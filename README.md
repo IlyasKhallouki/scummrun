@@ -1,7 +1,7 @@
-# fast-mi
+# scummrun
 
-An automated speedrunner for *The Secret of Monkey Island* (SCUMM v5), running on a patched
-ScummVM.
+An automated speedrunner for ScummVM games, starting with *The Secret of Monkey Island*
+(SCUMM v5). It plays on a patched ScummVM.
 
 [![The bot's Any% run, DOS CD, 21:01.483](https://img.youtube.com/vi/lHQrHf5b_5o/maxresdefault.jpg)](https://youtu.be/lHQrHf5b_5o)
 

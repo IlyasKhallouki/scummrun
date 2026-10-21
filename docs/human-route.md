@@ -133,7 +133,7 @@ neither is restricted. Every guide and every top run uses both:
 
 ### 2.3 Tricks in Part I and whether they change the trial action list
 
-| Trick | Where | Changes the treasure/idol action list? | Against fast-mi `rules/glitchless.md` |
+| Trick | Where | Changes the treasure/idol action list? | Against scummrun `rules/glitchless.md` |
 |---|---|---|---|
 | Logo "speed glitch": Esc at the first sparkle of the Lucasfilm logo makes walking and animations faster for the whole run (G19, F-SPEED). G19 calls it "probably just a quirk". | Boot | No (timing only) | A timing exploit of engine behaviour, so it falls under banned item 2. It cannot be expressed as a sentence anyway. |
 | Early door entry: entering "at the beginning of the door opening animation" (G19) | All doors | No | Pixel/timing input, so it is never modelled (banned item 4). |
@@ -166,7 +166,7 @@ differences that matter elsewhere:
 - The Special Edition is slower and has a separate board. In SE, Carla never
   uses one insult (G-SW).
 - EGA allows a map-teleport trick on Hook Isle (F-EGA, crew only).
-- fast-mi uses the Mac v5 VGA release. No human runs on Mac were found.
+- scummrun uses the Mac v5 VGA release. No human runs on Mac were found.
 
 ## 3. Route
 
@@ -593,7 +593,7 @@ The human route as run in the IL, without Credit Early, totals:
    (step 67). The trial flag may be set at pickup, at the climb out, or on
    returning to the Dock. This matters for a goal condition.
 9. **Version.** Human evidence is DOS VGA floppy (IL), DOS CD (WR, G19) and EGA
-   (HYP, comment only). fast-mi uses Mac v5 VGA. No differences in the Part I
+   (HYP, comment only). scummrun uses Mac v5 VGA. No differences in the Part I
    trial steps were seen between floppy and CD. Mac was not checked. The IL
    floppy inventory shows extra mansion items (staple remover, Manual of
    Style, wax lips); I did not check whether CD gives the same.

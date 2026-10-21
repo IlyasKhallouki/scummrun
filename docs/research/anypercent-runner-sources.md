@@ -22,7 +22,7 @@ Two caveats on the evidence:
 2. **Measured from video, the CD record beats saruya's best EGA run (22:59, a week earlier) by 68 s.** Almost all of it comes from Part III before the catacombs (86 s, CD faster). CD loses about 22 s in the Part I crew phase setting up the slide (§4.2) (D, my frame measurements).
 3. **In ScummVM 2026.3.0 the DOS floppy releases (SCUMM v4) run 1.39% slower than DOS CD (v5).** v4 uses 59.17 jiffies/s and DOS CD v5 uses 60.00 (Local, `engines/scumm/scumm.cpp`). On a 23-minute run this is at most about 19 s. Mac, FM-Towns, Sega CD, Amiga and Atari ST all run at exactly 60.00 (Local).
 4. **The best floppy times are EGA, not VGA, but EGA against VGA is unresolved.** saruya's 2026 floppy runs use an "(EGA)" split file, and hyperformance's 24:23 is EGA ("EGA is still king"). Both floppy releases are v4, run at 59.17 jiffies/s and have snap scroll (§4.3). Each has one documented trick of its own: EGA has the Hook Isle map teleport, which needs ScummVM's minor bug fixes turned off; VGA has a crack position that improves the beach teleport. No source measures one against the other (§4.4). The VGA-floppy runs at places 3, 5 and 6 predate the item-slide route.
-5. **Text speed conflicts with fast-mi's pin.** LeoLitz says slow text is close to required for the full CD item-slide chain, because the slides ride on long "reading" animations [YT-SLIDE, D]. mike's MI2 TAS used `talkspeed=0` [RENTRY-MI2, D]. fast-mi pins the maximum talk speed (`docs/comparison.md` §2.2). The record's input overlay shows no `-`/`+` (text speed) presses during the run, so its text speed was fixed beforehand, at an unknown value (D, my scan of [V-WR]).
+5. **Text speed conflicts with scummrun's pin.** LeoLitz says slow text is close to required for the full CD item-slide chain, because the slides ride on long "reading" animations [YT-SLIDE, D]. mike's MI2 TAS used `talkspeed=0` [RENTRY-MI2, D]. scummrun pins the maximum talk speed (`docs/comparison.md` §2.2). The record's input overlay shows no `-`/`+` (text speed) presses during the run, so its text speed was fixed beforehand, at an unknown value (D, my scan of [V-WR]).
 6. **The RNG is reproducible for a bot.** A fixed `random_seed` plus a fixed number of RNG calls gives a fixed safe combination, fixed catacombs and fixed insult fights. Humans save and reload through the ScummVM launcher to reseed (Local; [G-CATA, D]). The RNG stream also depends on the music device and the game version (§7). Human seeds such as 2756848129 will not transfer to our setup unless every condition matches.
 7. **No MI1 TAS exists that I could find.** That includes the one mike mentioned in July 2025 (§6).
 
@@ -373,7 +373,7 @@ The guide was written 2026-08-09 [G-MONKEY-FL, D]:
 - **Theory (LeoLitz, 2025).** Guybrush's speed is fractional, so steps alternate long and short. When walking left or up the first step is long, so restarting the walk repeatedly helps. "maybe TAS could find some weird dances that are faster for certain walks" [F-CONV, D].
 - **Other descriptions.** thewoofs: "rapidly entering in LMB or Enter inputs while traveling left or up on certain screens ... to force Guybrush to take 'bigger steps'". It "greatly varies in success screen to screen". mike's original write-up is in Discord, which I could not access [F-CONV, D].
 - **Saving.** Not quantified. Versions: both.
-- **Inference.** This is an engine-level effect of how a fresh walk starts its step sequence. A bot can exploit it with walk-target re-issues, but it needs measurement in `actor.cpp`'s walk code. It would need a rules decision under fast-mi's own rules.
+- **Inference.** This is an engine-level effect of how a fresh walk starts its step sequence. A bot can exploit it with walk-target re-issues, but it needs measurement in `actor.cpp`'s walk code. It would need a rules decision under scummrun's own rules.
 
 ### 3.8 Catacombs RNG manipulation
 
@@ -528,11 +528,11 @@ These PIT rates were added in "SCUMM: Implement accurate PIT timings for DOS ver
 - **Sega CD.** v5, 60.000 Hz, `MDT_NONE` music in the detection table (CD audio). Listed as a platform since 2024 [F-PORT, D]. No runs.
 - **Amiga.** v4 at 60.000 Hz in ScummVM (Local). The original Amiga version has unskippable dialogue (MilkToast, WinUAE) [F-CD, D]. In ScummVM, Amiga MI1 has, by inference, the floppy interface, snap scroll and the 60 Hz timer. Untested; no ScummVM Amiga runs exist.
 - **Atari ST.** EGA variant ("No AdLib", PC speaker or PCjr music only), v4 at 60.000 Hz (Local). No MT-32 branch is possible. No runs.
-- **Mac (fast-mi's current version).** v5, 60.000 Hz, Mac sound (`VAR_SOUNDCARD = 0xFFFF`). Not a listed platform. Whether the CD item slides reproduce on Mac was not checked.
+- **Mac (scummrun's current version).** v5, 60.000 Hz, Mac sound (`VAR_SOUNDCARD = 0xFFFF`). Not a listed platform. Whether the CD item slides reproduce on Mac was not checked.
 - **Special Edition.** A separate board, and slower even in classic mode [F-SE-PAGE, D].
 - **Load times.** MilkToast wrote in 2018, in an Amiga context, that the "CD-Version runs and loads a bit faster" [F-CD, D]. No source documents a load-time difference between versions under ScummVM (not found). Inference: ScummVM loads rooms from disk images without the original's disk access, so load time is unlikely to separate versions there.
 
-### 4.5 Verdict for fast-mi
+### 4.5 Verdict for scummrun
 
 - **Facts.** The record route depends on CD-documented item slides. The CD record is 68 s ahead of the same runner's best EGA run. The DOS VGA floppy we hold is a v4 release at 59.17 Hz, like EGA.
 - **Inference.** For a human-comparable route, DOS CD beats both floppy releases. EGA against VGA is unresolved: top runners preferred EGA, but no measurement exists, and the Hook Isle teleport was not seen in the EGA 22:59 (the frame at its Chicken split shows Guybrush on the cable post). The CD gain is engine time (slide states, 1.39% timer), so it applies to a bot too. The floppy-only engine advantages (snap scroll, the MT-32 fanfare branch, EGA's Hook Isle teleport, VGA's crack spot) are small next to the 86 s Part III gain.
@@ -550,7 +550,7 @@ These PIT rates were added in "SCUMM: Implement accurate PIT timings for DOS ver
   - AdLib runs an extra `getRandomNr(4)` loop in the kitchen, which changes the RNG stream.
   - Several scripts wait in `isSoundRunning` loops: the crate fanfare, the Part I card in `room-096-part1/local-200`, the mansion foyer `local-208` (Local).
 - **Inference on the ban.** "No Music" sets `VAR_SOUNDCARD = 0` and takes the PC-speaker branches. It may also end sound waits early depending on what `isSoundRunning` returns without a real music driver. I did not determine which. Either way it would change timings and fairness, which plausibly explains the ban.
-- **For fast-mi.** The music device is a route parameter: it changes both wait lengths and the RNG.
+- **For scummrun.** The music device is a route parameter: it changes both wait lengths and the RNG.
 
 ### 5.2 Text speed, subtitles and fast mode
 
@@ -572,7 +572,7 @@ No MI1 run comment states its enhancement setting (not found). mike's MI2 TAS us
 - **What they changed: not found.** Neither build was obtained.
 - **Inference.** ScummVM 2.1.0's `waitForTimer` sleeps in 10 ms polls and does not compensate for overshoot or screen-update time [GH-210, D]. That loses a few milliseconds per 83 ms frame, which fits about 2 minutes over a 28-minute run. Upstream fixed it in 2022: compensated waits (`_lastWaitTime`), quarter-frame precision (9fc868c7ed) and PIT rates (95894ae9fe), all in 2.6.0 [GH-PIT, D]. The 2.8+ requirement postdates these.
 - **Update in 2024.** LeoLitz: with "a different version of ScummVM" the quicksave prompt no longer needs clearing [YT-LEO-SAVES, D].
-- **Version note.** A v2026.4.0 tag exists [GH-TAGS, D]. The record and fast-mi use 2026.3.0.
+- **Version note.** A v2026.4.0 tag exists [GH-TAGS, D]. The record and scummrun use 2026.3.0.
 
 ### 5.5 Keybinds and ScummVM features in use
 
@@ -612,14 +612,14 @@ Other ScummVM features runners use:
 - **"Weird dances".** LeoLitz in 2025: "maybe TAS could find some weird dances that are faster for certain walks" [F-CONV, D]. Nobody has followed this up publicly.
 - **saruya's MI2 "jiffyspeed".** Videos titled "Getting jiffyspeed in Monkey Island 2" and "Keeping jiffyspeed in Monkey Island 2: the invitation skip" (2026-07-25) [PT-SARUYA-LIST, D, titles only; not watched]. Inference: probably an MI2 analogue of the logo glitch (a changed `VAR_TIMER_NEXT`).
 
-Inference for "at least as fast as any possible TAS": what a TAS can do and a human cannot is mostly three things. Frame-exact buffering in the six-frame input windows. Walk-step optimisation (shmoovement and the "dances"). RNG chosen by timing instead of by reloads. All three need the bot to act at engine-frame granularity, which fast-mi's bridge already does.
+Inference for "at least as fast as any possible TAS": what a TAS can do and a human cannot is mostly three things. Frame-exact buffering in the six-frame input windows. Walk-step optimisation (shmoovement and the "dances"). RNG chosen by timing instead of by reloads. All three need the bot to act at engine-frame granularity, which scummrun's bridge already does.
 
 ## 7. RNG and determinism notes for a bot
 
 - **Seeding.** `Common::RandomSource` takes its seed from the `random_seed` config key when set (`common/random.cpp`). Returning to the launcher re-creates the engine and reseeds. That is why runners quit to the launcher before loading [G-CATA, D] (Local).
 - **No per-frame RNG call.** The 2022 main loop had one (`_rnd.getRandomNumber(2)` in `ScummEngine::go()`, visible in the 9fc868c7ed diff) [GH-PIT, D]. It is gone in 2026.3.0, which has no `_rnd` call in `scumm.cpp` (Local). The RNG advances only through script `getRandomNr` calls and engine calls such as actor talk animation (`actor.cpp:2631`), object state and some graphics effects (Local). The frame of a save matters only because background scripts (pirates, Fester, sounds) draw numbers while time passes.
 - **Device and version dependence.** The kitchen's AdLib-only RNG loop is one example (Local). Seeds are version-specific [SRC-RUN-SARUYA, D].
-- **CD nondeterminism.** saruya reports two RNG calls that "aren't always consistent" on CD, and a variable 0 to 2 Fester RNG calls [G-CATA, D]. He also wonders whether the item slide makes the catacombs RNG inconsistent [SRC-RUN-SARUYA, D]. Inference: CD audio timing (`VAR_MUSIC_TIMER` comes from CD playback in `sound.cpp` `updateMusicTimer`) is a plausible source. fast-mi would need to control or stub the audio timing to make CD runs repeatable.
+- **CD nondeterminism.** saruya reports two RNG calls that "aren't always consistent" on CD, and a variable 0 to 2 Fester RNG calls [G-CATA, D]. He also wonders whether the item slide makes the catacombs RNG inconsistent [SRC-RUN-SARUYA, D]. Inference: CD audio timing (`VAR_MUSIC_TIMER` comes from CD playback in `sound.cpp` `updateMusicTimer`) is a plausible source. scummrun would need to control or stub the audio timing to make CD runs repeatable.
 - **Original record/playback.** ScummVM 2026.3.0 has a Shift+F10 "Enter playback file name" prompt for DOS MI1, MI2 and Indy4 (`engines/scumm/input.cpp`, `canOpenPlaybackPrompt`) (Local). Not investigated. Inference: it may support the original interpreter's demo-recording format, which the MI1 demo's F9/F10 record/play feature hints at [F-DEMO, D].
 
 ## 8. Corrections to earlier project documents
