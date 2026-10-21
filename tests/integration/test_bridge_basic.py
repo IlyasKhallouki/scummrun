@@ -12,7 +12,7 @@ import pytest
 from speedrun import engine
 from speedrun.engine import EngineConfig, build_argv, build_env, run_engine, write_ini
 
-BRIDGE_VERSION = "speedrun-bridge v2"
+BRIDGE_VERSION = "speedrun-bridge v3"
 END_FINGERPRINT = ("room", "audio_frames", "music_timer", "vars_fnv1a")
 
 
@@ -70,7 +70,7 @@ def test_bridge_boots_and_stops_at_max_ticks(engine_ready, tmp_path, home_scummv
     # The pump drives the Mac player: its VBL callback advances the music timer.
     assert end["audio_frames"] > 0
     assert end["music_timer"] > 0
-    assert [r["type"] for r in records] == ["boot", "end"], records
+    assert [r["type"] for r in records if r["type"] != "room"] == ["boot", "end"], records
 
     assert result.returncode == 0, log[-4000:]
     assert "ERROR:" not in log, log[-4000:]

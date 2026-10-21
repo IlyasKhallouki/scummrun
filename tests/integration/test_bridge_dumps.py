@@ -180,7 +180,7 @@ def test_goal_all_condition_kinds(engine_ready, tmp_path, home_scummvm_guard):
 @pytest.mark.integration
 def test_dump_not_reached_is_an_error(engine_ready, tmp_path, home_scummvm_guard):
     cfg = EngineConfig(out_dir=tmp_path / "run", dump_objects=True, max_ticks=600, timeout_s=TIMEOUT_S)
-    records = _run(cfg)
+    records = [r for r in _run(cfg) if r["type"] != "room"]  # room changes are logged from boot on
     assert [r["type"] for r in records] == ["boot", "error", "end"], records
     assert records[1]["code"] == "dump_not_reached"
     assert records[2]["reason"] == "error" and records[2]["tick"] >= 600

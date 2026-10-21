@@ -65,6 +65,17 @@ def stock_engine(game_ready) -> Path:
 
 
 @pytest.fixture(scope="session")
+def dos_vga_ready() -> Path:
+    """The DOS VGA floppy data directory (000.LFL + DISK01-04.LEC under game/)."""
+    from speedrun import releases
+
+    try:
+        return releases.game_dir(releases.get("dos-vga"))
+    except releases.ReleaseError as e:
+        pytest.skip(f"DOS VGA GAME DATA MISSING: {e} (integration test skipped)")
+
+
+@pytest.fixture(scope="session")
 def engine_ready(game_ready) -> Path:
     """The ScummVM binary, which must carry the speedrun bridge patch."""
     if not paths.SCUMMVM_BIN.exists():

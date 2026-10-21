@@ -35,9 +35,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from speedrun import paths
+from speedrun import paths, releases
 
-TARGET = "monkey-mac"
+TARGET = releases.RELEASES["mac"].target  # the default release's ScummVM target
 
 # After SIGTERM, how long ScummVM gets to quit cleanly (the bridge then writes
 # its end record) before SIGKILL.
@@ -86,6 +86,9 @@ def bridge_version(binary: Path | None = None) -> str | None:
 class EngineConfig:
     out_dir: Path
     game_path: Path = paths.CLASSIC_DIR
+    # Which MI1 release game_path holds (speedrun.releases): picks the ScummVM target,
+    # platform and timer rate. The default keeps every glitchless Mac run as it was.
+    release: str = releases.DEFAULT_RELEASE
     headless: bool = True
     fast: bool = True
     # SPEEDRUN_FAST_BOOT (C1): no real-time waiting until the segment start, then `fast`
@@ -109,6 +112,18 @@ class EngineConfig:
     interrupts: list[dict] = field(default_factory=list)
     # Diagnostic: state-step-NNN.json (C7) at every step_end (the skip-safety harness).
     step_states: bool = False
+    # Any% controls (bridge v3, C1/C8). raw_inputs: a JSONL schedule of keys, clicks and
+    # mouse moves on exact frames (SPEEDRUN_INPUTS). timer_next: the var 19 value required
+    # while the player has control, or "any" (SPEEDRUN_TIMER_NEXT; 6 under the glitchless
+    # rules). start_frame: start the segment at that frame's decision point, e.g. the logo
+    # skip that starts Any% timing (SPEEDRUN_START_FRAME). frame_log: frames.jsonl.
+    raw_inputs: Path | None = None
+    timer_next: int | str = 6
+    start_frame: int | None = None
+    frame_log: bool = False
+    # Extra `key=value` pairs for the game's ini section (e.g. music_driver); they
+    # override the pinned defaults, so a measurement must record them.
+    game_settings: dict[str, str] = field(default_factory=dict)
     timeout_s: float = 600.0
     extra_args: list[str] = field(default_factory=list)
 
@@ -149,6 +164,25 @@ def _xdg_cache_dir(cfg: EngineConfig) -> Path:
 
 def _ini_text(cfg: EngineConfig) -> str:
     # ScummVM's ConfigFile parser wants `key=value` with no spaces around `=`.
+    release = releases.get(cfg.release)
+    game = [
+        ("gameid", release.gameid),
+        ("engineid", "scumm"),
+        ("path", str(Path(cfg.game_path).resolve())),
+        ("platform", release.platform),
+        ("language", "en"),
+        ("copy_protection", "false"),
+        ("autosave_period", "0"),
+        # MI1's boot forces subtitles on anyway (global/script-001.txt [0005] writes
+        # VAR_NOSUBTITLES = 0, which writeVar stores in ConfMan); pinned for clarity.
+        ("subtitles", "true"),
+        ("original_gui", "false"),
+        ("enhancements", "0"),
+        # Sets VAR_CHARINC (var 37), the per-character text delay: 0 at TALKSPEED.
+        ("talkspeed", str(TALKSPEED)),
+    ]
+    overrides = dict(cfg.game_settings)
+    game = [(k, overrides.pop(k, v)) for k, v in game] + sorted(overrides.items())
     sections = {
         "scummvm": [
             ("savepath", str(saves_dir())),
@@ -161,22 +195,7 @@ def _ini_text(cfg: EngineConfig) -> str:
             ("extrapath", str(paths.ROOT / "third_party" / "scummvm" / "dists" / "engine-data")),
             ("themepath", str(paths.ROOT / "third_party" / "scummvm" / "gui" / "themes")),
         ],
-        TARGET: [
-            ("gameid", "monkey"),
-            ("engineid", "scumm"),
-            ("path", str(Path(cfg.game_path).resolve())),
-            ("platform", "macintosh"),
-            ("language", "en"),
-            ("copy_protection", "false"),
-            ("autosave_period", "0"),
-            # MI1's boot forces subtitles on anyway (global/script-001.txt [0005] writes
-            # VAR_NOSUBTITLES = 0, which writeVar stores in ConfMan); pinned for clarity.
-            ("subtitles", "true"),
-            ("original_gui", "false"),
-            ("enhancements", "0"),
-            # Sets VAR_CHARINC (var 37), the per-character text delay: 0 at TALKSPEED.
-            ("talkspeed", str(TALKSPEED)),
-        ],
+        release.target: game,
     }
     blocks = []
     for name, items in sections.items():
@@ -207,7 +226,7 @@ def build_argv(cfg: EngineConfig) -> list[str]:
         "--disable-sdl-audio",
         f"--random-seed={cfg.seed}",
         *cfg.extra_args,
-        TARGET,
+        releases.get(cfg.release).target,
     ]
 
 
@@ -242,6 +261,14 @@ def build_env(cfg: EngineConfig, base_env: Mapping[str, str] | None = None) -> d
         env["SPEEDRUN_INTERRUPTS"] = json.dumps([{k: i[k] for k in keep} for i in cfg.interrupts])
     if cfg.step_states:
         env["SPEEDRUN_STEP_STATES"] = "1"
+    if cfg.raw_inputs is not None:
+        env["SPEEDRUN_INPUTS"] = str(Path(cfg.raw_inputs).resolve())
+    if cfg.timer_next != 6:
+        env["SPEEDRUN_TIMER_NEXT"] = str(cfg.timer_next)
+    if cfg.start_frame is not None:
+        env["SPEEDRUN_START_FRAME"] = str(cfg.start_frame)
+    if cfg.frame_log:
+        env["SPEEDRUN_FRAME_LOG"] = "1"
 
     # Keep ScummVM's unconditional data/cache dirs out of $HOME (see module doc).
     env["XDG_DATA_HOME"] = str(_xdg_data_dir(cfg))

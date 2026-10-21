@@ -39,7 +39,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from speedrun import extract, gamedata, measure, paths, pddl_diff
+from speedrun import extract, gamedata, measure, paths, pddl_diff, probe, releases
 from speedrun.citations import check_fragments, filter_fragments, parse_fragment
 from speedrun.compiler import CompileError, ObjectIndex, compile_plan, load_steps, write_jsonl
 from speedrun.costing import CostingError, CostTable, write_timed
@@ -157,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="ScummVM random seed (default 1)")  # fmt: skip
         p.add_argument("--max-ticks", type=_positive_int, metavar="N", help="engine tick cap, counted from boot")
         p.add_argument("--replan", action="store_true", help="re-run the planner and recompile first")
+        p.add_argument("--release", choices=sorted(releases.RELEASES), default=releases.DEFAULT_RELEASE,
+                       help=f"game release (default {releases.DEFAULT_RELEASE}); the plan's object ids must exist in it")
         p.add_argument(
             "--boot-param", type=int, metavar="N",
             help="pass ScummVM --boot-param=N (forces debug mode: the run is NOT a valid measured run)",
@@ -171,6 +173,19 @@ def build_parser() -> argparse.ArgumentParser:
                 help="fast-forward the boot (logo, credits, opening) to the segment start, then play in "
                      "real time; ticks are unaffected (default: on)",
             )  # fmt: skip
+
+    p = sub.add_parser("probe", help="replay a raw input movie (Any%%) on a release and show where the time goes")
+    p.add_argument("inputs", type=Path, nargs="?", help="raw input schedule, JSONL (bridge contract C8)")
+    p.add_argument("--release", choices=sorted(releases.RELEASES), default="dos-vga", help="game release (default dos-vga)")
+    p.add_argument("--seed", type=_non_negative_int, default=1, metavar="N", help="ScummVM random seed (default 1)")
+    p.add_argument("--max-ticks", type=_positive_int, default=20000, metavar="N", help="tick cap from boot (default 20000)")
+    p.add_argument("--start-frame", type=_positive_int, metavar="N",
+                   help="segment start frame (default: the first esc input, i.e. the logo skip)")
+    p.add_argument("--goal", metavar="JSON", help="C3 goal conditions, e.g. '[{\"room\": 28}]'")
+    p.add_argument("--no-skips", action="store_true", help="no automatic text and cutscene skips")
+    p.add_argument("--frame-log", action="store_true", help="also write frames.jsonl")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="extra ScummVM game setting, e.g. music_driver=adlib (repeatable)")
 
     p = sub.add_parser("measure", help="replay a plan headless on many seeds and report per-action ticks")
     p.add_argument("segment", help="segment name, e.g. part1")
@@ -706,6 +721,7 @@ def run_segment(name: str, mode: str, args: argparse.Namespace) -> int:
     objective, jsonl = select_plan(name, seg, getattr(args, "objective", None), args.replan)
 
     run_dir = _new_run_dir(mode)
+    release = releases.get(getattr(args, "release", releases.DEFAULT_RELEASE))
     config = {
         "out_dir": run_dir,
         "plan": jsonl,
@@ -719,6 +735,11 @@ def run_segment(name: str, mode: str, args: argparse.Namespace) -> int:
         "fast_boot": getattr(args, "fast_boot", False),  # demo only
         "timeout_s": RUN_TIMEOUT_S[mode],
     }
+    if release.name != releases.DEFAULT_RELEASE:  # the default is EngineConfig's own
+        try:
+            config.update(release=release.name, game_path=releases.game_dir(release))
+        except releases.ReleaseError as e:
+            raise CommandError(str(e)) from e
     if seg.interrupts:
         config["interrupts"] = seg.interrupts
     if seg.inventory is not None:
@@ -729,7 +750,7 @@ def run_segment(name: str, mode: str, args: argparse.Namespace) -> int:
                 "EngineConfig has no 'inventory' field, so SPEEDRUN_INVENTORY is not set:",
                 "plan steps that click inventory slots will fail with click_target_missing.",
             )
-    print(f"{mode} {name}: seed {args.seed}, objective {objective}, plan {jsonl}, run dir {run_dir}")
+    print(f"{mode} {name}: release {release.name}, seed {args.seed}, objective {objective}, plan {jsonl}, run dir {run_dir}")
     _launch(EngineConfig(**config))
 
     trace = _load_run_trace(run_dir)
@@ -1048,8 +1069,39 @@ def _cmd_pddl_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_probe(args: argparse.Namespace) -> int:
+    rel = releases.get(args.release)
+    try:
+        game = releases.game_dir(rel)
+    except releases.ReleaseError as e:
+        raise CommandError(str(e)) from e
+    start = args.start_frame
+    if start is None and args.inputs:
+        firsts = [json.loads(line) for line in args.inputs.read_text().splitlines() if line.strip()]
+        start = next((e["frame"] for e in firsts if e.get("key") == "esc"), None)
+    settings = {}
+    for item in args.set:
+        key, sep, value = item.partition("=")
+        if not sep or not key:
+            raise CommandError(f"--set {item!r}: expected KEY=VALUE")
+        settings[key] = value
+    goal = json.loads(args.goal) if args.goal else []
+    out = _new_run_dir("probe")
+    cfg = EngineConfig(
+        out_dir=out, game_path=game, release=rel.name, seed=args.seed, max_ticks=args.max_ticks,
+        raw_inputs=args.inputs, timer_next="any", start_frame=start, goal=goal,
+        skip_text=not args.no_skips, skip_cutscenes=not args.no_skips, frame_log=args.frame_log,
+        game_settings=settings,
+    )  # fmt: skip
+    res = probe.probe(cfg)
+    print(probe.report(res))
+    print(f"run dir: {out}")
+    return 0 if res.end.get("reason") in ("goal", "max_ticks") else 1
+
+
 COMMANDS = {
     "extract": _cmd_extract,
+    "probe": _cmd_probe,
     "dump-objects": _cmd_dump_objects,
     "plan": _cmd_plan,
     "compile": _cmd_compile,

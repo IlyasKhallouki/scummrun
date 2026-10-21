@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Decompile every script of The Secret of Monkey Island (Mac, SCUMM v5).
+# Decompile every script of The Secret of Monkey Island: the Mac release (SCUMM v5)
+# or the DOS VGA floppy (SCUMM v4), picked by the files in GAME_DIR.
 #
 #   build/scummtr/            ScummTR source (pinned commit), provides scummrp
 #   build/scummtr-build/      scummrp build (CMake, out of tree)
@@ -19,7 +20,22 @@ cd "$ROOT"
 
 MAKE_JOBS="${MAKE_JOBS:-4}"
 GAME_DIR="${GAME_DIR:-game/classic}"
-GAME_ID="monkeycdalt"            # scummrp id for MONKEY1.000 / MONKEY1.00x (SCUMM v5, XOR 0x69)
+# The layout picks the release: MONKEY1.000 is the Mac release (SCUMM v5), MONKEY.000 the
+# DOS CD release (SCUMM v5, same block format), 000.LFL plus
+# DISKnn.LEC is the DOS VGA floppy (SCUMM v4). OUT and the block dirs default per release.
+if [[ -f "$GAME_DIR/000.LFL" || -f "$GAME_DIR/000.lfl" ]]; then
+  RELEASE="dos-vga"
+  GAME_ID="monkey"               # scummrp id for 000.LFL / DISKnn.LEC (SCUMM v4)
+  INDEX_FILE="$(ls "$GAME_DIR"/000.[Ll][Ff][Ll] | head -1)"
+elif [[ -f "$GAME_DIR/MONKEY.000" ]]; then
+  RELEASE="dos-cd"
+  GAME_ID="monkeycd"             # scummrp id for MONKEY.000 / MONKEY.001 (SCUMM v5, XOR 0x69)
+  INDEX_FILE="$GAME_DIR/MONKEY.000"
+else
+  RELEASE="mac"
+  GAME_ID="monkeycdalt"          # scummrp id for MONKEY1.000 / MONKEY1.00x (SCUMM v5, XOR 0x69)
+  INDEX_FILE="$GAME_DIR/MONKEY1.000"
+fi
 
 SCUMMTR_URL="https://github.com/dwatteau/scummtr.git"
 SCUMMTR_REF="a50c6f4bf03566721b3f2c00df257a41a82e22ed"
@@ -31,15 +47,23 @@ TOOLS_SRC="third_party/scummvm-tools"
 TOOLS_BUILD="build/scummvm-tools"
 DESCUMM="$TOOLS_BUILD/descumm"
 
-BLOCKS="build/blocks"
-VERB_BLOCKS="build/verb-blocks"
-OUT="data/scripts"
+if [[ "$RELEASE" == "mac" ]]; then
+  BLOCKS="build/blocks"
+  VERB_BLOCKS="build/verb-blocks"
+  OUT="${OUT:-data/scripts}"
+else
+  BLOCKS="build/blocks-$RELEASE"
+  VERB_BLOCKS="build/verb-blocks-$RELEASE"
+  OUT="${OUT:-data/scripts-$RELEASE}"
+fi
 
 log() { printf '==> %s\n' "$*" >&2; }
 
-for f in MONKEY1.000 MONKEY1.001; do
-  [[ -f "$GAME_DIR/$f" ]] || { echo "missing $GAME_DIR/$f" >&2; exit 1; }
-done
+if [[ "$RELEASE" == "mac" ]]; then
+  for f in MONKEY1.000 MONKEY1.001; do
+    [[ -f "$GAME_DIR/$f" ]] || { echo "missing $GAME_DIR/$f" >&2; exit 1; }
+  done
+fi
 
 # ---- scummrp (ScummTR) ------------------------------------------------------
 if [[ ! -d "$SCUMMTR_SRC/.git" ]]; then
@@ -97,8 +121,19 @@ EOF
 
 # ---- decompile + index ------------------------------------------------------------
 log "decompiling into $OUT"
+if [[ "$RELEASE" == "dos-vga" ]]; then
+  uv run --quiet --no-project --python 3.12 --script scripts/dump_scripts_v4.py \
+    --index-file "$INDEX_FILE" \
+    --blocks "$BLOCKS" \
+    --descumm "$DESCUMM" \
+    --out "$OUT" \
+    --jobs "$MAKE_JOBS" \
+    --tool-info "$TOOL_INFO"
+  log "done: $OUT/INDEX.md"
+  exit 0
+fi
 uv run --quiet --no-project --python 3.12 --script scripts/dump_scripts.py \
-  --index-file "$GAME_DIR/MONKEY1.000" \
+  --index-file "$INDEX_FILE" \
   --blocks "$BLOCKS" \
   --verb-dir "$VERB_BLOCKS" \
   --descumm "$DESCUMM" \

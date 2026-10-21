@@ -1,3 +1,68 @@
+diff --git a/audio/audiostream.cpp b/audio/audiostream.cpp
+index d75fb947..c52486b6 100644
+--- a/audio/audiostream.cpp
++++ b/audio/audiostream.cpp
+@@ -65,6 +65,8 @@ static const StreamFileFormat STREAM_FILEFORMATS[] = {
+ 	{ "WAV",          ".wav",  makeWAVStream },
+ };
+ 
++bool SeekableAudioStream::_loadStreamFilesInMemory = false;
++
+ SeekableAudioStream *SeekableAudioStream::openStreamFile(const Common::Path &basename) {
+ 	SeekableAudioStream *stream = nullptr;
+ 	Common::File *fileHandle = new Common::File();
+@@ -73,8 +75,13 @@ SeekableAudioStream *SeekableAudioStream::openStreamFile(const Common::Path &bas
+ 		Common::Path filename = basename.append(STREAM_FILEFORMATS[i].fileExtension);
+ 		fileHandle->open(filename);
+ 		if (fileHandle->isOpen()) {
++			Common::SeekableReadStream *source = fileHandle;
++			if (_loadStreamFilesInMemory) {
++				source = fileHandle->readStream((uint32)fileHandle->size());
++				delete fileHandle;
++			}
+ 			// Create the stream object
+-			stream = STREAM_FILEFORMATS[i].openStreamFile(fileHandle, DisposeAfterUse::YES);
++			stream = STREAM_FILEFORMATS[i].openStreamFile(source, DisposeAfterUse::YES);
+ 			fileHandle = nullptr;
+ 			break;
+ 		}
+diff --git a/audio/audiostream.h b/audio/audiostream.h
+index 7af56eda..3f6db87a 100644
+--- a/audio/audiostream.h
++++ b/audio/audiostream.h
+@@ -224,6 +224,13 @@ public:
+ 	 */
+ 	static SeekableAudioStream *openStreamFile(const Common::Path &basename);
+ 
++	/**
++	 * When true, openStreamFile() reads the whole file into memory and closes
++	 * it before decoding. The SCUMM speedrun bridge sets it: a process it
++	 * fork()s must not share an open file's read offset with its parent.
++	 */
++	static bool _loadStreamFilesInMemory;
++
+ 	/**
+ 	 * Seek to a given offset in the stream.
+ 	 *
+diff --git a/backends/mixer/null/null-mixer.cpp b/backends/mixer/null/null-mixer.cpp
+index 451ca3ea..2345ccfb 100644
+--- a/backends/mixer/null/null-mixer.cpp
++++ b/backends/mixer/null/null-mixer.cpp
+@@ -20,10 +20,14 @@
+  */
+ 
+ #include "backends/mixer/null/null-mixer.h"
++#include "common/config-manager.h"
+ #include "common/savefile.h"
+ 
+ NullMixerManager::NullMixerManager() : MixerManager() {
+ 	_outputRate = 22050;
++	// An explicit output_rate (never set by default) overrides the fixed rate.
++	if (ConfMan.hasKey("output_rate") && ConfMan.getInt("output_rate") > 0)
++		_outputRate = ConfMan.getInt("output_rate");
+ 	_callsCounter = 0;
+ 	_samples = 8192;
+ 	while (_samples * 16 > _outputRate * 2)
 diff --git a/engines/scumm/input.cpp b/engines/scumm/input.cpp
 index ecef09cf..a3302152 100644
 --- a/engines/scumm/input.cpp
@@ -19,16 +84,18 @@ index ecef09cf..a3302152 100644
  
  	_mouseAndKeyboardStat = 0;
 diff --git a/engines/scumm/module.mk b/engines/scumm/module.mk
-index 2cee05ab..a1352c86 100644
+index 2cee05ab..c7ba6c26 100644
 --- a/engines/scumm/module.mk
 +++ b/engines/scumm/module.mk
-@@ -97,6 +97,16 @@ MODULE_OBJS := \
+@@ -97,6 +97,18 @@ MODULE_OBJS := \
  	vars.o \
  	verbs.o
  
 +MODULE_OBJS += \
 +	speedrun/speedrun_bridge.o \
 +	speedrun/speedrun_conditions.o \
++	speedrun/speedrun_control.o \
++	speedrun/speedrun_inputs.o \
 +	speedrun/speedrun_interrupts.o \
 +	speedrun/speedrun_json.o \
 +	speedrun/speedrun_plan.o \
@@ -40,7 +107,7 @@ index 2cee05ab..a1352c86 100644
  MODULE_OBJS += \
  	debugger/debugtools.o \
 diff --git a/engines/scumm/scumm.cpp b/engines/scumm/scumm.cpp
-index f0bb1a53..8f127eaa 100644
+index f0bb1a53..9a19d373 100644
 --- a/engines/scumm/scumm.cpp
 +++ b/engines/scumm/scumm.cpp
 @@ -83,6 +83,7 @@
@@ -67,7 +134,19 @@ index f0bb1a53..8f127eaa 100644
  
  	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
  
-@@ -2738,6 +2741,7 @@ Common::Error ScummEngine::go() {
+@@ -1660,7 +1663,10 @@ void ScummEngine::setupScumm(const Common::Path &macResourceFile) {
+ 
+ 		// The Ultimate Talkie version of Monkey Island 1 provides an automatic
+ 		// fallback with MIDI music when CD tracks are not found.
+-		if (!existExtractedCDAudioFiles(track)
++		// The speedrun bridge never shows this modal warning (it would block a
++		// headless run); it records every CD track play and whether its file
++		// opened instead ("cd_track" trace records).
++		if (!_speedrun && !existExtractedCDAudioFiles(track)
+ 		    && !isDataAndCDAudioReadFromSameCD()
+ 			&& !(_game.id == GID_MONKEY && _game.features & GF_ULTIMATE_TALKIE)
+ 			&& !(_game.id == GID_MONKEY && _game.features & GF_DOUBLEFINE_PAK)) {
+@@ -2738,6 +2744,7 @@ Common::Error ScummEngine::go() {
  	}
  #endif
  
@@ -75,7 +154,11 @@ index f0bb1a53..8f127eaa 100644
  	setTotalPlayTime();
  
  	_lastWaitTime = _system->getMillis();
-@@ -2913,7 +2917,7 @@ void ScummEngine::waitForTimer(int quarterFrames, bool freezeMacGui) {
+@@ -2910,10 +2917,11 @@ Common::Error ScummEngine::go() {
+ }
+ 
+ void ScummEngine::waitForTimer(int quarterFrames, bool freezeMacGui) {
++	if (_speedrun) _speedrun->onWait(quarterFrames);
  	uint32 endTime, cur;
  	uint32 msecDelay = getIntegralTime(quarterFrames * (1000 / getTimerFrequency()));
  
@@ -84,7 +167,7 @@ index f0bb1a53..8f127eaa 100644
  		msecDelay = 0;
  	else if (_fastMode & 1)
  		msecDelay = 10;
-@@ -3097,6 +3101,7 @@ void ScummEngine_v0::scummLoop(int delta) {
+@@ -3097,6 +3105,7 @@ void ScummEngine_v0::scummLoop(int delta) {
  }
  
  void ScummEngine::scummLoop(int delta) {
@@ -92,7 +175,7 @@ index f0bb1a53..8f127eaa 100644
  	// Notify the script about how much time has passed, in jiffies
  	if (VAR_TIMER != 0xFF)
  		VAR(VAR_TIMER) = delta;
-@@ -3242,6 +3247,7 @@ load_game:
+@@ -3242,6 +3251,7 @@ load_game:
  		} while (_saveLoadFlag != 0);
  	}
  
@@ -128,12 +211,138 @@ index ae7b4bb7..816bf55d 100644
  	bool _useMacGraphicsSmoothing = true;
  	byte _completeScreenBuffer[320 * 200];
  
+diff --git a/engines/scumm/sound.cpp b/engines/scumm/sound.cpp
+index bfb33823..fb0ed0f3 100644
+--- a/engines/scumm/sound.cpp
++++ b/engines/scumm/sound.cpp
+@@ -1233,10 +1233,23 @@ static void speechTimerHandler(void *refCon) {
+ }
+ 
+ void Sound::startSpeechTimer() {
++	if (_vm->_speedrun) {
++		_speechTimerByTicks = true; // advanceTimers(), from the bridge: no timer thread
++		return;
++	}
+ 	_vm->getTimerManager()->installTimerProc(&speechTimerHandler, 1000000 / _vm->getTimerFrequency(), this, "scummSpeechTimer");
+ }
+ 
++void Sound::advanceTimers(int quarterFrames) {
++	if (_speechTimerByTicks) {
++		for (int i = 0; i < quarterFrames; i++)
++			speechTimerHandler(this);
++	}
++	_soundCD->advanceCDTimer(quarterFrames);
++}
++
+ void Sound::stopSpeechTimer() {
++	_speechTimerByTicks = false;
+ 	_vm->getTimerManager()->removeTimerProc(&speechTimerHandler);
+ }
+ 
+diff --git a/engines/scumm/sound.h b/engines/scumm/sound.h
+index 2b9b1e66..9e4a9ee5 100644
+--- a/engines/scumm/sound.h
++++ b/engines/scumm/sound.h
+@@ -113,6 +113,7 @@ public:
+ 	byte _digiSndMode;
+ 	uint _lastSound;
+ 	uint32 _speechTimerMod;
++	bool _speechTimerByTicks = false; // the speedrun bridge drives it (advanceTimers())
+ 
+ 	MidiDriverFlags _musicType;
+ 
+@@ -144,6 +145,8 @@ public:
+ 	void resetSpeechTimer();
+ 	void startSpeechTimer();
+ 	void stopSpeechTimer();
++	/** Speedrun bridge: advance the speech and CD timers by @p quarterFrames of game time. */
++	void advanceTimers(int quarterFrames);
+ 	bool speechIsPlaying(); // Used within MIDI iMUSE
+ 
+ 	void saveLoadWithSerializer(Common::Serializer &ser) override;
+diff --git a/engines/scumm/soundcd.cpp b/engines/scumm/soundcd.cpp
+index f01ec67f..b9334832 100644
+--- a/engines/scumm/soundcd.cpp
++++ b/engines/scumm/soundcd.cpp
+@@ -27,6 +27,7 @@
+ #include "scumm/music.h"
+ #include "scumm/scumm.h"
+ #include "scumm/soundcd.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ #include "scumm/soundse.h"
+ 
+ namespace Scumm {
+@@ -105,14 +106,32 @@ void SoundCD::startCDTimer() {
+ 	if (_vm->_game.id == GID_LOOM && (_hasFileBasedCDAudio || _vm->enhancementEnabled(kEnhMinorBugFixes)))
+ 		interval = 1000000 / LOOM_STEAM_CDDA_RATE;
+ 
++	// The speedrun bridge advances the timer from the engine's own waits
++	// (advanceCDTimer(), one call per waited quarter-frame) instead of a
++	// timer thread: game time, not wall time, and nothing on another thread.
++	if (_vm->_speedrun) {
++		_cdTimerByTicks = true;
++		return;
++	}
++
+ 	_vm->getTimerManager()->removeTimerProc(&cdTimerHandler);
+ 	_vm->getTimerManager()->installTimerProc(&cdTimerHandler, interval, this, "scummCDtimer");
+ }
+ 
++void SoundCD::advanceCDTimer(int quarterFrames) {
++	if (!_cdTimerByTicks)
++		return;
++	for (int i = 0; i < quarterFrames; i++) {
++		if ((_cdMusicTimerMod++ & 3) == 0)
++			_cdMusicTimer++;
++	}
++}
++
+ void SoundCD::stopCDTimer() {
+ 	if (_useReplacementAudioTracks)
+ 		return;
+ 
++	_cdTimerByTicks = false;
+ 	_vm->getTimerManager()->removeTimerProc(&cdTimerHandler);
+ }
+ 
+@@ -149,7 +168,9 @@ void SoundCD::playCDTrackInternal(int track, int numLoops, int startFrame, int d
+ 	_fileBasedCDStatus.duration = duration;
+ 
+ 	if (!_hasFileBasedCDAudio) {
+-		g_system->getAudioCDManager()->play(track, numLoops, startFrame, duration);
++		const bool playing = g_system->getAudioCDManager()->play(track, numLoops, startFrame, duration);
++		if (_vm->_speedrun)
++			_vm->_speedrun->onCDTrack(track, numLoops, startFrame, duration, playing);
+ 	} else {
+ 		// Stop any currently playing track
+ 		_mixer->stopHandle(*_fileBasedCDAudioHandle);
+diff --git a/engines/scumm/soundcd.h b/engines/scumm/soundcd.h
+index 6c161ccd..e62dc05f 100644
+--- a/engines/scumm/soundcd.h
++++ b/engines/scumm/soundcd.h
+@@ -50,6 +50,7 @@ private:
+ 	int _musicTimer = 0;
+ 
+ 	bool _useReplacementAudioTracks = false;
++	bool _cdTimerByTicks = false; // the speedrun bridge drives the CD timer (advanceCDTimer())
+ 	int _loomOvertureTransition = 0;
+ 	uint32 _replacementTrackStartTime = 0;
+ 
+@@ -74,6 +75,8 @@ public:
+ 
+ 	void startCDTimer();
+ 	void stopCDTimer();
++	/** Speedrun bridge: advance the CD music timer by @p quarterFrames, as cdTimerHandler() would. */
++	void advanceCDTimer(int quarterFrames);
+ 
+ 	int playCDTrackFromSoundID(int soundId);
+ 	void playCDTrack(int track, int numLoops, int startFrame, int duration);
 diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
 new file mode 100644
-index 00000000..b335d0fd
+index 00000000..ad7e69a2
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.cpp
-@@ -0,0 +1,606 @@
+@@ -0,0 +1,796 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -160,15 +369,22 @@ index 00000000..b335d0fd
 +
 +#include "common/config-manager.h"
 +#include "common/debug.h"
++#include "common/file.h"
++#include "common/fs.h"
 +#include "common/formats/json.h"
 +#include "common/path.h"
 +#include "common/textconsole.h"
 +#include "common/util.h"
++#include "common/system.h"
++#include "graphics/paletteman.h"
++#include "graphics/surface.h"
 +
++#include "audio/audiostream.h"
 +#include "audio/mixer_intern.h"
 +
 +#include "scumm/actor.h"
 +#include "scumm/scumm.h"
++#include "scumm/sound.h"
 +#include "scumm/speedrun/speedrun_bridge.h"
 +
 +namespace Scumm {
@@ -178,7 +394,7 @@ index 00000000..b335d0fd
 +// whenever a change can move run timing: measurements of different bridges
 +// are never pooled (speedrun.costing). v2: no plan action in a frame whose
 +// input an Esc or a click clear used up (C5 defer).
-+static const char kBridgeMarker[] = "speedrun-bridge v2";
++static const char kBridgeMarker[] = "speedrun-bridge v3";
 +
 +static const char kTraceName[] = "trace.jsonl";
 +
@@ -221,6 +437,9 @@ index 00000000..b335d0fd
 +
 +	SpeedrunBridge *bridge = new SpeedrunBridge(vm);
 +	bridge->_outDir = outDir;
++	// Audio files (CD tracks) are decoded from memory, so a fork()ed branch
++	// never shares an open file's read offset with its parent.
++	Audio::SeekableAudioStream::_loadStreamFilesInMemory = true;
 +	bridge->readEnv();
 +
 +	// Replace the engine's default error handler first: it attaches the GUI
@@ -231,6 +450,9 @@ index 00000000..b335d0fd
 +	const Common::Path tracePath = Common::Path(bridge->_outDir, Common::Path::kNativeSeparator).appendComponent(kTraceName);
 +	if (!bridge->_trace.open(tracePath))
 +		error("speedrun: cannot open trace file '%s'", tracePath.toString(Common::Path::kNativeSeparator).c_str());
++
++	if (bridge->_frameLog && !bridge->_frameFile.open(Common::Path(bridge->_outDir, Common::Path::kNativeSeparator).appendComponent("frames.jsonl")))
++		error("speedrun: cannot open frames.jsonl in '%s'", bridge->_outDir.c_str());
 +
 +	bridge->validateEnv();
 +
@@ -243,6 +465,20 @@ index 00000000..b335d0fd
 +		bridge->_pumpAudio = bridge->_audioRate > 0;
 +	}
 +
++	if (!bridge->_videoPrefix.empty()) {
++		const int info = captureOpen(bridge->_videoPrefix + ".txt");
++		if (info >= 0) {
++			const Common::String line = Common::String::format("video 320x200 rgb24 jiffies_per_second %f audio_rate %u frame_bytes %u\n",
++			    vm->getTimerFrequency() / 4.0, bridge->_audioRate, bridge->_audioFrameBytes);
++			captureWrite(info, line.c_str(), line.size());
++			captureClose(info);
++		}
++		bridge->_audioFd = captureOpen(bridge->_videoPrefix + ".pcm");
++		bridge->_videoFd = captureOpen(bridge->_videoPrefix + ".rgb"); // last: opening a FIFO waits for its reader
++		if (bridge->_videoFd < 0 || bridge->_audioFd < 0)
++			error("speedrun: cannot open the SPEEDRUN_VIDEO capture '%s'", bridge->_videoPrefix.c_str());
++	}
++
 +	debug(1, "speedrun: %s active, out='%s' fast=%d fast_boot=%d audio_pump=%d rate=%u max_ticks=%s",
 +	      kBridgeMarker, bridge->_outDir.c_str(), bridge->_skipWaits, bridge->_fastBoot, bridge->_pumpAudio, bridge->_audioRate,
 +	      bridge->_hasMaxTicks ? Common::String::format("%llu", (unsigned long long)bridge->_maxTicks).c_str() : "none");
@@ -252,6 +488,9 @@ index 00000000..b335d0fd
 +void SpeedrunBridge::readEnv() {
 +	// Booleans and integers are validated in validateEnv(), once the trace is
 +	// open and an invalid value can be reported there.
++	const char *video = envValue("SPEEDRUN_VIDEO");
++	if (video)
++		_videoPrefix = video;
 +	const char *fast = envValue("SPEEDRUN_FAST");
 +	if (fast && !Common::parseBool(fast, _skipWaits) && _envError.empty())
 +		_envError = Common::String::format("invalid SPEEDRUN_FAST '%s'", fast);
@@ -274,6 +513,7 @@ index 00000000..b335d0fd
 +		{"SPEEDRUN_SKIP_TEXT", &SpeedrunBridge::_skipText},
 +		{"SPEEDRUN_SKIP_CUTSCENES", &SpeedrunBridge::_skipCutscenes},
 +		{"SPEEDRUN_STEP_STATES", &SpeedrunBridge::_stepStates},
++		{"SPEEDRUN_FRAME_LOG", &SpeedrunBridge::_frameLog},
 +	};
 +	for (const auto &var : kBoolVars) {
 +		const char *value = envValue(var.name);
@@ -310,6 +550,36 @@ index 00000000..b335d0fd
 +	}
 +
 +	// Read and parsed in onBoot(), once object and variable counts are known.
++	const char *control = envValue("SPEEDRUN_CONTROL");
++	_controlPath = control ? control : "";
++
++	const char *timerNext = envValue("SPEEDRUN_TIMER_NEXT");
++	if (timerNext) {
++		uint64 value = 0;
++		if (!strcmp(timerNext, "any"))
++			_timerNextExpected = -1;
++		else if (parseUint64(timerNext, value) && value < 256)
++			_timerNextExpected = (int32)value;
++		else if (_envError.empty())
++			_envError = Common::String::format("invalid SPEEDRUN_TIMER_NEXT '%s': expected a number or \"any\"", timerNext);
++	}
++
++	const char *startFrame = envValue("SPEEDRUN_START_FRAME");
++	if (startFrame && (!parseUint64(startFrame, _startFrame) || _startFrame == 0) && _envError.empty())
++		_envError = Common::String::format("invalid SPEEDRUN_START_FRAME '%s'", startFrame);
++
++	const char *inputs = envValue("SPEEDRUN_INPUTS");
++	if (inputs) {
++		Common::File f;
++		Common::String error;
++		if (!f.open(Common::FSNode(Common::Path(inputs, Common::Path::kNativeSeparator)))) {
++			if (_envError.empty())
++				_envError = Common::String::format("cannot open SPEEDRUN_INPUTS '%s'", inputs);
++		} else if (!parseSpeedrunInputs(f.readString(0, f.size()), _inputs, error) && _envError.empty()) {
++			_envError = Common::String::format("invalid SPEEDRUN_INPUTS '%s': %s", inputs, error.c_str());
++		}
++	}
++
 +	const char *plan = envValue("SPEEDRUN_PLAN");
 +	_planPath = plan ? plan : "";
 +	_hasPlan = plan != nullptr;
@@ -348,6 +618,9 @@ index 00000000..b335d0fd
 +	// handler, and a headless run must never get a message box or debugger.
 +	if (g_speedrunBridge == this)
 +		g_speedrunBridge = nullptr;
++	captureClose(_videoFd);
++	captureClose(_audioFd);
++	delete[] _videoRgb;
 +}
 +
 +#pragma mark - Hooks
@@ -371,7 +644,18 @@ index 00000000..b335d0fd
 +	   .add("variant", _vm->_game.variant)
 +	   .add("fast", _skipWaits)
 +	   .add("fast_boot", _fastBoot)
-+	   .add("audio_pump", _pumpAudio);
++	   .add("audio_pump", _pumpAudio)
++	   .add("version", (int)_vm->_game.version)
++	   .add("platform", Common::getPlatformCode(_vm->_game.platform))
++	   // Quarter-frames per second: a jiffy (one tick) lasts 4 / timer_hz s
++	   // (scumm.cpp setTimerAndShakeFrequency(); DOS v4 1193182/5041, v5 and Mac ~240).
++	   .addRaw("timer_hz", Common::String::format("%.9f", _vm->getTimerFrequency()))
++	   .add("timer_next_expected", (int)_timerNextExpected)
++	   .add("raw_inputs", (uint)_inputs.size())
++	   // The MidiDriverFlags bit setupMusic() chose (scumm.cpp): 0 none, 1 PC
++	   // speaker, 2 PCjr, 4 CMS, 8 AdLib, 16 MIDI; sound waits depend on it.
++	   .add("music_type", (int)_vm->_sound->_musicType)
++	   .add("music_driver", ConfMan.hasKey("music_driver") ? ConfMan.get("music_driver") : Common::String("auto"));
 +	// --random-seed is stored in the session domain; Common::RandomSource uses
 +	// it when the key exists (common/random.cpp).
 +	if (ConfMan.hasKey("random_seed"))
@@ -380,6 +664,8 @@ index 00000000..b335d0fd
 +		rec.addNull("seed");
 +	rec.add("boot_param", _vm->_bootParam);
 +	writeRecord(rec);
++	if (!_controlPath.empty())
++		controlInit();
 +
 +	// A save slot from the command line makes go() load a game instead of
 +	// running the boot script. Runs never load.
@@ -411,11 +697,17 @@ index 00000000..b335d0fd
 +		_ticks += (uint64)delta;
 +	_frames++;
 +
-+	// 3. Prepare this frame: pin input, press '.' or Esc if that has an effect
-+	//    now (processInput() reads the key later in this frame), then let
++	// 3. Prepare this frame: pin input, apply the scheduled raw input, press
++	//    '.' or Esc if that has an effect now and no scheduled key took the
++	//    frame (processInput() reads the key later in this frame), then let
 +	//    delta jiffies of audio play.
 +	neutraliseInput();
++	applyRawInputs();
++	if (_finished)
++		return;
 +	maybeInjectSkip(delta);
++	if (_finished)
++		return;
 +	_inputWindow = true; // processInput() comes next
 +	if (_pumpAudio)
 +		pumpAudio(delta);
@@ -441,6 +733,13 @@ index 00000000..b335d0fd
 +
 +	// The goal is judged on the state after a whole frame: scripts, the
 +	// sentence script, walking and room changes have all run.
++	if (_vm->_currentRoom != _lastRoom) {
++		// Every room change, from boot on: where the run spends its ticks.
++		writeRecord(record("room").add("room", (int)_vm->_currentRoom).add("from", _lastRoom)
++		            .add("var19", _vm->VAR_TIMER_NEXT != 0xFF ? (int)_vm->_scummVars[_vm->VAR_TIMER_NEXT] : -1));
++		_lastRoom = _vm->_currentRoom;
++	}
++
 +	if (_segmentStarted && !_goal.empty() && allHold(_goal)) {
 +		if (!timerNextChanged("the goal"))
 +			reachGoal();
@@ -456,6 +755,33 @@ index 00000000..b335d0fd
 +	}
 +
 +	maybeReportStall();
++}
++
++void SpeedrunBridge::onWait(int quarterFrames) {
++	if (quarterFrames <= 0)
++		return;
++	_quarterFrames += (uint64)quarterFrames;
++	if (_videoFd >= 0) {
++		// The video follows the run clock: one 1/60 s video frame per 4 quarter-frames waited,
++		// showing the screen that is up during the wait.
++		_videoQfPending += (uint64)quarterFrames;
++		const int jiffies = (int)(_videoQfPending / 4);
++		_videoQfPending -= (uint64)jiffies * 4;
++		if (jiffies > 0)
++			captureFrame(jiffies);
++	}
++	// The engine's timer-thread counters (the CD music timer, the speech
++	// timer) advance one step per quarter-frame of game time here, where the
++	// wait happens, instead of on SDL's timer thread in wall time.
++	if (_vm->_sound)
++		_vm->_sound->advanceTimers(quarterFrames);
++}
++
++void SpeedrunBridge::onCDTrack(int track, int numLoops, int startFrame, int duration, bool playing) {
++	if (_finished)
++		return;
++	writeRecord(record("cd_track").add("track", track).add("loops", numLoops).add("start", startFrame)
++	            .add("duration", duration).add("playing", playing).add("room", (int)_vm->_currentRoom));
 +}
 +
 +void SpeedrunBridge::onClearClicked() {
@@ -504,6 +830,32 @@ index 00000000..b335d0fd
 +	const IdleKind previousKind = _lastIdle.kind;
 +	_lastIdle = evaluateIdle();
 +	_idleStreak = (_lastIdle.kind == kNotIdle) ? 0 : (_lastIdle.kind == previousKind ? _idleStreak + 1 : 1);
++	if (_frameLog) {
++		const ScummEngine &e = *_vm;
++		JsonObject f;
++		f.add("f", _frames).add("t", _ticks).add("r", (int)e._currentRoom).add("up", (int)e._userPut)
++		 .add("cs", (int)e.vm.cutSceneStackPointer).add("v19", (int)e._scummVars[e.VAR_TIMER_NEXT]);
++		if (_lastIdle.kind != kNotIdle)
++			f.add("idle", _lastIdle.kind == kIdleSentence ? "sentence" : "dialog");
++		else
++			f.add("blk", _lastIdle.blocker ? _lastIdle.blocker : "?").add("scr", _lastIdle.script);
++		const int ego = e._scummVars[e.VAR_EGO];
++		if (ego > 0 && ego < e._numActors && e._actors[ego]->isInCurrentRoom()) {
++			const Actor *a = e._actors[ego];
++			f.addRaw("e", JsonArray().add(a->getRealPos().x).add(a->getRealPos().y).str())
++			 .add("mv", (int)a->_moving).add("box", (int)a->_walkbox);
++		}
++		_frameFile.writeLine(f.str());
++	}
++	if (_lastIdle.kind != kNotIdle && previousKind == kNotIdle) {
++		// The player has control again (sentence or dialogue idle).
++		JsonObject rec = record("control");
++		rec.add("kind", _lastIdle.kind == kIdleSentence ? "sentence" : "dialog").add("room", (int)_vm->_currentRoom);
++		const int ego = _vm->_scummVars[_vm->VAR_EGO];
++		if (ego > 0 && ego < _vm->_numActors && _vm->_actors[ego]->isInCurrentRoom())
++			rec.addRaw("ego_pos", JsonArray().add(_vm->_actors[ego]->getRealPos().x).add(_vm->_actors[ego]->getRealPos().y).str());
++		writeRecord(rec);
++	}
 +	// What keeps the run from progressing at this decision point: not being
 +	// idle, or (set by the plan player) a pending step that cannot go yet.
 +	// Without a plan, any idle frame is progress.
@@ -526,13 +878,15 @@ index 00000000..b335d0fd
 +	if (_speedCheckPending && _lastIdle.kind != kNotIdle && timerNextChanged("the first idle frame after a cutscene skip"))
 +		return;
 +
-+	if (!_segmentStarted && _lastIdle.kind == kIdleSentence && allHold(_start) && !startSegment())
++	if (!_segmentStarted && (_startFrame ? _frames >= _startFrame : (_lastIdle.kind == kIdleSentence && allHold(_start))) &&
++	    !startSegment())
 +		return;
 +
 +	if (_hasPlan && !_finished)
 +		runPlan();
 +	if (!_blocker.blocker)
 +		markProgress();
++	controlAtDecisionPoint();
 +}
 +
 +#pragma mark - Run control
@@ -540,6 +894,7 @@ index 00000000..b335d0fd
 +bool SpeedrunBridge::startSegment() {
 +	_segmentStarted = true;
 +	_tick0 = _ticks;
++	_qf0 = _quarterFrames;
 +	writeFile("state-start.json", stateJson());
 +	// The speed and key settings skips depend on (docs/research/skips-engine.md
 +	// sections 1.1, 5 and 6): var 19 (VAR_TIMER_NEXT) is the frame length in
@@ -555,7 +910,7 @@ index 00000000..b335d0fd
 +
 +void SpeedrunBridge::reachGoal() {
 +	writeFile("state-end.json", stateJson());
-+	writeRecord(record("goal").add("ticks_from_start", _ticks - _tick0));
++	writeRecord(record("goal").add("ticks_from_start", _ticks - _tick0).add("qf_from_start", _quarterFrames - _qf0));
 +	finish("goal");
 +}
 +
@@ -598,6 +953,8 @@ index 00000000..b335d0fd
 +}
 +
 +bool SpeedrunBridge::writeFile(const char *name, const Common::String &contents) {
++	if (_branchChild)
++		return true;
 +	const Common::Path path = Common::Path(_outDir, Common::Path::kNativeSeparator).appendComponent(name);
 +	const bool ok = writeJsonFile(path, contents);
 +	if (!ok)
@@ -623,10 +980,13 @@ index 00000000..b335d0fd
 +	if (delta <= 0)
 +		return;
 +
-+	// Frames owed for delta jiffies of 1/60 s, exact over the whole run.
-+	const uint64 owed = (uint64)delta * _audioRate + _audioRemainder;
-+	_audioPending += owed / 60;
-+	_audioRemainder = owed % 60;
++	// Frames owed for delta jiffies of 4 / timer Hz each: 1/60 s on Mac and
++	// DOS v5, 1/59.17 s on DOS v4 (scumm.cpp setTimerAndShakeFrequency()).
++	// Deterministic: the same deltas always give the same frames.
++	_audioOwed += (double)delta * _audioRate * 4.0 / _vm->getTimerFrequency();
++	const uint64 whole = (uint64)_audioOwed;
++	_audioPending += whole;
++	_audioOwed -= (double)whole;
 +
 +	// Fixed-size calls: the stream sees the same buffer sizes whatever the
 +	// frame pacing; leftover frames wait for the next frame.
@@ -636,9 +996,42 @@ index 00000000..b335d0fd
 +	const uint chunkBytes = kAudioChunkFrames * _audioFrameBytes;
 +	while (_audioPending >= kAudioChunkFrames) {
 +		mixer->mixCallback((byte *)_audioBuf, chunkBytes);
++		if (_audioFd >= 0)
++			captureWrite(_audioFd, _audioBuf, chunkBytes);
 +		_audioPending -= kAudioChunkFrames;
 +		_audioPumped += kAudioChunkFrames;
 +	}
++}
++
++void SpeedrunBridge::captureFrame(int delta) {
++	const int w = 320, h = 200;
++	if (!_videoRgb)
++		_videoRgb = new byte[w * h * 3];
++	memset(_videoRgb, 0, w * h * 3);
++	Graphics::Surface *screen = g_system->lockScreen();
++	if (screen) {
++		const bool clut = screen->format.bytesPerPixel == 1;
++		byte pal[256 * 3];
++		if (clut)
++			g_system->getPaletteManager()->grabPalette(pal, 0, 256);
++		const int cw = MIN<int>(w, screen->w), ch = MIN<int>(h, screen->h);
++		for (int y = 0; y < ch; y++) {
++			for (int x = 0; x < cw; x++) {
++				byte *d = _videoRgb + (y * w + x) * 3;
++				if (clut) {
++					const byte c = *(const byte *)screen->getBasePtr(x, y);
++					d[0] = pal[c * 3];
++					d[1] = pal[c * 3 + 1];
++					d[2] = pal[c * 3 + 2];
++				} else {
++					screen->format.colorToRGB(screen->getPixel(x, y), d[0], d[1], d[2]);
++				}
++			}
++		}
++		g_system->unlockScreen();
++	}
++	for (int i = 0; i < delta; i++)
++		captureWrite(_videoFd, _videoRgb, w * h * 3);
 +}
 +
 +void SpeedrunBridge::finish(const char *reason) {
@@ -691,7 +1084,11 @@ index 00000000..b335d0fd
 +	else
 +		end.addNull("vars_fnv1a");
 +	writeRecord(end);
-+	_trace.close();
++	if (!_branchChild)
++		_trace.close();
++	controlEnd(end);
++	if (_frameLog)
++		_frameFile.close();
 +
 +	debug(1, "speedrun: %s", end.str().c_str());
 +	return true;
@@ -719,11 +1116,13 @@ index 00000000..b335d0fd
 +
 +JsonObject SpeedrunBridge::record(const char *type) const {
 +	JsonObject rec;
-+	rec.add("type", type).add("tick", _ticks).add("frame", _frames);
++	rec.add("type", type).add("tick", _ticks).add("frame", _frames).add("qf", _quarterFrames);
 +	return rec;
 +}
 +
 +void SpeedrunBridge::writeRecord(const JsonObject &rec) {
++	if (_branchChild)
++		return; // branches report over the control socket only
 +	_trace.writeLine(rec.str()); // flushed: a killed run keeps every record so far
 +}
 +
@@ -742,10 +1141,10 @@ index 00000000..b335d0fd
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..804a77b5
+index 00000000..8ad90bcb
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,509 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -772,6 +1171,7 @@ index 00000000..804a77b5
 +
 +#include "common/scummsys.h"
 +#include "common/array.h"
++#include "common/keyboard.h"
 +#include "common/str.h"
 +
 +#include "scumm/speedrun/speedrun_json.h"
@@ -786,13 +1186,14 @@ index 00000000..804a77b5
 +
 +/** One C3 condition (docs/plan.md, contract C3). */
 +struct SpeedrunCondition {
-+	enum Kind { kVar, kBit, kRoom, kOwner, kState, kHas, kActorRoom, kActorX, kActorY };
-+	enum Op { kEq, kLe, kGe };
++	enum Kind { kVar, kBit, kRoom, kOwner, kState, kHas, kActorRoom, kActorX, kActorY, kClass, kActorMoving, kScript };
++	enum Op { kEq, kLe, kGe, kIn };
 +
 +	Kind kind;
 +	int32 subject; // var or bit index, room, object or actor
 +	Op op;
-+	int32 value;   // unused for kRoom and kHas
++	int32 value;   // unused for kRoom and kHas; kClass: the class number
++	Common::Array<int32> values; // kIn: the value is one of these
 +	bool negate;
 +};
 +
@@ -835,6 +1236,21 @@ index 00000000..804a77b5
 +	SpeedrunConditions when;              // checked when an unexpected menu is visible
 +	Common::Array<Common::String> choose; // one entry per menu, in order
 +};
++
++/** One SPEEDRUN_INPUTS event (contract C8): raw input on an exact frame. */
++struct SpeedrunInput {
++	enum Kind { kKey, kClick, kRightClick, kMove, kSkips };
++	uint64 frame = 0;
++	Kind kind = kKey;
++	int32 x = 0, y = 0;
++	bool skipText = false, skipCutscenes = false; // kSkips: the automatic '.' and Esc from this frame on
++	Common::Array<int32> spare; // kSkips: global scripts whose own lines never get the automatic '.'
++	Common::KeyState key;
++	Common::String keyName;
++};
++
++/** Parse SPEEDRUN_INPUTS (JSONL, one event per line). In speedrun_inputs.cpp. */
++bool parseSpeedrunInputs(const Common::String &text, Common::Array<SpeedrunInput> &out, Common::String &error);
 +
 +/**
 + * Parse a plan (JSONL, one step per line; blank lines are skipped) with the
@@ -879,6 +1295,18 @@ index 00000000..804a77b5
 + *  - SPEEDRUN_SKIP_CUTSCENES=1   after the segment start, press Esc on the first frame
 + *                                an override is live, except during no_skip steps
 + *  - SPEEDRUN_STEP_STATES=1      diagnostic: state-step-NNN.json at every step_end
++ *  - SPEEDRUN_INPUTS=<path>      raw input schedule (C8, speedrun_inputs.cpp): keys, clicks
++ *                                and mouse moves on exact frames, from boot on
++ *  - SPEEDRUN_TIMER_NEXT=<n|any> the var 19 (VAR_TIMER_NEXT) value required whenever
++ *                                control is with the player (default 6, the glitchless
++ *                                rules); "any" turns the check off (Any% rules)
++ *  - SPEEDRUN_FRAME_LOG=1        frames.jsonl: room, userput, cutscene level, idle or
++ *                                blocker, ego position and walk state at every decision point
++ *  - SPEEDRUN_CONTROL=<socket>   serve the C9 control protocol (speedrun_control.cpp):
++ *                                run to a frame or condition, schedule input, fork branches
++ *  - SPEEDRUN_START_FRAME=<n>    start the segment at the decision point of frame n
++ *                                instead of SPEEDRUN_START (Any% timing starts at the
++ *                                logo skip, which is an input, not a game state)
 + * The RNG seed is ScummVM's own --random-seed (ConfMan "random_seed").
 + *
 + * Record stamping (contract C2): records about the completed previous frame
@@ -911,6 +1339,19 @@ index 00000000..804a77b5
 +	 */
 +	bool skipWaits() const { return _skipWaits || (_fastBoot && !_segmentStarted); }
 +	/**
++	 * First statement of waitForTimer(): every wait the engine makes, the
++	 * main loop's 4 * delta and the room-change effects' (dissolve, iris,
++	 * fades), counted in quarter-frames. RTA is qf / timer_hz seconds.
++	 */
++	void onWait(int quarterFrames);
++	/**
++	 * SoundCD::playCDTrackInternal(): a CD audio track started (@p playing:
++	 * its file opened). A track that did not open plays as silence and ends
++	 * at once, which changes every wait on it: the run's Python side treats
++	 * a "cd_track" record with "playing": false as an invalid run.
++	 */
++	void onCDTrack(int track, int numLoops, int startFrame, int duration, bool playing);
++	/**
 +	 * First statement of clearClickedStatus(). Counts the calls that wipe a
 +	 * click a player made this frame (speedrun_bridge.cpp).
 +	 */
@@ -937,6 +1378,8 @@ index 00000000..804a77b5
 +	/** onFrameBegin, step 1: checks on the completed previous frame. */
 +	void observePreviousFrame();
 +	void neutraliseInput();
++	/** After neutraliseInput(): this frame's SPEEDRUN_INPUTS events (speedrun_inputs.cpp). */
++	void applyRawInputs();
 +	void pumpAudio(int delta);
 +
 +	// Idle detection (speedrun_state.cpp)
@@ -961,6 +1404,8 @@ index 00000000..804a77b5
 +	/** Some slot parked on WaitForMessage, or -1. */
 +	int messageWaitSlot() const;
 +	bool textSkipEffective(int delta, int &waitSlot) const;
++	bool textSpared() const;
++	bool spared(int number) const; // in the last skips event's "spare"
 +	/** No cutscene skips for the active or pending step (C4 no_skip). */
 +	bool stepForbidsCutsceneSkip() const;
 +	/** Var 19 (VAR_TIMER_NEXT) is not 6 (@p when names the check): fails the run with timer_next. */
@@ -1027,6 +1472,20 @@ index 00000000..804a77b5
 +	 */
 +	bool inputUsedUp();
 +
++	// Control socket (speedrun_control.cpp, contract C9)
++	void controlInit();
++	bool controlConnect();
++	void controlSend(const Common::String &line);
++	bool controlReadLine(Common::String &out);
++	Common::String controlStatus(const char *reason) const;
++	/** The engine's click gate: user input on, no cutscene, a real room. */
++	bool clickGateOpen() const;
++	/** End of onDecisionPoint(): stop and serve commands if a run command's stop holds. */
++	void controlAtDecisionPoint();
++	void controlLoop(const char *reason);
++	/** The run ended: report it; a branch then exits without engine shutdown. */
++	void controlEnd(const JsonObject &endRecord);
++
 +	// Interrupts (speedrun_interrupts.cpp)
 +	/**
 +	 * A menu is visible that the plan does not answer (would be
@@ -1083,13 +1542,22 @@ index 00000000..804a77b5
 +	uint64 _stepTimeout = 36000;    // ticks; 10 minutes of game time
 +	bool _skipText = false;         // SPEEDRUN_SKIP_TEXT
 +	bool _skipCutscenes = false;    // SPEEDRUN_SKIP_CUTSCENES
++	Common::Array<int32> _skipSpare; // the last skips event's "spare" (textSpared())
 +	bool _stepStates = false;       // SPEEDRUN_STEP_STATES
 +	Common::Array<SpeedrunInterrupt> _interrupts; // SPEEDRUN_INTERRUPTS
++	Common::Array<SpeedrunInput> _inputs; // SPEEDRUN_INPUTS
++	uint _inputIndex = 0;           // next event to deliver
++	int32 _rawMouseX = 0, _rawMouseY = 0; // where the schedule last put the mouse
++	int32 _timerNextExpected = 6;   // SPEEDRUN_TIMER_NEXT; -1 = any
++	uint64 _startFrame = 0;         // SPEEDRUN_START_FRAME; 0 = use SPEEDRUN_START
++	int _lastRoom = 0;              // for "room" records
 +	Common::String _envError;       // first invalid variable, reported once the trace is open
 +
 +	// Run clock (contract C2): ticks = sum of unclamped deltas since boot
 +	uint64 _ticks = 0;
 +	uint64 _frames = 0;
++	uint64 _quarterFrames = 0;      // every waitForTimer() wait since boot (RTA clock)
++	uint64 _qf0 = 0;                // _quarterFrames at the segment start
 +
 +	// Segment and idle tracking
 +	bool _segmentStarted = false;
@@ -1148,12 +1616,37 @@ index 00000000..804a77b5
 +	static const uint kAudioChunkFrames = 512;
 +	uint _audioRate = 0;            // mixer output rate, frames per second
 +	uint _audioFrameBytes = 4;      // 16-bit stereo
-+	uint64 _audioRemainder = 0;     // sub-frame remainder, in 1/60 frames
++	double _audioOwed = 0;          // fractional audio frames owed (jiffies are 4 / timer Hz long)
 +	uint64 _audioPending = 0;       // whole frames owed to the mixer (< one chunk after pumping)
 +	uint64 _audioPumped = 0;        // frames mixed so far
 +	int16 _audioBuf[kAudioChunkFrames * 2];
 +
++	// SPEEDRUN_VIDEO: a capture of the run at game time, for a video of it. "<prefix>.rgb" gets
++	// the 320x200 screen as RGB24 once per jiffy of the run clock (onWait's quarter-frames / 4),
++	// "<prefix>.pcm" the mixed audio as the pump produces it. Observation only.
++	Common::String _videoPrefix;
++	int _videoFd = -1;              // plain POSIX writes (a FIFO works; DumpFile writes a .tmp and renames)
++	int _audioFd = -1;
++	byte *_videoRgb = nullptr;
++	uint64 _videoQfPending = 0;     // quarter-frames waited but not yet written as video frames
++	void captureFrame(int delta);
++	static int captureOpen(const Common::String &path);   // speedrun_control.cpp (POSIX allowed there)
++	static void captureWrite(int fd, const void *buf, uint32 size);
++	static void captureClose(int fd);
++
 +	JsonlWriter _trace;            // $SPEEDRUN_OUT/trace.jsonl, written in place
++	bool _frameLog = false;         // SPEEDRUN_FRAME_LOG
++	Common::String _controlPath;    // SPEEDRUN_CONTROL: Unix socket the controller listens on
++	int _controlFd = -1;
++	Common::String _controlBuf;     // received bytes not yet consumed as lines
++	bool _branchChild = false;      // a fork() made this process: no files, exit on end
++	uint64 _stopFrame = 0, _stopMaxFrame = 0; // the current run command's stops (0 = none)
++	bool _stopOnControl = false;
++	bool _stopOnIdle = false;                    // run "idle": the bridge's idle rule (sentence or dialog)
++	bool _stopOnMenu = false;                    // run "menu": a dialogue menu takes a click
++	SpeedrunConditions _stopUntil;
++	Common::Array<SpeedrunConditions> _stopUntilAny; // run "until_any": any group holds
++	JsonlWriter _frameFile;         // $SPEEDRUN_OUT/frames.jsonl: one line per decision point
 +	const char *_errorCode = "engine_error"; // code for the next error() record
 +	bool _finished = false;
 +};
@@ -1163,10 +1656,10 @@ index 00000000..804a77b5
 +#endif
 diff --git a/engines/scumm/speedrun/speedrun_conditions.cpp b/engines/scumm/speedrun/speedrun_conditions.cpp
 new file mode 100644
-index 00000000..f60caba5
+index 00000000..49d670d5
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_conditions.cpp
-@@ -0,0 +1,288 @@
+@@ -0,0 +1,347 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1248,20 +1741,63 @@ index 00000000..f60caba5
 +		{"owner", SpeedrunCondition::kOwner},
 +		{"state", SpeedrunCondition::kState},
 +		{"actor_room", SpeedrunCondition::kActorRoom},
++		{"actor_moving", SpeedrunCondition::kActorMoving}, // 1 while the actor walks (Actor::_moving != 0)
 +	};
 +	for (const auto &form : kCompare) {
++		if (hasExactKeys(obj, form.key, "in")) {
++			// {"var": N, "in": [a, b, ...]}: the value is one of the list.
++			cond.kind = form.kind;
++			cond.op = SpeedrunCondition::kIn;
++			const Common::JSONValue *list = obj.getVal("in");
++			if (!readInt(obj.getVal(form.key), cond.subject) || !list->isArray() || list->asArray().empty()) {
++				error = Common::String::format("'%s' must be an integer and 'in' a non-empty array", form.key);
++				return false;
++			}
++			for (const Common::JSONValue *v : list->asArray()) {
++				int32 x;
++				if (!readInt(v, x)) {
++					error = "'in' must hold integers";
++					return false;
++				}
++				cond.values.push_back(x);
++			}
++			return true;
++		}
++		if (hasExactKeys(obj, form.key, "ge") || hasExactKeys(obj, form.key, "le")) {
++			// {"var": N, "ge": K}: Var[145] >= 5 (bananas given), as the scripts test it
++			const bool ge = obj.contains("ge");
++			cond.kind = form.kind;
++			cond.op = ge ? SpeedrunCondition::kGe : SpeedrunCondition::kLe;
++			if (!readInt(obj.getVal(form.key), cond.subject) || !readInt(obj.getVal(ge ? "ge" : "le"), cond.value)) {
++				error = Common::String::format("'%s' and '%s' must be integers", form.key, ge ? "ge" : "le");
++				return false;
++			}
++			return true;
++		}
 +		if (hasExactKeys(obj, form.key, "eq")) {
 +			cond.kind = form.kind;
 +			if (!readInt(obj.getVal(form.key), cond.subject) || !readInt(obj.getVal("eq"), cond.value)) {
 +				error = Common::String::format("'%s' and 'eq' must be integers", form.key);
 +				return false;
 +			}
-+			if (cond.kind == SpeedrunCondition::kActorRoom && (cond.subject < 1 || cond.subject > kMaxActor)) {
-+				error = Common::String::format("'actor_room' must be an actor id 1..%d", kMaxActor);
++			if ((cond.kind == SpeedrunCondition::kActorRoom || cond.kind == SpeedrunCondition::kActorMoving) &&
++			    (cond.subject < 1 || cond.subject > kMaxActor)) {
++				error = Common::String::format("'%s' must be an actor id 1..%d", form.key, kMaxActor);
 +				return false;
 +			}
 +			return true;
 +		}
++	}
++
++	if (hasExactKeys(obj, "class", "set")) {
++		// {"class": object, "set": n}: class n of the object is set (getClass()).
++		cond.kind = SpeedrunCondition::kClass;
++		if (!readInt(obj.getVal("class"), cond.subject) || !readInt(obj.getVal("set"), cond.value) ||
++		    cond.value < 1 || cond.value > 32) {
++			error = "'class' must be an object id and 'set' a class 1..32";
++			return false;
++		}
++		return true;
 +	}
 +
 +	static const struct {
@@ -1270,6 +1806,7 @@ index 00000000..f60caba5
 +	} kUnary[] = {
 +		{"room", SpeedrunCondition::kRoom},
 +		{"has", SpeedrunCondition::kHas},
++		{"script", SpeedrunCondition::kScript}, // a script with this number is running (isScriptRunning)
 +	};
 +	for (const auto &form : kUnary) {
 +		if (hasExactKeys(obj, form.key)) {
@@ -1315,8 +1852,10 @@ index 00000000..f60caba5
 +		}
 +	}
 +
-+	error = "unknown condition; expected {var|bit|owner|state: int, eq: int}, {room: int}, {has: int}, "
-+	        "{actor_room: actor, eq: int}, {actor_x|actor_y: actor, eq|le|ge: int} or {not: condition}";
++	error = "unknown condition; expected {var|bit|owner|state: int, eq|ge|le: int | in: [int...]}, {room: int}, {has: int}, "
++	        "{actor_room|actor_moving: actor, eq: int}, {actor_x|actor_y: actor, eq|le|ge: int}, {class: object, set: class}, "
++	        "{script: number} "
++	        "or {not: condition}";
 +	return false;
 +}
 +
@@ -1370,16 +1909,19 @@ index 00000000..f60caba5
 +		case SpeedrunCondition::kOwner:
 +		case SpeedrunCondition::kState:
 +		case SpeedrunCondition::kHas:
++		case SpeedrunCondition::kClass:
 +			limit = _vm->_numGlobalObjects;
 +			kind = "object";
 +			break;
 +		case SpeedrunCondition::kActorRoom:
 +		case SpeedrunCondition::kActorX:
 +		case SpeedrunCondition::kActorY:
++		case SpeedrunCondition::kActorMoving:
 +			limit = _vm->_numActors;
 +			kind = "actor";
 +			break;
 +		case SpeedrunCondition::kRoom:
++		case SpeedrunCondition::kScript:
 +			break;
 +		}
 +		if (kind && (c.subject < 0 || c.subject >= limit))
@@ -1409,6 +1951,10 @@ index 00000000..f60caba5
 +	case SpeedrunCondition::kState:
 +		actual = e._objectStateTable[c.subject];
 +		break;
++	case SpeedrunCondition::kClass:
++		return e.getClass(c.subject, c.value) != c.negate;
++	case SpeedrunCondition::kScript:
++		return (const_cast<ScummEngine &>(e).isScriptRunning(c.subject) != 0) != c.negate;
 +	case SpeedrunCondition::kHas: {
 +		// Ego's inventory, as findInventory()/getInventoryCount() see it.
 +		const int ego = e._scummVars[e.VAR_EGO];
@@ -1418,10 +1964,13 @@ index 00000000..f60caba5
 +	}
 +	case SpeedrunCondition::kActorRoom:
 +	case SpeedrunCondition::kActorX:
-+	case SpeedrunCondition::kActorY: {
++	case SpeedrunCondition::kActorY:
++	case SpeedrunCondition::kActorMoving: {
 +		const Actor *a = e._actors[c.subject];
 +		if (c.kind == SpeedrunCondition::kActorRoom)
 +			actual = a->_room;
++		else if (c.kind == SpeedrunCondition::kActorMoving)
++			actual = a->_moving ? 1 : 0;
 +		else if (c.kind == SpeedrunCondition::kActorX)
 +			actual = a->getRealPos().x;
 +		else
@@ -1435,7 +1984,10 @@ index 00000000..f60caba5
 +		result = actual == c.subject;
 +		break;
 +	default:
-+		if (c.op == SpeedrunCondition::kLe)
++		if (c.op == SpeedrunCondition::kIn) {
++			for (uint i = 0; i < c.values.size() && !result; i++)
++				result = actual == c.values[i];
++		} else if (c.op == SpeedrunCondition::kLe)
 +			result = actual <= c.value;
 +		else if (c.op == SpeedrunCondition::kGe)
 +			result = actual >= c.value;
@@ -1452,6 +2004,629 @@ index 00000000..f60caba5
 +			return false;
 +	}
 +	return true;
++}
++
++} // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
+new file mode 100644
+index 00000000..62ec31be
+--- /dev/null
++++ b/engines/scumm/speedrun/speedrun_control.cpp
+@@ -0,0 +1,400 @@
++/* ScummVM - Graphic Adventure Engine
++ *
++ * ScummVM is the legal property of its developers, whose names
++ * are too numerous to list here. Please refer to the COPYRIGHT
++ * file distributed with this source distribution.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++// Control socket (SPEEDRUN_CONTROL, contract C9): an external search drives
++// the run frame by frame and branches it with fork(). A forked child is an
++// exact copy of the game, RNG included: a savestate that cannot drift. The
++// engine runs on the main thread only (--disable-sdl-audio, the bridge pumps
++// the mixer; SDL's timer thread carries no game logic: real-time-paced and
++// fast runs end byte-identical, docs/anypercent/findings.md), so a child
++// that has only the forking thread plays on exactly as the parent would.
++//
++// Protocol: one JSON object per line, both ways, over a Unix stream socket
++// the controller listens on. Each process (the root and every child) holds
++// its own connection.
++//   engine -> controller
++//     {"hello": pid, "parent": ppid|0, "frame", "tick"}   on connect
++//     {"stop": reason, "frame", "tick", ...status}        when a run command stops
++//     {"forked": child_pid}                              reply to fork
++//     {"state": {...}}                                   reply to state (C7)
++//     {"end": reason, "frame", "tick", "room", ...}      the run ended (goal, error, ...)
++//   controller -> engine (only while stopped)
++//     {"cmd": "inputs", "events": [C8 events]}   schedule raw input (frames after now)
++//     {"cmd": "run", "frame": N}                 run to the decision point of frame N
++//     {"cmd": "run", "until": [C3], "max_frame": N}   ... or until the conditions hold
++//     {"cmd": "run", "control": true, "max_frame": N} ... or until a click would count
++//     {"cmd": "fork"}                            fork; the child connects on its own
++//     {"cmd": "state"}                           C7 state dump
++//     {"cmd": "holds", "until": [C3...]}         {"holds": bool} now, no frame run
++//     run also takes "idle": true (stop when the bridge's idle rule holds), "menu": true
++//     (stop when a dialogue menu takes a click) and
++//     "until_any": [[C3...], ...] (stop when any group holds; reason "until_any:<i>")
++//     {"cmd": "set_rng", "state": N}             search only: set the RNG state (trace "rng_set")
++//     {"cmd": "quit"}                            exit at once
++
++#define FORBIDDEN_SYMBOL_ALLOW_ALL
++
++#include <errno.h>
++#include <signal.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <unistd.h>
++#include <fcntl.h>
++
++#include "common/formats/json.h"
++
++#include "scumm/actor.h"
++#include "scumm/scumm.h"
++#include "scumm/speedrun/speedrun_bridge.h"
++
++namespace Scumm {
++
++bool SpeedrunBridge::controlConnect() {
++	_controlFd = socket(AF_UNIX, SOCK_STREAM, 0);
++	if (_controlFd < 0)
++		return false;
++	sockaddr_un addr;
++	memset(&addr, 0, sizeof(addr));
++	addr.sun_family = AF_UNIX;
++	if (_controlPath.size() >= sizeof(addr.sun_path))
++		return false;
++	strncpy(addr.sun_path, _controlPath.c_str(), sizeof(addr.sun_path) - 1);
++	if (connect(_controlFd, (const sockaddr *)&addr, sizeof(addr)) < 0) {
++		close(_controlFd);
++		_controlFd = -1;
++		return false;
++	}
++	_controlBuf.clear();
++	JsonObject hello;
++	hello.add("hello", (int)getpid()).add("parent", _branchChild ? (int)getppid() : 0)
++	     .add("frame", _frames).add("tick", _ticks);
++	controlSend(hello.str());
++	return true;
++}
++
++void SpeedrunBridge::controlSend(const Common::String &line) {
++	if (_controlFd < 0)
++		return;
++	Common::String out = line + "\n";
++	const char *p = out.c_str();
++	size_t left = out.size();
++	while (left > 0) {
++		const ssize_t n = send(_controlFd, p, left, MSG_NOSIGNAL);
++		if (n < 0) {
++			if (errno == EINTR)
++				continue;
++			_exit(3); // the controller is gone: nothing left to report to
++		}
++		p += n;
++		left -= (size_t)n;
++	}
++}
++
++bool SpeedrunBridge::controlReadLine(Common::String &out) {
++	for (;;) {
++		for (uint i = 0; i < _controlBuf.size(); i++) {
++			if (_controlBuf[i] == '\n') {
++				out = Common::String(_controlBuf.c_str(), i);
++				_controlBuf = Common::String(_controlBuf.c_str() + i + 1);
++				return true;
++			}
++		}
++		char buf[4096];
++		const ssize_t n = recv(_controlFd, buf, sizeof(buf), 0);
++		if (n < 0 && errno == EINTR)
++			continue;
++		if (n <= 0)
++			return false;
++		_controlBuf += Common::String(buf, (uint32)n);
++	}
++}
++
++Common::String SpeedrunBridge::controlStatus(const char *reason) const {
++	const ScummEngine &e = *_vm;
++	JsonObject s;
++	s.add("stop", reason).add("frame", _frames).add("tick", _ticks).add("qf", _quarterFrames).add("qf0", _qf0)
++	 .add("room", (int)e._currentRoom)
++	 .add("up", (int)e._userPut).add("cur", (int)e._cursor.state).add("cs", (int)e.vm.cutSceneStackPointer)
++	 .add("v19", (int)e._scummVars[e.VAR_TIMER_NEXT]).add("seg", _segmentStarted)
++	 .add("tick0", _tick0).add("rng", (uint64)e._rnd.getSeed()); // the RNG state (xorshift32, common/random.cpp)
++	if (_lastIdle.kind != kNotIdle)
++		s.add("idle", _lastIdle.kind == kIdleSentence ? "sentence" : "dialog");
++	else
++		s.add("blk", _lastIdle.blocker ? _lastIdle.blocker : "?");
++	const int ego = e._scummVars[e.VAR_EGO];
++	if (ego > 0 && ego < e._numActors && e._actors[ego]->isInCurrentRoom()) {
++		const Actor *a = e._actors[ego];
++		s.addRaw("ego", JsonArray().add(a->getRealPos().x).add(a->getRealPos().y).str())
++		 .add("mv", (int)a->_moving).add("box", (int)a->_walkbox);
++	}
++	s.add("cam", (int)e.camera._cur.x).add("xstart", (int)e._virtscr[kMainVirtScreen].xstart)
++	 .add("room_w", (int)e._roomWidth);
++	return s.str();
++}
++
++bool SpeedrunBridge::clickGateOpen() const {
++	// The engine's own gate for a scene or verb click (checkExecVerbs(),
++	// verbs.cpp): user input on and no cutscene running. Room 0 (between
++	// rooms) has nothing to click.
++	const ScummEngine &e = *_vm;
++	return e._userPut > 0 && e.vm.cutSceneStackPointer == 0 && e._currentRoom != 0;
++}
++
++void SpeedrunBridge::controlAtDecisionPoint() {
++	if (_controlFd < 0 || _finished)
++		return;
++	const char *reason = nullptr;
++	if (_stopFrame && _frames >= _stopFrame)
++		reason = "frame";
++	else if (_stopOnControl && clickGateOpen())
++		reason = "control";
++	else if (!_stopUntil.empty() && allHold(_stopUntil))
++		reason = "until";
++	else if (_stopOnIdle && _lastIdle.kind != kNotIdle)
++		reason = "idle";
++	else if (_stopOnMenu && clickGateOpen() && anyVisibleVerb(120, 128)) // dialogue lines (speedrun_state.cpp)
++		reason = "menu";
++	if (!reason) {
++		for (uint i = 0; i < _stopUntilAny.size(); i++) {
++			if (allHold(_stopUntilAny[i])) {
++				static const char *kAny[] = {"until_any:0", "until_any:1", "until_any:2", "until_any:3",
++				                             "until_any:4", "until_any:5", "until_any:6", "until_any:7"};
++				reason = kAny[MIN<uint>(i, 7)];
++				break;
++			}
++		}
++	}
++	if (!reason && _stopMaxFrame && _frames >= _stopMaxFrame)
++		reason = "max_frame";
++	if (!reason && !_stopFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu && _stopUntil.empty() &&
++	    _stopUntilAny.empty() &&
++	    !_stopMaxFrame)
++		reason = "idle_controller"; // no run command yet (just connected or forked)
++	if (!reason)
++		return;
++	controlLoop(reason);
++}
++
++void SpeedrunBridge::controlLoop(const char *reason) {
++	_stopFrame = 0;
++	_stopMaxFrame = 0;
++	_stopOnControl = false;
++	_stopOnIdle = false;
++	_stopOnMenu = false;
++	_stopUntil.clear();
++	_stopUntilAny.clear();
++	controlSend(controlStatus(reason));
++
++	Common::String line;
++	for (;;) {
++		if (!controlReadLine(line))
++			_exit(0); // controller closed the connection
++		Common::JSONValue *root = Common::JSON::parse(line);
++		const Common::JSONObject *obj = (root && root->isObject()) ? &root->asObject() : nullptr;
++		const Common::String cmd = (obj && obj->contains("cmd") && obj->getVal("cmd")->isString())
++		                           ? obj->getVal("cmd")->asString() : Common::String();
++		Common::String error;
++		bool resume = false;
++
++		if (cmd == "run") {
++			if (obj->contains("frame") && obj->getVal("frame")->isIntegerNumber())
++				_stopFrame = (uint64)obj->getVal("frame")->asIntegerNumber();
++			if (obj->contains("max_frame") && obj->getVal("max_frame")->isIntegerNumber())
++				_stopMaxFrame = (uint64)obj->getVal("max_frame")->asIntegerNumber();
++			if (obj->contains("control"))
++				_stopOnControl = obj->getVal("control")->isBool() && obj->getVal("control")->asBool();
++			if (obj->contains("until") && !parseSpeedrunConditionArray(obj->getVal("until"), _stopUntil, error))
++				error = "until: " + error;
++			if (obj->contains("idle"))
++				_stopOnIdle = obj->getVal("idle")->isBool() && obj->getVal("idle")->asBool();
++			if (obj->contains("menu"))
++				_stopOnMenu = obj->getVal("menu")->isBool() && obj->getVal("menu")->asBool();
++			if (error.empty() && obj->contains("until_any")) {
++				const Common::JSONValue *groups = obj->getVal("until_any");
++				if (!groups->isArray()) {
++					error = "until_any: expected an array of condition arrays";
++				} else {
++					for (const Common::JSONValue *g : groups->asArray()) {
++						SpeedrunConditions conds;
++						if (!parseSpeedrunConditionArray(g, conds, error)) {
++							error = "until_any: " + error;
++							break;
++						}
++						_stopUntilAny.push_back(conds);
++					}
++				}
++			}
++			if (error.empty() && !_stopFrame && !_stopMaxFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu &&
++			    _stopUntil.empty() && _stopUntilAny.empty())
++				error = "run needs frame, max_frame, control, idle, until or until_any";
++			if (error.empty() && _stopFrame && _stopFrame <= _frames)
++				error = Common::String::format("frame %llu is not after the current frame %llu",
++				                               (unsigned long long)_stopFrame, (unsigned long long)_frames);
++			resume = error.empty();
++		} else if (cmd == "inputs") {
++			const Common::JSONValue *events = obj->contains("events") ? obj->getVal("events") : nullptr;
++			if (!events || !events->isArray()) {
++				error = "inputs needs an events array";
++			} else {
++				Common::String text;
++				for (const Common::JSONValue *ev : events->asArray())
++					text += ev->stringify() + "\n";
++				Common::Array<SpeedrunInput> parsed;
++				if (!parseSpeedrunInputs(text, parsed, error)) {
++					error = "events: " + error;
++				} else {
++					const uint64 last = _inputs.empty() ? 0 : _inputs.back().frame;
++					for (const SpeedrunInput &in : parsed) {
++						if (in.frame <= _frames || in.frame < last) {
++							error = Common::String::format("event frame %llu must be after frame %llu and not before %llu",
++							                               (unsigned long long)in.frame, (unsigned long long)_frames,
++							                               (unsigned long long)last);
++							break;
++						}
++					}
++					if (error.empty()) {
++						for (const SpeedrunInput &in : parsed)
++							_inputs.push_back(in);
++						controlSend("{\"ok\":\"inputs\"}");
++					}
++				}
++			}
++		} else if (cmd == "fork") {
++			// The open data file's read position would be shared by both
++			// processes; close it so each one reopens its own on demand.
++			_vm->closeRoom();
++			const pid_t pid = fork();
++			if (pid < 0) {
++				error = Common::String::format("fork failed: %s", strerror(errno));
++			} else if (pid == 0) {
++				// The child: its own connection, and no files shared with the
++				// parent (the trace's file offset is shared after fork()).
++				_branchChild = true;
++				close(_controlFd);
++				_controlFd = -1;
++				_trace.close();
++				if (_frameLog)
++					_frameFile.close();
++				_frameLog = false;
++				if (!controlConnect())
++					_exit(4);
++				controlSend(controlStatus("forked"));
++				delete root;
++				continue;
++			} else {
++				controlSend(Common::String::format("{\"forked\":%d}", (int)pid));
++			}
++		} else if (cmd == "at") {
++			// What a click at screen (x, y) would hit now: the virtual screen
++			// zone, the object findObject() returns for the main screen (as the
++			// input script asks it), and the verb slot under it.
++			const Common::JSONValue *vx = obj->contains("x") ? obj->getVal("x") : nullptr;
++			const Common::JSONValue *vy = obj->contains("y") ? obj->getVal("y") : nullptr;
++			if (!vx || !vy || !vx->isIntegerNumber() || !vy->isIntegerNumber()) {
++				error = "at needs integer x and y";
++			} else {
++				const int x = (int)vx->asIntegerNumber(), y = (int)vy->asIntegerNumber();
++				VirtScreen *vs = _vm->findVirtScreen(y);
++				JsonObject at;
++				at.add("x", x).add("y", y).add("zone", vs ? (int)vs->number : -1);
++				if (vs && vs->number == kMainVirtScreen) {
++					const int virtX = x + vs->xstart, virtY = y - vs->topline;
++					at.add("vx", virtX).add("vy", virtY).add("obj", _vm->findObject(virtX, virtY))
++					  .add("actor", _vm->getActorFromPos(virtX, virtY));
++				}
++				at.add("verb_slot", _vm->findVerbAtPos(x, y));
++				controlSend("{\"at\":" + at.str() + "}");
++			}
++		} else if (cmd == "set_rng") {
++			// Search only: put the RNG in a state, so a branch stands in for a
++			// run from boot with another seed. The trace record marks the run.
++			const Common::JSONValue *v = obj->contains("state") ? obj->getVal("state") : nullptr;
++			if (!v || !v->isIntegerNumber() || v->asIntegerNumber() <= 0 || v->asIntegerNumber() > 0xFFFFFFFFLL) {
++				error = "set_rng needs a state in 1..2^32-1";
++			} else {
++				_vm->_rnd.setSeed((uint32)v->asIntegerNumber());
++				writeRecord(record("rng_set").add("state", (uint64)_vm->_rnd.getSeed()));
++				controlSend("{\"ok\":\"set_rng\"}");
++			}
++		} else if (cmd == "holds") {
++			// Whether conditions hold now, without running a frame.
++			SpeedrunConditions conds;
++			if (!obj->contains("until") || !parseSpeedrunConditionArray(obj->getVal("until"), conds, error))
++				error = "holds: " + error;
++			else
++				controlSend(Common::String::format("{\"holds\":%s}", allHold(conds) ? "true" : "false"));
++		} else if (cmd == "state") {
++			controlSend("{\"state\":" + stateJson() + "}");
++		} else if (cmd == "quit") {
++			_exit(0);
++		} else {
++			error = "unknown command: " + line;
++		}
++		delete root;
++		if (!error.empty()) {
++			JsonObject err;
++			err.add("error", error);
++			controlSend(err.str());
++			continue;
++		}
++		if (resume)
++			return;
++	}
++}
++
++void SpeedrunBridge::controlEnd(const JsonObject &endRecord) {
++	if (_controlFd < 0)
++		return;
++	controlSend("{\"end\":" + endRecord.str() + "}");
++	if (_branchChild)
++		_exit(0); // a branch never runs the engine's shutdown (SDL state belongs to the root)
++}
++
++void SpeedrunBridge::controlInit() {
++	signal(SIGCHLD, SIG_IGN); // branches are reaped automatically
++	if (!controlConnect())
++		raiseError("bad_env", Common::String::format("cannot connect to SPEEDRUN_CONTROL '%s'", _controlPath.c_str()));
++}
++
++int SpeedrunBridge::captureOpen(const Common::String &path) {
++	return ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
++}
++
++void SpeedrunBridge::captureWrite(int fd, const void *buf, uint32 size) {
++	const char *p = (const char *)buf;
++	while (fd >= 0 && size > 0) {
++		const ssize_t n = ::write(fd, p, size);
++		if (n < 0 && errno == EINTR)
++			continue;
++		if (n <= 0)
++			return; // the reader went away: the run itself must not depend on the capture
++		p += n;
++		size -= (uint32)n;
++	}
++}
++
++void SpeedrunBridge::captureClose(int fd) {
++	if (fd >= 0)
++		::close(fd);
++}
++
++} // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_inputs.cpp b/engines/scumm/speedrun/speedrun_inputs.cpp
+new file mode 100644
+index 00000000..fc240cda
+--- /dev/null
++++ b/engines/scumm/speedrun/speedrun_inputs.cpp
+@@ -0,0 +1,211 @@
++/* ScummVM - Graphic Adventure Engine
++ *
++ * ScummVM is the legal property of its developers, whose names
++ * are too numerous to list here. Please refer to the COPYRIGHT
++ * file distributed with this source distribution.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++// Raw input schedule (SPEEDRUN_INPUTS, contract C8): mouse moves, clicks and
++// key presses delivered on exact frames, the way a TAS input movie drives a
++// game. Each event is written into the same fields parseEvents() fills from a
++// real SDL event (input.cpp), right before processInput() reads them, so the
++// game's own input scripts see an ordinary click or key press.
++
++#include "common/formats/json.h"
++#include "common/keyboard.h"
++
++#include "scumm/scumm.h"
++#include "scumm/speedrun/speedrun_bridge.h"
++
++namespace Scumm {
++
++// input.cpp's MouseButtonStatus, which is local to that file.
++enum { kMsDown = 1, kMsClicked = 2 };
++
++static bool parseKeyName(const Common::String &name, Common::KeyState &out) {
++	// The keys a MI1 run uses: Esc (cutscene skip, and the logo skip), '.'
++	// (text skip), space (pause), Enter, and single printable characters
++	// (verb shortcuts, dialogue digits).
++	if (name == "esc") {
++		out = Common::KeyState(Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE, 0);
++	} else if (name == "space") {
++		out = Common::KeyState(Common::KEYCODE_SPACE, ' ', 0);
++	} else if (name == "enter") {
++		out = Common::KeyState(Common::KEYCODE_RETURN, Common::ASCII_RETURN, 0);
++	} else if (name.size() == 1 && name[0] >= 0x20 && name[0] < 0x7F) {
++		const char c = name[0];
++		const Common::KeyCode code = (c >= 'A' && c <= 'Z') ? (Common::KeyCode)(c - 'A' + 'a') : (Common::KeyCode)c;
++		out = Common::KeyState(code, (uint16)c, 0);
++	} else {
++		return false;
++	}
++	return true;
++}
++
++static bool readPoint(const Common::JSONValue *v, int32 &x, int32 &y) {
++	if (!v || !v->isArray() || v->asArray().size() != 2)
++		return false;
++	const Common::JSONValue *vx = v->asArray()[0], *vy = v->asArray()[1];
++	if (!vx->isIntegerNumber() || !vy->isIntegerNumber())
++		return false;
++	x = (int32)vx->asIntegerNumber();
++	y = (int32)vy->asIntegerNumber();
++	return x >= 0 && y >= 0 && x < 0x10000 && y < 0x10000;
++}
++
++bool parseSpeedrunInputs(const Common::String &text, Common::Array<SpeedrunInput> &out, Common::String &error) {
++	// One JSON object per line: {"frame": N, <one of>} with
++	//   "click": [x, y]   left button pressed on frame N (screen coordinates)
++	//   "rclick": [x, y]  right button
++	//   "move": [x, y]    the mouse moves; it stays there until the next event
++	//   "key": name       "esc", "space", "enter" or one printable character
++	//   "skips": {"text": 0|1, "cutscenes": 0|1}
++	//                     switch the bridge's automatic '.' and Esc
++	//                     (SPEEDRUN_SKIP_TEXT/_CUTSCENES) from frame N on
++	// Frames are the bridge's frame counter (trace "frame"); they must not decrease.
++	out.clear();
++	uint lineNo = 0;
++	uint64 lastFrame = 0;
++	for (uint pos = 0; pos < text.size();) {
++		const char *nl = strchr(text.c_str() + pos, '\n');
++		const uint end = nl ? (uint)(nl - text.c_str()) : text.size();
++		Common::String line(text.c_str() + pos, end - pos);
++		pos = end + 1;
++		lineNo++;
++		line.trim();
++		if (line.empty())
++			continue;
++		Common::JSONValue *root = Common::JSON::parse(line);
++		if (!root || !root->isObject()) {
++			delete root;
++			error = Common::String::format("line %u: not a JSON object", lineNo);
++			return false;
++		}
++		const Common::JSONObject &obj = root->asObject();
++		SpeedrunInput in;
++		bool ok = obj.size() == 2 && obj.contains("frame") && obj.getVal("frame")->isIntegerNumber() &&
++		          obj.getVal("frame")->asIntegerNumber() > 0;
++		if (ok) {
++			in.frame = (uint64)obj.getVal("frame")->asIntegerNumber();
++			if (obj.contains("click")) {
++				in.kind = SpeedrunInput::kClick;
++				ok = readPoint(obj.getVal("click"), in.x, in.y);
++			} else if (obj.contains("rclick")) {
++				in.kind = SpeedrunInput::kRightClick;
++				ok = readPoint(obj.getVal("rclick"), in.x, in.y);
++			} else if (obj.contains("move")) {
++				in.kind = SpeedrunInput::kMove;
++				ok = readPoint(obj.getVal("move"), in.x, in.y);
++			} else if (obj.contains("skips") && obj.getVal("skips")->isObject()) {
++				const Common::JSONObject &sk = obj.getVal("skips")->asObject();
++				in.kind = SpeedrunInput::kSkips;
++				ok = (sk.size() == 2 || (sk.size() == 3 && sk.contains("spare"))) && sk.contains("text") &&
++				     sk.contains("cutscenes") && sk.getVal("text")->isIntegerNumber() &&
++				     sk.getVal("cutscenes")->isIntegerNumber();
++				if (ok) {
++					in.skipText = sk.getVal("text")->asIntegerNumber() != 0;
++					in.skipCutscenes = sk.getVal("cutscenes")->asIntegerNumber() != 0;
++				}
++				if (ok && sk.contains("spare")) {
++					ok = sk.getVal("spare")->isArray();
++					if (ok) {
++						for (const Common::JSONValue *v : sk.getVal("spare")->asArray()) {
++							if (!v->isIntegerNumber()) {
++								ok = false;
++								break;
++							}
++							in.spare.push_back((int32)v->asIntegerNumber());
++						}
++					}
++				}
++			} else if (obj.contains("key") && obj.getVal("key")->isString()) {
++				in.kind = SpeedrunInput::kKey;
++				in.keyName = obj.getVal("key")->asString();
++				ok = parseKeyName(in.keyName, in.key);
++			} else {
++				ok = false;
++			}
++		}
++		delete root;
++		if (!ok) {
++			error = Common::String::format("line %u: expected {\"frame\": N > 0, and one of click/rclick/move [x, y], key or skips}", lineNo);
++			return false;
++		}
++		if (in.frame < lastFrame) {
++			error = Common::String::format("line %u: frame %llu comes before frame %llu", lineNo,
++			                               (unsigned long long)in.frame, (unsigned long long)lastFrame);
++			return false;
++		}
++		lastFrame = in.frame;
++		out.push_back(in);
++	}
++	return true;
++}
++
++void SpeedrunBridge::applyRawInputs() {
++	// After neutraliseInput() and before maybeInjectSkip(): the mouse is where
++	// the schedule last put it, as a real mouse stays put between events, and
++	// this frame's events land in the fields processInput() reads next. A
++	// scheduled key takes the frame's one key; the automatic skip waits.
++	if (_inputs.empty())
++		return;
++	ScummEngine &e = *_vm;
++	e._mouse.x = _rawMouseX;
++	e._mouse.y = _rawMouseY;
++	while (_inputIndex < _inputs.size() && _inputs[_inputIndex].frame <= _frames) {
++		const SpeedrunInput &in = _inputs[_inputIndex++];
++		if (in.frame < _frames) {
++			fail("bad_inputs", Common::String::format("input %u is for frame %llu, already past", _inputIndex - 1,
++			                                         (unsigned long long)in.frame));
++			return;
++		}
++		JsonObject rec = record("input");
++		switch (in.kind) {
++		case SpeedrunInput::kSkips:
++			_skipText = in.skipText;
++			_skipCutscenes = in.skipCutscenes;
++			_skipSpare = in.spare;
++			rec.add("skip_text", (int)in.skipText).add("skip_cutscenes", (int)in.skipCutscenes)
++			   .add("skip_spare", (int)in.spare.size());
++			break;
++		case SpeedrunInput::kKey:
++			e._keyPressed = in.key;
++			if (in.key.keycode == Common::KEYCODE_ESCAPE)
++				_escThisFrame = true;
++			rec.add("key", in.keyName.c_str());
++			break;
++		case SpeedrunInput::kClick:
++		case SpeedrunInput::kRightClick:
++		case SpeedrunInput::kMove:
++			_rawMouseX = in.x;
++			_rawMouseY = in.y;
++			e._mouse.x = in.x;
++			e._mouse.y = in.y;
++			if (in.kind == SpeedrunInput::kClick)
++				e._leftBtnPressed |= kMsClicked | kMsDown;
++			else if (in.kind == SpeedrunInput::kRightClick)
++				e._rightBtnPressed |= kMsClicked | kMsDown;
++			rec.addRaw(in.kind == SpeedrunInput::kClick ? "click" : in.kind == SpeedrunInput::kRightClick ? "rclick" : "move",
++			           JsonArray().add((int)in.x).add((int)in.y).str());
++			break;
++		}
++		rec.add("room", (int)e._currentRoom);
++		writeRecord(rec);
++	}
 +}
 +
 +} // End of namespace Scumm
@@ -2731,10 +3906,10 @@ index 00000000..a8c6f042
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_skips.cpp b/engines/scumm/speedrun/speedrun_skips.cpp
 new file mode 100644
-index 00000000..4c794710
+index 00000000..7263e24f
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_skips.cpp
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,275 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -2851,6 +4026,8 @@ index 00000000..4c794710
 +		return false;
 +	if (!_override.ptr || _override.stale)
 +		return false;
++	if (_override.where == WIO_GLOBAL && spared(_override.number))
++		return false; // the skips event's "spare": the book's own override would end the book
 +	const byte *code = nullptr;
 +	uint32 size = 0;
 +	return slotCode(_override.slot, code, size) && _override.ptr < size && code[_override.ptr] == kOpJumpRelative;
@@ -2883,7 +4060,38 @@ index 00000000..4c794710
 +	// (global/script-024.txt [0057], [0069]).
 +	const int talker = e.VAR_TALK_ACTOR != 0xFF ? e._scummVars[e.VAR_TALK_ACTOR] : 0;
 +	waitSlot = messageWaitSlot();
-+	return (talker > 0 && talker < 0x80) || waitSlot >= 0;
++	return ((talker > 0 && talker < 0x80) || waitSlot >= 0) && !textSpared();
++}
++
++bool SpeedrunBridge::spared(int number) const {
++	for (uint k = 0; k < _skipSpare.size(); k++) {
++		if (_skipSpare[k] == number)
++			return true;
++	}
++	return false;
++}
++
++bool SpeedrunBridge::textSpared() const {
++	// The skips event's "spare" scripts: a line is theirs while one of them
++	// runs unfrozen and no other unfrozen script waits for the message. The
++	// item slide's book (global 148) turns a page each time the message ends
++	// while it waits (script_v5.cpp o5_wait), so '.' on its own page spends a
++	// page early; on a dialogue line, whose end costs the same page either way,
++	// or while a dialogue cutscene has the book frozen, '.' only saves time.
++	if (_skipSpare.empty())
++		return false;
++	const ScummEngine &e = *_vm;
++	bool spareRuns = false;
++	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
++		const ScriptSlot &ss = e.vm.slot[i];
++		if (ss.status == ssDead || ss.freezeCount > 0)
++			continue;
++		if (ss.where == WIO_GLOBAL && spared(ss.number))
++			spareRuns = true;
++		else if (slotWaitsForMessage(i))
++			return false;
++	}
++	return spareRuns;
 +}
 +
 +bool SpeedrunBridge::stepForbidsCutsceneSkip() const {
@@ -2898,6 +4106,8 @@ index 00000000..4c794710
 +		return;
 +
 +	ScummEngine &e = *_vm;
++	if (e._keyPressed.keycode != Common::KEYCODE_INVALID)
++		return; // a scheduled key (applyRawInputs()) has the frame's one key
 +	const int step = errorStep(); // -1 without a plan, and once it is done
 +	// One key per frame (the engine reads one): Esc first, since it removes
 +	// a whole override region; a line still showing gets '.' next frame.
@@ -2959,10 +4169,12 @@ index 00000000..4c794710
 +	// must be 6 whenever control is with the player: at the segment start,
 +	// at every step_end, at the goal, and at the first idle decision point
 +	// after a cutscene skip (which names the skip).
-+	static const int32 kTimerNext = 6;
++	// SPEEDRUN_TIMER_NEXT sets the required value (6 by default); "any"
++	// (-1) allows the logo glitch and its family under the Any% rules.
++	const int32 kTimerNext = _timerNextExpected;
 +	_speedCheckPending = false;
 +	const int32 now = _vm->_scummVars[_vm->VAR_TIMER_NEXT];
-+	if (now == kTimerNext)
++	if (kTimerNext < 0 || now == kTimerNext)
 +		return false;
 +	Common::String message = Common::String::format("var 19 (VAR_TIMER_NEXT) is %d at %s, not %d", now, when, kTimerNext);
 +	if (_speedCheckScript >= 0)
@@ -2975,10 +4187,10 @@ index 00000000..4c794710
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..85355f2f
+index 00000000..f8a73191
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,510 @@
+@@ -0,0 +1,576 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -3005,6 +4217,7 @@ index 00000000..85355f2f
 +
 +#include "common/config-manager.h"
 +#include "common/endian.h"
++#include "common/file.h"
 +
 +#include "scumm/actor.h"
 +#include "scumm/object.h"
@@ -3395,6 +4608,34 @@ index 00000000..85355f2f
 +			verbs.addRaw(verbJson(slot, true));
 +	}
 +	s.addRaw("verbs", verbs.str());
++
++	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
++	// PC offset, frozen count and cutscene override count.
++	JsonArray slots;
++	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
++		const ScriptSlot &ss = e.vm.slot[i];
++		if (ss.status == ssDead)
++			continue;
++		JsonObject o;
++		o.add("slot", i).add("number", (int)ss.number).add("where", (int)ss.where).add("status", (int)ss.status)
++		 .add("offs", (uint64)ss.offs).add("frozen", (int)ss.freezeCount).add("delay", (int)ss.delay)
++		 .add("cutscene_override", (int)ss.cutsceneOverride);
++		slots.addRaw(o.str());
++	}
++	s.addRaw("slots", slots.str());
++
++	// Actors in the current room: what a click on a person (Give fish to troll) aims at.
++	JsonArray actors;
++	for (int i = 1; i < e._numActors; i++) {
++		const Actor *a = e._actors[i];
++		if (!a || !a->isInCurrentRoom() || !a->_visible)
++			continue;
++		JsonObject o;
++		o.add("id", i).add("x", (int)a->getRealPos().x).add("y", (int)a->getRealPos().y)
++		 .add("elevation", (int)a->getElevation()).add("moving", (int)a->_moving);
++		actors.addRaw(o.str());
++	}
++	s.addRaw("actors", actors.str());
 +	return s.str();
 +}
 +
@@ -3421,7 +4662,12 @@ index 00000000..85355f2f
 +		const ResourceManager::Resource &res = e._res->_types[rtRoom][r];
 +		// Rooms outside the disk's LOFF table would make openRoom() fall back
 +		// to askForDisk() and its modal dialog.
-+		if (res._roomno == 0 || res._roomoffs == 0 || res._roomoffs == RES_INVALID_OFFSET)
++		if (res._roomno == 0 || res._roomoffs == RES_INVALID_OFFSET)
++			continue;
++		// Offset 0: the room is on a disk whose LOFF is not loaded. Multi-disk
++		// releases (DOS floppy: DISKnn.LEC) find it by opening that disk's
++		// file (openRoom(), resource.cpp), so only a missing file is skipped.
++		if (res._roomoffs == 0 && (!(e._game.features & GF_SMALL_HEADER) || !Common::File::exists(e.generateFilename(r))))
 +			continue;
 +		const byte *room = e.getResourceAddress(rtRoom, r);
 +		if (!room)
@@ -3432,11 +4678,43 @@ index 00000000..85355f2f
 +		const RoomHeader *rmhd = (const RoomHeader *)e.findResourceData(MKTAG('R','M','H','D'), room);
 +		const int numObjects = rmhd ? READ_LE_UINT16(&rmhd->old.numObjects) : 0;
 +		JsonArray objects;
-+		ResourceIterator obcds(room, false);
++		const bool small = (e._game.features & GF_SMALL_HEADER) != 0;
++		ResourceIterator obcds(room, small);
 +		for (int i = 0; i < numObjects; i++) {
 +			const byte *obcd = obcds.findNext(MKTAG('O','B','C','D'));
 +			if (!obcd)
 +				break;
++			if (small) {
++				// v4 OBCD, as ScummEngine_v4::resetRoomObject() and
++				// getVerbEntrypoint() read it (object.cpp, script.cpp): no
++				// sub-blocks, fixed fields, the name at the offset in byte
++				// 18, the verb table from byte 19.
++				const int id = READ_LE_UINT16(obcd + 6);
++				const bool known = id > 0 && id < e._numGlobalObjects;
++				JsonArray handled;
++				for (const byte *p = obcd + 19; *p; p += 3)
++					handled.add(*p);
++				JsonObject o;
++				o.add("id", id).add("name", withoutAt(obcd + obcd[18]));
++				if (known) {
++					o.add("owner", (int)e._objectOwnerTable[id])
++					 .add("state", (int)e._objectStateTable[id])
++					 .addRaw("classes", classesJson(e._classData[id]));
++				} else {
++					o.addNull("owner").addNull("state").addRaw("classes", "[]");
++				}
++				o.addRaw("walk", pointJson((int16)READ_LE_UINT16(obcd + 13), (int16)READ_LE_UINT16(obcd + 15)))
++				 .add("x", obcd[9] * 8)
++				 .add("y", (obcd[10] & 0x7F) * 8)
++				 .add("w", obcd[11] * 8)
++				 .add("h", obcd[17] & 0xF8)
++				 .add("parent", (int)obcd[12])
++				 .add("parentstate", (obcd[10] & 0x80) ? 1 : 0)
++				 .add("actordir", obcd[17] & 7)
++				 .addRaw("verbs", handled.str());
++				objects.add(o);
++				continue;
++			}
 +			const CodeHeader *cdhd = (const CodeHeader *)e.findResourceData(MKTAG('C','D','H','D'), obcd);
 +			if (!cdhd)
 +				continue;
