@@ -1,0 +1,277 @@
+    search: expanded 1 tried 2 frontier 1 best None bound 215785
+    search: expanded 2 tried 5 frontier 0 best None bound 215785
+5001 S5g1 Stand up on the beach                           rta   894.55s hint            12s 
+    search: expanded 1 tried 1 frontier 0 best None bound 218265
+5002 S5g2 Map: up the volcano trail to the fort           rta   904.88s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 218865 bound None
+5003  hint failed: target does not hold after the hint
+5003 S5g3 Fort: push the cannon (the gunpowder spills)    rta   907.38s search           1s ['auto: verb 6 cannon', 'auto: wait until idle']
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 2 best None bound None
+    search: expanded 3 tried 7 frontier 1 best 219385 bound None
+    search: expanded 4 tried 9 frontier 0 best 219345 bound None
+5004  hint failed: target does not hold after the hint
+5004 S5g4 Fort: take the gunpowder and the rope           rta   909.38s search           1s ['auto: verb 9 rope', 'auto: verb 9 gunpowder']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 1 best None bound None
+    search: expanded 4 tried 11 frontier 2 best None bound None
+    search: expanded 5 tried 16 frontier 3 best 221845 bound None
+    search: expanded 6 tried 20 frontier 3 best 221845 bound None
+5005  hint failed: target does not hold after the hint
+5005 S5g5 River fork: take the flint (noteworthy rock)    rta   919.80s search          10s ['auto: walk to exit 39 -> room 4', 'auto: walk to exit 51 -> room 15', 'auto: verb 9 rock on top of note']
+    search: expanded 1 tried 2 frontier 2 best None bound 224225
+    search: expanded 2 tried 4 frontier 2 best None bound 224225
+    search: expanded 3 tried 6 frontier 2 best None bound 224225
+    search: expanded 4 tried 11 frontier 3 best None bound 224225
+    search: expanded 5 tried 16 frontier 4 best None bound 224225
+    search: expanded 6 tried 18 frontier 4 best None bound 224225
+    search: expanded 7 tried 20 frontier 4 best None bound 224225
+    search: expanded 8 tried 22 frontier 4 best None bound 224225
+    search: expanded 9 tried 24 frontier 4 best None bound 224225
+    search: expanded 10 tried 29 frontier 3 best None bound 224225
+    search: expanded 11 tried 34 frontier 2 best None bound 224225
+    search: expanded 12 tried 39 frontier 1 best None bound 224225
+    search: expanded 13 tried 44 frontier 0 best None bound 224225
+5006 S5g6 Seesaw: aim the catapult (Var[242] 2 -> 4)      rta   929.72s hint             7s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 6 frontier 0 best 227205 bound None
+5007  hint failed: target does not hold after the hint
+5007 S5g7 Vista: push the rock (bananas fall on the main  rta   942.13s search           1s ['auto: wait until idle', 'auto: walk to exit 232 -> room 11', 'auto: verb 5 rock']
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 4 frontier 3 best None bound None
+    search: expanded 3 tried 7 frontier 3 best None bound None
+    search: expanded 4 tried 10 frontier 2 best None bound None
+    search: expanded 5 tried 13 frontier 1 best None bound None
+    search: expanded 6 tried 15 frontier 1 best None bound None
+    search: expanded 7 tried 17 frontier 0 best 230225 bound None
+5008  hint failed: target does not hold after the hint
+5008 S5g8 Back down to the river fork                     rta   954.72s search           1s ["auto: say 'Yes, it IS a nice view.'", 'auto: walk to exit 115 -> room 16', 'auto: walk to exit 233 -> room 15']
+    search: expanded 1 tried 3 frontier 1 best None bound 234893
+    search: expanded 2 tried 4 frontier 0 best None bound 234893
+5009 S5g9 River fork: blow up the dam (gunpowder, then fl rta   974.17s hint             2s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 236013 bound None
+5010  hint failed: target does not hold after the hint
+5010 S5g10 Pond: take the rope                            rta   978.84s search           1s ['auto: walk to exit 59 -> room 40', 'auto: verb 9 rope']
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 4 frontier 2 best None bound None
+    search: expanded 3 tried 6 frontier 1 best 237133 bound None
+    search: expanded 4 tried 9 frontier 3 best 237133 bound None
+    search: expanded 5 tried 11 frontier 3 best 237133 bound None
+    search: expanded 6 tried 15 frontier 3 best 237133 bound None
+    search: expanded 7 tried 19 frontier 3 best 237133 bound None
+5011  hint failed: target does not hold after the hint
+5011 S5g11 Map: into the crack                            rta   983.50s search           2s ['auto: walk to exit 554 -> room 4', 'auto: walk to exit 46 -> room 2', 'auto: walk to exit 35 -> room 18']
+    search: expanded 1 tried 2 frontier 0 best None bound 240953
+5012 S5g12 Crack: tie both ropes and take the oars        rta   999.42s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 2 best None bound None
+    search: expanded 3 tried 8 frontier 1 best 243753 bound None
+    search: expanded 4 tried 11 frontier 0 best 243653 bound None
+5013  hint failed: target does not hold after the hint
+5013 S5g13 Main beach: pick up the fallen bananas         rta  1010.67s search           2s ['auto: walk to exit 244 -> room 2', 'auto: walk to exit 30 -> room 20', 'auto: verb 9 bananas']
+    search: expanded 1 tried 5 frontier 2 best None bound None
+    search: expanded 2 tried 8 frontier 1 best 244073 bound None
+5014  hint failed: target does not hold after the hint
+5014 S5g14 Main beach: launch the rowboat with the oars   rta  1012.42s search           1s ['auto: verb 7 oars', 'auto: walk to exit 261 -> room 2']
+    search: expanded 1 tried 3 frontier 1 best None bound 248213
+    search: expanded 2 tried 5 frontier 1 best None bound 248213
+    search: expanded 3 tried 7 frontier 0 best 248013 bound 248213
+5015 S5g15 Row to the village beach (room 132)            rta  1028.84s search<hint      4s ['auto: walk to exit 33 -> room 5', 'auto: walk to exit 64 -> room 6', 'auto: verb 11 beach']
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 0 best 249413 bound None
+5016  hint failed: target does not hold after the hint
+5016 S5g16 Walk into the cannibal village (first visit)   rta  1034.67s search           4s ['auto: walk to exit 16 -> room 6', 'auto: walk to exit 72 -> room 25']
+    search: expanded 1 tried 4 frontier 1 best None bound 252373
+    search: expanded 2 tried 6 frontier 0 best None bound 252373
+5017 S5g17 Village visit 1: take the bananas and get capt rta  1047.01s hint             5s 
+    search: expanded 1 tried 2 frontier 1 best None bound 253173
+    search: expanded 2 tried 5 frontier 0 best None bound 253173
+5018 S5g18 Hut: escape through the loose board            rta  1050.34s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 257193
+5019 S5g19 Row back to the clearing-side beach (room 131) rta  1067.09s hint             2s 
+    search: expanded 1 tried 3 frontier 2 best None bound 258833
+    search: expanded 2 tried 10 frontier 2 best None bound 258833
+    search: expanded 3 tried 14 frontier 2 best None bound 258833
+    search: expanded 4 tried 21 frontier 1 best None bound 258833
+    search: expanded 5 tried 28 frontier 3 best None bound 258833
+    search: expanded 6 tried 33 frontier 2 best 258693 bound 258833
+    search: expanded 7 tried 35 frontier 2 best 258693 bound 258833
+    search: expanded 8 tried 40 frontier 2 best 258693 bound 258833
+    search: expanded 9 tried 45 frontier 2 best 258693 bound 258833
+    search: expanded 10 tried 52 frontier 1 best 258693 bound 258833
+    search: expanded 11 tried 59 frontier 0 best 258693 bound 258833
+5020 S5g20 Map room 2 on foot (the monkey's screen)       rta  1073.34s search<hint    188s ['auto: walk to exit 16 -> room 5', 'auto: walk to exit 62 -> room 4', 'auto: walk to exit 46 -> room 2']
+    search: expanded 1 tried 3 frontier 1 best None bound 262493
+    search: expanded 2 tried 5 frontier 0 best None bound 262493
+5021 S5g21 Meet the monkey (jungle room 21)               rta  1089.17s hint             3s 
+    search: expanded 1 tried 1 frontier 0 best None bound 265993
+5022 S5g22 Feed the monkey all five bananas               rta  1103.76s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 269233
+    search: expanded 2 tried 5 frontier 1 best None bound 269233
+    search: expanded 3 tried 8 frontier 0 best None bound 269233
+5023 S5g23 Lead the monkey to the clearing (room 12)      rta  1117.26s hint             7s 
+    search: expanded 1 tried 3 frontier 1 best None bound 271953
+    search: expanded 2 tried 5 frontier 1 best None bound 271953
+    search: expanded 3 tried 6 frontier 0 best None bound 271953
+5024 S5g24 Pull the nose: the monkey holds the gate open  rta  1128.59s hint             5s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 0 best 272993 bound None
+5025  hint failed: target does not hold after the hint
+5025 S5g25 Idol field: take the wimpy idol                rta  1132.92s search           2s ['auto: wait until idle', 'auto: walk to exit 155 -> room 69', 'auto: verb 9 wimpy little idol']
+    search: expanded 1 tried 2 frontier 1 best None bound 282753
+    search: expanded 2 tried 4 frontier 1 best None bound 282753
+    search: expanded 3 tried 6 frontier 0 best None bound 282753
+5026 S5g26 Row to the village beach with the idol         rta  1173.59s hint            10s 
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 0 best 284153 bound None
+5027  hint failed: target does not hold after the hint
+5027 S5g27 Walk into the village (second visit)           rta  1179.43s search           5s ['auto: walk to exit 16 -> room 6', 'auto: walk to exit 72 -> room 25']
+    search: expanded 1 tried 3 frontier 0 best None bound 286813
+5028 S5g28 Village visit 2: give the idol to the cannibal rta  1190.51s hint             2s 
+    search: expanded 1 tried 2 frontier 1 best None bound 289373
+    search: expanded 2 tried 6 frontier 2 best None bound 289373
+    search: expanded 3 tried 9 frontier 2 best None bound 289373
+    search: expanded 4 tried 14 frontier 4 best None bound 289373
+    search: expanded 5 tried 18 frontier 5 best None bound 289373
+    search: expanded 6 tried 20 frontier 5 best None bound 289373
+    search: expanded 7 tried 22 frontier 5 best None bound 289373
+    search: expanded 8 tried 26 frontier 7 best None bound 289373
+    search: expanded 9 tried 30 frontier 9 best None bound 289373
+    search: expanded 10 tried 32 frontier 9 best None bound 289373
+    search: expanded 11 tried 36 frontier 12 best None bound 289373
+    search: expanded 12 tried 39 frontier 14 best None bound 289373
+    search: expanded 13 tried 42 frontier 16 best None bound 289373
+    search: expanded 14 tried 46 frontier 15 best None bound 289373
+    search: expanded 15 tried 49 frontier 16 best None bound 289373
+    search: expanded 16 tried 52 frontier 16 best None bound 289373
+    search: expanded 17 tried 57 frontier 15 best None bound 289373
+    search: expanded 18 tried 60 frontier 16 best None bound 289373
+    search: expanded 19 tried 64 frontier 16 best None bound 289373
+    search: expanded 20 tried 68 frontier 16 best None bound 289373
+    search: expanded 21 tried 72 frontier 16 best None bound 289373
+    search: expanded 22 tried 76 frontier 16 best None bound 289373
+    search: expanded 23 tried 78 frontier 16 best None bound 289373
+    search: expanded 24 tried 82 frontier 16 best None bound 289373
+    search: expanded 25 tried 84 frontier 16 best None bound 289373
+    search: expanded 26 tried 88 frontier 15 best None bound 289373
+    search: expanded 27 tried 90 frontier 15 best None bound 289373
+    search: expanded 28 tried 94 frontier 14 best None bound 289373
+    search: expanded 29 tried 96 frontier 14 best None bound 289373
+    search: expanded 30 tried 100 frontier 14 best None bound 289373
+    search: expanded 31 tried 102 frontier 15 best None bound 289373
+    search: expanded 32 tried 104 frontier 16 best None bound 289373
+    search: expanded 33 tried 106 frontier 16 best None bound 289373
+    search: expanded 34 tried 108 frontier 16 best None bound 289373
+    search: expanded 35 tried 110 frontier 16 best None bound 289373
+    search: expanded 36 tried 112 frontier 16 best None bound 289373
+    search: expanded 37 tried 116 frontier 16 best None bound 289373
+    search: expanded 38 tried 120 frontier 16 best None bound 289373
+    search: expanded 39 tried 124 frontier 16 best None bound 289373
+    search: expanded 40 tried 128 frontier 16 best None bound 289373
+    search: expanded 41 tried 132 frontier 15 best None bound 289373
+    search: expanded 42 tried 136 frontier 14 best None bound 289373
+    search: expanded 43 tried 140 frontier 13 best None bound 289373
+    search: expanded 44 tried 142 frontier 13 best None bound 289373
+    search: expanded 45 tried 145 frontier 15 best None bound 289373
+    search: expanded 46 tried 149 frontier 14 best None bound 289373
+    search: expanded 47 tried 152 frontier 16 best None bound 289373
+    search: expanded 48 tried 156 frontier 15 best None bound 289373
+    search: expanded 49 tried 157 frontier 15 best None bound 289373
+    search: expanded 50 tried 160 frontier 16 best None bound 289373
+    search: expanded 51 tried 164 frontier 15 best None bound 289373
+    search: expanded 52 tried 167 frontier 16 best None bound 289373
+    search: expanded 53 tried 171 frontier 15 best None bound 289373
+    search: expanded 54 tried 172 frontier 14 best None bound 289373
+    search: expanded 55 tried 173 frontier 13 best None bound 289373
+    search: expanded 56 tried 175 frontier 14 best None bound 289373
+    search: expanded 57 tried 177 frontier 15 best None bound 289373
+    search: expanded 58 tried 179 frontier 16 best None bound 289373
+    search: expanded 59 tried 183 frontier 16 best None bound 289373
+    search: expanded 60 tried 185 frontier 16 best None bound 289373
+    search: expanded 61 tried 186 frontier 15 best None bound 289373
+    search: expanded 62 tried 188 frontier 16 best None bound 289373
+    search: expanded 63 tried 192 frontier 15 best None bound 289373
+    search: expanded 64 tried 194 frontier 16 best None bound 289373
+    search: expanded 65 tried 198 frontier 15 best None bound 289373
+    search: expanded 66 tried 200 frontier 16 best None bound 289373
+    search: expanded 67 tried 204 frontier 15 best None bound 289373
+    search: expanded 68 tried 206 frontier 16 best None bound 289373
+    search: expanded 69 tried 210 frontier 15 best None bound 289373
+    search: expanded 70 tried 213 frontier 16 best None bound 289373
+    search: expanded 71 tried 217 frontier 15 best None bound 289373
+    search: expanded 72 tried 220 frontier 16 best None bound 289373
+    search: expanded 73 tried 224 frontier 15 best None bound 289373
+    search: expanded 74 tried 227 frontier 16 best None bound 289373
+    search: expanded 75 tried 231 frontier 15 best None bound 289373
+    search: expanded 76 tried 233 frontier 16 best None bound 289373
+    search: expanded 77 tried 235 frontier 16 best None bound 289373
+    search: expanded 78 tried 237 frontier 16 best None bound 289373
+    search: expanded 79 tried 240 frontier 16 best None bound 289373
+    search: expanded 80 tried 244 frontier 15 best None bound 289373
+    search: expanded 81 tried 246 frontier 15 best None bound 289373
+    search: expanded 82 tried 250 frontier 14 best None bound 289373
+    search: expanded 83 tried 252 frontier 14 best None bound 289373
+    search: expanded 84 tried 256 frontier 13 best None bound 289373
+    search: expanded 85 tried 258 frontier 13 best None bound 289373
+    search: expanded 86 tried 262 frontier 12 best None bound 289373
+    search: expanded 87 tried 263 frontier 12 best None bound 289373
+    search: expanded 88 tried 265 frontier 13 best None bound 289373
+    search: expanded 90 tried 267 frontier 13 best None bound 289373
+    search: expanded 92 tried 269 frontier 13 best None bound 289373
+    search: expanded 94 tried 272 frontier 14 best None bound 289373
+    search: expanded 96 tried 275 frontier 15 best None bound 289373
+    search: expanded 98 tried 276 frontier 14 best None bound 289373
+    search: expanded 99 tried 279 frontier 16 best None bound 289373
+    search: expanded 101 tried 281 frontier 16 best None bound 289373
+    search: expanded 103 tried 282 frontier 15 best None bound 289373
+    search: expanded 105 tried 283 frontier 14 best None bound 289373
+    search: expanded 107 tried 284 frontier 13 best None bound 289373
+    search: expanded 109 tried 286 frontier 13 best None bound 289373
+5029 S5g29 Leave and re-enter from the map: the navigator rta  1201.18s hint            50s 
+    search: expanded 1 tried 3 frontier 0 best None bound 290238
+5030 S5g30 Give the leaflet: navigator head and necklace  rta  1204.78s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 291258 bound None
+5031  hint failed: target does not hold after the hint
+5031 S5g31 Hut: take the banana picker                    rta  1209.03s search           1s ['auto: walk to exit 285 -> room 27', 'auto: verb 9 banana picker']
+    search: expanded 1 tried 3 frontier 1 best None bound 292598
+    search: expanded 2 tried 7 frontier 1 best None bound 292598
+    search: expanded 3 tried 13 frontier 1 best None bound 292598
+    search: expanded 4 tried 18 frontier 0 best None bound 292598
+5032 S5g32 Herman: the banana picker for the monkey head  rta  1214.61s hint             4s 
+    search: expanded 1 tried 2 frontier 1 best None bound 297298
+    search: expanded 2 tried 4 frontier 1 best None bound 297298
+    search: expanded 3 tried 6 frontier 0 best None bound 297298
+5033 S5g33 Row back to the clearing-side beach with the k rta  1234.20s hint             3s 
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 1 best None bound None
+    search: expanded 4 tried 10 frontier 0 best 300858 bound None
+5034  hint failed: target does not hold after the hint
+5034 S5g34 Through the open gate to the idol field (S6 ha rta  1249.03s search           7s ['auto: walk to exit 16 -> room 5', 'auto: walk to exit 63 -> room 12', 'auto: walk to exit 155 -> room 69']
+    search: expanded 1 tried 2 frontier 0 best 303378 bound None
+6001  hint failed: target does not hold after the hint
+6001 S6g1 Open the giant monkey head: Use the ear with th rta  1259.53s search           1s ['auto: use monkey head key with gigantic monkey ear']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 303778 bound None
+6002  hint failed: target does not hold after the hint
+6002 S6g2 Walk into the open mouth: climb down to the und rta  1261.20s search           1s ['auto: wait until idle', 'auto: walk to exit 133 -> room 65']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 7 frontier 1 best 304758 bound None
+6003  hint failed: target does not hold after the hint
+6003 S6g3 Take out the navigator head in room 65          rta  1265.28s search           3s ['auto: wait until idle', 'auto: verb 2 head of the navigator']
+    search: expanded 1 tried 2 frontier 0 best 309178 bound None
+6004  hint failed: target does not hold after the hint
+6004 S6g4 Walk to the cave: enter the catacombs (room 39) rta  1283.70s search           3s ['auto: walk to exit 755 -> room 39']
+    search: expanded 1 tried 6 frontier 0 best None bound 309598
+6005 S6g5 Catacombs exit 1/6: walk to the cave the head p rta  1285.45s hint             9s 
+    search: expanded 1 tried 2 frontier 1 best None bound 310038
+    search: expanded 2 tried 8 frontier 1 best None bound 310038
+    search: expanded 3 tried 10 frontier 1 best None bound 310038

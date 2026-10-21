@@ -1,0 +1,500 @@
+diff -ruN -x __pycache__ a/routes/anypercent/S4-part2.json b/routes/anypercent/S4-part2.json
+--- a/routes/anypercent/S4-part2.json	2026-10-20 10:53:56.985344139 +0000
++++ b/routes/anypercent/S4-part2.json	2026-10-20 18:41:14.250634666 +0000
+@@ -407,7 +407,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-014-sh-galley/obj-0163-cupboard.txt [002C] startScript(25,[VAR_ME]), [0012]-[0023] (default verb Open while closed); global/script-025.txt [000A]-[003C]; global/script-002.txt [032A]-[0397] (class 14: cutscene([2]) + delay(20)); global/script-070.txt [0211], [021A], [02DA]; global/script-019.txt [0054]",
+-      "note": "GATE: var 352 == 0 means global 70's last endCutscene has run (var 352 is the scripts' own cutscene depth, raised only by global/script-018.txt [0000] and lowered by global/script-019.txt [0000]; at S4 entry it is 2, see entry.flags). No reach-producing sentence may start before that: a carrier endCutscene inside a reach window pops the reach's cutscene-stack entry and its doSentence(STOP) stops global 2 with its cutscene active (crash_rules). SLIDE CHECK here: with var 352 == 0, var 53 == 2 means the slide is armed (global 70's endCutscene raised _userPut from 1 to 2); var 53 == 1 means it was lost: keep going but use the fallbacks named in the kind=glitch moves (15, 16, 25, 34, 39-57, 68, 72). While waiting, a floor click at (72,131) pre-walks the ego (dx 24, dy 7: about 4 frames). The executor may deliver this as one right-click (default verb Open; global/script-004.txt [0000]-[0016]) instead of 'o' + click. Crash window: the reach (crash_rules 1)."
++      "note": "GATE: var 352 == 0 means global 70's last endCutscene has run (var 352 is the scripts' own cutscene depth, raised only by global/script-018.txt [0000] and lowered by global/script-019.txt [0000]; at S4 entry it is 2, see entry.flags). No reach-producing sentence may start before that: a carrier endCutscene inside a reach window pops the reach's cutscene-stack entry and its doSentence(STOP) stops global 2 with its cutscene active (crash_rules). SLIDE CHECK here: with var 352 == 0, var 53 == 2 means the slide is armed (global 70's endCutscene raised _userPut from 1 to 2); var 53 == 1 means it was lost: keep going but use the fallbacks named in the kind=glitch moves (15, 16, 25, 34, 39-57, 68, 72). While waiting, a floor click at (72,131) pre-walks the ego (dx 24, dy 7: about 4 frames). The executor may deliver this as one right-click (default verb Open; global/script-004.txt [0000]-[0016]) instead of 'o' + click. Crash window: the reach (crash_rules 1). ENGINE (2026-10-20, part3b lane): right-click (rclick): the verb-90 entry sets Var[182] = 2 (Open) while closed, so script 4 takes Open for a right click (global/script-004.txt [0005]-[0016]) and the 'o' key's frame goes: done 1 frame sooner with early inputs (measured from slide-int1).",
++      "rclick": true
+     },
+     {
+       "name": "Pick up cereal",
+@@ -801,7 +802,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-007-sh-captai/obj-0083-drawer.txt [002F] setState(VAR_ME,1); [0015]-[0026] default verb Open while closed; global/script-002.txt [033D]-[0397] (class 15 reach)",
+-      "note": "Book route only (moves 23-26, about 1.4 s per LeoLitz, YT-SLIDE 15:35). The executor may right-click (default verb Open). Ink (154,116) -> drawer (118,120): about 5 frames. Crash window: the reach."
++      "note": "Book route only (moves 23-26, about 1.4 s per LeoLitz, YT-SLIDE 15:35). The executor may right-click (default verb Open). Ink (154,116) -> drawer (118,120): about 5 frames. Crash window: the reach. ENGINE (2026-10-20, part3b lane): right-click (rclick): the verb-90 entry sets Var[182] = 2 (Open) while closed, so script 4 takes Open for a right click (global/script-004.txt [0005]-[0016]) and the 'o' key's frame goes (measured 1 frame on the cupboard and the hull chest with early inputs; the same mechanism here).",
++      "rclick": true
+     },
+     {
+       "name": "Look at the drawer (take the dusty book)",
+@@ -1005,7 +1007,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-008-sh-hull/obj-0092-chest.txt [00DE] startScript(25,[VAR_ME]), [0015]-[0029] default verb Open while closed; global/script-025.txt [000A]-[003C]; global/script-002.txt [032F]-[0397] (class 16 reach)",
+-      "note": "Right-click gives Open in one input. Rope (214,143) -> chest (292,135): about 10 frames. Crash window: the reach."
++      "note": "Right-click gives Open in one input. Rope (214,143) -> chest (292,135): about 10 frames. Crash window: the reach. ENGINE (2026-10-20, part3b lane): right-click (rclick): the verb-90 entry sets Var[182] = 2 (Open) while closed, so script 4 takes Open for a right click (global/script-004.txt [0005]-[0016]) and the 'o' key's frame goes: done 1 frame sooner with early inputs (measured from slide-int1).",
++      "rclick": true
+     },
+     {
+       "name": "Look at the hull chest (fine wine)",
+diff -ruN -x __pycache__ a/routes/anypercent/S5-part3-island.json b/routes/anypercent/S5-part3-island.json
+--- a/routes/anypercent/S5-part3-island.json	2026-10-20 10:53:56.986344154 +0000
++++ b/routes/anypercent/S5-part3-island.json	2026-10-20 19:39:15.975986918 +0000
+@@ -906,20 +906,22 @@
+         {
+           "var": 2,
+           "eq": 624
++        },
++        {
++          "var": 352,
++          "eq": 0
+         }
+       ],
+       "until": [
+         {
+-          "not": {
+-            "var": 3,
+-            "eq": 0
+-          }
++          "var": 352,
++          "eq": 1
+         }
+       ],
+       "kind": "glitch",
+       "glitch": "Inputs: verb Look at (key 'l') and a click on the note icon, landing on the frame after state(142) becomes 1 (202 has then run [002B]-[0046]: boxes unlocked, endCutscene). Mechanism: the note's Look-at is cutscene([2]) (room-083-cu-dock/obj-0907-note.txt [0015]) and every cutscene start runs freezeScripts(127) (global/script-018.txt [0070]; engines/scumm/script.cpp freezeScripts skips only freeze-resistant slots). Local 202 (started without F) is frozen in its 'wait until ego moves' loop; local 204 is freeze-resistant but waits for 202 to finish, so the gate never closes. The slide keeps input on during the reading (_userPut 1), and scene clicks become floor walks because the hover script 23 is frozen with Var[108]=0 (script 11 cleared it, global/script-011.txt [0005]). PRECONDITION (var 2 == 624, VAR_CAMERA_POS_X): local 202's panCameraTo(624) is conditional (room-012-monkey-he/local-202.txt [0005] 'if (VAR_CAMERA_POS_X < 624)'). Only the pan puts the camera in panning mode (engines/scumm/camera.cpp:195-199), which stops it from following ego. Without the pan the camera stays in follow mode, the walk to (770,88) drags it to about 768, and local 209 (already started by 208 at the nose, getDist(ego,135) < 200, local-208.txt [0001]-[000F]; frozen during the reading) fires on unfreeze (local-209.txt [0001] camera >= 684) before the 155 click (scripts run before input, scumm.cpp:3231-3232): Herman walks ego to (693,127) ([0054]-[0070]), 202 ends and 204/203 close the gate. At state(142)==1 the camera can read exactly 624 only if the pan ran (202 waits for == 624 at [0010]; a follow camera that skipped the pan is at least 2 strips past 624 by then).",
+       "cite": "room-083-cu-dock/obj-0907-note.txt [0015]-[0192]; room-012-monkey-he/local-202.txt [0047]-[0052]; local-204.txt [0027]-[002C]; global/script-018.txt [0005]-[0070]",
+-      "note": "If the click lands during 202's opening cutscene the sentence still runs (new sentences have freezeCount 0, engines/scumm/script.cpp doSentence) and would freeze 202 before the boxes unlock: too early fails. Note 907 is picked up at the end of Part I (room-083-cu-dock/local-203.txt [0732]); S3's and S4's exit inventories list it. Fallback reading: compass 732 Look at (room-059-stans/obj-0732-magnetic-compass.txt [0021]) or the book 74 (global/script-148.txt [001F]). A reading-free variant (click 155 so that its pixel snaps into a box unreachable from the nose, making the exit instant) does not exist: with 10-13 unlocked all room-12 boxes form one component (BOXM), and with 10-13 locked the click snaps to a reachable box and ego walks. PRE-SLIDE FALLBACK: pick up the beach bananas (room 20 object 270, which also takes 265-267, room-020-main-beac/obj-0270-bananas.txt [0018]-[0040]), give them to the map monkey so it follows (global/script-043.txt), pull the nose and let the monkey hold it (room-012-monkey-he/local-204.txt [004E]-[0057], local-205.txt). If 'after' does not hold (var 2 != 624 once state(142)==1), the skip is impossible from this state: the search discards the branch (or the run reloads a save made before the clearing, Any% Saves) and approaches again; never continue. ENGINE (slide run, 2026-10-20): with the slide carried the counters are already var 53 == 1, var 352 == 1 before the reading and stay there during it (202 and 209 frozen), so 'until' is ego's first line (VAR_HAVE_MSG != 0); the bridge's automatic '.' is off from here to the idol, or it ends the reading before ego reaches (770,88).",
++      "note": "If the click lands during 202's opening cutscene the sentence still runs (new sentences have freezeCount 0, engines/scumm/script.cpp doSentence) and would freeze 202 before the boxes unlock: too early fails. Note 907 is picked up at the end of Part I (room-083-cu-dock/local-203.txt [0732]); S3's and S4's exit inventories list it. Fallback reading: compass 732 Look at (room-059-stans/obj-0732-magnetic-compass.txt [0021]) or the book 74 (global/script-148.txt [001F]). A reading-free variant (click 155 so that its pixel snaps into a box unreachable from the nose, making the exit instant) does not exist: with 10-13 unlocked all room-12 boxes form one component (BOXM), and with 10-13 locked the click snaps to a reachable box and ego walks. PRE-SLIDE FALLBACK: pick up the beach bananas (room 20 object 270, which also takes 265-267, room-020-main-beac/obj-0270-bananas.txt [0018]-[0040]), give them to the map monkey so it follows (global/script-043.txt), pull the nose and let the monkey hold it (room-012-monkey-he/local-204.txt [004E]-[0057], local-205.txt). If 'after' does not hold (var 2 != 624 once state(142)==1), the skip is impossible from this state: the search discards the branch (or the run reloads a save made before the clearing, Any% Saves) and approaches again; never continue. ENGINE (slide run, 2026-10-20): with the slide carried the counters are already var 53 == 1, var 352 == 1 before the reading and stay there during it (202 and 209 frozen), so 'until' is ego's first line (VAR_HAVE_MSG != 0); the bridge's automatic '.' is off from here to the idol, or it ends the reading before ego reaches (770,88). ENGINE (2026-10-20, part3b lane): until is now the reading's cutscene (var 352 == 1), with 'after' var 352 == 0 (202's opening cutscene has ended, so the depth can only rise for the note): the next move walks at once, during the note's 20-frame costume-68 animation ([0041]-[005E] breakHere) instead of from ego's first line. The walk in costume 68 is harmless (the override at [0172] restores costume 1). Measured from slide-int1 frame 10787 with early inputs: ego at (770,88) at 10916 instead of 10935, room 69 at 10920 instead of 10939.",
+       "gate": "input",
+       "skips": {
+         "text": 0,
+@@ -961,7 +963,7 @@
+       "kind": "glitch",
+       "glitch": "Inputs: floor clicks (repeat allowed) at one fixed pixel that lies on object 155's hotspot but not on 133's: room x 760-783, y 81-95 (or x 752-759). With the camera parked at 624 by 202's panCameraTo (202 is frozen, so actorFollowCamera never runs) that pixel is on screen at screen x 296-319. Ego walks there through boxes 10-13. Herman's 208/209 are frozen too, and the camera, in panning mode at 624 (the precondition of 'Monkey skip 1'), does not follow ego, so it stays below 684.",
+       "cite": "room-012-monkey-he/local-202.txt [0005]-[0010] (panCameraTo(624)), [002B]-[003F]; object boxes from out/objects.json (155: 752,0,208,96 class 10; 133: 760,24,136,56; 135/140-142 untouchable); room-012-monkey-he/local-209.txt [0001]",
+-      "note": "Runner wording: 'walk right below the monkey's ear while holding Enter'. Room-12 BOXD/BOXM replayed with ScummVM's adjustXYToBeInBox: (770,88) lies inside box 11 (768-822 x 85-104), so the target is exactly (770,88); the nose walk point (677,109) snaps to (676,111) in box 15, and 15-9-13-10-11 is connected once 202 unlocks 10-13. 'until' is exact arrival: Esc must not land while ego is still moving, or 202 ends on unfreeze and the gate closes. Any pixel of 155 outside 133 with x 768-783, y 85-95 is inside box 11 and works the same; pixels with y < 85 snap to (x,85).",
++      "note": "Runner wording: 'walk right below the monkey's ear while holding Enter'. Room-12 BOXD/BOXM replayed with ScummVM's adjustXYToBeInBox: (770,88) lies inside box 11 (768-822 x 85-104), so the target is exactly (770,88); the nose walk point (677,109) snaps to (676,111) in box 15, and 15-9-13-10-11 is connected once 202 unlocks 10-13. 'until' is exact arrival: Esc must not land while ego is still moving, or 202 ends on unfreeze and the gate closes. Any pixel of 155 outside 133 with x 768-783, y 85-95 is inside box 11 and works the same; pixels with y < 85 snap to (x,85). ENGINE (2026-10-20, part3b lane): played right after the reading's cutscene opens (previous move), during its costume animation.",
+       "gate": "input"
+     },
+     {
+@@ -1576,8 +1578,9 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-025-village/local-200.txt [00A7]-[00C1] (Bit[97], !Bit[358], Var[101]==6, !Bit[513] -> startScript(214)); local-214.txt [0007]-[0047] (cutscene([2]), cannibals walk in, startScript(213)); local-213.txt [0000]-[0053]",
+-      "note": "72's walk point (126,64) is where 290 put ego, so this is nearly instant.",
+-      "gate": "input"
++      "note": "72's walk point (126,64) is where 290 put ego, so this is nearly instant. ENGINE (2026-10-20, part3b lane): delay 3. Visit 2's 213 dialogue runs while the spared book's pages show (no automatic '.' on a page only the book waits for), so its length hangs on how the lines and pages interleave: a greedy search of delays 0-15 on S5#40-S5#57 (from the run with early inputs) found only this one, the leaflet scene's Esc 3 at frame 11615 instead of 11624 (delays 0-2 and 4-15: 11616-11626).",
++      "gate": "input",
++      "delay": 3
+     },
+     {
+       "name": "213: 'Well, actually, there is something...'",
+@@ -2182,7 +2185,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-025-village/obj-0290-jungle.txt [000C]-[0025]",
+-      "note": ""
++      "note": "ENGINE (2026-10-20, part3b lane): delay 4, from a greedy search of delays 0-8 on S5#58-S5#72 (goal: room 69 at S5#72): with this and S5#72's delay 4 the idol field came at frame 12086 instead of 12090.",
++      "delay": 4
+     },
+     {
+       "name": "Map room 6: beach on foot (to room 132)",
+@@ -2343,7 +2347,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-005-monkey-4/obj-0063-clearing.txt [000C] loadRoomWithEgo(134,12,224,136); room-012-monkey-he/entry.txt [006E]-[0091] (!Bit[364] -> startScript(208)); room-012-monkey-he/local-208.txt, local-209.txt",
+-      "note": "Herman watch: local 208 arms 209 once ego is within 200 of object 135 (756,126); 209 fires when VAR_CAMERA_POS_X >= 684."
++      "note": "Herman watch: local 208 arms 209 once ego is within 200 of object 135 (756,126); 209 fires when VAR_CAMERA_POS_X >= 684. ENGINE (2026-10-20, part3b lane): delay 4 frames on the map before the click (route delay; the map rooms draw the RNG twice a frame). The catacomb chambers draw their layout from the RNG on entry, so the draw count at the room-39 entry decides them; earlier inputs upstream moved it. Map delays 0-18 (even) were tried with the driver's default catacomb lookahead (from the run's frame at S5#70): room 70 reached at 1079.86 (0), 1071.19 (2), 1071.03 (4), 1083.28 (6), 1075.69 (8), 1071.94 (10), 1073.28 (12), 1072.94 (14), 1072.78 (16), 1072.94 s (18, which restores slide-int1's draw count and its 63-frame catacombs exactly); odd: 1079.78 (1), 1071.11 (3), 1072.03 (5), 1075.78 s (7). Room 70 alone does not decide: the head dialogue after it hangs on the frame alignment (S6#15, S6#20 delays); with its delays searched, the necklace came at frame 12732 for 4 and 12733 for 3 (12757 for 4 and 18 without them). 4 was kept, then 3 once S5#45's delay 3 had moved the village 9 frames sooner with 2 more draws: one map frame (2 draws) fewer puts the RNG at S6#6 exactly where the delay-4 run had it (state 3054704320, frame 12392 instead of 12402), so the catacombs and the head dialogue (with its searched delays) replay as in that run, 10 frames sooner; then 6 once S5#65's and S5#72's delays (4 each) had left 6 draws fewer at S6#6: the state is back at 3054704320 on frame 12391, and the run ends 2 frames sooner again (16615). INTEGRATION: this delay and the alignment delays of S5#45 (3), S5#65 (4), S5#72 (4), S6#15 (1) and S6#20 (11) hold only on this run's timeline (driver with --early, this executor, S1 to S6#6 frame-identical). Any upstream change moves the catacomb draw count: re-sync by reading the RNG state at S6#6 done (this run: 3054704320 on frame 12391) and stepping it (speedrun.rng.step) to the run's state; for a deficit of N draws add N/2 frames here (the map draws twice a frame), for a surplus take frames off (down to 0), and confirm the state matches before trusting the catacombs and the head dialogue; otherwise search the delay again (catacombs scored at the necklace) and the head dialogue's delays (greedy per move). INT3 (2026-10-20, merge of part3b onto i2a's Part I): delay 3. i2a's Part I leaves the RNG 325 draws behind int1's at S3#123, so S6#6 came 317 draws short of 3054704320 (odd, about 158 map frames: not re-synced). Delays 0-18 searched again from the merged run (cut after S5#70, S6#15/S6#20 delays off), scored at the necklace S6#26: frames 12541 (0), 12539 (1), 12538 (2), 12537 (3), 12547-12546 (4-7), 12544 (8, 9, 14, 15), 12572-12571 (10-13, 16, 17), 12581 (18).",
++      "delay": 3
+     },
+     {
+       "name": "Walk through the open gate to the idol field (S6 handoff)",
+@@ -2370,7 +2375,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-012-monkey-he/obj-0155-unnamed.txt [000F]-[002A] (state(151)==0 -> room 69 at (186,120)); 155 touchable since local-202.txt [003F]; object 133's walk-to delegates to 155 (obj-0133 [0059]-[007C])",
+-      "note": "155 is class 10: click the nearest reachable pixel of its hotspot. S6 starts here with 'Use ear with key'. PIXEL (measured 2026-10-20 from the new run's frame 12179): (770,95), 155's lowest row (its hotspot is 752..959 x 0..95; y 96 is floor and gives no room change) inside walk box 11 (768..822 x 85..104), the first point of box 11 on the path up from box 10: room 69 at 12287 against 12292 for the executor's pixel (the visible part's centre, snapped near (813,84))."
++      "note": "155 is class 10: click the nearest reachable pixel of its hotspot. S6 starts here with 'Use ear with key'. PIXEL (measured 2026-10-20 from the new run's frame 12179): (770,95), 155's lowest row (its hotspot is 752..959 x 0..95; y 96 is floor and gives no room change) inside walk box 11 (768..822 x 85..104), the first point of box 11 on the path up from box 10: room 69 at 12287 against 12292 for the executor's pixel (the visible part's centre, snapped near (813,84)). ENGINE (2026-10-20, part3b lane): delay 4 (see 'Leave the village'): the eager approach clicks then line up with the camera scroll so the gate is reached 3 frames sooner (delays 0-3: 12089, 4-5: 12086).",
++      "delay": 4
+     }
+   ],
+   "rng_points": [
+diff -ruN -x __pycache__ a/routes/anypercent/S6-catacombs-ghostship.json b/routes/anypercent/S6-catacombs-ghostship.json
+--- a/routes/anypercent/S6-catacombs-ghostship.json	2026-10-20 10:53:56.988344184 +0000
++++ b/routes/anypercent/S6-catacombs-ghostship.json	2026-10-20 19:39:15.980986995 +0000
+@@ -765,7 +765,8 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-039-hellmaze/local-205.txt [0025] loadRoomWithEgo(768,70,110,96); room-070-hellcliff/entry.txt [0091]-[00B2] (three breakHere segments), [00D0]-[00D5] (Bit[426] -> startScript(200)); room-070-hellcliff/local-200.txt [0000]-[000E]; room-025-village/obj-0293-head-of-the-navigator.txt [009E]-[00A3] (Use with Bit[426] -> script 111); global/script-111.txt [0000]-[002D] (returns at once only in walk boxes 8, 9, 12), [0030]-[0060] (cutscene([2]), Bit[426]=0, turn + WaitForActor, animateCostume 10, breakHere, costume 1, endCutscene); global/script-018.txt [0070] freezeScripts(127); engines/scumm/script.cpp:914-940",
+-      "note": "The record's head method (runner sources 3.12, 'faster variant': Use the head, walk to where the path down starts, then talk): the head goes away first and the talk happens from walk box 8, where 110 and 111 do nothing, so local 200 never runs and the dialogue neither takes out nor puts away the head. TIMING: room 70's entry runs its first segment in the arrival frame f0 and would start local 200 in its 4th segment (f0+3) while Bit[426]==1. 111 must start by f0+2: its cutscene([2]) freezes the entry script (started without F); after 111's endCutscene the entry resumes with Bit[426]==0 and skips startScript(200). The executor's own 'u' (f0+1) plus click (f0+2) is in time. Ego enters at 768's walk point (2,122), pulled into walk box 6 (x 6..116, y 85..139), and walks toward (110,96); 111's turn (animateCostume 245 -> turnToDirection sets _moving = MF_TURN, engines/scumm/actor.cpp:1674-1685) stops that walk after a step or two. 111 takes about 3 frames. Its costume change hides and re-shows ego, which also stops any walk (actor.cpp:3661-3684, hideActor 2174-2184), so the walk click must come after 111's endCutscene. LATE CLICK (f0+3 or later): local 200's cutscene is open (WaitForActor, delay(60), then 111): wait for var 352==0 before the book or the talk, because 140's loadRoom(86) would kill local 200 holding a cutscene (crash_rules, leak). Head slot: predicted var 140."
++      "note": "The record's head method (runner sources 3.12, 'faster variant': Use the head, walk to where the path down starts, then talk): the head goes away first and the talk happens from walk box 8, where 110 and 111 do nothing, so local 200 never runs and the dialogue neither takes out nor puts away the head. TIMING: room 70's entry runs its first segment in the arrival frame f0 and would start local 200 in its 4th segment (f0+3) while Bit[426]==1. 111 must start by f0+2: its cutscene([2]) freezes the entry script (started without F); after 111's endCutscene the entry resumes with Bit[426]==0 and skips startScript(200). The executor's own 'u' (f0+1) plus click (f0+2) is in time. Ego enters at 768's walk point (2,122), pulled into walk box 6 (x 6..116, y 85..139), and walks toward (110,96); 111's turn (animateCostume 245 -> turnToDirection sets _moving = MF_TURN, engines/scumm/actor.cpp:1674-1685) stops that walk after a step or two. 111 takes about 3 frames. Its costume change hides and re-shows ego, which also stops any walk (actor.cpp:3661-3684, hideActor 2174-2184), so the walk click must come after 111's endCutscene. LATE CLICK (f0+3 or later): local 200's cutscene is open (WaitForActor, delay(60), then 111): wait for var 352==0 before the book or the talk, because 140's loadRoom(86) would kill local 200 holding a cutscene (crash_rules, leak). Head slot: predicted var 140. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
++      "no_early": true
+     },
+     {
+       "name": "Walk onto walk box 8's line at (52,83)",
+@@ -801,7 +802,8 @@
+       "kind": "walk",
+       "glitch": null,
+       "cite": "build/blocks-dos-cd/DISK_0001/LECF/LFLF_0070/ROOM/BOXD: box 6 = (6,85)-(116,85)-(116,139)-(6,139), box 8 = the line (72,78)-(46,85) touching box 6 only at (46,85), box 9 = the line (72,78)-(130,125); ROOM/BOXM: from box 6, boxes 8..13 are reached through box 8; global/script-004.txt [0418]-[0431] (floor click: walkActorTo); engines/scumm/actor.cpp:1983-2088 (adjustXYToBeInBox scans boxes from the highest number down), engines/scumm/boxes.cpp:520-563 (checkXYInBoxBounds: corner quick reject, then a line box contains points within 2 px)",
+-      "note": "A click at (46,85) resolves to walk box 8 (the highest-numbered box containing it; box 6 contains it too), so ego stops there with walkbox 8: the spot where 110 and 111 return at once (global/script-110.txt [0030]-[0063], global/script-111.txt [0000]-[002D]) and where the necklace skips its animation. Every path to the ghost ship passes this point (BOXM), so the walk is not a detour: the draft walked it after the dialogue instead. About 17 frames (33 px up at 2 px per frame from where 111 stopped ego). until only marks that the walk is under way, so the 'l' key lands during it. Inventory: the predicted view (var 118 == 2) shows the book (var 135) and the head (var 140); if vars 133-140 show neither, click an inventory arrow (verbs 208/209) during this walk: arrows do not stop it (global/script-004.txt [02E6]-[0304]). ENGINE (2026-10-20): box 8 is a line from (72,78) to (46,85) (BOXD), and (46,85) is also on box 6's top edge: the walk ended in box 6, 140's 110 took the head out (Bit[426]=1), 111 then refused to put it away in box 8 and the necklace said 'I can't put it on now'. (52,83) lies on box 8 only: the head stays away and room 86 comes 6 frames sooner (no 110)."
++      "note": "A click at (46,85) resolves to walk box 8 (the highest-numbered box containing it; box 6 contains it too), so ego stops there with walkbox 8: the spot where 110 and 111 return at once (global/script-110.txt [0030]-[0063], global/script-111.txt [0000]-[002D]) and where the necklace skips its animation. Every path to the ghost ship passes this point (BOXM), so the walk is not a detour: the draft walked it after the dialogue instead. About 17 frames (33 px up at 2 px per frame from where 111 stopped ego). until only marks that the walk is under way, so the 'l' key lands during it. Inventory: the predicted view (var 118 == 2) shows the book (var 135) and the head (var 140); if vars 133-140 show neither, click an inventory arrow (verbs 208/209) during this walk: arrows do not stop it (global/script-004.txt [02E6]-[0304]). ENGINE (2026-10-20): box 8 is a line from (72,78) to (46,85) (BOXD), and (46,85) is also on box 6's top edge: the walk ended in box 6, 140's 110 took the head out (Bit[426]=1), 111 then refused to put it away in box 8 and the necklace said 'I can't put it on now'. (52,83) lies on box 8 only: the head stays away and room 86 comes 6 frames sooner (no 110). ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run). ENGINE (2026-10-20, part3b lane): delay 1: the head dialogue's length depends on how its lines interleave with the open book's pages (no automatic '.' on a page the spared book waits for) and on room 86's random animation delays, so it hangs on the frame alignment: a greedy search of delays 0-30 on this move and the dialogue's moves (from the run with the S5#71 delay 4) put the necklace at 12734 with delay 1 here against 12757 with none, and 12732 with delay 11 on choice 2/5. INT3 (2026-10-20): delay removed: on the merged timeline (S5#71 delay 3) a greedy search of delays 0-30 here put the necklace at 12537 with 0 (12539 for 1 and 2, 12553+ for the rest).",
++      "no_early": true
+     },
+     {
+       "name": "Pre-select Look at during the walk",
+@@ -866,14 +868,15 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-007-sh-captai/obj-0074-dusty-book.txt [002E] (Look at -> startScript(148)); global/script-148.txt [001F] cutscene([2]), [0024] animateCostume(1,247) (turn to the back), [0027] beginOverride, [002C]-[0598] ten printEgo lines with WaitForMessage and 400 jiffies of delay, [059C]-[05BB] override path; global/script-018.txt [0005]-[0007], [0070]; global/script-019.txt [0005]-[0007]; global/script-140.txt [0C59]-[0C5B]",
+-      "note": "Click on the frame after ego arrives (the book's turn would stop a walk, engines/scumm/actor.cpp:1674-1685). The book's cutscene must still be open when 140 runs its absolute CursorShow/UserputOn at [0C5B]; the book's later endCutscene then adds the extra level back (the slide). It is the ONLY thing that can carry the slide across [0C5B]: no other cutscene is open there in this variant, and in the draft's variant local 200's cutscene froze 140 until it had ended (item-slide glitch). See the hard check and the book-survival rule on the 'Esc the book' move. Book slot: predicted var 135. ENGINE (2026-10-20): the bridge's automatic '.' would turn the book's pages early (S5's regain lost the book within 36 frames that way); 'spare': [148] keeps the book's own lines from it, and the head dialogue's lines still get '.'. Restored after the Esc of the book. The bridge's automatic Esc is on too (the book's own override spared): with it off, 140's opening in room 86 played in full (about 136 s, slide-b8).",
++      "note": "Click on the frame after ego arrives (the book's turn would stop a walk, engines/scumm/actor.cpp:1674-1685). The book's cutscene must still be open when 140 runs its absolute CursorShow/UserputOn at [0C5B]; the book's later endCutscene then adds the extra level back (the slide). It is the ONLY thing that can carry the slide across [0C5B]: no other cutscene is open there in this variant, and in the draft's variant local 200's cutscene froze 140 until it had ended (item-slide glitch). See the hard check and the book-survival rule on the 'Esc the book' move. Book slot: predicted var 135. ENGINE (2026-10-20): the bridge's automatic '.' would turn the book's pages early (S5's regain lost the book within 36 frames that way); 'spare': [148] keeps the book's own lines from it, and the head dialogue's lines still get '.'. Restored after the Esc of the book. The bridge's automatic Esc is on too (the book's own override spared): with it off, 140's opening in room 86 played in full (about 136 s, slide-b8). ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
+       "skips": {
+         "text": 1,
+         "cutscenes": 1,
+         "spare": [
+           148
+         ]
+-      }
++      },
++      "no_early": true
+     },
+     {
+       "name": "Talk to the navigator head inside the book's cutscene",
+@@ -913,8 +916,9 @@
+       "kind": "glitch",
+       "glitch": "Inputs: 't' on the frame after the book click, then a left click on the head's inventory slot (predicted var 140) on the next frame, both inside the book's cutscene. Mechanism: with the slide the book's soft cutscene leaves _userPut at 1 (global/script-018.txt [0007]; engines/scumm/verbs.cpp:590). Hover is frozen, but an inventory slot click does not need it: with Var[107]=10 from the key, script 4 takes Var[108] from Var[133+slot] and runs doSentence(10,293,0) (global/script-004.txt [0304]-[033F], [03C0]-[0407]); the sentence script runs the head's Talk entry, startScript(140). 140's cutscenes then freeze the book (global/script-018.txt [0070]; engines/scumm/script.cpp:914-940), and with the book open they take _userPut to 0, so no input reaches 140's non-interactive parts. 140 plays the full dialogue because the necklace still has class 6 and VAR_ROOM is 70 ([0000]-[000C] -> [00AE]); Bit[426]==0 sets Local[3]=0 and starts 110, which returns at once in walk box 8 (global/script-110.txt [0030]-[0043]); then [00C8] breakHere and [00D2] delay(30): 7 frames. [0122]-[0127] saves ego's position (46,85) for the return. Room 86 is entered with fade-in effect 128 ([013E]).",
+       "cite": "room-025-village/obj-0293-head-of-the-navigator.txt [01B6]; global/script-140.txt [0000]-[000C], [00AE]-[0157]; global/script-110.txt [0000]-[0043]; global/script-004.txt [0304]-[033F], [03C0]-[0407]",
+-      "note": "Kind glitch because the click comes inside an open cutscene: the executor must act while up > 0 although cs == 1. Never click the book's slot again while it reads (crash_rules, re-trigger). The draft's variant (talk with the head still out, from box 6) saves these 7 frames but pays local 200 after the re-entry (3 frames to start, WaitForActor, delay(60) = 12 frames), 111's put-away (about 3) and the rest of 140's delay(30) before [0C5B] (about 3), and walks to (46,85) afterwards: about 5 frames slower by script count.",
+-      "gate": "input"
++      "note": "Kind glitch because the click comes inside an open cutscene: the executor must act while up > 0 although cs == 1. Never click the book's slot again while it reads (crash_rules, re-trigger). The draft's variant (talk with the head still out, from box 6) saves these 7 frames but pays local 200 after the re-entry (3 frames to start, WaitForActor, delay(60) = 12 frames), 111's put-away (about 3) and the rest of 140's delay(30) before [0C5B] (about 3), and walks to (46,85) afterwards: about 5 frames slower by script count. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
++      "gate": "input",
++      "no_early": true
+     },
+     {
+       "name": "Head dialogue choice 1/5 (line 2)",
+@@ -951,8 +955,9 @@
+       "kind": "glitch",
+       "glitch": "Dialogue line chosen while the dusty book's cutscene is open (cs == 1, up == 1): an input inside a cutscene, allowed by the slide (see note).",
+       "cite": "global/script-140.txt [0158]-[01A9] (Bit[473]==0: first menu; Bit[473]==1 would skip it), [01AC]-[0200] (Bit[470]==0: 'Okay, we're here.' + 'Now what do you want from me?'), [025E] (verb 121, line 2), [03E0]-[03EA] (Var[194]=0, wait loop with getRandomNr), [0442]-[0453] Bit[473]=1, [056D]-[0599] 'No, but thanks for asking so politely.' -> [059B] begging menu; room-086-cu-naviga/local-204.txt [0000]-[0051]",
+-      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. Before this first menu the head's intro line (two parts, inside 140's cutscene [01AC]-[0200]) needs two '.'.",
+-      "gate": "input"
++      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. Before this first menu the head's intro line (two parts, inside 140's cutscene [01AC]-[0200]) needs two '.'. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
++      "gate": "input",
++      "no_early": true
+     },
+     {
+       "name": "Head dialogue choice 2/5 (line 2)",
+@@ -993,8 +998,9 @@
+       "kind": "glitch",
+       "glitch": "Dialogue line chosen while the dusty book's cutscene is open (cs == 1, up == 1): an input inside a cutscene, allowed by the slide (see note).",
+       "cite": "global/script-140.txt [059B]-[0607] (begging menu, verb 121 text while Var[286]==0), [093D]-[0947], [0A29]-[0A6B] Var[286]++, <4 -> 'You can beg all you want, but you can't have it.' -> [059B]; room-086-cu-naviga/local-204.txt [0000]-[0051]",
+-      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move.",
+-      "gate": "input"
++      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run). ENGINE (2026-10-20, part3b lane): delay 11 (see 'Walk onto walk box 8's line'): the necklace at 12732 instead of 12734 in the greedy alignment search. INT3 (2026-10-20): delay removed: delays 0-30 here (S6#15 delay 0) all gave the necklace at 12537 or later (0: 12537).",
++      "gate": "input",
++      "no_early": true
+     },
+     {
+       "name": "Head dialogue choice 3/5 (line 2)",
+@@ -1035,8 +1041,9 @@
+       "kind": "glitch",
+       "glitch": "Dialogue line chosen while the dusty book's cutscene is open (cs == 1, up == 1): an input inside a cutscene, allowed by the slide (see note).",
+       "cite": "global/script-140.txt [0646]-[065F] (Var[286]==1), [0A29]-[0A6B]; room-086-cu-naviga/local-204.txt [0000]-[0051]",
+-      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move.",
+-      "gate": "input"
++      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
++      "gate": "input",
++      "no_early": true
+     },
+     {
+       "name": "Head dialogue choice 4/5 (line 2)",
+@@ -1077,8 +1084,9 @@
+       "kind": "glitch",
+       "glitch": "Dialogue line chosen while the dusty book's cutscene is open (cs == 1, up == 1): an input inside a cutscene, allowed by the slide (see note).",
+       "cite": "global/script-140.txt [0695]-[06AE] (Var[286]==2), [0A29]-[0A6B]; room-086-cu-naviga/local-204.txt [0000]-[0051]",
+-      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move.",
+-      "gate": "input"
++      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
++      "gate": "input",
++      "no_early": true
+     },
+     {
+       "name": "Head dialogue choice 5/5 (line 2)",
+@@ -1119,8 +1127,9 @@
+       "kind": "glitch",
+       "glitch": "Dialogue line chosen while the dusty book's cutscene is open (cs == 1, up == 1): an input inside a cutscene, allowed by the slide (see note).",
+       "cite": "global/script-140.txt [06EB]-[0704] (Var[286]==3), [0A29]-[0AA4] (Var[286]==4 -> 'Oh, all right, you big baby.' + 'You can have it.' -> [0BB0]), [0BB0]-[0C5D]; room-086-cu-naviga/local-204.txt [0000]-[0051]",
+-      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. After this choice 140 runs 'Oh, all right...' (two parts), 'Hey, what good's a necklace if you don't have shoulders?' ([0BB0]-[0BEE]), local 201's animation ([0BF1]-[0BFF]), drawObject(929), delay(120) ([0C08], 24 frames, no message is waited on), setClass(294,[6]) ([0C0C], clears class 6: the necklace becomes usable), then the return ([0C16]-[0C35]): room 70's entry runs again (Bit[426]==0: no local 200), delay(30) at [0C38] (6 frames), 111 at [0C41] returns at once in box 8, [0C44] breakHere, then [0C4E] VAR_VERB_SCRIPT=4, [0C53] startScript(17,[2]) (restores the verbs and restarts hover), [0C59] CursorShow and [0C5B] UserputOn, all in one frame. The threat line (line 3) also needs four rounds and adds a delay(120) ([0B87]), so begging is faster.",
+-      "gate": "input"
++      "note": "SELECTION IS BY MOUSE Y: room 86's verb script ignores the key or verb and recomputes the line as 120 + (VAR_MOUSE_Y-161)/10 (room-086-cu-naviga/local-204.txt [0000]-[001C]). Click, or press a digit with the mouse resting, inside line 2's band, screen y 171-180 (global/script-140.txt [0204] Var[229]=161, +8 +2 per line). Kind glitch: the book's cutscene stays open through the whole dialogue (cs == 1), so the executor must act on up > 0 (script 32's absolute UserputOn makes var 53 == 1 at every menu, global/script-032.txt [000F]-[0011]) and must not wait for cs == 0. After the click local 204 sets CursorHide/UserputOff (var 53 = 0, [0039]-[003B]) and waits for room 86's local 200 head animation to answer Var[105] after its random delayVariable (0..50 jiffies) (room-086-cu-naviga/local-200.txt [0057]-[0084]): choose the frame when that delay is about to end (RNG point). TEXT: skip dialogue lines with '.', never Esc (Esc would hit the book's override and end it early). The book runs during menus and answers: each message end can advance it one line, and its printEgo lines replace whatever line is shown (140's and 204's WaitForMessage then wait on the book's line). Follow the book-survival rule on the 'Esc the book' move. After this choice 140 runs 'Oh, all right...' (two parts), 'Hey, what good's a necklace if you don't have shoulders?' ([0BB0]-[0BEE]), local 201's animation ([0BF1]-[0BFF]), drawObject(929), delay(120) ([0C08], 24 frames, no message is waited on), setClass(294,[6]) ([0C0C], clears class 6: the necklace becomes usable), then the return ([0C16]-[0C35]): room 70's entry runs again (Bit[426]==0: no local 200), delay(30) at [0C38] (6 frames), 111 at [0C41] returns at once in box 8, [0C44] breakHere, then [0C4E] VAR_VERB_SCRIPT=4, [0C53] startScript(17,[2]) (restores the verbs and restarts hover), [0C59] CursorShow and [0C5B] UserputOn, all in one frame. The threat line (line 3) also needs four rounds and adds a delay(120) ([0B87]), so begging is faster. ENGINE (2026-10-20, part3b lane): no_early: the head dialogue's timing depends on random draws (room-086-cu-naviga/local-200.txt [000A] getRandomNr(4) and [004B] delayVariable(getRandomNr(50)), global/script-140.txt [03E5]); these moves keep the frames the alignment delays (S6#15, S6#20) were searched on, so early inputs cannot move them (one early frame at S6#17 cost 18 frames over the five choices in a measured run).",
++      "gate": "input",
++      "no_early": true
+     },
+     {
+       "name": "Esc the book on the frame after 140's UserputOn (hard check: the book must still be open)",
+diff -ruN -x __pycache__ a/src/speedrun/autoplay.py b/src/speedrun/autoplay.py
+--- a/src/speedrun/autoplay.py	2026-10-20 00:54:06.789118313 +0000
++++ b/src/speedrun/autoplay.py	2026-10-20 18:41:14.255101576 +0000
+@@ -88,6 +88,9 @@
+     def _hint(self, ex: Executor, ms: Milestone) -> Executor | None:
+         h = Executor(self.fork(ex.b), self.release, self.fork)
+         h.skips, h.movie, h.results = dict(ex.skips), list(ex.movie), []
++        h.early = ex.early
++        if ex._lag is not None:
++            h.b.lag = self.fork(ex._lag)
+         try:
+             group: list[Move] = []
+             for m in ms.hint + [None]:
+diff -ruN -x __pycache__ a/src/speedrun/control.py b/src/speedrun/control.py
+--- a/src/speedrun/control.py	2026-10-19 19:34:42.858749188 +0000
++++ b/src/speedrun/control.py	2026-10-20 18:41:14.255480676 +0000
+@@ -115,6 +115,10 @@
+         return self._recv()["holds"]
+ 
+     def quit(self) -> None:
++        lag = getattr(self, "lag", None)  # the executor's lag snapshot of this branch (Executor._set_lag)
++        if lag is not None:
++            self.lag = None
++            lag.quit()
+         try:
+             self._send({"cmd": "quit"})
+         except OSError:
+diff -ruN -x __pycache__ a/src/speedrun/executor.py b/src/speedrun/executor.py
+--- a/src/speedrun/executor.py	2026-10-20 18:34:41.819776375 +0000
++++ b/src/speedrun/executor.py	2026-10-20 18:41:14.391198649 +0000
+@@ -138,6 +138,9 @@
+     # target, whose first step rounds up on axes moving left or up, so in a scaled box ego climbs
+     # 1 px per frame instead of 2 * scale / 255; a slope under 4.5:1 keeps x at the speed clamp).
+     shmoove: list[dict] | None = None
++    # Never send this move's inputs early (_play_early): its frame decides a random draw later on
++    # (the head dialogue's animation delays in room 86 come from getRandomNr, room-086 local 200).
++    no_early: bool = False
+ 
+ 
+ @dataclass
+@@ -159,6 +162,9 @@
+         self._verb_keys: dict[int, str] = {}
+         self._fork = fork  # Controller.fork, for play_steered()
+         self.skips = {"text": 1, "cutscenes": 1}  # the bridge's automatic skips (EngineConfig default)
++        # Early inputs (_play_early): try each click move's inputs 1-2 frames before the executor
++        # would send them, on forks, and keep the earliest that still completes the move.
++        self.early = False
+ 
+     # --- scheduling -------------------------------------------------------------------
+ 
+@@ -286,7 +292,173 @@
+                 raise RouteError(f"no user input within {limit} frames (frame {self.b.frame})")
+             self._run(frame=self.b.frame + 1)
+ 
++    EARLY_SHIFTS = (2, 1)  # frames an input burst is moved forward, tried in this order
++    LAG = 2  # frames the lag snapshot trails the branch (early inputs may land this far back)
++
+     def play(self, move: Move) -> MoveResult:
++        if not (self.early and self._fork is not None):
++            return self._play(move)
++        pre = self._fork(self.b)  # the move's start, to rebuild the lag snapshot from
++        mark = len(self.movie)
++        try:
++            res = self._play_early(move) if self._early_candidate(move) else None
++            if res is None:
++                res = self._play(move)
++                self._set_lag(pre, self.movie[mark:])
++                pre = None
++            return res
++        finally:
++            if pre is not None:
++                pre.quit()
++
++    @property
++    def _lag(self) -> Branch | None:
++        """The lag snapshot (_set_lag), owned by the branch: Branch.quit() quits it too."""
++        return getattr(self.b, "lag", None)
++
++    def drop_lag(self) -> None:
++        lag = getattr(self.b, "lag", None)
++        if lag is not None:
++            self.b.lag = None
++            lag.quit()
++
++    def _set_lag(self, src: Branch, events: list[dict]) -> None:
++        """Keep ``src`` (a fork at or before this move's inputs) with ``events`` queued, run to LAG
++        frames before the branch: the next move may move its inputs into these frames."""
++        src.inputs(sorted((dict(e) for e in events), key=lambda e: e["frame"]))
++        target = self.b.frame - self.LAG
++        if target > src.frame:
++            src.run(frame=target)
++        self.drop_lag()
++        self.b.lag = src
++
++    @staticmethod
++    def _is_input(e: dict) -> bool:
++        return "key" in e or "click" in e or "rclick" in e
++
++    def _early_candidate(self, move: Move) -> bool:
++        # Click moves and dialogue choices (a menu line's click or digit key is read after the
++        # frame's scripts too, so it can land on the frame the menu appears); not keys such as '.' and
++        # Esc (processInput reads them before the scripts), press rules or re-clicked walks.
++        # Not moves that read their object from a var (the catacomb exits, obj_from_var 164): a shifted
++        # exit redraws every later chamber (each chamber draws its layout on entry), so the run's
++        # catacomb RNG alignment (the route's delay before the cave, then the lookahead) would be lost.
++        return (move.key is None and not move.press and not move.reclick and bool(move.until) and not move.delay
++                and move.obj_from_var is None and not move.no_early
++                and (move.obj is not None or move.point is not None or move.choose is not None))
++
++    def _play_early(self, move: Move) -> MoveResult | None:
++        """The move's inputs, sent 1 or 2 frames before the executor sends them.
++
++        The executor clicks on the frame after it sees the gate open (user input on, no cutscene),
++        and presses a verb key one frame before that click. The engine reads a click and a verb key
++        after the frame's scripts (scumm.cpp scummLoop: processInput, runAllScripts, then
++        checkExecVerbs), so on the frame a cutscene or reach ends the gate is already open when the
++        input is read: a verb key there is taken (with the item slide also inside the reach), and a
++        click is taken too when the hover script has already run after the cutscene's unfreeze (slot
++        order; a slot click needs no hover). Often that frame is the one the previous move's `until`
++        first held, so the inputs may go back into the previous move's last LAG frames: the lag
++        snapshot (_set_lag) replays them. The move is first played as usual on a fork (its inputs,
++        done frame and end state); its input events, shifted earlier by 2 and by 1 frames, are then
++        replayed on forks, and the first shift that is a pure shift (`until` first holds exactly that
++        many frames sooner, in the same end state) is played here."""
++        start = self.b.frame
++        base = Executor(self._fork(self.b), self.release, self._fork)
++        base.skips, base._verb_keys = dict(self.skips), dict(self._verb_keys)
++        try:
++            r0 = base._play(move)
++            events0 = list(base.movie)
++            skips0 = dict(base.skips)
++            sig0 = self._early_signature(base.b, move)
++        except (RouteError, ControlError, OSError):
++            return None
++        finally:
++            base.b.quit()
++        if r0.skipped or not any(self._is_input(e) for e in events0):
++            return None
++        lag = self._lag
++        floor = lag.frame if lag is not None else start
++        queued = [e for e in self.movie if e["frame"] > floor and self._is_input(e)] if lag is not None else []
++        for s in self.EARLY_SHIFTS:
++            cand = [dict(e, frame=e["frame"] - s) if self._is_input(e) else dict(e) for e in events0]
++            frames = [e["frame"] for e in cand if self._is_input(e)]
++            if min(frames) <= floor:
++                continue
++            # One key and one mouse event per frame: the earlier move's inputs still queued there.
++            kinds = {(e["frame"], "key" if "key" in e else "mouse") for e in queued}
++            if any((e["frame"], "key" if "key" in e else "mouse") in kinds for e in cand if self._is_input(e)):
++                continue
++            src = lag if min(frames) <= start else self.b
++            # A pure shift: `until` first holds exactly s frames sooner, in the same state (room, ego,
++            # inventory, sentence and cutscene vars, the objects' states) as the usual play.
++            if self._early_trial(src, cand, max(frames), move.until, r0.done_frame - s, sig0, move):
++                break
++        else:
++            return None
++        done = r0.done_frame - s
++        cand = sorted(cand, key=lambda e: e["frame"])
++        if src is lag:
++            nb = self._fork(lag)
++            nb.inputs(cand)
++            self.b.quit()  # and its lag snapshot
++            self.b = nb
++        else:
++            self.b.inputs(cand)
++        lag_src = self._fork(self.b)  # before running: the lag is rebuilt from here
++        self.movie.extend(cand)
++        self.movie.sort(key=lambda e: e["frame"])
++        self.skips = skips0
++        st = self._run(frame=done)
++        if not self.b.holds(move.until):
++            lag_src.quit()
++            raise RouteError(f"{move.name}: early inputs replayed off their trial (frame {st['frame']})")
++        self._set_lag(lag_src, [])
++        issue = min(e["frame"] for e in cand if self._is_input(e))
++        res = MoveResult(move.name, issue, st["frame"], st["qf"])
++        self.results.append(res)
++        return res
++
++    # Vars a pure time shift changes by itself: the timers (VAR_TIMER and its copies) and scratch 100.
++    EARLY_VOLATILE_VARS = frozenset({11, 12, 13, 14, 47, 100})
++
++    @classmethod
++    def _early_signature(cls, b: Branch, move: Move) -> tuple:
++        """What an early-input variant must leave as the usual play does: room, ego's position, every
++        var but the timers, every bit, owner, class and inventory slot, and the state of every object
++        outside the room (the room's own objects may animate on the clock) and of the move's objects.
++        A shift that crosses the previous move's last frames must keep its effects too (an early 'u'
++        on the spyglass's Open frame left the lens unmade, class 6, and the dam blast failed later)."""
++        st = b.state()
++        v = st["vars"]
++        here = {o["id"] for o in st["room_objects"]} - {move.obj, move.obj2}
++        states = tuple(sorted((k, x) for k, x in st["states"].items() if int(k) not in here))
++        return (st.get("room"), tuple(st.get("ego_pos") or ()), tuple(st["inventory"]),
++                tuple(x for i, x in enumerate(v) if i not in cls.EARLY_VOLATILE_VARS), tuple(st["bits_set"]),
++                tuple(sorted(st["owners"].items())), tuple(sorted((k, tuple(x)) for k, x in st["classes"].items())),
++                states)
++
++    def _early_trial(self, src: Branch, events: list[dict], last: int, until: list[dict], done: int, sig0: tuple,
++                     move: Move) -> bool:
++        """Whether ``events``, queued on a fork of ``src``, make `until` first hold on frame ``done``
++        (not on the frame before, unless that is before the last input) with the usual play's end
++        signature."""
++        if done < last:
++            return False
++        trial = self._fork(src)
++        try:
++            trial.inputs(sorted(events, key=lambda e: e["frame"]))
++            if done - 1 > trial.frame:
++                trial.run(frame=done - 1)
++                if trial.holds(until) and done - 1 >= last:
++                    return False
++            trial.run(frame=done)
++            return trial.holds(until) and self._early_signature(trial, move) == sig0
++        except (ControlError, OSError):  # the engine crashed on the shifted inputs (a click inside a reach)
++            return False
++        finally:
++            trial.quit()
++
++    def _play(self, move: Move) -> MoveResult:
+         if move.skips is not None:
+             self._schedule([{"frame": self.b.frame + 1, "skips": move.skips}])
+             self.skips = dict(move.skips)
+diff -ruN -x __pycache__ a/src/speedrun/route.py b/src/speedrun/route.py
+--- a/src/speedrun/route.py	2026-10-20 18:34:41.820543932 +0000
++++ b/src/speedrun/route.py	2026-10-20 18:41:14.390528980 +0000
+@@ -34,7 +34,7 @@
+ _DOC_FIELDS = {"room", "kind", "glitch", "cite", "note"}
+ _MOVE_FIELDS = {"name", "key", "verb", "obj", "obj2", "point", "choose", "after", "until", "max_frames",
+                 "obj_from_var", "skips", "delay", "choose_by", "press", "auto_skips", "optional", "gate", "approach_y",
+-                "rclick", "via", "approach", "reclick", "reclick_sweep", "approach_hold", "shmoove"}
++                "rclick", "via", "approach", "reclick", "reclick_sweep", "approach_hold", "shmoove", "no_early"}
+ 
+ 
+ class RouteFileError(Exception):
+diff -ruN -x __pycache__ a/scripts/anypercent_auto.py b/scripts/anypercent_auto.py
+--- a/scripts/anypercent_auto.py	2026-10-20 01:55:41.358046998 +0000
++++ b/scripts/anypercent_auto.py	2026-10-20 18:41:14.257268537 +0000
+@@ -122,6 +122,8 @@
+                     help="for goals matching --lookahead-match: try 0..N frames of delay on the first hint move "
+                          "and keep the one that finishes the NEXT goal first (random rooms drawn on entry)")
+     ap.add_argument("--lookahead-match", default=r"Catacombs exit|catacombs cave|enter the catacombs")
++    ap.add_argument("--early", action="store_true",
++                    help="early inputs (Executor._play_early): try each click move's inputs 1-2 frames sooner on forks")
+     ap.add_argument("--lookahead-slow", help="RUN:SECONDS: also look ahead before every goal that took at least "
+                                              "SECONDS in RUN's results (a slow goal can hide a random wait)")
+     args = ap.parse_args()
+@@ -160,6 +162,7 @@
+         b = c.start()
+         b.run(frame=stop)
+         ex = Executor(b, "dos-cd", c.fork)
++        ex.early = args.early
+         ex.movie = list(prefix)
+         sk = [e["skips"] for e in prefix if "skips" in e]
+         if sk:  # the run's automatic-skip setting is the last switch replayed
+@@ -191,6 +194,7 @@
+                                             "rta": round((alt.qf - qf0) / rel.timer_hz, 3), "how": "hint (backtrack)",
+                                             "via": alt.via[-6:]}]
+                 ex, backup = alt.ex, None
++                ex.early = args.early
+                 save(out, ex, records)
+                 continue
+             if o is None:
+@@ -235,6 +239,7 @@
+             if o.ex is not ex:
+                 ex.b.quit()
+                 ex = o.ex
++            ex.early = args.early
+             rta = (o.qf - qf0) / rel.timer_hz
+             records.append({"i": ms.index, "name": ms.name, "done": ex.b.frame, "rta": round(rta, 3), "how": o.how,
+                             "via": o.via[-6:]})

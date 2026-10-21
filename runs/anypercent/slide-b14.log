@@ -1,0 +1,18 @@
+447 S6#25 Put the head away if the dialogue took it out  rta  1185.55s hint             0s 
+448 S6#26 Put the necklace on standing at (52,83) in wal rta  1187.63s hint             0s 
+451 S6#29 Open the captain's cabin door (left door)      rta  1201.89s hint             1s 
+452 S6#30 Enter the captain's cabin                      rta  1202.05s hint             0s 
+453 S6#31 Use magnetic compass with the key (magnet pull rta  1204.97s hint             0s 
+454 S6#32 Leave the captain's cabin                      rta  1206.14s hint             0s 
+455 S6#33 Down the deck hatch to the crew quarters       rta  1210.89s hint             0s 
+456 S6#34 Through the passage to the hull                rta  1213.22s hint             0s 
+457 S6#35 Use key in the hull hatch (unlock and open)    rta  1215.39s hint             0s 
+458 S6#36 Down the hatch to the storage room             rta  1215.55s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound None
+461  hint failed: S6#39 Feather skip 3/3: click during the rat cutscene to pick up the grease: the verb did not return to Walk to within 1
+461 S6#39 Feather skip 3/3: click during the rat cutscene to pic: NOT REACHED target [{'has': 815}]
+  hint failed: S6#39 Feather skip 3/3: click during the rat cutscene to pick up the grease: the verb did not return to Walk to within 1
+  x auto: verb 7 cooking grease: no effect
+  x auto: verb 9 cooking grease: no effect
+  x auto: stand and wait: nothing came
+END frame 14271 room 74

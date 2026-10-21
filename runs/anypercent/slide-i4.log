@@ -1,0 +1,312 @@
+    search: expanded 1 tried 2 frontier 0 best None bound 237133
+386 S5#32 Map room 5: beach on foot (to beach room 131)  rta   983.50s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 237633
+387 S5#33 Board the rowboat                              rta   985.59s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 240073
+388 S5#34 Row to room 6 (top edge of room 5)             rta   995.75s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 240313
+389 S5#35 Row to the village beach (room 132)            rta   996.75s hint             7s 
+    search: expanded 1 tried 3 frontier 0 best 240453 bound 240773
+  S5#36 Beach 132: jungle to the map (room: search branch loses at the next goal; hint kept
+390 S5#36 Beach 132: jungle to the map (room 6, on foot) rta   998.67s hint            42s 
+    search: expanded 1 tried 2 frontier 0 best None bound 241713
+391 S5#37 Map room 6: village                            rta  1002.59s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 243373
+392 S5#38 Pick up the bananas (starts the cannibal encou rta  1009.50s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best 243433 bound 243833
+  S5#40 Read the dusty book while the came: search branch loses at the next goal; hint kept
+394 S5#40 Read the dusty book while the camera scrolls   rta  1011.42s hint            14s 
+    search: expanded 1 tried 2 frontier 1 best None bound 244713
+    search: expanded 2 tried 6 frontier 1 best None bound 244713
+    search: expanded 3 tried 10 frontier 0 best None bound 244713
+395 S5#41 Encounter: 'I'll give you anything!'           rta  1015.09s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 244813
+396 S5#42 Give the idol to the cannibals                 rta  1015.50s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 245573
+397 S5#43 Leave the village (visit 1)                    rta  1018.67s hint             2s 
+    search: expanded 1 tried 4 frontier 0 best None bound 246133
+398 S5#44 Map room 6: village again (visit 2)            rta  1021.00s hint             9s 
+    search: expanded 1 tried 2 frontier 0 best None bound 246693
+402 S5#48 213: 'Where are LeChuck and his crew hiding?'  rta  1023.34s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 246833
+403 S5#49 213: 'What's in your standard potion of exorci rta  1023.92s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 246973
+404 S5#50 213: 'I'm off to find LeChuck and get the root rta  1024.50s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248433
+407 S5#53 Give the leaflet to the natives                rta  1030.59s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248633
+408 S5#54 Leaflet scene: Esc 1 ('instructions on how to  rta  1031.42s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248698
+409 S5#55 Leaflet scene: Esc 2 (skip the navigator close rta  1031.69s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 249158
+410 S5#56 Leaflet scene: Esc 3 ('follow his nose...')    rta  1033.61s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 249758
+411 S5#57 Enter the hut                                  rta  1036.11s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 250178
+412 S5#58 Pick up the banana picker                      rta  1037.86s hint             0s 
+    search: expanded 1 tried 5 frontier 0 best None bound 250438
+413 S5#59 Leave the hut (Herman appears)                 rta  1038.94s hint             1s 
+    search: expanded 1 tried 4 frontier 1 best None bound 251518
+    search: expanded 2 tried 10 frontier 0 best None bound 251518
+414 S5#60 Give the banana picker to Herman (key)         rta  1043.44s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 252198
+415 S5#61 Leave the village                              rta  1046.28s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 253178
+416 S5#62 Map room 6: beach on foot (to room 132)        rta  1050.36s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 253578
+417 S5#63 Board the rowboat (room 132)                   rta  1052.03s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 253878
+418 S5#64 Row to room 5 (bottom edge of room 6)          rta  1053.28s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 256218
+419 S5#65 Row to the clearing-side beach (room 131)      rta  1063.03s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 256378 bound 256638
+  S5#66 Beach 131: jungle to the map (room: search branch loses at the next goal; hint kept
+420 S5#66 Beach 131: jungle to the map (room 5)          rta  1064.78s hint            37s 
+    search: expanded 1 tried 2 frontier 0 best None bound 256998
+421 S5#67 Map room 5: clearing                           rta  1066.28s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 259258
+422 S5#68 Walk through the open gate to the idol field ( rta  1075.69s hint             4s 
+    search: expanded 1 tried 2 frontier 0 best 259738 bound 261538
+423 S6#1 Use ear with monkey head key (opens the giant h rta  1085.19s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 261778 bound 261798
+424 S6#2 Pre-walk to the mouth's walk point during scrip rta  1086.28s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 261898
+425 S6#3 Walk into the open mouth of the giant monkey he rta  1086.69s hint             0s 
+    search: expanded 1 tried 5 frontier 0 best None bound 262878
+426 S6#4 Take out the navigator head right after the cli rta  1090.78s hint             3s 
+  lookahead: S6#5 Walk toward the catacombs cave (fir delay 0
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1105.78s hint            30s 
+    search: expanded 1 tried 3 frontier 0 best None bound 266498
+428 S6#6 Esc the mushroom line                           rta  1105.86s hint             2s 
+  lookahead: S6#7 Walk to the catacombs cave delay 4
+    search: expanded 1 tried 2 frontier 0 best None bound 267258
+429 S6#7 Walk to the catacombs cave                      rta  1109.03s hint            12s 
+  lookahead: S6#8 Catacombs exit 1/6: walk to the cav delay 7
+    search: expanded 1 tried 6 frontier 0 best None bound 269878
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1119.94s hint            21s 
+  lookahead: S6#9 Catacombs exit 2/6: walk to the cav delay 8
+    search: expanded 1 tried 1 frontier 0 best None bound 270158
+431 S6#9 Catacombs exit 2/6: walk to the cave the head p rta  1121.11s hint            10s 
+  lookahead: S6#10 Catacombs exit 3/6: walk to the ca delay 3
+    search: expanded 1 tried 1 frontier 0 best None bound 270318
+432  hint failed: S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+432  hint failed: S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+432  hint failed: S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+432 S6#10 Catacombs exit 3/6: walk to the cave the head  rta  1121.78s hint           189s 
+  lookahead: S6#11 Catacombs exit 4/6: walk to the ca delay 4
+    search: expanded 1 tried 1 frontier 0 best None bound 270518
+433 S6#11 Catacombs exit 4/6: walk to the cave the head  rta  1122.61s hint             5s 
+  lookahead: S6#12 Catacombs exit 5/6: walk to the ca delay 6
+    search: expanded 1 tried 1 frontier 0 best None bound 270758
+434 S6#12 Catacombs exit 5/6: walk to the cave the head  rta  1123.61s hint             4s 
+  lookahead: S6#13 Catacombs exit 6/6: walk to the ca delay 0
+    search: expanded 1 tried 2 frontier 0 best None bound 271118
+435 S6#13 Catacombs exit 6/6: walk to the cave the head  rta  1125.11s hint             3s 
+    search: expanded 1 tried 8 frontier 0 best 271178 bound 271198
+436 S6#14 Put the navigator head away on arrival (record rta  1125.45s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best 271258 bound 271618
+  S6#17 Read the dusty book standing at (5: search branch loses at the next goal; hint kept
+439 S6#17 Read the dusty book standing at (52,83) (carri rta  1127.20s hint            13s 
+    search: expanded 1 tried 6 frontier 0 best None bound 271818
+440 S6#18 Talk to the navigator head inside the book's c rta  1128.03s hint             4s 
+    search: expanded 1 tried 2 frontier 0 best None bound 272383
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1130.38s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 272863
+    search: expanded 2 tried 6 frontier 2 best 272763 bound 272863
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1132.38s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 273343
+    search: expanded 2 tried 6 frontier 0 best 273323 bound 273343
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1134.38s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 273663
+    search: expanded 2 tried 6 frontier 0 best 273643 bound 273663
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1135.72s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 273883
+    search: expanded 2 tried 6 frontier 0 best None bound 273883
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1136.63s hint             0s 
+447 S6#25 Put the head away if the dialogue took it out  rta  1140.80s hint             0s 
+    search: expanded 1 tried 5 frontier 1 best None bound 275383
+    search: expanded 2 tried 7 frontier 0 best None bound 275383
+448 S6#26 Put the necklace on standing at (52,83) in wal rta  1142.88s hint             2s 
+    search: expanded 1 tried 2 frontier 1 best None bound 278803
+    search: expanded 2 tried 4 frontier 1 best None bound 278803
+    search: expanded 3 tried 6 frontier 0 best 278723 bound 278803
+451 S6#29 Open the captain's cabin door (left door)      rta  1156.80s search<hint      1s ['auto: walk to exit 769 -> room 77', 'auto: wait until idle', 'auto: verb 2 door']
+    search: expanded 1 tried 2 frontier 0 best None bound 278763
+452 S6#30 Enter the captain's cabin                      rta  1156.97s hint             0s 
+    search: expanded 1 tried 1 frontier 0 best None bound 279463
+453 S6#31 Use magnetic compass with the key (magnet pull rta  1159.88s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 279743
+454 S6#32 Leave the captain's cabin                      rta  1161.05s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 280883
+455 S6#33 Down the deck hatch to the crew quarters       rta  1165.80s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 281443
+456 S6#34 Through the passage to the hull                rta  1168.13s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 281963
+457 S6#35 Use key in the hull hatch (unlock and open)    rta  1170.30s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 282003
+458 S6#36 Down the hatch to the storage room             rta  1170.47s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 282643
+461 S6#39 Feather skip 3/3: click during the rat cutscen rta  1173.13s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 283163
+463 S6#41 Up the ladder to the hull                      rta  1175.30s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 283623
+464 S6#42 Through the passage back to the crew quarters  rta  1177.22s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 284163
+465 S6#43 Up the ladder to the deck                      rta  1179.47s hint             0s 
+    search: expanded 1 tried 3 frontier 1 best None bound 284363
+    search: expanded 2 tried 6 frontier 0 best None bound 284363
+467 S6#45 Open the greased door                          rta  1180.30s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 284403
+468 S6#46 Enter the brig room                            rta  1180.47s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 284703
+469 S6#47 Pick up the ghost tools                        rta  1181.72s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 285023
+470 S6#48 Back to the deck                               rta  1183.05s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 285123
+471 S6#49 Down the deck hatch again                      rta  1183.47s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 285683
+472 S6#50 Through the passage to the hull again          rta  1185.80s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best 287863 bound 288403
+473 S6#51 Use glowing crate with ghost tools             rta  1197.13s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 288463
+474 S6#52 Look at the open crate to grab the voodoo root rta  1197.38s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 289183
+475 S6#53 Through the passage to the crew quarters       rta  1200.39s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 289723
+476 S6#54 Up the ladder to the deck                      rta  1202.64s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 290083
+477 S6#55 Leave the ghost ship                           rta  1204.14s hint             0s 
+    search: expanded 1 tried 1 frontier 0 best None bound 291943
+478 S6#56 Walk into the cave with the root               rta  1211.89s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 291963
+479 S6#57 Esc 'A long walk, a brief row, and a short hik rta  1211.97s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 291983
+480 S6#58 Esc the cannibals' root scene                  rta  1212.05s hint             0s 
+    search: expanded 1 tried 1 frontier 0 best None bound 292603
+481 S6#59 Walk out to the jungle (back toward the ghost- rta  1214.64s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 292623
+482 S6#60 Esc 'After some more furious paddling...'      rta  1214.72s hint             0s 
+    search: expanded 1 tried 5 frontier 3 best None bound 293383
+    search: expanded 2 tried 8 frontier 3 best None bound 293383
+    search: expanded 3 tried 11 frontier 3 best None bound 293383
+    search: expanded 4 tried 14 frontier 3 best None bound 293383
+    search: expanded 5 tried 17 frontier 2 best None bound 293383
+    search: expanded 6 tried 20 frontier 1 best None bound 293383
+    search: expanded 7 tried 23 frontier 0 best None bound 293383
+484 S6#62 Bob scene: 'Where is the wedding?'             rta  1217.89s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 296003
+    search: expanded 2 tried 5 frontier 4 best None bound 296003
+    search: expanded 3 tried 8 frontier 6 best None bound 296003
+    search: expanded 4 tried 10 frontier 7 best None bound 296003
+    search: expanded 5 tried 12 frontier 8 best None bound 296003
+    search: expanded 6 tried 15 frontier 9 best None bound 296003
+    search: expanded 7 tried 18 frontier 10 best None bound 296003
+    search: expanded 8 tried 21 frontier 11 best None bound 296003
+    search: expanded 9 tried 24 frontier 12 best None bound 296003
+    search: expanded 10 tried 26 frontier 12 best None bound 296003
+    search: expanded 11 tried 28 frontier 12 best None bound 296003
+    search: expanded 12 tried 30 frontier 12 best None bound 296003
+    search: expanded 13 tried 32 frontier 12 best None bound 296003
+    search: expanded 14 tried 35 frontier 13 best None bound 296003
+    search: expanded 15 tried 38 frontier 14 best None bound 296003
+    search: expanded 16 tried 40 frontier 14 best None bound 296003
+    search: expanded 17 tried 42 frontier 14 best None bound 296003
+    search: expanded 18 tried 44 frontier 14 best None bound 296003
+    search: expanded 19 tried 46 frontier 14 best None bound 296003
+    search: expanded 20 tried 49 frontier 15 best None bound 296003
+    search: expanded 21 tried 52 frontier 16 best None bound 296003
+    search: expanded 22 tried 53 frontier 15 best None bound 296003
+    search: expanded 23 tried 54 frontier 14 best None bound 296003
+    search: expanded 24 tried 55 frontier 13 best None bound 296003
+    search: expanded 25 tried 56 frontier 12 best None bound 296003
+    search: expanded 26 tried 58 frontier 12 best None bound 296003
+    search: expanded 27 tried 60 frontier 12 best None bound 296003
+    search: expanded 28 tried 61 frontier 11 best None bound 296003
+    search: expanded 29 tried 62 frontier 10 best None bound 296003
+    search: expanded 30 tried 64 frontier 10 best None bound 296003
+    search: expanded 31 tried 66 frontier 10 best None bound 296003
+    search: expanded 32 tried 67 frontier 9 best None bound 296003
+    search: expanded 33 tried 68 frontier 8 best None bound 296003
+    search: expanded 34 tried 70 frontier 8 best None bound 296003
+    search: expanded 35 tried 72 frontier 8 best None bound 296003
+    search: expanded 36 tried 74 frontier 8 best None bound 296003
+    search: expanded 37 tried 76 frontier 8 best None bound 296003
+    search: expanded 38 tried 77 frontier 7 best None bound 296003
+    search: expanded 39 tried 78 frontier 6 best None bound 296003
+    search: expanded 40 tried 79 frontier 5 best None bound 296003
+    search: expanded 41 tried 80 frontier 4 best None bound 296003
+    search: expanded 42 tried 81 frontier 3 best None bound 296003
+    search: expanded 43 tried 82 frontier 2 best None bound 296003
+    search: expanded 44 tried 83 frontier 1 best None bound 296003
+    search: expanded 45 tried 84 frontier 0 best None bound 296003
+487 S6#65 Esc the crew's 'Come on, let's go.' exit       rta  1228.80s hint             5s 
+    search: expanded 1 tried 2 frontier 0 best None bound 327863
+489 S7#2 Dock: skip script 131's three ego text segments rta  1361.56s hint             2s 
+    search: expanded 1 tried 2 frontier 2 best None bound 330003
+    search: expanded 2 tried 6 frontier 2 best None bound 330003
+    search: expanded 3 tried 10 frontier 1 best None bound 330003
+    search: expanded 4 tried 12 frontier 0 best None bound 330003
+493 S7#6 Dock: walk right again (to Low Street)          rta  1370.47s hint             1s 
+    search: expanded 1 tried 3 frontier 2 best None bound 334061
+    search: expanded 2 tried 7 frontier 5 best None bound 334061
+    search: expanded 3 tried 11 frontier 7 best None bound 334061
+    search: expanded 4 tried 14 frontier 6 best None bound 334061
+    search: expanded 5 tried 17 frontier 5 best None bound 334061
+    search: expanded 6 tried 20 frontier 6 best None bound 334061
+    search: expanded 7 tried 23 frontier 7 best None bound 334061
+    search: expanded 8 tried 26 frontier 6 best None bound 334061
+    search: expanded 9 tried 29 frontier 5 best None bound 334061
+    search: expanded 10 tried 32 frontier 6 best None bound 334061
+    search: expanded 11 tried 35 frontier 7 best None bound 334061
+    search: expanded 12 tried 38 frontier 6 best None bound 334061
+    search: expanded 13 tried 41 frontier 5 best None bound 334061
+    search: expanded 14 tried 44 frontier 6 best None bound 334061
+    search: expanded 15 tried 47 frontier 7 best None bound 334061
+    search: expanded 16 tried 50 frontier 6 best None bound 334061
+    search: expanded 17 tried 53 frontier 5 best None bound 334061
+    search: expanded 18 tried 57 frontier 4 best None bound 334061
+    search: expanded 19 tried 61 frontier 3 best None bound 334061
+    search: expanded 20 tried 65 frontier 2 best None bound 334061
+    search: expanded 21 tried 69 frontier 1 best None bound 334061
+    search: expanded 22 tried 72 frontier 0 best 333601 bound 334061
+494 S7#7 Low Street: archway up to High Street (avoid th rta  1385.47s search<hint      4s ['auto: walk to exit 451 -> room 34', "auto: say 'No, but I do have this deadly magic root'", 'auto: walk to exit 451 -> room 34']
+    search: expanded 1 tried 4 frontier 0 best None bound 334681
+495 S7#8 High Street: open the church door (door closed: rta  1389.97s hint             2s 
+    search: expanded 1 tried 4 frontier 0 best None bound 334721
+496 S7#9 High Street: enter the church                   rta  1390.13s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 335501
+    search: expanded 2 tried 6 frontier 1 best None bound 335501
+    search: expanded 3 tried 10 frontier 0 best None bound 335501
+499 S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?' rta  1393.38s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 335981
+    search: expanded 2 tried 6 frontier 1 best None bound 335981
+    search: expanded 3 tried 10 frontier 0 best None bound 335981
+504 S7#17 Close-up menu 2: 'If you're here, then who's t rta  1395.38s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 336061
+505 S7#18 Close-up: skip ego's 'who's that in the dress' rta  1395.72s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 336301
+    search: expanded 2 tried 7 frontier 0 best None bound 336301
+510 S7#23 Close-up: Esc LeChuck's punch                  rta  1396.72s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 336341
+511 S7#24 Map: Esc the POW / BIFF flight                 rta  1396.88s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 337001
+512 S7#25 Stan's: Esc Stan's greeting                    rta  1399.63s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 337861
+513 S7#26 Stan's: Esc Stan's sales pitch                 rta  1403.22s hint             0s 
+514 S7#27 Stan's: wake Guybrush (first input after the f rta  1412.80s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 341181
+    search: expanded 2 tried 4 frontier 0 best 340541 bound 341181
+515 S7#28 Stan's: use root beer with LeChuck (click LeCh rta  1417.05s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 343081
+516 S7#29 Ending: skip 'Gasp! --choke--' (first pass)    rta  1424.97s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 345841
+517 S7#30 Ending: skip 'Gasp! --choke--' (instant replay rta  1436.47s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 350121
+518 S7#31 Ending: skip Elaine's 'Hey...' exchange        rta  1454.30s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 351921
+519 S7#32 Fireworks: skip the small talk                 rta  1461.80s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 355266
+522 S7#35 Fireworks: skip the epilogue lines (Stan, Herm rta  1475.74s hint             1s 
+    search: expanded 1 tried 4 frontier 0 best None bound 355666
+525 S7#38 Fireworks: skip 'Yes, I've heard that one.' (t rta  1477.41s hint             3s 
+END frame 17411 room 0

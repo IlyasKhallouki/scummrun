@@ -1,0 +1,114 @@
+    search: expanded 1 tried 3 frontier 0 best 229373 bound 229633
+374 S5#20 Beach 131: jungle to the map (room 5, on foot) rta   951.17s search<hint      1s ['auto: walk to exit 17 -> room 5']
+    search: expanded 1 tried 2 frontier 0 best None bound None
+375  hint failed: S5#21 Map room 5: clearing: object 63 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of 
+375 S5#21 Map room 5: clearing: not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 0 best None bound 229993
+375 S5#21 Map room 5: clearing                           rta   953.75s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 231693
+376 S5#22 Pull the nose (gate opens)                     rta   960.84s hint             7s 
+    search: expanded 1 tried 3 frontier 0 best None bound 233093
+380 S5#26 Monkey skip 4: click 155 at the same pixel (in rta   966.67s hint             4s 
+    search: expanded 1 tried 2 frontier 0 best None bound 233373
+381 S5#27 Pick up the wimpy little idol                  rta   967.84s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 233933
+382 S5#28 Leave the idol field                           rta   970.17s hint             1s 
+    search: expanded 1 tried 4 frontier 0 best 234673 bound 234693
+383 S5#29 Herman: Esc his monologue                      rta   973.34s hint             8s 
+    search: expanded 1 tried 3 frontier 0 best None bound 234973
+384 S5#30 Herman: answer 'What?'                         rta   974.50s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 236573
+385 S5#31 Clearing: jungle back to the map               rta   981.17s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 240273
+386 S5#32 Map room 5: beach on foot (to beach room 131)  rta   996.59s hint             2s 
+    search: expanded 1 tried 3 frontier 0 best None bound 240773
+387 S5#33 Board the rowboat                              rta   998.67s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 243213
+388 S5#34 Row to room 6 (top edge of room 5)             rta  1008.84s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 243453
+389 S5#35 Row to the village beach (room 132)            rta  1009.84s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best 243593 bound 243913
+390 S5#36 Beach 132: jungle to the map (room 6, on foot) rta  1010.42s search<hint      1s ['auto: walk to exit 17 -> room 6']
+    search: expanded 1 tried 2 frontier 0 best None bound None
+391  hint failed: S5#37 Map room 6: village: object 72 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of d
+391 S5#37 Map room 6: village: not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 0 best None bound 244853
+391 S5#37 Map room 6: village                            rta  1015.67s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 246513
+392 S5#38 Pick up the bananas (starts the cannibal encou rta  1022.59s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best 246573 bound 246973
+394 S5#40 Read the dusty book while the camera scrolls   rta  1022.84s search<hint      0s ['auto: verb 8 dusty book']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 6 frontier 0 best None bound None
+395  hint failed: S5#41 Encounter: 'I'll give you anything!': `after` did not hold within 1200 frames (and with 1..12 frames of delay)
+395 S5#41 Encounter: 'I'll give you anything!': not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 1 best None bound 247853
+    search: expanded 2 tried 6 frontier 1 best None bound 247853
+    search: expanded 3 tried 10 frontier 0 best None bound 247853
+395 S5#41 Encounter: 'I'll give you anything!'           rta  1028.17s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 247953
+396 S5#42 Give the idol to the cannibals                 rta  1028.59s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248713
+397 S5#43 Leave the village (visit 1)                    rta  1031.75s hint             3s 
+    search: expanded 1 tried 4 frontier 0 best None bound 249273
+398 S5#44 Map room 6: village again (visit 2)            rta  1034.09s hint             9s 
+    search: expanded 1 tried 2 frontier 0 best None bound 249833
+402 S5#48 213: 'Where are LeChuck and his crew hiding?'  rta  1036.42s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 249973
+403 S5#49 213: 'What's in your standard potion of exorci rta  1037.00s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 250113
+404 S5#50 213: 'I'm off to find LeChuck and get the root rta  1037.59s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 251573
+407 S5#53 Give the leaflet to the natives                rta  1043.67s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 251773
+408 S5#54 Leaflet scene: Esc 1 ('instructions on how to  rta  1044.50s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 251838
+409 S5#55 Leaflet scene: Esc 2 (skip the navigator close rta  1044.78s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 252298
+410 S5#56 Leaflet scene: Esc 3 ('follow his nose...')    rta  1046.69s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 252898
+411 S5#57 Enter the hut                                  rta  1049.19s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 253318
+412 S5#58 Pick up the banana picker                      rta  1050.94s hint             0s 
+    search: expanded 1 tried 5 frontier 0 best None bound 253578
+413 S5#59 Leave the hut (Herman appears)                 rta  1052.03s hint             1s 
+    search: expanded 1 tried 4 frontier 1 best None bound 254658
+    search: expanded 2 tried 10 frontier 0 best None bound 254658
+414 S5#60 Give the banana picker to Herman (key)         rta  1056.53s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 255338
+415 S5#61 Leave the village                              rta  1059.36s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 256318
+416 S5#62 Map room 6: beach on foot (to room 132)        rta  1063.44s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 256718
+417 S5#63 Board the rowboat (room 132)                   rta  1065.11s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 257018
+418 S5#64 Row to room 5 (bottom edge of room 6)          rta  1066.36s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 259358
+419 S5#65 Row to the clearing-side beach (room 131)      rta  1076.11s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 259518 bound 259778
+420 S5#66 Beach 131: jungle to the map (room 5)          rta  1076.78s search<hint      1s ['auto: walk to exit 17 -> room 5']
+    search: expanded 1 tried 2 frontier 0 best None bound None
+421  hint failed: S5#67 Map room 5: clearing: object 63 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of 
+421 S5#67 Map room 5: clearing: not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 0 best None bound 260138
+421 S5#67 Map room 5: clearing                           rta  1079.36s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 262398
+422 S5#68 Walk through the open gate to the idol field ( rta  1088.78s hint             5s 
+    search: expanded 1 tried 2 frontier 0 best 262878 bound 264678
+423 S6#1 Use ear with monkey head key (opens the giant h rta  1098.28s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 264918 bound 264938
+424 S6#2 Pre-walk to the mouth's walk point during scrip rta  1099.36s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 265038
+425 S6#3 Walk into the open mouth of the giant monkey he rta  1099.78s hint             0s 
+    search: expanded 1 tried 5 frontier 0 best None bound 266018
+426 S6#4 Take out the navigator head right after the cli rta  1103.86s hint             3s 
+  lookahead: S6#5 Walk toward the catacombs cave (fir delay 0
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1118.86s hint            36s 
+    search: expanded 1 tried 3 frontier 0 best None bound 269638
+428 S6#6 Esc the mushroom line                           rta  1118.94s hint             3s 
+  lookahead: S6#7 Walk to the catacombs cave delay 4
+    search: expanded 1 tried 2 frontier 0 best None bound 270398
+429 S6#7 Walk to the catacombs cave                      rta  1122.11s hint             3s 
+  lookahead: S6#8 Catacombs exit 1/6: walk to the cav delay 8
+    search: expanded 1 tried 6 frontier 0 best 270698 bound 270778
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1123.36s search<hint     10s ['auto: verb 11 cave']

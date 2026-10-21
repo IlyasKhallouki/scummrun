@@ -1,0 +1,6 @@
+    search: expanded 1 tried 1 frontier 0 best None bound None
+431  hint failed: S6#9 Catacombs exit 2/6: walk to the cave the head points at (Var[164]): object 521 never came on screen (and with 1..12
+431 S6#9 Catacombs exit 2/6: walk to the cave the head points at: NOT REACHED target [{'var': 265, 'eq': 2}]
+  hint failed: S6#9 Catacombs exit 2/6: walk to the cave the head points at (Var[164]): object 521 never came on screen (and with 1..12
+  x auto: stand and wait: nothing came
+END frame 13134 room 0

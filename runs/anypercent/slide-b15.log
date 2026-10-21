@@ -1,0 +1,29 @@
+461 S6#39 Feather skip 3/3: click during the rat cutscen rta  1218.22s hint             0s 
+463 S6#41 Up the ladder to the hull                      rta  1220.39s hint             0s 
+464 S6#42 Through the passage back to the crew quarters  rta  1222.30s hint             0s 
+465 S6#43 Up the ladder to the deck                      rta  1224.55s hint             0s 
+467 S6#45 Open the greased door                          rta  1225.39s hint             0s 
+468 S6#46 Enter the brig room                            rta  1225.55s hint             0s 
+469 S6#47 Pick up the ghost tools                        rta  1226.80s hint             0s 
+470 S6#48 Back to the deck                               rta  1228.14s hint             0s 
+471 S6#49 Down the deck hatch again                      rta  1228.55s hint             0s 
+472 S6#50 Through the passage to the hull again          rta  1230.89s hint             0s 
+473 S6#51 Use glowing crate with ghost tools             rta  1242.22s hint             0s 
+474 S6#52 Look at the open crate to grab the voodoo root rta  1242.47s hint             0s 
+475 S6#53 Through the passage to the crew quarters       rta  1245.47s hint             0s 
+476 S6#54 Up the ladder to the deck                      rta  1247.72s hint             0s 
+477 S6#55 Leave the ghost ship                           rta  1249.22s hint             0s 
+478 S6#56 Walk into the cave with the root               rta  1256.97s hint             0s 
+479 S6#57 Esc 'A long walk, a brief row, and a short hik rta  1257.05s hint             0s 
+480 S6#58 Esc the cannibals' root scene                  rta  1257.14s hint             0s 
+481 S6#59 Walk out to the jungle (back toward the ghost- rta  1259.72s hint             0s 
+482 S6#60 Esc 'After some more furious paddling...'      rta  1259.80s hint             0s 
+484 S6#62 Bob scene: 'Where is the wedding?'             rta  1262.97s hint             0s 
+487 S6#65 Esc the crew's 'Come on, let's go.' exit       rta  1273.89s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound None
+489  hint failed: S7#1 Dock: walk to the right edge (the ghost starts on arrival): `after` did not hold within 1200 frames (and with 1..12
+489 S7#2 Dock: skip script 131's three ego text segments during : NOT REACHED target [{'var': 277, 'eq': 0}]
+  hint failed: S7#1 Dock: walk to the right edge (the ghost starts on arrival): `after` did not hold within 1200 frames (and with 1..12
+  x auto: wait until idle: no control within 900 frames (frame 15871, room 95)
+  + auto: Esc -> qf 324843 room 95
+END frame 14971 room 95

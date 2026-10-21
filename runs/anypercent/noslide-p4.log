@@ -1,0 +1,43 @@
+5009 S5g9 River fork: blow up the dam (gunpowder, then fl rta   974.17s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 236013 bound None
+5010  hint failed: target does not hold after the hint
+5010 S5g10 Pond: take the rope                            rta   978.84s search           7s ['auto: walk to exit 59 -> room 40', 'auto: verb 9 rope']
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 4 frontier 2 best None bound None
+    search: expanded 3 tried 6 frontier 1 best 237133 bound None
+    search: expanded 4 tried 9 frontier 3 best 237133 bound None
+    search: expanded 5 tried 11 frontier 3 best 237133 bound None
+    search: expanded 6 tried 15 frontier 3 best 237133 bound None
+    search: expanded 7 tried 19 frontier 3 best 237133 bound None
+5011  hint failed: target does not hold after the hint
+5011 S5g11 Map: into the crack                            rta   983.50s search           3s ['auto: walk to exit 554 -> room 4', 'auto: walk to exit 46 -> room 2', 'auto: walk to exit 35 -> room 18']
+5012 S5g12 Crack: tie both ropes and take the oars        rta   999.42s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 2 best None bound None
+    search: expanded 3 tried 8 frontier 1 best 243753 bound None
+    search: expanded 4 tried 11 frontier 0 best 243653 bound None
+5013  hint failed: target does not hold after the hint
+5013 S5g13 Main beach: pick up the fallen bananas         rta  1010.67s search           3s ['auto: walk to exit 244 -> room 2', 'auto: walk to exit 30 -> room 20', 'auto: verb 9 bananas']
+    search: expanded 1 tried 5 frontier 2 best None bound None
+    search: expanded 2 tried 8 frontier 1 best 244073 bound None
+5014  hint failed: target does not hold after the hint
+5014 S5g14 Main beach: launch the rowboat with the oars   rta  1012.42s search           1s ['auto: verb 7 oars', 'auto: walk to exit 261 -> room 2']
+5015 S5g15 Row to the village beach (room 132)            rta  1029.67s hint             0s 
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 0 best 249613 bound None
+5016  hint failed: target does not hold after the hint
+5016 S5g16 Walk into the cannibal village (first visit)   rta  1035.50s search           4s ['auto: walk to exit 16 -> room 6', 'auto: walk to exit 72 -> room 25']
+5017 S5g17 Village visit 1: take the bananas and get capt rta  1047.84s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 0 best None bound None
+5018  hint failed: S5g18 Open the loose board: object 309 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of
+5018 S5g18 Hut: escape through the loose board: NOT REACHED target [{'room': 6}, {'bit': 355, 'eq': 1}]
+  hint failed: S5g18 Open the loose board: object 309 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of
+  + auto: wait until idle -> qf 252593 room 27
+  + auto: Esc -> qf 252613 room 27
+  x auto: walk to exit 309 -> room 6: auto: walk to exit 309 -> room 6: object 309 never came on screen (no floor path
+  x auto: verb 9 loose board: auto: verb 9 loose board: object 309 never came on screen (no floor path, no ste
+  x auto: stand and wait: nothing came
+END frame 12261 room 27

@@ -1,0 +1,15 @@
+5018 S5g18 Hut: escape through the loose board            rta  1051.17s hint             0s 
+5019 S5g19 Row back to the clearing-side beach (room 131) rta  1067.92s hint             1s 
+5020 S5g20 Map room 2 on foot (the monkey's screen)       rta  1074.76s hint             0s 
+    search: expanded 1 tried 3 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 0 best None bound None
+5021  hint failed: S5g21 Click the wandering monkey on the map: object 2 is not in room 2 (and with 1..12 frames of delay)
+5021 S5g21 Meet the monkey (jungle room 21): NOT REACHED target [{'room': 21}]
+  hint failed: S5g21 Click the wandering monkey on the map: object 2 is not in room 2 (and with 1..12 frames of delay)
+  + auto: walk to exit 29 -> room 4 -> qf 259173 room 4
+  x auto: walk to exit 33 -> room 5: auto: walk to exit 33 -> room 5: object 33 never came on screen (no floor path, 
+  x auto: stand and wait: nothing came
+  + auto: walk to exit 46 -> room 2 -> qf 259313 room 2
+  x auto: stand and wait: nothing came
+    search: expanded 1 tried 1 frontier 0 best None bound None
+END frame 12584 room 2

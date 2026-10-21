@@ -1,0 +1,17 @@
+439 S6#17 Read the dusty book standing at (46,85) (carri rta  1171.45s hint             0s 
+440 S6#18 Talk to the navigator head inside the book's c rta  1172.86s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 6 frontier 3 best 315263 bound None
+441  hint failed: S6#19 Head dialogue choice 1/5 (line 2): no dialogue menu within 1200 frames (and with 1..12 frames of delay)
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1309.06s search          23s ['auto: Esc', "auto: say 'May I please have that necklace?'"]
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1310.64s hint             0s 
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1311.89s hint             0s 
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1313.81s hint             0s 
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1315.39s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 10 frontier 3 best None bound None
+    search: expanded 3 tried 17 frontier 4 best None bound None
+    search: expanded 4 tried 19 frontier 4 best None bound None
+    search: expanded 5 tried 30 frontier 4 best None bound None
+    search: expanded 6 tried 32 frontier 3 best None bound None
+    search: expanded 7 tried 34 frontier 3 best None bound None

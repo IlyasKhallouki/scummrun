@@ -1,0 +1,25 @@
+439 S6#17 Read the dusty book standing at (52,83) (carri rta  1171.53s hint             0s 
+440 S6#18 Talk to the navigator head inside the book's c rta  1172.36s hint             0s 
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1174.97s hint             0s 
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1176.72s hint             0s 
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1178.63s hint             0s 
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1180.13s hint             0s 
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1181.63s hint             0s 
+447 S6#25 Put the head away if the dialogue took it out  rta  1181.63s already          0s []
+448 S6#26 Put the necklace on standing at (52,83) in wal rta  1187.30s hint             0s 
+451 S6#29 Open the captain's cabin door (left door)      rta  1247.97s hint             1s 
+452 S6#30 Enter the captain's cabin                      rta  1248.14s hint             0s 
+453 S6#31 Use magnetic compass with the key (magnet pull rta  1251.05s hint             0s 
+454 S6#32 Leave the captain's cabin                      rta  1252.22s hint             0s 
+455 S6#33 Down the deck hatch to the crew quarters       rta  1256.97s hint             0s 
+456 S6#34 Through the passage to the hull                rta  1259.30s hint             0s 
+457 S6#35 Use key in the hull hatch (unlock and open)    rta  1261.47s hint             0s 
+458 S6#36 Down the hatch to the storage room             rta  1261.64s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound None
+461  hint failed: S6#39 Feather skip 3/3: click during the rat cutscene to pick up the grease: the verb did not return to Walk to within 1
+461 S6#39 Feather skip 3/3: click during the rat cutscene to pic: NOT REACHED target [{'has': 815}]
+  hint failed: S6#39 Feather skip 3/3: click during the rat cutscene to pick up the grease: the verb did not return to Walk to within 1
+  x auto: verb 7 cooking grease: no effect
+  x auto: verb 9 cooking grease: no effect
+  x auto: stand and wait: nothing came
+END frame 14824 room 74

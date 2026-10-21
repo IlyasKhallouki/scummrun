@@ -1,0 +1,145 @@
+  lookahead: S2#21 Leave Smirk's (right path) delay 11
+103 S2#21 Leave Smirk's (right path)                     rta   352.54s hint             5s 
+  lookahead: S2#22 Fight 1: intercept a pirate on the delay 0
+104 S2#22 Fight 1: intercept a pirate on the map         rta   368.96s hint             4s 
+  lookahead: S2#23 Fight 1: choose 'Prepare to die' ( delay 0
+105 S2#23 Fight 1: choose 'Prepare to die' (encounter 1) rta   370.46s hint            10s 
+  lookahead: S2#24 Fight 1 E1: insult 2 'shish kebab' delay 0
+106 S2#24 Fight 1 E1: insult 2 'shish kebab' (pirate mus rta   378.13s hint            17s 
+  lookahead: S2#25 Fight 1 E2: insult 8 'dairy farmer delay 0
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107 S2#25 Fight 1 E2: insult 8 'dairy farmer' (pirate mu rta   384.63s hint           173s 
+  lookahead: S2#26 Fight 1 E3: default insult 'Boy ar delay 0
+108  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+108 S2#26 Fight 1 E3: default insult 'Boy are you ugly!' rta   388.96s hint           113s 
+  lookahead: S2#27 Fight 1 E4: answer 16 wrongly ('Oh delay 0
+109 S2#27 Fight 1 E4: answer 16 wrongly ('Oh yeah?'), le rta   393.30s hint            36s 
+  lookahead: S2#28 Fight 1 E5: answer the pirate's in delay 0
+110 S2#28 Fight 1 E5: answer the pirate's insult (2 or 8 rta   396.05s hint             1s 
+111 S1#84 map -> forest entrance (2)                     rta   397.38s hint             0s 
+112 S1#85 218 -> 215 through path 686 (Back)             rta   399.63s hint             0s 
+113 S1#86 215 -> 220 (Left, map gate)                    rta   403.21s hint             0s 
+114 S1#87 220 -> 213 (Right)                             rta   407.21s hint             0s 
+115 S1#88 213 -> 212 (Left)                              rta   410.80s hint             0s 
+116 S1#89 212 -> 207 (Back, into the trap)               rta   414.21s hint             0s 
+117 S1#90 forest map teleport: Look at the map in the tr rta   416.63s hint             0s 
+118 S1#91 207 -> 211 (Back, now touchable)               rta   418.21s hint             0s 
+119 S1#92 211 -> 216 (Right)                             rta   421.21s hint             0s 
+120 S1#93 216 -> 201 (Left)                              rta   423.21s hint             0s 
+121 S1#94 201 -> treasure site (Back)                    rta   426.21s hint             0s 
+123 S1#96 dig: Use shovel with X (treasure trial done)   rta   431.38s hint             0s 
+  lookahead: S2#29 Treasure site -> map (forest path  delay 0
+124 S2#29 Treasure site -> map (forest path 750)         rta   434.46s hint             4s 
+  lookahead: S2#30 Fight 2: wait at the fork for a fo delay 0
+125 S2#30 Fight 2: wait at the fork for a fork-bound pir rta   437.63s hint             2s 
+  lookahead: S2#31 Fight 2: choose 'Prepare to die' ( delay 0
+126  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+126  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+126 S2#31 Fight 2: choose 'Prepare to die' (encounter 2) rta   439.13s hint            65s 
+  lookahead: S2#32 Fight 2 E1: insult 16 'apes', pira delay 0
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127 S2#32 Fight 2 E1: insult 16 'apes', pirate must coun rta   444.05s hint            86s 
+  lookahead: S2#33 Fight 2 E2: answer the pirate's in delay 0
+128 S2#33 Fight 2 E2: answer the pirate's insult (2, 8 o rta   447.88s hint            14s 
+  lookahead: S2#34 Fight 2 E3: insult 2 'shish kebab' delay 0
+129 S2#34 Fight 2 E3: insult 2 'shish kebab' (pirate mus rta   452.05s hint            24s 
+  lookahead: S2#35 Fight 2 E4: insult 8 'dairy farmer delay 4
+130 S2#35 Fight 2 E4: insult 8 'dairy farmer' (fight 2 w rta   455.38s hint            14s 
+  lookahead: S2#36 Fight 3: wait at the fork for a fo delay 0
+131 S2#36 Fight 3: wait at the fork for a fork-bound pir rta   458.55s hint             1s 
+  lookahead: S2#37 Fight 3: choose 'Prepare to die' ( delay 0
+132 S2#37 Fight 3: choose 'Prepare to die' (encounter 3) rta   460.05s hint            15s 
+  lookahead: S2#38 Fight 3 E1: insult 2 'shish kebab' delay 0
+133 S2#38 Fight 3 E1: insult 2 'shish kebab' (pirate mus rta   464.13s hint            29s 
+  lookahead: S2#39 Fight 3 E2: insult 8 'dairy farmer delay 0
+134 S2#39 Fight 3 E2: insult 8 'dairy farmer' (pirate mu rta   468.30s hint            22s 
+  lookahead: S2#40 Fight 3 E3: insult 16 'apes' (figh delay 0
+135 S2#40 Fight 3 E3: insult 16 'apes' (fight 3 won)     rta   471.38s hint            11s 
+136 S2#41 Map -> fork (forest screen 218)                rta   471.63s hint             0s 
+137 S2#42 Forest 218 -> 215: up (path 686)               rta   473.88s hint             0s 
+138 S2#43 Forest 215 -> 203: up                          rta   475.88s hint             0s 
+139 S2#44 Forest 203 -> 202: right                       rta   479.30s hint             0s 
+140 S2#45 Forest 202 -> 205: right                       rta   482.97s hint             0s 
+141 S2#46 Forest 205 -> 217: left                        rta   487.47s hint             0s 
+142 S2#47 Forest 217 -> 209: up                          rta   490.55s hint             0s 
+143 S2#48 Use sign (log bridge over the ravine)          rta   493.30s hint             0s 
+144 S2#49 Forest 209 -> Sword Master's clearing: right o rta   498.97s hint             0s 
+146 S2#51 Walk to the Sword Master (starts the challenge rta   511.80s hint             0s 
+147 S2#52 Esc: skip 'How dare you approach the Sword Mas rta   511.88s hint             0s 
+148 S2#53 Carla menu: 'My name is Guybrush Threepwood.   rta   513.97s hint             1s 
+149 S2#54 Carla E1: answer her insult (planned 32 -> 'fa rta   518.22s hint             1s 
+150 S2#55 Carla E2: answer her insult (planned 21 -> 'fa rta   522.38s hint             1s 
+    search: expanded 1 tried 6 frontier 4 best 126608 bound None
+151  hint failed: S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion'): `until` did not hold within 1200 frames of frame 605
+151 S2#56 Carla E3: answer her insult (planned 33 -> 'fa rta   522.97s search          13s ['auto: say "I\'m glad to hear you attended your famil"']
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 8 frontier 5 best None bound None
+    search: expanded 3 tried 14 frontier 4 best None bound None
+    search: expanded 4 tried 20 frontier 7 best None bound None
+    search: expanded 5 tried 26 frontier 6 best None bound None
+    search: expanded 6 tried 32 frontier 5 best None bound None
+    search: expanded 7 tried 38 frontier 4 best None bound None
+    search: expanded 8 tried 44 frontier 7 best None bound None
+    search: expanded 9 tried 50 frontier 10 best None bound None
+    search: expanded 10 tried 56 frontier 9 best None bound None
+    search: expanded 11 tried 62 frontier 8 best None bound None
+    search: expanded 12 tried 68 frontier 7 best None bound None
+    search: expanded 13 tried 74 frontier 6 best None bound None
+    search: expanded 14 tried 80 frontier 5 best None bound None
+    search: expanded 15 tried 86 frontier 4 best None bound None
+    search: expanded 16 tried 92 frontier 7 best None bound None
+    search: expanded 17 tried 98 frontier 6 best None bound None
+    search: expanded 18 tried 104 frontier 5 best None bound None
+    search: expanded 19 tried 110 frontier 4 best None bound None
+    search: expanded 20 tried 116 frontier 4 best None bound None
+    search: expanded 21 tried 122 frontier 3 best None bound None
+    search: expanded 22 tried 128 frontier 2 best None bound None
+    search: expanded 23 tried 134 frontier 1 best None bound None
+    search: expanded 24 tried 136 frontier 0 best None bound None
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): var 240 is 20, which has no planned reply (and with 
+152 S2#57 Carla E4: answer her insult (planned 18 -> 'feather-du: NOT REACHED target [{'var': 263, 'eq': 4}, {'var': 262, 'eq': 0}, {'var': 240, 'in': [18, 21, 24, 32, 33]}]
+  + auto: say "I'm glad to hear you attended your famil" -> qf 132348 room 44
+  + auto: say 'Oh yeah?' -> qf 132348 room 44
+  + auto: say 'I am rubber, you are glue.' -> qf 132348 room 44
+  + auto: say "I'm shaking, I'm shaking." -> qf 132348 room 44
+  + auto: say "First you'd better stop waving it like a" -> qf 133088 room 61
+  + auto: say 'How appropriate.  You fight like a cow.' -> qf 133088 room 61
+  + auto: say "I'm glad to hear you attended your famil" -> qf 133088 room 61
+  + auto: say 'Oh yeah?' -> qf 133088 room 61
+  + auto: say 'I am rubber, you are glue.' -> qf 133088 room 61
+  + auto: say "I'm shaking, I'm shaking." -> qf 133088 room 61
+  + auto: say "First you'd better stop waving it like a" -> qf 133088 room 61
+  + auto: say 'How appropriate.  You fight like a cow.' -> qf 133088 room 61
+  + auto: say "I'm glad to hear you attended your famil" -> qf 133088 room 61
+  + auto: say 'Oh yeah?' -> qf 133088 room 61
+  + auto: say 'I am rubber, you are glue.' -> qf 133088 room 61
+  + auto: say "I'm shaking, I'm shaking." -> qf 133088 room 61
+  + auto: say "First you'd better stop waving it like a" -> qf 133088 room 61
+  + auto: say 'How appropriate.  You fight like a cow.' -> qf 133088 room 61
+  + auto: say "I'm glad to hear you attended your famil" -> qf 133088 room 61
+  + auto: say 'Oh yeah?' -> qf 133088 room 61
+  + auto: say 'I am rubber, you are glue.' -> qf 133088 room 61
+  + auto: say "I'm shaking, I'm shaking." -> qf 133088 room 61
+  + auto: say "First you'd better stop waving it like a" -> qf 133088 room 61
+  + auto: say 'How appropriate.  You fight like a cow.' -> qf 133088 room 61
+  + auto: say "I'm glad to hear you attended your famil" -> qf 133088 room 61
+  + auto: say 'Oh yeah?' -> qf 133088 room 61
+  + auto: say 'I am rubber, you are glue.' -> qf 133088 room 61
+  + auto: say "I'm shaking, I'm shaking." -> qf 133088 room 61
+  x auto: verb 11 Sword Master: auto: verb 11 Sword Master: object 744 never came on screen (no floor path, no s
+  x auto: stand and wait: nothing came
+END frame 6063 room 44

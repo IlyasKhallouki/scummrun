@@ -1,0 +1,23 @@
+489 S7#2 Dock: skip script 131's three ego text segments rta  1406.64s hint             1s 
+493 S7#6 Dock: walk right again (to Low Street)          rta  1415.56s hint             0s 
+494 S7#7 Low Street: archway up to High Street (avoid th rta  1432.47s hint             0s 
+495 S7#8 High Street: open the church door (door closed: rta  1436.97s hint             0s 
+496 S7#9 High Street: enter the church                   rta  1437.13s hint             0s 
+499 S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?' rta  1440.38s hint             0s 
+504 S7#17 Close-up menu 2: 'If you're here, then who's t rta  1442.38s hint             0s 
+505 S7#18 Close-up: skip ego's 'who's that in the dress' rta  1442.72s hint             0s 
+510 S7#23 Close-up: Esc LeChuck's punch                  rta  1443.72s hint             0s 
+511 S7#24 Map: Esc the POW / BIFF flight                 rta  1443.88s hint             0s 
+512 S7#25 Stan's: Esc Stan's greeting                    rta  1446.63s hint             0s 
+513 S7#26 Stan's: Esc Stan's sales pitch                 rta  1450.22s hint             0s 
+514 S7#27 Stan's: wake Guybrush (first input after the f rta  1450.22s already          0s []
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best None bound None
+515  hint failed: S7#28 Stan's: use root beer with LeChuck (click LeChuck's left side): `after` did not hold within 1200 frames (and with 
+515 S7#28 Stan's: use root beer with LeChuck (click LeChuck's le: NOT REACHED target [{'has': 733}]
+  hint failed: S7#28 Stan's: use root beer with LeChuck (click LeChuck's left side): `after` did not hold within 1200 frames (and with 
+  + auto: wait until idle -> qf 351421 room 59
+  + auto: Esc -> qf 351421 room 59
+  x auto: verb 9 root beer: auto: verb 9 root beer: verb key did not select verb 9
+  x auto: stand and wait: nothing came
+END frame 17086 room 59

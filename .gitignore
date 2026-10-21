@@ -33,3 +33,14 @@ output.sas
 # Editor / OS
 .DS_Store
 *.swp
+
+# Run outputs: keep the movie (raw inputs), per-goal results, verify reports,
+# route diffs and driver logs; engine traces, state dumps and configs stay local
+runs/**/trace.jsonl
+runs/**/state-*.json
+runs/**/fail-state.json
+runs/**/prefix.jsonl
+runs/**/scummvm.ini
+runs/**/stdout.log
+runs/**/xdg/
+runs/**/movie-explicit.jsonl

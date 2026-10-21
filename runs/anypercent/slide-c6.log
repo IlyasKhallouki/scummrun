@@ -1,0 +1,234 @@
+3 S1#4 open the SCUMM Bar door                         rta    12.92s hint             1s 
+  lookahead: S1#5 enter the bar delay 0
+4 S1#5 enter the bar                                   rta    13.08s hint             7s 
+  lookahead: S1#7 provoke the cook (Open kitchen door delay 0
+6 S1#7 provoke the cook (Open kitchen door while he is rta    23.08s hint             9s 
+7 S1#8 enter the kitchen as the cook walks away        rta    37.75s hint             0s 
+8 S2#1 INTERLEAVE S1 kitchen: open the pier door       rta    39.67s hint             0s 
+9 S2#2 INTERLEAVE S1 kitchen: step on the plank (gull  rta    42.08s hint             0s 
+10 S2#3 INTERLEAVE S1 kitchen: step on the plank again  rta    42.42s hint             0s 
+11 S2#4 INTERLEAVE S1 kitchen: pick up the fish during  rta    43.92s hint             0s 
+12 S1#9 pick up the pot                                 rta    46.00s hint             0s 
+13 S1#10 pick up the hunk of meat                       rta    47.08s hint             0s 
+14 S1#11 leave the kitchen                              rta    47.50s hint             0s 
+  lookahead: S1#13 leave the bar (first exit: LeChuck delay 0
+16 S1#13 leave the bar (first exit: LeChuck cutscene, s rta    53.59s hint            18s 
+17 S1#14 dock -> Lookout                                rta    64.84s hint             1s 
+  lookahead: S1#15 Lookout -> island map delay 0
+18 S1#15 Lookout -> island map                          rta    68.84s hint             2s 
+  lookahead: S1#16 map -> clearing delay 0
+19 S1#16 map -> clearing                                rta    74.00s hint             6s 
+21 S1#18 enter the circus tent                          rta    82.09s hint             0s 
+23 S1#20 circus menu 2: OK, I'll do it                  rta    86.15s hint             0s 
+24 S1#21 circus menu 3: Of course I have a helmet       rta    86.90s hint             0s 
+  lookahead: S1#22 helmet: Use + the fish icon (the i delay 0
+25 S1#22 helmet: Use + the fish icon (the inventory slo rta    88.82s hint             3s 
+  lookahead: S1#23 circus menu 4 after the cannon (an delay 0
+26 S1#23 circus menu 4 after the cannon (any line) -> 4 rta   101.07s hint             7s 
+27 S1#24 circus grounds -> map                          rta   109.49s hint             0s 
+28 S1#25 map -> forest entrance (fork, pseudo-room 218) rta   112.07s hint             0s 
+29 S1#26 218 -> 215 (petal screen) through path 686     rta   114.32s hint             0s 
+30 S1#27 pick up the yellow petal (plants)              rta   115.82s hint             0s 
+31 S1#28 215 -> 218                                     rta   117.24s hint             0s 
+32 S1#29 218 -> map                                     rta   120.49s hint             0s 
+33 S1#30 map -> village (lands on the dock)             rta   123.57s hint             0s 
+  lookahead: S1#31 drug the meat: Use hunk of meat wi delay 0
+34 S1#31 drug the meat: Use hunk of meat with yellow pe rta   123.90s hint            16s 
+  lookahead: S1#32 dock -> Low Street delay 0
+35 S1#32 dock -> Low Street                             rta   140.24s hint            17s 
+36 S1#33 talk to the Citizen of Melee                   rta   144.90s hint             0s 
+37 S1#34 citizen: barber named Dominique                rta   145.49s hint             0s 
+  lookahead: S1#35 citizen: buy the map delay 0
+38 S1#35 citizen: buy the map                           rta   146.32s hint             1s 
+39 S1#36 open the Voodoo shop door                      rta   151.32s hint             0s 
+40 S1#37 enter the Voodoo shop                          rta   151.49s hint             0s 
+41 S1#38 pick up the rubber chicken                     rta   154.16s hint             0s 
+42 S1#39 open the shop door from inside                 rta   156.57s hint             0s 
+  lookahead: S1#40 leave the Voodoo shop delay 0
+43 S1#40 leave the Voodoo shop                          rta   156.82s hint             2s 
+  lookahead: S1#41 Low Street -> High Street (clock a delay 0
+44 S1#41 Low Street -> High Street (clock archway)      rta   162.07s hint             3s 
+45 S1#42 High Street -> jail                            rta   168.49s hint             0s 
+46 S1#43 Otis #1: talk to the prisoner (unlocks the min rta   170.99s hint             0s 
+  lookahead: S1#44 leave the jail delay 0
+47 S1#44 leave the jail                                 rta   174.07s hint             1s 
+48 S1#45 open the store door                            rta   179.16s hint             0s 
+    search: expanded 1 tried 5 frontier 3 best None bound None
+    search: expanded 2 tried 12 frontier 6 best None bound None
+    search: expanded 3 tried 14 frontier 7 best None bound None
+    search: expanded 4 tried 21 frontier 9 best None bound None
+    search: expanded 5 tried 23 frontier 8 best None bound None
+    search: expanded 6 tried 30 frontier 10 best None bound None
+    search: expanded 7 tried 33 frontier 12 best None bound None
+    search: expanded 8 tried 40 frontier 14 best None bound None
+    search: expanded 9 tried 43 frontier 16 best None bound None
+    search: expanded 10 tried 46 frontier 16 best None bound None
+    search: expanded 11 tried 48 frontier 16 best None bound None
+    search: expanded 12 tried 51 frontier 16 best None bound None
+    search: expanded 13 tried 53 frontier 15 best None bound None
+    search: expanded 14 tried 56 frontier 16 best None bound None
+    search: expanded 15 tried 63 frontier 16 best None bound None
+    search: expanded 16 tried 68 frontier 16 best None bound None
+    search: expanded 17 tried 70 frontier 16 best None bound None
+    search: expanded 18 tried 73 frontier 16 best None bound None
+    search: expanded 19 tried 76 frontier 16 best None bound None
+    search: expanded 20 tried 78 frontier 16 best None bound None
+    search: expanded 21 tried 80 frontier 16 best None bound None
+    search: expanded 22 tried 82 frontier 15 best None bound None
+    search: expanded 23 tried 88 frontier 16 best None bound None
+    search: expanded 24 tried 91 frontier 16 best None bound None
+    search: expanded 25 tried 93 frontier 15 best None bound None
+    search: expanded 26 tried 96 frontier 16 best None bound None
+    search: expanded 27 tried 99 frontier 16 best None bound None
+    search: expanded 28 tried 102 frontier 16 best None bound None
+    search: expanded 29 tried 105 frontier 16 best None bound None
+    search: expanded 30 tried 108 frontier 16 best None bound None
+    search: expanded 31 tried 115 frontier 16 best None bound None
+    search: expanded 32 tried 118 frontier 15 best None bound None
+    search: expanded 33 tried 120 frontier 16 best None bound None
+    search: expanded 34 tried 122 frontier 15 best None bound None
+    search: expanded 35 tried 128 frontier 16 best None bound None
+    search: expanded 36 tried 130 frontier 15 best None bound None
+    search: expanded 37 tried 132 frontier 14 best None bound None
+    search: expanded 38 tried 135 frontier 14 best None bound None
+    search: expanded 39 tried 138 frontier 14 best None bound None
+    search: expanded 40 tried 144 frontier 15 best None bound None
+    search: expanded 41 tried 146 frontier 14 best None bound None
+    search: expanded 42 tried 149 frontier 13 best None bound None
+    search: expanded 43 tried 152 frontier 12 best None bound None
+    search: expanded 44 tried 159 frontier 14 best None bound None
+    search: expanded 45 tried 161 frontier 15 best None bound None
+    search: expanded 46 tried 163 frontier 14 best None bound None
+    search: expanded 47 tried 165 frontier 13 best None bound None
+    search: expanded 48 tried 171 frontier 14 best None bound None
+    search: expanded 49 tried 173 frontier 13 best None bound None
+    search: expanded 50 tried 175 frontier 12 best None bound None
+    search: expanded 51 tried 178 frontier 12 best None bound None
+    search: expanded 52 tried 181 frontier 14 best None bound None
+    search: expanded 53 tried 184 frontier 15 best None bound None
+    search: expanded 54 tried 191 frontier 16 best None bound None
+    search: expanded 55 tried 194 frontier 16 best None bound None
+    search: expanded 56 tried 196 frontier 16 best None bound None
+    search: expanded 57 tried 199 frontier 16 best None bound None
+    search: expanded 58 tried 201 frontier 16 best None bound None
+    search: expanded 59 tried 204 frontier 16 best None bound None
+    search: expanded 60 tried 211 frontier 16 best None bound None
+    search: expanded 61 tried 214 frontier 15 best None bound None
+    search: expanded 62 tried 217 frontier 16 best None bound None
+    search: expanded 63 tried 220 frontier 15 best None bound None
+    search: expanded 64 tried 223 frontier 15 best None bound None
+    search: expanded 65 tried 226 frontier 16 best None bound None
+    search: expanded 66 tried 229 frontier 16 best None bound None
+    search: expanded 67 tried 236 frontier 16 best None bound None
+    search: expanded 68 tried 238 frontier 16 best None bound None
+    search: expanded 69 tried 241 frontier 15 best None bound None
+    search: expanded 70 tried 247 frontier 16 best None bound None
+    search: expanded 71 tried 250 frontier 15 best None bound None
+    search: expanded 72 tried 252 frontier 16 best None bound None
+    search: expanded 73 tried 259 frontier 16 best None bound None
+    search: expanded 74 tried 262 frontier 16 best None bound None
+    search: expanded 75 tried 265 frontier 15 best None bound None
+    search: expanded 76 tried 268 frontier 14 best None bound None
+    search: expanded 77 tried 270 frontier 13 best None bound None
+    search: expanded 78 tried 272 frontier 12 best None bound None
+    search: expanded 79 tried 278 frontier 13 best None bound None
+    search: expanded 81 tried 280 frontier 12 best None bound None
+    search: expanded 82 tried 286 frontier 13 best None bound None
+    search: expanded 83 tried 289 frontier 13 best None bound None
+    search: expanded 84 tried 292 frontier 13 best None bound None
+    search: expanded 85 tried 294 frontier 14 best None bound None
+    search: expanded 86 tried 296 frontier 14 best None bound None
+    search: expanded 87 tried 302 frontier 15 best None bound None
+    search: expanded 88 tried 305 frontier 15 best None bound None
+    search: expanded 89 tried 308 frontier 14 best None bound None
+    search: expanded 90 tried 315 frontier 16 best None bound None
+    search: expanded 91 tried 317 frontier 16 best None bound None
+    search: expanded 92 tried 319 frontier 16 best None bound None
+    search: expanded 93 tried 324 frontier 16 best None bound None
+    search: expanded 94 tried 330 frontier 16 best None bound None
+    search: expanded 95 tried 337 frontier 16 best None bound None
+    search: expanded 96 tried 339 frontier 15 best None bound None
+    search: expanded 97 tried 342 frontier 14 best None bound None
+    search: expanded 98 tried 349 frontier 16 best None bound None
+    search: expanded 99 tried 352 frontier 15 best None bound None
+    search: expanded 100 tried 359 frontier 16 best None bound None
+    search: expanded 101 tried 361 frontier 15 best None bound None
+    search: expanded 102 tried 363 frontier 15 best None bound None
+    search: expanded 103 tried 369 frontier 16 best None bound None
+    search: expanded 104 tried 371 frontier 16 best None bound None
+    search: expanded 106 tried 374 frontier 16 best None bound None
+    search: expanded 107 tried 376 frontier 16 best None bound None
+    search: expanded 108 tried 382 frontier 16 best None bound None
+    search: expanded 109 tried 389 frontier 16 best None bound None
+    search: expanded 110 tried 391 frontier 16 best None bound None
+    search: expanded 112 tried 393 frontier 14 best None bound None
+    search: expanded 114 tried 395 frontier 14 best None bound None
+    search: expanded 115 tried 402 frontier 15 best None bound None
+    search: expanded 117 tried 404 frontier 13 best None bound None
+    search: expanded 119 tried 410 frontier 14 best None bound None
+    search: expanded 120 tried 412 frontier 15 best None bound None
+    search: expanded 121 tried 417 frontier 16 best None bound None
+    search: expanded 123 tried 423 frontier 16 best None bound None
+    search: expanded 126 tried 425 frontier 14 best None bound None
+    search: expanded 127 tried 427 frontier 14 best None bound None
+    search: expanded 128 tried 432 frontier 16 best None bound None
+    search: expanded 129 tried 438 frontier 16 best None bound None
+    search: expanded 130 tried 444 frontier 16 best None bound None
+    search: expanded 131 tried 446 frontier 15 best None bound None
+    search: expanded 132 tried 448 frontier 15 best None bound None
+    search: expanded 133 tried 450 frontier 15 best None bound None
+    search: expanded 134 tried 455 frontier 16 best None bound None
+    search: expanded 136 tried 461 frontier 15 best None bound None
+    search: expanded 137 tried 463 frontier 16 best None bound None
+    search: expanded 139 tried 465 frontier 14 best None bound None
+    search: expanded 141 tried 467 frontier 14 best None bound None
+    search: expanded 142 tried 470 frontier 16 best None bound None
+    search: expanded 147 tried 473 frontier 12 best None bound None
+    search: expanded 148 tried 475 frontier 12 best None bound None
+    search: expanded 150 tried 481 frontier 14 best None bound None
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49 S1#46 enter the store (first visit: safe combination and sto: NOT REACHED target [{'room': 30}, {'actor_room': 11, 'eq': 0}, {'var': 221, 'eq': 1}, {'var': 222, 'eq': 1}, {'var': 223, 'eq': 1}, {'var': 224, 'eq': 1}]
+  x auto: verb 11 door: auto: verb 11 door: object 437 is not in room 30
+  + auto: verb 11 door -> qf 48636 room 30
+  x auto: stand and wait: nothing came
+  + auto: scripted walk via town -> qf 48876 room 34
+  + auto: walk to exit 387 -> room 34 -> qf 48796 room 34
+  x auto: verb 11 door: auto: verb 11 door: object 387 is not in room 34
+  x auto: verb 10 storekeeper: auto: verb 10 storekeeper: object 394 never came on screen (no floor path, no st
+  x auto: give 396 to storekeeper: auto: give 396 to storekeeper: object 394 never came on screen (no floor path, n
+  + auto: verb 7 bell -> qf 49796 room 30
+  x auto: stand and wait: nothing came
+  + auto: wait until idle -> qf 48216 room 35
+  + auto: Esc -> qf 48736 room 35
+  + auto: say "I'm looking for the Sword Master of M\x88l\x82" -> qf 49736 room 30
+  + auto: say "I think I'd just like to browse." -> qf 48976 room 30
+  + auto: wait until idle -> qf 48376 room 35
+  + auto: Esc -> qf 48896 room 35
+  + auto: say 'Now that I have this sword, who can I te' -> qf 49896 room 30
+  + auto: say 'I could really use a breath mint.' -> qf 49256 room 30
+  + auto: say "I think I'd just like to browse." -> qf 49136 room 30
+  + auto: walk to exit 451 -> room 34 -> qf 48856 room 34
+  x auto: walk to exit 450 -> room 34: auto: walk to exit 450 -> room 34: object 450 is not in room 33
+  x auto: stand and wait: nothing came
+  + auto: walk to exit 400 -> room 34 -> qf 48376 room 34
+  x auto: stand and wait: nothing came
+  + auto: walk to exit 437 -> room 30 -> qf 49476 room 30
+  + auto: walk to exit 434 -> room 31 -> qf 48456 room 31
+  + auto: verb 11 door -> qf 49476 room 30
+  + auto: walk to exit 433 -> room 35 -> qf 49896 room 35
+  x auto: stand and wait: nothing came
+  + auto: scripted walk via town -> qf 49716 room 34
+END frame 2207 room 34

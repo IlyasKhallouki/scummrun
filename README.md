@@ -1,6 +1,78 @@
 # fast-mi
 
-Automated glitchless speedrunner for *The Secret of Monkey Island* (SCUMM v5).
+An automated speedrunner for *The Secret of Monkey Island* (SCUMM v5), running on a patched
+ScummVM.
+
+[![The bot's Any% run, DOS CD, 21:01.483](https://img.youtube.com/vi/lHQrHf5b_5o/maxresdefault.jpg)](https://youtu.be/lHQrHf5b_5o)
+
+The bot's best Any% run on the DOS CD release is 21:01.483, 50.9 s under the human record
+(21:52.4 by saruya). [Watch it on YouTube.](https://youtu.be/lHQrHf5b_5o)
+
+The time comes from replaying the run's input file from boot twice: once with the bridge's
+automatic text and cutscene skips, and once with every skip written out as a key press. Both
+replays end on frame 14820.
+
+That run was made with CD track 6 missing from the game folder. The "Last Part" card waits for
+that track to finish, so it lasts 130 s when the track plays and 0.2 s when the file is
+missing. In the record's video it lasts about 6 s. With the track present, the same route runs
+23:11.3. The leaderboard bans the "No Music" setting. Here the music driver is unchanged and
+every other CD track plays, so whether a missing track 6 counts is still an open question.
+
+The repo holds two projects that share the engine bridge: the Any% bot below, and the
+original glitchless Part I planner after it.
+
+## Any%
+
+The route follows saruya's record and uses the same glitches: the logo speed glitch, Credit
+Early, the item slide carried into Part II, the oars, monkey and feather skips, and getting
+the slide back with the dusty book. It is written as 532 moves in `routes/anypercent/`, and
+all but one cite the scripts they rely on.
+
+The driver (`scripts/anypercent_auto.py`) treats each move as a hint, not a script. For every
+goal it plays the hint on a fork of the running engine. If the hint fails, it falls back to a
+best-first search over forks, where the candidate actions come from a parsed index of the
+decompiled scripts that says which action writes which fact (`src/speedrun/scriptindex.py`).
+Where the next room or fight is drawn at random (the catacombs, the insult fights, Carla), it
+tries 0 to 12 frames of delay first and keeps the one that finishes the next goal soonest.
+With `--early` it also sends an input one or two frames earlier whenever the game ends up in
+exactly the same state.
+
+The first full run with the item slide took 25:24.4. The driver's random-room lookahead and
+fixes to hints that had silently fallen back to the search brought that to 24:08.6. Most of
+the rest came from parallel passes, each working on one stretch of the route in its own copy
+of the project and measuring every change in the engine; the changes were then merged and the
+whole route replayed from boot. `docs/anypercent/overnight.md` lists every verified time and
+what changed between them.
+
+To check the time yourself, put your own DOS CD files (`MONKEY.000`, `MONKEY.001` and the CD
+audio as `track2.flac` and so on) in a folder under `game/`, remove `track6.flac`, build
+ScummVM with `scripts/build-scummvm.sh`, then run:
+
+```sh
+uv run python scripts/anypercent_verify.py runs/anypercent/m2n/movie.jsonl out/verify-m2n \
+  --goal '[{"room":0},{"var":293,"eq":161}]' --talkspeed 85 --explicit
+```
+
+Both replays should report frame 14820 and an RTA of 1261.483 s. `runs/anypercent/m2/` holds
+the run with track 6 present (frame 16378, 1391.320 s).
+
+To have the bot play the route from a checkpoint, copy a run directory, cut its
+`results.jsonl` down to the goals you want to keep, and pass that copy as `CUT`:
+
+```sh
+uv run python scripts/anypercent_auto.py runs/anypercent/mine --slide --talkspeed 85 \
+  --prefix runs/anypercent/CUT --resume runs/anypercent/CUT --start S1#4 --lookahead 12 \
+  --lookahead-match "Carla|Fight|Catacombs exit|catacombs cave|enter the catacombs" --early
+```
+
+It prints one line per goal with the RTA so far, and writes `movie.jsonl` and `results.jsonl`
+after every goal so a run can be resumed.
+
+`rules/anypercent.md` has the rules and pinned settings, `docs/anypercent/findings.md` and
+`docs/research/anypercent-*.md` the engine and route research, and
+`routes/anypercent/README.md` the route notes.
+
+## Glitchless Part I
 
 It works in three stages:
 
@@ -149,3 +221,7 @@ end lists every skipped test, so that a skip is not mistaken for a pass.
 - `docs/human-route.md`: the current human speedrun route, with sources.
 - `docs/comparison.md`: this project's route compared with the human route.
 - `docs/next.md`: follow-ups that are out of scope for v1.
+- `docs/anypercent/overnight.md`: every verified Any% time and what changed between them.
+- `docs/anypercent/findings.md`: Any% engine and route findings, with script citations.
+- `docs/research/anypercent-runner-sources.md`: the human Any% route and its sources.
+- `docs/research/anypercent-engine-mechanics.md`: timing, input and skip mechanics in the engine.

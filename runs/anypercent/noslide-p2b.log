@@ -1,0 +1,70 @@
+278 S4#1 Esc the Part II card                            rta   816.88s hint             0s 
+280 S4#3 Skip '--sigh--'                                 rta   818.38s hint             0s 
+281 S4#4 Leave the captain's cabin (first visit)         rta   818.80s hint             1s 
+282 S4#5 Deck to crew quarters (hatch)                   rta   819.80s hint             2s 
+283 S4#6 Crew quarters to galley (door)                  rta   820.55s hint             0s 
+284 S4#7 Open cupboard (first reach: wait for the carrie rta   821.63s hint             0s 
+285 S4#8 Pick up cereal                                  rta   822.71s hint             0s 
+286 S4#9 Galley to crew quarters (ladder)                rta   823.38s hint             0s 
+287 S4#10 Crew quarters to deck (ladder)                 rta   824.30s hint             1s 
+288 S4#11 Deck to crow's nest (rope ladder)              rta   826.30s hint             0s 
+289 S4#12 Pick up the Jolly Roger                        rta   827.13s hint             0s 
+290 S4#13 Crow's nest to deck (jump)                     rta   828.05s hint             0s 
+291 S4#14 Deck to captain's cabin (door)                 rta   829.71s hint             0s 
+292 S4#15 Open the cereal (inventory) on entering the ca rta   829.96s hint             0s 
+295 S4#18 Use the prize with the cabinet                 rta   836.13s hint             0s 
+296 S4#19 Open the heavy chest (carry it, then open it)  rta   839.30s hint             0s 
+297 S4#20 Look at the chest (recipe and cinnamon)        rta   839.96s hint             0s 
+298 S4#21 Skip 'Hey look! A piece of paper.'             rta   840.55s hint             0s 
+299 S4#22 Pick up the feather pen (unlocks the ink; late rta   841.47s hint             0s 
+300 S4#23 Pick up the ink                                rta   842.38s hint             0s 
+301 S4#24 Open the drawer (dusty-book route)             rta   843.47s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best 203725 bound None
+304  hint failed: S4#27 Skip the dusty-book lines: `after` did not hold within 1200 frames (and with 1..12 frames of delay)
+304 S4#27 Skip the dusty-book lines                      rta   844.30s search          19s ['auto: verb 8 drawer']
+305 S4#28 Leave the captain's cabin                      rta   845.72s hint             0s 
+306 S4#29 Deck to crew quarters (hatch), second time     rta   846.72s hint             1s 
+307 S4#30 Crew quarters to hull (hatch)                  rta   848.63s hint             0s 
+308 S4#31 Take gunpowder (for the pot)                   rta   851.38s hint             0s 
+309 S4#32 Pick up the giant piece of rope (moved from hu rta   853.13s hint             0s 
+310 S4#33 Open the hull chest                            rta   854.72s hint             0s 
+313 S4#36 Esc the wine lines                             rta   855.55s hint             1s 
+314 S4#37 Hull to crew quarters (ladder)                 rta   857.55s hint             0s 
+315 S4#38 Crew quarters to galley (door), second time    rta   859.47s hint             1s 
+    search: expanded 1 tried 10 frontier 1 best 207925 bound None
+    search: expanded 2 tried 14 frontier 1 best 207925 bound None
+322  hint failed: S4#45 Complete 'Use feather pen with red hot fire' (fire click only): `until` did not hold within 1200 frames of frame 1
+322 S4#45 Complete 'Use feather pen with red hot fire' ( rta   861.80s search          18s ['auto: verb 7 feather pen']
+    search: expanded 1 tried 15 frontier 9 best None bound None
+    search: expanded 2 tried 29 frontier 16 best None bound None
+    search: expanded 3 tried 42 frontier 16 best None bound None
+    search: expanded 4 tried 54 frontier 16 best None bound None
+    search: expanded 5 tried 65 frontier 16 best None bound None
+    search: expanded 6 tried 75 frontier 16 best None bound None
+    search: expanded 7 tried 84 frontier 16 best None bound None
+    search: expanded 8 tried 90 frontier 16 best 209505 bound None
+    search: expanded 9 tried 96 frontier 16 best 209505 bound None
+336  hint failed: S4#49 Scroll the inventory up one row inside the wine reach: the verb did not return to Walk to within 120 frames (and w
+336 S4#59 Use the cooking pot with the breath mints (eig rta   868.38s search          77s ['auto: use cereal with cooking pot', 'auto: use breath mints with cooking pot', 'auto: use chicken with cooking pot']
+337 S4#60 Esc the cooking cutscene                       rta   869.13s hint             0s 
+339 S4#62 Skip 'I feel awful.'                           rta   870.80s hint             0s 
+340 S4#63 Pick up the pot (helmet)                       rta   872.63s hint             0s 
+341 S4#64 Galley to crew quarters (ladder), second time  rta   873.47s hint             0s 
+342 S4#65 Crew quarters to hull (hatch), second time     rta   875.47s hint             0s 
+343 S4#66 Take gunpowder (for the cannon)                rta   878.22s hint             0s 
+344 S4#67 Hull to crew quarters (ladder), second time    rta   880.55s hint             0s 
+345 S4#68 Crew quarters to deck (ladder), last time      rta   882.38s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 214085 bound None
+348  hint failed: S4#69 Stop by the cannon during 'Monkey Island ahead': `until` did not hold within 1200 frames of frame 10365 (and with 
+348 S4#71 Use the rope with the cannon (fuse appears)    rta   887.47s search          11s ['auto: wait until idle', 'auto: verb 7 giant piece of rope']
+    search: expanded 1 tried 5 frontier 0 best 214485 bound None
+351  hint failed: S4#73 Select 'Use gunpowder' inside the fuse reach (inventory click during use): `after` did not hold within 1200 frames
+351 S4#74 Complete 'Use gunpowder in cannon nozzle' (noz rta   889.13s search          11s ['auto: use gunpowder with cannon nozzle']
+352 S4#75 Walk to the cannon nozzle (climbs in, starts t rta   889.13s already          0s []
+    search: expanded 1 tried 4 frontier 1 best None bound None
+    search: expanded 2 tried 8 frontier 0 best 215305 bound None
+353  hint failed: S4#76 Esc the cannon shot: `until` did not hold within 1200 frames of frame 10408 (and with 1..12 frames of delay)
+353 S4#76 Esc the cannon shot                            rta   892.55s search          11s ['auto: verb 7 pot', 'auto: verb 7 pot']
+354 S4#77 Esc the Part III card                          rta   892.63s hint             0s 
+END frame 10449 room 20

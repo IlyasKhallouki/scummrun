@@ -1,0 +1,120 @@
+5028 S5g28 Village visit 2: give the idol to the cannibal rta  1183.43s hint             1s 
+5029 S5g29 Leave and re-enter from the map: the navigator rta  1194.09s hint             0s 
+5030 S5g30 Give the leaflet: navigator head and necklace  rta  1197.70s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 289558 bound None
+5031  hint failed: target does not hold after the hint
+5031 S5g31 Hut: take the banana picker                    rta  1201.95s search           4s ['auto: walk to exit 285 -> room 27', 'auto: verb 9 banana picker']
+5032 S5g32 Herman: the banana picker for the monkey head  rta  1207.53s hint             1s 
+5033 S5g33 Row back to the clearing-side beach with the k rta  1227.12s hint             1s 
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 1 best None bound None
+    search: expanded 4 tried 10 frontier 0 best 299158 bound None
+5034  hint failed: target does not hold after the hint
+5034 S5g34 Through the open gate to the idol field (S6 ha rta  1241.95s search           6s ['auto: walk to exit 16 -> room 5', 'auto: walk to exit 63 -> room 12', 'auto: walk to exit 155 -> room 69']
+    search: expanded 1 tried 2 frontier 0 best 301678 bound None
+6001  hint failed: target does not hold after the hint
+6001 S6g1 Open the giant monkey head: Use the ear with th rta  1252.45s search           0s ['auto: use monkey head key with gigantic monkey ear']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 302078 bound None
+6002  hint failed: target does not hold after the hint
+6002 S6g2 Walk into the open mouth: climb down to the und rta  1254.12s search           0s ['auto: wait until idle', 'auto: walk to exit 133 -> room 65']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 7 frontier 1 best 303058 bound None
+6003  hint failed: target does not hold after the hint
+6003 S6g3 Take out the navigator head in room 65          rta  1258.20s search           3s ['auto: wait until idle', 'auto: verb 2 head of the navigator']
+    search: expanded 1 tried 2 frontier 0 best 307478 bound None
+6004  hint failed: target does not hold after the hint
+6004 S6g4 Walk to the cave: enter the catacombs (room 39) rta  1276.62s search           2s ['auto: walk to exit 755 -> room 39']
+6005 S6g5 Catacombs exit 1/6: walk to the cave the head p rta  1282.45s hint             0s 
+6006 S6g6 Catacombs exit 2/6: walk to the cave the head p rta  1301.12s hint             1s 
+6007 S6g7 Catacombs exit 3/6: walk to the cave the head p rta  1302.37s hint             0s 
+6008 S6g8 Catacombs exit 4/6: walk to the cave the head p rta  1303.87s hint             0s 
+6009 S6g9 Catacombs exit 5/6: walk to the cave the head p rta  1321.70s hint             1s 
+6010 S6g10 Catacombs exit 6/6: out to the ghost-ship clif rta  1323.12s hint             0s 
+6011 S6g11 Put the head away on arrival at the cliff      rta  1323.37s hint             0s 
+6012 S6g12 Talk to the head: 'May I please have that neck rta  1327.22s hint             0s 
+6013 S6g13 Beg 1/4: 'Oh come on, pleeeeease?'             rta  1328.31s hint             0s 
+6014 S6g14 Beg 2/4: 'Pretty please?'                      rta  1329.81s hint             0s 
+6015 S6g15 Beg 3/4: 'Pretty PRETTY please?'               rta  1331.64s hint             0s 
+6016 S6g16 Beg 4/4: 'Pretty please with sugar on top?': t rta  1335.72s hint             0s 
+6017 S6g17 Put on the necklace                            rta  1339.81s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best 324483 bound None
+6018  hint failed: target does not hold after the hint
+6018 S6g18 Walk to the ghost ship (deck, room 77)         rta  1347.47s search           0s ['auto: walk to exit 769 -> room 77']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 326323 bound None
+6019  hint failed: target does not hold after the hint
+6019 S6g19 Open the captain's cabin door                  rta  1355.14s search           1s ['auto: wait until idle', 'auto: verb 2 door']
+    search: expanded 1 tried 2 frontier 0 best 326363 bound None
+6020  hint failed: target does not hold after the hint
+6020 S6g20 Enter the captain's cabin (room 72)            rta  1355.31s search           0s ['auto: walk to exit 838 -> room 72']
+6021 S6g21 Pull the key off the wall with the magnetic co rta  1358.22s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 6 frontier 1 best None bound None
+    search: expanded 4 tried 11 frontier 0 best 329423 bound None
+6022  hint failed: target does not hold after the hint
+6022 S6g22 Pick up the ghost feather (hull, room 75)      rta  1368.06s search           3s ['auto: walk to exit 841 -> room 73', 'auto: walk to exit 800 -> room 75', 'auto: verb 9 ghost feather']
+6023 S6g23 Tickle the sleeping pirate's foot twice, pick  rta  1374.81s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 332063 bound None
+6024  hint failed: target does not hold after the hint
+6024 S6g24 Unlock and open the hull hatch with the key    rta  1379.06s search           1s ['auto: walk to exit 800 -> room 75', 'auto: verb 7 key']
+    search: expanded 1 tried 2 frontier 0 best 332103 bound None
+6025  hint failed: target does not hold after the hint
+6025 S6g25 Down the hatch to the storage room (room 74)   rta  1379.22s search           0s ['auto: walk to exit 824 -> room 74']
+6026 S6g26 Feed the rats with the grog, then pick up the  rta  1383.14s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 6 frontier 1 best None bound None
+    search: expanded 4 tried 8 frontier 0 best 334703 bound None
+6027  hint failed: target does not hold after the hint
+6027 S6g27 Grease the squeaky door (deck)                 rta  1390.06s search           1s ['auto: walk to exit 822 -> room 73', 'auto: walk to exit 801 -> room 77', 'auto: verb 7 glob of grease']
+    search: expanded 1 tried 3 frontier 0 best 334763 bound None
+6028  hint failed: target does not hold after the hint
+6028 S6g28 Open the greased door                          rta  1390.31s search           1s ['auto: verb 2 door']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 335103 bound None
+6029  hint failed: target does not hold after the hint
+6029 S6g29 Pick up the ghost tools (room 71)              rta  1391.72s search           1s ['auto: walk to exit 840 -> room 71', 'auto: verb 9 ghost tools']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 6 frontier 1 best None bound None
+    search: expanded 4 tried 8 frontier 0 best 338263 bound None
+6030  hint failed: target does not hold after the hint
+6030 S6g30 Open the glowing crate with the ghost tools (h rta  1404.89s search           2s ['auto: walk to exit 841 -> room 73', 'auto: walk to exit 800 -> room 75', 'auto: use ghost tools with glowing crate']
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 4 frontier 1 best 338883 bound None
+    search: expanded 3 tried 6 frontier 0 best 338883 bound None
+6031  hint failed: target does not hold after the hint
+6031 S6g31 Take the voodoo root                           rta  1407.48s search           1s ['auto: wait until idle', 'auto: verb 8 glowing crate']
+6032 S6g32 Back to the cannibals with the root            rta  1422.14s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best 343043 bound None
+6033  hint failed: target does not hold after the hint
+6033 S6g33 Out to the jungle: back to the cliff (room 70) rta  1424.81s search           0s ['auto: walk to exit 290 -> room 70']
+6034 S6g34 Bob: 'What happened to the ship?', then 'Where rta  1427.98s hint             0s 
+6035 S6g35 'I've got to go after them!', then 'We've got  rta  1434.81s hint             0s 
+7001 S7g1 Last Part card ends: ego on the Melee dock (roo rta  1564.73s hint             2s 
+7002 S7g2 Dock: the ghost is sprayed and the way to town  rta  1574.06s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best 379443 bound None
+7003  hint failed: target does not hold after the hint
+7003 S7g3 Low Street (room 35)                            rta  1576.48s search           0s ['auto: walk to exit 905 -> room 35']
+7004 S7g4 Low Street: spray the grim spectre before he ca rta  1578.97s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 0 best 382641 bound None
+7005  hint failed: target does not hold after the hint
+7005 S7g5 High Street (room 34) through archway 451       rta  1589.81s search           1s ['auto: wait until idle', 'auto: walk to exit 451 -> room 34']
+    search: expanded 1 tried 4 frontier 0 best 383721 bound None
+7006  hint failed: target does not hold after the hint
+7006 S7g6 High Street: the church door is open            rta  1594.31s search           3s ['auto: verb 2 door']
+7007 S7g7 Inside the church (room 78)                     rta  1594.47s hint             0s 
+7008 S7g8 Wedding interrupted: the LeChuck close-up (room rta  1597.72s hint             0s 
+7009 S7g9 Close-up: Elaine's monkeys take the root beer b rta  1600.06s hint             0s 
+7010 S7g10 Stan's (room 59): LeChuck's punch and the map  rta  1601.22s hint             0s 
+7011 S7g11 LeChuck defeated: root beer picked up and used rta  1640.81s hint             1s 
+7012 S7g12 Fireworks (room 89): Blimp-Cam, KABOOM and Ela rta  1658.64s hint             0s 
+7013 S7g13 Fireworks menu 1 answered ('Sure.'), epilogue  rta  1679.75s hint             0s 
+7014 S7g14 Final fade: 'It's not the size of the ship...' rta  1681.41s hint             0s 
+END frame 19859 room 0

@@ -1,0 +1,455 @@
+  lookahead: S2#21 Leave Smirk's (right path) delay 11
+103 S2#21 Leave Smirk's (right path)                     rta   352.54s hint             3s 
+  lookahead: S2#22 Fight 1: intercept a pirate on the delay 0
+104 S2#22 Fight 1: intercept a pirate on the map         rta   368.96s hint             3s 
+  lookahead: S2#23 Fight 1: choose 'Prepare to die' ( delay 0
+105 S2#23 Fight 1: choose 'Prepare to die' (encounter 1) rta   370.46s hint             7s 
+  lookahead: S2#24 Fight 1 E1: insult 2 'shish kebab' delay 0
+106 S2#24 Fight 1 E1: insult 2 'shish kebab' (pirate mus rta   378.13s hint            11s 
+  lookahead: S2#25 Fight 1 E2: insult 8 'dairy farmer delay 0
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+107 S2#25 Fight 1 E2: insult 8 'dairy farmer' (pirate mu rta   384.63s hint           118s 
+  lookahead: S2#26 Fight 1 E3: default insult 'Boy ar delay 0
+108  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+108 S2#26 Fight 1 E3: default insult 'Boy are you ugly!' rta   388.96s hint            97s 
+  lookahead: S2#27 Fight 1 E4: answer 16 wrongly ('Oh delay 0
+109 S2#27 Fight 1 E4: answer 16 wrongly ('Oh yeah?'), le rta   393.30s hint            29s 
+  lookahead: S2#28 Fight 1 E5: answer the pirate's in delay 0
+110 S2#28 Fight 1 E5: answer the pirate's insult (2 or 8 rta   396.05s hint             1s 
+111 S1#84 map -> forest entrance (2)                     rta   397.38s hint             0s 
+112 S1#85 218 -> 215 through path 686 (Back)             rta   399.63s hint             0s 
+  lookahead: S1#86 215 -> 220 (Left, map gate) delay 0
+113 S1#86 215 -> 220 (Left, map gate)                    rta   403.21s hint             1s 
+114 S1#87 220 -> 213 (Right)                             rta   407.21s hint             0s 
+115 S1#88 213 -> 212 (Left)                              rta   410.80s hint             0s 
+116 S1#89 212 -> 207 (Back, into the trap)               rta   414.21s hint             0s 
+117 S1#90 forest map teleport: Look at the map in the tr rta   416.63s hint             0s 
+118 S1#91 207 -> 211 (Back, now touchable)               rta   418.21s hint             0s 
+119 S1#92 211 -> 216 (Right)                             rta   421.21s hint             0s 
+120 S1#93 216 -> 201 (Left)                              rta   423.21s hint             0s 
+  lookahead: S1#94 201 -> treasure site (Back) delay 0
+121 S1#94 201 -> treasure site (Back)                    rta   426.21s hint             2s 
+123 S1#96 dig: Use shovel with X (treasure trial done)   rta   431.38s hint             0s 
+124 S2#29 Treasure site -> map (forest path 750)         rta   434.46s hint             0s 
+  lookahead: S2#30 Fight 2: wait at the fork for a fo delay 0
+125 S2#30 Fight 2: wait at the fork for a fork-bound pir rta   437.63s hint             1s 
+  lookahead: S2#31 Fight 2: choose 'Prepare to die' ( delay 0
+126  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+126  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+126 S2#31 Fight 2: choose 'Prepare to die' (encounter 2) rta   439.13s hint            58s 
+  lookahead: S2#32 Fight 2 E1: insult 16 'apes', pira delay 0
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127  hint failed: S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion'): `until` did not hold within 1200 frame
+127 S2#32 Fight 2 E1: insult 16 'apes', pirate must coun rta   444.05s hint            78s 
+  lookahead: S2#33 Fight 2 E2: answer the pirate's in delay 0
+128 S2#33 Fight 2 E2: answer the pirate's insult (2, 8 o rta   447.88s hint            11s 
+  lookahead: S2#34 Fight 2 E3: insult 2 'shish kebab' delay 0
+129 S2#34 Fight 2 E3: insult 2 'shish kebab' (pirate mus rta   452.05s hint            21s 
+  lookahead: S2#35 Fight 2 E4: insult 8 'dairy farmer delay 4
+130 S2#35 Fight 2 E4: insult 8 'dairy farmer' (fight 2 w rta   455.38s hint            13s 
+  lookahead: S2#36 Fight 3: wait at the fork for a fo delay 0
+131 S2#36 Fight 3: wait at the fork for a fork-bound pir rta   458.55s hint             1s 
+  lookahead: S2#37 Fight 3: choose 'Prepare to die' ( delay 0
+132 S2#37 Fight 3: choose 'Prepare to die' (encounter 3) rta   460.05s hint            11s 
+  lookahead: S2#38 Fight 3 E1: insult 2 'shish kebab' delay 0
+133 S2#38 Fight 3 E1: insult 2 'shish kebab' (pirate mus rta   464.13s hint            24s 
+  lookahead: S2#39 Fight 3 E2: insult 8 'dairy farmer delay 0
+134 S2#39 Fight 3 E2: insult 8 'dairy farmer' (pirate mu rta   468.30s hint            19s 
+  lookahead: S2#40 Fight 3 E3: insult 16 'apes' (figh delay 0
+135 S2#40 Fight 3 E3: insult 16 'apes' (fight 3 won)     rta   471.38s hint             9s 
+136 S2#41 Map -> fork (forest screen 218)                rta   471.63s hint             0s 
+137 S2#42 Forest 218 -> 215: up (path 686)               rta   473.88s hint             0s 
+138 S2#43 Forest 215 -> 203: up                          rta   475.88s hint             0s 
+139 S2#44 Forest 203 -> 202: right                       rta   479.30s hint             0s 
+  lookahead: S2#45 Forest 202 -> 205: right delay 0
+140 S2#45 Forest 202 -> 205: right                       rta   482.97s hint             2s 
+141 S2#46 Forest 205 -> 217: left                        rta   487.47s hint             0s 
+142 S2#47 Forest 217 -> 209: up                          rta   490.55s hint             0s 
+  lookahead: S2#48 Use sign (log bridge over the ravi delay 0
+143 S2#48 Use sign (log bridge over the ravine)          rta   493.30s hint             1s 
+  lookahead: S2#49 Forest 209 -> Sword Master's clear delay 0
+144 S2#49 Forest 209 -> Sword Master's clearing: right o rta   498.97s hint             3s 
+146 S2#51 Walk to the Sword Master (starts the challenge rta   511.80s hint             0s 
+147 S2#52 Esc: skip 'How dare you approach the Sword Mas rta   511.88s hint             0s 
+  lookahead: S2#53 Carla menu: 'My name is Guybrush T delay 0
+148 S2#53 Carla menu: 'My name is Guybrush Threepwood.   rta   513.97s hint            34s 
+  lookahead: S2#54 Carla E1: answer her insult (plann delay 0
+149 S2#54 Carla E1: answer her insult (planned 32 -> 'fa rta   518.22s hint            48s 
+  lookahead: S2#55 Carla E2: answer her insult (plann delay 2
+150  hint failed: S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion'): `until` did not hold within 1200 frames of frame 605
+150  hint failed: S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion'): `until` did not hold within 1200 frames of frame 605
+150 S2#55 Carla E2: answer her insult (planned 21 -> 'fa rta   522.88s hint            81s 
+  lookahead: S2#56 Carla E3: answer her insult (plann delay 0
+151  hint failed: S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion'): `until` did not hold within 1200 frames of frame 607
+151  hint failed: S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion'): `until` did not hold within 1200 frames of frame 607
+151  hint failed: S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion'): `until` did not hold within 1200 frames of frame 607
+151 S2#56 Carla E3: answer her insult (planned 33 -> 'fa rta   527.72s hint           101s 
+  lookahead: S2#57 Carla E4: answer her insult (plann delay 0
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): `until` did not hold within 1200 frames of frame 611
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): `until` did not hold within 1200 frames of frame 611
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): `until` did not hold within 1200 frames of frame 611
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): `until` did not hold within 1200 frames of frame 611
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): `until` did not hold within 1200 frames of frame 611
+152 S2#57 Carla E4: answer her insult (planned 18 -> 'fe rta   532.38s hint            62s 
+  lookahead: S2#58 Carla E5: answer her insult (plann delay 0
+153 S2#58 Carla E5: answer her insult (planned 24 -> 'co rta   535.63s hint             8s 
+  lookahead: S2#59 Leave the Sword Master's clearing delay 0
+154 S2#59 Leave the Sword Master's clearing              rta   548.88s hint             9s 
+155 S3#1 Map: village (forces the kidnap scene)          rta   554.13s hint             0s 
+156 S3#2 Esc the kidnap cutscene                         rta   555.13s hint             0s 
+158 S3#4 Esc the lookout's speech (note, Bit[304])       rta   555.63s hint             0s 
+  lookahead: S3#5 Cu-dock: walk to the left dock edge delay 0
+159 S3#5 Cu-dock: walk to the left dock edge             rta   557.63s hint             2s 
+  lookahead: S3#6 Dock: cliffside to the Lookout delay 0
+160 S3#6 Dock: cliffside to the Lookout                  rta   564.21s hint             3s 
+  lookahead: S3#7 Lookout: path to the map delay 0
+161 S3#7 Lookout: path to the map                        rta   568.21s hint             3s 
+162 S3#8 Map: Stan's (lights)                            rta   576.46s hint             0s 
+163 S3#9 Stan: skip 'Howdy!'                             rta   579.04s hint             0s 
+  lookahead: S3#11 Stan: 'I really don't have that mu delay 0
+165 S3#11 Stan: 'I really don't have that much to spend. rta   580.38s hint             1s 
+166 S3#12 Stan: skip to the Sea Monkey pitch             rta   586.46s hint             0s 
+169 S3#15 Stan: Esc the credit speech, skip 'brass tacks rta   587.38s hint             0s 
+171 S3#17 Stan: 'Forget it.  I don't need this boat anyw rta   587.88s hint             0s 
+174 S3#20 Stan: skip 'Of course I am...'                 rta   591.21s hint             0s 
+176 S3#22 Stan: 'Let's talk extras.'                     rta   591.71s hint             0s 
+179 S3#25 Stan: skip reply + 'But wait, there's more!' ( rta   593.21s hint             0s 
+181 S3#27 Stan: skip reply + 'But wait, there's more!' ( rta   594.13s hint             0s 
+183 S3#29 Stan: skip reply + 'But wait, there's more!' ( rta   595.13s hint             0s 
+185 S3#31 Stan: skip reply + 'But wait, there's more!' ( rta   596.13s hint             0s 
+187 S3#33 Stan: skip reply + 'But wait, there's more!' ( rta   597.04s hint             0s 
+189 S3#35 Stan: skip reply + 'But wait, there's more!' ( rta   597.96s hint             0s 
+194 S3#40 Stan: offer 5000 (accepted at Var[202] = 4750) rta   599.71s hint             0s 
+  lookahead: S3#42 Stan: Esc the closing (ship bought delay 0
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196  hint failed: S3#41 Stan: skip 'Five thousand pieces of eight?!?': `after` did not hold within 1200 frames (and with 1..12 frames of d
+196 S3#42 Stan: Esc the closing (ship bought, compass)   rta   599.96s hint           110s 
+  lookahead: S3#43 Stan's: path back to the map delay 0
+197 S3#43 Stan's: path back to the map                   rta   608.29s hint            10s 
+  lookahead: S3#44 Map: Sword Master's delay 0
+198 S3#44 Map: Sword Master's                            rta   615.63s hint             8s 
+199 S3#45 Give LeChuck's note 907 to the Sword Master    rta   628.21s hint             1s 
+  lookahead: S3#46 Esc Carla's 'What's this? ... I'll delay 0
+200  hint failed: S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.': `after` did not hold within 1200 frames (and with 1..12
+200  hint failed: S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.': `after` did not hold within 1200 frames (and with 1..12
+200  hint failed: S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.': `after` did not hold within 1200 frames (and with 1..12
+200  hint failed: S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.': `after` did not hold within 1200 frames (and with 1..12
+200 S3#46 Esc Carla's 'What's this? ... I'll meet you at rta   632.13s hint            33s 
+201 S3#47 Leave the clearing (triggers 'Meanwhile')      rta   645.38s hint             1s 
+  lookahead: S3#48 Esc 'Meanwhile...' delay 0
+202 S3#48 Esc 'Meanwhile...'                             rta   645.46s hint             2s 
+  lookahead: S3#49 Map: shore (Hook Isle) delay 0
+203 S3#49 Map: shore (Hook Isle)                         rta   654.46s hint             4s 
+204 S3#50 Use cable with rubber chicken (zip to the hous rta   663.63s hint             0s 
+  lookahead: S3#51 Climb down pole 600 (empty spot be delay 0
+205 S3#51 Climb down pole 600 (empty spot below the pole rta   666.46s hint             2s 
+206 S3#52 Open the door of Meathook's house              rta   672.96s hint             0s 
+207 S3#53 Enter Meathook's house                         rta   673.13s hint             0s 
+208 S3#54 Esc Meathook's 'Hey! I don't like visitors!'   rta   675.13s hint             0s 
+212 S3#58 Esc 'Now, if only we had a captain...', skip ' rta   676.63s hint             0s 
+213 S3#59 Esc Meathook's beast demonstration             rta   676.71s hint             0s 
+214 S3#60 Open the little door (the beast)               rta   679.63s hint             0s 
+  lookahead: S3#64 Esc 'I don't believe it... You are delay 0
+218 S3#64 Esc 'I don't believe it... You are a brave man rta   683.46s hint             3s 
+219 S3#65 Use cable with rubber chicken (zip back)       rta   696.38s hint             0s 
+  lookahead: S3#67 Climb down pole 601 delay 0
+221  hint failed: S3#66 Skip 'Wow!  It works both ways. / That's some chicken.': `after` did not hold within 1200 frames (and with 1..12 f
+221  hint failed: S3#66 Skip 'Wow!  It works both ways. / That's some chicken.': `after` did not hold within 1200 frames (and with 1..12 f
+221  hint failed: S3#66 Skip 'Wow!  It works both ways. / That's some chicken.': `after` did not hold within 1200 frames (and with 1..12 f
+221  hint failed: S3#66 Skip 'Wow!  It works both ways. / That's some chicken.': `after` did not hold within 1200 frames (and with 1..12 f
+221  hint failed: S3#66 Skip 'Wow!  It works both ways. / That's some chicken.': `after` did not hold within 1200 frames (and with 1..12 f
+221 S3#67 Climb down pole 601                            rta   699.21s hint            47s 
+  lookahead: S3#68 Hook Isle: path back to the map delay 1
+222 S3#68 Hook Isle: path back to the map                rta   702.21s hint             3s 
+223 S3#69 Map: village (to the dock, no cutscene now)    rta   712.30s hint             0s 
+224 S3#70 Open the SCUMM Bar door (only if closed)       rta   712.30s already          0s []
+225 S3#71 Enter the SCUMM Bar                            rta   724.80s hint             1s 
+226 S3#72 Pick up mug 364                                rta   727.47s hint             0s 
+227 S3#73 Pick up mug 365                                rta   730.38s hint             0s 
+228 S3#74 Pick up mug 366                                rta   732.80s hint             0s 
+229 S3#75 Open the kitchen door (only if closed)         rta   732.80s already          0s []
+230 S3#76 Enter the kitchen                              rta   734.38s hint             0s 
+231 S3#77 Use barrel with mug 364 (fill with grog)       rta   736.72s hint             0s 
+  lookahead: S3#78 Kitchen: back to the bar delay 0
+232 S3#78 Kitchen: back to the bar                       rta   737.38s hint             7s 
+  lookahead: S3#79 Leave the SCUMM Bar delay 0
+233 S3#79 Leave the SCUMM Bar                            rta   746.72s hint            11s 
+  lookahead: S3#80 Dock: archway to Low Street delay 0
+234 S3#80 Dock: archway to Low Street                    rta   750.97s hint             5s 
+  lookahead: S3#81 Low Street: archway to High Street delay 0
+235 S3#81 Low Street: archway to High Street             rta   761.38s hint             4s 
+237 S3#83 High Street: into the jail                     rta   767.97s hint             0s 
+238 S3#84 Talk to the prisoner                           rta   771.05s hint             0s 
+239 S3#85 Otis: 'The Governor's been kidnapped!'         rta   771.47s hint             0s 
+241 S3#87 Otis: 'If I let you out, would you join my cre rta   771.97s hint             0s 
+242 S3#88 Skip 'Sure! Of course! ... Until then, I pace. rta   772.47s hint             0s 
+243 S3#89 Jail: out to High Street                       rta   774.88s hint             0s 
+244 S3#90 Open the store door (only if closed)           rta   774.88s already          0s []
+  lookahead: S3#91 Enter the store delay 0
+245 S3#91 Enter the store                                rta   779.47s hint             2s 
+  lookahead: S3#95 Leave the store (slide held) delay 0
+249 S3#95 Leave the store (slide held)                   rta   783.72s hint             5s 
+251 S3#97 High Street: into the jail (slide held)        rta   789.05s hint             0s 
+252 S3#98 Use mug o' grog with the lock (Otis's cutscene rta   791.47s hint             0s 
+253 S3#99 Look at the map (restores hotspots inside Otis rta   791.97s hint             0s 
+254 S3#100 Close the map page                            rta   792.05s hint             0s 
+  lookahead: S3#104 Leave the jail while Otis's cutsc delay 0
+258 S3#104 Leave the jail while Otis's cutscene runs     rta   794.63s hint             4s 
+  lookahead: S3#111 High Street: archway to Low Stree delay 0
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9455 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9456 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9457 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9456 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9457 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9458 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9452 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9453 (and with 1..12 f
+265  hint failed: S3#118 Low Street: archway to the end of Part I: `until` did not hold within 1200 frames of frame 9454 (and with 1..12 f
+265 S3#111 High Street: archway to Low Street            rta   801.22s hint           206s 
+272 S3#118 Low Street: archway to the end of Part I      rta   812.38s hint             0s 
+  lookahead: S3#119 Esc Stan's farewell cutscene delay 0
+273 S3#119 Esc Stan's farewell cutscene                  rta   812.47s hint             2s 
+277 S3#123 Esc the crew banter (end of Part I, Part II s rta   822.05s hint             0s 
+278 S4#1 Esc the Part II card                            rta   822.13s hint             0s 
+280 S4#3 Skip '--sigh--'                                 rta   823.63s hint             0s 
+281 S4#4 Leave the captain's cabin (first visit)         rta   826.46s hint             0s 
+282 S4#5 Deck to crew quarters (hatch)                   rta   827.38s hint             0s 
+283 S4#6 Crew quarters to galley (door)                  rta   828.13s hint             0s 
+284 S4#7 Open cupboard (first reach: wait for the carrie rta   829.21s hint             0s 
+285 S4#8 Pick up cereal                                  rta   830.30s hint             0s 
+286 S4#9 Galley to crew quarters (ladder)                rta   830.96s hint             0s 
+287 S4#10 Crew quarters to deck (ladder)                 rta   831.80s hint             0s 
+288 S4#11 Deck to crow's nest (rope ladder)              rta   833.80s hint             0s 
+289 S4#12 Pick up the Jolly Roger                        rta   834.63s hint             0s 
+290 S4#13 Crow's nest to deck (jump)                     rta   835.55s hint             0s 
+291 S4#14 Deck to captain's cabin (door)                 rta   837.21s hint             0s 
+292 S4#15 Open the cereal (inventory) on entering the ca rta   837.46s hint             0s 
+295 S4#18 Use the prize with the cabinet                 rta   841.30s hint             0s 
+296 S4#19 Open the heavy chest (carry it, then open it)  rta   844.47s hint             0s 
+297 S4#20 Look at the chest (recipe and cinnamon)        rta   845.13s hint             0s 
+298 S4#21 Skip 'Hey look! A piece of paper.'             rta   845.72s hint             0s 
+299 S4#22 Pick up the feather pen (unlocks the ink; late rta   846.63s hint             0s 
+300 S4#23 Pick up the ink                                rta   847.55s hint             0s 
+301 S4#24 Open the drawer (dusty-book route)             rta   848.63s hint             0s 
+304 S4#27 Skip the dusty-book lines                      rta   849.47s hint             0s 
+305 S4#28 Leave the captain's cabin                      rta   850.30s hint             0s 
+306 S4#29 Deck to crew quarters (hatch), second time     rta   851.22s hint             0s 
+307 S4#30 Crew quarters to hull (hatch)                  rta   853.13s hint             0s 
+308 S4#31 Take gunpowder (for the pot)                   rta   855.88s hint             0s 
+309 S4#32 Pick up the giant piece of rope (moved from hu rta   857.63s hint             0s 
+310 S4#33 Open the hull chest                            rta   859.22s hint             0s 
+313 S4#36 Esc the wine lines                             rta   860.13s hint             0s 
+314 S4#37 Hull to crew quarters (ladder)                 rta   861.63s hint             0s 
+  lookahead: S4#38 Crew quarters to galley (door), se delay 0
+315 S4#38 Crew quarters to galley (door), second time    rta   863.47s hint             3s 
+323 S4#46 Select Use inside the fire reach               rta   867.88s hint             0s 
+336 S4#59 Use the cooking pot with the breath mints (eig rta   871.13s hint             0s 
+337 S4#60 Esc the cooking cutscene                       rta   871.88s hint             0s 
+339 S4#62 Skip 'I feel awful.'                           rta   873.55s hint             0s 
+340 S4#63 Pick up the pot (helmet)                       rta   875.38s hint             0s 
+341 S4#64 Galley to crew quarters (ladder), second time  rta   876.22s hint             0s 
+342 S4#65 Crew quarters to hull (hatch), second time     rta   878.13s hint             0s 
+343 S4#66 Take gunpowder (for the cannon)                rta   880.88s hint             0s 
+344 S4#67 Hull to crew quarters (ladder), second time    rta   883.22s hint             0s 
+345 S4#68 Crew quarters to deck (ladder), last time      rta   884.97s hint             0s 
+348 S4#71 Use the rope with the cannon (fuse appears)    rta   887.97s hint             0s 
+351 S4#74 Complete 'Use gunpowder in cannon nozzle' (noz rta   890.72s hint             0s 
+352 S4#75 Walk to the cannon nozzle (climbs in, starts t rta   890.97s hint             0s 
+353 S4#76 Esc the cannon shot                            rta   891.05s hint             0s 
+354 S4#77 Esc the Part III card                          rta   891.13s hint             0s 
+355 S5#1 Esc the monkey part of the arrival intro        rta   891.22s hint             0s 
+356 S5#2 Esc the Herman part of the arrival intro        rta   891.30s hint             0s 
+357 S5#3 Stand up (any scene click)                      rta   893.05s hint             0s 
+358 S5#4 Main beach: jungle exit to the map              rta   895.13s hint             0s 
+  lookahead: S5#5 Map room 2 -> room 3 (top-left edge delay 0
+359 S5#5 Map room 2 -> room 3 (top-left edge)            rta   898.22s hint             2s 
+360 S5#6 Map room 3: walk to the fort                    rta   903.38s hint             0s 
+361 S5#7 Push the cannon                                 rta   905.88s hint             0s 
+362 S5#8 Pick up the gunpowder                           rta   906.88s hint             0s 
+363 S5#9 Pick up the spyglass                            rta   908.13s hint             0s 
+  lookahead: S5#10 Leave the fort (plain exit right a delay 0
+364 S5#10 Leave the fort (plain exit right after the spy rta   909.30s hint             2s 
+365 S5#11 Map room 3 -> room 4 (right edge, down the vol rta   915.30s hint             0s 
+366 S5#12 Map room 4: river fork                         rta   917.13s hint             0s 
+367 S5#13 Open the spyglass (lens)                       rta   917.38s hint             0s 
+368 S5#14 Use gunpowder with dam                         rta   919.30s hint             0s 
+369 S5#15 Use lens with sun: dam blast                   rta   922.30s hint             0s 
+370 S5#16 Oars skip 1: off-room instant exit to room 5   rta   922.50s hint             0s 
+  lookahead: S5#17 Oars skip 2: walk toward room-5 ex delay 0
+371 S5#17 Oars skip 2: walk toward room-5 exit 62 so the rta   925.50s hint             1s 
+372 S5#18 Row: room 4 sea box 22 -> room 5 (during the b rta   930.00s hint             0s 
+373 S5#19 Row to the clearing-side beach (room 5 beach - rta   930.92s hint             0s 
+374 S5#20 Beach 131: jungle to the map (room 5, on foot) rta   932.67s hint             0s 
+  lookahead: S5#21 Map room 5: clearing delay 0
+375 S5#21 Map room 5: clearing                           rta   934.17s hint             8s 
+  lookahead: S5#22 Pull the nose (gate opens) delay 0
+376 S5#22 Pull the nose (gate opens)                     rta   941.25s hint             9s 
+380 S5#26 Monkey skip 4: click 155 at the same pixel (in rta   947.09s hint             0s 
+381 S5#27 Pick up the wimpy little idol                  rta   948.25s hint             0s 
+382 S5#28 Leave the idol field                           rta   950.59s hint             0s 
+383 S5#29 Herman: Esc his monologue                      rta   953.75s hint             0s 
+  lookahead: S5#30 Herman: answer 'What?' delay 0
+384 S5#30 Herman: answer 'What?'                         rta   954.92s hint             7s 
+385 S5#31 Clearing: jungle back to the map               rta   961.59s hint             1s 
+386 S5#32 Map room 5: beach on foot (to beach room 131)  rta   963.92s hint             0s 
+  lookahead: S5#33 Board the rowboat delay 0
+387 S5#33 Board the rowboat                              rta   966.00s hint             2s 
+388 S5#34 Row to room 6 (top edge of room 5)             rta   976.17s hint             0s 
+389 S5#35 Row to the village beach (room 132)            rta   977.17s hint             0s 
+390 S5#36 Beach 132: jungle to the map (room 6, on foot) rta   979.09s hint             0s 
+  lookahead: S5#37 Map room 6: village delay 0
+391 S5#37 Map room 6: village                            rta   983.00s hint             7s 
+392 S5#38 Pick up the bananas (starts the cannibal encou rta   989.92s hint             1s 
+394 S5#40 Read the dusty book while the camera scrolls   rta   991.84s hint             0s 
+395 S5#41 Encounter: 'I'll give you anything!'           rta   995.50s hint             0s 
+396 S5#42 Give the idol to the cannibals                 rta   995.92s hint             0s 
+397 S5#43 Leave the village (visit 1)                    rta   999.09s hint             0s 
+398 S5#44 Map room 6: village again (visit 2)            rta  1001.42s hint             0s 
+402 S5#48 213: 'Where are LeChuck and his crew hiding?'  rta  1003.75s hint             0s 
+403 S5#49 213: 'What's in your standard potion of exorci rta  1004.34s hint             0s 
+  lookahead: S5#50 213: 'I'm off to find LeChuck and  delay 0
+404 S5#50 213: 'I'm off to find LeChuck and get the root rta  1004.92s hint             2s 
+407 S5#53 Give the leaflet to the natives                rta  1011.00s hint             0s 
+408 S5#54 Leaflet scene: Esc 1 ('instructions on how to  rta  1011.84s hint             0s 
+409 S5#55 Leaflet scene: Esc 2 (skip the navigator close rta  1012.11s hint             0s 
+410 S5#56 Leaflet scene: Esc 3 ('follow his nose...')    rta  1014.02s hint             0s 
+411 S5#57 Enter the hut                                  rta  1016.52s hint             0s 
+412 S5#58 Pick up the banana picker                      rta  1018.27s hint             0s 
+  lookahead: S5#59 Leave the hut (Herman appears) delay 0
+413 S5#59 Leave the hut (Herman appears)                 rta  1019.36s hint             4s 
+414 S5#60 Give the banana picker to Herman (key)         rta  1023.86s hint             0s 
+  lookahead: S5#61 Leave the village delay 0
+415 S5#61 Leave the village                              rta  1026.69s hint             2s 
+416 S5#62 Map room 6: beach on foot (to room 132)        rta  1030.78s hint             0s 
+417 S5#63 Board the rowboat (room 132)                   rta  1032.44s hint             0s 
+  lookahead: S5#64 Row to room 5 (bottom edge of room delay 0
+418 S5#64 Row to room 5 (bottom edge of room 6)          rta  1033.69s hint             3s 
+419 S5#65 Row to the clearing-side beach (room 131)      rta  1043.44s hint             0s 
+420 S5#66 Beach 131: jungle to the map (room 5)          rta  1045.19s hint             0s 
+  lookahead: S5#67 Map room 5: clearing delay 0
+421 S5#67 Map room 5: clearing                           rta  1046.69s hint             9s 
+  lookahead: S5#68 Walk through the open gate to the  delay 4
+422 S5#68 Walk through the open gate to the idol field ( rta  1056.03s hint            10s 
+423 S6#1 Use ear with monkey head key (opens the giant h rta  1065.53s hint             0s 
+424 S6#2 Pre-walk to the mouth's walk point during scrip rta  1066.61s hint             0s 
+  lookahead: S6#3 Walk into the open mouth of the gia delay 0
+425 S6#3 Walk into the open mouth of the giant monkey he rta  1067.03s hint             1s 
+  lookahead: S6#4 Take out the navigator head right a delay 0
+426 S6#4 Take out the navigator head right after the cli rta  1071.11s hint            15s 
+  lookahead: S6#5 Walk toward the catacombs cave (fir delay 0
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1086.11s hint            16s 
+428 S6#6 Esc the mushroom line                           rta  1086.19s hint             0s 
+  lookahead: S6#7 Walk to the catacombs cave delay 4
+429 S6#7 Walk to the catacombs cave                      rta  1089.36s hint             1s 
+  lookahead: S6#8 Catacombs exit 1/6: walk to the cav delay 12
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1090.86s hint             7s 
+  lookahead: S6#9 Catacombs exit 2/6: walk to the cav delay 0
+431 S6#9 Catacombs exit 2/6: walk to the cave the head p rta  1092.36s hint             3s 
+  lookahead: S6#10 Catacombs exit 3/6: walk to the ca delay 0
+432 S6#10 Catacombs exit 3/6: walk to the cave the head  rta  1109.44s hint             9s 
+  lookahead: S6#11 Catacombs exit 4/6: walk to the ca delay 0
+433 S6#11 Catacombs exit 4/6: walk to the cave the head  rta  1120.11s hint             9s 
+  lookahead: S6#12 Catacombs exit 5/6: walk to the ca delay 10
+434 S6#12 Catacombs exit 5/6: walk to the cave the head  rta  1121.44s hint             5s 
+  lookahead: S6#13 Catacombs exit 6/6: walk to the ca delay 0
+435 S6#13 Catacombs exit 6/6: walk to the cave the head  rta  1121.95s hint             1s 
+436 S6#14 Put the navigator head away on arrival (record rta  1122.28s hint             0s 
+439 S6#17 Read the dusty book standing at (52,83) (carri rta  1124.03s hint             0s 
+440 S6#18 Talk to the navigator head inside the book's c rta  1124.86s hint             0s 
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1127.38s hint             0s 
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1129.05s hint             0s 
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1130.80s hint             0s 
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1131.72s hint             0s 
+  lookahead: S6#23 Head dialogue choice 5/5 (line 2) delay 0
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1133.13s hint             1s 
+447 S6#25 Put the head away if the dialogue took it out  rta  1137.05s hint             0s 
+  lookahead: S6#26 Put the necklace on standing at (5 delay 0
+448 S6#26 Put the necklace on standing at (52,83) in wal rta  1139.13s hint             3s 
+451 S6#29 Open the captain's cabin door (left door)      rta  1150.05s hint             0s 
+452 S6#30 Enter the captain's cabin                      rta  1150.22s hint             0s 
+453 S6#31 Use magnetic compass with the key (magnet pull rta  1153.13s hint             0s 
+  lookahead: S6#32 Leave the captain's cabin delay 0
+454 S6#32 Leave the captain's cabin                      rta  1154.30s hint             3s 
+455 S6#33 Down the deck hatch to the crew quarters       rta  1159.05s hint             0s 
+456 S6#34 Through the passage to the hull                rta  1161.38s hint             0s 
+457 S6#35 Use key in the hull hatch (unlock and open)    rta  1163.55s hint             0s 
+458 S6#36 Down the hatch to the storage room             rta  1163.72s hint             0s 
+461 S6#39 Feather skip 3/3: click during the rat cutscen rta  1166.38s hint             0s 
+463 S6#41 Up the ladder to the hull                      rta  1168.55s hint             0s 
+464 S6#42 Through the passage back to the crew quarters  rta  1170.47s hint             0s 
+465 S6#43 Up the ladder to the deck                      rta  1172.72s hint             0s 
+467 S6#45 Open the greased door                          rta  1173.55s hint             0s 
+468 S6#46 Enter the brig room                            rta  1173.72s hint             0s 
+469 S6#47 Pick up the ghost tools                        rta  1174.97s hint             0s 
+470 S6#48 Back to the deck                               rta  1176.30s hint             0s 
+471 S6#49 Down the deck hatch again                      rta  1176.72s hint             0s 
+  lookahead: S6#50 Through the passage to the hull ag delay 0
+472 S6#50 Through the passage to the hull again          rta  1179.05s hint             2s 
+473 S6#51 Use glowing crate with ghost tools             rta  1190.47s hint             0s 
+474 S6#52 Look at the open crate to grab the voodoo root rta  1190.72s hint             0s 
+475 S6#53 Through the passage to the crew quarters       rta  1193.72s hint             0s 
+476 S6#54 Up the ladder to the deck                      rta  1195.97s hint             0s 
+  lookahead: S6#55 Leave the ghost ship delay 0
+477 S6#55 Leave the ghost ship                           rta  1197.47s hint             2s 
+478 S6#56 Walk into the cave with the root               rta  1205.22s hint             0s 
+479 S6#57 Esc 'A long walk, a brief row, and a short hik rta  1205.30s hint             0s 
+480 S6#58 Esc the cannibals' root scene                  rta  1205.39s hint             0s 
+481 S6#59 Walk out to the jungle (back toward the ghost- rta  1207.97s hint             0s 
+482 S6#60 Esc 'After some more furious paddling...'      rta  1208.05s hint             0s 
+  lookahead: S6#62 Bob scene: 'Where is the wedding?' delay 0
+484 S6#62 Bob scene: 'Where is the wedding?'             rta  1211.22s hint             2s 
+  lookahead: S6#65 Esc the crew's 'Come on, let's go. delay 0
+487 S6#65 Esc the crew's 'Come on, let's go.' exit       rta  1222.14s hint            12s 
+  lookahead: S7#2 Dock: skip script 131's three ego t delay 0
+489 S7#2 Dock: skip script 131's three ego text segments rta  1354.89s hint            11s 
+  lookahead: S7#6 Dock: walk right again (to Low Stre delay 0
+493 S7#6 Dock: walk right again (to Low Street)          rta  1363.81s hint             4s 
+  lookahead: S7#7 Low Street: archway up to High Stre delay 0
+494 S7#7 Low Street: archway up to High Street (avoid th rta  1380.72s hint             3s 
+495 S7#8 High Street: open the church door (door closed: rta  1385.22s hint             0s 
+496 S7#9 High Street: enter the church                   rta  1385.38s hint             0s 
+499 S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?' rta  1388.63s hint             0s 
+504 S7#17 Close-up menu 2: 'If you're here, then who's t rta  1390.63s hint             0s 
+505 S7#18 Close-up: skip ego's 'who's that in the dress' rta  1390.97s hint             0s 
+510 S7#23 Close-up: Esc LeChuck's punch                  rta  1391.97s hint             0s 
+511 S7#24 Map: Esc the POW / BIFF flight                 rta  1392.13s hint             0s 
+512 S7#25 Stan's: Esc Stan's greeting                    rta  1394.88s hint             0s 
+  lookahead: S7#26 Stan's: Esc Stan's sales pitch delay 0
+513 S7#26 Stan's: Esc Stan's sales pitch                 rta  1398.47s hint             2s 
+  lookahead: S7#27 Stan's: wake Guybrush (first input delay 0
+514 S7#27 Stan's: wake Guybrush (first input after the f rta  1408.05s hint             3s 
+  lookahead: S7#28 Stan's: use root beer with LeChuck delay 0
+515 S7#28 Stan's: use root beer with LeChuck (click LeCh rta  1412.30s hint             2s 
+  lookahead: S7#29 Ending: skip 'Gasp! --choke--' (fi delay 0
+516 S7#29 Ending: skip 'Gasp! --choke--' (first pass)    rta  1420.22s hint             2s 
+  lookahead: S7#30 Ending: skip 'Gasp! --choke--' (in delay 0
+517 S7#30 Ending: skip 'Gasp! --choke--' (instant replay rta  1431.72s hint             3s 
+  lookahead: S7#31 Ending: skip Elaine's 'Hey...' exc delay 0
+518 S7#31 Ending: skip Elaine's 'Hey...' exchange        rta  1449.55s hint             3s 
+  lookahead: S7#32 Fireworks: skip the small talk delay 0
+519 S7#32 Fireworks: skip the small talk                 rta  1457.05s hint             3s 
+522 S7#35 Fireworks: skip the epilogue lines (Stan, Herm rta  1470.99s hint             0s 
+525 S7#38 Fireworks: skip 'Yes, I've heard that one.' (t rta  1472.66s hint             0s 
+END frame 17354 room 0

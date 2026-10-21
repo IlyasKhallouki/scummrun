@@ -1,0 +1,23 @@
+491 S6#65 Esc the crew's 'Come on, let's go.' exit       rta  1155.30s hint             1s 
+493 S7#2 Dock: skip script 131's three ego text segments rta  1158.30s hint             0s 
+497 S7#6 Dock: walk right again (to Low Street)          rta  1167.22s hint             0s 
+499 S7#8 Low Street: use the root beer (823) with the sp rta  1169.54s hint             0s 
+500 S7#9 Low Street: archway up to High Street (re-click rta  1179.79s hint           164s 
+501 S7#10 High Street: open the church door (door closed rta  1184.13s hint            43s 
+502 S7#11 High Street: enter the church                  rta  1184.29s hint             0s 
+505 S7#14 Church: skip 'Elaine!' and 'Hey!! Who's that?' rta  1187.54s hint             0s 
+510 S7#19 Close-up menu 2: 'If you're here, then who's t rta  1189.54s hint             0s 
+511 S7#20 Close-up: skip ego's 'who's that in the dress' rta  1189.88s hint             0s 
+516 S7#25 Close-up: Esc LeChuck's punch                  rta  1190.88s hint             0s 
+517 S7#26 Map: Esc the POW / BIFF flight                 rta  1191.04s hint             0s 
+518 S7#27 Stan's: Esc Stan's greeting                    rta  1193.79s hint             0s 
+519 S7#28 Stan's: Esc Stan's sales pitch                 rta  1197.38s hint             0s 
+520 S7#29 Stan's: wake Guybrush (first input after the f rta  1206.96s hint             0s 
+521 S7#30 Stan's: use root beer with LeChuck (click LeCh rta  1211.21s hint             0s 
+522 S7#31 Ending: skip 'Gasp! --choke--' (first pass)    rta  1219.13s hint             0s 
+523 S7#32 Ending: skip 'Gasp! --choke--' (instant replay rta  1230.63s hint             0s 
+524 S7#33 Ending: skip Elaine's 'Hey...' exchange        rta  1248.46s hint             0s 
+525 S7#34 Fireworks: skip the small talk                 rta  1255.80s hint             0s 
+528 S7#37 Fireworks: skip the epilogue lines (Stan, Herm rta  1269.57s hint             0s 
+531 S7#40 Fireworks: skip 'Yes, I've heard that one.' (t rta  1271.15s hint             0s 
+END frame 14936 room 0

@@ -1,0 +1,12 @@
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1175.38s hint             0s 
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1176.88s hint             0s 
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1178.38s hint             0s 
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1179.13s hint             0s 
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1180.55s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound None
+448  hint failed: S6#24 Esc the book on the frame after 140's UserputOn (hard check: the book must still be open): `after` did not hold wi
+448 S6#26 Put the necklace on standing at (46,85) in walk box 8 : NOT REACHED target [{'bit': 357, 'eq': 1}]
+  hint failed: S6#24 Esc the book on the frame after 140's UserputOn (hard check: the book must still be open): `after` did not hold wi
+  x auto: wait until idle: no control within 900 frames (frame 14751, room 70)
+  + auto: Esc -> qf 284583 room 86
+END frame 13851 room 86

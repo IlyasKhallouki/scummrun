@@ -1,0 +1,45 @@
+{"i": 0, "name": "S1#1 logo skip (logo speed glitch, timer start)", "issue": 46, "done": 48, "rta": 0.167, "room": 38, "skipped": false}
+{"i": 1, "name": "S1#2 skip the Lookout intro", "issue": 49, "done": 50, "rta": 0.333, "room": 96, "skipped": false}
+{"i": 2, "name": "S1#3 skip the 'Part One' card", "issue": 51, "done": 51, "rta": 0.417, "room": 33, "skipped": false}
+{"i": 3, "name": "S1#4 open the SCUMM Bar door", "done": 201, "rta": 12.917, "how": "hint", "via": ["S1#4 open the SCUMM Bar door"]}
+{"i": 4, "name": "S1#5 enter the bar", "done": 203, "rta": 13.084, "how": "hint", "via": ["S1#5 enter the bar"]}
+{"i": 6, "name": "S1#7 provoke the cook (Open kitchen door while he is inside)", "done": 323, "rta": 23.084, "how": "hint", "via": ["S1#6 bar: cross to the right half (curtain)", "S1#7 provoke the cook (Open kitchen door while he is inside)"]}
+{"i": 7, "name": "S1#8 enter the kitchen as the cook walks away", "done": 499, "rta": 37.751, "how": "hint", "via": ["S1#8 enter the kitchen as the cook walks away"]}
+{"i": 8, "name": "S2#1 INTERLEAVE S1 kitchen: open the pier door", "done": 522, "rta": 39.668, "how": "hint", "via": ["S2#1 INTERLEAVE S1 kitchen: open the pier door"]}
+{"i": 9, "name": "S2#2 INTERLEAVE S1 kitchen: step on the plank (gull launch 1, sacrificed)", "done": 551, "rta": 42.085, "how": "hint", "via": ["S2#2 INTERLEAVE S1 kitchen: step on the plank (gull launch 1, sacrificed)"]}
+{"i": 10, "name": "S2#3 INTERLEAVE S1 kitchen: step on the plank again (gull launch 2)", "done": 555, "rta": 42.418, "how": "hint", "via": ["S2#3 INTERLEAVE S1 kitchen: step on the plank again (gull launch 2)"]}
+{"i": 11, "name": "S2#4 INTERLEAVE S1 kitchen: pick up the fish during flight 2", "done": 573, "rta": 43.918, "how": "hint", "via": ["S2#4 INTERLEAVE S1 kitchen: pick up the fish during flight 2"]}
+{"i": 12, "name": "S1#9 pick up the pot", "done": 598, "rta": 46.002, "how": "hint", "via": ["S1#9 pick up the pot"]}
+{"i": 13, "name": "S1#10 pick up the hunk of meat", "done": 611, "rta": 47.085, "how": "hint", "via": ["S1#10 pick up the hunk of meat"]}
+{"i": 14, "name": "S1#11 leave the kitchen", "done": 616, "rta": 47.502, "how": "hint", "via": ["S1#11 leave the kitchen"]}
+{"i": 16, "name": "S1#13 leave the bar (first exit: LeChuck cutscene, skipped)", "done": 689, "rta": 53.585, "how": "hint", "via": ["S1#12 bar: cross back to the left half (curtain)", "S1#13 leave the bar (first exit: LeChuck cutscene, skipped)"]}
+{"i": 17, "name": "S1#14 dock -> Lookout", "done": 824, "rta": 64.835, "how": "hint", "via": ["S1#14 dock -> Lookout"]}
+{"i": 18, "name": "S1#15 Lookout -> island map", "done": 872, "rta": 68.836, "how": "hint", "via": ["S1#15 Lookout -> island map"]}
+{"i": 19, "name": "S1#16 map -> clearing", "done": 934, "rta": 74.002, "how": "hint", "via": ["S1#16 map -> clearing"]}
+{"i": 21, "name": "S1#18 enter the circus tent", "done": 1031, "rta": 82.086, "how": "hint", "via": ["S1#17 walk toward the circus tent (stopped once by local 202)", "S1#18 enter the circus tent"]}
+{"i": 23, "name": "S1#20 circus menu 2: OK, I'll do it", "done": 1091, "rta": 86.153, "how": "hint", "via": ["S1#19 circus menu 1 (any line)", "S1#20 circus menu 2: OK, I'll do it"]}
+{"i": 24, "name": "S1#21 circus menu 3: Of course I have a helmet", "done": 1100, "rta": 86.903, "how": "hint", "via": ["S1#21 circus menu 3: Of course I have a helmet"]}
+{"i": 25, "name": "S1#22 helmet: Use + the fish icon (the inventory slot just before the pot)", "done": 1123, "rta": 88.82, "how": "hint", "via": ["S1#22 helmet: Use + the fish icon (the inventory slot just before the pot)"]}
+{"i": 26, "name": "S1#23 circus menu 4 after the cannon (any line) -> 478 pieces of eight", "done": 1270, "rta": 101.07, "how": "hint", "via": ["S1#23 circus menu 4 after the cannon (any line) -> 478 pieces of eight"]}
+{"i": 27, "name": "S1#24 circus grounds -> map", "done": 1371, "rta": 109.487, "how": "hint", "via": ["S1#24 circus grounds -> map"]}
+{"i": 28, "name": "S1#25 map -> forest entrance (fork, pseudo-room 218)", "done": 1402, "rta": 112.07, "how": "hint", "via": ["S1#25 map -> forest entrance (fork, pseudo-room 218)"]}
+{"i": 29, "name": "S1#26 218 -> 215 (petal screen) through path 686", "done": 1429, "rta": 114.32, "how": "hint", "via": ["S1#26 218 -> 215 (petal screen) through path 686"]}
+{"i": 30, "name": "S1#27 pick up the yellow petal (plants)", "done": 1447, "rta": 115.82, "how": "hint", "via": ["S1#27 pick up the yellow petal (plants)"]}
+{"i": 31, "name": "S1#28 215 -> 218", "done": 1464, "rta": 117.237, "how": "hint", "via": ["S1#28 215 -> 218"]}
+{"i": 32, "name": "S1#29 218 -> map", "done": 1503, "rta": 120.487, "how": "hint", "via": ["S1#29 218 -> map"]}
+{"i": 33, "name": "S1#30 map -> village (lands on the dock)", "done": 1540, "rta": 123.571, "how": "hint", "via": ["S1#30 map -> village (lands on the dock)"]}
+{"i": 34, "name": "S1#31 drug the meat: Use hunk of meat with yellow petal", "done": 1544, "rta": 123.904, "how": "hint", "via": ["S1#31 drug the meat: Use hunk of meat with yellow petal"]}
+{"i": 35, "name": "S1#32 dock -> Low Street", "done": 1740, "rta": 140.238, "how": "hint", "via": ["S1#32 dock -> Low Street"]}
+{"i": 36, "name": "S1#33 talk to the Citizen of Melee", "done": 1796, "rta": 144.905, "how": "hint", "via": ["S1#33 talk to the Citizen of Melee"]}
+{"i": 37, "name": "S1#34 citizen: barber named Dominique", "done": 1803, "rta": 145.488, "how": "hint", "via": ["S1#34 citizen: barber named Dominique"]}
+{"i": 38, "name": "S1#35 citizen: buy the map", "done": 1813, "rta": 146.321, "how": "hint", "via": ["S1#35 citizen: buy the map"]}
+{"i": 39, "name": "S1#36 open the Voodoo shop door", "done": 1873, "rta": 151.322, "how": "hint", "via": ["S1#36 open the Voodoo shop door"]}
+{"i": 40, "name": "S1#37 enter the Voodoo shop", "done": 1875, "rta": 151.488, "how": "hint", "via": ["S1#37 enter the Voodoo shop"]}
+{"i": 41, "name": "S1#38 pick up the rubber chicken", "done": 1907, "rta": 154.155, "how": "hint", "via": ["S1#38 pick up the rubber chicken"]}
+{"i": 42, "name": "S1#39 open the shop door from inside", "done": 1936, "rta": 156.572, "how": "hint", "via": ["S1#39 open the shop door from inside"]}
+{"i": 43, "name": "S1#40 leave the Voodoo shop", "done": 1939, "rta": 156.822, "how": "hint", "via": ["S1#40 leave the Voodoo shop"]}
+{"i": 44, "name": "S1#41 Low Street -> High Street (clock archway)", "done": 2002, "rta": 162.072, "how": "hint", "via": ["S1#41 Low Street -> High Street (clock archway)"]}
+{"i": 45, "name": "S1#42 High Street -> jail", "done": 2079, "rta": 168.489, "how": "hint", "via": ["S1#42 High Street -> jail"]}
+{"i": 46, "name": "S1#43 Otis #1: talk to the prisoner (unlocks the mint topic)", "done": 2109, "rta": 170.989, "how": "hint", "via": ["S1#43 Otis #1: talk to the prisoner (unlocks the mint topic)"]}
+{"i": 47, "name": "S1#44 leave the jail", "done": 2146, "rta": 174.072, "how": "hint", "via": ["S1#44 leave the jail"]}
+{"i": 48, "name": "S1#45 open the store door", "done": 2207, "rta": 179.156, "how": "hint", "via": ["S1#45 open the store door"]}

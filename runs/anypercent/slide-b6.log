@@ -1,0 +1,12 @@
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1107.03s hint             2s 
+428 S6#6 Esc the mushroom line                           rta  1107.11s hint             0s 
+429 S6#7 Walk to the catacombs cave                      rta  1110.36s hint             0s 
+    search: expanded 1 tried 6 frontier 0 best 270058 bound None
+430  hint failed: S6#8 Catacombs exit 1/6: walk to the cave the head points at (Var[164]): object 0 is not in room 39 (and with 1..12 fram
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1120.69s search          23s ['auto: verb 11 cave']
+    search: expanded 1 tried 1 frontier 0 best None bound None
+431  hint failed: S6#9 Catacombs exit 2/6: walk to the cave the head points at (Var[164]): object 0 is not in room 39 (and with 1..12 fram
+431 S6#9 Catacombs exit 2/6: walk to the cave the head points at: NOT REACHED target [{'var': 265, 'eq': 2}]
+  hint failed: S6#9 Catacombs exit 2/6: walk to the cave the head points at (Var[164]): object 0 is not in room 39 (and with 1..12 fram
+  x auto: stand and wait: nothing came
+END frame 13134 room 0

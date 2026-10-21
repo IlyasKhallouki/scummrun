@@ -1,0 +1,45 @@
+5001 S5g1 Stand up on the beach                           rta   894.55s hint             0s 
+5002 S5g2 Map: up the volcano trail to the fort           rta   904.88s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 218865 bound None
+5003  hint failed: target does not hold after the hint
+5003 S5g3 Fort: push the cannon (the gunpowder spills)    rta   907.38s search           8s ['auto: verb 6 cannon', 'auto: wait until idle']
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 2 best None bound None
+    search: expanded 3 tried 7 frontier 1 best 219385 bound None
+    search: expanded 4 tried 9 frontier 0 best 219345 bound None
+5004  hint failed: target does not hold after the hint
+5004 S5g4 Fort: take the gunpowder and the rope           rta   909.38s search           2s ['auto: verb 9 rope', 'auto: verb 9 gunpowder']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 1 best None bound None
+    search: expanded 4 tried 11 frontier 2 best None bound None
+    search: expanded 5 tried 16 frontier 3 best 221845 bound None
+    search: expanded 6 tried 20 frontier 3 best 221845 bound None
+5005  hint failed: target does not hold after the hint
+5005 S5g5 River fork: take the flint (noteworthy rock)    rta   919.80s search          12s ['auto: walk to exit 39 -> room 4', 'auto: walk to exit 51 -> room 15', 'auto: verb 9 rock on top of note']
+5006 S5g6 Seesaw: aim the catapult (Var[242] 2 -> 4)      rta   929.72s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 6 frontier 0 best 227205 bound None
+5007  hint failed: target does not hold after the hint
+5007 S5g7 Vista: push the rock (bananas fall on the main  rta   942.13s search           1s ['auto: wait until idle', 'auto: walk to exit 232 -> room 11', 'auto: verb 5 rock']
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 4 frontier 3 best None bound None
+    search: expanded 3 tried 7 frontier 3 best None bound None
+    search: expanded 4 tried 10 frontier 2 best None bound None
+    search: expanded 5 tried 13 frontier 1 best None bound None
+    search: expanded 6 tried 15 frontier 1 best None bound None
+    search: expanded 7 tried 17 frontier 0 best 230225 bound None
+5008  hint failed: target does not hold after the hint
+5008 S5g8 Back down to the river fork                     rta   954.72s search           2s ["auto: say 'Yes, it IS a nice view.'", 'auto: walk to exit 115 -> room 16', 'auto: walk to exit 233 -> room 15']
+    search: expanded 1 tried 3 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best None bound None
+5009  hint failed: S5g9 Use flint with compass at the dam (strike): inventory object 169 is scrolled out of view (and with 1..12 frames of 
+5009 S5g9 River fork: blow up the dam (gunpowder, then flint with: NOT REACHED target [{'state': 563, 'eq': 1}]
+  hint failed: S5g9 Use flint with compass at the dam (strike): inventory object 169 is scrolled out of view (and with 1..12 frames of 
+  + auto: use handful of gunpowder with dam -> qf 232665 room 15
+  + auto: use handful of gunpowder with dam -> qf 232665 room 15
+  x auto: stand and wait: nothing came
+  x auto: stand and wait: nothing came
+END frame 11194 room 15

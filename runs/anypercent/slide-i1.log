@@ -1,0 +1,50 @@
+    search: expanded 1 tried 1 frontier 0 best None bound 219685
+355 S5#1 Esc the monkey part of the arrival intro        rta   910.80s hint             5s 
+    search: expanded 1 tried 3 frontier 0 best None bound 219705
+356 S5#2 Esc the Herman part of the arrival intro        rta   910.88s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 220125
+357 S5#3 Stand up (any scene click)                      rta   912.63s hint             6s 
+    search: expanded 1 tried 3 frontier 0 best None bound 220625
+358 S5#4 Main beach: jungle exit to the map              rta   914.72s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 221365
+359 S5#5 Map room 2 -> room 3 (top-left edge)            rta   917.80s hint             2s 
+    search: expanded 1 tried 1 frontier 0 best None bound 222605
+360 S5#6 Map room 3: walk to the fort                    rta   922.97s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 223205
+    search: expanded 2 tried 3 frontier 0 best None bound 223205
+361 S5#7 Push the cannon                                 rta   925.47s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 223445
+362 S5#8 Pick up the gunpowder                           rta   926.47s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 223745
+363 S5#9 Pick up the spyglass                            rta   927.72s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 224025
+364 S5#10 Leave the fort (plain exit right after the spy rta   928.88s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 225465
+365 S5#11 Map room 3 -> room 4 (right edge, down the vol rta   934.88s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 225905
+366 S5#12 Map room 4: river fork                         rta   936.72s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 225965
+367 S5#13 Open the spyglass (lens)                       rta   936.97s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 226425
+368 S5#14 Use gunpowder with dam                         rta   938.88s hint             1s 
+    search: expanded 1 tried 3 frontier 1 best None bound 227145
+    search: expanded 2 tried 4 frontier 0 best None bound 227145
+369 S5#15 Use lens with sun: dam blast                   rta   941.88s hint            25s 
+    search: expanded 1 tried 2 frontier 0 best None bound 227193
+370 S5#16 Oars skip 1: off-room instant exit to room 5   rta   942.08s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 227913
+371 S5#17 Oars skip 2: walk toward room-5 exit 62 so the rta   945.09s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 228993
+372 S5#18 Row: room 4 sea box 22 -> room 5 (during the b rta   949.59s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 229213
+373 S5#19 Row to the clearing-side beach (room 5 beach - rta   950.50s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best 229373 bound 229633
+374 S5#20 Beach 131: jungle to the map (room 5, on foot) rta   951.17s search<hint      0s ['auto: walk to exit 17 -> room 5']
+    search: expanded 1 tried 2 frontier 0 best None bound None
+375  hint failed: S5#21 Map room 5: clearing: object 63 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of 
+375 S5#21 Map room 5: clearing: NOT REACHED target [{'room': 12}]
+  hint failed: S5#21 Map room 5: clearing: object 63 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of 
+  x auto: walk to exit 63 -> room 12: auto: walk to exit 63 -> room 12: object 63 never came on screen (no floor path,
+  x auto: stand and wait: nothing came
+    search: expanded 1 tried 2 frontier 0 best None bound None
+END frame 11101 room 5

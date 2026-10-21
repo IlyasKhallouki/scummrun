@@ -1,0 +1,167 @@
+    search: expanded 1 tried 2 frontier 0 best None bound 237133
+386 S5#32 Map room 5: beach on foot (to beach room 131)  rta   983.50s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 237633
+387 S5#33 Board the rowboat                              rta   985.59s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 240073
+388 S5#34 Row to room 6 (top edge of room 5)             rta   995.75s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 240313
+389 S5#35 Row to the village beach (room 132)            rta   996.75s hint             5s 
+    search: expanded 1 tried 3 frontier 0 best 240453 bound 240773
+390 S5#36 Beach 132: jungle to the map (room 6, on foot) rta   997.34s search<hint      1s ['auto: walk to exit 17 -> room 6']
+    search: expanded 1 tried 2 frontier 0 best None bound None
+391  hint failed: S5#37 Map room 6: village: object 72 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of d
+391 S5#37 Map room 6: village: not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 0 best None bound 241713
+391 S5#37 Map room 6: village                            rta  1002.59s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 243373
+392 S5#38 Pick up the bananas (starts the cannibal encou rta  1009.50s hint             5s 
+    search: expanded 1 tried 2 frontier 0 best 243433 bound 243833
+394 S5#40 Read the dusty book while the camera scrolls   rta  1009.75s search<hint      1s ['auto: verb 8 dusty book']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 6 frontier 0 best None bound None
+395  hint failed: S5#41 Encounter: 'I'll give you anything!': `after` did not hold within 1200 frames (and with 1..12 frames of delay)
+395 S5#41 Encounter: 'I'll give you anything!': not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 1 best None bound 244713
+    search: expanded 2 tried 6 frontier 1 best None bound 244713
+    search: expanded 3 tried 10 frontier 0 best None bound 244713
+395 S5#41 Encounter: 'I'll give you anything!'           rta  1015.09s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 244813
+396 S5#42 Give the idol to the cannibals                 rta  1015.50s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 245573
+397 S5#43 Leave the village (visit 1)                    rta  1018.67s hint             3s 
+    search: expanded 1 tried 4 frontier 0 best None bound 246133
+398 S5#44 Map room 6: village again (visit 2)            rta  1021.00s hint             9s 
+    search: expanded 1 tried 2 frontier 0 best None bound 246693
+402 S5#48 213: 'Where are LeChuck and his crew hiding?'  rta  1023.34s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 246833
+403 S5#49 213: 'What's in your standard potion of exorci rta  1023.92s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 246973
+404 S5#50 213: 'I'm off to find LeChuck and get the root rta  1024.50s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248433
+407 S5#53 Give the leaflet to the natives                rta  1030.59s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248633
+408 S5#54 Leaflet scene: Esc 1 ('instructions on how to  rta  1031.42s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 248698
+409 S5#55 Leaflet scene: Esc 2 (skip the navigator close rta  1031.69s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 249158
+410 S5#56 Leaflet scene: Esc 3 ('follow his nose...')    rta  1033.61s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 249758
+411 S5#57 Enter the hut                                  rta  1036.11s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 250178
+412 S5#58 Pick up the banana picker                      rta  1037.86s hint             1s 
+    search: expanded 1 tried 5 frontier 0 best None bound 250438
+413 S5#59 Leave the hut (Herman appears)                 rta  1038.94s hint             1s 
+    search: expanded 1 tried 4 frontier 1 best None bound 251518
+    search: expanded 2 tried 10 frontier 0 best None bound 251518
+414 S5#60 Give the banana picker to Herman (key)         rta  1043.44s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 252198
+415 S5#61 Leave the village                              rta  1046.28s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 253178
+416 S5#62 Map room 6: beach on foot (to room 132)        rta  1050.36s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 253578
+417 S5#63 Board the rowboat (room 132)                   rta  1052.03s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 253878
+418 S5#64 Row to room 5 (bottom edge of room 6)          rta  1053.28s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 256218
+419 S5#65 Row to the clearing-side beach (room 131)      rta  1063.03s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 256378 bound 256638
+420 S5#66 Beach 131: jungle to the map (room 5)          rta  1063.69s search<hint      1s ['auto: walk to exit 17 -> room 5']
+    search: expanded 1 tried 2 frontier 0 best None bound None
+421  hint failed: S5#67 Map room 5: clearing: object 63 never came on screen (no floor path, no stepping stone) (and with 1..12 frames of 
+421 S5#67 Map room 5: clearing: not reached; back to the previous goal's hint branch
+    search: expanded 1 tried 2 frontier 0 best None bound 256998
+421 S5#67 Map room 5: clearing                           rta  1066.28s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 259258
+422 S5#68 Walk through the open gate to the idol field ( rta  1075.69s hint             5s 
+    search: expanded 1 tried 2 frontier 0 best 259738 bound 261538
+423 S6#1 Use ear with monkey head key (opens the giant h rta  1085.19s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 261778 bound 261798
+424 S6#2 Pre-walk to the mouth's walk point during scrip rta  1086.28s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 261898
+425 S6#3 Walk into the open mouth of the giant monkey he rta  1086.69s hint             0s 
+    search: expanded 1 tried 5 frontier 0 best None bound 262878
+426 S6#4 Take out the navigator head right after the cli rta  1090.78s hint             4s 
+  lookahead: S6#5 Walk toward the catacombs cave (fir delay 0
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1105.78s hint            36s 
+    search: expanded 1 tried 3 frontier 0 best None bound 266498
+428 S6#6 Esc the mushroom line                           rta  1105.86s hint             3s 
+  lookahead: S6#7 Walk to the catacombs cave delay 4
+    search: expanded 1 tried 2 frontier 0 best None bound 267258
+429 S6#7 Walk to the catacombs cave                      rta  1109.03s hint            14s 
+  lookahead: S6#8 Catacombs exit 1/6: walk to the cav delay 7
+    search: expanded 1 tried 6 frontier 0 best None bound 269878
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1119.94s hint            31s 
+  lookahead: S6#9 Catacombs exit 2/6: walk to the cav delay 8
+    search: expanded 1 tried 1 frontier 0 best None bound 270158
+431 S6#9 Catacombs exit 2/6: walk to the cave the head p rta  1121.11s hint            13s 
+  lookahead: S6#10 Catacombs exit 3/6: walk to the ca delay 3
+    search: expanded 1 tried 1 frontier 0 best None bound 270318
+432  hint failed: S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+432  hint failed: S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+432  hint failed: S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+432 S6#10 Catacombs exit 3/6: walk to the cave the head  rta  1121.78s hint           269s 
+  lookahead: S6#11 Catacombs exit 4/6: walk to the ca delay 4
+    search: expanded 1 tried 1 frontier 0 best None bound 270518
+433 S6#11 Catacombs exit 4/6: walk to the cave the head  rta  1122.61s hint             8s 
+  lookahead: S6#12 Catacombs exit 5/6: walk to the ca delay 6
+    search: expanded 1 tried 1 frontier 0 best None bound 270758
+434 S6#12 Catacombs exit 5/6: walk to the cave the head  rta  1123.61s hint             7s 
+  lookahead: S6#13 Catacombs exit 6/6: walk to the ca delay 0
+    search: expanded 1 tried 2 frontier 0 best None bound 271118
+435 S6#13 Catacombs exit 6/6: walk to the cave the head  rta  1125.11s hint             5s 
+    search: expanded 1 tried 8 frontier 0 best 271178 bound 271198
+436 S6#14 Put the navigator head away on arrival (record rta  1125.45s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best 271258 bound 271618
+439 S6#17 Read the dusty book standing at (52,83) (carri rta  1125.70s search<hint      0s ['auto: verb 8 dusty book']
+    search: expanded 1 tried 6 frontier 2 best 273923 bound None
+    search: expanded 2 tried 12 frontier 3 best 273923 bound None
+440  hint failed: S6#18 Talk to the navigator head inside the book's cutscene: `after` did not hold within 1200 frames (and with 1..12 fra
+440 S6#18 Talk to the navigator head inside the book's c rta  1136.80s search          20s ['auto: verb 8 head of the navigator']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 8 frontier 3 best 274828 bound None
+441  hint failed: S6#19 Head dialogue choice 1/5 (line 2): `after` did not hold within 1200 frames (and with 1..12 frames of delay)
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1140.57s search          13s ['auto: Esc', 'auto: verb 10 head of the navigator', "auto: say 'May I please have that necklace?'"]
+    search: expanded 1 tried 2 frontier 2 best None bound 275188
+    search: expanded 2 tried 6 frontier 1 best None bound 275188
+    search: expanded 3 tried 10 frontier 0 best None bound 275188
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1142.07s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 275588
+    search: expanded 2 tried 6 frontier 1 best None bound 275588
+    search: expanded 3 tried 10 frontier 0 best 275548 bound 275588
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1143.57s search<hint      1s ['auto: Esc', "auto: say 'Pretty please?'"]
+    search: expanded 1 tried 2 frontier 2 best None bound 275828
+    search: expanded 2 tried 6 frontier 1 best None bound 275828
+    search: expanded 3 tried 10 frontier 0 best None bound 275828
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1144.74s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 276208
+    search: expanded 2 tried 6 frontier 1 best None bound 276208
+    search: expanded 3 tried 10 frontier 0 best 276168 bound 276208
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1146.15s search<hint      1s ['auto: Esc', "auto: say 'Pretty please with sugar on top?'"]
+    search: expanded 1 tried 2 frontier 0 best 277208 bound None
+447  hint failed: S6#24 Esc the book on the frame after 140's UserputOn (hard check: the book must still be open): `after` did not hold wi
+447 S6#25 Put the head away if the dialogue took it out  rta  1150.49s search          27s ['auto: Esc']
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 7 frontier 2 best None bound None
+    search: expanded 3 tried 9 frontier 1 best None bound None
+    search: expanded 4 tried 11 frontier 1 best None bound None
+    search: expanded 5 tried 15 frontier 0 best None bound None
+448  hint failed: S6#26 Put the necklace on standing at (52,83) in walk box 8 (necklace skip): `after` did not hold within 1200 frames (an
+448 S6#26 Put the necklace on standing at (52,83) in walk box 8 : NOT REACHED target [{'bit': 357, 'eq': 1}]
+  hint failed: S6#26 Put the necklace on standing at (52,83) in walk box 8 (necklace skip): `after` did not hold within 1200 frames (an
+  + auto: wait until idle -> qf 277348 room 70
+  + auto: Esc -> qf 277348 room 70
+  x auto: verb 9 necklace on navigator: no effect
+  x auto: verb 10 head of the navigator: no effect
+  + auto: walk to exit 768 -> room 65 -> qf 277428 room 65
+  + auto: walk to exit 769 -> room 77 -> qf 279188 room 77
+  x auto: stand and wait: nothing came
+  x auto: walk to exit 755 -> room 70: auto: walk to exit 755 -> room 70: object 755 is not in room 39
+  x auto: stand and wait: nothing came
+  x auto: wait until idle: no control within 900 frames (frame 14488, room 77)
+  + auto: Esc -> qf 297208 room 77
+  x auto: say "You wouldn't happen to have a root I cou": auto: say "You wouldn't happen to have a root I cou": no dialogue menu within 90
+  x auto: say "I've come to interrogate the prisoner.": auto: say "I've come to interrogate the prisoner.": no dialogue menu within 900 
+  x auto: say 'Excuse me, but is this the Lido Deck?': auto: say 'Excuse me, but is this the Lido Deck?': no dialogue menu within 900 f
+  x auto: say "I think I'll be running along.": auto: say "I think I'll be running along.": no dialogue menu within 900 frames
+END frame 13489 room 70

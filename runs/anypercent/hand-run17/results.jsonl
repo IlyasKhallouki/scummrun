@@ -1,0 +1,266 @@
+{"i": 0, "name": "S1#1 logo skip (logo speed glitch, timer start)", "issue": 46, "done": 48, "rta": 0.167, "room": 38, "skipped": false}
+{"i": 1, "name": "S1#2 skip the Lookout intro", "issue": 49, "done": 50, "rta": 0.333, "room": 96, "skipped": false}
+{"i": 2, "name": "S1#3 skip the 'Part One' card", "issue": 51, "done": 51, "rta": 0.417, "room": 33, "skipped": false}
+{"i": 3, "name": "S1#4 open the SCUMM Bar door", "issue": 186, "done": 201, "rta": 12.917, "room": 33, "skipped": false}
+{"i": 4, "name": "S1#5 enter the bar", "issue": 202, "done": 203, "rta": 13.084, "room": 28, "skipped": false}
+{"i": 5, "name": "S1#6 bar: cross to the right half (curtain)", "issue": 204, "done": 235, "rta": 15.751, "room": 28, "skipped": false}
+{"i": 6, "name": "S1#7 provoke the cook (Open kitchen door while he is inside)", "issue": 274, "done": 286, "rta": 20.001, "room": 28, "skipped": false}
+{"i": 7, "name": "S1#8 enter the kitchen as the cook walks away", "issue": 456, "done": 462, "rta": 34.668, "room": 41, "skipped": false}
+{"i": 8, "name": "S2#1 INTERLEAVE S1 kitchen: open the pier door", "issue": 464, "done": 485, "rta": 36.585, "room": 41, "skipped": false}
+{"i": 9, "name": "S2#2 INTERLEAVE S1 kitchen: step on the plank (gull launch 1, sacrificed)", "issue": 486, "done": 514, "rta": 39.001, "room": 41, "skipped": false}
+{"i": 10, "name": "S2#3 INTERLEAVE S1 kitchen: step on the plank again (gull launch 2)", "issue": 515, "done": 518, "rta": 39.335, "room": 41, "skipped": false}
+{"i": 11, "name": "S2#4 INTERLEAVE S1 kitchen: pick up the fish during flight 2", "issue": 522, "done": 536, "rta": 40.835, "room": 41, "skipped": false}
+{"i": 12, "name": "S1#9 pick up the pot", "issue": 538, "done": 561, "rta": 42.918, "room": 41, "skipped": false}
+{"i": 13, "name": "S1#10 pick up the hunk of meat", "issue": 563, "done": 574, "rta": 44.001, "room": 41, "skipped": false}
+{"i": 14, "name": "S1#11 leave the kitchen", "issue": 575, "done": 579, "rta": 44.418, "room": 28, "skipped": false}
+{"i": 15, "name": "S1#12 bar: cross back to the left half (curtain)", "issue": 580, "done": 614, "rta": 47.335, "room": 28, "skipped": false}
+{"i": 16, "name": "S1#13 leave the bar (first exit: LeChuck cutscene, skipped)", "issue": 647, "done": 652, "rta": 50.502, "room": 33, "skipped": false}
+{"i": 17, "name": "S1#14 dock -> Lookout", "issue": 730, "done": 787, "rta": 61.752, "room": 38, "skipped": false}
+{"i": 18, "name": "S1#15 Lookout -> island map", "issue": 788, "done": 835, "rta": 65.752, "room": 85, "skipped": false}
+{"i": 19, "name": "S1#16 map -> clearing", "issue": 836, "done": 897, "rta": 70.919, "room": 52, "skipped": false}
+{"i": 20, "name": "S1#17 walk toward the circus tent (stopped once by local 202)", "issue": 943, "done": 943, "rta": 74.752, "room": 52, "skipped": false}
+{"i": 21, "name": "S1#18 enter the circus tent", "issue": 944, "done": 994, "rta": 79.003, "room": 51, "skipped": false}
+{"i": 22, "name": "S1#19 circus menu 1 (any line)", "issue": 1020, "done": 1020, "rta": 81.169, "room": 51, "skipped": false}
+{"i": 23, "name": "S1#20 circus menu 2: OK, I'll do it", "issue": 1047, "done": 1054, "rta": 83.069, "room": 51, "skipped": false}
+{"i": 24, "name": "S1#21 circus menu 3: Of course I have a helmet", "issue": 1057, "done": 1063, "rta": 83.819, "room": 51, "skipped": false}
+{"i": 25, "name": "S1#22 helmet: Use + the fish icon (the inventory slot just before the pot)", "issue": 1065, "done": 1086, "rta": 85.736, "room": 51, "skipped": false}
+{"i": 26, "name": "S1#23 circus menu 4 after the cannon (any line) -> 478 pieces of eight", "issue": 1229, "done": 1233, "rta": 97.987, "room": 51, "skipped": false}
+{"i": 27, "name": "S1#24 circus grounds -> map", "issue": 1307, "done": 1334, "rta": 106.403, "room": 85, "skipped": false}
+{"i": 28, "name": "S1#25 map -> forest entrance (fork, pseudo-room 218)", "issue": 1335, "done": 1365, "rta": 108.987, "room": 218, "skipped": false}
+{"i": 29, "name": "S1#26 218 -> 215 (petal screen) through path 686", "issue": 1366, "done": 1392, "rta": 111.237, "room": 215, "skipped": false}
+{"i": 30, "name": "S1#27 pick up the yellow petal (plants)", "issue": 1394, "done": 1410, "rta": 112.737, "room": 215, "skipped": false}
+{"i": 31, "name": "S1#28 215 -> 218", "issue": 1411, "done": 1427, "rta": 114.154, "room": 218, "skipped": false}
+{"i": 32, "name": "S1#29 218 -> map", "issue": 1428, "done": 1466, "rta": 117.404, "room": 85, "skipped": false}
+{"i": 33, "name": "S1#30 map -> village (lands on the dock)", "issue": 1467, "done": 1503, "rta": 120.487, "room": 33, "skipped": false}
+{"i": 34, "name": "S1#31 drug the meat: Use hunk of meat with yellow petal", "issue": 1506, "done": 1507, "rta": 120.821, "room": 33, "skipped": false}
+{"i": 35, "name": "S1#32 dock -> Low Street", "issue": 1686, "done": 1703, "rta": 137.154, "room": 35, "skipped": false}
+{"i": 36, "name": "S1#33 talk to the Citizen of Melee", "issue": 1732, "done": 1759, "rta": 141.821, "room": 35, "skipped": false}
+{"i": 37, "name": "S1#34 citizen: barber named Dominique", "issue": 1760, "done": 1766, "rta": 142.405, "room": 35, "skipped": false}
+{"i": 38, "name": "S1#35 citizen: buy the map", "issue": 1768, "done": 1776, "rta": 143.238, "room": 35, "skipped": false}
+{"i": 39, "name": "S1#36 open the Voodoo shop door", "issue": 1780, "done": 1836, "rta": 148.238, "room": 35, "skipped": false}
+{"i": 40, "name": "S1#37 enter the Voodoo shop", "issue": 1837, "done": 1838, "rta": 148.405, "room": 29, "skipped": false}
+{"i": 41, "name": "S1#38 pick up the rubber chicken", "issue": 1840, "done": 1870, "rta": 151.072, "room": 29, "skipped": false}
+{"i": 42, "name": "S1#39 open the shop door from inside", "issue": 1872, "done": 1899, "rta": 153.488, "room": 29, "skipped": false}
+{"i": 43, "name": "S1#40 leave the Voodoo shop", "issue": 1901, "done": 1902, "rta": 153.738, "room": 35, "skipped": false}
+{"i": 44, "name": "S1#41 Low Street -> High Street (clock archway)", "issue": 1903, "done": 1965, "rta": 158.989, "room": 34, "skipped": false}
+{"i": 45, "name": "S1#42 High Street -> jail", "issue": 2010, "done": 2042, "rta": 165.405, "room": 31, "skipped": false}
+{"i": 46, "name": "S1#43 Otis #1: talk to the prisoner (unlocks the mint topic)", "issue": 2044, "done": 2072, "rta": 167.905, "room": 31, "skipped": false}
+{"i": 47, "name": "S1#44 leave the jail", "issue": 2081, "done": 2109, "rta": 170.989, "room": 34, "skipped": false}
+{"i": 48, "name": "S1#45 open the store door", "issue": 2114, "done": 2173, "rta": 176.322, "room": 34, "skipped": false}
+{"i": 49, "name": "S1#46 enter the store (first visit: safe combination and storekeeper draw)", "issue": 2174, "done": 2175, "rta": 176.489, "room": 30, "skipped": false}
+{"i": 50, "name": "S1#47 pick up the shovel", "issue": 2177, "done": 2244, "rta": 182.239, "room": 30, "skipped": false}
+{"i": 51, "name": "S1#48 safe digit 1: pull the handle d1 times (here 1)", "issue": 2246, "done": 2255, "rta": 183.156, "room": 30, "skipped": false}
+{"i": 52, "name": "S1#49 safe digit 2: push the handle d2 times (here 1)", "issue": 2257, "done": 2262, "rta": 183.739, "room": 30, "skipped": false}
+{"i": 53, "name": "S1#50 safe digit 3: pull the handle d3 times (here 1)", "issue": 2264, "done": 2269, "rta": 184.323, "room": 30, "skipped": false}
+{"i": 54, "name": "S1#51 safe digit 4: push the handle d4 times (here 1): the safe opens", "issue": 2271, "done": 2283, "rta": 185.489, "room": 30, "skipped": false}
+{"i": 55, "name": "S2#5 INTERLEAVE S1 store: pick up the sword", "issue": 2285, "done": 2349, "rta": 190.99, "room": 30, "skipped": false}
+{"i": 56, "name": "S1#52 ring the bell (summons the storekeeper, opens the shop menu)", "issue": 2351, "done": 2384, "rta": 193.906, "room": 30, "skipped": false}
+{"i": 57, "name": "S1#53 shop: breath mint", "issue": 2388, "done": 2398, "rta": 195.073, "room": 30, "skipped": false}
+{"i": 58, "name": "S2#6 INTERLEAVE S1 store: choose 'About this sword...'", "issue": 2401, "done": 2405, "rta": 195.656, "room": 30, "skipped": false}
+{"i": 59, "name": "S2#7 INTERLEAVE S1 store: choose 'I want it.' (pay 100)", "issue": 2409, "done": 2421, "rta": 196.99, "room": 30, "skipped": false}
+{"i": 60, "name": "S1#54 shop: about this shovel", "issue": 2422, "done": 2426, "rta": 197.406, "room": 30, "skipped": false}
+{"i": 61, "name": "S1#55 shop: I want it (pay 75 for the shovel)", "issue": 2430, "done": 2437, "rta": 198.323, "room": 30, "skipped": false}
+{"i": 62, "name": "S2#8 INTERLEAVE S1 store: choose 'I think I'd just like to browse.' (ends the shop menu)", "issue": 2440, "done": 2446, "rta": 199.073, "room": 30, "skipped": false}
+{"i": 63, "name": "S1#56 open the store door from inside (the bell path closed it)", "issue": 2448, "done": 2472, "rta": 201.24, "room": 30, "skipped": false}
+{"i": 64, "name": "S1#57 leave the store", "issue": 2474, "done": 2475, "rta": 201.49, "room": 34, "skipped": false}
+{"i": 65, "name": "S1#58 High Street: town half -> mansion half", "issue": 2510, "done": 2573, "rta": 209.657, "room": 34, "skipped": false}
+{"i": 66, "name": "S1#59 enter the mansion grounds", "issue": 2574, "done": 2638, "rta": 215.074, "room": 36, "skipped": false}
+{"i": 67, "name": "S1#60 give the drugged meat to the poodles", "issue": 2642, "done": 2728, "rta": 222.574, "room": 36, "skipped": false}
+{"i": 68, "name": "S1#61 open the mansion door (dismisses the sign)", "issue": 2759, "done": 2794, "rta": 228.074, "room": 36, "skipped": false}
+{"i": 69, "name": "S1#62 enter the foyer", "issue": 2795, "done": 2796, "rta": 228.241, "room": 53, "skipped": false}
+{"i": 70, "name": "S1#63 open the idol-room door", "issue": 2798, "done": 2817, "rta": 229.991, "room": 53, "skipped": false}
+{"i": 71, "name": "S1#64 walk into the idol room (first visit: repellent)", "issue": 2818, "done": 2819, "rta": 230.158, "room": 53, "skipped": false}
+{"i": 72, "name": "S1#65 leave the foyer", "issue": 2905, "done": 2919, "rta": 238.491, "room": 36, "skipped": false}
+{"i": 73, "name": "S1#66 mansion grounds -> High Street", "issue": 2921, "done": 2968, "rta": 242.575, "room": 34, "skipped": false}
+{"i": 74, "name": "S1#67 High Street: mansion half -> town half", "issue": 2970, "done": 3074, "rta": 251.408, "room": 34, "skipped": false}
+{"i": 75, "name": "S1#68 High Street -> jail (Otis #2)", "issue": 3076, "done": 3094, "rta": 253.075, "room": 31, "skipped": false}
+{"i": 76, "name": "S1#69 give the breath mints to Otis", "issue": 3097, "done": 3141, "rta": 256.992, "room": 31, "skipped": false}
+{"i": 77, "name": "S1#70 Otis: leave the conversation", "issue": 3144, "done": 3148, "rta": 257.575, "room": 31, "skipped": false}
+{"i": 78, "name": "S1#71 give the gopher repellent to Otis (carrot cake)", "issue": 3153, "done": 3178, "rta": 260.075, "room": 31, "skipped": false}
+{"i": 79, "name": "S1#72 open the cake (the file)", "issue": 3180, "done": 3181, "rta": 260.325, "room": 31, "skipped": false}
+{"i": 80, "name": "S1#73 leave the jail", "issue": 3182, "done": 3210, "rta": 262.742, "room": 34, "skipped": false}
+{"i": 81, "name": "S1#74 High Street: town half -> mansion half (2)", "issue": 3211, "done": 3269, "rta": 267.659, "room": 34, "skipped": false}
+{"i": 82, "name": "S1#75 enter the mansion grounds (2)", "issue": 3270, "done": 3334, "rta": 273.076, "room": 36, "skipped": false}
+{"i": 83, "name": "S1#76 enter the foyer (door still open)", "issue": 3335, "done": 3380, "rta": 276.909, "room": 53, "skipped": false}
+{"i": 84, "name": "S1#77 walk to the gaping hole (the theft)", "issue": 3382, "done": 3447, "rta": 282.493, "room": 53, "skipped": false}
+{"i": 85, "name": "S1#78 Fester menu (any line)", "issue": 3493, "done": 3497, "rta": 286.659, "room": 53, "skipped": false}
+{"i": 86, "name": "S1#79 open the foyer door: Fester throws Guybrush in the sea", "issue": 3530, "done": 3552, "rta": 291.393, "room": 42, "skipped": false}
+{"i": 87, "name": "S1#80 pick up the idol underwater (idol trial done)", "issue": 3554, "done": 3624, "rta": 297.468, "room": 42, "skipped": false}
+{"i": 88, "name": "S1#81 close-up dock -> dock", "issue": 3636, "done": 3662, "rta": 300.635, "room": 33, "skipped": false}
+{"i": 89, "name": "S1#82 dock -> Lookout (2)", "issue": 3663, "done": 3740, "rta": 307.21, "room": 38, "skipped": false}
+{"i": 90, "name": "S1#83 Lookout -> island map (2)", "issue": 3741, "done": 3788, "rta": 311.21, "room": 85, "skipped": false}
+{"i": 91, "name": "S2#9 Map -> troll bridge", "issue": 3789, "done": 3866, "rta": 317.71, "room": 57, "skipped": false}
+{"i": 92, "name": "S2#10 Give fish to troll (no troll conversation)", "issue": 3870, "done": 4019, "rta": 330.461, "room": 85, "skipped": false}
+{"i": 93, "name": "S2#11 Map -> Smirk's house", "issue": 4020, "done": 4081, "rta": 335.628, "room": 43, "skipped": false}
+{"i": 94, "name": "S2#12 Open Smirk's door", "issue": 4083, "done": 4150, "rta": 341.378, "room": 43, "skipped": false}
+{"i": 95, "name": "S2#13 Smirk menu 1: 'best swordfighter'", "issue": 4151, "done": 4160, "rta": 342.211, "room": 76, "skipped": false}
+{"i": 96, "name": "S2#14 Esc: skip Smirk's close-up", "issue": 4161, "done": 4164, "rta": 342.545, "room": 43, "skipped": false}
+{"i": 97, "name": "S2#15 Smirk menu 2: 'I do so have what it takes!' (1/3)", "issue": 4165, "done": 4169, "rta": 342.961, "room": 43, "skipped": false}
+{"i": 98, "name": "S2#16 Smirk menu 2: 'I do so!' (2/3)", "issue": 4172, "done": 4176, "rta": 343.545, "room": 43, "skipped": false}
+{"i": 99, "name": "S2#17 Smirk menu 2: 'I do so!' (3/3)", "issue": 4179, "done": 4183, "rta": 344.128, "room": 43, "skipped": false}
+{"i": 100, "name": "S2#18 Smirk menu 3: 'I've got 30 pieces of eight.'", "issue": 4193, "done": 4197, "rta": 345.295, "room": 43, "skipped": false}
+{"i": 101, "name": "S2#19 Smirk menu 4: 'OK, check it out.'", "issue": 4202, "done": 4212, "rta": 346.545, "room": 60, "skipped": false}
+{"i": 102, "name": "S2#20 Esc: skip Smirk's training", "issue": 4213, "done": 4214, "rta": 346.711, "room": 43, "skipped": false}
+{"i": 103, "name": "S2#21 Leave Smirk's (right path)", "issue": 4225, "done": 4283, "rta": 352.462, "room": 85, "skipped": false}
+{"i": 104, "name": "S2#22 Fight 1: intercept a pirate on the map", "issue": 4284, "done": 4560, "rta": 375.546, "room": 49, "skipped": false}
+{"i": 105, "name": "S2#23 Fight 1: choose 'Prepare to die' (encounter 1)", "issue": 4564, "done": 4578, "rta": 377.046, "room": 49, "skipped": false}
+{"i": 106, "name": "S2#24 Fight 1 E1: insult 2 'shish kebab' (pirate must fail)", "issue": 4580, "done": 4631, "rta": 384.713, "room": 49, "skipped": false}
+{"i": 107, "name": "S2#25 Fight 1 E2: insult 8 'dairy farmer' (pirate must fail)", "issue": 4632, "done": 4676, "rta": 391.129, "room": 49, "skipped": false}
+{"i": 108, "name": "S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16)", "issue": 4689, "done": 4723, "rta": 396.546, "room": 49, "skipped": false}
+{"i": 109, "name": "S2#27 Fight 1 E4: answer 16 wrongly ('Oh yeah?'), learn insult 16", "issue": 4724, "done": 4754, "rta": 400.63, "room": 49, "skipped": false}
+{"i": 110, "name": "S2#28 Fight 1 E5: answer the pirate's insult (2 or 8; fight 1 won)", "issue": 4755, "done": 4776, "rta": 403.38, "room": 85, "skipped": false}
+{"i": 111, "name": "S1#84 map -> forest entrance (2)", "issue": 4777, "done": 4792, "rta": 404.713, "room": 218, "skipped": false}
+{"i": 112, "name": "S1#85 218 -> 215 through path 686 (Back)", "issue": 4793, "done": 4819, "rta": 406.963, "room": 215, "skipped": false}
+{"i": 113, "name": "S1#86 215 -> 220 (Left, map gate)", "issue": 4820, "done": 4862, "rta": 410.547, "room": 220, "skipped": false}
+{"i": 114, "name": "S1#87 220 -> 213 (Right)", "issue": 4863, "done": 4910, "rta": 414.547, "room": 213, "skipped": false}
+{"i": 115, "name": "S1#88 213 -> 212 (Left)", "issue": 4911, "done": 4953, "rta": 418.13, "room": 212, "skipped": false}
+{"i": 116, "name": "S1#89 212 -> 207 (Back, into the trap)", "issue": 4954, "done": 4994, "rta": 421.547, "room": 207, "skipped": false}
+{"i": 117, "name": "S1#90 forest map teleport: Look at the map in the trapped 207", "issue": 4996, "done": 5023, "rta": 423.964, "room": 207, "skipped": false}
+{"i": 118, "name": "S1#91 207 -> 211 (Back, now touchable)", "issue": 5029, "done": 5042, "rta": 425.547, "room": 211, "skipped": false}
+{"i": 119, "name": "S1#92 211 -> 216 (Right)", "issue": 5043, "done": 5078, "rta": 428.547, "room": 216, "skipped": false}
+{"i": 120, "name": "S1#93 216 -> 201 (Left)", "issue": 5079, "done": 5102, "rta": 430.547, "room": 201, "skipped": false}
+{"i": 121, "name": "S1#94 201 -> treasure site (Back)", "issue": 5103, "done": 5138, "rta": 433.548, "room": 64, "skipped": false}
+{"i": 122, "name": "S1#95 walk right until the X is on screen", "issue": 5140, "done": 5167, "rta": 435.964, "room": 64, "skipped": false}
+{"i": 123, "name": "S1#96 dig: Use shovel with X (treasure trial done)", "issue": 5170, "done": 5201, "rta": 438.798, "room": 64, "skipped": false}
+{"i": 124, "name": "S2#29 Treasure site -> map (forest path 750)", "issue": 5223, "done": 5238, "rta": 441.881, "room": 85, "skipped": false}
+{"i": 125, "name": "S2#30 Fight 2: wait at the fork for a fork-bound pirate", "issue": 5251, "done": 5276, "rta": 445.048, "room": 49, "skipped": false}
+{"i": 126, "name": "S2#31 Fight 2: choose 'Prepare to die' (encounter 2)", "issue": 5280, "done": 5294, "rta": 446.548, "room": 49, "skipped": false}
+{"i": 127, "name": "S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion')", "issue": 5303, "done": 5336, "rta": 451.548, "room": 49, "skipped": false}
+{"i": 128, "name": "S2#33 Fight 2 E2: answer the pirate's insult (2, 8 or 16)", "issue": 5337, "done": 5364, "rta": 455.382, "room": 49, "skipped": false}
+{"i": 129, "name": "S2#34 Fight 2 E3: insult 2 'shish kebab' (pirate must fail)", "issue": 5367, "done": 5397, "rta": 459.632, "room": 49, "skipped": false}
+{"i": 130, "name": "S2#35 Fight 2 E4: insult 8 'dairy farmer' (fight 2 won)", "issue": 5400, "done": 5424, "rta": 462.798, "room": 85, "skipped": false}
+{"i": 131, "name": "S2#36 Fight 3: wait at the fork for a fork-bound pirate", "issue": 5425, "done": 5491, "rta": 468.382, "room": 49, "skipped": false}
+{"i": 132, "name": "S2#37 Fight 3: choose 'Prepare to die' (encounter 3)", "issue": 5495, "done": 5509, "rta": 469.882, "room": 49, "skipped": false}
+{"i": 133, "name": "S2#38 Fight 3 E1: insult 2 'shish kebab' (pirate must fail)", "issue": 5513, "done": 5543, "rta": 474.215, "room": 49, "skipped": false}
+{"i": 134, "name": "S2#39 Fight 3 E2: insult 8 'dairy farmer' (pirate must fail)", "issue": 5544, "done": 5574, "rta": 478.299, "room": 49, "skipped": false}
+{"i": 135, "name": "S2#40 Fight 3 E3: insult 16 'apes' (fight 3 won)", "issue": 5575, "done": 5600, "rta": 481.382, "room": 85, "skipped": false}
+{"i": 136, "name": "S2#41 Map -> fork (forest screen 218)", "issue": 5601, "done": 5603, "rta": 481.632, "room": 218, "skipped": false}
+{"i": 137, "name": "S2#42 Forest 218 -> 215: up (path 686)", "issue": 5604, "done": 5630, "rta": 483.882, "room": 215, "skipped": false}
+{"i": 138, "name": "S2#43 Forest 215 -> 203: up", "issue": 5631, "done": 5654, "rta": 485.883, "room": 203, "skipped": false}
+{"i": 139, "name": "S2#44 Forest 203 -> 202: right", "issue": 5656, "done": 5695, "rta": 489.299, "room": 202, "skipped": false}
+{"i": 140, "name": "S2#45 Forest 202 -> 205: right", "issue": 5696, "done": 5739, "rta": 492.966, "room": 205, "skipped": false}
+{"i": 141, "name": "S2#46 Forest 205 -> 217: left", "issue": 5741, "done": 5793, "rta": 497.466, "room": 217, "skipped": false}
+{"i": 142, "name": "S2#47 Forest 217 -> 209: up", "issue": 5794, "done": 5830, "rta": 500.55, "room": 209, "skipped": false}
+{"i": 143, "name": "S2#48 Use sign (log bridge over the ravine)", "issue": 5832, "done": 5863, "rta": 503.3, "room": 209, "skipped": false}
+{"i": 144, "name": "S2#49 Forest 209 -> Sword Master's clearing: right over the log", "issue": 5897, "done": 5931, "rta": 508.967, "room": 61, "skipped": false}
+{"i": 145, "name": "S2#50 Walk right toward the Sword Master (one held floor click)", "issue": 5932, "done": 6056, "rta": 519.384, "room": 61, "skipped": false}
+{"i": 146, "name": "S2#51 Walk to the Sword Master (starts the challenge)", "issue": 6057, "done": 6085, "rta": 521.8, "room": 62, "skipped": false}
+{"i": 147, "name": "S2#52 Esc: skip 'How dare you approach the Sword Master...'", "issue": 6086, "done": 6086, "rta": 521.884, "room": 44, "skipped": false}
+{"i": 148, "name": "S2#53 Carla menu: 'My name is Guybrush Threepwood.  I've come to kill you.'", "issue": 6089, "done": 6112, "rta": 524.05, "room": 44, "skipped": false}
+{"i": 149, "name": "S2#54 Carla E1: answer her insult (planned 32 -> 'family reunion')", "issue": 6114, "done": 6144, "rta": 528.217, "room": 44, "skipped": false}
+{"i": 150, "name": "S2#55 Carla E2: answer her insult (planned 21 -> 'family reunion')", "issue": 6153, "done": 6183, "rta": 532.967, "room": 44, "skipped": false}
+{"i": 151, "name": "S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion')", "issue": 6186, "done": 6216, "rta": 537.218, "room": 44, "skipped": false}
+{"i": 152, "name": "S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster')", "issue": 6219, "done": 6249, "rta": 541.468, "room": 44, "skipped": false}
+{"i": 153, "name": "S2#58 Carla E5: answer her insult (planned 24 -> 'cow') (Carla beaten, T-shirt)", "issue": 6250, "done": 6277, "rta": 544.718, "room": 61, "skipped": false}
+{"i": 154, "name": "S2#59 Leave the Sword Master's clearing", "issue": 6402, "done": 6436, "rta": 557.968, "room": 85, "skipped": false}
+{"i": 155, "name": "S3#1 Map: village (forces the kidnap scene)", "issue": 6463, "done": 6499, "rta": 563.218, "room": 83, "skipped": false}
+{"i": 156, "name": "S3#2 Esc the kidnap cutscene", "issue": 6500, "done": 6511, "rta": 564.218, "room": 83, "skipped": false}
+{"i": 157, "name": "S3#3 Kidnap dialogue: 'Where did they go?'", "issue": 6512, "done": 6516, "rta": 564.635, "room": 83, "skipped": false}
+{"i": 158, "name": "S3#4 Esc the lookout's speech (note, Bit[304])", "issue": 6517, "done": 6517, "rta": 564.718, "room": 83, "skipped": false}
+{"i": 159, "name": "S3#5 Cu-dock: walk to the left dock edge", "issue": 6518, "done": 6541, "rta": 566.719, "room": 33, "skipped": false}
+{"i": 160, "name": "S3#6 Dock: cliffside to the Lookout", "issue": 6542, "done": 6619, "rta": 573.294, "room": 38, "skipped": false}
+{"i": 161, "name": "S3#7 Lookout: path to the map", "issue": 6620, "done": 6667, "rta": 577.294, "room": 85, "skipped": false}
+{"i": 162, "name": "S3#8 Map: Stan's (lights)", "issue": 6668, "done": 6766, "rta": 585.544, "room": 59, "skipped": false}
+{"i": 163, "name": "S3#9 Stan: skip 'Howdy!'", "issue": 6769, "done": 6797, "rta": 588.128, "room": 59, "skipped": false}
+{"i": 164, "name": "S3#10 Stan: Esc the sales intro, skip 'So tell me-- / What are you interested in...'", "issue": 6798, "done": 6808, "rta": 589.044, "room": 59, "skipped": false}
+{"i": 165, "name": "S3#11 Stan: 'I really don't have that much to spend.' (the Sea Monkey)", "issue": 6809, "done": 6813, "rta": 589.461, "room": 59, "skipped": false}
+{"i": 166, "name": "S3#12 Stan: skip to the Sea Monkey pitch", "issue": 6814, "done": 6886, "rta": 595.544, "room": 59, "skipped": false}
+{"i": 167, "name": "S3#13 Stan: Esc the Sea Monkey story", "issue": 6887, "done": 6889, "rta": 595.794, "room": 59, "skipped": false}
+{"i": 168, "name": "S3#14 Stan: 'I got credit from the storekeeper.  Will you take it?'", "issue": 6890, "done": 6894, "rta": 596.211, "room": 59, "skipped": false}
+{"i": 169, "name": "S3#15 Stan: Esc the credit speech, skip 'brass tacks'", "issue": 6895, "done": 6897, "rta": 596.461, "room": 59, "skipped": false}
+{"i": 170, "name": "S3#16 Stan: Esc the haggling speech", "issue": 6898, "done": 6898, "rta": 596.544, "room": 59, "skipped": false}
+{"i": 171, "name": "S3#17 Stan: 'Forget it.  I don't need this boat anyway.' (-1000)", "issue": 6899, "done": 6903, "rta": 596.961, "room": 59, "skipped": false}
+{"i": 172, "name": "S3#18 Stan: skip 'Now, wait a second!' lines", "issue": 6904, "done": 6934, "rta": 599.545, "room": 59, "skipped": false}
+{"i": 173, "name": "S3#19 Stan: 'Well, maybe you're right...'", "issue": 6935, "done": 6939, "rta": 599.961, "room": 59, "skipped": false}
+{"i": 174, "name": "S3#20 Stan: skip 'Of course I am...'", "issue": 6940, "done": 6943, "rta": 600.295, "room": 59, "skipped": false}
+{"i": 175, "name": "S3#21 Stan: Esc the second haggling speech", "issue": 6944, "done": 6944, "rta": 600.378, "room": 59, "skipped": false}
+{"i": 176, "name": "S3#22 Stan: 'Let's talk extras.'", "issue": 6945, "done": 6949, "rta": 600.795, "room": 59, "skipped": false}
+{"i": 177, "name": "S3#23 Stan: skip 'Extras? ... For instance' and the porthole defoggers line", "issue": 6950, "done": 6956, "rta": 601.378, "room": 59, "skipped": false}
+{"i": 178, "name": "S3#24 Stan: refuse extra 1: porthole defoggers", "issue": 6957, "done": 6961, "rta": 601.795, "room": 59, "skipped": false}
+{"i": 179, "name": "S3#25 Stan: skip reply + 'But wait, there's more!' (1/6)", "issue": 6962, "done": 6967, "rta": 602.295, "room": 59, "skipped": false}
+{"i": 180, "name": "S3#26 Stan: refuse extra 2: anti-lock anchor", "issue": 6968, "done": 6972, "rta": 602.711, "room": 59, "skipped": false}
+{"i": 181, "name": "S3#27 Stan: skip reply + 'But wait, there's more!' (2/6)", "issue": 6973, "done": 6978, "rta": 603.211, "room": 59, "skipped": false}
+{"i": 182, "name": "S3#28 Stan: refuse extra 3: rack-and-pinion rudder", "issue": 6979, "done": 6983, "rta": 603.628, "room": 59, "skipped": false}
+{"i": 183, "name": "S3#29 Stan: skip reply + 'But wait, there's more!' (3/6)", "issue": 6984, "done": 6990, "rta": 604.211, "room": 59, "skipped": false}
+{"i": 184, "name": "S3#30 Stan: refuse extra 4: velour sail covers", "issue": 6991, "done": 6995, "rta": 604.628, "room": 59, "skipped": false}
+{"i": 185, "name": "S3#31 Stan: skip reply + 'But wait, there's more!' (4/6)", "issue": 6996, "done": 7002, "rta": 605.211, "room": 59, "skipped": false}
+{"i": 186, "name": "S3#32 Stan: refuse extra 5: tack-o-meter", "issue": 7003, "done": 7007, "rta": 605.628, "room": 59, "skipped": false}
+{"i": 187, "name": "S3#33 Stan: skip reply + 'But wait, there's more!' (5/6)", "issue": 7008, "done": 7013, "rta": 606.128, "room": 59, "skipped": false}
+{"i": 188, "name": "S3#34 Stan: refuse extra 6: burgundy-cask elevator", "issue": 7014, "done": 7018, "rta": 606.545, "room": 59, "skipped": false}
+{"i": 189, "name": "S3#35 Stan: skip reply + 'But wait, there's more!' (6/6)", "issue": 7019, "done": 7024, "rta": 607.045, "room": 59, "skipped": false}
+{"i": 190, "name": "S3#36 Stan: 'Enough about extras, already.'", "issue": 7025, "done": 7029, "rta": 607.462, "room": 59, "skipped": false}
+{"i": 191, "name": "S3#37 Stan: skip 'Okay, where were we'", "issue": 7030, "done": 7031, "rta": 607.628, "room": 59, "skipped": false}
+{"i": 192, "name": "S3#38 Stan: 'I'd like to make you an offer.'", "issue": 7032, "done": 7036, "rta": 608.045, "room": 59, "skipped": false}
+{"i": 193, "name": "S3#39 Stan: skip 'Great! / How much?'", "issue": 7037, "done": 7040, "rta": 608.378, "room": 59, "skipped": false}
+{"i": 194, "name": "S3#40 Stan: offer 5000 (accepted at Var[202] = 4750)", "issue": 7041, "done": 7045, "rta": 608.795, "room": 59, "skipped": false}
+{"i": 195, "name": "S3#41 Stan: skip 'Five thousand pieces of eight?!?'", "issue": 7046, "done": 7047, "rta": 608.962, "room": 59, "skipped": false}
+{"i": 196, "name": "S3#42 Stan: Esc the closing (ship bought, compass)", "issue": 7048, "done": 7048, "rta": 609.045, "room": 59, "skipped": false}
+{"i": 197, "name": "S3#43 Stan's: path back to the map", "issue": 7135, "done": 7148, "rta": 617.379, "room": 85, "skipped": false}
+{"i": 198, "name": "S3#44 Map: Sword Master's", "issue": 7150, "done": 7237, "rta": 624.795, "room": 61, "skipped": false}
+{"i": 199, "name": "S3#45 Give LeChuck's note 907 to the Sword Master", "issue": 7327, "done": 7388, "rta": 637.379, "room": 44, "skipped": false}
+{"i": 200, "name": "S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.'", "issue": 7389, "done": 7435, "rta": 641.296, "room": 61, "skipped": false}
+{"i": 201, "name": "S3#47 Leave the clearing (triggers 'Meanwhile')", "issue": 7560, "done": 7594, "rta": 654.546, "room": 0, "skipped": false}
+{"i": 202, "name": "S3#48 Esc 'Meanwhile...'", "issue": 7595, "done": 7595, "rta": 654.63, "room": 85, "skipped": false}
+{"i": 203, "name": "S3#49 Map: shore (Hook Isle)", "issue": 7596, "done": 7703, "rta": 663.63, "room": 48, "skipped": false}
+{"i": 204, "name": "S3#50 Use cable with rubber chicken (zip to the house)", "issue": 7707, "done": 7813, "rta": 672.797, "room": 48, "skipped": false}
+{"i": 205, "name": "S3#51 Climb down pole 600 (empty spot below the pole top)", "issue": 7822, "done": 7847, "rta": 675.63, "room": 48, "skipped": false}
+{"i": 206, "name": "S3#52 Open the door of Meathook's house", "issue": 7850, "done": 7925, "rta": 682.131, "room": 48, "skipped": false}
+{"i": 207, "name": "S3#53 Enter Meathook's house", "issue": 7926, "done": 7927, "rta": 682.297, "room": 37, "skipped": false}
+{"i": 208, "name": "S3#54 Esc Meathook's 'Hey! I don't like visitors!'", "issue": 7951, "done": 7951, "rta": 684.297, "room": 37, "skipped": false}
+{"i": 209, "name": "S3#55 Meathook: 'The Governor's been KIDNAPPED!'", "issue": 7952, "done": 7956, "rta": 684.714, "room": 37, "skipped": false}
+{"i": 210, "name": "S3#56 Esc 'That's preposterous! ... This is horrible!'", "issue": 7957, "done": 7961, "rta": 685.131, "room": 37, "skipped": false}
+{"i": 211, "name": "S3#57 Meathook: 'We could get a crew together and sail off after them.'", "issue": 7962, "done": 7966, "rta": 685.547, "room": 37, "skipped": false}
+{"i": 212, "name": "S3#58 Esc 'Now, if only we had a captain...', skip 'Walk this way.'", "issue": 7967, "done": 7969, "rta": 685.797, "room": 37, "skipped": false}
+{"i": 213, "name": "S3#59 Esc Meathook's beast demonstration", "issue": 7970, "done": 7970, "rta": 685.881, "room": 37, "skipped": false}
+{"i": 214, "name": "S3#60 Open the little door (the beast)", "issue": 7992, "done": 8005, "rta": 688.798, "room": 37, "skipped": false}
+{"i": 215, "name": "S3#61 Esc the 'AAAAAAIIIIIEEEEE!!!' close-up", "issue": 8006, "done": 8006, "rta": 688.881, "room": 37, "skipped": false}
+{"i": 216, "name": "S3#62 Tap the murderous winged devil", "issue": 8008, "done": 8009, "rta": 689.131, "room": 37, "skipped": false}
+{"i": 217, "name": "S3#63 Skip Meathook's 'I don't believe it.'", "issue": 8049, "done": 8050, "rta": 692.548, "room": 37, "skipped": false}
+{"i": 218, "name": "S3#64 Esc 'I don't believe it... You are a brave man' (Meathook joins)", "issue": 8051, "done": 8051, "rta": 692.631, "room": 48, "skipped": false}
+{"i": 219, "name": "S3#65 Use cable with rubber chicken (zip back)", "issue": 8054, "done": 8206, "rta": 705.548, "room": 48, "skipped": false}
+{"i": 220, "name": "S3#66 Skip 'Wow!  It works both ways. / That's some chicken.'", "issue": 8212, "done": 8214, "rta": 706.215, "room": 48, "skipped": false}
+{"i": 221, "name": "S3#67 Climb down pole 601", "issue": 8215, "done": 8240, "rta": 708.381, "room": 48, "skipped": false}
+{"i": 222, "name": "S3#68 Hook Isle: path back to the map", "issue": 8242, "done": 8276, "rta": 711.382, "room": 85, "skipped": false}
+{"i": 223, "name": "S3#69 Map: village (to the dock, no cutscene now)", "issue": 8278, "done": 8398, "rta": 721.549, "room": 33, "skipped": false}
+{"i": 224, "name": "S3#70 Open the SCUMM Bar door (only if closed)", "issue": 8398, "done": 8398, "rta": 721.549, "room": 33, "skipped": true}
+{"i": 225, "name": "S3#71 Enter the SCUMM Bar", "issue": 8532, "done": 8548, "rta": 734.049, "room": 28, "skipped": false}
+{"i": 226, "name": "S3#72 Pick up mug 364", "issue": 8550, "done": 8580, "rta": 736.716, "room": 28, "skipped": false}
+{"i": 227, "name": "S3#73 Pick up mug 365", "issue": 8600, "done": 8611, "rta": 739.299, "room": 28, "skipped": false}
+{"i": 228, "name": "S3#74 Pick up mug 366", "issue": 8613, "done": 8640, "rta": 741.716, "room": 28, "skipped": false}
+{"i": 229, "name": "S3#75 Open the kitchen door (only if closed)", "issue": 8640, "done": 8640, "rta": 741.716, "room": 28, "skipped": true}
+{"i": 230, "name": "S3#76 Enter the kitchen", "issue": 8641, "done": 8659, "rta": 743.299, "room": 41, "skipped": false}
+{"i": 231, "name": "S3#77 Use barrel with mug 364 (fill with grog)", "issue": 8662, "done": 8687, "rta": 745.633, "room": 41, "skipped": false}
+{"i": 232, "name": "S3#78 Kitchen: back to the bar", "issue": 8688, "done": 8695, "rta": 746.299, "room": 28, "skipped": false}
+{"i": 233, "name": "S3#79 Leave the SCUMM Bar", "issue": 8763, "done": 8767, "rta": 752.3, "room": 33, "skipped": false}
+{"i": 234, "name": "S3#80 Dock: archway to Low Street", "issue": 8796, "done": 8818, "rta": 756.55, "room": 35, "skipped": false}
+{"i": 235, "name": "S3#81 Low Street: archway to High Street", "issue": 8846, "done": 8943, "rta": 766.967, "room": 34, "skipped": false}
+{"i": 236, "name": "S3#82 Grog transfer 1: use mug 364 with mug 365", "issue": 8946, "done": 8947, "rta": 767.3, "room": 34, "skipped": false}
+{"i": 237, "name": "S3#83 High Street: into the jail", "issue": 8990, "done": 9022, "rta": 773.55, "room": 31, "skipped": false}
+{"i": 238, "name": "S3#84 Talk to the prisoner", "issue": 9024, "done": 9059, "rta": 776.634, "room": 31, "skipped": false}
+{"i": 239, "name": "S3#85 Otis: 'The Governor's been kidnapped!'", "issue": 9060, "done": 9064, "rta": 777.05, "room": 31, "skipped": false}
+{"i": 240, "name": "S3#86 Esc 'What? ... Here, look at this note.'", "issue": 9065, "done": 9065, "rta": 777.134, "room": 31, "skipped": false}
+{"i": 241, "name": "S3#87 Otis: 'If I let you out, would you join my crew?'", "issue": 9066, "done": 9070, "rta": 777.55, "room": 31, "skipped": false}
+{"i": 242, "name": "S3#88 Skip 'Sure! Of course! ... Until then, I pace.'", "issue": 9071, "done": 9076, "rta": 778.05, "room": 31, "skipped": false}
+{"i": 243, "name": "S3#89 Jail: out to High Street", "issue": 9077, "done": 9105, "rta": 780.467, "room": 34, "skipped": false}
+{"i": 244, "name": "S3#90 Open the store door (only if closed)", "issue": 9105, "done": 9105, "rta": 780.467, "room": 34, "skipped": true}
+{"i": 245, "name": "S3#91 Enter the store", "issue": 9106, "done": 9160, "rta": 785.051, "room": 30, "skipped": false}
+{"i": 246, "name": "S3#92 Walk toward the pillows (right of the counter)", "issue": 9161, "done": 9162, "rta": 785.217, "room": 30, "skipped": false}
+{"i": 247, "name": "S3#93 ITEM SLIDE: read the compass while walking past x=250", "issue": 9169, "done": 9188, "rta": 787.384, "room": 30, "skipped": false}
+{"i": 248, "name": "S3#94 End the reading (slide = 2)", "issue": 9189, "done": 9189, "rta": 787.467, "room": 30, "skipped": false}
+{"i": 249, "name": "S3#95 Leave the store (slide held)", "issue": 9190, "done": 9211, "rta": 789.301, "room": 34, "skipped": false}
+{"i": 250, "name": "S3#96 Grog transfer 2: use mug 365 with mug 366", "issue": 9214, "done": 9215, "rta": 789.634, "room": 34, "skipped": false}
+{"i": 251, "name": "S3#97 High Street: into the jail (slide held)", "issue": 9243, "done": 9275, "rta": 794.634, "room": 31, "skipped": false}
+{"i": 252, "name": "S3#98 Use mug o' grog with the lock (Otis's cutscene starts)", "issue": 9278, "done": 9304, "rta": 797.051, "room": 31, "skipped": false}
+{"i": 253, "name": "S3#99 Look at the map (restores hotspots inside Otis's cutscene)", "issue": 9309, "done": 9310, "rta": 797.551, "room": 63, "skipped": false}
+{"i": 254, "name": "S3#100 Close the map page", "issue": 9311, "done": 9311, "rta": 797.634, "room": 31, "skipped": false}
+{"i": 255, "name": "S3#101 [stall J, optional] Jail: start walking to doorway 400", "issue": 9312, "done": 9313, "rta": 797.801, "room": 31, "skipped": false}
+{"i": 256, "name": "S3#102 [stall J, optional] read the compass while walking (freezes global 70)", "issue": 9316, "done": 9317, "rta": 798.134, "room": 31, "skipped": false}
+{"i": 257, "name": "S3#103 [stall J, optional] Esc the reading at the doorway", "issue": 9340, "done": 9340, "rta": 800.051, "room": 31, "skipped": false}
+{"i": 258, "name": "S3#104 Leave the jail while Otis's cutscene runs", "issue": 9341, "done": 9342, "rta": 800.218, "room": 34, "skipped": false}
+{"i": 259, "name": "S3#105 [stall H, optional] High Street: start walking to archway 433", "issue": 9395, "done": 9395, "rta": 804.635, "room": 34, "skipped": false}
+{"i": 260, "name": "S3#106 [stall H, optional] read the compass while walking (freezes global 70)", "issue": 9397, "done": 9398, "rta": 804.885, "room": 34, "skipped": false}
+{"i": 261, "name": "S3#107 [stall H, optional] Esc the reading at the archway", "issue": 9420, "done": 9420, "rta": 806.718, "room": 34, "skipped": false}
+{"i": 262, "name": "S3#108 High Street: archway to Low Street", "issue": 9421, "done": 9422, "rta": 806.885, "room": 35, "skipped": false}
+{"i": 263, "name": "S3#109 [stall L, optional] Low Street: start walking to archway 450", "issue": 9507, "done": 9507, "rta": 813.968, "room": 35, "skipped": false}
+{"i": 264, "name": "S3#110 [stall L, optional] read the compass while walking (freezes global 70)", "issue": 9509, "done": 9510, "rta": 814.218, "room": 35, "skipped": false}
+{"i": 265, "name": "S3#111 [stall L, optional] Esc the reading at the archway", "issue": 9527, "done": 9527, "rta": 815.635, "room": 35, "skipped": false}

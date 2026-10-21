@@ -1,0 +1,33 @@
+273 S3#119 Esc Stan's farewell cutscene                  rta   817.97s hint             0s 
+277 S3#123 Esc the crew banter (end of Part I, Part II s rta   858.55s hint             1s 
+278 S4#1 Esc the Part II card                            rta   858.63s hint             0s 
+280 S4#3 Skip '--sigh--'                                 rta   860.13s hint             0s 
+281 S4#4 Leave the captain's cabin (first visit)         rta   860.55s hint             1s 
+282 S4#5 Deck to crew quarters (hatch)                   rta   861.55s hint             1s 
+283 S4#6 Crew quarters to galley (door)                  rta   862.30s hint             0s 
+284 S4#7 Open cupboard (first reach: wait for the carrie rta   863.38s hint             0s 
+285 S4#8 Pick up cereal                                  rta   864.47s hint             0s 
+286 S4#9 Galley to crew quarters (ladder)                rta   865.13s hint             0s 
+287 S4#10 Crew quarters to deck (ladder)                 rta   866.05s hint             1s 
+288 S4#11 Deck to crow's nest (rope ladder)              rta   868.05s hint             0s 
+289 S4#12 Pick up the Jolly Roger                        rta   868.88s hint             0s 
+290 S4#13 Crow's nest to deck (jump)                     rta   869.80s hint             0s 
+291 S4#14 Deck to captain's cabin (door)                 rta   871.47s hint             0s 
+292 S4#15 Open the cereal (inventory) on entering the ca rta   871.72s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 211825 bound None
+295 S4#18 Use the prize with the cabinet                 rta   878.05s search          16s ['auto: wait until idle', 'auto: use small key with cabinet']
+296 S4#19 Open the heavy chest (carry it, then open it)  rta   881.22s hint             0s 
+297 S4#20 Look at the chest (recipe and cinnamon)        rta   881.88s hint             0s 
+298 S4#21 Skip 'Hey look! A piece of paper.'             rta   882.47s hint             0s 
+299 S4#22 Pick up the feather pen (unlocks the ink; late rta   883.38s hint             0s 
+300 S4#23 Pick up the ink                                rta   884.30s hint             0s 
+301 S4#24 Open the drawer (dusty-book route)             rta   885.38s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best 213785 bound None
+304 S4#27 Skip the dusty-book lines                      rta   886.22s search          20s ['auto: verb 8 drawer']
+305 S4#28 Leave the captain's cabin                      rta   887.63s hint             0s 
+306 S4#29 Deck to crew quarters (hatch), second time     rta   888.63s hint             2s 
+307 S4#30 Crew quarters to hull (hatch)                  rta   890.55s hint             0s 
+308 S4#31 Take gunpowder (for the pot)                   rta   893.30s hint             0s 
+309 S4#32 Pick up the giant piece of rope (moved from hu rta   895.05s hint             0s 
+310 S4#33 Open the hull chest                            rta   896.63s hint             0s 

@@ -1,0 +1,7 @@
+    search: expanded 1 tried 2 frontier 0 best None bound None
+448  hint failed: S6#25 Scroll the inventory down one row (necklace into view): a click move needs obj or point (and with 1..12 frames of 
+448 S6#26 Put the necklace on standing at (46,85) in walk box 8 : NOT REACHED target [{'bit': 357, 'eq': 1}]
+  hint failed: S6#25 Scroll the inventory down one row (necklace into view): a click move needs obj or point (and with 1..12 frames of 
+  x auto: wait until idle: no control within 900 frames (frame 14751, room 70)
+  + auto: Esc -> qf 284583 room 86
+END frame 13851 room 86

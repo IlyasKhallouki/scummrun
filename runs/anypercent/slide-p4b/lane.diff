@@ -1,0 +1,278 @@
+diff -ruN -x __pycache__ /home/ilyask/projects/fast-mi/routes/anypercent/S7-part4.json /home/ilyask/projects/fast-mi-sandboxes/part4/routes/anypercent/S7-part4.json
+--- /home/ilyask/projects/fast-mi/routes/anypercent/S7-part4.json	2026-10-20 10:53:56.991344228 +0000
++++ /home/ilyask/projects/fast-mi-sandboxes/part4/routes/anypercent/S7-part4.json	2026-10-20 12:20:37.445737294 +0000
+@@ -288,11 +288,34 @@
+       "note": "The animation cannot be skipped (no override). The executor's gate waits for UserputOn. 'Cool!' does not block. Ego walks from (128,121) to (345,121) again."
+     },
+     {
+-      "name": "Low Street: archway up to High Street (avoid the spectre)",
++      "name": "Low Street: start walking toward the spectre's walk point (299,128) on the first input frame",
+       "room": 35,
+       "verb": null,
+-      "obj": 451,
++      "obj": null,
+       "obj2": null,
++      "point": [
++        299,
++        128
++      ],
++      "key": null,
++      "choose": null,
++      "after": [
++        {
++          "room": 35
++        }
++      ],
++      "until": [],
++      "kind": "walk",
++      "glitch": null,
++      "cite": "room-035-low-stree/boxes (tools/boxes.py 35): ego enters on box 21 at (437,108); boxes 21 -> 7 -> 6 reach (299,128) without x<299; local-212.txt [0001]-[001F] (the encounter needs x<299 and y>120)",
++      "note": "One floor click while the next move's three inputs ('u', the root beer, the spectre) are still to come: the walk runs during the 'u' and inventory frames (neither stops it: global/script-004.txt [0304]-[035B] only builds the sentence), and the spectre click re-targets it to 440's walk point. Measured from the S6#65 cut: script 213 starts 2 frames sooner than with the sentence alone (frame 15440 against 15442). A floor click in the 'u' frame is lost (a key overwrites _mouseAndKeyboardStat: engines/scumm/input.cpp processKeyboard), and per-frame re-clicks toward (299,128) or box 7's corner gain nothing (measured)."
++    },
++    {
++      "name": "Low Street: use the root beer (823) with the spectre (440): script 213 at once, no invitation dialogue",
++      "room": 35,
++      "verb": 7,
++      "obj": 823,
++      "obj2": 440,
+       "point": null,
+       "key": null,
+       "choose": null,
+@@ -303,13 +326,41 @@
+       ],
+       "until": [
+         {
++          "bit": 455,
++          "eq": 1
++        }
++      ],
++      "kind": "verb",
++      "glitch": null,
++      "cite": "room-035-low-stree/entry.txt [00A4] setClass(440,[32]) (bit 7 clear = class 32 'untouchable' OFF while the spectre stands: engines/scumm/script_v5.cpp o5_setClass, putClass(obj, cls, cls & 0x80)); room-075-gh-hull/obj-0823-voodoo-root.txt [00E7]-[00F1] (Use 823 with 440 -> doSentence(7,440,823)); room-035-low-stree/obj-0440-grim-spectre.txt [0013]-[001A] (Use with 823 -> startScript(213)); local-213.txt [0000]-[0004] (stopScript(212), Bit[455]=1), [001D]-[00F8] (~58 frames of animation without override, then 4 text segments); global/script-002.txt [0203]-[02E0] (823 is owned, 440 is in the room: walk to 440's walk point (299,128), where x is not < 299, so local 212 never fires)",
++      "note": "Replaces the old 'avoid the spectre' walk, which cannot avoid it: from box 6 the only way to box 4 is box 5 (x 48-299, y 124-141), all inside local 212's x<299 and y>120 trigger (tools/boxes.py 35), so slide-int1 met the spectre at (293,125) on frame 15445 and its scene clicks answered 'other pants', then 'Try not to take this root beer too personally' (local-211.txt [0359]-[0500] -> [0A34] startScript(213)): 213 ran anyway, after 35 frames of invitation dialogue. Using the root beer directly skips 211 and its 'Bye, now' / 'Not so fast' walks. Measured from the S6#65 cut: High Street entered on frame 15566 (slide-int1: 15615). The 'u' key cannot be pressed on the dock: entering a room runs global 6 -> script 11 (Var[107] = Walk to) (global/script-006.txt [005A]). 'Use 440' alone would need class 129-132 on 440 for the 'with'; the order 823 then 440 is the one that works."
++    },
++    {
++      "name": "Low Street: archway up to High Street (re-clicked walk)",
++      "room": 35,
++      "verb": null,
++      "obj": 451,
++      "obj2": null,
++      "point": null,
++      "key": null,
++      "choose": null,
++      "after": [
++        {
++          "bit": 455,
++          "eq": 1
++        }
++      ],
++      "until": [
++        {
+           "room": 34
+         }
+       ],
+       "kind": "walk",
+       "glitch": null,
+       "cite": "room-035-low-stree/entry.txt [007C]-[00BA] (Bit[453]: pirates, citizen and rat made untouchable, spectre actor 9 at (240,128), local 212 started); local-212.txt [0000]-[0022] (each frame: ego x<299 and y>120 -> doSentence(STOP), startScript(211) = the spectre's invitation dialogue); obj-0451-archway.txt [000C]-[001F] (cutscene, local 205, loadRoomWithEgo(433,34,750,128)); local-205.txt [0000]-[0063] (climb: one frame per pixel from ego y to 72, then a walk to (155,72)); obj-0450-archway.txt [000C]-[003B] (back towards the dock: 'The church is in the other direction!')",
+-      "note": "Ego starts at 450's walk point (437,107) (loadRoomWithEgo with x=-1: engines/scumm/script_v5.cpp:1857-1897). Keep y<=120 whenever x<299; that is the record's 'no need to fight that ghost'. The way is up and left, so a new target every frame gains (shmoovement, anypercent-engine-mechanics.md §2.5); 451 faces north (actordir 3), so a final up leg avoids the turn (§2.7). 451 (x 144-175) is off screen at arrival; the executor's approach clicks toward (160,88), which is safe. Never use the root beer on the spectre (room-035-low-stree/local-213.txt: ~70 frames + 'This stuff's great!'); the guide's 'Use shortcut' is this archway."
++      "note": "Ego starts at 440's walk point (299,128) once 213's last text segment ends and UserputOn returns (first click the frame after). The way is up and left, so a walk restarted every frame gains ground (a fresh walk rounds each step away from zero: anypercent-engine-mechanics.md §2.5). reclick: true plays the executor's greedy re-clicks; reclick_sweep: true also tries a floor click every frame, alternating between two points ahead of ego (a new target each frame, so no restart is ignored), with the archway click on the frame that finishes first (executor._reclick_sweep), and keeps the faster. Measured from the S6#65 cut, first click to High Street: 67 frames with one click, 63 greedy, 60 sweep (points 16 and 40 px ahead won; six other pairs gave 63-67). 451's climb (local-205.txt) starts at ego's y, which is always the walk point's 88 (17 frames), then a scale-18 walk to (155,72) (8 frames); neither can be shortened.",
++      "reclick": true,
++      "reclick_sweep": true
+     },
+     {
+       "name": "High Street: open the church door (door closed: the default)",
+@@ -338,7 +389,10 @@
+       "kind": "verb",
+       "glitch": null,
+       "cite": "room-034-high-stre/obj-0438-door.txt [0018] (Open -> global 25), [002A]-[0043] (verb 90: Var[182]=2 while closed, 3 while open); global/script-023.txt [00F9]-[0186] (runs every frame, [0198]-[0199]; when the hovered object changes it runs that object's verb 90 and keeps Var[182]); global/script-004.txt [0000]-[001B] (a right click, Local[2]==2, takes Var[182] as the verb); global/script-025.txt [000A]-[003C] (438 is not class 6 'locked': setState(438,1), sound 2); global/script-002.txt [032A]-[0397] (438 has class 15 = 143: a 20-jiffy reach cutscene before the Open runs)",
+-      "note": "Executable form: 'o' then a click on 438 (two input frames). FASTER INPUT, needs executor support: one right click on 438 does the same in one frame. In that frame processInput moves the mouse and sets the right button, script 23 (runAllScripts) sees the hover change and sets Var[182]=2, then checkExecVerbs runs script 4 with the right button and Var[107]=2 (engines/scumm/scumm.cpp:3177, 3231-3232). A key and a click cannot share a frame (one _mouseAndKeyboardStat per frame), so 'o' + click is always two. The bridge accepts {\"rclick\": [x, y]} (patches/0001-scumm-add-speedrun-bridge.patch, input 'rclick'), but neither this move format nor src/speedrun/executor.py _click can emit it (open_questions). Never right-click 438 after it is open (Var[182]=3 = Close once the hover is recomputed); the next move enters with a left click (Walk to). 438 starts closed (out/objects.json state 0); only the player or Part I's wandering pirates change it (see glitches, rng_points). Door-open variant: drop this move (the format has no skip). Ego arrives at 433's walk point (767,130) heading for (750,128) (room-035-low-stree/obj-0451-archway.txt [001F]); the door (x 528-559) is off screen until the camera follows ego left (room-034-high-stre/entry.txt [0061] RoomScroll(528,1121)). Ego walk speed here is (16,8) (entry.txt [000B])."
++      "note": "Played as one right click on 438 (rclick: true): a right click takes the door's default verb Var[182]=2 (Open), set by its verb 90 entry from the hover script (global/script-023.txt [00F9]-[0186], global/script-004.txt [0000]-[001B]), so no 'o' key frame. The walk is up and left: reclick: true re-clicks it (the own re-click is the right click; a repeated click on the same target is ignored, engines/scumm/actor.cpp startWalkActor, so floor clicks go in between) and reclick_sweep: true tries per-frame alternating floor clicks with the right click on the best frame (executor._reclick_sweep). Measured from the S6#65 cut, room entry to state(438)=1: 54 frames with 'o' + click (slide-int1), 54 with rclick alone, 53 greedy, 52 sweep. Never right-click 438 after it is open (Var[182]=3 = Close); the next move enters with a left click (Walk to). 438 starts closed (out/objects.json state 0); only the player or Part I's wandering pirates change it (see glitches, rng_points). Ego arrives at 433's walk point (767,130) heading for (750,128) (room-035-low-stree/obj-0451-archway.txt [001F]). Ego walk speed here is (16,8) at box scale 75 (entry.txt [000B]): 4.69 px a frame, 5 with a fresh walk.",
++      "rclick": true,
++      "reclick": true,
++      "reclick_sweep": true
+     },
+     {
+       "name": "High Street: enter the church",
+@@ -1372,7 +1426,7 @@
+     },
+     {
+       "name": "Shmoovement on the up-left walks (Low Street to 451, High Street to 438)",
+-      "saves": "not measured; fractions of a second per walk (largest in perspective-scaled rooms)",
++      "saves": "measured from the S6#65 cut: 7 frames on the Low Street archway walk, 2 on the High Street door walk (executor reclick + reclick_sweep, against one click)",
+       "mechanism": "Every new walk target resets the step fractions, and moving left or up rounds each step away from zero (anypercent-engine-mechanics.md §2.5); diagonal targets beat the x clamp (§2.4).",
+       "inputs": "A new floor or object target every frame while both axes move left or up; end on the door/archway click.",
+       "risk": "Room 35: a target that pulls ego below y 120 left of x 299 triggers the spectre (room-035-low-stree/local-212.txt [0001]-[001F]). Walking right (the dock) gets slower with re-clicks.",
+@@ -1390,13 +1444,13 @@
+   "open_questions": [
+     "RULES DECISION, affects the whole run: the 'Last Part' card waits for all of CD track 6. The official disc's track 6 is 129.8 s (redump Track 06.bin, 22896720 bytes, no pregap; equal to game/dos-cd/track6.flac), and the user confirms the audio is on the disc, so under rules/anypercent.md ('playing': false is invalid) the CD-audio requirement alone costs ~124 s here against the record. The record's card lasted ~4 s at most (record_comparison), so its setup had no track 6 or a short one. Does the board treat a CD version without its audio tracks as 'No Music'? The same answer applies to every other script wait on a CD-track sound (type 2). S6's crate fanfare, sound 53, is not one: it is a sampled SOU/SBL resource. Also confirm the 7794-tick measurement in a Part IV run.",
+     "Church door 438: this file assumes it closed. If a Part I route ever leaves it open (pirate four-frame window), a separate door-open variant (no Open move, entry flag state 438 eq 1) is needed, or executor support for conditional moves (e.g. an only_if field checked at the move). Can a Part I room-34 exit be timed into the window at no cost?",
+-    "Low Street: does the path from (437,107) to 451 (160,88) stay out of x<299 with y>120 (local 212)? If not, add a waypoint.",
++    "Low Street (answered, measured): the path from (437,107) to 451 cannot avoid local 212 (box 5 is the only link from box 6 to box 4, all of it x<299, y>120). The route now uses the root beer on the spectre (440 is touchable while it stands) and starts 213 at frame 15440 from the S6#65 cut.",
+     "The Esc moves whose after-condition can precede the override by a frame because of script slot order (the [1490] Esc in particular): confirm the first effective frame in the engine. The others use markers set in the override frame (var 277, VAR_HAVE_MSG, actor 10 room, Bit[468], 'not has 823', state(733) for Stan's greeting, LeChuck in room 59 with var 25 == 3 and Stan at x 270 for the sales pitch).",
+     "VAR_TALK_ACTOR (var 25) values used as markers: 255 between lines, 1 ego, 9 LeChuck, 3 Stan, 10 Elaine. Confirm on CD (engines/scumm/actor.cpp stopTalk/actorTalk).",
+     "Room 59 click: does findObject resolve room (232-239, 56-95) to 734 and never to door 701 or sign 731 (object order)? The executor's hit test answers it.",
+     "Room 83: the walkbox extent toward 905's walk point (345,121), beyond the 320-px screen; measure both dock walks.",
+     "Whether the bridge clock counts room 83's 18-qf dissolve fade-in (room-083-cu-dock/entry.txt [0009]) and the other room changes of the ending (anypercent-engine-mechanics.md §1.3).",
+-    "Executor support: (a) right-click Open of 438 (one 'rclick' event; the bridge has it, the move format and executor._click do not), 1 frame; (b) conditional moves (door-open variant); (c) the key-move convention of one '.' per new text segment until the until-conditions hold (executor.play currently schedules one key per move); (d) the two final-menu moves carry both 'choose' and a 'point' (y 175 / 185) in room 89 with SetScreen(0,200): the executor's choose path sends a digit wherever the mouse is, and its point clicks stop at y 143, so it needs a click at that point instead.",
++    "Executor support: (a) right-click Open of 438: done (move field rclick, also inside re-clicked walks); (b) conditional moves (door-open variant); (c) the key-move convention of one '.' per new text segment until the until-conditions hold (executor.play currently schedules one key per move); (d) the two final-menu moves carry both 'choose' and a 'point' (y 175 / 185) in room 89 with SetScreen(0,200): the executor's choose path sends a digit wherever the mouse is, and its point clicks stop at y 143, so it needs a click at that point instead.",
+     "Dock: confirm in the engine that the three '.' presses during the first walk end script 131 before local 204 starts, and measure both dock walks (the 265-px walk is the basis of the record's ~4 s card bound).",
+     "Record video: the card length (runner-sources §2.1 says at least 6 s; the dock arithmetic says at most ~4 s), and which overrides the runner skipped between 20:12 and 20:51 ([1300], [1490], map, Stan's two), to pin the expected gain."
+   ]
+diff -ruN -x __pycache__ /home/ilyask/projects/fast-mi/src/speedrun/executor.py /home/ilyask/projects/fast-mi-sandboxes/part4/src/speedrun/executor.py
+--- /home/ilyask/projects/fast-mi/src/speedrun/executor.py	2026-10-20 10:53:57.014681746 +0000
++++ /home/ilyask/projects/fast-mi-sandboxes/part4/src/speedrun/executor.py	2026-10-20 11:47:33.832740655 +0000
+@@ -118,8 +118,13 @@
+     approach: str | None = None
+     # A Walk-to walk that re-clicks where a restarted walk gains ground (_reclick_walk): True plays
+     # it until `until` holds, a C3 list until that list holds (the walk's real end, such as the next
+-    # room, when `until` only marks the walk as started).
++    # room, when `until` only marks the walk as started). With rclick, the re-clicks are right clicks:
++    # each restarts the object's default-verb sentence and its walk (the church door's Open).
+     reclick: bool | list | None = None
++    # With reclick: also try a sweep (_reclick_sweep): a floor click every frame, alternating between
++    # two points ahead of ego so that every frame starts a fresh walk, then the own click on the frame
++    # that reaches the goal first. Kept only when it beats the greedy re-clicks.
++    reclick_sweep: bool = False
+ 
+ 
+ @dataclass
+@@ -313,7 +318,8 @@
+             else:
+                 self.wait_gate(move.max_frames)
+             issue = self._click(move)
+-            if move.reclick and self._fork is not None and move.obj is not None and move.verb in (None, self.p.walk_to):
++            if move.reclick and self._fork is not None and move.obj is not None and (
++                    move.verb in (None, self.p.walk_to) or move.rclick):
+                 self._run(frame=issue)
+                 self._reclick_walk(move, move.until if move.reclick is True else move.reclick)
+         if move.reclick and move.until and self.b.holds(move.until):
+@@ -485,6 +491,10 @@
+                 pass
+             finally:
+                 trial.b.quit()
++        if move.reclick_sweep:
++            sweep = self._reclick_sweep(move, goal, best[0] if best is not None else None)
++            if sweep is not None and (best is None or sweep[0] < best[0]):
++                best = sweep
+         if best is None:
+             raise RouteError(f"{move.name}: re-clicked walk did not reach {goal}")
+         if best[1]:
+@@ -493,6 +503,69 @@
+         if st["stop"] != "until":
+             raise RouteError(f"{move.name}: re-clicked walk replayed off its trial (frame {st['frame']})")
+ 
++    # (ahead, side) px of the two floor points a sweep alternates between, per variant tried.
++    SWEEP_PAIRS = (((40, 0), (40, 8)), ((40, 0), (40, -8)), ((16, 0), (40, 0)))
++
++    def _reclick_sweep(self, move: Move, goal: list[dict], bound: int | None) -> tuple[int, list[dict]] | None:
++        """The greedy re-click (_reclick_greedy) judges each frame by the finish frame with no
++        further input, so it cannot see a gain that only adds up over many restarts: a fresh walk
++        gains at most a pixel's fraction a frame (moving left or up). Here a walker branch clicks the
++        floor every frame, alternating between two points ahead along ego's heading (a new target
++        each frame, so startWalkActor never ignores it and every step is a fresh one), and on every
++        frame a fork tries the move's own click instead and runs to ``goal``. Returns the best
++        (finish frame, events) over SWEEP_PAIRS, or None."""
++        end = self.b.frame + self.RECLICK_LIMIT
++        ck = "rclick" if move.rclick else "click"
++        best = None
++        for pair in self.SWEEP_PAIRS:
++            walker = Executor(self._fork(self.b), self.release, self._fork)
++            walker.skips = dict(self.skips)
++            try:
++                prev, i = None, 0
++                while not walker.b.holds(goal) and walker.b.frame < end:
++                    limit = min(x for x in (bound, best[0] if best else None, end) if x is not None)
++                    if walker.b.frame + 1 >= limit:
++                        break  # an own click from here cannot finish sooner
++                    st = walker.b.status
++                    state = walker.b.state()
++                    ego = next((a for a in state.get("actors", []) if a["id"] == 1), None)
++                    f = walker.b.frame + 1
++                    if ego is not None and st.get("up", 0) > 0 and st.get("cs", 1) == 0:
++                        pts = walker.object_points(move.obj, state)
++                        if pts:
++                            own = [{"frame": f, ck: list(pts[0])}]
++                            t = walker._finish_frame(own, None, f, goal, end)
++                            if t is not None and (best is None or t < best[0]):
++                                best = (t, list(walker.movie) + own)
++                        pt = walker._sweep_point(move, state, ego, prev, pair[i % 2])
++                        if pt is not None:
++                            walker._schedule([{"frame": f, "click": pt}])
++                        i += 1
++                    prev = (ego["x"], ego["y"]) if ego else None
++                    walker._run(frame=f)
++            except (RouteError, ControlError):
++                pass
++            finally:
++                walker.b.quit()
++        return best
++
++    def _sweep_point(self, move: Move, state: dict, ego: dict, prev: tuple[int, int] | None,
++                     offset: tuple[int, int]) -> list[int] | None:
++        """The floor point ``offset`` = (ahead, side) px from ego along its heading, on screen and
++        hitting no object or actor; None if it does not."""
++        ux, uy = self._heading(move, state, ego, prev)
++        if ux == uy == 0:
++            return None
++        xs = self._xstart()
++        lag = xs - self.b.status["xstart"]
++        k, side = offset
++        px = round(ego["x"] + ux * k - uy * side) - xs
++        py = round(ego["y"] + uy * k + ux * side)
++        if not (0 <= px < SCREEN_W and 0 <= py < self._main_h()):
++            return None
++        hit = self.b.at(px + lag, py)
++        return None if hit.get("obj") or hit.get("actor") else [px, py]
++
+     def _reclick_greedy(self, move: Move, goal: list[dict], ties: tuple[str, ...]) -> None:
+         """Each frame with input on and no cutscene, the candidates are: no input, the move's own
+         click (the object again), and floor clicks a little ahead of ego along its heading (then the
+@@ -517,15 +590,16 @@
+                 prev = (ego["x"], ego["y"]) if ego else None
+                 self._run(frame=f)
+                 continue
+-            cands = [("none", [], floor_last), ("own", [{"frame": f, "click": own}], False)]
++            ck = "rclick" if move.rclick else "click"  # an rclick move re-clicks its own default verb
++            cands = [("none", [], floor_last), ("own", [{"frame": f, ck: own}], False)]
+             for p in self._reclick_points(move, state, ego, prev):
+                 cands.append(("floor", [{"frame": f, "click": p}], True))
+             best = None  # (finish frame, tie rank, kind, events)
+             for kind, evs, follow in cands:
+-                t = self._finish_frame(evs, own if follow else None, f, goal, end)
++                t = self._finish_frame(evs, own if follow else None, f, goal, end, ck)
+                 if t is not None and (best is None or (t, ties.index(kind)) < best[:2]):
+                     best = (t, ties.index(kind), kind, evs)
+-            kind, evs = (best[2], best[3]) if best is not None else ("own", [{"frame": f, "click": own}])
++            kind, evs = (best[2], best[3]) if best is not None else ("own", [{"frame": f, ck: own}])
+             if evs:
+                 self._schedule(evs)
+             floor_last = kind == "floor" or (kind == "none" and floor_last)
+@@ -533,14 +607,14 @@
+             self._run(frame=f)
+ 
+     def _finish_frame(self, events: list[dict], follow: list[int] | None, f: int, goal: list[dict],
+-                      end: int) -> int | None:
++                      end: int, follow_kind: str = "click") -> int | None:
+         """On a fork: ``events``, then (if given) the click ``follow`` on the next frame; the frame
+         ``goal`` first holds, or None."""
+         trial = self._fork(self.b)
+         try:
+             evs = list(events)
+             if follow is not None:
+-                evs.append({"frame": f + 1, "click": follow})
++                evs.append({"frame": f + 1, follow_kind: follow})
+             trial.inputs(evs)
+             st = trial.run(until=goal, max_frame=end)
+             return st.get("frame") if st.get("stop") == "until" else None
+diff -ruN -x __pycache__ /home/ilyask/projects/fast-mi/src/speedrun/route.py /home/ilyask/projects/fast-mi-sandboxes/part4/src/speedrun/route.py
+--- /home/ilyask/projects/fast-mi/src/speedrun/route.py	2026-10-20 10:53:57.015111441 +0000
++++ /home/ilyask/projects/fast-mi-sandboxes/part4/src/speedrun/route.py	2026-10-20 11:47:33.833414280 +0000
+@@ -34,7 +34,7 @@
+ _DOC_FIELDS = {"room", "kind", "glitch", "cite", "note"}
+ _MOVE_FIELDS = {"name", "key", "verb", "obj", "obj2", "point", "choose", "after", "until", "max_frames",
+                 "obj_from_var", "skips", "delay", "choose_by", "press", "auto_skips", "optional", "gate", "approach_y",
+-                "rclick", "via", "approach", "reclick"}
++                "rclick", "via", "approach", "reclick", "reclick_sweep"}
+ 
+ 
+ class RouteFileError(Exception):

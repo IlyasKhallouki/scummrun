@@ -1,0 +1,35 @@
+{
+  "movie": "runs/anypercent/m2n/movie.jsonl",
+  "goal": [
+    {
+      "room": 0
+    },
+    {
+      "var": 293,
+      "eq": 161
+    }
+  ],
+  "seed": 836557856,
+  "talkspeed": "85",
+  "auto_skips": {
+    "stop": "until",
+    "frame": 14820,
+    "room": 0,
+    "qf": 303846,
+    "qf0": 1100,
+    "rta": 1261.483,
+    "card_s": 0.167,
+    "rta_without_card": 1261.316
+  },
+  "explicit": {
+    "stop": "until",
+    "frame": 14820,
+    "room": 0,
+    "qf": 303846,
+    "qf0": 1100,
+    "rta": 1261.483,
+    "card_s": 0.167,
+    "rta_without_card": 1261.316,
+    "movie": "runs/anypercent/m2n-verify/movie-explicit.jsonl"
+  }
+}

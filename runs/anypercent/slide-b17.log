@@ -1,0 +1,13 @@
+514 S7#27 Stan's: wake Guybrush (first input after the f rta  1459.80s hint             0s 
+515 S7#28 Stan's: use root beer with LeChuck (click LeCh rta  1464.05s hint             0s 
+516 S7#29 Ending: skip 'Gasp! --choke--' (first pass)    rta  1471.97s hint             0s 
+517 S7#30 Ending: skip 'Gasp! --choke--' (instant replay rta  1483.47s hint             0s 
+518 S7#31 Ending: skip Elaine's 'Hey...' exchange        rta  1501.30s hint             0s 
+519 S7#32 Fireworks: skip the small talk                 rta  1508.80s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound None
+522  hint failed: S7#33 Fireworks menu 1: 'Sure.' (mouse y 171-180): no dialogue menu within 1200 frames (and with 1..12 frames of delay)
+522 S7#35 Fireworks: skip the epilogue lines (Stan, Herman): NOT REACHED target [{'var': 293, 'eq': 161}]
+  hint failed: S7#33 Fireworks menu 1: 'Sure.' (mouse y 171-180): no dialogue menu within 1200 frames (and with 1..12 frames of delay)
+  x auto: say 'Sure.': auto: say 'Sure.': no dialogue menu within 900 frames
+  x auto: say "Actually, I'm a bit sick of root beer.": auto: say "Actually, I'm a bit sick of root beer.": no dialogue menu within 900 
+END frame 17789 room 89

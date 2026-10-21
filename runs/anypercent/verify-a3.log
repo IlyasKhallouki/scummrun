@@ -1,0 +1,2 @@
+auto skips: {'stop': 'until', 'frame': 17130, 'room': 0, 'qf': 350046, 'qf0': 1100, 'rta': 1453.989, 'card_s': 129.921, 'rta_without_card': 1324.068}
+explicit keys: {'stop': 'until', 'frame': 17130, 'room': 0, 'qf': 350046, 'qf0': 1100, 'rta': 1453.989, 'card_s': 129.921, 'rta_without_card': 1324.068, 'movie': 'runs/anypercent/verify-a3/movie-explicit.jsonl'}

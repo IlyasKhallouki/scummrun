@@ -1,0 +1,23 @@
+5021 S5g21 Meet the monkey (jungle room 21)               rta  1078.59s hint             0s 
+5022 S5g22 Feed the monkey all five bananas               rta  1096.84s hint             1s 
+5023 S5g23 Lead the monkey to the clearing (room 12)      rta  1110.17s hint             0s 
+5024 S5g24 Pull the nose: the monkey holds the gate open  rta  1121.51s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 0 best 271293 bound None
+5025  hint failed: target does not hold after the hint
+5025 S5g25 Idol field: take the wimpy idol                rta  1125.84s search           6s ['auto: wait until idle', 'auto: walk to exit 155 -> room 69', 'auto: verb 9 wimpy little idol']
+5026 S5g26 Row to the village beach with the idol         rta  1166.51s hint             3s 
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best None bound None
+    search: expanded 3 tried 7 frontier 0 best 282453 bound None
+5027  hint failed: target does not hold after the hint
+5027 S5g27 Walk into the village (second visit)           rta  1172.34s search           5s ['auto: walk to exit 16 -> room 6', 'auto: walk to exit 72 -> room 25']
+    search: expanded 1 tried 3 frontier 0 best None bound None
+5028  hint failed: S5g28 Walk back right (camera to 270: the cannibals come): `until` did not hold within 1200 frames of frame 13756 (and w
+5028 S5g28 Village visit 2: give the idol to the cannibals: NOT REACHED target [{'bit': 97, 'eq': 1}]
+  hint failed: S5g28 Walk back right (camera to 270: the cannibals come): `until` did not hold within 1200 frames of frame 13756 (and w
+  x auto: give 761 to friendly natives: auto: give 761 to friendly natives: object 292 never came on screen (no floor pa
+  x auto: give 761 to cannibals: auto: give 761 to cannibals: object 303 never came on screen (no floor path, no 
+  x auto: stand and wait: nothing came
+END frame 13755 room 25

@@ -1,0 +1,11 @@
+--- /home/ilyask/projects/fast-mi/routes/anypercent/S7-part4.json	2026-10-20 18:34:41.816646528 +0000
++++ /home/ilyask/projects/fast-mi-sandboxes/nocd-i2/routes/anypercent/S7-part4.json	2026-10-20 18:29:02.993483394 +0000
+@@ -136,7 +136,7 @@
+       "glitch": null,
+       "cite": "global/script-131.txt [0059]-[0060] (card waits for sound 107), [0065]-[0074] (ego put in room 83 at (80,121), endCutscene, camera follows: room 83); room-083-cu-dock/entry.txt [0009] (dissolve fade-in), [0020]-[0067] (Var[277]==6: every object the ego owns except 488, 823 and 733 is taken away); room-083-cu-dock/obj-0905-dock.txt [0010]-[0032] (Bit[453] set and 905 not class 6 -> startScript(204)); room-083-cu-dock/local-204.txt [0000] Var[277]=0; global/script-002.txt [02DB]-[02E4], [039D] (walk to 905's walk point (345,121), then its FF handler)",
+       "note": "Input is on from the first room-83 frame: script 131 ended its cutscene at [0070] (global/script-019.txt UserputSoftOn). One click on 905 (box x 304-319, on screen at the start): walking right, per-frame re-clicks are slower (docs/research/anypercent-engine-mechanics.md §2.5). 905's actordir 1 (east) matches the walking direction, so no final turn. The left dock 904 only redirects to 905 (room-083-cu-dock/obj-0904-dock.txt [0026]-[002C]) and prints 'The church is the other way!' (room-083-cu-dock/local-205.txt). The until only confirms the walk has started (ego was put at x 80, global/script-131.txt [0069]), so the next move can clear script 131's text during the ~40-frame walk; the ghost itself starts when ego reaches (345,121), which the next move's until and the 'Esc the ghost' move wait for (Var[277] is 6 from global/script-131.txt [0034] until local 204 [0000] clears it). ENGINE: 'delay': 800 frames inside the Last Part card (about 1560 frames of CD track 6 left when S6 ends), so the 'after' wait fits the driver's 1200-frame hint window; no game time.",
+-      "delay": 800
++      "delay": 0
+     },
+     {
+       "name": "Dock: skip script 131's three ego text segments during the walk",

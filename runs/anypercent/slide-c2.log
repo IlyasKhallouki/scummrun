@@ -1,0 +1,147 @@
+348 S4#71 Use the rope with the cannon (fuse appears)    rta   897.30s hint             0s 
+351 S4#74 Complete 'Use gunpowder in cannon nozzle' (noz rta   900.05s hint             0s 
+352 S4#75 Walk to the cannon nozzle (climbs in, starts t rta   900.30s hint             0s 
+353 S4#76 Esc the cannon shot                            rta   900.38s hint             0s 
+354 S4#77 Esc the Part III card                          rta   900.47s hint             0s 
+355 S5#1 Esc the monkey part of the arrival intro        rta   900.55s hint             0s 
+356 S5#2 Esc the Herman part of the arrival intro        rta   900.63s hint             0s 
+357 S5#3 Stand up (any scene click)                      rta   902.38s hint             0s 
+358 S5#4 Main beach: jungle exit to the map              rta   904.47s hint             0s 
+359 S5#5 Map room 2 -> room 3 (top-left edge)            rta   907.55s hint             0s 
+360 S5#6 Map room 3: walk to the fort                    rta   912.72s hint             0s 
+361 S5#7 Push the cannon                                 rta   915.22s hint             0s 
+362 S5#8 Pick up the gunpowder                           rta   916.22s hint             0s 
+363 S5#9 Pick up the spyglass                            rta   917.47s hint             0s 
+364 S5#10 Leave the fort (plain exit right after the spy rta   918.63s hint             0s 
+365 S5#11 Map room 3 -> room 4 (right edge, down the vol rta   924.63s hint             0s 
+366 S5#12 Map room 4: river fork                         rta   926.47s hint             0s 
+367 S5#13 Open the spyglass (lens)                       rta   926.72s hint             0s 
+368 S5#14 Use gunpowder with dam                         rta   928.63s hint             0s 
+369 S5#15 Use lens with sun: dam blast                   rta   931.63s hint             0s 
+370 S5#16 Oars skip 1: off-room instant exit to room 5   rta   931.83s hint             0s 
+371 S5#17 Oars skip 2: walk toward room-5 exit 62 so the rta   934.83s hint             0s 
+372 S5#18 Row: room 4 sea box 22 -> room 5 (during the b rta   939.33s hint             0s 
+373 S5#19 Row to the clearing-side beach (room 5 beach - rta   940.25s hint             0s 
+374 S5#20 Beach 131: jungle to the map (room 5, on foot) rta   942.00s hint             0s 
+375 S5#21 Map room 5: clearing                           rta   943.50s hint             0s 
+376 S5#22 Pull the nose (gate opens)                     rta   950.59s hint             0s 
+380 S5#26 Monkey skip 4: click 155 at the same pixel (in rta   956.42s hint             0s 
+381 S5#27 Pick up the wimpy little idol                  rta   957.59s hint             0s 
+382 S5#28 Leave the idol field                           rta   959.92s hint             0s 
+383 S5#29 Herman: Esc his monologue                      rta   963.09s hint             0s 
+384 S5#30 Herman: answer 'What?'                         rta   964.25s hint             0s 
+385 S5#31 Clearing: jungle back to the map               rta   970.92s hint             1s 
+386 S5#32 Map room 5: beach on foot (to beach room 131)  rta   973.25s hint             0s 
+387 S5#33 Board the rowboat                              rta   975.34s hint             0s 
+388 S5#34 Row to room 6 (top edge of room 5)             rta   985.50s hint             0s 
+389 S5#35 Row to the village beach (room 132)            rta   986.50s hint             0s 
+390 S5#36 Beach 132: jungle to the map (room 6, on foot) rta   988.42s hint             0s 
+391 S5#37 Map room 6: village                            rta   992.34s hint             0s 
+392 S5#38 Pick up the bananas (starts the cannibal encou rta   999.25s hint             1s 
+394 S5#40 Read the dusty book while the camera scrolls   rta  1001.17s hint             0s 
+395 S5#41 Encounter: 'I'll give you anything!'           rta  1004.84s hint             0s 
+396 S5#42 Give the idol to the cannibals                 rta  1005.25s hint             0s 
+397 S5#43 Leave the village (visit 1)                    rta  1008.42s hint             0s 
+398 S5#44 Map room 6: village again (visit 2)            rta  1010.75s hint             0s 
+402 S5#48 213: 'Where are LeChuck and his crew hiding?'  rta  1013.09s hint             0s 
+403 S5#49 213: 'What's in your standard potion of exorci rta  1013.67s hint             0s 
+404 S5#50 213: 'I'm off to find LeChuck and get the root rta  1014.25s hint             0s 
+407 S5#53 Give the leaflet to the natives                rta  1020.34s hint             0s 
+408 S5#54 Leaflet scene: Esc 1 ('instructions on how to  rta  1021.17s hint             0s 
+409 S5#55 Leaflet scene: Esc 2 (skip the navigator close rta  1021.44s hint             0s 
+410 S5#56 Leaflet scene: Esc 3 ('follow his nose...')    rta  1023.36s hint             0s 
+411 S5#57 Enter the hut                                  rta  1025.86s hint             0s 
+412 S5#58 Pick up the banana picker                      rta  1027.61s hint             0s 
+413 S5#59 Leave the hut (Herman appears)                 rta  1028.69s hint             0s 
+414 S5#60 Give the banana picker to Herman (key)         rta  1033.19s hint             0s 
+415 S5#61 Leave the village                              rta  1036.03s hint             0s 
+416 S5#62 Map room 6: beach on foot (to room 132)        rta  1040.11s hint             0s 
+417 S5#63 Board the rowboat (room 132)                   rta  1041.78s hint             0s 
+418 S5#64 Row to room 5 (bottom edge of room 6)          rta  1043.03s hint             0s 
+419 S5#65 Row to the clearing-side beach (room 131)      rta  1052.78s hint             0s 
+420 S5#66 Beach 131: jungle to the map (room 5)          rta  1054.53s hint             0s 
+421 S5#67 Map room 5: clearing                           rta  1056.03s hint             0s 
+422 S5#68 Walk through the open gate to the idol field ( rta  1065.44s hint             1s 
+423 S6#1 Use ear with monkey head key (opens the giant h rta  1074.94s hint             0s 
+424 S6#2 Pre-walk to the mouth's walk point during scrip rta  1076.03s hint             0s 
+425 S6#3 Walk into the open mouth of the giant monkey he rta  1076.44s hint             0s 
+426 S6#4 Take out the navigator head right after the cli rta  1080.53s hint             0s 
+  lookahead: S6#5 Walk toward the catacombs cave (fir delay 0
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1095.53s hint            17s 
+428 S6#6 Esc the mushroom line                           rta  1095.61s hint             0s 
+  lookahead: S6#7 Walk to the catacombs cave delay 4
+429 S6#7 Walk to the catacombs cave                      rta  1098.78s hint             2s 
+  lookahead: S6#8 Catacombs exit 1/6: walk to the cav delay 7
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1099.86s hint             2s 
+  lookahead: S6#9 Catacombs exit 2/6: walk to the cav delay 0
+431 S6#9 Catacombs exit 2/6: walk to the cave the head p rta  1100.44s hint             2s 
+  lookahead: S6#10 Catacombs exit 3/6: walk to the ca delay 0
+432 S6#10 Catacombs exit 3/6: walk to the cave the head  rta  1100.94s hint             4s 
+  lookahead: S6#11 Catacombs exit 4/6: walk to the ca delay 6
+433  hint failed: S6#12 Catacombs exit 5/6: walk to the cave the head points at (Var[164]): object 495 never came on screen (no floor path
+433 S6#11 Catacombs exit 4/6: walk to the cave the head  rta  1101.94s hint            59s 
+  lookahead: S6#12 Catacombs exit 5/6: walk to the ca delay 4
+434 S6#12 Catacombs exit 5/6: walk to the cave the head  rta  1102.78s hint             4s 
+  lookahead: S6#13 Catacombs exit 6/6: walk to the ca delay 0
+435 S6#13 Catacombs exit 6/6: walk to the cave the head  rta  1103.28s hint             1s 
+436 S6#14 Put the navigator head away on arrival (record rta  1103.61s hint             0s 
+439 S6#17 Read the dusty book standing at (52,83) (carri rta  1105.36s hint             0s 
+440 S6#18 Talk to the navigator head inside the book's c rta  1106.19s hint             0s 
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1108.72s hint             0s 
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1109.97s hint             0s 
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1111.63s hint             0s 
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1112.88s hint             0s 
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1114.47s hint             0s 
+447 S6#25 Put the head away if the dialogue took it out  rta  1118.38s hint             0s 
+448 S6#26 Put the necklace on standing at (52,83) in wal rta  1120.47s hint             0s 
+451 S6#29 Open the captain's cabin door (left door)      rta  1131.38s hint             0s 
+452 S6#30 Enter the captain's cabin                      rta  1131.55s hint             0s 
+453 S6#31 Use magnetic compass with the key (magnet pull rta  1134.47s hint             0s 
+454 S6#32 Leave the captain's cabin                      rta  1135.63s hint             0s 
+455 S6#33 Down the deck hatch to the crew quarters       rta  1140.38s hint             0s 
+456 S6#34 Through the passage to the hull                rta  1142.72s hint             0s 
+457 S6#35 Use key in the hull hatch (unlock and open)    rta  1144.88s hint             0s 
+458 S6#36 Down the hatch to the storage room             rta  1145.05s hint             0s 
+461 S6#39 Feather skip 3/3: click during the rat cutscen rta  1147.72s hint             0s 
+463 S6#41 Up the ladder to the hull                      rta  1149.88s hint             0s 
+464 S6#42 Through the passage back to the crew quarters  rta  1151.80s hint             0s 
+465 S6#43 Up the ladder to the deck                      rta  1154.05s hint             0s 
+467 S6#45 Open the greased door                          rta  1154.88s hint             0s 
+468 S6#46 Enter the brig room                            rta  1155.05s hint             0s 
+469 S6#47 Pick up the ghost tools                        rta  1156.30s hint             0s 
+470 S6#48 Back to the deck                               rta  1157.63s hint             0s 
+471 S6#49 Down the deck hatch again                      rta  1158.05s hint             0s 
+472 S6#50 Through the passage to the hull again          rta  1160.38s hint             0s 
+473 S6#51 Use glowing crate with ghost tools             rta  1171.80s hint             0s 
+474 S6#52 Look at the open crate to grab the voodoo root rta  1172.05s hint             0s 
+475 S6#53 Through the passage to the crew quarters       rta  1175.05s hint             0s 
+476 S6#54 Up the ladder to the deck                      rta  1177.30s hint             0s 
+477 S6#55 Leave the ghost ship                           rta  1178.80s hint             0s 
+478 S6#56 Walk into the cave with the root               rta  1186.55s hint             0s 
+479 S6#57 Esc 'A long walk, a brief row, and a short hik rta  1186.63s hint             0s 
+480 S6#58 Esc the cannibals' root scene                  rta  1186.72s hint             0s 
+481 S6#59 Walk out to the jungle (back toward the ghost- rta  1189.30s hint             0s 
+482 S6#60 Esc 'After some more furious paddling...'      rta  1189.38s hint             0s 
+484 S6#62 Bob scene: 'Where is the wedding?'             rta  1192.55s hint             0s 
+487 S6#65 Esc the crew's 'Come on, let's go.' exit       rta  1203.47s hint             0s 
+489 S7#2 Dock: skip script 131's three ego text segments rta  1336.22s hint             1s 
+493 S7#6 Dock: walk right again (to Low Street)          rta  1345.14s hint             0s 
+494 S7#7 Low Street: archway up to High Street (avoid th rta  1362.05s hint             0s 
+495 S7#8 High Street: open the church door (door closed: rta  1366.55s hint             0s 
+496 S7#9 High Street: enter the church                   rta  1366.72s hint             0s 
+499 S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?' rta  1369.97s hint             0s 
+504 S7#17 Close-up menu 2: 'If you're here, then who's t rta  1371.97s hint             0s 
+505 S7#18 Close-up: skip ego's 'who's that in the dress' rta  1372.30s hint             0s 
+510 S7#23 Close-up: Esc LeChuck's punch                  rta  1373.30s hint             0s 
+511 S7#24 Map: Esc the POW / BIFF flight                 rta  1373.47s hint             0s 
+512 S7#25 Stan's: Esc Stan's greeting                    rta  1376.22s hint             0s 
+513 S7#26 Stan's: Esc Stan's sales pitch                 rta  1379.80s hint             0s 
+514 S7#27 Stan's: wake Guybrush (first input after the f rta  1389.38s hint             0s 
+515 S7#28 Stan's: use root beer with LeChuck (click LeCh rta  1393.63s hint             0s 
+516 S7#29 Ending: skip 'Gasp! --choke--' (first pass)    rta  1401.55s hint             0s 
+517 S7#30 Ending: skip 'Gasp! --choke--' (instant replay rta  1413.05s hint             0s 
+518 S7#31 Ending: skip Elaine's 'Hey...' exchange        rta  1430.88s hint             0s 
+519 S7#32 Fireworks: skip the small talk                 rta  1438.38s hint             0s 
+522 S7#35 Fireworks: skip the epilogue lines (Stan, Herm rta  1452.32s hint             0s 
+525 S7#38 Fireworks: skip 'Yes, I've heard that one.' (t rta  1453.99s hint             0s 
+END frame 17130 room 0

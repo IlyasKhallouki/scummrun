@@ -1,0 +1,435 @@
+    search: expanded 1 tried 3 frontier 0 best None bound 4200
+3 S1#4 open the SCUMM Bar door                         rta    12.92s hint            10s 
+    search: expanded 1 tried 2 frontier 0 best None bound 4240
+4 S1#5 enter the bar                                   rta    13.08s hint             0s 
+    search: expanded 1 tried 6 frontier 1 best 6360 bound 6640
+    search: expanded 2 tried 12 frontier 1 best 5880 bound 6640
+    search: expanded 3 tried 18 frontier 1 best 5880 bound 6640
+    search: expanded 4 tried 24 frontier 1 best 5880 bound 6640
+    search: expanded 5 tried 30 frontier 1 best 5880 bound 6640
+    search: expanded 6 tried 36 frontier 1 best 5880 bound 6640
+    search: expanded 7 tried 42 frontier 1 best 5880 bound 6640
+    search: expanded 8 tried 48 frontier 1 best 5880 bound 6640
+    search: expanded 9 tried 54 frontier 1 best 5880 bound 6640
+    search: expanded 10 tried 60 frontier 1 best 5880 bound 6640
+6 S1#7 provoke the cook (Open kitchen door while he is rta    19.92s search<hint     31s ['auto: scripted walk via ', 'auto: verb 2 door']
+    search: expanded 1 tried 2 frontier 2 best None bound 9400
+    search: expanded 2 tried 6 frontier 2 best None bound 9400
+    search: expanded 3 tried 10 frontier 1 best None bound 9400
+    search: expanded 4 tried 14 frontier 1 best None bound 9400
+    search: expanded 5 tried 18 frontier 1 best None bound 9400
+    search: expanded 6 tried 22 frontier 1 best None bound 9400
+    search: expanded 7 tried 26 frontier 1 best None bound 9400
+    search: expanded 8 tried 30 frontier 1 best None bound 9400
+    search: expanded 9 tried 34 frontier 1 best None bound 9400
+    search: expanded 10 tried 38 frontier 1 best None bound 9400
+    search: expanded 11 tried 42 frontier 1 best None bound 9400
+    search: expanded 12 tried 46 frontier 1 best None bound 9400
+    search: expanded 13 tried 50 frontier 1 best None bound 9400
+7 S1#8 enter the kitchen as the cook walks away        rta    34.58s hint             9s 
+    search: expanded 1 tried 2 frontier 0 best None bound 9860
+8 S2#1 INTERLEAVE S1 kitchen: open the pier door       rta    36.50s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 10440
+9 S2#2 INTERLEAVE S1 kitchen: step on the plank (gull  rta    38.92s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 10520
+10 S2#3 INTERLEAVE S1 kitchen: step on the plank again  rta    39.25s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 10880
+    search: expanded 2 tried 6 frontier 0 best None bound 10880
+11 S2#4 INTERLEAVE S1 kitchen: pick up the fish during  rta    40.75s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 11380
+12 S1#9 pick up the pot                                 rta    42.83s hint             0s 
+    search: expanded 1 tried 4 frontier 1 best None bound 11640
+    search: expanded 2 tried 9 frontier 0 best None bound 11640
+13 S1#10 pick up the hunk of meat                       rta    43.92s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 11740
+14 S1#11 leave the kitchen                              rta    44.33s hint             0s 
+    search: expanded 1 tried 5 frontier 1 best None bound 13200
+    search: expanded 2 tried 10 frontier 1 best 13160 bound 13200
+    search: expanded 3 tried 12 frontier 0 best 13160 bound 13200
+16 S1#13 leave the bar (first exit: LeChuck cutscene, s rta    50.25s search<hint      6s ['auto: scripted walk via ', 'auto: walk to exit 315 -> room 33']
+    search: expanded 1 tried 2 frontier 0 best None bound 15860
+17 S1#14 dock -> Lookout                                rta    61.50s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 16820
+18 S1#15 Lookout -> island map                          rta    65.50s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 18060
+19 S1#16 map -> clearing                                rta    70.67s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 20000
+21 S1#18 enter the circus tent                          rta    78.75s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 20976
+    search: expanded 2 tried 7 frontier 5 best None bound 20976
+    search: expanded 3 tried 12 frontier 4 best None bound 20976
+    search: expanded 4 tried 15 frontier 3 best None bound 20976
+    search: expanded 5 tried 18 frontier 2 best None bound 20976
+    search: expanded 6 tried 21 frontier 1 best None bound 20976
+    search: expanded 7 tried 24 frontier 0 best None bound 20976
+23 S1#20 circus menu 2: OK, I'll do it                  rta    82.82s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 21156
+    search: expanded 2 tried 4 frontier 1 best None bound 21156
+    search: expanded 3 tried 6 frontier 0 best None bound 21156
+24 S1#21 circus menu 3: Of course I have a helmet       rta    83.57s hint             0s 
+    search: expanded 1 tried 1 frontier 0 best None bound 21616
+25 S1#22 helmet: Use + the fish icon (the inventory slo rta    85.49s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 24556
+    search: expanded 2 tried 4 frontier 1 best None bound 24556
+    search: expanded 3 tried 6 frontier 0 best None bound 24556
+26 S1#23 circus menu 4 after the cannon (any line) -> 4 rta    97.74s hint             2s 
+    search: expanded 1 tried 2 frontier 2 best None bound 26576
+    search: expanded 2 tried 4 frontier 1 best None bound 26576
+    search: expanded 3 tried 6 frontier 0 best None bound 26576
+27 S1#24 circus grounds -> map                          rta   106.15s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 27196
+28 S1#25 map -> forest entrance (fork, pseudo-room 218) rta   108.74s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 27736
+29 S1#26 218 -> 215 (petal screen) through path 686     rta   110.99s hint             1s 
+    search: expanded 1 tried 1 frontier 0 best None bound 28096
+30 S1#27 pick up the yellow petal (plants)              rta   112.49s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 28436
+31 S1#28 215 -> 218                                     rta   113.90s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 29216
+32 S1#29 218 -> map                                     rta   117.15s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 29956
+33 S1#30 map -> village (lands on the dock)             rta   120.24s hint             0s 
+    search: expanded 1 tried 7 frontier 0 best None bound 30036
+34 S1#31 drug the meat: Use hunk of meat with yellow pe rta   120.57s hint            21s 
+    search: expanded 1 tried 2 frontier 0 best None bound 33956
+35 S1#32 dock -> Low Street                             rta   136.90s hint             5s 
+    search: expanded 1 tried 2 frontier 1 best None bound 35076
+    search: expanded 2 tried 4 frontier 0 best None bound 35076
+36 S1#33 talk to the Citizen of Melee                   rta   141.57s hint             1s 
+    search: expanded 1 tried 4 frontier 0 best None bound 35216
+37 S1#34 citizen: barber named Dominique                rta   142.15s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 35416
+    search: expanded 2 tried 5 frontier 2 best None bound 35416
+    search: expanded 3 tried 8 frontier 1 best None bound 35416
+    search: expanded 4 tried 10 frontier 0 best None bound 35416
+38 S1#35 citizen: buy the map                           rta   142.99s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 36616
+    search: expanded 2 tried 4 frontier 0 best None bound 36616
+39 S1#36 open the Voodoo shop door                      rta   147.99s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 36656
+40 S1#37 enter the Voodoo shop                          rta   148.15s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 37296
+41 S1#38 pick up the rubber chicken                     rta   150.82s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 37876
+42 S1#39 open the shop door from inside                 rta   153.24s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 37936
+    search: expanded 2 tried 4 frontier 0 best None bound 37936
+43 S1#40 leave the Voodoo shop                          rta   153.49s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 39196
+44 S1#41 Low Street -> High Street (clock archway)      rta   158.74s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 40736
+45 S1#42 High Street -> jail                            rta   165.16s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 41336
+46 S1#43 Otis #1: talk to the prisoner (unlocks the min rta   167.66s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 42076
+    search: expanded 2 tried 4 frontier 1 best None bound 42076
+    search: expanded 3 tried 6 frontier 0 best None bound 42076
+47 S1#44 leave the jail                                 rta   170.74s hint             1s 
+    search: expanded 1 tried 5 frontier 0 best None bound 43296
+48 S1#45 open the store door                            rta   175.82s hint             1s 
+    search: expanded 1 tried 5 frontier 2 best 43656 bound None
+49  hint failed: S1#46 enter the store (first visit: safe combination and storekeeper draw): object 437 is not in room 30 (and with 1..12
+49 S1#46 enter the store (first visit: safe combination rta   177.32s search           4s ['auto: walk to exit 437 -> room 30']
+    search: expanded 1 tried 2 frontier 0 best None bound 45036
+50 S1#47 pick up the shovel                             rta   183.07s hint             0s 
+    search: expanded 1 tried 4 frontier 0 best None bound 45256
+51 S1#48 safe digit 1: pull the handle d1 times (here 1 rta   183.99s hint             0s 
+    search: expanded 1 tried 4 frontier 0 best None bound 45396
+52 S1#49 safe digit 2: push the handle d2 times (here 1 rta   184.57s hint             1s 
+    search: expanded 1 tried 10 frontier 0 best None bound 45536
+53 S1#50 safe digit 3: pull the handle d3 times (here 1 rta   185.16s hint             2s 
+    search: expanded 1 tried 4 frontier 1 best None bound 45816
+    search: expanded 2 tried 8 frontier 0 best None bound 45816
+54 S1#51 safe digit 4: push the handle d4 times (here 1 rta   186.32s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 47136
+55 S2#5 INTERLEAVE S1 store: pick up the sword          rta   191.82s hint             1s 
+    search: expanded 1 tried 9 frontier 1 best None bound 47836
+    search: expanded 2 tried 11 frontier 0 best None bound 47836
+56 S1#52 ring the bell (summons the storekeeper, opens  rta   194.74s hint            16s 
+    search: expanded 1 tried 2 frontier 2 best None bound 48116
+    search: expanded 2 tried 6 frontier 4 best None bound 48116
+    search: expanded 3 tried 10 frontier 5 best None bound 48116
+    search: expanded 4 tried 18 frontier 4 best None bound 48116
+    search: expanded 5 tried 21 frontier 3 best None bound 48116
+    search: expanded 6 tried 24 frontier 2 best None bound 48116
+    search: expanded 7 tried 27 frontier 1 best None bound 48116
+    search: expanded 8 tried 30 frontier 0 best None bound 48116
+57 S1#53 shop: breath mint                              rta   195.91s hint             2s 
+    search: expanded 1 tried 2 frontier 2 best None bound 48576
+    search: expanded 2 tried 5 frontier 4 best None bound 48576
+    search: expanded 3 tried 8 frontier 5 best None bound 48576
+    search: expanded 4 tried 16 frontier 6 best None bound 48576
+    search: expanded 5 tried 19 frontier 7 best 48536 bound 48576
+    search: expanded 6 tried 22 frontier 9 best 48536 bound 48576
+    search: expanded 7 tried 25 frontier 10 best 48536 bound 48576
+    search: expanded 8 tried 28 frontier 11 best 48536 bound 48576
+    search: expanded 9 tried 31 frontier 10 best 48536 bound 48576
+    search: expanded 10 tried 34 frontier 9 best 48536 bound 48576
+    search: expanded 11 tried 37 frontier 8 best 48536 bound 48576
+    search: expanded 12 tried 40 frontier 7 best 48536 bound 48576
+    search: expanded 13 tried 43 frontier 6 best 48536 bound 48576
+    search: expanded 14 tried 45 frontier 5 best 48536 bound 48576
+    search: expanded 15 tried 47 frontier 4 best 48536 bound 48576
+59 S2#7 INTERLEAVE S1 store: choose 'I want it.' (pay 1 rta   197.82s hint             3s 
+    search: expanded 1 tried 3 frontier 2 best None bound 48896
+    search: expanded 2 tried 10 frontier 3 best None bound 48896
+    search: expanded 3 tried 13 frontier 2 best None bound 48896
+    search: expanded 4 tried 16 frontier 1 best None bound 48896
+    search: expanded 5 tried 19 frontier 0 best None bound 48896
+61 S1#55 shop: I want it (pay 75 for the shovel)        rta   199.16s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 49076
+    search: expanded 2 tried 4 frontier 1 best None bound 49076
+    search: expanded 3 tried 6 frontier 0 best None bound 49076
+62 S2#8 INTERLEAVE S1 store: choose 'I think I'd just l rta   199.91s hint             0s 
+    search: expanded 1 tried 6 frontier 1 best None bound 49596
+    search: expanded 2 tried 8 frontier 0 best None bound 49596
+63 S1#56 open the store door from inside (the bell path rta   202.07s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 49656
+    search: expanded 2 tried 4 frontier 0 best None bound 49656
+64 S1#57 leave the store                                rta   202.32s hint             1s 
+    search: expanded 1 tried 4 frontier 1 best None bound 52916
+    search: expanded 2 tried 8 frontier 1 best None bound 52916
+    search: expanded 3 tried 12 frontier 1 best None bound 52916
+    search: expanded 4 tried 16 frontier 0 best None bound 52916
+66 S1#59 enter the mansion grounds                      rta   215.91s hint            21s 
+    search: expanded 1 tried 5 frontier 1 best None bound 54716
+    search: expanded 2 tried 10 frontier 0 best None bound 54716
+67 S1#60 give the drugged meat to the poodles           rta   223.41s hint             5s 
+    search: expanded 1 tried 2 frontier 1 best None bound 56036
+    search: expanded 2 tried 6 frontier 0 best None bound 56036
+68 S1#61 open the mansion door (dismisses the sign)     rta   228.91s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 56076
+69 S1#62 enter the foyer                                rta   229.07s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 56496
+70 S1#63 open the idol-room door                        rta   230.82s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 56536
+71 S1#64 walk into the idol room (first visit: repellen rta   230.99s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 58536
+    search: expanded 2 tried 4 frontier 0 best None bound 58536
+72 S1#65 leave the foyer                                rta   239.32s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 59516
+73 S1#66 mansion grounds -> High Street                 rta   243.41s hint             0s 
+    search: expanded 1 tried 3 frontier 1 best None bound 62036
+    search: expanded 2 tried 6 frontier 0 best None bound 62036
+75 S1#68 High Street -> jail (Otis #2)                  rta   253.91s hint             3s 
+    search: expanded 1 tried 2 frontier 1 best None bound 62976
+    search: expanded 2 tried 4 frontier 0 best None bound 62976
+76 S1#69 give the breath mints to Otis                  rta   257.83s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 63716
+    search: expanded 2 tried 5 frontier 4 best None bound 63716
+    search: expanded 3 tried 8 frontier 6 best None bound 63716
+    search: expanded 4 tried 10 frontier 7 best None bound 63716
+    search: expanded 5 tried 13 frontier 7 best None bound 63716
+    search: expanded 6 tried 15 frontier 8 best None bound 63716
+    search: expanded 7 tried 18 frontier 8 best None bound 63716
+    search: expanded 8 tried 21 frontier 8 best None bound 63716
+    search: expanded 9 tried 24 frontier 8 best None bound 63716
+    search: expanded 10 tried 27 frontier 10 best None bound 63716
+    search: expanded 11 tried 30 frontier 12 best None bound 63716
+    search: expanded 12 tried 33 frontier 13 best None bound 63716
+    search: expanded 13 tried 36 frontier 15 best None bound 63716
+    search: expanded 14 tried 39 frontier 14 best None bound 63716
+    search: expanded 15 tried 42 frontier 15 best None bound 63716
+    search: expanded 16 tried 44 frontier 16 best None bound 63716
+    search: expanded 17 tried 47 frontier 15 best None bound 63716
+    search: expanded 18 tried 50 frontier 16 best None bound 63716
+    search: expanded 19 tried 53 frontier 16 best None bound 63716
+    search: expanded 20 tried 55 frontier 16 best None bound 63716
+    search: expanded 21 tried 58 frontier 16 best None bound 63716
+    search: expanded 22 tried 61 frontier 16 best None bound 63716
+    search: expanded 23 tried 64 frontier 16 best None bound 63716
+    search: expanded 24 tried 67 frontier 15 best None bound 63716
+    search: expanded 25 tried 70 frontier 14 best None bound 63716
+    search: expanded 26 tried 73 frontier 13 best None bound 63716
+    search: expanded 27 tried 75 frontier 12 best None bound 63716
+    search: expanded 28 tried 78 frontier 11 best None bound 63716
+    search: expanded 29 tried 81 frontier 10 best None bound 63716
+    search: expanded 30 tried 84 frontier 9 best None bound 63716
+    search: expanded 31 tried 87 frontier 8 best None bound 63716
+    search: expanded 32 tried 89 frontier 7 best None bound 63716
+    search: expanded 33 tried 91 frontier 6 best None bound 63716
+    search: expanded 34 tried 94 frontier 5 best None bound 63716
+    search: expanded 35 tried 97 frontier 4 best None bound 63716
+    search: expanded 36 tried 99 frontier 3 best None bound 63716
+    search: expanded 37 tried 102 frontier 2 best None bound 63716
+    search: expanded 38 tried 105 frontier 1 best None bound 63716
+    search: expanded 39 tried 107 frontier 0 best None bound 63716
+78 S1#71 give the gopher repellent to Otis (carrot cake rta   260.91s hint             9s 
+    search: expanded 1 tried 3 frontier 0 best None bound 63776
+79 S1#72 open the cake (the file)                       rta   261.16s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 64356
+80 S1#73 leave the jail                                 rta   263.58s hint             0s 
+    search: expanded 1 tried 4 frontier 1 best None bound 66836
+    search: expanded 2 tried 8 frontier 1 best None bound 66836
+    search: expanded 3 tried 12 frontier 0 best None bound 66836
+82 S1#75 enter the mansion grounds (2)                  rta   273.91s hint             6s 
+    search: expanded 1 tried 2 frontier 0 best None bound 67756
+83 S1#76 enter the foyer (door still open)              rta   277.74s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 69096
+84 S1#77 walk to the gaping hole (the theft)            rta   283.33s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 71232
+    search: expanded 2 tried 6 frontier 2 best None bound 71232
+    search: expanded 3 tried 10 frontier 1 best None bound 71232
+    search: expanded 4 tried 14 frontier 1 best None bound 71232
+    search: expanded 5 tried 16 frontier 0 best None bound 71232
+86 S1#79 open the foyer door: Fester throws Guybrush in rta   292.23s hint             4s 
+    search: expanded 1 tried 1 frontier 0 best None bound 72690
+87 S1#80 pick up the idol underwater (idol trial done)  rta   298.30s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 73450
+    search: expanded 2 tried 5 frontier 0 best 73330 bound 73450
+88 S1#81 close-up dock -> dock                          rta   300.97s search<hint      0s ['auto: wait until idle', 'auto: walk to exit 905 -> room 33']
+    search: expanded 1 tried 2 frontier 0 best None bound 75628
+89 S1#82 dock -> Lookout (2)                            rta   310.54s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 76588
+90 S1#83 Lookout -> island map (2)                      rta   314.54s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 78148
+91 S2#9 Map -> troll bridge                             rta   321.04s hint             1s 
+    search: expanded 1 tried 4 frontier 2 best None bound 81208
+    search: expanded 2 tried 8 frontier 3 best None bound 81208
+    search: expanded 3 tried 10 frontier 2 best None bound 81208
+    search: expanded 4 tried 14 frontier 3 best None bound 81208
+    search: expanded 5 tried 18 frontier 2 best None bound 81208
+    search: expanded 6 tried 21 frontier 2 best None bound 81208
+    search: expanded 7 tried 23 frontier 2 best None bound 81208
+    search: expanded 8 tried 26 frontier 2 best None bound 81208
+    search: expanded 9 tried 30 frontier 1 best None bound 81208
+    search: expanded 10 tried 34 frontier 0 best None bound 81208
+92 S2#10 Give fish to troll (no troll conversation)     rta   333.79s hint            14s 
+    search: expanded 1 tried 2 frontier 0 best None bound 82448
+93 S2#11 Map -> Smirk's house                           rta   338.96s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 83788 bound 83828
+94 S2#12 Open Smirk's door                              rta   344.71s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 84008 bound 84028
+95 S2#13 Smirk menu 1: 'best swordfighter'              rta   345.46s search<hint      0s ["auto: say 'Could you make me the best swordfighter '"]
+    search: expanded 1 tried 2 frontier 0 best None bound 84108
+96 S2#14 Esc: skip Smirk's close-up                     rta   345.88s hint             0s 
+    search: expanded 1 tried 3 frontier 2 best None bound 84488
+    search: expanded 2 tried 5 frontier 2 best None bound 84488
+    search: expanded 3 tried 8 frontier 1 best None bound 84488
+    search: expanded 4 tried 10 frontier 0 best None bound 84488
+99 S2#17 Smirk menu 2: 'I do so!' (3/3)                 rta   347.46s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 84768
+    search: expanded 2 tried 6 frontier 1 best None bound 84768
+    search: expanded 3 tried 10 frontier 0 best None bound 84768
+100 S2#18 Smirk menu 3: 'I've got 30 pieces of eight.'   rta   348.63s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 85068
+    search: expanded 2 tried 5 frontier 3 best None bound 85068
+    search: expanded 3 tried 8 frontier 3 best None bound 85068
+    search: expanded 4 tried 11 frontier 2 best None bound 85068
+    search: expanded 5 tried 13 frontier 1 best None bound 85068
+    search: expanded 6 tried 16 frontier 0 best None bound 85068
+101 S2#19 Smirk menu 4: 'OK, check it out.'              rta   349.88s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 85108
+102 S2#20 Esc: skip Smirk's training                     rta   350.04s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 86488
+    search: expanded 2 tried 5 frontier 0 best 86068 bound 86488
+103 S2#21 Leave Smirk's (right path)                     rta   354.04s search<hint      1s ['auto: wait until idle', 'auto: walk to exit 592 -> room 85']
+    search: expanded 1 tried 9 frontier 5 best None bound 89348
+    search: expanded 2 tried 14 frontier 4 best None bound 89348
+    search: expanded 3 tried 16 frontier 4 best None bound 89348
+    search: expanded 4 tried 25 frontier 4 best None bound 89348
+    search: expanded 5 tried 29 frontier 5 best None bound 89348
+    search: expanded 6 tried 38 frontier 4 best 88968 bound 89348
+    search: expanded 7 tried 41 frontier 4 best 88968 bound 89348
+    search: expanded 8 tried 50 frontier 3 best 88968 bound 89348
+    search: expanded 9 tried 52 frontier 2 best 88968 bound 89348
+    search: expanded 10 tried 57 frontier 2 best 88968 bound 89348
+104 S2#22 Fight 1: intercept a pirate on the map         rta   366.13s search<hint     16s ['auto: walk to exit 911 -> room 218', 'auto: walk to exit 687 -> room 85', 'auto: stand and wait']
+    search: expanded 1 tried 2 frontier 2 best None bound 89328
+    search: expanded 2 tried 5 frontier 3 best 89148 bound 89328
+    search: expanded 3 tried 8 frontier 3 best 89148 bound 89328
+105 S2#23 Fight 1: choose 'Prepare to die' (encounter 1) rta   367.63s hint             1s 
+    search: expanded 1 tried 6 frontier 1 best 89528 bound 91148
+    search: expanded 2 tried 7 frontier 1 best 89528 bound 91148
+106 S2#24 Fight 1 E1: insult 2 'shish kebab' (pirate mus rta   375.21s hint             1s 
+    search: expanded 1 tried 5 frontier 1 best 91348 bound 92688
+    search: expanded 2 tried 6 frontier 1 best 91348 bound 92688
+107 S2#25 Fight 1 E2: insult 8 'dairy farmer' (pirate mu rta   381.63s hint             1s 
+    search: expanded 1 tried 4 frontier 4 best None bound None
+    search: expanded 2 tried 10 frontier 8 best None bound None
+    search: expanded 3 tried 16 frontier 7 best None bound None
+    search: expanded 4 tried 22 frontier 6 best None bound None
+    search: expanded 5 tried 28 frontier 9 best None bound None
+    search: expanded 6 tried 30 frontier 9 best None bound None
+    search: expanded 7 tried 33 frontier 11 best None bound None
+    search: expanded 8 tried 34 frontier 11 best None bound None
+    search: expanded 9 tried 37 frontier 12 best None bound None
+    search: expanded 10 tried 43 frontier 16 best None bound None
+    search: expanded 11 tried 49 frontier 16 best None bound None
+    search: expanded 12 tried 55 frontier 16 best None bound None
+    search: expanded 13 tried 61 frontier 16 best None bound None
+    search: expanded 14 tried 67 frontier 15 best None bound None
+    search: expanded 15 tried 73 frontier 14 best None bound None
+    search: expanded 16 tried 79 frontier 16 best None bound None
+    search: expanded 17 tried 85 frontier 16 best None bound None
+    search: expanded 18 tried 91 frontier 16 best None bound None
+    search: expanded 19 tried 93 frontier 16 best None bound None
+    search: expanded 20 tried 94 frontier 16 best None bound None
+    search: expanded 21 tried 100 frontier 16 best None bound None
+    search: expanded 22 tried 106 frontier 16 best None bound None
+    search: expanded 23 tried 112 frontier 16 best None bound None
+    search: expanded 24 tried 118 frontier 16 best None bound None
+    search: expanded 25 tried 124 frontier 16 best None bound None
+    search: expanded 26 tried 130 frontier 16 best None bound None
+    search: expanded 27 tried 136 frontier 16 best None bound None
+    search: expanded 28 tried 142 frontier 16 best None bound None
+    search: expanded 29 tried 148 frontier 15 best None bound None
+    search: expanded 30 tried 154 frontier 14 best None bound None
+    search: expanded 31 tried 160 frontier 13 best None bound None
+    search: expanded 32 tried 161 frontier 13 best None bound None
+    search: expanded 33 tried 167 frontier 16 best None bound None
+    search: expanded 34 tried 173 frontier 16 best None bound None
+    search: expanded 35 tried 179 frontier 16 best None bound None
+    search: expanded 36 tried 185 frontier 15 best None bound None
+    search: expanded 37 tried 191 frontier 14 best None bound None
+    search: expanded 38 tried 197 frontier 13 best None bound None
+    search: expanded 39 tried 203 frontier 16 best None bound None
+    search: expanded 40 tried 209 frontier 16 best None bound None
+    search: expanded 41 tried 215 frontier 16 best None bound None
+    search: expanded 42 tried 221 frontier 16 best None bound None
+    search: expanded 43 tried 227 frontier 15 best None bound None
+    search: expanded 44 tried 233 frontier 14 best None bound None
+    search: expanded 45 tried 239 frontier 16 best None bound None
+    search: expanded 46 tried 245 frontier 16 best None bound None
+    search: expanded 47 tried 251 frontier 16 best None bound None
+    search: expanded 48 tried 252 frontier 16 best None bound None
+    search: expanded 49 tried 258 frontier 16 best None bound None
+    search: expanded 50 tried 264 frontier 16 best None bound None
+    search: expanded 51 tried 270 frontier 15 best None bound None
+    search: expanded 52 tried 276 frontier 14 best None bound None
+    search: expanded 53 tried 278 frontier 14 best None bound None
+    search: expanded 54 tried 284 frontier 16 best None bound None
+    search: expanded 55 tried 290 frontier 16 best None bound None
+    search: expanded 56 tried 296 frontier 16 best None bound None
+    search: expanded 57 tried 298 frontier 16 best None bound None
+    search: expanded 58 tried 302 frontier 16 best None bound None
+    search: expanded 59 tried 303 frontier 16 best None bound None
+    search: expanded 60 tried 309 frontier 16 best None bound None
+    search: expanded 61 tried 313 frontier 16 best None bound None
+    search: expanded 62 tried 316 frontier 16 best None bound None
+    search: expanded 63 tried 317 frontier 16 best None bound None
+    search: expanded 64 tried 320 frontier 16 best None bound None
+    search: expanded 65 tried 321 frontier 16 best None bound None
+    search: expanded 66 tried 327 frontier 16 best None bound None
+    search: expanded 67 tried 333 frontier 15 best None bound None
+    search: expanded 68 tried 339 frontier 14 best None bound None
+    search: expanded 69 tried 345 frontier 15 best 96868 bound None
+108  hint failed: S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16): `until` did not hold 
+108 S2#26 Fight 1 E3: default insult 'Boy are you ugly!' rta   399.05s search          59s ['auto: stand and wait', "auto: say 'My name is Guybrush Threepwood.  Prepare'", "auto: say 'Boy are you ugly!'"]
+    search: expanded 1 tried 2 frontier 2 best None bound 97988
+    search: expanded 2 tried 8 frontier 6 best None bound 97988
+    search: expanded 3 tried 14 frontier 5 best None bound 97988
+    search: expanded 4 tried 20 frontier 4 best None bound 97988
+    search: expanded 5 tried 26 frontier 3 best None bound 97988
+    search: expanded 6 tried 32 frontier 2 best None bound 97988
+    search: expanded 7 tried 38 frontier 6 best None bound 97988
+    search: expanded 8 tried 44 frontier 5 best None bound 97988
+    search: expanded 9 tried 50 frontier 4 best None bound 97988
+    search: expanded 10 tried 56 frontier 3 best None bound 97988
+    search: expanded 11 tried 62 frontier 2 best None bound 97988
+    search: expanded 12 tried 68 frontier 1 best None bound 97988
+    search: expanded 13 tried 74 frontier 0 best None bound 97988
+109 S2#27 Fight 1 E4: answer 16 wrongly ('Oh yeah?'), le rta   403.71s hint            20s 
+    search: expanded 1 tried 6 frontier 3 best None bound None
+    search: expanded 2 tried 7 frontier 3 best None bound None
+    search: expanded 3 tried 13 frontier 4 best None bound None

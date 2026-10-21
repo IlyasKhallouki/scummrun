@@ -1,0 +1,445 @@
+    search: expanded 1 tried 6 frontier 3 best None bound None
+    search: expanded 2 tried 7 frontier 3 best None bound None
+    search: expanded 3 tried 13 frontier 4 best None bound None
+    search: expanded 4 tried 19 frontier 5 best None bound None
+    search: expanded 5 tried 25 frontier 6 best None bound None
+    search: expanded 6 tried 31 frontier 5 best None bound None
+    search: expanded 7 tried 37 frontier 7 best None bound None
+    search: expanded 8 tried 38 frontier 7 best None bound None
+    search: expanded 9 tried 39 frontier 7 best None bound None
+    search: expanded 10 tried 40 frontier 7 best None bound None
+    search: expanded 11 tried 46 frontier 8 best None bound None
+    search: expanded 12 tried 50 frontier 10 best None bound None
+    search: expanded 13 tried 56 frontier 11 best None bound None
+    search: expanded 14 tried 59 frontier 12 best None bound None
+    search: expanded 15 tried 65 frontier 11 best None bound None
+    search: expanded 16 tried 71 frontier 16 best None bound None
+    search: expanded 17 tried 74 frontier 16 best None bound None
+    search: expanded 18 tried 80 frontier 16 best None bound None
+    search: expanded 19 tried 82 frontier 16 best None bound None
+    search: expanded 20 tried 84 frontier 15 best None bound None
+    search: expanded 21 tried 90 frontier 16 best None bound None
+    search: expanded 22 tried 95 frontier 16 best 100768 bound None
+    search: expanded 23 tried 96 frontier 16 best 100768 bound None
+    search: expanded 24 tried 101 frontier 16 best 100768 bound None
+    search: expanded 25 tried 102 frontier 16 best 100768 bound None
+    search: expanded 26 tried 108 frontier 16 best 100768 bound None
+    search: expanded 27 tried 113 frontier 15 best 100768 bound None
+    search: expanded 28 tried 118 frontier 14 best 100768 bound None
+    search: expanded 29 tried 122 frontier 16 best 100768 bound None
+    search: expanded 30 tried 126 frontier 16 best 100768 bound None
+    search: expanded 31 tried 127 frontier 16 best 100768 bound None
+    search: expanded 32 tried 128 frontier 16 best 100768 bound None
+    search: expanded 33 tried 131 frontier 16 best 100768 bound None
+    search: expanded 34 tried 134 frontier 16 best 100768 bound None
+    search: expanded 35 tried 138 frontier 16 best 100768 bound None
+    search: expanded 36 tried 144 frontier 16 best 100768 bound None
+    search: expanded 37 tried 150 frontier 16 best 100768 bound None
+    search: expanded 38 tried 156 frontier 16 best 100768 bound None
+    search: expanded 39 tried 162 frontier 16 best 100768 bound None
+    search: expanded 40 tried 168 frontier 15 best 100768 bound None
+    search: expanded 41 tried 169 frontier 15 best 100768 bound None
+    search: expanded 42 tried 172 frontier 16 best 100768 bound None
+    search: expanded 43 tried 178 frontier 16 best 100768 bound None
+    search: expanded 44 tried 184 frontier 16 best 100768 bound None
+    search: expanded 45 tried 190 frontier 16 best 100768 bound None
+    search: expanded 46 tried 194 frontier 16 best 100768 bound None
+    search: expanded 47 tried 198 frontier 16 best 100768 bound None
+    search: expanded 48 tried 201 frontier 16 best 100768 bound None
+    search: expanded 49 tried 204 frontier 16 best 100768 bound None
+    search: expanded 50 tried 210 frontier 16 best 100768 bound None
+110  hint failed: S2#28 Fight 1 E5: answer the pirate's insult (2 or 8; fight 1 won): `after` did not hold within 1200 frames (and with 1.
+110 S2#28 Fight 1 E5: answer the pirate's insult (2 or 8 rta   415.30s search         501s ['auto: say "First you\'d better stop waving it like a"', 'auto: say "Soon you\'ll be wearing my sword like a s"', "auto: say 'You fight like a dairy farmer.'"]
+    search: expanded 1 tried 2 frontier 0 best None bound 100828
+111 S1#84 map -> forest entrance (2)                     rta   415.55s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 101368
+112 S1#85 218 -> 215 through path 686 (Back)             rta   417.80s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 102228
+113 S1#86 215 -> 220 (Left, map gate)                    rta   421.38s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 103188
+114 S1#87 220 -> 213 (Right)                             rta   425.38s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 104048
+115 S1#88 213 -> 212 (Left)                              rta   428.96s hint             1s 
+    search: expanded 1 tried 4 frontier 0 best None bound 104868
+116 S1#89 212 -> 207 (Back, into the trap)               rta   432.38s hint            11s 
+    search: expanded 1 tried 3 frontier 1 best None bound 105448
+    search: expanded 2 tried 5 frontier 0 best None bound 105448
+117 S1#90 forest map teleport: Look at the map in the tr rta   434.80s hint            16s 
+    search: expanded 1 tried 2 frontier 1 best None bound 105828
+    search: expanded 2 tried 5 frontier 0 best None bound 105828
+118 S1#91 207 -> 211 (Back, now touchable)               rta   436.38s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 106548
+119 S1#92 211 -> 216 (Right)                             rta   439.38s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 107028
+120 S1#93 216 -> 201 (Left)                              rta   441.38s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 107748
+121 S1#94 201 -> treasure site (Back)                    rta   444.38s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 108988
+123 S1#96 dig: Use shovel with X (treasure trial done)   rta   449.55s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 109728
+124 S2#29 Treasure site -> map (forest path 750)         rta   452.63s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 120308
+    search: expanded 2 tried 11 frontier 6 best None bound 120308
+    search: expanded 3 tried 15 frontier 7 best None bound 120308
+    search: expanded 4 tried 24 frontier 11 best 110908 bound 120308
+    search: expanded 5 tried 27 frontier 11 best 110908 bound 120308
+    search: expanded 6 tried 36 frontier 15 best 110908 bound 120308
+    search: expanded 7 tried 38 frontier 14 best 110908 bound 120308
+    search: expanded 8 tried 43 frontier 14 best 110908 bound 120308
+    search: expanded 9 tried 46 frontier 14 best 110908 bound 120308
+    search: expanded 10 tried 50 frontier 13 best 110908 bound 120308
+    search: expanded 11 tried 59 frontier 16 best 110908 bound 120308
+    search: expanded 12 tried 61 frontier 15 best 110908 bound 120308
+125 S2#30 Fight 2: wait at the fork for a fork-bound pir rta   457.55s search<hint     11s ['auto: walk to exit 911 -> room 218', 'auto: walk to exit 687 -> room 85', 'auto: stand and wait']
+    search: expanded 1 tried 2 frontier 2 best None bound 111268
+    search: expanded 2 tried 6 frontier 3 best 111248 bound 111268
+    search: expanded 3 tried 10 frontier 3 best 111248 bound 111268
+    search: expanded 4 tried 13 frontier 2 best 111248 bound 111268
+    search: expanded 5 tried 15 frontier 1 best 111248 bound 111268
+    search: expanded 6 tried 18 frontier 0 best 111248 bound 111268
+126 S2#31 Fight 2: choose 'Prepare to die' (encounter 2) rta   459.05s hint             1s 
+    search: expanded 1 tried 6 frontier 0 best 111468 bound 112308
+127 S2#32 Fight 2 E1: insult 16 'apes', pirate must coun rta   463.38s hint             0s 
+    search: expanded 1 tried 6 frontier 0 best 112448 bound 113228
+128 S2#33 Fight 2 E2: answer the pirate's insult (2, 8 o rta   467.22s hint             1s 
+    search: expanded 1 tried 6 frontier 1 best 113428 bound 114208
+    search: expanded 2 tried 7 frontier 0 best 113428 bound 114208
+129 S2#34 Fight 2 E3: insult 2 'shish kebab' (pirate mus rta   471.30s hint             1s 
+    search: expanded 1 tried 5 frontier 1 best None bound 115008
+    search: expanded 2 tried 6 frontier 0 best None bound 115008
+130 S2#35 Fight 2 E4: insult 8 'dairy farmer' (fight 2 w rta   474.63s hint            11s 
+    search: expanded 1 tried 9 frontier 1 best None bound 115448
+    search: expanded 2 tried 13 frontier 0 best None bound 115448
+131 S2#36 Fight 3: wait at the fork for a fork-bound pir rta   476.47s hint             2s 
+    search: expanded 1 tried 2 frontier 2 best None bound 115808
+    search: expanded 2 tried 6 frontier 3 best 115788 bound 115808
+    search: expanded 3 tried 10 frontier 3 best 115788 bound 115808
+    search: expanded 4 tried 13 frontier 2 best 115788 bound 115808
+    search: expanded 5 tried 15 frontier 1 best 115788 bound 115808
+    search: expanded 6 tried 18 frontier 0 best 115788 bound 115808
+132 S2#37 Fight 3: choose 'Prepare to die' (encounter 3) rta   477.97s hint             2s 
+    search: expanded 1 tried 6 frontier 0 best None bound 116808
+133 S2#38 Fight 3 E1: insult 2 'shish kebab' (pirate mus rta   482.13s hint             2s 
+    search: expanded 1 tried 6 frontier 1 best None bound 117808
+    search: expanded 2 tried 7 frontier 1 best None bound 117808
+    search: expanded 3 tried 11 frontier 0 best None bound 117808
+134 S2#39 Fight 3 E2: insult 8 'dairy farmer' (pirate mu rta   486.30s hint             2s 
+    search: expanded 1 tried 5 frontier 1 best None bound 118548
+    search: expanded 2 tried 6 frontier 0 best None bound 118548
+135 S2#40 Fight 3 E3: insult 16 'apes' (fight 3 won)     rta   489.38s hint             9s 
+    search: expanded 1 tried 2 frontier 0 best None bound 118608
+136 S2#41 Map -> fork (forest screen 218)                rta   489.63s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 119148
+137 S2#42 Forest 218 -> 215: up (path 686)               rta   491.88s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 119628
+138 S2#43 Forest 215 -> 203: up                          rta   493.88s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 120448
+139 S2#44 Forest 203 -> 202: right                       rta   497.30s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 121328
+140 S2#45 Forest 202 -> 205: right                       rta   500.97s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 122408
+141 S2#46 Forest 205 -> 217: left                        rta   505.47s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 123148
+142 S2#47 Forest 217 -> 209: up                          rta   508.55s hint             1s 
+    search: expanded 1 tried 1 frontier 0 best None bound 123808
+143 S2#48 Use sign (log bridge over the ravine)          rta   511.30s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 125168
+    search: expanded 2 tried 4 frontier 0 best None bound 125168
+144 S2#49 Forest 209 -> Sword Master's clearing: right o rta   516.97s hint             1s 
+    search: expanded 1 tried 1 frontier 0 best None bound 128248
+146 S2#51 Walk to the Sword Master (starts the challenge rta   529.80s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 128268
+147 S2#52 Esc: skip 'How dare you approach the Sword Mas rta   529.88s hint             0s 
+    search: expanded 1 tried 3 frontier 1 best 128668 bound 128848
+148 S2#53 Carla menu: 'My name is Guybrush Threepwood.   rta   532.30s hint             8s 
+    search: expanded 1 tried 6 frontier 0 best 128988 bound 129828
+149 S2#54 Carla E1: answer her insult (planned 32 -> 'fa rta   536.38s hint             1s 
+    search: expanded 1 tried 6 frontier 4 best 129968 bound 130888
+150 S2#55 Carla E2: answer her insult (planned 21 -> 'fa rta   540.80s hint             7s 
+    search: expanded 1 tried 6 frontier 4 best 131028 bound 131948
+151 S2#56 Carla E3: answer her insult (planned 33 -> 'fa rta   545.22s hint             7s 
+    search: expanded 1 tried 6 frontier 4 best 132088 bound None
+152  hint failed: S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster'): `until` did not hold within 1200 frames of frame 627
+152 S2#57 Carla E4: answer her insult (planned 18 -> 'fe rta   545.80s search          20s ["auto: say 'How appropriate.  You fight like a cow.'"]
+    search: expanded 1 tried 2 frontier 2 best None bound None
+    search: expanded 2 tried 8 frontier 5 best None bound None
+    search: expanded 3 tried 14 frontier 4 best None bound None
+    search: expanded 4 tried 20 frontier 7 best None bound None
+    search: expanded 5 tried 26 frontier 6 best None bound None
+    search: expanded 6 tried 32 frontier 5 best None bound None
+    search: expanded 7 tried 38 frontier 4 best None bound None
+    search: expanded 8 tried 44 frontier 7 best None bound None
+    search: expanded 9 tried 50 frontier 6 best None bound None
+    search: expanded 10 tried 56 frontier 5 best None bound None
+    search: expanded 11 tried 62 frontier 4 best None bound None
+    search: expanded 12 tried 68 frontier 7 best None bound None
+    search: expanded 13 tried 74 frontier 6 best None bound None
+    search: expanded 14 tried 80 frontier 5 best None bound None
+    search: expanded 15 tried 86 frontier 4 best None bound None
+    search: expanded 16 tried 92 frontier 4 best 137628 bound None
+    search: expanded 17 tried 94 frontier 3 best 137628 bound None
+    search: expanded 18 tried 100 frontier 2 best 137628 bound None
+    search: expanded 19 tried 106 frontier 1 best 137628 bound None
+    search: expanded 20 tried 112 frontier 0 best 137628 bound None
+153  hint failed: S2#58 Carla E5: answer her insult (planned 24 -> 'cow') (Carla beaten, T-shirt): var 240 is 30, which has no planned rep
+153 S2#58 Carla E5: answer her insult (planned 24 -> 'co rta   568.89s search          11s ['auto: say "First you\'d better stop waving it like a"', 'auto: say "First you\'d better stop waving it like a"', 'auto: say "I\'m glad to hear you attended your famil"']
+    search: expanded 1 tried 2 frontier 0 best None bound 140808
+154 S2#59 Leave the Sword Master's clearing              rta   582.14s hint             3s 
+    search: expanded 1 tried 2 frontier 1 best None bound 142068
+    search: expanded 2 tried 4 frontier 0 best None bound 142068
+155 S3#1 Map: village (forces the kidnap scene)          rta   587.39s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 142308
+156 S3#2 Esc the kidnap cutscene                         rta   588.39s hint             0s 
+    search: expanded 1 tried 4 frontier 0 best None bound 142428
+158 S3#4 Esc the lookout's speech (note, Bit[304])       rta   588.89s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 142908
+159 S3#5 Cu-dock: walk to the left dock edge             rta   590.89s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 144486
+160 S3#6 Dock: cliffside to the Lookout                  rta   597.46s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 145446
+161 S3#7 Lookout: path to the map                        rta   601.46s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best None bound 147426
+162 S3#8 Map: Stan's (lights)                            rta   609.71s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 148046
+163 S3#9 Stan: skip 'Howdy!'                             rta   612.30s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 148366
+    search: expanded 2 tried 7 frontier 1 best None bound 148366
+    search: expanded 3 tried 12 frontier 0 best None bound 148366
+165 S3#11 Stan: 'I really don't have that much to spend. rta   613.63s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 149826
+166 S3#12 Stan: skip to the Sea Monkey pitch             rta   619.71s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 150046
+    search: expanded 2 tried 8 frontier 3 best None bound 150046
+    search: expanded 3 tried 14 frontier 4 best None bound 150046
+    search: expanded 4 tried 19 frontier 3 best None bound 150046
+    search: expanded 5 tried 24 frontier 2 best None bound 150046
+    search: expanded 6 tried 29 frontier 1 best None bound 150046
+    search: expanded 7 tried 34 frontier 0 best None bound 150046
+169 S3#15 Stan: Esc the credit speech, skip 'brass tacks rta   620.63s hint             2s 
+    search: expanded 1 tried 2 frontier 2 best None bound 150166
+    search: expanded 2 tried 6 frontier 1 best None bound 150166
+    search: expanded 3 tried 10 frontier 0 best None bound 150166
+171 S3#17 Stan: 'Forget it.  I don't need this boat anyw rta   621.13s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 150966
+    search: expanded 2 tried 4 frontier 2 best None bound 150966
+    search: expanded 3 tried 6 frontier 1 best None bound 150966
+    search: expanded 4 tried 9 frontier 0 best None bound 150966
+174 S3#20 Stan: skip 'Of course I am...'                 rta   624.46s hint             1s 
+    search: expanded 1 tried 2 frontier 2 best None bound 151086
+    search: expanded 2 tried 6 frontier 1 best None bound 151086
+    search: expanded 3 tried 10 frontier 0 best None bound 151086
+176 S3#22 Stan: 'Let's talk extras.'                     rta   624.96s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 151446
+    search: expanded 2 tried 5 frontier 2 best 151366 bound 151446
+    search: expanded 3 tried 8 frontier 2 best 151366 bound 151446
+179 S3#25 Stan: skip reply + 'But wait, there's more!' ( rta   626.46s hint             1s 
+    search: expanded 1 tried 3 frontier 1 best 151586 bound 151666
+181 S3#27 Stan: skip reply + 'But wait, there's more!' ( rta   627.38s hint             0s 
+    search: expanded 1 tried 3 frontier 1 best 151826 bound 151906
+    search: expanded 2 tried 7 frontier 0 best 151826 bound 151906
+183 S3#29 Stan: skip reply + 'But wait, there's more!' ( rta   628.38s hint             1s 
+    search: expanded 1 tried 3 frontier 1 best 152066 bound 152146
+    search: expanded 2 tried 7 frontier 0 best 152066 bound 152146
+185 S3#31 Stan: skip reply + 'But wait, there's more!' ( rta   629.38s hint             1s 
+    search: expanded 1 tried 3 frontier 1 best 152286 bound 152366
+187 S3#33 Stan: skip reply + 'But wait, there's more!' ( rta   630.30s hint             0s 
+    search: expanded 1 tried 3 frontier 1 best 152506 bound 152586
+189 S3#35 Stan: skip reply + 'But wait, there's more!' ( rta   631.21s hint             0s 
+    search: expanded 1 tried 3 frontier 3 best None bound 153006
+    search: expanded 2 tried 7 frontier 5 best None bound 153006
+    search: expanded 3 tried 10 frontier 5 best None bound 153006
+    search: expanded 4 tried 13 frontier 5 best None bound 153006
+    search: expanded 5 tried 16 frontier 4 best None bound 153006
+    search: expanded 6 tried 20 frontier 3 best None bound 153006
+    search: expanded 7 tried 25 frontier 2 best None bound 153006
+    search: expanded 8 tried 29 frontier 1 best None bound 153006
+    search: expanded 9 tried 33 frontier 0 best None bound 153006
+194 S3#40 Stan: offer 5000 (accepted at Var[202] = 4750) rta   632.96s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 153066
+196 S3#42 Stan: Esc the closing (ship bought, compass)   rta   633.21s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 155066
+197 S3#43 Stan's: path back to the map                   rta   641.55s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 156826
+198 S3#44 Map: Sword Master's                            rta   648.88s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 159846
+199 S3#45 Give LeChuck's note 907 to the Sword Master    rta   661.46s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best None bound 160786
+200 S3#46 Esc Carla's 'What's this? ... I'll meet you at rta   665.38s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 163966
+201 S3#47 Leave the clearing (triggers 'Meanwhile')      rta   678.63s hint             3s 
+    search: expanded 1 tried 2 frontier 0 best None bound 163986
+202 S3#48 Esc 'Meanwhile...'                             rta   678.71s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best None bound 166146
+203 S3#49 Map: shore (Hook Isle)                         rta   687.71s hint             1s 
+    search: expanded 1 tried 9 frontier 0 best 167406 bound 168346
+204 S3#50 Use cable with rubber chicken (zip to the hous rta   696.88s hint            38s 
+    search: expanded 1 tried 2 frontier 1 best None bound 169026
+    search: expanded 2 tried 11 frontier 0 best None bound 169026
+205 S3#51 Climb down pole 600 (empty spot below the pole rta   699.71s hint            11s 
+    search: expanded 1 tried 3 frontier 0 best None bound 170586
+206 S3#52 Open the door of Meathook's house              rta   706.21s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 170626
+207 S3#53 Enter Meathook's house                         rta   706.38s hint             0s 
+208 S3#54 Esc Meathook's 'Hey! I don't like visitors!'   rta   708.38s hint             0s 
+    search: expanded 1 tried 4 frontier 3 best None bound 171466
+    search: expanded 2 tried 7 frontier 4 best None bound 171466
+    search: expanded 3 tried 9 frontier 4 best None bound 171466
+    search: expanded 4 tried 13 frontier 3 best None bound 171466
+    search: expanded 5 tried 15 frontier 2 best None bound 171466
+    search: expanded 6 tried 19 frontier 1 best None bound 171466
+    search: expanded 7 tried 21 frontier 0 best None bound 171466
+212 S3#58 Esc 'Now, if only we had a captain...', skip ' rta   709.88s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 171486
+213 S3#59 Esc Meathook's beast demonstration             rta   709.96s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best None bound 172186
+    search: expanded 2 tried 4 frontier 0 best None bound 172186
+214 S3#60 Open the little door (the beast)               rta   712.88s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 173106
+    search: expanded 2 tried 6 frontier 2 best None bound 173106
+    search: expanded 3 tried 8 frontier 1 best None bound 173106
+    search: expanded 4 tried 10 frontier 0 best None bound 173106
+218 S3#64 Esc 'I don't believe it... You are a brave man rta   716.72s hint             5s 
+    search: expanded 1 tried 8 frontier 0 best 175066 bound 176206
+219 S3#65 Use cable with rubber chicken (zip back)       rta   729.63s hint            17s 
+    search: expanded 1 tried 2 frontier 1 best None bound 176886
+    search: expanded 2 tried 11 frontier 0 best None bound 176886
+221 S3#67 Climb down pole 601                            rta   732.47s hint            21s 
+    search: expanded 1 tried 2 frontier 0 best None bound 177886
+222 S3#68 Hook Isle: path back to the map                rta   736.63s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best None bound 180306
+223 S3#69 Map: village (to the dock, no cutscene now)    rta   746.72s hint             1s 
+224 S3#70 Open the SCUMM Bar door (only if closed)       rta   746.72s already          0s []
+    search: expanded 1 tried 2 frontier 0 best None bound 183306
+225 S3#71 Enter the SCUMM Bar                            rta   759.22s hint             3s 
+    search: expanded 1 tried 4 frontier 0 best None bound 183946
+226 S3#72 Pick up mug 364                                rta   761.88s hint             1s 
+    search: expanded 1 tried 4 frontier 1 best None bound 184646
+    search: expanded 2 tried 8 frontier 1 best 184566 bound 184646
+    search: expanded 3 tried 12 frontier 0 best 184566 bound 184646
+227 S3#73 Pick up mug 365                                rta   764.47s search<hint      2s ['auto: scripted walk via ', 'auto: verb 9 mug']
+    search: expanded 1 tried 4 frontier 1 best None bound 185146
+    search: expanded 2 tried 8 frontier 0 best None bound 185146
+228 S3#74 Pick up mug 366                                rta   766.88s hint             1s 
+229 S3#75 Open the kitchen door (only if closed)         rta   766.88s already          0s []
+    search: expanded 1 tried 4 frontier 0 best None bound 185526
+230 S3#76 Enter the kitchen                              rta   768.47s hint             1s 
+    search: expanded 1 tried 6 frontier 1 best None bound 186086
+    search: expanded 2 tried 16 frontier 1 best None bound 186086
+    search: expanded 3 tried 22 frontier 0 best None bound 186086
+231 S3#77 Use barrel with mug 364 (fill with grog)       rta   770.80s hint             8s 
+    search: expanded 1 tried 2 frontier 0 best None bound 186246
+232 S3#78 Kitchen: back to the bar                       rta   771.47s hint             0s 
+    search: expanded 1 tried 4 frontier 1 best None bound 188486
+    search: expanded 2 tried 8 frontier 0 best 187646 bound 188486
+233 S3#79 Leave the SCUMM Bar                            rta   777.30s search<hint      3s ['auto: scripted walk via ', 'auto: walk to exit 315 -> room 33']
+    search: expanded 1 tried 2 frontier 0 best None bound 188666
+234 S3#80 Dock: archway to Low Street                    rta   781.55s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound 191166
+    search: expanded 2 tried 5 frontier 0 best None bound 191166
+235 S3#81 Low Street: archway to High Street             rta   791.97s hint             1s 
+    search: expanded 1 tried 3 frontier 0 best 192706 bound 192746
+237 S3#83 High Street: into the jail                     rta   798.38s search<hint      4s ['auto: walk to exit 434 -> room 31']
+    search: expanded 1 tried 9 frontier 1 best 193306 bound 193446
+    search: expanded 2 tried 11 frontier 1 best 193306 bound 193446
+238 S3#84 Talk to the prisoner                           rta   801.47s hint            11s 
+    search: expanded 1 tried 3 frontier 0 best None bound 193546
+239 S3#85 Otis: 'The Governor's been kidnapped!'         rta   801.88s hint             0s 
+    search: expanded 1 tried 2 frontier 2 best None bound 193666
+    search: expanded 2 tried 5 frontier 1 best None bound 193666
+    search: expanded 3 tried 8 frontier 0 best None bound 193666
+241 S3#87 Otis: 'If I let you out, would you join my cre rta   802.38s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 193786
+242 S3#88 Skip 'Sure! Of course! ... Until then, I pace. rta   802.88s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best None bound 194366
+243 S3#89 Jail: out to High Street                       rta   805.30s hint             0s 
+244 S3#90 Open the store door (only if closed)           rta   805.30s already          0s []
+    search: expanded 1 tried 3 frontier 0 best None bound 195466
+245 S3#91 Enter the store                                rta   809.88s hint             2s 
+    search: expanded 1 tried 2 frontier 0 best 195546 bound 196486
+249 S3#95 Leave the store (slide held)                   rta   814.13s hint             0s 
+    search: expanded 1 tried 3 frontier 0 best 197686 bound 197766
+251 S3#97 High Street: into the jail (slide held)        rta   819.14s search<hint      2s ['auto: walk to exit 434 -> room 31']
+    search: expanded 1 tried 4 frontier 1 best None bound None
+    search: expanded 2 tried 8 frontier 2 best None bound None
+    search: expanded 3 tried 12 frontier 2 best None bound None
+    search: expanded 4 tried 16 frontier 3 best None bound None
+    search: expanded 5 tried 20 frontier 3 best None bound None
+    search: expanded 6 tried 24 frontier 4 best None bound None
+    search: expanded 7 tried 28 frontier 4 best None bound None
+    search: expanded 8 tried 32 frontier 5 best None bound None
+    search: expanded 9 tried 36 frontier 4 best None bound None
+    search: expanded 10 tried 39 frontier 5 best None bound None
+    search: expanded 11 tried 42 frontier 6 best None bound None
+    search: expanded 12 tried 45 frontier 7 best None bound None
+    search: expanded 13 tried 48 frontier 8 best None bound None
+    search: expanded 14 tried 52 frontier 8 best None bound None
+    search: expanded 15 tried 56 frontier 8 best None bound None
+    search: expanded 16 tried 60 frontier 8 best None bound None
+    search: expanded 17 tried 64 frontier 7 best None bound None
+    search: expanded 18 tried 67 frontier 8 best None bound None
+    search: expanded 19 tried 70 frontier 7 best None bound None
+    search: expanded 20 tried 73 frontier 8 best None bound None
+    search: expanded 21 tried 76 frontier 7 best None bound None
+    search: expanded 22 tried 80 frontier 6 best None bound None
+    search: expanded 23 tried 83 frontier 7 best None bound None
+    search: expanded 24 tried 86 frontier 6 best None bound None
+    search: expanded 25 tried 90 frontier 6 best None bound None
+    search: expanded 26 tried 93 frontier 7 best None bound None
+    search: expanded 27 tried 97 frontier 8 best None bound None
+    search: expanded 28 tried 100 frontier 7 best None bound None
+    search: expanded 29 tried 104 frontier 7 best None bound None
+    search: expanded 30 tried 108 frontier 6 best None bound None
+    search: expanded 31 tried 112 frontier 7 best None bound None
+    search: expanded 32 tried 116 frontier 7 best None bound None
+    search: expanded 33 tried 120 frontier 8 best None bound None
+    search: expanded 35 tried 124 frontier 8 best None bound None
+    search: expanded 36 tried 127 frontier 9 best None bound None
+    search: expanded 37 tried 131 frontier 10 best None bound None
+    search: expanded 38 tried 135 frontier 10 best None bound None
+    search: expanded 39 tried 138 frontier 11 best None bound None
+    search: expanded 40 tried 142 frontier 12 best None bound None
+    search: expanded 41 tried 146 frontier 11 best None bound None
+    search: expanded 42 tried 149 frontier 12 best None bound None
+    search: expanded 43 tried 153 frontier 13 best None bound None
+    search: expanded 44 tried 157 frontier 14 best None bound None
+    search: expanded 45 tried 160 frontier 15 best None bound None
+    search: expanded 46 tried 163 frontier 15 best None bound None
+    search: expanded 48 tried 167 frontier 14 best None bound None
+    search: expanded 49 tried 171 frontier 14 best None bound None
+    search: expanded 50 tried 175 frontier 15 best None bound None
+    search: expanded 51 tried 179 frontier 14 best None bound None
+    search: expanded 52 tried 182 frontier 15 best None bound None
+    search: expanded 53 tried 186 frontier 15 best None bound None
+    search: expanded 54 tried 190 frontier 15 best None bound None
+    search: expanded 55 tried 193 frontier 16 best None bound None
+    search: expanded 56 tried 197 frontier 16 best None bound None
+    search: expanded 57 tried 200 frontier 16 best None bound None
+    search: expanded 58 tried 204 frontier 16 best None bound None
+    search: expanded 62 tried 207 frontier 13 best None bound None
+    search: expanded 63 tried 210 frontier 13 best None bound None
+    search: expanded 64 tried 213 frontier 13 best None bound None
+    search: expanded 65 tried 216 frontier 13 best None bound None
+    search: expanded 66 tried 219 frontier 13 best None bound None
+    search: expanded 69 tried 222 frontier 12 best None bound None
+    search: expanded 70 tried 226 frontier 11 best None bound None
+    search: expanded 71 tried 230 frontier 10 best None bound None
+    search: expanded 72 tried 234 frontier 10 best None bound None
+    search: expanded 73 tried 237 frontier 10 best None bound None
+    search: expanded 74 tried 240 frontier 10 best None bound None
+    search: expanded 75 tried 243 frontier 10 best None bound None
+    search: expanded 76 tried 246 frontier 10 best None bound None
+    search: expanded 77 tried 249 frontier 11 best None bound None
+    search: expanded 78 tried 252 frontier 10 best None bound None
+    search: expanded 79 tried 256 frontier 11 best None bound None
+    search: expanded 80 tried 259 frontier 12 best None bound None
+    search: expanded 81 tried 262 frontier 11 best None bound None
+    search: expanded 83 tried 266 frontier 11 best None bound None
+    search: expanded 84 tried 269 frontier 10 best None bound None
+    search: expanded 86 tried 273 frontier 10 best None bound None
+    search: expanded 88 tried 277 frontier 10 best None bound None
+    search: expanded 89 tried 280 frontier 11 best None bound None
+    search: expanded 92 tried 284 frontier 10 best None bound None
+    search: expanded 93 tried 287 frontier 9 best None bound None
+    search: expanded 94 tried 291 frontier 10 best None bound None
+    search: expanded 95 tried 295 frontier 11 best None bound None
+    search: expanded 96 tried 298 frontier 10 best None bound None

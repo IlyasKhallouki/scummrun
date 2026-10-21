@@ -1,0 +1,11 @@
+418 S5#64 Row to room 5 (bottom edge of room 6)          rta  1054.44s hint             0s 
+419 S5#65 Row to the clearing-side beach (room 131)      rta  1064.19s hint             0s 
+420 S5#66 Beach 131: jungle to the map (room 5)          rta  1065.94s hint             0s 
+421 S5#67 Map room 5: clearing                           rta  1067.44s hint             0s 
+422 S5#68 Walk through the open gate to the idol field ( rta  1076.94s hint             1s 
+423 S6#1 Use ear with monkey head key (opens the giant h rta  1086.44s hint             0s 
+424 S6#2 Pre-walk to the mouth's walk point during scrip rta  1087.53s hint             0s 
+425 S6#3 Walk into the open mouth of the giant monkey he rta  1087.94s hint             0s 
+426 S6#4 Take out the navigator head right after the cli rta  1092.03s hint             0s 
+427 S6#5 Walk toward the catacombs cave (first try, inte rta  1092.03s already          0s []
+    search: expanded 1 tried 3 frontier 1 best None bound None

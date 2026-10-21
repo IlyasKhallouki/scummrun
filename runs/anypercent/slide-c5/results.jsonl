@@ -1,0 +1,403 @@
+{"i": 0, "name": "S1#1 logo skip (logo speed glitch, timer start)", "issue": 46, "done": 48, "rta": 0.167, "room": 38, "skipped": false}
+{"i": 1, "name": "S1#2 skip the Lookout intro", "issue": 49, "done": 50, "rta": 0.333, "room": 96, "skipped": false}
+{"i": 2, "name": "S1#3 skip the 'Part One' card", "issue": 51, "done": 51, "rta": 0.417, "room": 33, "skipped": false}
+{"i": 3, "name": "S1#4 open the SCUMM Bar door", "issue": 186, "done": 201, "rta": 12.917, "room": 33, "skipped": false}
+{"i": 4, "name": "S1#5 enter the bar", "issue": 202, "done": 203, "rta": 13.084, "room": 28, "skipped": false}
+{"i": 5, "name": "S1#6 bar: cross to the right half (curtain)", "issue": 204, "done": 235, "rta": 15.751, "room": 28, "skipped": false}
+{"i": 6, "name": "S1#7 provoke the cook (Open kitchen door while he is inside)", "issue": 274, "done": 286, "rta": 20.001, "room": 28, "skipped": false}
+{"i": 7, "name": "S1#8 enter the kitchen as the cook walks away", "issue": 456, "done": 462, "rta": 34.668, "room": 41, "skipped": false}
+{"i": 8, "name": "S2#1 INTERLEAVE S1 kitchen: open the pier door", "issue": 464, "done": 485, "rta": 36.585, "room": 41, "skipped": false}
+{"i": 9, "name": "S2#2 INTERLEAVE S1 kitchen: step on the plank (gull launch 1, sacrificed)", "issue": 486, "done": 514, "rta": 39.001, "room": 41, "skipped": false}
+{"i": 10, "name": "S2#3 INTERLEAVE S1 kitchen: step on the plank again (gull launch 2)", "issue": 515, "done": 518, "rta": 39.335, "room": 41, "skipped": false}
+{"i": 11, "name": "S2#4 INTERLEAVE S1 kitchen: pick up the fish during flight 2", "issue": 522, "done": 536, "rta": 40.835, "room": 41, "skipped": false}
+{"i": 12, "name": "S1#9 pick up the pot", "issue": 538, "done": 561, "rta": 42.918, "room": 41, "skipped": false}
+{"i": 13, "name": "S1#10 pick up the hunk of meat", "issue": 563, "done": 574, "rta": 44.001, "room": 41, "skipped": false}
+{"i": 14, "name": "S1#11 leave the kitchen", "issue": 575, "done": 579, "rta": 44.418, "room": 28, "skipped": false}
+{"i": 15, "name": "S1#12 bar: cross back to the left half (curtain)", "issue": 580, "done": 614, "rta": 47.335, "room": 28, "skipped": false}
+{"i": 16, "name": "S1#13 leave the bar (first exit: LeChuck cutscene, skipped)", "issue": 647, "done": 652, "rta": 50.502, "room": 33, "skipped": false}
+{"i": 17, "name": "S1#14 dock -> Lookout", "issue": 730, "done": 787, "rta": 61.752, "room": 38, "skipped": false}
+{"i": 18, "name": "S1#15 Lookout -> island map", "issue": 788, "done": 835, "rta": 65.752, "room": 85, "skipped": false}
+{"i": 19, "name": "S1#16 map -> clearing", "issue": 836, "done": 897, "rta": 70.919, "room": 52, "skipped": false}
+{"i": 20, "name": "S1#17 walk toward the circus tent (stopped once by local 202)", "issue": 943, "done": 943, "rta": 74.752, "room": 52, "skipped": false}
+{"i": 21, "name": "S1#18 enter the circus tent", "issue": 944, "done": 994, "rta": 79.003, "room": 51, "skipped": false}
+{"i": 22, "name": "S1#19 circus menu 1 (any line)", "issue": 1020, "done": 1020, "rta": 81.169, "room": 51, "skipped": false}
+{"i": 23, "name": "S1#20 circus menu 2: OK, I'll do it", "issue": 1047, "done": 1054, "rta": 83.069, "room": 51, "skipped": false}
+{"i": 24, "name": "S1#21 circus menu 3: Of course I have a helmet", "issue": 1057, "done": 1063, "rta": 83.819, "room": 51, "skipped": false}
+{"i": 25, "name": "S1#22 helmet: Use + the fish icon (the inventory slot just before the pot)", "issue": 1065, "done": 1086, "rta": 85.736, "room": 51, "skipped": false}
+{"i": 26, "name": "S1#23 circus menu 4 after the cannon (any line) -> 478 pieces of eight", "issue": 1229, "done": 1233, "rta": 97.987, "room": 51, "skipped": false}
+{"i": 27, "name": "S1#24 circus grounds -> map", "issue": 1307, "done": 1334, "rta": 106.403, "room": 85, "skipped": false}
+{"i": 28, "name": "S1#25 map -> forest entrance (fork, pseudo-room 218)", "issue": 1335, "done": 1365, "rta": 108.987, "room": 218, "skipped": false}
+{"i": 29, "name": "S1#26 218 -> 215 (petal screen) through path 686", "issue": 1366, "done": 1392, "rta": 111.237, "room": 215, "skipped": false}
+{"i": 30, "name": "S1#27 pick up the yellow petal (plants)", "issue": 1394, "done": 1410, "rta": 112.737, "room": 215, "skipped": false}
+{"i": 31, "name": "S1#28 215 -> 218", "issue": 1411, "done": 1427, "rta": 114.154, "room": 218, "skipped": false}
+{"i": 32, "name": "S1#29 218 -> map", "issue": 1428, "done": 1466, "rta": 117.404, "room": 85, "skipped": false}
+{"i": 33, "name": "S1#30 map -> village (lands on the dock)", "issue": 1467, "done": 1503, "rta": 120.487, "room": 33, "skipped": false}
+{"i": 34, "name": "S1#31 drug the meat: Use hunk of meat with yellow petal", "issue": 1506, "done": 1507, "rta": 120.821, "room": 33, "skipped": false}
+{"i": 35, "name": "S1#32 dock -> Low Street", "issue": 1686, "done": 1703, "rta": 137.154, "room": 35, "skipped": false}
+{"i": 36, "name": "S1#33 talk to the Citizen of Melee", "issue": 1732, "done": 1759, "rta": 141.821, "room": 35, "skipped": false}
+{"i": 37, "name": "S1#34 citizen: barber named Dominique", "issue": 1760, "done": 1766, "rta": 142.405, "room": 35, "skipped": false}
+{"i": 38, "name": "S1#35 citizen: buy the map", "issue": 1768, "done": 1776, "rta": 143.238, "room": 35, "skipped": false}
+{"i": 39, "name": "S1#36 open the Voodoo shop door", "issue": 1780, "done": 1836, "rta": 148.238, "room": 35, "skipped": false}
+{"i": 40, "name": "S1#37 enter the Voodoo shop", "issue": 1837, "done": 1838, "rta": 148.405, "room": 29, "skipped": false}
+{"i": 41, "name": "S1#38 pick up the rubber chicken", "issue": 1840, "done": 1870, "rta": 151.072, "room": 29, "skipped": false}
+{"i": 42, "name": "S1#39 open the shop door from inside", "issue": 1872, "done": 1899, "rta": 153.488, "room": 29, "skipped": false}
+{"i": 43, "name": "S1#40 leave the Voodoo shop", "issue": 1901, "done": 1902, "rta": 153.738, "room": 35, "skipped": false}
+{"i": 44, "name": "S1#41 Low Street -> High Street (clock archway)", "issue": 1903, "done": 1965, "rta": 158.989, "room": 34, "skipped": false}
+{"i": 45, "name": "S1#42 High Street -> jail", "issue": 2010, "done": 2042, "rta": 165.405, "room": 31, "skipped": false}
+{"i": 46, "name": "S1#43 Otis #1: talk to the prisoner (unlocks the mint topic)", "issue": 2044, "done": 2072, "rta": 167.905, "room": 31, "skipped": false}
+{"i": 47, "name": "S1#44 leave the jail", "issue": 2081, "done": 2109, "rta": 170.989, "room": 34, "skipped": false}
+{"i": 48, "name": "S1#45 open the store door", "issue": 2114, "done": 2173, "rta": 176.322, "room": 34, "skipped": false}
+{"i": 49, "name": "S1#46 enter the store (first visit: safe combination and storekeeper draw)", "issue": 2174, "done": 2175, "rta": 176.489, "room": 30, "skipped": false}
+{"i": 50, "name": "S1#47 pick up the shovel", "issue": 2177, "done": 2244, "rta": 182.239, "room": 30, "skipped": false}
+{"i": 51, "name": "S1#48 safe digit 1: pull the handle d1 times (here 1)", "issue": 2246, "done": 2255, "rta": 183.156, "room": 30, "skipped": false}
+{"i": 52, "name": "S1#49 safe digit 2: push the handle d2 times (here 1)", "issue": 2257, "done": 2262, "rta": 183.739, "room": 30, "skipped": false}
+{"i": 53, "name": "S1#50 safe digit 3: pull the handle d3 times (here 1)", "issue": 2264, "done": 2269, "rta": 184.323, "room": 30, "skipped": false}
+{"i": 54, "name": "S1#51 safe digit 4: push the handle d4 times (here 1): the safe opens", "issue": 2271, "done": 2283, "rta": 185.489, "room": 30, "skipped": false}
+{"i": 55, "name": "S2#5 INTERLEAVE S1 store: pick up the sword", "issue": 2285, "done": 2349, "rta": 190.99, "room": 30, "skipped": false}
+{"i": 56, "name": "S1#52 ring the bell (summons the storekeeper, opens the shop menu)", "issue": 2351, "done": 2384, "rta": 193.906, "room": 30, "skipped": false}
+{"i": 57, "name": "S1#53 shop: breath mint", "issue": 2388, "done": 2398, "rta": 195.073, "room": 30, "skipped": false}
+{"i": 58, "name": "S2#6 INTERLEAVE S1 store: choose 'About this sword...'", "issue": 2401, "done": 2405, "rta": 195.656, "room": 30, "skipped": false}
+{"i": 59, "name": "S2#7 INTERLEAVE S1 store: choose 'I want it.' (pay 100)", "issue": 2409, "done": 2421, "rta": 196.99, "room": 30, "skipped": false}
+{"i": 60, "name": "S1#54 shop: about this shovel", "issue": 2422, "done": 2426, "rta": 197.406, "room": 30, "skipped": false}
+{"i": 61, "name": "S1#55 shop: I want it (pay 75 for the shovel)", "issue": 2430, "done": 2437, "rta": 198.323, "room": 30, "skipped": false}
+{"i": 62, "name": "S2#8 INTERLEAVE S1 store: choose 'I think I'd just like to browse.' (ends the shop menu)", "issue": 2440, "done": 2446, "rta": 199.073, "room": 30, "skipped": false}
+{"i": 63, "name": "S1#56 open the store door from inside (the bell path closed it)", "issue": 2448, "done": 2472, "rta": 201.24, "room": 30, "skipped": false}
+{"i": 64, "name": "S1#57 leave the store", "issue": 2474, "done": 2475, "rta": 201.49, "room": 34, "skipped": false}
+{"i": 65, "name": "S1#58 High Street: town half -> mansion half", "issue": 2510, "done": 2573, "rta": 209.657, "room": 34, "skipped": false}
+{"i": 66, "name": "S1#59 enter the mansion grounds", "issue": 2574, "done": 2638, "rta": 215.074, "room": 36, "skipped": false}
+{"i": 67, "name": "S1#60 give the drugged meat to the poodles", "issue": 2642, "done": 2728, "rta": 222.574, "room": 36, "skipped": false}
+{"i": 68, "name": "S1#61 open the mansion door (dismisses the sign)", "issue": 2759, "done": 2794, "rta": 228.074, "room": 36, "skipped": false}
+{"i": 69, "name": "S1#62 enter the foyer", "issue": 2795, "done": 2796, "rta": 228.241, "room": 53, "skipped": false}
+{"i": 70, "name": "S1#63 open the idol-room door", "issue": 2798, "done": 2817, "rta": 229.991, "room": 53, "skipped": false}
+{"i": 71, "name": "S1#64 walk into the idol room (first visit: repellent)", "issue": 2818, "done": 2819, "rta": 230.158, "room": 53, "skipped": false}
+{"i": 72, "name": "S1#65 leave the foyer", "issue": 2905, "done": 2919, "rta": 238.491, "room": 36, "skipped": false}
+{"i": 73, "name": "S1#66 mansion grounds -> High Street", "issue": 2921, "done": 2968, "rta": 242.575, "room": 34, "skipped": false}
+{"i": 74, "name": "S1#67 High Street: mansion half -> town half", "issue": 2970, "done": 3074, "rta": 251.408, "room": 34, "skipped": false}
+{"i": 75, "name": "S1#68 High Street -> jail (Otis #2)", "issue": 3076, "done": 3094, "rta": 253.075, "room": 31, "skipped": false}
+{"i": 76, "name": "S1#69 give the breath mints to Otis", "issue": 3097, "done": 3141, "rta": 256.992, "room": 31, "skipped": false}
+{"i": 77, "name": "S1#70 Otis: leave the conversation", "issue": 3144, "done": 3148, "rta": 257.575, "room": 31, "skipped": false}
+{"i": 78, "name": "S1#71 give the gopher repellent to Otis (carrot cake)", "issue": 3153, "done": 3178, "rta": 260.075, "room": 31, "skipped": false}
+{"i": 79, "name": "S1#72 open the cake (the file)", "issue": 3180, "done": 3181, "rta": 260.325, "room": 31, "skipped": false}
+{"i": 80, "name": "S1#73 leave the jail", "issue": 3182, "done": 3210, "rta": 262.742, "room": 34, "skipped": false}
+{"i": 81, "name": "S1#74 High Street: town half -> mansion half (2)", "issue": 3211, "done": 3269, "rta": 267.659, "room": 34, "skipped": false}
+{"i": 82, "name": "S1#75 enter the mansion grounds (2)", "issue": 3270, "done": 3334, "rta": 273.076, "room": 36, "skipped": false}
+{"i": 83, "name": "S1#76 enter the foyer (door still open)", "issue": 3335, "done": 3380, "rta": 276.909, "room": 53, "skipped": false}
+{"i": 84, "name": "S1#77 walk to the gaping hole (the theft)", "issue": 3382, "done": 3447, "rta": 282.493, "room": 53, "skipped": false}
+{"i": 85, "name": "S1#78 Fester menu (any line)", "issue": 3493, "done": 3497, "rta": 286.659, "room": 53, "skipped": false}
+{"i": 86, "name": "S1#79 open the foyer door: Fester throws Guybrush in the sea", "issue": 3530, "done": 3552, "rta": 291.393, "room": 42, "skipped": false}
+{"i": 87, "name": "S1#80 pick up the idol underwater (idol trial done)", "issue": 3554, "done": 3624, "rta": 297.468, "room": 42, "skipped": false}
+{"i": 88, "name": "S1#81 close-up dock -> dock", "issue": 3636, "done": 3662, "rta": 300.635, "room": 33, "skipped": false}
+{"i": 89, "name": "S1#82 dock -> Lookout (2)", "issue": 3663, "done": 3740, "rta": 307.21, "room": 38, "skipped": false}
+{"i": 90, "name": "S1#83 Lookout -> island map (2)", "issue": 3741, "done": 3788, "rta": 311.21, "room": 85, "skipped": false}
+{"i": 91, "name": "S2#9 Map -> troll bridge", "issue": 3789, "done": 3866, "rta": 317.71, "room": 57, "skipped": false}
+{"i": 92, "name": "S2#10 Give fish to troll (no troll conversation)", "issue": 3870, "done": 4019, "rta": 330.461, "room": 85, "skipped": false}
+{"i": 93, "name": "S2#11 Map -> Smirk's house", "issue": 4020, "done": 4081, "rta": 335.628, "room": 43, "skipped": false}
+{"i": 94, "name": "S2#12 Open Smirk's door", "issue": 4083, "done": 4150, "rta": 341.378, "room": 43, "skipped": false}
+{"i": 95, "name": "S2#13 Smirk menu 1: 'best swordfighter'", "issue": 4151, "done": 4160, "rta": 342.211, "room": 76, "skipped": false}
+{"i": 96, "name": "S2#14 Esc: skip Smirk's close-up", "issue": 4161, "done": 4164, "rta": 342.545, "room": 43, "skipped": false}
+{"i": 97, "name": "S2#15 Smirk menu 2: 'I do so have what it takes!' (1/3)", "issue": 4165, "done": 4169, "rta": 342.961, "room": 43, "skipped": false}
+{"i": 98, "name": "S2#16 Smirk menu 2: 'I do so!' (2/3)", "issue": 4172, "done": 4176, "rta": 343.545, "room": 43, "skipped": false}
+{"i": 99, "name": "S2#17 Smirk menu 2: 'I do so!' (3/3)", "issue": 4179, "done": 4183, "rta": 344.128, "room": 43, "skipped": false}
+{"i": 100, "name": "S2#18 Smirk menu 3: 'I've got 30 pieces of eight.'", "issue": 4193, "done": 4197, "rta": 345.295, "room": 43, "skipped": false}
+{"i": 101, "name": "S2#19 Smirk menu 4: 'OK, check it out.'", "issue": 4202, "done": 4212, "rta": 346.545, "room": 60, "skipped": false}
+{"i": 102, "name": "S2#20 Esc: skip Smirk's training", "issue": 4213, "done": 4214, "rta": 346.711, "room": 43, "skipped": false}
+{"i": 103, "name": "S2#21 Leave Smirk's (right path)", "done": 4284, "rta": 352.545, "how": "hint", "via": ["S2#21 Leave Smirk's (right path)"]}
+{"i": 104, "name": "S2#22 Fight 1: intercept a pirate on the map", "done": 4481, "rta": 368.962, "how": "hint", "via": ["S2#22 Fight 1: intercept a pirate on the map"]}
+{"i": 105, "name": "S2#23 Fight 1: choose 'Prepare to die' (encounter 1)", "done": 4499, "rta": 370.462, "how": "hint", "via": ["S2#23 Fight 1: choose 'Prepare to die' (encounter 1)"]}
+{"i": 106, "name": "S2#24 Fight 1 E1: insult 2 'shish kebab' (pirate must fail)", "done": 4552, "rta": 378.129, "how": "hint", "via": ["S2#24 Fight 1 E1: insult 2 'shish kebab' (pirate must fail)"]}
+{"i": 107, "name": "S2#25 Fight 1 E2: insult 8 'dairy farmer' (pirate must fail)", "done": 4598, "rta": 384.629, "how": "hint", "via": ["S2#25 Fight 1 E2: insult 8 'dairy farmer' (pirate must fail)"]}
+{"i": 108, "name": "S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16)", "done": 4632, "rta": 388.963, "how": "hint", "via": ["S2#26 Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16)"]}
+{"i": 109, "name": "S2#27 Fight 1 E4: answer 16 wrongly ('Oh yeah?'), learn insult 16", "done": 4666, "rta": 393.296, "how": "hint", "via": ["S2#27 Fight 1 E4: answer 16 wrongly ('Oh yeah?'), learn insult 16"]}
+{"i": 110, "name": "S2#28 Fight 1 E5: answer the pirate's insult (2 or 8; fight 1 won)", "done": 4688, "rta": 396.046, "how": "hint", "via": ["S2#28 Fight 1 E5: answer the pirate's insult (2 or 8; fight 1 won)"]}
+{"i": 111, "name": "S1#84 map -> forest entrance (2)", "done": 4704, "rta": 397.38, "how": "hint", "via": ["S1#84 map -> forest entrance (2)"]}
+{"i": 112, "name": "S1#85 218 -> 215 through path 686 (Back)", "done": 4731, "rta": 399.63, "how": "hint", "via": ["S1#85 218 -> 215 through path 686 (Back)"]}
+{"i": 113, "name": "S1#86 215 -> 220 (Left, map gate)", "done": 4774, "rta": 403.213, "how": "hint", "via": ["S1#86 215 -> 220 (Left, map gate)"]}
+{"i": 114, "name": "S1#87 220 -> 213 (Right)", "done": 4822, "rta": 407.213, "how": "hint", "via": ["S1#87 220 -> 213 (Right)"]}
+{"i": 115, "name": "S1#88 213 -> 212 (Left)", "done": 4865, "rta": 410.797, "how": "hint", "via": ["S1#88 213 -> 212 (Left)"]}
+{"i": 116, "name": "S1#89 212 -> 207 (Back, into the trap)", "done": 4906, "rta": 414.214, "how": "hint", "via": ["S1#89 212 -> 207 (Back, into the trap)"]}
+{"i": 117, "name": "S1#90 forest map teleport: Look at the map in the trapped 207", "done": 4935, "rta": 416.63, "how": "hint", "via": ["S1#90 forest map teleport: Look at the map in the trapped 207"]}
+{"i": 118, "name": "S1#91 207 -> 211 (Back, now touchable)", "done": 4954, "rta": 418.214, "how": "hint", "via": ["S1#91 207 -> 211 (Back, now touchable)"]}
+{"i": 119, "name": "S1#92 211 -> 216 (Right)", "done": 4990, "rta": 421.214, "how": "hint", "via": ["S1#92 211 -> 216 (Right)"]}
+{"i": 120, "name": "S1#93 216 -> 201 (Left)", "done": 5014, "rta": 423.214, "how": "hint", "via": ["S1#93 216 -> 201 (Left)"]}
+{"i": 121, "name": "S1#94 201 -> treasure site (Back)", "done": 5050, "rta": 426.214, "how": "hint", "via": ["S1#94 201 -> treasure site (Back)"]}
+{"i": 123, "name": "S1#96 dig: Use shovel with X (treasure trial done)", "done": 5112, "rta": 431.381, "how": "hint", "via": ["S1#95 walk right until the X is on screen", "S1#96 dig: Use shovel with X (treasure trial done)"]}
+{"i": 124, "name": "S2#29 Treasure site -> map (forest path 750)", "done": 5149, "rta": 434.464, "how": "hint", "via": ["S2#29 Treasure site -> map (forest path 750)"]}
+{"i": 125, "name": "S2#30 Fight 2: wait at the fork for a fork-bound pirate", "done": 5187, "rta": 437.631, "how": "hint", "via": ["S2#30 Fight 2: wait at the fork for a fork-bound pirate"]}
+{"i": 126, "name": "S2#31 Fight 2: choose 'Prepare to die' (encounter 2)", "done": 5205, "rta": 439.131, "how": "hint", "via": ["S2#31 Fight 2: choose 'Prepare to die' (encounter 2)"]}
+{"i": 127, "name": "S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion')", "done": 5246, "rta": 444.048, "how": "hint", "via": ["S2#32 Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion')"]}
+{"i": 128, "name": "S2#33 Fight 2 E2: answer the pirate's insult (2, 8 or 16)", "done": 5274, "rta": 447.881, "how": "hint", "via": ["S2#33 Fight 2 E2: answer the pirate's insult (2, 8 or 16)"]}
+{"i": 129, "name": "S2#34 Fight 2 E3: insult 2 'shish kebab' (pirate must fail)", "done": 5306, "rta": 452.048, "how": "hint", "via": ["S2#34 Fight 2 E3: insult 2 'shish kebab' (pirate must fail)"]}
+{"i": 130, "name": "S2#35 Fight 2 E4: insult 8 'dairy farmer' (fight 2 won)", "done": 5335, "rta": 455.382, "how": "hint", "via": ["S2#35 Fight 2 E4: insult 8 'dairy farmer' (fight 2 won)"]}
+{"i": 131, "name": "S2#36 Fight 3: wait at the fork for a fork-bound pirate", "done": 5373, "rta": 458.548, "how": "hint", "via": ["S2#36 Fight 3: wait at the fork for a fork-bound pirate"]}
+{"i": 132, "name": "S2#37 Fight 3: choose 'Prepare to die' (encounter 3)", "done": 5391, "rta": 460.048, "how": "hint", "via": ["S2#37 Fight 3: choose 'Prepare to die' (encounter 3)"]}
+{"i": 133, "name": "S2#38 Fight 3 E1: insult 2 'shish kebab' (pirate must fail)", "done": 5422, "rta": 464.132, "how": "hint", "via": ["S2#38 Fight 3 E1: insult 2 'shish kebab' (pirate must fail)"]}
+{"i": 134, "name": "S2#39 Fight 3 E2: insult 8 'dairy farmer' (pirate must fail)", "done": 5454, "rta": 468.299, "how": "hint", "via": ["S2#39 Fight 3 E2: insult 8 'dairy farmer' (pirate must fail)"]}
+{"i": 135, "name": "S2#40 Fight 3 E3: insult 16 'apes' (fight 3 won)", "done": 5480, "rta": 471.382, "how": "hint", "via": ["S2#40 Fight 3 E3: insult 16 'apes' (fight 3 won)"]}
+{"i": 136, "name": "S2#41 Map -> fork (forest screen 218)", "done": 5483, "rta": 471.632, "how": "hint", "via": ["S2#41 Map -> fork (forest screen 218)"]}
+{"i": 137, "name": "S2#42 Forest 218 -> 215: up (path 686)", "done": 5510, "rta": 473.882, "how": "hint", "via": ["S2#42 Forest 218 -> 215: up (path 686)"]}
+{"i": 138, "name": "S2#43 Forest 215 -> 203: up", "done": 5534, "rta": 475.882, "how": "hint", "via": ["S2#43 Forest 215 -> 203: up"]}
+{"i": 139, "name": "S2#44 Forest 203 -> 202: right", "done": 5575, "rta": 479.299, "how": "hint", "via": ["S2#44 Forest 203 -> 202: right"]}
+{"i": 140, "name": "S2#45 Forest 202 -> 205: right", "done": 5619, "rta": 482.966, "how": "hint", "via": ["S2#45 Forest 202 -> 205: right"]}
+{"i": 141, "name": "S2#46 Forest 205 -> 217: left", "done": 5673, "rta": 487.466, "how": "hint", "via": ["S2#46 Forest 205 -> 217: left"]}
+{"i": 142, "name": "S2#47 Forest 217 -> 209: up", "done": 5710, "rta": 490.549, "how": "hint", "via": ["S2#47 Forest 217 -> 209: up"]}
+{"i": 143, "name": "S2#48 Use sign (log bridge over the ravine)", "done": 5743, "rta": 493.299, "how": "hint", "via": ["S2#48 Use sign (log bridge over the ravine)"]}
+{"i": 144, "name": "S2#49 Forest 209 -> Sword Master's clearing: right over the log", "done": 5811, "rta": 498.966, "how": "hint", "via": ["S2#49 Forest 209 -> Sword Master's clearing: right over the log"]}
+{"i": 146, "name": "S2#51 Walk to the Sword Master (starts the challenge)", "done": 5965, "rta": 511.8, "how": "hint", "via": ["S2#50 Walk right toward the Sword Master (one held floor click)", "S2#51 Walk to the Sword Master (starts the challenge)"]}
+{"i": 147, "name": "S2#52 Esc: skip 'How dare you approach the Sword Master...'", "done": 5966, "rta": 511.883, "how": "hint", "via": ["S2#52 Esc: skip 'How dare you approach the Sword Master...'"]}
+{"i": 148, "name": "S2#53 Carla menu: 'My name is Guybrush Threepwood.  I've come to kill you.'", "done": 5991, "rta": 513.967, "how": "hint", "via": ["S2#53 Carla menu: 'My name is Guybrush Threepwood.  I've come to kill you.'"]}
+{"i": 149, "name": "S2#54 Carla E1: answer her insult (planned 32 -> 'family reunion')", "done": 6024, "rta": 518.217, "how": "hint", "via": ["S2#54 Carla E1: answer her insult (planned 32 -> 'family reunion')"]}
+{"i": 150, "name": "S2#55 Carla E2: answer her insult (planned 21 -> 'family reunion')", "done": 6062, "rta": 522.884, "how": "hint", "via": ["S2#55 Carla E2: answer her insult (planned 21 -> 'family reunion')"]}
+{"i": 151, "name": "S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion')", "done": 6102, "rta": 527.717, "how": "hint", "via": ["S2#56 Carla E3: answer her insult (planned 33 -> 'family reunion')"]}
+{"i": 152, "name": "S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster')", "done": 6140, "rta": 532.384, "how": "hint", "via": ["S2#57 Carla E4: answer her insult (planned 18 -> 'feather-duster')"]}
+{"i": 153, "name": "S2#58 Carla E5: answer her insult (planned 24 -> 'cow') (Carla beaten, T-shirt)", "done": 6168, "rta": 535.634, "how": "hint", "via": ["S2#58 Carla E5: answer her insult (planned 24 -> 'cow') (Carla beaten, T-shirt)"]}
+{"i": 154, "name": "S2#59 Leave the Sword Master's clearing", "done": 6327, "rta": 548.885, "how": "hint", "via": ["S2#59 Leave the Sword Master's clearing"]}
+{"i": 155, "name": "S3#1 Map: village (forces the kidnap scene)", "done": 6390, "rta": 554.135, "how": "hint", "via": ["S3#1 Map: village (forces the kidnap scene)"]}
+{"i": 156, "name": "S3#2 Esc the kidnap cutscene", "done": 6402, "rta": 555.135, "how": "hint", "via": ["S3#2 Esc the kidnap cutscene"]}
+{"i": 158, "name": "S3#4 Esc the lookout's speech (note, Bit[304])", "done": 6408, "rta": 555.635, "how": "hint", "via": ["S3#3 Kidnap dialogue: 'Where did they go?'", "S3#4 Esc the lookout's speech (note, Bit[304])"]}
+{"i": 159, "name": "S3#5 Cu-dock: walk to the left dock edge", "done": 6432, "rta": 557.635, "how": "hint", "via": ["S3#5 Cu-dock: walk to the left dock edge"]}
+{"i": 160, "name": "S3#6 Dock: cliffside to the Lookout", "done": 6510, "rta": 564.21, "how": "hint", "via": ["S3#6 Dock: cliffside to the Lookout"]}
+{"i": 161, "name": "S3#7 Lookout: path to the map", "done": 6558, "rta": 568.21, "how": "hint", "via": ["S3#7 Lookout: path to the map"]}
+{"i": 162, "name": "S3#8 Map: Stan's (lights)", "done": 6657, "rta": 576.461, "how": "hint", "via": ["S3#8 Map: Stan's (lights)"]}
+{"i": 163, "name": "S3#9 Stan: skip 'Howdy!'", "done": 6688, "rta": 579.044, "how": "hint", "via": ["S3#9 Stan: skip 'Howdy!'"]}
+{"i": 165, "name": "S3#11 Stan: 'I really don't have that much to spend.' (the Sea Monkey)", "done": 6704, "rta": 580.377, "how": "hint", "via": ["S3#10 Stan: Esc the sales intro, skip 'So tell me-- / What are you interested in...'", "S3#11 Stan: 'I really don't have that much to spend.' (the Sea Monkey)"]}
+{"i": 166, "name": "S3#12 Stan: skip to the Sea Monkey pitch", "done": 6777, "rta": 586.461, "how": "hint", "via": ["S3#12 Stan: skip to the Sea Monkey pitch"]}
+{"i": 169, "name": "S3#15 Stan: Esc the credit speech, skip 'brass tacks'", "done": 6788, "rta": 587.378, "how": "hint", "via": ["S3#13 Stan: Esc the Sea Monkey story", "S3#14 Stan: 'I got credit from the storekeeper.  Will you take it?'", "S3#15 Stan: Esc the credit speech, skip 'brass tacks'"]}
+{"i": 171, "name": "S3#17 Stan: 'Forget it.  I don't need this boat anyway.' (-1000)", "done": 6794, "rta": 587.878, "how": "hint", "via": ["S3#16 Stan: Esc the haggling speech", "S3#17 Stan: 'Forget it.  I don't need this boat anyway.' (-1000)"]}
+{"i": 174, "name": "S3#20 Stan: skip 'Of course I am...'", "done": 6834, "rta": 591.211, "how": "hint", "via": ["S3#18 Stan: skip 'Now, wait a second!' lines", "S3#19 Stan: 'Well, maybe you're right...'", "S3#20 Stan: skip 'Of course I am...'"]}
+{"i": 176, "name": "S3#22 Stan: 'Let's talk extras.'", "done": 6840, "rta": 591.711, "how": "hint", "via": ["S3#21 Stan: Esc the second haggling speech", "S3#22 Stan: 'Let's talk extras.'"]}
+{"i": 179, "name": "S3#25 Stan: skip reply + 'But wait, there's more!' (1/6)", "done": 6858, "rta": 593.211, "how": "hint", "via": ["S3#23 Stan: skip 'Extras? ... For instance' and the porthole defoggers line", "S3#24 Stan: refuse extra 1: porthole defoggers", "S3#25 Stan: skip reply + 'But wait, there's more!' (1/6)"]}
+{"i": 181, "name": "S3#27 Stan: skip reply + 'But wait, there's more!' (2/6)", "done": 6869, "rta": 594.128, "how": "hint", "via": ["S3#26 Stan: refuse extra 2: anti-lock anchor", "S3#27 Stan: skip reply + 'But wait, there's more!' (2/6)"]}
+{"i": 183, "name": "S3#29 Stan: skip reply + 'But wait, there's more!' (3/6)", "done": 6881, "rta": 595.128, "how": "hint", "via": ["S3#28 Stan: refuse extra 3: rack-and-pinion rudder", "S3#29 Stan: skip reply + 'But wait, there's more!' (3/6)"]}
+{"i": 185, "name": "S3#31 Stan: skip reply + 'But wait, there's more!' (4/6)", "done": 6893, "rta": 596.128, "how": "hint", "via": ["S3#30 Stan: refuse extra 4: velour sail covers", "S3#31 Stan: skip reply + 'But wait, there's more!' (4/6)"]}
+{"i": 187, "name": "S3#33 Stan: skip reply + 'But wait, there's more!' (5/6)", "done": 6904, "rta": 597.045, "how": "hint", "via": ["S3#32 Stan: refuse extra 5: tack-o-meter", "S3#33 Stan: skip reply + 'But wait, there's more!' (5/6)"]}
+{"i": 189, "name": "S3#35 Stan: skip reply + 'But wait, there's more!' (6/6)", "done": 6915, "rta": 597.961, "how": "hint", "via": ["S3#34 Stan: refuse extra 6: burgundy-cask elevator", "S3#35 Stan: skip reply + 'But wait, there's more!' (6/6)"]}
+{"i": 194, "name": "S3#40 Stan: offer 5000 (accepted at Var[202] = 4750)", "done": 6936, "rta": 599.711, "how": "hint", "via": ["S3#36 Stan: 'Enough about extras, already.'", "S3#37 Stan: skip 'Okay, where were we'", "S3#38 Stan: 'I'd like to make you an offer.'", "S3#39 Stan: skip 'Great! / How much?'", "S3#40 Stan: offer 5000 (accepted at Var[202] = 4750)"]}
+{"i": 196, "name": "S3#42 Stan: Esc the closing (ship bought, compass)", "done": 6939, "rta": 599.961, "how": "hint", "via": ["S3#41 Stan: skip 'Five thousand pieces of eight?!?'", "S3#42 Stan: Esc the closing (ship bought, compass)"]}
+{"i": 197, "name": "S3#43 Stan's: path back to the map", "done": 7039, "rta": 608.295, "how": "hint", "via": ["S3#43 Stan's: path back to the map"]}
+{"i": 198, "name": "S3#44 Map: Sword Master's", "done": 7127, "rta": 615.628, "how": "hint", "via": ["S3#44 Map: Sword Master's"]}
+{"i": 199, "name": "S3#45 Give LeChuck's note 907 to the Sword Master", "done": 7278, "rta": 628.212, "how": "hint", "via": ["S3#45 Give LeChuck's note 907 to the Sword Master"]}
+{"i": 200, "name": "S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.'", "done": 7325, "rta": 632.129, "how": "hint", "via": ["S3#46 Esc Carla's 'What's this? ... I'll meet you at the dock.'"]}
+{"i": 201, "name": "S3#47 Leave the clearing (triggers 'Meanwhile')", "done": 7484, "rta": 645.379, "how": "hint", "via": ["S3#47 Leave the clearing (triggers 'Meanwhile')"]}
+{"i": 202, "name": "S3#48 Esc 'Meanwhile...'", "done": 7485, "rta": 645.463, "how": "hint", "via": ["S3#48 Esc 'Meanwhile...'"]}
+{"i": 203, "name": "S3#49 Map: shore (Hook Isle)", "done": 7593, "rta": 654.463, "how": "hint", "via": ["S3#49 Map: shore (Hook Isle)"]}
+{"i": 204, "name": "S3#50 Use cable with rubber chicken (zip to the house)", "done": 7703, "rta": 663.63, "how": "hint", "via": ["S3#50 Use cable with rubber chicken (zip to the house)"]}
+{"i": 205, "name": "S3#51 Climb down pole 600 (empty spot below the pole top)", "done": 7737, "rta": 666.463, "how": "hint", "via": ["S3#51 Climb down pole 600 (empty spot below the pole top)"]}
+{"i": 206, "name": "S3#52 Open the door of Meathook's house", "done": 7815, "rta": 672.964, "how": "hint", "via": ["S3#52 Open the door of Meathook's house"]}
+{"i": 207, "name": "S3#53 Enter Meathook's house", "done": 7817, "rta": 673.13, "how": "hint", "via": ["S3#53 Enter Meathook's house"]}
+{"i": 208, "name": "S3#54 Esc Meathook's 'Hey! I don't like visitors!'", "done": 7841, "rta": 675.13, "how": "hint", "via": ["S3#54 Esc Meathook's 'Hey! I don't like visitors!'"]}
+{"i": 212, "name": "S3#58 Esc 'Now, if only we had a captain...', skip 'Walk this way.'", "done": 7859, "rta": 676.63, "how": "hint", "via": ["S3#55 Meathook: 'The Governor's been KIDNAPPED!'", "S3#56 Esc 'That's preposterous! ... This is horrible!'", "S3#57 Meathook: 'We could get a crew together and sail off after them.'", "S3#58 Esc 'Now, if only we had a captain...', skip 'Walk this way.'"]}
+{"i": 213, "name": "S3#59 Esc Meathook's beast demonstration", "done": 7860, "rta": 676.714, "how": "hint", "via": ["S3#59 Esc Meathook's beast demonstration"]}
+{"i": 214, "name": "S3#60 Open the little door (the beast)", "done": 7895, "rta": 679.631, "how": "hint", "via": ["S3#60 Open the little door (the beast)"]}
+{"i": 218, "name": "S3#64 Esc 'I don't believe it... You are a brave man' (Meathook joins)", "done": 7941, "rta": 683.464, "how": "hint", "via": ["S3#61 Esc the 'AAAAAAIIIIIEEEEE!!!' close-up", "S3#62 Tap the murderous winged devil", "S3#63 Skip Meathook's 'I don't believe it.'", "S3#64 Esc 'I don't believe it... You are a brave man' (Meathook joins)"]}
+{"i": 219, "name": "S3#65 Use cable with rubber chicken (zip back)", "done": 8096, "rta": 696.381, "how": "hint", "via": ["S3#65 Use cable with rubber chicken (zip back)"]}
+{"i": 221, "name": "S3#67 Climb down pole 601", "done": 8130, "rta": 699.215, "how": "hint", "via": ["S3#66 Skip 'Wow!  It works both ways. / That's some chicken.'", "S3#67 Climb down pole 601"]}
+{"i": 222, "name": "S3#68 Hook Isle: path back to the map", "done": 8180, "rta": 703.381, "how": "hint", "via": ["S3#68 Hook Isle: path back to the map"]}
+{"i": 223, "name": "S3#69 Map: village (to the dock, no cutscene now)", "done": 8301, "rta": 713.465, "how": "hint", "via": ["S3#69 Map: village (to the dock, no cutscene now)"]}
+{"i": 224, "name": "S3#70 Open the SCUMM Bar door (only if closed)", "done": 8301, "rta": 713.465, "how": "already", "via": []}
+{"i": 225, "name": "S3#71 Enter the SCUMM Bar", "done": 8451, "rta": 725.965, "how": "hint", "via": ["S3#71 Enter the SCUMM Bar"]}
+{"i": 226, "name": "S3#72 Pick up mug 364", "done": 8483, "rta": 728.632, "how": "hint", "via": ["S3#72 Pick up mug 364"]}
+{"i": 227, "name": "S3#73 Pick up mug 365", "done": 8518, "rta": 731.549, "how": "hint", "via": ["S3#73 Pick up mug 365"]}
+{"i": 228, "name": "S3#74 Pick up mug 366", "done": 8547, "rta": 733.966, "how": "hint", "via": ["S3#74 Pick up mug 366"]}
+{"i": 229, "name": "S3#75 Open the kitchen door (only if closed)", "done": 8547, "rta": 733.966, "how": "already", "via": []}
+{"i": 230, "name": "S3#76 Enter the kitchen", "done": 8566, "rta": 735.549, "how": "hint", "via": ["S3#76 Enter the kitchen"]}
+{"i": 231, "name": "S3#77 Use barrel with mug 364 (fill with grog)", "done": 8594, "rta": 737.882, "how": "hint", "via": ["S3#77 Use barrel with mug 364 (fill with grog)"]}
+{"i": 232, "name": "S3#78 Kitchen: back to the bar", "done": 8602, "rta": 738.549, "how": "hint", "via": ["S3#78 Kitchen: back to the bar"]}
+{"i": 233, "name": "S3#79 Leave the SCUMM Bar", "done": 8714, "rta": 747.883, "how": "hint", "via": ["S3#79 Leave the SCUMM Bar"]}
+{"i": 234, "name": "S3#80 Dock: archway to Low Street", "done": 8765, "rta": 752.133, "how": "hint", "via": ["S3#80 Dock: archway to Low Street"]}
+{"i": 235, "name": "S3#81 Low Street: archway to High Street", "done": 8890, "rta": 762.55, "how": "hint", "via": ["S3#81 Low Street: archway to High Street"]}
+{"i": 237, "name": "S3#83 High Street: into the jail", "done": 8969, "rta": 769.133, "how": "hint", "via": ["S3#82 Grog transfer 1: use mug 364 with mug 365", "S3#83 High Street: into the jail"]}
+{"i": 238, "name": "S3#84 Talk to the prisoner", "done": 9006, "rta": 772.217, "how": "hint", "via": ["S3#84 Talk to the prisoner"]}
+{"i": 239, "name": "S3#85 Otis: 'The Governor's been kidnapped!'", "done": 9011, "rta": 772.634, "how": "hint", "via": ["S3#85 Otis: 'The Governor's been kidnapped!'"]}
+{"i": 241, "name": "S3#87 Otis: 'If I let you out, would you join my crew?'", "done": 9017, "rta": 773.134, "how": "hint", "via": ["S3#86 Esc 'What? ... Here, look at this note.'", "S3#87 Otis: 'If I let you out, would you join my crew?'"]}
+{"i": 242, "name": "S3#88 Skip 'Sure! Of course! ... Until then, I pace.'", "done": 9023, "rta": 773.634, "how": "hint", "via": ["S3#88 Skip 'Sure! Of course! ... Until then, I pace.'"]}
+{"i": 243, "name": "S3#89 Jail: out to High Street", "done": 9052, "rta": 776.05, "how": "hint", "via": ["S3#89 Jail: out to High Street"]}
+{"i": 244, "name": "S3#90 Open the store door (only if closed)", "done": 9052, "rta": 776.05, "how": "already", "via": []}
+{"i": 245, "name": "S3#91 Enter the store", "done": 9107, "rta": 780.634, "how": "hint", "via": ["S3#91 Enter the store"]}
+{"i": 249, "name": "S3#95 Leave the store (slide held)", "done": 9158, "rta": 784.884, "how": "hint", "via": ["S3#92 Walk toward the pillows (right of the counter)", "S3#93 ITEM SLIDE: read the compass while walking past x=250", "S3#94 End the reading (slide = 2)", "S3#95 Leave the store (slide held)"]}
+{"i": 251, "name": "S3#97 High Street: into the jail (slide held)", "done": 9222, "rta": 790.217, "how": "hint", "via": ["S3#96 Grog transfer 2: use mug 365 with mug 366", "S3#97 High Street: into the jail (slide held)"]}
+{"i": 252, "name": "S3#98 Use mug o' grog with the lock (Otis's cutscene starts)", "done": 9251, "rta": 792.634, "how": "hint", "via": ["S3#98 Use mug o' grog with the lock (Otis's cutscene starts)"]}
+{"i": 253, "name": "S3#99 Look at the map (restores hotspots inside Otis's cutscene)", "done": 9257, "rta": 793.134, "how": "hint", "via": ["S3#99 Look at the map (restores hotspots inside Otis's cutscene)"]}
+{"i": 254, "name": "S3#100 Close the map page", "done": 9258, "rta": 793.218, "how": "hint", "via": ["S3#100 Close the map page"]}
+{"i": 258, "name": "S3#104 Leave the jail while Otis's cutscene runs", "done": 9289, "rta": 795.801, "how": "hint", "via": ["S3#101 [stall J, optional] Jail: start walking to doorway 400", "S3#102 [stall J, optional] read the compass while walking (freezes global 70)", "S3#103 [stall J, optional] Esc the reading at the doorway", "S3#104 Leave the jail while Otis's cutscene runs"]}
+{"i": 265, "name": "S3#111 High Street: archway to Low Street", "done": 9368, "rta": 802.385, "how": "hint", "via": ["S3#106 [stall H, optional] read the compass while walking (freezes global 70)", "S3#107 [stall H, optional] Esc the reading at the archway", "S3#108 [stall H2, optional] High Street: Walk to archway 433 (second reading)", "S3#109 [stall H2, optional] read the compass during the exit walk", "S3#110 [stall H2, optional] Esc the reading when ego stops", "S3#111 High Street: archway to Low Street"]}
+{"i": 272, "name": "S3#118 Low Street: archway to the end of Part I", "done": 9502, "rta": 813.552, "how": "hint", "via": ["S3#113 [stall L, optional] read the compass while walking (freezes global 70)", "S3#114 [stall L, optional] Esc the reading at the archway", "S3#115 [stall L2, optional] Low Street: Walk to archway 450 (second reading)", "S3#116 [stall L2, optional] read the compass during the exit walk", "S3#117 [stall L2, optional] Esc the reading when ego stops", "S3#118 Low Street: archway to the end of Part I"]}
+{"i": 273, "name": "S3#119 Esc Stan's farewell cutscene", "done": 9503, "rta": 813.635, "how": "hint", "via": ["S3#119 Esc Stan's farewell cutscene"]}
+{"i": 277, "name": "S3#123 Esc the crew banter (end of Part I, Part II starts)", "done": 9616, "rta": 823.214, "how": "hint", "via": ["S3#120 End of Part I: 'Otis!  I thought I'd never see you again!'", "S3#121 Skip 'Money?' and Carla's 'Yeah, we are getting paid for this, right?'", "S3#122 End of Part I: 'Boy, talk about a crummy attitude.'", "S3#123 Esc the crew banter (end of Part I, Part II starts)"]}
+{"i": 278, "name": "S4#1 Esc the Part II card", "done": 9617, "rta": 823.298, "how": "hint", "via": ["S4#1 Esc the Part II card"]}
+{"i": 280, "name": "S4#3 Skip '--sigh--'", "done": 9635, "rta": 824.798, "how": "hint", "via": ["S4#2 Esc the crew dialogue on deck", "S4#3 Skip '--sigh--'"]}
+{"i": 281, "name": "S4#4 Leave the captain's cabin (first visit)", "done": 9669, "rta": 827.631, "how": "hint", "via": ["S4#4 Leave the captain's cabin (first visit)"]}
+{"i": 282, "name": "S4#5 Deck to crew quarters (hatch)", "done": 9680, "rta": 828.548, "how": "hint", "via": ["S4#5 Deck to crew quarters (hatch)"]}
+{"i": 283, "name": "S4#6 Crew quarters to galley (door)", "done": 9689, "rta": 829.298, "how": "hint", "via": ["S4#6 Crew quarters to galley (door)"]}
+{"i": 284, "name": "S4#7 Open cupboard (first reach: wait for the carrier to end)", "done": 9702, "rta": 830.381, "how": "hint", "via": ["S4#7 Open cupboard (first reach: wait for the carrier to end)"]}
+{"i": 285, "name": "S4#8 Pick up cereal", "done": 9715, "rta": 831.465, "how": "hint", "via": ["S4#8 Pick up cereal"]}
+{"i": 286, "name": "S4#9 Galley to crew quarters (ladder)", "done": 9723, "rta": 832.131, "how": "hint", "via": ["S4#9 Galley to crew quarters (ladder)"]}
+{"i": 287, "name": "S4#10 Crew quarters to deck (ladder)", "done": 9733, "rta": 832.965, "how": "hint", "via": ["S4#10 Crew quarters to deck (ladder)"]}
+{"i": 288, "name": "S4#11 Deck to crow's nest (rope ladder)", "done": 9757, "rta": 834.965, "how": "hint", "via": ["S4#11 Deck to crow's nest (rope ladder)"]}
+{"i": 289, "name": "S4#12 Pick up the Jolly Roger", "done": 9767, "rta": 835.798, "how": "hint", "via": ["S4#12 Pick up the Jolly Roger"]}
+{"i": 290, "name": "S4#13 Crow's nest to deck (jump)", "done": 9778, "rta": 836.715, "how": "hint", "via": ["S4#13 Crow's nest to deck (jump)"]}
+{"i": 291, "name": "S4#14 Deck to captain's cabin (door)", "done": 9798, "rta": 838.382, "how": "hint", "via": ["S4#14 Deck to captain's cabin (door)"]}
+{"i": 292, "name": "S4#15 Open the cereal (inventory) on entering the cabin", "done": 9801, "rta": 838.632, "how": "hint", "via": ["S4#15 Open the cereal (inventory) on entering the cabin"]}
+{"i": 295, "name": "S4#18 Use the prize with the cabinet", "done": 9847, "rta": 842.465, "how": "hint", "via": ["S4#16 Walk to the cabinet during the crunch (cereal while walking)", "S4#17 Select Use during the crunch (after the floor click)", "S4#18 Use the prize with the cabinet"]}
+{"i": 296, "name": "S4#19 Open the heavy chest (carry it, then open it)", "done": 9885, "rta": 845.632, "how": "hint", "via": ["S4#19 Open the heavy chest (carry it, then open it)"]}
+{"i": 297, "name": "S4#20 Look at the chest (recipe and cinnamon)", "done": 9893, "rta": 846.298, "how": "hint", "via": ["S4#20 Look at the chest (recipe and cinnamon)"]}
+{"i": 298, "name": "S4#21 Skip 'Hey look! A piece of paper.'", "done": 9900, "rta": 846.882, "how": "hint", "via": ["S4#21 Skip 'Hey look! A piece of paper.'"]}
+{"i": 299, "name": "S4#22 Pick up the feather pen (unlocks the ink; later the fire fuel)", "done": 9911, "rta": 847.799, "how": "hint", "via": ["S4#22 Pick up the feather pen (unlocks the ink; later the fire fuel)"]}
+{"i": 300, "name": "S4#23 Pick up the ink", "done": 9922, "rta": 848.715, "how": "hint", "via": ["S4#23 Pick up the ink"]}
+{"i": 301, "name": "S4#24 Open the drawer (dusty-book route)", "done": 9935, "rta": 849.799, "how": "hint", "via": ["S4#24 Open the drawer (dusty-book route)"]}
+{"i": 304, "name": "S4#27 Skip the dusty-book lines", "done": 9945, "rta": 850.632, "how": "hint", "via": ["S4#25 Look at the drawer (take the dusty book)", "S4#26 Walk to the cabin door while finding the book", "S4#27 Skip the dusty-book lines"]}
+{"i": 305, "name": "S4#28 Leave the captain's cabin", "done": 9955, "rta": 851.465, "how": "hint", "via": ["S4#28 Leave the captain's cabin"]}
+{"i": 306, "name": "S4#29 Deck to crew quarters (hatch), second time", "done": 9966, "rta": 852.382, "how": "hint", "via": ["S4#29 Deck to crew quarters (hatch), second time"]}
+{"i": 307, "name": "S4#30 Crew quarters to hull (hatch)", "done": 9989, "rta": 854.299, "how": "hint", "via": ["S4#30 Crew quarters to hull (hatch)"]}
+{"i": 308, "name": "S4#31 Take gunpowder (for the pot)", "done": 10022, "rta": 857.049, "how": "hint", "via": ["S4#31 Take gunpowder (for the pot)"]}
+{"i": 309, "name": "S4#32 Pick up the giant piece of rope (moved from hull visit 2)", "done": 10043, "rta": 858.799, "how": "hint", "via": ["S4#32 Pick up the giant piece of rope (moved from hull visit 2)"]}
+{"i": 310, "name": "S4#33 Open the hull chest", "done": 10062, "rta": 860.382, "how": "hint", "via": ["S4#33 Open the hull chest"]}
+{"i": 313, "name": "S4#36 Esc the wine lines", "done": 10073, "rta": 861.299, "how": "hint", "via": ["S4#34 Look at the hull chest (fine wine)", "S4#35 Walk to the hull ladder while finding the wine", "S4#36 Esc the wine lines"]}
+{"i": 314, "name": "S4#37 Hull to crew quarters (ladder)", "done": 10091, "rta": 862.799, "how": "hint", "via": ["S4#37 Hull to crew quarters (ladder)"]}
+{"i": 315, "name": "S4#38 Crew quarters to galley (door), second time", "done": 10113, "rta": 864.632, "how": "hint", "via": ["S4#38 Crew quarters to galley (door), second time"]}
+{"i": 323, "name": "S4#46 Select Use inside the fire reach", "done": 10166, "rta": 869.049, "how": "hint", "via": ["S4#41 Use the cooking pot with the ink", "S4#42 Select Use inside the ink reach", "S4#43 Use the cooking pot with the gunpowder", "S4#44 Select 'Use feather pen' inside the gunpowder reach (inventory click during use)", "S4#45 Complete 'Use feather pen with red hot fire' (fire click only)", "S4#46 Select Use inside the fire reach"]}
+{"i": 336, "name": "S4#59 Use the cooking pot with the breath mints (eighth ingredient)", "done": 10205, "rta": 872.299, "how": "hint", "via": ["S4#54 Select Use inside the Jolly Roger reach", "S4#55 Scroll the inventory up one row inside the Jolly Roger reach (1 of 2)", "S4#56 Scroll the inventory up one row inside the Jolly Roger reach (2 of 2)", "S4#57 Use the cooking pot with the chicken", "S4#58 Select Use inside the chicken reach", "S4#59 Use the cooking pot with the breath mints (eighth ingredient)"]}
+{"i": 337, "name": "S4#60 Esc the cooking cutscene", "done": 10214, "rta": 873.049, "how": "hint", "via": ["S4#60 Esc the cooking cutscene"]}
+{"i": 339, "name": "S4#62 Skip 'I feel awful.'", "done": 10234, "rta": 874.716, "how": "hint", "via": ["S4#61 Stand up (one scene click)", "S4#62 Skip 'I feel awful.'"]}
+{"i": 340, "name": "S4#63 Pick up the pot (helmet)", "done": 10256, "rta": 876.549, "how": "hint", "via": ["S4#63 Pick up the pot (helmet)"]}
+{"i": 341, "name": "S4#64 Galley to crew quarters (ladder), second time", "done": 10266, "rta": 877.383, "how": "hint", "via": ["S4#64 Galley to crew quarters (ladder), second time"]}
+{"i": 342, "name": "S4#65 Crew quarters to hull (hatch), second time", "done": 10289, "rta": 879.3, "how": "hint", "via": ["S4#65 Crew quarters to hull (hatch), second time"]}
+{"i": 343, "name": "S4#66 Take gunpowder (for the cannon)", "done": 10322, "rta": 882.05, "how": "hint", "via": ["S4#66 Take gunpowder (for the cannon)"]}
+{"i": 344, "name": "S4#67 Hull to crew quarters (ladder), second time", "done": 10350, "rta": 884.383, "how": "hint", "via": ["S4#67 Hull to crew quarters (ladder), second time"]}
+{"i": 345, "name": "S4#68 Crew quarters to deck (ladder), last time", "done": 10371, "rta": 886.133, "how": "hint", "via": ["S4#68 Crew quarters to deck (ladder), last time"]}
+{"i": 348, "name": "S4#71 Use the rope with the cannon (fuse appears)", "done": 10407, "rta": 889.133, "how": "hint", "via": ["S4#69 Stop by the cannon during 'Monkey Island ahead'", "S4#70 Skip 'Holy Monkey Bladders! It's Monkey Island.'", "S4#71 Use the rope with the cannon (fuse appears)"]}
+{"i": 351, "name": "S4#74 Complete 'Use gunpowder in cannon nozzle' (nozzle click only)", "done": 10440, "rta": 891.883, "how": "hint", "via": ["S4#72 Light the fuse: Use the fuse with the flaming mass", "S4#73 Select 'Use gunpowder' inside the fuse reach (inventory click during use)", "S4#74 Complete 'Use gunpowder in cannon nozzle' (nozzle click only)"]}
+{"i": 352, "name": "S4#75 Walk to the cannon nozzle (climbs in, starts the shot)", "done": 10443, "rta": 892.133, "how": "hint", "via": ["S4#75 Walk to the cannon nozzle (climbs in, starts the shot)"]}
+{"i": 353, "name": "S4#76 Esc the cannon shot", "done": 10444, "rta": 892.217, "how": "hint", "via": ["S4#76 Esc the cannon shot"]}
+{"i": 354, "name": "S4#77 Esc the Part III card", "done": 10445, "rta": 892.3, "how": "hint", "via": ["S4#77 Esc the Part III card"]}
+{"i": 355, "name": "S5#1 Esc the monkey part of the arrival intro", "done": 10446, "rta": 892.383, "how": "hint", "via": ["S5#1 Esc the monkey part of the arrival intro"]}
+{"i": 356, "name": "S5#2 Esc the Herman part of the arrival intro", "done": 10447, "rta": 892.467, "how": "hint", "via": ["S5#2 Esc the Herman part of the arrival intro"]}
+{"i": 357, "name": "S5#3 Stand up (any scene click)", "done": 10468, "rta": 894.217, "how": "hint", "via": ["S5#3 Stand up (any scene click)"]}
+{"i": 358, "name": "S5#4 Main beach: jungle exit to the map", "done": 10493, "rta": 896.3, "how": "hint", "via": ["S5#4 Main beach: jungle exit to the map"]}
+{"i": 359, "name": "S5#5 Map room 2 -> room 3 (top-left edge)", "done": 10530, "rta": 899.384, "how": "hint", "via": ["S5#5 Map room 2 -> room 3 (top-left edge)"]}
+{"i": 360, "name": "S5#6 Map room 3: walk to the fort", "done": 10592, "rta": 904.55, "how": "hint", "via": ["S5#6 Map room 3: walk to the fort"]}
+{"i": 361, "name": "S5#7 Push the cannon", "done": 10622, "rta": 907.05, "how": "hint", "via": ["S5#7 Push the cannon"]}
+{"i": 362, "name": "S5#8 Pick up the gunpowder", "done": 10634, "rta": 908.051, "how": "hint", "via": ["S5#8 Pick up the gunpowder"]}
+{"i": 363, "name": "S5#9 Pick up the spyglass", "done": 10649, "rta": 909.301, "how": "hint", "via": ["S5#9 Pick up the spyglass"]}
+{"i": 364, "name": "S5#10 Leave the fort (plain exit right after the spyglass; wins Herman's delay(60) race)", "done": 10663, "rta": 910.467, "how": "hint", "via": ["S5#10 Leave the fort (plain exit right after the spyglass; wins Herman's delay(60) race)"]}
+{"i": 365, "name": "S5#11 Map room 3 -> room 4 (right edge, down the volcano trail)", "done": 10735, "rta": 916.467, "how": "hint", "via": ["S5#11 Map room 3 -> room 4 (right edge, down the volcano trail)"]}
+{"i": 366, "name": "S5#12 Map room 4: river fork", "done": 10757, "rta": 918.301, "how": "hint", "via": ["S5#12 Map room 4: river fork"]}
+{"i": 367, "name": "S5#13 Open the spyglass (lens)", "done": 10760, "rta": 918.551, "how": "hint", "via": ["S5#13 Open the spyglass (lens)"]}
+{"i": 368, "name": "S5#14 Use gunpowder with dam", "done": 10783, "rta": 920.468, "how": "hint", "via": ["S5#14 Use gunpowder with dam"]}
+{"i": 369, "name": "S5#15 Use lens with sun: dam blast", "done": 10819, "rta": 923.468, "how": "hint", "via": ["S5#15 Use lens with sun: dam blast"]}
+{"i": 370, "name": "S5#16 Oars skip 1: off-room instant exit to room 5", "done": 10820, "rta": 923.668, "how": "hint", "via": ["S5#16 Oars skip 1: off-room instant exit to room 5"]}
+{"i": 371, "name": "S5#17 Oars skip 2: walk toward room-5 exit 62 so the blast interrupts it", "done": 10835, "rta": 926.668, "how": "hint", "via": ["S5#17 Oars skip 2: walk toward room-5 exit 62 so the blast interrupts it"]}
+{"i": 372, "name": "S5#18 Row: room 4 sea box 22 -> room 5 (during the blast's slow tail)", "done": 10861, "rta": 931.168, "how": "hint", "via": ["S5#18 Row: room 4 sea box 22 -> room 5 (during the blast's slow tail)"]}
+{"i": 373, "name": "S5#19 Row to the clearing-side beach (room 5 beach -> beach room 131)", "done": 10872, "rta": 932.085, "how": "hint", "via": ["S5#19 Row to the clearing-side beach (room 5 beach -> beach room 131)"]}
+{"i": 374, "name": "S5#20 Beach 131: jungle to the map (room 5, on foot)", "done": 10893, "rta": 933.835, "how": "hint", "via": ["S5#20 Beach 131: jungle to the map (room 5, on foot)"]}
+{"i": 375, "name": "S5#21 Map room 5: clearing", "done": 10911, "rta": 935.335, "how": "hint", "via": ["S5#21 Map room 5: clearing"]}
+{"i": 376, "name": "S5#22 Pull the nose (gate opens)", "done": 10996, "rta": 942.418, "how": "hint", "via": ["S5#22 Pull the nose (gate opens)"]}
+{"i": 380, "name": "S5#26 Monkey skip 4: click 155 at the same pixel (instant entry to the idol field)", "done": 11066, "rta": 948.252, "how": "hint", "via": ["S5#23 Monkey skip 1: read LeChuck's note while holding the nose", "S5#24 Monkey skip 2: walk through the open gate under the monkey's ear", "S5#25 Monkey skip 3: Esc ends the reading", "S5#26 Monkey skip 4: click 155 at the same pixel (instant entry to the idol field)"]}
+{"i": 381, "name": "S5#27 Pick up the wimpy little idol", "done": 11080, "rta": 949.419, "how": "hint", "via": ["S5#27 Pick up the wimpy little idol"]}
+{"i": 382, "name": "S5#28 Leave the idol field", "done": 11108, "rta": 951.752, "how": "hint", "via": ["S5#28 Leave the idol field"]}
+{"i": 383, "name": "S5#29 Herman: Esc his monologue", "done": 11146, "rta": 954.919, "how": "hint", "via": ["S5#29 Herman: Esc his monologue"]}
+{"i": 384, "name": "S5#30 Herman: answer 'What?'", "done": 11160, "rta": 956.085, "how": "hint", "via": ["S5#30 Herman: answer 'What?'"]}
+{"i": 385, "name": "S5#31 Clearing: jungle back to the map", "done": 11240, "rta": 962.752, "how": "hint", "via": ["S5#31 Clearing: jungle back to the map"]}
+{"i": 386, "name": "S5#32 Map room 5: beach on foot (to beach room 131)", "done": 11268, "rta": 965.086, "how": "hint", "via": ["S5#32 Map room 5: beach on foot (to beach room 131)"]}
+{"i": 387, "name": "S5#33 Board the rowboat", "done": 11293, "rta": 967.169, "how": "hint", "via": ["S5#33 Board the rowboat"]}
+{"i": 388, "name": "S5#34 Row to room 6 (top edge of room 5)", "done": 11415, "rta": 977.336, "how": "hint", "via": ["S5#34 Row to room 6 (top edge of room 5)"]}
+{"i": 389, "name": "S5#35 Row to the village beach (room 132)", "done": 11427, "rta": 978.336, "how": "hint", "via": ["S5#35 Row to the village beach (room 132)"]}
+{"i": 390, "name": "S5#36 Beach 132: jungle to the map (room 6, on foot)", "done": 11450, "rta": 980.253, "how": "hint", "via": ["S5#36 Beach 132: jungle to the map (room 6, on foot)"]}
+{"i": 391, "name": "S5#37 Map room 6: village", "done": 11497, "rta": 984.17, "how": "hint", "via": ["S5#37 Map room 6: village"]}
+{"i": 392, "name": "S5#38 Pick up the bananas (starts the cannibal encounter)", "done": 11580, "rta": 991.087, "how": "hint", "via": ["S5#38 Pick up the bananas (starts the cannibal encounter)"]}
+{"i": 394, "name": "S5#40 Read the dusty book while the camera scrolls", "done": 11603, "rta": 993.003, "how": "hint", "via": ["S5#39 Walk right so the camera scrolls", "S5#40 Read the dusty book while the camera scrolls"]}
+{"i": 395, "name": "S5#41 Encounter: 'I'll give you anything!'", "done": 11647, "rta": 996.67, "how": "hint", "via": ["S5#41 Encounter: 'I'll give you anything!'"]}
+{"i": 396, "name": "S5#42 Give the idol to the cannibals", "done": 11652, "rta": 997.087, "how": "hint", "via": ["S5#42 Give the idol to the cannibals"]}
+{"i": 397, "name": "S5#43 Leave the village (visit 1)", "done": 11690, "rta": 1000.254, "how": "hint", "via": ["S5#43 Leave the village (visit 1)"]}
+{"i": 398, "name": "S5#44 Map room 6: village again (visit 2)", "done": 11718, "rta": 1002.587, "how": "hint", "via": ["S5#44 Map room 6: village again (visit 2)"]}
+{"i": 402, "name": "S5#48 213: 'Where are LeChuck and his crew hiding?'", "done": 11746, "rta": 1004.92, "how": "hint", "via": ["S5#45 213: 'Well, actually, there is something...'", "S5#46 213: 'I'm looking for somebody.'", "S5#47 213: 'The people I'm looking for aren't living.'", "S5#48 213: 'Where are LeChuck and his crew hiding?'"]}
+{"i": 403, "name": "S5#49 213: 'What's in your standard potion of exorcism?'", "done": 11753, "rta": 1005.504, "how": "hint", "via": ["S5#49 213: 'What's in your standard potion of exorcism?'"]}
+{"i": 404, "name": "S5#50 213: 'I'm off to find LeChuck and get the root!'", "done": 11760, "rta": 1006.087, "how": "hint", "via": ["S5#50 213: 'I'm off to find LeChuck and get the root!'"]}
+{"i": 407, "name": "S5#53 Give the leaflet to the natives", "done": 11833, "rta": 1012.171, "how": "hint", "via": ["S5#51 213: 'What's the Eadhay of the Avigatornay?'", "S5#52 Finish the dusty book (regain the slide)", "S5#53 Give the leaflet to the natives"]}
+{"i": 408, "name": "S5#54 Leaflet scene: Esc 1 ('instructions on how to get a head')", "done": 11843, "rta": 1013.004, "how": "hint", "via": ["S5#54 Leaflet scene: Esc 1 ('instructions on how to get a head')"]}
+{"i": 409, "name": "S5#55 Leaflet scene: Esc 2 (skip the navigator close-up)", "done": 11845, "rta": 1013.275, "how": "hint", "via": ["S5#55 Leaflet scene: Esc 2 (skip the navigator close-up)"]}
+{"i": 410, "name": "S5#56 Leaflet scene: Esc 3 ('follow his nose...')", "done": 11868, "rta": 1015.192, "how": "hint", "via": ["S5#56 Leaflet scene: Esc 3 ('follow his nose...')"]}
+{"i": 411, "name": "S5#57 Enter the hut", "done": 11898, "rta": 1017.692, "how": "hint", "via": ["S5#57 Enter the hut"]}
+{"i": 412, "name": "S5#58 Pick up the banana picker", "done": 11919, "rta": 1019.442, "how": "hint", "via": ["S5#58 Pick up the banana picker"]}
+{"i": 413, "name": "S5#59 Leave the hut (Herman appears)", "done": 11932, "rta": 1020.525, "how": "hint", "via": ["S5#59 Leave the hut (Herman appears)"]}
+{"i": 414, "name": "S5#60 Give the banana picker to Herman (key)", "done": 11986, "rta": 1025.025, "how": "hint", "via": ["S5#60 Give the banana picker to Herman (key)"]}
+{"i": 415, "name": "S5#61 Leave the village", "done": 12020, "rta": 1027.859, "how": "hint", "via": ["S5#61 Leave the village"]}
+{"i": 416, "name": "S5#62 Map room 6: beach on foot (to room 132)", "done": 12069, "rta": 1031.942, "how": "hint", "via": ["S5#62 Map room 6: beach on foot (to room 132)"]}
+{"i": 417, "name": "S5#63 Board the rowboat (room 132)", "done": 12089, "rta": 1033.609, "how": "hint", "via": ["S5#63 Board the rowboat (room 132)"]}
+{"i": 418, "name": "S5#64 Row to room 5 (bottom edge of room 6)", "done": 12104, "rta": 1034.859, "how": "hint", "via": ["S5#64 Row to room 5 (bottom edge of room 6)"]}
+{"i": 419, "name": "S5#65 Row to the clearing-side beach (room 131)", "done": 12221, "rta": 1044.609, "how": "hint", "via": ["S5#65 Row to the clearing-side beach (room 131)"]}
+{"i": 420, "name": "S5#66 Beach 131: jungle to the map (room 5)", "done": 12242, "rta": 1046.359, "how": "hint", "via": ["S5#66 Beach 131: jungle to the map (room 5)"]}
+{"i": 421, "name": "S5#67 Map room 5: clearing", "done": 12260, "rta": 1047.859, "how": "hint", "via": ["S5#67 Map room 5: clearing"]}
+{"i": 422, "name": "S5#68 Walk through the open gate to the idol field (S6 handoff)", "done": 12373, "rta": 1057.276, "how": "hint", "via": ["S5#68 Walk through the open gate to the idol field (S6 handoff)"]}
+{"i": 423, "name": "S6#1 Use ear with monkey head key (opens the giant head, script 94)", "done": 12487, "rta": 1066.777, "how": "hint", "via": ["S6#1 Use ear with monkey head key (opens the giant head, script 94)"]}
+{"i": 424, "name": "S6#2 Pre-walk to the mouth's walk point during script 94's last frames (slide)", "done": 12500, "rta": 1067.86, "how": "hint", "via": ["S6#2 Pre-walk to the mouth's walk point during script 94's last frames (slide)"]}
+{"i": 425, "name": "S6#3 Walk into the open mouth of the giant monkey head", "done": 12505, "rta": 1068.277, "how": "hint", "via": ["S6#3 Walk into the open mouth of the giant monkey head"]}
+{"i": 426, "name": "S6#4 Take out the navigator head right after the climb-down (room 65)", "done": 12554, "rta": 1072.36, "how": "hint", "via": ["S6#4 Take out the navigator head right after the climb-down (room 65)"]}
+{"i": 427, "name": "S6#5 Walk toward the catacombs cave (first try, interrupted by the mushroom line)", "done": 12734, "rta": 1087.361, "how": "hint", "via": ["S6#5 Walk toward the catacombs cave (first try, interrupted by the mushroom line)"]}
+{"i": 428, "name": "S6#6 Esc the mushroom line", "done": 12735, "rta": 1087.444, "how": "hint", "via": ["S6#6 Esc the mushroom line"]}
+{"i": 429, "name": "S6#7 Walk to the catacombs cave", "done": 12774, "rta": 1090.694, "how": "hint", "via": ["S6#7 Walk to the catacombs cave"]}
+{"i": 430, "name": "S6#8 Catacombs exit 1/6: walk to the cave the head points at (Var[164])", "done": 12792, "rta": 1092.194, "how": "hint", "via": ["S6#8 Catacombs exit 1/6: walk to the cave the head points at (Var[164])"]}
+{"i": 431, "name": "S6#9 Catacombs exit 2/6: walk to the cave the head points at (Var[164])", "done": 12803, "rta": 1093.111, "how": "hint", "via": ["S6#9 Catacombs exit 2/6: walk to the cave the head points at (Var[164])"]}
+{"i": 432, "name": "S6#10 Catacombs exit 3/6: walk to the cave the head points at (Var[164])", "done": 12809, "rta": 1093.611, "how": "hint", "via": ["S6#10 Catacombs exit 3/6: walk to the cave the head points at (Var[164])"]}
+{"i": 433, "name": "S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164])", "done": 12830, "rta": 1095.361, "how": "hint", "via": ["S6#11 Catacombs exit 4/6: walk to the cave the head points at (Var[164])"]}
+{"i": 434, "name": "S6#12 Catacombs exit 5/6: walk to the cave the head points at (Var[164])", "done": 12840, "rta": 1096.194, "how": "hint", "via": ["S6#12 Catacombs exit 5/6: walk to the cave the head points at (Var[164])"]}
+{"i": 435, "name": "S6#13 Catacombs exit 6/6: walk to the cave the head points at (Var[164])", "done": 12854, "rta": 1097.361, "how": "hint", "via": ["S6#13 Catacombs exit 6/6: walk to the cave the head points at (Var[164])"]}
+{"i": 436, "name": "S6#14 Put the navigator head away on arrival (record head variant, frames f0+1..f0+2)", "done": 12858, "rta": 1097.694, "how": "hint", "via": ["S6#14 Put the navigator head away on arrival (record head variant, frames f0+1..f0+2)"]}
+{"i": 439, "name": "S6#17 Read the dusty book standing at (52,83) (carries the slide across the head dialogue)", "done": 12879, "rta": 1099.444, "how": "hint", "via": ["S6#15 Walk onto walk box 8's line at (52,83)", "S6#16 Pre-select Look at during the walk", "S6#17 Read the dusty book standing at (52,83) (carries the slide across the head dialogue)"]}
+{"i": 440, "name": "S6#18 Talk to the navigator head inside the book's cutscene", "done": 12889, "rta": 1100.278, "how": "hint", "via": ["S6#18 Talk to the navigator head inside the book's cutscene"]}
+{"i": 441, "name": "S6#19 Head dialogue choice 1/5 (line 2)", "done": 12914, "rta": 1102.465, "how": "hint", "via": ["S6#19 Head dialogue choice 1/5 (line 2)"]}
+{"i": 442, "name": "S6#20 Head dialogue choice 2/5 (line 2)", "done": 12938, "rta": 1104.465, "how": "hint", "via": ["S6#20 Head dialogue choice 2/5 (line 2)"]}
+{"i": 443, "name": "S6#21 Head dialogue choice 3/5 (line 2)", "done": 12955, "rta": 1105.882, "how": "hint", "via": ["S6#21 Head dialogue choice 3/5 (line 2)"]}
+{"i": 444, "name": "S6#22 Head dialogue choice 4/5 (line 2)", "done": 12979, "rta": 1107.882, "how": "hint", "via": ["S6#22 Head dialogue choice 4/5 (line 2)"]}
+{"i": 445, "name": "S6#23 Head dialogue choice 5/5 (line 2)", "done": 12992, "rta": 1108.965, "how": "hint", "via": ["S6#23 Head dialogue choice 5/5 (line 2)"]}
+{"i": 447, "name": "S6#25 Put the head away if the dialogue took it out", "done": 13040, "rta": 1112.966, "how": "hint", "via": ["S6#24 Esc the book on the frame after 140's UserputOn (hard check: the book must still be open)", "S6#25 Put the head away if the dialogue took it out"]}
+{"i": 448, "name": "S6#26 Put the necklace on standing at (52,83) in walk box 8 (necklace skip)", "done": 13065, "rta": 1115.049, "how": "hint", "via": ["S6#26 Put the necklace on standing at (52,83) in walk box 8 (necklace skip)"]}
+{"i": 451, "name": "S6#29 Open the captain's cabin door (left door)", "done": 13196, "rta": 1125.966, "how": "hint", "via": ["S6#27 Walk to the ghost ship", "S6#28 Walk to the box-5 corner (146,115) during script 78 (slide; also skips 141's necklace animation)", "S6#29 Open the captain's cabin door (left door)"]}
+{"i": 452, "name": "S6#30 Enter the captain's cabin", "done": 13198, "rta": 1126.133, "how": "hint", "via": ["S6#30 Enter the captain's cabin"]}
+{"i": 453, "name": "S6#31 Use magnetic compass with the key (magnet pulls the key)", "done": 13233, "rta": 1129.049, "how": "hint", "via": ["S6#31 Use magnetic compass with the key (magnet pulls the key)"]}
+{"i": 454, "name": "S6#32 Leave the captain's cabin", "done": 13247, "rta": 1130.216, "how": "hint", "via": ["S6#32 Leave the captain's cabin"]}
+{"i": 455, "name": "S6#33 Down the deck hatch to the crew quarters", "done": 13304, "rta": 1134.966, "how": "hint", "via": ["S6#33 Down the deck hatch to the crew quarters"]}
+{"i": 456, "name": "S6#34 Through the passage to the hull", "done": 13332, "rta": 1137.3, "how": "hint", "via": ["S6#34 Through the passage to the hull"]}
+{"i": 457, "name": "S6#35 Use key in the hull hatch (unlock and open)", "done": 13358, "rta": 1139.466, "how": "hint", "via": ["S6#35 Use key in the hull hatch (unlock and open)"]}
+{"i": 458, "name": "S6#36 Down the hatch to the storage room", "done": 13360, "rta": 1139.633, "how": "hint", "via": ["S6#36 Down the hatch to the storage room"]}
+{"i": 461, "name": "S6#39 Feather skip 3/3: click during the rat cutscene to pick up the grease", "done": 13392, "rta": 1142.3, "how": "hint", "via": ["S6#37 Feather skip 1/3: start walking right (Walk to cooking grease)", "S6#38 Feather skip 2/3: select Pick up while hovering the grease", "S6#39 Feather skip 3/3: click during the rat cutscene to pick up the grease"]}
+{"i": 463, "name": "S6#41 Up the ladder to the hull", "done": 13418, "rta": 1144.467, "how": "hint", "via": ["S6#40 Walk back toward the ladder's walk point inside the rat cutscene", "S6#41 Up the ladder to the hull"]}
+{"i": 464, "name": "S6#42 Through the passage back to the crew quarters", "done": 13441, "rta": 1146.383, "how": "hint", "via": ["S6#42 Through the passage back to the crew quarters"]}
+{"i": 465, "name": "S6#43 Up the ladder to the deck", "done": 13468, "rta": 1148.633, "how": "hint", "via": ["S6#43 Up the ladder to the deck"]}
+{"i": 467, "name": "S6#45 Open the greased door", "done": 13478, "rta": 1149.467, "how": "hint", "via": ["S6#44 Use glob of grease on the squeaky door (right door)", "S6#45 Open the greased door"]}
+{"i": 468, "name": "S6#46 Enter the brig room", "done": 13480, "rta": 1149.633, "how": "hint", "via": ["S6#46 Enter the brig room"]}
+{"i": 469, "name": "S6#47 Pick up the ghost tools", "done": 13495, "rta": 1150.883, "how": "hint", "via": ["S6#47 Pick up the ghost tools"]}
+{"i": 470, "name": "S6#48 Back to the deck", "done": 13511, "rta": 1152.217, "how": "hint", "via": ["S6#48 Back to the deck"]}
+{"i": 471, "name": "S6#49 Down the deck hatch again", "done": 13516, "rta": 1152.634, "how": "hint", "via": ["S6#49 Down the deck hatch again"]}
+{"i": 472, "name": "S6#50 Through the passage to the hull again", "done": 13544, "rta": 1154.967, "how": "hint", "via": ["S6#50 Through the passage to the hull again"]}
+{"i": 473, "name": "S6#51 Use glowing crate with ghost tools", "done": 13680, "rta": 1166.301, "how": "hint", "via": ["S6#51 Use glowing crate with ghost tools"]}
+{"i": 474, "name": "S6#52 Look at the open crate to grab the voodoo root", "done": 13683, "rta": 1166.551, "how": "hint", "via": ["S6#52 Look at the open crate to grab the voodoo root"]}
+{"i": 475, "name": "S6#53 Through the passage to the crew quarters", "done": 13719, "rta": 1169.551, "how": "hint", "via": ["S6#53 Through the passage to the crew quarters"]}
+{"i": 476, "name": "S6#54 Up the ladder to the deck", "done": 13746, "rta": 1171.801, "how": "hint", "via": ["S6#54 Up the ladder to the deck"]}
+{"i": 477, "name": "S6#55 Leave the ghost ship", "done": 13764, "rta": 1173.301, "how": "hint", "via": ["S6#55 Leave the ghost ship"]}
+{"i": 478, "name": "S6#56 Walk into the cave with the root", "done": 13857, "rta": 1181.051, "how": "hint", "via": ["S6#56 Walk into the cave with the root"]}
+{"i": 479, "name": "S6#57 Esc 'A long walk, a brief row, and a short hike later...'", "done": 13858, "rta": 1181.134, "how": "hint", "via": ["S6#57 Esc 'A long walk, a brief row, and a short hike later...'"]}
+{"i": 480, "name": "S6#58 Esc the cannibals' root scene", "done": 13859, "rta": 1181.218, "how": "hint", "via": ["S6#58 Esc the cannibals' root scene"]}
+{"i": 481, "name": "S6#59 Walk out to the jungle (back toward the ghost-ship cliff)", "done": 13890, "rta": 1183.801, "how": "hint", "via": ["S6#59 Walk out to the jungle (back toward the ghost-ship cliff)"]}
+{"i": 482, "name": "S6#60 Esc 'After some more furious paddling...'", "done": 13891, "rta": 1183.885, "how": "hint", "via": ["S6#60 Esc 'After some more furious paddling...'"]}
+{"i": 484, "name": "S6#62 Bob scene: 'Where is the wedding?'", "done": 13929, "rta": 1187.051, "how": "hint", "via": ["S6#61 Bob scene: 'What happened to the ship?'", "S6#62 Bob scene: 'Where is the wedding?'"]}
+{"i": 487, "name": "S6#65 Esc the crew's 'Come on, let's go.' exit", "done": 14060, "rta": 1197.968, "how": "hint", "via": ["S6#63 Bob scene: 'I've got to go after them!'", "S6#64 Bob scene: 'We've got to get back to'", "S6#65 Esc the crew's 'Come on, let's go.' exit"]}
+{"i": 489, "name": "S7#2 Dock: skip script 131's three ego text segments during the walk", "done": 15654, "rta": 1330.806, "how": "hint", "via": ["S7#1 Dock: walk to the right edge (the ghost starts on arrival)", "S7#2 Dock: skip script 131's three ego text segments during the walk"]}
+{"i": 493, "name": "S7#6 Dock: walk right again (to Low Street)", "done": 15761, "rta": 1339.723, "how": "hint", "via": ["S7#3 Dock: Esc the ghost's 'Yikes!' scene", "S7#4 Dock ghost: 'Could I interest you in some root beer, sir?'", "S7#5 Dock: skip ego's root-beer line", "S7#6 Dock: walk right again (to Low Street)"]}
+{"i": 494, "name": "S7#7 Low Street: archway up to High Street (avoid the spectre)", "done": 15963, "rta": 1356.632, "how": "hint", "via": ["S7#7 Low Street: archway up to High Street (avoid the spectre)"]}
+{"i": 495, "name": "S7#8 High Street: open the church door (door closed: the default)", "done": 16017, "rta": 1361.132, "how": "hint", "via": ["S7#8 High Street: open the church door (door closed: the default)"]}
+{"i": 496, "name": "S7#9 High Street: enter the church", "done": 16019, "rta": 1361.299, "how": "hint", "via": ["S7#9 High Street: enter the church"]}
+{"i": 499, "name": "S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?'", "done": 16058, "rta": 1364.549, "how": "hint", "via": ["S7#10 Church: Esc the priest ('...speak now or forever hold his peace')", "S7#11 Church: 'Elaine!'", "S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?'"]}
+{"i": 504, "name": "S7#17 Close-up menu 2: 'If you're here, then who's that in the dress?'", "done": 16082, "rta": 1366.549, "how": "hint", "via": ["S7#13 Close-up: skip LeChuck's 'You!'", "S7#14 Close-up menu 1: 'Take THIS, you vaporous voodoo vermin!'", "S7#15 Close-up: skip ego's line (menu 1)", "S7#16 Close-up: Esc Elaine's entrance", "S7#17 Close-up menu 2: 'If you're here, then who's that in the dress?'"]}
+{"i": 505, "name": "S7#18 Close-up: skip ego's 'who's that in the dress' line", "done": 16086, "rta": 1366.882, "how": "hint", "via": ["S7#18 Close-up: skip ego's 'who's that in the dress' line"]}
+{"i": 510, "name": "S7#23 Close-up: Esc LeChuck's punch", "done": 16098, "rta": 1367.882, "how": "hint", "via": ["S7#19 Close-up: Esc the monkeys-in-the-dress scene", "S7#20 Close-up: skip 'You dared to come here and confront me! / I can't believe your audacity!'", "S7#21 Close-up menu 3: 'I've just remembered an appointment at the dentist's.' (ROUTE CHANGE)", "S7#22 Close-up: skip ego's dentist line", "S7#23 Close-up: Esc LeChuck's punch"]}
+{"i": 511, "name": "S7#24 Map: Esc the POW / BIFF flight", "done": 16100, "rta": 1368.049, "how": "hint", "via": ["S7#24 Map: Esc the POW / BIFF flight"]}
+{"i": 512, "name": "S7#25 Stan's: Esc Stan's greeting", "done": 16133, "rta": 1370.799, "how": "hint", "via": ["S7#25 Stan's: Esc Stan's greeting"]}
+{"i": 513, "name": "S7#26 Stan's: Esc Stan's sales pitch", "done": 16176, "rta": 1374.382, "how": "hint", "via": ["S7#26 Stan's: Esc Stan's sales pitch"]}
+{"i": 514, "name": "S7#27 Stan's: wake Guybrush (first input after the fight cutscene)", "done": 16291, "rta": 1383.966, "how": "hint", "via": ["S7#27 Stan's: wake Guybrush (first input after the fight cutscene)"]}
+{"i": 515, "name": "S7#28 Stan's: use root beer with LeChuck (click LeChuck's left side)", "done": 16342, "rta": 1388.216, "how": "hint", "via": ["S7#28 Stan's: use root beer with LeChuck (click LeChuck's left side)"]}
+{"i": 516, "name": "S7#29 Ending: skip 'Gasp! --choke--' (first pass)", "done": 16437, "rta": 1396.133, "how": "hint", "via": ["S7#29 Ending: skip 'Gasp! --choke--' (first pass)"]}
+{"i": 517, "name": "S7#30 Ending: skip 'Gasp! --choke--' (instant replay)", "done": 16575, "rta": 1407.634, "how": "hint", "via": ["S7#30 Ending: skip 'Gasp! --choke--' (instant replay)"]}
+{"i": 518, "name": "S7#31 Ending: skip Elaine's 'Hey...' exchange", "done": 16789, "rta": 1425.467, "how": "hint", "via": ["S7#31 Ending: skip Elaine's 'Hey...' exchange"]}
+{"i": 519, "name": "S7#32 Fireworks: skip the small talk", "done": 16879, "rta": 1432.968, "how": "hint", "via": ["S7#32 Fireworks: skip the small talk"]}
+{"i": 522, "name": "S7#35 Fireworks: skip the epilogue lines (Stan, Herman)", "done": 17045, "rta": 1446.906, "how": "hint", "via": ["S7#33 Fireworks menu 1: 'Sure.' (mouse y 171-180)", "S7#34 Fireworks: skip 'Sure.'", "S7#35 Fireworks: skip the epilogue lines (Stan, Herman)"]}
+{"i": 525, "name": "S7#38 Fireworks: skip 'Yes, I've heard that one.' (to the final fade)", "done": 17065, "rta": 1448.572, "how": "hint", "via": ["S7#36 Fireworks menu 2: 'It's not the size of the ship...' (mouse y 181-190)", "S7#37 Fireworks: skip 'It's not the size of the ship...'", "S7#38 Fireworks: skip 'Yes, I've heard that one.' (to the final fade)"]}

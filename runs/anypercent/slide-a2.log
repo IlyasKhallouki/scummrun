@@ -1,0 +1,121 @@
+273 S3#119 Esc Stan's farewell cutscene                  rta   817.97s hint             0s 
+277 S3#123 Esc the crew banter (end of Part I, Part II s rta   827.63s hint             0s 
+278 S4#1 Esc the Part II card                            rta   827.71s hint             0s 
+280 S4#3 Skip '--sigh--'                                 rta   829.21s hint             0s 
+281 S4#4 Leave the captain's cabin (first visit)         rta   829.63s hint             1s 
+    search: expanded 1 tried 2 frontier 0 best 202185 bound None
+282 S4#5 Deck to crew quarters (hatch)                   rta   837.88s search          14s ['auto: walk to exit 254 -> room 9']
+283 S4#6 Crew quarters to galley (door)                  rta   838.63s hint             0s 
+284 S4#7 Open cupboard (first reach: wait for the carrie rta   839.71s hint             0s 
+285 S4#8 Pick up cereal                                  rta   840.80s hint             0s 
+286 S4#9 Galley to crew quarters (ladder)                rta   841.47s hint             0s 
+287 S4#10 Crew quarters to deck (ladder)                 rta   842.38s hint             1s 
+288 S4#11 Deck to crow's nest (rope ladder)              rta   844.38s hint             0s 
+289 S4#12 Pick up the Jolly Roger                        rta   845.22s hint             0s 
+290 S4#13 Crow's nest to deck (jump)                     rta   846.13s hint             0s 
+291 S4#14 Deck to captain's cabin (door)                 rta   847.80s hint             0s 
+292 S4#15 Open the cereal (inventory) on entering the ca rta   848.05s hint             0s 
+295 S4#18 Use the prize with the cabinet                 rta   851.88s hint             0s 
+296 S4#19 Open the heavy chest (carry it, then open it)  rta   855.05s hint             0s 
+297 S4#20 Look at the chest (recipe and cinnamon)        rta   855.72s hint             0s 
+298 S4#21 Skip 'Hey look! A piece of paper.'             rta   856.30s hint             0s 
+299 S4#22 Pick up the feather pen (unlocks the ink; late rta   857.22s hint             0s 
+300 S4#23 Pick up the ink                                rta   858.13s hint             0s 
+301 S4#24 Open the drawer (dusty-book route)             rta   859.22s hint             0s 
+    search: expanded 1 tried 2 frontier 0 best 207505 bound None
+304 S4#27 Skip the dusty-book lines                      rta   860.05s search          13s ['auto: verb 8 drawer']
+305 S4#28 Leave the captain's cabin                      rta   861.47s hint             0s 
+306 S4#29 Deck to crew quarters (hatch), second time     rta   862.47s hint             1s 
+307 S4#30 Crew quarters to hull (hatch)                  rta   864.38s hint             0s 
+308 S4#31 Take gunpowder (for the pot)                   rta   867.13s hint             0s 
+309 S4#32 Pick up the giant piece of rope (moved from hu rta   868.88s hint             0s 
+310 S4#33 Open the hull chest                            rta   870.47s hint             0s 
+313 S4#36 Esc the wine lines                             rta   871.38s hint             0s 
+314 S4#37 Hull to crew quarters (ladder)                 rta   872.88s hint             0s 
+315 S4#38 Crew quarters to galley (door), second time    rta   874.80s hint             1s 
+    search: expanded 1 tried 24 frontier 15 best None bound None
+    search: expanded 2 tried 47 frontier 16 best None bound None
+    search: expanded 3 tried 69 frontier 16 best None bound None
+    search: expanded 4 tried 90 frontier 16 best None bound None
+    search: expanded 5 tried 110 frontier 16 best None bound None
+    search: expanded 6 tried 122 frontier 16 best None bound None
+    search: expanded 7 tried 132 frontier 16 best None bound None
+    search: expanded 8 tried 138 frontier 15 best 212965 bound None
+    search: expanded 9 tried 144 frontier 14 best 212965 bound None
+    search: expanded 10 tried 155 frontier 15 best 212965 bound None
+    search: expanded 11 tried 161 frontier 15 best 212965 bound None
+336 S4#59 Use the cooking pot with the breath mints (eig rta   882.80s search         145s ['auto: use cereal with cooking pot', 'auto: use breath mints with cooking pot', 'auto: use chicken with cooking pot']
+337 S4#60 Esc the cooking cutscene                       rta   896.63s hint             0s 
+339 S4#62 Skip 'I feel awful.'                           rta   898.30s hint             0s 
+340 S4#63 Pick up the pot (helmet)                       rta   900.13s hint             0s 
+341 S4#64 Galley to crew quarters (ladder), second time  rta   900.96s hint             0s 
+342 S4#65 Crew quarters to hull (hatch), second time     rta   902.96s hint             1s 
+343 S4#66 Take gunpowder (for the cannon)                rta   905.71s hint             0s 
+344 S4#67 Hull to crew quarters (ladder), second time    rta   908.05s hint             0s 
+345 S4#68 Crew quarters to deck (ladder), last time      rta   909.88s hint             1s 
+    search: expanded 1 tried 2 frontier 1 best None bound None
+    search: expanded 2 tried 4 frontier 0 best 220684 bound None
+348 S4#71 Use the rope with the cannon (fuse appears)    rta   914.96s search          19s ['auto: wait until idle', 'auto: verb 7 giant piece of rope']
+    search: expanded 1 tried 6 frontier 1 best 221084 bound None
+351 S4#74 Complete 'Use gunpowder in cannon nozzle' (noz rta   916.63s search           2s ['auto: use gunpowder with cannon nozzle']
+352 S4#75 Walk to the cannon nozzle (climbs in, starts t rta   916.63s already          0s []
+    search: expanded 1 tried 4 frontier 1 best None bound None
+    search: expanded 2 tried 8 frontier 2 best None bound None
+    search: expanded 3 tried 12 frontier 1 best None bound None
+    search: expanded 4 tried 22 frontier 6 best None bound None
+    search: expanded 5 tried 24 frontier 6 best None bound None
+    search: expanded 6 tried 26 frontier 6 best None bound None
+    search: expanded 7 tried 28 frontier 6 best None bound None
+    search: expanded 8 tried 30 frontier 6 best None bound None
+    search: expanded 9 tried 32 frontier 6 best None bound None
+    search: expanded 10 tried 34 frontier 6 best None bound None
+    search: expanded 11 tried 36 frontier 6 best None bound None
+    search: expanded 12 tried 38 frontier 6 best None bound None
+    search: expanded 13 tried 40 frontier 6 best None bound None
+    search: expanded 14 tried 42 frontier 6 best None bound None
+    search: expanded 15 tried 44 frontier 6 best None bound None
+    search: expanded 16 tried 46 frontier 6 best None bound None
+    search: expanded 17 tried 50 frontier 6 best None bound None
+    search: expanded 18 tried 54 frontier 6 best None bound None
+    search: expanded 19 tried 58 frontier 6 best None bound None
+    search: expanded 20 tried 62 frontier 6 best None bound None
+    search: expanded 21 tried 66 frontier 6 best None bound None
+    search: expanded 22 tried 70 frontier 6 best None bound None
+    search: expanded 23 tried 74 frontier 5 best 228984 bound None
+    search: expanded 24 tried 78 frontier 4 best 228984 bound None
+    search: expanded 25 tried 82 frontier 3 best 228984 bound None
+    search: expanded 26 tried 86 frontier 2 best 228984 bound None
+    search: expanded 27 tried 90 frontier 1 best 228984 bound None
+    search: expanded 28 tried 94 frontier 0 best 228984 bound None
+353 S4#76 Esc the cannon shot                            rta   949.55s search          27s ['auto: walk to exit 105 -> room 19', 'auto: verb 7 pot', 'auto: verb 7 pot']
+354 S4#77 Esc the Part III card                          rta   949.63s hint             0s 
+355 S5#1 Esc the monkey part of the arrival intro        rta   949.71s hint             0s 
+356 S5#2 Esc the Herman part of the arrival intro        rta   949.80s hint             0s 
+357 S5#3 Stand up (any scene click)                      rta   951.55s hint             0s 
+358 S5#4 Main beach: jungle exit to the map              rta   953.63s hint             0s 
+359 S5#5 Map room 2 -> room 3 (top-left edge)            rta   956.71s hint             0s 
+360 S5#6 Map room 3: walk to the fort                    rta   961.88s hint             0s 
+361 S5#7 Push the cannon                                 rta   964.38s hint             0s 
+362 S5#8 Pick up the gunpowder                           rta   965.38s hint             0s 
+363 S5#9 Pick up the spyglass                            rta   966.63s hint             0s 
+    search: expanded 1 tried 2 frontier 1 best 233364 bound None
+367 S5#13 Leave the fort (instant: ego already stands on rta   967.80s search          13s ['auto: walk to exit 886 -> room 3']
+368 S5#14 Map room 3 -> room 4 (right edge, down the vol rta   973.80s hint             0s 
+369 S5#15 Map room 4: river fork                         rta   975.63s hint             0s 
+370 S5#16 Open the spyglass (lens)                       rta   975.63s already          0s []
+371 S5#17 Use gunpowder with dam                         rta   977.55s hint             0s 
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 4 frontier 1 best None bound None
+    search: expanded 3 tried 5 frontier 0 best None bound None
+372 S5#18 Use lens with sun: dam blast: NOT REACHED target [{'room': 4}, {'actor_room': 1, 'eq': 0}]
+  hint failed: S5#18 Use lens with sun: dam blast: `until` did not hold within 1200 frames of frame 11469 (and with 1..12 frames of del
+  + auto: walk to exit 171 -> room 4 -> qf 236004 room 4
+  + auto: walk to exit 175 -> room 4 -> qf 236704 room 4
+  x auto: stand and wait: nothing came
+  x auto: stand and wait: nothing came
+  x auto: stand and wait: nothing came
+    search: expanded 1 tried 3 frontier 2 best None bound None
+    search: expanded 2 tried 5 frontier 1 best 237044 bound None
+    search: expanded 3 tried 7 frontier 0 best 237044 bound None
+372 S5#18 Use lens with sun: dam blast                   skipped: unreachable here
+373 S5#19 Oars skip 1: off-room instant exit to room 5   rta   983.13s search          46s ['auto: walk to exit 171 -> room 4', 'auto: walk to exit 47 -> room 5']

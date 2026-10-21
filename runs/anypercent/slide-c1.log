@@ -1,0 +1,76 @@
+  lookahead: S6#7 Walk to the catacombs cave delay 4
+429 S6#7 Walk to the catacombs cave                      rta  1110.28s hint             8s 
+  lookahead: S6#8 Catacombs exit 1/6: walk to the cav delay 0
+430 S6#8 Catacombs exit 1/6: walk to the cave the head p rta  1116.61s hint             8s 
+  lookahead: S6#9 Catacombs exit 2/6: walk to the cav delay 10
+431 S6#9 Catacombs exit 2/6: walk to the cave the head p rta  1117.94s hint            10s 
+  lookahead: S6#10 Catacombs exit 3/6: walk to the ca delay 4
+432 S6#10 Catacombs exit 3/6: walk to the cave the head  rta  1118.78s hint            21s 
+  lookahead: S6#11 Catacombs exit 4/6: walk to the ca delay 0
+433  hint failed: S6#12 Catacombs exit 5/6: walk to the cave the head points at (Var[164]): object 496 never came on screen (no floor path
+433 S6#11 Catacombs exit 4/6: walk to the cave the head  rta  1119.28s hint            18s 
+  lookahead: S6#12 Catacombs exit 5/6: walk to the ca delay 0
+434 S6#12 Catacombs exit 5/6: walk to the cave the head  rta  1120.61s hint             2s 
+  lookahead: S6#13 Catacombs exit 6/6: walk to the ca delay 0
+435 S6#13 Catacombs exit 6/6: walk to the cave the head  rta  1122.11s hint             2s 
+436 S6#14 Put the navigator head away on arrival (record rta  1122.45s hint             0s 
+439 S6#17 Read the dusty book standing at (52,83) (carri rta  1124.20s hint             0s 
+440 S6#18 Talk to the navigator head inside the book's c rta  1125.03s hint             0s 
+441 S6#19 Head dialogue choice 1/5 (line 2)              rta  1127.47s hint             0s 
+442 S6#20 Head dialogue choice 2/5 (line 2)              rta  1128.38s hint             0s 
+443 S6#21 Head dialogue choice 3/5 (line 2)              rta  1130.13s hint             0s 
+444 S6#22 Head dialogue choice 4/5 (line 2)              rta  1131.47s hint             0s 
+445 S6#23 Head dialogue choice 5/5 (line 2)              rta  1132.63s hint             0s 
+447 S6#25 Put the head away if the dialogue took it out  rta  1136.55s hint             0s 
+448 S6#26 Put the necklace on standing at (52,83) in wal rta  1138.63s hint             0s 
+451 S6#29 Open the captain's cabin door (left door)      rta  1152.88s hint             1s 
+452 S6#30 Enter the captain's cabin                      rta  1153.05s hint             0s 
+453 S6#31 Use magnetic compass with the key (magnet pull rta  1155.97s hint             0s 
+454 S6#32 Leave the captain's cabin                      rta  1157.13s hint             0s 
+455 S6#33 Down the deck hatch to the crew quarters       rta  1161.88s hint             0s 
+456 S6#34 Through the passage to the hull                rta  1164.22s hint             0s 
+457 S6#35 Use key in the hull hatch (unlock and open)    rta  1166.38s hint             0s 
+458 S6#36 Down the hatch to the storage room             rta  1166.55s hint             0s 
+461 S6#39 Feather skip 3/3: click during the rat cutscen rta  1169.22s hint             0s 
+463 S6#41 Up the ladder to the hull                      rta  1171.38s hint             0s 
+464 S6#42 Through the passage back to the crew quarters  rta  1173.30s hint             0s 
+465 S6#43 Up the ladder to the deck                      rta  1175.55s hint             0s 
+467 S6#45 Open the greased door                          rta  1176.38s hint             0s 
+468 S6#46 Enter the brig room                            rta  1176.55s hint             0s 
+469 S6#47 Pick up the ghost tools                        rta  1177.80s hint             0s 
+470 S6#48 Back to the deck                               rta  1179.13s hint             0s 
+471 S6#49 Down the deck hatch again                      rta  1179.55s hint             0s 
+472 S6#50 Through the passage to the hull again          rta  1181.88s hint             0s 
+473 S6#51 Use glowing crate with ghost tools             rta  1193.30s hint             0s 
+474 S6#52 Look at the open crate to grab the voodoo root rta  1193.55s hint             0s 
+475 S6#53 Through the passage to the crew quarters       rta  1196.55s hint             0s 
+476 S6#54 Up the ladder to the deck                      rta  1198.80s hint             0s 
+477 S6#55 Leave the ghost ship                           rta  1200.30s hint             0s 
+478 S6#56 Walk into the cave with the root               rta  1208.05s hint             0s 
+479 S6#57 Esc 'A long walk, a brief row, and a short hik rta  1208.14s hint             0s 
+480 S6#58 Esc the cannibals' root scene                  rta  1208.22s hint             0s 
+481 S6#59 Walk out to the jungle (back toward the ghost- rta  1210.80s hint             0s 
+482 S6#60 Esc 'After some more furious paddling...'      rta  1210.89s hint             0s 
+484 S6#62 Bob scene: 'Where is the wedding?'             rta  1214.05s hint             0s 
+487 S6#65 Esc the crew's 'Come on, let's go.' exit       rta  1224.97s hint             0s 
+489 S7#2 Dock: skip script 131's three ego text segments rta  1357.72s hint             2s 
+493 S7#6 Dock: walk right again (to Low Street)          rta  1366.64s hint             0s 
+494 S7#7 Low Street: archway up to High Street (avoid th rta  1383.55s hint             0s 
+495 S7#8 High Street: open the church door (door closed: rta  1388.05s hint             0s 
+496 S7#9 High Street: enter the church                   rta  1388.22s hint             0s 
+499 S7#12 Church: skip 'Elaine!' and 'Hey!! Who's that?' rta  1391.47s hint             0s 
+504 S7#17 Close-up menu 2: 'If you're here, then who's t rta  1393.47s hint             0s 
+505 S7#18 Close-up: skip ego's 'who's that in the dress' rta  1393.80s hint             0s 
+510 S7#23 Close-up: Esc LeChuck's punch                  rta  1394.80s hint             0s 
+511 S7#24 Map: Esc the POW / BIFF flight                 rta  1394.97s hint             0s 
+512 S7#25 Stan's: Esc Stan's greeting                    rta  1397.72s hint             0s 
+513 S7#26 Stan's: Esc Stan's sales pitch                 rta  1401.30s hint             0s 
+514 S7#27 Stan's: wake Guybrush (first input after the f rta  1410.88s hint             0s 
+515 S7#28 Stan's: use root beer with LeChuck (click LeCh rta  1415.13s hint             0s 
+516 S7#29 Ending: skip 'Gasp! --choke--' (first pass)    rta  1423.05s hint             0s 
+517 S7#30 Ending: skip 'Gasp! --choke--' (instant replay rta  1434.55s hint             0s 
+518 S7#31 Ending: skip Elaine's 'Hey...' exchange        rta  1452.38s hint             0s 
+519 S7#32 Fireworks: skip the small talk                 rta  1459.89s hint             0s 
+522 S7#35 Fireworks: skip the epilogue lines (Stan, Herm rta  1473.82s hint             0s 
+525 S7#38 Fireworks: skip 'Yes, I've heard that one.' (t rta  1475.49s hint             0s 
+END frame 17388 room 0
