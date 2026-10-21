@@ -15,11 +15,17 @@ replays end on frame 14820.
 That run was made with CD track 6 missing from the game folder. The "Last Part" card waits for
 that track to finish, so it lasts 130 s when the track plays and 0.2 s when the file is
 missing. In the record's video it lasts about 6 s. With the track present, the same route runs
-23:11.3. The leaderboard bans the "No Music" setting. Here the music driver is unchanged and
-every other CD track plays, so whether a missing track 6 counts is still an open question.
+23:11.3.
 
 The repo holds two projects that share the engine bridge: the Any% bot below, and the
 original glitchless Part I planner after it.
+
+## Research
+
+This repo is also a research project, written up as a paper with the working title *Speedrunning as
+Search: Script-Derived Planning and Engine-Verified Optimization for ScummVM Games*. The research
+question, the decisions and the lab notebook are in `notes/`, planned and finished experiments in
+`experiments/`, and the paper outline and claims table in `paper/`.
 
 ## Any%
 
