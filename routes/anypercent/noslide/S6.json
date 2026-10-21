@@ -1,0 +1,1241 @@
+{
+  "segment": "S6",
+  "title": "Part III without the item slide: giant monkey head, catacombs, navigator head and necklace (normal begging), ghost ship (key with the compass, feather, grog, rats, grease, tools, root), cannibals, Bob, to the 'Last Part' card (DOS CD, SCUMM v5)",
+  "entry": {
+    "room": 69,
+    "notes": "S5 no-slide exit: routes/anypercent/noslide/S5.json lists every fact below in its exit, and its last goal ends in room 69 (the slide route's S5 also ends here: routes/anypercent/S5-part3-island.json move 80). The necklace's class 6 is not in that list, but it is set from the start (index file DOBJ) and only global 140 [0C0C] clears it (or the debug warp, global/script-001.txt [0F7F]). Ego in room 69 (the idol field at the giant monkey head) or in room 12 (the search then walks through gate 155 first: exit 12 -> 69 needs state 142 == 1). Facts assumed at entry: owner(269) == 1 (the Q-tip key from Herman); has 293 (navigator head) and has 294 (its necklace, picked up with it in global/script-104.txt [04D2]-[04DA], still class 6 so the head's full dialogue runs: global/script-140.txt [0000]-[000C]); has 732 (the magnetic compass: the ONLY way to the ghost-ship key, room-072-gh-captai/local-202.txt [0000]-[0029]. It comes with the ship: Stan's closing pickupObject(732), global/script-056.txt [3EDE]-[3EEE], route S3 move 42, which the no-slide plan keeps (scripts/anypercent_auto.py drops only S3#91-#117). No script takes it away again: the index has no writer of owner 732 other than ego); state 142 == 1 (gate opened by the monkey on the totem nose, persistent: room-012-monkey-he/entry.txt [000E]-[0049]); state 151 == 0 (mouth closed); Bit[364] == 1 (Herman met, else room 12's entry starts his scene, entry.txt [006E]-[0094]); Bit[383] == 0 (no root brewed yet); Bit[426] == 0 (head put away); Bit[357] == 0 (necklace not worn); Bit[470] == 0, Bit[473] == 0, Var[286] == 0, Var[287] == 0 (head never asked); Bit[536] == 0 and Bit[545] == 0; Var[237] == 0 (ghost foot never tickled); Bit[316] == 0 (rats not fed); Bit[51] == 1, Var[19] == 5, Var[196] == 3 (from Part I, needed by S7). Bit[436] == 0 (your ship was not sunk; Part III's vista catapult with Var[242] == 2 would set it, room-011-vista-1/local-207.txt [002C]): with Bit[436] == 0 the crew comes for you at the end (room-070-hellcliff/local-204.txt [0BC1]-[0BE2]), which the last goal's hint assumes. NO SLIDE: inputs are taken only while user input is on (no clicks inside cutscenes); the bridge's automatic '.' and Esc skip lines and overrides. Goals that the script index cannot reach by an object verb handler carry a hint (catacombs, the cabin key, the grog, the grease order, the dialogues)."
+  },
+  "exit": [
+    {
+      "room": 95
+    },
+    {
+      "has": 823
+    },
+    {
+      "not": {
+        "class": 823,
+        "set": 6
+      }
+    },
+    {
+      "bit": 383,
+      "eq": 1
+    },
+    {
+      "bit": 441,
+      "eq": 1
+    },
+    {
+      "bit": 453,
+      "eq": 1
+    },
+    {
+      "var": 277,
+      "eq": 6
+    },
+    {
+      "bit": 51,
+      "eq": 1
+    },
+    {
+      "var": 19,
+      "eq": 5
+    },
+    {
+      "var": 196,
+      "eq": 3
+    }
+  ],
+  "goals": [
+    {
+      "name": "Open the giant monkey head: Use the ear with the Q-tip key",
+      "target": [
+        {
+          "state": 151,
+          "eq": 1
+        }
+      ],
+      "cite": "room-069-bighead/obj-0767-gigantic-monkey-ear.txt [006D]-[0074]; global/script-094.txt [0000], [006B]-[0080], [0089]-[0096], [009F]; room-020-main-beac/obj-0269-monkey-head-key.txt [0021]",
+      "note": "Writer: ('obj', 767, 7) with OBJ2 == 269; script 94's last drawObject sets state 151 (the open mouth). 94 is cutscene([]) with no override (about 90 frames, unskippable) and puts ego in room 12 at (876,80) ([006B]-[0080]). Click the ear (class 2, 'with') first and then the key: 'Use key with ear' goes through the key's redirect one frame later. The slide route's pre-walk inside 94 is not possible without the slide."
+    },
+    {
+      "name": "Walk into the open mouth: climb down to the underground (room 65)",
+      "target": [
+        {
+          "room": 65
+        }
+      ],
+      "cite": "room-012-monkey-he/obj-0133-gigantic-monkey-head.txt [0059]-[0071]; room-065-hellhall/entry.txt [000B], [002D]-[0034]; room-065-hellhall/local-202.txt [0000]-[0070]",
+      "note": "Exit 133 -> 65 needs state 142 == 1 (entry) and state 151 == 1 (goal 1); mouth walk point (813,84). Room 65's entry resets the catacomb counter Var[265] to 0 and, coming from room 12, runs the climb-down cutscene local 202 (no override), which ends with ego in costume 1 at the monkey-head walk point (64,82) and starts the mushroom watcher local 203 while Bit[536] == 0."
+    },
+    {
+      "name": "Take out the navigator head in room 65",
+      "target": [
+        {
+          "room": 65
+        },
+        {
+          "bit": 426,
+          "eq": 1
+        }
+      ],
+      "cite": "room-025-village/obj-0293-head-of-the-navigator.txt [009E]-[00AC]; global/script-110.txt [0000]-[0005], [0063]-[0117], [0123]-[012A], [013A]-[0151]; room-039-hellmaze/local-205.txt [0000]-[0033]",
+      "note": "Writer: Use head 293 -> script 110 (needs costume 1, which local 202 sets at [0058], and Bit[426] == 0). The room-65 pairing keeps the search from taking it out in room 39, where the first take-out also queues doSentence(8,293,0) ('I think it wants me to go to the...', Bit[545], 110 [0147]-[0151]). Do it right after the climb-down, before any walk moves the camera past x=160 (the mushroom cutscene). The head must stay out through the whole maze: local 205 counts an exit only while Bit[426] == 1."
+    },
+    {
+      "name": "Walk to the cave: enter the catacombs (room 39)",
+      "target": [
+        {
+          "room": 39
+        },
+        {
+          "bit": 426,
+          "eq": 1
+        }
+      ],
+      "cite": "room-065-hellhall/obj-0755-cave.txt [0010]-[0022]; room-065-hellhall/local-203.txt [0000]-[0012], [0067]-[006D]; room-039-hellmaze/entry.txt [0017], [004A]-[0059]; room-039-hellmaze/local-204.txt [0000]-[0104]",
+      "note": "Cave 755 answers any verb with loadRoom(39) while Bit[383] == 0 (walk point (973,87), about 900 px). On the way the camera passes x=160 and local 203 plays the mushroom cutscene once (Esc ends it via its override, Bit[536] = 1); its walkActorTo(300,120) replaces the cave walk, which must then be issued again. Room 39's entry (head owned) starts locals 207 and 206, which store the target cave in Var[164]; local 204 puts ego at a random entrance. Bit[426] == 1 is part of the target: local 205 counts an exit only while the head is out, and the catacomb hints wait for it, so a branch that reaches room 39 with the head put away is no use."
+    },
+    {
+      "name": "Catacombs exit 1/6: walk to the cave the head points at",
+      "target": [
+        {
+          "var": 265,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk to the target cave (Var[164])",
+          "verb": 11,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "obj_from_var": 164,
+          "after": [
+            {
+              "room": 39
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            },
+            {
+              "not": {
+                "var": 164,
+                "eq": 0
+              }
+            }
+          ],
+          "until": [
+            {
+              "var": 265,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "room-039-hellmaze/obj-0497-cave.txt [0024]; room-039-hellmaze/local-205.txt [0000]-[0059]; room-039-hellmaze/local-206.txt [0000]-[016D]; room-039-hellmaze/entry.txt [0017]; global/script-109.txt [0000]-[000E]; room-065-hellhall/entry.txt [000B], [0037]-[003F]",
+      "note": "HINT REQUIRED. The index sees Var[265]++ on all five caves, but the test that picks the right one is '495 == Var[164]', a guard form the search does not parse, and the exit graph offers only two caves per hop. obj_from_var is an existing Move field (src/speedrun/executor.py Move.obj_from_var, accepted by route.to_move): the executor clicks the cave id local 206 stored in Var[164]. The after waits until 206 has chosen a real cave (each room-39 entry resets Var[164] to 0, entry [0017]). Each cave's Walk to starts local 205 after the walk: right cave -> Var[265]++ and a fresh room through script 109; another cave -> Var[265]-- (minimum 0); the entrance cave (Var[266]) -> back to room 65, whose entry resets Var[265] and puts the head away (local 200), so goals 3-5 would be redone. MIDDLE MARKERS: if Var[164] is 543 or 544 (target on the other half) the after never holds; a floor walk across x=320 pans (local 202) and 206 rolls again. Crossing the middle on the way to a cave also pans and cancels the walk: re-issue. The layouts come from the RNG (slide file rng_points; runner sources 3.8). INDEX ARTEFACT: the index also lists Var[265]++ under the guard '!(Bit[426])'. That comes from descumm hiding the jump at local-205 [0018] (bytes 18 1A 00 = goto 0035): with the head put away every cave goes to the wrong-cave branch at [0035], so the head must stay out. The search keeps the 'Bit[426]' branch for each cave because it has fewer missing facts."
+    },
+    {
+      "name": "Catacombs exit 2/6: walk to the cave the head points at",
+      "target": [
+        {
+          "var": 265,
+          "eq": 2
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk to the target cave (Var[164])",
+          "verb": 11,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "obj_from_var": 164,
+          "after": [
+            {
+              "room": 39
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            },
+            {
+              "not": {
+                "var": 164,
+                "eq": 0
+              }
+            }
+          ],
+          "until": [
+            {
+              "var": 265,
+              "eq": 2
+            }
+          ]
+        }
+      ],
+      "cite": "room-039-hellmaze/obj-0497-cave.txt [0024]; room-039-hellmaze/local-205.txt [0000]-[0059]; room-039-hellmaze/local-206.txt [0000]-[016D]; global/script-109.txt [0000]-[000E]",
+      "note": "Same as exit 1/6."
+    },
+    {
+      "name": "Catacombs exit 3/6: walk to the cave the head points at",
+      "target": [
+        {
+          "var": 265,
+          "eq": 3
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk to the target cave (Var[164])",
+          "verb": 11,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "obj_from_var": 164,
+          "after": [
+            {
+              "room": 39
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            },
+            {
+              "not": {
+                "var": 164,
+                "eq": 0
+              }
+            }
+          ],
+          "until": [
+            {
+              "var": 265,
+              "eq": 3
+            }
+          ]
+        }
+      ],
+      "cite": "room-039-hellmaze/obj-0497-cave.txt [0024]; room-039-hellmaze/local-205.txt [0000]-[0059]; room-039-hellmaze/local-206.txt [0000]-[016D]; global/script-109.txt [0000]-[000E]",
+      "note": "Same as exit 1/6."
+    },
+    {
+      "name": "Catacombs exit 4/6: walk to the cave the head points at",
+      "target": [
+        {
+          "var": 265,
+          "eq": 4
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk to the target cave (Var[164])",
+          "verb": 11,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "obj_from_var": 164,
+          "after": [
+            {
+              "room": 39
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            },
+            {
+              "not": {
+                "var": 164,
+                "eq": 0
+              }
+            }
+          ],
+          "until": [
+            {
+              "var": 265,
+              "eq": 4
+            }
+          ]
+        }
+      ],
+      "cite": "room-039-hellmaze/obj-0497-cave.txt [0024]; room-039-hellmaze/local-205.txt [0000]-[0059]; room-039-hellmaze/local-206.txt [0000]-[016D]; global/script-109.txt [0000]-[000E]",
+      "note": "Same as exit 1/6."
+    },
+    {
+      "name": "Catacombs exit 5/6: walk to the cave the head points at",
+      "target": [
+        {
+          "var": 265,
+          "eq": 5
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk to the target cave (Var[164])",
+          "verb": 11,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "obj_from_var": 164,
+          "after": [
+            {
+              "room": 39
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            },
+            {
+              "not": {
+                "var": 164,
+                "eq": 0
+              }
+            }
+          ],
+          "until": [
+            {
+              "var": 265,
+              "eq": 5
+            }
+          ]
+        }
+      ],
+      "cite": "room-039-hellmaze/obj-0497-cave.txt [0024]; room-039-hellmaze/local-205.txt [0000]-[0059]; room-039-hellmaze/local-206.txt [0000]-[016D]; global/script-109.txt [0000]-[000E]",
+      "note": "Same as exit 1/6."
+    },
+    {
+      "name": "Catacombs exit 6/6: out to the ghost-ship cliff (room 70)",
+      "target": [
+        {
+          "room": 70
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk to the target cave (Var[164])",
+          "verb": 11,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "obj_from_var": 164,
+          "after": [
+            {
+              "room": 39
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            },
+            {
+              "not": {
+                "var": 164,
+                "eq": 0
+              }
+            }
+          ],
+          "until": [
+            {
+              "room": 70
+            }
+          ]
+        }
+      ],
+      "cite": "room-039-hellmaze/local-205.txt [001B]-[0025] (Var[265] >= 6 -> loadRoomWithEgo(768,70,110,96)); room-039-hellmaze/local-206.txt [0000]-[016D]; room-070-hellcliff/entry.txt [0091]-[00D5]",
+      "note": "Same as exit 1/6. Arrival frame f0: room 70's entry runs in segments and starts local 200 (head put-away cutscene) in its 4th segment while Bit[426] == 1, which is the next goal's window."
+    },
+    {
+      "name": "Put the head away on arrival at the cliff",
+      "target": [
+        {
+          "room": 70
+        },
+        {
+          "bit": 426,
+          "eq": 0
+        }
+      ],
+      "hint": [
+        {
+          "name": "Use the head on the first input frame in room 70",
+          "verb": 7,
+          "obj": 293,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 426,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "bit": 426,
+              "eq": 0
+            }
+          ],
+          "max_frames": 6
+        }
+      ],
+      "cite": "room-025-village/obj-0293-head-of-the-navigator.txt [009E]-[00A3]; global/script-111.txt [0000]-[0061]; room-070-hellcliff/entry.txt [0091]-[00D5]; room-070-hellcliff/local-200.txt [0000]-[0011]",
+      "note": "The record's head variant (runner sources 3.12 'faster variant'; works without the slide). Without input the entry's local 200 does the same after a cutscene with WaitForActor and delay(60), about 15 frames later. The Use must land by f0+2 so that 111's cutscene freezes the entry before it starts local 200. If input comes later, local 200's cutscene holds input until its own 111 has cleared Bit[426], and the click would take the head out again (110): the hint then misses its until and the search puts the head away again. The hint carries max_frames 6 (an executor Move field that route.to_move accepts, like obj_from_var). Without it the move could pass falsely: play() reads `after` once, then waits for the click gate. If the gate first opens after local 200 and 111 have run, Bit[426] is already 0, so the click's `until` holds at once while the click itself runs 110 and takes the head out again (the head would then be out for the talk and the necklace). With 6 frames, a missed window fails fast and the search's WAIT reaches the goal by local 200's own put-away."
+    },
+    {
+      "name": "Talk to the head: 'May I please have that necklace?'",
+      "target": [
+        {
+          "bit": 473,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Talk to the navigator head",
+          "verb": 10,
+          "obj": 293,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 426,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "room": 86
+            }
+          ]
+        },
+        {
+          "name": "Head dialogue: ask for the necklace (line 2)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "May I please have that necklace?",
+          "after": [
+            {
+              "room": 86
+            },
+            {
+              "bit": 473,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "bit": 473,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "room-025-village/obj-0293-head-of-the-navigator.txt [01B6]; global/script-140.txt [0000]-[000C], [00AE]-[0157], [01AC]-[0200], [025E], [03E0]-[03EA], [0442]-[0453], [056D]-[0599]; room-086-cu-naviga/local-204.txt [0000]-[0051]",
+      "note": "The necklace is the normal solution: talk and beg (no book, no slide). The full dialogue runs only in room 70 while necklace 294 still has class 6 (140 [0000]-[000C]); elsewhere the head just says 'Hello.'. Room 86 picks the line from the mouse y (local 204 [0000]-[001C]). 'Hello, head.' and line 3 loop back to this menu. With Bit[426] == 0, 140 calls 110 at its start and 111 at its end; both return at once when ego stands in walk box 8, 9 or 12 (global/script-110.txt [0030]-[0063], global/script-111.txt [0000]-[002D]). SPEEDUP the hint leaves out (it needs a position check): floor-walk to (46,85), the bottom end of walk box 8 that every path to the ship crosses, and talk on the frame after arrival. That skips 110's take-out and 111's put-away, and since 140 puts ego back at the saved spot it also gives goal 17's necklace skip (slide file moves 14-17 and glitches 'Head variant', 'Necklace skip')."
+    },
+    {
+      "name": "Beg 1/4: 'Oh come on, pleeeeease?'",
+      "target": [
+        {
+          "var": 286,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Head dialogue: beg (line 2)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Oh come on, pleeeeease?",
+          "after": [
+            {
+              "room": 86
+            },
+            {
+              "bit": 473,
+              "eq": 1
+            },
+            {
+              "var": 286,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "var": 286,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "global/script-140.txt [059B]-[0607] (begging menu; line 2's text follows Var[286]), [093D]-[0960], [0A29]-[0A6B] (Var[286]++, below 4: 'You can beg all you want, but you can't have it.' and back to the menu)",
+      "note": "Writer: ('obj', 293, 10) -> 140 [0A29] Var[286]++ (a counter). One choice per goal, because the search's MENU_REPEATS (4) would cut a four-round loop. Line 3 ('Maybe I'll just take it...', Var[287]) also gives the necklace after four rounds, but its last answer waits delay(120) ([0B87]): begging is shorter."
+    },
+    {
+      "name": "Beg 2/4: 'Pretty please?'",
+      "target": [
+        {
+          "var": 286,
+          "eq": 2
+        }
+      ],
+      "hint": [
+        {
+          "name": "Head dialogue: beg (line 2)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Pretty please?",
+          "after": [
+            {
+              "room": 86
+            },
+            {
+              "var": 286,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "var": 286,
+              "eq": 2
+            }
+          ]
+        }
+      ],
+      "cite": "global/script-140.txt [0646]-[0698], [093D]-[0960], [0A29]-[0A6B]",
+      "note": "Same menu, next begging text."
+    },
+    {
+      "name": "Beg 3/4: 'Pretty PRETTY please?'",
+      "target": [
+        {
+          "var": 286,
+          "eq": 3
+        }
+      ],
+      "hint": [
+        {
+          "name": "Head dialogue: beg (line 2)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Pretty PRETTY please?",
+          "after": [
+            {
+              "room": 86
+            },
+            {
+              "var": 286,
+              "eq": 2
+            }
+          ],
+          "until": [
+            {
+              "var": 286,
+              "eq": 3
+            }
+          ]
+        }
+      ],
+      "cite": "global/script-140.txt [0695]-[06EE], [093D]-[0960], [0A29]-[0A6B]",
+      "note": "Same menu, next begging text."
+    },
+    {
+      "name": "Beg 4/4: 'Pretty please with sugar on top?': the head gives the necklace",
+      "target": [
+        {
+          "not": {
+            "class": 294,
+            "set": 6
+          }
+        }
+      ],
+      "hint": [
+        {
+          "name": "Head dialogue: beg (line 2)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Pretty please with sugar on top?",
+          "after": [
+            {
+              "room": 86
+            },
+            {
+              "var": 286,
+              "eq": 3
+            }
+          ],
+          "until": [
+            {
+              "not": {
+                "class": 294,
+                "set": 6
+              }
+            }
+          ]
+        }
+      ],
+      "cite": "global/script-140.txt [06EB]-[074F], [0A29]-[0AA4] (Var[286] == 4: 'Oh, all right, you big baby.' -> [0BB0]), [0BB0]-[0C0C] (setClass(294,[6]) clears class 6), [0C16]-[0C5B] (ego back in room 70 at the saved spot, UserputOn)",
+      "note": "Writer: ('obj', 293, 10) -> 140 [0C0C] (index value -6: class 6 cleared). After the answer, 'Hey, what good's a necklace if you don't have shoulders?', local 201's animation and delay(120) run before the class changes; then 140 returns ego to room 70 (and runs 111 if it ran 110)."
+    },
+    {
+      "name": "Put on the necklace",
+      "target": [
+        {
+          "bit": 357,
+          "eq": 1
+        }
+      ],
+      "cite": "room-025-village/obj-0294-necklace-on-navigator.txt [0197]-[0269], [029E]; global/script-141.txt [002B]-[0075], [007F]; global/script-078.txt [0041]-[0049], [0280]-[0285]; global/script-023.txt [004A]-[0086] (hover swap: Walk to / Pick up become Look at over the inventory)",
+      "note": "Writer: ('obj', 294, 9), the Use/Pick up entry @0197 that verbs 7 and 9 share (the index files it under 9). Needs VAR_ROOM 70, Bit[426] == 0 ('I can't put it on now--I've got the head whipped out.') and class 6 clear (goal 16). Required for the ship: script 78 sends ego straight back to room 70 without Bit[357]. 141 plays a 20-frame animation unless actor 12, placed at (x, y+1), lands in another walk box than ego: standing at (46,85) in box 8 skips it. HINT REQUIRED for the verb: verbs 7 and 9 share the entry @0197, but the index files it under 9 only, so the search would click 'Pick up' on the inventory slot. Over the inventory the hover script turns Pick up into Look at (Var[107] 9 -> 8, saved in var 394), so that click only looks at the necklace. 'Use' is not swapped. The slide route uses verb 7 here as well (S6 move 26). The necklace has class 6 only and no preposition class (1-4, global/script-008.txt), so 'Use necklace' runs at once without a second object.",
+      "hint": [
+        {
+          "name": "Use the necklace (inventory)",
+          "verb": 7,
+          "obj": 294,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 426,
+              "eq": 0
+            },
+            {
+              "not": {
+                "class": 294,
+                "set": 6
+              }
+            }
+          ],
+          "until": [
+            {
+              "bit": 357,
+              "eq": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Walk to the ghost ship (deck, room 77)",
+      "target": [
+        {
+          "room": 77
+        }
+      ],
+      "cite": "room-070-hellcliff/obj-0769-ghost-ship.txt [005A]-[006D]; room-077-gh-deck/entry.txt [0049]-[0050]; global/script-078.txt [0041]-[004C], [027F]-[0285]",
+      "note": "Ship walk point (192,111). The entry from room 70 runs script 78 (cutscene([1]), no input without the slide), which with the necklace starts 141 again (a second 20-frame animation; the slide route's deck skip needs input inside 78) and 72."
+    },
+    {
+      "name": "Open the captain's cabin door",
+      "target": [
+        {
+          "state": 838,
+          "eq": 1
+        }
+      ],
+      "cite": "room-077-gh-deck/obj-0838-door.txt [0044], [002F]-[003B]; global/script-025.txt [000A]-[003C]",
+      "note": "Writer: Open 838 -> script 25. Its own goal because the search reaches a room through its exit object and does not open a closed door on the way: 838's Walk to loads room 72 only with state 838 == 1."
+    },
+    {
+      "name": "Enter the captain's cabin (room 72)",
+      "target": [
+        {
+          "room": 72
+        }
+      ],
+      "cite": "room-077-gh-deck/obj-0838-door.txt [002F]-[003B] (loadRoomWithEgo(794,72,249,117)); room-072-gh-captai/entry.txt [0015]-[001A], [0042]",
+      "note": "Ego already stands on the door's walk point after the Open, so the room can change in the click frame."
+    },
+    {
+      "name": "Pull the key off the wall with the magnetic compass",
+      "target": [
+        {
+          "has": 799
+        }
+      ],
+      "hint": [
+        {
+          "name": "Use magnetic compass with key",
+          "verb": 7,
+          "obj": 732,
+          "obj2": 799,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 72
+            }
+          ],
+          "until": [
+            {
+              "has": 799
+            }
+          ]
+        }
+      ],
+      "cite": "room-072-gh-captai/entry.txt [0015]-[001A] (VAR_SENTENCE_SCRIPT = local 202), [0042] (compass gets class 2, 'with'); room-072-gh-captai/local-202.txt [0000]-[0029], [0035]-[009C]; room-072-gh-captai/local-201.txt [0000]-[0019]; room-072-gh-captai/obj-0799-key.txt [0018]",
+      "note": "HINT REQUIRED: the index finds no writer for owner(799), because the pick-up lives in room 72's sentence script local 202, which catches 'Use compass with key' in either order and runs the key cutscene (walk to (181,116), jiggle, flight, pickupObject(799)). The key has no Pick up entry. Keep ego at x >= 180 here: below it local 201 wakes LeChuck (cutscene, ego walked back, sentence stopped). Compass 732 comes from the entry."
+    },
+    {
+      "name": "Pick up the ghost feather (hull, room 75)",
+      "target": [
+        {
+          "has": 820
+        }
+      ],
+      "cite": "room-075-gh-hull/obj-0820-ghost-feather.txt [0024]; room-072-gh-captai/obj-0794-door.txt [0013]; room-077-gh-deck/obj-0841-hatch.txt [000C]; room-073-gh-crews/obj-0800-passage.txt [0012]; room-075-gh-hull/local-204.txt [00C7]-[00F4]",
+      "note": "Route 72 -> 77 (door 794) -> 73 (hatch 841) -> 75 (passage 800). Pick up the feather itself (walk point (192,122)); getting it from a chicken (817-819, local 204) costs a clucking cutscene (runner sources 3.12). Leave hatch 824 locked on this visit: the next visit to room 75 walks to the hatch anyway to go down, so unlocking it now adds about 70 px of walking."
+    },
+    {
+      "name": "Tickle the sleeping pirate's foot twice, pick up the jug o' grog",
+      "target": [
+        {
+          "has": 802
+        }
+      ],
+      "hint": [
+        {
+          "name": "Back through the passage to the crew quarters",
+          "verb": 11,
+          "obj": 822,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 75
+            },
+            {
+              "has": 820
+            }
+          ],
+          "until": [
+            {
+              "room": 73
+            }
+          ]
+        },
+        {
+          "name": "Use feather with sleeping ghost crew (1/2)",
+          "verb": 7,
+          "obj": 820,
+          "obj2": 804,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 73
+            },
+            {
+              "var": 237,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "var": 237,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Use feather with sleeping ghost crew (2/2): the grog drops",
+          "verb": 7,
+          "obj": 820,
+          "obj2": 804,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 73
+            },
+            {
+              "var": 237,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "var": 237,
+              "eq": 2
+            },
+            {
+              "state": 802,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Pick up the jug o' grog",
+          "verb": 9,
+          "obj": 802,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 73
+            },
+            {
+              "state": 802,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "has": 802
+            }
+          ]
+        }
+      ],
+      "cite": "room-075-gh-hull/obj-0822-passage.txt [0013]; room-075-gh-hull/obj-0820-ghost-feather.txt [0029]-[0030]; room-073-gh-crews/entry.txt [001A]-[0034]; room-073-gh-crews/local-200.txt [0000]-[0052]; room-073-gh-crews/local-201.txt [0000]-[0067]; room-073-gh-crews/obj-0802-jug-o-grog.txt [007F]; global/script-183.txt [0000]-[0004]",
+      "note": "HINT REQUIRED: 'Use feather with crew 804' starts local 200 of the current room (73), but the index resolves the feather's startScript(200) to its home room 75, so it sees no writer for Var[237] or state 802. Tickle 1 (Var[237] 0 -> 1, 10 frames); tickle 2 (1 -> 2, 20 frames, then stopScript(201), setState(802,1) and setClass(802,[32]) clear the jug's untouchable class: runner sources 3.12 'the grog only once it has turned blue'). Foot 804 is touchable only while ego is at x >= 120 (local 201 hides it below x=120 and needs delay(120) plus an animation to show it again), so arrive through the passage at (267,103), not from the deck ladder at (53,102); the foot's walk point is (137,103). Script 183 sets state 802 back to 0 on pick-up, so state 802 is not a target."
+    },
+    {
+      "name": "Unlock and open the hull hatch with the key",
+      "target": [
+        {
+          "state": 824,
+          "eq": 1
+        }
+      ],
+      "cite": "room-072-gh-captai/obj-0799-key.txt [0018]-[0026]; global/script-025.txt [000A]-[003C]; room-075-gh-hull/obj-0824-hatch.txt [0034]-[007D]; room-073-gh-crews/obj-0800-passage.txt [0012]",
+      "note": "Writer: Use key 799 in hatch 824 (the key clears the hatch's class 6, then script 25 opens it); route 73 -> 75. Hatch walk point (227,103)."
+    },
+    {
+      "name": "Down the hatch to the storage room (room 74)",
+      "target": [
+        {
+          "room": 74
+        }
+      ],
+      "cite": "room-075-gh-hull/obj-0824-hatch.txt [00A5]-[00B1]; room-074-gh-storag/entry.txt [0009]-[001E]",
+      "note": "Ego arrives at the ladder's walk point (63,117). With Bit[316] == 0 the entry starts the rat watch local 203: as soon as ego's x > 150 it plays 'Yikes! I hate rats!', stops the sentence and walks ego back to (20,121)."
+    },
+    {
+      "name": "Feed the rats with the grog, then pick up the cooking grease",
+      "target": [
+        {
+          "has": 815
+        }
+      ],
+      "hint": [
+        {
+          "name": "Use dish with jug o' grog",
+          "verb": 7,
+          "obj": 807,
+          "obj2": 802,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 74
+            },
+            {
+              "has": 802
+            },
+            {
+              "script": 203
+            }
+          ],
+          "until": [
+            {
+              "not": {
+                "script": 203
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pick up the cooking grease",
+          "verb": 9,
+          "obj": 806,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 74
+            },
+            {
+              "not": {
+                "script": 203
+              }
+            }
+          ],
+          "until": [
+            {
+              "has": 815
+            }
+          ]
+        }
+      ],
+      "cite": "room-074-gh-storag/obj-0807-dish.txt [006F]-[00A4]; room-073-gh-crews/obj-0802-jug-o-grog.txt [0086]-[008D]; room-074-gh-storag/local-201.txt [0000]-[0029]; room-074-gh-storag/local-203.txt [0000]-[004E]; room-074-gh-storag/obj-0806-cooking-grease.txt [0067]-[0097]",
+      "note": "HINT for the order: the grease's Pick up has no guard the index can see, but its walk point (282,127) is past the rat watch's x > 150 line until local 201 has stopped local 203 (the rat walks to (145,126), delay(30), [0019] stopScript(203)). The dish's walk point (102,130) is short of the line. Click the dish first (class 2, 'with'); 'Use grog with dish' redirects a frame later. Do not wait for Bit[316]: local 201 sets it only after another delay(300) + delay(120) (about 7 s), and leaving the room earlier is harmless because the route never returns. The grog stays in the inventory. Gives 815, 'glob of grease'."
+    },
+    {
+      "name": "Grease the squeaky door (deck)",
+      "target": [
+        {
+          "not": {
+            "class": 840,
+            "set": 6
+          }
+        }
+      ],
+      "cite": "room-074-gh-storag/obj-0815-glob-of-grease.txt [0042]-[00A2]; room-077-gh-deck/obj-0840-door.txt [002F]-[0169]; room-074-gh-storag/obj-0811-ladder.txt [000F]; room-075-gh-hull/obj-0822-passage.txt [0013]; room-073-gh-crews/obj-0801-ladder.txt [0015]",
+      "note": "Writer: ('obj', 815, 7) with OBJ2 == 840 while class 6 is set: 'This should stop it from squeaking.', setClass(840,[6]) clears class 6. Route 74 -> 75 (ladder 811) -> 73 (passage 822) -> 77 (ladder 801); door walk point (421,113). Opening the door while class 6 is set plays the CREEEAK cutscene instead ([003B]-[0169])."
+    },
+    {
+      "name": "Open the greased door",
+      "target": [
+        {
+          "state": 840,
+          "eq": 1
+        }
+      ],
+      "cite": "room-077-gh-deck/obj-0840-door.txt [002F]-[0175] (class 6 clear: setState(840,1), setState(789,1), no cutscene)",
+      "note": "Its own goal for the same reason as the cabin door: exit 840 -> 71 needs state 840 == 1."
+    },
+    {
+      "name": "Pick up the ghost tools (room 71)",
+      "target": [
+        {
+          "has": 788
+        }
+      ],
+      "cite": "room-077-gh-deck/obj-0840-door.txt [0176]-[0182]; room-071-gh-room/obj-0788-ghost-tools.txt [001B]-[0036]",
+      "note": "Tools walk point (136,112), 'Oh good, more inventory.' The sleeping guard and the brig play no part."
+    },
+    {
+      "name": "Open the glowing crate with the ghost tools (hull)",
+      "target": [
+        {
+          "state": 821,
+          "eq": 1
+        }
+      ],
+      "cite": "room-075-gh-hull/obj-0821-glowing-crate.txt [00FD]-[016B]; global/script-025.txt [000A]-[003C]; room-071-gh-room/obj-0788-ghost-tools.txt [003B]; room-071-gh-room/obj-0789-door.txt [002F]-[003B]",
+      "note": "Writer: Use crate 821 with tools 788 (the tools' own Use only redirects, a frame later). Route 71 -> 77 (door 789) -> 73 (hatch 841) -> 75 (passage 800); crate walk point (331,102). The crate cutscene is fixed: 'This should do it...' (skippable), delay(300) + 30 + 30, then the fanfare (waits while isSoundRunning(53); its CD length is an open question in the slide file). Input stays off throughout."
+    },
+    {
+      "name": "Take the voodoo root",
+      "target": [
+        {
+          "has": 823
+        }
+      ],
+      "cite": "room-075-gh-hull/obj-0821-glowing-crate.txt [0024]-[0075], [001E]",
+      "note": "Writer: Look at the open crate: 'I'll just grab this old root and be on my way.', pickupObject(823). Right-click is Look at (verb 90 sets Var[182] = 8). The crate has no Pick up entry."
+    },
+    {
+      "name": "Back to the cannibals with the root",
+      "target": [
+        {
+          "bit": 383,
+          "eq": 1
+        },
+        {
+          "not": {
+            "class": 823,
+            "set": 6
+          }
+        }
+      ],
+      "cite": "room-077-gh-deck/obj-0855-cave.txt [000C]; room-070-hellcliff/obj-0768-cave.txt [000C]-[002C]; global/script-170.txt [0000]-[006C]; room-025-village/local-200.txt [0066]-[0077]; global/script-106.txt [055B]-[057D]; room-075-gh-hull/obj-0822-passage.txt [0013]; room-073-gh-crews/obj-0801-ladder.txt [0015]; room-077-gh-deck/obj-0855-cave.txt [000C]; global/script-170.txt [0012]-[0014] (override -> [005D]), [006C]; room-025-village/entry.txt [00AB]-[00D8] (local 200 only while scripts 105, 102, 103, 104 and 1 are not running; global 1 is the boot script and ends at global/script-001.txt [14C6]); global/script-106.txt [001E]-[0020] (override -> [0501]), [057D]; global/script-106.txt [0573] setClass(823,[6,146]) (class 6 cleared, class 18 set)",
+      "note": "Route 75 -> 73 -> 77 -> 70 (cave 855, arrive at (192,111)), then Walk to cave 768 (walk point (2,122)). With the root and Bit[383] == 0 it starts 170 ('A long walk, a brief row, and a short hike later...', override; VAR_ROOM is 0 on that text screen), which loads room 25. Local 200 there starts 106 (the cannibals brew the root, override), which renames 823 'magic seltzer bottle' and sets Bit[383]. HINT added (slide moves 55-58, with the Escs left to the bridge's automatic skips). The search can reach this goal, but the index also credits Bit[383] to 'Talk to head' (293, verb 10): script 140's startScript(200) is resolved to the head's home room 25, whose local 200 starts 106. That false candidate is in the inventory, so the search would try it at every node. The root's class 6 is cleared in the same slice as Bit[383] (106 [0573], then [057D]; the override lands at [0501], before both). S7 needs it: 823's Use handler passes the sentence on only while class 6 is clear (routes/anypercent/noslide/S7.json entry notes), so it is in the target and in the exit.",
+      "hint": [
+        {
+          "name": "Through the passage back to the crew quarters",
+          "verb": 11,
+          "obj": 822,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 75
+            },
+            {
+              "has": 823
+            }
+          ],
+          "until": [
+            {
+              "room": 73
+            }
+          ]
+        },
+        {
+          "name": "Up the ladder to the deck",
+          "verb": 11,
+          "obj": 801,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 73
+            },
+            {
+              "has": 823
+            }
+          ],
+          "until": [
+            {
+              "room": 77
+            }
+          ]
+        },
+        {
+          "name": "Leave the ghost ship",
+          "verb": 11,
+          "obj": 855,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 77
+            },
+            {
+              "has": 823
+            }
+          ],
+          "until": [
+            {
+              "room": 70
+            }
+          ]
+        },
+        {
+          "name": "Walk into the cave with the root (the bridge's auto-Esc skips 170's text and 106's brew)",
+          "verb": 11,
+          "obj": 768,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "has": 823
+            },
+            {
+              "bit": 383,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "bit": 383,
+              "eq": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Out to the jungle: back to the cliff (room 70)",
+      "target": [
+        {
+          "room": 70
+        },
+        {
+          "bit": 383,
+          "eq": 1
+        }
+      ],
+      "cite": "room-025-village/obj-0290-jungle.txt [000C]-[0014]; global/script-171.txt [0000]-[0051]; room-070-hellcliff/entry.txt [0042]-[008E]; room-070-hellcliff/local-201.txt [0000]-[0035]",
+      "note": "With Bit[383] the jungle exit (walk point (569,104)) runs 171 ('After some more furious paddling...', override) and loads room 70 at (110,96). The entry hides the ship (states 769-771, untouchable) and local 201 starts Bob's conversation (local 204) by itself."
+    },
+    {
+      "name": "Bob: 'What happened to the ship?', then 'Where is the wedding?'",
+      "target": [
+        {
+          "bit": 441,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Bob: ask about the ship (line 3)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "What happened to the ship?",
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 383,
+              "eq": 1
+            },
+            {
+              "bit": 441,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "var": 194,
+              "eq": 122
+            }
+          ]
+        },
+        {
+          "name": "Bob: ask where the wedding is (line 2)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Where is the wedding?",
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 441,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "bit": 441,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "room-070-hellcliff/local-204.txt [0064]-[0162], [0306]-[0310], [0501], [068E]-[06B2], [06B5]-[0857], [08D5]; global/script-014.txt [00A5]-[00E2], [00E4]-[0105]",
+      "note": "The ship question leads to 'They all left for the wedding.' and the wedding menu; 'Where is the wedding?' sets Bit[441] ([08D5]). The first choice writes nothing persistent, so its move ends on var 194 == 122 (the chosen line's verb id, written by script 14 after ego says the line, [0105]); var 194 is transient and appears only as this move's completion check, never as a target (the slide route's move 62 does the same). Script 14 turns the menu off and sets UserputOff in the click frame ([00A5]-[00E2]). 'Balmy weather' only loops; root beer first adds the zap and the promise menu; 'What wedding?' first costs a menu round. Skip lines with '.'. Same choices as the slide route (moves 62-63): nothing here used the slide."
+    },
+    {
+      "name": "'I've got to go after them!', then 'We've got to get back to Melee Island!': the 'Last Part' card",
+      "target": [
+        {
+          "room": 95
+        },
+        {
+          "bit": 453,
+          "eq": 1
+        },
+        {
+          "var": 277,
+          "eq": 6
+        }
+      ],
+      "hint": [
+        {
+          "name": "Bob: go after them (line 1)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "I've got to go after them!",
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 441,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "var": 194,
+              "eq": 123
+            }
+          ]
+        },
+        {
+          "name": "Crew: back to Melee Island (line 1)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "We've got to get back to",
+          "after": [
+            {
+              "room": 70
+            },
+            {
+              "bit": 441,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "room": 95
+            }
+          ]
+        }
+      ],
+      "cite": "room-070-hellcliff/local-204.txt [0748]-[0794], [0B04]-[0BE2]; room-070-hellcliff/local-206.txt [00C6]-[010E], [03BD]-[046E]; global/script-131.txt [0000]-[0039]; room-070-hellcliff/local-205.txt [0000]-[07A0]",
+      "note": "'I've got to go after them!' -> 'Bye!', ego walks to (124,98) and local 206 brings the crew (delay(60), walk-ins, 'Oh, there you are!'); its menu's line 1 (the text uses accented-character codes, so match the substring) also stops the Bob/crew chat. Then 'No kidding.', 'Yeah, we're out of sunscreen.' and an override (Esc) up to startScript(131), which sets Bit[453] and Var[277] = 6 and loads room 95 ([002F]-[0039]). Segment ends on the first frame of room 95 (S7 entry). The first move ends on var 194 == 123 (transient, completion check only, as slide move 64). BIT[436] BRANCH: with Bit[436] == 1 (ship sunk) local 204 starts local 205 instead of 206 ([0BC1]-[0BD1]), whose menus differ ('We'll need to scare up a ship first.', 'Will you take me to Mêlée Island?', ...) and which starts 131 at [07A0]; the second hint move then finds no matching line and the search takes over (room 95 is written under both branches). Bit[453] and Var[277] == 6 are in the target so that every exit fact is reached by a goal: 131 writes both ([002F], [0034]) just before loadRoom(95) ([0039]), so they hold on the same frame as room 95."
+    }
+  ]
+}

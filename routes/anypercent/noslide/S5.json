@@ -1,0 +1,2240 @@
+{
+  "segment": "S5",
+  "title": "Part III without the item slide: Monkey Island from the beach to the idol field with Herman's key, the navigator head and its necklace (normal puzzles: catapult bananas, dam blast, two ropes and the oars, capture and escape, the monkey on the nose, idol, navigator dialogue, leaflet, banana picker)",
+  "entry": {
+    "room": 20,
+    "notes": "First frame in room 20 after the Part III card (global/script-107.txt [0112]-[016D]). room-020-main-beac/entry.txt [0073]-[00A6] has set VAR_VERB_SCRIPT=201 (var 32 == 201), parked the key 269 and memo 272 with owner 14 ([0090]-[0098]) and started the arrival intro local 202 (an override the bridge's automatic Esc skips). NO ITEM SLIDE: every cutscene takes input away, inputs are only taken while user input is on. Inventory = the S4 exit (routes/anypercent/S4-part2.json exit.inventory): 488 pieces of eight, 395 breath mints, 643 staple remover, 752 T-shirt, 596 cotton T-shirt, 907 LeChuck's note, 732 magnetic compass, 901 pamphlet, 902 leaflet, 903 brochure, 82 ink, 74 dusty book. Used in S5: 732 (strikes the flint at the dam) and 902 (traded to the natives for the navigator head). Var[143] == 20 (global/script-001.txt [082C]): the rowboat 263 lies at the main beach and needs the oars (room-020-main-beac/entry.txt [002A]-[0059], local-200.txt [0000]-[0091]). Var[242] == 2 (catapult aim, global/script-001.txt [0851]). The monkey (actor 2) waits on map room 2 near (151,126) (room-020-main-beac/local-202.txt [00C9]; room-002-monkey-1/local-202.txt, local-200.txt). Var[145] == 0 (bananas given). Island layout that fixes the order: the cannibal village side (room 6 land boxes 1-11, room 4 boxes 1-12, room 3 boxes 20-25, village 25, hut 27, beach 132) is a separate land mass from the fort, fork, pond, crack, main beach and clearing (room 2 boxes 1-9, room 3 boxes 1-19, room 4 boxes 13-19, room 5 boxes 1-7) (BOXM of LFLF_0002..0006; room-003-monkey-2/entry.txt [00D3]-[0140], room-004-monkey-3/entry.txt [0129]-[01A8], room-006-monkey-5/entry.txt [005B]-[00B4]), so every crossing is by rowboat, which needs the oars, which need two ropes, one of which needs the dam blast. The monkey needs all five bananas in the game (three on the main beach after the catapult, two in the village), so the village must be visited before the monkey and again with the idol: four boat crossings in all. Order mirrors the runner sources' pre-slide guide (docs/research/anypercent-runner-sources.md section 2.5, steps 1-13)."
+  },
+  "exit": [
+    {
+      "room": 69
+    },
+    {
+      "owner": 269,
+      "eq": 1
+    },
+    {
+      "has": 293
+    },
+    {
+      "has": 294
+    },
+    {
+      "has": 74
+    },
+    {
+      "has": 732
+    },
+    {
+      "state": 142,
+      "eq": 1
+    },
+    {
+      "state": 151,
+      "eq": 0
+    },
+    {
+      "bit": 364,
+      "eq": 1
+    },
+    {
+      "bit": 97,
+      "eq": 1
+    },
+    {
+      "bit": 358,
+      "eq": 1
+    },
+    {
+      "bit": 436,
+      "eq": 0
+    },
+    {
+      "bit": 426,
+      "eq": 0
+    },
+    {
+      "bit": 383,
+      "eq": 0
+    },
+    {
+      "bit": 357,
+      "eq": 0
+    },
+    {
+      "bit": 470,
+      "eq": 0
+    },
+    {
+      "bit": 473,
+      "eq": 0
+    },
+    {
+      "bit": 536,
+      "eq": 0
+    },
+    {
+      "bit": 545,
+      "eq": 0
+    },
+    {
+      "bit": 316,
+      "eq": 0
+    },
+    {
+      "var": 286,
+      "eq": 0
+    },
+    {
+      "var": 287,
+      "eq": 0
+    },
+    {
+      "var": 237,
+      "eq": 0
+    },
+    {
+      "bit": 51,
+      "eq": 1
+    },
+    {
+      "var": 19,
+      "eq": 5
+    },
+    {
+      "var": 196,
+      "eq": 3
+    }
+  ],
+  "goals": [
+    {
+      "name": "Stand up on the beach",
+      "target": [
+        {
+          "room": 20
+        },
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "hint": [
+        {
+          "name": "Stand up (any scene click once the intro has ended)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": [
+            300,
+            60
+          ],
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 20
+            },
+            {
+              "var": 32,
+              "eq": 201
+            }
+          ],
+          "until": [
+            {
+              "var": 32,
+              "eq": 4
+            }
+          ]
+        }
+      ],
+      "cite": "room-020-main-beac/entry.txt [0073]-[00A6] (VAR_VERB_SCRIPT=201, startScript(202)); room-020-main-beac/local-202.txt [0010] beginOverride (arrival intro, skipped by the automatic Esc); room-020-main-beac/local-201.txt [0000]-[002C] (any scene click: 20-frame stand-up cutscene, [0027] VAR_VERB_SCRIPT=4)",
+      "note": "Verb script 201 ignores the click position. Send nothing else until var 32 == 4 (a second input during the stand-up re-runs verb script 201; S5 slide file crash_rules). No object verb handler writes var 32 here, hence the hint."
+    },
+    {
+      "name": "Map: up the volcano trail to the fort",
+      "target": [
+        {
+          "room": 80
+        }
+      ],
+      "hint": [
+        {
+          "name": "Main beach: jungle exit to the map",
+          "verb": 11,
+          "obj": 261,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 20
+            },
+            {
+              "var": 32,
+              "eq": 4
+            }
+          ],
+          "until": [
+            {
+              "room": 2
+            }
+          ]
+        },
+        {
+          "name": "Map room 2 -> room 3 (top-left edge)",
+          "verb": 11,
+          "obj": 28,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 2
+            }
+          ],
+          "until": [
+            {
+              "room": 3
+            }
+          ]
+        },
+        {
+          "name": "Map room 3: walk to the fort",
+          "verb": 11,
+          "obj": 44,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 3
+            }
+          ],
+          "until": [
+            {
+              "room": 80
+            }
+          ]
+        }
+      ],
+      "cite": "room-020-main-beac/obj-0261-jungle.txt [000F]-[004C] (map room 2 at (115+x/10,150-x/24)); room-002-monkey-1/obj-0028-unnamed.txt [000C] startScript(34,[3,246,128]); room-003-monkey-2/entry.txt [00D3]-[0111] (fort side, boxes <= 19); room-003-monkey-2/local-200.txt [0000]-[0011] (getDist(ego,44) <= 2 -> loadRoomWithEgo(886,80,225,127))",
+      "note": "The fort is loaded by room 3's proximity script, not by an exit handler, so ScriptIndex.exits() has no edge into room 80 and the search needs this hint. Map clicks on a hotspot run at WalkSpeed(4,4) (global/script-117.txt). Do not click the wandering map monkey in room 2 yet (room-002-monkey-1/local-203.txt [000B]-[002F] sends ego to jungle room 21 with no bananas). The fort's 'The trail ends here.' line is skipped by the automatic '.'."
+    },
+    {
+      "name": "Fort: push the cannon (the gunpowder spills)",
+      "target": [
+        {
+          "bit": 137,
+          "eq": 1
+        },
+        {
+          "state": 887,
+          "eq": 1
+        }
+      ],
+      "cite": "room-080-fort/obj-0883-cannon.txt [001B]-[0025] (Push or Pull, !Bit[137]: Bit[137]=1, startScript(200)); room-080-fort/local-200.txt [0000]-[0032] (15-frame cutscene, [001B] drawObject(887), [0026] setClass(887,[32]) makes the gunpowder touchable)",
+      "note": "Pre-slide guide step 1. Do NOT take the spyglass 882 in this plan: owning it starts Herman's fort timer (room-080-fort/local-202.txt [0007]-[0013]: delay(60), then his cutscene and global 95). Cannon walk point (206,121)."
+    },
+    {
+      "name": "Fort: take the gunpowder and the rope",
+      "target": [
+        {
+          "has": 884
+        },
+        {
+          "has": 881
+        }
+      ],
+      "cite": "room-080-fort/obj-0887-gunpowder.txt [0048]-[005A] -> room-080-fort/local-201.txt [000B] pickupObject(884) (guard getObjectOwner(884) == 15); room-080-fort/obj-0881-rope.txt [003B] pickupObject(881,0)",
+      "note": "Rope 881 is the first of the two ropes the crack needs (room-018-crack/obj-0248-strong-branch.txt [0024]-[0047], obj-0249-sturdy-stump.txt [0024]-[0047] accept 881 and 561). The gunpowder goes on the dam. Walk points: gunpowder (174,128), rope (158,134)."
+    },
+    {
+      "name": "River fork: take the flint (noteworthy rock)",
+      "target": [
+        {
+          "has": 169
+        }
+      ],
+      "cite": "room-080-fort/obj-0886-path.txt [000C]-[0017] (map room 3 at (115,58)); room-003-monkey-2/obj-0039-unnamed.txt [000C] startScript(34,[4,-272,54]) (room 4 region B, boxes 13-19); room-004-monkey-3/obj-0051-river-fork.txt [000C] loadRoomWithEgo(171,15); room-015-fork/obj-0169-rock-on-top-of-note.txt [00CB]-[010B] (cutscene line, then startScript(167,[231])); global/script-167.txt [0045] pickupObject(169,0)",
+      "note": "Pre-slide guide step 2. The rock lies at walk point (121,142), 43 px from the fork's entry point (164,137) (path 171). The pickup also reads the note under it (global/script-167.txt [00B5]-[00BB] -> global/script-164.txt, an override the automatic Esc skips) and hands ego the memo 272 (global/script-166.txt [001A]); harmless, it only shifts the inventory. Leaving the fort: walk west/down from (115,58), not through (119,57), or room 3's fort trigger reloads the fort."
+    },
+    {
+      "name": "Seesaw: aim the catapult (Var[242] 2 -> 4)",
+      "target": [
+        {
+          "var": 242,
+          "eq": 4
+        }
+      ],
+      "hint": [
+        {
+          "name": "Fork: climb the footholds to the seesaw",
+          "verb": 11,
+          "obj": 170,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 15
+            }
+          ],
+          "until": [
+            {
+              "room": 16
+            }
+          ]
+        },
+        {
+          "name": "Pull the primitive art (aim 3)",
+          "verb": 6,
+          "obj": 235,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 16
+            }
+          ],
+          "until": [
+            {
+              "var": 242,
+              "eq": 3
+            }
+          ]
+        },
+        {
+          "name": "Pull the primitive art again (aim 4)",
+          "verb": 6,
+          "obj": 235,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 242,
+              "eq": 3
+            }
+          ],
+          "until": [
+            {
+              "var": 242,
+              "eq": 4
+            }
+          ]
+        }
+      ],
+      "cite": "room-015-fork/obj-0170-footholds.txt [000F] -> room-015-fork/local-203.txt [001E] loadRoomWithEgo(233,16); room-016-seesaw/obj-0235-primitive-art.txt [008D] (Pull: startScript(200,[1])); room-016-seesaw/local-200.txt [0007]-[006B] ([003E] Var[242] += Local[0], limits 1..7); global/script-001.txt [0851] (Var[242]=2 at boot); room-011-vista-1/local-200.txt [00EA]-[0108] (only aim 4 hits the banana tree)",
+      "note": "Pre-slide guide step 3 ('pull the primitive art twice'). Pull 235 or Push 234 adds 1, Push 235 or Pull 234 subtracts 1; both arts share walk point (262,111), so the second pull has no walk. The writers of var 242 are non-constant (+= Local[0]), hence the hint. With the boot aim 2 the rock sinks your ship instead (room-011-vista-1/local-200.txt [00D6] -> local-207.txt [002C] Bit[436]=1, which S6 and S7 need at 0)."
+    },
+    {
+      "name": "Vista: push the rock (bananas fall on the main beach)",
+      "target": [
+        {
+          "state": 270,
+          "eq": 1
+        },
+        {
+          "bit": 530,
+          "eq": 1
+        },
+        {
+          "bit": 436,
+          "eq": 0
+        }
+      ],
+      "cite": "room-016-seesaw/obj-0232-footholds.txt [000F] -> room-016-seesaw/local-201.txt [0022] loadRoomWithEgo(115,11); room-011-vista-1/obj-0116-rock.txt [006F] startScript(200); room-011-vista-1/local-200.txt [00EA]-[0108] (Var[242]==4, !Bit[530]: [00F6] Bit[530]=1, [0104] setState(270,1), [0108] setClass(270,[32]) makes the beach bananas takable)",
+      "note": "Pre-slide guide step 3 ('then push the rock (Herman appears)'). bit 436 == 0 in the target prunes any branch that fires at the wrong aim. Herman's vista watch: room-011-vista-1/entry.txt [0072]-[0098] starts local 206 (!Bit[360]); 120 jiffies after ego's first walk stops he walks up and global 95 talks (local-206.txt [000B]-[0080]); the rock's cutscene freezes that timer, so leaving right after the push may beat him (runner sources 3.10, 'Herman skip at the rock'); if he comes, the search answers his menu. Never enter walk box 8 (x 332-350): local 204 then starts the long vista scene 205."
+    },
+    {
+      "name": "Back down to the river fork",
+      "target": [
+        {
+          "room": 15
+        }
+      ],
+      "cite": "room-011-vista-1/obj-0115-path-down.txt [000C] loadRoomWithEgo(232,16); room-016-seesaw/obj-0233-path-down.txt [000F] loadRoomWithEgo(170,15)",
+      "note": "Search only (it also answers Herman's menu if he caught ego at the vista). This separate goal puts ego in room 15 for the dam hint."
+    },
+    {
+      "name": "River fork: blow up the dam (gunpowder, then flint with compass)",
+      "target": [
+        {
+          "state": 563,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Use gunpowder with dam",
+          "verb": 7,
+          "obj": 884,
+          "obj2": 176,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 15
+            }
+          ],
+          "until": [
+            {
+              "owner": 884,
+              "eq": 15
+            },
+            {
+              "state": 178,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Use flint with compass at the dam (strike)",
+          "verb": 7,
+          "obj": 169,
+          "obj2": 732,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "owner": 884,
+              "eq": 15
+            }
+          ],
+          "until": [
+            {
+              "state": 563,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "room-015-fork/obj-0176-dam.txt [000C]-[0022] (Use with 884: drawObject(178), setClass(178,[32]), owner(884)=15); room-015-fork/obj-0169-rock-on-top-of-note.txt [0118]-[016E] (flint with 732, 643, 883, 885 or the closed spyglass: strike cutscene, then VAR_ROOM==15, getDist(ego,176) <= 5, classOfIs(178,[32]) -> setClass(178,[160]), startScript(44)); global/script-044.txt [00CA]-[0165] (blast; ego back on map room 4 at (148,151); [014C] setState(563,1), [0165] setClass(561,[32]) makes the pond rope takable)",
+      "note": "Pre-slide guide step 4. The strike only fires within 5 px of the dam: Use gunpowder with dam leaves ego on the dam's walk point (255,136) and the strike is inventory-only (no walk). The ScriptIndex writer for state 563 lists only the cannon-ball branch (OBJ2 == 885); 732 jumps to the same code ([016E] goto 011F). The blast is a prerequisite of the oars: before it the pond rope 561 is untouchable (class 32 in out/objects.json). ALTERNATIVE TO MEASURE (not in this plan): spyglass 882 from the fort (wins Herman's fort timer only if ego leaves at once), Open it at the fork (room-080-fort/obj-0882-spyglass.txt [003D]-[0076]) and Use lens with sun 179 from the dam point (room-015-fork/local-200.txt [0000]-[006C]); the script index does not see that path (startScript(Var[243]))."
+    },
+    {
+      "name": "Pond: take the rope",
+      "target": [
+        {
+          "has": 561
+        }
+      ],
+      "cite": "room-004-monkey-3/obj-0059-pond.txt [000C] loadRoomWithEgo(554,40); room-040-pond/obj-0561-rope.txt [0041] pickupObject(561,0); global/script-044.txt [0139]-[0165] (pond states 546-553 and 563 set, corpse 551 and rope 562 untouchable, 561 touchable)",
+      "note": "Pre-slide guide step 5. Ego starts on map room 4 region B after the blast. Herman's pond watch (room-040-pond/entry.txt [0040]-[0048], local-202.txt [0000]-[0057]: 120 jiffies after ego's first walk, Bit[363]) may catch ego here; the search answers his menu."
+    },
+    {
+      "name": "Map: into the crack",
+      "target": [
+        {
+          "room": 18
+        }
+      ],
+      "cite": "room-040-pond/obj-0554-jungle.txt [000C]-[0017] (map room 4 at (227,162)); room-004-monkey-3/obj-0046-unnamed.txt [000C] startScript(34,[2,26,-176]); room-002-monkey-1/obj-0035-crack.txt [000C]-[0025] (saves the map point in Var[141]/Var[142], room 18 at (11,143))",
+      "note": "Search only (the guide's 'beach warp' is one way across map room 2; the search picks the faster). This separate goal puts ego in room 18 for the crack hint."
+    },
+    {
+      "name": "Crack: tie both ropes and take the oars",
+      "target": [
+        {
+          "has": 245
+        }
+      ],
+      "hint": [
+        {
+          "name": "Use the fort rope with the strong branch",
+          "verb": 7,
+          "obj": 881,
+          "obj2": 248,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 18
+            }
+          ],
+          "until": [
+            {
+              "owner": 881,
+              "eq": 14
+            }
+          ]
+        },
+        {
+          "name": "Use the pond rope with the sturdy stump (climbs down the first rope by itself)",
+          "verb": 7,
+          "obj": 561,
+          "obj2": 249,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "owner": 881,
+              "eq": 14
+            }
+          ],
+          "until": [
+            {
+              "owner": 561,
+              "eq": 14
+            }
+          ]
+        },
+        {
+          "name": "Pick up the oars (climbs down the second rope by itself)",
+          "verb": 9,
+          "obj": 245,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "owner": 561,
+              "eq": 14
+            }
+          ],
+          "until": [
+            {
+              "has": 245
+            }
+          ]
+        }
+      ],
+      "cite": "room-018-crack/obj-0248-strong-branch.txt [0018]-[0047] (walk box <= 5: startScript(202,[rope,246])); room-018-crack/obj-0249-sturdy-stump.txt [0018]-[0047] (walk box == 6: startScript(202,[rope,247])); room-018-crack/local-202.txt [0000]-[006E] (rope drawn and made climbable, [006A] setOwnerOf(rope,14)); room-018-crack/entry.txt [0025]-[002A] (VAR_SENTENCE_SCRIPT=203); room-018-crack/local-203.txt [0000]-[0245] (sentence script: climbs rope 246 or 247 to the target object's level first); room-018-crack/obj-0245-oars.txt [0027]-[0044] (walk box >= 7: pickupObject(245))",
+      "note": "Pre-slide guide step 6. The levels are walk boxes 1-5 (top), 6 (ledge) and 7 (bottom), joined only by the ropes; their guards are walk-box tests, not C3 facts, so the search needs this hint. Either rope fits either anchor. The way out (Walk to 244 in the next goal) climbs back up both ropes by itself."
+    },
+    {
+      "name": "Main beach: pick up the fallen bananas",
+      "target": [
+        {
+          "has": 265
+        },
+        {
+          "has": 266
+        },
+        {
+          "has": 267
+        }
+      ],
+      "cite": "room-018-crack/obj-0244-jungle.txt [000C]-[0023] (walk box <= 5: back to map room 2 at Var[141]/Var[142]); room-002-monkey-1/obj-0030-beach.txt [000C]-[0061] (on foot: room 20); room-020-main-beac/obj-0270-bananas.txt [0018]-[0047] (picks up 265 if still there, then 266 and 267)",
+      "note": "Pre-slide guide step 7. 270 is takable only after the catapult (state 270 == 1). One pickup takes all three beach bananas (265 also lies there from the start, obj-0265-banana.txt [0031]). With the village's 282 and 283 these are the only five bananas the monkey accepts (room-021-gen-jungl/local-202.txt [0010]-[005D]); the banana picker cannot pick more (room-027-hut/obj-0314-banana-picker.txt [0024]-[010F])."
+    },
+    {
+      "name": "Main beach: launch the rowboat with the oars",
+      "target": [
+        {
+          "owner": 245,
+          "eq": 0
+        },
+        {
+          "room": 2
+        }
+      ],
+      "cite": "room-020-main-beac/obj-0263-rowboat.txt [004D] (Use: startScript(200)); room-020-main-beac/local-200.txt [0000]-[0091] (class 6 and owner(245)==ego: [0015] setClass(263,[6]) clears 'needs oars', [0030] setOwnerOf(245,0), ego to map room 2 at (156,168), sea box 17)",
+      "note": "Pre-slide guide step 7. Rowboat walk point (148,98). From now on the boat is boarded at whichever beach Var[143] names (room-001-beach/obj-0017-rowboat-and-oars.txt [000F]-[004E]; room-001-beach/entry.txt [0002]-[0022])."
+    },
+    {
+      "name": "Row to the village beach (room 132)",
+      "target": [
+        {
+          "var": 143,
+          "eq": 132
+        }
+      ],
+      "hint": [
+        {
+          "name": "Row: map room 2 -> room 5 (exit 34, top edge)",
+          "verb": 11,
+          "obj": 34,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 2
+            },
+            {
+              "owner": 245,
+              "eq": 0
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            }
+          ]
+        },
+        {
+          "name": "Row: room 5 -> room 6 (exit 64, top edge)",
+          "verb": 11,
+          "obj": 64,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            }
+          ]
+        },
+        {
+          "name": "Row to the village beach (room 132)",
+          "verb": 11,
+          "obj": 71,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            }
+          ],
+          "until": [
+            {
+              "var": 143,
+              "eq": 132
+            }
+          ]
+        }
+      ],
+      "cite": "room-002-monkey-1/entry.txt [007E]-[00D5] (sea boxes > 9: boat costume 4, sea exits 32/33/34 touchable, 29 untouchable); room-002-monkey-1/obj-0034-unnamed.txt [000C]-[0017] (putActorInRoom(VAR_EGO,5), putActor(VAR_EGO,66,196): absolute, sea box 15 of room 5); global/script-033.txt [0033]-[0047] (class-10 map exits: walk to the clicked pixel, then startObject(obj,11) wherever the walk ended); room-005-monkey-4/entry.txt [0032]-[007D] (box > 7: boat, 64/65 touchable); room-005-monkey-4/obj-0064-unnamed.txt [000C] startScript(34,[6,239,192]); room-006-monkey-5/obj-0071-beach.txt [002A]-[0054] (costume 4: [0036] Var[143]=132, room 132)",
+      "note": "The village side is a separate land mass (see entry.notes), so this crossing is required. Hint added because the search's exit graph has no boat/land distinction: from room 2 its two shortest hops toward room 6 are 29 (untouchable in the boat) and 33, whose relative target (startScript(34,[5,-226,176])) depends on where the boat stopped; 34 places the boat at (66,196) absolutely. Room 5's sea boxes 10-15 join only round the east side (BOXD of LFLF_0005), so the leg to 64 (67,3) is long but has no alternative."
+    },
+    {
+      "name": "Walk into the cannibal village (first visit)",
+      "target": [
+        {
+          "room": 25
+        }
+      ],
+      "cite": "room-001-beach/obj-0016-jungle.txt [004C]-[007D] (132: map room 6 at (250,186-x/5)); room-006-monkey-5/obj-0072-village.txt [000C] loadRoomWithEgo(290,25,506,133); room-025-village/local-200.txt [007A]-[00A7] (Var[232]==0: no encounter on entry)",
+      "note": "Search only. Herman's beach watch (room-001-beach/entry.txt [012F]-[0155], local-200.txt: 180 jiffies after ego's first walk, Bit[361]) normally does not catch a direct walk to the jungle."
+    },
+    {
+      "name": "Village visit 1: take the bananas and get captured",
+      "target": [
+        {
+          "room": 27
+        },
+        {
+          "has": 282
+        },
+        {
+          "has": 283
+        }
+      ],
+      "hint": [
+        {
+          "name": "Pick up the village bananas",
+          "verb": 9,
+          "obj": 291,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 25
+            }
+          ],
+          "until": [
+            {
+              "has": 282
+            },
+            {
+              "has": 283
+            }
+          ]
+        },
+        {
+          "name": "Walk right so the camera reaches 270 (the cannibals come)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": [
+            312,
+            140
+          ],
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "has": 283
+            }
+          ],
+          "until": [
+            {
+              "var": 32,
+              "eq": 14
+            }
+          ]
+        },
+        {
+          "name": "Answer 'Oh, go ahead and eat me.'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "go ahead and eat me",
+          "after": [
+            {
+              "var": 32,
+              "eq": 14
+            }
+          ],
+          "until": [
+            {
+              "room": 27
+            }
+          ]
+        }
+      ],
+      "cite": "room-025-village/obj-0291-bananas.txt [003C]-[005E] (pickupObject 282, 283; startScript(202,[],F)); room-025-village/local-202.txt [0039]-[0057] (encounter once VAR_CAMERA_POS_X >= 270: [004C] VAR_VERB_SCRIPT=14), [0587] (choice 122), [075A]-[0788] (122: chainScript(105)); room-025-village/local-209.txt [0000]-[002D] (camera follows ego again once x > 268); global/script-105.txt [00FB]-[0109] (ego into hut room 27; door 307 closed again by global 26), [022C] Var[179] += 1",
+      "note": "Pre-slide guide step 8 ('bananas, dialogue 3, captured'). After the bananas the cannibals block every way out: they start talking when the camera reaches 270, their 'Well?' phase refuses walking (local-206.txt [0022]-[0064]) and only the idol satisfies them, so capture (choice 3) is the fastest way out; waiting 1,200 jiffies ends in the same capture (local-204.txt [0018]-[0061]). The walk-right point must be on screen (camera at 160 after the pickup at (120,141)); local 209 turns camera following back on past x 268 and the camera then catches up with ego. Choosing 3 needs no Esc; the capture's overrides are skipped automatically."
+    },
+    {
+      "name": "Hut: escape through the loose board",
+      "target": [
+        {
+          "room": 6
+        },
+        {
+          "bit": 355,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Pick up the skull (reveals the board)",
+          "verb": 9,
+          "obj": 310,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 27
+            }
+          ],
+          "until": [
+            {
+              "has": 310
+            }
+          ]
+        },
+        {
+          "name": "Open the loose board",
+          "verb": 2,
+          "obj": 309,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "has": 310
+            }
+          ],
+          "until": [
+            {
+              "state": 309,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Crawl through the hole",
+          "verb": 11,
+          "obj": 309,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "state": 309,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            },
+            {
+              "bit": 355,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "room-027-hut/obj-0309-loose-board.txt [0060]-[0070] (Open/Push/Pick up: setState(309,1), name 'hole'), [00F8]-[0149] (door 307 still locked (class 6) and no banana picker: [0130] Bit[355]=1, startScript(102)); global/script-102.txt [0000]-[0071] (first-escape scene, override skipped); room-025-village/local-210.txt [0048]-[0069] (ego to map room 6 at (126,64))",
+      "note": "Pre-slide guide step 9 ('skull and loose board'). The skull 310 covers part of the board (out/objects.json: 310 at (88,120,16,16) inside 309 at (80,120,48,16)); the executor clicks a board pixel off the skull (object_points tests every candidate with the engine's hit test). Do not take the banana picker now: it cannot pass the hole (room-027-hut/local-200.txt [006B]-[0077] puts it back) and the hut door stays locked until the idol is given (room-025-village/local-205.txt [023A]-[023E]). ENGINE (2026-10-20): the board 309 has parent 5, the skull 310, and is hit-testable only once the skull's state is 1, which pickupObject sets (findObject's parent-state chain). Before it no pixel hits 309 (measured). Skull, board, hole: room 6 at frame 12301 from capture control 12262."
+    },
+    {
+      "name": "Row back to the clearing-side beach (room 131)",
+      "target": [
+        {
+          "var": 143,
+          "eq": 131
+        }
+      ],
+      "hint": [
+        {
+          "name": "Map room 6: beach on foot (beach room 132)",
+          "verb": 11,
+          "obj": 71,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            },
+            {
+              "bit": 355,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "room": 132
+            }
+          ]
+        },
+        {
+          "name": "Board the rowboat (beach 132)",
+          "verb": 11,
+          "obj": 17,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 132
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            },
+            {
+              "not": {
+                "class": 70,
+                "set": 32
+              }
+            }
+          ]
+        },
+        {
+          "name": "Row: room 6 -> room 5 (exit 70, bottom edge)",
+          "verb": 11,
+          "obj": 70,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            },
+            {
+              "not": {
+                "class": 70,
+                "set": 32
+              }
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            }
+          ]
+        },
+        {
+          "name": "Row to the clearing-side beach (room 131)",
+          "verb": 11,
+          "obj": 60,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            }
+          ],
+          "until": [
+            {
+              "var": 143,
+              "eq": 131
+            }
+          ]
+        }
+      ],
+      "cite": "room-006-monkey-5/obj-0071-beach.txt [0049]-[0054] (on foot: room 132); room-001-beach/obj-0017-rowboat-and-oars.txt [0036]-[004E] (132: map room 6 sea at (291,141)); room-006-monkey-5/entry.txt [0014]-[0058] (box > 11: boat, setClass(70,[32]) makes 70 touchable; on foot [008D] setClass(70,[160])); room-006-monkey-5/obj-0070-unnamed.txt [000C] startScript(34,[5,-239,-192]); room-005-monkey-4/obj-0060-beach.txt [000C]-[0028] (costume 4: [0018] Var[143]=131, room 131)",
+      "note": "Hint added (the slide route's S5 moves 62-65, played in runs/anypercent/slide-b4 and slide-b5): the search cannot find this crossing, because from room 6 on foot its only shortest hop toward room 5 is the sea exit 70, untouchable on foot (room 6 entry [008D]), and the detour through beach 132 and the boat is not on a shortest exit path. {not class 70 set 32} is the C3 test for 'ego is in the boat in room 6'. Route choice: the boat is left at beach 131, beside map room 5 and the clearing, because the idol trip later starts at the clearing (room 12 -> room 5 -> beach 60 -> 131) and the key trip ends there. Landing at the main beach 20 would be nearer the monkey but leaves the boat a map screen away from the clearing. Both landings go round room 5's sea chain 10-15 (room 5 BOXM)."
+    },
+    {
+      "name": "Map room 2 on foot (the monkey's screen)",
+      "target": [
+        {
+          "room": 2
+        },
+        {
+          "var": 32,
+          "eq": 203
+        },
+        {
+          "var": 143,
+          "eq": 131
+        }
+      ],
+      "hint": [
+        {
+          "name": "Beach 131: jungle to map room 5 (on foot)",
+          "verb": 11,
+          "obj": 25,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 131
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            }
+          ]
+        },
+        {
+          "name": "Map room 5 -> room 4 (exit 62, left edge)",
+          "verb": 11,
+          "obj": 62,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            }
+          ],
+          "until": [
+            {
+              "room": 4
+            }
+          ]
+        },
+        {
+          "name": "Map room 4 -> room 2 (exit 46, bottom edge)",
+          "verb": 11,
+          "obj": 46,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 4
+            }
+          ],
+          "until": [
+            {
+              "room": 2
+            },
+            {
+              "var": 32,
+              "eq": 203
+            }
+          ]
+        }
+      ],
+      "cite": "room-001-beach/entry.txt [009B]-[00C2] (131: 24, 25 touchable); room-001-beach/obj-0025-jungle.txt [000C] -> obj-0023-jungle.txt [001D]-[0028] (131: map room 5 at (167,116), land box 5); room-005-monkey-4/entry.txt [0083]-[00CE] (on foot: 62, 63 touchable); room-005-monkey-4/obj-0062-unnamed.txt [000C] startScript(34,[4,200,0]) (lands in room 4 box 15, region B); room-004-monkey-3/entry.txt [0129]-[0167] (box > 12: 46, 47 touchable); room-004-monkey-3/obj-0046-unnamed.txt [000C] startScript(34,[2,26,-176]) (room 2 land box 1); room-002-monkey-1/entry.txt [00D8] (on foot: VAR_VERB_SCRIPT=203; the boat sets 33 at [0085]), [004E]-[0070] (monkey present and Var[145] < 5: local 202 then local 200 keep it at (151,126))",
+      "note": "var 32 == 203 means on foot in map room 2 (only then does a click on the monkey work); var 143 == 131 keeps the boat where the previous goal left it. Hint added: the search's shortest exit path from room 5 to room 2 is the sea exit 65 (untouchable on foot), so it would not find the walk 5 -> 4 -> 2. Box checks (BOXD of LFLF_0004/0005/0002): 62's centre (23,163) snaps to room 5 land box 1; (223,165) is room 4 box 15; 46's centre (127,195) is room 4 box 14 and lands at room 2 (153,19), land box 1."
+    },
+    {
+      "name": "Meet the monkey (jungle room 21)",
+      "target": [
+        {
+          "room": 21
+        }
+      ],
+      "hint": [
+        {
+          "name": "Click the wandering monkey on the map",
+          "verb": 11,
+          "obj": 2,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 2
+            },
+            {
+              "var": 32,
+              "eq": 203
+            },
+            {
+              "script": 200
+            }
+          ],
+          "until": [
+            {
+              "room": 21
+            }
+          ]
+        }
+      ],
+      "cite": "room-002-monkey-1/local-203.txt [0000]-[002F] (on-foot verb script: while local 200 runs, a click on actor 2 walks ego there and starts local 201); room-002-monkey-1/local-201.txt [0000]-[0015] (saves the map point, loadRoomWithEgo(273,21,89,101)); room-021-gen-jungl/entry.txt [0008]-[0056] (Var[116]=202, VAR_VERB_SCRIPT=204, VAR_SENTENCE_SCRIPT=205, monkey actor 2 at (214,106))",
+      "note": "Room 21 has no exit handler leading into it, so the search cannot reach it. The executor clicks actor 2 through its actor hit test (executor.actor_points). The click counts only once local 200 (the wander loop) runs, i.e. after local 202 has walked the monkey to (151,126); the hint's after therefore waits for {script 200} (room 2's local 200: isScriptRunning finds local slots too). A click on ego also works while the monkey is within 4 px (local-203.txt [0031]-[0049])."
+    },
+    {
+      "name": "Feed the monkey all five bananas",
+      "target": [
+        {
+          "var": 145,
+          "eq": 5
+        }
+      ],
+      "hint": [
+        {
+          "name": "Give banana 265 to the monkey",
+          "verb": 4,
+          "obj": 265,
+          "obj2": 2,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 21
+            },
+            {
+              "not": {
+                "script": 201
+              }
+            }
+          ],
+          "until": [
+            {
+              "var": 145,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Give banana 266 to the monkey",
+          "verb": 4,
+          "obj": 266,
+          "obj2": 2,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 145,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "var": 145,
+              "eq": 2
+            }
+          ]
+        },
+        {
+          "name": "Give banana 267 to the monkey",
+          "verb": 4,
+          "obj": 267,
+          "obj2": 2,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 145,
+              "eq": 2
+            }
+          ],
+          "until": [
+            {
+              "var": 145,
+              "eq": 3
+            }
+          ]
+        },
+        {
+          "name": "Give banana 282 to the monkey",
+          "verb": 4,
+          "obj": 282,
+          "obj2": 2,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 145,
+              "eq": 3
+            }
+          ],
+          "until": [
+            {
+              "var": 145,
+              "eq": 4
+            }
+          ]
+        },
+        {
+          "name": "Give banana 283 to the monkey",
+          "verb": 4,
+          "obj": 283,
+          "obj2": 2,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 145,
+              "eq": 4
+            }
+          ],
+          "until": [
+            {
+              "var": 145,
+              "eq": 5
+            }
+          ]
+        }
+      ],
+      "cite": "room-021-gen-jungl/local-204.txt [0000]-[0086] (room verb script: Give with an inventory item on actor 2 in costume 6 runs the sentence inside a cutscene; a monkey up the tree answers 'Not until he comes down.'); room-021-gen-jungl/local-202.txt [0010]-[005D] (265, 266, 267, 282, 283 -> local 203); room-021-gen-jungl/local-203.txt [0000]-[0047] (setOwnerOf(banana,14), [000A] Var[145] += 1, [000F] VAR_VERB_SCRIPT=4, [0047] startScript(43,[],F)); global/script-043.txt [004E]-[0062] (follows for good once Var[145] >= 5)",
+      "note": "Pre-slide guide step 10 ('Monkey: bananas'). No object verb handler writes Var[145]: the gives go through room 21's verb and give scripts, so this goal needs the hint, and the search has no fallback for it. If the monkey is climbing (local 201, costume 74, room-021-gen-jungl/local-200.txt [0069] starts it with chance 1/8 per wander step) local 204 refuses the first give ('Not until he comes down.'); the climb (11 elevation steps up and down) outlasts the hint's 12 frames of delay steering, so the first give waits for {not script 201}. Gives 2-5 are safe: local 204 [0038]-[003A] stops 200 and 201 at the first give and global 43 (started by local 203 [0047]) then keeps the monkey near ego. After the first banana local 203 [000F] sets VAR_VERB_SCRIPT = 4; gives 2-5 still reach local 202 through global/script-002.txt [011B]-[0127] (actor 2 has class 5 from room 21's entry [004F], Var[116] == 202). Each banana costs about 40 frames of cutscene (local 203)."
+    },
+    {
+      "name": "Lead the monkey to the clearing (room 12)",
+      "target": [
+        {
+          "room": 12
+        },
+        {
+          "script": 43
+        },
+        {
+          "var": 145,
+          "eq": 5
+        }
+      ],
+      "hint": [
+        {
+          "name": "Jungle: back to map room 2 with the monkey",
+          "verb": 11,
+          "obj": 273,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 145,
+              "eq": 5
+            }
+          ],
+          "until": [
+            {
+              "room": 2
+            }
+          ]
+        },
+        {
+          "name": "Map room 2 -> room 4 on foot (exit 29, top edge)",
+          "verb": 11,
+          "obj": 29,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 2
+            }
+          ],
+          "until": [
+            {
+              "room": 4
+            }
+          ]
+        },
+        {
+          "name": "Map room 4 -> room 5 on foot (exit 47, right edge)",
+          "verb": 11,
+          "obj": 47,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 4
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            }
+          ]
+        },
+        {
+          "name": "Map room 5: clearing",
+          "verb": 11,
+          "obj": 63,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            }
+          ],
+          "until": [
+            {
+              "room": 12
+            }
+          ]
+        }
+      ],
+      "cite": "room-021-gen-jungl/exit.txt [001E]-[002C] (ego and monkey to map room 2 at (147,127)); room-002-monkey-1/entry.txt [0141]-[0157] (Var[145] >= 5: startScript(43)); room-002-monkey-1/obj-0029-unnamed.txt [000C] startScript(34,[4,-26,176]); room-004-monkey-3/obj-0047-unnamed.txt [000C] startScript(34,[5,-200,0]); global/script-034.txt [0028]-[0066] (the monkey moves with ego on foot; in the boat costume script 43 is stopped); room-005-monkey-4/obj-0063-clearing.txt [000C] loadRoomWithEgo(134,12,224,136); global/script-043.txt [014F]-[01A8] (room 12: monkey put at object 134 after 8 frames); room-012-monkey-he/entry.txt [0054]-[0069] (43 running: Bit[364]=1, so Herman's room-12 watch never starts)",
+      "note": "On foot only: rowing stops global 43, and the target fact {script 43} prunes such branches. Path 21 -> 2 -> (29) 4 -> (47) 5 -> (63) 12. Hint added: the search's shortest exit path from room 2 to room 12 goes through the sea exits 33/34 (room 2 -> room 5), untouchable on foot, so it would never try 29. Box checks: ego arrives in room 2 at (147,127) (room 21 exit.txt [001E]), land box 8; 29's centre (175,3) is room 2 land box 1 and lands at room 4 (149,179), region-B box 14; 47's centre (303,127) is room 4 box 16 and lands at room 5 (103,127), land box 2; 63's walk point (231,96) is room 5 land box 6. room-002-monkey-1/entry.txt [0141]-[0157], room-004-monkey-3/entry.txt [01A8]-[01BA] and room-005-monkey-4/entry.txt [00E3]-[00F5] restart 43 on each map entry. Bit[364] set by room 12's entry is one of S6's entry facts."
+    },
+    {
+      "name": "Pull the nose: the monkey holds the gate open",
+      "target": [
+        {
+          "state": 142,
+          "eq": 1
+        },
+        {
+          "not": {
+            "script": 43
+          }
+        },
+        {
+          "actor_room": 2,
+          "eq": 12
+        }
+      ],
+      "hint": [
+        {
+          "name": "Pull the nose",
+          "verb": 6,
+          "obj": 144,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 12
+            }
+          ],
+          "until": [
+            {
+              "state": 142,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Step off the nose (the monkey takes it)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": [
+            684,
+            132
+          ],
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "state": 142,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "state": 142,
+              "eq": 1
+            },
+            {
+              "not": {
+                "script": 43
+              }
+            }
+          ]
+        }
+      ],
+      "cite": "room-012-monkey-he/obj-0144-nose.txt [0015] startScript(204,[],F); room-012-monkey-he/local-204.txt [0000]-[005A] (pull; 202 opens; waits until ego moves off the nose; drawObject(144), startScript(203,[],F); 43 running -> startScript(205)); room-012-monkey-he/local-202.txt [0000]-[0055] (draws 140-142: state(142)=1, boxes 10-13 open, [003F] 155 touchable); room-012-monkey-he/local-203.txt [0000]-[0059] (closes: state 142 back to 0); room-012-monkey-he/local-205.txt [0000]-[0067] ([000D] stopScript(43), monkey walks to the nose, [0055] startScript(202) reopens for good)",
+      "note": "Pre-slide guide step 10 ('then pull the nose'). state(142)==1 is the open gate (objects 135, 140, 141, 142 share one rectangle and drawObject leaves only the last drawn at state 1). After the pull, local 202 waits for ego to move; the step-off click starts 203 (gate closes) and 205 (the monkey takes the nose and 202 reopens); nothing closes the gate after 205, and the target with {not script 43} excludes the short-lived opening of the pull itself. The point (684,132) lies in walk box 15 next to the nose's snapped point (676,111) and on no hotspot."
+    },
+    {
+      "name": "Idol field: take the wimpy idol",
+      "target": [
+        {
+          "has": 761
+        }
+      ],
+      "cite": "room-012-monkey-he/obj-0155-unnamed.txt [000F]-[002A] (state(151)==0: room 69 at (186,120)); room-069-bighead/obj-0761-wimpy-little-idol.txt [0085]-[00B4] (printEgo, pickupObject(VAR_ME,0)); 761 class 16 -> global/script-002.txt [032F]-[0397] reach cutscene",
+      "note": "Pre-slide guide step 10 ('then the wimpy idol'). 155 is class 10 (walk to the clicked pixel): click a pixel inside the boxes 10-13 the gate opened."
+    },
+    {
+      "name": "Row to the village beach with the idol",
+      "target": [
+        {
+          "var": 143,
+          "eq": 132
+        },
+        {
+          "has": 761
+        }
+      ],
+      "hint": [
+        {
+          "name": "Leave the idol field",
+          "verb": 11,
+          "obj": 756,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "has": 761
+            }
+          ],
+          "until": [
+            {
+              "room": 12
+            }
+          ]
+        },
+        {
+          "name": "Clearing: jungle back to map room 5",
+          "verb": 11,
+          "obj": 134,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 12
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            }
+          ]
+        },
+        {
+          "name": "Map room 5: beach on foot (beach room 131)",
+          "verb": 11,
+          "obj": 60,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            }
+          ],
+          "until": [
+            {
+              "room": 131
+            }
+          ]
+        },
+        {
+          "name": "Board the rowboat (beach 131)",
+          "verb": 11,
+          "obj": 17,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 131
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            },
+            {
+              "not": {
+                "class": 64,
+                "set": 32
+              }
+            }
+          ]
+        },
+        {
+          "name": "Row: room 5 -> room 6 (exit 64, top edge)",
+          "verb": 11,
+          "obj": 64,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            },
+            {
+              "not": {
+                "class": 64,
+                "set": 32
+              }
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            }
+          ]
+        },
+        {
+          "name": "Row to the village beach (room 132)",
+          "verb": 11,
+          "obj": 71,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            }
+          ],
+          "until": [
+            {
+              "var": 143,
+              "eq": 132
+            }
+          ]
+        }
+      ],
+      "cite": "room-069-bighead/obj-0756-monkey-grounds.txt [000C] loadRoomWithEgo(155,12,790,104); room-012-monkey-he/obj-0134-jungle.txt [000C]-[001E] (map room 5 at 63's walk point); room-005-monkey-4/obj-0060-beach.txt [002B]-[0042] (on foot: room 131); room-001-beach/obj-0017-rowboat-and-oars.txt [0021]-[002F] (131: map room 5 sea at (137,137)); room-005-monkey-4/entry.txt [0032]-[007D] (box > 7: boat, setClass(64,[32]); on foot [00D5] setClass(64,[160])); room-005-monkey-4/obj-0064-unnamed.txt [000C]; room-006-monkey-5/obj-0071-beach.txt [0036] Var[143]=132",
+      "note": "Hint added (the slide route's S5 moves 28 and 31-35, played in runs/anypercent/slide-b3): from room 5 on foot the search's only shortest hop toward room 6 is the sea exit 64, untouchable on foot, so it would not find the boat at beach 131. {not class 64 set 32} is the C3 test for 'ego is in the boat in room 5'."
+    },
+    {
+      "name": "Walk into the village (second visit)",
+      "target": [
+        {
+          "room": 25
+        },
+        {
+          "has": 761
+        }
+      ],
+      "cite": "room-001-beach/obj-0016-jungle.txt [004C]-[007D]; room-006-monkey-5/obj-0072-village.txt [000C] loadRoomWithEgo(290,25,506,133); room-025-village/local-200.txt [0082]-[00A4] (!Bit[97], Var[232] > 0: the encounter waits for the camera to drop below 270 and come back)",
+      "note": "Search only."
+    },
+    {
+      "name": "Village visit 2: give the idol to the cannibals",
+      "target": [
+        {
+          "bit": 97,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Walk left toward the closed hut door (camera below 270)",
+          "verb": 11,
+          "obj": 285,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 25
+            },
+            {
+              "var": 2,
+              "ge": 300
+            }
+          ],
+          "until": [
+            {
+              "var": 2,
+              "in": [
+                160,
+                161,
+                162,
+                163,
+                164,
+                165,
+                166,
+                167,
+                168,
+                169,
+                170,
+                171,
+                172,
+                173,
+                174,
+                175,
+                176,
+                177,
+                178,
+                179,
+                180,
+                181,
+                182,
+                183,
+                184,
+                185,
+                186,
+                187,
+                188,
+                189,
+                190,
+                191,
+                192,
+                193,
+                194,
+                195,
+                196,
+                197,
+                198,
+                199,
+                200,
+                201,
+                202,
+                203,
+                204,
+                205,
+                206,
+                207,
+                208,
+                209,
+                210,
+                211,
+                212,
+                213,
+                214,
+                215,
+                216,
+                217,
+                218,
+                219,
+                220,
+                221,
+                222,
+                223,
+                224,
+                225,
+                226,
+                227,
+                228,
+                229,
+                230,
+                231,
+                232,
+                233,
+                234,
+                235,
+                236,
+                237,
+                238,
+                239,
+                240,
+                241,
+                242,
+                243,
+                244,
+                245,
+                246,
+                247,
+                248,
+                249,
+                250,
+                251,
+                252,
+                253,
+                254,
+                255,
+                256,
+                257,
+                258,
+                259,
+                260,
+                261,
+                262,
+                263,
+                264,
+                265,
+                266,
+                267,
+                268,
+                269
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Walk back right (camera to 270: the cannibals come)",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": [
+            318,
+            138
+          ],
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 2,
+              "in": [
+                160,
+                161,
+                162,
+                163,
+                164,
+                165,
+                166,
+                167,
+                168,
+                169,
+                170,
+                171,
+                172,
+                173,
+                174,
+                175,
+                176,
+                177,
+                178,
+                179,
+                180,
+                181,
+                182,
+                183,
+                184,
+                185,
+                186,
+                187,
+                188,
+                189,
+                190,
+                191,
+                192,
+                193,
+                194,
+                195,
+                196,
+                197,
+                198,
+                199,
+                200,
+                201,
+                202,
+                203,
+                204,
+                205,
+                206,
+                207,
+                208,
+                209,
+                210,
+                211,
+                212,
+                213,
+                214,
+                215,
+                216,
+                217,
+                218,
+                219,
+                220,
+                221,
+                222,
+                223,
+                224,
+                225,
+                226,
+                227,
+                228,
+                229,
+                230,
+                231,
+                232,
+                233,
+                234,
+                235,
+                236,
+                237,
+                238,
+                239,
+                240,
+                241,
+                242,
+                243,
+                244,
+                245,
+                246,
+                247,
+                248,
+                249,
+                250,
+                251,
+                252,
+                253,
+                254,
+                255,
+                256,
+                257,
+                258,
+                259,
+                260,
+                261,
+                262,
+                263,
+                264,
+                265,
+                266,
+                267,
+                268,
+                269
+              ]
+            }
+          ],
+          "until": [
+            {
+              "var": 32,
+              "eq": 14
+            }
+          ]
+        },
+        {
+          "name": "Answer 'Don't eat me! I'll give you anything!'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "give you anything",
+          "after": [
+            {
+              "var": 32,
+              "eq": 14
+            }
+          ],
+          "until": [
+            {
+              "var": 32,
+              "eq": 206
+            }
+          ]
+        },
+        {
+          "name": "Give the idol to the cannibals",
+          "verb": 4,
+          "obj": 761,
+          "obj2": 303,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "var": 32,
+              "eq": 206
+            }
+          ],
+          "until": [
+            {
+              "bit": 97,
+              "eq": 1
+            }
+          ]
+        }
+      ],
+      "cite": "room-025-village/local-200.txt [0082]-[00A4] (camera < 270, then >= 270 -> startScript(202,[],F)); room-025-village/local-209.txt [000D]-[002A] (ego below x 260: panCameraTo(160); above x 268: actorFollowCamera); room-025-village/local-202.txt [0236] (Var[232]==2 lines), [052F] (choice 121), [070D]-[0751] (first 121 and !Bit[354]: goto 08E2), [08E2]-[09DB] (offering, 'Well?', startScript(204,[],F), VAR_VERB_SCRIPT=206, UserputOn); room-025-village/local-204.txt [000A] (cannibals 303 touchable); room-025-village/local-206.txt [0007]-[0013] (Give passes); room-025-village/obj-0303-cannibals.txt [0012] -> local-203.txt; room-025-village/local-205.txt [0007] Bit[97]=1, [022F]-[023E] (door 285 open, hut door 307 open and unlocked), [0254] endCutscene",
+      "note": "Pre-slide guide step 11 (first half). Ego enters at (506,133) with the camera at 480, so the cannibals come only after a walk left past x 260 (local 209 pans to 160) and back right past x 268. Walk to the closed door 285 is only a walk (its handler needs state 1, obj-0285-door.txt [0053]); the move ends when the camera is below 270, not on arrival. var 2 is VAR_CAMERA_POS_X. Choice 120 ('mighty pirate') also leads to the offering. Give the idol within the 1,200-jiffy 'Well?' window (local-204.txt [0018]). ENGINE (2026-10-20): on the entry frame var 2 still reads 160 (the camera is set to 480 a frame later), which made the walk-left move look done; it now waits for var 2 >= 300. The walk back right goes to the screen's right edge (318,138): (400,138) is off screen while the camera is below 270."
+    },
+    {
+      "name": "Leave and re-enter from the map: the navigator dialogue",
+      "target": [
+        {
+          "bit": 513,
+          "eq": 1
+        },
+        {
+          "not": {
+            "class": 292,
+            "set": 32
+          }
+        }
+      ],
+      "hint": [
+        {
+          "name": "Leave the village (jungle)",
+          "verb": 11,
+          "obj": 290,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "bit": 97,
+              "eq": 1
+            },
+            {
+              "var": 32,
+              "eq": 4
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            }
+          ]
+        },
+        {
+          "name": "Map room 6: village again",
+          "verb": 11,
+          "obj": 72,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            }
+          ],
+          "until": [
+            {
+              "room": 25
+            },
+            {
+              "var": 32,
+              "eq": 14
+            }
+          ]
+        },
+        {
+          "name": "213: 'Well, actually, there is something...'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Well, actually, there is something",
+          "after": [
+            {
+              "room": 25
+            }
+          ],
+          "until": []
+        },
+        {
+          "name": "213: 'I'm looking for somebody.'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "I'm looking for somebody.",
+          "after": [],
+          "until": []
+        },
+        {
+          "name": "213: 'The people I'm looking for aren't living.'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "aren't living.",
+          "after": [],
+          "until": []
+        },
+        {
+          "name": "213: 'Where are LeChuck and his crew hiding?'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Where are LeChuck and his crew hiding?",
+          "after": [],
+          "until": [
+            {
+              "bit": 511,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "213: 'What's in your standard potion of exorcism?'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "standard potion of exorcism",
+          "after": [
+            {
+              "bit": 511,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "bit": 510,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "213: 'I'm off to find LeChuck and get the root!'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "get the root!",
+          "after": [
+            {
+              "bit": 510,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "bit": 513,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "213: 'What's the Eadhay of the Avigatornay?'",
+          "verb": null,
+          "obj": null,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": "Eadhay of the Avigatornay",
+          "after": [
+            {
+              "bit": 513,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "not": {
+                "class": 292,
+                "set": 32
+              }
+            }
+          ]
+        }
+      ],
+      "cite": "room-025-village/obj-0290-jungle.txt [001A]-[0025] (map room 6 at (126,64)); room-025-village/local-200.txt [00A7]-[00C1] (Bit[97], !Bit[358], Var[101]==6, !Bit[513] -> startScript(214)); room-025-village/local-214.txt [0007]-[0047] (cannibals walk in, ego to (437,136), startScript(213)); room-025-village/local-213.txt [0053] (menu), [0F80]-[0F87] (Bit[511]; its override jumps back to the main menu and skips the [10C5] sub-menu), [0BD9] (Bit[510]), [1323] (Bit[513]), [1900] setClass(292,[32,133]) (natives touchable), [194E]-[1957] (UserputOn, VAR_VERB_SCRIPT=4)",
+      "note": "Pre-slide guide step 11 (dialogue '1, 1, 1, 4, 2, 3, 1' with an Esc right after the 4; runner sources 2.5 and 2.7). The leaflet can go only to the friendly natives 292, which become touchable only at the end of this dialogue (local-213 [1900]) or on a later entry with Bit[513] set (local-217.txt [0006]); the cannibals 303 are untouchable after the idol (local-205.txt [000C]). The bridge's automatic Esc takes every override, including [0F85], so no Esc move is listed. The re-entry must come from map room 6 (Var[101]==6); an entry from the hut does not start 214. ALTERNATIVE ORDER TO MEASURE: hut, banana picker and Herman first (door 285 is open after the idol), then this re-entry and the leaflet; about 60 px less walking for the same room loads."
+    },
+    {
+      "name": "Give the leaflet: navigator head and necklace",
+      "target": [
+        {
+          "has": 293
+        },
+        {
+          "has": 294
+        },
+        {
+          "bit": 358,
+          "eq": 1
+        }
+      ],
+      "hint": [
+        {
+          "name": "Give the leaflet to the friendly natives",
+          "verb": 4,
+          "obj": 902,
+          "obj2": 292,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "not": {
+                "class": 292,
+                "set": 32
+              }
+            }
+          ],
+          "until": [
+            {
+              "has": 293
+            },
+            {
+              "has": 294
+            }
+          ]
+        }
+      ],
+      "cite": "room-025-village/obj-0292-friendly-natives.txt [001C] startScript(203,[Local[0]]); room-025-village/local-203.txt [0011]-[0030] (Bit[97], Local[0]==902 -> startScript(104)); global/script-104.txt [0007] Bit[358]=1, [04CB] setClass(292,[160]), [04D2]-[04DE] pickupObject(293,0), pickupObject(294,0), [04E2] endCutscene",
+      "note": "Pre-slide guide step 11 ('then the leaflet'). Ego already stands on the natives' walk point (437,136) from local 214, so there is no walk. Global 104 visits room 86 for the navigator close-up and reloads room 25 (its overrides are skipped automatically). Do not leave room 25 before 104 [04DE] (pickupObject from the current room crashes elsewhere; S5 slide file crash_rules)."
+    },
+    {
+      "name": "Hut: take the banana picker",
+      "target": [
+        {
+          "has": 314
+        }
+      ],
+      "cite": "room-025-village/obj-0285-door.txt [0053]-[005F] (state 1: loadRoomWithEgo(307,27)); room-025-village/local-205.txt [022F] setState(285,1); room-027-hut/obj-0314-banana-picker.txt [014F] pickupObject(VAR_ME,0); 314 class 15 -> global/script-002.txt [034E]-[0397] reach",
+      "note": "Search only. Banana picker walk point (126,120)."
+    },
+    {
+      "name": "Herman: the banana picker for the monkey head key",
+      "target": [
+        {
+          "has": 269
+        }
+      ],
+      "hint": [
+        {
+          "name": "Leave the hut by the door (Herman appears)",
+          "verb": 11,
+          "obj": 307,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "has": 314
+            }
+          ],
+          "until": [
+            {
+              "room": 25
+            },
+            {
+              "bit": 548,
+              "eq": 1
+            }
+          ]
+        },
+        {
+          "name": "Give the banana picker to Herman",
+          "verb": 4,
+          "obj": 314,
+          "obj2": 281,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "bit": 548,
+              "eq": 1
+            }
+          ],
+          "until": [
+            {
+              "has": 269
+            }
+          ]
+        }
+      ],
+      "cite": "room-027-hut/obj-0307-door.txt [004A]-[0056] (state 1: loadRoomWithEgo(285,25)); room-025-village/local-205.txt [023A]-[023E] (307 open and unlocked); room-025-village/entry.txt [001A]-[004B] (owner(314)==ego, !Bit[548]: Bit[548]=1, startScript(218), local 200 skipped); room-025-village/local-218.txt [0000]-[0026] ([0019] setClass(281,[32]), Herman at (521,140)); room-025-village/obj-0281-herman-toothrot.txt [0026] startScript(96,[Local[0]]); global/script-096.txt [0023]-[0113] ([00BD] setOwnerOf(269,VAR_EGO))",
+      "note": "Pre-slide guide step 12. The key 269 has been parked with owner 14 since the Part III arrival (room-020-main-beac/entry.txt [0090]-[0094]), so setOwnerOf works from any room. Herman's walk point is (477,140); he is touchable from the entry frame, before his babbling starts (local-218 [002D] waits for the camera)."
+    },
+    {
+      "name": "Row back to the clearing-side beach with the key",
+      "target": [
+        {
+          "var": 143,
+          "eq": 131
+        },
+        {
+          "has": 269
+        }
+      ],
+      "hint": [
+        {
+          "name": "Leave the village (jungle)",
+          "verb": 11,
+          "obj": 290,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "has": 269
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            }
+          ]
+        },
+        {
+          "name": "Map room 6: beach on foot (beach room 132)",
+          "verb": 11,
+          "obj": 71,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            }
+          ],
+          "until": [
+            {
+              "room": 132
+            }
+          ]
+        },
+        {
+          "name": "Board the rowboat (beach 132)",
+          "verb": 11,
+          "obj": 17,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 132
+            }
+          ],
+          "until": [
+            {
+              "room": 6
+            },
+            {
+              "not": {
+                "class": 70,
+                "set": 32
+              }
+            }
+          ]
+        },
+        {
+          "name": "Row: room 6 -> room 5 (exit 70, bottom edge)",
+          "verb": 11,
+          "obj": 70,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 6
+            },
+            {
+              "not": {
+                "class": 70,
+                "set": 32
+              }
+            }
+          ],
+          "until": [
+            {
+              "room": 5
+            }
+          ]
+        },
+        {
+          "name": "Row to the clearing-side beach (room 131)",
+          "verb": 11,
+          "obj": 60,
+          "obj2": null,
+          "point": null,
+          "key": null,
+          "choose": null,
+          "after": [
+            {
+              "room": 5
+            }
+          ],
+          "until": [
+            {
+              "var": 143,
+              "eq": 131
+            }
+          ]
+        }
+      ],
+      "cite": "room-025-village/obj-0290-jungle.txt [001A]-[0025]; room-006-monkey-5/obj-0071-beach.txt [0049]-[0054]; room-001-beach/obj-0017-rowboat-and-oars.txt [0036]-[004E]; room-006-monkey-5/entry.txt [0014]-[0058] (boat: 70 touchable); room-006-monkey-5/obj-0070-unnamed.txt [000C]; room-005-monkey-4/obj-0060-beach.txt [000C]-[0028]",
+      "note": "Fourth and last crossing. Hint added for the same reason as the room-131 crossing above (the slide route's S5 moves 61-65, played in runs/anypercent/slide-b4 and slide-b5)."
+    },
+    {
+      "name": "Through the open gate to the idol field (S6 handoff)",
+      "target": [
+        {
+          "room": 69
+        },
+        {
+          "has": 269
+        },
+        {
+          "has": 293
+        },
+        {
+          "has": 294
+        },
+        {
+          "state": 142,
+          "eq": 1
+        }
+      ],
+      "cite": "room-001-beach/obj-0025-jungle.txt [000C] -> obj-0023-jungle.txt [001D]-[0028] (map room 5); room-005-monkey-4/obj-0063-clearing.txt [000C] loadRoomWithEgo(134,12,224,136); room-012-monkey-he/entry.txt [000E]-[0049] (state(142)==1: boxes 10-13 open), [006E] (Bit[364] set: no Herman watch); room-012-monkey-he/obj-0155-unnamed.txt [000F]-[002A] (state(151)==0: room 69 at (186,120))",
+      "note": "Pre-slide guide step 13 begins here: S6 (routes/anypercent/noslide/S6.json) opens with 'Use ear with monkey head key' in room 69. The monkey keeps holding the nose, so the gate stays open (state 142 == 1) for the rest of the game."
+    }
+  ]
+}

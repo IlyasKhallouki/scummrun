@@ -1,0 +1,2491 @@
+{
+  "segment": "S5",
+  "title": "Part III: Monkey Island from the beach to the giant monkey head (fort, dam blast oars skip, monkey skip, cannibals with the book, hut, leaflet, Herman's key)",
+  "entry": {
+    "room": 20,
+    "inventory": [
+      488,
+      395,
+      643,
+      752,
+      596,
+      907,
+      732,
+      901,
+      902,
+      903,
+      82,
+      74
+    ],
+    "flags": [
+      {
+        "room": 20
+      },
+      {
+        "var": 32,
+        "eq": 201
+      },
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "var": 143,
+        "eq": 20
+      },
+      {
+        "var": 53,
+        "eq": 1
+      },
+      {
+        "var": 352,
+        "eq": 1
+      },
+      {
+        "bit": 398,
+        "eq": 0
+      },
+      {
+        "has": 74
+      },
+      {
+        "has": 732
+      },
+      {
+        "has": 907
+      },
+      {
+        "has": 902
+      },
+      {
+        "bit": 51,
+        "eq": 1
+      },
+      {
+        "var": 196,
+        "eq": 3
+      },
+      {
+        "bit": 436,
+        "eq": 0
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ],
+    "notes": "First frame in room 20 after global/script-107.txt [0161]-[016D] (Bit[398]=1, endCutscene, actorFollowCamera). The entry (room-020-main-beac/entry.txt [0073]-[00A6]) has consumed Bit[398] (=0 again), set costume 72, VAR_VERB_SCRIPT=201, parked 269 and 272 with owner 14 and started the intro local 202 (cutscene([])), so var 352 == 1 and, with the slide, var 53 == 1 (S4 exit flags, which match). Inventory = S4's exit inventory. Used here: 74 dusty book (Part II), 732 compass (fort shield), 907 LeChuck's note (monkey skip; picked up in room-083-cu-dock/local-203.txt [0732], listed by both S3's and S4's exits), 902 leaflet (room-083-cu-dock/local-200.txt [0C43]). Slide = _userPut one above normal: 2 at rest, 1 inside one cutscene. Cutscene start/end scripts change it by -1/+1 (global/script-018.txt [0007] UserputSoftOff, global/script-019.txt [0007] UserputSoftOn); dialogue code sets it absolutely (global/script-032.txt [0011] UserputOn=1, global/script-014.txt [00E2] UserputOff=0). VAR_USERPUT var 53 mirrors _userPut after every cursorCommand (engines/scumm/script_v5.cpp:934-937); the bridge frame log field 'up' is the raw value. Var[143]=20 (boot, global/script-001.txt [082C]): the rowboat is at the main beach and needs the oars (room-020-main-beac/local-200.txt [0000]-[0084]). Run configuration: talk speed is a run-wide setting (rules/anypercent.md: talkspeed is free); the project pins 255 (var 37 == 0, src/speedrun/engine.py). The book plan works at either speed but slower text widens the windows the bot must hit; see open_questions."
+  },
+  "exit": {
+    "until": [
+      {
+        "room": 69
+      },
+      {
+        "owner": 269,
+        "eq": 1
+      },
+      {
+        "has": 293
+      },
+      {
+        "has": 294
+      }
+    ],
+    "inventory": [
+      269,
+      293,
+      294,
+      74,
+      732,
+      907,
+      882,
+      282,
+      283,
+      488,
+      395,
+      643,
+      752,
+      596,
+      901,
+      903,
+      82
+    ],
+    "flags": [
+      {
+        "state": 142,
+        "eq": 1
+      },
+      {
+        "state": 151,
+        "eq": 0
+      },
+      {
+        "bit": 364,
+        "eq": 1
+      },
+      {
+        "bit": 97,
+        "eq": 1
+      },
+      {
+        "bit": 358,
+        "eq": 1
+      },
+      {
+        "bit": 426,
+        "eq": 0
+      },
+      {
+        "bit": 383,
+        "eq": 0
+      },
+      {
+        "var": 352,
+        "eq": 0
+      },
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "not": {
+          "var": 53,
+          "eq": 0
+        }
+      },
+      {
+        "has": 269
+      },
+      {
+        "has": 74
+      },
+      {
+        "has": 732
+      },
+      {
+        "bit": 536,
+        "eq": 0
+      },
+      {
+        "bit": 545,
+        "eq": 0
+      },
+      {
+        "bit": 357,
+        "eq": 0
+      },
+      {
+        "bit": 316,
+        "eq": 0
+      },
+      {
+        "bit": 470,
+        "eq": 0
+      },
+      {
+        "bit": 473,
+        "eq": 0
+      },
+      {
+        "var": 286,
+        "eq": 0
+      },
+      {
+        "var": 287,
+        "eq": 0
+      },
+      {
+        "bit": 436,
+        "eq": 0
+      },
+      {
+        "bit": 51,
+        "eq": 1
+      },
+      {
+        "var": 196,
+        "eq": 3
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ]
+  },
+  "moves": [
+    {
+      "name": "Esc the monkey part of the arrival intro",
+      "room": 20,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 20
+        },
+        {
+          "var": 32,
+          "eq": 201
+        }
+      ],
+      "until": [
+        {
+          "actor_room": 2,
+          "eq": 2
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-107.txt [0112]-[016D] (ego put in room 20 at (344,105), Bit[398]=1, actorFollowCamera); room-020-main-beac/entry.txt [0073]-[00A6] (Bit[398]: costume 72, VAR_VERB_SCRIPT=201, startScript(202)); room-020-main-beac/local-202.txt [0000] cutscene([]), [0010] beginOverride -> [00BD], [00C9] putActorInRoom(2,2)",
+      "note": "First input of S5. The override is armed from the first room-20 frame. With the slide carried from Part II the player has input inside this cutscene (_userPut 2-1=1); do NOT click the scene here: a click runs verb script 201 and starts the stand-up cutscene nested inside 202. With the slide the Esc is also forwarded to the verb script as key 27 (engines/scumm/input.cpp:1423-1428, verbs.cpp:590 and the generic key branch runInputScript); local 201 is not running yet and ignores keys (room-020-main-beac/local-201.txt [0000] acts only on Local[0]==2), so this is harmless here.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Esc the Herman part of the arrival intro",
+      "room": 20,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "actor_room": 2,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "actor_room": 7,
+          "eq": 0
+        },
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-020-main-beac/local-202.txt [00D2] beginOverride -> [0209], [0210] putActorInRoom(7,0), [0213] endCutscene; global/script-019.txt [0000] Var[352]-=1 (cutscene depth)",
+      "note": "The second override is armed in the same frame the first Esc lands (202 runs [00BD]-[00EE] before yielding), so this Esc can go on the next frame.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stand up (any scene click)",
+      "room": 20,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        300,
+        60
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 0
+        },
+        {
+          "var": 32,
+          "eq": 201
+        },
+        {
+          "var": 53,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "var": 32,
+          "eq": 4
+        },
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-020-main-beac/local-201.txt [0000] (Local[0]==2: any scene click) [0007] cutscene([]), 20 breakHere, [0021] Costume(1), [0027] VAR_VERB_SCRIPT=4, [002C] endCutscene",
+      "note": "The click position is ignored by verb script 201; it only starts the 20-frame stand-up. 'after' var 53 == 2 is the first rest state of S5 and proves the slide arrived (S4's exit hands var 53 == 1 inside 202's cutscene; 202's endCutscene runs global/script-019.txt [0007] UserputSoftOn, a cursorCommand, which refreshes var 53, engines/scumm/script_v5.cpp:934-937). If var 53 stays 1 the slide is gone: this move hangs on purpose and the pre-slide route applies (see the 'Oars skip' and 'Monkey skip' fallbacks). CRASH: no click and no key except '.' until VAR_VERB_SCRIPT is 4 (see crash_rules; Esc is forwarded to verb 201 as key 27 with the slide)."
+    },
+    {
+      "name": "Main beach: jungle exit to the map",
+      "room": 20,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        479,
+        20
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "room": 2
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-020-main-beac/obj-0261-jungle.txt [000F]-[004C] (map position (115+x/10, 150-x/24) in room 2); object 261 class 10 (=138 test, MONKEY.000 DOBJ) -> global/script-002.txt [02C1]-[02D5] walk to the clicked pixel, no distance check",
+      "note": "Click a pixel of 261 (box 0,0,640,72). The walk target is the clicked pixel, so click the nearest point of the top band that is reachable; small x lands nearer map exit 28. Every x lands on a land box of room 2 (checked: all (115..179,124..150) are in boxes 8/9), so this is always on foot. PIXEL (measured 2026-10-20 from slide-c5 frame 10468, camera 344): (479,20), screen x 295 of 261's band. Searched jointly with the next move's pixel over 7 x 11 pairs, then refined: the fort is entered at 10584 against 10592 with the hint's pixels (261's centre, 28's centre). The landing (115+x/10, 150-x/24) is then (162,131)."
+    },
+    {
+      "name": "Map room 2 -> room 3 (top-left edge)",
+      "room": 2,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        10,
+        10
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 2
+        }
+      ],
+      "until": [
+        {
+          "room": 3
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-002-monkey-1/obj-0028-unnamed.txt [000C] startScript(34,[3,246,128]); global/script-034.txt [0000]-[0068]; global/script-033.txt [000D]-[0047] (map verb script: class 138 hotspot -> startScript(117) WalkSpeed(4,4), walk to the clicked pixel, startObject); room-002-monkey-1/entry.txt [00D8]-[0105] (on foot: boxes 10-13 locked)",
+      "note": "Map clicks on a hotspot walk at 4,4 (global/script-117.txt [0005]); floor clicks at 1,1 (global/script-118.txt). Translated point (x+246,y+128) lands in room 3 boxes 4/5/9/10 (fort side, boxes <=19), so room 3's fort trigger local 200 is armed (room-003-monkey-2/entry.txt [00D3]-[0111]). HAZARD: on foot room 2 runs verb script 203, not 33 (room-002-monkey-1/entry.txt [00D8]); its local 203 [000B]-[002C] sends a click on the map monkey (actor 2, wandering around (151,126) by local 200/202, put there by the arrival intro room-020-main-beac/local-202.txt [00C9]), or on ego while the monkey is within 4 px, to jungle room 21 (local-201.txt loadRoomWithEgo(273,21)). Never click the monkey's pixels. PIXEL: (10,10) in 28 (0..55 x 0..55; the walk goes to the clicked pixel): room 3 landing (256,138), nearer the trail to the fort than 28's centre's (273,155)."
+    },
+    {
+      "name": "Map room 3: walk to the fort",
+      "room": 3,
+      "verb": 11,
+      "obj": 44,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 3
+        }
+      ],
+      "until": [
+        {
+          "room": 80
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-003-monkey-2/local-200.txt [0000]-[0011] (getDist(ego,44)<=2 -> doSentence(STOP), loadRoomWithEgo(886,80,225,127)); global/script-033.txt [004F] (44 has no class 10 -> doSentence(11,44)); global/script-002.txt [016C]-[01DB]",
+      "note": "Fort 44 walk point (119,57). The room change fires from the proximity script, not from the sentence. Fort entry prints 'The trail ends here.' (room-080-fort/entry.txt [006D]-[0078]); skip with '.'."
+    },
+    {
+      "name": "Push the cannon",
+      "room": 80,
+      "verb": 5,
+      "obj": 883,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 80
+        }
+      ],
+      "until": [
+        {
+          "bit": 137,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-080-fort/obj-0883-cannon.txt [001B]-[0025] (Bit[137]=1, startScript(200)); room-080-fort/local-200.txt [0000] cutscene([]), 15 breakHere, [0017]-[0026] drawObject(885), drawObject(887), setClass(887,[32]) (touchable)",
+      "note": "Walk point (206,121). Pick up the spyglass LAST (fort Herman timer, next moves). With the slide you may floor-walk toward (174,128) during the 15-frame cutscene, but gunpowder 887 is untouchable until [0026]. ENGINE (2026-10-20): until is now the push cutscene being open (local 200, cutscene([]), Bit[137] set by the cannon's verb script just before); the next move walks during its 15 breakHere frames."
+    },
+    {
+      "name": "Walk to the gunpowder during the cannon's push cutscene",
+      "room": 80,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        174,
+        128
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 137,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 137,
+          "eq": 1
+        },
+        {
+          "state": 887,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "gate": "input",
+      "glitch": "Input: a floor click at the gunpowder's walk point (174,128) on the frame after the push cutscene opens. room-080-fort/local-200.txt is cutscene([]) (verbs kept, hover frozen) with 15 breakHere; with the slide _userPut is 1 inside, so the click is a plain floor walk (global/script-004.txt [0418]-[0431]). 887 is untouchable until [0026], so it cannot be clicked earlier; the walk only moves ego there.",
+      "cite": "room-080-fort/local-200.txt [0000]-[0032]; room-080-fort/obj-0887-gunpowder.txt (walk point (174,128)); global/script-004.txt [0418]-[0431]",
+      "note": "until is the old push milestone (Bit[137] and state(887) == 1). Measured from slide-c5 frame 10592: the gunpowder pickup needs no walk, and the fort is left 5 frames sooner (room 3 at 10658 against 10663), with the same 14 frames from has(882) to the exit (Herman's delay(60) race unchanged)."
+    },
+    {
+      "name": "Pick up the gunpowder",
+      "room": 80,
+      "verb": 9,
+      "obj": 887,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "state": 887,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "has": 884
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-080-fort/obj-0887-gunpowder.txt [0048]-[005A] (startScript(201,[884])); room-080-fort/local-201.txt [0000]-[0018] (cutscene([2]), pickupObject(884,0))",
+      "note": "Walk point (174,128). 887 has no class 14-16, so no reach cutscene in script 2."
+    },
+    {
+      "name": "Pick up the spyglass",
+      "room": 80,
+      "verb": 9,
+      "obj": 882,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 884
+        }
+      ],
+      "until": [
+        {
+          "has": 882
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-080-fort/obj-0882-spyglass.txt [0038] pickupObject(882,0); 882 class 16 -> global/script-002.txt [032F]-[0397] reach cutscene([2]) delay(20) before the pickup; room-080-fort/local-202.txt [0006]-[000C] (Herman timer starts when 882 is owned)",
+      "note": "Walk point (223,126). CRASH: no mouse click of any kind during the 20-jiffy reach (crash_rules). has(882) appears only after the reach: global/script-002.txt [0397] endCutscene comes before [039D] startObject(882,9) -> obj-0882 [0038] pickupObject, so an input on the frame after has(882) is crash-safe. Fort local 202 (room-080-fort/local-202.txt [0007]-[0013]) starts its delay(60) on the frame it sees owner(882)==ego; the next three moves freeze it before ego walks away."
+    },
+    {
+      "name": "Leave the fort (plain exit right after the spyglass; wins Herman's delay(60) race)",
+      "room": 80,
+      "verb": 11,
+      "obj": 886,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 882
+        }
+      ],
+      "until": [
+        {
+          "room": 3
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-080-fort/obj-0886-path.txt [000C]-[0017] (room 3 at (115,58)); global/script-002.txt [0203]-[02E0] (walkActorToObject(886) returns at once: engines/scumm/actor.cpp:894-898 '_pos == abr'), [02E4]-[02EB] (distance 0), [039D] startObject; room-080-fort/local-202.txt [0013]-[002D]",
+      "note": "ENGINE (slide run, 2026-10-20): Walk to 886 right after has(882) leaves room 80 at frame 10884, 7 frames before the compass-reading shield (10891), and the slide is kept (the oars and monkey skips work after it). The shield moves were dropped; their mechanism: Inputs: 'l' on the frame after has(882) is first seen, the compass icon on the next frame (the executor's key-then-click). Mechanism: the compass Look-at is cutscene([2]) with an override (room-059-stans/obj-0732-magnetic-compass.txt [0021] cutscene([2]), [0026] beginOverride -> [00CD]). The sentence runs in the click frame (checkAndRunSentenceScript after checkExecVerbs, engines/scumm/scumm.cpp:3231-3232, 3255; owner(732)==ego so global/script-002.txt [02A6] skips the walk and [032F]-[0398] the reach), and the cutscene start runs freezeScripts(127) (global/script-018.txt [0070]). Fort local 202 was started without F (room-080-fort/entry.txt [0065] startScript(202,[])), so it is frozen in its delay(60) (local-202.txt [0013]); a frozen slot has status ssPaused|0x80 (engines/scumm/script.cpp:928-930) and decreaseScriptDelay only counts down slots whose status is exactly ssPaused (script.cpp:1513-1525). Herman's timer therefore stops with about 50 of its 60 jiffies left. With the slide the reading keeps input on (_userPut 2-1=1). Script 4 ran global/script-011.txt (Var[107]=Walk to, Var[108]=0) at global/script-004.txt [043D] before the freeze, and the hover script 23 is now frozen, so scene clicks are floor walks (script 4 [040E]-[0431])."
+    },
+    {
+      "name": "Map room 3 -> room 4 (right edge, down the volcano trail)",
+      "room": 3,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        319,
+        136
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 3
+        }
+      ],
+      "until": [
+        {
+          "room": 4
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-003-monkey-2/obj-0039-unnamed.txt [000C] startScript(34,[4,-272,54]); box matrix of room 3 (boxes 17..12 trail, 8, 6/7, 4, 10, 11 to the right edge); room-003-monkey-2/local-200.txt (fort trigger at dist<=2 of (119,57))",
+      "note": "Ego appears at (115,58) on the trail 4 px from the fort point; walk west/down first (the trail runs 17->16->...->12), never through (119,57) or the fort reloads. Alternative to compare: exits 37/38 to room 2 then 29 to room 4. PIXEL (measured from slide-c5 frame 10663): (319,136) in 39 (312..319 x 104..143; walk to the clicked pixel): the fork is entered at 10754 against 10757 from 39's centre (315,123); room 4 landing (x-272, y+54)."
+    },
+    {
+      "name": "Map room 4: river fork",
+      "room": 4,
+      "verb": 11,
+      "obj": 51,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 4
+        }
+      ],
+      "until": [
+        {
+          "room": 15
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-004-monkey-3/obj-0051-river-fork.txt [000C] loadRoomWithEgo(171,15,-1,-1); room-004-monkey-3/entry.txt [0129]-[0167] (region B boxes 13-19: 51, 58, 59, 46, 49, 47 touchable)",
+      "note": "51 has no class 10: sentence walk to (117,132). Fork entry line 'Boy, it sure is HOT here.' (room-015-fork/entry.txt [009E]-[00A4]); '.' skips it."
+    },
+    {
+      "name": "Open the spyglass (lens)",
+      "room": 15,
+      "verb": 2,
+      "obj": 882,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 15
+        }
+      ],
+      "until": [
+        {
+          "not": {
+            "class": 882,
+            "set": 6
+          }
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-080-fort/obj-0882-spyglass.txt [003D]-[0076] (classOfIs(882,[134]) -> 'There's a nifty lens in it.', setClass(882,[6,130]), setObjectName 'lens'); room-015-fork/local-200.txt [0000] needs class 6 clear",
+      "note": "UNTIL = the lens exists: obj-0882 [0064] setClass(882,[6,130]) clears class 6 (and names it 'lens'). A room-only until let the executor treat the move as already done, so the lens never existed and the dam blast (Use lens with sun) only printed a line (measured). Issue it on the first input frame in room 15 (do not wait for the HOT line): the only needed effect, setClass(882,[6,130]) at obj-0882 [0064], runs in the click's own slice right after the non-waiting printEgo [0046]. 'until' var 25 == 1 is only a liveness check (the entry's 'Boy, it sure is HOT here.' at room-015-fork/entry.txt [00A3]-[00A4] also sets it); C3 cannot read classes. The real check is the next move but one: with class 6 still set, room-015-fork/local-200.txt [0000] runs startScript(3) instead of the beam and the blast move's 'until' never holds. Do it before clicking the dam: any complete-sentence click runs doSentence(STOP) (global/script-004.txt [03FC]) and would cancel a pending walk sentence. Not needed if the lens was opened during 'Fort shield 2' (search option there)."
+    },
+    {
+      "name": "Use gunpowder with dam",
+      "room": 15,
+      "verb": 7,
+      "obj": 884,
+      "obj2": 176,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 15
+        }
+      ],
+      "until": [
+        {
+          "state": 178,
+          "eq": 1
+        },
+        {
+          "owner": 884,
+          "eq": 15
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-080-fort/obj-0884-handful-of-gunpowder.txt [0021] doSentence(7,Local[0],VAR_ME) (re-issued as Use 176 with 884); room-015-fork/obj-0176-dam.txt [000C]-[0022] (drawObject(178), setClass(178,[32]), owner 884 -> room); 176 class 15 -> global/script-002.txt [033D]-[0397] reach cutscene",
+      "note": "Walk point (255,136) (also 177's). CRASH: no clicks during the reach (20 jiffies). Ego must stay on (255,136) for the next move."
+    },
+    {
+      "name": "Use lens with sun: dam blast",
+      "room": 15,
+      "verb": 7,
+      "obj": 882,
+      "obj2": 179,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "state": 178,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 4
+        },
+        {
+          "actor_room": 1,
+          "eq": 0
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-015-fork/obj-0179-the-sun.txt (class 8 = no walk, global/script-002.txt [02B4]-[02BE]); room-080-fort/obj-0882-spyglass.txt [007D]-[0082] (Var[243]=200 set by room-015-fork/entry.txt [0099] -> startScript(200,[179])); room-015-fork/local-200.txt [0032] getDist(ego,176)<=5, [0040]-[006C] beam 13 frames, chainScript(44); global/script-044.txt [0000] cutscene([]), [00CA] putActorInRoom(ego,4)/putActor(148,151), [00D7] actorFollowCamera(10) -> room 4, [00D9] putActorInRoom(ego,0), [00E2] VAR_TIMER_NEXT=12",
+      "note": "No walk (the sun is class 8). The blast is a full cutscene (Local[0]=0: doSentence(STOP), freeze). With the slide the player still has input (_userPut 1). From [00D9] ego is in room 0 for 16 frames at 12 jiffies each, then [00FA] puts him back in room 4 at (148,151). The next two moves must happen in that window."
+    },
+    {
+      "name": "Oars skip 1: off-room instant exit to room 5",
+      "room": 4,
+      "verb": 11,
+      "obj": 47,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 4
+        },
+        {
+          "actor_room": 1,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Inputs: one left click on a pixel of room-4 exit 47 (box 288,112,32,32) on the first frame after global 44 ran [00D9] (ego in room 0), i.e. inside the 16-frame window before [00FA]. Mechanism: the map verb script 33 does its own findObject (it does not use the frozen hover script 23), calls walkActorTo and WaitForActor, then startObject (global/script-033.txt [000D]-[0047]). Because ego is not in the current room, Actor::startWalkActor only sets his position to the snapped target and returns (engines/scumm/actor.cpp startWalkActor, '!isInCurrentRoom() && version<=6' branch), so WaitForActor passes at once and exit 47 fires instantly: global/script-034.txt puts ego in room 5 at (x-200,y) and actorFollowCamera switches the scene to room 5 (on foot, land box 2). Input is accepted only because of the slide (_userPut 2-1=1 inside the blast cutscene).",
+      "cite": "global/script-044.txt [00D9]-[00FA]; global/script-033.txt [000D]-[0047]; room-004-monkey-3/obj-0047-unnamed.txt [000C] startScript(34,[5,-200,0]); room-004-monkey-3/entry.txt [0129]-[0167] (47 touchable in region B); room-005-monkey-4/entry.txt [0083]-[00F8] (on foot: boxes 8-15 locked, 62/66/67/63 touchable)",
+      "note": "Runner wording: 'click the beach (an instant teleport)'. Any room-4 hotspot works the same way while ego is off-room; 47 is the one that leads to room 5. A click on (300,128) snaps inside box 16 and lands ego at (100,128) in room 5 (land box 2). PRE-SLIDE FALLBACK if this step fails (or the slide was lost at the fort): let the blast finish, then pond rope 561 (map pond 59 -> room 40, room-040-pond/obj-0561-rope.txt [0041] pickupObject), crack (map room 2 object 35 -> room 18, room-002-monkey-1/obj-0035-crack.txt), Use rope 561 with strong branch 248 (from walkbox <=5) or sturdy stump 249 (walkbox 6) (room-018-crack/obj-0248-strong-branch.txt [0018]-[004A], obj-0249-sturdy-stump.txt [0018]-[004A]), pick up oars 245 (obj-0245-oars.txt [0027]-[0044], needs walkbox >=7), then Use the main-beach rowboat 263, whose local 200 accepts it only when owner(245)==ego (room-020-main-beac/local-200.txt [0000]-[0086]).",
+      "gate": "input"
+    },
+    {
+      "name": "Oars skip 2: walk toward room-5 exit 62 so the blast interrupts it",
+      "room": 5,
+      "verb": 11,
+      "obj": 62,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 4
+        },
+        {
+          "actor_x": 1,
+          "ge": 300
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Inputs: one left click on a pixel of room-5 exit 62 (box 0,128,48,72; its alias 66 'dry river bed' also works; avoid the pond 67 at 24,152,8,16) far enough from ego that the walk (4 px/frame) is still in progress when global 44 executes [00FA]. Mechanism: [00FA] putActorInRoom(ego,4)+putActor(148,151) hides ego and stops his walk (engines/scumm/actor.cpp Actor::putActor -> hideActor). The pending script-33 instance then passes WaitForActor and runs exit 62: global/script-034.txt reads ego's position, now (148,151), and puts him in room 4 at (348,151). startScene snaps that point with room 4's BOXD default flags: ScummVM copies BOXD afresh on every room load (engines/scumm/room.cpp:555-587), so no earlier setBoxFlags survives (room-005-monkey-4/exit.txt [0011]-[0019] only resets room 5's own boxes). The nearest box is sea box 22 at (316,151) (ScummVM adjustXYToBeInBox replayed on the BOXD data). Room 4's entry sees walkbox 22 >= 20 and switches to boat mode: costume 4, land boxes 1-19 locked, sea exits 56/57 touchable (room-004-monkey-3/entry.txt [008E]-[010C]). The rowboat is obtained without the oars. If no exit walk is in progress at [00FA], [012E] actorFollowCamera(ego) loads room 4 with ego on foot at (148,151): 'he returns to the fork'.",
+      "cite": "global/script-044.txt [00FA]-[0138]; room-005-monkey-4/obj-0062-unnamed.txt [000C] startScript(34,[4,200,0]); room-005-monkey-4/obj-0066-dry-river-bed.txt [000C] startObject(62,11); global/script-034.txt [0000]-[0068]; room-004-monkey-3/entry.txt [006E]-[010C]",
+      "note": "Of all on-foot map exits only 62/66 turn (148,151) into a sea landing (checked against every script-34 exit; 64, 65 and room 6's 70 would too but are untouchable on foot). Runner wording: 'the few pixels at the border between island, sea and bottom screen edge', 'Guybrush must still be walking fast when the map changes'. Do not click again after this: a new map click restarts script 33 and kills the pending exit. PRE-SLIDE FALLBACK if this step fails (or the slide was lost at the fort): let the blast finish, then pond rope 561 (map pond 59 -> room 40, room-040-pond/obj-0561-rope.txt [0041] pickupObject), crack (map room 2 object 35 -> room 18, room-002-monkey-1/obj-0035-crack.txt), Use rope 561 with strong branch 248 (from walkbox <=5) or sturdy stump 249 (walkbox 6) (room-018-crack/obj-0248-strong-branch.txt [0018]-[004A], obj-0249-sturdy-stump.txt [0018]-[004A]), pick up oars 245 (obj-0245-oars.txt [0027]-[0044], needs walkbox >=7), then Use the main-beach rowboat 263, whose local 200 accepts it only when owner(245)==ego (room-020-main-beac/local-200.txt [0000]-[0086]).",
+      "gate": "input"
+    },
+    {
+      "name": "Row: room 4 sea box 22 -> room 5 (during the blast's slow tail)",
+      "room": 4,
+      "verb": 11,
+      "obj": 56,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 4
+        },
+        {
+          "actor_x": 1,
+          "ge": 300
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        },
+        {
+          "actor_y": 1,
+          "ge": 130
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-004-monkey-3/entry.txt [006E]-[010C] (box 22: costume 4, 56/57 touchable, all other boxes locked; BOXM: sea boxes 20, 21, 22 each reach only themselves); room-004-monkey-3/obj-0056-unnamed.txt [000C] startObject(47,11) -> obj-0047 [000C] startScript(34,[5,-200,0]); global/script-033.txt [000D]-[0047] (own findObject, class 138 -> walkActorTo(clicked pixel), WaitForActor, startObject: no sentence script); global/script-044.txt [0105]-[011B] (20 more frames at VAR_TIMER_NEXT 12), [0121] drawObject(58) (engines/scumm/script_v5.cpp o5_drawObject returns when 58 is not in the current room), [012E], [0138]; room-005-monkey-4/entry.txt [002D]-[0080]",
+      "note": "Click object 56 at ego's own pixel, room (316,151): 56's hotspot is (312,136,8,64) (out/objects.json) and box 22 contains (316,151), so the walk target equals ego's position, startWalkActor returns at once (engines/scumm/actor.cpp:894-898) and exit 47 puts ego in room 5 at (116,151), sea box 15 (boat). Issue it on the first frame room 4 shows ego at x >= 300: input works inside global 44's cutscene with the slide (_userPut 1), and script 33's exit survives 44's endCutscene (global/script-019.txt [0054] doSentence(STOP) only stops the sentence script). This uses frames of the blast tail that pass anyway (each 12 jiffies instead of 5). Side effect: [0121] drawObject(58) and [0125] setObjectName run while room 5 is current, so object 58 keeps state 0 (cosmetic; room 4 is not used again in S5-S7)."
+    },
+    {
+      "name": "Row to the clearing-side beach (room 5 beach -> beach room 131)",
+      "room": 5,
+      "verb": 11,
+      "obj": 60,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 131
+        },
+        {
+          "var": 143,
+          "eq": 131
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-005-monkey-4/obj-0060-beach.txt [000C]-[0028] (costume 4: Var[143]=131, putActorInRoom(ego,131) at (160,112)); global/script-033.txt [0024]-[004F] (60 has no class 10: startScript(117) WalkSpeed(4,4), then doSentence(11,60)); global/script-002.txt [016C]-[0173] (60 has a verb-11 entry, index.json) -> [0203], [027A]-[02E0] walkActorToObject(ego,60), WaitForActor, [02E4]-[02FB] distance test; engines/scumm/object.cpp:546-550 (getObjActToObjActDist snaps the object point with the same adjustXYToBeInBox the walk used, so the distance after arrival is 0)",
+      "note": "Room 131 is engine room number 131, mapped to the 'beach' resource room 1 (room-001-beach/entry.txt [0061]-[0112] branches on VAR_ROOM 130/131/132). The walk point (132,122) snaps to sea box 15 at about (132,137) (room-5 BOXD: box 15 top edge (114,142)-(163,129); box 8 is farther), reached directly from (116,151). This sentence is a script-2 sentence and global 44's endCutscene would kill it (global/script-019.txt [0054] doSentence(STOP)): issue it right after the room-5 landing so it ends well before 44's [0138] (it needs about 4-5 frames; the tail has 20). If var 19 becomes 5 while ego is still rowing in room 5, reissue the click. Record: '15:25 beach with the rowboat'."
+    },
+    {
+      "name": "Beach 131: jungle to the map (room 5, on foot)",
+      "room": 1,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        304,
+        109
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 131
+        },
+        {
+          "var": 19,
+          "eq": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-001-beach/entry.txt [0038]-[004D], [00AD]-[00C2] (131: class 10 cleared on 16 and 23, 24 and 25 made touchable, both keep their data class 10); room-001-beach/obj-0025-jungle.txt [000C] startObject(23,11) -> obj-0023-jungle.txt [001D]-[0028] (class 10 cleared: putActorInRoom(ego,5) at (167,116)); global/script-002.txt [02C1]-[02D5] (class 138: walk to the clicked pixel); room-001-beach/local-200.txt [0000]-[0055] (Herman: delay(180) after ego first moves, then cutscene + global 95)",
+      "note": "Click 25 (hotspot (304,72,16,72)) at room (304,y) with y in 81..109, inside walk box 4 (room-1 BOXD: box 4 is x 62..313, y 81..109; box 5 is locked in 131): from the landing point (160,109) that is 144 px, 18 frames, against about 20 frames to 23's fixed walk point (314,78) (snaps to (313,81)). 25 lands on the same room-5 point as 23 (167,116), nearer the clearing than 16/24's (97,132). 'after' var 19 == 5: the first step starts local 200's delay(180) (Bit[361] is still 0); while global 44's tail runs, every frame removes 12 jiffies (15 frames instead of 36), and a walk sentence in flight at 44's [0138] would be killed by global/script-019.txt [0054] doSentence(STOP). var 19 == 5 is set at 44's [011C] in the same slice as [0138], so it marks the end of the blast. SEARCH OPTION: start earlier if fewer than about 12 tail frames remain (12k + 5(18-k) < 181 jiffies) and reissue the click if [0138] kills it. PIXEL: (304,109), 25's left column at box 4's bottom row: 1 frame sooner than 25's centre (311,107), measured on the return visit from frame 12140 (room 12 at 12178 against 12179)."
+    },
+    {
+      "name": "Map room 5: clearing",
+      "room": 5,
+      "verb": 11,
+      "obj": 63,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 12
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-005-monkey-4/obj-0063-clearing.txt [000C] loadRoomWithEgo(134,12,224,136); room-012-monkey-he/entry.txt [006E]-[0091] (!Bit[364] -> startScript(208)); room-012-monkey-he/local-208.txt, local-209.txt",
+      "note": "Herman watch: local 208 arms 209 once ego is within 200 of object 135 (756,126); 209 fires when VAR_CAMERA_POS_X >= 684."
+    },
+    {
+      "name": "Pull the nose (gate opens)",
+      "room": 12,
+      "verb": 6,
+      "obj": 144,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 12
+        }
+      ],
+      "until": [
+        {
+          "state": 142,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-012-monkey-he/obj-0144-nose.txt [0015] startScript(204,[],F) (freeze-resistant); local-204.txt [0000]-[0024] (cutscene([2]) pull, then startScript(202)); local-202.txt [0000]-[0046] (cutscene([2]), panCameraTo(624), draw 140-142, boxes 10-13 unlocked, setClass(155,[32]), endCutscene), [0047]-[0052] wait until ego moves; local-204.txt [0027]-[004B] (waits for 202 to end, then for ego to leave the nose, then gate-close script 203)",
+      "note": "Walk point (677,109) (snaps to (676,111), box 15). Issue the Pull from the clearing entry point (224,136) so ego walks straight to the nose and the pull fires on arrival: the follow camera trails a walking ego by about 80 px (engines/scumm/camera.cpp:119-159, right trigger 30 strips, scumm.cpp:2151-2152) and catches up at 8 px per frame only after ego stops. Local 202 checks the camera about 2 frames after arrival (local-204.txt [0000]-[0024] runs over 2 frames) and pans only if VAR_CAMERA_POS_X < 624 (local-202.txt [0005]). Never walk to the nose first and pull later: the camera would settle at 672 and 202 would not pan. Do not move ego after this: 202 ends as soon as ego moves and 204 then closes the gate."
+    },
+    {
+      "name": "Monkey skip 1: read LeChuck's note while holding the nose",
+      "room": 12,
+      "verb": 8,
+      "obj": 907,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "state": 142,
+          "eq": 1
+        },
+        {
+          "var": 2,
+          "eq": 624
+        },
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Inputs: verb Look at (key 'l') and a click on the note icon, landing on the frame after state(142) becomes 1 (202 has then run [002B]-[0046]: boxes unlocked, endCutscene). Mechanism: the note's Look-at is cutscene([2]) (room-083-cu-dock/obj-0907-note.txt [0015]) and every cutscene start runs freezeScripts(127) (global/script-018.txt [0070]; engines/scumm/script.cpp freezeScripts skips only freeze-resistant slots). Local 202 (started without F) is frozen in its 'wait until ego moves' loop; local 204 is freeze-resistant but waits for 202 to finish, so the gate never closes. The slide keeps input on during the reading (_userPut 1), and scene clicks become floor walks because the hover script 23 is frozen with Var[108]=0 (script 11 cleared it, global/script-011.txt [0005]). PRECONDITION (var 2 == 624, VAR_CAMERA_POS_X): local 202's panCameraTo(624) is conditional (room-012-monkey-he/local-202.txt [0005] 'if (VAR_CAMERA_POS_X < 624)'). Only the pan puts the camera in panning mode (engines/scumm/camera.cpp:195-199), which stops it from following ego. Without the pan the camera stays in follow mode, the walk to (770,88) drags it to about 768, and local 209 (already started by 208 at the nose, getDist(ego,135) < 200, local-208.txt [0001]-[000F]; frozen during the reading) fires on unfreeze (local-209.txt [0001] camera >= 684) before the 155 click (scripts run before input, scumm.cpp:3231-3232): Herman walks ego to (693,127) ([0054]-[0070]), 202 ends and 204/203 close the gate. At state(142)==1 the camera can read exactly 624 only if the pan ran (202 waits for == 624 at [0010]; a follow camera that skipped the pan is at least 2 strips past 624 by then).",
+      "cite": "room-083-cu-dock/obj-0907-note.txt [0015]-[0192]; room-012-monkey-he/local-202.txt [0047]-[0052]; local-204.txt [0027]-[002C]; global/script-018.txt [0005]-[0070]",
+      "note": "If the click lands during 202's opening cutscene the sentence still runs (new sentences have freezeCount 0, engines/scumm/script.cpp doSentence) and would freeze 202 before the boxes unlock: too early fails. Note 907 is picked up at the end of Part I (room-083-cu-dock/local-203.txt [0732]); S3's and S4's exit inventories list it. Fallback reading: compass 732 Look at (room-059-stans/obj-0732-magnetic-compass.txt [0021]) or the book 74 (global/script-148.txt [001F]). A reading-free variant (click 155 so that its pixel snaps into a box unreachable from the nose, making the exit instant) does not exist: with 10-13 unlocked all room-12 boxes form one component (BOXM), and with 10-13 locked the click snaps to a reachable box and ego walks. PRE-SLIDE FALLBACK: pick up the beach bananas (room 20 object 270, which also takes 265-267, room-020-main-beac/obj-0270-bananas.txt [0018]-[0040]), give them to the map monkey so it follows (global/script-043.txt), pull the nose and let the monkey hold it (room-012-monkey-he/local-204.txt [004E]-[0057], local-205.txt). If 'after' does not hold (var 2 != 624 once state(142)==1), the skip is impossible from this state: the search discards the branch (or the run reloads a save made before the clearing, Any% Saves) and approaches again; never continue. ENGINE (slide run, 2026-10-20): with the slide carried the counters are already var 53 == 1, var 352 == 1 before the reading and stay there during it (202 and 209 frozen), so 'until' is ego's first line (VAR_HAVE_MSG != 0); the bridge's automatic '.' is off from here to the idol, or it ends the reading before ego reaches (770,88). ENGINE (2026-10-20, part3b lane): until is now the reading's cutscene (var 352 == 1), with 'after' var 352 == 0 (202's opening cutscene has ended, so the depth can only rise for the note): the next move walks at once, during the note's 20-frame costume-68 animation ([0041]-[005E] breakHere) instead of from ego's first line. The walk in costume 68 is harmless (the override at [0172] restores costume 1). Measured from slide-int1 frame 10787 with early inputs: ego at (770,88) at 10916 instead of 10935, room 69 at 10920 instead of 10939.",
+      "gate": "input",
+      "skips": {
+        "text": 0,
+        "cutscenes": 0
+      }
+    },
+    {
+      "name": "Monkey skip 2: walk through the open gate under the monkey's ear",
+      "room": 12,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        770,
+        88
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "eq": 770
+        },
+        {
+          "actor_y": 1,
+          "eq": 88
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Inputs: floor clicks (repeat allowed) at one fixed pixel that lies on object 155's hotspot but not on 133's: room x 760-783, y 81-95 (or x 752-759). With the camera parked at 624 by 202's panCameraTo (202 is frozen, so actorFollowCamera never runs) that pixel is on screen at screen x 296-319. Ego walks there through boxes 10-13. Herman's 208/209 are frozen too, and the camera, in panning mode at 624 (the precondition of 'Monkey skip 1'), does not follow ego, so it stays below 684.",
+      "cite": "room-012-monkey-he/local-202.txt [0005]-[0010] (panCameraTo(624)), [002B]-[003F]; object boxes from out/objects.json (155: 752,0,208,96 class 10; 133: 760,24,136,56; 135/140-142 untouchable); room-012-monkey-he/local-209.txt [0001]",
+      "note": "Runner wording: 'walk right below the monkey's ear while holding Enter'. Room-12 BOXD/BOXM replayed with ScummVM's adjustXYToBeInBox: (770,88) lies inside box 11 (768-822 x 85-104), so the target is exactly (770,88); the nose walk point (677,109) snaps to (676,111) in box 15, and 15-9-13-10-11 is connected once 202 unlocks 10-13. 'until' is exact arrival: Esc must not land while ego is still moving, or 202 ends on unfreeze and the gate closes. Any pixel of 155 outside 133 with x 768-783, y 85-95 is inside box 11 and works the same; pixels with y < 85 snap to (x,85). ENGINE (2026-10-20, part3b lane): played right after the reading's cutscene opens (previous move), during its costume animation.",
+      "gate": "input"
+    },
+    {
+      "name": "Monkey skip 3: Esc ends the reading",
+      "room": 12,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "actor_x": 1,
+          "eq": 770
+        },
+        {
+          "actor_y": 1,
+          "eq": 88
+        },
+        {
+          "var": 2,
+          "eq": 624
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 0
+        },
+        {
+          "var": 53,
+          "eq": 2
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-083-cu-dock/obj-0907-note.txt [001A] beginOverride -> [0172] (costume back), [0192] endCutscene; global/script-019.txt [004B] freezeScripts(0)",
+      "note": "Ego must already be standing still on the target point: when 202 unfreezes it ends as soon as ego moves, and 204 then closes the gate (local-203.txt doSentence(STOP), boxes 10-13 locked). var 2 must still be 624 (panning mode), or 209 fires on unfreeze (see 'Monkey skip 1'). With the slide the Esc is also forwarded to verb script 4 as key 27, which only runs global/script-011.txt (Var[108]=0); the hover script, unfrozen by the reading's endCutscene, sets Var[108]=155 again before the next click.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Monkey skip 4: click 155 at the same pixel (instant entry to the idol field)",
+      "room": 12,
+      "verb": 11,
+      "obj": 155,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "room": 69
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Inputs: one left click at exactly the pixel used for the floor walk, on the frame after the reading ended (the hover script runs again first and sets Var[108]=155). 155 is class 10, so script 2 walks to the clicked pixel (global/script-002.txt [02C1]-[02D5]); ego already stands on its snapped point, startWalkActor returns without moving, WaitForActor passes and 155's Walk-to puts ego in room 69 at (186,120) in the same frame. Ego never 'moves' in room 12, so 202 never ends and the gate is never closed; state(142) stays 1 for the rest of the game.",
+      "cite": "room-012-monkey-he/obj-0155-unnamed.txt [000F]-[002A]; global/script-002.txt [02C1]-[02D5]; engines/scumm/actor.cpp startWalkActor ('_pos == abr' early return)",
+      "note": "If 133 is under the cursor instead, its walk point (813,84) makes ego move and the gate closes (race lost). Fallback (pre-slide route): feed the monkey bananas (beach bananas 270/265, room 20) so it follows (global/script-043.txt) and holds the nose (room-012-monkey-he/local-205.txt).",
+      "gate": "input"
+    },
+    {
+      "name": "Pick up the wimpy little idol",
+      "room": 69,
+      "verb": 9,
+      "obj": 761,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 69
+        }
+      ],
+      "until": [
+        {
+          "has": 761
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-069-bighead/obj-0761-wimpy-little-idol.txt [0085]-[00B4] (printEgo, pickupObject(761,0)); 761 class 16 -> global/script-002.txt [032F]-[0397] reach cutscene",
+      "note": "Walk point (220,120). CRASH: no click until has(761) (runner: 'wait until the idol pickup has finished').",
+      "skips": {
+        "text": 1,
+        "cutscenes": 0
+      }
+    },
+    {
+      "name": "Leave the idol field",
+      "room": 69,
+      "verb": 11,
+      "obj": 756,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 761
+        }
+      ],
+      "until": [
+        {
+          "room": 12
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-069-bighead/obj-0756-monkey-grounds.txt [000C] loadRoomWithEgo(155,12,790,104); room-012-monkey-he/entry.txt [000E]-[0049] (state(142)==1 -> boxes 10-13 open), [006E]-[0091] (Herman scripts)",
+      "note": "Herman's first room-12 meeting now fires (camera >= 684 at x 790): accepted, it costs the slide, which the book restores at the cannibals."
+    },
+    {
+      "name": "Herman: Esc his monologue",
+      "room": 12,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "bit": 364,
+          "eq": 1
+        },
+        {
+          "var": 32,
+          "eq": 14
+        }
+      ],
+      "until": [
+        {
+          "var": 53,
+          "eq": 1
+        },
+        {
+          "var": 32,
+          "eq": 14
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-012-monkey-he/local-209.txt [0008]-[0078] (cutscene([]) with no override, Bit[364]=1 at [000A], startScript(95) at [0078]); global/script-095.txt [0005] VAR_VERB_SCRIPT=14, [0033] UserputOff, [0035]-[003C] beginOverride -> [033A] (room != 25), all in 95's first slice; [0341] startScript(32) (UserputOn: choices)",
+      "note": "var 32 == 14 can only come from global 95 here ([0005]), and 95 arms its override in the same slice, so the Esc on the next frame always hits it. The draft's 'var 53 == 0' also held inside 209's approach cutscene when the slide was already lost; an Esc there hits no override (209 has none) and the monologue would play in full.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Herman: answer 'What?'",
+      "room": 12,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "What?",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        },
+        {
+          "var": 32,
+          "eq": 14
+        }
+      ],
+      "until": [
+        {
+          "var": 32,
+          "eq": 4
+        },
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-095.txt [0005] VAR_VERB_SCRIPT=14 during the talk; [05E9]-[0670] (room 12 lines 120/121), [0725] 'Leave me alone', [079B]-[0832] first meeting: any answer but 120 -> 'Don't be a jerk.' -> [1C55]; [1C79]-[1C86] VAR_VERB_SCRIPT restored, UserputOn",
+      "note": "Key '2'. 'Leave me alone, would you?' (key '3') gives the same reply with a longer line. '.' skips both lines. Slide is now gone (var 53 = 1)."
+    },
+    {
+      "name": "Clearing: jungle back to the map",
+      "room": 12,
+      "verb": 11,
+      "obj": 134,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-012-monkey-he/obj-0134-jungle.txt [000C]-[001E] loadRoomWithEgo(63,5,-1,-1)",
+      "note": "Walk point (167,126), about 620 px from (790,104)."
+    },
+    {
+      "name": "Map room 5: beach on foot (to beach room 131)",
+      "room": 5,
+      "verb": 11,
+      "obj": 60,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 131
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-005-monkey-4/obj-0060-beach.txt [002B]-[0042] (on foot: room 131 at ((x-103)*5,74))",
+      "note": "Rowboat 17 is shown because Var[143]==131 (room-001-beach/entry.txt [0002]-[0014]). Herman 180-jiffy rule applies again."
+    },
+    {
+      "name": "Board the rowboat",
+      "room": 1,
+      "verb": 11,
+      "obj": 17,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 131
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        },
+        {
+          "actor_x": 1,
+          "ge": 130
+        },
+        {
+          "actor_x": 1,
+          "le": 144
+        },
+        {
+          "actor_y": 1,
+          "ge": 130
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-001-beach/obj-0017-rowboat-and-oars.txt [000F]-[004E] (131 -> putActorInRoom(ego,5) at (137,137)); room-005-monkey-4/entry.txt [002D]-[0080] ((137,137) is in sea box 15 -> boat)",
+      "note": "Engine room 131. Walk point (125,110)."
+    },
+    {
+      "name": "Row to room 6 (top edge of room 5)",
+      "room": 5,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        95,
+        3
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 6
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-005-monkey-4/obj-0064-unnamed.txt [000C] startScript(34,[6,239,192]); room-005-monkey-4/entry.txt [006F] (64 touchable in boat mode); room-006-monkey-5/entry.txt [000F]-[0055] (box >11 -> boat)",
+      "note": "The sea path is forced: room-5 BOXM makes sea boxes 8-15 one chain 8-9-10-11-12-13-14-15 (decoded from build/blocks-dos-cd/DISK_0001/LECF/LFLF_0005/ROOM/BOXM), so from box 15 the way to 64 (40..95 x 0..7, in box 10) is 15-14-13-12-11-10 around the east coast. Room 4 offers nothing: its sea boxes 20, 21, 22 are isolated in BOXM and room-004-monkey-3/entry.txt [0073]-[0087] locks all but ego's own. Only the click pixel is free for the search. Record: '15:58 to 16:13 boat and rowing'. PIXEL (measured 2026-10-20 from slide-c5 frame 11293): 64 is class 138 (script 33 walks the boat to the clicked pixel, then starts 64), so the click is the floor point (95,3), 64's right end (40..95 x 0..7): the last leg along box 10 is 28 px shorter than to the hint's centre (67,3). Room 6 at 11408 instead of 11415; room 6's landing becomes (316,195) (x+239 clamped into box 20)."
+    },
+    {
+      "name": "Row to the village beach (room 132)",
+      "room": 6,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        276,
+        146
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 6
+        }
+      ],
+      "until": [
+        {
+          "room": 132
+        },
+        {
+          "var": 143,
+          "eq": 132
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-006-monkey-5/obj-0071-beach.txt [000C]-[0054] (costume 4: Var[143]=132, room 132 at (320-(y-112)*4,112))",
+      "note": "71 is class 10: the walk target is the clicked pixel (snapped to sea). PIXEL: (276,146), inside 71 (256..279 x 120..183). The boat stops at the clicked pixel snapped to sea box 19, and the arrival y sets room 132's x (320-(y-112)*4); with the next move's click this lands ego at x 180 in room 132. Searched with the next two moves over 16 x 4 pixel pairs from frame 11408: village (room 25) at 11478, against 11490 with the objects' centres."
+    },
+    {
+      "name": "Beach 132: jungle to the map (room 6, on foot)",
+      "room": 1,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        305,
+        70
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 132
+        }
+      ],
+      "until": [
+        {
+          "room": 6
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-001-beach/obj-0016-jungle.txt [004C]-[007D] (132 -> room 6 at (250,186-x/5)); room-001-beach/entry.txt [0038]-[003F] (16 and 23 class 138; the 132 branch [00E1]-[010F] leaves them so); room-001-beach/obj-0023-jungle.txt [000C]-[0015] (class 138 -> startObject(16,11)); room-001-beach/local-200.txt (Herman 180-jiffy rule)",
+      "note": "Engine room 132 (resource room 1). Click the reachable pixel of 16 (0,0,160,72) or of 23 (160,0,160,72, forwards to 16) that gives the shortest walk; both walk to the clicked pixel (snapped into box 1, y 73..81, or box 4, y 81) and use ego's x for the room-6 landing (250,186-x/5). The search should treat 16 and 23 as one target; pixels straight above ego avoid an x leg, and the y leg (2 px per frame) dominates. PIXEL: (305,70), in 23 (class 138 here: walk to the clicked pixel, then startObject(16)). Walking right to x ~300 costs about the same frames as the hint's diagonal to 16's centre (79,35) -> (66,82), but the room-6 landing (250,186-x/5) is then about 60 px higher, and the map walk to the village is about 10 frames shorter (map paths go box edge to box edge, so a low landing first walks straight up)."
+    },
+    {
+      "name": "Map room 6: village",
+      "room": 6,
+      "verb": 11,
+      "obj": 72,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 6
+        }
+      ],
+      "until": [
+        {
+          "room": 25
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-006-monkey-5/obj-0072-village.txt [000C] loadRoomWithEgo(290,25,506,133); room-025-village/entry.txt [00AB]-[00D8] (local 200); room-025-village/local-200.txt [007A]-[00A7] (first visit: Var[232]==0, no encounter)",
+      "note": "Village visit 1."
+    },
+    {
+      "name": "Pick up the bananas (starts the cannibal encounter)",
+      "room": 25,
+      "verb": 9,
+      "obj": 291,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 25
+        }
+      ],
+      "until": [
+        {
+          "has": 282
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/obj-0291-bananas.txt [003C]-[005E] (pickupObject 282/283, startScript(202,[],F)); 291 class 16 -> global/script-002.txt [032F]-[0397] reach",
+      "note": "Walk point (120,141). Runner: still needed to talk to the cannibals. No slide here, so the reach is crash-safe."
+    },
+    {
+      "name": "Walk right so the camera scrolls",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        318,
+        138
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 282
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 266
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-025-village/local-202.txt [0039]-[0045] (waits for VAR_CAMERA_POS_X >= 270 before the encounter cutscene)",
+      "note": "The book is opened during this walk (next move); the walk is engine-driven and continues with input disabled. ENGINE: (430,138) is off screen with the camera at 160; the walk goes to the screen's right edge (318,138). Local 202 starts the encounter once VAR_CAMERA_POS_X >= 270 ([0045]); the follow camera trails ego by about 80 px and then centres on where the book's turn stops ego, so the book opens at x >= 266 (camera about 184): ego stops near 287 and the camera reaches 270 inside the reading. At x 255 ego stopped at 271 and the camera at 264: no encounter."
+    },
+    {
+      "name": "Read the dusty book while the camera scrolls",
+      "room": 25,
+      "verb": 8,
+      "obj": 74,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "actor_x": 1,
+          "ge": 266
+        }
+      ],
+      "until": [
+        {
+          "script": 148
+        },
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Inputs: 'l' and a click on the book icon while ego walks right after the bananas, before local 202 passes [0045] (camera >= 270), because [004C] sets VAR_VERB_SCRIPT=14 (no inventory) and [0057] opens 202's cutscene. Mechanism (slide regain): the book is global 148, cutscene([2]) at [001F] with override [0027] -> [059C]; it stays open as cutscene level 1 across visit 1, the map and visit 2. Local 202 is freeze-resistant (obj-0291 startScript(202,[],F)), so the encounter runs inside the reading; its menu code sets _userPut absolutely (global/script-032.txt [0011] =1, global/script-014.txt [00E2] =0), [09DB] UserputOn gives input inside the book (=1), and [09D3] startScript(17,[2]) restarts hover script 23 after the book's freeze (global/script-017.txt [0049]-[0060]), so hotspots work while the book is open. Visit 2 is the same with 213: [0053] startScript(32), [1950] UserputOn, [1957] startScript(17,[2]). When the book's endCutscene runs after [1950], global/script-019.txt [0007] UserputSoftOn makes _userPut 2: the slide. PAGE BUDGET (release model; unproven, decides var 53 at the exit): global/script-148.txt has 11 printEgo and 10 WaitForMessage gates ([00BB], [011F], [0174], [01CA], [026A], [02EB], [03D9], [046A], [04DF], [0596]); after the 10th it runs [0598] delay(30), [059C], three breakHere and [05A2] 'That's the last entry.', then [05BB] endCutscene with no wait, about 10 frames later. A gate releases only when 148 runs unfrozen and reads VAR_HAVE_MSG == 0 (script_v5.cpp:3288-3291). VAR_HAVE_MSG is copied from _haveMsg once per frame (scumm.cpp:3382) and set to 0xFF by every new message, which first stops the old one (actor.cpp:3416-3446). So: (1) lines inside 202's, 205's, 214's and 213's opening cutscenes cost nothing while the book is frozen (global/script-018.txt [0070]); a frozen stretch costs at most one release when it unfreezes; (2) a message replaced before it ends costs nothing, e.g. the print(255,' ') blank after each Esc'd 213 override (local-213.txt [05FC] and the other targets) when the next spoken choice replaces it within its 12-14 frames; (3) each gap, a message ending by timer or by '.', while 148 waits costs one page; (4) gaps while 148 sits in its own delays are free: 4 frames after page 1 ([00BD] delay(20)), about 10 frames after pages 2-7 and 9 (delay(30)+delay(20)), none after page 8 ([046A] -> [046C]); (5) in a gap frame, a dialogue script whose slot runs before 148 and prints at once hides the gap from 148 (slot order, unknown statically). Map rooms cost nothing: global 24 reprints a label every frame (global/script-024.txt [0057]/[0069]). Required gaps on this path: visit 1 about 3 (spoken choice 'anything', 'Anything? Hmmm', 205's closing blank local-205.txt [0204]), room changes 0-2 (slot order), visit 2 about 9 (213's opening line, 7 spoken choices, 'Tell us. What is it?'). That is 12-14 gaps against 10 gates if every gap counts; frame-tight play that puts the choice and 'Tell us' gaps inside the book's delay windows brings it to about 7-9 releases. The regain needs the 10th release no earlier than about 10 frames before local-213 [1950].",
+      "cite": "global/script-148.txt [001F]-[05BB]; room-007-sh-captai/obj-0074-dusty-book.txt [002E]; room-025-village/obj-0291-bananas.txt (startScript(202,[],F)); room-025-village/local-202.txt [0039]-[0057], [04C8], [09CE]-[09DB]; room-025-village/local-213.txt [0047]-[0053], [194E]-[1957]; global/script-032.txt [0011]; global/script-014.txt [00E2], [00F7]-[0105]; global/script-017.txt [0049]-[0060]; global/script-018.txt [0070]; global/script-019.txt [0007]",
+      "note": "'until' also proves the book opened strictly before local 202 passes [0045]: 202 sets var 32 to 14 ([004C]) in the same slice as its cutscene ([0057]), so var 352 == 1 with var 32 == 4 can only be the book. If the book opened in or after that frame it would sit above 202's cutscene (crossed stack) and the move hangs on purpose. Talk speed: the page budget is set by gaps, not by text length. Text speed only matters where nothing else happens and a book page can time out (the walk out of visit 1 and the 213 menus while the bot waits). At talkspeed 255 (VAR_CHARINC, var 37, = 0) every message part lasts 60 jiffies, 12 frames; at talkspeed 0 (var 37 = 9) 60 + 9 per character (string.cpp:1305-1312, scumm.cpp:2647-2651). Slower text widens every window the bot must hit (see open_questions). Bot policy from here to local-213 [1950]: choose each dialogue line on the first accepted frame; press '.' on the spoken choice on the next frame; press '.' at once on every 213 line that is outside an override ('Tell us. What is it?'); choose the next line before the 12-14-frame print(255,' ') blank after an Esc expires; never let a book page time out; never press '.' on a book page except to finish the book after [1950]. Esc only on frames where a dialogue script's override is armed: 202's and 205's inside their own cutscenes, and 213's, which overwrite the book's level-1 slot (see crash_rules). IF THE REGAIN FAILS (the book ends before [1950]): var 53 is 1 at the S5 exit. S6's entry flags require 2; S6 then has no slide and must use its no-slide fallbacks (S6 entry notes and glitches: plain head skip, feather/grog/rat route), because without the slide the book cannot be opened with input in S6. S5's own later steps still work without the slide (no 'walk away early' during 104 and 96). ENGINE (slide run, 2026-10-20): 'until' is global 148 running (var 352 is a transient counter that other cutscenes also set). From here to the book's end the bridge's automatic '.' and Esc are on with the book spared (skips 'spare': [148]): no automatic '.' on a line only the book waits for while it runs unfrozen, and no automatic Esc on the book's own override. The bridge then presses Esc on 202's and 213's overrides on their first effective frame (input off), which replaces the route's Esc moves (Encounter: Esc the cannibals' intro; Encounter: Esc 'offering' speech; Esc the idol speech; 213: Esc 'Here? On Monkey Island?'; 213: Esc 'THOSE guys...'; 213: Esc right after the 4 (skips the 'health department' menu); 213: Esc 'main ingredient... root'; 213: Esc 'Ixnay on the Eadhay...'; 213: Esc the head explanation; 213: Esc 'So anyway, Lemonhead...'). Explicit Esc rules on var 352 hit the book: in visit 2 213's cutscenes sit at level 1, so 'var 352 >= 1' also holds while only the book is armed. Measured: book open at frame 11834, visit 2's last choice 11994, book finished 12055 with var 53 == 2.",
+      "gate": "input",
+      "skips": {
+        "text": 1,
+        "cutscenes": 1,
+        "spare": [
+          148
+        ]
+      }
+    },
+    {
+      "name": "Encounter: 'I'll give you anything!'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Don't eat me!  I'll give you anything!",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        },
+        {
+          "var": 32,
+          "eq": 14
+        }
+      ],
+      "until": [
+        {
+          "bit": 354,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-202.txt [052F] (choice 121), [070D]-[0751] ('Anything? Hmmm', Bit[354]=1, goto 08E2)",
+      "note": "Key '2', on the first frame the menu accepts input; '.' on the spoken line on the next frame (book budget). Choice 3 ('go ahead and eat me') leads to capture (global/script-105.txt), not used.",
+      "gate": "input"
+    },
+    {
+      "name": "Give the idol to the cannibals",
+      "room": 25,
+      "verb": 4,
+      "obj": 761,
+      "obj2": 303,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 206
+        }
+      ],
+      "until": [
+        {
+          "bit": 97,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/local-206.txt [0007]-[0013] (Give passes to script 4); room-025-village/local-204.txt [000A] setClass(303,[32]); global/script-002.txt [0046]-[00A2] (303 class 5 -> walk, dist<=32, startObject(303,80,[761])); room-025-village/obj-0303-cannibals.txt [0012]; local-203.txt [01A3]-[01AD]; local-205.txt [0000]-[0007] Bit[97]=1",
+      "note": "Walk point (405,138) (ego already stands at (405,138) from 202 [005C]). Give within the display time of 'Well?' (12 frames at talkspeed 255, 21 at talkspeed 0) (local-202.txt [09BF]) so that 205's cutscene freezes the book before 'Well?' ends (one page saved).",
+      "gate": "input"
+    },
+    {
+      "name": "Leave the village (visit 1)",
+      "room": 25,
+      "verb": 11,
+      "obj": 290,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "room": 6
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/obj-0290-jungle.txt [000C]-[0025] (room 6 at (126,64))",
+      "note": "The book must still be open. 214/213 start only on an entry from room 6 (local-200.txt [00AF]-[00C1], in the entry's own slice), and a script started before the book's freeze stays frozen until the book ends, so the book cannot be opened later (no inventory on the map, and 214 starts on the room-25 entry frame). Hotspots work here although the book is open because 202's [09D3] restarted the hover script after the book's freeze. 205's closing blank ([0204]) ends during this walk and costs one page. ENGINE (2026-10-20): '.' on every frame a line shows during this walk (press rule; the bridge spares the book's own lines, a scheduled key is not spared). The book is unfrozen here (cs 1) and only waits: on 205's closing blank ([0204], talker 255, nobody else waits, so no automatic '.'), then on its own March 12th and March 17th pages (global/script-148.txt [011F], [0174], [01CA]). Ending them at once lets the book run its delay(30)+delay(20) gaps during the walk instead of after local-213 [1950]: it is two pages further on when 214 freezes it ([01D0] instead of [0174]), still ends after [1950] (var 53 == 2), and 'Finish the dusty book' ends 18 frames sooner (frame 11806 instead of 11824 from the slide-c5 state at S5#42). Measured, not to copy: the same rule on S5#41 lost 14 frames (a scheduled key takes the frame's one key, and the bridge's automatic Esc waits, speedrun_skips.cpp maybeInjectSkip), on S5#42 2 frames, and on S5#45-51 the 213 dialogue went another way and S5#49's line never showed.",
+      "gate": "input",
+      "press": [
+        {
+          "key": ".",
+          "when": [
+            {
+              "not": {
+                "var": 3,
+                "eq": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Map room 6: village again (visit 2)",
+      "room": 6,
+      "verb": 11,
+      "obj": 72,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 6
+        }
+      ],
+      "until": [
+        {
+          "room": 25
+        },
+        {
+          "var": 32,
+          "eq": 14
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/local-200.txt [00A7]-[00C1] (Bit[97], !Bit[358], Var[101]==6, !Bit[513] -> startScript(214)); local-214.txt [0007]-[0047] (cutscene([2]), cannibals walk in, startScript(213)); local-213.txt [0000]-[0053]",
+      "note": "72's walk point (126,64) is where 290 put ego, so this is nearly instant. ENGINE (2026-10-20, part3b lane): delay 3. Visit 2's 213 dialogue runs while the spared book's pages show (no automatic '.' on a page only the book waits for), so its length hangs on how the lines and pages interleave: a greedy search of delays 0-15 on S5#40-S5#57 (from the run with early inputs) found only this one, the leaflet scene's Esc 3 at frame 11615 instead of 11624 (delays 0-2 and 4-15: 11616-11626).",
+      "gate": "input",
+      "delay": 3
+    },
+    {
+      "name": "213: 'Well, actually, there is something...'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Well, actually, there is something",
+      "after": [
+        {
+          "var": 32,
+          "eq": 14
+        },
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 53,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [0065] (verb 120), [011C]-[0123] -> [01A5] 'Tell us. What is it?'",
+      "note": "Key '1'. Guide sequence 1,1,1,4,2,3,1 (runner-sources section 2.7) matches the script order below. Book budget: the gap at the end of 213's opening line ([0007]-[0047]) costs one page; choose and '.' this line and 'Tell us. What is it?' inside the book's following delay window.",
+      "gate": "input"
+    },
+    {
+      "name": "213: 'I'm looking for somebody.'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I'm looking for somebody.",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 53,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [01C0]-[0207], [0362]-[0369] -> [057B] override 'Here? On Monkey Island?'",
+      "note": "Key '1'. Esc the override that follows (next move).",
+      "gate": "input"
+    },
+    {
+      "name": "213: 'The people I'm looking for aren't living.'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "aren't living.",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 53,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [0613] (120), [07AB]-[07B2] -> [0854] override 'Oh yeah. THOSE guys.'",
+      "note": "Key '1'.",
+      "gate": "input"
+    },
+    {
+      "name": "213: 'Where are LeChuck and his crew hiding?'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Where are LeChuck and his crew hiding?",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 511,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [0B31] (123, shown 4th), [0BC9]-[0BD3] -> [0F80] Bit[511]=1, [0F85] beginOverride -> [0CA9]",
+      "note": "Key '4'.",
+      "gate": "input"
+    },
+    {
+      "name": "213: 'What's in your standard potion of exorcism?'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "What's in your standard potion of exorcism?",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 510,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [0CB0]-[0DB5] (menu: 121 catacombs, 122 potion), [0EBC]-[0EC6] -> [0BD9] Bit[510]=1, [0BDE] override",
+      "note": "Key '2'.",
+      "gate": "input"
+    },
+    {
+      "name": "213: 'I'm off to find LeChuck and get the root!'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I'm off to find LeChuck and get the root!",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 513,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [0E2C]-[0E8F] (124 needs Bit[510] and Bit[511], shown 3rd), [0F12]-[0F1C] -> [1323] Bit[513]=1, [1328] override",
+      "note": "Key '3'.",
+      "gate": "input"
+    },
+    {
+      "name": "213: 'What's the Eadhay of the Avigatornay?'",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "What's the Eadhay of the Avigatornay?",
+      "after": [
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 53,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-025-village/local-213.txt [1454] (120), [15C8]-[15CF] -> [162E] override",
+      "note": "Key '1'.",
+      "gate": "input"
+    },
+    {
+      "name": "Finish the dusty book (regain the slide)",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 0
+        },
+        {
+          "var": 53,
+          "eq": 2
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-148.txt [00BB]-[05BB] (each '.' ends the current page part; the page's WaitForMessage then releases, about 10 frames of delays follow, then the next page); global/script-019.txt [0007] UserputSoftOn; engines/scumm/input.cpp:1418-1419 ('.' sets _talkDelay=0 and is never forwarded to the verb script)",
+      "note": "Press '.' once per frame whenever a book page part is displayed, until var 352 == 0. If the book is still open after local-213 [1950], its endCutscene leaves var 53 == 2 (the slide, S6's requirement). If var 352 is already 0 the book ended before [1950] (regain failed, var 53 == 1) and this move completes at once. The book cannot be ended with Esc any more (213 cleared its override) and it is frozen inside every later cutscene (104, reaches, 96), so finishing it now, before the leaflet, is what enables the 'walk away early' inputs during 104 and 96. Cost: about (parts + 10) frames per remaining page. SEARCH OPTION: if many pages remain, give the leaflet first and press '.' during the later walks instead, giving up the walk-away during 104. ENGINE: '.' on every book page once 213 has ended (var 32 == 4): the pages are spared from the automatic '.' until here. var 53 == 2 is the regained slide.",
+      "press": [
+        {
+          "key": ".",
+          "when": [
+            {
+              "script": 148
+            },
+            {
+              "not": {
+                "var": 3,
+                "eq": 0
+              }
+            }
+          ]
+        }
+      ],
+      "gate": "input"
+    },
+    {
+      "name": "Give the leaflet to the natives",
+      "room": 25,
+      "verb": 4,
+      "obj": 902,
+      "obj2": 292,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "bit": 358,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-002.txt [0046]-[00A2] (292 class 5); room-025-village/obj-0292-friendly-natives.txt [001C]; local-203.txt [0011]-[0030] (Bit[97], Local[0]==902 -> startScript(104)); global/script-104.txt [0000]-[0007] Bit[358]=1",
+      "note": "Walk point (437,136), where local 214 already put ego ([003C]), so no walk. Only works after the idol (Bit[97]); before it the natives answer 'we already have one' (local-203.txt [035C]).",
+      "skips": {
+        "text": 1,
+        "cutscenes": 0
+      }
+    },
+    {
+      "name": "Leaflet scene: Esc 1 ('instructions on how to get a head')",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "bit": 358,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 426,
+          "eq": 1
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-104.txt [0000] cutscene([1]), [0013] beginOverride -> [0161] (ego walks to native 5, costume 92), [0185] Bit[426]=1, [018A] beginOverride",
+      "note": "104 is the top of the cutscene stack, so Esc is safe for the book.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Leaflet scene: Esc 2 (skip the navigator close-up)",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "bit": 426,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 426,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-104.txt [0181]-[0184] breakHere, then [0185] Bit[426]=1, [018A] beginOverride, [018F] screenEffect, [0193] loadRoom(86), [0199] print, [019E] delay(180) in one slice; [018A] -> [023B] print(255,[Color(15)]), [0240] beginOverride, [0245] screenEffect, [0249] actorFollowCamera(VAR_EGO) (ego is in room 25: room 25 is reloaded), [024C]-[024E] breakHere, [024F] Costume(1), [0255] Bit[426]=0; room-025-village/entry.txt [0009]-[0017] (Init on ego, startScript(209,[],F)), [00C6] (isScriptRunning(104): no local 200)",
+      "note": "By the frame Bit[426]==1 is seen, room 86 is already loaded: [0185]-[019E] run in one slice. The Esc skips the 180+120-jiffy delays and the Var[105] waits ([01FA]-[0218]) but not the room trip: this move costs one room-86 load and one room-25 reload. Leaving room 25 kills its locals (203 is frozen under 104 and holds no cutscene, so nothing leaks; idle 215 is not restarted). The reload re-runs room 25's entry: ActorOps Init on ego and a fresh freeze-resistant village local 209 (camera pan to 160 when ego goes from x > 268 to x < 260, local-209.txt [0000]-[002D]), which matters for the next move.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Leaflet scene: Esc 3 ('follow his nose...')",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "bit": 426,
+          "eq": 0
+        },
+        {
+          "var": 25,
+          "eq": 5
+        }
+      ],
+      "until": [
+        {
+          "var": 141,
+          "eq": 225
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-104.txt [0240] beginOverride -> [0485], [048A] startScript(111), [0498]-[04C2] natives walk off, [04D2]-[04DE] pickupObject(293,0), pickupObject(294,0), [04E2] endCutscene",
+      "note": "Runner: 'give the leaflet, then walk away early'. With the slide (book finished) input works inside 104 (cutscene([1]), _userPut 1), but hotspots are dead (hover frozen): only floor walks. SOFTLOCK: [04AA] computes Var[141] = VAR_CAMERA_POS_X - 175 once, and [04B5]-[04BB] waits for native 5's x to drop below it; the natives stop at room-25 box 1's west end, x 119 ((0,138) snaps to (119,139), BOXD), so a camera at 294 or less at [04AA] loops forever. The Esc lands at [0485]; [048A] startScript(111) returns at once (global/script-111.txt [0030]: Bit[426] is already 0 from 104 [0255], and the room-70 branch does not apply), so [048A]-[0497] run in that frame and [0498]-[04AA] in the next. Start the walk-away floor click no earlier than that next frame (the click is handled after runAllScripts, so ego and the camera move only after [04AA]). Never leave room 25 before [04DE] (crash_rules). ENGINE (2026-10-20): until is now Var[141] == 225, i.e. [04AA] has run (Var[141] = VAR_CAMERA_POS_X - 175 with the camera at 400; it held 152 before). The pickups ([04D2]-[04DE]) come about 20 frames later, when native 5 is past x 225; the next two moves walk ego toward the hut in that time (the runners' 'walk away early').",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Walk away toward the hut during 104's tail (1/2)",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        241,
+        139
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 141,
+          "eq": 225
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 249
+        }
+      ],
+      "kind": "glitch",
+      "gate": "input",
+      "glitch": "Input: a floor click at room (241,139) (screen x 1, camera 400) on the frame after [04AA]. With the regained slide _userPut is 1 inside 104's cutscene([1]) (verbs saved, hover frozen), so the click is a plain floor walk (global/script-004.txt [0395]-[03B3], [0418]-[0431]). 104 now only waits for native 5's x < Var[141] (225) and then picks up 293/294 in room 25; ego never leaves the room before [04DE] (crash_rules) and the camera, which 104's [0249] actorFollowCamera makes follow ego, no longer matters after [04AA] (the softlock rule).",
+      "cite": "global/script-104.txt [0485]-[04E2]; global/script-018.txt [0041]-[0070]; global/script-004.txt [0395]-[03B3], [0418]-[0431]; room-025-village BOXD box 1 (119..280 x 139..141)",
+      "note": "Measured from slide-c5 frame 11833: ego walks 405 -> 249 in 104's last 20 frames, and the hut door is entered at 11879 instead of 11898."
+    },
+    {
+      "name": "Walk away toward the hut during 104's tail (2/2)",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        184,
+        139
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "actor_x": 1,
+          "le": 249
+        }
+      ],
+      "until": [
+        {
+          "owner": 293,
+          "eq": 1
+        },
+        {
+          "owner": 294,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "gate": "input",
+      "glitch": "Input: a floor click at the door's walk point (184,135), snapped into box 1 at (184,139), once the follow camera shows it (as the previous move).",
+      "cite": "room-025-village/obj-0285-door.txt (walk point (184,135)); global/script-104.txt [04D2]-[04E2]",
+      "note": "until is the old Esc-3 milestone (the pickups at [04D2]-[04DE]). In the measured state 104 ends on the frame ego reaches x 249, so this move is already done there and the door click (next move) walks the rest."
+    },
+    {
+      "name": "Enter the hut",
+      "room": 25,
+      "verb": 11,
+      "obj": 285,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "owner": 294,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 27
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/obj-0285-door.txt [0053]-[005F] (state 1 -> loadRoomWithEgo(307,27)); local-205.txt [022F] setState(285,1)",
+      "note": "Walk point (184,135) (snaps into box 1, y 139). With the slide, a floor walk toward it may start during 104's tail (see the previous move for the earliest frame); click the door itself once 294 is owned."
+    },
+    {
+      "name": "Pick up the banana picker",
+      "room": 27,
+      "verb": 9,
+      "obj": 314,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 27
+        }
+      ],
+      "until": [
+        {
+          "has": 314
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-027-hut/obj-0314-banana-picker.txt [014F] pickupObject(VAR_ME,0); 314 class 15 -> global/script-002.txt [034E]-[0397] reach",
+      "note": "Walk point (126,120). CRASH with the slide: no click during the reach. (If the book were still open, _userPut would be 0 inside the reach and clicks would be ignored.)"
+    },
+    {
+      "name": "Leave the hut (Herman appears)",
+      "room": 27,
+      "verb": 11,
+      "obj": 307,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 314
+        }
+      ],
+      "until": [
+        {
+          "room": 25
+        },
+        {
+          "bit": 548,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-027-hut/obj-0307-door.txt [004A]-[0056] (loadRoomWithEgo(285,25)); room-025-village/entry.txt [001A]-[004B] (owner(314)==ego, !Bit[548] -> Bit[548]=1, startScript(218), skip local 200); local-218.txt [0000]-[0034]",
+      "note": "Walk point (220,126). Herman babbles at (521,140) once the camera is at x>=352."
+    },
+    {
+      "name": "Give the banana picker to Herman (key)",
+      "room": 25,
+      "verb": 4,
+      "obj": 314,
+      "obj2": 281,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 548,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "script": 96
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/local-218.txt [0019] setClass(281,[32]); room-025-village/obj-0281-herman-toothrot.txt [0026] startScript(96,[Local[0]]); global/script-096.txt [0023]-[0113] (cutscene, setOwnerOf(269,VAR_EGO), startScript(97))",
+      "note": "Walk point (477,140). Herman 281 is class 5. Runner: 'walk away early from Herman after the banana picker': with the slide, floor-walk toward the jungle during 96's cutscene([]) (hotspots are dead inside it). 269 was parked with owner 14 by the Part III arrival (room-020-main-beac/entry.txt [0090]-[0094]), so setOwnerOf is room-independent. ENGINE (2026-10-20): until is now global 96 running (the give started it, [0000]-[0016] in its first slice); the next move walks away during 96 and waits for the key (owner(269) == 1, the old until)."
+    },
+    {
+      "name": "Walk away from Herman toward the jungle during 96",
+      "room": 25,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        551,
+        107
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "script": 96
+        }
+      ],
+      "until": [
+        {
+          "owner": 269,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "gate": "input",
+      "glitch": "Input: a floor click at (551,107), the end of entry box 12 where 290's walk point (569,104) snaps, on the frame after 96 starts. 96's faceActor(VAR_EGO,7) (a turn, which would stop a walk) runs in its first slice, before the click; its later animateCostume(VAR_EGO,10/3) only start animations (cmd 63, actor.cpp animateActor), and both of its cutscenes keep _userPut at 1 with the slide, so ego walks through the give and Herman's thanks; hover is frozen, so the click can only be this floor walk (runners: 'walk away early from Herman after the banana picker').",
+      "cite": "global/script-096.txt [0000]-[0104]; global/script-018.txt [0009]-[0015], [0070]; room-025-village/obj-0290-jungle.txt (walk point (569,104)); room-025-village BOXD box 12",
+      "note": "Measured from slide-c5 frame 11833 (with the walk-away during 104): room 6 at 11982; without this walk 96 ends with ego still at (477,140) and the exit walk takes 30 frames after it."
+    },
+    {
+      "name": "Leave the village",
+      "room": 25,
+      "verb": 11,
+      "obj": 290,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "owner": 269,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 6
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-025-village/obj-0290-jungle.txt [000C]-[0025]",
+      "note": "ENGINE (2026-10-20, part3b lane): delay 4, from a greedy search of delays 0-8 on S5#58-S5#72 (goal: room 69 at S5#72): with this and S5#72's delay 4 the idol field came at frame 12086 instead of 12090.",
+      "delay": 4
+    },
+    {
+      "name": "Map room 6: beach on foot (to room 132)",
+      "room": 6,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        256,
+        150
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 6
+        }
+      ],
+      "until": [
+        {
+          "room": 132
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-006-monkey-5/obj-0071-beach.txt [002A]-[0054] (on foot: room 132 at (320-(y-112)*4,74)); room-001-beach/entry.txt [0002]-[0014] (rowboat shown: Var[143]==132)",
+      "note": "Herman 180-jiffy rule in room 132. PIXEL: (256,150), in 71 (class 138: ego walks to the clicked pixel, and the arrival y sets room 132's x, 320-(y-112)*4). Searched over 25 pixels with the boarding and the row out (from slide-c5 frame 11982 with the village walk-aways): rowing starts 2 frames sooner than from the hint's (267,151)."
+    },
+    {
+      "name": "Board the rowboat (room 132)",
+      "room": 1,
+      "verb": 11,
+      "obj": 17,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 132
+        }
+      ],
+      "until": [
+        {
+          "room": 6
+        },
+        {
+          "actor_x": 1,
+          "ge": 276
+        },
+        {
+          "actor_y": 1,
+          "ge": 130
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-001-beach/obj-0017-rowboat-and-oars.txt [0036]-[004E] (132 -> room 6 at (291,141), sea box 19)",
+      "note": "Engine room 132 (resource room 1)."
+    },
+    {
+      "name": "Row to room 5 (bottom edge of room 6)",
+      "room": 6,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        319,
+        196
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 6
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-006-monkey-5/obj-0070-unnamed.txt [000C] startScript(34,[5,-239,-192]); room-006-monkey-5/entry.txt [0035]-[003C] (69, 70 touchable in boat mode)",
+      "note": "Lands in room 5's top sea box 10. Record: '17:04 to 17:19 rowing back, beach, clearing'. PIXEL: (319,196), 70's right end (280..319 x 192..199, class 138): the boat lands in room 5 at (x-239, 4), so the rightmost pixel lands at (77,4) instead of (60,3) and the eastward leg of the next row is 17 px shorter (about 4 frames)."
+    },
+    {
+      "name": "Row to the clearing-side beach (room 131)",
+      "room": 5,
+      "verb": 11,
+      "obj": 60,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 131
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-005-monkey-4/obj-0060-beach.txt [000C]-[0028]",
+      "note": "The walk point (132,122) snaps to sea box 15 (nearer than box 8); from room 6's landing in box 10 the only sea path is 10-11-12-13-14-15 (room-5 BOXM chain)."
+    },
+    {
+      "name": "Beach 131: jungle to the map (room 5)",
+      "room": 1,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        304,
+        109
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 131
+        }
+      ],
+      "until": [
+        {
+          "room": 5
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-001-beach/obj-0025-jungle.txt [000C] startObject(23,11); room-001-beach/obj-0023-jungle.txt [001D]-[0028]; room-001-beach/entry.txt [00AD]-[00C2]",
+      "note": "As in the first beach-131 visit: click 25 at (304,y), y 81..109 (18 frames from (160,109)). Herman 180-jiffy rule (no blast tail now, 36 frames). Engine room 131. PIXEL: (304,109), 25's left column at box 4's bottom row: 1 frame sooner than 25's centre (311,107), measured on the return visit from frame 12140 (room 12 at 12178 against 12179)."
+    },
+    {
+      "name": "Map room 5: clearing",
+      "room": 5,
+      "verb": 11,
+      "obj": 63,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 5
+        }
+      ],
+      "until": [
+        {
+          "room": 12
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-005-monkey-4/obj-0063-clearing.txt [000C] loadRoomWithEgo(134,12,224,136); room-012-monkey-he/entry.txt [006E]-[0091] (!Bit[364] -> startScript(208)); room-012-monkey-he/local-208.txt, local-209.txt",
+      "note": "Herman watch: local 208 arms 209 once ego is within 200 of object 135 (756,126); 209 fires when VAR_CAMERA_POS_X >= 684. ENGINE (2026-10-20, part3b lane): delay 4 frames on the map before the click (route delay; the map rooms draw the RNG twice a frame). The catacomb chambers draw their layout from the RNG on entry, so the draw count at the room-39 entry decides them; earlier inputs upstream moved it. Map delays 0-18 (even) were tried with the driver's default catacomb lookahead (from the run's frame at S5#70): room 70 reached at 1079.86 (0), 1071.19 (2), 1071.03 (4), 1083.28 (6), 1075.69 (8), 1071.94 (10), 1073.28 (12), 1072.94 (14), 1072.78 (16), 1072.94 s (18, which restores slide-int1's draw count and its 63-frame catacombs exactly); odd: 1079.78 (1), 1071.11 (3), 1072.03 (5), 1075.78 s (7). Room 70 alone does not decide: the head dialogue after it hangs on the frame alignment (S6#15, S6#20 delays); with its delays searched, the necklace came at frame 12732 for 4 and 12733 for 3 (12757 for 4 and 18 without them). 4 was kept, then 3 once S5#45's delay 3 had moved the village 9 frames sooner with 2 more draws: one map frame (2 draws) fewer puts the RNG at S6#6 exactly where the delay-4 run had it (state 3054704320, frame 12392 instead of 12402), so the catacombs and the head dialogue (with its searched delays) replay as in that run, 10 frames sooner; then 6 once S5#65's and S5#72's delays (4 each) had left 6 draws fewer at S6#6: the state is back at 3054704320 on frame 12391, and the run ends 2 frames sooner again (16615). INTEGRATION: this delay and the alignment delays of S5#45 (3), S5#65 (4), S5#72 (4), S6#15 (1) and S6#20 (11) hold only on this run's timeline (driver with --early, this executor, S1 to S6#6 frame-identical). Any upstream change moves the catacomb draw count: re-sync by reading the RNG state at S6#6 done (this run: 3054704320 on frame 12391) and stepping it (speedrun.rng.step) to the run's state; for a deficit of N draws add N/2 frames here (the map draws twice a frame), for a surplus take frames off (down to 0), and confirm the state matches before trusting the catacombs and the head dialogue; otherwise search the delay again (catacombs scored at the necklace) and the head dialogue's delays (greedy per move). INT3 (2026-10-20, merge of part3b onto i2a's Part I): delay 3. i2a's Part I leaves the RNG 325 draws behind int1's at S3#123, so S6#6 came 317 draws short of 3054704320 (odd, about 158 map frames: not re-synced). Delays 0-18 searched again from the merged run (cut after S5#70, S6#15/S6#20 delays off), scored at the necklace S6#26: frames 12541 (0), 12539 (1), 12538 (2), 12537 (3), 12547-12546 (4-7), 12544 (8, 9, 14, 15), 12572-12571 (10-13, 16, 17), 12581 (18).",
+      "delay": 3
+    },
+    {
+      "name": "Walk through the open gate to the idol field (S6 handoff)",
+      "room": 12,
+      "verb": 11,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        770,
+        95
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 12
+        }
+      ],
+      "until": [
+        {
+          "room": 69
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-012-monkey-he/obj-0155-unnamed.txt [000F]-[002A] (state(151)==0 -> room 69 at (186,120)); 155 touchable since local-202.txt [003F]; object 133's walk-to delegates to 155 (obj-0133 [0059]-[007C])",
+      "note": "155 is class 10: click the nearest reachable pixel of its hotspot. S6 starts here with 'Use ear with key'. PIXEL (measured 2026-10-20 from the new run's frame 12179): (770,95), 155's lowest row (its hotspot is 752..959 x 0..95; y 96 is floor and gives no room change) inside walk box 11 (768..822 x 85..104), the first point of box 11 on the path up from box 10: room 69 at 12287 against 12292 for the executor's pixel (the visible part's centre, snapped near (813,84)). ENGINE (2026-10-20, part3b lane): delay 4 (see 'Leave the village'): the eager approach clicks then line up with the camera scroll so the gate is reached 3 frames sooner (delays 0-3: 12089, 4-5: 12086).",
+      "delay": 4
+    }
+  ],
+  "rng_points": [
+    {
+      "where": "map rooms 2-6 (every frame)",
+      "what is random": "global 24 draws getRandomNr(1) each frame while a map room is shown; room 2 local 200 moves the map monkey with getRandomNr(4)/(30)",
+      "script": "global/script-024.txt [0000]; room-002-monkey-1/local-200.txt [0000]-[002B]",
+      "how the seed/search should treat it": "No effect inside S5, but it advances the generator by the number of map frames, so S6's catacombs depend on S5's exact frame count unless S6 reseeds by save, quit to launcher and load (runner-sources section 3.8; RNG state is not saved, engine mechanics section 5). Treat S5 frame counts as a catacombs input if S6 does not reseed."
+    },
+    {
+      "where": "rooms 20, 15, 80 and beaches 131/132 (birds)",
+      "what is random": "global 45 (freeze-resistant, runs through cutscenes) animates actors 3 and 4 with 4 getRandomNr calls per cycle",
+      "script": "global/script-045.txt; started by room-020-main-beac/entry.txt [0067], room-015-fork/entry.txt [0087], room-080-fort/entry.txt [0020], room-001-beach/entry.txt [0123]",
+      "how the seed/search should treat it": "Cosmetic here; RNG consumption only (same as above)."
+    },
+    {
+      "where": "every dialogue menu wait (202, 213, Herman 95)",
+      "what is random": "getRandomNr(1) each frame while the choices are shown",
+      "script": "room-025-village/local-202.txt [0636]; room-025-village/local-213.txt [0112], [0358], [07A1], [0B7F], [0E9B], [15BE]; global/script-095.txt [07AC], [083A]",
+      "how the seed/search should treat it": "Choosing on the first accepted frame fixes the count; RNG consumption only."
+    },
+    {
+      "where": "village",
+      "what is random": "cannibal idle animations (local 215 getRandomNr(3)/(2)) and the fruit-eating native (local 207 getRandomNr(200)); wrong-item replies (local 203 getRandomNr(6))",
+      "script": "room-025-village/local-215.txt [0046], [005F]; local-207.txt [005A]; local-203.txt [03A3]",
+      "how the seed/search should treat it": "No route effect; RNG consumption only. Never give a wrong item."
+    },
+    {
+      "where": "item slide carry-over",
+      "what is random": "nothing random, but the slide state comes from Part I and is fragile",
+      "script": "global/script-018.txt, global/script-019.txt",
+      "how the seed/search should treat it": "Check var 53 at the S5 entry; without the slide the oars and monkey skips are impossible and the pre-slide route (crack and oars, monkey with bananas) applies."
+    }
+  ],
+  "glitches": [
+    {
+      "name": "Item slide (carried state)",
+      "saves": "enabler for the oars and monkey skips and for walking during cutscenes",
+      "mechanism": "Slide = _userPut one above normal: 2 at rest, 1 inside one cutscene. Cutscene start/end scripts change it by -1/+1 (global/script-018.txt [0007] UserputSoftOff, global/script-019.txt [0007] UserputSoftOn); dialogue code sets it hard (global/script-032.txt [0011] UserputOn=1, global/script-014.txt [00E2] UserputOff=0). VAR_USERPUT var 53 mirrors _userPut after every cursorCommand (engines/scumm/script_v5.cpp:934-937); the bridge frame log field 'up' is the raw value. In the slide state the cutscene start script only brings _userPut to 1, so checkExecVerbs keeps accepting input (engines/scumm/verbs.cpp gate _userPut>0). Inside a cutscene the hover script 23 is frozen (freezeScripts, global/script-018.txt [0070]), so scene clicks see Var[108]=0 and become floor walks; inventory clicks set Var[108] from the slot (global/script-004.txt [0304]-[033F]) and new sentences are not frozen (engines/scumm/script.cpp doSentence sets freezeCount 0), so inventory verbs still work. Map rooms use verb script 33, which calls findObject itself, so map hotspots stay live. Dialogues reset it: script 32 sets _userPut=1 and the dialogue end sets it again. With the slide every Esc is also forwarded to the current verb script as key 27 (engines/scumm/input.cpp:1423-1428 sets _mouseAndKeyboardStat to VAR_CUTSCENEEXIT_KEY; verbs.cpp:590 lets it through when _userPut > 0); '.' never is (input.cpp:1418-1419).",
+      "inputs": "none by itself",
+      "risk": "every crash in crash_rules needs input inside a cutscene, i.e. the slide",
+      "cite": "global/script-018.txt [0000]-[0070]; global/script-019.txt [0000]-[0066]; global/script-032.txt [000F]-[0011]; global/script-014.txt [00E0]-[00E2]"
+    },
+    {
+      "name": "Oars skip (dam blast, off-room exit, interrupted exit walk)",
+      "saves": "the pond rope, the crack and the oars (pre-slide steps 5-6); record: fork 15:07 to beach-with-rowboat 15:25",
+      "mechanism": "See moves 'Oars skip 1' and 'Oars skip 2'. Global 44 removes ego to room 0 for 16 slow frames and then re-places him with putActor(148,151). An off-room ego is teleported by any map hotspot click (instant exit 47 to room 5); an exit-62 walk in progress at [00FA] is cut short by the re-placement, and exit 62 then translates (148,151) by +200 to (348,151), which snaps to room-4 sea box 22, so room 4's entry gives the boat costume and locks the land. The row out of room 4 and the row to beach 131 are done during 44's last 20 slow frames ([0105]-[011B], 12 jiffies each): script-33 exits survive 44's endCutscene, and the beach-60 sentence ends long before it.",
+      "inputs": "Use lens 882 with sun 179 at the dam; when room 4 shows and ego is gone, click exit 47; in room 5, click a far pixel of exit 62 (not the pond 67); on the room-4 landing click 56 at ego's own pixel (316,151); in room 5 click beach 60; in room 131 wait for var 19 == 5 before the first step.",
+      "risk": "late click: back on foot at the fork position; clicking twice in room 5 kills the pending exit; without the slide no input is accepted",
+      "cite": "global/script-044.txt [00CA]-[0138]; global/script-033.txt; global/script-034.txt; room-004-monkey-3/entry.txt [006E]-[010C]; engines/scumm/actor.cpp startWalkActor and putActor"
+    },
+    {
+      "name": "Monkey skip (gate held open by a frozen script)",
+      "saves": "the beach bananas, feeding the monkey and its walk to the nose (about 1:10 on floppy per runner-sources section 3.5)",
+      "mechanism": "See moves 'Monkey skip 1-4'. Reading the note freezes local 202 in its 'wait for ego to move' loop; 204 (freeze-resistant) waits on 202, so the gate stays open while ego walks through; ending the reading and clicking class-138 object 155 at ego's own position changes the room without ego ever moving, so the gate is never closed. Precondition: local 202 must have panned the camera (var 2 == 624 at state(142)==1, local-202.txt [0005]); in follow mode the walk under the ear drags the camera past 684 and Herman's 209 fires on unfreeze.",
+      "inputs": "Pull nose; Look at note on the frame after state(142)=1; floor-click a fixed pixel under the ear (on 155, not 133); Esc; click the same pixel.",
+      "risk": "Camera not panned (approach that lets the camera catch up before 202 starts); Herman (camera >= 684 or a late frame); clicking 133 instead of 155; moving ego after Esc",
+      "cite": "room-012-monkey-he/local-202.txt, local-203.txt, local-204.txt, local-209.txt, obj-0155-unnamed.txt"
+    },
+    {
+      "name": "Book slide regain at the cannibals",
+      "saves": "restores the slide lost to Herman, needed for walking during 104/96 and for S6 (feather skip, navigator head)",
+      "mechanism": "A reading cutscene left open across a dialogue's absolute UserputOn turns the dialogue's _userPut=1 into 2 when the reading ends (script 19 +1). The book is the only reading long enough. Scripts started before the book's freeze stay frozen until it ends, so the book must already be open when 214/213 start (visit 2) and when 202 reaches [09DB] (visit 1). The book can only advance on a message gap it sees while unfrozen and waiting (release model in the 'Read the dusty book' move); it is frozen inside every later cutscene, so it can neither advance nor end there.",
+      "inputs": "Look at book 74 while walking right after the bananas; keep it open through 202, the map and 213 with frame-tight choices and '.' presses (policy in the move note); Esc only on dialogue overrides; after local-213 [1950] finish it with '.'.",
+      "risk": "Unproven page budget: 12-14 required gaps against 10 gates unless at least 3 fall inside the book's delay windows (estimate 7-9 releases with frame-tight play); slot order can hide or expose gaps; an Esc on the book's own override in visit 1 or on the map ends it early. Failure is not a crash: var 53 == 1 at the exit and S6 uses its no-slide fallbacks.",
+      "cite": "global/script-148.txt; room-025-village/local-202.txt [09D3]-[09DB]; local-213.txt [0047]-[0053], [194E]-[1957]; global/script-018.txt [0070]; global/script-019.txt [0007]; engines/scumm/script_v5.cpp:3288-3291; scumm.cpp:3382; actor.cpp:3416-3446"
+    },
+    {
+      "name": "Map instant exits and fast map walk",
+      "saves": "fractions of a second per map screen",
+      "mechanism": "Clicking a map hotspot runs script 117 (WalkSpeed 4,4) instead of 118 (1,1). A hotspot whose clicked pixel snaps into an unlocked but unreachable box (room 2 on foot leaves sea boxes 14-18 unlocked) makes ego not move, so the exit fires at once from his current position (the runners' 'beach warp').",
+      "inputs": "click hotspots, not the floor, on map screens",
+      "risk": "none",
+      "cite": "global/script-033.txt [0024]-[0047]; global/script-117.txt; global/script-118.txt; room-002-monkey-1/entry.txt [00F1]-[00FE]; engines/scumm/actor.cpp walkActor (next_box < 0 -> stop)"
+    },
+    {
+      "name": "Reading freeze shield (fort Herman timer)",
+      "saves": "Makes the fort exit race-free (the draft had about one frame of margin; a loss costs the slide, the oars skip and the monkey skip) for about 3 input frames.",
+      "mechanism": "A reading (compass Look-at, cutscene([2])) freezes every non-freeze-resistant script (global/script-018.txt [0070]); a frozen script's delay does not count down (engines/scumm/script.cpp:928-930, 1513-1525). Fort local 202 is not freeze-resistant (room-080-fort/entry.txt [0065]), so its 60-jiffy Herman timer pauses while ego floor-walks onto the path's walk point; after the Esc the exit click needs no walk.",
+      "inputs": "'l' + compass on the frame after has(882); floor click (319,123); Esc on arrival at (308,117); Walk to path 886 on the next frame.",
+      "risk": "None found in the scripts; the slide must be present (input inside the reading). Do not press '.' during the reading.",
+      "cite": "room-059-stans/obj-0732-magnetic-compass.txt [0021]-[00D2]; room-080-fort/local-202.txt [0006]-[002D]"
+    }
+  ],
+  "crash_rules": [
+    "Reach cutscene + click: with the slide, any mouse click (scene, inventory or verb object) while sentence script 2 is inside its reach cutscene (global/script-002.txt [0385]-[0397], objects of class 14/15/16: here 882 spyglass, 176 dam, 761 idol, 291 village bananas, 314 banana picker) makes script 4 call doSentence(STOP) (global/script-004.txt [03FC], [0426]), which stops script 2 with an active cutscene: error 'Script 2 stopped with active cutscene/override' (engines/scumm/script.cpp:273-275). Runner sources: crashes on clicking during pickups. While the dusty book is open after local-213 [1950] without the slide being back (_userPut 1), a reach takes _userPut to 0, so clicks are ignored there; the hazard returns once the book has ended.",
+    "Part III stand-up: during room-020 local 201's stand-up cutscene (room-020-main-beac/local-201.txt [0007]-[002C]), any input that reaches the verb script (a click, a verb or other key, an inventory click) re-runs verb script 201 non-recursively (engines/scumm/script.cpp runScript: 'if (!recursive) stopScript(script)'), which stops the running copy with its cutscene active: error 'Script 201 stopped with active cutscene/override' (script.cpp:273-275). With the slide Esc is no exception: input.cpp:1423-1428 forwards it as key 27 and verbs.cpp:590 lets it through when _userPut > 0 (same as S4 crash rule 3; LeoLitz reports Esc as safe, YT-SLIDE). Only '.' is certainly safe (input.cpp:1418-1419). Wait for var 32 == 4.",
+    "Leaflet pickups: global 104 picks up 293 and 294 with pickupObject(...,0), i.e. from the current room (engines/scumm/script_v5.cpp o5_pickupObject; object.cpp:1585 'findObjectInRoom: Object %d not found in room %d'). Leaving room 25 before global/script-104.txt [04DE] crashes.",
+    "Room change from inside a cutscene: a room/local/object script that is inside its own cutscene must not trigger a room change (engines/scumm/room.cpp startScene errors 'stopped with active cutscene/override in exit'); a local script killed by a room change while in a cutscene only warns but leaves the cutscene stack unbalanced (_userPut stays -1, frozen scripts stay frozen): do not leave room 80 or 12 during Herman's approach cutscenes.",
+    "Crossed cutscene stack: endCutscene pops the TOP stack entry whoever owns it (engines/scumm/script.cpp:1650-1680), and an Esc after a crossing can resurrect a dead slot (abortCutscene uses cutSceneScript[sp] without checking it). With the readings used here a crossing cannot happen: the book (global 148), the note and the compass object scripts are not freeze-resistant, so every later cutscene freezes them (global/script-018.txt [0070]) and they cannot reach their endCutscene while it is open. Keep it that way: never open a reading from a freeze-resistant context, and never Esc after an unexpected var 352 value.",
+    "Route hazard (not a crash): in map room 2 on foot, a click on the wandering map monkey (actor 2) sends ego to jungle room 21 via room-002-monkey-1/local-203.txt [000B]-[002C] and local-201.txt.",
+    "Never press Esc while the dusty book's own override is the top of the cutscene stack (global/script-148.txt [0027] beginOverride -> [059C]): it ends the reading and the slide is not regained (route failure, not a crash). In visit 1 and on the map the book's override stays armed at level 1 (202's overrides at [0070] and [08E7] are inside 202's own cutscenes, level 2), so Esc only on frames where 202's or 205's override level is on top (moves 'Encounter: Esc...' and 'Esc the idol speech'). From 213's first override in visit 2 on, the book's slot is cleared (script.cpp:1707, 1732) and Esc can no longer end it.",
+    "Leaflet softlock (not a crash, but the run is lost): global/script-104.txt [04AA] Var[141] = VAR_CAMERA_POS_X - 175 is computed once and [04B5]-[04BB] waits for native 5's x < Var[141]; the natives walk to (0,138), which snaps to (119,139) (room-25 BOXD box 1 starts at x 119), so a camera at 294 or less at [04AA] loops forever and 293/294 are never picked up. With the slide, no ego movement before the frame [0498]-[04AA] runs: the follow camera set at [0249] and the fresh village local 209 (room-025-village/entry.txt [0017]; local-209.txt [000E]-[001A] panCameraTo(160) when ego goes from x > 268 to x < 260) can both drop the camera.",
+    "Esc with the slide is also a key for the verb script (input.cpp:1423-1428): it clears a pending 'Use/Give X with' through global/script-004.txt [0360]-[036A] -> [0438] startScript(11) (S4 crash rule 6). In S5 no two-object sentence is pending at any Esc."
+  ],
+  "record_comparison": "Record (saruya 21:52, DOS CD): Part III beach 14:48 to the giant monkey head 'Hell' split 17:39 = 2:51 for this segment plus the head opening (S6 here); EGA 22:59 took 4:17. Record sub-splits from runner-sources section 2.5: beach to fort 10 s, fort to fork 9 s, fork to beach with rowboat 18 s (oars skip), clearing and idol 15:31-15:52, boat 15:58-16:13, village with book 16:16-16:58, rowing back 17:04-17:19, monkey head 17:22-17:39. This route follows the record's order. Script-level differences a bot can exploit: map moves by hotspot click (script 117 speed 4,4), frame-exact Esc on every override (205's override at its 4th frame instead of after native 5's delay(40), about 9 frames; 213's head-explanation override two frames before the line), the frame-perfect note click right after the gate opens with the camera-pan guard, the 155 click with zero movement, the row out of room 4 and to beach 131 inside the blast's slow tail (about 0.5 s), the beach-131 exit by object 25 (2 frames, twice), the two-visit village plan and the shortest Herman answer ('What?'). It pays about 3 frames at the fort for a race-free Herman timer (compass shield) and, if pages remain, the frames needed to finish the book before the leaflet. The record's 'stalling with the compass' in the village is not reproduced (open_questions). The segment ends on entering room 69 for the head (S6 opens it), slightly before the record's 'Hell' frame.",
+  "open_questions": [
+    "Oars skip mechanism is a script-level hypothesis that matches the runner description but was not run: verify that (a) a room-4 hotspot click while ego is in room 0 teleports him and fires exit 47 at once, (b) global 44 [00FA] stops an in-progress exit-62 walk and that script 33 then runs exit 62 with ego at (148,151), (c) (348,151) snaps to room-4 box 22 and the entry gives costume 4, (d) the 56 click at (316,151) and the beach-60 row work inside 44's slow tail (input with the slide, script-33 exit not killed by 44's endCutscene). If (a)-(c) fail, use the pre-slide oars: pond rope 561 (room 40 via map pond 59), crack (map 35 -> room 18), Use rope with strong branch 248 or sturdy stump 249, pick up oars 245, Use rowboat 263 (room-020-main-beac/local-200.txt [0000]-[0086] checks owner(245)).",
+    "Fort: the compass shield is script-proven; measure whether the plain exit (Walk to 886 on the frame after has(882)) also leaves with at least one frame of margin (the walk is about 11 frames to the snapped point (308,117), the timer wakes on the 13th frame, the arrival frame is decided by slot order). If it does, drop the three shield moves (about 3 frames). Also confirm the snapped point (308,117) for 886's walk point. Rejected as likely slower (not measured): the flint instead of the lens, which needs no spyglass and so no Herman timer: Pick up rock 169 at (121,142), 134 px from the dam (room-015-fork/obj-0169-rock-on-top-of-note.txt [00CB]-[010B]: a cutscene line, then global 167's pickup cutscene), then Use flint with compass 732 within 5 px of dam 176 ([016E]-[0178] -> [011F]-[016B]: a 7-frame strike, then startScript(44)).",
+    "Room 12 camera: confirm that a Pull issued from the clearing entry reaches 202's [0005] with VAR_CAMERA_POS_X < 624 (camera about 80 px behind ego on arrival, 2 frames of catch-up before the check), so var 2 == 624 at state(142)==1. The moves guard this; if it fails for the chosen approach, adjust the approach (the nose sentence from a farther point) rather than continuing.",
+    "Exact pixel for the 155 click under the ear and the point it snaps to inside boxes 10-13 of room 12 (BOXD box 11 is (768..822, 85..104)); confirm that findObject returns 155, not 133, at that pixel.",
+    "Book budget (decides var 53 at the S5 exit, 2 = slide, 1 = no slide; exit.flags only promise 'not 0'): measure the number of releases of global 148's 10 WaitForMessage gates between local-202 [04C4] and local-213 [1950] with the frame-tight policy of the 'Read the dusty book' move, and the slot order of 148 against 202, 213 and global 24 (it decides whether gaps followed by an immediate print are seen). Estimate: 12-14 gaps on the path, 7-9 releases if the choice and 'Tell us' gaps land inside the book's delay windows. S6's entry flags require var 53 == 2; if the regain cannot be made reliable, S6's no-slide fallbacks (plain head skip, feather/grog/rat route) are the plan and S6's entry flags must accept var 53 == 1.",
+    "The record's 'stalling with the compass' (runner sources section 2.5) is not reproduced: a compass reading freezes the book, but its own closing print(255,' ') (room-059-stans/obj-0732-magnetic-compass.txt [00CD]) ends after the reading and costs a page unless replaced, so a stall only pays where it hides two or more gaps (for example a book page timing out while the player idles). It can only be opened where the verb script passes inventory clicks (after local-202 [09DB] through local 206, or with VAR_VERB_SCRIPT 4), not in 202's or 213's menus (VAR_VERB_SCRIPT 14). Find in the record (16:16-16:58) where it is opened and why, before adding it.",
+    "Talk speed (run-wide): the project pins talkspeed 255 (var 37 == 0: 12 frames per message part), S3 measured its windows at 255, and the runners recommend slow text for the book. Under the release model text speed matters only where a page or blank can time out before the bot acts: the 12-14-frame print(255,' ') blanks after Esc'd 213 overrides (the next choice must replace them) and the book pages while the bot waits. Decide one value for S3, S5 and S6; at talkspeed 0 every such window is several times longer.",
+    "Rooms 131 and 132 are engine room numbers (VAR_ROOM) of the 'beach' resource room 1; index.json only lists room 1. The bridge's {room} condition reads _currentRoom, so 131/132 are used in conditions; moves there carry room 1.",
+    "VAR_USERPUT (var 53) is only refreshed by cursorCommand (engines/scumm/script_v5.cpp:934-937); use the bridge frame log 'up' field to confirm the slide where var 53 could be stale.",
+    "Room-1 Herman (local 200): 180 jiffies after the first step on any secondary beach, counted at 12 jiffies per frame while global 44's tail runs. Verify all three beach visits leave in time with the object-25 exit; if he catches the first one (before the monkey skip) the slide is lost.",
+    "Herman 218 in the village babbles every line; the 'Finish the dusty book' move closes the book before the leaflet, so no foreign line falls inside it after [1950]. If the search defers finishing (many pages left), check that the book still ends before S5's exit (S6 needs var 352 == 0).",
+    "Giving the leaflet in visit 1 (to skip 213 and the map round trip) looks impossible: 205 sets Bit[97] and makes 303 untouchable in the same frame (room-025-village/local-205.txt [0007]-[000C]), 292 only becomes touchable through 213 [1900] or local 217, and selecting a verb clears Var[109] (global/script-004.txt [0347]-[0351]) so a stale hover target cannot be reused. Not tested in the engine.",
+    "Re-reading the book for visit 2 (Esc the first reading after local-202 [09DB] to get the slide at once, then open a second reading) does not work: a reading opened after [09D3] freezes the restarted hover script, so the exit 290 cannot be clicked, and on the map there is no inventory. Recorded so it is not retried."
+  ]
+}

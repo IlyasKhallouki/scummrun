@@ -1,0 +1,2441 @@
+{
+  "segment": "S1",
+  "title": "Part I: logo skip, intro, kitchen, circus, petal, map, chicken, Otis, store with Credit Early, mansion, Fester and the underwater idol, forest (map teleport) and the treasure",
+  "entry": {
+    "room": 10,
+    "inventory": [],
+    "flags": [],
+    "notes": "Boot of the DOS CD release in ScummVM 2026.3.0 with the bridge; the run clock starts at the first move (the logo-skip Esc, SPEEDRUN_START_FRAME). SPEEDRUN_SKIP_TEXT and SPEEDRUN_SKIP_CUTSCENES are on from that Esc: every '.' and every Esc not listed as a move is the bridge's automatic skip, pressed on the first frame a line can be cut or an override is armed; move notes say which overrides each move passes through. The brief says control first comes at the Lookout: on DOS CD the Lookout has input on but no verb bar and must not be clicked; usable control starts on the dock 0.42 s after the logo Esc (docs/anypercent/findings.md). Money starts at 0 (Var[195]; room-038-lookout/entry.txt [002C]-[0040]). Map entries are counted in Var[290] (0 at boot). Interleave points for S2 (fish, sword, troll, Smirk, fights) are marked 'S2 HANDOFF' in move notes; this file contains only S1 moves. Script logic was checked against data/scripts-dos-cd: the route rooms differ from Mac only in sound and resource calls (plus the CD-only wait for sound 108 on the Lookout stairs and two extra fish scripts underwater), so the engine-verified glitchless model's ids and mechanics carry over. REVISION NOTES: S2 cites S1 moves by 1-based position; this revision keeps all 96 positions. The only reorder is the kitchen pair: position 9 is now the pot and position 10 the meat (the record's order, after S2's fish). The file encodes the MERGED run (S1 + S2 interleaved). The moves that differ when S1 runs alone are the two kitchen pickups and the helmet move (their notes give the standalone form). S2 owns the shop's 'browse' choice and the walk from the treasure room back to the map."
+  },
+  "exit": {
+    "until": [
+      {
+        "bit": 85,
+        "eq": 1
+      },
+      {
+        "bit": 86,
+        "eq": 1
+      },
+      {
+        "has": 752
+      },
+      {
+        "room": 64
+      }
+    ],
+    "inventory": [
+      488,
+      442,
+      377,
+      396,
+      395,
+      397,
+      643,
+      578,
+      752,
+      388
+    ],
+    "flags": [
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "bit": 85,
+        "eq": 1
+      },
+      {
+        "bit": 86,
+        "eq": 1
+      },
+      {
+        "has": 752
+      },
+      {
+        "var": 196,
+        "eq": 2
+      },
+      {
+        "bit": 320,
+        "eq": 1
+      },
+      {
+        "has": 397
+      },
+      {
+        "has": 395
+      },
+      {
+        "has": 377
+      },
+      {
+        "bit": 15,
+        "eq": 1
+      },
+      {
+        "bit": 401,
+        "eq": 1
+      },
+      {
+        "bit": 103,
+        "eq": 1
+      },
+      {
+        "bit": 446,
+        "eq": 1
+      },
+      {
+        "bit": 420,
+        "eq": 1
+      },
+      {
+        "bit": 312,
+        "eq": 1
+      },
+      {
+        "bit": 99,
+        "eq": 1
+      },
+      {
+        "bit": 65,
+        "eq": 1
+      },
+      {
+        "has": 388
+      },
+      {
+        "bit": 98,
+        "eq": 1
+      },
+      {
+        "bit": 19,
+        "eq": 1
+      },
+      {
+        "var": 282,
+        "eq": 1
+      },
+      {
+        "bit": 156,
+        "eq": 1
+      },
+      {
+        "bit": 476,
+        "eq": 1
+      },
+      {
+        "bit": 481,
+        "eq": 1
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ]
+  },
+  "moves": [
+    {
+      "name": "logo skip (logo speed glitch, timer start)",
+      "room": 10,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 10
+        },
+        {
+          "var": 19,
+          "eq": 5
+        }
+      ],
+      "until": [
+        {
+          "var": 19,
+          "eq": 5
+        },
+        {
+          "room": 38
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Press Esc once on a frame between 46 and 92 from boot (both inclusive, measured on DOS CD with the bridge: docs/anypercent/findings.md 'Logo glitch'), i.e. while room 10's local 204 runs. global/script-152.txt [0055] waits for VAR_MUSIC_TIMER >= 250 and [005C] starts local 204, which sets VAR_TIMER_NEXT (var 19) = 5 at room-010-logo/local-204.txt [0000] and restores 6 only at [0097]. The Esc fires 152's override (global/script-152.txt [004F] beginOverride -> [089D] endCutscene); the boot script then puts ego in room 38 (global/script-001.txt [14B1]-[14C3] actorFollowCamera), and that room change kills room 10's local 204 before [0097]. var 19 stays 5 for the whole run: every frame waits 5 jiffies instead of 6. The 'after' gate var 19 == 5 is exact: nothing else writes 5 before local 204 [0000] (boot sets 0 at global/script-001.txt [006A], 6 at [06EB]), so the Esc lands on the first frame inside the window.",
+      "cite": "room-010-logo/local-204.txt [0000], [0097]; global/script-152.txt [004F], [0055], [005C], [089D]-[08A2]; global/script-001.txt [06EB] (boot value 6), [14B1]-[14C3]",
+      "note": "This Esc is SPEEDRUN_START_FRAME (the RTA clock starts here). It also skips the credits, so the credits' only RNG draw (global/script-152.txt [01A8]) never happens. VAR_MUSIC_TIMER comes from CD audio; the bridge advances it from game ticks, so the 46-92 window is deterministic. From here on the bridge's automatic skips are on (SPEEDRUN_SKIP_TEXT presses '.', SPEEDRUN_SKIP_CUTSCENES presses Esc on the first frame an override is armed)."
+    },
+    {
+      "name": "skip the Lookout intro",
+      "room": 38,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 38
+        }
+      ],
+      "until": [
+        {
+          "room": 96
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-038-lookout/entry.txt [0059] startScript(200); local-200.txt [0042]-[004F] (first visit, !Bit[116]: startScript(203)); local-203.txt [0000] cutscene([1]), [0005] beginOverride -> [02BF] stopSound(108), [02CA] endCutscene, [02CB] startObject(486,11); obj-0486-stairs.txt [004A]-[005E] (Bit[395]=1, CD-only wait for sound 108, loadRoom(96))",
+      "note": "Identical to the bridge's automatic cutscene skip; a duplicate Esc with no armed override does nothing (scumm/script.cpp abortCutscene, offs == 0). NEVER click in this room: the Lookout has user input on but no verb bar, and a click at frame 49 cut the intro and the verb bar never came back (docs/anypercent/findings.md 'The intro')."
+    },
+    {
+      "name": "skip the 'Part One' card",
+      "room": 96,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 96
+        }
+      ],
+      "until": [
+        {
+          "room": 33
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-096-part1/local-200.txt [0000]-[0004] (UserputOff, beginOverride), [0033] stopSound(104), [0037]-[0039] UserputOn/CursorShow, [003B] loadRoomWithEgo(426,33,346,133)",
+      "note": "Automatic cutscene skip as well. Measured: dock control 0.42 s after the logo Esc (docs/anypercent/findings.md). Ego arrives at the cliffside walking to (346,133)."
+    },
+    {
+      "name": "open the SCUMM Bar door",
+      "room": 33,
+      "verb": 2,
+      "obj": 428,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 428,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-033-dock/obj-0428-door.txt [0015] startScript(25,[428,315]); global/script-025.txt [000F]-[003A]",
+      "note": "Door 428 (x 696-736, walk point 715,130) is off screen on arrival: the executor approaches with floor clicks to the right (ego walks 12 px/frame in dock boxes <= 6, room-033-dock/local-202.txt [0000]-[0021]). Script 25 sets state 1 on the Open's own frame (and opens partner 315), so the Walk to can follow on the next frame ('early door entry'). Alternative input: a right-click on the door is its default verb Open (room-033-dock/obj-0428-door.txt [003E]-[004A] Var[182]=2; global/script-004.txt [0005]-[0016]) if the cursor was on it the frame before."
+    },
+    {
+      "name": "enter the bar",
+      "room": 33,
+      "verb": null,
+      "obj": 428,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 28
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-033-dock/obj-0428-door.txt [0029]-[0035] loadRoomWithEgo(315,28)",
+      "note": "Bar entry from the dock closes 316 and starts the cook's 30-50 s kitchen timer: room-028-bar/entry.txt [001A] startScript(205); local-205.txt [0040] setState(316,0), [0044] startScript(211); local-211.txt [000D]-[001E]. The bar's input script is local 202 (entry.txt [0080])."
+    },
+    {
+      "name": "bar: cross to the right half (curtain)",
+      "room": 28,
+      "verb": null,
+      "obj": 323,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 320
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-028-bar/obj-0323-curtain.txt [000C]-[0018] walkActorTo(330,137) from x < 320; local-201.txt [0000]-[0016] pans the camera to 480 once ego x >= 320",
+      "note": "Kitchen door 316 (x 592-624) is off screen from the left half, and a floor click cannot cross the bar (docs/comparison.md D4). The curtain is visible from both halves. Micro: once the pan starts, chain floor clicks at the right screen edge so ego keeps walking toward 316 instead of stopping at (330,137)."
+    },
+    {
+      "name": "provoke the cook (Open kitchen door while he is inside)",
+      "room": 28,
+      "verb": 2,
+      "obj": 316,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 316,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-028-bar/local-202.txt [001C]-[0023] (click on 316 -> local 203); local-203.txt [0009], [003A]-[004A] (cook not in room 28: walk, then run the door's verb); obj-0316-door.txt [0018]-[0021] (local 211 running -> startScript(214)); local-214.txt [0005] door opens (state 1), [003B] closes, [004B] startScript(212); local-212.txt [0000]-[0020] startScript(216) after 600 jiffies",
+      "note": "Provoking brings the cook out 600 jiffies after local 214 ends, instead of the 1800-3000 jiffies left on local 211 (docs/comparison.md D2: saves about 25 s). The 'until' catches local 214 opening 316 (nothing else opens it while the cook is in the kitchen). Do NOT Open 316 a second time: local 211 still runs, so it re-runs 214 and restarts 212's 600-jiffy timer (startScript is not recursive)."
+    },
+    {
+      "name": "enter the kitchen as the cook walks away",
+      "room": 28,
+      "verb": null,
+      "obj": 316,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "actor_room": 6,
+          "eq": 28
+        },
+        {
+          "actor_x": 6,
+          "le": 310
+        },
+        {
+          "state": 316,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 41
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-028-bar/local-216.txt [000B]-[002A] (cook put at (660,100), stops 211/212, opens 316, walks to 595,125), [003F]-[004C] walks to random object 330+getRandomNr(28) (all walk x <= 285); local-203.txt [000E]-[0035] (cook in room 28 at x <= 310: frozen, click accepted; x > 310: local 215 refuses); obj-0316-door.txt [003F]-[004B] (state 1 -> local 218); local-218.txt [0000]-[0017] loadRoomWithEgo(570,41)",
+      "note": "Humans: 'enter while the chef's elbow is still visible' (runner sources §3.10). Ego already stands at 316's walk point."
+    },
+    {
+      "name": "pick up the pot",
+      "room": 41,
+      "verb": 9,
+      "obj": 567,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 567
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-041-kitchen/obj-0567-pot.txt [001E]-[002A] pickupObject(567); global/script-002.txt [032F]-[0397] (the pot has class 16: a reach cutscene with delay(20) while it is a room object)",
+      "note": "MERGED-RUN ORDER (the record's): S2's pier door, plank and fish (S2 moves 1-4) come first, then the pot, then the meat on the way back to door 570. From the fish's walk point (237,129), pot (104,122) -> meat (75,124) -> door 570 (51,129) is 133+29+24 = 186 px, against 162+29+53 = 244 px with the meat first (out/objects.json room 41 walk points). That is about 7 frames at 8 px/frame. The meat (class 15) has the same reach cutscene, so the order changes only the walking. The fish then sits in the inventory slot before the pot, and the helmet move clicks that slot. STANDALONE S1 (no fish): pieces of eight 488 belong to owner 14 until the circus pays (room-038-lookout/entry.txt [0038]-[003C]), so nothing would come before the pot. In that case pick up the meat first and click the meat (566) in the helmet move. Alternative to measure: one sentence 'Use meat with pot' picks up both items (global/script-002.txt [0229]-[0267], both class 7) and then falls back to script 3 (a failure line)."
+    },
+    {
+      "name": "pick up the hunk of meat",
+      "room": 41,
+      "verb": 9,
+      "obj": 566,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 566
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-041-kitchen/obj-0566-hunk-of-meat.txt [0035]-[0041] pickupObject(566); global/script-002.txt [032F]-[0397] (class 15: reach cutscene, delay(20))",
+      "note": "Taken after the pot (merged run). S2's fish move still says 'S1 continues with move 9 (meat)'. Position 9 is now the pot and the meat is position 10, and S2's insertion point (right after 'enter the kitchen') is unchanged."
+    },
+    {
+      "name": "leave the kitchen",
+      "room": 41,
+      "verb": null,
+      "obj": 570,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 28
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-041-kitchen/obj-0570-door.txt [0030]-[003C] (570 open as 316's partner) loadRoomWithEgo(316,28); room-028-bar/local-205.txt [0033]-[003A] (from the kitchen: local 216, the cook comes out)",
+      "note": ""
+    },
+    {
+      "name": "bar: cross back to the left half (curtain)",
+      "room": 28,
+      "verb": null,
+      "obj": 323,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 319
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-028-bar/obj-0323-curtain.txt [001F]-[0022] walkActorTo(310,137); local-201.txt [0005]-[000C] pan to 160",
+      "note": "Door 315 (x 32-72) is visible only after the camera pans left (8 px/frame). Micro: chase with floor clicks at the left screen edge during the pan, then click 315 as soon as it is on screen (comparison.md D4: a plain wait costs about 30 frames)."
+    },
+    {
+      "name": "leave the bar (first exit: LeChuck cutscene, skipped)",
+      "room": 28,
+      "verb": null,
+      "obj": 315,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 446,
+          "eq": 1
+        },
+        {
+          "room": 33
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-028-bar/obj-0315-door.txt [0072]-[008A] (state 1, first exit: Bit[446]=1, startScript(120)); global/script-120.txt [0013] beginOverride -> [0532], [053D] loadRoomWithEgo(428,33)",
+      "note": "The automatic cutscene skip presses Esc once 120's override is armed (its first frame; the earlier loadRoom(0) at [0005] does not break the script). Ego lands at the bar door (715,130)."
+    },
+    {
+      "name": "dock -> Lookout",
+      "room": 33,
+      "verb": null,
+      "obj": 426,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 38
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-033-dock/obj-0426-cliffside.txt [000C] loadRoomWithEgo(486,38,244,106)",
+      "note": "Long walk left from x 715 to the cliffside (x 0-48): candidate for re-click 'shmoovement' (runner sources §3.7)."
+    },
+    {
+      "name": "Lookout -> island map",
+      "room": 38,
+      "verb": null,
+      "obj": 487,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-038-lookout/obj-0487-path.txt [0010] loadRoomWithEgo(913,85) (0xFF default verb); room-085-melee/entry.txt [005D]-[0062] (map input script local 201, ego walk speed 2), [00C8] Var[290]++ (map entry 1)",
+      "note": ""
+    },
+    {
+      "name": "map -> clearing",
+      "room": 85,
+      "verb": null,
+      "obj": 912,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 52
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/local-201.txt [0035] (map clicks -> global 33); obj-0912-clearing.txt [000C] loadRoomWithEgo(622,52,430,130)",
+      "note": ""
+    },
+    {
+      "name": "walk toward the circus tent (stopped once by local 202)",
+      "room": 52,
+      "verb": null,
+      "obj": 621,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 216
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-052-circus-gr/entry.txt [0004] startScript(202); local-202.txt [0000]-[001C] (first frame ego is in walkbox 7 at x > 200: animateCostume(ego,255) + doSentence(STOP)), [001E]-[0024] (then waits until ego leaves box 7); room 52 walkboxes (build/blocks-dos-cd/DISK_0001/LECF/LFLF_0052/ROOM/BOXD and BOXM): box 6 = line (332,95)-(223,118), box 5 = line (215,118)-(224,118), box 7 = line (215,118)-(178,116), boxes 1-6 all at x >= 215; the box path to the tent's box 17 is ... 3, 6, 5, 7, 8, 19, 9, 16, 15, 17 from every arrival box; third_party/scummvm/engines/scumm/actor.cpp Actor::actorWalkStep (v4-v6: a step that lands on the leg target returns 0) and Actor::walkActor (then the next leg starts with a full step in the same frame); scumm.cpp 3231-3232 (runAllScripts before checkExecVerbs)",
+      "note": "Where the STOP happens, from the walkboxes: every walk to the tent reaches box 7 at its end point (215,118), coming from box 5. A v5 leg that ends on its target continues with a full step of the next leg in the same frame, so ego is never seen on (215,118). At the decision point (where the bridge checks `until`) he is last in box 5 at 223 minus one step (218 for the replay's 5 px step), then in box 7 at 215 minus one step (the replay's (210,117)). Local 202 STOPs at the start of that frame. So the stop is always at x 207-214, never above 216, and above 200, so it always happens. The bound 216 is safe for any step size. It holds either at the last box-5 position (only if that is 216, a 7 px step), and then #17's click lands on the STOP frame and wins, or in box 7 after the STOP. Do NOT loosen it (a reviewer suggested 224): box-6 positions start at 224, and a click two frames before box 7 is cancelled by the STOP, so #17 would stall. With the real 5 px step, the cost is one standing frame. 218 would save that frame (see open_questions). C3 cannot test walkboxes."
+    },
+    {
+      "name": "enter the circus tent",
+      "room": 52,
+      "verb": null,
+      "obj": 621,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 51
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-052-circus-gr/obj-0621-circus-tent.txt [000F]-[0014] (!Bit[103] -> loadRoom(51)); room-051-circus-te/entry.txt [002D]-[004D] (walk-in cutscene to 243,135, then startScript(207))",
+      "note": ""
+    },
+    {
+      "name": "circus menu 1 (any line)",
+      "room": 51,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": ". . .ahem. . .",
+      "after": [],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-051-circus-te/local-207.txt [0010]-[01F2] (argument, override [001F] skipped), [0204]-[0213] line 120, [03A3] wait; local-209.txt [0000]-[0013] (input script for this menu sets Var[194])",
+      "note": "Key '1' (global/script-032.txt [0005] Var[230]=49: keys start at '1'). After it: local 208 (14 frames at VAR_TIMER_NEXT 1, room-051-circus-te/local-207.txt [03CE]-[03D6], room-051-circus-te/local-208.txt [0005]/[005F], input off) and the sales pitch (room-051-circus-te/local-207.txt override [0438] -> [0882], skipped)."
+    },
+    {
+      "name": "circus menu 2: OK, I'll do it",
+      "room": 51,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "OK, I'll do it.",
+      "after": [],
+      "until": [
+        {
+          "bit": 72,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-051-circus-te/local-207.txt [08AB] line 120 (key 1), [0973]-[09B0] -> 478 offer, [0AA8] Bit[72]=1 and menu 3",
+      "note": "Key '1'."
+    },
+    {
+      "name": "circus menu 3: Of course I have a helmet",
+      "room": 51,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Of course I have a helmet",
+      "after": [],
+      "until": [
+        {
+          "var": 32,
+          "eq": 200
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-051-circus-te/local-207.txt [0AE7] 'Er^ no...' (verb 121, key 1), [0B49] 'Of course...' (verb 120, key 2), [0BC4]-[0BCB] (override, skipped), [0D4C] VAR_VERB_SCRIPT=200, [0D5C] waits for Bit[103]",
+      "note": "Key '2'. 'have a helmet' alone would match both lines."
+    },
+    {
+      "name": "helmet: Use + the fish icon (the inventory slot just before the pot)",
+      "room": 51,
+      "verb": 7,
+      "obj": 568,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 200
+        }
+      ],
+      "until": [
+        {
+          "bit": 103,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-051-circus-te/local-200.txt [00E7]-[0126] (a verb click on slot verb 200+k, k <= 5, reads Var[134+k], the item in the NEXT slot; it needs 567, Var[107]==7 (Use selected) and !Var[110]), [0021]-[008B] walk to (243,135), 'Ah, that will work as a helmet!', Bit[103]=1; global/script-009.txt [0092], [00BC]-[00C7] (slot verb 200+k shows Var[133+k])",
+      "note": "DEVIATION FROM RECORD (one input fewer): press 'u', then click the FISH's inventory icon. The merged inventory here is 568 fish, 567 pot, 566 meat (488 still belongs to owner 14 until local-207 [110E] pays 478), so the fish is slot verb 200 and the script reads Var[134] = 567. The record gives the pot: Give (4) pot 567, then a click on a Fettucini brother (actors 3/4, room-051-circus-te/local-200.txt [0007]-[001A] actorFromPos, not an object id). Both paths join at [0021], so the record's path needs one input more. STANDALONE S1 (no fish): obj 566, with the meat picked up before the pot."
+    },
+    {
+      "name": "circus menu 4 after the cannon (any line) -> 478 pieces of eight",
+      "room": 51,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "nibboB",
+      "after": [],
+      "until": [
+        {
+          "var": 195,
+          "eq": 478
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-051-circus-te/local-207.txt [0D61]-[0F07] (cannon; override [0DE0] -> [0E5D] skipped), [0F40] line 120 (key 1), [0FE3] wait, [1041] override -> [1107] (skipped), [110E] startObject(488,250,[478,0]); room-038-lookout/obj-0488-pieces-of-eight.txt [0086]-[00FB]",
+      "note": "Key '1'. Then [1125]-[114D]: ego is walked out by startObject(617,11) -> room-051-circus-te/obj-0617-outside.txt [000C] loadRoomWithEgo(621,52,78,87)."
+    },
+    {
+      "name": "circus grounds -> map",
+      "room": 52,
+      "verb": null,
+      "obj": 622,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 52
+        }
+      ],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-052-circus-gr/obj-0622-path.txt [000C] loadRoomWithEgo(912,85); room-085-melee/entry.txt [00C8] (map entry 2)",
+      "note": "Walking right from the tent enters box 7 at x <= 200, so local 202 does not stop this walk."
+    },
+    {
+      "name": "map -> forest entrance (fork, pseudo-room 218)",
+      "room": 85,
+      "verb": null,
+      "obj": 911,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/obj-0911-fork.txt [000C] loadRoomWithEgo(687,218)",
+      "note": "Forest steps test VAR_ROOM (var 4): inside the forest the room is pseudo-room 201-220 on resource room 58 (global/script-001.txt [066E]-[069A] PseudoRoom(58,...); pddl/part1/steps.toml header)."
+    },
+    {
+      "name": "218 -> 215 (petal screen) through path 686",
+      "room": 58,
+      "verb": null,
+      "obj": 686,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/entry.txt [08DB]-[08ED] (in 218: 685 at strip 15, 686 at strip 28); obj-0686-path.txt [0010] startObject(685,11); obj-0685-path.txt [015E]-[0168] loadRoomWithEgo(687,215)",
+      "note": "686 is nearer than 685 to ego's entry point at the right edge (docs/comparison.md D12)."
+    },
+    {
+      "name": "pick up the yellow petal (plants)",
+      "room": 58,
+      "verb": 9,
+      "obj": 678,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "until": [
+        {
+          "has": 689
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-058-damnfores/entry.txt [07D1] (plants 678 drawn at strip 31,13 in 215); obj-0678-plants.txt [007F]-[0096] (VAR_ROOM 215: pickupObject(689))",
+      "note": ""
+    },
+    {
+      "name": "215 -> 218",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [0045]-[004F] loadRoomWithEgo(685,218)",
+      "note": ""
+    },
+    {
+      "name": "218 -> map",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [010B]-[0115] loadRoomWithEgo(911,85); room-085-melee/entry.txt [00A3] (Var[290] is 2: no pirates yet), [00C8] (map entry 3)",
+      "note": ""
+    },
+    {
+      "name": "map -> village (lands on the dock)",
+      "room": 85,
+      "verb": null,
+      "obj": 917,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 33
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/obj-0917-village.txt [000C]-[0046] (Var[196] < 3: loadRoomWithEgo(426,33,307,133))",
+      "note": ""
+    },
+    {
+      "name": "drug the meat: Use hunk of meat with yellow petal",
+      "room": 33,
+      "verb": 7,
+      "obj": 566,
+      "obj2": 689,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 33
+        }
+      ],
+      "until": [
+        {
+          "owner": 689,
+          "eq": 0
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-008.txt [0000]-[001B] (566 has class 2, so Var[105]=130: 'Use hunk of meat' waits for 'with'); global/script-004.txt [036D]-[037F], [03C5]-[0407] doSentence(7,566,689); global/script-002.txt [027A]-[02E4] (both held: no walk), [0398]-[039D] startObject(566,7,[689,7]); room-041-kitchen/obj-0566-hunk-of-meat.txt [0077]-[0085] (Local[0]==689: setClass(566,[134]), startScript(182)); global/script-182.txt [0000] rename 'meat with condiment', [0017] setOwnerOf(689,0)",
+      "note": "DEVIATION FROM RECORD (one frame faster, same three inputs: 'u', meat icon, petal icon). 'Use yellow petal with hunk of meat' only re-sends itself as this sentence (room-058-damnfores/obj-0689-yellow-petal.txt [0042]-[0049] doSentence(7,566,689)). With both items held, script 2 runs to its end inside checkAndRunSentenceScript, which runs once per frame (third_party/scummvm/engines/scumm/scumm.cpp 3255), so the re-sent sentence would run a frame later. Crash check: the code path is the same as the record's second dispatch. setOwnerOf(689,0) runs in global 182, so the current script is a global and neither 'odd setOwnerOf' error in object.cpp setOwnerOf applies. Do it during the arrival walk to (307,133). That walk comes from loadRoomWithEgo, not from a sentence, so the new sentence's doSentence(STOP) (global/script-004.txt [03FC]-[0407]) does not stop it. Never issue it while a sentence-walk to an exit is pending, because it would cancel that sentence. The archway move may follow on the next frame (the drug is done in the click's own frame). Record: same place (IL 2:06). Any room except the map and the tent works (docs/comparison.md D6)."
+    },
+    {
+      "name": "dock -> Low Street",
+      "room": 33,
+      "verb": null,
+      "obj": 427,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 35
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-033-dock/obj-0427-archway.txt [000C] loadRoomWithEgo(450,35)",
+      "note": ""
+    },
+    {
+      "name": "talk to the Citizen of Melee",
+      "room": 35,
+      "verb": 10,
+      "obj": 441,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 16,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-035-low-stree/obj-0441-citizen-of-mle.txt [0015] startScript(218); local-218.txt [0398]-[03CF] ('cousin named Sven', text skipped), [03D0]-[04AA] menu, [054F] Bit[16]=1 while the menu waits",
+      "note": ""
+    },
+    {
+      "name": "citizen: barber named Dominique",
+      "room": 35,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "barber named Dominique",
+      "after": [],
+      "until": [
+        {
+          "bit": 475,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-035-low-stree/local-218.txt [04AA] line 123 (key 4), [05AE]-[05CB] 'Close enough.', [06AA] Bit[475]=1, [06B4] override -> [0792] (sales pitch, skipped)",
+      "note": "Key '4' (runner sources §2.7: '4, SKIP, 2')."
+    },
+    {
+      "name": "citizen: buy the map",
+      "room": 35,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I'll take it.  It'll make a swell gift.",
+      "after": [],
+      "until": [
+        {
+          "has": 442
+        },
+        {
+          "bit": 65,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-035-low-stree/local-218.txt [07F6] (shown only if Var[195] >= 100), [080C] line 121 (key 2), [08EF]-[0950] pickupObject(442), Bit[65]=1, startObject(488,250,[0,100])",
+      "note": "Key '2'. Money 478 -> 378."
+    },
+    {
+      "name": "open the Voodoo shop door",
+      "room": 35,
+      "verb": 2,
+      "obj": 444,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 444,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-035-low-stree/obj-0444-door.txt [0018] startScript(25,[444,367])",
+      "note": "CREW item (rubber chicken for Hook Isle), kept in S1 as the record does (record 'Street' split 2:31 is after it)."
+    },
+    {
+      "name": "enter the Voodoo shop",
+      "room": 35,
+      "verb": null,
+      "obj": 444,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 29
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-035-low-stree/obj-0444-door.txt [0030]-[0067] (state 1) loadRoomWithEgo(367,29)",
+      "note": ""
+    },
+    {
+      "name": "pick up the rubber chicken",
+      "room": 29,
+      "verb": 9,
+      "obj": 377,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 377
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-029-fortune/obj-0377-chicken.txt [009B]-[00C9] (printEgo, then pickupObject at once); entry.txt [0021] startScript(200); local-200.txt [0000] breakHere, [0004] breakHere, [000C]-[0017] (entered from 35: walkActorTo(ego,122,106), WaitForActor, then closes door 367), [001D] delay(60), [0023]-[0043] (Voodoo Lady only if ego's walkbox > 5); global/script-002.txt [02E4]-[0317] (reach test); third_party/scummvm/engines/scumm/script.cpp runAllScripts/didexec; room 29 walkboxes (build/blocks-dos-cd/DISK_0001/LECF/LFLF_0029/ROOM/BOXD and BOXM)",
+      "note": "TIMING: local 200 runs [0000] on the entry frame E (the frame the previous move's until {room 29} fires; a script started mid-frame is not run again that frame), [0001]-[0004] on E+1, and [000C] walkActorTo(VAR_EGO,122,106) on E+2 (Var[101]==35, from Low Street). A chicken sentence started before E+2 has its walk replaced. Script 2 then waits for ego at (122,106) and fails the reach test ('I can't reach it.', doSentence(STOP)). On E+2 itself the click wins (checkExecVerbs runs after runAllScripts). The executor's default schedule (key 'p' on E+1, click on E+2) is the earliest valid one. The search must not move the click earlier or preselect Pick up. VOODOO LADY (settled by the walkboxes): she comes only if ego stands in a box > 5 after the chicken walk has ended and delay(60) has run. The chicken's walk point (256,143) snaps to (256,141) in box 5, and the box path back to door 367 (109,101) is 5 -> 2 -> 1 (boxes 6-9 lie at x >= 256, y <= 130), so she never appears on this route. Door 367 closes once the chicken walk ends ([0017]), so an Open is needed to leave."
+    },
+    {
+      "name": "open the shop door from inside",
+      "room": 29,
+      "verb": 2,
+      "obj": 367,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 367,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-029-fortune/obj-0367-door.txt [0018]-[0034] (short cutscene, then startScript(25,[367,444]))",
+      "note": ""
+    },
+    {
+      "name": "leave the Voodoo shop",
+      "room": 29,
+      "verb": null,
+      "obj": 367,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 35
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-029-fortune/obj-0367-door.txt [0072]-[007E] loadRoomWithEgo(444,35)",
+      "note": ""
+    },
+    {
+      "name": "Low Street -> High Street (clock archway)",
+      "room": 35,
+      "verb": null,
+      "obj": 451,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 34
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-035-low-stree/obj-0451-archway.txt [000C]-[001F] (shrink-walk cutscene, local 205) loadRoomWithEgo(433,34,750,128); room-034-high-stre/entry.txt [000B] ego walk speed 16",
+      "note": ""
+    },
+    {
+      "name": "High Street -> jail",
+      "room": 34,
+      "verb": null,
+      "obj": 434,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 31
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0434-doorway.txt [0011] loadRoomWithEgo(400,31,262,120)",
+      "note": ""
+    },
+    {
+      "name": "Otis #1: talk to the prisoner (unlocks the mint topic)",
+      "room": 31,
+      "verb": 10,
+      "obj": 405,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 420,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-031-jail/obj-0405-prisoner.txt [0015]-[001F] (!Bit[420]: Bit[420]=1 at once, startScript(202)); local-202.txt [0015]-[004F] (cutscene, no override: walk to cell 401, Otis walks to (54,125)), [0050] (bad breath, class 6) -> [18DE]-[19C0] halitosis lines (override [18E3] skipped), [19C4]-[19D8] control back, no menu; room-030-store/local-211.txt [0251]-[026A] (mint topic needs Bit[420])",
+      "note": "Record's choice (WR 2:45, 'talk to prisoner, skip his line, leave'). Bit[420] has only two setters (obj-0405 [001A], local-203 [0351]) and the mints only one source (the store menu, local-211 [1BC0]), so this visit must precede the store. The until holds at the click; the next move waits for control. ALTERNATIVE (not proven faster by the scripts): Give (4) any held item with no handler, e.g. the meat 566, to 405: room-031-jail/local-203.txt [0082]-[00B7] (the same unskippable cell walk), [029D]-[0343] refusal (override [02A3]), [0351] Bit[420]=1; the glitchless replay measured it faster (1032 vs 1770 ticks) but without skips."
+    },
+    {
+      "name": "leave the jail",
+      "room": 31,
+      "verb": null,
+      "obj": 400,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 34
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-031-jail/obj-0400-doorway.txt [0010]-[0037] (Bit[88]+Bit[89]+Bit[76] = 0: no extra scene) loadRoomWithEgo(434,34)",
+      "note": ""
+    },
+    {
+      "name": "open the store door",
+      "room": 34,
+      "verb": 2,
+      "obj": 437,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 437,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0437-door.txt [0018] startScript(25,[437,387])",
+      "note": "An ambient townsperson (room-034-high-stre/local-200.txt [0053], [00CC] startScript(26,[437,387])) can close 437 again (global/script-026.txt [000A]-[002D] closes both doors), so walk in on the next frame."
+    },
+    {
+      "name": "enter the store (first visit: safe combination and storekeeper draw)",
+      "room": 34,
+      "verb": null,
+      "obj": 437,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 30
+        },
+        {
+          "actor_room": 11,
+          "eq": 0
+        },
+        {
+          "var": 221,
+          "eq": 1
+        },
+        {
+          "var": 222,
+          "eq": 1
+        },
+        {
+          "var": 223,
+          "eq": 1
+        },
+        {
+          "var": 224,
+          "eq": 1
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0437-door.txt [004A]-[005B] loadRoomWithEgo(387,30); room-030-store/entry.txt [002D]-[0037] (!Bit[319]: Bit[319]=1, startScript(205)); local-205.txt [0000]-[0017] Var[221..224] = 1+getRandomNr(3) each; entry.txt [003A] Var[100]=getRandomNr(3), [0051]-[006D] (0: storekeeper absent, putActorInRoom(11,0), 394 untouchable, local 208 makes the bell touchable), [0070] local 203 resets the safe",
+      "note": "SEED GATE: Credit Early needs the storekeeper ABSENT here (Var[100] = 0, p = 1/4). With him in the room the handle only answers 'Hey! Get away from that!' (room-030-store/obj-0390-handle.txt [008B]-[00BC]). The until also checks the combination 1-1-1-1 that the next four moves assume (Var[221..224], set by local 205 on the entry frame: entry.txt [0037] -> local-205.txt [0005]). A wrong seed therefore fails here, not two handle sentences later. For another combination, generate the handle moves from the digits (Pull x d1, Push x d2, Pull x d3, Push x d4) and change these four conditions."
+    },
+    {
+      "name": "pick up the shovel",
+      "room": 30,
+      "verb": 9,
+      "obj": 396,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 396
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/obj-0396-shovel.txt [0079] pickupObject (no payment check; paid later, Bit[99])",
+      "note": "Upstairs next to the safe (walk 155,76; handle 173,78). S2 HANDOFF: the sword (388, walk 232,127, room-030-store/obj-0388-sword.txt [0067]) is picked up in this visit too; it changes the shop menu (see the menu moves)."
+    },
+    {
+      "name": "safe digit 1: pull the handle d1 times (here 1)",
+      "room": 30,
+      "verb": 6,
+      "obj": 390,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 226,
+          "eq": 0
+        },
+        {
+          "var": 227,
+          "eq": 1
+        },
+        {
+          "var": 228,
+          "eq": 0
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "CREDIT EARLY. The combination is four digits 1-4 drawn on the first store entry (room-030-store/local-205.txt [0005]: Var[221+i]). Input: Pull (6) handle 390 d1 times, Push (5) d2 times, Pull d3 times, Push d4 times; each action is a full sentence on 390 issued when the previous one has finished. Mechanism, room-030-store/local-202.txt (Local[0] 0 = pull, 1 = push), state from room-030-store/local-203.txt [0000]-[0014] (Var[226]=0 digit index, Var[227]=0 count, Bit[73]=1 all-correct, Var[228]=0 last direction). In room-030-store/local-202.txt: same direction as last -> Var[227]++ ([0009]-[0013]; > 4 resets via local 203); direction change -> Bit[73]=0 unless Var[227] == Var[221+Var[226]], Var[226]++, Var[227]=1 ([0020]-[0041]); after any action with Var[226]==3, Var[227]==Var[224] and Bit[73] the safe opens ([0046]-[00C0]): Bit[320]=1, note 397 picked up. Because Var[228] starts at 0, the first group must be pulls. Minimum (1-1-1-1, 'quad 1s') is 4 actions; each extra unit of the digit sum costs one more handle sentence (local-201.txt animates 10 frames, harmless if restarted). Allowed: Any% board 'Credit Early*' (rules/anypercent.md).",
+      "cite": "room-030-store/obj-0390-handle.txt [00BD]-[00EE] (Pull, storekeeper not in 30: startScript(202,[0])); local-202.txt [0000], [0009]-[0013], [00EE]; local-203.txt [0000]-[0014]; local-205.txt [0005]",
+      "note": "Objects 391-393 (handle frames, no verbs) share 390's box; 390 is earlier in the room's object list and has the same parent (the closed safe), so clicks hit 390 (scumm/object.cpp findObject); confirm with the executor's hit test. For d1 > 1 repeat with until Var[227] == count."
+    },
+    {
+      "name": "safe digit 2: push the handle d2 times (here 1)",
+      "room": 30,
+      "verb": 5,
+      "obj": 390,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 226,
+          "eq": 1
+        },
+        {
+          "var": 228,
+          "eq": 1
+        },
+        {
+          "bit": 73,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/obj-0390-handle.txt [008B]-[00B6] (Push: startScript(202,[1])); local-202.txt [0020]-[0041], [00EE]",
+      "note": "Bit[73] still 1 proves digit 1 was right. For d2 > 1 repeat with until Var[227] == count."
+    },
+    {
+      "name": "safe digit 3: pull the handle d3 times (here 1)",
+      "room": 30,
+      "verb": 6,
+      "obj": 390,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 226,
+          "eq": 2
+        },
+        {
+          "var": 228,
+          "eq": 0
+        },
+        {
+          "bit": 73,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/local-202.txt [0020]-[0041], [00EE]",
+      "note": ""
+    },
+    {
+      "name": "safe digit 4: push the handle d4 times (here 1): the safe opens",
+      "room": 30,
+      "verb": 5,
+      "obj": 390,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 397
+        },
+        {
+          "bit": 320,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/local-202.txt [0046]-[00C0] (Var[226]==3, Var[227]==Var[224], Bit[73]: safe opens, [007A] Bit[320]=1, [00B8] pickupObject(397), cutscene text skipped), [00E3]-[00EC] safe closes, state reset",
+      "note": "NO handle input from this push until the note is held: [005F]-[0074] has breakHeres, and a new Pull/Push restarts local 202 mid-way and corrupts the counters ('going too fast at the end glitches the safe; the only recovery is to leave and re-enter the store', runner sources §3.2)."
+    },
+    {
+      "name": "ring the bell (summons the storekeeper, opens the shop menu)",
+      "room": 30,
+      "verb": 5,
+      "obj": 399,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 32,
+          "eq": 14
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/obj-0399-bell.txt [0018] startScript(207); local-207.txt [0000]-[0037] (override armed at [0037] after delay(60)+delay(30)), [015A]-[0199] skipped path: storekeeper put behind the counter, [0162] startScript(26,[387,437]) closes the doors, [01A1] startScript(211); local-211.txt [0007] VAR_VERB_SCRIPT=14",
+      "note": "LeoLitz's Credit Early method ('use the bell, then 3, 1x4, 2'). Alternative: Walk to door 387 with the shovel unpaid -> room-030-store/local-204.txt [0031]-[042B] (no override: the storekeeper walks in from (335,175), ego walks to the counter) -> 211; it keeps the door open but walks ego door->counter->door. Measure both."
+    },
+    {
+      "name": "shop: breath mint",
+      "room": 30,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I could really use a breath mint.",
+      "after": [],
+      "until": [
+        {
+          "has": 395
+        },
+        {
+          "bit": 312,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-030-store/local-211.txt [0251]-[026A] (Bit[420], !Bit[312]), [1AFA]-[1BC8] ('You're telling me!', override [1B28] skipped, Bit[312]=1, pickupObject(395), startObject(488,250,[0,1]))",
+      "note": "Key '2' standalone (menu: About this shovel / breath mint / browse). MERGED RUN: with the unpaid sword held the menu is sword / shovel / mint / browse, and the record's digits are 3 (mint), 1 1 (sword, I want it: S2 moves 6-7), 1 1 (shovel, I want it), 2 (browse: S2 move 8). `choose` is text, so the changing key does not matter."
+    },
+    {
+      "name": "shop: about this shovel",
+      "room": 30,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "About this shovel",
+      "after": [],
+      "until": [
+        {
+          "var": 194,
+          "eq": 121
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-030-store/local-211.txt [00B1]-[00C0] (line 121, owns 396 and !Bit[99]), [0712]-[0724] startScript(206); local-206.txt [0005] 'What about it?'",
+      "note": "Key '1'. Var[194] stays 121 while 'What about it?' is on screen (local-206 resets it only at [00E0])."
+    },
+    {
+      "name": "shop: I want it (pay 75 for the shovel)",
+      "room": 30,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I want it.",
+      "after": [],
+      "until": [
+        {
+          "bit": 99,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-030-store/local-206.txt [0030] line 120 (key 1), [00EF]-[00FB] Var[105]=1, Bit[479]=1; local-211.txt [0729]-[073A] (money >= 75: buy at once), [0910]-[09CE] (override skipped; startObject(488,250,[0,75]), Bit[99]=1), [1DB6] -> [003F] menu rebuilt, [03EB]-[0435] nothing but 'browse' left: the dialogue ends by itself, [1DD5] closing line (override [1DDA] skipped; getRandomNr(4) at [1DDF] only if not skipped)",
+      "note": "Key '1'. Money standalone: 378 -> 377 (mint) -> 302. Merged: 377 -> 277 (sword) -> 202. STANDALONE: with nothing else unpaid the menu ends by itself ([03EB]-[0435]). MERGED RUN: the paid sword adds option 122 ('Now that I have this sword, who can I test it out on?', local-211 [016A]-[01D9], Local[1]=1), so the menu no longer ends by itself. S2's 'I think I'd just like to browse.' (S2 move 8, 1-based) comes between this move and the door, and it restores the VAR_VERB_SCRIPT that the door move waits for."
+    },
+    {
+      "name": "open the store door from inside (the bell path closed it)",
+      "room": 30,
+      "verb": 2,
+      "obj": 387,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "state": 387,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/local-211.txt [1ED5] VAR_VERB_SCRIPT restored; obj-0387-door.txt [0032]-[004E] (cutscene, startScript(25,[387,437]))",
+      "note": "Waits for VAR_VERB_SCRIPT == 4, restored when the shop dialogue closes (local-211 [1ED5]): by itself when S1 runs alone, by S2's browse choice in the merged run."
+    },
+    {
+      "name": "leave the store",
+      "room": 30,
+      "verb": null,
+      "obj": 387,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 34
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-030-store/obj-0387-door.txt [008C]-[0098] -> local-204.txt [0000]-[0044] (nothing unpaid: loadRoomWithEgo(437,34))",
+      "note": ""
+    },
+    {
+      "name": "High Street: town half -> mansion half",
+      "room": 34,
+      "verb": null,
+      "obj": 436,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 232
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0436-archway.txt [001E]-[003C] (cutscene: walk to (229,98), pan to 160)",
+      "note": ""
+    },
+    {
+      "name": "enter the mansion grounds",
+      "room": 34,
+      "verb": null,
+      "obj": 431,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 36
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0431-governor-s-mansion.txt [000C] loadRoomWithEgo(466,36)",
+      "note": ""
+    },
+    {
+      "name": "give the drugged meat to the poodles",
+      "room": 36,
+      "verb": 4,
+      "obj": 566,
+      "obj2": 467,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 15,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-002.txt [003F]-[009A] (Give to a class-5 object: walk to it, then startObject(obj2,80,[obj1])); room-036-mansion-e/obj-0467-deadly-piranha-poodles.txt [00B2]-[00D5] startScript(201,[566]); local-201.txt [0000]-[0079] (cutscene, no override), [0079]-[0087] (meat has class 6: Bit[15]=1), [00CE] door 465 made touchable, [01B9] VAR_VERB_SCRIPT=203 (sign shown until the next click); entry.txt [002E]-[0042] (465 untouchable while !Bit[15])",
+      "note": "Unskippable (a cutscene with no override): five delay(60) = 300 jiffies = 60 frames at VAR_TIMER_NEXT 5 ([005B], [0064], [006D], [0073] before Bit[15]; [00D5] after it), plus 34 breakHere frames ([0025]-[002A] 6, [0042]-[004D] 12, [00AB]-[00B9] 15, [00DD] 1), plus the walk to the poodles. This until (Bit[15], [0087]) holds about 16 frames + 60 jiffies before #60's gate (VAR_VERB_SCRIPT=203 at [01B9]). 'Use meat with poodles' reaches the same script (obj-0566 [0098]-[00A2]). Never 'Use sword with poodles' (S2 item; obj-0388 [006C])."
+    },
+    {
+      "name": "open the mansion door (dismisses the sign)",
+      "room": 36,
+      "verb": 2,
+      "obj": 465,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 203
+        }
+      ],
+      "until": [
+        {
+          "state": 465,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-036-mansion-e/local-203.txt [0000]-[0009] (hides the sign, passes the click to script 4); obj-0465-door.txt [0018] startScript(25,[465,633])",
+      "note": ""
+    },
+    {
+      "name": "enter the foyer",
+      "room": 36,
+      "verb": null,
+      "obj": 465,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 53
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-036-mansion-e/obj-0465-door.txt [0030]-[003C] loadRoomWithEgo(633,53)",
+      "note": ""
+    },
+    {
+      "name": "open the idol-room door",
+      "room": 53,
+      "verb": 2,
+      "obj": 632,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 632,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-053-foyer/obj-0632-door.txt [0028] startScript(25) (Local[0] = VAR_ME)",
+      "note": ""
+    },
+    {
+      "name": "walk into the idol room (first visit: repellent)",
+      "room": 53,
+      "verb": null,
+      "obj": 632,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 640
+        },
+        {
+          "bit": 481,
+          "eq": 1
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-053-foyer/obj-0632-door.txt [0018]-[0024] (state 1: startScript(210)); local-210.txt [0002] Bit[481]=1, [0007] override -> [042F]-[04B6] (skipped: pickupObject 643, 641, 642, 640; gaping hole 637 made touchable), [04CC] local-214.txt [0000]-[0080] (ego put at (540,28), 'If only I had a file' text)",
+      "note": ""
+    },
+    {
+      "name": "leave the foyer",
+      "room": 53,
+      "verb": null,
+      "obj": 633,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 36
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-053-foyer/obj-0633-door.txt [005C]-[0068] (state 1, opened as 465's partner) loadRoomWithEgo(465,36)",
+      "note": "Long walk from (540,28) to (91,97)."
+    },
+    {
+      "name": "mansion grounds -> High Street",
+      "room": 36,
+      "verb": null,
+      "obj": 466,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 34
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-036-mansion-e/obj-0466-trail.txt [000C] loadRoomWithEgo(431,34); room-034-high-stre/entry.txt [0051]-[0058] (from 36: mansion half)",
+      "note": ""
+    },
+    {
+      "name": "High Street: mansion half -> town half",
+      "room": 34,
+      "verb": null,
+      "obj": 435,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 390
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0435-town.txt [000C]-[003F] (cutscene: walk to (397,108), pan to 528)",
+      "note": ""
+    },
+    {
+      "name": "High Street -> jail (Otis #2)",
+      "room": 34,
+      "verb": null,
+      "obj": 434,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 31
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0434-doorway.txt [0011] loadRoomWithEgo(400,31,262,120)",
+      "note": ""
+    },
+    {
+      "name": "give the breath mints to Otis",
+      "room": 31,
+      "verb": 4,
+      "obj": 395,
+      "obj2": 405,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 476,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-002.txt [003F]-[009A] (Give to a class-5 object: walk to it, then startObject(obj2,80,[obj1])); room-031-jail/local-203.txt [0082]-[00B7] (cell walk, no override), [00B8]-[0112] (setClass(405,[6]) clears the bad breath, override [00D8] skipped, chainScript(202)); local-202.txt [0050]-[0091] (class 6 clear, !Bit[476]: Bit[476]=1, 'So, have you come to release me?')",
+      "note": "The mints are not consumed (no setOwnerOf in this branch); they stay for Part II. Inventory here (10 items: 488 442 377 396 397 395 643 641 642 640) exceeds the 8 icons, but every pickup scrolls the icon window to the newest row pair (global/script-009.txt [0000]-[0029]: Var[118] = rows-1 when called with 1, as pickupObject does), so items 5-10 are shown and both 395 and 640 are clickable without the scroll arrows."
+    },
+    {
+      "name": "Otis: leave the conversation",
+      "room": 31,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "keep a stiff upper lip",
+      "after": [],
+      "until": [
+        {
+          "var": 194,
+          "eq": 127
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-031-jail/local-202.txt [0148]-[0546] menu (Who are you? / Would you happen to have a file? / stiff upper lip), [1381]-[13A9] (override skipped, goto 19C4), [19C4]-[19D8] control back",
+      "note": "DEVIATION FROM RECORD (fewer text waits by script count): key '3' (or a scene click: [0596]-[05A1] Var[257]=1 makes it the scene default). Its only line, 'Thanks a lot.', sits in an override ([1390] -> [13A8]), and the later cake line then has two segments (local-203 [018F]): 3 skips in all. The record's '2', 'Would you happen to have a file?' (verb 125, [12A1]-[137E]), ends the talk too, with four text segments, and sets Bit[95], which shortens the cake line to one ('Here's the cake.', local-203 [0171]-[0178]): 5 skips. Revert to the record's line if the engine shows otherwise."
+    },
+    {
+      "name": "give the gopher repellent to Otis (carrot cake)",
+      "room": 31,
+      "verb": 4,
+      "obj": 640,
+      "obj2": 405,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 420
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-002.txt [003F]-[009A] (Give to a class-5 object: walk to it, then startObject(obj2,80,[obj1])); room-031-jail/local-203.txt [0115]-[01E5] (class 6 clear: repellent to owner 14, texts, [01E0] pickupObject(420); no override, text skips only)",
+      "note": "Giving the repellent before the mints is refused (local-203 [011F]-[01EB]). After it leaves (ScummVM compacts the inventory, scumm/object.cpp clearOwnerOf) the window stays on row 1, and the cake 420 arrives as item 10, inside the window (global/script-009.txt [0012]-[0017])."
+    },
+    {
+      "name": "open the cake (the file)",
+      "room": 31,
+      "verb": 2,
+      "obj": 420,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 420
+        },
+        {
+          "not": {
+            "class": 420,
+            "set": 6
+          }
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-031-jail/obj-0420-cake.txt [0056]-[0071] (class 6 set: setClass(420,[6,131]), renamed 'file', printEgo 'There's a file in it!'); room-031-jail/local-203.txt [0141]-[01DE] (Otis's lines, actor 4), [0344] print(255,' '); third_party/scummvm/engines/scumm/actor.cpp actorTalk -> setTalkingActor (VAR_TALK_ACTOR, var 25 in v5: vars.cpp) and stopTalk (sets 255); patches/0001-scumm-add-speedrun-bridge.patch controlAtDecisionPoint (until is checked after checkExecVerbs) and textSkipEffective ('.' ends a line only in the next frame's displayDialog)",
+      "note": "Until = the Open has run: obj-0420-cake.txt [005F] setClass(420,[6,131]) clears class 6, which the Open branch requires set ([0056] classOfIs(VAR_ME,[134])). Measured (seed 836557856): the click at the first frame after Otis's dialogue runs the Open in the same frame local-203 [0344] prints its closing blank line (print(255,' ')), so 'There's a file in it!' is overwritten at once and var 25 never reads 1 at a decision point; the file costs no talk time. Do not use {has 420} alone: it is already true, so the jail-exit click could follow at once, and its doSentence(STOP) (global/script-004.txt [03FC]) could drop the Open."
+    },
+    {
+      "name": "leave the jail",
+      "room": 31,
+      "verb": null,
+      "obj": 400,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 34
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-031-jail/obj-0400-doorway.txt [0037] loadRoomWithEgo(434,34)",
+      "note": ""
+    },
+    {
+      "name": "High Street: town half -> mansion half (2)",
+      "room": 34,
+      "verb": null,
+      "obj": 436,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 232
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0436-archway.txt [001E]-[003C]",
+      "note": ""
+    },
+    {
+      "name": "enter the mansion grounds (2)",
+      "room": 34,
+      "verb": null,
+      "obj": 431,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 36
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0431-governor-s-mansion.txt [000C]",
+      "note": ""
+    },
+    {
+      "name": "enter the foyer (door still open)",
+      "room": 36,
+      "verb": null,
+      "obj": 465,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 53
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-036-mansion-e/obj-0465-door.txt [0030]-[003C] (465 stayed open since the Open; glitchless plan step 49 replays this on CD)",
+      "note": ""
+    },
+    {
+      "name": "walk to the gaping hole (the theft)",
+      "room": 53,
+      "verb": null,
+      "obj": 637,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 635
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-053-foyer/obj-0637-gaping-hole.txt [000C]-[0021] (owns 420 with class 6 clear: startScript(211)); local-211.txt [000F] override -> [01A3]-[01E4] (skipped: idol 635 picked up, 641/642/420 to owner 14, door 633 closed), [01F8] startScript(212); local-212.txt [0015] override (skipped)",
+      "note": ""
+    },
+    {
+      "name": "Fester menu (any line)",
+      "room": 53,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "She said I could have it!",
+      "after": [],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-053-foyer/local-212.txt [0294] endCutscene, [02BE] line 120 (key 1), [0449]-[0453] wait (outside any override), [04D3] beginOverride -> [04D5] goto 0857: [0857]-[087F] VAR_OVERRIDE fix-up, [087F] endOverride, [0881] endCutscene, [0882] startScript(119); global/script-119.txt [0000] beginOverride -> [08A1]-[08EE] skip path (its menus [01BB], [038E], [05D2] never show; [08BC] UserputOff), [08F4] print 'I really wish I knew how to talk to women.' after the override, [0923] WaitForMessage, [0930] UserputOn",
+      "note": "Key '1'. All five lines only set a variable that nothing on the route reads (pddl/part1/steps.toml steal-idol). After the two automatic Esc skips one line remains: global 119 [08F4] needs one '.' skip, and input returns only at [0930], which gates #78."
+    },
+    {
+      "name": "open the foyer door: Fester throws Guybrush in the sea",
+      "room": 53,
+      "verb": 2,
+      "obj": 633,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 53
+        }
+      ],
+      "until": [
+        {
+          "room": 42
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-053-foyer/obj-0633-door.txt [0018]-[0024] (owns 635: startScript(217)); local-217.txt [000F] override -> [034B]-[0391] (skipped: [0364]-[0370] sword to owner 14 if held, [0388] 635 to owner 0, [038C] Var[277]=1, loadRoomWithEgo(904,83)); room-083-cu-dock/entry.txt [0016]-[001D] (Var[277]==1: global 65); global/script-065.txt [0005] and [01B9] overrides (two skips), [023A]-[025C] ego to room 42 at (150,130)",
+      "note": "S2 HANDOFF: if the sword was bought, Fester takes it here and the idol cutscene below walks ego to the underwater sword 590 and takes it back (room-042-underwate/local-203.txt [0030]-[0094]: walk, text, 2 x delay(30)): the price of buying the sword at the first store visit."
+    },
+    {
+      "name": "pick up the idol underwater (idol trial done)",
+      "room": 42,
+      "verb": 9,
+      "obj": 578,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 42
+        }
+      ],
+      "until": [
+        {
+          "bit": 85,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-042-underwate/entry.txt [0029] walk speed 4, [0032] VAR_VERB_SCRIPT=204; obj-0578-fabulous-idol.txt [001B]-[0027] startScript(203); local-203.txt [0000]-[009E] (cutscene, no override: [0024] pickupObject(578), [0094] walk to the ladder 577), local-200.txt [003F]-[0041] startScript(71,[2]); global/script-071.txt [0088]-[0094] Var[196]+=1, Bit[85]=1, Var[200]=2",
+      "note": "Then local-200 [0047]-[009D]: climb, Var[277]=4, ego put in room 83; room-083-cu-dock/entry.txt [0084]-[008E] starts local 201 (the Elaine scene), room-083-cu-dock/local-201.txt override [0017] -> [0775] skipped: ego at (185,121)."
+    },
+    {
+      "name": "close-up dock -> dock",
+      "room": 83,
+      "verb": null,
+      "obj": 904,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 83
+        }
+      ],
+      "until": [
+        {
+          "room": 33
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-083-cu-dock/local-201.txt [0775]-[07A0]; obj-0904-dock.txt [0010]-[0020] putActorInRoom(ego,33), putActor(308,132); room-033-dock/entry.txt [0032]-[0039] (from 83: local 201); local-201.txt [000A]-[0011] (arrival at x 308: RoomScroll(0,160), so the cliffside 426 is on screen) versus [0042] RoomScroll(712,848) for an arrival at x 566 (via 905), which keeps the camera on the right until ego x < 566",
+      "note": "904 (walk -25,121) rather than 905 (345,121). 905 is nearer in room 83, but it lands at x 566 on the dock, 258 px further from the cliffside, and with the camera held on the right, so #81 would need an approach. Through 904, #81 is a direct click. The record's choice here was not observed."
+    },
+    {
+      "name": "dock -> Lookout (2)",
+      "room": 33,
+      "verb": null,
+      "obj": 426,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 38
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-033-dock/obj-0426-cliffside.txt [000C]",
+      "note": ""
+    },
+    {
+      "name": "Lookout -> island map (2)",
+      "room": 38,
+      "verb": null,
+      "obj": 487,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-038-lookout/obj-0487-path.txt [0010]; room-085-melee/entry.txt [00A3]-[00C8] (Var[290] is 3 > 2 and Var[196] < 3: roaming pirates start, local 202), [00C8] map entry 4",
+      "note": "MERGED RUN: S2's block 1 (S2 moves 9-28, 1-based: troll, Smirk, fight 1) starts right after this move. S2 dropped its own 'Lookout -> Melee map', so this is the only copy, and S2's entry state (Var[290]=4 after this map entry) relies on it. Map entries 5-7 then come from S2 (troll, Smirk, fight 1). STANDALONE: straight to the fork. A pirate encounter fires only if ego stops within 2 of one (room-085-melee/local-202.txt)."
+    },
+    {
+      "name": "map -> forest entrance (2)",
+      "room": 85,
+      "verb": null,
+      "obj": 911,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/obj-0911-fork.txt [000C] loadRoomWithEgo(687,218)",
+      "note": "MERGED RUN: comes after S2 'Fight 1 E5' (S2 move 28, 1-based), which ends back on the map where the fight started (room 85). Click the fork on the first gate frame so that no new encounter starts."
+    },
+    {
+      "name": "218 -> 215 through path 686 (Back)",
+      "room": 58,
+      "verb": null,
+      "obj": 686,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0686-path.txt [0010]; obj-0685-path.txt [015E]-[0168] loadRoomWithEgo(687,215)",
+      "note": ""
+    },
+    {
+      "name": "215 -> 220 (Left, map gate)",
+      "room": 58,
+      "verb": null,
+      "obj": 688,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 220
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0688-path.txt [0045]-[006B] (owns map 442: Bit[401]=1, loadRoomWithEgo(688,220))",
+      "note": ""
+    },
+    {
+      "name": "220 -> 213 (Right)",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 220
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 213
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [012F]-[0139] loadRoomWithEgo(687,213)",
+      "note": ""
+    },
+    {
+      "name": "213 -> 212 (Left)",
+      "room": 58,
+      "verb": null,
+      "obj": 688,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 213
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 212
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0688-path.txt [00DF]-[00E9] loadRoomWithEgo(688,212)",
+      "note": ""
+    },
+    {
+      "name": "212 -> 207 (Back, into the trap)",
+      "room": 58,
+      "verb": null,
+      "obj": 685,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 212
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 207
+        },
+        {
+          "var": 101,
+          "eq": 212
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0685-path.txt [00F2]-[00FC] loadRoomWithEgo(687,207); entry.txt [0419]-[0488] (in 207 with Var[101]==212: 685 and 688 untouchable, only box 6 enabled; ego enters at 687, the right edge)",
+      "note": "Map-teleport route (record WR 6:44). Standard alternative for these two hops: 212 -> 204 by 687 (obj-0687 [00C3]-[00CD]) then 204 -> 211 by 685 (obj-0685 [0033]-[003D]); both are 9 path sentences in total. Measure both."
+    },
+    {
+      "name": "forest map teleport: Look at the map in the trapped 207",
+      "room": 58,
+      "verb": 8,
+      "obj": 442,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 207
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 207
+        },
+        {
+          "var": 101,
+          "eq": 63
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: on the first frame with control after arriving in 207 from 212, Look at (8) the map 442 in the inventory ('l' + inventory click, or a right-click: 442's default verb is Look at, room-035-low-stree/obj-0442-map.txt [0035]); '.' through 'I think I've been had!' (first read only, global/script-123.txt [01CB]-[022A]); Esc (or any click) on the map screen ([0245] override, [024A]-[0254] click wait). Mechanism: global 123 loadRoom(63) ([0235]) and returns with actorFollowCamera(VAR_EGO) ([0264]), which re-enters ego's room 207 with no entry object (scumm/room.cpp startScene with a == null keeps ego's x,y). Leaving room 63 ran global 7 (global/script-007.txt [0000] Var[101] = VAR_ROOM = 63), so the forest entry takes 207's untrapped branch (room-058-damnfores/entry.txt [048F]-[049A]: 687 untouchable, boxes 1 and 29 enabled; box 6, ego's box, stays disabled by [0028]-[0035]); global/script-006.txt [0060] Var[113] = VAR_WALKTO_OBJ = 0, so no walk-in (room-058-damnfores/entry.txt [0A2D]-[0A65]). Then 123 swaps ego's costume back (VAR_FIXEDDISK = 1 in ScummVM v5, scumm/vars.cpp; global/script-123.txt [0267]-[0281] ActorOps Costume(1)): Actor::setActorCostume hides and re-shows the visible actor and showActor calls adjustActorPos (scumm/actor.cpp), which moves ego to the nearest point of an enabled box, on the left side next to path 685 (strip 2), now touchable and leading to 211. Evidence: in the 2025 IL Guybrush is off screen from 6:14.0, 'I think I've been had!' at 6:15.5, and he reappears at the left edge at 6:17.0 (runner sources §8). Saves the right-edge exit at 212, the 204 crossing and 211's full-width crossing (211 is then entered at the top, strip 17) for the cost of the map read (about 20 reading frames, [01A9]-[01BC], two room loads and the costume frames).",
+      "cite": "room-035-low-stree/obj-0442-map.txt [001B] startScript(123); global/script-123.txt [017B]-[0298]; global/script-007.txt [0000]; global/script-006.txt [0060]; room-058-damnfores/entry.txt [0028]-[0035], [0419]-[049E], [0A2D]-[0A65]; third_party/scummvm/engines/scumm/actor.cpp Actor::setActorCostume, Actor::showActor, Actor::adjustActorPos; room.cpp ScummEngine::startScene; third_party/scummvm/engines/scumm/camera.cpp ScummEngine::setCameraFollows (ego not in the current room: startScene(a->getRoom(), nullptr, 0), i.e. back to ego's own room)",
+      "note": "The return room is set by the engine: global 123 [0264] actorFollowCamera(VAR_EGO) re-enters ego's own room, 207 (camera.cpp setCameraFollows). The until {var 4 == 207, var 101 == 63} is therefore exact. The runner's 'right, left, up' (LeoLitz 2022, runner sources §3.11) counts the hops after the short 207 -> 211 Back. Verify the snap position with actor_x right after this move. MAP READ: this is the first read of map 442, so its lines ('I think I've been had!...dancing lessons!', global/script-123.txt [01CB]-[022A]) play here and class 6 is cleared on 442. S3's jail map trick relies on that (S3 entry notes). If the teleport is replaced by the standard 212 -> 204 -> 211 hops, the map must still be read once before S3. Do not charge these lines to the teleport when comparing the two. PRESS: the map screen waits for a click with input soft-on (global/script-123.txt [024A]-[0254]), and the bridge never presses Esc while input is on (speedrun_skips.cpp cutsceneSkipEffective), so the move presses Esc itself on every frame in room 63; the first one after [0245] beginOverride jumps to [0259].",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "room": 63
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "207 -> 211 (Back, now touchable)",
+      "room": 58,
+      "verb": null,
+      "obj": 685,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 207
+        },
+        {
+          "var": 101,
+          "eq": 63
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 211
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0685-path.txt [00CE]-[00D8] loadRoomWithEgo(685,211)",
+      "note": ""
+    },
+    {
+      "name": "211 -> 216 (Right)",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 211
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 216
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [00B1]-[00BB] loadRoomWithEgo(685,216)",
+      "note": ""
+    },
+    {
+      "name": "216 -> 201 (Left)",
+      "room": 58,
+      "verb": null,
+      "obj": 688,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 216
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 201
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0688-path.txt [0103]-[010D] loadRoomWithEgo(687,201)",
+      "note": ""
+    },
+    {
+      "name": "201 -> treasure site (Back)",
+      "room": 58,
+      "verb": null,
+      "obj": 685,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 201
+        }
+      ],
+      "until": [
+        {
+          "room": 64
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0685-path.txt [0012]-[0019] loadRoomWithEgo(750,64)",
+      "note": ""
+    },
+    {
+      "name": "walk right until the X is on screen",
+      "room": 64,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        319,
+        108
+      ],
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 296
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-064-treasure/obj-0750-forest-path.txt (ego enters at 750, walk point 119,82); room 64 walkboxes (build/blocks-dos-cd/DISK_0001/LECF/LFLF_0064/ROOM/BOXD and BOXM): ego snaps into box 3 (121,89), path 3 -> 2 -> 1, box 1 spans x 194-349 at scale 255 and contains (319,108); out/objects.json room 64: X 749 at x 368-424 (751 and 753 on top are class 32, untouchable); third_party/scummvm/engines/scumm/camera.cpp ScummEngine::moveCamera (the follow starts when ego's strip exceeds _rightTrigger 30, scumm.cpp 2152; then the camera moves 8 px per frame toward ego; no script sets VAR_CAMERA_FAST_X, var 26), setCameraAt (camera starts at VAR_CAMERA_MIN_X 160); src/speedrun/executor.py object_points (X needs xstart >= 49), _click (a point must be on screen: x - xstart < 320)",
+      "note": "Camera: it starts at 160 (xstart 0) and starts following when ego reaches x 248. From then on, camera and ego both move 8 px per frame (ego in box 1 at scale 255, WalkSpeed(8,2)), so the camera trails by 80-87 px. Camera x is a multiple of 8, so X becomes hit-testable at camera 216 (xstart 56). The camera reaches that 6 frames after the follow starts, when ego is at 296-303. So x >= 296 means X is on screen at the until frame itself, and two frames later, when the executor looks up obj2 (the 'u' frame, then the shovel click, then target_point(749)), the camera is at 232. The draft's 260 fired at about camera 176, and the X lookup failed. The point is the right screen edge (319 is the largest x that _click accepts at xstart 0, so the reviewer's 392 cannot be clicked from the entry). Ego reaches it about when the dig sentence lands, so at most one walking frame is lost. Derived from the engine code, not measured: if the executor still reports 749 off screen, raise the bound by 8."
+    },
+    {
+      "name": "dig: Use shovel with X (treasure trial done)",
+      "room": 64,
+      "verb": 7,
+      "obj": 396,
+      "obj2": 749,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 86,
+          "eq": 1
+        },
+        {
+          "has": 752
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/obj-0396-shovel.txt [0072] doSentence(7,749,396); room-064-treasure/obj-0749-x.txt [006B]-[00A6] (!Bit[86]: startScript(200)); local-200.txt [0005] override -> [01A7] (skipped), [01B6]-[0208] unskippable tail (pan to 336, about 20 frames), [020C] pickupObject(752), [0214] startScript(71,[3]); global/script-071.txt [0088]-[0094] Bit[86]=1, Var[201]=2",
+      "note": "Ego walks on from the floor click to X's walk point (392,108) (box 4). 'Use X with shovel' (X first; X has class 2, so it takes 'with') would skip the shovel's re-send (obj-0396 [0072] doSentence(7,Local[0],VAR_ME)), but that re-send costs no frame here. Script 2 resumes after its WaitForActor inside runAllScripts and ends, and checkAndRunSentenceScript runs the re-sent sentence in the same frame, with ego already at the walk point and facing it. Clicking X last also lets X appear one frame later, so the record's order stays. END OF S1 / HANDOFF: S2 move 29 (1-based) 'Treasure site -> map' walks out by 750 (room-064-treasure/obj-0750-forest-path.txt [000C]) after {room 64, bit 86, has 752}. State that C3 cannot express: map 442 has been read (class 6 cleared, global/script-123.txt [022A]), and S3's jail map trick relies on it. Values that depend on the merge: Var[195] money is 302 standalone and 172 merged (S2 pays 100 for the sword and 30 to Smirk); Var[290] map entries are 4 standalone and 7 merged (troll, Smirk and fight 1 each return to the map; room-085-melee/entry.txt [00C8])."
+    }
+  ],
+  "rng_points": [
+    {
+      "where": "store, first entry (move 'enter the store')",
+      "what is random": "the safe combination Var[221..224] = 1 + getRandomNr(3) four times, then storekeeper presence Var[100] = getRandomNr(3) (0 = away, p 1/4), all on the entry frame",
+      "script": "room-030-store/entry.txt [002D]-[0037], [003A]-[006D]; local-205.txt [0005]",
+      "how the seed/search should treat it": "Hard seed filter: storekeeper away (else no Credit Early this visit) and the smallest digit sum (1-1-1-1 = 4 handle actions, p 1/256; joint p 1/1024). The draw depends on every RNG call before it, so freeze the S1 prefix first, then search seeds by replaying to this frame (fork at boot per seed). Fallback the runners use: save a fixed number of frames before the store, quit to the launcher (reseeds; the SCUMM RNG is not in savegames), load; legal under Any% Saves but the load time counts. Cheaper fallback: storekeeper presence is redrawn on EVERY store entry (entry.txt [003A] is outside the !Bit[319] guard), while the combination is drawn only on the first. A seed with 1-1-1-1 but the storekeeper present can be fixed by leaving and re-entering before touching anything (local-204.txt [0031]-[004C]: nothing unpaid, plain exit). Each re-entry is a 1-in-4 reroll that costs one door cycle (to measure: the present storekeeper's local 200/209 run during that visit) and shifts every later draw."
+    },
+    {
+      "where": "SCUMM Bar, cook",
+      "what is random": "kitchen timer (getRandomNr(20)+30)*60 jiffies (irrelevant after the provoke) and the cook's target 330+getRandomNr(28), which sets when he passes x <= 310",
+      "script": "room-028-bar/local-211.txt [000D]; local-216.txt [003F]",
+      "how the seed/search should treat it": "timing only (a frame or two at the kitchen entry); let the seed search see it."
+    },
+    {
+      "where": "every dialogue menu",
+      "what is random": "getRandomNr(1) every frame the menu waits (RNG stirring, no outcome)",
+      "script": "room-051-circus-te/local-207.txt [0969], [0A84], [0BBA], [0FDE]; room-035-low-stree/local-218.txt [0559], [08A9]; room-030-store/local-211.txt [043D]; local-206.txt [00E5]; room-031-jail/local-202.txt [05AD]; room-053-foyer/local-212.txt [044E]",
+      "how the seed/search should treat it": "answer on the first frame the menu takes input; any delay shifts the store draw."
+    },
+    {
+      "where": "background scripts on the route",
+      "what is random": "ambient animation and sound timers that consume RNG every few frames: kitchen sounds, circus grounds, Low Street walkers and the door maze, High Street walkers (they can also close store door 437) and the alley 'Psst', Otis, poodles, foyer, forest fireflies, underwater fish, close-up dock; also the bar's local 200 and 210, the circus tent's local 201, the Voodoo shop's local 202, and the store's local 212 (started when the shop dialogue ends)",
+      "script": "room-041-kitchen/local-201.txt [000E]; room-052-circus-gr/local-200.txt [0020]; room-035-low-stree/local-206.txt, local-208.txt [000D]; room-034-high-stre/local-200.txt, local-203.txt [0012], [00FA]; room-031-jail/local-204.txt, local-207.txt, local-209.txt; room-036-mansion-e/local-202.txt, local-204.txt; room-053-foyer/local-207.txt, local-217.txt, local-218.txt, local-219.txt; room-058-damnfores/local-201.txt, local-202.txt; room-042-underwate/local-206.txt, local-207.txt; room-028-bar/local-200.txt [0019] (entry.txt [0089]), local-210.txt [0002], [002E] (local-204.txt [004A]); room-051-circus-te/local-201.txt [0000], [0010] (entry.txt [0027]); room-029-fortune/local-202.txt [0003], [0016] (local-201.txt [001C], entry.txt [0024]); room-030-store/local-212.txt [030C] (local-211.txt [1EE4])",
+      "how the seed/search should treat it": "no outcome in S1, but each one shifts later draws (store, S2 fights, catacombs): the movie is seed-specific end to end. Not on the route: the dock pirate room-033-dock/local-200.txt (its only starter is global/script-047.txt [0035] startScript(Var[193]). Rooms 34 and 35 stop script 47 on exit while Var[196] < 3 (room-034-high-stre/exit.txt [0007], room-035-low-stree/exit.txt [001C]), and room 33's entry starts only local 203, a resource loader). So door 428 is never opened or shut by him in S1. Also off the route: the Voodoo Lady (room-029-fortune/local-210.txt, see the chicken move) and the bar and Lookout conversations not taken (room-028-bar/local-220/222, room-038-lookout/local-202)."
+    },
+    {
+      "where": "island map, map entry 4 (treasure trip)",
+      "what is random": "roaming pirates (one, or three if Bit[19]) and where they walk; an encounter fires when ego stops within 2 of one",
+      "script": "room-085-melee/entry.txt [00A3]-[00C8]; local-202.txt",
+      "how the seed/search should treat it": "Merged run: S2 plays its encounters on this map visit (S2 entry notes, intercept moves). S1 alone: pick click frames/points so that ego never stops next to a pirate on the way to the fork."
+    },
+    {
+      "where": "foyer theft and Fester",
+      "what is random": "animation scripts with a variable number of RNG calls (saruya: Fester makes 0 to 2)",
+      "script": "room-053-foyer/local-212.txt, local-217.txt, local-218.txt, local-219.txt",
+      "how the seed/search should treat it": "deterministic for a fixed input schedule in the bridge; verify by replay."
+    },
+    {
+      "where": "credits (boot)",
+      "what is random": "writer order getRandomNr(2)",
+      "script": "global/script-152.txt [01A8]",
+      "how the seed/search should treat it": "never reached: the logo Esc jumps past it."
+    }
+  ],
+  "glitches": [
+    {
+      "name": "logo speed glitch",
+      "saves": "every frame waits 5 jiffies instead of 6 for the whole run: walking and breakHere animation 6/5 faster (delays in jiffies unchanged)",
+      "mechanism": "room 10 local 204 sets VAR_TIMER_NEXT 5 and restores 6 at its end; the logo Esc ends the credits and the room change to 38 kills 204 before the restore",
+      "inputs": "Esc on one frame in 46-92 from boot (DOS CD, measured)",
+      "risk": "none if the frame is inside the window; outside it var 19 is 6 (the run is still valid, just slower)",
+      "cite": "room-010-logo/local-204.txt [0000], [0097]; global/script-152.txt [004F], [005C], [089D]; docs/anypercent/findings.md"
+    },
+    {
+      "name": "Credit Early (store safe at the first visit)",
+      "saves": "the whole second store visit of the crew phase (about 58 s measured on the same runner's EGA runs, runner sources §3.2); in S1 it costs the handle actions and the bell",
+      "mechanism": "the four-digit pull/push combination is drawn at the first store entry; with the storekeeper away the handle feeds local 202's counter machine, which opens the safe and gives the storekeeper's note 397 (Bit[320])",
+      "inputs": "Pull x d1, Push x d2, Pull x d3, Push x d4 on handle 390, each sentence after the previous finished; nothing on the handle until 397 is held",
+      "risk": "The seed must put the storekeeper away (p 1/4, or reroll by re-entering) and give small digits. A handle input after the final push and before local 202's cutscene corrupts the safe (leave and re-enter to reset). Inside its cutscene, a restart would be an engine error, but input is off there (crash_rules).",
+      "cite": "room-030-store/entry.txt [002D]-[006D]; local-205.txt; local-202.txt; local-203.txt; obj-0390-handle.txt [008B]-[00EE]"
+    },
+    {
+      "name": "forest map teleport",
+      "saves": "Replaces the 212 right-edge exit, the 204 crossing and the 211 left-edge entry (a reviewer's estimate, not decoded here: about 430 px, about 54 frames at 8 px/frame) with the snap next to 685 and a top entry into 211. It costs about 26 frames of map animation and room loads (global/script-123.txt [017D]-[0293], with Esc on the map). The first-read lines are a sunk cost, because S3 needs map 442 read anyway. To be measured against the standard 9 hops.",
+      "mechanism": "reading the map in 207 entered from 212 re-enters 207 with Var[101]=63 (untrapped box set); the costume restore at the end of global 123 re-shows ego and adjustActorPos snaps him into the nearest enabled box, next to the now-touchable path 685",
+      "inputs": "212: Walk to 685; 207: Look at map 442 at once, '.' through the first-read lines, Esc on the map; then Walk to 685, 687, 688, 685",
+      "risk": "The return room is fixed by the engine (actorFollowCamera re-enters ego's room 207). The snap point depends on the 207 box geometry, which is not decoded: confirm it in the engine. Replacing the teleport needs a map read elsewhere before S3.",
+      "cite": "global/script-123.txt [017B]-[0298]; room-058-damnfores/entry.txt [0419]-[049E]; scumm/actor.cpp adjustActorPos; third_party/scummvm/engines/scumm/camera.cpp setCameraFollows"
+    }
+  ],
+  "crash_rules": [
+    "Do not click in the Lookout during the intro (room 38 before the stairs): input is on but there is no verb bar; a click cut the intro and the verb bar never came back (docs/anypercent/findings.md 'The intro').",
+    "Safe: no Pull/Push on handle 390 between the final push and holding note 397. Before local 202's cutscene (room-030-store/local-202.txt [005F]-[0074] breakHeres), a new handle sentence restarts the non-recursive local 202 (startScript stops the running instance first, third_party/scummvm/engines/scumm/script.cpp:65-66) and corrupts the counters (runner sources §3.2: 'going too fast at the end glitches the safe'). Inside its cutscene([2]) [007F]-[00C0] the same restart would be a fatal engine error (next rule), but the cutscene start script turns input soft-off (global/script-018.txt [0005]-[0007]), so no click reaches it.",
+    "Do not Open kitchen door 316 again after the provoke. Local 211 still runs, so a second Open replays local 214 and restarts local 212's 600-jiffy timer (room-028-bar/obj-0316-door.txt [0018]-[0021]): not a crash, about 10 s lost. During local 214's own cutscene ([0000]-[004E]) the restart would be a fatal error, but input is off there.",
+    "Engine error (crash): ScummVM's startScene() calls error() if the current script is a room, object or local script with an active cutscene override when a room change happens (third_party/scummvm/engines/scumm/room.cpp startScene). No S1 move does this; keep it in mind for any reordered input.",
+    "Engine error (crash): stopping a global or local script, or an object script, while it is inside cutscene()..endCutscene() calls error() in v5 ('Script %d stopped with active cutscene/override' / 'Object %d stopped with ...', third_party/scummvm/engines/scumm/script.cpp:271-275 and 305-309; cutscene() is what counts, script.cpp:1634). A non-recursive startScript stops the running instance first (script.cpp:65-66), and setOwnerOf(x,0) stops x's object script first (object.cpp:180, clearOwnerOf -> stopObjectScript). So never re-trigger a local or object script while it is inside its cutscene (store local 202, bar local 214, poodles local 201, jail local 203), and never move a setOwnerOf(x,0) into x's own running verb script. On this route every such cutscene turns input off (global/script-018.txt [0005]-[0007]), so only reordered or injected input can hit this.",
+    "'Use meat with flower' was a famous ScummVM crash (bug #2771): an inventory object's own script removing an object. ScummVM 2026.3.0 raises error() only in two 'odd setOwnerOf' cases, and both need the CURRENT script to be the inventory object's script (third_party/scummvm/engines/scumm/object.cpp setOwnerOf, 158-169). The drug move ('Use meat with petal') runs the meat's verb script, which removes the petal from inside global script 182 (global/script-182.txt [0017]), so the current script is a global and neither case applies. The record's 'Use petal with meat' reaches the same code after one re-send. Do not route any item removal through a different verb path without checking this.",
+    "The documented ScummVM crashes from clicking an item or moving while Guybrush picks something up (G-MONKEY-FL) or clicking the compass while he uses an item (G-COOK-CD) are reported in item-slide states only (runner sources §3.4); S1 has no slide state. To be safe, schedule no input during the pickup cutscenes of the sentence script (global/script-002.txt [0385]-[0393]) or the idol pickup (room-042 local-203)."
+  ],
+  "record_comparison": "saruya's 21:52 (DOS CD) covers this content between the logo skip and the dig at WR 7:05, interleaved with S2 detours. docs/comparison.md §4.3 puts the record's S1-equivalent (dock control to dig, minus the troll, Smirk, the first insult fight, the fish and the sword, but with the chicken and Credit Early) at about 329 s (+-5 s, plus 0-3 s at the end), i.e. about 334 s from the logo skip (dock control at WR 0:05). Record anchors: 'Street' split 2:31 (after the map and the chicken), Otis #1 at 2:45, safe at 3:00, forest 6:33 -> 7:01 with the map teleport, dig 7:05. This route follows the record's order and differs in input method only: provoke the cook from a curtain crossing (as the human), pot then meat after S2's fish (the record's order) with the Use + fish-icon helmet (one input fewer than Give pot), 'Use meat with petal' (one frame, no re-send), 'stiff upper lip' with Esc at Otis #2 (fewer text waits), door 904 out of the close-up dock, and bridge-exact skips; the Talk for Bit[420] and the bell are the record's choices. The glitchless engine run of the crew-free version (no logo glitch, no chicken, no Credit Early) took 6:11.5 held-out mean (docs/comparison.md §4.4); the record walks about 1.21-1.26x faster in the forest, which matches 6/5 from the logo glitch plus the teleport.",
+  "open_questions": [
+    "Map teleport: confirm in the engine that after the map read in the trapped 207, ego is snapped to the left side (actor_x right after the move) and path 685 is clickable, and that the route beats the standard 212 -> 204 -> 211 hops. The return room itself is fixed by camera.cpp setCameraFollows (ego's room 207). The 207 walkbox geometry (boxes 1, 6, 29 in the pseudo-room set) was not decoded.",
+    "Seed search for Credit Early: find seeds with the storekeeper away and digits 1-1-1-1 at the store entry for the frozen prefix (or 1-1-1-1 plus re-entries to reroll the storekeeper, see rng_points). Also confirm that the CD RNG is reproducible under the bridge (saruya reports two CD RNG calls that 'aren't always consistent', runner sources §3.8).",
+    "Bell path versus door path (Walk to 387 with the shovel unpaid, local 204, no override) to start the shop dialogue with the storekeeper away. The bell costs about 90 jiffies before its override is armed, plus an Open 387 later. The door path costs the storekeeper's walk-in and two counter walks. Measure.",
+    "Bit[420]: Give meat to Otis versus Talk to Otis with skips on. Both pass the same unskippable cell walk.",
+    "Circus grounds (#16): the walkboxes give one decision-point position in box 5, 223 minus one step (218 for the replay's 5 px step), on the frame before ego enters box 7. An until of x <= 218 would put #17's click on the STOP frame and save one standing frame. Confirm the step in the engine before tightening it this way (216 is safe for any step).",
+    "Treasure room (#94): the bound x >= 296 comes from the camera code, not from a run. Measure the first frame 749 is hit-testable. An executor approach for obj2 (re-click at the right screen edge as the camera scrolls) would remove the floor-click move's one possible standing frame.",
+    "C3 cannot test object classes. The drugged meat is checked through the petal's owner 0, and the cake-to-file Open through the talking actor (var 25 == 1). The class changes themselves are proven only by the poodles' Bit[15] and the gaping hole.",
+    "Kitchen: two pickups versus one 'Use pot with meat' sentence (auto pick-up of both, then a script-3 failure line). The order (pot then meat) and the helmet's fish icon assume S2's fish was taken first. S1 alone needs meat, pot and the meat icon.",
+    "Otis #2: 'stiff upper lip' + Esc versus 'Would you happen to have a file?' (which ends the talk and shortens the later cake line): measure.",
+    "Right-click default verbs (global/script-004.txt [0005]-[0016] uses Var[182], set by each object's 0x5A entry). Verified here: doors 428, 316, 444, 367, 437, 387, 465, 632, 633 give Open while closed (Var[182]=2, Close when open); citizen 441 and prisoner 405 give Talk (10); map 442 gives Look at (8). The plants 678 give Look at, so the petal still needs 'p'. Handle 390 gives the same direction as the last move (obj-0390 [00F5]-[0109]), which does not help 1-1-1-1. A verb key and a click cannot share a frame, so each right-click saves one input frame: about 10-12 frames in S1. Needs executor 'rclick' support (the bridge accepts it; S2 open_questions).",
+    "Text speed: S1 is insensitive with '.' skips, but the crew-phase item slide wants slow text (runner sources §3.4). Talkspeed is global, so pick it once for the whole run before measuring S1."
+  ]
+}

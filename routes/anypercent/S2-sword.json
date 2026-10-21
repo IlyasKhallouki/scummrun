@@ -1,0 +1,2358 @@
+{
+  "segment": "S2",
+  "title": "Part I: the swordfighting trial (fish, sword, troll, Smirk, insult fights, Carla)",
+  "entry": {
+    "room": 85,
+    "inventory": [
+      488,
+      442,
+      377,
+      396,
+      395,
+      397,
+      643,
+      578,
+      568,
+      388
+    ],
+    "flags": [
+      {
+        "room": 85
+      },
+      {
+        "has": 568
+      },
+      {
+        "has": 388
+      },
+      {
+        "has": 442
+      },
+      {
+        "has": 396
+      },
+      {
+        "bit": 98,
+        "eq": 1
+      },
+      {
+        "bit": 99,
+        "eq": 1
+      },
+      {
+        "var": 196,
+        "eq": 1
+      },
+      {
+        "bit": 85,
+        "eq": 1
+      },
+      {
+        "bit": 86,
+        "eq": 0
+      },
+      {
+        "bit": 19,
+        "eq": 0
+      },
+      {
+        "bit": 75,
+        "eq": 0
+      },
+      {
+        "var": 199,
+        "eq": 0
+      },
+      {
+        "var": 271,
+        "eq": 0
+      },
+      {
+        "var": 282,
+        "eq": 0
+      },
+      {
+        "var": 280,
+        "eq": 3
+      },
+      {
+        "bit": 546,
+        "eq": 0
+      },
+      {
+        "bit": 21,
+        "eq": 0
+      },
+      {
+        "var": 284,
+        "eq": 0
+      },
+      {
+        "var": 290,
+        "eq": 4
+      },
+      {
+        "var": 195,
+        "eq": 202
+      },
+      {
+        "var": 19,
+        "eq": 5
+      }
+    ],
+    "notes": "S2 is not contiguous; it runs in four pieces inside S1. (1) Kitchen, moves 1-4: after S1 move 8 (enter the kitchen), before S1 move 9 (pot; the meat is S1 move 10). (2) Store, moves 5-8: move 5 (sword) after S1 move 47 (shovel) and before S1 move 52 (bell); moves 6-7 between S1 moves 53 (mint) and 54 (shovel); move 8 ('browse') between S1 moves 55 and 56, because S1 move 56 waits for var 32 eq 4 and with the sword paid only this choice ends the menu. (3) Block 1, moves 9-28: right after S1 move 83 (Lookout -> map; S1 owns that step, so the draft's duplicate 'Lookout -> Melee map' is removed): troll, Smirk, fight 1. S1 moves 84-96 (fork, forest, treasure, dig) follow; S1 move 84 must wait for move 28. (4) Block 2, moves 29-59: room 64 -> map (new: nobody owned it), fights 2-3 at the fork, forest to Carla, Carla, exit. This matches the record (fish and sword in S1's rooms; troll, Smirk and one fight before the treasure). The entry state below is the state at move 9: ego on the Melee map at 913's walk point (77,119), map entry 4 (Var[290]=4 after the entry script's increment), pirate 1 walking without a fight option. Inventory = S1's items at its move 83 plus the fish and the sword. Money 202 (478 - 100 map - 1 mint - 100 sword - 75 shovel); Smirk's '30 pieces of eight' needs Var[195]>30. Var[199]==0 means S1 never talked to the important-looking pirates (it changes Smirk's first option and the store's option 122). The rubber chicken 377 adds Smirk options after the ones used; no key changes. TEXT-SKIP CONVENTION: every line is skipped with '.' on the first frame that has an effect (bridge SPEEDRUN_SKIP_TEXT=1, default on in src/speedrun/engine.py; maybeInjectSkip in patches/0001-scumm-add-speedrun-bridge.patch). Without it every `until` is still reached, only later. If SPEEDRUN_SKIP_CUTSCENES=1 is also on, the bridge presses Esc itself once an override is armed: then drop the explicit Esc moves 14, 20 and 52, whose `after` may otherwise never be seen. BRIDGE C3 SEMANTICS (conditionHolds in the patch): var = _scummVars[N], bit = descumm Bit[N], room = _currentRoom (the forest pseudo-room in the forest, room.cpp:154), has = in inventory and owned by ego, state = object state. Var 3 VAR_HAVE_MSG, 4 VAR_ROOM, 32 VAR_VERB_SCRIPT. Var[194] is the dialogue choice: reset to 0 right before every menu wait and set to the chosen verb id (120-128) after Guybrush's line (global/script-014.txt [00F7]-[0105]); MENU = {var 194 eq 0}. Fight vars: Var[240] current insult, Var[262] exchanges lost and Var[263] won this fight, Var[282] fights won, Var[285] fight mode (3 pirate, 2 Sword Master). FIGHT PLAN (from the scripts; replaces the record's troll insult and save/reload): Smirk gives insults 2, 8 and comebacks 2, 8. A fight is won at 3 exchange wins before 3 losses (Var[351]=3; Carla 5). Guybrush insults first and the exchange winner insults next. Comeback 16 ('family reunion') answers Carla's 21, 32 and 33 (global/script-090.txt [0054]-[010D]), so comebacks {2, 8, 16} cover exactly 18, 21, 24, 32, 33, the five a 5-0 needs. Learning it costs two lessons: hear insult 16 from a pirate (fight 1), then use it on a later pirate who counters (fight 2). Fight 1 needs one turn-passing loss before the pirate can insult; a default insult (34-36) is a certain loss, so the troll's 'dog' is not needed. Total 12 pirate exchanges (5+4+3: 9 wins + 3 required losses) and a 5-0 Carla. STEERED OUTCOMES: every random outcome is chosen by delaying the preceding menu choice (rng_points). Only two are hard targets: fight 1 E3 must draw pirate insult 16, and fight 2 E1 must be countered. Every other target is a SET (pirate insult in {2, 8} or {2, 8, 16}; Carla insult among the answerable ones left), so the conditions are order-free (counts plus MENU) and never name the insult. REPLY-BY-INSULT MOVES (28, 33, 54-58): the right reply depends on the steered insult; the move's `choose` holds the planned instance and its note holds the table. The search resolves `choose` per seed from Var[240] at the menu (or the executor reads Var[240] and maps it through the table). A wrong reply loses the exchange, so the `until` fails and the executor raises RouteError instead of silently continuing. INTERCEPT MOVES (22; and 30, 36 when no fork-bound pirate comes): an encounter starts when, in a frame in which pirate actor A (8, 9 or 10) was still walking at the end of the previous frame, ego is not moving and getDist(ego,A) < 2 (Chebyshev <= 1) (room-085-melee/local-202.txt [018A]-[01A6]). Pirates walk at WalkSpeed(1,1) (up to about 2 px/frame in x on diagonals) along walkbox paths to 913 (77,119), 911 (72,87), 912 (133,87) or 910 (219,21), vanish for 0-120 jiffies (0-24 frames), reappear at a random destination (1 in 5: room 148, gone for this visit) and pick a new one ([01B0]-[024F]). Procedure: on a fork of the engine state, run the map forward with ego idle and record each pirate's per-frame position; choose a pirate A, a frame t at which A is still walking, and a stand point P within 1 px of A's position at t that ego can reach and stop at before t (ego walks at 1.99 px/frame, about 2.96 on slope 1.5:1 diagonals); P must lie outside every map object box (a click there is that object's Walk to) and inside a walkbox. Click P (one floor click, global/script-033.txt [0062]); the encounter comes at about t. Cost = map frames from the gate to the encounter. If none comes by t+5, re-plan from the current state with another pirate."
+  },
+  "exit": {
+    "until": [
+      {
+        "room": 85
+      },
+      {
+        "bit": 20,
+        "eq": 1
+      },
+      {
+        "has": 596
+      }
+    ],
+    "inventory": [
+      488,
+      442,
+      377,
+      396,
+      395,
+      397,
+      643,
+      578,
+      752,
+      388,
+      596
+    ],
+    "flags": [
+      {
+        "var": 196,
+        "eq": 3
+      },
+      {
+        "bit": 84,
+        "eq": 1
+      },
+      {
+        "bit": 85,
+        "eq": 1
+      },
+      {
+        "bit": 86,
+        "eq": 1
+      },
+      {
+        "bit": 20,
+        "eq": 1
+      },
+      {
+        "has": 596
+      },
+      {
+        "has": 752
+      },
+      {
+        "has": 388
+      },
+      {
+        "has": 442
+      },
+      {
+        "bit": 19,
+        "eq": 1
+      },
+      {
+        "bit": 98,
+        "eq": 1
+      },
+      {
+        "bit": 99,
+        "eq": 1
+      },
+      {
+        "var": 282,
+        "eq": 4
+      },
+      {
+        "var": 284,
+        "eq": 1
+      },
+      {
+        "bit": 546,
+        "eq": 1
+      },
+      {
+        "bit": 156,
+        "eq": 1
+      },
+      {
+        "bit": 238,
+        "eq": 1
+      },
+      {
+        "bit": 142,
+        "eq": 1
+      },
+      {
+        "bit": 148,
+        "eq": 1
+      },
+      {
+        "bit": 224,
+        "eq": 1
+      },
+      {
+        "bit": 230,
+        "eq": 1
+      },
+      {
+        "var": 199,
+        "eq": 2
+      },
+      {
+        "var": 195,
+        "eq": 172
+      },
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "has": 397
+      },
+      {
+        "has": 377
+      },
+      {
+        "has": 395
+      },
+      {
+        "bit": 420,
+        "eq": 1
+      },
+      {
+        "bit": 446,
+        "eq": 1
+      },
+      {
+        "bit": 476,
+        "eq": 1
+      },
+      {
+        "bit": 481,
+        "eq": 1
+      },
+      {
+        "bit": 477,
+        "eq": 0
+      },
+      {
+        "bit": 94,
+        "eq": 0
+      },
+      {
+        "bit": 304,
+        "eq": 0
+      },
+      {
+        "bit": 449,
+        "eq": 0
+      },
+      {
+        "bit": 447,
+        "eq": 0
+      },
+      {
+        "bit": 51,
+        "eq": 0
+      },
+      {
+        "bit": 88,
+        "eq": 0
+      },
+      {
+        "bit": 89,
+        "eq": 0
+      },
+      {
+        "bit": 76,
+        "eq": 0
+      },
+      {
+        "bit": 17,
+        "eq": 0
+      },
+      {
+        "bit": 18,
+        "eq": 0
+      },
+      {
+        "bit": 323,
+        "eq": 0
+      },
+      {
+        "bit": 421,
+        "eq": 0
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ]
+  },
+  "moves": [
+    {
+      "name": "INTERLEAVE S1 kitchen: open the pier door",
+      "room": 41,
+      "verb": 2,
+      "obj": 564,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 41
+        }
+      ],
+      "until": [
+        {
+          "state": 564,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-041-kitchen/obj-0564-door.txt [0018] Open/Use: setClass(564,[160]); [001F]-[0023] setBoxFlags(4,0)/(5,0) (pier walkable); [0033] setClass(568,[32]) (fish touchable); [003A] startScript(203) (plank watcher); [003D] startScript(25,[564]) -> global/script-025.txt [001F]-[003C] cutscene([2]), [0024] setState(564,1), endCutscene, all in one frame. Closed door locks the pier: room-041-kitchen/entry.txt [0054]-[0068]. Gull: room-041-kitchen/local-204.txt [0000] ActorOps(7,[Init()...IgnoreBoxes()]) (speed (8,2)), [0011]-[0023] first visit: the frame after ego X>170, local-205 flies the gull in (room-041-kitchen/local-205.txt [0000]-[0021])",
+      "note": "Inserted right after S1 move 8 (enter the kitchen), before S1 move 9 (pot; the meat is S1 move 10). Fish 568 starts with class 6 set (the gull guards it; out/objects.json classes [2,6,16]), so it can only be taken while the gull is up. The walk to the door's walk point (185,130) crosses X=170 and starts the gull's arrival (actor 7: (340,100) -> (260,120) in about 11 frames, put at (252,133), class 6 set again 6 frames later). Right-click alternative: 564's verb 90 sets Var[182]=2 (Open) (room-041-kitchen/obj-0564-door.txt [0012]) and the input script turns a right click into that verb (global/script-004.txt [0005]-[0016]), one input instead of key + click; the bridge accepts 'rclick' events, the executor does not emit them yet (open_questions)."
+    },
+    {
+      "name": "INTERLEAVE S1 kitchen: step on the plank (gull launch 1, sacrificed)",
+      "room": 41,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        298,
+        134
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "state": 564,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 272,
+          "eq": 1
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-041-kitchen/local-203.txt [0001]-[000F] (getDist(ego,575)<3 -> local-202); room-041-kitchen/local-202.txt [0000] cutscene([2]) (global/script-018.txt [0007] UserputSoftOff, [0070] freezeScripts(127)), room-041-kitchen/local-202.txt [0019]-[0022] fish class 6 set -> startScript(206), [0043] putActor(ego,294,131), [004E] endCutscene (global/script-019.txt [004B] freezeScripts(0)); room-041-kitchen/local-206.txt [0002] setClass(568,[6]) (fish takeable), [0016]-[002F] 5 frames, [0036]-[0045] Var[272]==0 -> room-041-kitchen/local-207.txt ([000D]-[0026] 5 frames, [002D] class 6 back), room-041-kitchen/local-206.txt [0071]-[0080] fish still there -> Var[272]++; room-041-kitchen/local-205.txt [0009]-[0021] (gull walk, putActor(7,252,133), 6 breakHere, setClass(568,[134])); room-041-kitchen/local-204.txt [0023] starts local-205 without the freeze-resistant flag",
+      "note": "Object 575 (plank) is class 32, so this is a floor click on its walk point (298,134). NO GULL GATE (changed from the draft): flight 1 is sacrificed, and the fish has class 6 from the start, so the step may come as soon as the pier is open. Flight 2 stays safe because local-205's re-guard [0021] always runs before Var[272] becomes 1. Let W1 be the frame local-202 [0022] starts local-206. If the step lands while local-205 still runs, the plank cutscene freezes local-205 until local-202's endCutscene at W1+2, after which it needs at most 7 frames ([0012]-[0021]), so [0021] runs by about W1+9. local-206 sets Var[272]=1 only at W1+10 or W1+11 (its own 5 frames, then local-207's 5). The geometry also lands the gull first: its walk takes about 11 frames from the frame ego crosses x=170, while ego still has the door action and about 15 frames of walking (113 px at 7.97 px/frame) to the plank. Launch 1 cannot be used for the fish: local-207 [002D] re-guards at W1+10, and the earliest Pick-up check is about W1+12 (input back at W1+2, key W1+2 at best, click W1+3, 8 steps for 57 px, then a 90-degree turn to the fish's actordir 2). The draft's 'fish on launch 1' race is therefore dropped. Micro-search: a zig-zag at slope just under 4.5:1 (engine-mechanics §2.4) may save about 2 frames on the 113 px if the pier box is tall enough."
+    },
+    {
+      "name": "INTERLEAVE S1 kitchen: step on the plank again (gull launch 2)",
+      "room": 41,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        298,
+        134
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 272,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "state": 575,
+          "eq": 1
+        },
+        {
+          "var": 272,
+          "eq": 1
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-041-kitchen/local-206.txt [004A]-[005C] Var[272]==1 -> room-041-kitchen/local-208.txt; room-041-kitchen/local-202.txt [0013] drawObject(575) runs in the frame W in which [0022] starts local-206, [004A] drawObject(576) at W+2; third_party/scummvm/engines/scumm/script_v5.cpp o5_drawObject: putState(0) on every object with the same box, then putState(obj,1). 575 and 576 share x 248, y 120, 72x24 (out/objects.json), so state(575) is 1 exactly on W and W+1",
+      "note": "Until = flight 2 launched (frame W), while the plank cutscene still runs; Var[272]==1 makes it this launch, not launch 1. Do not use an ego-position condition here: ego reaches the plank one frame before local-203 starts the cutscene, so the executor would see the input gate still open and send move 4's Pick-up key into the cutscene's first frame, where checkExecVerbs drops it (_userPut <= 0 after global/script-018.txt [0007]). With this until, move 4's gate waits for local-202's endCutscene at W+2. Ego stands at (294,131) after launch 1 (room-041-kitchen/local-202.txt [0043]), 4 px from the plank point, so the walk is 2 steps."
+    },
+    {
+      "name": "INTERLEAVE S1 kitchen: pick up the fish during flight 2",
+      "room": 41,
+      "verb": 9,
+      "obj": 568,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 568
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-041-kitchen/local-206.txt [0054] starts local-208 at W+5; room-041-kitchen/local-208.txt [001B] first breakHere at W+5, [0024]-[0048] five +6 px steps W+6..W+10, [0063]-[007C] four frames W+11..W+14, [0092] setClass(568,[134]) at W+15; room-041-kitchen/local-202.txt [004E] endCutscene at W+2; room-041-kitchen/obj-0568-fish.txt [001E]-[0033] owner 15 and class 6 clear -> pickupObject(568), else [003A] 'I think that bird will peck my hand off^'",
+      "note": "Executor timing: the gate opens after W+2, Pick-up key W+3, click W+4. The walk (294,131) -> fish walk point (237,129) is 57 px: 8 steps at 7.97 px/frame (last step W+11), then a 90-degree turn to the fish's actordir 2 (about 2 frames, engine-mechanics §2.7) before sentence script 2 runs the Pick-up code, about W+13 or W+14, against the re-guard at W+15: one to two frames of margin. If the engine run misses, inject the key on W+2 itself: local-202's endCutscene runs script 19's UserputSoftOn (global/script-019.txt [0007]) inside runAllScripts, before checkExecVerbs reads that frame's key, and cutscene([2]) never hides the verbs (global/script-018.txt [003A]-[0055]). Selecting Pick up before the plank step does not work: a floor click walks only with verb 11 (global/script-004.txt [040E]-[0431]). Schedule no click or walk until has(568) holds (pickup crash rule). S1 continues with move 9 (pot), then move 10 (meat)."
+    },
+    {
+      "name": "INTERLEAVE S1 store: pick up the sword",
+      "room": 30,
+      "verb": 9,
+      "obj": 388,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 388
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-030-store/obj-0388-sword.txt [0067] pickupObject(VAR_ME,0)",
+      "note": "After S1 move 47 (shovel), before S1 move 52 (bell); the sword's walk point (232,127) is next to the counter. Leaving the store with the sword unpaid starts the shoplifting scene (room-030-store/local-204.txt [0005]-[042B]), so it is paid in the same visit (moves 6-7). Do not click or walk until has(388) holds (pickup crash rule)."
+    },
+    {
+      "name": "INTERLEAVE S1 store: choose 'About this sword...'",
+      "room": 30,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "About this sword",
+      "after": [
+        {
+          "room": 30
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-030-store/local-211.txt [0047]-[009B] option 120 'About this sword^' while owner(388)==ego and !Bit[98]; [0438]-[0447] wait, 120 -> [044E] startScript(206)",
+      "note": "Between S1 move 53 (breath mint) and S1 move 54 (shovel). Menu after the mint: About this sword (key 1), About this shovel (2), I think I'd just like to browse. (3). Record store digits 'Dia: 3, 1, 1, 1, 1, 2' = mint, this line and 'I want it.', the shovel's two lines, then 'browse' (move 8). Var[194] holds the chosen verb id after Guybrush's line (global/script-014.txt [0105])."
+    },
+    {
+      "name": "INTERLEAVE S1 store: choose 'I want it.' (pay 100)",
+      "room": 30,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I want it.",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "bit": 98,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-030-store/local-206.txt [0005] 'What about it?', [0021]-[0030] option 120 'I want it.', [00EF]-[00FB] Var[105]=1, Bit[479]=1; room-030-store/local-211.txt [045B]-[046C] money >= 100 -> [061C] 'Great.', [0628] 'Best 100 pieces of eight you ever spent.', [0656] startObject(488,250,[0,100]) (pay 100), [0661] Bit[98]=1, [1DB6]-[1DD2] 'What else do you want?' and back to the menu ([0438] Var[194]=0)",
+      "note": "Key 1. The menu comes back as About this shovel (1), 'Now that I have this sword, who can I test it out on?' (2), browse (3), so S1 move 54 keeps key 1."
+    },
+    {
+      "name": "INTERLEAVE S1 store: choose 'I think I'd just like to browse.' (ends the shop menu)",
+      "room": 30,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "like to browse",
+      "after": [
+        {
+          "bit": 98,
+          "eq": 1
+        },
+        {
+          "bit": 99,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-030-store/local-211.txt [016A]-[01D9] with Bit[98] set (Var[199]==0) option 122 'Now that I have this sword, who can I test it out on?' is added and Local[1]=1; [03EB]-[0435] the automatic 'I think I'd just like to browse for now.' exit runs only when Local[1]==0; [0387]-[03D2] option 125 'I think I'd just like to browse.'; [0438]-[0442] wait; [1BD6]-[1BE0] 125 -> goto 1DD5: [1DD5] cutscene([2]), [1DDA] beginOverride (target [1ECF]), [1DDF]-[1ECD] the storekeeper's random reply, [1ED4] endCutscene, [1ED5] VAR_VERB_SCRIPT = Local[0] (4, saved at [0002]), [1EE0]-[1EE2] cursor and input back",
+      "note": "NEW (reviewer 2). Between S1 move 55 (shovel paid) and S1 move 56 (open the door), which waits for var 32 eq 4: only this choice produces it once the sword is paid, because option 122 keeps the menu from emptying itself. Menu: 'Now that I have this sword, who can I test it out on?' (key 1), 'I think I'd just like to browse.' (key 2), the record's last store digit. The storekeeper's reply is under an override: with SPEEDRUN_SKIP_CUTSCENES=1 the bridge's Esc jumps to [1ECF]; otherwise the text skip ends it a frame or two later. An explicit Esc only acts once beginOverride [1DDA] has run (abortCutscene ignores it before)."
+    },
+    {
+      "name": "Map -> troll bridge",
+      "room": 85,
+      "verb": null,
+      "obj": 914,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        }
+      ],
+      "until": [
+        {
+          "room": 57
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-038-lookout/obj-0487-path.txt [0010] loadRoomWithEgo(913,85) (S1 move 83: ego at 913's walk point (77,119)); room-085-melee/entry.txt [0062] WalkSpeed(2,2), [0079]-[0082] local-200 while 654 has class 32, [00A3]-[00C8] map entry 4 (Var[290]=3 before it): pirate 1 starts, pirates 2-3 only with Bit[19]; room-085-melee/local-201.txt [0007]-[002D] (click on 914 with ego X<133: walkActorToObject(914), startObject(914,11)); room-085-melee/local-200.txt [0001]-[0011] ego within 2 of 914 -> loadRoomWithEgo(653,57,78,136)",
+      "note": "First move of block 1, right after S1 move 83 (S1 owns Lookout -> map; the draft's duplicate of it is gone). Straight click: (77,119) -> (169,133) is 92 px at 1.99 px/frame, about 46 frames. Map clicks ignore the selected verb (local-201 [0035] -> global/script-033.txt [0022]-[0062]), so no verb key. Keep moving: pirate 1 spawned on this entry and has no fight option yet (room-085-melee/local-202.txt [018A] needs ego stopped). ZIG-ZAG (search parameter, not encoded): at WalkSpeed(2,2) a target at slope just under 1.5:1 gives about 2.96 px/frame in x (engine-mechanics §2.4, mirror result); the last leg needs no click on 914 because local-200 pulls ego in at getDist<=2. The map's walkboxes are not dumped, so the legs need a box check first."
+    },
+    {
+      "name": "Give fish to troll (no troll conversation)",
+      "room": 57,
+      "verb": 4,
+      "obj": 568,
+      "obj2": 655,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 85
+        },
+        {
+          "not": {
+            "has": 568
+          }
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-002.txt [003F]-[009A] (Give to a class-5 object: walk to it, dist<=32 -> startObject(655,80,[568])); room-057-bridge/local-202.txt [0000]-[0037] (Use fish with troll becomes Give); room-057-bridge/obj-0655-troll.txt [004C] -> room-057-bridge/local-204.txt [0009] cutscene([2]) (no override), [000E]-[0012] fish handed over, [0016] 'Ah!  A red herring!', [0030]-[0041] ten breakHere, [0047] 'Pass.', [0052]-[0061] setBoxFlags(2/3,0), setClass(654,[32]) (bridge open), [006D]-[0072] walk to 654 (211,86), [0076] startScript(205) (75 breakHere in room-057-bridge/local-205.txt); room-057-bridge/local-204.txt [0083] delay(30), [008B] delay(60), [0093]-[0095] three breakHere, [0096] endCutscene, [0097] startObject(654,11) -> room-057-bridge/obj-0654-path.txt [000C]-[0017] ego to the map at (171,135)",
+      "note": "Issue on the first frame of room 57 (it overrides the entry walk to (78,136)). Give does not pass through room-057-bridge/local-201.txt's STOP trigger (it skips verbs 10/4/7, [0019]-[0027]), so the troll's 'STOP!! You must pay a toll!' (global/script-055.txt) never runs. Fixed cost after the give: 10 + 75 frames, 90 jiffies of delay (18 frames at VAR_TIMER_NEXT=5) and 3 frames, plus the two lines (skippable) and the walk to (211,86). DEVIATION FROM THE RECORD: the record first talks to the troll ('Dia: 1, 2', global/script-055.txt [0305] -> [041F] -> [0677] -> [06CB] Bit[145]=1, insult 5 'dog'); this route does not need insult 5 (fight plan in entry notes), so the conversation is dropped."
+    },
+    {
+      "name": "Map -> Smirk's house",
+      "room": 85,
+      "verb": null,
+      "obj": 916,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 43
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/obj-0916-house.txt [000C] loadRoomWithEgo(592,43); global/script-033.txt [004F] doSentence(11,916,0)",
+      "note": "(171,135) -> house walk point (274,107): 103 px x and 28 px y at 1.99 px/frame, about 52 frames straight. Pirate 1 (no fight option yet) is far west; keep moving. ZIG-ZAG as in move 9 (search parameter)."
+    },
+    {
+      "name": "Open Smirk's door",
+      "room": 43,
+      "verb": 2,
+      "obj": 591,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 75,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-043-trainers/obj-0591-door.txt [0012] startScript(57); global/script-057.txt [0012]-[0048] 'I think I'll knock. / It'd only be polite.' (Bit[74]), [004A] knock (room-043-trainers/local-200.txt, about 10 frames); global/script-057.txt [007A]-[010A] cutscene: Smirk opens, delay(30), [00B2] Bit[75]=1 'What do you want, you wimpy little spineless maggot?'; [0141]-[034B] menu 1, [034B]-[0355] wait",
+      "note": "Entry point is 592's walk point (92,148); the door's walk point (136,89) is 59 px up at 1.99 px/frame, about 30 frames. The knock and the door opening are a cutscene with no override. Right-click alternative: 591's verb 90 sets Var[182]=2 while the door is closed (room-043-trainers/obj-0591-door.txt [001A]-[0033]), so a right click is Open without the verb key (open_questions)."
+    },
+    {
+      "name": "Smirk menu 1: 'best swordfighter'",
+      "room": 43,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "best swordfighter",
+      "after": [
+        {
+          "bit": 75,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "room": 76
+        },
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-057.txt [01B6]-[0213] option 120 'Could you make me the best swordfighter on Melee?' (Var[199]==0, [0144]); [052D]-[05A3] 120: [053B] Var[199]=1, [0542] 'You mean, not counting the Sword Master?', [0570] 'Counting everybody.  I want to be the BEST.', [05A0] loadRoom(76), [05A3] beginOverride (goto 0758), [05B3] narrator text",
+      "note": "Key 1. If S1 ever talked to the important-looking pirates (Var[199]!=0) the text is 'Could you train me to be better than the Sword Master?' and the two lines after it are skipped. Until = close-up room 76 with its first text up, one frame after beginOverride ran (loadRoom(76) [05A0] is followed by breakHere [05A2]), so the Esc that follows is not lost."
+    },
+    {
+      "name": "Esc: skip Smirk's close-up",
+      "room": 76,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 76
+        },
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "until": [
+        {
+          "room": 43
+        },
+        {
+          "bit": 483,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-057.txt [05A3]-[05A5] override target 0758; [0758] endOverride, [075A] 'You just don't have what it takes.', [0782] loadRoom(43), [078A] Bit[483]=1, [078F]-[08D7] menu 2",
+      "note": "Skips the whole Port Royal story (runner 'Smirk: 1, SKIP, ...'). Drop this move if SPEEDRUN_SKIP_CUTSCENES=1."
+    },
+    {
+      "name": "Smirk menu 2: 'I do so have what it takes!' (1/3)",
+      "room": 43,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I do so have what it takes!",
+      "after": [],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-057.txt [0797]-[07DD] option 120 (Local[3]==0), [08CD]-[08D7] wait, [08DC]-[0900] Local[3]+=1, <3 -> 'You do not!' -> [078A]",
+      "note": "Smirk needs option 1 three times (Local[3] reaches 3). Key 1."
+    },
+    {
+      "name": "Smirk menu 2: 'I do so!' (2/3)",
+      "room": 43,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I do so!",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-057.txt [07E7]-[081A] option 120 'I do so!' (Local[3]!=0); [08DC]-[0900]",
+      "note": "Key 1. The 'quit smoking' option (global/script-057.txt [0868]-[08C6]) is gone after its first showing (Bit[505])."
+    },
+    {
+      "name": "Smirk menu 2: 'I do so!' (3/3)",
+      "room": 43,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I do so!",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "bit": 106,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-057.txt [08E8] Local[3]==3 -> [0964] Bit[106]=1, [0969] 'I like your spirit.  I'll do what I can. / Of course^ / ^it'll cost you.', [09BA]-[0A1E] (Bit[105]==0) 'Did you see my sign? / I usually charge 30 pieces of eight...', [0A26] 'What have you got?', [0A68]-[0BCD] menu 3",
+      "note": "Key 1."
+    },
+    {
+      "name": "Smirk menu 3: 'I've got 30 pieces of eight.'",
+      "room": 43,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "30 pieces of eight",
+      "after": [
+        {
+          "bit": 106,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "bit": 107,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-057.txt [0A6B]-[0AB9] option 120 shown only when Var[195]>30; [0BD2]-[0C08] startObject(488,250,[0,30]) (pay 30), [0BE4] Bit[107]=1, 'Say no more, say no more.', [0CF2] 'Let's see your sword.', [0D0D]-[0E76] menu 4",
+      "note": "Key 1. Needs more than 30 pieces of eight: 202 here (478 - 100 map - 1 mint - 100 sword - 75 shovel), 172 after."
+    },
+    {
+      "name": "Smirk menu 4: 'OK, check it out.'",
+      "room": 43,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "check it out",
+      "after": [
+        {
+          "bit": 107,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "room": 60
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-057.txt [0D10]-[0D58] option 120 when owner(388)==ego; [0E7B]-[0EC0] 'Yes, this is a nice one.', 'Let's get to it.'; [1033] loadRoom(60), [1035] Bit[412]=1, [103A] beginOverride (goto 1E4B)",
+      "note": "Key 1. loadRoom(60) and beginOverride run in the same frame, so room 60 means the override is armed."
+    },
+    {
+      "name": "Esc: skip Smirk's training",
+      "room": 60,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 60
+        }
+      ],
+      "until": [
+        {
+          "bit": 19,
+          "eq": 1
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-057.txt [103A]-[103C] override target 1E4B; [1E4B] endOverride; [1E68]-[1E7D] Bit[148], Bit[142] (insults 8 'dairy farmer', 2 'shish kebab') and Bit[230], Bit[224] (their comebacks); [1E84] loadRoom(43); [1E9C] Bit[19]=1; [1EA5] 'I can't help but feel like I've been ripped off. / I'm sure you're feeling something similar.'; [1F07]-[1F16] input back",
+      "note": "Skips THE MACHINE and both teaching questions (no answers needed). Smirk teaches nothing else. Drop this move if SPEEDRUN_SKIP_CUTSCENES=1."
+    },
+    {
+      "name": "Leave Smirk's (right path)",
+      "room": 43,
+      "verb": null,
+      "obj": 594,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-043-trainers/obj-0594-path.txt [000C] loadRoomWithEgo(916,85) (room-043-trainers/obj-0592-path.txt [000C] is the same exit); ego stands at 591 after the training (global/script-057.txt [1E8E])",
+      "note": "From (136,89): 594's walk point (329,99) is about 25 frames (x-dominant at 7.97 px/frame), 592's (92,148) about 30 frames (y at 1.99 px/frame). Search both. Map entry 6: pirates 1-3 spawn (Bit[19] now set) and ego appears at 916's walk point (274,107)."
+    },
+    {
+      "name": "Fight 1: intercept a pirate on the map",
+      "room": 85,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        49,
+        85
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        },
+        {
+          "bit": 19,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 49
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/entry.txt [00A3]-[00C2] (pirates = actors 8, 9, 10 via local-202 Local[4]=8+n-1); room-085-melee/local-202.txt [000F] WalkSpeed(1,1), [0019]-[0033] spawn x 0..64, y 0..200 at distance >20 from ego, [013B]-[0185] destination lookout 913 / fork 911 / clearing 912 / shore 910 and walkActorToObject, [018A]-[01A2] while the pirate walks: if ego is NOT moving and getDist(ego,pirate)<2 -> startScript(114), [01A6]-[01AB] the check stops once the pirate stops; global/script-033.txt [0062] floor click = walkActorTo",
+      "note": "INTERCEPT MOVE (procedure in the entry notes). The point is chosen per seed; [100,87] is a placeholder on the y=87 road between the fork (72,87) and the clearing (133,87), outside every map object box, so the move runs as written. With the placeholder it only succeeds if some pirate walks through (100,87) within the executor's frame budget; otherwise it stops with RouteError and the search must supply the computed point. Record: intercepted between the house and the fork (WR 5:55). The encounter frame fixes the pirate type (rng_points), so the search can also shift it. POINT FOR SEED 836557856 (new, measured): (49,85), the junction of boxes 11-13 west of the fork. From the state after S2#21 (map entry at f4283) every point on the map's road boxes (every 3 px, 208 points without an object) was clicked on a fork after 0-12 frames and run until a fight started (scripts/anypercent_intercept.py RUN 103 OUT.jsonl, RUN a driver run's directory): a pirate walking down box 11 from the lookout reaches (49,85) one frame after ego stops there, fight at f4420 with 0-2 frames of delay (f4573 from 4 frames on), against f4475 for the old placeholder (100,87) with the lookahead's 6 frames. Script 114 puts ego back at (49,85) after the fight, 11 frames of road from the fork (S1#84). Recompute if anything before S2#22 changes (the pirates spawn on the map entry's RNG draws)."
+    },
+    {
+      "name": "Fight 1: choose 'Prepare to die' (encounter 1)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Prepare to die",
+      "after": [
+        {
+          "room": 49
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 285,
+          "eq": 3
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 0
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-114.txt [0005]-[005B] (pirate type draw, loadRoom(49), global/script-113.txt actors, startScript(73,[type,200])); global/script-073.txt [007A]-[0088] Var[285]=0; room-049-road/local-200.txt [0001]-[00F6] greeting, [00F8]-[00FF] Var[271]++, [022F]-[028F] option 127 'My name is Guybrush Threepwood.  Prepare to die!' (only with Bit[19]), [0370] Var[194]=0, [0375]-[037A] wait, [044E]-[0462] 127 -> Var[285]=3, Var[288]=ego (Guybrush insults first); global/script-090.txt [0000]-[0122] per-fight reset (Var[262], Var[263], Bit[181..221], Bit[263..303]) and Var[351]=3, [0163]-[0191] Guybrush's turn = scripts 80, 82, 84",
+      "note": "Key 2: 'Nice night we're having, isn't it?', 'My name is Guybrush Threepwood.  Prepare to die!', 'Sorry to bother you.  I'll be on my way.' (runner: 2 for the first two fights, 3 from the third). Until = first insult menu up. The greeting line is random (one of four) and skippable."
+    },
+    {
+      "name": "Fight 1 E1: insult 2 'shish kebab' (pirate must fail)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "shish kebab",
+      "after": [],
+      "until": [
+        {
+          "var": 263,
+          "eq": 1
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win); global/script-100.txt [0081]-[010D] extra flourishes while Var[280]>1 (Var[280]=3 at boot, global/script-001.txt [086A]): this and the next exchange are the longest of the game",
+      "note": "Menu: shish kebab, dairy farmer, Boy are you ugly!, What an idiot!, You call yourself a pirate!, I give up. Win iff the pirate's draw >= skill (P = (11-skill)/11). RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 1 E2: insult 8 'dairy farmer' (pirate must fail)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "dairy farmer",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 2
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win)",
+      "note": "Second flourish-extended exchange. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 1 E3: default insult 'Boy are you ugly!' (turn pass; pirate's next insult must be 16)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Boy are you ugly",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "var": 262,
+          "eq": 1
+        },
+        {
+          "var": 240,
+          "eq": 16
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win); global/script-082.txt [002D]-[0163] insults >= 34 always get a lame reply; global/script-084.txt [0000]-[0022] -> loss; then the pirate's turn: global/script-083.txt [0055]-[0089] pirate insult = getRandomNr(15)+1, not one he used this fight (Bit[263+i]), [00FA]-[012A] first time heard -> Bit[140+i] (insult learned); global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; replies global/script-161.txt (known comebacks Bit[222+i], then 17-21), menu global/script-089.txt; global/script-081.txt [000A]-[003B] -> global/script-087.txt (string 37, global/script-090.txt [0054]-[010D]: insult i is answered by comeback i)",
+      "note": "A certain loss that hands the turn to the pirate (Guybrush has no third insult without the troll's 'dog'). HARD STEERING TARGET: the pirate's next insult must be exactly 16 'I've spoken with apes more polite than you.' (P = 1/16 per frame of delay), because hearing it is the only way to learn insult 16, which leads to comeback 16 (entry notes). RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 1 E4: answer 16 wrongly ('Oh yeah?'), learn insult 16",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Oh yeah?",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "eq": 16
+        }
+      ],
+      "until": [
+        {
+          "var": 262,
+          "eq": 2
+        },
+        {
+          "bit": 156,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            2,
+            8
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0055]-[0089] pirate insult = getRandomNr(15)+1, not one he used this fight (Bit[263+i]), [00FA]-[012A] first time heard -> Bit[140+i] (insult learned); global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; replies global/script-161.txt (known comebacks Bit[222+i], then 17-21), menu global/script-089.txt; global/script-081.txt [000A]-[003B] -> global/script-087.txt (string 37, global/script-090.txt [0054]-[010D]: insult i is answered by comeback i); global/script-083.txt [011C] Bit[156]=1 (insult 16 now known, usable from the next fight)",
+      "note": "Reply menu: feather-duster, cow, Oh yeah?, I am rubber..., I'm shaking..., Uhh^ Could you repeat that? (never 'repeat': global/script-079.txt [00A9]-[00C5] loops). ORDER-FREE STEERING TARGET: the pirate's next insult must be 2 or 8 (P = 2/15 per frame), not a specific one; until only asks for the reply menu. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 1 E5: answer the pirate's insult (2 or 8; fight 1 won)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "feather-duster",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 262,
+          "eq": 2
+        },
+        {
+          "var": 263,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "var": 282,
+          "eq": 1
+        },
+        {
+          "room": 85
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0055]-[0089] pirate insult = getRandomNr(15)+1, not one he used this fight (Bit[263+i]), [00FA]-[012A] first time heard -> Bit[140+i] (insult learned); global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; replies global/script-161.txt (known comebacks Bit[222+i], then 17-21), menu global/script-089.txt; global/script-081.txt [000A]-[003B] -> global/script-087.txt (string 37, global/script-090.txt [0054]-[010D]: insult i is answered by comeback i); global/script-074.txt [0161]-[01ED] Var[263] reaches Var[351]: Var[282]++, 'I give up!  You win!', fight ends; global/script-114.txt [006E]-[0079] ego back on the map where the fight started, standing; room-085-melee/entry.txt [00A3]-[00C8] pirates respawn on that entry (Var[196]<3)",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 2 -> 'feather-duster' (key 1), 8 -> 'like a cow' (key 2), 16 -> 'family reunion' (key 3, only once Bit[238] is set). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 2 -> 'feather-duster'. HANDOFF: S1 moves 84-96 run next (map -> fork -> forest -> treasure room 64 -> dig); S1 move 84 must wait for this move. Back on the map ego stands where the fight started and pirates respawn; S1 move 84's fork click comes on the first gate frame, so no new encounter can start (spawns are >20 px away, ~1-2 px/frame).",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "2": "feather-duster",
+          "8": "like a cow"
+        }
+      }
+    },
+    {
+      "name": "Treasure site -> map (forest path 750)",
+      "room": 64,
+      "verb": null,
+      "obj": 750,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 64
+        },
+        {
+          "bit": 86,
+          "eq": 1
+        },
+        {
+          "has": 752
+        }
+      ],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-064-treasure/local-200.txt [01C6]-[01CA] ego put at (392,108), [01E1] panCameraTo(336), [020C] pickupObject(752), [0214] startScript(71,[3]) (global/script-071.txt [0088]-[0094]: Var[196]+=1 (now 2), Bit[86]=1, Var[201]=2), room-064-treasure/local-200.txt [021A] actorFollowCamera(ego), [021D] endCutscene, no room change; room-064-treasure/obj-0750-forest-path.txt [000C] loadRoomWithEgo(911,85,-1,-1); room-085-melee/entry.txt [00E2]-[00F7] Var[101]==64 -> room-085-melee/local-203.txt [0000] cutscene([]) (no override), [0026] putActor(ego,82,66), [002E]-[0035] walkActorTo(ego,72,87) at (2,2), [0041] endCutscene",
+      "note": "NEW (reviewer 2): neither S1 nor the draft had this step. First move of block 2, right after S1 move 96 (dig). 750 (box x 96-151) is off screen when the dig ends (camera 336, view x 176-495), so the executor's approach (src/speedrun/executor.py _approach) floor-clicks toward 750's walk point (119,82) clipped to the left screen edge, renewing the click as the camera scrolls, then clicks 750. Moving left and up, per-frame re-clicks round the step up (engine-mechanics §2.5), so the approach costs nothing. About 273 px: roughly 34 frames, then the room-85 walk-in (82,66) -> (72,87), about 11 frames of cutscene. Map entry with Var[196]==2 and Bit[19]: all three pirates spawn."
+    },
+    {
+      "name": "Fight 2: wait at the fork for a fork-bound pirate",
+      "room": 85,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        },
+        {
+          "has": 752
+        },
+        {
+          "actor_x": 1,
+          "eq": 72
+        },
+        {
+          "actor_y": 1,
+          "eq": 87
+        }
+      ],
+      "until": [
+        {
+          "room": 49
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-085-melee/local-203.txt [002E]-[0041] (ego left standing at (72,87) = fork 911's walk point); room-085-melee/local-202.txt [013B]-[0185] (destination 911 for draw 2), [018A]-[01A6] encounter check",
+      "note": "Ego stands exactly on the fork's walk point (72,87), which is where every fork-bound pirate's walk ends (room-085-melee/local-202.txt [015F]-[0185] walkActorToObject to 911), and pirates never spawn or reappear within 20 px of ego ([002C]-[0033], [0241]-[0248]), so a fork-bound pirate always arrives walking. Its last step must leave it within 1 px of ego while still walking: a step from distance 2 straight onto the point ends the walk before the next check ([01A6]); check per seed. '.' is a no-op key here (VAR_TALKSTOP_KEY with no text): the move is 'stand still until a fight starts'. BUDGET AND FALLBACK: if no fork-bound pirate arrives within the search's budget (destination draw 2 of 4 at [013B], redrawn after each disappearance; a 1-in-5 reappearance in room 148 removes that pirate for the visit, [022B]-[0239]), replace the wait by an INTERCEPT walk (entry notes). Never click inside the fork box (x 64-79, y 80-95): that enters the forest."
+    },
+    {
+      "name": "Fight 2: choose 'Prepare to die' (encounter 2)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Prepare to die",
+      "after": [
+        {
+          "room": 49
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 285,
+          "eq": 3
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 0
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-114.txt [0005]-[005B] (pirate type draw, loadRoom(49), global/script-113.txt actors, startScript(73,[type,200])); global/script-073.txt [007A]-[0088] Var[285]=0; room-049-road/local-200.txt [0001]-[00F6] greeting, [00F8]-[00FF] Var[271]++, [022F]-[028F] option 127 'My name is Guybrush Threepwood.  Prepare to die!' (only with Bit[19]), [0370] Var[194]=0, [0375]-[037A] wait, [044E]-[0462] 127 -> Var[285]=3, Var[288]=ego (Guybrush insults first); global/script-090.txt [0000]-[0122] per-fight reset (Var[262], Var[263], Bit[181..221], Bit[263..303]) and Var[351]=3, [0163]-[0191] Guybrush's turn = scripts 80, 82, 84",
+      "note": "Key 2 (same three options as fight 1). Until = first insult menu up."
+    },
+    {
+      "name": "Fight 2 E1: insult 16 'apes', pirate must counter (learn 'family reunion')",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "apes more polite",
+      "after": [],
+      "until": [
+        {
+          "var": 262,
+          "eq": 1
+        },
+        {
+          "bit": 238,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            2,
+            8,
+            16
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win); global/script-082.txt [0279]-[028E] the pirate's correct reply teaches it: Bit[222+16]=Bit[238]=1; then the pirate's turn: global/script-083.txt [0055]-[0089] pirate insult = getRandomNr(15)+1, not one he used this fight (Bit[263+i]), [00FA]-[012A] first time heard -> Bit[140+i] (insult learned); global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; replies global/script-161.txt (known comebacks Bit[222+i], then 17-21), menu global/script-089.txt; global/script-081.txt [000A]-[003B] -> global/script-087.txt (string 37, global/script-090.txt [0054]-[010D]: insult i is answered by comeback i)",
+      "note": "Menu: shish kebab, dairy farmer, apes, defaults. STEERING TARGET: the pirate counters (P = skill/11, so a blond pirate, skill 8, is best) AND his next insult is one Guybrush can now answer: 2, 8 or 16 (order-free; P = 3/16). Until only asks for the reply menu. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 2 E2: answer the pirate's insult (2, 8 or 16)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "like a cow",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 262,
+          "eq": 1
+        },
+        {
+          "bit": 238,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 1
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0055]-[0089] pirate insult = getRandomNr(15)+1, not one he used this fight (Bit[263+i]), [00FA]-[012A] first time heard -> Bit[140+i] (insult learned); global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; replies global/script-161.txt (known comebacks Bit[222+i], then 17-21), menu global/script-089.txt; global/script-081.txt [000A]-[003B] -> global/script-087.txt (string 37, global/script-090.txt [0054]-[010D]: insult i is answered by comeback i)",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 2 -> 'feather-duster' (key 1), 8 -> 'like a cow' (key 2), 16 -> 'family reunion' (key 3, only once Bit[238] is set). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 8 -> 'like a cow'. Guybrush gets the turn back.",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "2": "feather-duster",
+          "8": "like a cow",
+          "16": "family reunion"
+        }
+      }
+    },
+    {
+      "name": "Fight 2 E3: insult 2 'shish kebab' (pirate must fail)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "shish kebab",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 2
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win)",
+      "note": "RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws. Using insult 2 or 8 after the pirate used it is allowed (only Guybrush's own uses block, Bit[181+i])."
+    },
+    {
+      "name": "Fight 2 E4: insult 8 'dairy farmer' (fight 2 won)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "dairy farmer",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "var": 282,
+          "eq": 2
+        },
+        {
+          "room": 85
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win); global/script-074.txt [0161]-[01ED] Var[263] reaches Var[351]: Var[282]++, 'I give up!  You win!', fight ends; global/script-114.txt [006E]-[0079] ego back on the map where the fight started, standing; room-085-melee/entry.txt [00A3]-[00C8] pirates respawn on that entry (Var[196]<3)",
+      "note": "RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 3: wait at the fork for a fork-bound pirate",
+      "room": 85,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        },
+        {
+          "var": 282,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "room": 49
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-085-melee/local-202.txt [018A]-[01A6]; global/script-114.txt [006E]-[0079] (ego put back at (72,87), standing)",
+      "note": "Same as move 30: Ego stands exactly on the fork's walk point (72,87), which is where every fork-bound pirate's walk ends (room-085-melee/local-202.txt [015F]-[0185] walkActorToObject to 911), and pirates never spawn or reappear within 20 px of ego ([002C]-[0033], [0241]-[0248]), so a fork-bound pirate always arrives walking. Its last step must leave it within 1 px of ego while still walking: a step from distance 2 straight onto the point ends the walk before the next check ([01A6]); check per seed. '.' is a no-op key here (VAR_TALKSTOP_KEY with no text): the move is 'stand still until a fight starts'. BUDGET AND FALLBACK: if no fork-bound pirate arrives within the search's budget (destination draw 2 of 4 at [013B], redrawn after each disappearance; a 1-in-5 reappearance in room 148 removes that pirate for the visit, [022B]-[0239]), replace the wait by an INTERCEPT walk (entry notes). Never click inside the fork box (x 64-79, y 80-95): that enters the forest."
+    },
+    {
+      "name": "Fight 3: choose 'Prepare to die' (encounter 3)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Prepare to die",
+      "after": [
+        {
+          "room": 49
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 285,
+          "eq": 3
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 0
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-114.txt [0005]-[005B] (pirate type draw, loadRoom(49), global/script-113.txt actors, startScript(73,[type,200])); global/script-073.txt [007A]-[0088] Var[285]=0; room-049-road/local-200.txt [0001]-[00F6] greeting, [00F8]-[00FF] Var[271]++, [022F]-[028F] option 127 'My name is Guybrush Threepwood.  Prepare to die!' (only with Bit[19]), [0370] Var[194]=0, [0375]-[037A] wait, [044E]-[0462] 127 -> Var[285]=3, Var[288]=ego (Guybrush insults first); global/script-090.txt [0000]-[0122] per-fight reset (Var[262], Var[263], Bit[181..221], Bit[263..303]) and Var[351]=3, [0163]-[0191] Guybrush's turn = scripts 80, 82, 84; room-049-road/local-200.txt [01BF]-[0228] extra option while Var[271]==3",
+      "note": "Key 3: 'Nice night we're having, isn't it?', 'Ever notice how all these roads start to look the same?' (Var[271]==3), 'My name is Guybrush Threepwood.  Prepare to die!', 'Sorry to bother you.  I'll be on my way.'."
+    },
+    {
+      "name": "Fight 3 E1: insult 2 'shish kebab' (pirate must fail)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "shish kebab",
+      "after": [],
+      "until": [
+        {
+          "var": 263,
+          "eq": 1
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win)",
+      "note": "RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 3 E2: insult 8 'dairy farmer' (pirate must fail)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "dairy farmer",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 2
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win)",
+      "note": "RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws."
+    },
+    {
+      "name": "Fight 3 E3: insult 16 'apes' (fight 3 won)",
+      "room": 49,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "apes more polite",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 263,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "var": 282,
+          "eq": 3
+        },
+        {
+          "room": 85
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-080.txt [0019] Var[194]=0, [001E] one getRandomNr(1) per waiting frame, [00A2] Var[240]=insult, [00C4] Bit[181+i] (used this fight); insult list global/script-160.txt, menu global/script-075.txt; global/script-082.txt [01DB]-[0218] the pirate counters iff getRandomNr(10) < Var[268] (skill), else [023C] a lame reply 17-19; global/script-084.txt [0014]-[0045]; global/script-074.txt [0000]-[002B] (Var[262]++ loss, Var[263]++ win); global/script-074.txt [0161]-[01ED] Var[263] reaches Var[351]: Var[282]++, 'I give up!  You win!', fight ends; global/script-114.txt [006E]-[0079] ego back on the map where the fight started, standing; room-085-melee/entry.txt [00A3]-[00C8] pirates respawn on that entry (Var[196]<3); global/script-074.txt [0168]-[01CA] Var[282]>=3: 'Wow!  You're good enough to fight the Sword Master.'",
+      "note": "RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws. Low-skill pirates (scarf, skill 4) make the three fails cheapest."
+    },
+    {
+      "name": "Map -> fork (forest screen 218)",
+      "room": 85,
+      "verb": null,
+      "obj": 911,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        },
+        {
+          "var": 282,
+          "eq": 3
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-085-melee/obj-0911-fork.txt [000C] loadRoomWithEgo(687,218); global/script-033.txt [004F] doSentence(11,911,0)",
+      "note": "Ego already stands on 911's walk point (put back there by global/script-114.txt [0072]), so this is a click and at most a turn. Pirates still spawn on this map entry (Var[196]==2) but cannot reach ego within a frame."
+    },
+    {
+      "name": "Forest 218 -> 215: up (path 686)",
+      "room": 58,
+      "verb": null,
+      "obj": 686,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 218
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/entry.txt [08DB]-[0945] (screen 218 shows 685 at x=120, 686 at x=224, 687); room-058-damnfores/obj-0686-path.txt [0010] startObject(685,11); room-058-damnfores/obj-0685-path.txt [015E]-[0170] 218 -> loadRoomWithEgo(687,215)",
+      "note": "Both top exits lead to 215; 686's walk point (x about 248) is nearer the entry point on the right than 685's. Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Forest 215 -> 203: up",
+      "room": 58,
+      "verb": null,
+      "obj": 685,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 215
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 203
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0685-path.txt [0045]-[00CE] 215: needs owner(442)==ego or Bit[401] (else 'I'm not going into this mazelike forest...'), Bit[401]=1, loadRoomWithEgo(685,203)",
+      "note": "Map 442 is carried (and Bit[401] set by S1's treasure trip). Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Forest 203 -> 202: right",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 203
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 202
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [0033]-[003D] 203 -> loadRoomWithEgo(688,202)",
+      "note": "Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Forest 202 -> 205: right",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 202
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 205
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [0021]-[002B] 202 -> loadRoomWithEgo(685,205)",
+      "note": "Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Forest 205 -> 217: left",
+      "room": 58,
+      "verb": null,
+      "obj": 688,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 205
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 217
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0688-path.txt [00F1]-[00FB] 205 -> loadRoomWithEgo(688,217)",
+      "note": "Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Forest 217 -> 209: up",
+      "room": 58,
+      "verb": null,
+      "obj": 685,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 217
+        }
+      ],
+      "until": [
+        {
+          "var": 4,
+          "eq": 209
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0685-path.txt [014C]-[0156] 217 -> loadRoomWithEgo(688,209)",
+      "note": "209 is the ravine screen with the sign. Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Use sign (log bridge over the ravine)",
+      "room": 58,
+      "verb": 7,
+      "obj": 681,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 209
+        }
+      ],
+      "until": [
+        {
+          "bit": 546,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0681-sign.txt [001E]-[0029] Push/Pull/Use -> local-203 (Bit[546]==0); room-058-damnfores/local-203.txt [0000]-[002E] cutscene, no override: [0007] setBoxFlags(3,0), [000B] setClass(687,[32]), [0012] Bit[546]=1, local-205 sign animation (delay(30)+delay(80) jiffies), [002A] delay(30)",
+      "note": "Push (5) and Pull (6) run the same code; pick whichever verb key is cheapest. 140 jiffies of delay plus the walk, unskippable. Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Forest 209 -> Sword Master's clearing: right over the log",
+      "room": 58,
+      "verb": null,
+      "obj": 687,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 4,
+          "eq": 209
+        },
+        {
+          "bit": 546,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 61
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [008D]-[0097] 209 -> loadRoomWithEgo(743,61,13,125); room-058-damnfores/entry.txt [055F]-[057A] (path 687 in 209 is touchable only with Bit[546]); room-061-sword-mas/entry.txt [0002] setClass(918,[32]) (the map's 'Sword Master's' shortcut is touchable from now)",
+      "note": "Record split 'Sign' (8:09) is the sign use. Forest screens are pseudo-rooms 201-220 of room 58. `room` 58 is a label only (pseudo-rooms are not in index.json): the bridge's room condition compares _currentRoom, which holds the pseudo-room (room.cpp:154 sets it to the loadRoomWithEgo argument, :167 maps the resource to 58), so {room: 58} never holds here. after/until therefore read VAR_ROOM (var 4), which holds the same number. Shortest fork -> 209 path is 6 screens; 218-215-220-213-205-217-209 (up, left, right, up, left, up) is the other 6-screen path: search both."
+    },
+    {
+      "name": "Walk right toward the Sword Master (one held floor click)",
+      "room": 61,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        319,
+        82
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 61
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 278
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-058-damnfores/obj-0687-path.txt [0097] ego enters at (13,125); room-061-sword-mas/entry.txt [004B]-[0063] (from 209) RoomScroll(160,160), breakHere, RoomScroll(160,304): camera at 160, view x 0-319 on arrival (room 464 px wide, docs/part1/rooms.md); out/objects.json 744 box x 376-391, walk point (370,75); camera follow: third_party/scummvm/engines/scumm/scumm.cpp:2151-2152 (triggers 10 and 30 strips), camera.cpp:151-153 (8 px a frame)",
+      "note": "NEW (both reviewers): 744 is off screen on arrival, so the old single 'Walk to 744' could not be clicked. (319,82) is the right screen edge on the straight line (13,125) -> (370,75), so move 51 keeps the heading. One held target, because per-frame re-clicks while moving right floor the step to 7 px (engine-mechanics §2.5) and the executor's approach would re-click on every camera step. The camera starts following once ego passes x=248 (strip 31), about 30 frames in, and needs 8 more frames to put 744 on screen (camera >= 224); ego is then at about x=312 (about 38 frames). If 744 is still a frame short, the executor's approach covers it. ZIG-ZAG (search parameter): legs at slope just under 4.5:1 give 8.93 instead of 7.97 px/frame (§2.4 mirror result), e.g. a first leg to about (235,75) (222:50), if the room-61 walkboxes allow it. CHANGED (measured): until x >= 278 (inside room 61's box 7) instead of 312, so move 51's shmoove phase starts at the bottom of the climb."
+    },
+    {
+      "name": "Walk to the Sword Master (starts the challenge)",
+      "room": 61,
+      "verb": null,
+      "obj": 744,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 62
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-061-sword-mas/entry.txt [0069]-[0084] (Carla placed by room-061-sword-mas/local-201.txt unless Bit[89]); room-061-sword-mas/obj-0744-sword-master.txt [003F] Talk to and Walk to both start global/script-116.txt; global/script-116.txt [0006]-[0036] (!Bit[20]: loadRoom(44), actors via global/script-113.txt type 1, Var[283]=0, startScript(73,[1,58])); global/script-058.txt [0000] beginOverride, [000C] loadRoom(62)",
+      "note": "Default verb (Walk to): no verb key. Issued on the first frame 744's box is on screen; it retargets to the walk point (370,75) on the same heading. Arrival is about 45 frames after entering the room (357 px at 7.97 px/frame), the same as one straight walk. The overrides are armed before loadRoom(62) in the same frame. SHMOOVE (new, measured): from x >= 278 (move 50) a floor click at ego + (44,-10) on every frame until y <= 88, then Walk to 744. Box 7 is scaled (slot 0: 61 at y 67, 88 at y 109); a held walk climbs at 2*scale/255 = 0.5-0.7 px per frame, while each new target rounds the up step to 1 px and the 4.4:1 slope keeps x at the clamp (engine-mechanics sections 2.4-2.5). Measured from base-l1's state: room 62 at f5947 against f5967 (20 frames). Never start the per-frame clicks on the gate point (276,109): ego does not move (measured with x >= 270).",
+      "shmoove": [
+        {
+          "step": [
+            44,
+            -10
+          ],
+          "until": [
+            {
+              "actor_y": 1,
+              "le": 88
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Esc: skip 'How dare you approach the Sword Master...'",
+      "room": 62,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 62
+        }
+      ],
+      "until": [
+        {
+          "room": 44
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-058.txt [0000]-[0002] override target 00FA; [00FA]-[0104] VAR_OVERRIDE -> Bit[21]=1; [010E] actorFollowCamera(ego) (room 44); [0111]-[0232] menu (Var[284]==0); [0300] Var[194]=0, [0305]-[030A] wait",
+      "note": "Runner 'Carla: ESC, 2'. Drop this move if SPEEDRUN_SKIP_CUTSCENES=1."
+    },
+    {
+      "name": "Carla menu: 'My name is Guybrush Threepwood.  I've come to kill you.'",
+      "room": 44,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "come to kill you",
+      "after": [],
+      "until": [
+        {
+          "var": 285,
+          "eq": 2
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            18,
+            21,
+            24,
+            32,
+            33
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-058.txt [0173]-[01D5] option 121; [0974]-[099B] 'Nothing like being honest.' -> [0418]; [041F]-[046F] sword owned and Bit[19]; [0474] 'I can tell by the sarcastic expression on your face...'; [04DE] Var[282]>=3 -> [0693] Var[284]++, 'Let's get this over with.', [0AAD] Var[285]=2; global/script-090.txt [010E]-[0115] Var[351]=5, [0194]-[01C2] Var[285]==2: scripts 83, 79, 81 only (Carla insults every exchange); global/script-083.txt [0000]-[004B] Carla's insult = getRandomNr(16)+17, no repeat in a fight; global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; reply menu: known comebacks Bit[224] (2), Bit[230] (8), Bit[238] (16), then 17-21; global/script-081.txt [000A]-[0028] -> global/script-087.txt, string 37 from global/script-090.txt [0054]-[010D]: Carla insult 16+j is answered by comeback j, plus [00A4]-[00C8] insult 33 by 16 or 4 and [00CE]-[00DD] insult 21 by 16; global/script-074.txt [0026]-[002B] Var[263]++",
+      "note": "Key 2. Option 1 'I beg your pardon, I must talk to you.' + Esc (global/script-058.txt [0316]-[0418] is all override) reaches the same point: measure both. ORDER-FREE STEERING TARGET: the menu wait (global/script-058.txt [0305]) steers Carla's first insult into the answerable set {18, 21, 24, 32, 33} (P = 5/17 per frame). Until = first reply menu up."
+    },
+    {
+      "name": "Carla E1: answer her insult (planned 32 -> 'family reunion')",
+      "room": 44,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "family reunion",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 285,
+          "eq": 2
+        },
+        {
+          "var": 263,
+          "eq": 0
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 1
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            18,
+            21,
+            24,
+            32,
+            33
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0000]-[004B] Carla's insult = getRandomNr(16)+17, no repeat in a fight; global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; reply menu: known comebacks Bit[224] (2), Bit[230] (8), Bit[238] (16), then 17-21; global/script-081.txt [000A]-[0028] -> global/script-087.txt, string 37 from global/script-090.txt [0054]-[010D]: Carla insult 16+j is answered by comeback j, plus [00A4]-[00C8] insult 33 by 16 or 4 and [00CE]-[00DD] insult 21 by 16; global/script-074.txt [0026]-[002B] Var[263]++",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 18 -> 'feather-duster' (key 1), 24 -> 'like a cow' (key 2), 21, 32 or 33 -> 'family reunion' (key 3). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 32 -> 'family reunion' (planned order 32, 21, 33, 18, 24). Reply menu: feather-duster (1), cow (2), family reunion (3), Oh yeah?, rubber/glue, shaking. ORDER-FREE STEERING TARGET: Carla's next insult must be one of the 4 answerable insults not used yet (P = 4/16 per frame); until only asks for the next reply menu. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws.",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "18": "feather-duster",
+          "24": "like a cow",
+          "21": "family reunion",
+          "32": "family reunion",
+          "33": "family reunion"
+        }
+      }
+    },
+    {
+      "name": "Carla E2: answer her insult (planned 21 -> 'family reunion')",
+      "room": 44,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "family reunion",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 285,
+          "eq": 2
+        },
+        {
+          "var": 263,
+          "eq": 1
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 2
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            18,
+            21,
+            24,
+            32,
+            33
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0000]-[004B] Carla's insult = getRandomNr(16)+17, no repeat in a fight; global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; reply menu: known comebacks Bit[224] (2), Bit[230] (8), Bit[238] (16), then 17-21; global/script-081.txt [000A]-[0028] -> global/script-087.txt, string 37 from global/script-090.txt [0054]-[010D]: Carla insult 16+j is answered by comeback j, plus [00A4]-[00C8] insult 33 by 16 or 4 and [00CE]-[00DD] insult 21 by 16; global/script-074.txt [0026]-[002B] Var[263]++",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 18 -> 'feather-duster' (key 1), 24 -> 'like a cow' (key 2), 21, 32 or 33 -> 'family reunion' (key 3). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 21 -> 'family reunion' (planned order 32, 21, 33, 18, 24). Reply menu: feather-duster (1), cow (2), family reunion (3), Oh yeah?, rubber/glue, shaking. ORDER-FREE STEERING TARGET: Carla's next insult must be one of the 3 answerable insults not used yet (P = 3/15 per frame); until only asks for the next reply menu. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws.",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "18": "feather-duster",
+          "24": "like a cow",
+          "21": "family reunion",
+          "32": "family reunion",
+          "33": "family reunion"
+        }
+      }
+    },
+    {
+      "name": "Carla E3: answer her insult (planned 33 -> 'family reunion')",
+      "room": 44,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "family reunion",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 285,
+          "eq": 2
+        },
+        {
+          "var": 263,
+          "eq": 2
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 3
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            18,
+            21,
+            24,
+            32,
+            33
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0000]-[004B] Carla's insult = getRandomNr(16)+17, no repeat in a fight; global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; reply menu: known comebacks Bit[224] (2), Bit[230] (8), Bit[238] (16), then 17-21; global/script-081.txt [000A]-[0028] -> global/script-087.txt, string 37 from global/script-090.txt [0054]-[010D]: Carla insult 16+j is answered by comeback j, plus [00A4]-[00C8] insult 33 by 16 or 4 and [00CE]-[00DD] insult 21 by 16; global/script-074.txt [0026]-[002B] Var[263]++",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 18 -> 'feather-duster' (key 1), 24 -> 'like a cow' (key 2), 21, 32 or 33 -> 'family reunion' (key 3). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 33 -> 'family reunion' (planned order 32, 21, 33, 18, 24). Reply menu: feather-duster (1), cow (2), family reunion (3), Oh yeah?, rubber/glue, shaking. ORDER-FREE STEERING TARGET: Carla's next insult must be one of the 2 answerable insults not used yet (P = 2/14 per frame); until only asks for the next reply menu. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws.",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "18": "feather-duster",
+          "24": "like a cow",
+          "21": "family reunion",
+          "32": "family reunion",
+          "33": "family reunion"
+        }
+      }
+    },
+    {
+      "name": "Carla E4: answer her insult (planned 18 -> 'feather-duster')",
+      "room": 44,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "feather-duster",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 285,
+          "eq": 2
+        },
+        {
+          "var": 263,
+          "eq": 3
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 263,
+          "eq": 4
+        },
+        {
+          "var": 262,
+          "eq": 0
+        },
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 240,
+          "in": [
+            18,
+            21,
+            24,
+            32,
+            33
+          ]
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0000]-[004B] Carla's insult = getRandomNr(16)+17, no repeat in a fight; global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; reply menu: known comebacks Bit[224] (2), Bit[230] (8), Bit[238] (16), then 17-21; global/script-081.txt [000A]-[0028] -> global/script-087.txt, string 37 from global/script-090.txt [0054]-[010D]: Carla insult 16+j is answered by comeback j, plus [00A4]-[00C8] insult 33 by 16 or 4 and [00CE]-[00DD] insult 21 by 16; global/script-074.txt [0026]-[002B] Var[263]++",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 18 -> 'feather-duster' (key 1), 24 -> 'like a cow' (key 2), 21, 32 or 33 -> 'family reunion' (key 3). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 18 -> 'feather-duster' (planned order 32, 21, 33, 18, 24). Reply menu: feather-duster (1), cow (2), family reunion (3), Oh yeah?, rubber/glue, shaking. ORDER-FREE STEERING TARGET: Carla's next insult must be one of the 1 answerable insults not used yet (P = 1/13 per frame); until only asks for the next reply menu. RNG steering: delay this choice by d frames (fork search over d >= 0); each waiting frame is one getRandomNr(1) draw, so d selects the outcome of the next draws.",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "18": "feather-duster",
+          "24": "like a cow",
+          "21": "family reunion",
+          "32": "family reunion",
+          "33": "family reunion"
+        }
+      }
+    },
+    {
+      "name": "Carla E5: answer her insult (planned 24 -> 'cow') (Carla beaten, T-shirt)",
+      "room": 44,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "like a cow",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 285,
+          "eq": 2
+        },
+        {
+          "var": 263,
+          "eq": 4
+        },
+        {
+          "var": 262,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "bit": 20,
+          "eq": 1
+        },
+        {
+          "has": 596
+        },
+        {
+          "room": 61
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-083.txt [0000]-[004B] Carla's insult = getRandomNr(16)+17, no repeat in a fight; global/script-079.txt [0019] Var[194]=0, [001E] one draw per waiting frame; reply menu: known comebacks Bit[224] (2), Bit[230] (8), Bit[238] (16), then 17-21; global/script-081.txt [000A]-[0028] -> global/script-087.txt, string 37 from global/script-090.txt [0054]-[010D]: Carla insult 16+j is answered by comeback j, plus [00A4]-[00C8] insult 33 by 16 or 4 and [00CE]-[00DD] insult 21 by 16; global/script-074.txt [0026]-[002B] Var[263]++; global/script-074.txt [0161]-[01EA] 5th win: Var[282]++, 'OK, you win.'; global/script-116.txt [0057]-[011D] 'Well^I hope you're happy...', 'You'll need proof^ / Here, this should convince them.', [010A] Bit[20]=1, [010F] pickupObject(596) (100% Cotton T-shirt), [0117] startScript(71,[1]) -> global/script-071.txt [0088]-[0094] Var[196]=3, Bit[84]=1, Var[199]=2; global/script-116.txt [013E]-[014F] ego back in room 61 at (370,75), actorFollowCamera",
+      "note": "REPLY BY INSULT: read Var[240] when the reply menu is up and answer 18 -> 'feather-duster' (key 1), 24 -> 'like a cow' (key 2), 21, 32 or 33 -> 'family reunion' (key 3). `choose` holds the planned instance; the search writes the reply that matches the outcome its steering produced (entry notes). Planned instance: 24 -> 'cow' (planned order 32, 21, 33, 18, 24). Reply menu: feather-duster (1), cow (2), family reunion (3), Oh yeah?, rubber/glue, shaking. Input is back while Carla walks into her house (global/script-116.txt [0194]-[01B5] runs without a cutscene).",
+      "choose_by": {
+        "var": 240,
+        "map": {
+          "18": "feather-duster",
+          "24": "like a cow",
+          "21": "family reunion",
+          "32": "family reunion",
+          "33": "family reunion"
+        }
+      }
+    },
+    {
+      "name": "Leave the Sword Master's clearing",
+      "room": 61,
+      "verb": null,
+      "obj": 743,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 61
+        },
+        {
+          "has": 596
+        }
+      ],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-061-sword-mas/obj-0743-path.txt [0010]-[0037] (no crew yet: Bit[88]+Bit[89]+Bit[76]==0) loadRoomWithEgo(911,85); room-085-melee/entry.txt [00CB]-[00DD] Var[101]==61 -> local-203 walk-in cutscene; Var[196]==3 now, so no pirates (room-085-melee/entry.txt [00AA]); camera: global/script-116.txt [013E]-[014F] puts ego at (370,75) with actorFollowCamera, camera clamped to 304 (RoomScroll(160,304)), view x 144-463",
+      "note": "743 (box x 0-23) is off screen when input comes back, so the executor's approach (src/speedrun/executor.py _approach) floor-clicks toward 743's walk point (-10,109) clipped to the left screen edge, renewing the click each frame the camera scrolls, then clicks 743 once the camera is at 176 or less. Moving left (and down), re-clicks give 8 instead of 7.97 px/frame in x (engine-mechanics §2.5) and y needs only about 0.7 px/frame, so the approach is near optimal here (unlike move 50). About 380 px: roughly 47 frames. Record split 'T-shirts' (9:05) is this exit with both T-shirts. Carla cannot be recruited now (global/script-064.txt [01A9]: needs Bit[304], the kidnapping). APPROACH HOLD (new, measured): approach_hold 24 makes the executor's approach keep its clipped floor click while the camera scrolls and renew it only when ego is within 24 px of it or stops. The old per-scroll-step renewals were new walk targets on room 61's line boxes 5-6 while ego walked down (235,117)->(212,131): each renewal floors the down step (engine-mechanics section 2.5), so y froze and x crept at 1 px per frame for about 11 frames, then ego walked 5 px straight down to the box corner. Measured from base-l1's state: 11 frames sooner (margins 16-48 give 10-11).",
+      "approach_hold": 24
+    }
+  ],
+  "rng_points": [
+    {
+      "where": "every dialogue and fight menu (store, Smirk, pirate greeting, insult and reply menus, Carla's challenge)",
+      "what is random": "nothing by itself: the wait loop draws getRandomNr(1) once per frame until the choice registers, so the frame of the choice shifts every later draw",
+      "script": "global/script-080.txt [001E]-[0023]; global/script-079.txt [001E]-[0023]; room-049-road/local-200.txt [0375]-[037A]; global/script-058.txt [0305]-[030A]; global/script-057.txt [0350], [08D2], [0BC8], [0E71]; room-030-store/local-211.txt [043D], room-030-store/local-206.txt [00E5]; global/script-014.txt [00F7]-[0105] (Var[194] is set only after Guybrush's line, so that line's frames count too)",
+      "how the seed/search should treat it": "The steering lever. For each choice, fork over a delay d = 0..K frames (K about 40) before the key and keep the smallest d whose next outcome lies in the move's target SET (not a fixed value, except fight 1 E3 = 16 and fight 2 E1 = counter). One frame costs VAR_TIMER_NEXT=5 jiffies (83 ms with the logo glitch). No save/load is needed in S2."
+    },
+    {
+      "where": "player's insult (fights 1-3)",
+      "what is random": "whether the pirate counters: getRandomNr(10) (0..10) < skill; on a fail, which lame reply (17-19)",
+      "script": "global/script-082.txt [01DB]-[0218], [023C]; skill Var[268] from global/script-113.txt [0058]-[0146]",
+      "how the seed/search should treat it": "Steer with the insult menu's delay. Planned: fail on every insult except fight 2 E1 (insult 16 must be countered). P(counter) = skill/11."
+    },
+    {
+      "where": "pirate's turn (fight 1 E4, E5; fight 2 E2) and every Carla exchange",
+      "what is random": "which insult the opponent uses: pirates getRandomNr(15)+1 = 1..16, Carla getRandomNr(16)+17 = 17..33, rerolled (up to 20 times) while already used this fight",
+      "script": "global/script-083.txt [0055]-[0089] (pirates), [0000]-[004B] (Carla), [0131] Bit[263+i] marks it used",
+      "how the seed/search should treat it": "Steer with the preceding menu's delay. Targets: fight 1 E3 -> exactly 16 (1/16); E4 -> {2, 8} (2/15); fight 2 E1 -> counter AND {2, 8, 16} (skill/11 x 3/16); Carla -> any answerable insult not used yet (5/17, 4/16, 3/15, 2/14, 1/13). With independent draws the expected Carla delay is about 27 frames in total (sum of 1/p - 1), against about 70 for a fixed order such as the planned 32, 21, 33, 18, 24; this is why the Carla and reply moves are order-free."
+    },
+    {
+      "where": "encounter start (map)",
+      "what is random": "pirate type 2..7 (never the previous one, Var[360]); type sets skill: 3 -> 8 (blond), 2 and 5 -> 7, 4 -> 6 (hat), 6 and 7 -> 4 (scarf)",
+      "script": "global/script-114.txt [0005]-[0026]; global/script-113.txt [0097]-[0146]",
+      "how the seed/search should treat it": "Fixed by the RNG state at the encounter frame. Fight 2 wants a high-skill pirate for E1's counter but low skill for E3/E4; fights 1 and 3 want low skill. The search can shift the encounter frame (intercept point, wait) to pick the type."
+    },
+    {
+      "where": "Melee map (room 85)",
+      "what is random": "pirate spawn points (x 0..64, y 0..200, >20 px from ego), palette, name, destination (lookout/fork/clearing/shore), disappearance delay 0..120 jiffies (0..24 frames at VAR_TIMER_NEXT=5), reappearance spot (1 in 5: room 148, that pirate is gone for the visit); plus one getRandomNr(1) every map frame from the hover-name script",
+      "script": "room-085-melee/local-202.txt [0019]-[013B], [01B4]-[023E]; global/script-024.txt [0000] (started by room-085-melee/entry.txt [00FD])",
+      "how the seed/search should treat it": "Determines where and when an interception is possible and how long the fork wait lasts. Evaluate per seed: the time from the gate to the encounter is the cost. Spawns happen on every map entry with Var[290]>2 and Var[196]<3, including the re-entry after each fight (global/script-114.txt [006E]-[0079])."
+    },
+    {
+      "where": "fight animations",
+      "what is random": "animation variant and sound effects of each exchange, extra flourishes in the game's first two exchanges",
+      "script": "global/script-100.txt [0053], [008D]-[00E7]; global/script-101.txt [0016], [0060], [00E6], [011C], [0157], [018D], [0220]-[02B8]",
+      "how the seed/search should treat it": "No route effect, but the number of draws depends on the variant, which shifts later draws; the fork search sees it automatically. Each exchange animation runs at VAR_TIMER_NEXT=10 (global/script-100.txt [000A], restored to the saved 5 at [0153])."
+    },
+    {
+      "where": "forest screens (fork to 209)",
+      "what is random": "the two invisible 'bird' actors' positions and speeds",
+      "script": "room-058-damnfores/entry.txt [0008]-[000E]; room-058-damnfores/local-201.txt [0000]-[008A]; room-058-damnfores/local-202.txt [0000]",
+      "how the seed/search should treat it": "Cosmetic, but they draw RNG on every forest screen before Carla; check they never sit on a clicked path pixel (actor hit test)."
+    },
+    {
+      "where": "troll bridge, store, kitchen",
+      "what is random": "'NONE SHALL PASS' timer; storekeeper idle lines and his 'browse' reply; kitchen ambient sound timer",
+      "script": "room-057-bridge/local-203.txt [0000]; room-030-store/local-211.txt [1DDF]; room-041-kitchen/local-201.txt [000E]",
+      "how the seed/search should treat it": "Cosmetic; they only shift the RNG stream."
+    }
+  ],
+  "glitches": [
+    {
+      "name": "Menu-wait RNG steering (replaces the runners' save/reload insult method)",
+      "saves": "All reload cycles of the 'zergu' method and the record's missed Carla insult (about 10 s by the runner's own comment); exact gain to be measured",
+      "mechanism": "Every menu wait loop draws one random number per frame until Var[194] is set; ScummVM 2026.3.0 has no per-frame engine draw, so the RNG state at each later getRandomNr is a function of the choice frame. Not a glitch in the engine sense: legal input timing.",
+      "inputs": "Delay the dialogue key by d frames (d from a fork search) until the next outcome lies in the move's target set; keep the text-skip '.' presses as early as possible.",
+      "risk": "None for the run; cost is d frames of 5 jiffies per steered choice. Assumes no other script draws during the room 49/44 waits (true per the dumps; verify with an RNG call counter).",
+      "cite": "global/script-080.txt [001E]; global/script-079.txt [001E]; global/script-058.txt [0305]; room-049-road/local-200.txt [0375]; ScummVM script_v5.cpp o5_getRandomNr (one draw); docs/research/anypercent-runner-sources.md §7"
+    }
+  ],
+  "crash_rules": [
+    "Do not click or start a walk while Guybrush is picking up the fish (568) or the sword (388); wait for has(obj). Runners report ScummVM crashes for 'clicking on an item while Guybrush is picking it up, or moving while Guybrush is picking up an item' (docs/research/anypercent-runner-sources.md §3.4, observed in item-slide states; no slide is active in S2, kept as a precaution).",
+    "No crash is documented for the troll, Smirk, the insult fights or Carla in the runner corpus; untested in our build.",
+    "Not a crash but a lost input: a key and a click on the same frame keep only the key (docs/research/anypercent-engine-mechanics.md §6, input.cpp:1558), except '.', which combines with a click. A verb key during a cutscene([2]) is also lost: the verbs stay on screen but _userPut is off (global/script-018.txt [0007]), see move 3."
+  ],
+  "record_comparison": "Record (saruya 21:52, DOS CD): split 'Bridge' 5:17 at 'Use fish with troll', 'Sign' 8:09, 'T-shirts' 9:05; Bridge -> T-shirts = 3:48 including S1's treasure (dig at 7:05; human-route §3.2 steps 72-74 put the forest walk and dig at about 6:32-7:05, so about 33 s of it is S1). Inside it: fight 1 at 5:55-6:30 (about 35 s with the interception), fights 2-3 plus the forest walk to the sign 7:05-8:09 (64 s), Carla 8:09-9:05 (56 s, with one missed insult that the runner prices at about 10 s). Before the split the troll talk and give take about 10 s (WR 5:15-5:25; IL 5:12-5:24, human-route §3.2). The record learns the troll's insult and reloads saves until each pirate line comes out right. This route keeps the record's order and interleave but drops the troll conversation, plays 12 pirate exchanges (5+4+3, the minimum for comebacks {2, 8, 16}) with no reloads, and plays Carla 5-0 with order-free steering (about 27 frames of expected delay over her five draws). Fixed costs shared with the record: the troll's give cutscene (10 frames, local-205's 75 frames, 90 jiffies = 18 frames of delay and 3 frames, plus two lines and the walk to (211,86)), the knock, the sign cutscene (140 jiffies of delay), the two flourish-extended first exchanges, and the per-exchange animation (two script-101 runs plus delay(30) at VAR_TIMER_NEXT=10, global/script-100.txt, about 2.3 s). Rough script-based estimate, to be measured: 17 exchanges at about 2.3 s plus about 5 s of first-exchange flourishes, before lines, menus, steering delays, interceptions and walks; the record spends about 2:35 on fights + forest + Carla (35 + 64 + 56 s) including reloads and one lost Carla exchange. The gains come from no reloads, no lost Carla exchange and no troll conversation; the map and room-61 zig-zags (search parameters) would add a few seconds more.",
+  "open_questions": [
+    "Fish timing (move 4): with the executor's key on W+3 the Pick-up check lands about W+13/W+14 against the re-guard at W+15. Measure; if it misses, send the key on W+2 (endCutscene frame). The draft's 'fish on launch 1' is dropped (window ends W1+10, earliest check about W1+12).",
+    "Plank step 1 without a gull gate (move 2): verify in the engine that local-205 [0021] runs before Var[272] becomes 1 even when the step lands while local-205 is still running (freeze argument in move 2).",
+    "Executor support needed: (a) an INTERCEPT move kind for moves 22, 30, 36 (procedure in entry notes; move 22's point is a placeholder); (b) REPLY-BY-INSULT resolution for moves 28, 33, 54-58 (map Var[240] through the table in the move note, or have the search write the concrete reply per seed); (c) 'rclick' events for the right-click default verb (bridge already accepts them: patches/0001-scumm-add-speedrun-bridge.patch, 'rclick').",
+    "Right-click default verb: pier door 564 and Smirk's door 591 set Var[182]=2 on hover; global/script-004.txt [0005]-[0016] uses it on a right click. Measure whether the hover script (global/script-023.txt, started from global/script-001.txt [14C0]) sets Var[182] in the same frame as the click, which would save the Open key frame.",
+    "Zig-zag walking (engine-mechanics §2.4 is a mirror result, not an engine run): validate on the Melee map at slope about 1.45:1 (moves 9, 11, 22, 41) and in room 61 at about 4.45:1 (move 50). Needs the walkboxes of rooms 85 and 61, which out/objects.json does not have.",
+    "Fork wait (moves 30, 36): a fork-bound pirate must make its last step from within 1 px (not jump from 2 to 0). Per seed, compare waiting against an intercept walk. ALTERNATIVE (reviewer 2): play fights 2-3 right after fight 1, before the treasure; ego stands where fight 1 started and three pirates respawn (global/script-114.txt [006E]-[0079], room-085-melee/entry.txt [00A3]-[00C8]). Same transitions, so it is only faster when that seed's interceptions are cheaper; measure.",
+    "Accidental encounters: on map entries 4-5 (before Smirk) an encounter has no fight option and wastes a dialogue; after fight 3 (Var[196]==2) one would start a 4th fight. Never stand still next to a walking pirate then.",
+    "Steering assumption: exactly one RNG draw per menu frame and no other draws while waiting in rooms 49 and 44. Count RNG calls in the bridge. saruya reports two inconsistent RNG calls on CD (CD audio timing is a suspect); check whether any draw in this segment depends on VAR_MUSIC_TIMER or sound state.",
+    "Var[280] flourishes: the first two exchanges of the game have 3 and 2 extra script-101 animations (global/script-100.txt [0081]-[010D]); unavoidable, measure them so fight 1's cost is right.",
+    "Troll without the conversation (move 10, strictly faster per the scripts): verify that Give fish works on the first frame of room 57 without the STOP dialogue.",
+    "Smirk exit 594 vs 592; forest up-up-right-right-left-up vs up-left-right-up-left-up; Carla option 2 vs option 1 + Esc. Measure.",
+    "Forest map teleport (runner doc §3.11, used by S1 for the treasure) on the fork -> 209 trip: reviewer 1 could not derive one from the scripts and neither could this revision; engine test only.",
+    "Cross-segment fixes needed in S1 (not editable here): S1 move 84 must come after S2 move 28; S1 move 56 relies on S2 move 8; S1 move 96's 'S2 HANDOFF' is now S2 move 29; S1's exit flags var 195 eq 302 and var 290 eq 4 are its standalone values (with S2 interleaved: 202 before Smirk, 172 after, and map entries 7 by the dig).",
+    "Carla's T-shirt split: the record's 'T-shirts' frame is on leaving with both shirts; S3 starts on the map after the room-85 walk-in cutscene (Var[101]==61)."
+  ]
+}

@@ -1,0 +1,2404 @@
+{
+  "segment": "S4",
+  "title": "Part II: the journey (cereal, dusty book, cooking, cannon)",
+  "entry": {
+    "room": 83,
+    "inventory": [
+      732,
+      907,
+      901,
+      902,
+      903,
+      377,
+      442,
+      395,
+      596,
+      752,
+      488,
+      643
+    ],
+    "flags": [
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "room": 0
+      },
+      {
+        "var": 352,
+        "eq": 2
+      },
+      {
+        "var": 53,
+        "eq": 0
+      },
+      {
+        "bit": 477,
+        "eq": 1
+      },
+      {
+        "var": 244,
+        "eq": 0
+      },
+      {
+        "var": 259,
+        "eq": 0
+      },
+      {
+        "bit": 366,
+        "eq": 0
+      },
+      {
+        "bit": 531,
+        "eq": 0
+      },
+      {
+        "bit": 399,
+        "eq": 0
+      },
+      {
+        "has": 901
+      },
+      {
+        "has": 902
+      },
+      {
+        "has": 903
+      },
+      {
+        "has": 907
+      },
+      {
+        "has": 732
+      },
+      {
+        "has": 377
+      },
+      {
+        "has": 395
+      },
+      {
+        "bit": 51,
+        "eq": 1
+      },
+      {
+        "var": 196,
+        "eq": 3
+      },
+      {
+        "bit": 436,
+        "eq": 0
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ],
+    "notes": "ENTRY FRAME = S3's exit frame: the frame in which room-083-cu-dock/local-200.txt [0C74] starts global 122 (S3's until has(901..903) first holds at its end). Global 122's first slice runs [0000] cutscene([3]), [0005] loadRoom(0), [0007] beginOverride and [000C] delay(60) in that same frame, so at entry the current room is 0, the override is live, var 352 == 2 and var 53 == 0 (see flags). CARRIER (global 70, the Otis script) is the slide's holder and is still running: S3 hands it over inside one of its two type-0 cutscenes (case B: cutscene 1, global/script-070.txt [0066]-[0211], S3's guard state 408 == 0; case A: cutscene 2, [021A]-[02DA]). It is not freeze-resistant (chainScript keeps the caller's flags, engines/scumm/script_v5.cpp:834-851; started by room-031-jail/local-203.txt [0076] / global/script-069.txt), so 122's cutscene freezes it, 122's endCutscene [015B] unfreezes it, and in the same slice [0184] loadRoom(19) starts deck local 200 whose [0003] cutscene([1]) freezes it again (freezeCount, engines/scumm/script.cpp:926-932, 953-958). It next runs after deck local 200's [0399] endCutscene, which loads room 7 (global/script-019.txt [0063]): the TAIL RUNS FROM THE CAPTAIN'S CABIN ON (S3's exit.notes now say the same). What the tail does: actor 4 is now a deck crewman outside the current room, so its walks teleport (engines/scumm/actor.cpp:866-871), its prints are dropped (actor.cpp:3490-3511) and WaitForActor(4) passes; walkActorToObject(4,400) finds no object. What remains visible: case B only: the rest of cutscene 1 (delays [0099], [00A3], [00DB], [013D] or [0156] delay(120), breakHere runs [011A]-[012F] and [01EB]-[01F0], possibly 'Whoops.' [0147], ego costume/turns [0141], [01C0]-[01C4], [01F1] animateCostume(VAR_EGO,245), startScript(25/26,[401]) which may print 'Hmm.  This door appears to be locked.' (global/script-025.txt [0040])), then [0211] endCutscene (type 0: global/script-019.txt [0054]-[0063] doSentence(STOP), startScript(11), actorFollowCamera), [0212] Bit[477] set so no chainScript(208), [021A] cutscene([]) (type 0: doSentence(STOP), startScript(11), freezeScripts(127) freezes the hover script and room locals). Both cases: [024E]-[025C] walkActorTo(VAR_EGO, ego x + 30, 127), [0264] 'But^', [0271] WaitForActor(VAR_EGO), [0277] 'Do we still have a deal?', [0294] delay(60) (12 frames, not skippable), [0298] animateCostume(VAR_EGO,246) (a chore-4 turn that ends any walk in progress, engines/scumm/actor.cpp:1673-1685, 1318-1331), [029C] 'I'm sure he'll be back^' + 'He gave me his word as a pirate.', [02DA] endCutscene (type 0 again: doSentence(STOP), script 11, actorFollowCamera). That last endCutscene raises _userPut from 1 to 2: the slide is armed only then (var 53 == 2 at rest, 1 inside one cutscene). Until it runs, var 352 is one higher than S4's own cutscenes and var 53 is 1 at rest. Handling: the bridge's text skip ('.', SPEEDRUN_SKIP_TEXT) must be ON for the carrier's ego lines (unlike S3's carry exception: once [0C6E] has passed, ending the carrier sooner only helps); the transit moves 3-5 act while its cutscene is open (kind glitch) with the carrier retry rule; the first reach (move 6) waits for var 352 == 0. '.' can share a frame with a click but not with a verb key. INVENTORY at entry (S3 exit.inventory), with the predicted display order derived from S1's recorded order at its move 68 (488 442 377 396 397 395 643 ...) and the S1-S3 acquisition order, removals closing up the list (engines/scumm/object.cpp clearOwnerOf; findInventory lists the array in order): 488 442 377 395 | 643 752 596 907 | 732 901 902 903 (12 items, 3 rows of 4; global/script-009.txt shows rows Var[118] and Var[118]+1, and every pickupObject jumps the view to the last two rows via runInventoryScript(1), [0000]-[0022]; setOwnerOf only clamps). S4 then adds, in this order: 157 (owner 14 until global 185, listed before the cereal), 164, 238, 85, 88, 75, 82, 74, 101, 91, 104. Galley-2 view on entry: rows 4-5 = [88 75 82 74][101 91 104] (23 items). The cooking order and the four hidden scrolls (moves 48, 51, 54, 55) follow from this; the executor must read vars 133-140 and fall back to scrolling (verbs 208/209) if the prediction is off. Required: 377 chicken and 395 mints (ingredients), 732 compass and 907 LeChuck's note and 902 leaflet (Part III, S5 entry), the feather 75 picked up here is the fire fuel. Without the slide (var 53 never reaches 2 after the carrier ends) every move still works except the kind=glitch moves inside cutscenes, which have fallbacks in their notes; the route then loses the overlaps."
+  },
+  "exit": {
+    "until": [
+      {
+        "room": 20
+      },
+      {
+        "var": 32,
+        "eq": 201
+      }
+    ],
+    "inventory": [
+      488,
+      395,
+      643,
+      752,
+      596,
+      907,
+      732,
+      901,
+      902,
+      903,
+      82,
+      74
+    ],
+    "flags": [
+      {
+        "var": 259,
+        "eq": 2
+      },
+      {
+        "has": 74
+      },
+      {
+        "has": 732
+      },
+      {
+        "has": 907
+      },
+      {
+        "has": 902
+      },
+      {
+        "var": 53,
+        "eq": 1
+      },
+      {
+        "var": 352,
+        "eq": 1
+      },
+      {
+        "bit": 398,
+        "eq": 0
+      },
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "var": 32,
+        "eq": 201
+      },
+      {
+        "var": 143,
+        "eq": 20
+      },
+      {
+        "bit": 51,
+        "eq": 1
+      },
+      {
+        "var": 196,
+        "eq": 3
+      },
+      {
+        "bit": 436,
+        "eq": 0
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ]
+  },
+  "moves": [
+    {
+      "name": "Esc the Part II card",
+      "room": 0,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 0
+        }
+      ],
+      "until": [
+        {
+          "room": 19
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-083-cu-dock/local-200.txt [0C74] startScript(122); global/script-122.txt [0000] cutscene([3]), [0005] loadRoom(0), [0007] beginOverride, [0009] goto 014B, [000C] delay(60), [0010] loadRoom(97); [014B]-[015B] endOverride ... endCutscene, [015C]-[0180] setOwnerOf(...,0), [0184] loadRoom(19); engines/scumm/input.cpp:1423-1428 (abortCutscene in processInput, before runAllScripts, engines/scumm/scumm.cpp:3177, 3231-3232); engines/scumm/script.cpp:1689-1709",
+      "note": "Global 122's first slice ([0000]-[000C]) runs in the entry frame itself, so the current room is already 0 and the override is live when that frame ends: press Esc on the next frame (entry + 1). Do not wait for room 97: it only loads after delay(60) (12 frames at var 19 = 5). The Esc is for time only. It does not protect the slide: [0050] UserputOff would be a no-op because _userPut is already 0 there ([0C6E] UserputOn set 1, 122's own cutscene start took it to 0 at global/script-018.txt [0007]); the slide's extra level is held by global 70's still-open cutscene (see entry.notes). A late Esc would additionally run [0048] startScript(17,[5]) and [004E] CursorHide. With _userPut 0 the Esc's key-27 copy is dropped by checkExecVerbs (engines/scumm/verbs.cpp:590). Drop this move if S3 or the bridge already pressed it.",
+      "skips": {
+        "text": 1,
+        "cutscenes": 0
+      },
+      "auto_skips": {
+        "text": 1,
+        "cutscenes": 1
+      },
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Esc the crew dialogue on deck",
+      "room": 19,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 19
+        },
+        {
+          "var": 23,
+          "eq": 102
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-019-sh-deck/entry.txt [0047]-[00B4] (Var[244] 0 -> 1, crew actors, startScript(200)); room-019-sh-deck/local-200.txt [0003] cutscene([1]), [0008] breakHere, [0009] startSound(102), [000B] beginOverride, [000D] goto 0365, [0365]-[0377], [0378] print(1,'--sigh--'); engines/scumm/sound.cpp:120-123 and vars.cpp:59 (VAR_LAST_SOUND = var 23)",
+      "note": "The override is set on local 200's second frame together with startSound(102), so var 23 == 102 marks it; Esc on the next frame. Taken that early no crew line has been printed, so the until (actor 1 talking) is '--sigh--' at [0378]. Global 70 (the carrier) cannot run on the deck: 122's endCutscene [015B] unfreezes it, but in the same slice [0184] loadRoom(19) starts local 200, whose [0003] cutscene([1]) freezes it again (global/script-018.txt [0070]; engines/scumm/script.cpp:926-932, freezeCount).",
+      "auto_skips": {
+        "text": 1,
+        "cutscenes": 1
+      },
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Skip '--sigh--'",
+      "room": 19,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 7
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-019-sh-deck/local-200.txt [0378] print(1,'--sigh--'), [0388] WaitForMessage, [038A] delay(60), [038E] putActorInRoom(VAR_EGO,7), [0392] putActor(VAR_EGO,0,0), [0399] endCutscene; global/script-019.txt [004B] freezeScripts(0), [0054] doSentence(STOP), [0063] actorFollowCamera(VAR_EGO); engines/scumm/camera.cpp:61-73 (startScene of the followed actor's room); engines/scumm/input.cpp:1418-1419",
+      "note": "One-part line, then the unskippable delay(60) (12 frames). Room 7 loads inside local 200's endCutscene, which also unfreezes global 70: the carrier's tail starts in the captain's cabin (in the load frame or the next, depending on slot order), not on the deck as S3's exit.notes say."
+    },
+    {
+      "name": "Leave the captain's cabin (first visit)",
+      "room": 7,
+      "verb": null,
+      "obj": 84,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 7
+        },
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "actor_moving": 1,
+          "eq": 0
+        },
+        {
+          "actor_x": 1,
+          "ge": 60
+        }
+      ],
+      "until": [
+        {
+          "room": 19
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the exit object on the first frame the move may act, although global 70's cutscene is still open (var 352 >= 1, var 53 == 1, bridge cs >= 1). The executor's normal click gate (up > 0 and cs == 0) stays closed for the whole carrier tail, so this move must bypass it. The engine only needs _userPut > 0 (engines/scumm/verbs.cpp:590), and _userPut is 1 here (deck local 200's endCutscene, global/script-019.txt [0007]). The hover script 23 was restarted by room-007-sh-captai/entry.txt [0000] after global 70's freeze, so it is not frozen by that cutscene and object clicks are real (Var[108] = exit), unless global 70 starts a new cutscene ([021A]) after it. Here the ego stands on the door's walk point (33,132) (room-007-sh-captai/entry.txt [0016] putActorAtObject), so the Walk-to sentence needs no walk and the door handler runs loadRoomWithEgo in the click frame, before room 7's local 200 walks the ego to (160,140) on its third frame.",
+      "cite": "room-007-sh-captai/entry.txt [0000] startScript(23), [0006]-[001F] (Var[244] 1 -> 2, putActorAtObject(VAR_EGO,84), startScript(200)); room-007-sh-captai/local-200.txt [0000]-[0002]; room-007-sh-captai/obj-0084-door.txt [000C] setState(253,1), [0010] loadRoomWithEgo(253,19); global/script-002.txt [027A]-[02E4], [0398]-[039D]; global/script-070.txt [021A]-[02DA]",
+      "note": "Click on the frame after the room change (global 19's doSentence(STOP) runs before the load in the same slice, global/script-019.txt [0054]). If global 70 has already run [024E]-[025C] (walkActorTo(VAR_EGO,x+30,127)) the sentence walks the ego back about 30 px (about 4 frames) first. Carrier retry rule (applies while var 352 >= 1 from global 70, i.e. until the gate of move 6 opens): re-click this exit when (a) the ego stops short of the exit's walk point (global 70 [025C] walkActorTo(VAR_EGO,x+30,127) redirects it, or [0298] animateCostume(VAR_EGO,246) ends the walk: a chore-4 turn sets _moving = MF_TURN and then 0, engines/scumm/actor.cpp:1673-1685, 1318-1331, 2856-2860, and global 2 then says 'I can't reach it.', global/script-002.txt [02E4]-[0317]), or (b) the ego stands on the walk point for 2 frames without a room change (global 70's [02DA] or [0211] endCutscene runs global/script-019.txt [0054] doSentence(STOP) and [0056] startScript(11), which cancel the pending exit sentence). If global 70 is in its second cutscene and that cutscene started after this room's hover script (case B, [021A] cutscene([]) runs global/script-018.txt [0070] freezeScripts(127)), the click is a floor click (Var[108] = 0): click the exit's walk point, then the exit again once var 352 == 0. Nothing in the cabin is worth taking now (the cabinet needs the prize). WAIT IN THE CABIN (measured, seed 836557856, talkspeed 85): the carrier resumes at [01EC] in the cabin's load frame (t0) whatever S3 handed over (global 70 at [01BD] or [01E3]: [01BD]-[01EB] has no wait outside room 83), and its tail ends ([02DA], var 352 == 0) at t0 + 28. Leaving at once moves the tail to the deck, where actor 4 stands (the crewman: [021C] walkActorTo(4,200,136) is a real 8-frame walk and his lines play) and [025C]'s ego walk detours over the deck's boxes (20 frames): the tail then ended at t0 + 62 and the hatch was left at t0 + 78 (S3 handoff at [01BD], click at t0 + 1 left at once). So the 'after' waits for the tail's [024E]-[025C] walk to stop the ego at x + 30 (about x 89; var 352 == 1, ego still, x >= 60): the click is then a floor walk back to the door (the hover script is frozen by [021A]), the carrier retry rule re-clicks, and the click after [02DA] leaves: room 19 at t0 + 34, the hatch at t0 + 45 (S4#7 at t0 + 67, 33 frames sooner than leaving at once). The cabin entry frame t0 and this sequence are the same with the old S3 handoff ([01E3]), where the click at t0 + 1 did not leave the cabin.",
+      "gate": "input"
+    },
+    {
+      "name": "Deck to crew quarters (hatch)",
+      "room": 19,
+      "verb": null,
+      "obj": 254,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 19
+        }
+      ],
+      "until": [
+        {
+          "room": 9
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the exit object on the first frame the move may act, although global 70's cutscene is still open (var 352 >= 1, var 53 == 1, bridge cs >= 1). The executor's normal click gate (up > 0 and cs == 0) stays closed for the whole carrier tail, so this move must bypass it. The engine only needs _userPut > 0 (engines/scumm/verbs.cpp:590), and _userPut is 1 here (deck local 200's endCutscene, global/script-019.txt [0007]). The hover script 23 was restarted by room-007-sh-captai/entry.txt [0000] after global 70's freeze, so it is not frozen by that cutscene and object clicks are real (Var[108] = exit), unless global 70 starts a new cutscene ([021A]) after it.",
+      "cite": "room-019-sh-deck/entry.txt [00B7]-[010C] (Var[244] >= 2 -> 3, idle crew, startScript(205)); room-019-sh-deck/obj-0254-hatch.txt [000C]-[001B] loadRoomWithEgo(105,9); global/script-070.txt [025C], [0298], [02DA]",
+      "note": "From the door's walk point (111,79) to the hatch's (164,79): dx 53, about 7 frames at WalkSpeed(8,2). Carrier retry rule (applies while var 352 >= 1 from global 70, i.e. until the gate of move 6 opens): re-click this exit when (a) the ego stops short of the exit's walk point (global 70 [025C] walkActorTo(VAR_EGO,x+30,127) redirects it, or [0298] animateCostume(VAR_EGO,246) ends the walk: a chore-4 turn sets _moving = MF_TURN and then 0, engines/scumm/actor.cpp:1673-1685, 1318-1331, 2856-2860, and global 2 then says 'I can't reach it.', global/script-002.txt [02E4]-[0317]), or (b) the ego stands on the walk point for 2 frames without a room change (global 70's [02DA] or [0211] endCutscene runs global/script-019.txt [0054] doSentence(STOP) and [0056] startScript(11), which cancel the pending exit sentence). If global 70 is in its second cutscene and that cutscene started after this room's hover script (case B, [021A] cutscene([]) runs global/script-018.txt [0070] freezeScripts(127)), the click is a floor click (Var[108] = 0): click the exit's walk point, then the exit again once var 352 == 0.",
+      "gate": "input"
+    },
+    {
+      "name": "Crew quarters to galley (door)",
+      "room": 9,
+      "verb": null,
+      "obj": 107,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 9
+        }
+      ],
+      "until": [
+        {
+          "room": 14
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the exit object on the first frame the move may act, although global 70's cutscene is still open (var 352 >= 1, var 53 == 1, bridge cs >= 1). The executor's normal click gate (up > 0 and cs == 0) stays closed for the whole carrier tail, so this move must bypass it. The engine only needs _userPut > 0 (engines/scumm/verbs.cpp:590), and _userPut is 1 here (deck local 200's endCutscene, global/script-019.txt [0007]). The hover script 23 was restarted by room-007-sh-captai/entry.txt [0000] after global 70's freeze, so it is not frozen by that cutscene and object clicks are real (Var[108] = exit), unless global 70 starts a new cutscene ([021A]) after it.",
+      "cite": "room-009-sh-crews/obj-0107-door.txt [000C] loadRoomWithEgo(166,14); room-014-sh-galley/entry.txt [0009]-[0017] (mints, map and both T-shirts get class 2, 'with', while in the galley)",
+      "note": "Ego arrives at the crew-room ladder's walk point (276,105); the door is at (242,105), about 5 frames. Ego arrives in the galley at the ladder's walk point (48,138). Carrier retry rule (applies while var 352 >= 1 from global 70, i.e. until the gate of move 6 opens): re-click this exit when (a) the ego stops short of the exit's walk point (global 70 [025C] walkActorTo(VAR_EGO,x+30,127) redirects it, or [0298] animateCostume(VAR_EGO,246) ends the walk: a chore-4 turn sets _moving = MF_TURN and then 0, engines/scumm/actor.cpp:1673-1685, 1318-1331, 2856-2860, and global 2 then says 'I can't reach it.', global/script-002.txt [02E4]-[0317]), or (b) the ego stands on the walk point for 2 frames without a room change (global 70's [02DA] or [0211] endCutscene runs global/script-019.txt [0054] doSentence(STOP) and [0056] startScript(11), which cancel the pending exit sentence). If global 70 is in its second cutscene and that cutscene started after this room's hover script (case B, [021A] cutscene([]) runs global/script-018.txt [0070] freezeScripts(127)), the click is a floor click (Var[108] = 0): click the exit's walk point, then the exit again once var 352 == 0.",
+      "gate": "input"
+    },
+    {
+      "name": "Open cupboard (first reach: wait for the carrier to end)",
+      "room": 14,
+      "verb": 2,
+      "obj": 163,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 14
+        },
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "state": 163,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0163-cupboard.txt [002C] startScript(25,[VAR_ME]), [0012]-[0023] (default verb Open while closed); global/script-025.txt [000A]-[003C]; global/script-002.txt [032A]-[0397] (class 14: cutscene([2]) + delay(20)); global/script-070.txt [0211], [021A], [02DA]; global/script-019.txt [0054]",
+      "note": "GATE: var 352 == 0 means global 70's last endCutscene has run (var 352 is the scripts' own cutscene depth, raised only by global/script-018.txt [0000] and lowered by global/script-019.txt [0000]; at S4 entry it is 2, see entry.flags). No reach-producing sentence may start before that: a carrier endCutscene inside a reach window pops the reach's cutscene-stack entry and its doSentence(STOP) stops global 2 with its cutscene active (crash_rules). SLIDE CHECK here: with var 352 == 0, var 53 == 2 means the slide is armed (global 70's endCutscene raised _userPut from 1 to 2); var 53 == 1 means it was lost: keep going but use the fallbacks named in the kind=glitch moves (15, 16, 25, 34, 39-57, 68, 72). While waiting, a floor click at (72,131) pre-walks the ego (dx 24, dy 7: about 4 frames). The executor may deliver this as one right-click (default verb Open; global/script-004.txt [0000]-[0016]) instead of 'o' + click. Crash window: the reach (crash_rules 1). ENGINE (2026-10-20, part3b lane): right-click (rclick): the verb-90 entry sets Var[182] = 2 (Open) while closed, so script 4 takes Open for a right click (global/script-004.txt [0005]-[0016]) and the 'o' key's frame goes: done 1 frame sooner with early inputs (measured from slide-int1).",
+      "rclick": true
+    },
+    {
+      "name": "Pick up cereal",
+      "room": 14,
+      "verb": 9,
+      "obj": 168,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 164
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0168-cereal.txt [008E] doSentence(Local[1],164,0) (fallback entry); room-014-sh-galley/obj-0164-cereal.txt [002E] setClass(168,[160]), [0035] pickupObject(157,0), [0039] setOwnerOf(157,14), [003D] pickupObject(VAR_ME,0); global/script-002.txt [032A]-[0397]",
+      "note": "164 starts untouchable (class 32), so the click lands on the box 168, whose fallback re-issues the verb on 164: two reach cutscenes (both class 14). Do not use Open (168's Open queues pick up + open, obj-0168 [0081]-[0087], and the 28-frame crunch would play here with nothing to walk to). pickupObject(157) puts the key into the inventory array before the cereal (owner 14, so not shown); when global 185 later gives it to the ego it is listed just before the cereal. Crash windows: both reaches."
+    },
+    {
+      "name": "Galley to crew quarters (ladder)",
+      "room": 14,
+      "verb": null,
+      "obj": 166,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 9
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0166-ladder.txt [000C]-[001D] loadRoomWithEgo(107,9)",
+      "note": "From the cupboard (72,131) to the ladder (48,138), about 4 frames. Ego arrives at the crew-room door (242,105)."
+    },
+    {
+      "name": "Crew quarters to deck (ladder)",
+      "room": 9,
+      "verb": null,
+      "obj": 105,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 19
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-009-sh-crews/obj-0105-ladder.txt [000C]-[001B] loadRoomWithEgo(254,19)",
+      "note": "Door (242,105) to ladder (276,105), about 5 frames. Ego arrives at the deck hatch's walk point (164,79)."
+    },
+    {
+      "name": "Deck to crow's nest (rope ladder)",
+      "room": 19,
+      "verb": null,
+      "obj": 258,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 17
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-019-sh-deck/obj-0258-rope-ladder.txt [0022]-[0031] loadRoomWithEgo(237,17)",
+      "note": "Walk to, not Pick up ('It's tied down.', [000F]). Hatch (164,79) to (203,103): dy 24 limits it, about 12 frames."
+    },
+    {
+      "name": "Pick up the Jolly Roger",
+      "room": 17,
+      "verb": 9,
+      "obj": 238,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 238
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-017-sh-crows/obj-0238-jolly-roger.txt [002B]-[0039] (setState 0, setClass 134, actor 3 removed, pickupObject); global/script-002.txt [034E]-[0397] (class 14 reach)",
+      "note": "Ingredient (room-014-sh-galley/obj-0158-cooking-pot.txt [014F]-[0162]). Walk (141,95) -> (141,79): dy 16, about 8 frames. Crash window: the reach."
+    },
+    {
+      "name": "Crow's nest to deck (jump)",
+      "room": 17,
+      "verb": null,
+      "obj": 237,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 19
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-017-sh-crows/obj-0237-ship-deck.txt [0012] (default verb Walk to), [005A]-[007E] (fallback: cutscene([]), 7 breakHere, endCutscene, loadRoomWithEgo(258,19))",
+      "note": "A type-0 cutscene: global 18/19 run doSentence(STOP) and global 11 (global/script-018.txt [0010], global/script-019.txt [0054]). Give no input during the jump. Ego lands at the rope ladder (203,103)."
+    },
+    {
+      "name": "Deck to captain's cabin (door)",
+      "room": 19,
+      "verb": null,
+      "obj": 253,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 7
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-019-sh-deck/obj-0253-door.txt [003D]-[0049] (state 1 -> loadRoomWithEgo(84,7)); room-007-sh-captai/obj-0084-door.txt [000C] setState(253,1)",
+      "note": "(203,103) -> (111,79): about 12 frames. Do NOT pre-press 'o' during this walk: global 6 is VAR_ENTRY_SCRIPT2 (global/script-001.txt [05A1]) and runs after every room's entry script (engines/scumm/script.cpp:1057-1058); its [005A] startScript(11) resets Var[107] to Var[111] = 11 (global/script-011.txt [0000], global/script-001.txt [0827]). The earliest legal 'o' is in the frame in which room 7 loads (see move 14)."
+    },
+    {
+      "name": "Open the cereal (inventory) on entering the cabin",
+      "room": 7,
+      "verb": 2,
+      "obj": 164,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 7
+        }
+      ],
+      "until": [
+        {
+          "bit": 366,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-006.txt [005A] startScript(11); global/script-011.txt [0000]; global/script-023.txt [004A]-[0056] (Walk to over the inventory becomes Look at); global/script-004.txt [0312]-[033F], [03C0]-[0407] doSentence(2,164,0); room-014-sh-galley/obj-0164-cereal.txt [00A8]-[0162]: [00AD] Bit[366]=1, [00B2] cutscene([2]), [00DD] doSentence(STOP), [00EC]-[0135] ten 'Crunch' prints with delay(10), [013F] delay(30), [0143] printEgo('GREAT! A toy prize inside.'), [0161] endCutscene, [0162] startScript(185); global/script-185.txt [0000]-[0015]",
+      "note": "Two inputs: 'o', then the cereal's slot one frame later (a key and a click cannot share _mouseAndKeyboardStat: the key overwrites the click, engines/scumm/input.cpp:439-458 then 1418-1558). 'o' may go in the frame in which room 7 loads: the door handler's loadRoomWithEgo runs inside runAllScripts (global 2 resumes after WaitForActor), and keys are executed by checkExecVerbs after runAllScripts (engines/scumm/scumm.cpp:3230-3232), so it lands after global 6/11. Fork test: if the load happens in checkAndRunSentenceScript instead, the 'o' of that frame is lost; then press it on the first frame room == 7 is observed. Never press it during the walk, and never click the slot with Walk to selected: hovering the inventory with Var[107] == 11 sets Var[394] = 11 and Var[107] = 8 and skips the restore while over the inventory (global/script-023.txt [004A]-[0056], raw jumps [006C] -> [0072] -> [008B]), so the click would be 'Look at cereal' (a three-part line, Bit[366] stays 0, obj-0164 [0042]). Predicted slot: verb 204 (row 3, column 0; view rows 2-3 = [732 901 902 903][164 238], entry.notes). The crunch lasts about 2 + 10x2 + 6 = 28 frames. 20 RNG calls (rng_points). The cereal stays in the inventory: it is still an ingredient."
+    },
+    {
+      "name": "Walk to the cabinet during the crunch (cereal while walking)",
+      "room": 7,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        269,
+        128
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 366,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "var": 108,
+          "eq": 0
+        },
+        {
+          "var": 53,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 41
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on room point (269,128), the cabinet's walk point (out/objects.json), on the first frame after the cereal's cutscene([2]) has started (the frame after move 14's slot click), with Walk to selected. Mechanism: the cutscene start does UserputSoftOff (global/script-018.txt [0007]); with the slide _userPut stays 1 (var 53 == 1, the after-condition that confirms the slide), so checkExecVerbs still runs input script 4 (engines/scumm/verbs.cpp:590). Type 2 skips global 18's doSentence(STOP)/script 11 block ([0009]), but Var[107] is already 11 and Var[108] 0 because move 14's completed sentence ran global/script-004.txt [0438]-[043D] startScript(11). Hover (global 23) is frozen by [0070] freezeScripts(127), so Var[108] stays 0 whatever is under the cursor and the click walks the ego (global/script-004.txt [0395]-[03B3], [040E]-[0431]). The doSentence(STOP) on that path is harmless: the cereal handler already stopped the sentence script at [00DD], and an inventory object has no reach cutscene.",
+      "cite": "room-014-sh-galley/obj-0164-cereal.txt [00B2]-[0161]; global/script-018.txt [0007], [0009], [0070]; global/script-004.txt [0395]-[03B3], [040E]-[0431]; engines/scumm/verbs.cpp:590; runner sources section 2.4 (G-COOK-CD 'Open the cereal immediately after entering this room, and click on the cabinet')",
+      "note": "The walk from the door (33,132) is dx 236, about 30 frames, so the 28-frame crunch is nearly free. The until only confirms the walk started (x leaves 33). FALLBACK without the slide (var 53 reads 0 inside the crunch): the click is dropped; skip this move and move 16, wait for has(157), then play move 17 with its own 'u' (about 28 idle frames).",
+      "gate": "input"
+    },
+    {
+      "name": "Select Use during the crunch (after the floor click)",
+      "room": 7,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "actor_x": 1,
+          "ge": 41
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on any frame after the floor click of move 15 while the crunch still runs. A verb key only sets Var[107] = 7 and clears Var[108]-[110] (global/script-004.txt [02B5]-[02C5] via script 20, then [0347]-[0356]); it runs no doSentence, so nothing is stopped. Order matters: 'u' BEFORE the floor click would make that click a 'Use' click with Var[108] = 0, which does not walk ([040E] needs Var[107] == 11) and resets the verb through [0438]-[043D] startScript(11). The type-2 crunch does not reset Var[107] at its end (global/script-019.txt [004D] skips doSentence(STOP)/script 11 for Local[0] == 2).",
+      "cite": "global/script-004.txt [0347]-[0356], [040E], [0438]-[043D]; global/script-019.txt [004D]-[0066]",
+      "note": "Saves the 'u' frame of move 17. Equivalent alternative: a right-click on the prize's slot after the crunch (its verb 90 sets Var[182] = 7, room-014-sh-galley/obj-0157-small-key.txt [0018]; global/script-004.txt [0000]-[0016] makes Use active) costs the same one input."
+    },
+    {
+      "name": "Use the prize with the cabinet",
+      "room": 7,
+      "verb": 7,
+      "obj": 157,
+      "obj2": 79,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 157
+        }
+      ],
+      "until": [
+        {
+          "state": 79,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0157-small-key.txt [00D7]-[00DE] doSentence(7,79,VAR_ME); room-007-sh-captai/obj-0079-cabinet.txt [0032]-[003F] startScript(25,[79]), startScript(25,[80]); global/script-025.txt [000A]-[003C]; global/script-008.txt [0000]-[0022] (157 has class 1: preposition 129); global/script-004.txt [0312]-[033F], [036D]-[037F], [03C0]-[03DA]; global/script-002.txt [032A]-[0397] (cabinet class 15 reach)",
+      "note": "Var[107] is already 7: no key. The prize's slot is live as soon as global 185 runs (inside the cereal's last slice; global 9 updates the slots at once), so the slot click can come on that frame; the slot click does not need hover (script 4 reads Var[133+slot] directly). Predicted slot: verb 204 (view rows 2-3 = [732 901 902 903][157 164 238]). The cabinet click needs hover to have set Var[109] = 79 after the crunch unfroze it: one frame later. Prize first is forced ('Use cabinet' alone is a one-object sentence that fails, obj-0079 [0048]). The heavy chest 81 is a child of the cabinet interior 80 and becomes clickable when both open. Crash window: the cabinet reach (after the 1-frame hop through 157's handler)."
+    },
+    {
+      "name": "Open the heavy chest (carry it, then open it)",
+      "room": 7,
+      "verb": 2,
+      "obj": 81,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 78,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0081-chest.txt [001B] doSentence(2,77,0), [0021] doSentence(9,81,0), [0028] startScript(184); global/script-184.txt [0000]-[008F] (cutscene([2]), carry to (156,123), setState(77,1), setClass(77,[32]), setBoxFlags(11,128), endCutscene, setOwnerOf(81,0)); room-007-sh-captai/obj-0077-chest.txt [0035] setState(77,0), [0039] setState(78,1); engines/scumm/script.cpp:1145-1197 (sentence stack is LIFO)",
+      "note": "One command does the carry and the open. Give no scene click during global 184's cutscene: with the slide a floor click runs doSentence(STOP) (global/script-004.txt [0426]), which empties the sentence stack and loses the queued Open 77. The carry is about 4 + 14 (walk) + 10 breakHere frames. The Open 77 sentence has the chest reach (class 16): crash window."
+    },
+    {
+      "name": "Look at the chest (recipe and cinnamon)",
+      "room": 7,
+      "verb": 8,
+      "obj": 77,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "bit": 531,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0077-chest.txt [00F3]-[00FF] (78 open -> doSentence(61,77,0)), [0071]-[00D8]: [007D] cutscene([2]), [0082] printEgo('Hey look!  A piece of paper.'), [00A1] pickupObject(85,0), [00A5] Bit[531]=1, [00AA] WaitForMessage, [00AC]-[00B4] reach and delay(20), [00B8] printEgo('And some cinnamon sticks.'), [00D4] pickupObject(88,0), [00D8] endCutscene",
+      "note": "Bit[531] is the recipe flag the pot requires (room-014-sh-galley/obj-0158-cooking-pot.txt [00BC]-[010A]). The verb-61 sentence has the chest reach cutscene (class 16; verb 61 is not exempt, global/script-002.txt [0370]-[037E]): crash window."
+    },
+    {
+      "name": "Skip 'Hey look! A piece of paper.'",
+      "room": 7,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "bit": 531,
+          "eq": 1
+        },
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "has": 88
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0077-chest.txt [0082]-[00AA], [00D4]; engines/scumm/input.cpp:1418-1419",
+      "note": "One part (G-COOK-CD: 'Right after looking at the chest, press the period key once'). The cinnamon line is not waited on."
+    },
+    {
+      "name": "Pick up the feather pen (unlocks the ink; later the fire fuel)",
+      "room": 7,
+      "verb": 9,
+      "obj": 75,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 75
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0075-feather-pen.txt [0024] setClass(82,[32]), [002B] pickupObject(VAR_ME,0); global/script-002.txt [033D]-[0397] (class 15 reach)",
+      "note": "Needed because the ink starts untouchable (class 32) and only this pickup clears it. The feather is then burnt for the flaming mass (move 44), which keeps the map and avoids scrolling. Crash window: the reach."
+    },
+    {
+      "name": "Pick up the ink",
+      "room": 7,
+      "verb": 9,
+      "obj": 82,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 82
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0082-ink.txt [0028] pickupObject(VAR_ME,0); global/script-002.txt [033D]-[0397] (class 15 reach)",
+      "note": "Ingredient (obj-0158-cooking-pot.txt [0119]-[0134]: Bit[427], the ink is kept). Crash window: the reach."
+    },
+    {
+      "name": "Open the drawer (dusty-book route)",
+      "room": 7,
+      "verb": 2,
+      "obj": 83,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 83,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0083-drawer.txt [002F] setState(VAR_ME,1); [0015]-[0026] default verb Open while closed; global/script-002.txt [033D]-[0397] (class 15 reach)",
+      "note": "Book route only (moves 23-26, about 1.4 s per LeoLitz, YT-SLIDE 15:35). The executor may right-click (default verb Open). Ink (154,116) -> drawer (118,120): about 5 frames. Crash window: the reach. ENGINE (2026-10-20, part3b lane): right-click (rclick): the verb-90 entry sets Var[182] = 2 (Open) while closed, so script 4 takes Open for a right click (global/script-004.txt [0005]-[0016]) and the 'o' key's frame goes (measured 1 frame on the cupboard and the hull chest with early inputs; the same mechanism here).",
+      "rclick": true
+    },
+    {
+      "name": "Look at the drawer (take the dusty book)",
+      "room": 7,
+      "verb": 8,
+      "obj": 83,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0083-drawer.txt [0039]-[00A9]: [0051] cutscene([2]), [0056] printEgo('There is an old, dusty book inside.' + wait() + 'Let's see what it is.'), [0093] WaitForMessage, [0095]-[009D] reach and delay(20), [00A1] pickupObject(74,0), [00A5] setState(74,0), [00A9] endCutscene",
+      "note": "Issue it with the ego still at the drawer: the cutscene starts in the click frame and Var[108] stays 0 (script 11 after the sentence, hover frozen) for move 25. Look at is exempt from the reach (global/script-002.txt [0377]). The book keeps the slide alive in Part III (runner sources section 2.5)."
+    },
+    {
+      "name": "Walk to the cabin door while finding the book",
+      "room": 7,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        33,
+        132
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "var": 108,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 110
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on room point (33,132), the door's walk point, on the first frame of the drawer's cutscene([2]) (the frame after move 24). Same mechanism as move 15: the slide keeps _userPut at 1 inside the cutscene (verbs.cpp:590), hover is frozen with Var[108] = 0, so script 4 walks the ego (global/script-004.txt [040E]-[0431]). The cutscene belongs to the drawer's object script, not to global 2, so the doSentence(STOP) on that path does not crash. The exit itself cannot be taken during the cutscene (hover frozen), hence move 27.",
+      "cite": "room-007-sh-captai/obj-0083-drawer.txt [0051]-[00A9]; global/script-004.txt [040E]-[0431]; G-COOK-CD 'While Guybrush is getting the dusty book, hold period and start walking towards the exit'",
+      "note": "Drawer (118,120) -> door (33,132): about 11 frames, which covers the two lines, the reach and delay(20). A '.' can share this frame (it never sets _mouseAndKeyboardStat). Fallback without the slide: the click is dropped; click the door after has(74).",
+      "gate": "input"
+    },
+    {
+      "name": "Skip the dusty-book lines",
+      "room": 7,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 74
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0083-drawer.txt [0056]-[0093]; engines/scumm/input.cpp:1418-1419",
+      "note": "Two parts (wait() code): '.' on each part's first effective frame (bridge SPEEDRUN_SKIP_TEXT logic). Then the reach, delay(20) (4 frames) and the pickup. ENGINE: no 'after': with the bridge's automatic '.' the lines are gone and the book is taken (pickupObject at [00A1]) before this move; until has(74) then holds and the move is a no-op. Waiting for var 25 == 1 hung here."
+    },
+    {
+      "name": "Leave the captain's cabin",
+      "room": 7,
+      "verb": null,
+      "obj": 84,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 74
+        }
+      ],
+      "until": [
+        {
+          "room": 19
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-007-sh-captai/obj-0084-door.txt [000C]-[0010]",
+      "note": "Hotspots work again once the cutscene has ended; the ego is already walking to the same point (the click in move 25 was a floor click)."
+    },
+    {
+      "name": "Deck to crew quarters (hatch), second time",
+      "room": 19,
+      "verb": null,
+      "obj": 254,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 9
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-019-sh-deck/obj-0254-hatch.txt [000C]-[001B]",
+      "note": "Door (111,79) -> hatch (164,79): about 7 frames."
+    },
+    {
+      "name": "Crew quarters to hull (hatch)",
+      "room": 9,
+      "verb": null,
+      "obj": 106,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 8
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-009-sh-crews/obj-0106-hatch.txt [000C]-[001B] loadRoomWithEgo(89,8); room-008-sh-hull/entry.txt [0000]-[00A2]",
+      "note": "Ladder (276,105) -> hatch (216,130): dy 25 limits it, about 13 frames. Ego arrives at the hull ladder (202,106)."
+    },
+    {
+      "name": "Take gunpowder (for the pot)",
+      "room": 8,
+      "verb": 9,
+      "obj": 90,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 101
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0090-kegs.txt [0021]-[006A] (owner(101) == 15 -> pickupObject(101,0)); global/script-002.txt [033D]-[0397] (class 15 reach)",
+      "note": "Open runs the same code. Only one gunpowder can be carried ([0087]); the pot returns it to the kegs (obj-0158 [0145]-[0149]), so a second hull trip is needed for the cannon. 'WOW! Gunpowder!' is not a cutscene. Ladder (202,106) -> kegs (142,116): about 8 frames. Crash window: the reach."
+    },
+    {
+      "name": "Pick up the giant piece of rope (moved from hull visit 2)",
+      "room": 8,
+      "verb": 9,
+      "obj": 91,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 91
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0091-giant-piece-of-rope.txt [0024] pickupObject(VAR_ME,0) (no condition), [0028] Var[357]=0; global/script-002.txt [033D]-[0397] (class 15 reach)",
+      "note": "FASTER ALTERNATIVE ADOPTED (reviewer 2). Taking the rope here costs kegs -> rope -> chest (13.5 + 9.8 frames) instead of kegs -> chest (18.8), about +4.5 frames, and removes the rope legs from hull visit 2 (ladder -> rope 18.5, rope -> kegs 13.5 replaced by ladder -> kegs 7.5): about -24.5 frames, net about 20 frames by the max(dx/8, dy/2) model (rope at (214,143)). The rope reach exists in either order. Fork-measure with real walkboxes. The rope (class 2) is harmless in the cooking reaches. Crash window: the reach."
+    },
+    {
+      "name": "Open the hull chest",
+      "room": 8,
+      "verb": 2,
+      "obj": 92,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "state": 92,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0092-chest.txt [00DE] startScript(25,[VAR_ME]), [0015]-[0029] default verb Open while closed; global/script-025.txt [000A]-[003C]; global/script-002.txt [032F]-[0397] (class 16 reach)",
+      "note": "Right-click gives Open in one input. Rope (214,143) -> chest (292,135): about 10 frames. Crash window: the reach. ENGINE (2026-10-20, part3b lane): right-click (rclick): the verb-90 entry sets Var[182] = 2 (Open) while closed, so script 4 takes Open for a right click (global/script-004.txt [0005]-[0016]) and the 'o' key's frame goes: done 1 frame sooner with early inputs (measured from slide-int1).",
+      "rclick": true
+    },
+    {
+      "name": "Look at the hull chest (fine wine)",
+      "room": 8,
+      "verb": 8,
+      "obj": 92,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0092-chest.txt [002F]-[009B]: [003B] class 18 (wine still inside), [0044] cutscene([2]), [0049] beginOverride, [004B] goto 0086, [004E] printEgo('There's some VERY fine wine in here.' + wait() + 'I'll grab it.'), [0086]-[0096] reach, delay(20), endCutscene, [0097] pickupObject(104,0)",
+      "note": "Issue it with the ego still at the chest so the cutscene starts in the click frame and Var[108] stays 0. No reach for Look at."
+    },
+    {
+      "name": "Walk to the hull ladder while finding the wine",
+      "room": 8,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        202,
+        106
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "var": 108,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "le": 285
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on room point (202,106), the ladder's walk point, on the first frame of the chest's cutscene([2]) (the frame after move 33). Mechanism as in move 15: slide keeps _userPut 1 inside the cutscene, hover frozen with Var[108] = 0, script 4 walks the ego (global/script-004.txt [040E]-[0431]); the cutscene is the chest's object script, so doSentence(STOP) is harmless. The pickup ([0097]) does not depend on where the ego is.",
+      "cite": "room-008-sh-hull/obj-0092-chest.txt [0044]-[0097]; global/script-004.txt [040E]-[0431]; LeoLitz YT-SLIDE 13:55-14:29",
+      "note": "Walk first, then Esc (move 35): the walk back (dx 90, dy 29: about 15 frames) is longer than the rest of the cutscene. Fallback without the slide: click the ladder after has(104).",
+      "gate": "input"
+    },
+    {
+      "name": "Esc the wine lines",
+      "room": 8,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "has": 104
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0092-chest.txt [0049] beginOverride, [004B] goto 0086, [0086]-[0097]; engines/scumm/script.cpp:1689-1709 (abortCutscene)",
+      "note": "The override is set in the cutscene's first frame; Esc on the next. Esc does not stop the walk; its key-27 copy that reaches script 4 with the slide is harmless (no 'Use X with' pending). After the jump: reach, delay(20) (4 frames), endCutscene, pickup.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hull to crew quarters (ladder)",
+      "room": 8,
+      "verb": null,
+      "obj": 89,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 104
+        }
+      ],
+      "until": [
+        {
+          "room": 9
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0089-ladder.txt [000C]-[001B] loadRoomWithEgo(106,9)",
+      "note": "LeoLitz: 'remember to click on the ladder a second time after you have acquired the wine' (move 34 was a floor click)."
+    },
+    {
+      "name": "Crew quarters to galley (door), second time",
+      "room": 9,
+      "verb": null,
+      "obj": 107,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 14
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-009-sh-crews/obj-0107-door.txt [000C]; room-014-sh-galley/entry.txt [0009]-[0017]",
+      "note": "Hatch (216,130) -> door (242,105): dy 25, about 13 frames. Do not pre-press 'u' during this walk (lost to global 6/11 on entry, see move 13); the 'u' of move 38 may go in the room-load frame or later."
+    },
+    {
+      "name": "Use the cooking pot with the cinnamon sticks",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 88,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 14
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [01FA]-[021C] (cinnamon: Bit[434], kept); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. First ingredient: 'u' (room-load frame or later), pot click, then the cinnamon's slot; the ego walks ladder (48,138) -> pot (197,126), about 19 frames. Order of the eight is free (obj-0158 [042B] sums Bits 427-434), so it is chosen to need no visible scroll: cinnamon, ink and gunpowder are visible on entry. Predicted slot: verb 200 (view rows 4-5 = [88 75 82 74][101 91 104]). Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select Use inside the cinnamon reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the ink, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Use the cooking pot with the ink",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 82,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 434,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [0119]-[0134] (ink: Bit[427], 'Just a drop.', kept); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 202. Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select Use inside the ink reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the gunpowder, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Use the cooking pot with the gunpowder",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 101,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 427,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [0136]-[014D] (gunpowder: Bit[428], setOwnerOf(101,0), setOwnerOf(101,15)); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 204. The handler removes 101 after the reach (setOwnerOf(101,0), back to the kegs), the list closes up (engines/scumm/object.cpp clearOwnerOf) and the view stays on rows 4-5. Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select 'Use feather pen' inside the gunpowder reach (inventory click during use)",
+      "room": 14,
+      "verb": 7,
+      "obj": 75,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "bit": 427,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        },
+        {
+          "var": 108,
+          "eq": 75
+        },
+        {
+          "not": {
+            "var": 110,
+            "eq": 0
+          }
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: 'u' then a left click on the feather pen's slot (predicted verb 201), on two of the 3 input frames inside the gunpowder sentence's reach. With the slide _userPut is 1 inside the type-2 reach, so both reach script 4 (verbs.cpp:590). The slot click takes [0312]-[033F] (Var[108] = 75, Local[6] = 1, goto 035B), [036D]-[037F] (startScript(8): the feather has class 2, so Var[110] = 130), then [03C0]-[03DA] goto 0440: no doSentence and no script 11, so global 2 keeps its cutscene and the selection survives the reach end (global/script-002.txt [03A9] only runs global 12).",
+      "cite": "global/script-004.txt [0312]-[033F], [035B], [036D]-[037F], [03BD]-[03DA]; global/script-008.txt [0000]-[0022]; out/objects.json room 7: 75 classes [2, 15]; G-COOK-CD 'While Guybrush is putting the breath mints in the cooking pot, press U, and click on the map'",
+      "note": "The guide burns the map; here the feather is the fuel because it is on screen now (no scroll) and the map is not needed later (global/script-107.txt [0135] removes it anyway). Allowed fuels: 75, 596, 752, 442, 689, 702, 85, 86 (room-014-sh-galley/obj-0161-red-hot-fire.txt [0047]-[01CA]). NEVER 74 (the dusty book burns at [009C]-[00AA]) and never 164 (burns at [0109]-[0123] once 157 is owned, making Bit[430] impossible). Only items with a class 1-4 preposition may be clicked inside a reach (crash_rules 2). After this, press no key but '.' until move 44 (crash_rules 6). Fallback without the slide: 'u' + feather after the reach.",
+      "gate": "input"
+    },
+    {
+      "name": "Complete 'Use feather pen with red hot fire' (fire click only)",
+      "room": 14,
+      "verb": 7,
+      "obj": 161,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 428,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 0
+        },
+        {
+          "var": 107,
+          "eq": 7
+        },
+        {
+          "var": 108,
+          "eq": 75
+        },
+        {
+          "not": {
+            "var": 110,
+            "eq": 0
+          }
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: ONE left click on the red hot fire 161, nothing else: verb and first object are already selected by move 43. Do not let the executor press 'u' or click the feather again: a verb key clears the pending selection (global/script-004.txt [0347]-[0356] zeroes Var[108]-[110]) and the fire click would then be 'Use red hot fire', 'Ouch, that's hot!' (obj-0161 [002C]-[0033]) with no flaming mass. The click completes only if hover has set Var[109] = 161 after the reach unfroze it (global/script-023.txt [0105]-[0111]); a click before that reaches [03CF] with Var[109] = 0 and does nothing ([03DA] goto 0440). Earliest frame: reach end or one later (fork test).",
+      "cite": "room-007-sh-captai/obj-0075-feather-pen.txt [0030]-[0037] (Local[0] == 161 -> doSentence(7,161,VAR_ME)); room-014-sh-galley/obj-0161-red-hot-fire.txt [0047]-[0055] (75: setOwnerOf(75,0), goto 01D7), [01D7]-[01F7] (pickupObject(167,0)); global/script-004.txt [03C5]-[0407]; global/script-002.txt [032A]-[0397] (fire class 16 reach)",
+      "note": "MILESTONE: has(167), the flaming mass, which lights the fuse later (S4#72); without it as a goal a search that only counts the stew's eight ingredients leaves it behind and the cannon costs a trip back to the galley (measured: 27-33 s). The feather's handler hops (one frame) to 'Use red hot fire with feather pen', which has the fire's reach (class 16), then burns the feather and picks up the flaming mass: the pickup jumps the view to the last two rows (rows 4-5 = [88 82 74 91][104 167]). Fire and pot walk points are 6 px apart ((191,126), (197,126)). The until is the fire reach's start; has(167) is checked by move 46. ENGINE: one click on the fire with Use selected (the line reads 'Use feather pen with'); with obj 75 and obj2 161 the pen was clicked again. ENGINE: has(167) comes on the frame the fire's reach ends (frame 10247 after the click at 10238), never together with var 352 == 1, so the reach start is this move's until and has(167) is the next move's (the milestone the search keeps).",
+      "gate": "input"
+    },
+    {
+      "name": "Select Use inside the fire reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        },
+        {
+          "has": 167
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the wine, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Use the cooking pot with the fine wine",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 104,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "has": 167
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [0195]-[01BD] (wine: Bit[431], kept); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 204. Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select Use inside the wine reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the cereal, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Scroll the inventory up one row inside the wine reach",
+      "room": 14,
+      "verb": 208,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 118,
+          "eq": 3
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the inventory up arrow (verb 208, shown when Var[118] > 0, global/script-009.txt [00F4]-[0106]) on a free input frame inside the current pot reach. Script 4 only decrements Var[118] and chains to the inventory script (global/script-004.txt [02E6]-[02F5] chainScript(9)): no doSentence, Var[107]-[110] untouched, so it is safe inside the reach and with 'Use' pre-selected. Global 9 redraws rows Var[118] and Var[118]+1 (global/script-009.txt [0063]-[00ED]). The verb id 208 is not in index.json's verb table (only 2-11, 18-29, 129-132), so this move carries no verb field: the executor clicks Profile.inv_up (src/speedrun/executor.py PROFILES['dos-cd']).",
+      "cite": "global/script-004.txt [02CA]-[02F5]; global/script-009.txt [0000]-[0040], [0063]-[0133]",
+      "note": "Row offset after this click: 3. Hidden inside the reach, so it costs no frame. The view prediction is in entry.notes; if vars 133-140 show the next item already, drop this move.",
+      "gate": "input"
+    },
+    {
+      "name": "Use the cooking pot with the cereal",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 164,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 431,
+          "eq": 1
+        },
+        {
+          "var": 118,
+          "eq": 3
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [0164]-[0193] (cereal: Bit[430], kept); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 201 (rows 3-4 = [157 164 238 85][88 82 74 91]). Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select Use inside the cereal reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the Jolly Roger, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Scroll the inventory up one row inside the cereal reach",
+      "room": 14,
+      "verb": 208,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 118,
+          "eq": 2
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the inventory up arrow (verb 208, shown when Var[118] > 0, global/script-009.txt [00F4]-[0106]) on a free input frame inside the current pot reach. Script 4 only decrements Var[118] and chains to the inventory script (global/script-004.txt [02E6]-[02F5] chainScript(9)): no doSentence, Var[107]-[110] untouched, so it is safe inside the reach and with 'Use' pre-selected. Global 9 redraws rows Var[118] and Var[118]+1 (global/script-009.txt [0063]-[00ED]). The verb id 208 is not in index.json's verb table (only 2-11, 18-29, 129-132), so this move carries no verb field: the executor clicks Profile.inv_up (src/speedrun/executor.py PROFILES['dos-cd']).",
+      "cite": "global/script-004.txt [02CA]-[02F5]; global/script-009.txt [0000]-[0040], [0063]-[0133]",
+      "note": "Row offset after this click: 2. Hidden inside the reach, so it costs no frame. The view prediction is in entry.notes; if vars 133-140 show the next item already, drop this move.",
+      "gate": "input"
+    },
+    {
+      "name": "Use the cooking pot with the Jolly Roger",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 238,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 430,
+          "eq": 1
+        },
+        {
+          "var": 118,
+          "eq": 2
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [014F]-[0162] (flag: Bit[429], setOwnerOf(238,14)); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 206 (rows 2-3 = [732 901 902 903][157 164 238 85]). The handler gives 238 to room 14, so it leaves the ego's list. Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select Use inside the Jolly Roger reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the chicken, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Scroll the inventory up one row inside the Jolly Roger reach (1 of 2)",
+      "room": 14,
+      "verb": 208,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 118,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the inventory up arrow (verb 208, shown when Var[118] > 0, global/script-009.txt [00F4]-[0106]) on a free input frame inside the current pot reach. Script 4 only decrements Var[118] and chains to the inventory script (global/script-004.txt [02E6]-[02F5] chainScript(9)): no doSentence, Var[107]-[110] untouched, so it is safe inside the reach and with 'Use' pre-selected. Global 9 redraws rows Var[118] and Var[118]+1 (global/script-009.txt [0063]-[00ED]). The verb id 208 is not in index.json's verb table (only 2-11, 18-29, 129-132), so this move carries no verb field: the executor clicks Profile.inv_up (src/speedrun/executor.py PROFILES['dos-cd']).",
+      "cite": "global/script-004.txt [02CA]-[02F5]; global/script-009.txt [0000]-[0040], [0063]-[0133]",
+      "note": "Row offset after this click: 1. Hidden inside the reach, so it costs no frame. The view prediction is in entry.notes; if vars 133-140 show the next item already, drop this move.",
+      "gate": "input"
+    },
+    {
+      "name": "Scroll the inventory up one row inside the Jolly Roger reach (2 of 2)",
+      "room": 14,
+      "verb": 208,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 118,
+          "eq": 0
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on the inventory up arrow (verb 208, shown when Var[118] > 0, global/script-009.txt [00F4]-[0106]) on a free input frame inside the current pot reach. Script 4 only decrements Var[118] and chains to the inventory script (global/script-004.txt [02E6]-[02F5] chainScript(9)): no doSentence, Var[107]-[110] untouched, so it is safe inside the reach and with 'Use' pre-selected. Global 9 redraws rows Var[118] and Var[118]+1 (global/script-009.txt [0063]-[00ED]). The verb id 208 is not in index.json's verb table (only 2-11, 18-29, 129-132), so this move carries no verb field: the executor clicks Profile.inv_up (src/speedrun/executor.py PROFILES['dos-cd']).",
+      "cite": "global/script-004.txt [02CA]-[02F5]; global/script-009.txt [0000]-[0040], [0063]-[0133]",
+      "note": "Row offset after this click: 0. Hidden inside the reach, so it costs no frame. The view prediction is in entry.notes; if vars 133-140 show the next item already, drop this move.",
+      "gate": "input"
+    },
+    {
+      "name": "Use the cooking pot with the chicken",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 377,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 429,
+          "eq": 1
+        },
+        {
+          "var": 118,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [021E]-[0264] (chicken: Bit[433], setOwnerOf(377,14)); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 202 (rows 0-1 = [488 442 377 395][643 752 596 907]). The handler gives 377 to room 14. Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Select Use inside the chicken reach",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: the 'u' key on one of the 3 input frames inside the current pot reach (the sentence frame S runs checkExecVerbs before the reach starts; delay(20) is 4 frames at var 19 = 5, decremented before runAllScripts, so inputs of S+1..S+3 land inside and S+4's input lands after endCutscene: engines/scumm/scumm.cpp:3132, 3230-3232; global/script-002.txt [0385]-[0397]). With the slide _userPut is 1 inside the type-2 reach, so the key reaches script 4 (verbs.cpp:590). A verb key runs no doSentence (global/script-004.txt [02B5]-[02C5], [0347]-[0356]), so global 2 keeps its cutscene.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [0347]-[0356]; global/script-018.txt [0009]",
+      "note": "Pre-selects Use for the breath mints, so its pot click can come on the first frame after the reach. LeoLitz warns against verb keys during pickups (YT-SLIDE 15:02); by the scripts it is safe: fork test (open_questions). Fallback without the slide: press 'u' after the reach (one frame later each time)."
+    },
+    {
+      "name": "Use the cooking pot with the breath mints (eighth ingredient)",
+      "room": 14,
+      "verb": 7,
+      "obj": 158,
+      "obj2": 395,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 433,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 260,
+          "eq": 8
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0158-cooking-pot.txt [01BF]-[01F8] (mints: Bit[432], kept), [042B]-[0455] (Var[260] == 8 -> startScript(108)); room-014-sh-galley/obj-0158-cooking-pot.txt [0088]-[0112] (Var[260] < 8, Bit[531], setClass(158,[146])), [042B]-[0455]; global/script-004.txt [036D]-[037F], [0395]-[03B3], [0312]-[033F], [03C0]-[0407]",
+      "note": "The until is the start of this sentence's reach (var 352 == 1) so the next move can act inside it. Predicted slot: verb 202 again (rows 0-1 = [488 442 395 643][...]). The mints have class 2 only inside the galley (room-014-sh-galley/entry.txt [0009]). The eighth sentence starts global 108 from inside the pot's handler. Pot first, item second: the pot (class 2) leaves 'Use cooking pot with' pending and the item click completes the sentence, which reaches the pot directly (pot class 15: reach, global/script-002.txt [032A]-[0397]); item first adds a one-frame hop through the item's Use handler for no gain. The pot click needs hover to have run after the previous reach ended (Var[108] = 158); whether that is the reach-end frame or the next depends on the slot order of global 23 and global 2: fork test. The item click is a slot click (no hover needed). Crash window: the reach (crash_rules 1)."
+    },
+    {
+      "name": "Esc the cooking cutscene",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "var": 260,
+          "eq": 8
+        },
+        {
+          "var": 23,
+          "eq": 28
+        }
+      ],
+      "until": [
+        {
+          "var": 259,
+          "eq": 1
+        },
+        {
+          "var": 32,
+          "eq": 201
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-108.txt [0000] cutscene([1]), [002B] startSound(28), breakHere at [0054], [006D], [0086], [009F], [00AC], [00B3], [00BA], [00C1], [00C2] beginOverride, [00C4] goto 0221, [0221]-[0251]: [022F] loadRoom(14), [0239] Var[259]=1, [0249] VAR_VERB_SCRIPT = 201, [024E] startScript(202), [0251] endCutscene; engines/scumm/input.cpp:1423-1428; engines/scumm/scumm.cpp:3177, 3231",
+      "note": "Global 108 runs its first slice (to [0054]) in frame F0, the frame var 23 first reads 28. Its eight breakHere put [00C2] beginOverride in F8's runAllScripts; Esc is handled in processInput before runAllScripts, so the first Esc that works is in F9: press it 9 frames after F0 (an earlier Esc finds no override; its key-27 copy only runs global 20 through script 4 and is harmless, so a per-frame retry until the until holds is also safe). It skips the fumes, the voyage text, 'Days pass' and the sound-28 wait. Give no other input during 108: with the slide a click would walk the ego against 108's walkActorTo ([002D]).",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stand up (one scene click)",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        160,
+        100
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 201
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-014-sh-galley/local-201.txt [0000] (only area 2, a scene click, is handled), [0007] cutscene([2]), [000C] stopScript(202), [000E] print(255,' '), [0017]-[0022] twelve breakHere, [0023]-[002C] costume and delay(20), [0030] printEgo('I feel awful.'), [0040] WaitForMessage, [0042] VAR_VERB_SCRIPT = 4, [0047] endCutscene",
+      "note": "Any point in the room view (y < 144); it is not a walk. Earliest frame: the one after the Esc (global 19 clears the click of the frame the cooking cutscene ends, global/script-019.txt [0054]). From this click until var 32 == 4 the only safe input is '.' (crash_rules 3)."
+    },
+    {
+      "name": "Skip 'I feel awful.'",
+      "room": 14,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-014-sh-galley/local-201.txt [0030]-[0047]; engines/scumm/input.cpp:1418-1419",
+      "note": "Local 201's print(255) at [000E] clears any stale ego line, so var 25 == 1 is this line. '.' only zeroes _talkDelay and never reaches the input script, so it is safe in the crash window."
+    },
+    {
+      "name": "Pick up the pot (helmet)",
+      "room": 14,
+      "verb": 9,
+      "obj": 165,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "until": [
+        {
+          "has": 165
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0165-pot.txt [00CB] pickupObject(VAR_ME,0); global/script-002.txt [033D]-[0397] (class 15 reach)",
+      "note": "Needed for the cannon (room-019-sh-deck/obj-0257-cannon-nozzle.txt [00C1]-[00CD]). The ego stands at about (197,136) (global/script-108.txt [002D]); the pot's walk point (98,129) is on the way to the ladder (48,138). Taking it on the way in instead is a wash by the walk model (about +6 frames in, -6 out). Crash window: the reach."
+    },
+    {
+      "name": "Galley to crew quarters (ladder), second time",
+      "room": 14,
+      "verb": null,
+      "obj": 166,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 9
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-014-sh-galley/obj-0166-ladder.txt [000C]-[001D] (stopSound(115), loadRoomWithEgo(107,9))",
+      "note": "(98,129) -> (48,138): about 7 frames."
+    },
+    {
+      "name": "Crew quarters to hull (hatch), second time",
+      "room": 9,
+      "verb": null,
+      "obj": 106,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 8
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-009-sh-crews/obj-0106-hatch.txt [000C]-[001B]",
+      "note": "Door (242,105) -> hatch (216,130): about 13 frames."
+    },
+    {
+      "name": "Take gunpowder (for the cannon)",
+      "room": 8,
+      "verb": 9,
+      "obj": 90,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "has": 101
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0090-kegs.txt [0021]-[0031], [006D] ('I'll take some more.')",
+      "note": "Possible because the pot gave 101 back to the room (owner 15). The rope is already carried (move 31). Ladder -> kegs about 8 frames. Crash window: the reach."
+    },
+    {
+      "name": "Hull to crew quarters (ladder), second time",
+      "room": 8,
+      "verb": null,
+      "obj": 89,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 9
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0089-ladder.txt [000C]-[001B]",
+      "note": "Kegs (142,116) -> ladder (202,106): about 8 frames."
+    },
+    {
+      "name": "Crew quarters to deck (ladder), last time",
+      "room": 9,
+      "verb": null,
+      "obj": 105,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "room": 19
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-009-sh-crews/obj-0105-ladder.txt [000C]-[001B]; room-019-sh-deck/entry.txt [001D]-[002C] (Var[259] set: RoomScroll(160,640), Monkey Island touchable), [010F]-[0119] (Var[259] == 1 -> startScript(206), Var[259] = 2)",
+      "note": "Hatch (216,130) -> ladder (276,105): about 13 frames. Entering the deck after cooking starts local 206 ('Monkey Island ahead')."
+    },
+    {
+      "name": "Stop by the cannon during 'Monkey Island ahead'",
+      "room": 19,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        226,
+        102
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 19
+        },
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "var": 108,
+          "eq": 0
+        },
+        {
+          "actor_x": 1,
+          "ge": 166
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: one left click on room point (226,102), the cannon's walk point, on the first frame after local 206 has issued walkActorTo(1,326,121) (206 [0005] breakHere, [0006] walk: the ego leaves the hatch point (164,79), hence actor_x >= 166). A click before that frame is overridden by 206's own walk. Mechanism: 206 is cutscene([1]); global 18 runs global 11 (Var[108] = 0) and freezes hover; the slide keeps _userPut at 1, so script 4 walks the ego to the click (global/script-004.txt [040E]-[0431]); 206's WaitForActor(1) ([000F]) ends where the ego stops and the line follows. The camera pan to 352 continues; convert the room point with the current camera xstart.",
+      "cite": "room-019-sh-deck/local-206.txt [0000] cutscene([1]), [0006] walkActorTo(1,326,121), [000C] panCameraTo(352), [000F] WaitForActor(1), [0012] printEgo('Holy Monkey Bladders!' + wait() + 'It's Monkey Island.'), [0042] endCutscene; global/script-018.txt [0009]-[0018]; LeoLitz YT-SLIDE 18:52-19:24",
+      "note": "Aim at the cannon/fuse side because the new cannon order (moves 70-74) starts with the rope at the cannon (226,102) and the fuse (228,98) is next to it. Hatch -> cannon: dy 23 limits it, about 12 frames. Fallback without the slide: the click is dropped and the ego walks to (326,121); walk back to (226,102) afterwards.",
+      "gate": "input"
+    },
+    {
+      "name": "Skip 'Holy Monkey Bladders! It's Monkey Island.'",
+      "room": 19,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-019-sh-deck/local-206.txt [0012]-[0042]; global/script-019.txt [0000] (Var[352] -= 1)",
+      "note": "Two parts: one '.' per part. Local 206 is cutscene([1]): global/script-018.txt [003A]-[0055] saves verbs 2-11 and the inventory slots 200-209, so the rope cannot be pre-selected during it (a verb key matches no live verb, a slot click hits no slot: global/script-004.txt [02D6])."
+    },
+    {
+      "name": "Use the rope with the cannon (fuse appears)",
+      "room": 19,
+      "verb": 7,
+      "obj": 91,
+      "obj2": 256,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [],
+      "until": [
+        {
+          "actor_room": 6,
+          "eq": 19
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-008-sh-hull/obj-0091-giant-piece-of-rope.txt [0043]-[004A] (Local[0] == 256 -> startScript(250)), [004D]-[00E6] (rename, Var[357]++); room-019-sh-deck/local-250.txt [0000]-[0023] (fuse actor 6 into room 19, [001E] breakHere, [0023] setClass(252,[32]) makes the fuse touchable); global/script-002.txt [027A]-[02A1], [032A]-[0369]",
+      "note": "MEASURED (seed 836557856, no slide): the rope's Use runs local 250 (the fuse, actor 6, appears in room 19) but Var[357] still reads 0 afterwards, so the until is the fuse actor alone. Rope first, cannon second. The cannon DOES have class 2 ('with', out/objects.json room 19: 256 classes [2]), so 'Use cannon with rope' is possible, but the cannon's handler rejects it: Local[0] == 91 -> 'That isn't going to work.' (room-019-sh-deck/obj-0256-cannon.txt [000C]-[006B]). No reach: the reach class is read from the first object, and the rope is in the inventory (global/script-002.txt [0364]-[0369]). Predicted slot: verb 201 (view rows 4-5 = [74 91 104 167][165 101], entry.notes). The rope stays in the inventory."
+    },
+    {
+      "name": "Light the fuse: Use the fuse with the flaming mass",
+      "room": 19,
+      "verb": 7,
+      "obj": 252,
+      "obj2": 167,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "actor_room": 6,
+          "eq": 19
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-019-sh-deck/obj-0252-fuse.txt [000F]-[0016] (Local[0] == 167 -> startScript(251,[],F); no Bit[399] test); room-019-sh-deck/local-250.txt [0023]; room-019-sh-deck/local-251.txt [0003] actorFollowCamera, [0006] startSound(30), [000B]-[0022] 24 breakHere, [0026] delay(120), [002A] Bit[399] test; global/script-002.txt [032A]-[0397] (fuse class 15 reach)",
+      "note": "FASTER ALTERNATIVE ADOPTED (both reviewers): light the fuse before loading the gunpowder. The fuse becomes touchable on local 250's second frame; the fuse click needs hover to see it (one frame after). Fuse first, mass second: 'Use flaming mass with fuse' works too but hops through obj-0167 [002B]-[0032] (one frame later). Walk (226,102) -> (228,98): about 2 frames, then the fuse reach. Local 251 is freeze-resistant (F), so later cutscenes do not pause it; it tests Bit[399] about 48 frames after lighting (24 breakHere + delay(120) = 24 frames at var 19 = 5). Predicted mass slot: verb 203. Crash window: the fuse reach. The until is the reach's start, for move 72."
+    },
+    {
+      "name": "Select 'Use gunpowder' inside the fuse reach (inventory click during use)",
+      "room": 19,
+      "verb": 7,
+      "obj": 101,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 352,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 107,
+          "eq": 7
+        },
+        {
+          "var": 108,
+          "eq": 101
+        },
+        {
+          "not": {
+            "var": 110,
+            "eq": 0
+          }
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: 'u' then a left click on the gunpowder's slot (predicted verb 205) on two of the 3 input frames inside the fuse reach. Same path as move 43: global/script-004.txt [0312]-[033F], [036D]-[037F] (gunpowder class 1: Var[110] = 129), [03C0]-[03DA] goto 0440; no doSentence, so the reach's cutscene survives.",
+      "cite": "global/script-004.txt [0312]-[033F], [036D]-[037F], [03C0]-[03DA]; global/script-008.txt; out/objects.json room 8: 101 classes [1, 15]",
+      "note": "A right-click on the gunpowder (verb 90 sets Var[182] = 7, room-008-sh-hull/obj-0101-gunpowder.txt [0015]) would also select Use in one input, but not inside a reach (hover is frozen there, Var[182] is stale). Fallback without the slide: 'u' + gunpowder after the reach (2 frames; still far inside the 48-frame fuse budget). ENGINE (2026-10-20): 'after' is the lighting reach's cutscene alone; Var[357] stays 0 here (as measured at the rope), so the old 'var 357 == 1' term never held and the whole cannon sequence fell back to the search ('Use pot' twice, about 10 s lost).",
+      "gate": "input"
+    },
+    {
+      "name": "Complete 'Use gunpowder in cannon nozzle' (nozzle click only)",
+      "room": 19,
+      "verb": 7,
+      "obj": 257,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 23,
+          "eq": 30
+        },
+        {
+          "var": 352,
+          "eq": 0
+        },
+        {
+          "var": 108,
+          "eq": 101
+        },
+        {
+          "not": {
+            "var": 110,
+            "eq": 0
+          }
+        }
+      ],
+      "until": [
+        {
+          "bit": 399,
+          "eq": 1
+        }
+      ],
+      "kind": "glitch",
+      "glitch": "Input: ONE left click on the cannon nozzle 257 once hover runs again after the fuse reach (Var[109] = 257); no key (a key would clear the pending selection, global/script-004.txt [0347]-[0356]). var 23 == 30 shows the fuse is lit (local-251 [0006]).",
+      "cite": "room-008-sh-hull/obj-0101-gunpowder.txt [0021] doSentence(7,Local[0],VAR_ME); room-019-sh-deck/obj-0257-cannon-nozzle.txt [002C]-[0059] (cutscene([2]), three breakHere, [0048] Bit[399]=1, gunpowder back to the kegs, endCutscene); global/script-002.txt [027A]-[02A1]",
+      "note": "The nozzle (257), not the cannon (256: 'There's  no place back here to put the gunpowder.', obj-0256 [0011]-[0018]). Gunpowder must be first ('Use cannon nozzle' alone is a one-object sentence, and with 251 running and Bit[399] clear it stops the fuse: obj-0257 [0106]-[0112], crash_rules 8). Walk (228,98) -> (301,108): about 9 frames, then the gunpowder hop (1 frame) and the nozzle cutscene (4 frames). No reach (the nozzle has no reach class). ENGINE: played as one click on 257 with Use selected (the sentence line already reads 'Use gunpowder with'); with obj 101 and obj2 257 the executor clicked the gunpowder again first.",
+      "gate": "input"
+    },
+    {
+      "name": "Walk to the cannon nozzle (climbs in, starts the shot)",
+      "room": 19,
+      "verb": null,
+      "obj": 257,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 399,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "bit": 399,
+          "eq": 1
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-019-sh-deck/obj-0257-cannon-nozzle.txt [000F]-[0018] (Walk to while 251 runs -> startObject(257,7)), [007C]-[0100] (251 running, Var[259] set, Bit[399], owner(165) == ego -> startScript(107)); global/script-004.txt [03E0]-[0407]; global/script-107.txt [0000] cutscene([3])",
+      "note": "One plain click with Walk to (the default verb after the gunpowder sentence's script 11); the ego is already at the nozzle. Replaces the old 'Use pot' chain (obj-0165 [0074] needs Bit[399] before the fuse is lit, so it cannot light the fuse in this order). The whole sequence from lighting to 107 is about 17 frames of the fuse's 48 (local-251 [002A]); if 107 is not running by then the cannon fires empty or the fuse dies (crash_rules 8)."
+    },
+    {
+      "name": "Esc the cannon shot",
+      "room": 19,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "bit": 399,
+          "eq": 1
+        },
+        {
+          "var": 352,
+          "eq": 1
+        },
+        {
+          "actor_x": 1,
+          "ge": 290
+        }
+      ],
+      "until": [
+        {
+          "room": 98
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-107.txt [0000] cutscene([3]), [0009] beginOverride, [000B] goto 00DB, [00DB] stopSound(30), [00DD] beginOverride, [00DF] goto 0110, [00E2] loadRoom(98)",
+      "note": "Global 107's override is live from its first slice. Bit[399] == 1 with var 352 == 1 can only be 107: inside the nozzle's own cutscene Bit[399] is still 0 at every frame end ([0048] and [0059] endCutscene run in one slice). Esc on the next frame. The jump lands on the Part III card's own override.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Esc the Part III card",
+      "room": 98,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 98
+        }
+      ],
+      "until": [
+        {
+          "room": 20
+        },
+        {
+          "var": 32,
+          "eq": 201
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-107.txt [00DD] beginOverride, [0102]-[0109] (card sound wait, skipped), [0110]-[016D]: [0119] putActorInRoom(VAR_EGO,20), [011D] putActor(VAR_EGO,344,105), [0129]-[015D] setOwnerOf(101/91/689/442/566/75/88/85/86/104/157/165/164/167,0), [0161] Bit[398]=1, [0166] endCutscene, [0167] startScript(17,[2]), [016D] actorFollowCamera(VAR_EGO); room-020-main-beac/entry.txt [0067]-[00A6] (global 45 twice, Bit[398] -> 0, costume 72, VAR_VERB_SCRIPT = 201, startScript(202))",
+      "note": "Segment end. The beach entry runs in the same slice (actorFollowCamera -> startScene(20)), so at the exit frame local 202's cutscene([]) is already open: var 352 == 1 and, with the slide, var 53 == 1 (exit.flags). The next input (S5) is local 202's Esc, then the beach stand-up with the same crash rule as move 60.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rng_points": [
+    {
+      "where": "Captain's cabin, opening the cereal (move 14)",
+      "what is random": "Screen positions of the ten 'Crunch' prints: 20 getRandomNr(20) calls",
+      "script": "room-014-sh-galley/obj-0164-cereal.txt [00F1]-[0105]",
+      "how the seed/search should treat it": "Cosmetic, fixed count (20 calls, positions follow the walking ego); count it when replaying the stream to S5 and later."
+    },
+    {
+      "where": "Deck (room 19), visits 2-6",
+      "what is random": "Which crew member plays an idle animation: getRandomNr(2) every 180 jiffies (36 frames at var 19 = 5)",
+      "script": "room-019-sh-deck/local-205.txt [0000]-[0004], started by room-019-sh-deck/entry.txt [010C]",
+      "how the seed/search should treat it": "Cosmetic. One call per 36 frames on the deck, so deck frame counts (notably the final cannon visit, about 50 frames) shift the stream."
+    },
+    {
+      "where": "Hull (room 8), both visits",
+      "what is random": "Which of sounds 63/64/65 plays: getRandomNr on entry and then after 25, 41 and 26 frames in a loop",
+      "script": "room-008-sh-hull/local-200.txt [0013], [0071], [00D9]",
+      "how the seed/search should treat it": "Cosmetic; one call per entry plus one per elapsed step. Visit 1 is longer now (rope), visit 2 shorter."
+    },
+    {
+      "where": "Galley, between the cooking cutscene and the stand-up click",
+      "what is random": "The lying ego's noises: getRandomNr for the text and getRandomNr(15) for the next delay",
+      "script": "room-014-sh-galley/local-202.txt [000F], [00A8]; started by global/script-108.txt [024E], stopped by room-014-sh-galley/local-201.txt [000C]",
+      "how the seed/search should treat it": "Cosmetic. With the stand-up click on the earliest frame 202 is stopped before its first delay ends: normally zero calls."
+    },
+    {
+      "where": "S4/S5 boundary: the exit frame itself (room 20 entry)",
+      "what is random": "Two instances of global 45 (birds, actors 3 and 4) each call getRandomNr four times in their first slice: 8 calls in the exit frame",
+      "script": "room-020-main-beac/entry.txt [0067], [006D] startScript(45,[3]/[4],F,R); global/script-045.txt [00C2], [00E7], [0101], [0115] (no break before [0115])",
+      "how the seed/search should treat it": "Count these 8 calls in S4's stream so the Part III catacombs accounting (S5/S6) is complete; later global 45 cycles belong to S5."
+    },
+    {
+      "where": "Deck crew dialogue (local 204), not on the route",
+      "what is random": "Dialogue menu loop getRandomNr(1) and the 'You got it.' reply getRandomNr(4)",
+      "script": "room-019-sh-deck/local-204.txt [046E], [011A]",
+      "how the seed/search should treat it": "Avoid talking to the crew (obj-0259): it costs time and dialogue code sets userput hard, which would destroy the slide."
+    },
+    {
+      "where": "Whole segment",
+      "what is random": "Nothing on the route has a random outcome: the ship puzzle and the carrier tail (global 70 has no getRandomNr) are deterministic.",
+      "script": "Engine side: v5 has no per-frame RNG call (runner sources section 7); the talk-animation RNG at engines/scumm/actor.cpp:2631 is HE-only. All sound waits on the route are skipped by overrides (global/script-122.txt [003C]-[0041], global/script-108.txt [00CD]-[00D2], global/script-107.txt [0104]-[0109]).",
+      "how the seed/search should treat it": "Seed choice is free here; record the exact frame of every S4 input because the deck, hull and galley loops above shift the stream that S5+ depends on."
+    }
+  ],
+  "glitches": [
+    {
+      "name": "Item slide carried from Part I (enabler), armed by the carrier's last endCutscene",
+      "saves": "Enables every overlap below and the Part III oars/monkey skips.",
+      "mechanism": "The slide is _userPut one above what the cutscene nesting implies: 2 at rest, 1 inside one cutscene. room-083-cu-dock/local-200.txt [0C6E] UserputOn hard-sets 1 while global 70's cutscene is open (its SoftOff already counted); 122's start takes it to 0 (global/script-018.txt [0007]), 122's end back to 1 (global/script-019.txt [0007]), deck local 200 to 0 and back to 1, and global 70's final endCutscene ([02DA], or [0211] then [021A]/[02DA] in case B) to 2. No hard set runs in S4 before that: global/script-122.txt [0050] UserputOff is skipped by move 0 and would be a no-op anyway (_userPut is 0 there). After it, cutscene starts and ends are soft (-1/+1), so inside type-2/type-0 cutscenes _userPut stays 1 and checkExecVerbs keeps accepting clicks and keys (engines/scumm/verbs.cpp:590). Hover is frozen by every cutscene (global/script-018.txt [0070]), so room objects cannot be clicked then (a click is a floor click while Var[108] = 0); verb keys and inventory slots work inside type-2 and type-0 cutscenes; types 1 and 3 save the verbs and slots (global/script-018.txt [003A]-[0070]), so inside them (122, 108, 107, deck local 200 and 206) only floor clicks get through.",
+      "inputs": "None. It must not be destroyed: no dialogue (global/script-032.txt [0011] UserputOn, global/script-014.txt [00E2] UserputOff), no talking to the crew.",
+      "risk": "If S3's carrier was already finished before [0C6E], var 53 never reaches 2: the kind=glitch moves fall back (their notes). Checked at move 6 (var 53 == 2 with var 352 == 0) and move 15 (var 53 == 1 inside the crunch).",
+      "cite": "global/script-018.txt [0000]-[0007], [0070]; global/script-019.txt [0000]-[0007]; global/script-070.txt [0211], [021A], [02DA]; engines/scumm/script_v5.cpp:853-886 (o5_cursorCommand: 3/4 hard set, 5/6 soft); S3-crew-slide.json exit.notes"
+    },
+    {
+      "name": "Carrier tail overlap (global 70 finishes during the transit)",
+      "saves": "Up to the tail's length (at least delay(60) = 12 frames plus its ego lines, more in case B), capped by the cabin -> deck -> crew -> galley transit (about 17 frames).",
+      "mechanism": "Inside global 70's cutscene _userPut is 1, so clicks are accepted although the bridge reports cs >= 1. In case A the hover script restarted by room 7's entry is not frozen by the carrier, so exits are real object clicks; in case B the carrier's [021A] freezes hover until [02DA] and only floor walks are possible. The carrier disturbs walks three ways: [025C] redirect, [0298] turn, [0211]/[021A]/[02DA] doSentence(STOP) + script 11.",
+      "inputs": "Moves 3-5 (exit clicks on the first possible frame, bypassing the cs == 0 gate) with the carrier retry rule; '.' on every carrier ego line (bridge text skip); move 6 waits for var 352 == 0.",
+      "risk": "A carrier cutscene boundary inside a reach window crashes (crash_rules 7): hence the gate on move 6. Re-clicks cost 1-5 frames each.",
+      "cite": "global/script-070.txt [021A]-[02DA]; room-007-sh-captai/entry.txt [0000]; engines/scumm/verbs.cpp:590; engines/scumm/script.cpp:926-958"
+    },
+    {
+      "name": "Cereal while walking",
+      "saves": "About 28 frames: the crunch runs while the ego walks the 236 px (about 30 frames) from the cabin door to the cabinet.",
+      "mechanism": "The cereal's Open handler is a 28-frame cutscene([2]) in the cereal's own script; with the slide a floor click during it walks the ego (global/script-004.txt [040E]-[0431]). The handler stops the sentence script itself ([00DD] doSentence(STOP)), so the click's doSentence(STOP) is harmless.",
+      "inputs": "Move 14: 'o' in the room-7 load frame or later (never during the walk), the cereal slot one frame later; move 15: floor click at (269,128) the next frame; move 16: 'u' after the floor click.",
+      "risk": "'o' during the walk is reset by global 6/11 on entry and the slot click then becomes 'Look at cereal'; 'u' before the floor click turns it into a non-walking Use click.",
+      "cite": "room-014-sh-galley/obj-0164-cereal.txt [00A8]-[0162]; global/script-006.txt [005A]; global/script-023.txt [004A]-[0056]; G-COOK-CD; YT-SLIDE 12:17-13:55"
+    },
+    {
+      "name": "Walking during the book and wine discoveries",
+      "saves": "The walk to the exit overlaps the text, reach animation and delay(20) of each discovery.",
+      "mechanism": "Both discoveries are cutscene([2]) in the object's own script (drawer, hull chest), not in global 2, so a floor click during them only walks (global/script-004.txt [040E]-[0431]); Var[108] is 0 because the Look sentence starts with the ego already at the object.",
+      "inputs": "Moves 24-26 (book: Look, click (33,132), '.' x2) and 33-35 (wine: Look, click (202,106), Esc); then click the exit again (moves 27, 36).",
+      "risk": "The exit click during the cutscene is a floor click, so the exit must be clicked again afterwards (YT-SLIDE 14:29).",
+      "cite": "room-007-sh-captai/obj-0083-drawer.txt [0051]-[00A9]; room-008-sh-hull/obj-0092-chest.txt [0044]-[0097]; G-COOK-CD; YT-SLIDE 13:55-14:29, 16:06"
+    },
+    {
+      "name": "Inputs during use (cooking reaches and the fuse reach)",
+      "saves": "About one frame per pot sentence ('u' hidden in the previous reach), two frames for the fire and for the gunpowder (verb and first object hidden), and all four inventory scrolls.",
+      "mechanism": "Each pot/fire/fuse sentence has a 4-frame reach cutscene([2]) in global 2 ([0385]-[0397]): 3 input frames lie inside it (the sentence frame's input runs before the reach starts; delays are decremented before runAllScripts and input is handled after it, engines/scumm/scumm.cpp:3132, 3230-3232). With the slide, verb keys, inventory slots and the scroll arrows reach script 4 there. A verb key only sets Var[107] ([0347]-[0356]); an arrow only changes Var[118] and chains to script 9 ([02E6]-[0304]); a slot click with Use selected and an item that has a class 1-4 preposition takes [0312]-[033F], [036D]-[037F], [03C0]-[03DA] goto 0440. None runs doSentence or script 11, so global 2 keeps its cutscene. The pot itself cannot be clicked then (hover frozen), matching 'you cannot click on the cooking pot while Guybrush is using an item'.",
+      "inputs": "Moves 39, 41, 45, 47, 50, 53, 57 ('u'), 48, 51, 54, 55 (up arrow), 43 ('u' + feather), 72 ('u' + gunpowder).",
+      "risk": "Any completing click or one-object item inside a reach crashes (crash_rules 1-2). LeoLitz warns against verb keys during pickups: fork test before relying on it.",
+      "cite": "global/script-002.txt [0385]-[0397]; global/script-004.txt [02CA]-[0440]; global/script-008.txt; room-014-sh-galley/entry.txt [0009]-[0017]; G-COOK-CD"
+    },
+    {
+      "name": "Early stop during 'Monkey Island ahead'",
+      "saves": "Local 206's walk to (326,121) and the walk back to the cannon (about 100 px).",
+      "mechanism": "Local 206 is cutscene([1]); with the slide a floor click replaces 206's walkActorTo(1,326,121) and its WaitForActor(1) ends where the ego stops.",
+      "inputs": "Move 68: one floor click at (226,102) on the frame after 206's walk starts.",
+      "risk": "A click on 206's first frame is overridden by its own walk.",
+      "cite": "room-019-sh-deck/local-206.txt [0000]-[0042]; YT-SLIDE 18:52-19:24"
+    }
+  ],
+  "crash_rules": [
+    "1. Reach-animation window (slide only): from the frame global 2 enters its reach cutscene until its endCutscene (global/script-002.txt [0385]-[0397]: delay(20) = 4 frames at var 19 = 5, with 3 input frames inside; first object owned by the room and of class 14/15/16, verb not Walk to, Look at or Talk to), any input that runs doSentence(STOP) stops global 2 with an active cutscene: error('Script %d stopped with active cutscene/override') (engines/scumm/script.cpp:273-275 via script_v5.cpp o5_doSentence STOP). Such inputs: any scene click when no 'Use/Give X with' is pending (global/script-004.txt [0395]-[03B3] then [0426]), a click that completes a two-object sentence ([03C5]-[0407]), and 'Use' + an inventory item without a class 1-4 preposition ([03E0]-[03FC]). In S4 the windows are: cupboard 163, cereal 168 and 164, Jolly Roger 238, cabinet 79, chest 77 (Open and verb 61), feather pen 75, ink 82, drawer 83 (Open), kegs 90 (twice), rope 91, hull chest 92 (Open), cooking pot 158 (eight times), red hot fire 161, pot 165, fuse 252. Runner sources: G-COOK-CD, YT-SLIDE 15:02.",
+    "2. One-object inventory items inside a reach window crash for the same reason ('u' + item runs [03FC] doSentence(STOP)): magnetic compass 732 (G-COOK-CD), LeChuck's note 907 (verbs 8 and 91 only, no class, out/objects.json), pamphlet 901, leaflet 902, brochure 903, piece of paper 85 (it would also open the recipe screen, room-007-sh-captai/obj-0085-piece-of-paper.txt [0018]), bookmark 86, pot 165; outside the galley also mints 395, map 442 and the T-shirts 596/752, which have the 'with' class only inside the galley (room-014-sh-galley/entry.txt [0009]-[0017], exit.txt [0000]-[0030]).",
+    "3. Galley stand-up (move 60 to the end of move 61): VAR_VERB_SCRIPT is 201 (global/script-108.txt [0249]) and room-014-sh-galley/local-201.txt runs cutscene([2]) from [0007] to [0047]. Any input that reaches the verb script in that window (a click, a verb or other key, an inventory click) re-runs local 201 non-recursively, which stops the running copy with its cutscene active (engines/scumm/script.cpp:65-66 then :273-275). By the engine code Esc is no exception (with the slide its key 27 is forwarded, engines/scumm/input.cpp:1423-1428); LeoLitz says Esc is safe (YT-SLIDE 18:20). Only '.' is certainly safe (input.cpp:1418-1419). Wait for var 32 == 4.",
+    "4. Part III beach stand-up (S5, not in this segment): room-020-main-beac/entry.txt [0073]-[00A6] sets VAR_VERB_SCRIPT = 201 and the same rule applies (YT-SLIDE 19:24-19:58).",
+    "5. Not a crash, but a loss: a floor click during global 184's chest-carry cutscene (move 18) runs doSentence(STOP), which empties the sentence stack and drops the queued 'Open chest 77'.",
+    "6. Not a crash, but a loss: while 'Use X with' is pending, ANY key except '.' clears it: a verb key through global/script-004.txt [0347]-[0356] (Var[107] = key's verb, Var[108]-[110] = 0), any other key (Esc included) through script 20 and then [0360]-[036A] goto [0438] startScript(11). '.' never reaches the input script (engines/scumm/input.cpp:1418-1419). The inventory arrows (verbs 208/209) do not clear it ([02E6]-[0304]).",
+    "7. Carrier boundaries (global 70) must not fall inside a global-2 reach window or an S4 object cutscene: its endCutscene pops the TOP cutscene-stack entry whoever owns it (engines/scumm/script.cpp:1650-1680) and global 19 then runs doSentence(STOP) (global/script-019.txt [0054]), which stops global 2 with its reach cutscene active (crash as in rule 1); its cutscene([]) start does the same through global/script-018.txt [0010]. Hence no reach-producing sentence before var 352 == 0 (move 6's gate).",
+    "8. Not a crash, but a large loss at the cannon: (a) a Use or Walk-to on the nozzle while local 251 runs and Bit[399] is still 0 stops the fuse ('Hey! The cannon didn't go off!', room-019-sh-deck/obj-0257-cannon-nozzle.txt [0106]-[0112]); (b) if local 251 reaches [002A] with Bit[399] = 1 and global 107 not running, the cannon fires without Guybrush and the gunpowder is spent (room-019-sh-deck/local-251.txt [002F]-[0060]); (c) if Bit[399] is still 0 there, the fuse burns out ([0065]-[006A]). Each makes the fuse untouchable (class 160) and needs the rope again (plus new gunpowder for (b)). Any click that cancels the gunpowder sentence (move 73) risks (c).",
+    "9. Not a crash, but route-breaking: never put a non-ingredient into the cooking pot (room-014-sh-galley/obj-0158-cooking-pot.txt [0420] setOwnerOf(Local[0],0) destroys it; the dusty book 74 would be lost), and never burn 74 or 164 in the fire (obj-0161 [009C]-[00AA], [0109]-[0123])."
+  ],
+  "record_comparison": "Record (saruya, 21:52, DOS CD): Part II takes 77.5 s = 930 frames at 12 frames/s (var 19 = 5), from 13:30.5 (first frame on board) to 14:48 (Monkey Island beach); landmarks: the dusty book at 13:58 (+27.5 s), cooking 14:13-14:25, cannon 14:40-14:47 (runner sources section 2.4). This route keeps the record's macro order (guide's 'flag after cereal' with the dusty book; same rooms, 17 player-made room changes) with three script-proven changes: the rope is taken on hull visit 1 (about -20 frames), the cannon is rope -> fuse -> gunpowder -> nozzle click instead of rope -> gunpowder -> 'Use pot' (cannon->nozzle->fuse->nozzle 27.6 walk frames become cannon->fuse->nozzle 11: about -16 frames, and one input fewer outside reaches), and the feather is burnt instead of the map with an ingredient order that hides all inventory scrolling inside reaches. Frame estimate per visit (walks at max(dx/8, dy/2) per straight leg, reaches 4 frames, one frame per input that cannot be hidden; walkbox detours, room-change frames and the carrier wait W are NOT included): card + deck intro 18 (Esc, 2 frames to the override, '--sigh--', delay(60) 12); cabin 1: 1; deck 8; crew 6; galley 1: 26 + W (cupboard 10, cereal 11, ladder 5); crew 6; deck 13; crow's nest 30 (Jolly Roger 14, jump 16); deck 13; cabin 2: about 125 (crunch/walk 32, prize and cabinet 7, chest carry and open 35, chest look 11, feather 10, ink 7, drawer 10, book with walk 12, door 1); deck 8; crew 14; hull 1: about 66 (kegs 14, rope 20, chest 15, wine with walk 16); crew 14; galley 2: about 130 (walk and first ingredient 26, seven more pot sentences 42, fire 6, cooking Esc 10, stand-up 19, pot 165 19, ladder 8); crew 14; hull 2: 23; crew 14; deck 5: about 49 (206 with the early stop 16, rope 5, fuse 9, gunpowder 15, nozzle and two Esc 4). Total about 580 frames (about 48 s) plus W and room-change overhead, against the record's 930 frames; by the same model the book comes at about +20 s (record +27.5 s) and cooking starts at about +31 s (record +42.5 s). The straight-leg model is a lower bound, so the real margin is for the engine run to measure. Rejected alternatives in frames: (a) 'gunpowder after cereal' has the same room changes and the same crew/deck legs, but the crunch then overlaps only the 7.5-frame ladder->kegs walk instead of the 30-frame door->cabinet walk: about +20 frames; (b) loading the gunpowder into the nozzle before cooking needs a nozzle detour on the deck pass (hatch->nozzle 17 + sentence 5 + nozzle->rope ladder 12 instead of 12) and the gunpowder returns to the kegs anyway (obj-0257 [004D]-[0051]): about +18 frames; (c) taking the pot 165 on the way in to galley 2 is a wash (about +6 in, -6 out). The 206 stop is at the cannon (226,102) for the new order.",
+  "open_questions": [
+    "Where exactly is global 70 at the S3/S4 boundary (case A: inside cutscene 2; case B: inside cutscene 1, S3's guard state 408 == 0)? The answer fixes the tail's length and which of its effects ([025C] redirect, [0298] turn, [0211]/[021A]/[02DA] doSentence(STOP), and in case B the hover freeze from [021A] to [02DA]) hit moves 3-6. S3's exit.notes now also start the leftovers in room 7 (aligned in S3's revision); S3 argues the handoff is inside cutscene 1 (case B). Measure in the engine: var 352 and var 53 per frame from the room-7 load until var 352 == 0.",
+    "Walk-through (moves 3-5 acting while the carrier's cutscene is open) against waiting in the cabin until var 352 == 0: the first saves up to about 17 frames but needs re-clicks; the second is simpler but the ego is pushed away from the door by [025C] and, in case A, by room 7's local 200 walk to (160,140), so it needs gate-bypassing clicks too. Fork-measure both for the actual handover.",
+    "Is the slide alive? Expect var 53 == 2 with var 352 == 0 at move 6, and var 53 == 1 inside the crunch (move 15). If not, use the fallbacks in the glitch moves' notes.",
+    "Executor support needed: (1) kind=glitch moves must act while 'up' > 0 inside a cutscene (bypass wait_gate's cs == 0); (2) the carrier retry rule for moves 3-5; (3) the bridge's '.' auto-skip running alongside the move list (and never in the same frame as a verb key); (4) scroll moves (click Profile.inv_up, no verb field); (5) moves 44 and 73 must click only obj2 (no verb key, no first-object click) because the selection is already pending; (6) 'o'/'u' in the room-load frame (moves 14, 38) as a fork test; (7) optional right-clicks for default-verb Opens (moves 6, 23, 32).",
+    "Hover latency after a reach: can the pot, fire, nozzle and cabinet clicks come on the reach-end frame, or only one frame later (depends on whether global 23's slot runs after global 2's in runAllScripts)? A too-early click with a pending selection does nothing ([03CF] -> [03DA] goto 0440) and costs a frame; a too-early pot click with only 'u' selected is a floor click.",
+    "Verb keys and arrow clicks inside a reach: safe by global/script-004.txt, but LeoLitz says not to 'even select any verb using the keyboard' during pickups (YT-SLIDE 15:02). Fork-test once before relying on moves 39-57 and 72.",
+    "Inventory order: the predicted rows (entry.notes) rest on S1's recorded order at its move 68 and on S1-S3's acquisition order. Read vars 133-140 at the galley-2 entry; if they differ, re-derive the hidden scrolls and, if needed, change the ingredient order (any order works, obj-0158 [042B]) or the fuel (any visible fuel from move 43's list).",
+    "Esc during the galley stand-up: the engine code forwards key 27 to local 201 when _userPut > 0, which should crash; LeoLitz says it is safe. Test on a fork; the route never presses Esc there.",
+    "Walk estimates are straight-leg max(dx/8, dy/2) at WalkSpeed(8,2) (room-033-dock/exit.txt [0011], room-020-main-beac/entry.txt [00B2]); real walkbox paths can be longer. Confirm the rope-on-visit-1 gain (about 20 frames) and the cannon gain (about 16) with engine-measured walks. Shmoovement (runner sources section 3.7; repeated walk clicks are allowed by rules/anypercent.md) is not modelled: candidate legs are cabin drawer -> door, galley pot 165 -> ladder, hull chest -> ladder, crew door -> hatch.",
+    "Hull entry line: room-008-sh-hull/entry.txt prints only if Bit[321] is already set, and nothing sets it before; confirm it never appears on CD.",
+    "Var 352 baseline: a cutscene script killed without endCutscene (engines/scumm/script.cpp:1090-1101 only warns) would leave var 352 off by one for the rest of the run; every var-352 test from move 6 on assumes 0 outside S4's own cutscenes once the carrier has ended.",
+    "Whether a stale Var[108] can turn a slide click into a sentence on an object (the route issues Look at drawer/chest with the ego already in place so Var[108] = 0; the after conditions check it)."
+  ]
+}

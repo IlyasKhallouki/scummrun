@@ -1,0 +1,1457 @@
+{
+  "segment": "S7",
+  "title": "Part IV: Melee dock, streets, church, grog machine fight, LeChuck, ending (DOS CD, SCUMM v5)",
+  "entry": {
+    "room": 95,
+    "inventory": [
+      269,
+      293,
+      294,
+      74,
+      732,
+      907,
+      882,
+      282,
+      283,
+      488,
+      395,
+      643,
+      752,
+      596,
+      901,
+      903,
+      82,
+      799,
+      815,
+      788,
+      823
+    ],
+    "flags": [
+      {
+        "room": 95
+      },
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "bit": 453,
+        "eq": 1
+      },
+      {
+        "var": 277,
+        "eq": 6
+      },
+      {
+        "bit": 51,
+        "eq": 1
+      },
+      {
+        "has": 823
+      },
+      {
+        "var": 32,
+        "eq": 4
+      },
+      {
+        "var": 194,
+        "eq": 120
+      },
+      {
+        "var": 196,
+        "eq": 3
+      },
+      {
+        "bit": 436,
+        "eq": 0
+      },
+      {
+        "bit": 468,
+        "eq": 0
+      },
+      {
+        "bit": 537,
+        "eq": 0
+      },
+      {
+        "bit": 565,
+        "eq": 0
+      },
+      {
+        "state": 438,
+        "eq": 0
+      }
+    ],
+    "notes": "First frame of the 'Last Part' card: global/script-131.txt [0039] loadRoom(95), started by room-070-hellcliff/local-206.txt [046E] right after UserputOn [046C] (so no item slide survives into Part IV). Script 131 set Bit[453] (Part IV) and Var[277]=6 at global/script-131.txt [002F]/[0034]. THE CARD LASTS 129.8 s AND NO INPUT SHORTENS IT. 131 runs cutscene([]) with no beginOverride, so Esc does nothing (beginCutscene sets cutScenePtr to 0, engines/scumm/script.cpp:1631-1646; abortCutscene needs it, :1689-1709). The two prints are blanks, and the only exit is isSoundRunning(107) going false (global/script-131.txt [005B]-[0060]). Sound 107 is a CD-track resource: build/blocks-dos-cd/DISK_0001/LECF/LFLF_0095/SOUN_0107 has type byte 0x02 at +0x0F (engines/scumm/sound.cpp:315-324) and descriptor 06 01 00:00:00 00:00:00 at +0x18, i.e. track 6, one loop, from the start to the end of the track (engines/scumm/soundcd.cpp:226-251). The music driver plays no part. game/dos-cd/track6.flac is 5724180 samples at 44.1 kHz, 129.8 s, the same length as the redump's Track 06.bin. Measured: the unskipped Part One card, which waits on the same track (sound 104), lasted 7794 ticks (track 6 start at tick 7987, next track at tick 15781, out/runs/20261019T131143Z-run/trace.jsonl). Part One, Two and Three cards have overrides (room-096-part1/local-200.txt [0004], global/script-122.txt [0007], global/script-107.txt [00DD]); only this one does not. Save and load do not help: the CD track resumes at its saved position (engines/scumm/soundcd.cpp:345-397), and load time counts. Only a missing or short track 6 ends it early, and that is the No Music timing rules/anypercent.md bans (docs/anypercent/findings.md 'Music check'). Other levers checked and rejected: no item slide can be carried in (UserputOn above) or built (each dialogue choice runs UserputOff, then script 32 runs UserputOn: global/script-014.txt [00E2], global/script-032.txt [0011]). The dock ghost and the church are forced: 133 is started only by room-045-cu-church/local-200.txt [1594], and 733/734 become usable only inside it. Ctrl+W (global/script-004.txt [0257]-[02A6]) is banned. On the first room-83 frame the inventory is reduced to 823 (the 'magic seltzer bottle', renamed in global/script-106.txt [055B]); 488 and 733 would also be kept but are not owned (room-083-cu-dock/entry.txt [0020]-[0067]). Owning 823 is what starts the wedding scene (room-078-church/entry.txt [000E]-[0027]). Var[196]==3 (all trials, global/script-071.txt [0088]) keeps the street pirates off (global/script-047.txt [0000]). Bit[436]==0 (from S6) selects the Herman epilogue (global/script-146.txt [0170]); the crew variant (room 27) is about as long. Not expressible as a flag but required: 905 without class 6 (true unless the dock ghost was already met). Bit[51]==1 (ship bought; set only by global/script-056.txt [3F04] in S3, listed in S3's exit flags, and the only clear, global/script-056.txt [01A2], is on Stan's first-visit path) is required: when global 133 loads room 59, room-059-stans/entry.txt [0035]-[004C] starts local 201 if Stan (actor 3) is not in room 59, Bit[51] is 0 and Var[196] >= 3. Local 201 puts Stan in the room and starts global 56, his sales script (room-059-stans/local-201.txt [002F]-[003C]; global/script-056.txt [000D]-[002D]: VAR_VERB_SCRIPT=14, UserputOff, walks), which would collide with 133's fight. Stan is in room 0 since room-035-low-stree/entry.txt [007C] and Var[196]==3, so Bit[51] alone keeps it from starting. Church door 438: this file assumes it is CLOSED (state 0, entry flag). No Part I segment arranges the pirate-door window (see glitches), so closed is the default; the door-open variant is this file without the Open move and with {state 438 eq 1} at entry. The move format cannot skip a move, so that variant would be a separate file (open_questions)."
+  },
+  "exit": {
+    "until": [
+      {
+        "room": 0
+      },
+      {
+        "var": 194,
+        "eq": 122
+      }
+    ],
+    "inventory": [
+      733
+    ],
+    "flags": [
+      {
+        "bit": 565,
+        "eq": 1
+      },
+      {
+        "var": 19,
+        "eq": 5
+      },
+      {
+        "has": 733
+      }
+    ]
+  },
+  "moves": [
+    {
+      "name": "Dock: walk to the right edge (the ghost starts on arrival)",
+      "room": 83,
+      "verb": null,
+      "obj": 905,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 83
+        }
+      ],
+      "until": [
+        {
+          "actor_x": 1,
+          "ge": 81
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "global/script-131.txt [0059]-[0060] (card waits for sound 107), [0065]-[0074] (ego put in room 83 at (80,121), endCutscene, camera follows: room 83); room-083-cu-dock/entry.txt [0009] (dissolve fade-in), [0020]-[0067] (Var[277]==6: every object the ego owns except 488, 823 and 733 is taken away); room-083-cu-dock/obj-0905-dock.txt [0010]-[0032] (Bit[453] set and 905 not class 6 -> startScript(204)); room-083-cu-dock/local-204.txt [0000] Var[277]=0; global/script-002.txt [02DB]-[02E4], [039D] (walk to 905's walk point (345,121), then its FF handler)",
+      "note": "Input is on from the first room-83 frame: script 131 ended its cutscene at [0070] (global/script-019.txt UserputSoftOn). One click on 905 (box x 304-319, on screen at the start): walking right, per-frame re-clicks are slower (docs/research/anypercent-engine-mechanics.md §2.5). 905's actordir 1 (east) matches the walking direction, so no final turn. The left dock 904 only redirects to 905 (room-083-cu-dock/obj-0904-dock.txt [0026]-[002C]) and prints 'The church is the other way!' (room-083-cu-dock/local-205.txt). The until only confirms the walk has started (ego was put at x 80, global/script-131.txt [0069]), so the next move can clear script 131's text during the ~40-frame walk; the ghost itself starts when ego reaches (345,121), which the next move's until and the 'Esc the ghost' move wait for (Var[277] is 6 from global/script-131.txt [0034] until local 204 [0000] clears it). ENGINE: 'delay': 800 frames inside the Last Part card (about 1560 frames of CD track 6 left when S6 ends), so the 'after' wait fits the driver's 1200-frame hint window; no game time.",
+      "delay": 800
+    },
+    {
+      "name": "Dock: skip script 131's three ego text segments during the walk",
+      "room": 83,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "room": 83
+        },
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        },
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 277,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-131.txt [0077] breakHere, [0078] printEgo('Well, that was certainly easier than the trip TO Monkey Island.') + [00BB] WaitForMessage, [011C] (Bit[436]==0) printEgo('I wish those guys hadn't been so excited about getting sunscreen.' + wait() + 'Now I'll have to stop the wedding by myself!') with no wait, [018E] end; room-070-hellcliff/local-206.txt [046E] startScript(131,[]) (no F: not freeze-resistant); room-083-cu-dock/local-204.txt [0005] cutscene -> global/script-018.txt [0070] freezeScripts(127) (freezes 131), [00A3] endCutscene (unfreezes it); engines/scumm/actor.cpp:3530-3531 (actorTalk sets VAR_HAVE_MSG = 0xFF at once), engines/scumm/scumm.cpp:3382 (VAR_HAVE_MSG = _haveMsg each frame before the scripts run)",
+      "note": "Free: these presses fall inside the dock walk, which needs no other input. Why: left alone, 131 is still in WaitForMessage on its first line when local 204 starts (a 63-character line against a ~40-frame walk). 204's cutscene freezes it, [0083] print(255,' ') replaces its text, and after [00A3] it resumes as soon as the dialogue text clears, printing its two-segment second line in the middle of the dock dialogue. That line can satisfy the choose move's var-25 marker before the choice, and if 131 runs before script 14 in slot order its print re-arms VAR_HAVE_MSG and holds script 14's WaitForMessage ([00F7]) for two more segments, delaying the spray. With the three segments skipped here (about 6 frames), 131 has run [018E] long before the ghost appears. The until is the ghost's first frame (local-204 [0000] Var[277]=0, same frame as its beginOverride [0019]), as for the walk before this split: if only one '.' lands (an executor that sends one key per move), the move still ends on time for the ghost Esc, and only the interleave described in the next moves' notes remains. Local 204 prints nothing before its override ([0000]-[001B]), so no ghost text is caught here. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Dock: Esc the ghost's 'Yikes!' scene",
+      "room": 83,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "var": 277,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-083-cu-dock/local-204.txt [0005] cutscene, [0019] beginOverride (same frame as [0000]), [001E]-[0081] (skipped: ego runs to x=1, ten 'Yikes!', 'Hey!', 'Wait a second!'), [0083]-[0099] (ego put at (128,121), ghost actor 7 at (210,121)), [00A3] endCutscene, [00A4]-[01F9] (menu, VAR_VERB_SCRIPT=14, Var[194]=0)",
+      "note": "Var[194] is 120 from S6's last choice until this menu clears it. Script 131 has ended (previous move). If it has not (the previous move failed), expect one extra two-segment ego line from 131 between the chosen line and Var[194]=120; a '.' on it is harmless and local-204 [0329] blanks whatever is left. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Dock ghost: 'Could I interest you in some root beer, sir?'",
+      "room": 83,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Could I interest you in some root beer, sir?",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-083-cu-dock/local-204.txt [00B2]-[01F2] (four lines, keys 1-4 in display order: global/script-032.txt [0000]-[0005] Var[229]=145, Var[230]=49); room-083-cu-dock/local-204.txt [0208]-[02EB] (each answer prints one multi-segment ghost line without WaitForMessage; 120's is 'Root beer?' / 'Oh, boy!' / 'I LOVE root beer!'), [02EE] (all four fall into the same spray animation); global/script-014.txt [007F]-[0105] (the choice: verbs off, CursorHide, UserputOff, printEgo of the line, WaitForMessage, 2 frames, Var[194]=verb)",
+      "note": "Key 1. All four answers cost the same with '.': one ego segment each, and the ghost's reply never blocks (local 204 counts frames and [0329] blanks it). The 2019 guide says 2; the record's frame shows option 1's reply. VAR_TALK_ACTOR (var 25) is 255 between lines (stopTalk) and 1 while ego speaks; script 131's lines were cleared during the walk, so var 25 == 1 here can only be script 14's line."
+    },
+    {
+      "name": "Dock: skip ego's root-beer line",
+      "room": 83,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-014.txt [00F7]-[0105]; engines/scumm/input.cpp:1418-1421",
+      "note": "If script 131 was not cleared during the walk, its second line (two segments, no wait) can appear right after this one; the '.' loop must tolerate it (a '.' on it is harmless) and keep going until Var[194]==120. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Dock: walk right again (to Low Street)",
+      "room": 83,
+      "verb": null,
+      "obj": 905,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "until": [
+        {
+          "room": 35
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-083-cu-dock/local-204.txt [02EE]-[0360] (spray animation with input off: 11+8+4+6+13+1+6 frames, delay(30) twice, ghost walks off), [037B] setClass(905,[134]) (bit 7 set = class 6 on: engines/scumm/script_v5.cpp:642-686), [0382]-[038F] (VAR_VERB_SCRIPT=4, verbs restored, CursorShow, UserputOn); room-083-cu-dock/obj-0905-dock.txt [0023]-[0035] (classOfIs(905,[6]) is true only while class 6 is clear, engines/scumm/script_v5.cpp:1490-1516; now false -> loadRoomWithEgo(450,35,-1,-1))",
+      "note": "The animation cannot be skipped (no override). The executor's gate waits for UserputOn. 'Cool!' does not block. Ego walks from (128,121) to (345,121) again."
+    },
+    {
+      "name": "Low Street: start walking toward the spectre's walk point (299,128) on the first input frame",
+      "room": 35,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        299,
+        128
+      ],
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 35
+        }
+      ],
+      "until": [],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-035-low-stree/boxes (tools/boxes.py 35): ego enters on box 21 at (437,108); boxes 21 -> 7 -> 6 reach (299,128) without x<299; local-212.txt [0001]-[001F] (the encounter needs x<299 and y>120)",
+      "note": "One floor click while the next move's three inputs ('u', the root beer, the spectre) are still to come: the walk runs during the 'u' and inventory frames (neither stops it: global/script-004.txt [0304]-[035B] only builds the sentence), and the spectre click re-targets it to 440's walk point. Measured from the S6#65 cut: script 213 starts 2 frames sooner than with the sentence alone (frame 15440 against 15442). A floor click in the 'u' frame is lost (a key overwrites _mouseAndKeyboardStat: engines/scumm/input.cpp processKeyboard), and per-frame re-clicks toward (299,128) or box 7's corner gain nothing (measured)."
+    },
+    {
+      "name": "Low Street: use the root beer (823) with the spectre (440): script 213 at once, no invitation dialogue",
+      "room": 35,
+      "verb": 7,
+      "obj": 823,
+      "obj2": 440,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 35
+        }
+      ],
+      "until": [
+        {
+          "bit": 455,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-035-low-stree/entry.txt [00A4] setClass(440,[32]) (bit 7 clear = class 32 'untouchable' OFF while the spectre stands: engines/scumm/script_v5.cpp o5_setClass, putClass(obj, cls, cls & 0x80)); room-075-gh-hull/obj-0823-voodoo-root.txt [00E7]-[00F1] (Use 823 with 440 -> doSentence(7,440,823)); room-035-low-stree/obj-0440-grim-spectre.txt [0013]-[001A] (Use with 823 -> startScript(213)); local-213.txt [0000]-[0004] (stopScript(212), Bit[455]=1), [001D]-[00F8] (~58 frames of animation without override, then 4 text segments); global/script-002.txt [0203]-[02E0] (823 is owned, 440 is in the room: walk to 440's walk point (299,128), where x is not < 299, so local 212 never fires)",
+      "note": "Replaces the old 'avoid the spectre' walk, which cannot avoid it: from box 6 the only way to box 4 is box 5 (x 48-299, y 124-141), all inside local 212's x<299 and y>120 trigger (tools/boxes.py 35), so slide-int1 met the spectre at (293,125) on frame 15445 and its scene clicks answered 'other pants', then 'Try not to take this root beer too personally' (local-211.txt [0359]-[0500] -> [0A34] startScript(213)): 213 ran anyway, after 35 frames of invitation dialogue. Using the root beer directly skips 211 and its 'Bye, now' / 'Not so fast' walks. Measured from the S6#65 cut: High Street entered on frame 15566 (slide-int1: 15615). The 'u' key cannot be pressed on the dock: entering a room runs global 6 -> script 11 (Var[107] = Walk to) (global/script-006.txt [005A]). 'Use 440' alone would need class 129-132 on 440 for the 'with'; the order 823 then 440 is the one that works."
+    },
+    {
+      "name": "Low Street: archway up to High Street (re-clicked walk)",
+      "room": 35,
+      "verb": null,
+      "obj": 451,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "bit": 455,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 34
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-035-low-stree/entry.txt [007C]-[00BA] (Bit[453]: pirates, citizen and rat made untouchable, spectre actor 9 at (240,128), local 212 started); local-212.txt [0000]-[0022] (each frame: ego x<299 and y>120 -> doSentence(STOP), startScript(211) = the spectre's invitation dialogue); obj-0451-archway.txt [000C]-[001F] (cutscene, local 205, loadRoomWithEgo(433,34,750,128)); local-205.txt [0000]-[0063] (climb: one frame per pixel from ego y to 72, then a walk to (155,72)); obj-0450-archway.txt [000C]-[003B] (back towards the dock: 'The church is in the other direction!')",
+      "note": "Ego starts at 440's walk point (299,128) once 213's last text segment ends and UserputOn returns (first click the frame after). The way is up and left, so a walk restarted every frame gains ground (a fresh walk rounds each step away from zero: anypercent-engine-mechanics.md §2.5). reclick: true plays the executor's greedy re-clicks; reclick_sweep: true also tries a floor click every frame, alternating between two points ahead of ego (a new target each frame, so no restart is ignored), with the archway click on the frame that finishes first (executor._reclick_sweep), and keeps the faster. Measured from the S6#65 cut, first click to High Street: 67 frames with one click, 63 greedy, 60 sweep (points 16 and 40 px ahead won; six other pairs gave 63-67). 451's climb (local-205.txt) starts at ego's y, which is always the walk point's 88 (17 frames), then a scale-18 walk to (155,72) (8 frames); neither can be shortened.",
+      "reclick": true,
+      "reclick_sweep": true
+    },
+    {
+      "name": "High Street: open the church door (door closed: the default)",
+      "room": 34,
+      "verb": 2,
+      "obj": 438,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 34
+        },
+        {
+          "state": 438,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "state": 438,
+          "eq": 1
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0438-door.txt [0018] (Open -> global 25), [002A]-[0043] (verb 90: Var[182]=2 while closed, 3 while open); global/script-023.txt [00F9]-[0186] (runs every frame, [0198]-[0199]; when the hovered object changes it runs that object's verb 90 and keeps Var[182]); global/script-004.txt [0000]-[001B] (a right click, Local[2]==2, takes Var[182] as the verb); global/script-025.txt [000A]-[003C] (438 is not class 6 'locked': setState(438,1), sound 2); global/script-002.txt [032A]-[0397] (438 has class 15 = 143: a 20-jiffy reach cutscene before the Open runs)",
+      "note": "Played as one right click on 438 (rclick: true): a right click takes the door's default verb Var[182]=2 (Open), set by its verb 90 entry from the hover script (global/script-023.txt [00F9]-[0186], global/script-004.txt [0000]-[001B]), so no 'o' key frame. The walk is up and left: reclick: true re-clicks it (the own re-click is the right click; a repeated click on the same target is ignored, engines/scumm/actor.cpp startWalkActor, so floor clicks go in between) and reclick_sweep: true tries per-frame alternating floor clicks with the right click on the best frame (executor._reclick_sweep). Measured from the S6#65 cut, room entry to state(438)=1: 54 frames with 'o' + click (slide-int1), 54 with rclick alone, 53 greedy, 52 sweep. Never right-click 438 after it is open (Var[182]=3 = Close); the next move enters with a left click (Walk to). 438 starts closed (out/objects.json state 0); only the player or Part I's wandering pirates change it (see glitches, rng_points). Ego arrives at 433's walk point (767,130) heading for (750,128) (room-035-low-stree/obj-0451-archway.txt [001F]). Ego walk speed here is (16,8) at box scale 75 (entry.txt [000B]): 4.69 px a frame, 5 with a fresh walk.",
+      "rclick": true,
+      "reclick": true,
+      "reclick_sweep": true
+    },
+    {
+      "name": "High Street: enter the church",
+      "room": 34,
+      "verb": null,
+      "obj": 438,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "room": 34
+        },
+        {
+          "state": 438,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 78
+        }
+      ],
+      "kind": "walk",
+      "glitch": null,
+      "cite": "room-034-high-stre/obj-0438-door.txt [0044]-[0058] (state 1 -> loadRoomWithEgo(857,78,145,142)); obj-0432-alley.txt [001C]-[0037], obj-0433-archway.txt [001C]-[0042], obj-0434-doorway.txt [001C]-[0037], obj-0436-archway.txt [0040]-[0066], obj-0437-door.txt [0066]-[0081] (with Bit[453] every other exit says 'That's not the church' and redirects to 438)",
+      "note": "Walk point (544,101), actordir 3 (north): end on an up leg to avoid the 90-degree turn before the door fires (anypercent-engine-mechanics.md §2.7). Up-left travel: re-click every frame. Left click (Walk to) only, never a right click on the open door (Close)."
+    },
+    {
+      "name": "Church: Esc the priest ('...speak now or forever hold his peace')",
+      "room": 78,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 78
+        },
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-078-church/entry.txt [000E]-[0027] (ego owns 823 -> local 201); local-201.txt [0034] cutscene, [0036]-[003D] walk to (145,142) and WaitForActor, [0045] beginOverride, [004A] the priest's print in the same frame, [00F2]-[0235] (print ' ', ghost usher local 203, endCutscene, menu, Var[194]=0, timeout local 202 started)",
+      "note": "No input before this: loadRoomWithEgo walks ego in from 857 and 201's cutscene holds input. VAR_HAVE_MSG (var 3) becomes non-zero in the frame that ran beginOverride, so the Esc on the next frame lands. Var[194] is 120 (dock) until this menu clears it. Frame order: processInput (keys) runs before runAllScripts and checkExecVerbs (engines/scumm/scumm.cpp:3177, 3231-3232), so an Esc pressed on the frame after the after-condition first holds acts only if the override was registered in an earlier frame.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Church: 'Elaine!'",
+      "room": 78,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Elaine!",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-078-church/local-201.txt [010E]-[0235] (keys 1-4: 'The groom isn't a gentleman!', 'The groom isn't a human!', 'Elaine!', 'STOP THE WEDDING!!'), [023D]-[0243] (any answer: stopScript(202) and the same lines); local-202.txt [0000]-[0041] (600-jiffy timeout picks 124 and turns input off)",
+      "note": "Key 3, the record's choice. All four answers lead to the same lines and are one segment each, so they cost the same with '.'. A scene click would pick 'STOP THE WEDDING!!' (Var[253]=1, global/script-014.txt [0007]-[0075])."
+    },
+    {
+      "name": "Church: skip 'Elaine!' and 'Hey!! Who's that?'",
+      "room": 78,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 45
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-014.txt [00F7]-[0105]; room-078-church/local-201.txt [0245]-[0262] (system line with WaitForMessage), [0264]-[0289] (walk, 10 fixed frames, ego put in room 45 at (140,160), actorFollowCamera)",
+      "note": "Two segments. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Close-up: skip LeChuck's 'You!'",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "room": 45
+        },
+        {
+          "var": 25,
+          "eq": 9
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-045-cu-church/entry.txt [000F]-[0039]; local-200.txt [0005]-[0043] (cutscene without override: ego to (110,132), LeChuck actor 9 to (178,132), 'You!' with WaitForMessage, endCutscene), [0044]-[01C5] (menu 1, Var[194]=0)",
+      "note": "Esc does nothing here (no beginOverride). Var[194] is 122 from the church menu until menu 1 clears it. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Close-up menu 1: 'Take THIS, you vaporous voodoo vermin!'",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "Take THIS, you vaporous voodoo vermin!",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "bit": 468,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [0047]-[01AC] (keys in display order: 1 = 124 'I've come to stop you...', 2 = 122 'Please don't kill me.', 3 = 123 'Take THIS...', 4 = 121 dentist; scene click = 121 via Var[251]), [01D4]-[02A1] (each answer: one LeChuck line without WaitForMessage), [02A4]-[02B8] (then Elaine, actor 10, is put in the room and the override starts)",
+      "note": "Key 3, the record's choice. Every answer costs the same: one ego segment, and the reply is cut by the next Esc."
+    },
+    {
+      "name": "Close-up: skip ego's line (menu 1)",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 123
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-014.txt [00F7]-[0105]",
+      "note": "Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Close-up: Esc Elaine's entrance",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "var": 194,
+          "eq": 123
+        },
+        {
+          "actor_room": 10,
+          "eq": 45
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [02A4]-[02B8] (putActorInRoom(10,45) in the same frame as beginOverride), [02BD]-[0436] (skipped: Elaine's transformation, 'Governor!' x3, her three lines), [0438]-[0568] (endOverride, menu 2 with VAR_VERB_SCRIPT=201, Var[194]=0)",
+      "note": "Actor 10 is not in room 45 before [02AC] (last put in room 0 at the end of Part I, room-083-cu-dock/local-203.txt [0223] or local-202.txt [0048]), so actor_room 10 == 45 marks the override frame. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Close-up menu 2: 'If you're here, then who's that in the dress?'",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "If you're here, then who's that in the dress?",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "actor_room": 10,
+          "eq": 45
+        }
+      ],
+      "until": [
+        {
+          "bit": 544,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [044B]-[0568] (keys: 1 = 120 'How did you manage to escape?', 2 = 126 'I thought LeChuck was going to marry you.', 3 = 121), [056D]-[05A8] (LeChuck mumbles in a loop until Bit[544]), [05B6]-[06D4] (120 and 126 loop back to [0438]), [06D7] (only 121 goes on); room-045-cu-church/local-201.txt [0000]-[0015] (a verb choice sets Bit[544], then chains to script 14)",
+      "note": "Key 3, the only answer that leaves the loop. Choose at once: the mumble loop starts with the menu."
+    },
+    {
+      "name": "Close-up: skip ego's 'who's that in the dress' line",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "bit": 544,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "bit": 468,
+          "eq": 1
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-014.txt [00F7]-[0105]; room-045-cu-church/local-200.txt [05AB]-[05AC] (waits for Var[194]), [05B1] beginOverride, [06E1] Bit[468]=1 (same frame)",
+      "note": "Ego's line replaces LeChuck's mumble (actorTalk stops the current message, engines/scumm/actor.cpp:3415-3417). Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Close-up: Esc the monkeys-in-the-dress scene",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "bit": 468,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 9
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [05B1] beginOverride, [06E6]-[087D] (skipped: the monkeys run off with the root beer bottle, Elaine leaves), [0880]-[08A8] (ego at (136,132), actors 2 and 10 removed, endOverride, VAR_VERB_SCRIPT=14, 2 frames, LeChuck's 'You dared...' with WaitForMessage)",
+      "note": "Var 25 is 255 after ego's line was stopped and becomes 9 when LeChuck's line starts, 2 frames after the Esc. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Close-up: skip 'You dared to come here and confront me! / I can't believe your audacity!'",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 9
+        },
+        {
+          "bit": 468,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [08A8]-[08F3] (two segments), [08F5]-[0ACE] (menu 3, Var[194]=0)",
+      "note": "Two segments. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Close-up menu 3: 'I've just remembered an appointment at the dentist's.' (ROUTE CHANGE)",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": null,
+      "choose": "I've just remembered an appointment at the dentist's.",
+      "after": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "bit": 468,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [08F8]-[0AC7] (keys: 1 = 120 'Well, I can't believe your stupidity.', 2 = 124, 3 = 122 'Please don't kill me.', 4 = 123 'Take THIS...', 5 = 121 dentist; Var[251]=1, so a scene click also picks 121), [0ADD]-[0B1B] (121 -> goto 1490; 123 -> [1300]), [1300]-[148C] (123's jam scene, its own override, then falls into [1490])",
+      "note": "Faster than the record's '4' ('Take THIS...') by ONE FRAME (one Esc fewer), not by seconds. '4' runs [1300] beginOverride; an Esc jumps to [1302] goto 1490, and [1490]'s beginOverride runs in that same frame (abortCutscene is processed in processInput before runAllScripts, engines/scumm/script.cpp:1689-1709, engines/scumm/scumm.cpp:3177/3231), so a second Esc on the next frame skips the punch. 5 or a scene click jumps straight to [1490] ([0AF1]), so the first Esc already skips the punch. Only if a runner gives a single Esc after '4' does [1490]'s punch play (~40 frames + 4 x delay(60)). No flag differs: [1300]-[148C] sets only Local[0]."
+    },
+    {
+      "name": "Close-up: skip ego's dentist line",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 1
+        },
+        {
+          "bit": 468,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 121
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-014.txt [00F7]-[0105]",
+      "note": "Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Close-up: Esc LeChuck's punch",
+      "room": 45,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "var": 194,
+          "eq": 121
+        },
+        {
+          "bit": 468,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 85
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "room-045-cu-church/local-200.txt [0AE7] (Var[194]==121 -> goto 1490), [1490] beginOverride, [1495]-[1577] (skipped: the punch, 40 frames + 240 jiffies), [157E]-[1594] (endOverride, VAR_VERB_SCRIPT=4, verbs restored, CursorShow, UserputOn, startScript(133)); global/script-133.txt [0003]-[0005] (cutscene, loadRoom(85) in the same frame)",
+      "note": "Script 14 sets Var[194] at its own slot; local 200 may read it one frame later, so the override can be registered one frame after the after-condition holds. A lost Esc is harmless: press again each frame until room 85. Frame order: processInput (keys) runs before runAllScripts and checkExecVerbs (engines/scumm/scumm.cpp:3177, 3231-3232), so an Esc pressed on the frame after the after-condition first holds acts only if the override was registered in an earlier frame.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Map: Esc the POW / BIFF flight",
+      "room": 85,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 85
+        },
+        {
+          "not": {
+            "has": 823
+          }
+        }
+      ],
+      "until": [
+        {
+          "room": 59
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-133.txt [001B] breakHere after loadRoom(85), [001C] setOwnerOf(823,0) and [0020] beginOverride in the next frame, [0025]-[00E4] (skipped: three flights with scripts 134 and 147), [00E9]-[00ED] (endOverride, stopScript(134), loadRoom(59))",
+      "note": "An Esc on the frame after the room change is too early ([0020] has not run): 'not has 823' turns true in the frame of [0020]. The seltzer bottle 823 is gone from here on. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stan's: Esc Stan's greeting",
+      "room": 59,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "room": 59
+        },
+        {
+          "state": 733,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "actor_room": 9,
+          "eq": 59
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-133.txt [0143]-[01AB] (camera 280, delay(60), actor 12 = Guybrush crashing into the grog machine at (270,93) for 19 frames, removed at [01AB]), [01B1] drawObject(733) (o5_drawObject defaults state = 1 and ends with putState(obj, state): third_party/scummvm/engines/scumm/script_v5.cpp:1037, 1128), [01B5]-[01CB] (coins 735, 736 drawn; setClass(x,[32]) clears untouchable), [01DA] beginOverride (same frame as [01AB]-[01CB]: no breakHere between), [01DF]-[026C] (skipped: Stan walks in, two lines, delay(120)), [0270]-[028A] (Stan placed at (315,100), endOverride, startScript(136)); global/script-136.txt [000B] (LeChuck put in room 59 at once)",
+      "note": "Marker: state(733) becomes 1 at [01B1], in the override frame. 733 (the root beer, owner 15) starts at state 0 (out/objects.json), nothing else writes its state (drawObject(733) occurs only at global/script-133.txt [01B1]), and its box (264,104,16,8) is shared by no other room-59 object, so the same-box reset in o5_drawObject (script_v5.cpp:1122-1126) and the sign-light loop of local 205 cannot clear it. The previous marker (actor 12 in room 0 at (270,93)) could never hold: o5_putActorInRoom(a,0) also does putActor(0,0,0) (script_v5.cpp:2193-2195) and the bridge reads getRealPos(). actor_room 12 == 0 alone is not safe either: if the map Esc is lost, global/script-134.txt [0175] puts actor 12 in room 0 before loadRoom(59). Fallback if the executor can repeat keys: Esc on every frame from room 59 until actor_room 9 == 59 is harmless (cutScenePtr is 0 between [00E9] endOverride and [01DA], and userput is off inside 133's cutscene, so the Esc key reaches no verb script). Actor 9 was last in room 45. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stan's: Esc Stan's sales pitch",
+      "room": 59,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "esc",
+      "choose": null,
+      "after": [
+        {
+          "actor_room": 9,
+          "eq": 59
+        },
+        {
+          "var": 25,
+          "eq": 3
+        },
+        {
+          "actor_x": 3,
+          "eq": 270
+        }
+      ],
+      "until": [
+        {
+          "actor_room": 3,
+          "eq": 0
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-136.txt [001B]-[0034] (LeChuck appears: 20 frames); global/script-133.txt [0293]-[02BF] (waits for 136; LeChuck objects 734, 424, 906, 595 made touchable; Stan walks to (270,105)), [02C8] beginOverride, [02CD] 'Howdy, pardner.' (same frame), [02E0]-[0390] (skipped), [0394]-[03DB] (endOverride, LeChuck punches Stan away: 5 + 10 frames, actor 3 to room 0)",
+      "note": "Stan (actor 3) reaches x 270 only at the end of the [02B9] walk: he is at (0,0) in room 0 before 133, walks 460 -> 315 in the (skipped) greeting, is put at (315,100) by [0278], and (270,105) lies inside walkbox 8 (build/blocks-dos-cd/DISK_0001/LECF/LFLF_0059/ROOM/BOXD), so the walk ends exactly there. The bridge samples conditions after runAllScripts and before walkActors (engines/scumm/scumm.cpp:3254 onDecisionPoint, :3284 walkActors), so x == 270 is first seen at the decision point of the frame whose scripts ran WaitForActor -> [02C8] beginOverride -> [02CD] print. The x term guards the case where the greeting Esc was lost: Stan's last greeting line ([0221], no WaitForMessage, only delay(120)) can still be on screen (var 25 == 3) when 136 puts LeChuck in the room, 20+ frames before [02C8]. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold.",
+      "press": [
+        {
+          "key": "esc",
+          "when": [
+            {
+              "var": 352,
+              "ge": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stan's: wake Guybrush (first input after the fight cutscene)",
+      "room": 59,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": "u",
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 129
+        }
+      ],
+      "until": [
+        {
+          "var": 32,
+          "eq": 4
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-133.txt [03E1]-[049B] (LeChuck walks to (247,102); ego in costume 99 at (247,102), dazed for 55 frames + 240 jiffies, no override; LeChuck back at (225,104) walking to (243,104)), [04A1] VAR_VERB_SCRIPT=129, [04A6] endCutscene; engines/scumm/verbs.cpp:586-664 (any key or click runs VAR_VERB_SCRIPT); global/script-129.txt [0000]-[0039] (cutscene, VAR_VERB_SCRIPT=4, 12 frames getting up, ego costume 1 at (297,106), animateCostume 248 = face west at once (engines/scumm/actor.cpp:2817-2855), starts LeChuck's timer 126 and the move watchdog 125)",
+      "note": "The first input after [04A6] goes to script 129 whatever it is, so this 'u' does not select Use (the next move presses it again). Any key works; Esc too (engines/scumm/input.cpp:1426-1428). From the end of 129 on, ego must not move or turn: global/script-125.txt starts the punch (global/script-127.txt, then global/script-128.txt's flight to another room) on the first frame getActorMoving(ego) != 0, and global/script-126.txt punches anyway after 2 frames + 540 jiffies."
+    },
+    {
+      "name": "Stan's: use root beer with LeChuck (click LeChuck's left side)",
+      "room": 59,
+      "verb": 7,
+      "obj": 733,
+      "obj2": 734,
+      "point": null,
+      "key": null,
+      "choose": null,
+      "after": [
+        {
+          "var": 32,
+          "eq": 4
+        },
+        {
+          "actor_x": 1,
+          "ge": 290
+        }
+      ],
+      "until": [
+        {
+          "has": 733
+        },
+        {
+          "var": 25,
+          "eq": 9
+        }
+      ],
+      "kind": "verb",
+      "glitch": null,
+      "cite": "global/script-008.txt (733 has class 2, so 'Use root beer' waits for 'with'); global/script-004.txt [036D]-[037F], [03C5]-[0407] (second object: doSentence(7,733,734)); global/script-002.txt [0203]-[023F] (733 lies in the room and has class 7: queue 'Use 733 with 734', then 'Pick up 733'; the sentence stack is LIFO, engines/scumm/script.cpp:1145-1200, so the pick-up runs first), [02DB]-[02E4] (walkActorToObject: 733 and 734 both have walk point (297,106) and actordir 0 = west, where ego already stands facing west, so no move and no turn: engines/scumm/actor.cpp:894-897, engines/scumm/object.cpp:449-514, engines/scumm/util.cpp:54-58), [032A]-[0397] (733 has class 16 = 144: a 20-jiffy reach cutscene on the pick-up, which freezes 125/126 via global/script-018.txt [0070]); global/script-002.txt [039D]; global/script-183.txt (pickupObject); room-059-stans/obj-0733-root-beer.txt [0022] (Use 733 with X re-issues Use X with 733); room-059-stans/obj-0734-lechuck.txt [000F]-[0016] (Local[0]==733 -> startScript(132)); global/script-132.txt [0062]-[006C] ('--urk--': var 25 = 9)",
+      "note": "Click LeChuck's object box 734 (room x 208-239, y 56-103), not his sprite: the actor stands at x 243 and actors are not clickable, so the box sits to the sprite's left (LeoLitz's 'aim at his left side'). Camera 280 (global/script-133.txt [0143]): box = screen x 88-119. Overlaps: door 701 (192-231 x 40-95), sign 731 (208-223 x 56-79), coins 736 (216-247 x 96-111, touchable since [01CB]); room x 232-239, y 56-95 hits only 734. The executor's hit test (b.at) settles which object wins. Picking the root beer up first and then using it costs two more inputs and the same reach animation, which is why saruya finds both 'as fast'. Verb key 'u', then 733 at room (264-279, 104-111), then 734."
+    },
+    {
+      "name": "Ending: skip 'Gasp! --choke--' (first pass)",
+      "room": 59,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 25,
+          "eq": 9
+        },
+        {
+          "has": 733
+        }
+      ],
+      "until": [
+        {
+          "bit": 537,
+          "eq": 1
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-132.txt [0027] cutscene without override (Esc does nothing until the end), [0095]-[00A9] ('Gasp!' + wait() + '--choke--', WaitForMessage), [00AB]-[00FD] (delay(60), 'Aiiieeee!' without wait, 46 frames, two delay(30), Bit[537]=1)",
+      "note": "Two segments; '--urk--' and 'Aiiieeee!' do not block, '.' on them is harmless. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Ending: skip 'Gasp! --choke--' (instant replay)",
+      "room": 59,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "bit": 537,
+          "eq": 1
+        },
+        {
+          "var": 25,
+          "eq": 9
+        }
+      ],
+      "until": [
+        {
+          "bit": 565,
+          "eq": 1
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-132.txt [00F8]-[013F] (first pass only: Bit[537]=1, delay(60), 'Instant Replay' five times with delay(20), goto 0069: the whole death plays again), [0142] Bit[565]=1 after the replay",
+      "note": "The replay is forced (Bit[537] is 0 on the first pass). Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Ending: skip Elaine's 'Hey...' exchange",
+      "room": 59,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "bit": 565,
+          "eq": 1
+        },
+        {
+          "actor_room": 10,
+          "eq": 59
+        },
+        {
+          "var": 25,
+          "eq": 1
+        }
+      ],
+      "until": [
+        {
+          "room": 89
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-132.txt [015D]-[016A] (script 137, then 151); global/script-137.txt (Blimp-Cam in room 85, KABOOM, fireworks in room 10: cutscene without override, delay(300)); global/script-151.txt [001C]-[007C] (camera back on ego: room 59; Elaine, actor 10, at (511,108) walks to ego), [0091]-[00C7] ('Yikes!' + wait() + 'Don't sneak up on me like that!' and 'Sorry.', both waited), [00DE]-[00F9] (endCutscene, loadRoom(89), startScript(138))",
+      "note": "Three segments. Elaine's walk depends on ego's x (297), fixed by script 129. Room 10's entry only starts an empty local script (room-010-logo/entry.txt [0003], local-200.txt), so the logo script that writes VAR_TIMER_NEXT does not run again and var 19 stays 5. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Fireworks: skip the small talk",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "room": 89
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 32,
+          "eq": 149
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-138.txt [0000] cutscene([3]) without override, [002C]-[0195] (five waited lines: WaitForMessage at [00A8], [00C5], [0107], [014C], [0195], between fixed delays of 60, 20, 30, 60, 20, 60, 20, 60 jiffies; 'Yes, it's very romantic.' [0109] runs under delay(60)+delay(20) before its wait [014C]), [0197]-[0281] (VAR_VERB_SCRIPT=149, menu 1, Var[293]=171, Var[292]=121, Var[194]=0)",
+      "note": "Five segments. The '.'s only shorten the lines; the delays stay. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold. ENGINE (2026-10-20): the press rule sends '.' on every frame a line shows. 'Yes, it's very romantic.' ([0109]) stays up through delay(60)+delay(20) and is only waited for at [014C]. The bridge's automatic '.' needs a real talking actor or a slot in WaitForMessage (speedrun_skips.cpp textSkipEffective), so on this print(255) line it came one frame after [014C] blocked, and the message only closes in displayDialog() after that frame's scripts (engines/scumm/scumm.cpp:3177 processInput, 3198 VAR_HAVE_MSG = _haveMsg, 3231 runAllScripts, 3288 displayDialog), so [014C] cost 2 frames (slide-c5: blocked at frame 16842, '.' at 16843). Pressed while the line shows, the line is gone before [014C]: on slide-c5's state with only this change, menu 1 is clicked at frame 16878 instead of 16880.",
+      "press": [
+        {
+          "key": ".",
+          "when": [
+            {
+              "not": {
+                "var": 3,
+                "eq": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fireworks menu 1: 'Sure.' (mouse y 171-180)",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        160,
+        175
+      ],
+      "key": null,
+      "choose": "Sure.",
+      "after": [
+        {
+          "var": 32,
+          "eq": 149
+        },
+        {
+          "var": 293,
+          "eq": 171
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-138.txt [01A2]-[0277] (lines at screen y 171 and 181); global/script-149.txt [0000]-[004C] (the choice is 120 + (VAR_MOUSE_Y - Var[293]) / 10, whatever was clicked or pressed; y < Var[293] or a result above Var[292] is ignored; the line is shown as system text with WaitForMessage, then Var[194] = choice); engines/scumm/vars.cpp:78 (VAR_MOUSE_Y = var 45, screen y)",
+      "note": "Choose by mouse position, not by key: put the cursor at screen y 171-180 and click (one input). A key with the cursor there also works (engines/scumm/verbs.cpp:614, 664), but the digit means nothing, which is the guide's 'can't be selected with keyboard'. Both answers lead to the same branch with one reply each, so they cost the same. Room 89 runs SetScreen(0,200) (room-089-cu-works/entry.txt [003C]), so the lines are drawn in the main screen and the executor must allow y >= 144 here. 'point' is the click: room 89 is one screen wide and full height, so room and screen coordinates are the same; any y in 171-180 works. Equal-cost alternative (not faster): click at y 181-190 instead, which picks 121 'Actually, I'm a bit sick of root beer.'; its reply 'While I was in the machine over at Stan's--' shares the same delay(30)+delay(20)+WaitForMessage ([02FA]-[0314]) and script 149 shows one waited line either way, and menu 2 at the same y then picks 122. Kept 'Sure.' (the record's).",
+      "gate": "input"
+    },
+    {
+      "name": "Fireworks: skip 'Sure.'",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 293,
+          "eq": 171
+        },
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-149.txt [003D]-[004C]",
+      "note": "Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Fireworks: skip the epilogue lines (Stan, Herman)",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 194,
+          "eq": 120
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 0
+        },
+        {
+          "var": 293,
+          "eq": 161
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-138.txt [028C] (VAR_FIXEDDISK is always 1 in ScummVM, engines/scumm/vars.cpp:800-801, so the long branch), [0298] reply 'There's more at Stan's--' + delay(30), delay(20) + [0314] WaitForMessage, [0316] 'Gosh, I hope Stan's OK' + [0336], global/script-145.txt (Stan drops into room 83: two delay(60), no text), global/script-138.txt [038D] 'You know, I completely forgot about Herman Toothrot!' + [03CA] (Bit[436]==0), [03CC] delay(60), global/script-146.txt [0170]-[0205] (Herman in pseudo-room 130: delay(30), [018A]+[01C1] and [01C3]+[01F6], delay(60)), global/script-138.txt [03E4] delay(60), [03EF]+[0426] 'At least I learned something...', [0428]+[0447] 'What's that?', [0449]-[05F5] (menu 2: Var[293]=161, Var[292]=123, Var[194]=0)",
+      "note": "Seven segments; the rest is fixed. Pseudo-room 130 is room 1: global/script-001.txt [06C2] PseudoRoom(1,2,3,4) (descumm prints the 0x80|n bytes as n), engines/scumm/script_v5.cpp:2085-2092, engines/scumm/room.cpp:166-167; room-001-beach/entry.txt [0061]. Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold. ENGINE (2026-10-20): same press rule as 'Fireworks: skip the small talk'. 'There's more at Stan's--' ([0298]) stays up through delay(30)+delay(20) before its wait at [0314]: 2 frames. On slide-c5's state with only the two fireworks rules: [0316] prints at frame 16895 instead of 16899, final fade at frame 17061 instead of 17065 (1448.239 s instead of 1448.572 s, verified from boot).",
+      "press": [
+        {
+          "key": ".",
+          "when": [
+            {
+              "not": {
+                "var": 3,
+                "eq": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fireworks menu 2: 'It's not the size of the ship...' (mouse y 181-190)",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": [
+        160,
+        185
+      ],
+      "key": null,
+      "choose": "It's not the size of the ship",
+      "after": [
+        {
+          "var": 293,
+          "eq": 161
+        },
+        {
+          "var": 194,
+          "eq": 0
+        }
+      ],
+      "until": [
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "kind": "choose",
+      "glitch": null,
+      "cite": "global/script-138.txt [0449]-[05F5] (bands from y 161: 161-170 = 120 'How to deal with frustration...', 171-180 = 121, an off-screen copy of the same line at y 210 with the same branch, 181-190 = 122, 191-199 = 123), [0605]-[06FC] (122: one reply 'Yes, I've heard that one.'; 120/121: reply, drawObject, delay(120), 'Yikes!'; 123: 'A what?', delay(60), another line)",
+      "note": "The fastest answer by 60-120 jiffies plus one or two lines; the guide's '2'. Same input rule as menu 1: click at 'point' (any y in 181-190).",
+      "gate": "input"
+    },
+    {
+      "name": "Fireworks: skip 'It's not the size of the ship...'",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 293,
+          "eq": 161
+        },
+        {
+          "not": {
+            "var": 3,
+            "eq": 0
+          }
+        }
+      ],
+      "until": [
+        {
+          "var": 194,
+          "eq": 122
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-149.txt [003D]-[004C]",
+      "note": "Key-move convention (as in S3): press the key once on the first frame it can take effect (Esc only acts once the script has run beginOverride: abortCutscene does nothing while cutScenePtr is 0, engines/scumm/script.cpp:1689-1709), then press '.' on each new text segment (VAR_HAVE_MSG var 3 != 0; '.' sets _talkDelay = 0, engines/scumm/input.cpp:1418-1421; one press per wait() segment) until the until-conditions hold."
+    },
+    {
+      "name": "Fireworks: skip 'Yes, I've heard that one.' (to the final fade)",
+      "room": 89,
+      "verb": null,
+      "obj": null,
+      "obj2": null,
+      "point": null,
+      "key": ".",
+      "choose": null,
+      "after": [
+        {
+          "var": 194,
+          "eq": 122
+        }
+      ],
+      "until": [
+        {
+          "room": 0
+        },
+        {
+          "var": 194,
+          "eq": 122
+        }
+      ],
+      "kind": "key",
+      "glitch": null,
+      "cite": "global/script-138.txt [0677] print, [06FC] WaitForMessage, [06FE] delay(60), [0702] endCutscene, [0706] startScript(130); global/script-130.txt [0000] cutscene([1]), [000E] loadRoom(0) in the same frame; engines/scumm/room.cpp:55 (startScene -> fadeOut(_switchRoomEffect2)), engines/scumm/gfx.cpp:4441-4511 (effect 129 fills the screen black and blits it at once, no wait); the last screenEffect before it is 0x8181 (room-083-cu-dock/exit.txt [0000] during script 145, room-001-beach/entry.txt [005D] during script 146)",
+      "note": "End of the run. The first black frame is the frame in which script 130 runs loadRoom(0): 60 jiffies (12 frames at VAR_TIMER_NEXT 5) after the reply is skipped. VAR_ROOM is 0 from that frame (engines/scumm/room.cpp:148-155); Var[194]==122 tells it apart from script 137's earlier loadRoom(0) (global/script-137.txt [016E]), where Var[194] is still 121. Never press Esc while VAR_VERB_SCRIPT is 149: Esc also counts as an input (engines/scumm/input.cpp:1426-1428) and picks a line by mouse y."
+    }
+  ],
+  "rng_points": [
+    {
+      "where": "Part I, High Street (room 34): the church door 438",
+      "what is random": "Whether 438 is open (state 1) on entering Part IV. Wandering pirates (global/script-047.txt with Var[193]=200, only while Var[196]<3) run room-034-high-stre/local-200.txt: they enter through door index 4 (544,101) when Local[1]=getRandomNr(5)==4 or leave through it when Local[2]==4, opening 438 with global 25 and closing it with global 26 four frames later.",
+      "script": "room-034-high-stre/local-200.txt [0000]-[006E], [006E]-[00E7]; global/script-047.txt [000E]-[004D] (random delays); room-034-high-stre/entry.txt [0067]-[007E]",
+      "how the seed/search should treat it": "Part I segments decide it; S7 only reads state(438). If ego leaves room 34 inside a pirate's open-close window, startScene kills the local script (engines/scumm/room.cpp:80 killScriptsAndResources) and the door stays open for the rest of the game. Worth ~0.5 s in S7 (the Open sentence with its 20-jiffy reach); search Part I room-34 exits for it, never pay Part I time for it."
+    },
+    {
+      "where": "Room 59 fight, global/script-128.txt",
+      "what is random": "Where a LeChuck punch sends Guybrush (rooms 43, 59, 32 or 83 via getRandomNr(2) and getRandomNr(1), VAR_FIXEDDISK being 1). The first punch from the church is scripted to Stan's (global/script-133.txt [00CD]).",
+      "script": "global/script-128.txt [0028]-[00BC]; global/script-125.txt; global/script-126.txt; global/script-127.txt",
+      "how the seed/search should treat it": "Failure path only: the route never moves ego after script 129, so no punch and no draw matters. A branch that triggers a punch should be discarded, not reseeded."
+    },
+    {
+      "where": "Everywhere in Part IV (cosmetic draws)",
+      "what is random": "Candle flicker (room-078-church/local-200.txt, 8 draws per frame), every dialogue wait loop ('Var[100] = getRandomNr(1)' each frame, e.g. room-083-cu-dock/local-204.txt [01FE]), Stan's sign lights (room-059-stans/local-205.txt [007E] getRandomNr(Local[0]) in a loop, three draws or more per frame, started by room-059-stans/entry.txt [0029]), the map flight (global/script-134.txt [0035] getRandomNr(2) picks ego's flight frame, in the frame of 133's [0020], because 133 starts 147 and 134 nested at [0025]/[0028] before the map Esc can land), fireworks (room-089-cu-works/local-200.txt, local-202.txt, global/script-163.txt), the room-83 dissolve fade-in (anypercent-engine-mechanics.md §1.3).",
+      "script": "as listed",
+      "how the seed/search should treat it": "No effect on timing or branches in this route; the seed is free here. Nothing after the final fade reads the RNG."
+    }
+  ],
+  "glitches": [
+    {
+      "name": "Church door left open from Part I (pirate door window)",
+      "saves": "~0.5 s in S7: no Open sentence (20-jiffy reach cutscene plus 2-3 frames)",
+      "mechanism": "A room change kills room-local scripts. room-034-high-stre/local-200.txt opens 438 ([0030] or [00B4]) and closes it four frames later ([0065] or [00DE]); leaving room 34 in between leaves state(438)=1, which is global and persists to Part IV.",
+      "inputs": "Part I: leave High Street (any exit) on a frame inside the window, when a wandering pirate uses door index 4. Seed- and frame-dependent; no extra input.",
+      "risk": "None for timing, but it changes the route: this file assumes the door closed (entry flag state 438 eq 0). Using the glitch needs the door-open variant (this file without the Open move), which the move format can only express as a separate file.",
+      "cite": "room-034-high-stre/local-200.txt [0017]-[006E], [009B]-[00E7]; global/script-025.txt [000A]-[003C]; global/script-026.txt [000A]-[0033]; engines/scumm/room.cpp:78-80"
+    },
+    {
+      "name": "Shmoovement on the up-left walks (Low Street to 451, High Street to 438)",
+      "saves": "measured from the S6#65 cut: 7 frames on the Low Street archway walk, 2 on the High Street door walk (executor reclick + reclick_sweep, against one click)",
+      "mechanism": "Every new walk target resets the step fractions, and moving left or up rounds each step away from zero (anypercent-engine-mechanics.md §2.5); diagonal targets beat the x clamp (§2.4).",
+      "inputs": "A new floor or object target every frame while both axes move left or up; end on the door/archway click.",
+      "risk": "Room 35: a target that pulls ego below y 120 left of x 299 triggers the spectre (room-035-low-stree/local-212.txt [0001]-[001F]). Walking right (the dock) gets slower with re-clicks.",
+      "cite": "docs/research/anypercent-engine-mechanics.md §2.4-2.7; room-035-low-stree/local-212.txt"
+    }
+  ],
+  "crash_rules": [
+    "None found for the inputs of this route. The engine errors 'Script %d stopped with active cutscene/override in exit' (engines/scumm/room.cpp:58-70) cannot fire: the only local script that changes room, room-078-church/local-201.txt [0289], has closed its cutscene at [00FF] (and an Esc only decrements the counter, engines/scumm/script.cpp:1689-1709), and 133/137/138/145/146/151 are global scripts, which the check skips.",
+    "The crashes the runners report for actions during pick-ups/uses (docs/research/anypercent-runner-sources.md §3.4) need an item slide (userput > 1); there is none in Part IV (see entry notes).",
+    "Do not move or turn ego after script 129 before the Use: not a crash, but a punch (global/script-125.txt -> 127 -> 128) costs a map flight and a random room.",
+    "Do not press Esc while VAR_VERB_SCRIPT (var 32) is 149: Esc is also delivered as input key 27 (engines/scumm/input.cpp:1426-1428) and picks a final-dialogue line by mouse y (global/script-149.txt).",
+    "Never right-click the church door 438 once it is open: the right click takes Var[182], which is 3 (Close) once script 23 re-reads the door (room-034-high-stre/obj-0438-door.txt [002A]-[0043], global/script-004.txt [0000]-[001B]); not a crash, but the door closes and Walk to 438 stops entering (obj-0438-door.txt [0044]-[0058]). Enter with a left click."
+  ],
+  "record_comparison": "Record (saruya, 21:52, DOS CD): Part IV = 2:07.0, 19:45.5 ('Last Part' card) to 21:52.4 (fade). Frames: dock reply 'I LOVE root beer!' 19:53, church 20:12, grog machine fight 20:18-20:51, ending 20:51-21:52 (61 s) (docs/research/anypercent-runner-sources.md §2.1, §2.6). THE CARD DOMINATES: with the CD audio our rules require (rules/anypercent.md 'Music check'; the user confirms the audio tracks are on the disc), the card waits for all of CD track 6, 129.8 s: the official disc's Track 06.bin (redump zip in ~/Downloads/torrents/TheSecretOfMonkeyIslandUSAEnFrDeEsIt) is 22896720 bytes = 129.80 s at 176400 B/s, with no pregap in the cue, the same length as game/dos-cd/track6.flac. The record cannot have waited for it, and its own numbers bound its card: the dock reply came 7.5 s after the card's first frame, and the dock part alone needs about 3.5-4 s (ego's 265-px walk from (80,121) to (345,121) at WalkSpeed(8,2), the last WalkSpeed write on S6's path being room-012-monkey-he/entry.txt [0049], ~6.5 px/frame as measured on the Part I dock = ~41 frames = ~3.4 s; then the Esc, the menu, the choice, ego's line; and 'I LOVE root beer!' is the third segment of the ghost's reply, room-083-cu-dock/local-204.txt [020F]). So the record's card lasted about 4 s at most. That contradicts runner-sources §2.1 ('at least 6 s'), so one of the two readings is wrong; either way the record's setup had no track 6 or a much shorter one. With the rules as they stand, S7 is about 124-126 s slower than the record's split on the card alone. The rest is a script model of this route (12 frames/s at VAR_TIMER_NEXT 5, delays in 1/60 s; estimates, not measured). The ending is ~58-60 s of fixed time (script 132 with the forced instant replay ~20.5 s, 137 ~13.5 s, 151 ~3.5 s, 138 with the Stan and Herman cutaways ~21 s: five waited lines before menu 1, seven epilogue segments, one line after each menu), so the record's 61 s leaves only text-skip latency. Dock to church (19 s in the record) holds the ~6 s unskippable spray animation and three walks, where only input latency, shmoovement and the 1-frame right-click Open gain. The church entry to the start of script 132 is ~23 s in the model (walk-ins ~3 s, ~25 input/text frames, 133's unskippable ~15 s including Guybrush's 55-frame + 240-jiffy daze, wake-up 1 s, Use with the 20-jiffy reach) against ~39 s in the record (20:12-20:51). The menu-3 choice explains part of that gap only if the runner gave a single Esc after '4' and let [1490]'s punch (~7.3 s) play; with two Escs '4' costs one frame more than the dentist line, which is all this route gains there. The other candidates are unskipped overrides (map, Stan's two) and input latency. Excluding the card: expect a few seconds of gain outside the church and fight, and up to ~10-15 s inside it, depending on what the video shows. Re-measure the card and the 20:12-20:51 stretch from the video.",
+  "open_questions": [
+    "RULES DECISION, affects the whole run: the 'Last Part' card waits for all of CD track 6. The official disc's track 6 is 129.8 s (redump Track 06.bin, 22896720 bytes, no pregap; equal to game/dos-cd/track6.flac), and the user confirms the audio is on the disc, so under rules/anypercent.md ('playing': false is invalid) the CD-audio requirement alone costs ~124 s here against the record. The record's card lasted ~4 s at most (record_comparison), so its setup had no track 6 or a short one. Does the board treat a CD version without its audio tracks as 'No Music'? The same answer applies to every other script wait on a CD-track sound (type 2). S6's crate fanfare, sound 53, is not one: it is a sampled SOU/SBL resource. Also confirm the 7794-tick measurement in a Part IV run.",
+    "Church door 438: this file assumes it closed. If a Part I route ever leaves it open (pirate four-frame window), a separate door-open variant (no Open move, entry flag state 438 eq 1) is needed, or executor support for conditional moves (e.g. an only_if field checked at the move). Can a Part I room-34 exit be timed into the window at no cost?",
+    "Low Street (answered, measured): the path from (437,107) to 451 cannot avoid local 212 (box 5 is the only link from box 6 to box 4, all of it x<299, y>120). The route now uses the root beer on the spectre (440 is touchable while it stands) and starts 213 at frame 15440 from the S6#65 cut.",
+    "The Esc moves whose after-condition can precede the override by a frame because of script slot order (the [1490] Esc in particular): confirm the first effective frame in the engine. The others use markers set in the override frame (var 277, VAR_HAVE_MSG, actor 10 room, Bit[468], 'not has 823', state(733) for Stan's greeting, LeChuck in room 59 with var 25 == 3 and Stan at x 270 for the sales pitch).",
+    "VAR_TALK_ACTOR (var 25) values used as markers: 255 between lines, 1 ego, 9 LeChuck, 3 Stan, 10 Elaine. Confirm on CD (engines/scumm/actor.cpp stopTalk/actorTalk).",
+    "Room 59 click: does findObject resolve room (232-239, 56-95) to 734 and never to door 701 or sign 731 (object order)? The executor's hit test answers it.",
+    "Room 83: the walkbox extent toward 905's walk point (345,121), beyond the 320-px screen; measure both dock walks.",
+    "Whether the bridge clock counts room 83's 18-qf dissolve fade-in (room-083-cu-dock/entry.txt [0009]) and the other room changes of the ending (anypercent-engine-mechanics.md §1.3).",
+    "Executor support: (a) right-click Open of 438: done (move field rclick, also inside re-clicked walks); (b) conditional moves (door-open variant); (c) the key-move convention of one '.' per new text segment until the until-conditions hold (executor.play currently schedules one key per move); (d) the two final-menu moves carry both 'choose' and a 'point' (y 175 / 185) in room 89 with SetScreen(0,200): the executor's choose path sends a digit wherever the mouse is, and its point clicks stop at y 143, so it needs a click at that point instead.",
+    "Dock: confirm in the engine that the three '.' presses during the first walk end script 131 before local 204 starts, and measure both dock walks (the 265-px walk is the basis of the record's ~4 s card bound).",
+    "Record video: the card length (runner-sources §2.1 says at least 6 s; the dock arithmetic says at most ~4 s), and which overrides the runner skipped between 20:12 and 20:51 ([1300], [1490], map, Stan's two), to pin the expected gain."
+  ]
+}

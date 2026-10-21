@@ -1,0 +1,164 @@
+{
+  "segment": "S7",
+  "title": "Part IV without the item slide: Melee dock ghost, Low Street spectre, High Street, church, LeChuck close-up, Stan's fight, ending (DOS CD, SCUMM v5)",
+  "entry": {
+    "room": 95,
+    "notes": "First frame of the 'Last Part' card: room 95, loaded by global/script-131.txt [0039]. 131 is started by room-070-hellcliff/local-206.txt [046E], right after startScript(17,[2]) (verbs back) and UserputOn at [0464]-[046C]. 131 itself sets Bit[453] (Part IV) at [002F] and Var[277] = 6 at [0034]. This is the no-slide S6's last target ({room: 95}, routes/anypercent/noslide/S6.json). NO STEP OF PART IV USES THE ITEM SLIDE. No slide survives into Part IV (the UserputOn above). None can be formed either: each dialogue choice runs UserputOff (global/script-014.txt [00E2]) and then script 32's UserputOn (global/script-032.txt [0011]). The only 'gate: input' moves below are the two fireworks menus, which global 138 itself draws inside its own cutscene with input on (see goals 13-14); they are the game's normal way to answer, not a slide. FACTS S7 NEEDS FROM S6 AND CANNOT REPAIR: (1) ego owns 823, the root beer ('magic seltzer bottle', global/script-106.txt [055B]), with class 6 cleared ([0573] setClass(823,[6,146])); room-078-church/entry.txt [000E]-[0027] starts the wedding script local 201 only if ego owns it, and 823's Use handler (room-075-gh-hull/obj-0823-voodoo-root.txt [00A7]) only passes the sentence on while class 6 is clear. (2) Bit[51] == 1 (Stan's first visit, global/script-056.txt [3F04]). Without it, room-059-stans/entry.txt [0035]-[004C] starts Stan's sales script local 201 on top of global 133's fight (Stan is in room 0 and Var[196] >= 3). (3) Var[196] == 3: High Street starts no wandering pirates (room-034-high-stre/entry.txt [0067]). (4) var 19 == 5 (the logo glitch): every frame count below assumes 12 frames/s. STATE THAT DOES NOT MATTER: (a) state(438), the church door: 0 by default, and goal 6 opens it; if a Part I wandering pirate left it open, goal 6 already holds and is skipped. (b) Bit[436]: the vista catapult with Var[242] == 2 sets it (room-011-vista-1/local-207.txt [002C]). It only switches which line 131 prints at the dock ([00BD]: same two segments either way) and the ending cutaway (global/script-138.txt [0358], global/script-146.txt [0000]). No target reads it. Bits 455, 468, 537 and 565 are 0 (set only in Part IV). On the first room-83 frame the inventory is cut down to 823, 488 and 733 (room-083-cu-dock/entry.txt [0020]-[0067], Var[277] == 6), so whatever Part III's normal solutions left in the inventory does not matter. THE CARD LASTS 129.8 s (CD track 6, sound 107: global/script-131.txt [0059]-[0060]), about 7794 ticks = about 1559 frames at VAR_TIMER_NEXT 5. It is a cutscene with no override, so Esc does nothing. Goal 1's hint waits it out with a 'delay' (see there)."
+  },
+  "exit": [
+    {"room": 0},
+    {"var": 293, "eq": 161}
+  ],
+  "goals": [
+    {
+      "name": "Last Part card ends: ego on the Melee dock (room 83)",
+      "target": [
+        {"room": 83}
+      ],
+      "hint": [
+        {"name": "Last Part card: wait for CD track 6 to end (no input shortens it)", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": null, "delay": 800, "after": [{"room": 83}], "until": [{"room": 83}]}
+      ],
+      "cite": "global/script-131.txt [0000] cutscene([]) with no beginOverride, [0039] loadRoom(95), [0059] startSound(107), [005B]-[0060] loop while isSoundRunning(107), [0065]-[0074] putActorInRoom(VAR_EGO,83), putActor(VAR_EGO,80,121), endCutscene, startScript(175), actorFollowCamera(VAR_EGO); room-083-cu-dock/entry.txt [0020]-[0067]",
+      "note": "A pure wait with no input. The goal starts on the card's first frame (S6's last target is room 95), so about 1559 frames remain at var 19 == 5. autoplay._hint clamps each hint move's max_frames to HINT_FRAMES = 1200, but Executor.play runs 'delay' first and does not clamp it. With delay 800, the 'after' wait needs about 760 more frames, inside the clamp. This removes the old blocker ('the driver must lift the clamp'). It works for 800 to 2000 frames of card left, so var 19 == 6 (about 1298 frames) also fits. The delay ends inside the card, so it costs no game time. After and until are the same fact, so the move ends as 'skipped' on the first room-83 frame and sends nothing. The search could not pass the card: WAIT's wait_gate(900) times out, and the ESC child has the root's signature. Makeable: room 83 has 41 object-verb writers in ScriptIndex. The one that applies is ('obj', 784, 255) in room 70, which starts 131 and reaches global/script-131.txt [0065]."
+    },
+    {
+      "name": "Dock: the ghost is sprayed and the way to town opens (905 gets class 6)",
+      "target": [
+        {"class": 905, "set": 6}
+      ],
+      "hint": [
+        {"name": "Dock: walk to the right end (the ghost starts on arrival)", "verb": null, "obj": 905, "obj2": null, "point": null, "key": null, "choose": null, "after": [{"room": 83}], "until": [{"var": 277, "eq": 0}]},
+        {"name": "Dock ghost: 'Could I interest you in some root beer, sir?'", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "Could I interest you in some root beer", "after": [{"var": 277, "eq": 0}], "until": [{"class": 905, "set": 6}]}
+      ],
+      "cite": "room-083-cu-dock/obj-0905-dock.txt [0010]-[0035] (Bit[453] set and class 6 clear -> startScript(204); class 6 set -> loadRoomWithEgo(450,35)); room-083-cu-dock/local-204.txt [0000] Var[277]=0, [0005] cutscene, [0019] beginOverride ('Yikes!' scene), [00A3] endCutscene, [00A4]-[01F9] menu (VAR_VERB_SCRIPT=14), [0208]-[02EB] the ghost's reply, [02EE]-[0360] spray animation (no override), [037B] setClass(905,[134]), [0382]-[038F] VAR_VERB_SCRIPT=4, UserputOn",
+      "note": "Makeable: ScriptIndex.writers('class', 905, 6) = ('obj', 905, 255) -> local-204 [037B], guards Bit[453] (from 131) and class 6 clear (905 has no classes in out/objects.json). The menu is not an object verb, so the hint carries the choice. All four lines cost the same: one ego segment each, and the ghost's reply never blocks. Line 1 is the record's choice; the 2019 guide says 2. The bridge's automatic '.' clears 131's ego lines during the walk, and its Esc skips the 'Yikes!' override. 905 (x 304-319) is on screen on the first room-83 frame (room width 320). Click it once: walking right gets slower with re-clicks (anypercent-engine-mechanics.md section 2.5). Var[277] is 6 from 131 [0034] until local 204 [0000] sets it to 0."
+    },
+    {
+      "name": "Low Street (room 35)",
+      "target": [
+        {"room": 35}
+      ],
+      "cite": "room-083-cu-dock/obj-0905-dock.txt [0035] loadRoomWithEgo(450,35,-1,-1) once class 6 is set; room-035-low-stree/entry.txt [007C]-[00BA] (Bit[453] and !Bit[455]: spectre actor 9 at (240,128), object 440 made touchable, local 212 started freeze-resistant)",
+      "note": "No hint needed. Makeable: writers('room', 35) includes ('obj', 905, 255), guarded by class 6 set, which goal 2 provides. MilestoneSearch._hops(83, 35) = [(905, 35)]. Ego walks again from (128,121) to 905's walk point (345,121). Ego arrives at 450's walk point (437,107); Var[101] == 83 has no entry walk."
+    },
+    {
+      "name": "Low Street: spray the grim spectre before he can stop ego (Bit[455])",
+      "target": [
+        {"bit": 455, "eq": 1}
+      ],
+      "hint": [
+        {"name": "Low Street: use the root beer (823) with the grim spectre (440)", "verb": 7, "obj": 823, "obj2": 440, "point": null, "key": null, "choose": null, "after": [{"room": 35}], "until": [{"bit": 455, "eq": 1}]}
+      ],
+      "cite": "room-035-low-stree/local-212.txt [0001]-[001F] (every frame: ego x < 299 and y > 120 -> doSentence(STOP), startScript(211)); room-035-low-stree/local-211.txt [000D]-[006B] ('Excuse me.', walk to 440, 'Do you have an invitation to the wedding?'), [01D0]-[0204], [0332]-[0359], [0500], [06E8], [08B3], [0A17]-[0A34] (every answer path ends at [0A34] startScript(213)); room-035-low-stree/obj-0440-grim-spectre.txt [0013]-[001A] (Use with 823 -> startScript(213)); room-075-gh-hull/obj-0823-voodoo-root.txt [00A7]-[00F1] (class 6 clear and Local[0] == 440 -> doSentence(7,440,823)); room-035-low-stree/local-213.txt [0002] stopScript(212), [0004] Bit[455] = 1, [0075] ego's four-segment line, [00F8] endCutscene; build/blocks-dos-cd/DISK_0001/LECF/LFLF_0035/ROOM/BOXD and BOXM (walk boxes 21 -> 7 -> 6 -> 5 -> 4 -> 3 -> 2 -> 1)",
+      "note": "NEW GOAL. The old file claimed ego could reach archway 451 at y <= 120 while x < 299, and so avoid the spectre. Room 35's walk boxes rule that out. Ego enters at (437,107), in box 21. The box matrix's only way to 451's walk point (160,88), in box 1, is 21 -> 7 -> 6 -> 5 -> 4 -> 3 -> 2 -> 1. Box 6 (x 299-467, y 127-141) meets box 4 (bottom edge y 124, x 47-290) only through box 5 (x 48-299, y 124-141), so every walk to 451 passes x < 299 with y >= 124. local 212 (freeze-resistant) then stops ego and starts the spectre's dialogue 211. Every one of 211's answers ends in 213, the same spray, so the spray cannot be avoided. The fastest way in is to start 213 directly. 'Use 823 with 440' walks ego to 440's walk point (299,128), which is in box 6 on the box-5 edge, so x never drops below 299 and 212 never fires. 823's handler passes the sentence to 440 (doSentence(7,440,823)), and 440's verb 7 starts 213. Compared with letting 212 fire and answering 'No, but I do have this deadly magic root beer.' (the shortest dialogue path, 211 [01E7] -> [0A34]), this saves 211's cutscene, two spectre lines, the menu and ego's line (about 8 frames) for 2 extra input frames (the verb key and the inventory click). Makeable: writers('bit', 455, 1) includes ('obj', 440, 7) with guard OBJ2 == 823 (the search's 'auto: use voodoo root with grim spectre'). Prerequisites: has 823 (entry) and room 35 (goal 3). 440 (box x 224-255, y 80-127) and inventory slot 1 (823) are on screen at arrival: the camera is clamped at x 320 in this 480-wide room, so the screen starts at x 160. 213 keeps 823 (no setOwnerOf). After 213 control comes back with VAR_VERB_SCRIPT still 4."
+    },
+    {
+      "name": "High Street (room 34) through archway 451",
+      "target": [
+        {"room": 34}
+      ],
+      "cite": "room-035-low-stree/obj-0451-archway.txt [000C]-[001F] (cutscene, local 205 climb, loadRoomWithEgo(433,34,750,128)); room-035-low-stree/local-205.txt [0000]-[0063] (ego put at x 160, one frame per pixel up to y 72, walk to (155,72)); room-035-low-stree/obj-0450-archway.txt [000C]-[003B] (Part IV: 'The church is in the other direction!', doSentence(11,451,0))",
+      "note": "No hint needed. Makeable: writers('room', 34) includes ('obj', 451, 11) with no guard. MilestoneSearch._hops(35, 34) = [(451, 34), (450, 34)]. 450 prints a line and then re-issues Walk to 451, so the search keeps the faster 451. The goal starts while 213 still runs, so the search waits for control first (WAIT). 213 stopped local 212 and set Bit[455], so the walk through box 5 is free, and the room-35 entry will not restart 212. Ego walks from (299,128) to (160,88). Shmoovement helps on this up-left walk (anypercent-engine-mechanics.md section 2.5), but the executor does not use it."
+    },
+    {
+      "name": "High Street: the church door is open",
+      "target": [
+        {"state": 438, "eq": 1}
+      ],
+      "cite": "room-034-high-stre/obj-0438-door.txt [0018] (Open -> startScript(25,[438])), [002A]-[0043] (verb 90: Var[182] = 2 while closed, 3 while open); global/script-025.txt [0024] setState(438,1) (guards: state 0, class 6 clear); global/script-002.txt [032F]-[0397] (438 has class 15: a 20-jiffy reach cutscene before the Open runs)",
+      "note": "No hint needed. Makeable: writers('state', 438, 1) = ('obj', 438, 2) Open and ('obj', 438, 7) Use, both through global 25. Guards: state 438 == 0 (default, or already 1, see below) and class 6 clear (438 has only class 15). If a Part I pirate left the door open, the target already holds and the driver skips this goal. The door (x 528-559) is off screen on arrival (camera on ego at x 750), so the executor walks toward it first and then sends 'o' and a click: two input frames. A right click on the closed door does the same in one frame, but executor._click cannot emit 'rclick'. Never right-click the door once it is open: that is Close (Var[182] = 3)."
+    },
+    {
+      "name": "Inside the church (room 78)",
+      "target": [
+        {"room": 78}
+      ],
+      "hint": [
+        {"name": "High Street: walk through the church door", "verb": null, "obj": 438, "obj2": null, "point": null, "key": null, "choose": null, "after": [{"state": 438, "eq": 1}], "until": [{"room": 78}]}
+      ],
+      "cite": "room-034-high-stre/obj-0438-door.txt [0044]-[0058] (state 1 -> loadRoomWithEgo(857,78,145,142)); room-034-high-stre/obj-0432-alley.txt [000C]-[0037] (Bit[453]: 'That's not the church.', doSentence(11,438,0)); likewise obj-0433, 0434, 0436, 0437",
+      "note": "The hint is needed although 438's Walk to is an object verb. MilestoneSearch._hops(34, 78) = [(432, 78), (433, 78)]: it keeps only the two exits with the fewest guards and lowest object numbers. In Part IV both only print 'That's not the church.' and re-issue Walk to 438, so the search alone would take the long way. Prerequisite: state 438 == 1 (goal 6). After the Open, ego already stands at the door's walk point (544,101), so the click enters at once. Left click only (Walk to)."
+    },
+    {
+      "name": "Wedding interrupted: the LeChuck close-up (room 45)",
+      "target": [
+        {"room": 45}
+      ],
+      "hint": [
+        {"name": "Church: 'Elaine!'", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "Elaine!", "after": [{"room": 78}], "until": [{"room": 45}]}
+      ],
+      "cite": "room-078-church/entry.txt [000E]-[0027] (ego owns 823 -> local 201); room-078-church/local-201.txt [0034] cutscene, [0045] beginOverride (the priest), [00FF] endCutscene, [010E]-[0235] menu (keys 1-4: 'The groom isn't a gentleman!', 'The groom isn't a human!', 'Elaine!', 'STOP THE WEDDING!!'), [023A] local 202 timeout (delay(600)), [0245]-[0289] 'Hey!! Who's that?', putActorInRoom(VAR_EGO,45) and actorFollowCamera (the move to room 45); room-045-cu-church/local-200.txt [0005]-[0043] ('You!', no override)",
+      "note": "Makeable: writers('room', 45) are the room-34 door clicks through this church entry (guards state 438 == 1, has 823). Inside room 78 those writers would send the search back out to room 34, and the step that matters is the menu, so the hint carries the line. Prerequisite: has 823 (entry; neither 204 nor 213 takes it). All four answers lead to the same lines at the same cost, and 'Elaine!' is the only line containing that text. Line 3 is the record's choice. The bridge's Esc skips the priest's override."
+    },
+    {
+      "name": "Close-up: Elaine's monkeys take the root beer bottle (Bit[468])",
+      "target": [
+        {"bit": 468, "eq": 1}
+      ],
+      "hint": [
+        {"name": "Close-up menu 1: 'Take THIS, you vaporous voodoo vermin!'", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "Take THIS, you vaporous voodoo vermin!", "after": [{"room": 45}], "until": [{"actor_room": 10, "eq": 45}]},
+        {"name": "Close-up menu 2: 'If you're here, then who's that in the dress?'", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "who's that in the dress", "after": [{"actor_room": 10, "eq": 45}], "until": [{"bit": 468, "eq": 1}]}
+      ],
+      "cite": "room-045-cu-church/local-200.txt [0044]-[01C5] menu 1 (in display order: 124 'I've come to stop you...', 122 'Please don't kill me.', 123 'Take THIS...', 121 dentist), [01D4]-[02A1] one LeChuck reply each (no wait), [02AC] putActorInRoom(10,45), [02B8] beginOverride (Elaine's entrance), [0438] endOverride, [0448]-[0568] menu 2 (VAR_VERB_SCRIPT = 201: 120 'How did you manage to escape?', 126 'I thought LeChuck was going to marry you.', 121 'If you're here, then who's that in the dress?'), [0577]-[05AC] LeChuck's mumble loop until Bit[544], [05B1] beginOverride (goto 0880 on Esc), [06E1] Bit[468] = 1 (121 only, same frame as [05B1]); room-045-cu-church/local-201.txt [000C] Bit[544] = 1, chainScript(14)",
+      "note": "The hint is required: writers('bit', 468, 1) and writers('actor_room', 10, 45) are empty, because these dialogues are not object verbs. Menu 1: every answer costs the same, and line 3 is the record's. Menu 2: the bridge's automatic Esc fires once [05B1]'s override is live, and it jumps every answer to [0880], so 120 and 126 do not loop back to [0438] in this run. But only 121 (line 3) sets Bit[468], at [06E1], before the Esc frame. It costs the same, so the target names it. Actor 10 is put in room 0 on every Part IV Low Street entry (room-035-low-stree/entry.txt [007F]), so actor_room 10 == 45 first holds at [02AC], right after menu 1's choice. Neither menu runs inside a cutscene (200's cutscene ends at [0043]), so the default gate applies."
+    },
+    {
+      "name": "Stan's (room 59): LeChuck's punch and the map flight are over",
+      "target": [
+        {"room": 59}
+      ],
+      "hint": [
+        {"name": "Close-up menu 3: 'I've just remembered an appointment at the dentist's.'", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "appointment at the dentist", "after": [{"bit": 468, "eq": 1}], "until": [{"room": 59}]}
+      ],
+      "cite": "room-045-cu-church/local-200.txt [0880]-[089B] (Esc lands here: ego and actors put in place, endOverride), [08A1] VAR_VERB_SCRIPT = 14, [08A8]-[08F3] 'You dared to come here...', [08F5]-[0ACE] menu 3 (120 stupidity, 124, 122, 123 'Take THIS...', 121 dentist), [0AE7]-[0AF1] (121 -> goto 1490), [0B0E]-[0B18] (123 -> [1300], its own override, then [1490]), [1490] beginOverride (the punch), [157E]-[1594] endOverride, VAR_VERB_SCRIPT = 4, startScript(17,[2]), UserputOn, startScript(133); global/script-133.txt [0003]-[0005] cutscene, loadRoom(85), [001C] setOwnerOf(823,0), [0020] beginOverride (the flight), [00E9] endOverride, [00ED] loadRoom(59)",
+      "note": "The hint is required: room 59's only object-verb writer is the Part I map ('obj', 915, 11) in room 85, which is not reachable from a dialogue. The dentist line (line 5) jumps straight to [1490], so it needs one Esc fewer than the record's line 4 ('Take THIS...'), whose [1300] override comes first. That is one frame, not seconds. No flag differs. The bridge's Esc skips [1490] and 133's flight override [0020] (input is off in both). The root beer 823 is taken away at 133 [001C]."
+    },
+    {
+      "name": "LeChuck defeated: root beer picked up and used on him, death and instant replay over",
+      "target": [
+        {"has": 733},
+        {"bit": 565, "eq": 1}
+      ],
+      "hint": [
+        {"name": "Stan's: wake Guybrush (any input goes to VAR_VERB_SCRIPT 129)", "verb": null, "obj": null, "obj2": null, "point": null, "key": "u", "choose": null, "after": [{"var": 32, "eq": 129}], "until": [{"var": 32, "eq": 4}]},
+        {"name": "Stan's: use root beer with LeChuck (object 734)", "verb": 7, "obj": 733, "obj2": 734, "point": null, "key": null, "choose": null, "after": [{"var": 32, "eq": 4}], "until": [{"has": 733}, {"bit": 565, "eq": 1}]}
+      ],
+      "cite": "global/script-133.txt [01B1] drawObject(733), [01BD]-[01CB] and [029D]-[02B2] setClass(...,[32]) (733 and 734 made touchable), [01DA] beginOverride (Stan's greeting), [0281] endOverride, [028A] startScript(136) (LeChuck appears), [02C8] beginOverride (Stan's pitch), [039E] endOverride, [04A1] VAR_VERB_SCRIPT = 129, [04A6] endCutscene (same frame); global/script-129.txt [0000]-[0039] (cutscene, VAR_VERB_SCRIPT = 4, about 12 frames getting up, ego at (297,106) facing west via animateCostume 248, starts 126 and 125, endCutscene); global/script-125.txt (punch on any ego movement); global/script-126.txt (3 x delay(180), then the punch); room-059-stans/obj-0734-lechuck.txt [000F]-[0016] (Local[0] == 733 -> startScript(132)); global/script-183.txt (pickupObject 733); global/script-132.txt [002C]-[0030] stopScript(125/126/127), [00FD] Bit[537] = 1 (first pass), [00F8]-[013F] forced instant replay (no override), [0142] Bit[565] = 1",
+      "note": "The hint is required. After 133's cutscene, the first key or click goes to VAR_VERB_SCRIPT 129, whatever it is. Without the wake key, the executor's verb key 'u' is eaten by 129, and _click raises 'verb key did not select verb'. 133 sets var 32 = 129 and ends its cutscene in the same frame, so input is on (global/script-019.txt UserputSoftOn) when the key arrives. Makeable: writers('owner', 733, 1) = ('obj', 733, 9) via global 183; writers('bit', 565, 1) includes ('obj', 734, 7) with OBJ2 == 733. Prerequisites: Bit[537] == 0 (Part IV only), and 733 is drawn and touchable (133). 'Use 733 with 734' on a room object queues the pick-up first (global/script-002.txt [0203]-[023F]). 733 and 734 share walk point (297,106), facing west, where 129 puts ego, so ego neither walks nor turns. That matters: global 125 punches on any ego movement, and global 126 punches after 540 jiffies (about 108 frames). Hit test: the executor's right-edge candidate, room (239,79) with the camera at 280, lies only in 734's box (x 208-239, y 56-103), so it always hits 734. In out/objects.json (the Mac extraction), 734 is room 59's second object, after 733. findObject scans in ascending order, so if the DOS order is the same, the other four points also give 734 over door 701, sign 731 and coins 736. The record aims at LeChuck's left side for the same reason: the box sits left of his sprite. Picking up first and using afterwards costs the same (saruya). The forced replay takes about 240 frames, inside the 1200-frame hint clamp."
+    },
+    {
+      "name": "Fireworks (room 89): Blimp-Cam, KABOOM and Elaine's walk-in are over",
+      "target": [
+        {"room": 89}
+      ],
+      "hint": [
+        {"name": "Ending cutscenes: wait (no override anywhere, the bridge's '.' handles the lines)", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": null, "after": [{"room": 89}], "until": [{"room": 89}]}
+      ],
+      "cite": "global/script-132.txt [015D] startScript(137), [016A] startScript(151); global/script-137.txt [0009] SetScreen(0,200), [000F] cutscene, [004B] loadRoom(85) (Blimp-Cam, KABOOM), [00DA] loadRoom(10), no override; global/script-151.txt [000C] cutscene([1]), [0020]-[0077] (Elaine walks in at room 59), [007F]-[00C9] the lines, [00DE] endCutscene, loadRoom(89), startScript(138); room-089-cu-works/entry.txt [003C] SetScreen(0,200)",
+      "note": "A pure wait of about 230 frames with no input. Makeable: writers('room', 89) includes ('obj', 734, 7) via global/script-151.txt [00EB] (and global/script-138.txt [034F]). The hint is there because the search has no clean way through: wait_gate never sees control here (cutscene after cutscene, then 138's menu, which also runs inside a cutscene). Var[293] is first written by 138 after this goal, so no earlier room-0 frame can satisfy the final goal."
+    },
+    {
+      "name": "Fireworks menu 1 answered ('Sure.'), epilogue played up to menu 2",
+      "target": [
+        {"var": 293, "eq": 161}
+      ],
+      "hint": [
+        {"name": "Fireworks menu 1: 'Sure.' (click inside 138's cutscene; mouse y 171-180)", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "Sure.", "gate": "input", "after": [{"var": 293, "eq": 171}], "until": [{"var": 293, "eq": 161}]}
+      ],
+      "cite": "global/script-138.txt [0000] cutscene([3]) (held until [0702]), [002C]-[0195] five waited lines, [0197] VAR_VERB_SCRIPT = 149, [019C] startScript(17,[5]), [01D6] startScript(32) (UserputOn), [01D9] Var[293] = 171, [01F2] 'Sure.' at (2,171), [022E] 'Actually, I'm a bit sick of root beer.' at (2,181), [027C] Var[292] = 121, [028C]-[03E4] (VAR_FIXEDDISK: the epilogue with global 145, about 46 frames, and global 146, a few lines), [03EF]-[0447] two more lines, [0449] startScript(32), [044C] Var[293] = 161 (menu 2 drawn in the same frame); global/script-149.txt [0000]-[004C] (choice = 120 + (VAR_MOUSE_Y - Var[293]) / 10; ignored if y < Var[293] or the choice > Var[292]; then UserputOff, the line, Var[194] = choice)",
+      "note": "OLD BLOCKER FIXED by 'gate': 'input'. Script 138 holds cutscene([3]) from [0000] to [0702], so cs stays 1 at both fireworks menus, and Executor._choose with the default gate would never see them. With gate 'input', _choose takes the menu as soon as input is on and lines are shown (executor.py _choose: 'up > 0 and (cs == 0 or gate == input)'). 32's UserputOn sets input to 1, and the engine's checkExecVerbs tests only _userPut, not the cutscene. This is the game's normal menu inside its own cutscene, not an item slide. _choose clicks the line at (x + 2, y + 2) = (4,173): Branch.at's verb_slot test works at any y, and script 149 reads VAR_MOUSE_Y = 173, so choice = 120 + (173 - 171) / 10 = 120, 'Sure.'. 'point' is null because _choose ignores it. 'Sure.' (120) and 'sick of root beer' (121) cost the same, one reply each; 'Sure.' is the record's. Var[293] is written only by 138, so 171 and 161 mark the two menus. Never send Esc while var 32 == 149: it also arrives as an input and picks a line by mouse y. The bridge's Esc stays off here because input is on and 138 has no override. Makeable: writers('var', 293, 161) = ('obj', 734, 7) via global/script-138.txt [044C]. The epilogue up to menu 2 is about 150 frames, inside the hint clamp."
+    },
+    {
+      "name": "Final fade: 'It's not the size of the ship...' and room 0 (end of the run)",
+      "target": [
+        {"room": 0},
+        {"var": 293, "eq": 161}
+      ],
+      "hint": [
+        {"name": "Fireworks menu 2: 'It's not the size of the ship...' (click inside 138's cutscene; mouse y 181-190)", "verb": null, "obj": null, "obj2": null, "point": null, "key": null, "choose": "It's not the size of the ship", "gate": "input", "after": [{"var": 293, "eq": 161}], "until": [{"room": 0}, {"var": 293, "eq": 161}]}
+      ],
+      "cite": "global/script-138.txt [044C]-[05F5] menu 2 (bands from y 161: 161-170 = 120 'How to deal with frustration...', 171-180 = 121 (the same text; its own copy is drawn off screen at y 210), 181-190 = 122 'It's not the size of the ship...', 191-199 = 123 'Never pay more than 20 bucks...'; Var[292] = 123), [0605]-[06FC] (122: one reply 'Yes, I've heard that one.'; 120/121: reply, drawObject, delay(120), 'Yikes!'; 123: 'A what?', delay(60), another line), [06FC] WaitForMessage, [06FE] delay(60), [0702] endCutscene, [0706] startScript(130); global/script-130.txt [0000] cutscene([1]), [000E] loadRoom(0) (the first black frame; 130 goes on with 'You Win!' and the credits)",
+      "note": "Same fix as goal 13 ('gate': 'input'). _choose clicks line 122 at (4,183), so script 149 computes 120 + (183 - 161) / 10 = 122. The off-screen copy of line 120 (verb 121 at y 210) does not contain the needle, so the match is unique. 122 (line 2, the guide's choice; 'this can't be selected with keyboard' because 149 reads the mouse y) is the fastest by 60-120 jiffies plus one or two lines. Every answer ends in the same fade. The target therefore needs only room 0 after menu 2 (Var[293] == 161): room 0 was last loaded by 137 before Var[293] existed, so this pair first holds on 130's loadRoom(0). The run's clock stops on that frame, about 12 frames after the reply is skipped. Makeable: writers('room', 0) includes ('obj', 734, 7) (137's loadRoom), and writers('var', 293, 161) is listed under goal 13. The exit repeats this target. The old exit's var 194 == 122 (the answer given) was dropped: var 194 is a transient var."
+    }
+  ]
+}
