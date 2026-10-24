@@ -1,0 +1,131 @@
+domains (plan step 1, Facts): what has a finite domain, and what does not
+start values: the engine's init (every var 0: absent is 0); plan step 2's start is not built yet
+
+  cutscene        1
+  ego             1
+  owner          67
+  room            1
+  state         760
+  var           159
+  binary kinds (bit, class, script, local, objscript, at, frozen, esc, verb): 0 and 1, any number
+
+variables seen in the IR or the start: 246
+  with a finite domain: 159
+    of them collapsed (ABOVE or BELOW): 47
+    of them lossy (collapsed, and read other than by a comparison): 8
+    values per variable: median 2, max 107, total 1076
+    over 256 values: 0
+  with no domain (not facts, checked at replay): 87
+       20  a copy of another variable
+       12  a value from a local its unit writes
+       12  a value from another variable
+        9  a value from a getter
+        9  a step of another variable
+        5  a counter never compared with a constant
+        3  a value from an engine-bound local
+        2  a value from an unbound local
+        2  a step of a local its unit writes
+        1  written by the engine: VAR_CAMERA_POS_X: scumm.cpp:3379 every frame
+        1  written by the engine: VAR_HAVE_MSG: scumm.cpp:3382 every frame
+        1  written by the engine: VAR_TMR_1: a clock (facts.CLOCKS)
+        1  written by the engine: VAR_TMR_2: a clock
+        1  written by the engine: VAR_MUSIC_TIMER: a clock
+        1  written by the engine: VAR_VIRT_MOUSE_X: scumm.cpp:3385
+        1  written by the engine: VAR_VIRT_MOUSE_Y: scumm.cpp:3386
+        1  written by the engine: VAR_TALK_ACTOR: actor.cpp:3368, stopTalk on the message timer
+        1  written by the engine: VAR_CHARINC: input.cpp:1150-1156
+        1  fixed by the settings (value 0), not a fact
+        1  written by the engine: VAR_MOUSE_X: scumm.cpp:3387
+        1  written by the engine: VAR_MOUSE_Y: scumm.cpp:3388
+        1  a value from an expression that does not fold
+
+counts:
+      40  comparisons of a variable with a local its unit writes
+       2  comparisons of a variable with an engine-bound local
+       6  comparisons of a variable with an unbound local
+       2  comparisons of a variable with another variable
+       7  comparisons on an indexed variable (left to the reader)
+       6  finite variables compared with a variable whose domain is not exact
+       3  finite variables that need BELOW (the addition)
+      40  finite variables within 16 above the base of such a write (could be hit)
+      37  hook variable writes that do not fold (assumed to start no other unit)
+      43  indexed variable writes whose index does not fold (targets not worked out)
+   40786  instructions
+     759  instructions left out by the settings (only a decided jump leads there)
+     600  instructions no start reaches, whatever the settings
+      33  owner writes whose object does not fold (target not known)
+      72  room changes to a room that does not fold (room widened to every room)
+       3  rounds of the comparison fixpoint
+       6  starts of a script number that does not fold (assumed to reach no unit whose locals are bound)
+       6  starts of an object that does not fold (assumed to reach no unit whose locals are bound)
+      70  state writes whose object does not fold (target not known)
+     109  units the engine starts with its own arguments (engine-bound locals)
+       4  variables left out only for copies of finite variables
+
+owners: 67 objects, values per object max 4
+states: 760 objects, values per object max 2
+room: 107 values
+owner and state domains incomplete (a write's value does not fold): 0
+
+notes (sites):
+  hook write does not fold: global/script-055.txt:308 [0DA2]
+  hook write does not fold: global/script-056.txt:731 [2513]
+  hook write does not fold: global/script-056.txt:1171 [3F1E]
+  hook write does not fold: global/script-057.txt:680 [1F09]
+  hook write does not fold: global/script-059.txt:229 [083B]
+  hook write does not fold: global/script-060.txt:621 [17A6]
+  hook write does not fold: global/script-060.txt:640 [17F2]
+  hook write does not fold: global/script-060.txt:659 [1866]
+  hook write does not fold: global/script-064.txt:213 [0599]
+  hook write does not fold: global/script-073.txt:91 [00F9]
+  hook write does not fold: global/script-078.txt:103 [0274]
+  hook write does not fold: global/script-091.txt:470 [12D1]
+  hook write does not fold: global/script-092.txt:367 [0E9C]
+  hook write does not fold: global/script-093.txt:128 [05D0]
+  hook write does not fold: global/script-095.txt:579 [1C79]
+  hook write does not fold: global/script-103.txt:22 [002C]
+  hook write does not fold: global/script-119.txt:267 [0932]
+  hook write does not fold: global/script-123.txt:96 [025F]
+  hook write does not fold: global/script-140.txt:331 [0C4E]
+  hook write does not fold: room-019-sh-deck/local-204.txt:229 [07B3]
+  hook write does not fold: room-028-bar/local-220.txt:584 [19F5]
+  hook write does not fold: room-028-bar/local-222.txt:147 [0544]
+  hook write does not fold: room-029-fortune/local-210.txt:490 [1363]
+  hook write does not fold: room-030-store/local-211.txt:794 [1ED5]
+  hook write does not fold: room-031-jail/local-202.txt:379 [0F42]
+  hook write does not fold: room-031-jail/local-202.txt:615 [19C4]
+  hook write does not fold: room-031-jail/local-209.txt:93 [0657]
+  hook write does not fold: room-032-alley/local-200.txt:152 [068A]
+  hook write does not fold: room-034-high-stre/local-204.txt:209 [0997]
+  hook write does not fold: room-035-low-stree/local-216.txt:734 [1D0A]
+  hook write does not fold: room-035-low-stree/local-218.txt:254 [09C8]
+  hook write does not fold: room-038-lookout/local-202.txt:322 [0F30]
+  hook write does not fold: room-051-circus-te/local-207.txt:470 [113E]
+  hook write does not fold: room-053-foyer/local-212.txt:155 [04AC]
+  hook write does not fold: room-072-gh-captai/exit.txt:10 [000A]
+  hook write does not fold: room-083-cu-dock/local-203.txt:208 [074B]
+  hook write does not fold: room-007-sh-captai/obj-0085-piece-of-paper.txt:37 [0046]
+  startObject: object not a constant: global/script-002.txt:42 [009A]
+  startObject: object not a constant: global/script-002.txt:65 [010D]
+  start: number not a constant: global/script-002.txt:69 [0127]
+  startObject: object not a constant: global/script-002.txt:214 [039D]
+  startObject: object not a constant: global/script-009.txt:32 [00AA]
+  startObject: object not a constant: global/script-023.txt:76 [0147]
+  start: number not a constant: global/script-023.txt:78 [0155]
+  startObject: object not a constant: global/script-033.txt:23 [0047]
+  start: number not a constant: global/script-047.txt:17 [0035]
+  start: number not a constant: global/script-073.txt:49 [0084]
+  start: number not a constant: room-080-fort/obj-0882-spyglass.txt:47 [0082]
+  start: number not a constant: room-080-fort/obj-0882-spyglass.txt:57 [00C7]
+  setOwnerOf: object does not fold: global/script-010.txt:20 [002E]
+  setState: object does not fold: global/script-025.txt:15 [0024]
+  setState: object does not fold: global/script-026.txt:14 [001B]
+  setState: object does not fold: global/script-044.txt:112 [013E]
+  setOwnerOf: object does not fold: global/script-068.txt:34 [00CE]
+  setOwnerOf: object does not fold: global/script-068.txt:35 [00D2]
+  setOwnerOf: object does not fold: global/script-069.txt:49 [0171]
+  setOwnerOf: object does not fold: global/script-069.txt:50 [0175]
+  setOwnerOf: object does not fold: global/script-070.txt:40 [00E8]
+  setOwnerOf: object does not fold: global/script-070.txt:41 [00EC]
+  setOwnerOf: object does not fold: global/script-070.txt:166 [0335]
+  ... 207 more (all counted above)

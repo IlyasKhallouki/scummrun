@@ -1,0 +1,419 @@
+E003 step 4, second half: the reader (reader.py) on the kitchen branch
+
+model.py read: sha1 e413983eaf2d, reader.py sha1 94d495853f07
+
+start: the engine's state before run B's move S1#7 (groundtruth.py pre); scope rooms (28, 41) and the global scripts they reach; goal owner:566 = VAR_EGO's value 1; walk verb 11 (reader.walk_verbs, from the scripts; the executor profile's is 11)
+
+time: domains.build 6.9 s, reading 722.8 s
+
+scope: 100 units (33 global), 65 objects, sentence verbs [2, 3, 4, 5, 6, 7, 8, 9, 10], dialog verbs [109, 110, 120, 121, 122, 123, 124, 125, 126, 127, 128], 2909 slot facts listed
+
+actions (one per path) by kind, and the runs they come from:
+  dialog_line       549 actions from    66 runs   (8.1 s)
+  event           29023 actions from  7098 runs   (544.5 s)
+  sentence        28112 actions from  1774 runs   (506.1 s)
+  skip_cutscene   12680 actions from    68 runs   (142.5 s)
+  walk_to          1892 actions from   130 runs   (19.7 s)
+  total           72256
+
+preconditions per action: median 9, max 12, 0 with none
+  of them the input's engine conditions (actions.usable, the event's slot and wait point): median 5, max 9
+  of them what the scripts tested (forks on read): median 2, max 6, 11958 actions with none
+effects per action: median 9, max 274
+
+  dialog_line    script-tested preconditions: median 1, max 2
+  event          script-tested preconditions: median 2, max 6
+  sentence       script-tested preconditions: median 2, max 4
+  skip_cutscene  script-tested preconditions: median 5, max 6
+  walk_to        script-tested preconditions: median 2, max 2
+
+precondition facts by family (actions x facts): var 131840, frozen 89031, bit 78068, room 65636, args 41551, class 37511, script 36876, local 35667, pos 29023, verb 28661, escpos 12680, owner 10773, cutscene 2230, state 270, objscript 90
+forks on read by family: bit 30605, var 4354, class 1471, script 1076, room 457, owner 356, state 107, local 28
+
+conditions that could not be facts (replay checks), by reason (total 108094):
+   70236  not a fact
+   11409  message state
+   11199  position
+    8207  random draw
+    5026  actor state
+     966  the slot kind is not a fact
+     718  timer
+     274  local
+      55  cannot work out
+       2  branch
+       2  cutscene data
+conditions met on both sides of one record (listed apart, not checked): 96365 on 12025 records
+
+guessed effects (a value the reader cannot work out; replan on a mismatch), by reason:
+  111395  verb slot
+   90270  inventory order
+   23611  fact
+    5531  conditional write
+     954  freeze count
+     432  cannot work out
+     360  branch
+      63  local
+      54  resource cache
+records with a guessed effect: 39191 of 72256
+
+writes whose target does not fold (model.py unknown_writes), by statement (total 21159, counted per record; left out of the task and listed on the record for replay):
+   12680  runInputScript
+    5148  drawObject
+    1143  startObject
+    1134  startScript
+    1014  VerbOps
+      36  setClass
+       4  setOwnerOf
+  by site, the 12 largest:
+   12680  runInputScript at input.cpp:1427-1428
+    2050  drawObject at room-028-bar/local-208.txt:16 [0024]
+    1134  startObject at global/script-023.txt:76 [0147]
+    1134  startScript at global/script-023.txt:78 [0155]
+    1028  drawObject at room-028-bar/local-209.txt:13 [001C]
+    1028  drawObject at room-028-bar/local-209.txt:19 [0033]
+    1028  drawObject at room-028-bar/local-208.txt:11 [0010]
+     792  VerbOps at global/script-023.txt:70 [012B]
+     168  VerbOps at global/script-017.txt:46 [00B9]
+      54  VerbOps at global/script-007.txt:12 [001B]
+      20  setClass at global/script-068.txt:14 [0043]
+      10  drawObject at room-028-bar/local-200.txt:16 [0026]
+
+path ends (all runs):
+   21015  event: yield
+   20664  sentence: yield
+   12680  skip_cutscene: yield
+    6659  event: end
+    3836  sentence: chained
+    3420  sentence: end
+    1560  walk_to: yield
+     760  event: stopped
+     652  event: chained
+     330  dialog_line: end
+     318  sentence: limit
+     260  walk_to: chained
+     216  sentence: left the scope
+     180  sentence: no value
+     168  sentence: stopped
+     132  dialog_line: chained
+      87  dialog_line: yield
+      72  walk_to: end
+      48  event: room
+      47  event: left the scope
+      24  sentence: parked
+      17  event: parked
+       9  event: nesting
+       1  skip_cutscene: left the scope
+
+counts:
+       158  B = other (a stand-in object)
+         0  B actors (reachability a replay check)
+        26  B constants outside the scope (not built)
+       288  B objects whose own entry the sentence script starts
+     16149  at: writes not 0 or 1 (left out)
+     96365  conditions with both sides on one record (listed apart, not checked)
+      1028  event rounds
+        46  events with unknown locals (args 0) added for replans
+         4  lists of locals past SIG_LIMIT (taken as unknown)
+         0  lists of locals sharing a number (hash collisions)
+       128  no-op paths (no effect): event
+        21  pass 1: domain values added for the next pass
+     68953  pass 1: records
+     72256  pass 2: records
+       318  paths ended by the path limit
+     72256  records
+         2  runs past the path limit not split (more forks on non-facts than on facts)
+        66  runs: dialog_line
+      7098  runs: event
+      1774  runs: sentence
+        68  runs: skip_cutscene
+       130  runs: walk_to
+       952  sentence inputs~frozen
+     12680  unknown-target writes left out and listed on the record (no candidate list): runInputScript
+         7  unknown-target writes left out and listed on the record (no candidate list): startObject
+      1134  unknown-target writes left out and listed on the record (no candidate list): startScript
+      1014  unknown-target writes left out and listed on the record (with a candidate list): VerbOps
+      5148  unknown-target writes left out and listed on the record (with a candidate list): drawObject
+        36  unknown-target writes left out and listed on the record (with a candidate list): setClass
+         4  unknown-target writes left out and listed on the record (with a candidate list): setOwnerOf
+      1136  unknown-target writes left out and listed on the record (with a candidate list): startObject
+         0  value sets past model.MAX_VALUES (made plain unknowns)
+    259778  writes to non-facts (left out of the task)
+        68  Esc keys whose input-script run is left out (ESC_KEY)
+     23705  WaitFor ops that yield (their later part is an event)
+       256  events resuming a slot with its own open cutscenes (cutscene data carried)
+    174727  forks on non-fact tests
+     38454  forks on read
+     38974  freezes of a slot whose liveness is not known (frozen: where live)
+      2465  freezes undone in the same path (frozen: restored)
+        10  inventory hook runs summarized (writes guessed): actorFollowCamera
+        54  inventory hook runs summarized (writes guessed): loadRoomWithEgo
+       143  inventory hook runs summarized (writes guessed): pickupObject
+        28  inventory hook runs summarized (writes guessed): setObjectName
+        26  inventory hook runs summarized (writes guessed): setOwnerOf
+        15  inventory hook runs summarized (writes guessed): startScript
+       479  non-fact tests decided by the same test earlier in the frame
+      4103  non-fact tests forgotten after an op that may change them
+     80587  non-fact tests forgotten where merged paths differ
+     89600  paths from forks on read
+       180  paths with no value left for a fact (room)
+      6352  unfreezes of a slot frozen before the path (count taken as 1)
+         2  cursor variables given a window of +-1 around start, 0 and 1 (reader)
+         2  hook variables given the domain start + constant writes (reader)
+         0  room changes in the scope that do not fold (a guess among the scope's rooms)
+         2  starts with a script number that does not fold (callee not in the scope)
+         1  walk verb candidates (walk_verbs; one is taken only when there is one)
+         8  drawObject on an object that does not fold
+         8  hook variable writes that do not fold (assumed to start no other unit)
+       120  indexed bit writes whose index does not fold
+         3  indexed var writes whose index does not fold
+         1  pickupObject on an object that does not fold
+         9  setClass on an object that does not fold
+         8  setOwnerOf on an object that does not fold
+         5  setState on an object that does not fold
+         2  starts of a script number that does not fold (assumed to reach no unit whose locals are bound)
+         5  starts of an object that does not fold (assumed to reach no unit whose locals are bound)
+
+path ends that are no action, by what was run (limit, left the scope, ...), the 25 largest:
+     159  sentence(8,574): limit
+     159  sentence(8,574)~frozen: limit
+      39  event(script:2): left the scope
+      18  sentence(10,330): left the scope
+      18  sentence(10,330)~frozen: left the scope
+      18  sentence(10,333): left the scope
+      18  sentence(10,333)~frozen: left the scope
+      18  sentence(10,336): left the scope
+      18  sentence(10,336)~frozen: left the scope
+      18  sentence(8,330): left the scope
+      18  sentence(8,330)~frozen: left the scope
+      18  sentence(8,333): left the scope
+      18  sentence(8,333)~frozen: left the scope
+      18  sentence(8,336): left the scope
+      18  sentence(8,336)~frozen: left the scope
+       6  sentence(4,564,322): no value
+       6  sentence(4,564,322)~frozen: no value
+       6  sentence(4,565,322): no value
+       6  sentence(4,565,322)~frozen: no value
+       6  sentence(4,566,322): no value
+       6  sentence(4,566,322)~frozen: no value
+       6  sentence(4,567,322): no value
+       6  sentence(4,567,322)~frozen: no value
+       6  sentence(4,568,322): no value
+       6  sentence(4,568,322)~frozen: no value
+  on the demo's chain (sentence(2,316), walk_to(316), sentence(9,566), event(local:211), event(local:212), event(local:214), event(local:216), event(local:218), event(script:2), event(script:25), event(script:26)): event(local:211) nesting 2, event(local:212) nesting 2, event(local:214) left the scope 1, event(local:216) nesting 2, event(local:218) left the scope 1, event(script:2) left the scope 39, event(script:2) nesting 1
+
+values written outside their domain (domains.py lacks them; the task leaves such writes out):
+  none
+
+replan fixture (S1#7 with the sentence script waiting at 736, args 0): ignoring deletes the goal is reachable: True, script:2 can reach ['0', '1'], 27912 actions usable
+
+=== the plan ===
+records folded into an action of the same input with the same precondition and effects: 527
+task: 71324 actions, 244 facts; relevance keeps 71324 actions, 244 facts needed (43 whole)
+after pruning effects on facts nothing needs: 651994 effects
+SAS: 274 variables, 583670 operators, 9324673 effects, 30 pick variables, 163.8 MB
+lama-first: plan (exit 0) in 171.2 s, 7 steps, 31 landmarks (0 of the encoding)
+  1. walk_to(316)#478  [walk_to, path end yield]
+       pre: {'bit:6': ['0'], 'class:316:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'room': ['28'], 'script:2': ['0'], 'var:53': ['1', '2', 'above']}
+       variant: [('bit:6', 0), ('class:316:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('room', 28), ('script:2', 0), ('var:53', 1)]
+       effects (slot positions left out): {'args:script:2': 185570791967474, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+  2. event(local:211@33)#30568  [event, path end stopped]
+       pre: {'class:316:6': ['0'], 'frozen:local:211': ['0'], 'local:203': ['0'], 'local:211': ['1'], 'local:220': ['0'], 'pos:local:211': ['33'], 'room': ['28'], 'state:316': ['0']}
+       variant: [('class:316:6', 0), ('frozen:local:211', 0), ('local:203', 0), ('local:211', 1), ('local:220', 0), ('pos:local:211', 33), ('room', 28), ('state:316', 0)]
+       effects (slot positions left out): {'args:local:216': 210018218032833, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:211': 0, 'local:212': 0, 'local:216': 1, 'objscript:316': 0, 'pos:local:211': -1, 'pos:local:212': -1, 'pos:local:216': 33, 'pos:obj:316': -1, 'pos:script:18': -1, 'pos:script:19': -1, 'pos:script:25': -1, 'script:18': 0, 'script:19': 0, 'script:25': 0, 'state:316': 1, 'state:570': 1, 'var:5': 0}
+       replay checks: [('room-028-bar/local-211.txt:14 [001E]', "local:211's delay is over", True), ('room-028-bar/local-216.txt:10 [0004]', 'VAR_RESULT != 28', True)]
+  3. event(script:2@736#a8c69122caf2)#30915  [event, path end parked]
+       pre: {'args:script:2': ['185570791967474'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'pos:script:2': ['736'], 'room': ['28'], 'script:2': ['1'], 'state:316': ['1']}
+       variant: [('args:script:2', 185570791967474), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('pos:script:2', 736), ('room', 28), ('script:2', 1), ('state:316', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:local:218': 148283040822097, 'args:obj:316': 168840985904053, 'args:script:2': 245688617887937, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:218': 1, 'objscript:316': 1, 'pos:local:218': 16, 'pos:obj:316': 78, 'pos:script:18': -1, 'pos:script:2': 937, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+  4. event(local:218@16#86dcd5f97351)#35417  [event, path end room]
+       pre: {'args:local:218': ['148283040822097'], 'bit:304': ['0'], 'bit:424': ['0'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:local:218': ['0'], 'local:218': ['1'], 'owner:568': ['15'], 'pos:local:218': ['16'], 'room': ['28'], 'state:564': ['0']}
+       variant: [('args:local:218', 148283040822097), ('bit:304', 0), ('bit:424', 0), ('cutscene', 1), ('frozen:local:218', 0), ('local:218', 1), ('owner:568', 15), ('pos:local:218', 16), ('room', 28), ('state:564', 0)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'args:local:200': 135967696290086, 'args:local:201': 153694249886252, 'args:local:204': 23924946786969, 'class:568:32': 1, 'cutscene': 'add -1', 'escpos:entry': -1, 'escpos:exit': -1, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:200': 1, 'local:201': 1, 'local:202': 0, 'local:203': 0, 'local:204': 1, 'local:205': 0, 'local:206': 0, 'local:207': 0, 'local:208': 0, 'local:209': 0, 'local:210': 0, 'local:211': 0, 'local:212': 0, 'local:213': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'local:220': 0, 'local:221': 0, 'local:222': 0, 'objscript:315': 0, 'objscript:316': 0, 'objscript:320': 0, 'objscript:321': 0, 'objscript:322': 0, 'objscript:323': 0, 'objscript:330': 0, 'objscript:333': 0, 'objscript:336': 0, 'objscript:339': 0, 'objscript:342': 0, 'objscript:345': 0, 'objscript:354': 0, 'objscript:357': 0, 'objscript:362': "guess ['0', '1']", 'objscript:363': "guess ['0', '1']", 'objscript:364': "guess ['0', '1']", 'objscript:365': "guess ['0', '1']", 'objscript:366': "guess ['0', '1']", 'objscript:564': 0, 'objscript:566': "guess ['0', '1']", 'objscript:567': "guess ['0', '1']", 'objscript:568': "guess ['0', '1']", 'objscript:569': 0, 'objscript:570': 0, 'objscript:574': 0, 'pos:entry': -1, 'pos:exit': -1, 'pos:local:200': 10, 'pos:local:201': 35, 'pos:local:202': -1, 'pos:local:203': -1, 'pos:local:204': 18, 'pos:local:205': -1, 'pos:local:206': -1, 'pos:local:207': -1, 'pos:local:208': -1, 'pos:local:209': -1, 'pos:local:210': -1, 'pos:local:211': -1, 'pos:local:212': -1, 'pos:local:213': -1, 'pos:local:214': -1, 'pos:local:215': -1, 'pos:local:216': -1, 'pos:local:217': -1, 'pos:local:218': -1, 'pos:local:220': -1, 'pos:local:221': -1, 'pos:local:222': -1, 'pos:obj:315': -1, 'pos:obj:316': -1, 'pos:obj:320': -1, 'pos:obj:321': -1, 'pos:obj:322': -1, 'pos:obj:323': -1, 'pos:obj:330': -1, 'pos:obj:333': -1, 'pos:obj:336': -1, 'pos:obj:339': -1, 'pos:obj:342': -1, 'pos:obj:345': -1, 'pos:obj:354': -1, 'pos:obj:357': -1, 'pos:obj:564': -1, 'pos:obj:569': -1, 'pos:obj:570': -1, 'pos:obj:574': -1, 'pos:script:12': -1, 'pos:script:19': -1, 'pos:script:2': -1, 'pos:script:6': -1, 'pos:script:7': -1, 'pos:script:9': -1, 'room': 41, 'script:11': 0, 'script:12': 0, 'script:19': 0, 'script:2': 0, 'script:5': 0, 'script:6': 0, 'script:7': 0, 'script:9': 0, 'state:571': 1, 'var:133': "guess ['0']", 'var:134': "guess ['0']", 'var:135': "guess ['0']", 'var:136': "guess ['0']", 'var:137': "guess ['0']", 'var:138': "guess ['0']", 'var:139': "guess ['0']", 'var:140': "guess ['0']", 'var:143': "guess ['130', '131', '132', '20']", 'var:144': "guess ['0']", 'var:145': "guess ['0', '1', '2', '3', '4', '5', 'above']", 'var:146': "guess ['0', '1', 'above']", 'var:147': "guess ['0', '25']", 'var:148': "guess ['0', '24']", 'var:22': 41, 'var:32': 4, 'var:376': "guess ['1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042', '1043', '955', '956', '957', '958', '959', '960', '961', '962', '963', '964', '965', '966', '967', '968', '969', '970', '971', '972', '973', '974', '975', '976', '977', '978', '979', '980', '981', '982', '983', '984', '985', '986', '987', '988', '989', '990', '991', '992', '993', '994', '995', '996', '997', '998', '999']", 'var:38': 0, 'var:4': 41, 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1', 'var:54': -80, 'var:70': "guess ['0', '1']", 'var:72': 41, 'verb:100': "guess ['0', '1']", 'verb:208': "guess ['0', '1']", 'verb:209': "guess ['0', '1']"}
+       replay checks: [('room-028-bar/local-218.txt:12 [0010]', 'WaitForActor(VAR_EGO); blocks', False), ('room.cpp:42-260', 'obj:315 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:316 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:320 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:321 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:322 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:323 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:330 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:333 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:336 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:339 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:342 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:345 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:354 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:357 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:564 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:569 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:570 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:574 runs in a room slot (its owner is 15)', True)]
+       met on both sides (not checked): [('global/script-007.txt:11 [0016]', 'Var[183]'), ('room-041-kitchen/local-201.txt:10 [0005]', 'VAR_RESULT < 210')]
+       writes with unknown targets left out: [('VerbOps', 'global/script-007.txt:12 [001B]', 'verb ?(not a fact: var:183)')]
+  5. sentence(9,566)#12118  [sentence, path end yield]
+       pre: {'bit:6': ['0'], 'class:566:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'room': ['41'], 'script:2': ['0'], 'var:53': ['1', '2', 'above'], 'verb:9': ['1']}
+       variant: [('bit:6', 0), ('class:566:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('owner:566', 15), ('room', 41), ('script:2', 0), ('var:53', 1), ('verb:9', 1)]
+       effects (slot positions left out): {'args:script:2': 32642483726507, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+  6. event(script:2@736#1db02ba5a8ab)#34384  [event, path end yield]
+       pre: {'args:script:2': ['32642483726507'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'pos:script:2': ['736'], 'script:2': ['1']}
+       variant: [('args:script:2', 32642483726507), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('owner:566', 15), ('pos:script:2', 736), ('script:2', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:script:2': 262893370723218, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'pos:script:18': -1, 'pos:script:2': 915, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+  7. event(script:2@915#ef19a1f9cb92)#34395  [event, path end end]
+       pre: {'args:script:2': ['262893370723218'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'pos:script:2': ['915'], 'room': ['41'], 'script:2': ['1']}
+       variant: [('args:script:2', 262893370723218), ('cutscene', 1), ('frozen:script:2', 0), ('owner:566', 15), ('pos:script:2', 915), ('room', 41), ('script:2', 1)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'class:566:32': 1, 'cutscene': 'add -1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'objscript:566': 0, 'owner:566': 1, 'pos:obj:566': -1, 'pos:script:12': -1, 'pos:script:19': -1, 'pos:script:2': -1, 'pos:script:9': -1, 'script:12': 0, 'script:19': 0, 'script:2': 0, 'script:9': 0, 'state:566': 1, 'var:133': "guess ['0']", 'var:134': "guess ['0']", 'var:135': "guess ['0']", 'var:136': "guess ['0']", 'var:137': "guess ['0']", 'var:138': "guess ['0']", 'var:139': "guess ['0']", 'var:140': "guess ['0']", 'var:143': "guess ['130', '131', '132', '20']", 'var:144': "guess ['0']", 'var:145': "guess ['0', '1', '2', '3', '4', '5', 'above']", 'var:146': "guess ['0', '1', 'above']", 'var:147': "guess ['0', '25']", 'var:148': "guess ['0', '24']", 'var:376': "guess ['1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042', '1043', '955', '956', '957', '958', '959', '960', '961', '962', '963', '964', '965', '966', '967', '968', '969', '970', '971', '972', '973', '974', '975', '976', '977', '978', '979', '980', '981', '982', '983', '984', '985', '986', '987', '988', '989', '990', '991', '992', '993', '994', '995', '996', '997', '998', '999']", 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1', 'verb:100': "guess ['0', '1']", 'verb:208': "guess ['0', '1']", 'verb:209': "guess ['0', '1']"}
+       replay checks: [('global/script-002.txt:205 [038F]', "script:2's delay is over", True)]
+       met on both sides (not checked): [('global/script-012.txt:8 [0000]', 'Var[107] == 100'), ('global/script-012.txt:12 [0012]', 'Var[107] == 4'), ('global/script-012.txt:33 [009E]', 'Var[108]'), ('global/script-012.txt:14 [0021]', 'Var[107] == 2'), ('global/script-012.txt:16 [0030]', 'Var[107] == 3'), ('global/script-012.txt:18 [003F]', 'Var[107] == 9'), ('global/script-012.txt:20 [004E]', 'Var[107] == 8'), ('global/script-012.txt:22 [005D]', 'Var[107] == 10'), ('global/script-012.txt:24 [006C]', 'Var[107] == 7'), ('global/script-012.txt:26 [007B]', 'Var[107] == 5'), ('global/script-012.txt:28 [008A]', 'Var[107] == 6')]
+replay over the task's own actions: goal reached True, first step that cannot run None, guessed values used []
+steps the goal needs (7 of 7): ['walk_to(316)#478', 'event(local:211@33)#30568', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
+
+=== variant: local 211's own event left out (its delay never runs out within the plan) ===
+records folded into an action of the same input with the same precondition and effects: 527
+task: 71316 actions, 244 facts; relevance keeps 71316 actions, 244 facts needed (43 whole)
+after pruning effects on facts nothing needs: 651920 effects
+SAS: 274 variables, 583662 operators, 9324599 effects, 30 pick variables, 163.8 MB
+lama-first: plan (exit 0) in 210.7 s, 15 steps, 36 landmarks (0 of the encoding)
+  1. sentence(2,316)#262  [sentence, path end yield]
+       pre: {'bit:6': ['0'], 'class:316:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'room': ['28'], 'script:2': ['0'], 'var:53': ['1', '2', 'above'], 'verb:2': ['1']}
+       variant: [('bit:6', 0), ('class:316:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('room', 28), ('script:2', 0), ('var:53', 1), ('verb:2', 1)]
+       effects (slot positions left out): {'args:script:2': 117660302346789, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+  2. event(script:2@736#6b02ec868a25)#30822  [event, path end yield]
+       pre: {'args:script:2': ['117660302346789'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'pos:script:2': ['736'], 'script:2': ['1']}
+       variant: [('args:script:2', 117660302346789), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('pos:script:2', 736), ('script:2', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:script:2': 230447499279743, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'pos:script:18': -1, 'pos:script:2': 915, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+  3. event(script:2@915#d1973d557d7f)#30826  [event, path end parked]
+       pre: {'args:script:2': ['230447499279743'], 'class:316:6': ['0'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:script:2': ['0'], 'local:211': ['1'], 'pos:script:2': ['915'], 'room': ['28'], 'script:2': ['1'], 'state:316': ['0']}
+       variant: [('args:script:2', 230447499279743), ('class:316:6', 0), ('cutscene', 1), ('frozen:script:2', 0), ('local:211', 1), ('pos:script:2', 915), ('room', 28), ('script:2', 1), ('state:316', 0)]
+       effects (slot positions left out): {'args:local:214': 55405766080625, 'args:obj:316': 159419959242774, 'args:script:2': 16454574094364, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:214': 1, 'objscript:316': 1, 'pos:local:214': 15, 'pos:obj:316': 36, 'pos:script:18': -1, 'pos:script:19': -1, 'pos:script:2': 937, 'pos:script:25': -1, 'script:18': 0, 'script:19': 0, 'script:25': 0, 'state:316': 1, 'var:5': 0}
+       replay checks: [('global/script-002.txt:205 [038F]', "script:2's delay is over", True)]
+  4. event(local:214@15#326429017871)#35377  [event, path end yield]
+       pre: {'args:local:214': ['55405766080625'], 'frozen:local:214': ['0'], 'local:214': ['1'], 'pos:local:214': ['15'], 'room': ['28']}
+       variant: [('args:local:214', 55405766080625), ('frozen:local:214', 0), ('local:214', 1), ('pos:local:214', 15), ('room', 28)]
+       effects (slot positions left out): {'pos:local:214': 57}
+       replay checks: [('room-028-bar/local-214.txt:11 [000B]', "local:214's delay is over", True)]
+  5. event(local:214@57#326429017871)#39486  [event, path end yield]
+       pre: {'args:local:214': ['55405766080625'], 'frozen:local:214': ['0'], 'local:214': ['1'], 'pos:local:214': ['57'], 'room': ['28'], 'state:316': ['1']}
+       variant: [('args:local:214', 55405766080625), ('frozen:local:214', 0), ('local:214', 1), ('pos:local:214', 57), ('room', 28), ('state:316', 1)]
+       effects (slot positions left out): {'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'pos:local:214': 66, 'pos:script:18': -1, 'pos:script:19': -1, 'pos:script:26': -1, 'script:18': 0, 'script:19': 0, 'script:26': 0, 'state:316': 0, 'var:5': 0}
+       replay checks: [('room-028-bar/local-214.txt:13 [0039]', 'WaitForMessage(); blocks', False)]
+  6. event(local:214@66#326429017871)#39688  [event, path end end]
+       pre: {'args:local:214': ['55405766080625'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:local:214': ['0'], 'local:214': ['1'], 'pos:local:214': ['66'], 'room': ['28'], 'script:26': ['0']}
+       variant: [('args:local:214', 55405766080625), ('cutscene', 1), ('frozen:local:214', 0), ('local:214', 1), ('pos:local:214', 66), ('room', 28), ('script:26', 0)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'args:local:212': 259360292695480, 'cutscene': 'add -1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:212': 1, 'local:214': 0, 'pos:local:212': 4, 'pos:local:214': -1, 'pos:script:19': -1, 'script:19': 0, 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1'}
+  7. event(local:212@4#ebe3061d6db8)#49583  [event, path end yield]
+       pre: {'args:local:212': ['259360292695480'], 'frozen:local:212': ['0'], 'local:212': ['1'], 'pos:local:212': ['4'], 'room': ['28']}
+       variant: [('args:local:212', 259360292695480), ('frozen:local:212', 0), ('local:212', 1), ('pos:local:212', 4), ('room', 28)]
+       effects (slot positions left out): {'pos:local:212': 8}
+       replay checks: [('room-028-bar/local-212.txt:9 [0000]', "local:212's delay is over", True)]
+  8. event(local:212@8#ebe3061d6db8)#51226  [event, path end stopped]
+       pre: {'args:local:212': ['259360292695480'], 'class:316:6': ['0'], 'frozen:local:212': ['0'], 'local:203': ['0'], 'local:212': ['1'], 'local:220': ['0'], 'pos:local:212': ['8'], 'room': ['28'], 'state:316': ['0']}
+       variant: [('args:local:212', 259360292695480), ('class:316:6', 0), ('frozen:local:212', 0), ('local:203', 0), ('local:212', 1), ('local:220', 0), ('pos:local:212', 8), ('room', 28), ('state:316', 0)]
+       effects (slot positions left out): {'args:local:216': 210018218032833, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:211': 0, 'local:212': 0, 'local:216': 1, 'objscript:316': 0, 'pos:local:211': -1, 'pos:local:212': -1, 'pos:local:216': 33, 'pos:obj:316': -1, 'pos:script:18': -1, 'pos:script:19': -1, 'pos:script:25': -1, 'script:18': 0, 'script:19': 0, 'script:25': 0, 'state:316': 1, 'state:570': 1, 'var:5': 0}
+       replay checks: [('room-028-bar/local-212.txt:10 [0004]', "local:212's delay is over", True), ('room-028-bar/local-216.txt:10 [0004]', 'VAR_RESULT != 28', True)]
+  9. event(script:2@937#ef7210b381c)#35379  [event, path end end]
+       pre: {'args:script:2': ['16454574094364'], 'frozen:script:2': ['0'], 'pos:script:2': ['937'], 'script:2': ['1']}
+       variant: [('args:script:2', 16454574094364), ('frozen:script:2', 0), ('pos:script:2', 937), ('script:2', 1)]
+       effects (slot positions left out): {'pos:script:12': -1, 'pos:script:2': -1, 'script:12': 0, 'script:2': 0, 'verb:100': "guess ['0', '1']"}
+       met on both sides (not checked): [('global/script-012.txt:8 [0000]', 'Var[107] == 100'), ('global/script-012.txt:12 [0012]', 'Var[107] == 4'), ('global/script-012.txt:33 [009E]', 'Var[108]'), ('global/script-012.txt:14 [0021]', 'Var[107] == 2'), ('global/script-012.txt:16 [0030]', 'Var[107] == 3'), ('global/script-012.txt:18 [003F]', 'Var[107] == 9'), ('global/script-012.txt:20 [004E]', 'Var[107] == 8'), ('global/script-012.txt:22 [005D]', 'Var[107] == 10'), ('global/script-012.txt:24 [006C]', 'Var[107] == 7'), ('global/script-012.txt:26 [007B]', 'Var[107] == 5'), ('global/script-012.txt:28 [008A]', 'Var[107] == 6')]
+ 10. walk_to(316)#478  [walk_to, path end yield]
+       pre: {'bit:6': ['0'], 'class:316:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'room': ['28'], 'script:2': ['0'], 'var:53': ['1', '2', 'above']}
+       variant: [('bit:6', 0), ('class:316:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('room', 28), ('script:2', 0), ('var:53', 1)]
+       effects (slot positions left out): {'args:script:2': 185570791967474, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+ 11. event(script:2@736#a8c69122caf2)#30908  [event, path end parked]
+       pre: {'args:script:2': ['185570791967474'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'pos:script:2': ['736'], 'room': ['28'], 'script:2': ['1'], 'state:316': ['1']}
+       variant: [('args:script:2', 185570791967474), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('pos:script:2', 736), ('room', 28), ('script:2', 1), ('state:316', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:local:218': 148283040822097, 'args:obj:316': 168840985904053, 'args:script:2': 245688617887937, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:218': 1, 'objscript:316': 1, 'pos:local:218': 16, 'pos:obj:316': 78, 'pos:script:18': -1, 'pos:script:2': 937, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+ 12. event(local:218@16#86dcd5f97351)#35410  [event, path end room]
+       pre: {'args:local:218': ['148283040822097'], 'bit:304': ['0'], 'bit:424': ['0'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:local:218': ['0'], 'local:218': ['1'], 'owner:568': ['15'], 'pos:local:218': ['16'], 'room': ['28'], 'state:564': ['0']}
+       variant: [('args:local:218', 148283040822097), ('bit:304', 0), ('bit:424', 0), ('cutscene', 1), ('frozen:local:218', 0), ('local:218', 1), ('owner:568', 15), ('pos:local:218', 16), ('room', 28), ('state:564', 0)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'args:local:200': 135967696290086, 'args:local:201': 153694249886252, 'args:local:204': 23924946786969, 'class:568:32': 1, 'cutscene': 'add -1', 'escpos:entry': -1, 'escpos:exit': -1, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:200': 1, 'local:201': 1, 'local:202': 0, 'local:203': 0, 'local:204': 1, 'local:205': 0, 'local:206': 0, 'local:207': 0, 'local:208': 0, 'local:209': 0, 'local:210': 0, 'local:211': 0, 'local:212': 0, 'local:213': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'local:220': 0, 'local:221': 0, 'local:222': 0, 'objscript:315': 0, 'objscript:316': 0, 'objscript:320': 0, 'objscript:321': 0, 'objscript:322': 0, 'objscript:323': 0, 'objscript:330': 0, 'objscript:333': 0, 'objscript:336': 0, 'objscript:339': 0, 'objscript:342': 0, 'objscript:345': 0, 'objscript:354': 0, 'objscript:357': 0, 'objscript:362': "guess ['0', '1']", 'objscript:363': "guess ['0', '1']", 'objscript:364': "guess ['0', '1']", 'objscript:365': "guess ['0', '1']", 'objscript:366': "guess ['0', '1']", 'objscript:564': 0, 'objscript:566': "guess ['0', '1']", 'objscript:567': "guess ['0', '1']", 'objscript:568': "guess ['0', '1']", 'objscript:569': 0, 'objscript:570': 0, 'objscript:574': 0, 'pos:entry': -1, 'pos:exit': -1, 'pos:local:200': 10, 'pos:local:201': 35, 'pos:local:202': -1, 'pos:local:203': -1, 'pos:local:204': 18, 'pos:local:205': -1, 'pos:local:206': -1, 'pos:local:207': -1, 'pos:local:208': -1, 'pos:local:209': -1, 'pos:local:210': -1, 'pos:local:211': -1, 'pos:local:212': -1, 'pos:local:213': -1, 'pos:local:214': -1, 'pos:local:215': -1, 'pos:local:216': -1, 'pos:local:217': -1, 'pos:local:218': -1, 'pos:local:220': -1, 'pos:local:221': -1, 'pos:local:222': -1, 'pos:obj:315': -1, 'pos:obj:316': -1, 'pos:obj:320': -1, 'pos:obj:321': -1, 'pos:obj:322': -1, 'pos:obj:323': -1, 'pos:obj:330': -1, 'pos:obj:333': -1, 'pos:obj:336': -1, 'pos:obj:339': -1, 'pos:obj:342': -1, 'pos:obj:345': -1, 'pos:obj:354': -1, 'pos:obj:357': -1, 'pos:obj:564': -1, 'pos:obj:569': -1, 'pos:obj:570': -1, 'pos:obj:574': -1, 'pos:script:12': -1, 'pos:script:19': -1, 'pos:script:2': -1, 'pos:script:6': -1, 'pos:script:7': -1, 'pos:script:9': -1, 'room': 41, 'script:11': 0, 'script:12': 0, 'script:19': 0, 'script:2': 0, 'script:5': 0, 'script:6': 0, 'script:7': 0, 'script:9': 0, 'state:571': 1, 'var:133': "guess ['0']", 'var:134': "guess ['0']", 'var:135': "guess ['0']", 'var:136': "guess ['0']", 'var:137': "guess ['0']", 'var:138': "guess ['0']", 'var:139': "guess ['0']", 'var:140': "guess ['0']", 'var:143': "guess ['130', '131', '132', '20']", 'var:144': "guess ['0']", 'var:145': "guess ['0', '1', '2', '3', '4', '5', 'above']", 'var:146': "guess ['0', '1', 'above']", 'var:147': "guess ['0', '25']", 'var:148': "guess ['0', '24']", 'var:22': 41, 'var:32': 4, 'var:376': "guess ['1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042', '1043', '955', '956', '957', '958', '959', '960', '961', '962', '963', '964', '965', '966', '967', '968', '969', '970', '971', '972', '973', '974', '975', '976', '977', '978', '979', '980', '981', '982', '983', '984', '985', '986', '987', '988', '989', '990', '991', '992', '993', '994', '995', '996', '997', '998', '999']", 'var:38': 0, 'var:4': 41, 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1', 'var:54': -80, 'var:70': "guess ['0', '1']", 'var:72': 41, 'verb:100': "guess ['0', '1']", 'verb:208': "guess ['0', '1']", 'verb:209': "guess ['0', '1']"}
+       replay checks: [('room-028-bar/local-218.txt:12 [0010]', 'WaitForActor(VAR_EGO); blocks', False), ('room.cpp:42-260', 'obj:315 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:316 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:320 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:321 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:322 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:323 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:330 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:333 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:336 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:339 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:342 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:345 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:354 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:357 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:564 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:569 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:570 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:574 runs in a room slot (its owner is 15)', True)]
+       met on both sides (not checked): [('global/script-007.txt:11 [0016]', 'Var[183]'), ('room-041-kitchen/local-201.txt:10 [0005]', 'VAR_RESULT < 210')]
+       writes with unknown targets left out: [('VerbOps', 'global/script-007.txt:12 [001B]', 'verb ?(not a fact: var:183)')]
+ 13. sentence(9,566)#12118  [sentence, path end yield]
+       pre: {'bit:6': ['0'], 'class:566:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'room': ['41'], 'script:2': ['0'], 'var:53': ['1', '2', 'above'], 'verb:9': ['1']}
+       variant: [('bit:6', 0), ('class:566:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('owner:566', 15), ('room', 41), ('script:2', 0), ('var:53', 1), ('verb:9', 1)]
+       effects (slot positions left out): {'args:script:2': 32642483726507, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+ 14. event(script:2@736#1db02ba5a8ab)#34377  [event, path end yield]
+       pre: {'args:script:2': ['32642483726507'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'pos:script:2': ['736'], 'script:2': ['1']}
+       variant: [('args:script:2', 32642483726507), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('owner:566', 15), ('pos:script:2', 736), ('script:2', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:script:2': 262893370723218, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'pos:script:18': -1, 'pos:script:2': 915, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+ 15. event(script:2@915#ef19a1f9cb92)#34388  [event, path end end]
+       pre: {'args:script:2': ['262893370723218'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'pos:script:2': ['915'], 'room': ['41'], 'script:2': ['1']}
+       variant: [('args:script:2', 262893370723218), ('cutscene', 1), ('frozen:script:2', 0), ('owner:566', 15), ('pos:script:2', 915), ('room', 41), ('script:2', 1)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'class:566:32': 1, 'cutscene': 'add -1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'objscript:566': 0, 'owner:566': 1, 'pos:obj:566': -1, 'pos:script:12': -1, 'pos:script:19': -1, 'pos:script:2': -1, 'pos:script:9': -1, 'script:12': 0, 'script:19': 0, 'script:2': 0, 'script:9': 0, 'state:566': 1, 'var:133': "guess ['0']", 'var:134': "guess ['0']", 'var:135': "guess ['0']", 'var:136': "guess ['0']", 'var:137': "guess ['0']", 'var:138': "guess ['0']", 'var:139': "guess ['0']", 'var:140': "guess ['0']", 'var:143': "guess ['130', '131', '132', '20']", 'var:144': "guess ['0']", 'var:145': "guess ['0', '1', '2', '3', '4', '5', 'above']", 'var:146': "guess ['0', '1', 'above']", 'var:147': "guess ['0', '25']", 'var:148': "guess ['0', '24']", 'var:376': "guess ['1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042', '1043', '955', '956', '957', '958', '959', '960', '961', '962', '963', '964', '965', '966', '967', '968', '969', '970', '971', '972', '973', '974', '975', '976', '977', '978', '979', '980', '981', '982', '983', '984', '985', '986', '987', '988', '989', '990', '991', '992', '993', '994', '995', '996', '997', '998', '999']", 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1', 'verb:100': "guess ['0', '1']", 'verb:208': "guess ['0', '1']", 'verb:209': "guess ['0', '1']"}
+       replay checks: [('global/script-002.txt:205 [038F]', "script:2's delay is over", True)]
+       met on both sides (not checked): [('global/script-012.txt:8 [0000]', 'Var[107] == 100'), ('global/script-012.txt:12 [0012]', 'Var[107] == 4'), ('global/script-012.txt:33 [009E]', 'Var[108]'), ('global/script-012.txt:14 [0021]', 'Var[107] == 2'), ('global/script-012.txt:16 [0030]', 'Var[107] == 3'), ('global/script-012.txt:18 [003F]', 'Var[107] == 9'), ('global/script-012.txt:20 [004E]', 'Var[107] == 8'), ('global/script-012.txt:22 [005D]', 'Var[107] == 10'), ('global/script-012.txt:24 [006C]', 'Var[107] == 7'), ('global/script-012.txt:26 [007B]', 'Var[107] == 5'), ('global/script-012.txt:28 [008A]', 'Var[107] == 6')]
+replay over the task's own actions: goal reached True, first step that cannot run None, guessed values used []
+steps the goal needs (15 of 15): ['sentence(2,316)#262', 'event(script:2@736#6b02ec868a25)#30822', 'event(script:2@915#d1973d557d7f)#30826', 'event(local:214@15#326429017871)#35377', 'event(local:214@57#326429017871)#39486', 'event(local:214@66#326429017871)#39688', 'event(local:212@4#ebe3061d6db8)#49583', 'event(local:212@8#ebe3061d6db8)#51226', 'event(script:2@937#ef7210b381c)#35379', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30908', 'event(local:218@16#86dcd5f97351)#35410', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34377', 'event(script:2@915#ef19a1f9cb92)#34388']
+against the engine (S1#7 done_diff, the human's Open 316 until state:316 = 1), the plan's first 3 steps: precision 0.50, recall 0.53 over the 15 changed facts the task tracks
+  matched: ['cutscene', 'frozen:local:211', 'frozen:script:23', 'local:214', 'pos:local:214', 'state:316', 'var:52', 'var:53']
+  the engine changed, not predicted: ['frozen:local:203', 'local:203', 'local:209', 'pos:local:203', 'pos:local:207', 'pos:local:209', 'var:182']
+  predicted, not what the engine shows: ['args:local:214', 'args:script:2', 'frozen:local:206', 'frozen:local:207', 'frozen:local:210', 'frozen:script:2', 'pos:script:2', 'script:2']
+  changed facts the task does not track: 25
+
+=== replan: from the replan fixture (sentence script at 736, args 0) ===
+records folded into an action of the same input with the same precondition and effects: 527
+task: 71324 actions, 244 facts; relevance keeps 71324 actions, 244 facts needed (43 whole)
+after pruning effects on facts nothing needs: 651994 effects
+SAS: 274 variables, 583670 operators, 9324673 effects, 30 pick variables, 163.8 MB
+lama-first: plan (exit 0) in 97.8 s, 8 steps, 29 landmarks (0 of the encoding)
+  1. event(local:211@33)#30568  [event, path end stopped]
+       pre: {'class:316:6': ['0'], 'frozen:local:211': ['0'], 'local:203': ['0'], 'local:211': ['1'], 'local:220': ['0'], 'pos:local:211': ['33'], 'room': ['28'], 'state:316': ['0']}
+       variant: [('class:316:6', 0), ('frozen:local:211', 0), ('local:203', 0), ('local:211', 1), ('local:220', 0), ('pos:local:211', 33), ('room', 28), ('state:316', 0)]
+       effects (slot positions left out): {'args:local:216': 210018218032833, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:211': 0, 'local:212': 0, 'local:216': 1, 'objscript:316': 0, 'pos:local:211': -1, 'pos:local:212': -1, 'pos:local:216': 33, 'pos:obj:316': -1, 'pos:script:18': -1, 'pos:script:19': -1, 'pos:script:25': -1, 'script:18': 0, 'script:19': 0, 'script:25': 0, 'state:316': 1, 'state:570': 1, 'var:5': 0}
+       replay checks: [('room-028-bar/local-211.txt:14 [001E]', "local:211's delay is over", True), ('room-028-bar/local-216.txt:10 [0004]', 'VAR_RESULT != 28', True)]
+  2. event(script:2@736)#35292  [event, path end end]
+       pre: {'args:script:2': ['0'], 'frozen:script:2': ['0'], 'pos:script:2': ['736'], 'script:2': ['1']}
+       variant: [('args:script:2', 0), ('frozen:script:2', 0), ('pos:script:2', 736), ('script:2', 1)]
+       effects (slot positions left out): {'pos:script:12': -1, 'pos:script:2': -1, 'script:12': 0, 'script:2': 0, 'verb:100': "guess ['0', '1']"}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False), ('global/script-002.txt:184 [0319]', 'Bit[5 + Local[3]]', True), ('global/script-002.txt:185 [0320]', 'Local[0] == 11', True)]
+       met on both sides (not checked): [('global/script-012.txt:8 [0000]', 'Var[107] == 100'), ('global/script-012.txt:12 [0012]', 'Var[107] == 4'), ('global/script-012.txt:33 [009E]', 'Var[108]'), ('global/script-012.txt:14 [0021]', 'Var[107] == 2'), ('global/script-012.txt:16 [0030]', 'Var[107] == 3'), ('global/script-012.txt:18 [003F]', 'Var[107] == 9'), ('global/script-012.txt:20 [004E]', 'Var[107] == 8'), ('global/script-012.txt:22 [005D]', 'Var[107] == 10'), ('global/script-012.txt:24 [006C]', 'Var[107] == 7'), ('global/script-012.txt:26 [007B]', 'Var[107] == 5'), ('global/script-012.txt:28 [008A]', 'Var[107] == 6')]
+  3. walk_to(316)#478  [walk_to, path end yield]
+       pre: {'bit:6': ['0'], 'class:316:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'room': ['28'], 'script:2': ['0'], 'var:53': ['1', '2', 'above']}
+       variant: [('bit:6', 0), ('class:316:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('room', 28), ('script:2', 0), ('var:53', 1)]
+       effects (slot positions left out): {'args:script:2': 185570791967474, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+  4. event(script:2@736#a8c69122caf2)#30915  [event, path end parked]
+       pre: {'args:script:2': ['185570791967474'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'pos:script:2': ['736'], 'room': ['28'], 'script:2': ['1'], 'state:316': ['1']}
+       variant: [('args:script:2', 185570791967474), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('pos:script:2', 736), ('room', 28), ('script:2', 1), ('state:316', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:local:218': 148283040822097, 'args:obj:316': 168840985904053, 'args:script:2': 245688617887937, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:218': 1, 'objscript:316': 1, 'pos:local:218': 16, 'pos:obj:316': 78, 'pos:script:18': -1, 'pos:script:2': 937, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+  5. event(local:218@16#86dcd5f97351)#35417  [event, path end room]
+       pre: {'args:local:218': ['148283040822097'], 'bit:304': ['0'], 'bit:424': ['0'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:local:218': ['0'], 'local:218': ['1'], 'owner:568': ['15'], 'pos:local:218': ['16'], 'room': ['28'], 'state:564': ['0']}
+       variant: [('args:local:218', 148283040822097), ('bit:304', 0), ('bit:424', 0), ('cutscene', 1), ('frozen:local:218', 0), ('local:218', 1), ('owner:568', 15), ('pos:local:218', 16), ('room', 28), ('state:564', 0)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'args:local:200': 135967696290086, 'args:local:201': 153694249886252, 'args:local:204': 23924946786969, 'class:568:32': 1, 'cutscene': 'add -1', 'escpos:entry': -1, 'escpos:exit': -1, 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'local:200': 1, 'local:201': 1, 'local:202': 0, 'local:203': 0, 'local:204': 1, 'local:205': 0, 'local:206': 0, 'local:207': 0, 'local:208': 0, 'local:209': 0, 'local:210': 0, 'local:211': 0, 'local:212': 0, 'local:213': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'local:220': 0, 'local:221': 0, 'local:222': 0, 'objscript:315': 0, 'objscript:316': 0, 'objscript:320': 0, 'objscript:321': 0, 'objscript:322': 0, 'objscript:323': 0, 'objscript:330': 0, 'objscript:333': 0, 'objscript:336': 0, 'objscript:339': 0, 'objscript:342': 0, 'objscript:345': 0, 'objscript:354': 0, 'objscript:357': 0, 'objscript:362': "guess ['0', '1']", 'objscript:363': "guess ['0', '1']", 'objscript:364': "guess ['0', '1']", 'objscript:365': "guess ['0', '1']", 'objscript:366': "guess ['0', '1']", 'objscript:564': 0, 'objscript:566': "guess ['0', '1']", 'objscript:567': "guess ['0', '1']", 'objscript:568': "guess ['0', '1']", 'objscript:569': 0, 'objscript:570': 0, 'objscript:574': 0, 'pos:entry': -1, 'pos:exit': -1, 'pos:local:200': 10, 'pos:local:201': 35, 'pos:local:202': -1, 'pos:local:203': -1, 'pos:local:204': 18, 'pos:local:205': -1, 'pos:local:206': -1, 'pos:local:207': -1, 'pos:local:208': -1, 'pos:local:209': -1, 'pos:local:210': -1, 'pos:local:211': -1, 'pos:local:212': -1, 'pos:local:213': -1, 'pos:local:214': -1, 'pos:local:215': -1, 'pos:local:216': -1, 'pos:local:217': -1, 'pos:local:218': -1, 'pos:local:220': -1, 'pos:local:221': -1, 'pos:local:222': -1, 'pos:obj:315': -1, 'pos:obj:316': -1, 'pos:obj:320': -1, 'pos:obj:321': -1, 'pos:obj:322': -1, 'pos:obj:323': -1, 'pos:obj:330': -1, 'pos:obj:333': -1, 'pos:obj:336': -1, 'pos:obj:339': -1, 'pos:obj:342': -1, 'pos:obj:345': -1, 'pos:obj:354': -1, 'pos:obj:357': -1, 'pos:obj:564': -1, 'pos:obj:569': -1, 'pos:obj:570': -1, 'pos:obj:574': -1, 'pos:script:12': -1, 'pos:script:19': -1, 'pos:script:2': -1, 'pos:script:6': -1, 'pos:script:7': -1, 'pos:script:9': -1, 'room': 41, 'script:11': 0, 'script:12': 0, 'script:19': 0, 'script:2': 0, 'script:5': 0, 'script:6': 0, 'script:7': 0, 'script:9': 0, 'state:571': 1, 'var:133': "guess ['0']", 'var:134': "guess ['0']", 'var:135': "guess ['0']", 'var:136': "guess ['0']", 'var:137': "guess ['0']", 'var:138': "guess ['0']", 'var:139': "guess ['0']", 'var:140': "guess ['0']", 'var:143': "guess ['130', '131', '132', '20']", 'var:144': "guess ['0']", 'var:145': "guess ['0', '1', '2', '3', '4', '5', 'above']", 'var:146': "guess ['0', '1', 'above']", 'var:147': "guess ['0', '25']", 'var:148': "guess ['0', '24']", 'var:22': 41, 'var:32': 4, 'var:376': "guess ['1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042', '1043', '955', '956', '957', '958', '959', '960', '961', '962', '963', '964', '965', '966', '967', '968', '969', '970', '971', '972', '973', '974', '975', '976', '977', '978', '979', '980', '981', '982', '983', '984', '985', '986', '987', '988', '989', '990', '991', '992', '993', '994', '995', '996', '997', '998', '999']", 'var:38': 0, 'var:4': 41, 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1', 'var:54': -80, 'var:70': "guess ['0', '1']", 'var:72': 41, 'verb:100': "guess ['0', '1']", 'verb:208': "guess ['0', '1']", 'verb:209': "guess ['0', '1']"}
+       replay checks: [('room-028-bar/local-218.txt:12 [0010]', 'WaitForActor(VAR_EGO); blocks', False), ('room.cpp:42-260', 'obj:315 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:316 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:320 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:321 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:322 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:323 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:330 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:333 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:336 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:339 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:342 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:345 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:354 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:357 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:564 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:569 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:570 runs in a room slot (its owner is 15)', True), ('room.cpp:42-260', 'obj:574 runs in a room slot (its owner is 15)', True)]
+       met on both sides (not checked): [('global/script-007.txt:11 [0016]', 'Var[183]'), ('room-041-kitchen/local-201.txt:10 [0005]', 'VAR_RESULT < 210')]
+       writes with unknown targets left out: [('VerbOps', 'global/script-007.txt:12 [001B]', 'verb ?(not a fact: var:183)')]
+  6. sentence(9,566)#12118  [sentence, path end yield]
+       pre: {'bit:6': ['0'], 'class:566:32': ['0'], 'frozen:obj:2': ['0'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'room': ['41'], 'script:2': ['0'], 'var:53': ['1', '2', 'above'], 'verb:9': ['1']}
+       variant: [('bit:6', 0), ('class:566:32', 0), ('frozen:obj:2', 0), ('frozen:script:2', 0), ('owner:566', 15), ('room', 41), ('script:2', 0), ('var:53', 1), ('verb:9', 1)]
+       effects (slot positions left out): {'args:script:2': 32642483726507, 'pos:script:2': 736, 'script:2': 1, 'var:102': 0}
+       replay checks: [('global/script-002.txt:9 [0007]', 'Var[104] == Local[1]', False)]
+       met on both sides (not checked): [('global/script-002.txt:8 [0000]', 'Var[103] == Local[2]')]
+  7. event(script:2@736#1db02ba5a8ab)#34384  [event, path end yield]
+       pre: {'args:script:2': ['32642483726507'], 'bit:6': ['0'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'pos:script:2': ['736'], 'script:2': ['1']}
+       variant: [('args:script:2', 32642483726507), ('bit:6', 0), ('cutscene', 0), ('frozen:script:2', 0), ('owner:566', 15), ('pos:script:2', 736), ('script:2', 1)]
+       guessed: [('var:52', '2'), ('var:53', '2')]
+       effects (slot positions left out): {'args:script:2': 262893370723218, 'cutscene': 'add 1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'pos:script:18': -1, 'pos:script:2': 915, 'script:18': 0, 'var:52': 'add -1', 'var:53': 'add -1'}
+       replay checks: [('global/script-002.txt:170 [02E0]', 'WaitForActor(Local[3]); blocks', False), ('global/script-002.txt:175 [02EB]', 'VAR_RESULT > 16', False)]
+  8. event(script:2@915#ef19a1f9cb92)#34395  [event, path end end]
+       pre: {'args:script:2': ['262893370723218'], 'cutscene': ['1', '2', '3', '4', '5'], 'frozen:script:2': ['0'], 'owner:566': ['15'], 'pos:script:2': ['915'], 'room': ['41'], 'script:2': ['1']}
+       variant: [('args:script:2', 262893370723218), ('cutscene', 1), ('frozen:script:2', 0), ('owner:566', 15), ('pos:script:2', 915), ('room', 41), ('script:2', 1)]
+       guessed: [('var:52', 'below'), ('var:53', 'below')]
+       effects (slot positions left out): {'class:566:32': 1, 'cutscene': 'add -1', 'escpos:local:220': -1, 'escpos:local:222': -1, 'escpos:script:120': -1, 'escpos:script:56': -1, 'escpos:script:59': -1, 'escpos:script:70': -1, 'escpos:script:91': -1, 'escpos:script:92': -1, 'escpos:script:93': -1, 'objscript:566': 0, 'owner:566': 1, 'pos:obj:566': -1, 'pos:script:12': -1, 'pos:script:19': -1, 'pos:script:2': -1, 'pos:script:9': -1, 'script:12': 0, 'script:19': 0, 'script:2': 0, 'script:9': 0, 'state:566': 1, 'var:133': "guess ['0']", 'var:134': "guess ['0']", 'var:135': "guess ['0']", 'var:136': "guess ['0']", 'var:137': "guess ['0']", 'var:138': "guess ['0']", 'var:139': "guess ['0']", 'var:140': "guess ['0']", 'var:143': "guess ['130', '131', '132', '20']", 'var:144': "guess ['0']", 'var:145': "guess ['0', '1', '2', '3', '4', '5', 'above']", 'var:146': "guess ['0', '1', 'above']", 'var:147': "guess ['0', '25']", 'var:148': "guess ['0', '24']", 'var:376': "guess ['1000', '1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009', '1010', '1011', '1012', '1013', '1014', '1015', '1016', '1017', '1018', '1019', '1020', '1021', '1022', '1023', '1024', '1025', '1026', '1027', '1034', '1035', '1036', '1037', '1038', '1039', '1040', '1041', '1042', '1043', '955', '956', '957', '958', '959', '960', '961', '962', '963', '964', '965', '966', '967', '968', '969', '970', '971', '972', '973', '974', '975', '976', '977', '978', '979', '980', '981', '982', '983', '984', '985', '986', '987', '988', '989', '990', '991', '992', '993', '994', '995', '996', '997', '998', '999']", 'var:5': 0, 'var:52': 'add 1', 'var:53': 'add 1', 'verb:100': "guess ['0', '1']", 'verb:208': "guess ['0', '1']", 'verb:209': "guess ['0', '1']"}
+       replay checks: [('global/script-002.txt:205 [038F]', "script:2's delay is over", True)]
+       met on both sides (not checked): [('global/script-012.txt:8 [0000]', 'Var[107] == 100'), ('global/script-012.txt:12 [0012]', 'Var[107] == 4'), ('global/script-012.txt:33 [009E]', 'Var[108]'), ('global/script-012.txt:14 [0021]', 'Var[107] == 2'), ('global/script-012.txt:16 [0030]', 'Var[107] == 3'), ('global/script-012.txt:18 [003F]', 'Var[107] == 9'), ('global/script-012.txt:20 [004E]', 'Var[107] == 8'), ('global/script-012.txt:22 [005D]', 'Var[107] == 10'), ('global/script-012.txt:24 [006C]', 'Var[107] == 7'), ('global/script-012.txt:26 [007B]', 'Var[107] == 5'), ('global/script-012.txt:28 [008A]', 'Var[107] == 6')]
+replay over the task's own actions: goal reached True, first step that cannot run None, guessed values used []
+steps the goal needs (8 of 8): ['event(local:211@33)#30568', 'event(script:2@736)#35292', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']

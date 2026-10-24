@@ -1,0 +1,68 @@
+E003 step 4: Fast Downward build and check
+
+commit: 7ea2755269ff9398279b30f5c848e32ba6047c9c (release-26.6.0)
+build: cd third_party/downward && ./build.py release -j8   (CMAKE_BUILD_TYPE=Release, builds/release)
+tools: cmake version 4.4.2; g++ (GCC) 16.2.1 20260810
+binary: True
+
+hand-made task (task.py): door 0/1, room 1/2; open the door in room 1, walk through it; goal room 2
+  --alias lama-first: exit 0, 0.23 s, plan ['(a0)', '(a1)', '; cost = 2 (unit cost)']
+  lama-first with the landmark dump: plan (exit 0), 0.16 s, plan ['open door', 'walk through'], same plan as the alias: True
+  landmarks (4):
+    lm0 [('room', 2)] goal
+    lm1 [('room', 1)] initial
+    lm2 [('door', 1)]
+    lm3 [('door', 0)] initial
+  orderings: [(1, 2, 'gn'), (1, 0, 'gn'), (2, 0, 'gn'), (3, 2, 'gn')]
+
+the file:
+begin_version
+3
+end_version
+begin_metric
+0
+end_metric
+2
+begin_variable
+door
+-1
+2
+Atom door(door=0)
+Atom door(door=1)
+end_variable
+begin_variable
+room
+-1
+2
+Atom room(room=1)
+Atom room(room=2)
+end_variable
+0
+begin_state
+0
+0
+end_state
+begin_goal
+1
+1 1
+end_goal
+2
+begin_operator
+a0
+1
+1 0
+1
+0 0 -1 1
+1
+end_operator
+begin_operator
+a1
+2
+0 1
+1 0
+1
+0 1 -1 1
+1
+end_operator
+0
+

@@ -1,0 +1,58 @@
+E003 step 4: the coarse fixture (task_fixture.py's docstring: hand-made from the IR, flow-insensitive;
+no real actions exist yet, since the model has no symbolic oracle)
+
+start: the engine's init (absent is 0); goal: owner 901, 902, 903 = 1 (E001 key #97-99, the Part I end)
+built in 75.0 s
+
+fixture (a write or read site counts once per action whose reach holds it):
+      655  actions with no effect on a fact
+     1046  facts written with constants and steps, or two steps (a guess over the domain)
+    56932  indexed writes (left out)
+     1393  object verb entries (actions)
+    10214  owner, state, class or room writes that do not fold (left out)
+     6802  reads of a fact with no domain (not a precondition)
+      402  setClass of class 0 or not a constant (left out)
+     5152  writes to a fact with no domain (left out)
+    88672  writes whose value does not fold (left out)
+      955  facts named (with a domain)
+
+relevance (relevance.py), backward from the goal:
+     1393  actions
+      627  actions kept
+      955  facts named
+      469  facts needed
+       20  facts needed whole
+     1265  values needed
+        3  rounds
+  facts needed by kind: bit 259, class 22, owner 37, room 1, script 59, state 30, var 61
+
+SAS file of the kept actions (task.py), written in 9.0 s, 2.8 MB:
+      627  actions
+      198  actions whose guesses go through pick variables
+   112726  conditional effects
+   169431  effects
+     2177  effects that write the value the key already has (left out)
+       48  max variants of one action
+     1810  operators
+      807  pick operators
+      226  pick variables
+    43580  precondition sets that hold for every value (left out)
+     2857  values
+     1024  variables
+     1003  variants
+
+Fast Downward on it with the goal true at the start (no search): exit 0, 1.3 s
+  [t=0.000000s, 11928 KB] reading input...
+  [t=0.469249s, 21368 KB] done reading input!
+  [t=1.140013s, 36716 KB] Landmark graph contains 3 landmarks, of which 0 are disjunctive and 0 are conjunctive.
+  [t=1.140013s, 36716 KB] Landmark graph contains 0 orderings.
+  [t=1.140262s, 36716 KB] Variables: 1024
+  [t=1.140262s, 36716 KB] FactPairs: 2857
+  [t=1.140262s, 36716 KB] Bytes per state: 156
+  [t=1.141251s, 36716 KB] Solution found!
+  [t=1.141251s, 36716 KB] Plan length: 0 step(s).
+  [t=1.141251s, 36716 KB] Search time: 0.000000s
+  [t=1.141251s, 36716 KB] Total time: 1.141251s
+  Solution found.
+  Peak memory: 36716 KB
+  search exit code: 0
