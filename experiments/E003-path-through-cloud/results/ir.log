@@ -1,0 +1,156 @@
+files: 1750 .txt; units: 1195 (global 178, entry 83, exit 83, local 377, obj 474)
+instructions: 40786, of them recovered jumps: elseif-jump 1113, else-chain 9, while-back 1
+statement kinds: 124
+     4625 breakHere
+     4233 assign =
+     2678 jump if
+     2306 print
+     2022 stopObjectCode
+     1730 WaitForMessage
+     1694 animateCostume
+     1657 startScript
+     1113 jump elseif-jump
+     1113 jump elseif
+      967 jump goto
+      879 printEgo
+      860 jump else
+      847 ActorOps
+      832 assign ++
+      768 jump unless
+      726 assign +=
+      720 VerbOps
+      626 assign -=
+      616 delay
+      585 drawObject
+      499 putActorInRoom
+      408 putActor
+      399 setClass
+      387 WaitForActor
+      383 setState
+      351 walkActorTo
+      340 setBoxFlags
+      335 assign = isScriptRunning
+      327 SetStringChar
+      319 stopScript
+      315 cutscene
+      315 endCutscene
+      246 jump goto0
+      224 beginOverride
+      219 pickupObject
+      194 assign = getRandomNr
+      190 startSound
+      183 loadRoom
+      179 Resource.loadScript
+      157 loadRoomWithEgo
+      153 setOwnerOf
+      151 Resource.lockScript
+      142 assign = getObjectOwner
+      131 endOverride
+      130 assign = getObjectState
+      125 PutCodeInString
+      122 Resource.loadCostume
+      122 doSentence
+      114 Resource.unlockScript
+      101 assign = getActorX
+       98 Resource.loadSound
+       98 stopSound
+       95 walkActorToObject
+       90 startObject
+       79 setObjectName
+       71 InitCharset
+       71 actorFollowCamera
+       68 Resource.unlockCostume
+       67 Resource.lockCostume
+       62 faceActor
+       52 UserputOn
+       52 SetPalColor
+       51 chainScript
+       49 CursorShow
+       45 walkActorToActor
+       44 WaitForCamera
+       43 assign = getActorY
+       41 screenEffect
+       41 delayVariable
+       40 Resource.lockSound
+       40 assign = getActorRoom
+       38 assign = getActorWalkBox
+       37 putActorAtObject
+       37 panCameraTo
+       36 SetScreen
+       33 assign = getDist
+       30 assign = getActorCostume
+       29 assign = isSoundRunning
+       28 assign --
+       26 UserputOff
+       25 CursorHide
+       24 Resource.unlockSound
+       21 drawBox
+       20 setCameraAt
+       20 setRGBRoomIntensity
+       19 assign = getActorMoving
+       15 setVarRange
+       14 assign = getActorFacing
+       13 RoomIntensity
+       12 saveVerbs
+       12 RoomScroll
+       11 assign *=
+       11 assign = findObject
+       11 restoreVerbs
+       11 systemOps
+        9 jump else-chain
+        8 PseudoRoom
+        8 assign /=
+        7 assign = actorFromPos
+        6 Resource.loadCharset
+        5 Resource.loadRoom
+        5 assign = getVerbEntryPoint
+        5 UserputSoftOff
+        5 UserputSoftOn
+        5 createBoxMatrix
+        4 CursorSoftOff
+        4 CursorSoftOn
+        4 assign = GetStringChar
+        3 CreateString
+        3 ShakeOff
+        2 Resource.clearHeap
+        2 freezeScripts
+        2 ShakeOn
+        2 WaitForSentence
+        1 assign = getActorWidth
+        1 assign = findInventory
+        1 CursorCommand
+        1 CopyString
+        1 Resource.unlockRoom
+        1 Resource.lockRoom
+        1 assign = getActorElevation
+        1 jump while
+        1 jump while-back
+yields: frame 4625, wait 2163, delay 657; ends: if_self 1990, room 411, always 2184; beginOverride with an Esc jump: 224
+unparsed lines: 0
+notes and anomalies by class:
+       2 ambiguous name from bytes
+       9 else chain
+    1111 else-if target from bytes, text rule agrees
+       2 else-if target from bytes, text rule differs
+       2 empty unit
+   else chain: global/script-004.txt:93 2 jumps
+   else chain: global/script-023.txt:23 2 jumps
+   else chain: global/script-176.txt:13 2 jumps
+   else chain: room-025-village/local-202.txt:206 2 jumps
+   else chain: room-030-store/local-211.txt:156 2 jumps
+   else chain: room-030-store/local-211.txt:250 2 jumps
+   else chain: room-039-hellmaze/local-205.txt:15 2 jumps
+   else chain: room-039-hellmaze/local-207.txt:26 2 jumps
+   else chain: room-030-store/obj-0389-safe.txt:42 2 jumps
+   else-if target from bytes, text rule differs: global/script-023.txt:10 text 008B, bytes 0075
+   else-if target from bytes, text rule differs: global/script-057.txt:61 text 078A, bytes 0141
+   empty unit: room-088-fighting/entry.txt:0 
+   empty unit: room-088-fighting/exit.txt:0 
+   ambiguous name from bytes: room-071-gh-room/local-201.txt:12 VAR_TALK_ACTOR is var 25
+   ambiguous name from bytes: room-071-gh-room/local-202.txt:9 VAR_TALK_ACTOR is var 25
+object entries: 1393 verbs in 474 objects (+7 shadowed events = 1400, index.json counts 1400); 172 share an offset with another verb (one entry kept per offset would drop 97); default verb 255: 103 objects
+round trip: 39663 code lines, 39663 line instructions; lines in no unit 0, in two units 0; statements that print back differently: 0
+printed jump targets on no printed line (reading the text as printed, without the hidden jumps): 1122; after recovery: 0
+code-less objects (no unit): 555
+byte check: hidden else-chain agree 9, hidden elseif-jump agree 1113, hidden while-back agree 1, instructions 40786, jumps 7756, jumps agree 7756
+flat descumm: jumps same 7756, units same 1195
