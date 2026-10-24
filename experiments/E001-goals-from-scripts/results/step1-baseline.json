@@ -1,0 +1,1068 @@
+{
+ "seed": [
+  "bit",
+  565,
+  1
+ ],
+ "pulled_in": 295,
+ "max_depth": 14,
+ "stalls": 91,
+ "baseline": {
+  "size": 241,
+  "parts": {
+   "I": {
+    "facts": 99,
+    "found": 35,
+    "recall": 0.354,
+    "chance": 9.7
+   },
+   "II": {
+    "facts": 21,
+    "found": 0,
+    "recall": 0.0,
+    "chance": 2.4
+   },
+   "III": {
+    "facts": 42,
+    "found": 23,
+    "recall": 0.548,
+    "chance": 4.3
+   },
+   "IV": {
+    "facts": 7,
+    "found": 1,
+    "recall": 0.143,
+    "chance": 0.7
+   }
+  },
+  "held_out_pooled": {
+   "facts": 70,
+   "found": 24
+  },
+  "part1_facts": [
+   {
+    "fact": [
+     "state",
+     428,
+     1
+    ],
+    "means": "the door (428) is in state 1",
+    "move": "S1#4",
+    "found": true
+   },
+   {
+    "fact": [
+     "state",
+     316,
+     1
+    ],
+    "means": "the door (316) is in state 1",
+    "move": "S1#7",
+    "found": true
+   },
+   {
+    "fact": [
+     "state",
+     564,
+     1
+    ],
+    "means": "the door (564) is in state 1",
+    "move": "S2#1",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     272,
+     1
+    ],
+    "means": "Var[272] = 1",
+    "move": "S2#2",
+    "found": true
+   },
+   {
+    "fact": [
+     "state",
+     575,
+     1
+    ],
+    "means": "the object 575 is in state 1",
+    "move": "S2#3",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     568,
+     1
+    ],
+    "means": "Guybrush has the fish (568)",
+    "move": "S2#4",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     567,
+     1
+    ],
+    "means": "Guybrush has the pot (567)",
+    "move": "S1#9",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     566,
+     1
+    ],
+    "means": "Guybrush has the hunk of meat (566)",
+    "move": "S1#10",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     446,
+     1
+    ],
+    "means": "Bit[446] = 1",
+    "move": "S1#13",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     72,
+     1
+    ],
+    "means": "Bit[72] = 1",
+    "move": "S1#20",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     103,
+     1
+    ],
+    "means": "Bit[103] = 1",
+    "move": "S1#22",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     195,
+     478
+    ],
+    "means": "Var[195] = 478",
+    "move": "S1#23",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     689,
+     1
+    ],
+    "means": "Guybrush has the yellow petal (689)",
+    "move": "S1#27",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     689,
+     0
+    ],
+    "means": "the yellow petal (689) belongs to actor 0",
+    "move": "S1#31",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     16,
+     1
+    ],
+    "means": "Bit[16] = 1",
+    "move": "S1#33",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     475,
+     1
+    ],
+    "means": "Bit[475] = 1",
+    "move": "S1#34",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     442,
+     1
+    ],
+    "means": "Guybrush has the map (442)",
+    "move": "S1#35",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     65,
+     1
+    ],
+    "means": "Bit[65] = 1",
+    "move": "S1#35",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     444,
+     1
+    ],
+    "means": "the door (444) is in state 1",
+    "move": "S1#36",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     377,
+     1
+    ],
+    "means": "Guybrush has the chicken (377)",
+    "move": "S1#38",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     367,
+     1
+    ],
+    "means": "the door (367) is in state 1",
+    "move": "S1#39",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     420,
+     1
+    ],
+    "means": "Bit[420] = 1",
+    "move": "S1#43",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     437,
+     1
+    ],
+    "means": "the door (437) is in state 1",
+    "move": "S1#45",
+    "found": true
+   },
+   {
+    "fact": [
+     "var",
+     221,
+     1
+    ],
+    "means": "Var[221] = 1",
+    "move": "S1#46",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     222,
+     1
+    ],
+    "means": "Var[222] = 1",
+    "move": "S1#46",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     223,
+     1
+    ],
+    "means": "Var[223] = 1",
+    "move": "S1#46",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     224,
+     1
+    ],
+    "means": "Var[224] = 1",
+    "move": "S1#46",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     396,
+     1
+    ],
+    "means": "Guybrush has the shovel (396)",
+    "move": "S1#47",
+    "found": true
+   },
+   {
+    "fact": [
+     "var",
+     227,
+     1
+    ],
+    "means": "Var[227] = 1",
+    "move": "S1#48",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     228,
+     0
+    ],
+    "means": "Var[228] = 0",
+    "move": "S1#48",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     73,
+     1
+    ],
+    "means": "Bit[73] = 1",
+    "move": "S1#49",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     226,
+     2
+    ],
+    "means": "Var[226] = 2",
+    "move": "S1#50",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     397,
+     1
+    ],
+    "means": "Guybrush has the storekeeper's note (397)",
+    "move": "S1#51",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     320,
+     1
+    ],
+    "means": "Bit[320] = 1",
+    "move": "S1#51",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     388,
+     1
+    ],
+    "means": "Guybrush has the sword (388)",
+    "move": "S2#5",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     395,
+     1
+    ],
+    "means": "Guybrush has the breath mints (395)",
+    "move": "S1#53",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     312,
+     1
+    ],
+    "means": "Bit[312] = 1",
+    "move": "S1#53",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     98,
+     1
+    ],
+    "means": "Bit[98] = 1",
+    "move": "S2#7",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     99,
+     1
+    ],
+    "means": "Bit[99] = 1",
+    "move": "S1#55",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     387,
+     1
+    ],
+    "means": "the door (387) is in state 1",
+    "move": "S1#56",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     15,
+     1
+    ],
+    "means": "Bit[15] = 1",
+    "move": "S1#60",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     465,
+     1
+    ],
+    "means": "the door (465) is in state 1",
+    "move": "S1#61",
+    "found": true
+   },
+   {
+    "fact": [
+     "state",
+     632,
+     1
+    ],
+    "means": "the door (632) is in state 1",
+    "move": "S1#63",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     640,
+     1
+    ],
+    "means": "Guybrush has the gopher repellent (640)",
+    "move": "S1#64",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     481,
+     1
+    ],
+    "means": "Bit[481] = 1",
+    "move": "S1#64",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     476,
+     1
+    ],
+    "means": "Bit[476] = 1",
+    "move": "S1#69",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     420,
+     1
+    ],
+    "means": "Guybrush has the cake (420)",
+    "move": "S1#71",
+    "found": true
+   },
+   {
+    "fact": [
+     "class",
+     420,
+     -6
+    ],
+    "means": "the cake (420) loses class 6",
+    "move": "S1#72",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     635,
+     1
+    ],
+    "means": "Guybrush has the fabulous idol (635)",
+    "move": "S1#77",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     85,
+     1
+    ],
+    "means": "Bit[85] = 1",
+    "move": "S1#80",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner_not",
+     568,
+     1
+    ],
+    "means": "Guybrush no longer has the fish (568)",
+    "move": "S2#10",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     75,
+     1
+    ],
+    "means": "Bit[75] = 1",
+    "move": "S2#12",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     483,
+     1
+    ],
+    "means": "Bit[483] = 1",
+    "move": "S2#14",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     106,
+     1
+    ],
+    "means": "Bit[106] = 1",
+    "move": "S2#17",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     107,
+     1
+    ],
+    "means": "Bit[107] = 1",
+    "move": "S2#18",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     19,
+     1
+    ],
+    "means": "Bit[19] = 1",
+    "move": "S2#20",
+    "found": true
+   },
+   {
+    "fact": [
+     "var",
+     285,
+     3
+    ],
+    "means": "Var[285] = 3",
+    "move": "S2#23",
+    "found": true
+   },
+   {
+    "fact": [
+     "var",
+     262,
+     0
+    ],
+    "means": "Var[262] = 0",
+    "move": "S2#23",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     240,
+     16
+    ],
+    "means": "Var[240] = 16",
+    "move": "S2#26",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     156,
+     1
+    ],
+    "means": "Bit[156] = 1",
+    "move": "S2#27",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     86,
+     1
+    ],
+    "means": "Bit[86] = 1",
+    "move": "S1#96",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     752,
+     1
+    ],
+    "means": "Guybrush has the T-shirt (752)",
+    "move": "S1#96",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     238,
+     1
+    ],
+    "means": "Bit[238] = 1",
+    "move": "S2#32",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     282,
+     3
+    ],
+    "means": "Var[282] = 3",
+    "move": "S2#40",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     546,
+     1
+    ],
+    "means": "Bit[546] = 1",
+    "move": "S2#48",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     285,
+     2
+    ],
+    "means": "Var[285] = 2",
+    "move": "S2#53",
+    "found": true
+   },
+   {
+    "fact": [
+     "var",
+     263,
+     4
+    ],
+    "means": "Var[263] = 4",
+    "move": "S2#57",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     20,
+     1
+    ],
+    "means": "Bit[20] = 1",
+    "move": "S2#58",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     596,
+     1
+    ],
+    "means": "Guybrush has the 100% Cotton T-shirt (596)",
+    "move": "S2#58",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     304,
+     1
+    ],
+    "means": "Bit[304] = 1",
+    "move": "S3#4",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     907,
+     1
+    ],
+    "means": "Guybrush has the note (907)",
+    "move": "S3#4",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     17,
+     1
+    ],
+    "means": "Bit[17] = 1",
+    "move": "S3#9",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     26,
+     1
+    ],
+    "means": "Bit[26] = 1",
+    "move": "S3#11",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     24,
+     1
+    ],
+    "means": "Bit[24] = 1",
+    "move": "S3#12",
+    "found": true
+   },
+   {
+    "fact": [
+     "var",
+     220,
+     1
+    ],
+    "means": "Var[220] = 1",
+    "move": "S3#17",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     246,
+     2
+    ],
+    "means": "Var[246] = 2",
+    "move": "S3#20",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     347,
+     1
+    ],
+    "means": "Bit[347] = 1",
+    "move": "S3#22",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     207,
+     6
+    ],
+    "means": "Var[207] = 6",
+    "move": "S3#35",
+    "found": false
+   },
+   {
+    "fact": [
+     "var",
+     205,
+     5000
+    ],
+    "means": "Var[205] = 5000",
+    "move": "S3#40",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     51,
+     1
+    ],
+    "means": "Bit[51] = 1",
+    "move": "S3#42",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     732,
+     1
+    ],
+    "means": "Guybrush has the magnetic compass (732)",
+    "move": "S3#42",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     397,
+     15
+    ],
+    "means": "the storekeeper's note (397) belongs to actor 15",
+    "move": "S3#42",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     89,
+     1
+    ],
+    "means": "Bit[89] = 1",
+    "move": "S3#46",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     447,
+     1
+    ],
+    "means": "Bit[447] = 1",
+    "move": "S3#47",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     598,
+     1
+    ],
+    "means": "the door (598) is in state 1",
+    "move": "S3#52",
+    "found": true
+   },
+   {
+    "fact": [
+     "state",
+     473,
+     1
+    ],
+    "means": "the object 473 is in state 1",
+    "move": "S3#59",
+    "found": false
+   },
+   {
+    "fact": [
+     "state",
+     475,
+     0
+    ],
+    "means": "the lever (475) is in state 0",
+    "move": "S3#59",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     323,
+     1
+    ],
+    "means": "Bit[323] = 1",
+    "move": "S3#60",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     88,
+     1
+    ],
+    "means": "Bit[88] = 1",
+    "move": "S3#64",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     364,
+     1
+    ],
+    "means": "Guybrush has the mug (364)",
+    "move": "S3#72",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     365,
+     1
+    ],
+    "means": "Guybrush has the mug (365)",
+    "move": "S3#73",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     366,
+     1
+    ],
+    "means": "Guybrush has the mug (366)",
+    "move": "S3#74",
+    "found": true
+   },
+   {
+    "fact": [
+     "bit",
+     421,
+     1
+    ],
+    "means": "Bit[421] = 1",
+    "move": "S3#77",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     94,
+     1
+    ],
+    "means": "Bit[94] = 1",
+    "move": "S3#85",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     477,
+     1
+    ],
+    "means": "Bit[477] = 1",
+    "move": "S3#87",
+    "found": false
+   },
+   {
+    "fact": [
+     "bit",
+     76,
+     1
+    ],
+    "means": "Bit[76] = 1",
+    "move": "S3#98",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     901,
+     1
+    ],
+    "means": "Guybrush has the pamphlet (901)",
+    "move": "S3#123",
+    "found": false
+   },
+   {
+    "fact": [
+     "owner",
+     902,
+     1
+    ],
+    "means": "Guybrush has the leaflet (902)",
+    "move": "S3#123",
+    "found": true
+   },
+   {
+    "fact": [
+     "owner",
+     903,
+     1
+    ],
+    "means": "Guybrush has the brochure (903)",
+    "move": "S3#123",
+    "found": false
+   }
+  ]
+ },
+ "dump": {
+  "size": 2080,
+  "parts": {
+   "I": {
+    "facts": 99,
+    "found": 84,
+    "recall": 0.848,
+    "chance": 84.0
+   },
+   "II": {
+    "facts": 21,
+    "found": 21,
+    "recall": 1.0,
+    "chance": 21.0
+   },
+   "III": {
+    "facts": 42,
+    "found": 37,
+    "recall": 0.881,
+    "chance": 37.0
+   },
+   "IV": {
+    "facts": 7,
+    "found": 6,
+    "recall": 0.857,
+    "chance": 6.0
+   }
+  },
+  "held_out_pooled": {
+   "facts": 70,
+   "found": 64
+  }
+ }
+}
