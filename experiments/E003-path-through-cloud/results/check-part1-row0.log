@@ -1,0 +1,194 @@
+E003 model check, Part I of run B: features ['own_entry']; path limit 256, step limit 5000; switches on: none; 3.7 s
+ground truth: 250 rows, groundtruth-part1.jsonl (605361 bytes, modified 2026-10-22 22:12:24, sha256 824021824d99); fact families held: at:entry, at:exit, at:local, at:obj, at:script, bit, class, cutscene, ego, esc:entry, esc:exit, esc:local, esc:obj, esc:script, frozen, local, objscript, owner, room, script, state, var, verb
+
+denominator: 239 counted moves = 250 rows - 11 excluded
+  excluded S1#1: glitch (README table)
+  excluded S1#48: glitch (README table)
+  excluded S1#49: glitch (README table)
+  excluded S1#50: glitch (README table)
+  excluded S1#51: glitch (README table)
+  excluded S1#90: glitch (README table)
+  excluded S3#70: skipped door (results.jsonl)
+  excluded S3#75: skipped door (results.jsonl)
+  excluded S3#90: skipped door (results.jsonl)
+  excluded S3#118: composite (via holds several actions)
+  excluded S3#123: composite (via holds several actions)
+  counted moves with no action kind: 7
+    S2#2: walk to a floor point
+    S2#3: walk to a floor point
+    S2#22: walk to a floor point
+    S1#95: walk to a floor point
+    S2#50: walk to a floor point
+    S3#51: walk to a floor point
+    S3#67: walk to a floor point
+  S3#97: via auto: walk to exit 434 -> room 31
+  S3#98: via auto: verb 7 mug
+  S3#119: via auto: wait until idle
+
+kind           moves        accepted   prec. done (hits/certain)   prec. post (hits/certain)            recall   recall+possible  no pred.
+sentence          44    39     88.6%               40.3% (27/67)               31.3% (21/67)    27/1108   2.4%    33/1108   3.0%         8
+walk_to           86    86    100.0%              43.0% (83/193)              42.0% (81/193)    83/2517   3.3%    87/2517   3.5%         2
+dialog_line       60    60    100.0%                   n/a (0/0)                   n/a (0/0)     0/1216   0.0%     0/1216   0.0%        60
+skip_cutscene     22    21     95.5%                   n/a (0/0)                   n/a (0/0)     0/550    0.0%     0/550    0.0%        21
+wait              20    20    100.0%                   n/a (0/0)                   n/a (0/0)     0/400    0.0%     0/400    0.0%        20
+none               7     0      0.0%                   n/a (0/0)                   n/a (0/0)     0/89     0.0%     0/89     0.0%         0
+all              239   226     94.6%             42.3% (110/260)             39.2% (102/260)   110/5880   1.9%   120/5880   2.0%       111
+
+acceptance: 226 of 239 counted moves (94.6%); of the 232 with an action kind: 97.4%; of the 130 the model runs at this row (sentence, walk_to): 125 (96.2%). Dialog lines, skips and waits run nothing at this row: they are accepted when usable and predict nothing
+precision (certain predicted changes, micro; hits/certain predictions): done 42.3% (110/260); post 39.2% (102/260)
+precision over the facts recall scores (the engine variables and non-facts below left out of both; not the rules' number): done 42.3% (110/260); post 39.2% (102/260)
+recall over counted moves: certain 110/5880 = 1.9%; with possible 120/5880 = 2.0%
+recall over accepted moves: certain 110/5593 = 2.0%; with possible 120/5593 = 2.1%
+accepted moves with no certain prediction: 111 of 226 (9 with possible ones only)
+not accepted, by reason:
+     7 no action kind
+     4 no path: object N: no entry for verb N or N
+     1 not usable: object N reachable
+     1 not usable: override armed
+    S1#60 {'kind': 'sentence', 'verb': 4, 'a': 566, 'b': 467}: no path: object 566: no entry for verb 4 or 255
+    S1#69 {'kind': 'sentence', 'verb': 4, 'a': 395, 'b': 405}: no path: object 395: no entry for verb 4 or 255
+    S1#71 {'kind': 'sentence', 'verb': 4, 'a': 640, 'b': 405}: no path: object 640: no entry for verb 4 or 255
+    S2#10 {'kind': 'sentence', 'verb': 4, 'a': 568, 'b': 655}: no path: object 568: no entry for verb 4 or 255
+    S3#45 {'kind': 'sentence', 'verb': 4, 'a': 907, 'b': 744}: not usable: object 744 reachable (Untouchable)
+    S3#46 {'kind': 'skip_cutscene', 'verb': None, 'a': None, 'b': None}: not usable: override armed (no esc: fact is 1)
+
+recall exclusions:
+  engine variables written outside opcode handlers (13):
+    var   2 VAR_CAMERA_POS_X: scumm.cpp:3379 every frame (scummLoop_updateScummVars); also camera.cpp:164 moveCamera, every frame; also camera.cpp:53 setCameraAt, inside opcodes
+    var   3 VAR_HAVE_MSG: scumm.cpp:3382 every frame; also actorTalk inside print (actor.cpp:3446)
+    var   5 VAR_OVERRIDE: script.cpp:1706 abortCutscene, from Esc in processInput (input.cpp:1423-1424); also beginOverride, endOverride and endCutscene, opcodes
+    var  20 VAR_VIRT_MOUSE_X: scumm.cpp:3385 every frame
+    var  21 VAR_VIRT_MOUSE_Y: scumm.cpp:3386 every frame
+    var  23 VAR_LAST_SOUND: sound.cpp:121-122 from actor walk sounds, playActorSounds every frame (scumm.cpp:3312, actor.cpp:2267); also startSound, an opcode
+    var  25 VAR_TALK_ACTOR: actor.cpp:3368 setTalkingActor, from stopTalk (actor.cpp:3564-3592) on the message timer (string.cpp:1125-1128); also actorTalk inside print, and stopTalk inside startScene (room.cpp:53)
+    var  26 VAR_CAMERA_FAST_X: input.cpp:1283, 1439 (the snap-scroll key toggles it; vars.cpp:62)
+    var  37 VAR_CHARINC: input.cpp:1150-1156 (text speed keys)
+    var  39 VAR_DEBUGMODE: scumm.cpp:3391 every frame
+    var  44 VAR_MOUSE_X: scumm.cpp:3387 every frame
+    var  45 VAR_MOUSE_Y: scumm.cpp:3388 every frame
+    var  71 VAR_GAME_LOADED: scumm.cpp:3415-3445 on save and load
+  engine variables written only inside an opcode, left in recall (7; row 0's first run left them out, the rules file's correction note):
+    var   0 VAR_KEYPRESS: showMessageDialog, the message box of a print to actor 252, inside o5_print (script_v5.cpp:3448-3449; string.cpp:119, 164-169); input.cpp:931-936 is ScummEngine_v2::processKeyboard (input.cpp:887-960), which v5 does not run. Also the scripts' result register, VAR_RESULT
+    var   4 VAR_ROOM: room.cpp:149, 155 in startScene, inside loadRoom, loadRoomWithEgo (script_v5.cpp:1850, 1875) and actorFollowCamera (camera.cpp:70)
+    var  17 VAR_CAMERA_MIN_X: room.cpp:203 in startScene (the room change opcodes); also the RoomScroll opcode (script_v5.cpp:2374)
+    var  18 VAR_CAMERA_MAX_X: room.cpp:205 in startScene; also the RoomScroll opcode (script_v5.cpp:2375)
+    var  22 VAR_ROOM_RESOURCE: room.cpp:172 in startScene
+    var  70 VAR_ROOM_FLAG: resource.cpp:644 when startScene loads the room resource (room.cpp:175)
+    var  72 VAR_NEW_ROOM: room.cpp:76 in startScene
+    save and load also call startScene (scumm.cpp:3900) and write VAR_ROOM_FLAG (saveload.cpp:937-938); run B never saves or loads, so in this run these variables change only inside opcodes
+  engine-triggers.json names 43 variables at non-boot sites; 11 are in the table; 7 are written only inside opcodes (IN_OPCODES, left in recall); hook numbers and clocks the engine reads: VAR_CUTSCENE_END_SCRIPT, VAR_CUTSCENE_START_SCRIPT, VAR_ENTRY_SCRIPT, VAR_ENTRY_SCRIPT2, VAR_EXIT_SCRIPT, VAR_EXIT_SCRIPT2, VAR_INVENTORY_SCRIPT, VAR_MUSIC_TIMER, VAR_SCROLL_SCRIPT, VAR_SENTENCE_SCRIPT, VAR_TIMER, VAR_TIMER_TOTAL, VAR_TMR_1, VAR_TMR_2, VAR_TMR_3, VAR_VERB_SCRIPT
+  left in recall: VAR_CAMERA_MIN: the site's text for VAR_CAMERA_MIN_X
+  left in recall: VAR_CHARCOUNT: not a v5 variable
+  left in recall: VAR_CURSORSTATE: written only by o5_cursorCommand (script_v5.cpp:935-938), an opcode
+  left in recall: VAR_CUTSCENEEXIT_KEY: read by the Esc handler, not written
+  left in recall: VAR_EGO: read, not written (pickupObject)
+  left in recall: VAR_RESULT: the scripts' result register, var 0: in IN_OPCODES as VAR_KEYPRESS
+  left in recall: VAR_SOUNDRESULT: written by o5_soundKludge's iMUSE command (sound.cpp:178-182), an opcode
+  left in recall: VAR_USERPUT: written only by o5_cursorCommand (script_v5.cpp:935-938), an opcode
+  left in recall: VAR_WALKTO_OBJ: written inside o5_loadRoomWithEgo (script_v5.cpp:1874-1876), an opcode
+  named there, neither in the table nor explained: none
+  in the table but not named there (cited from ScummVM directly): ['VAR_CAMERA_FAST_X', 'VAR_GAME_LOADED']
+  the model's non-facts (model.non_fact_vars: every script write unknown by its rules): 2: var 297 (random draw), var 359 (timer)
+  changed facts left out of recall: 866 of 6746; by variable: engine var VAR_VIRT_MOUSE_X 152, engine var VAR_MOUSE_X 145, engine var VAR_MOUSE_Y 145, engine var VAR_VIRT_MOUSE_Y 122, engine var VAR_HAVE_MSG 98, engine var VAR_LAST_SOUND 91, engine var VAR_CAMERA_POS_X 55, engine var VAR_TALK_ACTOR 53, engine var VAR_OVERRIDE 5
+  changes of the IN_OPCODES variables, now scored (changed / predicted certain): VAR_KEYPRESS 99/0, VAR_ROOM 98/0, VAR_CAMERA_MIN_X 15/3, VAR_CAMERA_MAX_X 49/3, VAR_ROOM_RESOURCE 82/0, VAR_ROOM_FLAG 10/0, VAR_NEW_ROOM 98/0
+  the excluded changes the model predicted anyway (certain): 0 of 866
+
+model runs (counted moves with an action):
+  paths per move: max 6, total 261; moves that hit the path limit: 0; path ends: no effect at this row 102, end 77, room 73, yield 9
+  unmodelled statements met (moves): none
+  notes, partial or deferred effects (paths): loadRoomWithEgo 66, endCutscene 10, doSentence 6, actorFollowCamera 5, loadRoom 2
+  writes with an unknown target: 0; predictions in kinds the ground truth does not hold (or clocks): 0
+  forks on a WaitFor* op (moves with one): 6
+  assumptions by kind (distinct decisions per move: where, condition, side taken; moves): local 40 (7), actor state 22 (8), position 6 (3)
+  value sets past model.MAX_VALUES (64) made plain unknowns, by site: none (moves: 0)
+  F flags from constant start sites (model.Game.resistance): started both ways, so unknown when a freeze meets a slot live before the move: 19 global scripts; 247 of 377 room-local scripts, keyed by room (a start from global or object code, or a hook, counts for every room with that local number; merged over rooms by number it would be 360); starts with a variable script number, not counted: 6
+  script turns that ended, nested ones included (over paths): none (row 0 keeps one frame)
+  nesting: deepest stack 0 frames (the engine's limit is 15); moves that reached it: 0; starts of a unit already on the stack (recursion guard): 0 in 0 moves; most instructions on one path 18 (limit 5000)
+  paths left out of the predictions (model.INFEASIBLE: an engine error() or the nesting limit aborts the game, which run B did not; a spin meets a state again and adds nothing): 0 in 0 moves (spin 0, nesting 0, error 0); moves with no path left: 0
+  merges (paths folded into another where they met): 0 in 0 moves; paths that spin (back at a jump target in a state they had, with no yield): 0 in 0 moves
+  the engine's error()/warning() cases met, counted not raised (over paths; moves): none
+  sentence slots live and not frozen at pre, run for their turn before the sentence (runAllScripts): 0 moves
+  the input script (VAR_VERB_SCRIPT) is not run (the action is the sentence): 0 moves; its number at pre is a room's local script in 0, where it may do more than queue the sentence (a doSentence(STOP), a start of its own, a sentence it does not queue): none
+
+run B's inputs inside each move's window that the scored action does not hold (check.run_b_inputs; the explicit movie the ground truth replays; own: the executor's movie, auto: the bridge's automatic '.' and Esc). The engine ran them; the model runs only the action, so they are not modelled:
+  after the first input, up to done:
+    sentence: 44 moves; with a key 19, with a click 44; inputs by kind and source: click own 166, . auto 16, esc auto 6, g own 3, o own 3, p own 1, u own 1
+      S1#4 (o 1); S1#7 (o 1); S1#22 (. 1); S1#33 (. 1); S1#36 (. 1); S1#39 (. 1); S1#45 (. 1); S1#52 (esc 1); S1#60 (g 1); S1#69 (esc 1); S1#71 (. 4); S1#79 (esc 3, o 1); S1#80 (. 2); S2#10 (. 2, g 1); S2#12 (. 3); S1#96 (esc 1); S3#45 (g 1); S3#50 (u 1); S3#73 (p 1)
+    walk_to: 86 moves; with a key 5, with a click 21; inputs by kind and source: click own 411, . auto 4, esc auto 3
+      S1#13 (esc 1); S1#58 (. 2); S1#64 (esc 1); S1#77 (. 1, esc 1); S3#78 (. 1)
+    dialog_line: 60 moves; with a key 60, with a click 0; inputs by kind and source: . auto 102, esc auto 5
+    skip_cutscene: 22 moves; with a key 7, with a click 0; inputs by kind and source: . auto 7, esc auto 1
+      S2#14 (. 1); S3#10 (. 2); S3#13 (. 1); S3#15 (. 1); S3#46 (esc 1); S3#56 (. 1); S3#58 (. 1)
+    wait: 20 moves; with a key 13, with a click 0; inputs by kind and source: . auto 31
+      S3#12 (. 4); S3#18 (. 2); S3#20 (. 2); S3#23 (. 4); S3#25 (. 2); S3#27 (. 2); S3#29 (. 3); S3#31 (. 3); S3#33 (. 2); S3#35 (. 2); S3#39 (. 1); S3#66 (. 1); S3#88 (. 3)
+    none: 7 moves; with a key 0, with a click 0; inputs by kind and source: none
+  after done, up to post:
+    sentence: 44 moves; with a key 7, with a click 0; inputs by kind and source: . auto 23, esc auto 3
+      S1#7 (. 2); S1#22 (. 6, esc 1); S1#43 (esc 1); S1#52 (. 1); S1#69 (. 1); S1#80 (esc 1); S3#98 (. 13)
+    walk_to: 86 moves; with a key 3, with a click 0; inputs by kind and source: . auto 17, esc auto 2
+      S1#18 (. 11, esc 1); S1#64 (. 2); S1#77 (. 4, esc 1)
+    dialog_line: 60 moves; with a key 15, with a click 0; inputs by kind and source: . auto 19, esc auto 6
+    skip_cutscene: 22 moves; with a key 1, with a click 0; inputs by kind and source: . auto 2
+      S2#20 (. 2)
+    wait: 20 moves; with a key 2, with a click 0; inputs by kind and source: . auto 2
+      S2#30 (. 1); S2#36 (. 1)
+    none: 7 moves; with a key 1, with a click 0; inputs by kind and source: . auto 1
+      S2#22 (. 1)
+
+engine conditions an accepted move rests on but does not test (actions.UNCHECKED), of 125 sentences and walks and 60 dialog lines (a click on the line's verb: actions.CLICK):
+  parent state: 0 moves
+  on screen, first under the click: 121 moves
+  shown in an inventory slot: 9 moves
+  a virtual screen under the click: 60 moves
+  the verb's rectangle under the click, no later slot's over it: 60 moves
+  input on reads VAR_USERPUT for _userPut, which o5_cursorCommand copies into it (script_v5.cpp:935-938): script writes of VAR_USERPUT itself in the IR, which would break that: 0
+
+the engine's last sentence at done (the sentence script's copies of its objects: global/script-002.txt:21 [0030], global/script-002.txt:22 [0035]) against the scored action: 130 of 130 sentences and walks read; 123 match; 7 do not (7 of them accepted). The rules' table decides the action; this changes no number
+  S1#7 {'kind': 'sentence', 'verb': 2, 'a': 316, 'b': None}: pre [323, 0], done [323, 0]: no new sentence by done
+  S1#17 {'kind': 'walk_to', 'verb': 11, 'a': 621, 'b': None}: pre [912, 0], done [912, 0]: no new sentence by done
+  S1#22 {'kind': 'sentence', 'verb': 7, 'a': 568, 'b': None}: pre [621, 0], done [621, 0]: no new sentence by done
+  S2#9 {'kind': 'walk_to', 'verb': 11, 'a': 914, 'b': None}: pre [487, 0], done [487, 0]: no new sentence by done
+  S1#96 {'kind': 'sentence', 'verb': 7, 'a': 396, 'b': 749}: pre [685, 0], done [749, 396]: another sentence ran
+  S3#50 {'kind': 'sentence', 'verb': 7, 'a': 603, 'b': 377}: pre [910, 0], done [601, 0]: another sentence ran
+  S3#65 {'kind': 'sentence', 'verb': 7, 'a': 603, 'b': 377}: pre [478, 0], done [600, 0]: another sentence ran
+
+precision misses (certain, done), by fact kind: script 92, var 29, local 7, objscript 6, class 3, owner 3, state 3, at:obj 3, room 2, cutscene 2
+  top 10 by fact (moves): script:9 73, var:0 26, script:25 7, script:18 7, objscript:685 3, var:100 3, script:183 3, local:218 2, room 2, at:obj:451:21 2
+  top 10 by fact and wrong value (predicted -> done): script:9 1->0 73, var:0 1->0 15, script:25 1->0 7, script:18 1->0 7, objscript:685 1->0 3, script:183 1->0 3, local:218 1->0 2, var:0 15->0 2, at:obj:451:21 1->0 2, cutscene 1->0 2
+  S1#8 local:218: predicted 1, done 0
+  S1#17 room: predicted 51, done 52
+  S1#26 objscript:685: predicted 1, done 0
+  S1#38 class:374:32: predicted 1, done 0
+  S1#38 owner:374: predicted 1, done 15
+  S1#38 state:374: predicted 1, done 0
+  S1#39 at:obj:367:46: predicted 1, done 0
+  S1#41 at:obj:451:21: predicted 1, done 0
+  S1#41 cutscene: predicted 1, done 0
+  S1#41 local:205: predicted 1, done 0
+  S1#41 objscript:451: predicted 1, done 0
+  S1#47 class:0:32: predicted 1, done 0
+  S1#47 owner:0: predicted 1, done 0
+  S1#47 state:0: predicted 1, done 0
+  S2#5 class:389:32: predicted 1, done 0
+  S2#5 owner:389: predicted 1, done 15
+  S2#5 state:389: predicted 1, done 0
+  S1#52 local:207: predicted 1, done 0
+  S1#57 local:204: predicted 1, done 0
+  S1#73 var:100: predicted 0, done 1
+  S1#79 local:217: predicted 1, done 0
+  S1#85 objscript:685: predicted 1, done 0
+  S2#42 objscript:685: predicted 1, done 0
+  S2#59 var:100: predicted 0, done 1
+  S3#47 room: predicted 85, done 0
+  S3#62 objscript:478: predicted 0, done 1
+  S3#68 var:100: predicted 2, done 89
+  S3#76 local:218: predicted 1, done 0
+  S3#81 at:obj:451:21: predicted 1, done 0
+  S3#81 cutscene: predicted 1, done 0
+  S3#81 local:205: predicted 1, done 0
+  S3#81 objscript:451: predicted 1, done 0
+
+recall misses by fact kind (counted moves): var 2311, verb 1021, state 656, at:local 351, bit 345, at:script 247, local 222, script 125, frozen 118, class 100, at:entry 62, cutscene 38, room 33, owner 33, at:obj 29, objscript 27, esc:script 27, esc:local 15
+recall misses by fact kind (accepted moves): var 2175, verb 982, state 638, bit 342, at:local 331, at:script 240, local 208, script 118, frozen 105, class 93, at:entry 58, cutscene 33, room 29, owner 29, esc:script 27, at:obj 26, objscript 24, esc:local 15
+top 10 missed facts (accepted moves): var:100 190, var:103 110, var:7 102, var:101 94, var:4 94, var:72 94, var:52 91, var:53 91, var:0 89, var:181 84
+next 10: var:22 78, var:113 76, var:182 74, var:194 66, var:108 64, bit:384 64, verb:120 64, var:183 63, verb:121 61, var:32 55
