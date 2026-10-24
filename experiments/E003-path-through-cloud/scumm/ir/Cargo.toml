@@ -1,0 +1,14 @@
+[package]
+name = "scumm-ir"
+description = "E003's script IR: descumm text into units, the game data, and the static analyses (ir.py, facts.py, model.Game)"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+flate2.workspace = true
+rustc-hash.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+sha1_smol.workspace = true

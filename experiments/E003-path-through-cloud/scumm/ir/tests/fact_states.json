@@ -1,0 +1,69 @@
+[
+  {
+    "name": "empty",
+    "state": {"vars": [0, 1], "bits_set": [], "owners": {}, "states": {}, "classes": {}, "room": 3, "ego": 1,
+              "slots": [], "cutscene": {"depth": 0, "levels": [{"override": null}]}, "verbs": []}
+  },
+  {
+    "name": "clocks and values",
+    "state": {"vars": [7, 1, -3, 0, 12, 0, 2, 0, 13, 0, 0, 99, 98, 97, 96, 5, 6, 0, 0, 0, 0, 0, 22, 0, 27, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1234, 5678, 0, -32768, 2147483647],
+              "bits_set": [0, 5, 116, 2047], "owners": {"17": 15, "300": 1, "901": 0},
+              "states": {"17": 1, "300": 0, "455": -1}, "classes": {"17": [1, 32], "300": [], "455": [15]},
+              "room": 38, "ego": null, "slots": [], "cutscene": {"depth": 0, "levels": [{"override": null}]},
+              "verbs": [{"id": 2}, {"id": 11}, {"id": 100}]}
+  },
+  {
+    "name": "slots of every kind",
+    "state": {"vars": [0, 3], "bits_set": [1], "owners": {}, "states": {}, "classes": {}, "room": 1, "ego": 3,
+              "slots": [{"where": 2, "number": 9, "code": 4, "frozen": 1},
+                        {"where": 2, "number": 9, "code": 4, "frozen": 0},
+                        {"where": 2, "number": 152, "code": -1, "frozen": 0},
+                        {"where": 3, "number": 200, "code": 2, "frozen": 0},
+                        {"where": 3, "number": 204, "code": 129, "frozen": 3},
+                        {"where": 1, "number": 10002, "code": 6, "frozen": 2},
+                        {"where": 1, "number": 10001, "code": 0, "frozen": 0},
+                        {"where": 1, "number": 17, "code": 15, "frozen": 0},
+                        {"where": 0, "number": 300, "code": 40, "frozen": 1},
+                        {"where": 4, "number": 455, "code": -1, "frozen": 1},
+                        {"where": 5, "number": 1, "code": 3, "frozen": 1},
+                        {"where": 0, "number": 10002, "code": 1, "frozen": 0}],
+              "cutscene": {"depth": 0, "levels": [{"override": null}]}, "verbs": [{"id": 9}]}
+  },
+  {
+    "name": "armed override",
+    "state": {"vars": [0, 1], "bits_set": [], "owners": {}, "states": {}, "classes": {}, "room": 10, "ego": 1,
+              "slots": [{"where": 2, "number": 152, "code": 79, "frozen": 0}],
+              "cutscene": {"depth": 1, "levels": [{"override": null},
+                                                  {"override": {"where": 2, "number": 152, "code": 82, "stale": false}}]},
+              "verbs": []}
+  },
+  {
+    "name": "stale override",
+    "state": {"vars": [0, 1], "bits_set": [], "owners": {}, "states": {}, "classes": {}, "room": 10, "ego": 1,
+              "slots": [], "cutscene": {"depth": 1, "levels": [{"override": null},
+                                                               {"override": {"where": 2, "number": 152, "code": 82, "stale": true}}]},
+              "verbs": []}
+  },
+  {
+    "name": "override in room code, level 0",
+    "state": {"vars": [0, 1], "bits_set": [], "owners": {}, "states": {}, "classes": {}, "room": 10, "ego": 1,
+              "slots": [], "cutscene": {"depth": 0, "levels": [{"override": {"where": 1, "number": 10002, "code": 12, "stale": false}}]},
+              "verbs": []}
+  },
+  {
+    "name": "override with no code",
+    "state": {"vars": [0, 1], "bits_set": [], "owners": {}, "states": {}, "classes": {}, "room": 10, "ego": 1,
+              "slots": [], "cutscene": {"depth": 2, "levels": [{"override": null}, {"override": null},
+                                                               {"override": {"where": 3, "number": 201, "code": -1, "stale": false}}]},
+              "verbs": []}
+  },
+  {
+    "name": "override of an object, unknown where",
+    "state": {"vars": [0, 1], "bits_set": [7], "owners": {"17": 1}, "states": {}, "classes": {}, "room": 10, "ego": 1,
+              "slots": [], "cutscene": {"depth": 2, "levels": [{"override": null},
+                                                               {"override": {"where": 4, "number": 17, "code": 5, "stale": false}},
+                                                               {"override": {"where": 7, "number": 17, "code": 5, "stale": false}}]},
+              "verbs": [{"id": 129}]}
+  }
+]

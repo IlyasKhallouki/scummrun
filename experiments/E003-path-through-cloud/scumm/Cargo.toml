@@ -1,0 +1,31 @@
+# The Rust port of E003's machinery (decisions.md D7). Layers, each a crate that builds on the one before:
+#   ir      - the script IR and everything computed from the game files alone (ir.py, facts.py, model.Game)
+#   machine - model.py's Machine (row by row; machine/PORT-NOTES.md)
+#   reader  - reader.py (after)
+[workspace]
+members = ["ir"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+publish = false
+
+[workspace.dependencies]
+# later crates: scumm-ir.workspace = true
+scumm-ir = { path = "ir" }
+flate2 = "1"
+rustc-hash = "2"
+serde_json = "1"
+sha1_smol = "1"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+
+# the oracle test loads the whole game; dependencies (gzip, JSON) fast even in test builds
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.test]
+opt-level = 1

@@ -1,0 +1,297 @@
+{
+ "statements": [
+  "Var[5] = 3;",
+  "VAR_EGO = Var[3];",
+  "Var[5] = -3;",
+  "Var[2] = -(Var[3] - -2);",
+  "Var[3] = Var[100 + Var[3]];",
+  "Var[3] = Var[100 + 7];",
+  "Bit[5 + Local[2]] = 1;",
+  "Local[2]++;",
+  "Var[3]--;",
+  "Var[3] -= 4;",
+  "Var[3] *= 2;",
+  "Var[3] /= Var[2];",
+  "Var[3] += (Var[1] * (Var[2] / 3));",
+  "foo(,);",
+  "foo([]);",
+  "foo();",
+  "doSentence(STOP);",
+  "doSentence(5,17,0);",
+  "startScript(5,[1,2],F,R);",
+  "startScript(5,[]);",
+  "chainScript(6,[Var[1]],R);",
+  "startObject(17,9,[]);",
+  "startObject(17,9,[],F);",
+  "startScript(5,[On()]);",
+  "startScript(5);",
+  "VerbOps(100,[SetXY(2,3),Text(\"Hi \" + getName(Var[5]) + \"!\"),On()]);",
+  "Var[1] = <VAR_RESULT = getActorX(1)>;",
+  "Var[1] = <VAR_RESULT = getActorX(1)> + 3;",
+  "drawObject(17setXY(,10,20));",
+  "drawObject(Var[5]setImage(,3));",
+  "drawObject(17,[setXY(1,2)]);",
+  "Exprmode Var[5] = (Var[3] + 2);",
+  "if (Var[1] == 1) /*0010*/ {",
+  "while (Var[3] < 5) /*0020*/ {",
+  "} else if (VAR_ROOM == 131) /*0039*/ {",
+  "} else /*0040*/ {",
+  "goto 0040;",
+  "/* goto 0040; */",
+  "unless (!Bit[3]) goto 0058;",
+  "if (classOfIs(17,[143,15])) /*0050*/ {",
+  "if (!getObjectOwner(17)) /*0050*/ {",
+  "foo(\"a\\\"b\",Var[5 + 2]);",
+  "print(252,[Text(\"x\" + getInt(Var[3]) + wait())]);",
+  "foo(F,1,R);",
+  "Resource.loadRoom(5);",
+  "VAR_TALK_ACTOR = 3;",
+  "setVarRange(Var[100],3,[1,2,3]);",
+  "Var[5] = ;",
+  "foo(1,2",
+  "foo(1 2);",
+  "Var[x] = 1;",
+  "Var[5 + Foo] = 1;",
+  "VAR_NOPE = 1;",
+  "foo(1) bar;",
+  "foo(1);;",
+  "foo(1) @;",
+  "getFoo(1) = 3;",
+  "foo(<getX(1)>);",
+  "Var[1] ** 2;",
+  "if (Var[1] == ) /*0010*/ {",
+  "foo(\"unterminated);",
+  "",
+  "foo(1)",
+  "  if (Var[1]) /*0010*/ {",
+  "Var[1] = Var[2] Var[3];",
+  "Var[1 = 2;",
+  "foo(it's);",
+  "Var[1] = 'x';",
+  "Var[1] = getX(1) * 2;",
+  "foo(1,\"a\" + 3 * 2);",
+  "unless (Var[1]) goto 00G0;",
+  "Var[1] = Var[2 + -1];",
+  "[1,2];",
+  "Var[1] = < Var[2] = 3 >;",
+  "Var[1] = Var[2]++;",
+  "foo(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18) $;"
+ ],
+ "units": [
+  {
+   "key": [
+    "global",
+    50
+   ],
+   "text": "[0000] (48) if (Var[1] == 1) /*000D*/ {\n[0007] (1A)   Var[2] = 1;\n[000A] (48) } else if (Var[1] == 2) /*001A*/ {\n[0014] (1A)   Var[2] = 2;\n[0017] (48) } else if (Var[1] == 3) /*0027*/ {\n[0021] (1A)   Var[2] = 3;\n[0024] (18)   goto 0027;\n[0027] (**) }\n[0027] (00) stopObjectCode();",
+   "data": "000000000000000000000000000000000000181a0000000000000000000000180a000000000000000000000000000000"
+  },
+  {
+   "key": [
+    "global",
+    49
+   ],
+   "text": "[0000] (48) if (Var[1] == 1) /*000D*/ {\n[0007] (1A)   Var[2] = 1;\n[000A] (48) } else if (Var[1] == 2) /*001A*/ {\n[0014] (1A)   Var[2] = 2;\n[0017] (48) } else if (Var[1] == 3) /*0027*/ {\n[0021] (1A)   Var[2] = 3;\n[0024] (18)   goto 0027;\n[0027] (**) }\n[0027] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "local",
+    4,
+    201
+   ],
+   "room": 4,
+   "text": "[0000] (48) if (Var[1] == 1) /*000D*/ {\n[0007] (18)   goto 0000;\n[000A] (48) } else if (Var[1] == 2) /*0017*/ {\n[0014] (1A)   Var[2] = 2;\n[0017] (**) }\n[0017] (00) stopObjectCode();",
+   "data": "000000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+   "key": [
+    "global",
+    51
+   ],
+   "text": "[0000] (1A) VAR_TALK_ACTOR = 3;\n[0005] (1A) Var[3] = VAR_TALK_ACTOR;\n[000A] (1A) Var[4] = VAR_TALK_ACTORS;\n[000F] (00) stopObjectCode();",
+   "data": "000000000000000000290000000019002900000000000000"
+  },
+  {
+   "key": [
+    "global",
+    48
+   ],
+   "text": "[0000] (1A) VAR_TALK_ACTOR = 3;\n[0005] (1A) Var[3] = VAR_TALK_ACTOR;\n[000A] (1A) Var[4] = VAR_TALK_ACTORS;\n[000F] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    52
+   ],
+   "text": "[0000] (80) breakHere();\n[0001] (48) while (Var[1] == 0) /*000C*/ {\n[0008] (80)   breakHere();\n[0009] (**) }\n[000C] (48) while (Var[2] == 0) /*0018*/ {\n[0013] (80)   breakHere();\n[0014] (1A)   Var[3] = 1;\n[0018] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    53
+   ],
+   "text": "[0000] (28) if (Var[1]) /*000B*/ {\n[0007] (80)   breakHere();\n[0008] (18) } else /*0012*/ {\n[000E] (80)   breakHere();\n[000F] (80)   breakHere();\n[0010] (18) } else /*0013*/ {\n[0015] (1A)   Var[1] = 2;\n[001A] (**) }\n[001A] (18) goto 0030;\n[001D] (18) goto 0016;\n[0022] (18) /* goto 0025; */\n[0025] (**) }\n[0028] (18) goto 002B;\n[002A] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    54
+   ],
+   "text": "[0000] (58) beginOverride();\n[0002] (18) goto 0008;\n[0005] (58) beginOverride();\n[0007] (80) breakHere();\n[0008] (58) beginOverride();"
+  },
+  {
+   "key": [
+    "global",
+    55
+   ],
+   "text": "# a comment line\n[0000] (1A) Var[1] = ;\n[0005] (1A) Var[1] = 1;\n[0005] (1A) Var[2] = 2;\n[000A] (2C) foo(1 2);\n[000D] (2C) aVeryLongFunctionNameThatGoesOnAndOn(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18) @;\n[0020] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    56
+   ],
+   "text": "[0000] (62) stopScript(0);\n[0002] (62) stopScript(5);\n[0004] (42) startScript(5,[]);\n[0007] (42) startScript(5,[],R);\n[000A] (42) startScript(5,[],F,R);\n[000D] (29) setOwnerOf(17,0);\n[0011] (29) setOwnerOf(17,Var[3]);\n[0015] (29) setOwnerOf(17,3);\n[0019] (19) doSentence(STOP);\n[001B] (19) doSentence(5,17,0);\n[001F] (72) loadRoom(5);\n[0021] (24) loadRoomWithEgo(17,5,100,100);\n[0027] (52) actorFollowCamera(1);\n[0029] (37) startObject(17,9,[]);\n[002D] (6E) stopObjectScript(17);\n[002F] (AE) WaitForActor(1);\n[0032] (AE) WaitForMessage();\n[0034] (80) breakHere();\n[0035] (2E) delay(10);\n[0039] (2B) delayVariable(Var[1]);\n[003C] (42) startScript(Var[7],[],F);\n[003F] (1A) VAR_ENTRY_SCRIPT = 7;\n[0044] (1A) VAR_EXIT_SCRIPT = 0;\n[0049] (42) startScript(200,[]);\n[004C] (42) chainScript(6,[1,2]);\n[004F] (A0) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    6
+   ],
+   "text": "[0000] (42) chainScript(8,[]);"
+  },
+  {
+   "key": [
+    "global",
+    7
+   ],
+   "text": "[0000] (42) startScript(8,[],F);\n[0003] (42) chainScript(Var[1],[]);\n[0006] (A0) stopObjectCode();"
+  },
+  {
+   "key": [
+    "local",
+    4,
+    200
+   ],
+   "room": 4,
+   "text": "[0000] (42) startScript(201,[],F);\n[0003] (42) chainScript(9,[]);"
+  },
+  {
+   "key": [
+    "entry",
+    4
+   ],
+   "room": 4,
+   "text": "[0000] (42) startScript(200,[]);\n[0003] (42) chainScript(201,[]);\n[0006] (A0) stopObjectCode();"
+  },
+  {
+   "key": [
+    "exit",
+    4
+   ],
+   "room": 4,
+   "text": "# empty\n"
+  },
+  {
+   "key": [
+    "obj",
+    17
+   ],
+   "room": 4,
+   "text": "Events:\n[000C] (1A) Var[1] = 1;\n[0011] (A0) stopObjectCode();\n[0012] (1A) Var[1] = 2;\n[0017] (A0) stopObjectCode();",
+   "verbs": [
+    {
+     "verb": 10,
+     "offset": "0015"
+    },
+    {
+     "verb": 7,
+     "offset": "000C"
+    },
+    {
+     "verb": 255,
+     "offset": "0012"
+    },
+    {
+     "verb": 8,
+     "offset": "0012"
+    },
+    {
+     "verb": 7,
+     "offset": "0011"
+    },
+    {
+     "verb": 9,
+     "offset": "0013"
+    }
+   ]
+  },
+  {
+   "key": [
+    "obj",
+    18
+   ],
+   "room": 4,
+   "text": "[0000] (80) breakHere();\n[0001] (A0) stopObjectCode();",
+   "verbs": [
+    {
+     "verb": 9,
+     "offset": "0001"
+    }
+   ]
+  },
+  {
+   "key": [
+    "global",
+    57
+   ],
+   "text": "[0000] (AC) Exprmode Var[5] = (Var[3] + 2);\n[0008] (05) drawObject(17setXY(,10,20));\n[000E] (25) drawObject(Var[5]setImage(,3));\n[0013] (7A) VerbOps(100,[SetXY(2,3),Text(\"Hi \" + getName(Var[5]) + \"!\"),On()]);\n[0020] (1A) Var[1] = <VAR_RESULT = getActorX(1)>;\n[0028] (1A) Var[2] = -(Var[3] - -2);\n[0030] (1A) Var[3] = Var[100 + Var[3]];\n[0036] (1A) Bit[5 + Local[2]] = 1;\n[003C] (46) Local[2]++;\n[003E] (5A) Var[3] -= 4;\n[0043] (2C) foo(,);\n[0046] (2C) foo([]);\n[0049] (48) if (classOfIs(17,[143,15])) /*0050*/ {\n[004F] (80)   breakHere();\n[0050] (**) }\n[0050] (48) unless (!Bit[3]) goto 0058;\n[0055] (2C) foo(\"a\\\"b\",Var[5 + 2]);\n[0058] (26) setVarRange(Var[310],3,[1,getRandomNr(3),Var[11]]);\n[0060] (1A) Var[311] = <VAR_RESULT = getRandomNr(4)>;\n[0068] (A0) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    60
+   ],
+   "text": "[0000] (80) breakHere();\n[0001] (1A) Var[300] = 0;\n[0006] (48) unless (Var[300] == 1) goto 0000;\n[000D] (80) breakHere();\n[000E] (1A) Bit[40] = 0;\n[0013] (1A) Var[304] = 1;\n[0018] (1A) Var[304] = Var[305];\n[001D] (48) unless (Bit[40] == Var[304]) goto 000D;\n[0024] (48) unless (Bit[41]) goto 000D;\n[002B] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    61
+   ],
+   "text": "[0000] (1A) Var[302] = getRandomNr(5);\n[0006] (1A) Var[303] = Var[302];\n[000B] (80) breakHere();\n[000C] (46) Var[301]++;\n[000E] (48) unless (Var[301] >= 10) goto 000B;\n[0015] (80) breakHere();\n[0016] (48) unless (VAR_CAMERA_POS_X > 100) goto 0015;\n[001D] (AE) WaitForMessage();\n[001F] (48) unless (Var[303] == 1) goto 001D;\n[0026] (80) breakHere();\n[0027] (48) unless (isScriptRunning(250)) goto 0026;\n[002E] (80) breakHere();\n[002F] (48) unless (getVerbEntryPoint(Var[1],3)) goto 002E;\n[0036] (80) breakHere();\n[0037] (48) unless (classOfIs(17,[133,Var[5]])) goto 0036;\n[003E] (80) breakHere();\n[003F] (48) unless (Var[100 + Local[1]] == getActorX(1)) goto 003E;\n[0046] (80) breakHere();\n[0047] (48) unless (isScriptRunning(Var[2]) == getObjectOwner(Var[1])) goto 0046;\n[004E] (80) breakHere();\n[004F] (48) unless (getInventoryCount(1) == classOfIs(Var[1],[3])) goto 004E;\n[0056] (80) breakHere();\n[0057] (48) unless (foo(1) == VAR_TMR_1) goto 0056;\n[005E] (80) breakHere();\n[005F] (48) unless (Local[3] == <VAR_RESULT = getObjectState(17)>) goto 005E;\n[0066] (80) breakHere();\n[0067] (48) unless (Var[307] == 2) goto 0066;\n[006E] (1A) Var[307] = Var[307] + Var[306];\n[0073] (1A) Var[306] *= Var[2];\n[0078] (48) unless (classOfIs(Var[1])) goto 0066;\n[007F] (80) breakHere();\n[0080] (18) goto 007F;\n[0083] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    62
+   ],
+   "text": "[0000] (80) breakHere();\n[0001] (80) breakHere();\n[0002] (48) unless (getRandomNr(3) == 0) goto 0001;\n[0009] (48) unless (getRandomNr(4) == 0) goto 0000;\n[0010] (AE) WaitForActor(1);\n[0013] (48) unless (VAR_HAVE_MSG) goto 0010;\n[0018] (48) while (Var[1] == 0) /*0025*/ {\n[001F] (2E)   delay(5);\n[0022] (**) }\n[0025] (48) while (Var[2] == 0) /*002F*/ {\n[002C] (**) }\n[002F] (00) stopObjectCode();"
+  },
+  {
+   "key": [
+    "global",
+    63
+   ],
+   "text": "[0000] (80) breakHere();\n[0001] (80) breakHere();\n[0002] (18) goto 0001;"
+  }
+ ],
+ "game": {
+  "first_local": 200,
+  "local_rooms": [
+   [
+    200,
+    [
+     4
+    ]
+   ],
+   [
+    201,
+    [
+     4,
+     5
+    ]
+   ]
+  ]
+ }
+}
