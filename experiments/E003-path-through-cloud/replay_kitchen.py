@@ -228,30 +228,46 @@ def plan_lines(o: dict) -> list:
                      + (f"; misses {p['misses']}" if p.get('misses') else ""))
         if p.get("steps"):
             lines.append(f"    {p['steps']}")
+        for ro in p.get("reorders", []):
+            lines.append(f"    waits played first: {ro['moved']} before {ro['input']}")
     for ban in r["bans"]:
         lines.append(f"  ban: {ban['label']} at {dict(ban['values'])}")
     if o.get("noban"):
         n = o["noban"]
         lines.append(f"  check of the stop: from the same engine state (frame {n['frame']}) without the bans, "
                      f"lama-first: {n['status']} in {n['seconds']:.0f} s, {len(n['steps'])} steps {n['steps']}")
-    lines.append("steps (plan.index name [kind] input: frames start/issue/end, first idle or menu stop; "
-                 "outcome -> then; tries):")
+    lines.append("steps (plan.index name [kind] input: frames start/end; outcome -> then), then each try (kind: "
+                 "frames start/input/end, first idle or menu stop, how the window ended, taken, started):")
     for s in r["steps"]:
+        tries = s["tries"] if isinstance(s["tries"], list) else []
         lines.append(f"  {s['plan']}.{s['index'] + 1} {s['name']} [{s['kind']}] {s['input']}: frames {s['start']}/"
-                     f"{s['issue']}/{s['end']}, settled {s['first_settled']}; {s['outcome']} -> {s['then']}; "
-                     f"tries {s['tries']}" + (f"; {s['note']}" if s['note'] else ""))
+                     f"{s['end']}; {s['outcome']} -> {s['then']}; {len(tries)} tries"
+                     + (f"; {s['note']}" if s['note'] else ""))
+        for t in tries:
+            ins = [(e["frame"], e.get("click") or e.get("key")) for e in t.get("inputs", [])]
+            lines.append(f"      try {t['try']} ({t['kind']}): frames {t['start']}/{t.get('issue')}/{t.get('end')}, "
+                         f"settled {t.get('first_settled')}, {t.get('how')}, taken {t.get('taken')}, started "
+                         f"{t.get('started')}" + (f"; inputs {ins}" if ins else "")
+                         + (f"; error {t['error']}" if t.get("error") else ""))
+        if s.get("checks"):
+            lines.append("      replay checks at the last input (cite, condition, side, result): "
+                         + "; ".join(f"{c[0]} {c[1]!r} {c[2]} -> {c[4]}" for c in s["checks"]))
         if s["mismatches"]:
             lines.append(f"      mismatches ({len(s['mismatches'])}): {_mm(s['mismatches'])}")
-        if s["unplanned"]:
-            lines.append(f"      unplanned changes to tracked facts ({len(s['unplanned'])}): {_mm(s['unplanned'], 10)}")
-        ins = [e for e in s["inputs"] if replay._is_input(e)]
-        if ins:
-            lines.append(f"      inputs ({len(ins)}): {ins[:12]}" + (" ..." if len(ins) > 12 else ""))
+        if s["unplanned"] and "changes" not in s["unplanned"][0]:  # a result file from before the review's fixes
+            lines.append(f"      unplanned changes, step start to end ({len(s['unplanned'])}): {_mm(s['unplanned'], 10)}")
+        elif s["unplanned"]:
+            un = s["unplanned"]
+            lines.append(f"      tracked facts changed with no predicted write, last try ({len(un)}; start value, "
+                         f"then frame: value): " + "; ".join(
+                             f"{u['key']} {u['start']}, " + ", ".join(f"{f}: {v}" for f, v in u["changes"])
+                             + (f" (+{u['count'] - len(u['changes'])})" if u["count"] > len(u["changes"]) else "")
+                             for u in un[:24]) + (f" (+{len(un) - 24} facts)" if len(un) > 24 else ""))
     v = o["verify"]
     lines.append(f"verify from boot (run B's inputs to frame {o['start_frame']} plus the harness's "
                  f"{len([e for e in r['inputs'] if replay._is_input(e)])} inputs, {v['inputs']} in all): "
-                 f"{v['checkpoints']} checkpoints, {len(v['differ'])} differ; final {v.get('final')}, goal "
-                 f"{v['goal']} ({v['seconds']:.0f} s)")
+                 f"{v['checkpoints']} checkpoints (facts, tick, random state, actor positions), "
+                 f"{len(v['differ'])} differ; final {v.get('final')}, goal {v['goal']} ({v['seconds']:.0f} s)")
     for d in v["differ"][:5]:
         lines.append(f"  differs at {d}")
     if o.get("trace"):
