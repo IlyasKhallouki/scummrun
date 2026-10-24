@@ -3,7 +3,7 @@ test that plays the kitchen's main plan in the engine.
 
 usage: uv run pytest experiments/E003-path-through-cloud/test_replay.py -m 'not slow'     (the hand-made cases)
        READER_PICKLE=<reading.pkl> uv run pytest experiments/E003-path-through-cloud/test_replay.py -m slow
-       (the kitchen in the engine: about 15 minutes; skipped without a reading)
+       (the kitchen in the engine: about 15 minutes, planner limit 300 s; skipped without a reading)
 
 The fixtures name MI1's numbers (tests may, C2); replay.py does not.
 """
@@ -201,7 +201,8 @@ def test_kitchen_main_plan_in_the_engine(tmp_path):
     if not reading or not Path(reading).exists():
         pytest.skip("no kitchen reading: set READER_PICKLE (test_reader.py makes one)")
     import replay_kitchen
-    out = replay_kitchen.run("all", Path(reading), replan_limit=3, time_limit=3600, write=False, out_dir=tmp_path)
+    out = replay_kitchen.run("all", Path(reading), replan_limit=3, time_limit=3600, write=False, out_dir=tmp_path,
+                             plan_time=300)
     assert out["start_check"]["differ"] == 0
     r = out["run"]
     assert r["stop"] and r["steps"] and r["plans"][0]["status"] == "plan"

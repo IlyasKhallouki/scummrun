@@ -2,6 +2,8 @@
 
 usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_kitchen.py run all|no211 --reading PICKLE   (one plan: results/replay-kitchen-<plan>.json)
+       replay_kitchen.py trace all|no211                   (what the engine did, added to the json file)
+       replay_kitchen.py noban all|no211 --reading PICKLE  (the planner at the run's end without its bans, likewise)
        replay_kitchen.py log                               (results/replay-kitchen.log from the json files)
 
 An instrument, like test_reader.py's demo, whose task it reuses: it names MI1's numbers (the kitchen's rooms 28 and
@@ -35,11 +37,14 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
 import groundtruth  # noqa: E402
+import plan_fd  # noqa: E402
 import reader as R  # noqa: E402
 import relevance  # noqa: E402
 import replay  # noqa: E402
+import task as T  # noqa: E402
 from facts import diff, facts_of  # noqa: E402
 from speedrun import paths, releases  # noqa: E402
+from speedrun.control import Controller  # noqa: E402
 from speedrun.engine import EngineConfig  # noqa: E402
 
 ROOMS = (28, 41)
@@ -77,7 +82,7 @@ def say(msg: str) -> None:
 
 
 def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write: bool = True,
-        out_dir: Path | None = None) -> dict:
+        out_dir: Path | None = None, plan_time: int = replay.PLAN_TIME) -> dict:
     """One plan in the engine and its check from boot; ``write``: the result file (a test passes False and its own
     ``out_dir`` for the engines' files)."""
     t0 = time.monotonic()
@@ -89,7 +94,7 @@ def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write
            "sources": {n: sha(n) for n in SOURCES}, "reading": str(reading), "replan_limit": replan_limit,
            "time_limit": time_limit, "limits": {"input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT,
                                                 "retries": replay.RETRIES, "retry_wait": replay.RETRY_WAIT,
-                                                "plan_time": replay.PLAN_TIME}}
+                                                "plan_time": plan_time}}
     rsrc = Path(str(reading) + ".sources")
     out["reading_sources"] = rsrc.read_text().strip() if rsrc.exists() else None
 
@@ -116,7 +121,7 @@ def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write
         out["start_check"] = {"facts": len(start), "differ": len(d), "differences": sorted(d.items())[:40]}
         say(f"start check: {len(d)} facts differ from the ground truth's {MOVE} pre")
         h = replay.Harness(b, full, small, branch, goal, replan_limit=replan_limit, time_limit=time_limit,
-                           progress=say)
+                           plan_time=plan_time, progress=say)
         res = h.run()
         checkpoints = h.checkpoints
     finally:
@@ -135,6 +140,64 @@ def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write
         result_path(variant).write_text(json.dumps(out, indent=1, default=str) + "\n")
         say(f"wrote {result_path(variant)}")
     return out
+
+
+# --- the trace --------------------------------------------------------------------------------------------------------
+
+TRACE_KEYS = ("room", "state:316", "script:2", "local:203", "local:211", "local:212", "local:214", "local:215",
+              "local:216", "local:217", "local:218", "owner:566")  # the door, the sentence script, the cook's scripts
+COOK = 6  # the cook's actor (local-216.txt [000B])
+
+
+def trace(variant: str) -> list:
+    """The run's recorded inputs replayed from boot once more (verify's movie), with every frame where the door, the
+    sentence script, the cook's scripts, the room or the meat's owner change: what the engine did, for the log."""
+    o = json.loads(result_path(variant).read_text())
+    run_dir = OUT / f"kitchen-{variant}"
+    lines = []
+    with Controller(cfg_of(run_dir / "trace", run_dir / "verify" / "movie.jsonl"), timeout_s=600) as c:
+        b = c.root
+        start, end = o["start_frame"], o["run"]["frame_end"]
+        b.run(frame=start)
+        clicks = {e["frame"]: e for e in o["run"]["inputs"]}
+        prev = None
+        for f in range(start + 1, end + 1):
+            b.run(frame=f)
+            s = b.state()
+            fa = facts_of(s)
+            cur = tuple(fa.get(k, 0) for k in TRACE_KEYS)
+            if cur != prev or f in clicks:
+                cook = next((a for a in s["actors"] if a["id"] == COOK), None)
+                ch = {k: v for k, v, p in zip(TRACE_KEYS, cur, prev or (None,) * len(cur)) if v != p}
+                where = sorted(k[3:] for k in fa if k.startswith("at:") and k[3:].rsplit(":", 1)[0] in TRACE_KEYS)
+                lines.append(f"{f}: {ch}" + (f" input {clicks[f]}" if f in clicks else "") +
+                             f"; at {where}; cook {(cook['x'], cook['y']) if cook else 'not in the room'}; ego "
+                             f"{b.status.get('ego')}")
+                prev = cur
+    o["trace"] = lines
+    result_path(variant).write_text(json.dumps(o, indent=1, default=str) + "\n")
+    return lines
+
+
+def noban(variant: str, reading: Path, plan_time: int = replay.PLAN_TIME) -> dict:
+    """A check of the stop: the planner from the engine's state at the run's end (the recorded inputs replayed from
+    boot), on the task without the run's bans. A plan here means the bans, not the state, left no plan."""
+    o = json.loads(result_path(variant).read_text())
+    b, recs, _ = pickle.loads(reading.read_bytes())
+    goal = {k: set(v) for k, v in o["goal"].items()}
+    full = R.build_task(b, [r for r in recs if not (variant == "no211" and r.label == TIMER_EVENT)], goal)
+    del recs
+    small = R.prune(full, relevance.relevant(full))
+    run_dir = OUT / f"kitchen-{variant}"
+    with Controller(cfg_of(run_dir / "noban", run_dir / "verify" / "movie.jsonl"), timeout_s=600) as c:
+        c.root.run(frame=o["run"]["frame_end"])
+        obs = facts_of(c.root.state())
+    start, counts = R.replan_start(b, obs, {}, small)
+    res = plan_fd.plan(T.write_sas(small), start, time_limit=plan_time)
+    o["noban"] = {"frame": o["run"]["frame_end"], "status": res.status, "seconds": res.seconds,
+                  "steps": [st.name for st in res.steps], "start_counts": dict(counts)}
+    result_path(variant).write_text(json.dumps(o, indent=1, default=str) + "\n")
+    return o["noban"]
 
 
 # --- the log ----------------------------------------------------------------------------------------------------------
@@ -167,6 +230,10 @@ def plan_lines(o: dict) -> list:
             lines.append(f"    {p['steps']}")
     for ban in r["bans"]:
         lines.append(f"  ban: {ban['label']} at {dict(ban['values'])}")
+    if o.get("noban"):
+        n = o["noban"]
+        lines.append(f"  check of the stop: from the same engine state (frame {n['frame']}) without the bans, "
+                     f"lama-first: {n['status']} in {n['seconds']:.0f} s, {len(n['steps'])} steps {n['steps']}")
     lines.append("steps (plan.index name [kind] input: frames start/issue/end, first idle or menu stop; "
                  "outcome -> then; tries):")
     for s in r["steps"]:
@@ -187,6 +254,11 @@ def plan_lines(o: dict) -> list:
                  f"{v['goal']} ({v['seconds']:.0f} s)")
     for d in v["differ"][:5]:
         lines.append(f"  differs at {d}")
+    if o.get("trace"):
+        lines.append("what the engine did (the inputs replayed from boot; frames where the room, door 316, the "
+                     "sentence script, locals 203 and 211-218 or the meat's owner change; slot positions; the cook's "
+                     "x, y):")
+        lines += [f"  {t}" for t in o["trace"]]
     return lines
 
 
@@ -195,8 +267,8 @@ def write_log() -> None:
     if not parts:
         raise SystemExit("no result files")
     lines = ["E003 step 5: the replay harness (replay.py) on the kitchen", "",
-             f"sources (sha1, 12 hex): {parts[0]['sources']}",
-             f"reading: {parts[0]['reading']} (made under {parts[0]['reading_sources']})", ""]
+             f"reading: {parts[0]['reading']} (made under {parts[0]['reading_sources']})"]
+    lines += [f"sources of the {o['variant']} run (sha1, 12 hex): {o['sources']}" for o in parts] + [""]
     for o in parts:
         lines += plan_lines(o) + [""]
     LOG.write_text("\n".join(lines))
@@ -205,7 +277,7 @@ def write_log() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["run", "log"])
+    ap.add_argument("what", choices=["run", "trace", "noban", "log"])
     ap.add_argument("variant", nargs="?", choices=["all", "no211"])
     ap.add_argument("--reading", type=Path, default=os.environ.get("READER_PICKLE"))
     ap.add_argument("--replan-limit", type=int, default=10)
@@ -215,6 +287,10 @@ def main() -> None:
         if a.variant is None or a.reading is None:
             raise SystemExit("run needs a variant and --reading (or READER_PICKLE)")
         run(a.variant, Path(a.reading), a.replan_limit, a.time_limit)
+    elif a.what == "noban":
+        print(noban(a.variant, Path(a.reading)))
+    elif a.what == "trace":
+        print("\n".join(trace(a.variant)))
     else:
         write_log()
 
