@@ -1,0 +1,73 @@
+E003 step 5: the replay harness (replay.py) on the kitchen
+
+reading: /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/step5/reading.pkl (made under {'model.py': 'cc630446bdbe', 'reader.py': '94d495853f07', 'ir.py': 'c6ccf01059f1', 'facts.py': 'c06fc3489018', 'actions.py': 'ddbd1aaa2207', 'domains.py': '19932b58530a', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8'})
+sources of the all run (sha1, 12 hex): {'replay.py': 'cdefc72de9ca', 'replay_kitchen.py': '422e6a9770a9', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8', 'plan_fd.py': '3d365d693db2', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018'}
+sources of the no211 run (sha1, 12 hex): {'replay.py': '17d67605e805', 'replay_kitchen.py': '422e6a9770a9', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8', 'plan_fd.py': '3d365d693db2', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018'}
+
+=== plan all ===
+records 72256 of 72256; task 71729 actions, 716 facts; relevance keeps 71324 actions, 244 facts (168 s)
+start: engine at S1#7 provoke the cook (Open kitchen door while he is inside) pre (frame 235) from boot with run B's inputs: 0 of 3651 facts differ from the ground truth
+goal {'owner:566': [1]}; budget 10 replans, 10800 s; limits {'input': 600, 'wait': 3600, 'retries': 3, 'retry_wait': 60, 'plan_time': 600}
+result: stop 'no plan left (planner: time)'; goal reached False; 1 steps played; 1 replans; 1 bans; frames 1237 (from 235 to 1472), game time 103.1 s; wall 1206 s (harness 1030 s)
+  plan 0 at frame 235: plan, 7 steps, lama-first 139 s, task written in 161 s, 0 bans; start {}
+    ['walk_to(316)#478', 'event(local:211@33)#30568', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
+  plan 1 at frame 1472: time, 0 steps, lama-first 605 s, task written in 107 s, 1 bans; start {'live slots with unknown locals (args 0)': 6}
+  ban: walk_to(316) at {'bit:6': 0, 'room': 28}
+  check of the stop: from the same engine state (frame 1472) without the bans, lama-first: plan in 109 s, 7 steps ['walk_to(316)#478', 'event(local:211@33)#30568', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
+steps (plan.index name [kind] input: frames start/issue/end, first idle or menu stop; outcome -> then; tries):
+  0.1 walk_to(316)#478 [walk_to] click verb 11 on 316: frames 235/872/1472, settled 303; nothing happened -> ban; tries 2; waited 35 frames for the camera; nothing happened by frame 871; ban walk_to(316) at {'bit:6': 0, 'room': 28}
+      mismatches (2): script:2 predicted ['1'] observed 0, pos:script:2 predicted ['736'] observed -1
+      unplanned changes to tracked facts (13): local:208 predicted ['0'] observed 1, local:209 predicted ['1'] observed 0, pos:local:208 predicted ['-1'] observed 21, pos:local:209 predicted ['56'] observed -1, state:327 predicted ['1'] observed 0, state:328 predicted ['0'] observed 1, state:330 predicted ['1'] observed 0, state:333 predicted ['1'] observed 0, state:345 predicted ['1'] observed 0, state:354 predicted ['1'] observed 0 (+3 more)
+      inputs (2): [{'frame': 271, 'click': [315, 103]}, {'frame': 872, 'click': [287, 103]}]
+verify from boot (run B's inputs to frame 235 plus the harness's 2 inputs, 57 in all): 2 checkpoints, 0 differ; final {'owner:566': 15}, goal False (2 s)
+what the engine did (the inputs replayed from boot; frames where the room, door 316, the sentence script, locals 203 and 211-218 or the meat's owner change; slot positions; the cook's x, y):
+  236: {'room': 28, 'state:316': 0, 'script:2': 0, 'local:203': 0, 'local:211': 1, 'local:212': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'owner:566': 15}; at ['local:211:33']; cook not in the room; ego [330, 136]
+  271: {'local:203': 1} input {'frame': 271, 'click': [315, 103]}; at ['local:203:58', 'local:211:33']; cook not in the room; ego [330, 137]
+  303: {'local:203': 0}; at ['local:211:33']; cook not in the room; ego [592, 126]
+  636: {'state:316': 1, 'local:211': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [592, 126]
+  638: {'local:217': 1}; at ['local:216:86', 'local:217:18']; cook (592, 126); ego [592, 126]
+  684: {'local:217': 0}; at ['local:216:92']; cook (235, 135); ego [592, 126]
+  737: {'state:316': 0, 'local:211': 1, 'local:216': 0}; at ['local:211:4']; cook not in the room; ego [592, 126]
+  872: {} input {'frame': 872, 'click': [287, 103]}; at ['local:211:33']; cook not in the room; ego [592, 126]
+  1303: {'state:316': 1, 'local:211': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [592, 126]
+  1305: {'local:217': 1}; at ['local:216:86', 'local:217:18']; cook (592, 126); ego [592, 126]
+  1365: {'local:217': 0}; at ['local:216:92']; cook (114, 130); ego [592, 126]
+  1432: {'state:316': 0, 'local:211': 1, 'local:216': 0}; at ['local:211:4']; cook not in the room; ego [592, 126]
+
+=== plan no211 ===
+records 72248 of 72256; task 71721 actions, 716 facts; relevance keeps 71316 actions, 244 facts (115 s)
+start: engine at S1#7 provoke the cook (Open kitchen door while he is inside) pre (frame 235) from boot with run B's inputs: 0 of 3651 facts differ from the ground truth
+goal {'owner:566': [1]}; budget 10 replans, 10800 s; limits {'input': 600, 'wait': 3600, 'retries': 3, 'retry_wait': 60, 'plan_time': 600}
+result: stop 'no plan left (planner: time)'; goal reached False; 1 steps played; 1 replans; 1 bans; frames 1239 (from 235 to 1474), game time 103.3 s; wall 1139 s (harness 1018 s)
+  plan 0 at frame 235: plan, 15 steps, lama-first 126 s, task written in 61 s, 0 bans; start {}
+    ['sentence(2,316)#262', 'event(script:2@736#6b02ec868a25)#30822', 'event(script:2@915#d1973d557d7f)#30826', 'event(local:214@15#326429017871)#35377', 'event(local:214@57#326429017871)#39486', 'event(local:214@66#326429017871)#39688', 'event(local:212@4#ebe3061d6db8)#49583', 'event(local:212@8#ebe3061d6db8)#51226', 'event(script:2@937#ef7210b381c)#35379', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30908', 'event(local:218@16#86dcd5f97351)#35410', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34377', 'event(script:2@915#ef19a1f9cb92)#34388']
+  plan 1 at frame 1474: time, 0 steps, lama-first 703 s, task written in 109 s, 1 bans; start {'live slots with unknown locals (args 0)': 6}
+  ban: sentence(2,316) at {'bit:6': 0, 'room': 28}
+  check of the stop: from the same engine state (frame 1474) without the bans, lama-first: plan in 113 s, 15 steps ['sentence(2,316)#262', 'event(script:2@736#6b02ec868a25)#30822', 'event(script:2@915#d1973d557d7f)#30826', 'event(local:214@15#326429017871)#35377', 'event(local:214@57#326429017871)#39486', 'event(local:214@66#326429017871)#39688', 'event(local:212@4#ebe3061d6db8)#49583', 'event(local:212@8#ebe3061d6db8)#51226', 'event(script:2@937#ef7210b381c)#35379', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30908', 'event(local:218@16#86dcd5f97351)#35410', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34377', 'event(script:2@915#ef19a1f9cb92)#34388']
+steps (plan.index name [kind] input: frames start/issue/end, first idle or menu stop; outcome -> then; tries):
+  0.1 sentence(2,316)#262 [sentence] click verb 2 on 316: frames 235/874/1474, settled 338; nothing happened -> ban; tries 2; waited 35 frames for the camera; nothing happened by frame 872; ban sentence(2,316) at {'bit:6': 0, 'room': 28}
+      mismatches (2): script:2 predicted ['1'] observed 0, pos:script:2 predicted ['736'] observed -1
+      unplanned changes to tracked facts (8): state:324 predicted ['0'] observed 1, state:328 predicted ['1'] observed 0, state:333 predicted ['1'] observed 0, state:339 predicted ['1'] observed 0, state:342 predicted ['0'] observed 1, state:359 predicted ['0'] observed 1, state:360 predicted ['1'] observed 0, var:182 predicted ['0'] observed above
+      inputs (4): [{'frame': 271, 'key': 'o'}, {'frame': 272, 'click': [311, 103]}, {'frame': 873, 'key': 'o'}, {'frame': 874, 'click': [287, 103]}]
+verify from boot (run B's inputs to frame 235 plus the harness's 4 inputs, 59 in all): 2 checkpoints, 0 differ; final {'owner:566': 15}, goal False (3 s)
+what the engine did (the inputs replayed from boot; frames where the room, door 316, the sentence script, locals 203 and 211-218 or the meat's owner change; slot positions; the cook's x, y):
+  236: {'room': 28, 'state:316': 0, 'script:2': 0, 'local:203': 0, 'local:211': 1, 'local:212': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'owner:566': 15}; at ['local:211:33']; cook not in the room; ego [330, 136]
+  271: {} input {'frame': 271, 'key': 'o'}; at ['local:211:33']; cook not in the room; ego [330, 137]
+  272: {'local:203': 1} input {'frame': 272, 'click': [311, 103]}; at ['local:203:58', 'local:211:33']; cook not in the room; ego [330, 137]
+  304: {'state:316': 1, 'local:214': 1}; at ['local:203:80', 'local:211:33', 'local:214:15']; cook not in the room; ego [592, 126]
+  336: {'state:316': 0}; at ['local:203:80', 'local:211:33', 'local:214:66']; cook not in the room; ego [592, 126]
+  337: {'local:212': 1, 'local:214': 0}; at ['local:203:80', 'local:211:33', 'local:212:4']; cook not in the room; ego [592, 126]
+  338: {'local:203': 0}; at ['local:211:33', 'local:212:4']; cook not in the room; ego [592, 126]
+  459: {'state:316': 1, 'local:211': 0, 'local:212': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [592, 126]
+  461: {'local:217': 1}; at ['local:216:86', 'local:217:18']; cook (592, 126); ego [592, 126]
+  510: {'local:217': 0}; at ['local:216:92']; cook (203, 135); ego [592, 126]
+  567: {'state:316': 0, 'local:211': 1, 'local:216': 0}; at ['local:211:4']; cook not in the room; ego [592, 126]
+  873: {} input {'frame': 873, 'key': 'o'}; at ['local:211:33']; cook not in the room; ego [592, 126]
+  874: {'state:316': 1, 'local:203': 1, 'local:214': 1} input {'frame': 874, 'click': [287, 103]}; at ['local:203:80', 'local:211:33', 'local:214:15']; cook not in the room; ego [592, 126]
+  906: {'state:316': 0}; at ['local:203:80', 'local:211:33', 'local:214:66']; cook not in the room; ego [592, 126]
+  907: {'local:212': 1, 'local:214': 0}; at ['local:203:80', 'local:211:33', 'local:212:4']; cook not in the room; ego [592, 126]
+  908: {'local:203': 0}; at ['local:211:33', 'local:212:4']; cook not in the room; ego [592, 126]
+  1029: {'state:316': 1, 'local:211': 0, 'local:212': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [592, 126]
+  1031: {'local:217': 1}; at ['local:216:86', 'local:217:18']; cook (592, 126); ego [592, 126]
+  1091: {'local:217': 0}; at ['local:216:92']; cook (114, 130); ego [592, 126]
+  1158: {'state:316': 0, 'local:211': 1, 'local:216': 0}; at ['local:211:4']; cook not in the room; ego [592, 126]

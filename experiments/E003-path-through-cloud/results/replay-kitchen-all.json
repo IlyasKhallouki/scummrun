@@ -1,0 +1,327 @@
+{
+ "variant": "all",
+ "move": "S1#7 provoke the cook (Open kitchen door while he is inside)",
+ "start_frame": 235,
+ "goal": {
+  "owner:566": [
+   1
+  ]
+ },
+ "sources": {
+  "replay.py": "cdefc72de9ca",
+  "replay_kitchen.py": "422e6a9770a9",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "relevance.py": "3c50167cb0c8",
+  "plan_fd.py": "3d365d693db2",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018"
+ },
+ "reading": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/step5/reading.pkl",
+ "replan_limit": 10,
+ "time_limit": 10800,
+ "limits": {
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60,
+  "plan_time": 600
+ },
+ "reading_sources": "{'model.py': 'cc630446bdbe', 'reader.py': '94d495853f07', 'ir.py': 'c6ccf01059f1', 'facts.py': 'c06fc3489018', 'actions.py': 'ddbd1aaa2207', 'domains.py': '19932b58530a', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8'}",
+ "records": {
+  "all": 72256,
+  "kept": 72256
+ },
+ "task": {
+  "actions": 71729,
+  "facts": 716,
+  "kept actions": 71324,
+  "kept facts": 244,
+  "folded": 527,
+  "seconds": 167.8336331800001
+ },
+ "start_check": {
+  "facts": 3651,
+  "differ": 0,
+  "differences": []
+ },
+ "run": {
+  "stop": "no plan left (planner: time)",
+  "goal": false,
+  "replans": 1,
+  "bans": [
+   {
+    "label": "walk_to(316)",
+    "values": [
+     [
+      "bit:6",
+      0
+     ],
+     [
+      "room",
+      28
+     ]
+    ]
+   }
+  ],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 235,
+    "bans": 0,
+    "write_s": 161.2497548650008,
+    "start_counts": {},
+    "status": "plan",
+    "seconds": 138.97809350199896,
+    "steps": [
+     "walk_to(316)#478",
+     "event(local:211@33)#30568",
+     "event(script:2@736#a8c69122caf2)#30915",
+     "event(local:218@16#86dcd5f97351)#35417",
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ]
+   },
+   {
+    "plan": 1,
+    "frame": 1472,
+    "bans": 1,
+    "write_s": 107.41730732599899,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 6
+    },
+    "status": "time",
+    "seconds": 605.3440800930002,
+    "steps": []
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "walk_to(316)#478",
+    "kind": "walk_to",
+    "input": "click verb 11 on 316",
+    "start": 235,
+    "issue": 872,
+    "end": 1472,
+    "outcome": "nothing happened",
+    "then": "ban",
+    "tries": 2,
+    "first_settled": 303,
+    "mismatches": [
+     {
+      "key": "script:2",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "pos:script:2",
+      "predicted": [
+       "736"
+      ],
+      "observed": -1,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "local:208",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "unplanned"
+     },
+     {
+      "key": "local:209",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "pos:local:208",
+      "predicted": [
+       "-1"
+      ],
+      "observed": 21,
+      "kind": "unplanned"
+     },
+     {
+      "key": "pos:local:209",
+      "predicted": [
+       "56"
+      ],
+      "observed": -1,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:327",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:328",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:330",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:333",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:345",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:354",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:359",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "unplanned"
+     },
+     {
+      "key": "state:360",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "unplanned"
+     },
+     {
+      "key": "var:182",
+      "predicted": [
+       "0"
+      ],
+      "observed": "above",
+      "kind": "unplanned"
+     }
+    ],
+    "inputs": [
+     {
+      "frame": 271,
+      "click": [
+       315,
+       103
+      ]
+     },
+     {
+      "frame": 872,
+      "click": [
+       287,
+       103
+      ]
+     }
+    ],
+    "note": "waited 35 frames for the camera; nothing happened by frame 871; ban walk_to(316) at {'bit:6': 0, 'room': 28}"
+   }
+  ],
+  "frames": 1237,
+  "ticks": 6185,
+  "frame0": 235,
+  "frame_end": 1472,
+  "seconds": 1030.299996713,
+  "inputs": [
+   {
+    "frame": 271,
+    "click": [
+     315,
+     103
+    ]
+   },
+   {
+    "frame": 872,
+    "click": [
+     287,
+     103
+    ]
+   }
+  ]
+ },
+ "ban_task_sizes": [
+  161.2497548650008,
+  107.41730732599899
+ ],
+ "verify": {
+  "checkpoints": 2,
+  "differ": [],
+  "inputs": 57,
+  "final": {
+   "owner:566": 15
+  },
+  "same": true,
+  "seconds": 2.314938911000354,
+  "goal": false
+ },
+ "seconds": 1206.1773909189997,
+ "game_seconds": 103.08670235804756,
+ "trace": [
+  "236: {'room': 28, 'state:316': 0, 'script:2': 0, 'local:203': 0, 'local:211': 1, 'local:212': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'owner:566': 15}; at ['local:211:33']; cook not in the room; ego [330, 136]",
+  "271: {'local:203': 1} input {'frame': 271, 'click': [315, 103]}; at ['local:203:58', 'local:211:33']; cook not in the room; ego [330, 137]",
+  "303: {'local:203': 0}; at ['local:211:33']; cook not in the room; ego [592, 126]",
+  "636: {'state:316': 1, 'local:211': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [592, 126]",
+  "638: {'local:217': 1}; at ['local:216:86', 'local:217:18']; cook (592, 126); ego [592, 126]",
+  "684: {'local:217': 0}; at ['local:216:92']; cook (235, 135); ego [592, 126]",
+  "737: {'state:316': 0, 'local:211': 1, 'local:216': 0}; at ['local:211:4']; cook not in the room; ego [592, 126]",
+  "872: {} input {'frame': 872, 'click': [287, 103]}; at ['local:211:33']; cook not in the room; ego [592, 126]",
+  "1303: {'state:316': 1, 'local:211': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [592, 126]",
+  "1305: {'local:217': 1}; at ['local:216:86', 'local:217:18']; cook (592, 126); ego [592, 126]",
+  "1365: {'local:217': 0}; at ['local:216:92']; cook (114, 130); ego [592, 126]",
+  "1432: {'state:316': 0, 'local:211': 1, 'local:216': 0}; at ['local:211:4']; cook not in the room; ego [592, 126]"
+ ],
+ "noban": {
+  "frame": 1472,
+  "status": "plan",
+  "seconds": 108.79159976899973,
+  "steps": [
+   "walk_to(316)#478",
+   "event(local:211@33)#30568",
+   "event(script:2@736#a8c69122caf2)#30915",
+   "event(local:218@16#86dcd5f97351)#35417",
+   "sentence(9,566)#12118",
+   "event(script:2@736#1db02ba5a8ab)#34384",
+   "event(script:2@915#ef19a1f9cb92)#34395"
+  ],
+  "start_counts": {
+   "live slots with unknown locals (args 0)": 6
+  }
+ }
+}
