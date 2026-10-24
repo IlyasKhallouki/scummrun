@@ -1141,10 +1141,10 @@ index 00000000..ad7e69a2
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..8ad90bcb
+index 00000000..a493d1f6
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,509 @@
+@@ -0,0 +1,520 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1394,6 +1394,17 @@ index 00000000..8ad90bcb
 +	 */
 +	bool slotCode(int slot, const byte *&code, uint32 &size) const;
 +	bool slotWaitsForMessage(int slot) const;
++	/**
++	 * Where @p slot's script starts in the code its offs indexes: the offset
++	 * of its first opcode, the base of the [XXXX] offsets in the decompiled
++	 * scripts. -1 if it cannot be worked out.
++	 */
++	int64 scriptStart(int slot) const;
++	int64 objectScriptStart(int slot) const;
++	/** @p offs, an offset like ScriptSlot::offs, from scriptStart(@p slot); -1 if unknown. */
++	int64 scriptCode(int slot, uint32 offs) const;
++	/** The override armed at cutscene @p level points at a dead slot, or one that changed hands. */
++	bool overrideStale(int level) const;
 +
 +	// Skips (speedrun_skips.cpp)
 +	/** onFrameBegin, after neutraliseInput(): press '.' or Esc if it has an effect now. */
@@ -4187,10 +4198,10 @@ index 00000000..7263e24f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..f8a73191
+index 00000000..3152c00a
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,738 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -4297,6 +4308,27 @@ index 00000000..f8a73191
 +	return classes.str();
 +}
 +
++// The VERB block's offset inside the OBCD block at @p obcd (@p avail bytes
++// readable), or -1. The same walk over the block's children as
++// findResource() (resource.cpp:1552-1590), done here because findResource()
++// records each search in _resourceLastSearchBuf/_resourceLastSearchSize.
++int verbBlockOffset(const byte *obcd, uint32 avail) {
++	if (avail < 8)
++		return -1;
++	const uint32 total = READ_BE_UINT32(obcd + 4);
++	if (total > avail)
++		return -1;
++	for (uint32 pos = 8; pos + 8 <= total;) {
++		if (READ_BE_UINT32(obcd + pos) == MKTAG('V','E','R','B'))
++			return pos;
++		const uint32 size = READ_BE_UINT32(obcd + pos + 4);
++		if ((int32)size <= 0)
++			return -1;
++		pos += size;
++	}
++	return -1;
++}
++
 +} // End of anonymous namespace
 +
 +#pragma mark - Idle
@@ -4381,6 +4413,112 @@ index 00000000..f8a73191
 +	if (!slotCode(i, code, size) || ss.offs + 1 >= size)
 +		return false;
 +	return code[ss.offs] == kOpWait && (code[ss.offs + 1] & 0x1F) == kWaitForMessage;
++}
++
++#pragma mark - Script positions
++
++int64 SpeedrunBridge::scriptStart(int i) const {
++	// Where the engine started slot i's script, in the code its offs indexes
++	// (getScriptBaseAddress(), script.cpp:416-470): the script's first
++	// opcode, which is where the [XXXX] offsets of data/scripts-dos-cd count
++	// from (index.json "offset_bases"). Read from the engine's own tables and
++	// raw resource pointers, as slotCode() does, so no LRU counter moves.
++	const ScummEngine &e = *_vm;
++	const ScriptSlot &ss = e.vm.slot[i];
++	switch (ss.where) {
++	case WIO_GLOBAL:
++		return e._resourceHeaderSize; // runScript() (script.cpp:73)
++	case WIO_LOCAL: {
++		// runScript() (script.cpp:79). initRoomSubBlocks() sets the offset
++		// past the LSCR header and its script number byte (room.cpp:459).
++		const int k = ss.number - e._numGlobalScripts;
++		if (k < 0 || k >= ARRAYSIZE(e._localScriptOffsets) || !e._localScriptOffsets[k])
++			return -1;
++		return e._localScriptOffsets[k];
++	}
++	case WIO_ROOM:
++		// The room's entry and exit code run in room slots under these numbers
++		// (runEntryScript(), script.cpp:1046-1048; runExitScript(), :995-997),
++		// from the byte after their block header (findResourceData(),
++		// room.cpp:365-376). An exit-code slot is never live at a dump:
++		// runExitScript()'s one caller, startScene() (room.cpp:78), kills
++		// every room slot right after it (room.cpp:80, script.cpp:1089-1096).
++		if (ss.number == kScriptNumENCD)
++			return e._ENCD_offs ? (int64)e._ENCD_offs : -1;
++		if (ss.number == kScriptNumEXCD)
++			return e._EXCD_offs ? (int64)e._EXCD_offs : -1;
++		return objectScriptStart(i);
++	case WIO_INVENTORY:
++	case WIO_FLOBJECT:
++		return objectScriptStart(i);
++	default:
++		return -1;
++	}
++}
++
++int64 SpeedrunBridge::objectScriptStart(int i) const {
++	// runObjectScript() sets offs = getOBCDOffs(obj) + getVerbEntrypoint(obj,
++	// entry) (script.cpp:127-142). getOBCDOffs() is 0 for an inventory
++	// object, whose rtInventory resource is its OBCD block, and otherwise the
++	// OBCD's offset in the room, or 8 in a flobject's resource
++	// (object.cpp:1322-1337, 1355-1363). getVerbEntrypoint() returns the
++	// VERB block's offset in the OBCD plus the event's offset, which counts
++	// from the VERB block's start (script.cpp:210-214, 257). So the script
++	// starts at the OBCD offset plus the VERB block's offset, and the event
++	// offset is the code position.
++	//
++	// getOBCDOffs() tests the owner table, which can change while the script
++	// runs: a handler that picks up its own object runs on in its room slot.
++	// So the OBCD is found from the slot's where, fixed when the script
++	// starts (script.cpp:144), with getOBCDOffs()'s scan but not its owner
++	// test.
++	const ScummEngine &e = *_vm;
++	// The getVerbEntrypoint() branch that finds the VERB block by its tag
++	// (big headers, v5-v7); other layouts give -1.
++	if (e._game.version < 5 || e._game.version > 7 || (e._game.features & GF_SMALL_HEADER))
++		return -1;
++	const ScriptSlot &ss = e.vm.slot[i];
++	const byte *code = nullptr;
++	uint32 size = 0;
++	if (!slotCode(i, code, size))
++		return -1;
++	uint32 obcd = 0;
++	if (ss.where != WIO_INVENTORY) {
++		int k = e._numLocalObjects - 1; // getOBCDOffs() (object.cpp:1329-1334)
++		while (k > 0 && e._objs[k].obj_nr != ss.number)
++			k--;
++		// whereIsObject(): a flobject is an object with a fl_object_index (object.cpp:370-376).
++		if (k <= 0 || (e._objs[k].fl_object_index != 0) != (ss.where == WIO_FLOBJECT))
++			return -1;
++		obcd = e._objs[k].OBCDoffset;
++	}
++	if (obcd >= size)
++		return -1;
++	const int verb = verbBlockOffset(code + obcd, size - obcd);
++	return verb < 0 ? -1 : (int64)obcd + verb;
++}
++
++int64 SpeedrunBridge::scriptCode(int i, uint32 offs) const {
++	const int64 start = scriptStart(i);
++	return start < 0 || (int64)offs < start ? -1 : (int64)offs - start;
++}
++
++bool SpeedrunBridge::overrideStale(int level) const {
++	// What trackOverride() (speedrun_skips.cpp) would latch if it ran now:
++	// the override's slot is dead, or, for the top-level override it saw at
++	// the start of this frame, its script or room changed since.
++	// abortCutscene() would revive and rewind that slot all the same
++	// (script.cpp:1689-1709). Lower levels are followed by nobody, so for
++	// them only a dead slot counts.
++	const ScummEngine &e = *_vm;
++	const int slot = e.vm.cutSceneScript[level];
++	if (slot >= NUM_SCRIPT_SLOT || e.vm.slot[slot].status == ssDead)
++		return true;
++	if (level != e.vm.cutSceneStackPointer || level != _override.level || e.vm.cutScenePtr[level] != _override.ptr)
++		return false;
++	const ScriptSlot &ss = e.vm.slot[slot];
++	const int room = (ss.where == WIO_LOCAL || ss.where == WIO_ROOM) ? (int)e._roomResource : -1;
++	return _override.stale || ss.number != _override.number || ss.where != _override.where || room != _override.room;
 +}
 +
 +SpeedrunBridge::IdleState SpeedrunBridge::evaluateIdle() const {
@@ -4610,7 +4748,8 @@ index 00000000..f8a73191
 +	s.addRaw("verbs", verbs.str());
 +
 +	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
-+	// PC offset, frozen count and cutscene override count.
++	// PC offset, frozen count and cutscene override count. "code" is the PC
++	// from the script's first opcode (scriptCode()), or -1.
 +	JsonArray slots;
 +	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
 +		const ScriptSlot &ss = e.vm.slot[i];
@@ -4618,11 +4757,45 @@ index 00000000..f8a73191
 +			continue;
 +		JsonObject o;
 +		o.add("slot", i).add("number", (int)ss.number).add("where", (int)ss.where).add("status", (int)ss.status)
-+		 .add("offs", (uint64)ss.offs).add("frozen", (int)ss.freezeCount).add("delay", (int)ss.delay)
-+		 .add("cutscene_override", (int)ss.cutsceneOverride);
++		 .add("offs", (uint64)ss.offs).add("code", scriptCode(i, ss.offs)).add("frozen", (int)ss.freezeCount)
++		 .add("delay", (int)ss.delay).add("cutscene_override", (int)ss.cutsceneOverride);
 +		slots.addRaw(o.str());
 +	}
 +	s.addRaw("slots", slots.str());
++
++	// The cutscene stack (script.cpp:1632-1737). beginCutscene() pushes a
++	// level and clears its override, endCutscene() pops it. beginOverride()
++	// arms the current level's override: cutScenePtr[level] is the offs of
++	// the jump after it, in slot cutSceneScript[level]; endOverride() clears
++	// it. Esc calls abortCutscene() while VAR_CUTSCENEEXIT_KEY is non-zero
++	// (input.cpp:966, 1423-1424), which resumes the top level's override, if
++	// armed, at that jump with VAR_OVERRIDE = 1.
++	// Level 0 is the stack's bottom: an override can be armed there with no
++	// cutscene open. The script that began a level is not kept, so a level
++	// names a script only through its override.
++	JsonObject cutscene;
++	const int depth = e.vm.cutSceneStackPointer;
++	cutscene.add("depth", depth);
++	JsonArray levels;
++	for (int level = 0; level <= depth && level < kMaxCutsceneNum; level++) {
++		const uint32 ptr = e.vm.cutScenePtr[level];
++		const int slot = e.vm.cutSceneScript[level];
++		JsonObject l;
++		l.add("level", level);
++		if (!ptr || slot >= NUM_SCRIPT_SLOT) {
++			l.addNull("override");
++		} else {
++			const ScriptSlot &ss = e.vm.slot[slot];
++			JsonObject o;
++			o.add("slot", slot).add("number", (int)ss.number).add("where", (int)ss.where)
++			 .add("status", (int)ss.status).add("ptr", (uint64)ptr).add("code", scriptCode(slot, ptr))
++			 .add("stale", overrideStale(level));
++			l.addRaw("override", o.str());
++		}
++		levels.addRaw(l.str());
++	}
++	cutscene.addRaw("levels", levels.str());
++	s.addRaw("cutscene", cutscene.str());
 +
 +	// Actors in the current room: what a click on a person (Give fish to troll) aims at.
 +	JsonArray actors;
