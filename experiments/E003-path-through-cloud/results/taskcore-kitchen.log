@@ -1,0 +1,534 @@
+E003 step 4, the memory work, stage 1: the task side in Rust (taskcore) on the kitchen task
+
+files (new): export_records.py (the packed file, streaming), taskcore/ (the Rust crate, std only; README.md has the format), taskcore_kitchen.py (this log), test_taskcore.py (random tasks). Nothing else changed. This log is after the review's fixes (the last sections say what changed).
+sources read (sha1, 12 hex): reader.py 94d495853f07, task.py c356a6df633a, relevance.py 3c50167cb0c8, domains.py 19932b58530a, plan_fd.py 3d365d693db2, test_reader.py 5e7df313d499
+input: the pickled kitchen reading (72,256 records, rooms 28 and 41 and 33 global scripts); reader.build_task with test_reader's goal (owner:566 = 1); starts: s17 = reader.task_start of run B's S1#7 pre, replan = reader.replan_start of test_reader.replan_observed (as test_reader.plan_of).
+machine: the laptop (8 cores, 23 GB). Peak memory: getrusage / VmHWM of the process that does the work.
+
+== the packed file ==
+export_records.py: kitchen.tc 44.8 MB: 71,729 actions (72,256 records, 527 folded into an identical one, as build_task), 716 facts, 16,301 strings. 37.9 s to write, peak 1.05 GB for the whole process (loading the pickle alone: 2.4 s, about 1.05 GB; the export adds almost nothing). kitchen-no211.tc: 71,721 actions.
+The same bytes in every run: exported twice, with PYTHONHASHSEED 1 and 2: kitchen.tc the same (sha1 91083e331d91), kitchen-no211.tc the same (sha1 b87d2d27154d). Before the fix two exports of the same reading differed in 2,810 words (the builder's and the review's kitchen.tc).
+
+== the format check: taskcore with no fold, no reduction and task.py's encoding (--encoding task) against task.py's write_sas ==
+  build_task's task, all records, start s17: the same bytes (328,620,411 bytes, sha1 2e274251b17f, 550,401 operators, 24,181,125 effects; against the recorded sha1 and size)
+  build_task's task, all records, start replan: the same bytes (328,620,412 bytes, sha1 d7515e67ee19, 550,401 operators, 24,181,125 effects; against the recorded sha1 and size)
+  test_reader's pruned task, all records, start s17: the same bytes (163,791,437 bytes, sha1 30e1caac3efc, 583,670 operators, 9,324,673 effects; against the recorded sha1 and size)
+  test_reader's pruned task, all records, start replan: the same bytes (163,791,438 bytes, sha1 8f20d1b462ae, 583,670 operators, 9,324,673 effects; against the recorded sha1 and size)
+  test_reader's pruned task, no 211, start s17: the same bytes (163,789,987 bytes, sha1 6b54665c7604, 583,662 operators, 9,324,599 effects; against the recorded sha1 and size)
+  The recorded sha1 and size are pyref's, taken from task.py's own files on the same pickle; task.py, reader.py and the pickle are unchanged since (sha1 above).
+  No canonical sort was needed: taskcore writes task.py's order (variables by key, operators by action, variant and effect order of _expand).
+
+== reductions, kitchen.tc from start s17 ==
+Each row a separate taskcore run (load, fold, reductions to their fixpoint, both passes of the writer); time and peak memory of that run. Operators and effects are the SAS file's (after variant expansion).
+The Python pipeline's task (test_reader.plan_of: build_task, relevance.py, reader.prune, write_sas): 71,324 actions, 583,670 operators, 9,324,673 effects, 163.8 MB. task.py took 331 s and 4.1 GB for it.
+  row                                                             actions  operators     effects      MB      s    GB
+  input: no fold, no reduction (task.py's file, metric 1)          71,729    550,401  24,181,125   328.6   21.1  0.06
+  fold strict alone                                                28,203     94,150   3,471,296    67.4   12.1  0.12
+  fold every end alone (switch)                                    20,163     61,839   1,895,852    46.1    9.6  0.11
+  PRODUCT_LIMIT 1 alone (every guess through pick variables)       71,729    143,510   4,963,018    80.6    5.3  0.06
+  (a) alone                                                        71,729    550,401  24,181,125   328.6   18.2  0.12
+  (b) alone                                                        71,729    611,251  10,010,699   174.4    9.0  0.11
+  (c) alone                                                        71,729    550,401  24,181,125   328.6   21.4  0.12
+  (d) alone                                                        27,912    208,523   9,967,507   129.3   10.4  0.11
+  (e) alone                                                        71,324    583,670   9,324,673   163.8    8.9  0.11
+  (f) alone                                                        59,437    499,947  23,552,120   315.6   24.4  0.11
+  (a)-(f), no fold                                                 26,071    227,444   3,190,882    56.4    6.7  0.12
+  fold strict + (a)                                                28,203     94,150   3,471,296    67.4   10.2  0.12
+  fold strict + (a)(b)                                             28,203     97,987   1,712,895    40.8    7.9  0.11
+  fold strict + (a)(b)(c)                                          28,200     97,987   1,670,573    40.3    6.0  0.11
+  fold strict + (a)-(d)                                            13,203     27,219     432,344    11.5    6.7  0.11
+  fold strict + (a)-(e)                                            13,076     20,659     290,799     9.2   17.2  0.11
+  fold strict + (a)-(f) (the default)                              12,029     17,823     279,396     8.8    8.3  0.11
+  the default + PRODUCT_LIMIT 1                                    12,029     15,527     207,887     7.8    7.9  0.11
+  fold every end + (a)-(f)                                         11,742     16,673     252,744     8.4    7.9  0.11
+  fold every end + (a)-(f) + PRODUCT_LIMIT 1                       11,742     14,944     199,420     7.6    7.5  0.11
+
+the default run's counts (fold strict, then (a)-(f) in a loop until none changes the task):
+  fold: groups 2,246, paths in groups 47,794, subgroups 3,895, paths folded 47,406, folded actions 3,880, subgroups with a hole left unfolded 15, subgroups past 128 bits left unfolded 0, subgroups past pre limit left unfolded 0, dead conditional effects 0, actions after 28,203, effects after 716,684
+      1,083  (a) writes of a value the action already fixes, left out
+    369,352  (b) effects on facts nothing reads, left out
+          3  (c) null actions (no effect), left out
+     14,997  (d) actions whose precondition cannot hold, left out
+     92,698  (d) effects whose conditions cannot hold, left out
+         75  (d) precondition and condition sets cut to reached values
+         15  (d) reachability rounds
+      2,462  (d) values never reached, left out of the domains
+        127  (e) actions that write no needed value, left out
+     29,920  (e) effects on facts with no needed value, left out
+         62  (e) last pass: facts needed whole
+        131  (e) last pass: facts with a needed value
+      5,016  (e) last pass: needed values
+        138  (e) relevance rounds
+        873  (f) dominated actions (same effects, a weaker precondition at no more cost elsewhere), left out
+        174  (f) duplicate actions (same precondition, effects and cost), left out
+      5,623  normalize: sets that hold for every value, left out
+          3  rounds of the reduction loop
+  pick variables 27, pick operators 62, actions through picks 132, variables 158, conditional effects 184,983
+
+== the fold check (taskcore --check-fold 4, strict and every end) ==
+  fold strict: 3,880 folded actions, 47,406 paths, 189,624 states in the paths' boxes (corners and random) and 31,040 in the folded precondition's box: mismatches 0 (folded action does not apply 0, another path applies 0, writes differ 0, conflicting writes 0, not exactly one path in the union box 0), 9 s
+  fold every: 6,529 folded actions, 58,095 paths, 232,380 states in the paths' boxes (corners and random) and 52,232 in the folded precondition's box: mismatches 0 (folded action does not apply 0, another path applies 0, writes differ 0, conflicting writes 0, not exactly one path in the union box 0), 9 s
+
+== plans: lama-first (plan_fd.run, its search string with the landmark dump, 600 s), taskcore default (fold strict, (a)-(f)) ==
+  baseline, the same search on task.py's file (pruned task, s17) on this machine: 7 steps, Fast Downward 112.3 s (search 1.21 s), peak 2.66 GB, 31 landmarks. reader-kitchen.log: 7 steps in 171.2 s (all), 15 in 210.7 s (no 211), 8 in 97.8 s (replan).
+  all: taskcore 12,029 actions, 17,823 operators, 8.8 MB in 8.1 s, 0.12 GB; Fast Downward exit 0, 10 steps, 4.0 s (search 0.12 s), peak 0.10 GB, 26 landmarks
+     1. event(local:211@33)#30568
+     2. walk_to(316)#478
+     3. event(script:2@736#a8c69122caf2)#30915
+     4. event(local:218@16#86dcd5f97351)#35417
+     5. sentence(2,564)#11592
+     6. event(script:2@736#b743d861667c)#34210   (in fold:event(script:2@736#b743d861667c)#34210+1)
+     7. event(script:2@915#e3d84ac8767a)#34221
+     8. sentence(9,566)#12118
+     9. event(script:2@736#1db02ba5a8ab)#34384   (in fold:event(script:2@736#1db02ba5a8ab)#34384+1)
+    10. event(script:2@915#ef19a1f9cb92)#34395
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 52 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 16 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used none
+    steps the goal needs (test_reader.needed_steps): 10 of 10
+    test_reader's plan for this variant: 7 of 7 actions kept (1 as a path of a folded action), 0 replaced, 0 dropped
+  no 211: taskcore 12,026 actions, 17,820 operators, 8.8 MB in 5.8 s, 0.11 GB; Fast Downward exit 0, 18 steps, 3.2 s (search 0.18 s), peak 0.10 GB, 31 landmarks
+     1. sentence(2,316)#262
+     2. event(script:2@736#6b02ec868a25)#30822   (in fold:event(script:2@736#6b02ec868a25)#30822+1)
+     3. event(script:2@915#d1973d557d7f)#30826
+     4. event(local:214@15#326429017871)#35377
+     5. event(local:214@57#326429017871)#39486   (in fold:event(local:214@57#326429017871)#39485+1)
+     6. event(local:214@66#326429017871)#39688
+     7. event(local:212@4#ebe3061d6db8)#49583
+     8. event(local:212@8#ebe3061d6db8)#51226
+     9. event(script:2@937#ef7210b381c)#35379
+    10. walk_to(316)#478
+    11. event(script:2@736#a8c69122caf2)#30908
+    12. event(local:218@16#86dcd5f97351)#35410
+    13. sentence(2,564)#11592
+    14. event(script:2@736#b743d861667c)#34203   (in fold:event(script:2@736#b743d861667c)#34203+1)
+    15. event(script:2@915#e3d84ac8767a)#34214
+    16. sentence(9,566)#12118
+    17. event(script:2@736#1db02ba5a8ab)#34377   (in fold:event(script:2@736#1db02ba5a8ab)#34377+1)
+    18. event(script:2@915#ef19a1f9cb92)#34388
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 57 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 16 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used none
+    steps the goal needs (test_reader.needed_steps): 18 of 18
+    test_reader's plan for this variant: 15 of 15 actions kept (3 as a path of a folded action), 0 replaced, 0 dropped
+  replan: taskcore 12,029 actions, 17,823 operators, 8.8 MB in 8.7 s, 0.11 GB; Fast Downward exit 0, 11 steps, 2.6 s (search 0.11 s), peak 0.10 GB, 24 landmarks
+     1. event(local:211@33)#30568
+     2. event(script:2@736)#35292
+     3. walk_to(316)#478
+     4. event(script:2@736#a8c69122caf2)#30915
+     5. event(local:218@16#86dcd5f97351)#35417
+     6. sentence(2,564)#11592
+     7. event(script:2@736#b743d861667c)#34210   (in fold:event(script:2@736#b743d861667c)#34210+1)
+     8. event(script:2@915#e3d84ac8767a)#34221
+     9. sentence(9,566)#12118
+    10. event(script:2@736#1db02ba5a8ab)#34384   (in fold:event(script:2@736#1db02ba5a8ab)#34384+1)
+    11. event(script:2@915#ef19a1f9cb92)#34395
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 53 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 16 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used none
+    steps the goal needs (test_reader.needed_steps): 11 of 11
+    test_reader's plan for this variant: 8 of 8 actions kept (1 as a path of a folded action), 0 replaced, 0 dropped
+
+== plans: lama-first (plan_fd.run, its search string with the landmark dump, 600 s), taskcore fold-every-product-limit-1 ==
+  baseline, the same search on task.py's file (pruned task, s17) on this machine: 7 steps, Fast Downward 112.3 s (search 1.21 s), peak 2.66 GB, 31 landmarks. reader-kitchen.log: 7 steps in 171.2 s (all), 15 in 210.7 s (no 211), 8 in 97.8 s (replan).
+  all: taskcore 11,742 actions, 14,944 operators, 7.6 MB in 6.3 s, 0.11 GB; Fast Downward exit 0, 10 steps, 1.9 s (search 0.06 s), peak 0.09 GB, 26 landmarks
+     1. event(local:211@33)#30568   (in fold:event(local:211@33)#30567+2)
+     2. walk_to(316)#478
+     3. event(script:2@736#a8c69122caf2)#30915
+     4. event(local:218@16#86dcd5f97351)#35417   (in fold:event(local:218@16#86dcd5f97351)#35417+1)
+     5. sentence(2,564)#11592
+     6. event(script:2@736#b743d861667c)#34210   (in fold:event(script:2@736#b743d861667c)#34210+1)
+     7. event(script:2@915#e3d84ac8767a)#34221   (in fold:event(script:2@915#e3d84ac8767a)#34213+14)
+     8. sentence(9,566)#12118
+     9. event(script:2@736#1db02ba5a8ab)#34384   (in fold:event(script:2@736#1db02ba5a8ab)#34384+1)
+    10. event(script:2@915#ef19a1f9cb92)#34395   (in fold:event(script:2@915#ef19a1f9cb92)#34393+12)
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 52 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 16 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used none
+    steps the goal needs (test_reader.needed_steps): 10 of 10
+    test_reader's plan for this variant: 7 of 7 actions kept (4 as a path of a folded action), 0 replaced, 0 dropped
+  no 211: taskcore 11,739 actions, 14,941 operators, 7.6 MB in 6.1 s, 0.11 GB; Fast Downward exit 0, 20 steps, 2.1 s (search 0.24 s), peak 0.09 GB, 27 landmarks
+     1. walk_to(316)#478
+     2. event(script:2@736#a8c69122caf2)#30909
+     3. sentence(2,316)#262
+     4. event(script:2@736#6b02ec868a25)#30822   (in fold:event(script:2@736#6b02ec868a25)#30822+1)
+     5. event(script:2@915#d1973d557d7f)#30826   (in fold:event(script:2@915#d1973d557d7f)#30825+2)
+     6. event(local:214@15#326429017871)#35377
+     7. event(local:214@57#326429017871)#39486   (in fold:event(local:214@57#326429017871)#39485+1)
+     8. event(local:214@66#326429017871)#39688
+     9. event(local:212@4#ebe3061d6db8)#49583
+    10. event(local:212@8#ebe3061d6db8)#51226   (in fold:event(local:212@8#ebe3061d6db8)#51225+2)
+    11. event(script:2@937#ef7210b381c)#35379
+    12. walk_to(316)#478
+    13. event(script:2@736#a8c69122caf2)#30908
+    14. event(local:218@16#86dcd5f97351)#35410   (in fold:event(local:218@16#86dcd5f97351)#35410+1)
+    15. sentence(2,564)#11592
+    16. event(script:2@736#b743d861667c)#34203   (in fold:event(script:2@736#b743d861667c)#34203+1)
+    17. event(script:2@915#e3d84ac8767a)#34214   (in fold:event(script:2@915#e3d84ac8767a)#34206+14)
+    18. sentence(9,566)#12118
+    19. event(script:2@736#1db02ba5a8ab)#34377   (in fold:event(script:2@736#1db02ba5a8ab)#34377+1)
+    20. event(script:2@915#ef19a1f9cb92)#34388   (in fold:event(script:2@915#ef19a1f9cb92)#34386+12)
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 58 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 16 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used none
+    steps the goal needs (test_reader.needed_steps): 18 of 20
+    test_reader's plan for this variant: 15 of 15 actions kept (7 as a path of a folded action), 0 replaced, 0 dropped
+  replan: taskcore 11,742 actions, 14,944 operators, 7.6 MB in 6.4 s, 0.11 GB; Fast Downward exit 0, 11 steps, 1.8 s (search 0.10 s), peak 0.09 GB, 24 landmarks
+     1. event(local:211@33)#30568   (in fold:event(local:211@33)#30567+2)
+     2. event(script:2@736)#35292
+     3. walk_to(316)#478
+     4. event(script:2@736#a8c69122caf2)#30915
+     5. event(local:218@16#86dcd5f97351)#35417   (in fold:event(local:218@16#86dcd5f97351)#35417+1)
+     6. sentence(2,564)#11592
+     7. event(script:2@736#b743d861667c)#34210   (in fold:event(script:2@736#b743d861667c)#34210+1)
+     8. event(script:2@915#e3d84ac8767a)#34221   (in fold:event(script:2@915#e3d84ac8767a)#34213+14)
+     9. sentence(9,566)#12118
+    10. event(script:2@736#1db02ba5a8ab)#34384   (in fold:event(script:2@736#1db02ba5a8ab)#34384+1)
+    11. event(script:2@915#ef19a1f9cb92)#34395   (in fold:event(script:2@915#ef19a1f9cb92)#34393+12)
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 53 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 16 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used none
+    steps the goal needs (test_reader.needed_steps): 11 of 11
+    test_reader's plan for this variant: 8 of 8 actions kept (4 as a path of a folded action), 0 replaced, 0 dropped
+
+== plans: lama-first (plan_fd.run, its search string with the landmark dump, 600 s), taskcore reduce-none ==
+  baseline, the same search on task.py's file (pruned task, s17) on this machine: 7 steps, Fast Downward 112.3 s (search 1.21 s), peak 2.66 GB, 31 landmarks. reader-kitchen.log: 7 steps in 171.2 s (all), 15 in 210.7 s (no 211), 8 in 97.8 s (replan).
+  all: taskcore 28,203 actions, 94,150 operators, 67.4 MB in 7.3 s, 0.12 GB; Fast Downward exit 0, 7 steps, 47.5 s (search 0.73 s), peak 0.99 GB, 31 landmarks
+     1. walk_to(316)#478
+     2. event(local:211@33)#30568
+     3. event(script:2@736#a8c69122caf2)#30915
+     4. event(local:218@16#86dcd5f97351)#35417
+     5. sentence(9,566)#12118
+     6. event(script:2@736#1db02ba5a8ab)#34384   (in fold:event(script:2@736#1db02ba5a8ab)#34384+1)
+     7. event(script:2@915#ef19a1f9cb92)#34395
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 49 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 8 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used 49 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...)
+    steps the goal needs (test_reader.needed_steps): 7 of 7
+    test_reader's plan for this variant: 7 of 7 actions kept (1 as a path of a folded action), 0 replaced, 0 dropped
+  no 211: taskcore 28,195 actions, 94,142 operators, 67.4 MB in 6.6 s, 0.11 GB; Fast Downward exit 0, 15 steps, 58.5 s (search 1.99 s), peak 0.99 GB, 36 landmarks
+     1. sentence(2,316)#262
+     2. event(script:2@736#6b02ec868a25)#30822   (in fold:event(script:2@736#6b02ec868a25)#30822+1)
+     3. event(script:2@915#d1973d557d7f)#30826
+     4. event(local:214@15#326429017871)#35377
+     5. event(local:214@57#326429017871)#39486   (in fold:event(local:214@57#326429017871)#39485+1)
+     6. event(local:214@66#326429017871)#39688
+     7. event(local:212@4#ebe3061d6db8)#49583
+     8. event(local:212@8#ebe3061d6db8)#51226
+     9. event(script:2@937#ef7210b381c)#35379
+    10. walk_to(316)#478
+    11. event(script:2@736#a8c69122caf2)#30908
+    12. event(local:218@16#86dcd5f97351)#35410
+    13. sentence(9,566)#12118
+    14. event(script:2@736#1db02ba5a8ab)#34377   (in fold:event(script:2@736#1db02ba5a8ab)#34377+1)
+    15. event(script:2@915#ef19a1f9cb92)#34388
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 54 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 8 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used 54 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...)
+    steps the goal needs (test_reader.needed_steps): 15 of 15
+    test_reader's plan for this variant: 15 of 15 actions kept (3 as a path of a folded action), 0 replaced, 0 dropped
+  replan: taskcore 28,203 actions, 94,150 operators, 67.4 MB in 6.7 s, 0.12 GB; Fast Downward exit 0, 8 steps, 28.3 s (search 1.15 s), peak 0.99 GB, 29 landmarks
+     1. event(local:211@33)#30568
+     2. event(script:2@736)#35292
+     3. walk_to(316)#478
+     4. event(script:2@736#a8c69122caf2)#30915
+     5. event(local:218@16#86dcd5f97351)#35417
+     6. sentence(9,566)#12118
+     7. event(script:2@736#1db02ba5a8ab)#34384   (in fold:event(script:2@736#1db02ba5a8ab)#34384+1)
+     8. event(script:2@915#ef19a1f9cb92)#34395
+    replay over the full task, every guessed write that fires left unknown: goal reached True, failing step None; guessed writes that fired 50 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...), effects whose condition read one 8 (frozen:obj:362, frozen:obj:363, frozen:obj:364, frozen:obj:365, frozen:obj:366, frozen:obj:566, ...); so no step relies on a guessed value
+    test_reader.replay (the full task, effects on facts the file lacks left out): goal reached True, first step that cannot run None, guessed values used 50 (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, objscript:365, ...)
+    steps the goal needs (test_reader.needed_steps): 8 of 8
+    test_reader's plan for this variant: 8 of 8 actions kept (1 as a path of a folded action), 0 replaced, 0 dropped
+
+== plans: anytime LAMA (Fast Downward's seq-sat-lama-2011 alias, 120 s), taskcore default (model encoding: pick operators cost 0, so a plan's cost is its number of actions) ==
+  all: metric 1; plans found: 10 steps (cost 10) at 3.2 s, 7 steps (cost 7) at 7.1 s
+    the last plan: event(local:211@33)#30568, walk_to(316)#478, event(script:2@736#a8c69122caf2)#30915, event(local:218@16#86dcd5f97351)#35417, sentence(9,566)#12118, event(script:2@736#1db02ba5a8ab)#34384, event(script:2@915#ef19a1f9cb92)#34395
+    replay over the full task, every guessed write that fires left unknown: goal reached True
+  replan: metric 1; plans found: 11 steps (cost 11) at 2.8 s, 8 steps (cost 8) at 6.0 s
+    the last plan: event(local:211@33)#30568, event(script:2@736)#35292, walk_to(316)#478, event(script:2@736#a8c69122caf2)#30915, event(local:218@16#86dcd5f97351)#35417, sentence(9,566)#12118, event(script:2@736#1db02ba5a8ab)#34384, event(script:2@915#ef19a1f9cb92)#34395
+    replay over the full task, every guessed write that fires left unknown: goal reached True
+  no 211: metric 1; plans found: 18 steps (cost 18) at 4.4 s, 15 steps (cost 15) at 9.3 s
+    the last plan: sentence(2,316)#262, event(script:2@736#6b02ec868a25)#30822, event(script:2@915#d1973d557d7f)#30826, event(local:214@15#326429017871)#35377, event(local:214@57#326429017871)#39486, event(local:214@66#326429017871)#39688, event(local:212@4#ebe3061d6db8)#49583, event(local:212@8#ebe3061d6db8)#51226, event(script:2@937#ef7210b381c)#35379, walk_to(316)#478, event(script:2@736#a8c69122caf2)#30908, event(local:218@16#86dcd5f97351)#35410, sentence(9,566)#12118, event(script:2@736#1db02ba5a8ab)#34377, event(script:2@915#ef19a1f9cb92)#34388
+    replay over the full task, every guessed write that fires left unknown: goal reached True
+
+== test_reader's plans (7, 15 and 8 steps, found on task.py's pruned task) run on the reduced tasks (taskcore validate: each step the reduced action that holds its record's action; its precondition must hold; a guessed write that fires makes its fact unknown, and reading an unknown fails; the goal must hold) ==
+  all, default: 7 steps, runs True, goal True, 1 steps through a folded action, guessed writes that fired (left unknown) none
+  all, --reduce none: 7 steps, runs True, goal True, 1 steps through a folded action, guessed writes that fired (left unknown) 49, on 29 facts (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, ...), none read later
+  all, --fold every --product-limit 1: 7 steps, runs True, goal True, 4 steps through a folded action, guessed writes that fired (left unknown) none
+  all, --fold off: 7 steps, runs True, goal True, 0 steps through a folded action, guessed writes that fired (left unknown) none
+  no 211, default: 15 steps, runs True, goal True, 3 steps through a folded action, guessed writes that fired (left unknown) none
+  no 211, --reduce none: 15 steps, runs True, goal True, 3 steps through a folded action, guessed writes that fired (left unknown) 54, on 29 facts (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, ...), none read later
+  no 211, --fold every --product-limit 1: 15 steps, runs True, goal True, 7 steps through a folded action, guessed writes that fired (left unknown) none
+  no 211, --fold off: 15 steps, runs True, goal True, 0 steps through a folded action, guessed writes that fired (left unknown) none
+  replan, default: 8 steps, runs True, goal True, 1 steps through a folded action, guessed writes that fired (left unknown) none
+  replan, --reduce none: 8 steps, runs True, goal True, 1 steps through a folded action, guessed writes that fired (left unknown) 50, on 29 facts (frozen:entry, frozen:exit, objscript:362, objscript:363, objscript:364, ...), none read later
+  replan, --fold every --product-limit 1: 8 steps, runs True, goal True, 4 steps through a folded action, guessed writes that fired (left unknown) none
+  replan, --fold off: 8 steps, runs True, goal True, 0 steps through a folded action, guessed writes that fired (left unknown) none
+
+== Rust against Python, the same input (the pickled reading) ==
+  task.py, test_reader's pruned task: load the reading 3.5 s, build_task 104.0 s, relevance 77.8 s, prune 10.3 s, export_task 3.7 s, write_sas 133.7 s, text s17 0.7 s, text replan 0.6 s; peak 4.11 GB; 583,670 operators, 9,324,673 effects
+  task.py, build_task's task: load the reading 3.5 s, build_task 114.6 s, write_sas 346.4 s, text s17 1.5 s, text replan 1.2 s; peak 6.75 GB; 550,401 operators, 24,181,125 effects
+  task.py, the pruned task without local 211's event: load the reading 2.3 s, build_task 76.9 s, relevance 60.3 s, prune 9.8 s, export_task 3.5 s, write_sas 94.6 s, text s17 0.8 s; peak 4.11 GB; 583,662 operators, 9,324,599 effects
+  export_records.py (the pickle to kitchen.tc, build_task's rules, streaming): 37.9 s; peak 1.05 GB (the loaded pickle)
+  taskcore, build_task's task, all records, start s17, no fold, no reduction: 12.7 s, peak 0.063 GB (load and both passes)
+  taskcore, build_task's task, all records, start replan, no fold, no reduction: 13.0 s, peak 0.063 GB (load and both passes)
+  taskcore, test_reader's pruned task, all records, start s17, no fold, no reduction: 6.3 s, peak 0.052 GB (load and both passes)
+  taskcore, test_reader's pruned task, all records, start replan, no fold, no reduction: 6.4 s, peak 0.052 GB (load and both passes)
+  taskcore, test_reader's pruned task, no 211, start s17, no fold, no reduction: 5.3 s, peak 0.051 GB (load and both passes)
+  taskcore, the default (fold and reductions, then the file): 8.3 s, peak 0.115 GB
+  Fast Downward lama-first, all, s17: on task.py's file 112.3 s and 2.66 GB; on the default reduced file 4.0 s and 0.10 GB
+  The task.py rows are pyref's runs (task.py and reader.py unchanged since); the rest is this run. Times are wall seconds on the laptop while other jobs ran, so they vary by up to 2x between runs; memory does not.
+
+== the property test: python test_taskcore.py 2000 11 ==
+  test_start_out_of_domain: ok
+  test_fold_pre_limit: ok
+  test_metric_and_goal_set: ok
+       291  OutOfDomain: taskcore raises too, in every configuration
+     70351  PRODUCT_LIMIT 1: operators
+      1638  PRODUCT_LIMIT 1: the task's optimum
+     92106  a: operators
+      1638  a: the task's optimum
+     50644  all, fold every: operators
+      1638  all, fold every: the task's optimum
+     41221  all, fold strict, PRODUCT_LIMIT 1: operators
+      1638  all, fold strict, PRODUCT_LIMIT 1: the task's optimum
+     52622  all, fold strict: operators
+      1638  all, fold strict: the task's optimum
+     92042  b: operators
+      1638  b: the task's optimum
+     92304  c: operators
+      1638  c: the task's optimum
+     70099  d: operators
+      1638  d: the task's optimum
+     87433  e: operators
+      1638  e: the task's optimum
+     83145  f: operators
+      1638  f: the task's optimum
+      1989  fold check: folds
+     35480  fold check: states
+     82124  fold every: operators
+      1638  fold every: the task's optimum
+     85567  fold strict: operators
+      1638  fold strict: the task's optimum
+      1638  format: same bytes
+       465  goal sets
+     92304  no lever: operators
+      1638  no lever: the task's optimum
+      1173  single-value goals
+      1351  solvable
+        71  task.py raises (a rule of its writer)
+       291  task.py raises OutOfDomain (a start outside a domain)
+       261  task.py's encoding, PRODUCT_LIMIT 1: Fast Downward's optimum differs from the task's
+       240  task.py's encoding, all, fold strict, PRODUCT_LIMIT 1: Fast Downward's optimum differs from the task's
+         5  task.py's file: Fast Downward's optimum differs from the task's (goal set metric 0 with pick operators)
+       171  task.py's file: Fast Downward's optimum differs from the task's (goal set)
+         3  task.py's file: Fast Downward's optimum differs from the task's (metric 0 with pick operators)
+      1638  tasks
+       287  unsolvable
+  failures: 0
+
+== the property test: python test_taskcore.py 300 3 ==
+  test_start_out_of_domain: ok
+  test_fold_pre_limit: ok
+  test_metric_and_goal_set: ok
+        47  OutOfDomain: taskcore raises too, in every configuration
+     10644  PRODUCT_LIMIT 1: operators
+       243  PRODUCT_LIMIT 1: the task's optimum
+     14030  a: operators
+       243  a: the task's optimum
+      8127  all, fold every: operators
+       243  all, fold every: the task's optimum
+      6726  all, fold strict, PRODUCT_LIMIT 1: operators
+       243  all, fold strict, PRODUCT_LIMIT 1: the task's optimum
+      8478  all, fold strict: operators
+       243  all, fold strict: the task's optimum
+     13966  b: operators
+       243  b: the task's optimum
+     13992  c: operators
+       243  c: the task's optimum
+     11058  d: operators
+       243  d: the task's optimum
+     13089  e: operators
+       243  e: the task's optimum
+     12509  f: operators
+       243  f: the task's optimum
+       276  fold check: folds
+      4760  fold check: states
+     12713  fold every: operators
+       243  fold every: the task's optimum
+     13231  fold strict: operators
+       243  fold strict: the task's optimum
+       243  format: same bytes
+        70  goal sets
+     13992  no lever: operators
+       243  no lever: the task's optimum
+       173  single-value goals
+       209  solvable
+        10  task.py raises (a rule of its writer)
+        47  task.py raises OutOfDomain (a start outside a domain)
+        34  task.py's encoding, PRODUCT_LIMIT 1: Fast Downward's optimum differs from the task's
+        32  task.py's encoding, all, fold strict, PRODUCT_LIMIT 1: Fast Downward's optimum differs from the task's
+        22  task.py's file: Fast Downward's optimum differs from the task's (goal set)
+       243  tasks
+        34  unsolvable
+  failures: 0
+
+== the property test: python test_taskcore.py 400 5 ==
+  test_start_out_of_domain: ok
+  test_fold_pre_limit: ok
+  test_metric_and_goal_set: ok
+        80  OutOfDomain: taskcore raises too, in every configuration
+     13445  PRODUCT_LIMIT 1: operators
+       310  PRODUCT_LIMIT 1: the task's optimum
+     17196  a: operators
+       310  a: the task's optimum
+      9753  all, fold every: operators
+       310  all, fold every: the task's optimum
+      7944  all, fold strict, PRODUCT_LIMIT 1: operators
+       310  all, fold strict, PRODUCT_LIMIT 1: the task's optimum
+      9984  all, fold strict: operators
+       310  all, fold strict: the task's optimum
+     17163  b: operators
+       310  b: the task's optimum
+     17229  c: operators
+       310  c: the task's optimum
+     13029  d: operators
+       310  d: the task's optimum
+     16420  e: operators
+       310  e: the task's optimum
+     15482  f: operators
+       310  f: the task's optimum
+       378  fold check: folds
+      6768  fold check: states
+     15604  fold every: operators
+       310  fold every: the task's optimum
+     16025  fold strict: operators
+       310  fold strict: the task's optimum
+       310  format: same bytes
+        79  goal sets
+     17229  no lever: operators
+       310  no lever: the task's optimum
+       231  single-value goals
+       260  solvable
+        10  task.py raises (a rule of its writer)
+        80  task.py raises OutOfDomain (a start outside a domain)
+        38  task.py's encoding, PRODUCT_LIMIT 1: Fast Downward's optimum differs from the task's
+        33  task.py's encoding, all, fold strict, PRODUCT_LIMIT 1: Fast Downward's optimum differs from the task's
+        23  task.py's file: Fast Downward's optimum differs from the task's (goal set)
+         1  task.py's file: Fast Downward's optimum differs from the task's (metric 0 with pick operators)
+       310  tasks
+        50  unsolvable
+  failures: 0
+
+== reading the reduction table ==
+- The table is the same, row for row, as before the review's fixes. The fixes change no kitchen count: its starts
+  have no value outside a domain, no fold passes PRE_LIMIT, and its goal is one value.
+- (a) and (c) alone change nothing in the file: task._expand already leaves out writes of the value a key has, and
+  the input has no action without effects. They matter inside the loop (after (b) and the fold).
+- (b) alone cuts the effects from 24.2 to 10.0 million but raises the operators from 550,401 to 611,251: with fewer
+  guessed writes per action, fewer actions pass PRODUCT_LIMIT, so more are written as variants instead of through
+  pick variables. The operator count is not monotone in the reductions; the effect count and the file size are.
+- (e) alone gives exactly task.py's relevance.py plus reader.prune: 71,324 actions, 583,670 operators, 9,324,673
+  effects, 163.8 MB.
+- (d) alone drops the most actions of the six: 71,729 to 27,912. It makes the task depend on its start.
+- The default (fold strict, then (a)-(f)): 12,029 actions, 17,823 operators (3.1% of task.py's 583,670), 279,396
+  effects (3.0% of 9,324,673), 8.8 MB (5.4% of 163.8 MB).
+- The fold leaves 15 sub-groups unfolded for a hole (strict; 60 with every end), none for 128 bits, none for
+  PRE_LIMIT.
+
+== reading the plans ==
+- lama-first finds the same plans as before the fixes, step for step, in all 9 runs (3 configurations, 3 variants).
+  It searches with unit costs, so the metric line (now 1) does not change its search.
+- lama-first is greedy. On the default reduced tasks it finds 10, 18 and 11 steps (test_reader's plans: 7, 15, 8).
+  The shorter plans are still in the reduced tasks: test_reader's three plans run to the goal on every reduced
+  task (taskcore validate), and anytime LAMA finds them: 7, 15 and 8 steps after 7.1, 9.3 and 6.0 s, each replayed
+  to the goal over the full task with every fired guess left unknown. In 120 s it finds nothing shorter.
+- On the strict fold alone (--reduce none) lama-first finds 7, 15 and 8 steps, in 28 to 59 s with 0.99 GB.
+- The extra steps of the greedy plans: it opens 564 (sentence(2,564)) and runs the sentence script's two events
+  once more.
+
+== soundness of each lever (the full arguments are the doc comments of taskcore/src/fold.rs and reduce.rs) ==
+A plan is a sequence of actions with the guessed values it chose. Its cost is the sum of its actions' costs, and it
+must end in a state where every goal set holds. Every claim is about this cost. Every action costs at least 1.
+  fold (strict, every end): exact. Every plan maps both ways at the same cost. A sub-group with a hole, or whose
+    folded precondition would pass PRE_LIMIT, is not folded.
+  PRODUCT_LIMIT: a setting of the writer, not a reduction. Pick variables reach the same states.
+  (a) effects that cannot change the state: all plans survive.
+  (b) projection: all plans survive.
+  (c) null actions: optimal plans survive. A plan that uses a null action is lost; it has a cheaper plan without it.
+  (d) reachability from the start: all plans survive, from that start only. It needs every fact the task uses to
+      have a start value in its domain; the start check guarantees that (below).
+  (e) relevance by (fact, value): every optimal plan survives whole. Plans with dropped actions are lost.
+  (f) duplicates and dominance: the optimal cost survives, and at least one optimal plan.
+  The loop composes them: each keeps the optimal cost, so all together keep it.
+These hold for the task. They hold for the file's own optimum (what Fast Downward minimizes) in the model encoding,
+the default since the review. In task.py's encoding they do not: with metric 0 Fast Downward counts pick and goal
+operators, and the levers change how many a plan needs; and a goal set is a latch. The property test checks the
+model encoding against a search over the task's own states, which reads no SAS file.
+
+== the review of stage 1: each point, and what changed ==
+1. (d) and a start value outside a domain. Agreed. The review's task (K needs 1, start K=5) gave optimum 1 with
+   the plan [x] under --reduce d,b and the default; the true plan is z, x. One more case: the fold alone hid the
+   same start. Two paths split on F (F=0, F=1, the same effect) fold into one action that does not read F;
+   task.py raises OutOfDomain on F=5, the old taskcore with --fold strict wrote a file with optimum 1. Fix: a start
+   check on the input task, before the fold and the reductions (sas::start_misses). It stops with task.py's error
+   exactly when task.py's file names such a fact; it expands only the actions that name one. Now every
+   configuration raises on both tasks, and a start outside the domain of a fact no operator names still runs. The
+   property test: 418 of 2,700 tasks have a start task.py rejects; taskcore raises in all 13 configurations on all
+   418.
+   Kitchen: its starts have 0 facts outside their domains, so the check costs nothing there.
+2. metric 0. Agreed. Fast Downward reads metric 0 as cost 1 for every operator (root_task.cc:469), picks and goal
+   operators too. The review's task: (e) with PRODUCT_LIMIT 1 dropped the only cost-2 action, the metric went to 0,
+   and the optimum went from 1 to 2. Fix: the model encoding (--encoding model, the default) writes metric 1
+   whenever the file has a pick or goal operator; --encoding task keeps task.py's bytes. Now that task gives 1 in
+   every configuration. The property test now has unit-cost tasks (40%) and costs 1 to 3. In task.py's encoding
+   Fast Downward's optimum differs from the task's on 333 of 2,191 tasks with PRODUCT_LIMIT 1, and on 305 with every
+   lever and PRODUCT_LIMIT 1 (metric 0 or the latch). In the model encoding: 0 of 2,191, in all 13 configurations.
+   The review's own generator (600 tasks, costs 1 or 2, seed 12) had 10 failures (5 tasks, 2 configurations), all
+   metric flips; now 0.
+3. The goal-set latch. Agreed: task.py's goal operator sets `goal` to 1 and nothing sets it back. The review's
+   tiny task: task.py's file has optimum 4 (x, y ends outside B in {1, 2}); the task's optimum is 6 (x, y, x). It is
+   task.py's bug and stays in task.py. taskcore's model encoding fixes it: every effect that writes a goal-set fact
+   a value outside its set also sets `goal` to 0, under the same conditions. That task now gives 6 in every
+   configuration; --encoding task still gives 4. On random tasks task.py's own file misses the task's optimum on 221
+   of 614 goal-set tasks (and on 4 single-goal tasks, from metric 0 with picks). The kitchen's goal is one value
+   (owner:566 = 1): no goal variable, no latch.
+4. The fold past PRE_LIMIT. Agreed. The review's task (two paths of 4,096 variants, split on x0) stopped
+   --fold strict with "8192 variants from precondition sets alone". Fix: such a sub-group stays one action per
+   path, counted (subgroups_past_pre_limit_left_unfolded). Now 2 actions, optimum 1. Kitchen: 0 such sub-groups.
+5. The packed file's bytes. Agreed. The builder's and the review's kitchen.tc, from the same reading, differ in
+   2,810 words: a Python set of strings iterates in an order set by the hash seed, and string ids are given on
+   first sight. Fix: export_records writes every set (preconditions, conditions, guesses, add tables, goal) in the
+   order of its values' text. Exported twice, with PYTHONHASHSEED 1 and 2: the same bytes (kitchen.tc sha1
+   91083e331d91, kitchen-no211.tc b87d2d27154d). taskcore sorts by domain index on reading, so the SAS files did not
+   change: the 5 format checks give the same bytes as before.
+6. Errors in the report. Agreed on all three. The property test ran 700 tasks (300 + 400), not 684: 677 gave the
+   same bytes and 23 raised in both (7 + 16), not 7. "15 groups" left unfolded are 15 sub-groups. (f) recorded only
+   the first path of a folded action it replaced, so validate and known_plan could call the other paths dropped.
+   Fix: every member of a replaced action is recorded. The default's record grows from 1,047 to 1,056 entries,
+   every end + (a)-(f) from 732 to 1,621. No kitchen result changes: no step of test_reader's three plans is a
+   path (f) replaced.
+7. (d) makes the reduced file valid for its start only. Agreed, a design constraint: each replan is a taskcore run
+   from the packed file (6 to 9 s here for the default). And lama-first's longer plans are its search, not the
+   reductions: anytime LAMA on the default reduced files finds 7, 15 and 8 steps (above).
+What the review found sound was not changed: the format, the folds, (a), (b), (c), (e), (f), and the plan replays.
+
+== the property test after the fixes ==
+2,700 random tasks (300 seed 3, 400 seed 5, 2,000 seed 11), and the review's cases as fixed tests (all pass):
+  2,191 tasks task.py writes: the same bytes in all 2,191 (--encoding task). The task's optimum, from a search over
+    its states that reads no SAS file: Fast Downward's optimum on taskcore's file (model encoding) equals it in all
+    13 configurations on all 2,191 (1,820 solvable, 371 unsolvable; 614 with a goal set). The fold check: 0
+    mismatches over 2,643 folds.
+  418 tasks whose start task.py rejects (OutOfDomain): taskcore raises in all 13 configurations on all 418.
+  91 tasks task.py's writer rejects for another rule: taskcore raises too.
+The first run of the 2,000 had 3 failures, all in the state search itself: it took a write of the value a fact
+already has, next to another write of that fact, for a conflict; task.py leaves such a write out. Fixed in the test;
+the rerun has 0.
+
+== what stage 2 (streaming from the reader, then porting it) needs from this format ==
+- The reader can write each record as it makes it (export_records.Writer.action); the tables go at the end, so
+  nothing needs to be known in advance.
+- args: domains grow while the reader runs. The format writes values as strings and the domains at the end, so a
+  growing domain is fine; only a written value must not be labelled against a domain that is still growing (args
+  domains are exact, so their label is the value itself). Other domains are fixed before reading.
+- build_task's fold of identical records needs one key per distinct record over the whole run: now a 16-byte hash.
+- The fork fold needs, per record, its label, kind, path end and continuation (the events it leaves: unit, wait
+  point, Esc); they are in the file. Writing them is all the reader must do; the grouping is taskcore's.
+- The packed file is the same in every run, so a Rust reader's file can be compared with it byte for byte.
+- The exporter is the slow part now: 38 to 46 s for the kitchen in Python, against 6 to 9 s for taskcore to load,
+  reduce and write the SAS file. Porting the reader removes it.
+- Replays need the records' replay checks and the full actions; the packed file keeps only what the planner reads,
+  so the reader's records (or a side file of them by record index) stay the source for replays.

@@ -1,0 +1,13 @@
+[package]
+name = "taskcore"
+version = "0.1.0"
+edition = "2021"
+description = "E003 step 4: the planner's task as flat integer arrays, exact reductions, and Fast Downward's SAS file"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+codegen-units = 4
+lto = "thin"
+debug = false
