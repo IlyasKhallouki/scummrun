@@ -4,7 +4,7 @@ usage: from replay import Harness, boot, verify
        ctl, branch = boot(cfg_of, prefix_events, frame, out_dir)     # the engine at the test's start, from boot
        h = Harness(builder, full_task, task, branch, goal, ...)      # task: the planner's (pruned) task
        log = h.run()                                                 # plays, matches, bans, replans; log is a dict
-       verify(cfg_of, prefix_events + h.inputs(), h.checkpoints, out_dir2)   # the recorded inputs from boot
+       verify(cfg_of, prefix_events + h.inputs(), h.checkpoints, goal_keys, out_dir2)   # the inputs from boot
 
 What the harness does, per plan step (plan.md step 5, with D5):
 
@@ -13,68 +13,103 @@ What the harness does, per plan step (plan.md step 5, with D5):
   on A and B, a walk_to the walk click on A (the walk verb is the reader's own, read from the scripts), a dialog line
   a click on the line its verb shows, a skipped cutscene Esc, and an event no input at all: the harness waits.
   ``step_input`` and ``to_move`` do the translation.
+* **Waits first** (``waits_first``). Before an input step, the event steps that follow it up to the next input step
+  and that neither read nor write what it and the steps they pass read or write are played first, in their order.
+  The plan's order is one order of independent steps; in real time the input's own continuations (ego's arrival)
+  come a few frames after the click, so a wait the plan put between them has to come before the click.
 * **The camera.** A click on an object that is off screen while the camera still scrolls waits (no input) until the
   object is on screen or the camera stops (``Harness._wait_camera``): the Executor's approach walks toward a point
-  computed from the camera's position, which lies behind ego while the camera catches up with it.
+  computed from the camera's position, which lies behind ego while the camera catches up with it. The approach
+  takes actor ``EXECUTOR_EGO`` as ego (executor.py:1008, 1011, 1045, 1099); where VAR_EGO holds another actor the
+  click is an interface failure (``_check_ego``).
 * **The precondition.** Before its input, a step waits (no input) until its precondition holds in the engine's
   state, up to ``INPUT_LIMIT`` frames; the input then goes on the first frame the engine takes it (the Executor's
   click gate), not after the game settles (D5). A precondition that never holds is a mismatch of the plan's
   prediction, not of the step: replan, no ban. An event whose effects already hold at its turn (it ran during an
   earlier step) counts as done.
-* **The window.** After the input (or from the step's start, for an event) the harness watches every frame: the
-  step ends on the first frame all its predicted writes hold. Otherwise it runs on for ``INPUT_LIMIT`` frames after
-  the input (``WAIT_LIMIT`` for an event). The first idle or menu stop in the window is logged. If none of the
-  step's writes that change a value ever held (nothing happened; an Executor error counts the same), the input is
-  played once more, after the click gate reopens.
+* **The replay checks** (``eval_check``). The record's conditions on non-facts (reader.Record.checks) are checked in
+  the engine's state just before the input where the dump shows their operands: global variables, the sentence
+  script's locals 0-2 in its own code (the verb, A and B: script.cpp:1212-1214), VAR_EGO, and VAR_RESULT of
+  getActorX, getActorY or getActorRoom on an actor the dump lists. Before the input, a failing check on a position
+  or an actor's state whose actor is moving is waited for (no input), up to ``INPUT_LIMIT`` frames.
+* **The window.** After the input (or from the step's start, for an event) the harness watches every frame and keeps
+  every change to a tracked fact with its frame (``History``). The step ends on the first frame all its predicted
+  writes hold. Otherwise it runs on for ``INPUT_LIMIT`` frames after the input (``WAIT_LIMIT`` for an event), or,
+  once the engine took the input and none of the record's writes held, until the first idle or menu stop after it
+  (the input is spent: no sentence, input or object script runs and ego stands, so the record's path, which starts
+  at the input, can no longer start). The first idle or menu stop is logged per try.
+* **Taken, started.** The engine took the input when a slot fact (``SLOT_PREFIXES``) changed on the input's frame
+  or the next one, against the state just before the input (``_Watched``). The record's path started when one of
+  its writes that changes a value held on some frame of the window.
+* **The rules** (``verdict``):
+  - all writes held: the step is done; a guessed write that differs is a replan (task.py's rule);
+  - nothing happened (not taken, not started) or an Executor error: the input is played once more after the click
+    gate reopens (plan step 5). A second Executor error is an interface failure: replan, no ban;
+  - taken but not started: none of the record's tests ran, so its failure says nothing about the values it tested.
+    Retried after ``RETRY_WAIT`` frames, up to ``RETRIES`` times, then a replan with no ban. An event that never
+    started is a replan with no ban;
+  - started, then a mismatch: a replay check that failed in the engine explains it; retried when it is on time or
+    a position (``RETRY_REASONS``), and either way never banned (the test is on a non-fact, which a ban cannot
+    name). Otherwise, a check that could not be checked with a reason in ``RETRY_REASONS`` makes it a retry, then a
+    ban. Otherwise the mismatch is at a test on facts: the action is banned for the values its path tested (the
+    record's precondition facts that are not the input's engine conditions) plus the room, and the harness replans.
 * **The match** (``expectations``, ``match``): the record's predicted writes, each against the engine's value, and
   the tracked facts (the full task's facts, facts.py keys from the state dump, slot positions as ``pos:``) that
-  changed during the step without a predicted write (``unplanned``: events the engine ran without being chosen,
-  listed, not acted on). Every mismatch keeps the fact, the predicted values and the observed one. The locals of a
-  slot (``args:``) and saved verbs (``saved:``) are not in the dump: they are not matched, and the harness keeps the
-  plan's value for them.
-* **The rules** (``classify``): a mismatch only on guessed writes is a replan (task.py's rule); a mismatch on a
-  record that has a replay check on a position, a timer, a random draw, an actor's state or a message (the reader's
-  reasons) is retried after ``RETRY_WAIT`` frames, up to ``RETRIES`` times, then banned; any other mismatch is a
-  test on facts: the action is banned for the values its path tested (the record's precondition facts that are not
-  the input's engine conditions) plus the room, and the harness replans. A ban (``Ban``, ``apply_bans``) cuts the
-  banned point out of the precondition of every action of that label, so it holds wherever the planner meets those
-  values; a ban needs the task written again (task.py), a replan without a new ban only a new start.
-* **The replan**: ``reader.replan_start`` from the engine's facts and the plan's prediction (``args:`` copied where
-  the slot is where the plan put it), then ``plan_fd.plan``.
-* **The stop**: the goal (checked on every frame), no plan left (the planner's status), the replan limit, the
-  time limit, or a start outside the task's domains (task.OutOfDomain: the task would have to be built again).
-* **The record**: every input with its frame (the Executor's movie), every step with its frames, its outcome and
-  its mismatches, the plans and the bans; the engine's facts at every step's end are kept for ``verify``, which
-  plays the inputs from boot in a fresh engine (no fork, no change to the random state) and compares.
+  changed on any frame of the step without a predicted write (``History.unplanned``, with their frames). Every
+  mismatch keeps the fact, the predicted values and the observed one. The locals of a slot (``args:``) and saved
+  verbs (``saved:``) are not in the dump: they are not matched, and the harness keeps the plan's value for them.
+* **Bans** (``Ban``, ``apply_bans``): a ban cuts the banned point out of the precondition of every action of that
+  label, so it holds wherever the planner meets those values; it needs the task written again (task.py), a replan
+  without a new ban only a new start.
+* **The replan**: ``reader.replan_start`` from the engine's facts and the plan's prediction: the slot positions and
+  locals the played steps predicted (``Harness.pred``), so ``args:`` is copied only where the engine's slot is where
+  the plan put it; then ``plan_fd.plan``.
+* **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
+  one), a planner timeout, the replan limit, the time limit, or a start outside the task's domains
+  (task.OutOfDomain: the task would have to be built again).
+* **The record**: every input with its frame (the Executor's movie), every step with its tries and their frames,
+  its outcome and its mismatches, the plans, the reorders and the bans; the engine's facts, tick, random state and
+  actor positions at every input and every step's end are kept for ``verify``, which plays the inputs from boot in a
+  fresh engine (no fork, no change to the random state) and compares.
 
 C1 and C2: the harness gives only player inputs (clicks on verbs, objects and lines, walking, waiting, Esc), and
 names no game's number: the verbs, objects and lines come from the plan's records, the walk verb from the reader,
-the screen points from the Executor (its disclosed interface profile) and the engine's hit test.
+the screen points from the Executor (its disclosed interface profile, with ``EXECUTOR_EGO``) and the engine's hit
+test; the engine variables (VAR_EGO, VAR_SENTENCE_SCRIPT) are ScummVM's (model.py).
 """
 
 import collections
 import dataclasses
 import json
+import operator
+import re
 import time
 import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import facts as F
+import model as M
 import plan_fd
 import reader as R
 import task as T
 from speedrun.control import Branch, ControlError, Controller
-from speedrun.executor import DIALOG_FIRST, DIALOG_LAST, Executor, Move, RouteError
+from speedrun.executor import DIALOG_FIRST, DIALOG_LAST, MAX_ACTOR, Executor, Move, RouteError
 
 INPUT_LIMIT = 600  # frames an input step may take (plan step 5)
 WAIT_LIMIT = 3600  # frames an event (a wait) may take (plan step 5)
-RETRIES = 3  # retries of a step whose path tested a position, a timer or a random draw (plan step 5)
+RETRIES = 3  # retries of a step whose failure may be a matter of time or position (plan step 5)
 RETRY_WAIT = 60  # frames waited before such a retry
 PLAN_TIME = 600  # seconds per plan (plan step 4)
-# the reader's reasons for a replay check (reader._why) that time or a position can change: retried, not banned
-RETRY_REASONS = frozenset({"position", "timer", "random draw", "actor state", "message state"})
+# the reasons of a replay check (reader._why; model.py's R_* reasons) that time or a position can change: retried
+RETRY_REASONS = frozenset({"position", "timer", "random draw", "actor state", "message state", "loop exit by time",
+                           "wait over by time", "camera position"})
+TIME_CHECKS = frozenset({"position", "actor state"})  # failing checks waited for before the input (actor moving)
 UNOBSERVED = ("args:", "saved:")  # facts the state dump does not hold (a slot's locals, the saved verbs)
+PREDICTED = ("pos:", "escpos:") + UNOBSERVED  # the plan's values kept for the replan (``Harness.pred``)
+SLOT_PREFIXES = ("script:", "local:", "objscript:", "pos:", "escpos:", "frozen:", "cutscene")  # the input taken
+EXECUTOR_EGO = 1  # the actor the Executor's approach and stepping stone take as ego (executor.py:1008, 1011, 1099)
+HISTORY_CAP = 12  # changes kept per fact and step in the log
 
 
 # --- a step as player input ------------------------------------------------------------------------------------------
@@ -127,6 +162,52 @@ def to_move(inp: Input, name: str, state: dict | None = None, limit: int = INPUT
     return None
 
 
+# --- the plan's order --------------------------------------------------------------------------------------------------
+
+def reads_writes(a: T.Action) -> tuple:
+    """The facts an action reads (its precondition, its conditional effects' conditions, the facts it steps) and the
+    facts it writes."""
+    reads = set(a.pre) | {k for e in a.effects for k, _ in e.when} | {e.key for e in a.effects if e.add is not None}
+    return reads, {e.key for e in a.effects}
+
+
+def plain_writes(a: T.Action, now: dict) -> set:
+    """The facts an action writes with a plain value that they already hold in ``now``: writes that change nothing
+    there."""
+    return {e.key for e in a.effects if e.value is not None and e.add is None and e.values is None and not e.when
+            and now.get(e.key) == e.value}
+
+
+def _is_wait(task: T.Task, step) -> bool:
+    return getattr(task.actions[step.action].what, "kind", None) == "event"
+
+
+def waits_first(task: T.Task, steps: list, i: int, now: dict | None = None) -> tuple:
+    """``steps`` with the event steps after input step ``i``, up to the next input step, that are independent of
+    step i and of every step they pass moved before step i, in their order. Independent: neither writes a fact the
+    other writes, the event reads no fact the other writes, and the event changes no fact the other reads (a plain
+    write of the value the fact has ``now``, the state before step i, changes nothing). Returns (the new steps, the
+    moved steps)."""
+    if i >= len(steps) or _is_wait(task, steps[i]):
+        return steps, []
+    stay = [reads_writes(task.actions[steps[i].action])]
+    moved, kept = [], []
+    j = i + 1
+    while j < len(steps) and _is_wait(task, steps[j]):
+        a = task.actions[steps[j].action]
+        r, w = reads_writes(a)
+        changes = w - plain_writes(a, now or {})
+        if all(not (r & w2) and not (changes & r2) and not (w & w2) for r2, w2 in stay):
+            moved.append(steps[j])
+        else:
+            kept.append(steps[j])
+            stay.append((r, w))
+        j += 1
+    if not moved:
+        return steps, []
+    return steps[:i] + moved + [steps[i]] + kept + steps[j:], moved
+
+
 # --- observing --------------------------------------------------------------------------------------------------------
 
 def view(b, doms: dict, obs: dict) -> dict:
@@ -145,6 +226,132 @@ def view(b, doms: dict, obs: dict) -> dict:
 def holds(conds: dict, state: dict) -> list:
     """The keys of ``conds`` ({key: set of values}) that ``state`` does not meet (unobserved keys skipped)."""
     return [k for k, s in conds.items() if not k.startswith(UNOBSERVED) and state.get(k) not in s]
+
+
+def extra_of(state: dict, status: dict) -> dict:
+    """What a checkpoint keeps besides the facts: the tick, the random state and the listed actors' positions."""
+    return {"tick": status.get("tick"), "rng": status.get("rng"),
+            "actors": sorted([a["id"], a["x"], a["y"]] for a in state.get("actors", []))}
+
+
+class History:
+    """Every change to the tracked facts during a step, with its frame."""
+
+    def __init__(self, start: dict, frame: int):
+        self.start, self.last, self.frame0 = dict(start), dict(start), frame
+        self.changes: dict = {}  # key -> [(frame, value), ...]
+
+    def note(self, frame: int, now: dict) -> None:
+        for k in self.last.keys() | now.keys():
+            v = now.get(k)
+            if v != self.last.get(k):
+                self.changes.setdefault(k, []).append((frame, v))
+        self.last = dict(now)
+
+    def slots_changed(self, first: int, last: int) -> list:
+        """The slot facts that changed on a frame from ``first`` to ``last``."""
+        return sorted(k for k, ch in self.changes.items()
+                      if k.startswith(SLOT_PREFIXES) and any(first <= f <= last for f, _ in ch))
+
+    def unplanned(self, exps: dict) -> list:
+        """The tracked facts that changed on some frame with no predicted write: the value at the step's start, the
+        changes with their frames (the first ``HISTORY_CAP``), their count."""
+        return [{"key": k, "start": _str(self.start.get(k)), "changes": [(f, _str(v)) for f, v in ch[:HISTORY_CAP]],
+                 "count": len(ch)} for k, ch in sorted(self.changes.items()) if k not in exps]
+
+
+def _str(v):
+    return v if isinstance(v, int) or v is None else str(v)
+
+
+class _Watched:
+    """The Executor's branch, keeping the engine's state just before each input event is scheduled: the Executor
+    schedules an input for the next frame, so this is the state on the frame before the input's frame."""
+
+    def __init__(self, b: Branch):
+        self._b = b
+        self.before_input = None  # (frame, state dump)
+
+    def __getattr__(self, name):
+        return getattr(self._b, name)
+
+    def inputs(self, events: list) -> None:
+        if any(_is_input(e) for e in events):
+            self.before_input = (self._b.frame, self._b.state())
+        self._b.inputs(events)
+
+
+# --- the replay checks ------------------------------------------------------------------------------------------------
+
+_CMP = re.compile(r"^(.+?) (==|!=|<=|>=|<|>) (.+)$")
+_OPS = {"==": operator.eq, "!=": operator.ne, "<=": operator.le, ">=": operator.ge, "<": operator.lt,
+        ">": operator.gt}
+_GETTER = re.compile(r"^(getActorX|getActorY|getActorRoom)\((\d+|VAR_EGO)\)$")
+
+
+def _what(why: str) -> str:
+    """The what of a check's why (``?(reason: what)``)."""
+    s = why[2:] if why.startswith("?(") else why
+    return s.split(":", 1)[1].strip()[:-1].strip() if ":" in s else ""
+
+
+def check_getter(check) -> tuple | None:
+    """(getter, actor) when the check's VAR_RESULT comes from a getter on one actor, else None."""
+    m = _GETTER.match(_what(check[3]))
+    return (m[1], m[2]) if m else None
+
+
+def eval_check(check, rec, state: dict):
+    """Whether the engine's ``state`` takes the side the record's path took on a replay check (reader.Record.checks:
+    cite, condition, side, why): True, False, or None when the dump does not show the condition's operands
+    (module docstring)."""
+    cite, cond, side = check[0], check[1], check[2]
+    if side not in (True, False):
+        return None
+    vs = state["vars"]
+    locs = None
+    if rec.kind in ("sentence", "walk_to") and len(rec.source) == 4 and rec.source[0] == "sentence":
+        n = vs[M.VAR_SENTENCE_SCRIPT]
+        if cite.split(":", 1)[0] == f"global/script-{n:03d}.txt":
+            locs = {0: rec.source[1], 1: rec.source[2], 2: rec.source[3] or 0}
+    actors = {a["id"]: a for a in state.get("actors", [])}
+    getter = check_getter(check)
+    read = re.fullmatch(r"var:(\d+)", _what(check[3]))  # the non-fact the reader read, when it names one
+
+    def val(t: str):
+        t = t.strip()
+        if re.fullmatch(r"-?\d+", t):
+            return int(t)
+        m = re.fullmatch(r"Var\[(\d+)\]", t)
+        if m:
+            if read is not None and read[1] != m[1]:
+                return None  # the reader read another variable there (an indirect read): not the text's
+            return vs[int(m[1])] if int(m[1]) < len(vs) else None
+        m = re.fullmatch(r"Local\[(\d+)\]", t)
+        if m:
+            return None if locs is None else locs.get(int(m[1]))
+        if t == "VAR_EGO":
+            return vs[M.VAR_EGO]
+        if t == "VAR_RESULT" and getter is not None:
+            g, who = getter
+            a = actors.get(vs[M.VAR_EGO] if who == "VAR_EGO" else int(who))
+            if a is None:
+                return None  # not listed: in another room or not visible
+            return {"getActorX": a["x"], "getActorY": a["y"], "getActorRoom": state["room"]}[g]
+        return None
+
+    m = _CMP.match(cond)
+    if m:
+        lv, rv = val(m[1]), val(m[3])
+        if lv is None or rv is None:
+            return None
+        got = _OPS[m[2]](lv, rv)
+    else:
+        v = val(cond)
+        if v is None:
+            return None
+        got = v != 0
+    return got == side
 
 
 # --- the matcher ------------------------------------------------------------------------------------------------------
@@ -212,20 +419,31 @@ def match(exps: dict, now: dict) -> list:
 
 
 def unplanned(before: dict, after: dict, exps: dict) -> list:
-    """Tracked facts that changed from ``before`` to ``after`` with no predicted write: events the engine ran
-    without being chosen, or writes the record does not hold."""
+    """Tracked facts whose value differs from ``before`` to ``after`` with no predicted write (the step's ends only;
+    ``History.unplanned`` has every frame)."""
     return [Mismatch(k, _txt([before.get(k)]), after.get(k), "unplanned")
             for k in sorted(set(before) | set(after)) if k not in exps and before.get(k) != after.get(k)]
 
 
-def classify(rec, mismatches: list) -> str:
-    """What a failed step leads to (plan step 5): "replan" when only guessed writes differ, "retry" when the record's
-    path took a replay check on a position, a timer, a random draw, an actor's state or a message, else "ban"."""
+def verdict(rec, mismatches: list, evals=None) -> tuple:
+    """What a step whose path started and then differs leads to (module docstring): (first, after) with first one of
+    "replan", "retry", "ban" and after what a retry that keeps failing leads to ("ban" or "replan"). ``evals``: the
+    replay checks' results at the input (``eval_check``), one per ``rec.checks``; None: none were checked."""
     if not any(m.kind == "write" for m in mismatches):
-        return "replan"
-    if any(R._why(c[3]) in RETRY_REASONS for c in rec.checks):
-        return "retry"
-    return "ban"
+        return "replan", None
+    evals = list(evals) if evals is not None else [None] * len(rec.checks)
+    failed = [c for c, ok in zip(rec.checks, evals) if ok is False]
+    if failed:
+        return ("retry", "replan") if any(R._why(c[3]) in RETRY_REASONS for c in failed) else ("replan", None)
+    unknown = [c for c, ok in zip(rec.checks, evals) if ok is None]
+    if any(R._why(c[3]) in RETRY_REASONS for c in unknown):
+        return "retry", "ban"
+    return "ban", None
+
+
+def classify(rec, mismatches: list) -> str:
+    """``verdict``'s first answer with no replay check checked (the record's check reasons alone)."""
+    return verdict(rec, mismatches)[0]
 
 
 # --- bans -------------------------------------------------------------------------------------------------------------
@@ -280,6 +498,32 @@ def apply_bans(task: T.Task, bans: list) -> T.Task:
     return out
 
 
+# --- the replan's prediction --------------------------------------------------------------------------------------------
+
+def predict(pred: dict, rec, before: dict) -> dict:
+    """The plan's prediction ``pred`` (slot positions and the unobserved facts) after ``rec`` was played from the
+    state ``before``: its set writes, its conditional writes whose condition holds; a write of any other kind makes
+    the value unknown (dropped)."""
+    out = dict(pred)
+    for k, e in rec.effects.items():
+        if not k.startswith(PREDICTED):
+            continue
+        if e[0] == "set":
+            out[k] = e[1]
+        elif e[0] == "when":
+            if before.get(e[1]) == 1:
+                out[k] = e[2]
+        else:
+            out.pop(k, None)
+    return out
+
+
+def prediction(now: dict, pred: dict) -> dict:
+    """What ``reader.replan_start`` takes as the plan's predicted state: the engine's values with the plan's slot
+    positions and unobserved facts over them, so its guard compares the engine's slot position with the plan's."""
+    return dict(now, **pred)
+
+
 # --- the engine -------------------------------------------------------------------------------------------------------
 
 def write_events(path: Path, events: list) -> Path:
@@ -303,21 +547,38 @@ def boot(cfg_of, prefix: list, frame: int, out_dir: Path, timeout_s: float = 600
     return ctl, ctl.root
 
 
+def compare_checkpoint(want: tuple, state: dict, status: dict) -> dict:
+    """The differences between a checkpoint (frame, facts.py map[, extra_of]) and the engine's state and status."""
+    out = {}
+    d = F.diff(want[1], F.facts_of(state))
+    if d:
+        out["facts"] = len(d)
+        out["first"] = sorted(d.items())[:8]
+    if len(want) > 2:
+        got = extra_of(state, status)
+        for k, v in want[2].items():
+            if got.get(k) != v:
+                out[k] = {"want": v, "got": got.get(k)}
+    return out
+
+
 def verify(cfg_of, events: list, checkpoints: list, goal_keys, out_dir: Path) -> dict:
-    """Play ``events`` from boot in a fresh engine (no fork, no change to the random state) and compare its facts
-    with ``checkpoints`` ([(frame, facts.py map)], in frame order). Returns the counts and the first differences."""
+    """Play ``events`` from boot in a fresh engine (no fork, no change to the random state) and compare its facts,
+    tick, random state and actor positions with ``checkpoints`` ([(frame, facts.py map, extra_of)], in frame
+    order). Returns the counts and the first differences."""
     cfg = cfg_of(out_dir, write_events(out_dir / "movie.jsonl", events))
     out = {"checkpoints": len(checkpoints), "differ": [], "inputs": sum(1 for e in events if _is_input(e))}
     with Controller(cfg, timeout_s=600) as c:
         b = c.root
-        for frame, facts in checkpoints:
+        for cp in checkpoints:
+            frame = cp[0]
             st = b.run(frame=frame)
             if st.get("frame") != frame:
                 out["differ"].append({"frame": frame, "error": f"stopped at {st}"})
                 break
-            d = F.diff(facts, F.facts_of(b.state()))
+            d = compare_checkpoint(cp, b.state(), b.status)
             if d:
-                out["differ"].append({"frame": frame, "facts": len(d), "first": sorted(d.items())[:8]})
+                out["differ"].append(dict(frame=frame, **d))
         if checkpoints:
             last = F.facts_of(b.state())
             out["final"] = {k: last.get(k, 0) for k in goal_keys}
@@ -338,27 +599,32 @@ class Stop(Exception):
 @dataclass
 class StepLog:
     plan: int  # which plan (0: the first)
-    index: int  # the step's index in that plan
+    index: int  # the step's index in that plan (after the waits moved first)
     name: str
     kind: str
     input: str
     start: int  # frame the step began
-    issue: int | None = None  # frame of its (last) input
+    issue: int | None = None  # frame of its last input
     end: int | None = None  # frame it ended
-    outcome: str = ""  # matched, already happened, precondition, nothing happened, mismatch, goal
-    then: str = ""  # next, replan, retry, ban, goal
-    tries: int = 1  # times the input was played (a re-play after nothing happened, retries)
-    first_settled: int | None = None  # the first idle or menu stop after the input
+    outcome: str = ""  # matched, already happened, precondition, nothing happened, path not started, did not
+    # happen, interface failure, mismatch, goal
+    then: str = ""  # next, replan, ban, goal
+    tries: list = field(default_factory=list)  # per try: kind, start, issue, first settled, end, how, taken, started
     mismatches: list = field(default_factory=list)  # Mismatch as dicts (the last try's)
-    unplanned: list = field(default_factory=list)  # Mismatch as dicts
+    unplanned: list = field(default_factory=list)  # History.unplanned (the last try's)
+    checks: list = field(default_factory=list)  # the replay checks at the last input: (cite, condition, side, why,
+    # result)
     inputs: list = field(default_factory=list)  # the input events it sent
     note: str = ""
+
+    def add(self, note: str) -> None:
+        self.note = (self.note + "; " if self.note else "") + note
 
 
 class Harness:
     """Plays plans of ``task`` (the planner's task: actions whose ``what`` is a reader.Record) in the engine at
     ``branch`` until ``goal`` holds (module docstring). ``full_task``'s facts are the tracked facts and the domains
-    the matcher reads; ``bans`` start the run with bans already in place."""
+    the matcher reads."""
 
     def __init__(self, b, full_task: T.Task, task: T.Task, branch: Branch, goal: dict, *, release: str = "dos-cd",
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
@@ -368,21 +634,24 @@ class Harness:
         self.doms.update(task.facts)
         self.goal = goal
         self.branch = branch
-        self.ex = Executor(branch, release, fork=None)
+        self.watched = _Watched(branch)
+        self.ex = Executor(self.watched, release, fork=None)
         self.replan_limit, self.time_limit, self.plan_time = replan_limit, time_limit, plan_time
         self.progress = progress or (lambda msg: None)
         self.bans: list = []
         self.task: T.Task | None = None
         self.sas = None
         self.sas_bans = None  # the bans the current SAS file holds
-        self.plans: list = []  # per plan: status, seconds, steps, start counts
+        self.plans: list = []  # per plan: status, seconds, steps, start counts, reorders
         self.steps: list = []  # StepLog per step played
-        self.checkpoints: list = []  # (frame, facts.py map) at each step's end, for ``verify``
+        self.checkpoints: list = []  # (frame, facts.py map, extra_of) at each input and step end, for ``verify``
         self.replans = 0
         self.stop_reason = None
         self.obs: dict = {}
         self.now: dict = {}
-        self.kept: dict = {}  # the plan's values of the unobserved facts (args:, saved:)
+        self.pred: dict = {}  # the plan's slot positions and unobserved facts (PREDICTED), for the replan
+        self.kept: dict = {}  # the plan's values of the unobserved facts (args:, saved:), for the preconditions
+        self.prev_before = None
         self.frame0 = self.tick0 = None
 
     # --- observing ------------------------------------------------------------------------------------------------
@@ -412,6 +681,14 @@ class Harness:
             DIALOG_FIRST <= v["id"] <= DIALOG_LAST for v in self.state["verbs"])
         return "idle" in st or menu
 
+    def checkpoint(self) -> None:
+        if not self.checkpoints or self.checkpoints[-1][0] != self.branch.frame:
+            self.checkpoints.append((self.branch.frame, dict(self.obs), extra_of(self.state, self.branch.status)))
+
+    def _set_pred(self, pred: dict) -> None:
+        self.pred = pred
+        self.kept = {k: v for k, v in pred.items() if k.startswith(UNOBSERVED)}
+
     # --- planning -------------------------------------------------------------------------------------------------
 
     def plan(self, first: bool) -> list:
@@ -429,9 +706,9 @@ class Harness:
         if first:
             start, counts = R.task_start(self.b, self.obs, self.task), {}
         else:
-            start, counts = R.replan_start(self.b, self.obs, self.belief(), self.task)
+            start, counts = R.replan_start(self.b, self.obs, prediction(self.now, self.pred), self.task)
         entry = {"plan": len(self.plans), "frame": self.branch.frame, "bans": len(self.bans), "write_s": write_s,
-                 "start_counts": dict(counts)}
+                 "start_counts": dict(counts), "reorders": []}
         self.plans.append(entry)
         try:
             self.sas.state(start)
@@ -444,10 +721,13 @@ class Harness:
         entry.update(status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps])
         self.progress(f"plan {entry['plan']}: {res.status}, {len(res.steps)} steps, {res.seconds:.0f} s")
         if res.status != "plan":
-            self.stop_reason = f"no plan left (planner: {res.status})"
+            why = {"time": f"planner timeout ({self.plan_time} s)", "unsolvable": "no plan (the planner proved none)",
+                   "incomplete": "no plan (the search ended without one)"}
+            self.stop_reason = why.get(res.status, f"planner {res.status}")
             return []
-        # the plan's values of the unobserved facts at its start
-        self.kept = {k: self.task.facts[k].label(start.get(k, 0)) for k in self.task.facts if k.startswith(UNOBSERVED)}
+        # the plan's slot positions and unobserved facts at its start
+        self._set_pred({k: self.task.facts[k].label(start.get(k, 0)) for k in self.task.facts
+                        if k.startswith(PREDICTED)})
         return list(res.steps)
 
     # --- one step -------------------------------------------------------------------------------------------------
@@ -463,24 +743,32 @@ class Harness:
             self.advance()
         return True
 
-    def _watch(self, exps: dict, start: int, limit: int, log: StepLog) -> tuple:
-        """Every frame from now until all ``exps`` hold or ``limit`` frames after ``start``. Returns (how, the state
-        with the most writes held, whether a changed write ever held): how is "held", "goal" or "limit"."""
+    def _watch(self, exps: dict, start: int, limit: int, t: dict, hist: History, inputs: bool) -> tuple:
+        """Every frame from now until all ``exps`` hold, ``limit`` frames after ``start``, or (``inputs``) the input
+        is spent. Returns (how, the state with the most writes held, started, taken): how is "held", "goal",
+        "limit" or "spent"."""
         end = start + limit
-        best, ever = None, False
+        best, started, taken = None, False, False
         while True:
+            hist.note(self.branch.frame, self.now)
             held = [k for k, x in exps.items() if self.now.get(k) in x.values]
-            ever = ever or any(exps[k].changes for k in held)
+            started = started or any(exps[k].changes for k in held)
+            if inputs and not taken and self.branch.frame <= start + 1:
+                taken = bool(hist.slots_changed(start, start + 1))
             if best is None or len(held) > best[0]:
                 best = (len(held), dict(self.now))
-            if log.first_settled is None and self.branch.frame > start and self.settled():
-                log.first_settled = self.branch.frame
+            settled = self.branch.frame > start and self.settled()
+            if t.get("first_settled") is None and settled:
+                t["first_settled"] = self.branch.frame
             if len(held) == len(exps):
-                return "held", dict(self.now), ever
+                return "held", dict(self.now), started, taken
             if self.goal_holds():
-                return "goal", best[1], ever
+                return "goal", best[1], started, taken
+            if inputs and taken and not started and settled and self.branch.frame > start + 1 and \
+                    any(x.changes for x in exps.values()):
+                return "spent", best[1], started, taken
             if self.branch.frame >= end:
-                return "limit", best[1], ever
+                return "limit", best[1], started, taken
             self.advance()
 
     def _wait_camera(self, inp: Input, limit: int, log: StepLog) -> None:
@@ -499,25 +787,61 @@ class Harness:
             if self.branch.status.get("cam") == cam:
                 break
         if waited:
-            log.note = (log.note + "; " if log.note else "") + f"waited {waited} frames for the camera"
+            log.add(f"waited {waited} frames for the camera")
 
-    def _play_input(self, inp: Input, name: str, log: StepLog) -> bool:
+    def _check_ego(self, inp: Input) -> None:
+        """The Executor approaches an object that is off screen (not in the inventory, not a listed actor) with
+        actor ``EXECUTOR_EGO`` as ego: an interface failure where VAR_EGO holds another actor."""
+        s = self.state
+        for o in (inp.a, inp.b):
+            if o is None or o in s["inventory"] or self.ex.object_points(o, s):
+                continue
+            if o <= MAX_ACTOR and all(r["id"] != o for r in s["room_objects"]):
+                continue  # an actor: the Executor waits for it (Executor._wait_actor)
+            if s["vars"][M.VAR_EGO] != EXECUTOR_EGO:
+                raise RouteError(f"interface: object {o} is off screen and the Executor's approach takes actor "
+                                 f"{EXECUTOR_EGO} as ego, but VAR_EGO is {s['vars'][M.VAR_EGO]}")
+
+    def _wait_checks(self, rec, log: StepLog) -> None:
+        """Before an input: wait (no input), up to ``INPUT_LIMIT`` frames, while a replay check on a position or an
+        actor's state fails in the engine and its actor is moving (``TIME_CHECKS``)."""
+        def waiting() -> bool:
+            for c in rec.checks:
+                g = check_getter(c)
+                if R._why(c[3]) not in TIME_CHECKS or g is None or eval_check(c, rec, self.state) is not False:
+                    continue
+                who = self.state["vars"][M.VAR_EGO] if g[1] == "VAR_EGO" else int(g[1])
+                if any(a["id"] == who and a.get("moving") for a in self.state.get("actors", [])):
+                    return True
+            return False
+        f0 = self.branch.frame
+        self._wait_for(lambda: not waiting(), INPUT_LIMIT)
+        if self.branch.frame > f0:
+            log.add(f"waited {self.branch.frame - f0} frames for the record's position checks")
+
+    def _play_input(self, inp: Input, name: str, log: StepLog, t: dict) -> bool:
         """The step's input through the Executor; False on an Executor error (logged)."""
         mark = len(self.ex.movie)
+        self.watched.before_input = None
         try:
             if inp.kind == "click":
                 self._wait_camera(inp, INPUT_LIMIT, log)
+                self._check_ego(inp)
             move = to_move(inp, name, self.state)
             self.ex.play(move)
             ok = True
         except RouteError as e:
-            log.note = (log.note + "; " if log.note else "") + f"executor: {e}"
+            log.add(f"executor: {e}")
+            t["error"] = str(e)
             ok = False
         new = self.ex.movie[mark:]
         log.inputs += new
         ins = [e["frame"] for e in new if _is_input(e)]
-        log.issue = max(ins) if ins else self.branch.frame
+        t["inputs"] = [e for e in new if _is_input(e)]
+        t["issue"] = log.issue = max(ins) if ins else self.branch.frame
         self.observe()
+        if ins:
+            self.checkpoint()
         return ok
 
     def play_step(self, n_plan: int, i: int, step) -> str:
@@ -529,13 +853,14 @@ class Harness:
         limit = WAIT_LIMIT if is_event else INPUT_LIMIT
         log = StepLog(n_plan, i, step.name, rec.kind, _input_text(inp), self.branch.frame)
         self.steps.append(log)
-        retries, replayed = 0, False
+        retries, replays, kind = 0, 0, "first"
         try:
             while True:
                 # the precondition (or, for an event, its effects already there)
                 bad = holds(a.pre, self.belief())
                 if bad:
                     if is_event and self._already(rec, step):
+                        self._set_pred(predict(self.pred, rec, self.prev_before or self.belief()))
                         log.outcome, log.then, log.end = "already happened", "next", self.branch.frame
                         return "next"
                     ok = self._wait_for(lambda: not holds(a.pre, self.belief()), INPUT_LIMIT)
@@ -548,18 +873,32 @@ class Harness:
                         log.mismatches = [dataclasses.asdict(Mismatch(k, _txt(a.pre[k]), b.get(k), "precondition"))
                                           for k in holds(a.pre, b)]
                         return "replan"
+                if not is_event and rec.checks:
+                    self._wait_checks(rec, log)
+                t = {"try": len(log.tries) + 1, "kind": kind, "start": self.branch.frame}
+                log.tries.append(t)
                 before = self.belief()
-                seen0 = dict(self.now)  # the engine's values alone, for the unplanned changes
+                hist = History(self.now, self.branch.frame)
                 self.prev_before = before
                 exps = expectations(rec, before, self.doms, step.guessed)
+                evals = None
                 if is_event:
                     ok, start = True, self.branch.frame
                 else:
-                    ok = self._play_input(inp, step.name, log)
-                    start = log.issue
-                how, seen, ever = self._watch(exps, start, limit, log) if ok else ("error", dict(self.now), False)
+                    ok = self._play_input(inp, step.name, log, t)
+                    start = t["issue"]
+                    pre = self.watched.before_input
+                    if pre is not None:
+                        hist.note(pre[0], view(self.b, self.doms, F.facts_of(pre[1])))
+                        evals = [eval_check(c, rec, pre[1]) for c in rec.checks]
+                        log.checks = [list(c[:4]) + [ok_] for c, ok_ in zip(rec.checks, evals)]
+                if ok:
+                    how, seen, started, taken = self._watch(exps, start, limit, t, hist, not is_event)
+                else:
+                    how, seen, started, taken = "error", dict(self.now), False, False
+                t.update(end=self.branch.frame, how=how, started=started, taken=taken)
                 log.end = self.branch.frame
-                log.unplanned = [dataclasses.asdict(m) for m in unplanned(seen0, self.now, exps)]
+                log.unplanned = hist.unplanned(exps)
                 if how == "goal":
                     log.outcome, log.then = "goal", "goal"
                     return "goal"
@@ -567,47 +906,66 @@ class Harness:
                     log.outcome = "matched"
                     guesses = match(exps, seen)
                     log.mismatches = [dataclasses.asdict(m) for m in guesses]
-                    for k, e in rec.effects.items():  # the plan's values of the unobserved facts
-                        if k.startswith(UNOBSERVED) and e[0] == "set":
-                            self.kept[k] = e[1]
+                    self._set_pred(predict(self.pred, rec, before))
                     log.then = "replan" if guesses else "next"
                     return log.then
                 mism = match(exps, seen)
                 log.mismatches = [dataclasses.asdict(m) for m in mism]
-                if not ever and not is_event and not replayed:
-                    replayed = True
-                    log.tries += 1
-                    log.note = (log.note + "; " if log.note else "") + f"nothing happened by frame {self.branch.frame}"
-                    continue  # once more, after the click gate reopens (the Executor waits for it)
-                log.outcome = "nothing happened" if not ever else "mismatch"
-                verdict = classify(rec, mism) if mism else "replan"
-                if verdict == "retry" and retries < RETRIES:
-                    retries += 1
-                    log.tries += 1
-                    log.note = (log.note + "; " if log.note else "") + f"retry {retries} after {RETRY_WAIT} frames"
+                if how == "error":
+                    if replays < 1:
+                        replays, kind = replays + 1, "replay"
+                        log.add("an Executor error counts as nothing happening: played once more")
+                        continue
+                    log.outcome, log.then = "interface failure", "replan"
+                    log.add("no ban: the Executor could not play the input")
+                    return "replan"
+                if not started:
+                    if is_event:
+                        log.outcome, log.then = "did not happen", "replan"
+                        log.add("no ban: none of the event's writes held, so its path never ran")
+                        return "replan"
+                    if not taken and replays < 1:
+                        replays, kind = replays + 1, "replay"
+                        log.add(f"nothing happened by frame {self.branch.frame}: played once more")
+                        continue  # the Executor waits for the click gate
+                    log.outcome = "path not started" if taken else "nothing happened"
+                    if retries < RETRIES:
+                        retries, kind = retries + 1, "retry"
+                        log.add(f"retry {retries} after {RETRY_WAIT} frames (the record's path never started)")
+                        self.advance(RETRY_WAIT)
+                        continue
+                    log.then = "replan"
+                    log.add("no ban: the record's path never started, so none of its tests ran")
+                    return "replan"
+                log.outcome = "mismatch"
+                first, after = verdict(rec, mism, evals)
+                if first == "retry" and retries < RETRIES:
+                    retries, kind = retries + 1, "retry"
+                    log.add(f"retry {retries} after {RETRY_WAIT} frames")
                     self.advance(RETRY_WAIT)
                     continue
-                if verdict == "retry":
-                    verdict = "ban"
-                if verdict == "ban":
+                v = after if first == "retry" else first
+                if v == "ban":
                     ban = ban_of(rec, before)
                     self.bans.append(ban)
-                    log.note = (log.note + "; " if log.note else "") + f"ban {ban.label} at {dict(ban.values)}"
-                log.then = verdict if verdict == "ban" else "replan"
+                    log.add(f"ban {ban.label} at {dict(ban.values)}")
+                    log.then = "ban"
+                else:
+                    log.then = "replan"
                 return "replan"
         finally:
             if log.end is None:
                 log.end = self.branch.frame
-            if self.checkpoints[-1][0] != self.branch.frame:  # the engine's facts at the step's end, for verify
-                self.checkpoints.append((self.branch.frame, dict(self.obs)))
-            self.progress(f"  {log.outcome} -> {log.then} at frame {log.end} (tries {log.tries}); mismatches "
+            log.issue = log.tries[-1].get("issue") if log.tries else None
+            self.checkpoint()  # the engine's facts at the step's end, for verify
+            self.progress(f"  {log.outcome} -> {log.then} at frame {log.end} (tries {len(log.tries)}); mismatches "
                           f"{[(m['key'], m['predicted'], m['observed']) for m in log.mismatches[:6]]}; "
-                          f"{len(log.unplanned)} unplanned changes; {log.note}")
+                          f"{len(log.unplanned)} unplanned facts changed; {log.note}")
 
     def _already(self, rec, step) -> bool:
         """An event whose effects hold at its turn (it ran during the previous step): every write that changes a
         value, judged from the state at the previous step's start."""
-        before = getattr(self, "prev_before", None) or self.belief()
+        before = self.prev_before or self.belief()
         exps = expectations(rec, before, self.doms, step.guessed)
         changed = [x for x in exps.values() if x.changes]
         return bool(changed) and all(self.now.get(x.key) in x.values for x in changed)
@@ -618,7 +976,7 @@ class Harness:
         t0 = time.monotonic()
         self.observe()
         self.frame0, self.tick0 = self.branch.frame, self.branch.status.get("tick")
-        self.checkpoints.append((self.branch.frame, dict(self.obs)))
+        self.checkpoint()
         try:
             steps = self.plan(first=True)
             n_plan, i = 0, 0
@@ -634,6 +992,12 @@ class Harness:
                 if i >= len(steps):
                     how = "replan"  # the plan is played out and the goal does not hold
                 else:
+                    steps, moved = waits_first(self.task, steps, i, self.belief())
+                    if moved:
+                        self.plans[-1]["reorders"].append({"input": steps[i + len(moved)].name,
+                                                           "moved": [s.name for s in moved]})
+                        self.progress(f"plan {n_plan}: {[s.name for s in moved]} played before "
+                                      f"{steps[i + len(moved)].name}")
                     self.progress(f"plan {n_plan} step {i + 1}/{len(steps)}: {steps[i].name} (frame "
                                   f"{self.branch.frame})")
                     how = self.play_step(n_plan, i, steps[i])
@@ -652,8 +1016,7 @@ class Harness:
         except (Stop, ControlError) as e:
             self.stop_reason = f"engine: {e}"
         self.observe()
-        if not self.checkpoints or self.checkpoints[-1][0] != self.branch.frame:
-            self.checkpoints.append((self.branch.frame, dict(self.obs)))
+        self.checkpoint()
         st = self.branch.status
         return {
             "stop": self.stop_reason, "goal": self.goal_holds(), "replans": self.replans,
