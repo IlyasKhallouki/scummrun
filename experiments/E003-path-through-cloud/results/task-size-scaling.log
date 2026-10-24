@@ -1,0 +1,223 @@
+E003 step 4, a measurement: how the reading and the task grow with the scope, from Part I's real start
+
+script: experiments/E003-path-through-cloud/size_scaling.py (reader.py, task.py, relevance.py and domains.py as they are; the planner is not run)
+sources of k=0 (sha1, 12 hex, as uploaded to the VM): reader.py 94d495853f07, model.py cc630446bdbe, task.py c356a6df633a, relevance.py 3c50167cb0c8, domains.py 19932b58530a, ir.py c6ccf01059f1, actions.py ddbd1aaa2207, facts.py c06fc3489018
+sources of k=1 (sha1, 12 hex, as uploaded to the VM): reader.py 94d495853f07, model.py cc630446bdbe, task.py c356a6df633a, relevance.py 3c50167cb0c8, domains.py 19932b58530a, ir.py c6ccf01059f1, actions.py ddbd1aaa2207, facts.py c06fc3489018
+sources of k=2 (sha1, 12 hex, as uploaded to the VM): reader.py 94d495853f07, model.py cc630446bdbe, task.py c356a6df633a, relevance.py 3c50167cb0c8, domains.py 19932b58530a, ir.py c6ccf01059f1, actions.py ddbd1aaa2207, facts.py c06fc3489018
+
+== method ==
+Question: how do the reading and the task grow as the scope takes in more rooms, from Part I's real start?
+
+Start: results/start-part1.jsonl, seed 1 (frame 2728, room 33, 3,653 facts). The same map is the start and the
+input of domains.build(start, goals). Goal: results/end-part1.json goal_all: owner:901, owner:902 and owner:903 = 1
+(the ego). The planner is not run.
+
+Room graph, from the IR alone (no route data). Room R links to room R' when code that belongs to R has a room
+change with a constant target R'. Code that belongs to R: R's entry and exit code, R's local scripts, and the
+scripts of the objects whose room (index.json) is R. Room changes: loadRoom(R') and loadRoomWithEgo(obj, R'). A
+pseudo room (>= 0x80) is mapped to its room resource (model.Game.pseudo; 45 room changes). A change to R itself is
+not a link (44 room changes). Not links: Resource.loadRoom (a resource load), actorFollowCamera and putActorInRoom
+(no constant room). Global scripts are not part of the graph.
+Result: 109 room changes are links: 100 distinct links, out of 53 of the 83 rooms. From room 33, 26 rooms are
+reachable, in rings of 1, 3, 6, 12 and 4 rooms at distance 0 to 4. The other 57 rooms are reached only through
+global scripts (the map, the ship, cutscenes) or through rooms with no constant room change.
+
+Scope k: the rooms within k links of room 33. reader.Scope.of adds the global scripts they reach.
+  k=0:  1 room   [33]
+  k=1:  4 rooms  [28, 33, 35, 38]
+  k=2: 10 rooms  [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+  k=3: 22 rooms  [28, 29, 30, 31, 32, 33, 34, 35, 36, 38, 41, 43, 48, 52, 57, 58, 59, 61, 78, 83, 85, 96]
+
+Size of each scope from the IR alone (reader.Scope.of, no reading, under 3 s each):
+  scope       rooms  units  global scripts  objects  slot facts  dialog verbs  goal writable  by an exact write
+  k=0             1     28              18        5         428             0  0 of 3         0 of 3
+  k=1             4    140              42       86       4,024            11  3 of 3         0 of 3
+  k=2            10    283              82      146       6,846            11  3 of 3         3 of 3
+  k=3            22    463              91      319      10,013            11  3 of 3         3 of 3
+  k=4            26    544              94      374      12,107            12  3 of 3         3 of 3
+  full game      83  1,172             155    1,029      18,625            12  3 of 3         3 of 3
+155 of the game's 178 global scripts are reachable from the 83 rooms. "Goal writable" is Scope.writes.has. At k=1
+it holds only through a wildcard: a write to 'owner:' whose object does not fold. The exact writes of owner:901,
+902 and 903 (pickupObject(901..903)) are in room 83's local script 200 (the dock), which enters at k=2.
+
+Measurement script: size_scaling.py (new). Per scope, one child process: Game.load, domains.build, Scope.of,
+Reader, Builder, read_all(workers=16), build_task, relevance.relevant, reader.prune, task.write_sas of the pruned
+task and its file written to the VM's disk (head, state, tail), then write_sas of the task before relevance and its
+file. Each file is deleted after its size is taken. A supervisor process samples memory every 2 s. It kills the
+scope when the machine's memory in use (MemTotal - MemAvailable) passes 100 GB, or when a step passes 60 minutes.
+The line then names the step. Growth stops at the first scope that hits a limit. For k=2, a shell loop also
+sampled /proc/stat every 30 s, for the machine's CPU seconds (the child is killed before it can report its own).
+
+What ran:
+- Local test: scope 0 on the laptop (8 CPUs, 23.2 GB, workers=4, 3 GB free-memory floor), same sources as the VM:
+  878 records, 816 actions, 3,123 operators before relevance, 14.0 s wall, lowest free memory 3.77 GB.
+- VM: Google Cloud n2-highmem-16 Spot (16 vCPUs, 125.8 GB), workers=16, --full-sas. k=0 and k=1 ran in one
+  launch (17:22 to 17:52 UTC on 2026-10-24), k=2 in a second launch (17:55 UTC). All three scopes ran on the same
+  uploaded sources: reader.py 94d495853f07 and model.py cc630446bdbe (sha1, 12 hex; the full list is above).
+- A first attempt of this job (2026-10-23 23:32 UTC, model.py e413983eaf2d, same reader.py) ran k=0 and k=1 to
+  the end and stopped k=2 at the 60-minute read limit. Its counts match this run's for k=0 and k=1 (878 and
+  237,262 records) and for k=2's first two stages (163,981 and 229,680 records).
+
+== table (VM, workers=16; one row per scope; '-' = not reached) ==
+k  rooms  globals  units  records  actions     effects  kept  ops  ops full  MB full  read s  read CPU s  build s  relev s  parent GB  worker GB  mem GB      stopped
+0      1       18     28      878      816       5,631     0    0     3,123     0.59       1           5        0        0        0.1        0.1     0.2           no
+1      4       42    140  237,262  236,678  13,513,842     0    0         -        -   1,163       7,131      164       47       16.1        2.9    16.1           no
+2     10       82    283        -        -           -     -    -         -        -  >3,603     >15,473        -        -        8.8        8.8    52.4         read
+3     22       91    463        -        -           -     -    -         -        -       -           -        -        -          -          -       -  not started
+
+columns: rooms, global scripts and units in the scope (reader.Scope.of); records: paths read (read_all, last pass); actions and effects: build_task; kept: actions relevance keeps; ops: operators in the task file after relevance and prune; ops full, MB full: the task file of the task before relevance; read s, read CPU s: read_all's wall and CPU (parent and workers); build s: build_task; relev s: relevance; parent GB: the scope process's peak RSS over its steps (VmHWM); worker GB: the largest pool worker's peak RSS (RUSAGE_CHILDREN); mem GB: the machine's memory in use at its peak minus before the scope (MemTotal - MemAvailable, sampled every 2 s; the 100 GB limit applies to this measure). For a scope stopped in the read step, read s is the time until the stop, read CPU s the whole machine's CPU seconds from /proc/stat over that time, and parent GB and worker GB are the supervisor's samples every 2 s.
+
+== per scope ==
+k=0: 1 rooms [33]
+  global scripts (18): [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 18, 19, 20, 23, 25, 26, 130, 159]
+  units {'entry': 1, 'exit': 1, 'local': 4, 'obj': 4, 'global': 18}; objects 5; slot facts 428; dialog verbs 0
+  goal writable from the IR (Scope.writes.has): {'owner:901': False, 'owner:902': False, 'owner:903': False}; by an exact write (not only a wildcard 'owner:' write whose object does not fold): {'owner:901': False, 'owner:902': False, 'owner:903': False}
+  records by kind: {'event': 236, 'sentence': 576, 'skip_cutscene': 2, 'walk_to': 64}; reader: {'event rounds': 3, 'pass 1: records': 878, 'records': 878}; keys written outside their domain: 0
+  goal written in the records: {'owner:901': {'records_writing': 0, 'records_that_can_write_the_goal_value': 0}, 'owner:902': {'records_writing': 0, 'records_that_can_write_the_goal_value': 0}, 'owner:903': {'records_writing': 0, 'records_that_can_write_the_goal_value': 0}}
+  task: 816 actions, 146 facts, 5631 effects, 62 records folded
+  relevance: {'actions': 816, 'actions kept': 0, 'facts named': 146, 'facts needed': 3, 'facts needed whole': 0, 'values needed': 3, 'rounds': 1}
+  pruned: 0 actions, 3 facts; task file 424 bytes; {'actions': 0, 'operators': 0, 'variables': 3, 'values': 7, 'pick variables': 0}
+  task file before relevance: {'variants': 2901, 'max variants of one action': 20, 'steps whose result is several values (guesses)': 16, 'actions whose guesses go through pick variables': 6, 'effects that write the value the key already has (left out)': 400, 'pick operators': 222, 'conditional effects': 4515, 'effects': 27855, 'actions': 816, 'operators': 3123, 'variables': 213, 'values': 765, 'pick variables': 67}; 588207 bytes
+  steps (wall s / CPU s of the process / CPU s of its workers / peak RSS MB of the process): setup 2.4/1.5/0.0/67; read 0.9/0.2/5.1/68; build_task 0.0/0.0/0.0/69; relevance 0.0/0.0/0.0/70; prune 0.0/0.0/0.0/70; write_sas 0.0/0.0/0.0/70; write_file 0.0/0.0/0.0/70; write_sas_full 0.2/0.2/0.0/77; write_file_full 0.0/0.0/0.0/77
+  pass 1: 878 records from 166 runs in 0.9 s; 3 event rounds, 0 of them with 1 or 2 runs (0 records); first rounds: inputs 80 runs 640 records 0.4 s; event round 1 41 runs 191 records 0.4 s; event round 2 45 runs 47 records 0.1 s; event round 3 0 runs 0 records 0.0 s
+  machine: 16 CPUs, 125.8 GB; wall 6.0 s; memory in use before 1.46 GB, peak 1.66 GB; peak sum of RSS over the process tree 0.07 GB (shared pages counted once per process); sampled worker peak 0.0 GB
+
+k=1: 4 rooms [28, 33, 35, 38]
+  global scripts (42): [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 17, 18, 19, 20, 23, 25, 26, 31, 32, 46, 47, 48, 50, 51, 53, 54, 56, 59, 66, 68, 69, 70, 91, 92, 93, 120, 123, 130, 144, 159, 183]
+  units {'entry': 4, 'exit': 4, 'local': 48, 'obj': 42, 'global': 42}; objects 86; slot facts 4024; dialog verbs 11
+  goal writable from the IR (Scope.writes.has): {'owner:901': True, 'owner:902': True, 'owner:903': True}; by an exact write (not only a wildcard 'owner:' write whose object does not fold): {'owner:901': False, 'owner:902': False, 'owner:903': False}
+  records by kind: {'dialog_line': 1593, 'event': 125909, 'sentence': 83418, 'skip_cutscene': 21730, 'walk_to': 4612}; reader: {'pass 1: records': 217522, 'pass 1: domain values added for the next pass': 40, 'event rounds': 1027, 'pass 2: records': 237262, 'records': 237262}; keys written outside their domain: 0
+  goal written in the records: {'owner:901': {'records_writing': 0, 'records_that_can_write_the_goal_value': 0}, 'owner:902': {'records_writing': 0, 'records_that_can_write_the_goal_value': 0}, 'owner:903': {'records_writing': 0, 'records_that_can_write_the_goal_value': 0}}
+  task: 236678 actions, 1519 facts, 13513842 effects, 584 records folded
+  relevance: {'actions': 236678, 'actions kept': 0, 'facts named': 1519, 'facts needed': 3, 'facts needed whole': 0, 'values needed': 3, 'rounds': 1}
+  pruned: 0 actions, 3 facts; task file 424 bytes; {'actions': 0, 'operators': 0, 'variables': 3, 'values': 7, 'pick variables': 0}
+  task file before relevance: None; None bytes
+  sas_full_error: ValueError: event(script:47@35#a2bf3d907238)#150299: pos:local:200 := 10 is not in its domain (-1, 4, 11, 15, 20, 22, 30, 31, 35, 39, 40, 41, 42, 43, 44, 47, 50, 51, 53, 56, 58, 59, 62, 63, 66, 68, 72, 76, 79, 82, 83, 88, 93, 97, 118, 119, 120, 124, 125, 134, 141)
+  steps (wall s / CPU s of the process / CPU s of its workers / peak RSS MB of the process): setup 1.4/1.4/0.0/62; read 1162.7/276.5/6854.1/3034; build_task 164.2/164.2/0.0/8619; relevance 47.2/47.2/0.0/11534; prune 0.0/0.0/0.0/8635; write_sas 0.0/0.0/0.0/8635; write_file 0.0/0.0/0.0/8635; write_sas_full 256.2/256.2/0.0/16459
+  pass 1: 217,522 records from 20,268 runs in 557.3 s; 1,027 event rounds, 518 of them with 1 or 2 runs (2,072 records); first rounds: inputs 2,464 runs 83,103 records 137.5 s; event round 1 2,940 runs 56,143 records 173.2 s; event round 2 1,160 runs 7,523 records 35.8 s; event round 3 290 runs 3,335 records 7.2 s
+  pass 2: 237,262 records from 21,045 runs in 563.4 s; 1,027 event rounds, 518 of them with 1 or 2 runs (2,066 records); first rounds: inputs 2,628 runs 89,623 records 142.2 s; event round 1 2,966 runs 57,393 records 149.8 s; event round 2 1,175 runs 8,235 records 31.5 s; event round 3 321 runs 3,777 records 7.8 s
+  machine: 16 CPUs, 125.8 GB; wall 1642.1 s; memory in use before 1.46 GB, peak 17.53 GB; peak sum of RSS over the process tree 49.71 GB (shared pages counted once per process); sampled worker peak 2.93 GB
+
+k=2: 10 rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+  global scripts (82): [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 17, 18, 19, 20, 23, 24, 25, 26, 31, 32, 33, 46, 47, 48, 50, 51, 53, 54, 56, 59, 65, 66, 67, 68, 69, 70, 73, 74, 75, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 100, 101, 113, 114, 115, 117, 118, 120, 122, 123, 130, 132, 137, 138, 143, 144, 145, 146, 149, 151, 159, 160, 161, 162, 163, 182, 183]
+  units {'entry': 10, 'exit': 10, 'local': 91, 'obj': 90, 'global': 82}; objects 146; slot facts 6846; dialog verbs 11
+  goal writable from the IR (Scope.writes.has): {'owner:901': True, 'owner:902': True, 'owner:903': True}; by an exact write (not only a wildcard 'owner:' write whose object does not fold): {'owner:901': True, 'owner:902': True, 'owner:903': True}
+  pass 1: 500,605 records from 21,570 runs in 3,582.4 s; 43 event rounds, 0 of them with 1 or 2 runs (0 records); first rounds: inputs 4,702 runs 163,981 records 939.3 s; event round 1 5,042 runs 229,680 records 1876.9 s; event round 2 1,372 runs 14,603 records 343.3 s; event round 3 519 runs 5,775 records 96.7 s
+  machine: 16 CPUs, 125.8 GB; wall 3603.4 s; memory in use before 1.5 GB, peak 53.9 GB; peak sum of RSS over the process tree 149.0 GB (shared pages counted once per process); sampled worker peak 8.77 GB
+  machine CPU while the scope ran (/proc/stat, 122 samples): 15,473 CPU s over 3,631 s wall
+  STOPPED at step read: step read passed 60.0 minutes
+
+k=3: 22 rooms [28, 29, 30, 31, 32, 33, 34, 35, 36, 38, 41, 43, 48, 52, 57, 58, 59, 61, 78, 83, 85, 96]
+  global scripts (91): [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 17, 18, 19, 20, 23, 24, 25, 26, 31, 32, 33, 46, 47, 48, 50, 51, 53, 54, 55, 56, 57, 59, 64, 65, 66, 67, 68, 69, 70, 71, 73, 74, 75, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 100, 101, 113, 114, 115, 116, 117, 118, 120, 121, 122, 123, 124, 130, 132, 137, 138, 139, 142, 143, 144, 145, 146, 149, 151, 159, 160, 161, 162, 163, 182, 183]
+  units {'entry': 22, 'exit': 22, 'local': 159, 'obj': 169, 'global': 91}; objects 319; slot facts 10013; dialog verbs 11
+  goal writable from the IR (Scope.writes.has): {'owner:901': True, 'owner:902': True, 'owner:903': True}; by an exact write (not only a wildcard 'owner:' write whose object does not fold): {'owner:901': True, 'owner:902': True, 'owner:903': True}
+  not run: growth stopped at the first scope that hit a limit
+
+== growth from scope to scope ==
+k=0 -> k=1 (+3 rooms, +112 units, whole reading):
+  records 878 -> 237,262, x270.2, +78,795 per added room, +2,111 per added unit
+  actions 816 -> 236,678, x290.0, +78,621 per added room, +2,106 per added unit
+  effects 5,631 -> 13,513,842, x2,399.9, +4,502,737 per added room, +120,609 per added unit
+  read CPU s 5 -> 7,131, x1,345.4, +2,375 per added room, +64 per added unit
+  parent peak MB 77 -> 16,459, x213.8, +5,461 per added room, +146 per added unit
+k=1 -> k=2 (+6 rooms, +143 units), at the same depth (pass 1: inputs and event rounds 1 to 43; the stages k=2 finished):
+  records 203,434 -> 500,605, x2.46, +49,528 per added room, +2,078 per added unit
+  runs 12,460 -> 21,570, x1.73
+  wall s 476 -> 3,582, x7.5; wall s per run 0.038 -> 0.166
+  inputs: k=1 2,464 runs 83,103 records 137.5 s; k=2 4,702 runs 163,981 records 939.3 s
+  event round 1: k=1 2,940 runs 56,143 records 173.2 s; k=2 5,042 runs 229,680 records 1876.9 s
+  event round 2: k=1 1,160 runs 7,523 records 35.8 s; k=2 1,372 runs 14,603 records 343.3 s
+  event round 3: k=1 290 runs 3,335 records 7.2 s; k=2 519 runs 5,775 records 96.7 s
+  event round 4: k=1 350 runs 15,720 records 15.6 s; k=2 692 runs 24,734 records 36.2 s
+  event round 5: k=1 458 runs 5,610 records 12.2 s; k=2 753 runs 8,576 records 25.4 s
+  event rounds 6 to 43: k=1 4,798 runs 32,000 records 94.8 s; k=2 8,490 runs 53,256 records 264.6 s
+  k=1's whole pass 1 had 217,522 records; these stages were 94% of them
+
+== power law y = c * x^p, projected to the full game (1,172 units, 83 rooms) ==
+  records on units, through k=0 and k=1: p = 3.48; full game 3.85e+08
+  records on rooms, through k=0 and k=1: p = 4.04; full game 4.95e+10
+  actions on units, through k=0 and k=1: p = 3.52; full game 4.22e+08
+  actions on rooms, through k=0 and k=1: p = 4.09; full game 5.77e+10
+  effects on units, through k=0 and k=1: p = 4.84; full game 3.92e+11
+  effects on rooms, through k=0 and k=1: p = 5.61; full game 3.35e+14
+  read CPU s on units, through k=0 and k=1: p = 4.48; full game 9.64e+07
+  read CPU s on rooms, through k=0 and k=1: p = 5.20; full game 4.98e+10
+  records on units, k=1 -> k=2 at the same depth: p = 1.28; full game 3.6e+06 (from k=1's 237,262)
+  read wall on units, k=1 -> k=2 at the same depth: p = 2.87; full game 5.14e+05 s = 143 h on 16 workers (from k=1's 1,162.7 s)
+  records on rooms, k=1 -> k=2 at the same depth: p = 0.98; full game 4.67e+06 (from k=1's 237,262)
+  read wall on rooms, k=1 -> k=2 at the same depth: p = 2.20; full game 9.24e+05 s = 257 h on 16 workers (from k=1's 1,162.7 s)
+
+== findings ==
+1. Scope 0 (1 room, 18 global scripts, 28 units) reads in 0.9 s wall and 5 CPU s: 878 records, 816 actions,
+   3,123 operators and 27,855 effects before relevance, a 0.59 MB task file. No record writes owner:901, 902 or
+   903, so relevance keeps 0 of 816 actions.
+
+2. Scope 1 (4 rooms, 42 global scripts, 140 units) reads 237,262 records in 1,163 s wall and 7,131 CPU s (6.1 of
+   16 CPUs busy on average): 125,909 event, 83,418 sentence, 21,730 skip_cutscene, 4,612 walk_to and 1,593
+   dialog_line records. The task has 236,678 actions and 13,513,842 effects. build_task takes 164 s, relevance
+   47 s. The reading process peaks at 16.1 GB RSS (in write_sas of the task before relevance), the largest worker
+   at 2.9 GB, the machine at 16.1 GB in use above its base. The reading took 2 passes (40 domain values added
+   after pass 1) of 1,027 event rounds each; in each pass 518 rounds had 1 or 2 runs, and the 927 rounds past
+   round 100 took 30 to 36 s.
+
+3. Scope 1 cannot reach the goal. No record writes owner:901, 902 or 903, so relevance keeps 0 of 236,678 actions
+   and the pruned task has 0 operators (424 bytes). The IR agrees: at k=1 the goal is writable only through a
+   wildcard owner: write whose object does not fold. The exact writes (pickupObject 901 to 903) are in room 83's
+   local script 200, the dock, which enters at k=2.
+
+4. Scope 1's task before relevance cannot be written. task.write_sas stops on record #150,299,
+   event(script:47@35), with "pos:local:200 := 10 is not in its domain". Cause (a reader finding; reader.py not
+   changed):
+   - pos:<unit> takes its values from the stop points of the scope's own units (FactTable.points, from
+     Scope.universe). The unit name local:200 is shared by every room's local script 200. At k=1 the domain of
+     pos:local:200 is -1 and the stop points of the local 200 of rooms 28, 33, 35 and 38: 41 values, no 10.
+   - The room fact's domain is wider than the scope: the scope's rooms, the start room and every constant room
+     change in the scope. At k=1 it has 17 values: 0, 28, 29, 33, 34, 35, 38, 41, 63, 70, 72, 79, 81, 82, 83, 85
+     and 96.
+   - Global script 47 from offset 35 runs startScript(var 193), and var 193's domain is {0, 200, 208}. With room
+     41, 79 or 96 and var 193 = 200, the event starts that room's local script 200, which waits at offset 10.
+   - Builder.positions turns the write at:local:200:10 = 1 into pos:local:200 := 10 without checking the
+     domain, so the reader's own check (keys written outside their domain: 0 at k=1) does not see it and the
+     second pass does not widen it. write_sas is the first place that checks.
+
+5. Scope 2 (10 rooms, 82 global scripts, 283 units) stopped at the 60-minute limit of the read step, in pass 1.
+   By then it had read 500,605 records from 21,570 runs: inputs 4,702 runs and 163,981 records in 939 s, event
+   round 1 5,042 runs and 229,680 records in 1,877 s, event round 2 1,372 runs and 14,603 records in 343 s, and
+   41 more event rounds. That is already 2.1 times k=1's whole reading (237,262 records).
+   - Memory was not the limit. The machine's memory in use peaked at 52.4 GB above its base (limit 100 GB); the
+     reading process at 8.8 GB (sampled); the largest worker at 8.8 GB (sampled).
+   - The CPUs were mostly idle: 15,473 CPU s over 3,631 s, 4.3 of 16 CPUs busy on average. In the inputs stage 2
+     CPUs were busy for 12 of its 15.6 minutes; in event round 1 all 16 were busy for about 5 minutes, then 1 to 3
+     for the last 23 minutes. The stages wait on a few long runs.
+   - A stack dump (py-spy) of the last busy worker of event round 1, at 18:39 UTC, showed it in
+     event(script:2@721), an event of global script 2, inside a split run (a run past PATH_LIMIT run again per
+     value of its first fork).
+   - k=2's whole read, if its pass 1 has k=1's shape (the first 44 stages are 85% of pass 1's time) and it needs 2
+     passes like k=1: about 4,200 s per pass, 8,400 s (2.3 hours) in all, before build_task. It does not fit in
+     one more 2-hour start, so k=2 was not run again.
+   - The first attempt of this job (model.py e413983eaf2d) stopped k=2 at the same limit after the same first two
+     stages (163,981 and 229,680 records, in 1,165 s and 2,351 s).
+
+6. Growth per added room.
+   - k=0 -> k=1 (+3 rooms, +112 units), the whole reading: records x270 (+78,795 per added room), actions x290
+     (+78,621 per added room), effects x2,400 (+4.50 million per added room), read CPU s x1,345 (+2,375 per added
+     room), peak RSS of the reading process x214 (+5.3 GB per added room).
+   - k=1 -> k=2 (+6 rooms, +143 units), at the same depth (pass 1's inputs and event rounds 1 to 43, the stages
+     k=2 finished; 94% of k=1's pass 1 records): records 203,434 -> 500,605, x2.46, +49,528 per added room; runs
+     12,460 -> 21,570, x1.73; wall 476 s -> 3,582 s, x7.5, +518 s per added room; wall per run 0.038 s -> 0.166 s.
+   - The growth is not regular. As a power of the units in the scope, records grow with exponent 3.5 from k=0 to
+     k=1 and 1.3 from k=1 to k=2. The read time grows faster than the records: exponent 2.9 on units from k=1 to
+     k=2, because each run takes 4.4 times longer. With two points per step there is no fit; the projections
+     below are two-point power laws.
+
+7. A full-game scope (83 rooms, 155 global scripts, 1,172 units), if the growth held:
+   - records: 3.6 million (k=1 -> k=2 exponent on units; 4.7 million on rooms) to 385 million (k=0 -> k=1
+     exponent on units).
+   - read wall on 16 workers: about 514,000 s, 143 hours (k=1 -> k=2 exponent on units, from k=1's 1,163 s);
+     257 hours on rooms.
+   - memory: k=1's reading process peaked at 16,459 MB for 237,262 records, about 69 KB per record. At 3.6 to
+     4.7 million records the same rate gives about 245 to 315 GB, two to three times the VM's 125.8 GB.
+   - goal: no scope read so far writes the goal; k=2 is the first scope whose code holds the exact goal writes.
+
+8. Not run: k=3 (22 rooms, 91 global scripts, 463 units). Growth stopped at k=2, the first scope that hit a
+   limit. The planner was not run. VM time of this attempt: 1.77 hours of n2-highmem-16 Spot, $1.12.

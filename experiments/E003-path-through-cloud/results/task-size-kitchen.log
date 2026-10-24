@@ -1,0 +1,316 @@
+E003 step 4, a measurement: why relevance keeps almost every action of the kitchen task, and which lever shrinks
+the task most
+
+scripts (new, in the session scratchpad: .../scratchpad/size/relevance/). Second session: m0_check.py, m1_hubs.py,
+m2_guess.py, m2b_write.py, m2b_fd.py, m3_ops.py, m4_reach.py, m5_combo.py, m6_debug.py, m7_foldtask.py, with rel.py,
+common.py, slim.py and bclass.py from the first session. Third session: m8_foldcheck.py (the second session's,
+finished), m9_strict.py, m10_spot.py, m11_dead.py, m12_strict_task.py. Each script's output is next to it (.out).
+Nothing in E003's code was changed.
+sources (sha1, 12 hex), the same in the second and third sessions: reader.py 94d495853f07 (the reading's),
+task.py c356a6df633a, relevance.py 3c50167cb0c8, domains.py 19932b58530a, plan_fd.py 3d365d693db2. model.py is now
+cc630446bdbe; the reading was made with e413983eaf2d and is pickled, so its records are unchanged.
+input: the pickled kitchen reading (scratchpad/steps24/reading.pkl, 72,256 records); reader.build_task with
+test_reader's goal (owner:566 = VAR_EGO's value 1); start = reader.task_start of run B's S1#7 pre. slim.pkl is that
+task with each action's record cut to its kind, label, source, path end, next events and engine conditions; the
+preconditions and effects are build_task's own.
+
+== the task ==
+build_task: 71,729 actions (72,256 records, 527 folded into an action with the same label, precondition and effects)
+and 716 facts.
+relevance.relevant: keeps 71,324 of the 71,729 actions and 244 of the 716 facts (43 whole), in 46 rounds. The 405
+actions it drops are 276 dialog lines and 129 events. The 472 facts it drops: verb 101, saved 101, frozen 64, pos 49,
+state 34, var 31, objscript 28, script 26, bit 10, escpos 9, args 8, class 5, local 4, owner 2.
+reader-kitchen.log's line "task: 71324 actions, 244 facts; relevance keeps 71324" counts the pruned task, so it reads
+as 100%. The true share is 71,324 of 71,729 (99.4%).
+dead actions: 688 of the 71,729 are sentences whose room precondition is the empty set. They come from 28 inputs
+(a sentence and its ~frozen variant counted as one), for example sentence(4,564,322). relevance.py keeps all 688:
+it does not test whether a precondition can hold. task._expand drops them ("actions whose precondition no value
+meets"), so they cost no operator. Left out before relevance, relevance keeps 70,636 of 71,041: exactly the 688
+fewer, nothing else (m11_dead.out).
+pruned task (reader.prune): 71,324 actions, 244 facts, 651,994 effects. write_sas: 583,670 operators (583,602 from
+actions and 68 pick operators), 9,324,673 effects, 30 pick variables, 163.8 MB.
+
+== what was reused, and the re-checks ==
+Three sessions worked on this. The first left common.py, hubs.py, ops.py, rel.py, slim.py, slim.pkl, task.pkl and
+calib.pkl. The second re-checked those, ran m0-m7 and wrote this log; it stopped while m8_foldcheck.py ran. The third
+re-checked the second's outputs, finished m8 and added m9-m12. The sources' hashes did not change between the second
+and third sessions, so the second's outputs are of the same code.
+From the first session:
+- rel.fast_relevant (relevance.py's fixpoint as a worklist, with provenance and switches): on this task it gives the
+  same kept actions (71,324), the same needed values and the same 43 whole facts as relevance.relevant (m0_check.out).
+- calib.pkl (per-action operator and effect counts of the pruned task, rel.count_ops: task.write_sas's _expand,
+  dedup and drops without the text): its totals equal the log's 583,670 operators and 9,324,673 effects, its kept list
+  equals relevance.relevant's, and a fresh count of 1 action in 25 (2,853 actions, 23,402 operators) gives the same
+  operators and effects for every one.
+- hubs.json's block-one table: its top 40 recomputed, 0 differ. Its greedy step was wrong (it blocked the goal fact
+  owner:566 first, which removes everything trivially); redone with goal keys excluded.
+- bclass.py (which source gave each sentence's B): it had not run; run in the second session (bclass.json).
+- not reused: ops.py (it never finished; rewritten as m3_ops.py with the fork grouping changed, below); task.pkl
+  (deleted: /tmp is RAM here, and slim.pkl plus calib.pkl cover it).
+From the second session, every output (m0-m7, guess_small.pkl, fold_small.pkl, the fd-guess_small and fd-fold_small
+runs). The third session's re-checks:
+- m0_check.py run again: every line the same as the second session's (kept 71,324 by both relevance functions and
+  calib.pkl; 0 of 2,853 sampled actions differ in operators or effects).
+- m10_spot.py: item 1's block numbers with relevance.relevant itself. Blocking a fact gives the same kept set as
+  relevance.relevant on the task with every write to that fact removed. script:2: 66,656 kept both ways; var:102:
+  67,592; script:2, var:102 and frozen:script:2 together: 39,056. The same sets.
+- m8_foldcheck.py: the fold (item 3) does what each path did. For each member path, two states (the start with the
+  path's precondition keys at the first, then the last value of each set): the folded action must apply, no other
+  member may apply, and its writes (task.py's reading) must equal the path's. 6,647 folded actions, 58,932 member
+  paths, 116,488 states: 0 mismatches. 688 members were not compared: the dead sentences above, which the writer
+  drops either way.
+- m9_strict.py recomputes the fold's operator counts with m7_foldtask.py's functions: 44,618, 41,072, 20,737 and
+  19,279, the same as m5_combo.out.
+
+== 1. the hub facts: what makes relevance keep almost everything ==
+method: rel.fast_relevant with a block set: a blocked fact never becomes needed (its precondition values and its
+whole need are not passed on). Provenance: in FIFO order each kept action records the first (fact, value) or whole
+fact that kept it and the kept action whose precondition named that fact; this is a tree from the goal.
+- block one: only that fact blocked; the actions lost are those only it pulls in.
+- leave one in: the first session's 60 candidates (hubs.py: facts with at least 20 writers, ranked by how many
+  actions they keep first) all blocked but one; what that fact pulls in by itself.
+- greedy: block the fact that loses the most, repeat; goal facts excluded; pool: the 12 best by leave one in.
+- families: named groups blocked alone and cumulatively.
+facts named below: script:2 = the sentence script's slot is live; frozen:script:2 = its freeze; pos:script:2 = where
+it waits; args:script:2 = its list of locals (the reader's addition); var:53 = VAR_USERPUT (the input state);
+var:52 = VAR_CURSORSTATE; var:102 = the sentence script's repeat counter (global script 2 [000E]-[002B]: it counts
+a sentence with the same objects as the last one and chains script 3 at 4; every sentence writes it, and every
+sentence whose objects can equal the last ones forks on it); local:220 = room 28's pirate leaders' dialog.
+
+The heaviest chain from the goal (each hop: the fact = value that kept the action, then the action):
+  depth 1: owner:566=1 -> event(script:2@915#ef19a1f9cb92), the sentence script's part that picks up the meat.
+           Its preconditions: script:2=1, frozen:script:2=0, pos:script:2=915, args:script:2 = one list,
+           cutscene in 1..5, room 41, owner:566=15. They keep 28,448 actions directly: 16,585 through
+           frozen:script:2 (every freeze or unfreeze whose slot liveness the reader did not know writes it),
+           11,389 through script:2 (every action that starts the sentence script), 472 through cutscene, 2 through
+           args:script:2.
+  depth 2: script:2=1 -> sentence(2,315). Its preconditions keep 27,908 actions directly: 23,815 through var:53
+           (every action that steps the input state: every cutscene begin and end) and 4,093 through script:2.
+  depth 3: script:2=0 -> event(script:2@759#b1dc1303221e); keeps 681 through pos:script:2.
+Kept actions by depth: 3, 28,448, 32,217, 4,472, 4,449, 1,358, then 377 more down to depth 46. Depths 2 and 3 hold
+60,665 of the 71,324.
+First reason over all depths (actions kept first through that fact): var:53 23,923; frozen:script:2 16,585;
+script:2 15,482; var:102 3,852; args:local:208 3,078; args:local:209 2,076; local:209 2,058; local:208 1,030;
+pos:local:220 703; pos:script:2 681; cutscene 472; every other fact under 250.
+
+block one (fact: actions lost; readers, writers):
+  script:2 4,668 (35,559 readers, 19,738 writers); var:102 3,732 (25,586, 29,952); args:local:209 2,076;
+  local:209 2,062; args:local:208 2,055; local:208 1,037; pos:script:2 681 (5,193, 35,193); pos:local:220 663;
+  var:182 282; pos:local:207 202; every other fact under 100. var:53 (30,501 readers, 26,702 writers),
+  frozen:script:2 (35,145, 16,921), cutscene (2,699, 2,695) and the verb slots: 0 each.
+  These numbers are small because the hubs back each other up: an action that writes two hubs stays when one is
+  blocked.
+leave one in (the other 59 blocked; with all 60 blocked 26,321 actions are kept):
+  var:102 29,796; script:2 18,907; frozen:script:2 14,913; local:209 2,074; args:script:2 1,504;
+  pos:script:2 1,494; local:208 1,049; pos:local:220 907; var:53 822; var:182 414; cutscene 399; verb:2, verb:3,
+  verb:7, verb:8, verb:10 399 each; var:32 371.
+greedy: block script:2 -> 66,656 kept; + var:102 -> 52,856; + frozen:script:2 -> 39,056; + local:209 -> 36,994;
+  + local:208 -> 35,957; + pos:local:220 -> 35,294.
+families (actions lost of 71,324: blocked alone; cumulative with the families above it):
+  sentence slot (script:2, frozen:script:2, pos:script:2, args:script:2; 4 facts)    4,668;  4,668
+  input state (var:52, var:53)                                                         108;  4,776
+  sentence repeat counter var:102                                                    3,732; 34,128
+  cutscene depth                                                                         0; 34,518
+  verb slots (verb:*, saved:*; 29 facts)                                                 0; 34,518
+  every slot fact (running, frozen, pos, escpos, args, objscript; 93 facts)         14,993; 71,180 (144 kept)
+what stays with all 60 candidates blocked (26,321 actions): 12,672 Esc records and 12,626 events of local:220. They
+are kept at depth 5 because they write the dialog verbs that dialog lines need shown: verb:120 10,060,
+verb:121 5,824, verb:122 3,328, verb:123 1,584, verb:124 1,072, verb:125 676, verb:126 478, verb:127 478.
+engine conditions off (a diagnostic, not a sound relevance): the inputs' engine conditions (actions.usable; an
+event's slot and wait point) make nothing needed, only what the scripts tested does. Relevance still keeps 63,527 of
+71,729 actions, through 60 facts. First reasons: var:102 29,592; var:52 7,544; var:199 5,568; var:200 5,376;
+var:201 5,120; script:2 4,071; cutscene 2,692.
+
+Answer to 1: no single fact does it. The hubs are the sentence script's own bookkeeping: its slot (script:2,
+frozen:script:2, pos:script:2, args:script:2), its repeat counter var:102, and the input state var:53. The goal is
+written by a sentence-script event, so every action that starts, freezes or moves the sentence script, and every
+action that steps the input state, becomes relevant; and every sentence writes var:102, which every sentence reads.
+Blocking script:2, var:102 and frozen:script:2 together removes 32,268 actions (45%). Blocking every slot fact plus
+var:102, the input state, the cutscene depth and the verb slots leaves 144.
+
+== 2. relevance with guessed writes not counted as achievers ==
+method: a guessed write is a task.Effect with ``values`` (the reader could not work out the value). The reader counts
+guess reasons but does not keep them on the effects, so the split is by key: verb:* keys (the verb-slot guesses);
+the 21 keys the inventory hook writes (reader.Reader._hook_writes of the start's VAR_INVENTORY_SCRIPT, script 9;
+2 of them verb keys, counted under verb:*); the rest. rel.fast_relevant with a guessed effect not allowed to keep its
+action; it still makes its conditions' facts whole when its action is kept for another reason (relevance.py's rule,
+unchanged). Steps whose result is several values (an ``add`` on a collapsed value) are not marked on the effect and
+stay achievers. Reachability ignoring deletes: test_reader.relaxed_reach (and rel.relaxed, which re-applies effects
+as values grow) on reader.prune's task. Planner: plan_fd.run, lama-first with the landmark dump, 600 s, from the
+demo's start; the plan replayed over the task's own actions (test_reader.replay).
+guessed effects in the full task (71,729 actions): verb:* 127,299 on 38,377 actions; hook keys 79,650 on 5,310
+actions; other 9,209 on 1,074 actions; 38,886 actions have at least one. By family: verb 127,299, var 80,019,
+saved 6,402, script 1,059, frozen 947, objscript 432.
+relevance (actions kept of 71,729; facts needed):
+  baseline                                    71,324; 244 (43 whole)
+  verb:* guesses not achievers                71,324; 244
+  hook-key guesses not achievers              71,324; 244
+  other guesses not achievers                 71,294; 244
+  verb:* and hook-key guesses not achievers   71,324; 244
+  every guessed effect not an achiever        71,294; 244 (43 whole): 30 events fewer, all through the other
+                                              guesses (keys neither verb:* nor the hook's)
+All 7 steps of the baseline plan are kept in every variant.
+the task with every guessed effect not an achiever: 71,294 actions, 244 facts, 651,952 effects after pruning;
+write_sas: 274 variables, 583,610 operators (60 fewer), 9,324,589 effects, 30 pick variables, 163.8 MB.
+reachable ignoring deletes: the goal yes (both instruments); 27,788 of the 71,294 actions usable from the start.
+lama-first: a plan in 144.0 s (the baseline took 171.2 s in reader-kitchen.log), 7 steps, 31 landmarks. The steps
+are the baseline plan's 7, in the same order: walk_to(316)#478, event(local:211@33)#30568,
+event(script:2@736#a8c69122caf2)#30915, event(local:218@16#86dcd5f97351)#35417, sentence(9,566)#12118,
+event(script:2@736#1db02ba5a8ab)#34384, event(script:2@915#ef19a1f9cb92)#34395. Replayed over the task's own
+actions it reaches the goal and uses no guessed value. Fast Downward's peak memory: 2.26 GB (getrusage). Of its
+137.8 s, up to the landmarks (reading the file) took 34.7 s, the landmarks 101.3 s and the search 1.1 s. write_sas
+in Python peaked at 3.8 GB.
+Answer to 2: guessed writes are not why relevance keeps everything. Not counting them as achievers removes 30
+actions and 60 operators; the goal stays reachable and lama-first finds the same plan.
+
+== 3. operators by where they come from ==
+method: operators per action from calib.pkl (rel.count_ops on reader.prune's task; checked above). Each action's kind,
+label, path end and next events come from its record. "ops/action" is operators per action.
+by action kind (actions; operators of 583,670; ops/action):
+  event            28,419 actions  255,302 operators (43.7%)   9.0
+  skip_cutscene    12,680 actions  226,618 operators (38.8%)  17.9
+  sentence         28,060 actions   95,436 operators (16.4%)   3.4
+  walk_to           1,892 actions    5,676 operators  (1.0%)   3.0
+  dialog_line         273 actions      570 operators  (0.1%)   2.1
+  pick operators                        68
+One unit holds most of it: local:220 (room 28's pirate leaders' dialog) has 12,672 Esc records (226,550 operators)
+and 13,698 events (231,326 operators): 457,876 of the 583,670 operators (78.4%) from 26,370 of the 71,324 actions.
+The next unit is the sentence script's events, script:2: 5,193 actions, 13,064 operators.
+"~frozen" variants (the sentence script's slot live and frozen, Builder._sentence_base): exactly half the sentences
+  and walks. sentence: 14,030 plain and 14,030 ~frozen, 47,718 operators each; walk_to: 946 and 946, 2,838 each.
+  The ~frozen half is 50,556 operators (8.7%).
+sentences by A's place: room 23,676 actions (82,284 operators); inventory 4,384 (13,152).
+sentences by B (bclass.json, Builder.b_values's sources; every built B found its class):
+  one object                                   20,464 actions  74,712 operators
+  B whose own entry the sentence script starts  5,280 actions  13,800 operators   (Give: 128 (verb, A, B) entries)
+  B = "other" (the stand-in object)             2,184 actions   6,552 operators   (69 entries)
+  B = a constant A's entry compares with          132 actions     372 operators   (5 entries)
+  two-object sentences by verb: verb 4 7,332 actions (19,956 operators); verb 7 264 (768).
+Esc records (skip_cutscene): local:220 12,672 actions (226,550 operators); local:222 8 (68).
+events by unit kind: local 22,824 actions (241,695 operators); script 5,577 (13,520); obj 18 (87).
+events by locals: with a list of locals (args:<unit> = its number) 26,027 actions (218,899 operators); with unknown
+  locals (args 0) 2,392 actions (36,403 operators).
+lists of locals per wait point (the reader's args: facts): events reach 231 wait points. Lists per point: 1 at 3
+  points, 2 at 68, 3 at 7, 4 at 64, 5 at 3, 6 at 5, 7 at 44, 9 at 2, 10 at 17, 11 at 1, 13 at 5, 27 at 1, and more
+  than 27 at the other 11. Operators past the largest list at each point: 204,986. Esc reaches
+  11 wait points with 4 lists (3 points) or 7 (8 points); operators past the largest list: 192,671.
+dialog lines by VAR_VERB_SCRIPT value and room: 202 in room 41 33 actions (330 operators); 202 in room 28 132 (132);
+  14 in room 28 54 (54); 14 in room 41 54 (54).
+per-path forks: the 71,324 actions come from 8,984 labels (one input or event each). 1,845 labels have one action;
+  7,139 have more, holding 69,479 actions and 581,140 operators. Actions per label: 2 for 4,728 labels, 14 for 1,382,
+  8 for 169, 20 for 162, 50 or more for 143, 11 for 138, 26 for 118.
+path ends of the 71,324 actions: yield 55,369; end 10,113; chained 4,827; stopped 926; room 48; parked 41.
+
+the fork fold (plan step 1: "a handler that can end early becomes one action per path; other branches become
+conditional effects"; reader.py chose one action per path instead):
+method: the kept actions of one label that end the same way are grouped: the same path end and the same
+continuation (the events the path leaves: unit, wait point, Esc or not), counted with and without the same lists of
+locals (without, the args: write differs and becomes a conditional effect). Paths whose fact preconditions overlap
+differ only in non-fact tests (replay checks) and cannot become conditions on facts, so each group is split greedily
+into sub-groups of pairwise disjoint paths. A sub-group becomes one action: a key with one set on every path stays a
+precondition; on keys that differ the union stays a precondition (left out when it is the whole domain) and each
+path's own sets become the condition of its effects; an effect every path has stays unconditional when the paths
+cover the union, else it is conditional too. rel.count_ops on the result (task.write_sas's rules, PRODUCT_LIMIT 64).
+Two versions. Strict: only paths that end in a yield are folded. A yield names its site (the wait points of the next
+events), so these are paths that meet again; this is step 1's rule. Every end: also paths that end the handler (end,
+stopped, chained, room, parked) with the same end kind. The record keeps the end's kind, not its site, so this joins
+an early return with the last one, which step 1 keeps apart.
+results:
+  actions that share label, path end and continuation with another: 59,738 in 4,876 groups (4,939 with the same
+  locals required). 58,932 of them fold (pairwise disjoint on facts); the other 806 differ from a group-mate only in
+  non-fact tests.
+  strict (yield ends only): 47,953 actions (533,668 operators) become 3,937 actions. The task: 71,324 -> 27,308
+    actions; 583,670 -> 64,240 operators (70 pick, 31 pick variables); 9,324,673 -> 1,098,741 effects.
+  every end, locals may differ: 58,932 actions (567,658 operators) become 6,647 actions (28,601 operators). Yield
+    ends: 47,953 actions, 533,668 -> 14,236 operators. Other ends: 10,979 actions, 33,990 -> 14,365 operators. The
+    task: 71,324 -> 19,039 actions; 583,670 -> 44,618 operators (73 pick); 9,324,673 -> 764,137 effects (589,616
+    conditional). 60 folds have a hole (their paths do not cover the union; there the action writes nothing).
+  every end, same locals required: 58,908 actions (567,586 operators) become 6,716 (29,029); the task 19,132
+    actions, 45,113 operators, 777,950 effects.
+  the check (m8_foldcheck.out): 0 mismatches in 116,488 states over the 58,932 folded paths (method above).
+  How it works on local:220: esc(local:220@5216) has 320 paths that fork on var:197 (5 values), var:200 and var:201
+  (4 each), bit:349 and bit:87 (2 each), 320 combinations, all covered. Its paths guess dialog verbs among
+  verb:120-128 (the first path 3 of them, 8 operators); the 320 paths have 4,410 operators. Folded, it is 1 action
+  with 2,187 effects, 801 of them conditional guesses, written through 7 pick variables: 1 operator, plus pick
+  operators that every action shares. 186 of the 19,039 folded-task actions go through pick variables.
+  lama-first on the folded tasks (plan_fd.run, 600 s, demo start; Fast Downward's peak memory by getrusage):
+    every end: write_sas 274 variables, 44,618 operators, 764,137 effects, 32 pick variables, 24.7 MB; a plan in
+      13.1 s (the baseline: 171.2 s), 7 steps, 30 landmarks, peak 0.27 GB. Of its 12.2 s: up to the landmarks
+      (reading the file) 5.6 s, the landmarks 6.1 s, the search 0.5 s. 4 of the 7 steps are folded actions.
+    strict: write_sas 273 variables, 64,240 operators, 1,098,741 effects, 31 pick variables, 30.3 MB; a plan in
+      12.8 s, 7 steps, 31 landmarks, peak 0.35 GB. Of its 12.4 s: up to the landmarks 3.7 s, the landmarks 8.4 s,
+      the search 0.3 s. 1 of the 7 steps is a folded action (step 6, the sentence script's event at 736).
+  In both, the steps are the baseline plan's 7 in the same order. Replayed over the folded task's own actions each
+  plan reaches the goal and uses no guessed value.
+
+== 4. what else multiplies the count by 2 or more ==
+method: per kept action, the product of its precondition sets of more than one value (after cutting them to the
+domain and leaving out a set that holds for every value) and the product of its guessed values (task._expand's
+rules; an action past PRODUCT_LIMIT 64 counted once for guesses). "Operators gone if that set were one" is
+operators x (1 - 1/size), summed over the actions with that set. Full recounts with rel.count_ops.
+  per-path forks: 71,324 actions from 8,984 labels (x7.9). The fold above takes them to 19,039 (every end) or
+    27,308 (strict).
+  guessed values: x4.09 on top of the precondition sets (144,904 variants become 592,866 before variants with no
+    effect are dropped; 583,602 counted). Almost all of it is the dialog verb slots that local:220 writes as
+    guesses (VerbOps on a slot the reader cannot work out). Operators gone if that guess were one operator:
+    verb:127 224,505; verb:126 146,790; verb:128 146,790; verb:120 115,722; verb:121 114,588; verb:122 113,076;
+    verb:125 52,050; verb:124 51,042; verb:123 50,382; var:52 12,085; var:53 11,920; every other key under 400.
+    With every guess through pick variables (task.py's PRODUCT_LIMIT 1): 142,913 operators (73 pick, 32 pick
+    variables), 1,638,560 effects. PRODUCT_LIMIT 8: 193,691 operators.
+  precondition sets of more than one value: x2.03 (144,904 variants from 71,324 actions). var:53, the input state
+    (VAR_USERPUT > 0 is {1, 2, above}): x3 on 29,952 actions, 67,407 operators gone if it were one. cutscene depth
+    ({1..5}): x5 on 2,699 actions, 35,300. No other key. Cutting each set to the values reachable from the start
+    changes nothing (232,209 operators either way on the usable actions).
+  lists of locals per wait point (args:): events x5.1 (255,302 operators; 50,316 if each point kept its largest list
+    only); Esc x6.7 (226,618; 33,947).
+  "~frozen" sentence and walk variants: exactly x2 on sentences and walks (50,556 operators).
+  under x2: sentences on inventory objects (4,384 of 28,060), two-object sentences (7,596 of 28,060), dialog line
+    variants per VAR_VERB_SCRIPT value and room (273 actions).
+How they stack in local:220: one Esc input (a wait point and a list of locals) forks into up to 320 paths on the
+dialog's facts, and each path carries 2 to the power of its guessed verb slots in operators.
+
+== levers ==
+method: operators of the pruned task (583,670) after each change, recounted with rel.count_ops; "no Esc records" and
+"no ~frozen variants" are the per-action counts subtracted; the folded tasks also written and planned. "usable from
+the start": test_reader.relaxed_reach from the demo's start on reader.prune's task (27,800 of 71,324 actions; the
+same set as rel.relaxed).
+each alone (operators; removed):
+  fold forks, every path end (locals may differ)              44,618  -539,052 (92.4%)
+  fold forks, yield ends only (strict)                        64,240  -519,430 (89.0%)
+  every guess through pick variables (PRODUCT_LIMIT 1)       142,913  -440,757 (75.5%)
+  only actions usable from the start, ignoring deletes       232,209  -351,461 (60.2%)
+  no Esc records                                             357,052  -226,618 (38.8%)
+  no "~frozen" variants                                      533,114   -50,556  (8.7%)
+  guessed writes not achievers in relevance                  583,610       -60
+  dead sentences left out before relevance                   583,670         0
+together (operators; actions):
+                                            no fold            strict fold        fold, every end
+  PRODUCT_LIMIT 64, all actions:            583,670 (71,324)   64,240 (27,308)    44,618 (19,039)
+  PRODUCT_LIMIT 1,  all actions:            142,913 (71,324)   54,507 (27,308)    41,072 (19,039)
+  PRODUCT_LIMIT 64, usable from the start:  232,209 (27,800)   21,031 (13,089)    20,737 (12,473)
+  PRODUCT_LIMIT 1,  usable from the start:   39,241 (27,800)   18,556 (13,089)    19,279 (12,473)
+  The three overlap: all three cut local:220's Esc records and events. After the strict fold, pick variables remove
+  9,733 more and reachability 43,209 more. With every end folded and all three, 19,279 operators remain: events
+  10,477 actions (11,388 operators), sentences 1,768 (7,038), walks 132 (528), dialog lines 28 (168), Esc 68 (84),
+  and 73 pick operators.
+which need a change to the plan's rules:
+  fold, strict: none. It is plan step 1's own rule, "other branches become conditional effects"; reader.py's
+    docstring chose one action per path instead. It is a change to how the task is written: build_task joins the
+    paths of one input that leave the same continuation, from the records as they are.
+  fold, every end: step 1's "a handler that can end early becomes one action per path". It gives 19,622 operators
+    more than the strict fold (64,240 -> 44,618).
+  pick variables: none. Only task.py's PRODUCT_LIMIT. Step 4's "one effect per possible value, marked so that a
+    mismatch there leads to a replan" still holds (picks reach the same states, task.py).
+  reachability from the start: step 4, "A replan changes only the starting state, so the task is translated once."
+    The task would depend on its start, so a replan from a state outside the reachable set needs the task rebuilt.
+  no Esc records: step 1's "Skipped cutscene" kind, and C1, which lists Esc as a player input.
+  no "~frozen" variants: no plan rule; it is the reader's engine variant (Builder._sentence_base). Dropping it loses
+    the sentences given while the sentence script is live and frozen.
+  guessed writes not achievers: step 4's relevance ("keep the actions that can contribute ... removes nothing that
+    could matter"). It removes 60 operators.
+  blocking the hub facts in relevance: step 4's relevance too, and it is not sound.
+the three biggest levers, each alone: the fork fold (strict -519,430 operators; every end -539,052), every guess
+through pick variables (-440,757), only actions usable from the start (-351,461). The strict fold and the picks need
+no change to the plan's rules: the fold is step 1's own rule done in build_task, and the picks are task.py's
+PRODUCT_LIMIT. Folding every end needs step 1's early-end rule changed. Reachability needs step 4's "translated once"
+changed.
