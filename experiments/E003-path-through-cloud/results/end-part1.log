@@ -1,0 +1,20 @@
+key: experiments/E001-goals-from-scripts/key.json sha256 625462f6ff4839d0..., 170 entries, Part I: 99
+Part I end = the last 3 Part I entries: #[97, 98, 99] (#97-99 as plan.md says)
+  #97 ['owner', 901, 1] -> owner:901 == 1  (Guybrush has the pamphlet (901); route move S3#123: Esc the crew banter (end of Part I, Part II starts))
+  #98 ['owner', 902, 1] -> owner:902 == 1  (Guybrush has the leaflet (902); route move S3#123: Esc the crew banter (end of Part I, Part II starts))
+  #99 ['owner', 903, 1] -> owner:903 == 1  (Guybrush has the brochure (903); route move S3#123: Esc the crew banter (end of Part I, Part II starts))
+the owner value(s) [1] against the start's ego [1]: the same actor
+  seed 1 start (frame 2728): {'owner:901': 15, 'owner:902': 15, 'owner:903': 15}; end facts holding: []; Part I key goals already holding: 5 of 99 #[30, 51, 58, 82, 87]
+  seed 2 start (frame 2728): {'owner:901': 15, 'owner:902': 15, 'owner:903': 15}; end facts holding: []; Part I key goals already holding: 5 of 99 #[30, 51, 58, 82, 87]
+  seed 3 start (frame 2728): {'owner:901': 15, 'owner:902': 15, 'owner:903': 15}; end facts holding: []; Part I key goals already holding: 5 of 99 #[30, 51, 58, 82, 87]
+  seed 4 start (frame 2728): {'owner:901': 15, 'owner:902': 15, 'owner:903': 15}; end facts holding: []; Part I key goals already holding: 5 of 99 #[30, 51, 58, 82, 87]
+  seed 5 start (frame 2728): {'owner:901': 15, 'owner:902': 15, 'owner:903': 15}; end facts holding: []; Part I key goals already holding: 5 of 99 #[30, 51, 58, 82, 87]
+    #30 ['var', 228, 0] (Var[228] = 0; route move S1#48)
+    #51 ['owner_not', 568, 1] (Guybrush no longer has the fish (568); route move S2#10)
+    #58 ['var', 262, 0] (Var[262] = 0; route move S2#23)
+    #82 ['owner', 397, 15] (the storekeeper's note (397) belongs to actor 15; route move S3#42)
+    #87 ['state', 475, 0] (the lever (475) is in state 0; route move S3#59)
+run B's engine at its Part I end (groundtruth-part1.log, an instrument):
+  key #97 ['owner', 901, 1]: final post (frame 9539) has owner:901 = 1 -> holds; first holds after S3#123
+  key #98 ['owner', 902, 1]: final post (frame 9539) has owner:902 = 1 -> holds; first holds after S3#123
+  key #99 ['owner', 903, 1]: final post (frame 9539) has owner:903 = 1 -> holds; first holds after S3#123

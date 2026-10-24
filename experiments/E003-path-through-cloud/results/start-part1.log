@@ -1,0 +1,44 @@
+start: first idle stop from boot, no input, seeds [1, 2, 3, 4, 5]; wall time 25 s
+engine: ['/home/ilyask/projects/fast-mi/build/scummvm/scummvm', '--config=/home/ilyask/projects/fast-mi/out/E003-start/seed-1/scummvm.ini', '--savepath=/home/ilyask/projects/fast-mi/out/scummvm/saves', '--boot-param=0', '--disable-sdl-audio', '--random-seed=1', 'monkey-cd']
+ini (game section): [monkey-cd]; extra=CD; talkspeed=255; path=/home/ilyask/projects/fast-mi/game/dos-cd; engineid=scumm; subtitles=true; enhancements=0; gameid=monkey; original_gui=false; language=en; platform=pc; copy_protection=false; autosave_period=0; guioptions=sndNoSpeech sndNoMIDI ega gameOption2 gameOption4 gameOption9 midiAdLib vga lang_English plat_pc
+bridge: speedrun-bridge v3
+seed 1: idle stop at frame 2728 (tick 16321), room 33, kind sentence, ego 1 at [346, 133], rng 3182679328; control stop at frame 1337 (room 38, blocked: object_script); facts 3653; checks ok
+  trace records up to the stop: {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+  random (redrawn by a live script): ['var:100']; counts {'live slots': 3, 'read whole: no at: key': 0, 'read whole: W is no instruction': 0, 'units missing from the IR': 0, 'scripts started with a constant target (followed)': 1, 'starts with a target read at run time (not followed)': 2, 'ops that run a hook script (not followed)': 0, 'indexed draws (target unknown)': 0}
+seed 2: idle stop at frame 2728 (tick 16321), room 33, kind sentence, ego 1 at [346, 133], rng 1766402948; control stop at frame 1337 (room 38, blocked: object_script); facts 3653; checks ok
+  trace records up to the stop: {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+  random (redrawn by a live script): ['var:100']; counts {'live slots': 3, 'read whole: no at: key': 0, 'read whole: W is no instruction': 0, 'units missing from the IR': 0, 'scripts started with a constant target (followed)': 1, 'starts with a target read at run time (not followed)': 2, 'ops that run a hook script (not followed)': 0, 'indexed draws (target unknown)': 0}
+seed 3: idle stop at frame 2728 (tick 16321), room 33, kind sentence, ego 1 at [346, 133], rng 3573218980; control stop at frame 1337 (room 38, blocked: object_script); facts 3653; checks ok
+  trace records up to the stop: {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+  random (redrawn by a live script): ['var:100']; counts {'live slots': 3, 'read whole: no at: key': 0, 'read whole: W is no instruction': 0, 'units missing from the IR': 0, 'scripts started with a constant target (followed)': 1, 'starts with a target read at run time (not followed)': 2, 'ops that run a hook script (not followed)': 0, 'indexed draws (target unknown)': 0}
+seed 4: idle stop at frame 2728 (tick 16321), room 33, kind sentence, ego 1 at [346, 133], rng 3462404114; control stop at frame 1337 (room 38, blocked: object_script); facts 3653; checks ok
+  trace records up to the stop: {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+  random (redrawn by a live script): ['var:100']; counts {'live slots': 3, 'read whole: no at: key': 0, 'read whole: W is no instruction': 0, 'units missing from the IR': 0, 'scripts started with a constant target (followed)': 1, 'starts with a target read at run time (not followed)': 2, 'ops that run a hook script (not followed)': 0, 'indexed draws (target unknown)': 0}
+seed 5: idle stop at frame 2728 (tick 16321), room 33, kind sentence, ego 1 at [346, 133], rng 1943260466; control stop at frame 1337 (room 38, blocked: object_script); facts 3653; checks ok
+  trace records up to the stop: {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+  random (redrawn by a live script): ['var:100']; counts {'live slots': 3, 'read whole: no at: key': 0, 'read whole: W is no instruction': 0, 'units missing from the IR': 0, 'scripts started with a constant target (followed)': 1, 'starts with a target read at run time (not followed)': 2, 'ops that run a hook script (not followed)': 0, 'indexed draws (target unknown)': 0}
+determinism: seed 1 booted a second time: stop frame 2728, rng 3182679328; facts identical (0 key/value pairs differ)
+facts by kind (keys / keys not 0), per seed:
+  at:local: 1 / 1
+  at:script: 2 / 2
+  bit: 2 / 2
+  class: 832 / 832
+  cutscene: 1 / 0
+  ego: 1 / 1
+  local: 1 / 1
+  owner: 999 / 984
+  room: 1 / 1
+  script: 2 / 2
+  state: 999 / 2
+  var: 794 / 78
+  verb: 18 / 18
+seed 1's facts other than var, owner, state and class: {'at:local:202:1': 1, 'at:script:159:5': 1, 'at:script:23:409': 1, 'bit:116': 1, 'bit:395': 1, 'cutscene': 0, 'ego': 1, 'local:202': 1, 'room': 33, 'script:159': 1, 'script:23': 1, 'verb:10': 1, 'verb:100': 1, 'verb:2': 1, 'verb:200': 1, 'verb:201': 1, 'verb:202': 1, 'verb:203': 1, 'verb:204': 1, 'verb:205': 1, 'verb:206': 1, 'verb:207': 1, 'verb:3': 1, 'verb:4': 1, 'verb:5': 1, 'verb:6': 1, 'verb:7': 1, 'verb:8': 1, 'verb:9': 1}
+  states not 0: [('state:488', 1), ('state:730', 1)]; owners that are 0: 15
+facts.py sha256 9ffd0ff1f51fbc91... (stored per row)
+stop frames: [2728] (all the same)
+keys whose value differs across the seeds: 1, by kind {'var': 1}
+the wide net, random-written keys anywhere in the IR (data flow from getRandomNr, var 0 per script: 22; inside an if on such a value: 15; indexed writes skipped: 638)
+  var:100: [134, 20, 16, 142, 98]  [in every row's random: True; wide net: data]
+    draws into it a live script runs again: ['global/script-159.txt:8 [0000]']
+differing keys that are not redrawn by a live script: 0 []
+random keys whose value happens to be the same on every seed: 0 []

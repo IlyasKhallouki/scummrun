@@ -1,0 +1,16 @@
+{
+ "source": "experiments/E001-goals-from-scripts/key.json",
+ "key_sha256": "625462f6ff4839d0f5821a9eaf6acf6f80fb307aa7fc944fd71943049a270ad9",
+ "disclosed": "human input from the Any% route via E001's key; tuning on Part I only; breaks E001 rule C3 (plan.md step 2, C2)",
+ "goal_all": {
+  "owner:901": 1,
+  "owner:902": 1,
+  "owner:903": 1
+ },
+ "goal_not": {},
+ "key_entries": [
+  97,
+  98,
+  99
+ ]
+}
