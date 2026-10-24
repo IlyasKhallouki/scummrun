@@ -44,3 +44,17 @@ runs/**/scummvm.ini
 runs/**/stdout.log
 runs/**/xdg/
 runs/**/movie-explicit.jsonl
+
+# Generated outputs that quote game text (dialogue lines): regenerate them from the game files
+/experiments/E001-goals-from-scripts/key.json
+/experiments/E001-goals-from-scripts/key.md
+/experiments/E002-cause-cloud/results/census.json
+/experiments/E002-cause-cloud/results/cloud.json
+/experiments/E002-cause-cloud/results/cloud.log
+/experiments/E002-cause-cloud/results/engine-triggers.json
+/experiments/E002-cause-cloud/results/prefill.json
+/experiments/E003-path-through-cloud/results/check-part1*.jsonl
+/experiments/E003-path-through-cloud/results/groundtruth-part1.*
+
+# Per-machine timings of the parallel model check
+/experiments/E003-path-through-cloud/results/*.times.tsv
