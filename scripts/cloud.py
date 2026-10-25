@@ -322,8 +322,10 @@ def up(a) -> None:
     subprocess.run(["ssh", *opts, f"{user}@{ip}", f"mkdir -p {REMOTE}/build {REMOTE}/runs/anypercent"], check=True)
     for item in UP:
         dest = f"{user}@{ip}:{REMOTE}/{Path(item).parent}/" if "/" in item else f"{user}@{ip}:{REMOTE}/"
+        # Cargo's target/ dirs stay out: the laptop's binaries are built for its own system, and --delete would
+        # wipe the VM's builds on every copy.
         subprocess.run(["rsync", "-a", "--delete", "--exclude=__pycache__", "--exclude=.pytest_cache",
-                        "-e", "ssh " + " ".join(opts), str(ROOT / item), dest], check=True)
+                        "--exclude=target/", "-e", "ssh " + " ".join(opts), str(ROOT / item), dest], check=True)
     print(f"copied {len(UP)} items to {ip}:{REMOTE}")
 
 
