@@ -4,7 +4,7 @@
 //! usage:
 //!   taskcore sas    --task F.tc [--start NAME | --start-file F] [--bans F] [--fold strict|every|off]
 //!                   [--reduce all|none|a,b,..] [--product-limit N] [--encoding model|task] --out F.sas
-//!                   [--stats F.json] [--check-fold N] [--ops F.jsonl]
+//!                   [--stats F.json] [--check-fold N] [--ops F.jsonl] [--start-check input|needed]
 //!   taskcore decode (the same options) --plan sas_plan --out steps.json
 //!   taskcore validate (the same options) --names plan.txt --out result.json
 //!   taskcore info   --task F.tc
@@ -41,6 +41,7 @@ struct Args {
     start_file: Option<PathBuf>,
     bans: Option<PathBuf>,
     ops: Option<PathBuf>,
+    needed_check: bool,
 }
 
 fn parse() -> Result<Args, String> {
@@ -63,6 +64,7 @@ fn parse() -> Result<Args, String> {
         start_file: None,
         bans: None,
         ops: None,
+        needed_check: false,
     };
     while let Some(k) = it.next() {
         let v = it.next().ok_or(format!("{} needs a value", k))?;
@@ -88,6 +90,13 @@ fn parse() -> Result<Args, String> {
             "--start-file" => a.start_file = Some(v.into()),
             "--bans" => a.bans = Some(v.into()),
             "--ops" => a.ops = Some(v.into()),
+            "--start-check" => {
+                a.needed_check = match v.as_str() {
+                    "input" => false,
+                    "needed" => true,
+                    _ => return Err(format!("--start-check {}: input or needed", v)),
+                }
+            }
             "--encoding" => {
                 a.model = match v.as_str() {
                     "model" => true,
@@ -100,6 +109,9 @@ fn parse() -> Result<Args, String> {
     }
     if a.start.is_some() && a.start_file.is_some() {
         return Err("--start and --start-file: give one".into());
+    }
+    if a.needed_check && !a.reduce.e {
+        return Err("--start-check needed needs reduction (e)".into());
     }
     Ok(a)
 }
@@ -197,6 +209,7 @@ struct Prepared {
     start: usize,
     stats: J,
     replaced: Vec<(u32, u32)>,
+    needed: Vec<String>, // with --ops or --start-check needed: the facts (e) needs on the banned task, before the fold
 }
 
 fn prepare(a: &Args) -> Result<Prepared, String> {
@@ -244,11 +257,22 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
     };
     st.s("start", t.strs.get(t.starts.get(start).ok_or("the file has no start")?.0));
     // a start value outside a domain the input's file uses: task.py raises OutOfDomain; so does taskcore, before the
-    // fold and the reductions can hide the fact (sas::start_misses)
-    let misses = sas::start_misses(&t, &t.starts[start].1, a.limit)?;
-    if !misses.is_empty() {
-        return Err(format!("{} facts out of their domains: {:?}", misses.len(), &misses[..misses.len().min(10)]));
+    // fold and the reductions can hide the fact (sas::start_misses). With --start-check needed, only on those of
+    // these facts that (e) needs, before or after the first fold (below)
+    let input_misses = sas::start_misses(&t, &t.starts[start].1, a.limit)?;
+    if !a.needed_check && !input_misses.is_empty() {
+        let m = &input_misses;
+        return Err(format!("{} facts out of their domains: {:?}", m.len(), &m[..m.len().min(10)]));
     }
+    // the facts (e) needs on the banned task (reduce::needed: from the goal back; it reads no start): the operator
+    // table's "needed", and with --start-check needed half of the check
+    let needed_of = |t: &Task| -> Vec<String> {
+        let nd = reduce::needed(t);
+        (0..t.facts.len() as u32).filter(|&f| nd.ncount[f as usize] > 0).map(|f| t.key(f).to_string()).collect()
+    };
+    let t_needed = Instant::now();
+    let needed = if a.needed_check || a.ops.is_some() { needed_of(&t) } else { Vec::new() };
+    let mut seconds_needed = t_needed.elapsed().as_secs_f64();
     st.s("fold", &format!("{:?}", a.fold)).s("reduce", &format!("{:?}", a.reduce)).n("product_limit", a.limit);
     st.s("encoding", if a.model { "model" } else { "task" });
     // the fold, then the reductions to their fixpoint; then the fold again (after (d) has cut unreachable values,
@@ -299,6 +323,31 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
                 break;
             }
         }
+        if pass == 0 && a.needed_check {
+            // --start-check needed: of the facts the input check stops on, only those (e) needs before or after the
+            // first fold stop the run. A fact (e) does not need is in no precondition of an action that writes a
+            // needed value and in no condition of such an action's effects on needed facts; (e) drops everything
+            // else that names it (its effects, the actions that write no needed value), and the reductions after it
+            // never need a value the input did not, so the reduced file never names it and its start value is never
+            // read. Before the fold too: a fold whose union on a fact is its whole domain makes the fact unread, and
+            // a value outside the domain is in no path's box. The writer stops if the file names such a fact anyway
+            // (sas::pass2)
+            let t1 = Instant::now();
+            let after = if a.fold != FoldMode::Off { needed_of(&t) } else { needed.clone() };
+            let need: std::collections::HashSet<&str> = needed.iter().chain(after.iter()).map(|k| k.as_str()).collect();
+            let misses: Vec<&String> = input_misses.iter().filter(|k| need.contains(k.as_str())).collect();
+            if !misses.is_empty() {
+                return Err(format!("{} facts out of their domains: {:?}", misses.len(), &misses[..misses.len().min(10)]));
+            }
+            seconds_needed += t1.elapsed().as_secs_f64();
+            let mut j = J::new();
+            j.s("on", "the facts the input check stops on that (e) needs, before or after the first fold")
+                .n("needed_facts_before_the_fold", needed.len())
+                .n("needed_facts_after_the_fold", after.len())
+                .n("facts_the_input_check_stops_on", input_misses.len())
+                .f("seconds", seconds_needed);
+            st.raw("start_check", &j.done());
+        }
         if a.reduce.any() {
             let t1 = Instant::now();
             t = reduce::run(t, a.reduce, start, &mut c, &mut replaced)?;
@@ -313,7 +362,7 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         st.n("replaced", replaced.len());
     }
     st.n("actions", t.acts.len()).n("effects", t.acts.n_effects()).n("rss_after_reduce", peak_rss());
-    Ok(Prepared { names, task: t, start, stats: st, replaced })
+    Ok(Prepared { names, task: t, start, stats: st, replaced, needed })
 }
 
 fn run() -> Result<(), String> {
@@ -350,7 +399,7 @@ fn run() -> Result<(), String> {
             if let Some(path) = &a.ops {
                 let t3 = Instant::now();
                 let f = std::fs::File::create(path).map_err(|e| format!("{}: {}", path.display(), e))?;
-                sas::write_ops(&mut x, &plan, BufWriter::with_capacity(1 << 20, f))?;
+                sas::write_ops(&mut x, &plan, &p.needed, BufWriter::with_capacity(1 << 20, f))?;
                 p.stats.f("seconds_ops", t3.elapsed().as_secs_f64());
             }
             let mut c = plan.counts.clone();

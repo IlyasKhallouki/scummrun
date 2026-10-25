@@ -9,6 +9,7 @@ taskcore sas    --task kitchen.tc --start s17 --out task.sas [--stats stats.json
                 [--fold strict|every|off] [--reduce all|none|a,b,...] [--product-limit 64]
                 [--encoding model|task] [--check-fold N] [--kept kept.json]
                 [--start-file start.txt] [--bans bans.txt] [--ops ops.jsonl]   (the replay harness's, below)
+                [--start-check input|needed]
 taskcore decode (same options) --plan sas_plan --out steps.json
 taskcore validate (same options) --names plan.txt --out result.json   (a plan as input action names, run on the reduced task)
 taskcore info   --task kitchen.tc
@@ -34,7 +35,7 @@ start file and the bans).
 ## The replay harness's options
 
 replay.py plans through taskcore (plan_fd.py `plan_taskcore`): the reading is exported once to the packed file, and
-each replan runs `sas` from it with three options. Without them every output is as before, byte for byte (the old
+each replan runs `sas` from it with four options. Without them every output is as before, byte for byte (the old
 and the new binary on the kitchen and test_taskcore.py's property test).
 
 - `--start-file F`: the start as a file, one line per fact, `key<TAB>value` (the value's text), `key<TAB>` for a
@@ -48,6 +49,12 @@ and the new binary on the kitchen and test_taskcore.py's property test).
 - `--ops F`: the operator table, JSON lines (`sas::write_ops`): per operator its action, precondition values and
   guessed values with their conditions (task.py's `Op`), per action its name, members and picked guesses; the pick
   and goal operators. A plan reads back from it without a second run (`decode` loads, folds and reduces again).
+  Its first line also lists the facts (e) needs on the banned task, before the fold (`reduce::needed`): the harness
+  cuts each step's effects to them, as the python planner's pruned task cut them to relevance.py's (on the kitchen
+  the same 244 facts as the pruned task's).
+- `--start-check needed` (default `input`): the start check only on the facts (e) needs (below). It needs (e) on.
+  Where the input check passes it changes nothing (the same file and operator table on the kitchen's replan
+  starts, with and without bans); the stats count what the input check would have stopped on.
 
 ## What the reductions keep, and the two encodings
 
@@ -87,6 +94,21 @@ that fact (build the task again with that value). taskcore checks the input task
 reductions, and stops with the same error exactly then (`sas::start_misses`). Without it (d) read the start as no
 value: it shrank the fact's domain to the written values and dropped a precondition that does not hold at the
 start, or dropped the actions that need the fact; and a fold whose paths cover the fact's domain made it unread.
+
+With `--start-check needed` the run stops only on those of the input check's facts that (e) needs (from the goal
+back; it reads no start) on the banned task, before or after the first fold. So it stops in no case the input check
+passes, and where the input check passes it changes nothing. The python planner's task (relevance.py and
+reader.prune) held only the facts relevance needs, so task.py checked only those; (e) is the same rule, finer, and on
+the kitchen it needs the pruned task's 244 facts before the fold (242 after it). Why the facts (e) does not need
+cannot be read: such a fact is in no precondition of an action that writes a needed value, and in no condition of
+such an action's effects on needed facts; (e) drops the other actions and the effects on facts with no needed
+value, and no reduction after it needs a value the input did not (they only drop actions, effects, sets and
+values), so the reduced file never names the fact. Before (e) drops them, (d) may cut such an action's set on that
+fact to the values written to it; the action is dropped in the same round. Before and after the fold, because a
+fold can make a fact needed that no path needed (an effect only some paths have gets their sets as conditions), and
+can make a needed fact unread (a union of its whole domain), which a value outside the domain is not in. The writer
+stops if the file would name such a fact anyway (`sas::pass2`), and the harness's path choice treats the value as
+outside every set.
 
 **The fold and PRE_LIMIT.** A sub-group whose folded precondition would pass the writer's PRE_LIMIT (task.py raises
 on such an action) stays one action per path, counted (`subgroups_past_pre_limit_left_unfolded`).

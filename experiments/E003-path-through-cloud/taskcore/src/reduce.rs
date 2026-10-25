@@ -512,8 +512,45 @@ pub fn red_d(t: Task, start: usize, c: &mut Counts) -> (Task, bool) {
 /// that survives, costing no more; an optimal plan has no action to drop (dropping one would cost less), so it
 /// survives whole. Plans with dropped actions are lost. task.py's relevance.py is the same rule with every
 /// condition fact needed whole; this one is finer and keeps no more.
-#[allow(unused_assignments)]
 pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
+    let nf = t.facts.len();
+    let Needed { ncount, kept, rounds, .. } = needed(&t);
+    let whole = (0..nf).filter(|&f| ncount[f] > 0 && ncount[f] == t.facts.size(f as u32)).count();
+    let needed: u64 = ncount.iter().map(|&x| x as u64).sum();
+    let (mut da, mut de) = (0u64, 0u64);
+    let r = rebuild(t, |_, i, v| {
+        if !kept[i] {
+            da += 1;
+            return Edit::Drop;
+        }
+        let k = v.effs().filter(|e| e.kind != K_BAD && ncount[e.fact as usize] == 0).count();
+        if k == 0 {
+            return Edit::Same;
+        }
+        de += k as u64;
+        let mut a = v.to_owned();
+        a.eff.retain(|e| e.kind == K_BAD || ncount[e.fact as usize] > 0);
+        Edit::New(a)
+    });
+    add(c, "(e) actions that write no needed value, left out", da);
+    add(c, "(e) effects on facts with no needed value, left out", de);
+    c.insert("(e) last pass: needed values".into(), needed);
+    c.insert("(e) last pass: facts needed whole".into(), whole as u64);
+    c.insert("(e) last pass: facts with a needed value".into(), ncount.iter().filter(|&&x| x > 0).count() as u64);
+    add(c, "(e) relevance rounds", rounds);
+    r
+}
+
+/// (e)'s needed values (`red_e`): per fact how many of its values are needed, which actions are kept, and the
+/// rounds to the fixpoint. It reads no start.
+pub struct Needed {
+    pub ncount: Vec<u32>,
+    pub kept: Vec<bool>,
+    pub rounds: u64,
+}
+
+#[allow(unused_assignments)]
+pub fn needed(t: &Task) -> Needed {
     let nf = t.facts.len();
     let base: Vec<usize> = (0..nf as u32).map(|f| t.facts.base(f)).collect();
     let mut need = vec![false; t.facts.total_values()];
@@ -521,6 +558,10 @@ pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
     let n = t.acts.len();
     let mut kept = vec![false; n];
     let mut ch = false;
+    // a visit of an action reads the needed values only of the facts it writes: it is skipped while none of them
+    // changed since its last visit (it would change nothing), so the passes and their count are the same
+    let mut clock: u64 = 1;
+    let mut fact_clock = vec![0u64; nf];
     macro_rules! set {
         ($f:expr, $x:expr) => {{
             let p = base[$f as usize] + $x as usize;
@@ -528,6 +569,8 @@ pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
                 need[p] = true;
                 ncount[$f as usize] += 1;
                 ch = true;
+                clock += 1;
+                fact_clock[$f as usize] = clock;
             }
         }};
     }
@@ -536,12 +579,26 @@ pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
             set!(*f, x);
         }
     }
+    let mut wf_off = vec![0usize; n + 1];
+    let mut wf: Vec<u32> = Vec::new();
+    for i in 0..n {
+        let mut fs: Vec<u32> = t.acts.view(i).effs().filter(|e| e.kind != K_BAD).map(|e| e.fact).collect();
+        fs.sort_unstable();
+        fs.dedup();
+        wf.extend_from_slice(&fs);
+        wf_off[i + 1] = wf.len();
+    }
+    let mut seen = vec![0u64; n]; // the clock at the action's last visit; 0: never visited
     let mut rounds = 0u64;
     let mut prefs: Vec<u32> = Vec::new();
     loop {
         rounds += 1;
         ch = false;
         for i in 0..n {
+            if seen[i] != 0 && wf[wf_off[i]..wf_off[i + 1]].iter().all(|&f| fact_clock[f as usize] <= seen[i]) {
+                continue;
+            }
+            seen[i] = clock;
             let v = t.acts.view(i);
             if !kept[i] {
                 let hit = v.effs().any(|e| e.kind != K_BAD && e.vals.iter().any(|&x| need[base[e.fact as usize] + x as usize]));
@@ -595,30 +652,7 @@ pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
             break;
         }
     }
-    let whole = (0..nf).filter(|&f| ncount[f] > 0 && ncount[f] == t.facts.size(f as u32)).count();
-    let needed: u64 = ncount.iter().map(|&x| x as u64).sum();
-    let (mut da, mut de) = (0u64, 0u64);
-    let r = rebuild(t, |_, i, v| {
-        if !kept[i] {
-            da += 1;
-            return Edit::Drop;
-        }
-        let k = v.effs().filter(|e| e.kind != K_BAD && ncount[e.fact as usize] == 0).count();
-        if k == 0 {
-            return Edit::Same;
-        }
-        de += k as u64;
-        let mut a = v.to_owned();
-        a.eff.retain(|e| e.kind == K_BAD || ncount[e.fact as usize] > 0);
-        Edit::New(a)
-    });
-    add(c, "(e) actions that write no needed value, left out", da);
-    add(c, "(e) effects on facts with no needed value, left out", de);
-    c.insert("(e) last pass: needed values".into(), needed);
-    c.insert("(e) last pass: facts needed whole".into(), whole as u64);
-    c.insert("(e) last pass: facts with a needed value".into(), ncount.iter().filter(|&&x| x > 0).count() as u64);
-    add(c, "(e) relevance rounds", rounds);
-    r
+    Needed { ncount, kept, rounds }
 }
 
 /// (f) Duplicates and dominance among actions with the same effects (the same set of effects, conditions and

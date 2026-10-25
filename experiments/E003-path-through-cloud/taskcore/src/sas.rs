@@ -911,8 +911,9 @@ fn json_str(s: &str) -> String {
 
 /// The operator table (`sas --ops`), so that a plan reads back without a second run: JSON lines, in this order.
 ///
-/// * `{"operators": N, "facts": [...]}`: the operator count and the file's task facts (its variables but the pick
-///   and goal ones), in file order;
+/// * `{"operators": N, "facts": [...], "needed": [...]}`: the operator count, the file's task facts (its variables but
+///   the pick and goal ones) in file order, and the facts (e) needs on the banned task before the fold (main.rs), in
+///   fact order;
 /// * per operator of an action: `{"op": n, "action": i, "chosen": [[key, value]...], "guessed": [[key, value,
 ///   [[key, [values]]...]]...]}`, the variant's precondition values and guessed values, each guess with its live
 ///   conditions (task.py's `Op.chosen` and `Op.guessed`);
@@ -922,7 +923,7 @@ fn json_str(s: &str) -> String {
 /// * per pick operator `{"op": n, "pick": [key, value]}`, per goal operator `{"op": n, "goal": true}`.
 ///
 /// Values are the domain's value texts. Operators are numbered as in the file (pass 2's order).
-pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, mut w: W) -> Result<(), String> {
+pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, needed: &[String], mut w: W) -> Result<(), String> {
     let io = |e: std::io::Error| e.to_string();
     let t = x.t;
     let nf = x.nf;
@@ -930,7 +931,9 @@ pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, mut w: W) -> Result<()
     let val = |f: u32, v: u32| json_str(t.strs.get(t.facts.dom(f)[v as usize]));
     let set = |f: u32, vs: &[u32]| format!("[{}, [{}]]", key(f), vs.iter().map(|&v| val(f, v)).collect::<Vec<_>>().join(", "));
     let facts: Vec<String> = plan.vars.iter().filter(|&&v| v < nf).map(|&v| key(v)).collect();
-    writeln!(w, "{{\"operators\": {}, \"facts\": [{}]}}", plan.n_ops, facts.join(", ")).map_err(io)?;
+    let nd: Vec<String> = needed.iter().map(|k| json_str(k)).collect();
+    writeln!(w, "{{\"operators\": {}, \"facts\": [{}], \"needed\": [{}]}}", plan.n_ops, facts.join(", "), nd.join(", "))
+        .map_err(io)?;
     let mut n = 0u64;
     let mut ioerr: Option<std::io::Error> = None;
     for ai in 0..t.acts.len() {
