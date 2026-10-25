@@ -31,16 +31,27 @@ the encoding rather than a game fact; ``orderings``: (from, to, kind), kind one 
 (export_records.py, the reading's records, build_task's task) and taskcore (taskcore/README.md) writes the SAS file:
 the start as a file (``--start-file``), the harness's bans (``--bans``, replay.py's ``Ban``: taskcore cuts them out of
 the input task before anything else), its fold and reductions for that start, and the operator table (``--ops``).
+The start check is on the facts reduction (e) needs (``--start-check needed``, taskcore/README.md): a start value
+outside a domain stops the plan only on a fact that can matter to the goal, as the python planner's pruned task held
+only such facts; ``start_check="input"`` checks every fact the input's file names (task.py on build_task's task).
 Then lama-first (the same search string and limits as ``plan``) or, with ``search="anytime"``, anytime LAMA
 (``seq-sat-lama-2011``) for ``time_limit`` seconds, its last (best) plan. The plan reads back through the operator
 table, as ``parse_plan`` reads task.py's (picks folded into the steps that read them, goal operators left out), to
 the reduced actions and the input actions they stand for. A folded step stands for several paths; the step is the
 path whose precondition holds in the plan's predicted state at that step (``predict``: from the start, each step's
-path with the plan's guessed values; a guess the reduced task does not hold is unknown), and a step where not
-exactly one holds raises ``PathChoice``. ``pieces`` gives each input action's paths under the bans (replay.py
-``ban_pieces``: the same cut, in Python), so the chosen path is an action of the unreduced banned task. Each step's
-action is returned with its effects cut to the facts the file holds (the planner's task, as the pruned task was).
-A start outside a domain the file names: taskcore stops as task.py raises OutOfDomain; status "out of domain".
+path with the plan's guessed values; a guess on a fact the file does not hold has no value in the plan, so it is
+unknown, and a start value outside its domain is outside), and a step where not exactly one path holds or may hold
+raises ``PathChoice``. A path's precondition may hold where it reads an unknown value on a fact the reduced file
+does not hold: of a kept action's precondition the reductions drop only sets that hold for every value the fact can
+reach from the start ((d), then normalize), so the unknown value is in the set; a folded step whose paths differ only
+on such a fact has two paths that may hold, and raises. An unknown value on a fact the file holds fails (the planner
+gave it a value; not knowing it is a fault here), and so does a value outside the domain, unless the set is the
+whole domain. ``pieces`` gives each input action's paths under the bans (replay.py ``ban_pieces``: the same cut,
+in Python), so the chosen path is an action of the unreduced banned task. Each step's action is returned with its
+effects cut to the facts (e) needs (the operator table's ``needed``): the python planner's pruned task held the
+effects on the facts relevance.py needs, and on the kitchen (e) alone gives that task exactly
+(results/taskcore-kitchen.log). A start outside a domain on a needed fact: taskcore stops as task.py raises
+OutOfDomain; status "out of domain". Any other taskcore error raises ``TaskcoreError``.
 """
 
 import dataclasses
@@ -199,10 +210,20 @@ def plan(sas: SasTask, start: dict, time_limit: int = 600, memory_limit: str = "
 # --- through taskcore ----------------------------------------------------------------------------------------------
 
 UNKNOWN = "<unknown>"  # a predicted value the plan does not give: a guess the reduced task does not hold
+OUTSIDE = "<outside the domain>"  # a start value its fact's domain lacks: no set holds it but the whole domain
 
 
 class PathChoice(ValueError):
-    """A step of a taskcore plan where not exactly one of its paths holds in the plan's predicted state."""
+    """A step of a taskcore plan where not exactly one of its paths holds or may hold in the plan's predicted
+    state."""
+
+
+class TaskcoreError(RuntimeError):
+    """taskcore stopped with an error other than a start outside a domain (its message; ``cmd``: the command)."""
+
+    def __init__(self, message: str, cmd: str = ""):
+        super().__init__(message)
+        self.cmd = cmd
 
 
 @dataclass
@@ -216,6 +237,7 @@ class TaskcoreResult(Result):
     misses: list = field(default_factory=list)  # out of domain: (key, start value), the first ten taskcore names
     n_misses: int = 0
     file_facts: list = field(default_factory=list)  # the task facts the file holds
+    needed_facts: list = field(default_factory=list)  # the facts (e) needs (the operator table's head)
     folds: list = field(default_factory=list)  # per step: the reduced action's name when it stands for several paths
     predicted_goal: bool | None = None  # the goal holds in the predicted state after the last step
 
@@ -275,15 +297,25 @@ def _label(d, v):
 
 def _meets(facts: dict, k, vs, state: dict):
     """Whether ``state`` meets the set ``vs`` on ``k`` (task.py: the set cut to the domain; a set that holds for every
-    value holds whatever the value, an unknown one too): True, False, or None (unknown)."""
+    value holds whatever the value, an unknown one or one outside the domain too): True, False, or None (unknown)."""
     v = state.get(k)
     if v in vs or (k in facts and set(facts[k].values) <= set(vs)):
         return True
     return None if v == UNKNOWN else False
 
 
-def _holds(facts: dict, pre: dict, state: dict) -> bool:
-    return all(_meets(facts, k, vs, state) for k, vs in pre.items())
+def _holds(facts: dict, pre: dict, state: dict, held=None):
+    """Whether ``state`` meets the precondition ``pre``: True; None (may hold) where the only sets not met read an
+    unknown value on facts the file does not hold (``held``: the file's facts; None: every fact counts as held);
+    else False (module docstring)."""
+    out = True
+    for k, vs in pre.items():
+        m = _meets(facts, k, vs, state)
+        if m is None and held is not None and k not in held:
+            out = None
+        elif not m:
+            return False
+    return out
 
 
 def _guess(key, vals, guessed, state):
@@ -313,24 +345,28 @@ def apply_step(facts: dict, a, guessed, state: dict) -> dict:
             vals = {_label(d, v) for v in e.values}
         else:
             cur = state.get(e.key)
+            if cur == OUTSIDE:
+                continue  # task.py's add is one write per value of the domain: none fires outside it
             vals = d.add(cur, e.add) if cur not in (UNKNOWN, None) else frozenset()
         new[e.key] = next(iter(vals)) if len(vals) == 1 else _guess(e.key, vals, guessed, state) if vals else UNKNOWN
     return new
 
 
 def start_state(facts: dict, start: dict) -> dict:
-    """``start`` (a facts.py map, absent is 0) as the task's values; UNKNOWN where a domain lacks it."""
+    """``start`` (a facts.py map, absent is 0) as the task's values; OUTSIDE where a domain lacks it."""
     out = {}
     for k, d in facts.items():
         lab = _label(d, start.get(k, 0))
-        out[k] = UNKNOWN if lab is None else lab
+        out[k] = OUTSIDE if lab is None else lab
     return out
 
 
-def predict(facts: dict, pieces: list, steps: list, start: dict) -> tuple:
+def predict(facts: dict, pieces: list, steps: list, start: dict, held=None) -> tuple:
     """Each step's path: of the paths its members stand for (``pieces[m]`` for input action m), the one whose
-    precondition holds in the plan's predicted state at that step (module docstring); PathChoice when not exactly
-    one does. Returns (the paths, the predicted state after the last step)."""
+    precondition holds or may hold in the plan's predicted state at that step (module docstring; ``held``: the
+    file's facts, see ``_holds``); PathChoice when not exactly one does. Returns (the paths, the predicted state
+    after the last step)."""
+    held = set(held) if held is not None else None
     state, out = start_state(facts, start), []
     for i, s in enumerate(steps):
         cands = [p for m in dict.fromkeys(s["members"]) for p in pieces[m]]
@@ -338,10 +374,14 @@ def predict(facts: dict, pieces: list, steps: list, start: dict) -> tuple:
                                           for p in cands):
             raise ValueError(f"step {i + 1}: the packed file's action {s['members'][0]} is {s['name']}, the task's "
                              f"{[p.name for p in cands][:2]}: the file is not this task's")
-        ok = [p for p in cands if _holds(facts, p.pre, state)]
+        h = [(p, _holds(facts, p.pre, state, held)) for p in cands]
+        sure, maybe = [p for p, x in h if x is True], [p for p, x in h if x is None]
+        ok = sure + maybe
         if len(ok) != 1:
-            raise PathChoice(f"step {i + 1} ({s['name']}, {s['op']}): {len(ok)} of its {len(cands)} paths hold in "
-                             f"the plan's predicted state" + (f": {[p.name for p in ok][:4]}" if ok else ""))
+            raise PathChoice(f"step {i + 1} ({s['name']}, {s['op']}): {len(sure)} of its {len(cands)} paths hold in "
+                             f"the plan's predicted state" + (f" and {len(maybe)} may hold (an unknown value on a fact "
+                                                              f"the file does not hold)" if maybe else "")
+                             + (f": {[p.name for p in ok][:4]}" if ok else ""))
         out.append(ok[0])
         state = apply_step(facts, ok[0], s["guessed"], state)
     return out, state
@@ -349,18 +389,20 @@ def predict(facts: dict, pieces: list, steps: list, start: dict) -> tuple:
 
 def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, bans=(), *, time_limit: int = 600,
                   memory_limit: str = "32G", search: str = "lama-first", workdir, binary=TASKCORE, args=(),
-                  keep: bool = False) -> TaskcoreResult:
+                  start_check: str = "needed", keep: bool = False) -> TaskcoreResult:
     """A plan through taskcore (module docstring). ``facts``: the packed file's facts (key -> Domain), ``goal`` its
     goal, ``pieces`` per input action its paths under ``bans`` (replay.ban_pieces), ``start`` a facts.py map (with
     the task's pos:/escpos:/args: keys), ``bans`` replay.Ban or (label, ((key, value), ...)). ``args``: further
-    taskcore options (the default: fold strict, reductions (a)-(f), the model encoding). ``keep``: keep the SAS file
-    and the operator table in ``workdir``."""
+    taskcore options (the default: fold strict, reductions (a)-(f), the model encoding). ``start_check``: taskcore's
+    ``--start-check`` (needed: on the facts (e) needs; input: on every fact the input's file names). ``keep``: keep
+    the SAS file and the operator table in ``workdir``."""
     from export_records import write_bans, write_start
     work = Path(workdir)
     work.mkdir(parents=True, exist_ok=True)
     sas_file, ops_file, stats_file = work / "task.sas", work / "ops.jsonl", work / "stats.json"
     cmd = [str(binary), "sas", "--task", str(packed), "--start-file", str(write_start(work / "start.txt", facts, start)),
-           "--out", str(sas_file), "--stats", str(stats_file), "--ops", str(ops_file)] + [str(a) for a in args]
+           "--out", str(sas_file), "--stats", str(stats_file), "--ops", str(ops_file), "--start-check",
+           start_check] + [str(a) for a in args]
     if bans:
         cmd += ["--bans", str(write_bans(work / "bans.txt", bans))]
     t0 = time.monotonic()
@@ -369,7 +411,7 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
     if p.returncode != 0:
         m = re.search(r"(\d+) facts out of their domains: \[(.*)\]", p.stderr)
         if not m:
-            raise RuntimeError(f"{' '.join(cmd)}: {p.stderr.strip()}")
+            raise TaskcoreError(p.stderr.strip() or f"exit {p.returncode}", " ".join(cmd))
         keys = [json.loads(f'"{k}"') for k in re.findall(r'"((?:[^"\\]|\\.)*)"', m[2])]
         return TaskcoreResult("out of domain", -1, write_s=write_s, misses=[(k, start.get(k, 0)) for k in keys],
                               n_misses=int(m[1]), workdir=str(work))
@@ -392,12 +434,12 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
     if status == "plan":
         t1 = time.monotonic()
         head, ops, acts = read_ops(ops_file)
-        res.file_facts = head["facts"]
+        res.file_facts, res.needed_facts = head["facts"], head["needed"]
         dec = decode_ops(text, ops, acts)
-        paths, end = predict(facts, pieces, dec, start)
-        held = set(head["facts"])
+        paths, end = predict(facts, pieces, dec, start, head["facts"])
+        needed = set(head["needed"])
         res.paths = paths
-        res.actions = [dataclasses.replace(a, effects=tuple(e for e in a.effects if e.key in held)) for a in paths]
+        res.actions = [dataclasses.replace(a, effects=tuple(e for e in a.effects if e.key in needed)) for a in paths]
         res.steps = [Step(s["op"], i, a.name, s["chosen"], s["guessed"]) for i, (s, a) in enumerate(zip(dec, paths))]
         res.folds = [s["name"] if len(s["members"]) > 1 else None for s in dec]
         res.predicted_goal = all(end.get(k) in {_label(facts[k], v) for v in vs} for k, vs in goal.items())

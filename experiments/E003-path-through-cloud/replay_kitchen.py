@@ -286,6 +286,9 @@ def _plan_line(p: dict) -> str:
             f"{p.get('write_s', 0):.1f} s ({p.get('actions') or 0:,} actions, {p.get('operators') or 0:,} operators), "
             f"{search} {p.get('seconds', 0):.1f} s, read back {p.get('decode_s', 0):.2f} s, {p['bans']} bans; "
             f"start {p.get('start_counts')}" + (f"; misses {p['misses']}" if p.get('misses') else "")
+            + (f"; facts: {p['file_facts']} in the file, {p['needed_facts']} needed" if "needed_facts" in p else "")
+            + (f"; outside their domains, not needed: {p['input_check_misses']} facts"
+               if p.get("input_check_misses") else "")
             + (f"; {p['error']}" if p.get("error") else "")
             + ("; the goal holds in the plan's predicted end state" if p.get("predicted_goal") else
                "; the goal does NOT hold in the plan's predicted end state" if p.get("predicted_goal") is False else ""))

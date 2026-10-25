@@ -73,13 +73,16 @@ What the harness does, per plan step (plan.md step 5, with D5):
   reading's records (export_records.py), which is ``task`` (build_task's): each plan gives taskcore that start and
   every ban so far (taskcore cuts them as ``cut`` does, tested byte for byte against it), taskcore writes the reduced
   task for that start, lama-first plans on it (or anytime LAMA for ``plan_time`` seconds, ``search="anytime"``), and
-  each step is the path of its reduced action whose precondition holds in the plan's predicted state, an action of
-  ``apply_bans(task, bans)`` with its effects cut to the facts the reduced file holds (the planner's task). "python":
-  task.py's ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``. Each plan's
-  entry keeps the time to write the task (``write_s``), the planner's (``seconds``), the operators and the steps.
+  each step is the path of its reduced action whose precondition holds (or may hold) in the plan's predicted state,
+  an action of ``apply_bans(task, bans)`` with its effects cut to the facts reduction (e) needs (the planner's task,
+  as the pruned task's effects were cut to relevance's facts; ``waits_first`` reads them). "python": task.py's
+  ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``. Each plan's entry keeps
+  the time to write the task (``write_s``), the planner's (``seconds``), the operators and the steps.
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
-  one), a planner timeout, the replan limit, the time limit, or a start outside the task's domains
-  (task.OutOfDomain: the task would have to be built again).
+  one), a planner timeout, the replan limit, the time limit, a start outside the task's domains (task.OutOfDomain:
+  the task would have to be built again; through taskcore only on a fact reduction (e) needs, as the pruned task
+  held only facts relevance needs), or, through taskcore, a step whose path is not one (``plan_fd.PathChoice``) or
+  a taskcore error (``plan_fd.TaskcoreError``): "planner: ...".
 * **The record**: every input with its frame (the Executor's movie), every step with its tries and their frames,
   its outcome and its mismatches, the plans, the reorders and the bans; the engine's facts, tick, random state and
   actor positions at every input and every step's end are kept for ``verify``, which plays the inputs from boot in a
@@ -846,13 +849,17 @@ class Harness:
                                         time_limit=self.plan_time, search=self.search,
                                         workdir=self.workdir / f"plan-{n:03d}", args=self.taskcore_args,
                                         keep=self.keep_files)
-        except plan_fd.PathChoice as e:
-            entry.update(status="path choice", error=str(e), steps=[])
+        except (plan_fd.PathChoice, plan_fd.TaskcoreError) as e:
+            entry.update(status="path choice" if isinstance(e, plan_fd.PathChoice) else "taskcore error",
+                         error=str(e), steps=[])
             self.stop_reason = f"planner: {e}"
             return []
+        sc = res.stats.get("start_check", {})
         entry.update(write_s=res.write_s, status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps],
                      operators=res.operators, actions=res.stats.get("actions"), decode_s=res.decode_s,
-                     folds=res.folds, predicted_goal=res.predicted_goal)
+                     folds=res.folds, predicted_goal=res.predicted_goal, file_facts=len(res.file_facts),
+                     needed_facts=len(res.needed_facts),
+                     input_check_misses=sc.get("facts_the_input_check_stops_on"))
         if res.status == "out of domain":
             entry.update(misses=res.misses, steps=[])
             self.stop_reason = f"the engine's state is outside the task's domains ({res.n_misses} facts)"
