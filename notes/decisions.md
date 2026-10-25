@@ -103,3 +103,16 @@ else. We should have done this before.
 The Python code stays the reference: the Rust version must reproduce its outputs byte for byte (the
 model check's rows 0-5 and the kitchen reading) before it replaces it. Model fixes (fix round 1) wait
 until the port is done and are then made in Rust.
+
+## D8 (2026-10-25): Fix round 1 approved as designed, with its open choices
+
+Decided by: Ilyas.
+
+"Of course I approved it, because otherwise how would we move on?" Approved: the fix round 1 design
+(experiments/E003-path-through-cloud/fix-round1.md) and its order; const_polls on; inputs read after the frame's
+scripts, except what processInput does itself (Esc's override test and '.'), with due events first in the
+planner; '.', the talk-stop key, counts as a player input; the bridge dumps each live slot's locals. Also the
+replay's match measure: an unpredicted change counts against a step only when a script the step ran or started
+made it, and the strict count is reported next to it.
+
+Also today: "Do the vm if it's faster, why wait" (the first Part I attempt runs on the cloud VM, within D6's cap).
