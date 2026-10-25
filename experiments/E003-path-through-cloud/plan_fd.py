@@ -43,8 +43,11 @@ path with the plan's guessed values; a guess on a fact the file does not hold ha
 unknown, and a start value outside its domain is outside), and a step where not exactly one path holds or may hold
 raises ``PathChoice``. A path's precondition may hold where it reads an unknown value on a fact the reduced file
 does not hold: of a kept action's precondition the reductions drop only sets that hold for every value the fact can
-reach from the start ((d), then normalize), so the unknown value is in the set; a folded step whose paths differ only
-on such a fact has two paths that may hold, and raises. An unknown value on a fact the file holds fails (the planner
+reach from the start ((d), then normalize), so the unknown value is in the set. A folded step whose paths differ only
+on such a fact has two paths that may hold: ``plan_taskcore`` leaves it to the engine (``choices``: at most one path
+holds and the others may; the harness takes, when it plays the step, the path whose precondition holds in the
+engine's state, replay.py), the plan's state after it keeps what all its paths agree on and is UNKNOWN elsewhere;
+``predict`` without ``choices`` raises there. An unknown value on a fact the file holds fails (the planner
 gave it a value; not knowing it is a fault here), and so does a value outside the domain, unless the set is the
 whole domain. ``pieces`` gives each input action's paths under the bans (replay.py ``ban_pieces``: the same cut,
 in Python), so the chosen path is an action of the unreduced banned task. Each step's action is returned with its
@@ -240,6 +243,8 @@ class TaskcoreResult(Result):
     needed_facts: list = field(default_factory=list)  # the facts (e) needs (the operator table's head)
     folds: list = field(default_factory=list)  # per step: the reduced action's name when it stands for several paths
     predicted_goal: bool | None = None  # the goal holds in the predicted state after the last step
+    choices: dict = field(default_factory=dict)  # step index -> its paths (effects cut as ``actions``), left to the
+    # engine (module docstring); that step's entry in ``actions`` and ``paths`` is ``either`` of them
 
 
 def _conds(w) -> tuple:
@@ -361,11 +366,24 @@ def start_state(facts: dict, start: dict) -> dict:
     return out
 
 
-def predict(facts: dict, pieces: list, steps: list, start: dict, held=None) -> tuple:
+def either(name: str, paths: list):
+    """A stand-in for a step that is several paths, until the engine chooses: every fact their preconditions name,
+    with the union of their sets there, and all their effects (for the harness's order, which reads only which facts a
+    step reads and writes: the sets are never checked, the engine chooses the path), the first path's record."""
+    from task import Action
+    keys = set().union(*(set(p.pre) for p in paths))
+    pre = {k: set().union(*(set(p.pre.get(k, ())) for p in paths)) for k in sorted(keys)}
+    effects = tuple(dict.fromkeys(e for p in paths for e in p.effects))
+    return Action(name, pre=pre, effects=effects, what=paths[0].what, cost=paths[0].cost)
+
+
+def predict(facts: dict, pieces: list, steps: list, start: dict, held=None, choices=None) -> tuple:
     """Each step's path: of the paths its members stand for (``pieces[m]`` for input action m), the one whose
     precondition holds or may hold in the plan's predicted state at that step (module docstring; ``held``: the
-    file's facts, see ``_holds``); PathChoice when not exactly one does. Returns (the paths, the predicted state
-    after the last step)."""
+    file's facts, see ``_holds``); PathChoice when not exactly one does. With ``choices`` (a dict), a step where at
+    most one path holds and the others may hold is left to the engine instead: ``choices[i]`` its paths, its entry
+    an ``either`` of them, the state after it what they agree on (UNKNOWN elsewhere). Returns (the paths, the
+    predicted state after the last step)."""
     held = set(held) if held is not None else None
     state, out = start_state(facts, start), []
     for i, s in enumerate(steps):
@@ -377,6 +395,12 @@ def predict(facts: dict, pieces: list, steps: list, start: dict, held=None) -> t
         h = [(p, _holds(facts, p.pre, state, held)) for p in cands]
         sure, maybe = [p for p, x in h if x is True], [p for p, x in h if x is None]
         ok = sure + maybe
+        if len(ok) > 1 and len(sure) <= 1 and choices is not None:
+            choices[i] = ok
+            afters = [apply_step(facts, p, s["guessed"], state) for p in ok]
+            state = {k: (v if all(x.get(k) == v for x in afters[1:]) else UNKNOWN) for k, v in afters[0].items()}
+            out.append(either(s["name"], ok))
+            continue
         if len(ok) != 1:
             raise PathChoice(f"step {i + 1} ({s['name']}, {s['op']}): {len(sure)} of its {len(cands)} paths hold in "
                              f"the plan's predicted state" + (f" and {len(maybe)} may hold (an unknown value on a fact "
@@ -389,13 +413,14 @@ def predict(facts: dict, pieces: list, steps: list, start: dict, held=None) -> t
 
 def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, bans=(), *, time_limit: int = 600,
                   memory_limit: str = "32G", search: str = "lama-first", workdir, binary=TASKCORE, args=(),
-                  start_check: str = "needed", keep: bool = False) -> TaskcoreResult:
+                  start_check: str = "needed", keep: bool = False, engine_choice: bool = True) -> TaskcoreResult:
     """A plan through taskcore (module docstring). ``facts``: the packed file's facts (key -> Domain), ``goal`` its
     goal, ``pieces`` per input action its paths under ``bans`` (replay.ban_pieces), ``start`` a facts.py map (with
     the task's pos:/escpos:/args: keys), ``bans`` replay.Ban or (label, ((key, value), ...)). ``args``: further
     taskcore options (the default: fold strict, reductions (a)-(f), the model encoding). ``start_check``: taskcore's
     ``--start-check`` (needed: on the facts (e) needs; input: on every fact the input's file names). ``keep``: keep
-    the SAS file and the operator table in ``workdir``."""
+    the SAS file and the operator table in ``workdir``. ``engine_choice``: a step whose paths differ only on facts
+    the file does not hold is left to the engine (``choices``) instead of raising PathChoice."""
     from export_records import write_bans, write_start
     work = Path(workdir)
     work.mkdir(parents=True, exist_ok=True)
@@ -431,15 +456,23 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
         raise ValueError(f"search {search!r}: lama-first or anytime")
     res = TaskcoreResult(status, code, seconds=seconds, workdir=str(work), log=log, write_s=write_s,
                          operators=stats["sas"]["operators"], stats=stats)
+    res.landmarks, res.orderings = parse_landmarks(log)  # lama-first's dump (anytime LAMA's alias has none)
     if status == "plan":
         t1 = time.monotonic()
         head, ops, acts = read_ops(ops_file)
         res.file_facts, res.needed_facts = head["facts"], head["needed"]
         dec = decode_ops(text, ops, acts)
-        paths, end = predict(facts, pieces, dec, start, head["facts"])
+        choices = {}
+        paths, end = predict(facts, pieces, dec, start, head["facts"], choices=choices if engine_choice else None)
         needed = set(head["needed"])
+
+        def cut(a):
+            return dataclasses.replace(a, effects=tuple(e for e in a.effects if e.key in needed))
         res.paths = paths
-        res.actions = [dataclasses.replace(a, effects=tuple(e for e in a.effects if e.key in needed)) for a in paths]
+        res.actions = [cut(a) for a in paths]
+        res.choices = {i: [cut(p) for p in ps] for i, ps in choices.items()}
+        for i, ps in res.choices.items():
+            res.actions[i] = either(dec[i]["name"], ps)
         res.steps = [Step(s["op"], i, a.name, s["chosen"], s["guessed"]) for i, (s, a) in enumerate(zip(dec, paths))]
         res.folds = [s["name"] if len(s["members"]) > 1 else None for s in dec]
         res.predicted_goal = all(end.get(k) in {_label(facts[k], v) for v in vs} for k, vs in goal.items())

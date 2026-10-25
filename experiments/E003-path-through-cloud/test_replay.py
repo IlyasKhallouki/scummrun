@@ -25,7 +25,6 @@ import replay as RP  # noqa: E402
 import task as T  # noqa: E402
 from domains import ABOVE, Domain  # noqa: E402
 from reader import Record  # noqa: E402
-from speedrun.executor import RouteError  # noqa: E402
 
 
 def rec(kind="sentence", label="sentence(2,316)", pre=None, effects=None, checks=(), source=(), engine_pre=()):
@@ -49,17 +48,27 @@ def test_walk_to_is_the_walk_click_with_the_readers_walk_verb():
     assert (m.verb, m.obj, m.obj2) == (11, 316, None)
 
 
-def test_dialog_line_is_a_click_on_its_lines_text():
+def test_dialog_line_is_a_click_on_its_verb_by_number():
+    """The verb's point comes from the verb table (its slot and rectangle) and the engine's hit test, never from a
+    text: two lines with the same text, an arrow verb (109) outside 120-128, and a verb the table does not list."""
     r = rec(kind="dialog_line", label="dialog_line(121)[33@28]", source=("verb", 121))
-    inp = RP.step_input(r)
-    assert inp == RP.Input("line", 121)
-    state = {"verbs": [{"id": 121, "name": "I want to be a pirate."}, {"id": 122, "name": "Bye."},
-                       {"id": 9, "name": "Pick up"}]}
-    assert RP.to_move(inp, "say", state).choose == "I want to be a pirate."
-    with pytest.raises(RouteError):  # not shown
-        RP.to_move(RP.Input("line", 123), "say", state)
-    with pytest.raises(RouteError):  # its text is inside another line's: the click by text would be ambiguous
-        RP.to_move(RP.Input("line", 122), "say", {"verbs": state["verbs"] + [{"id": 124, "name": "Bye. See you."}]})
+    assert RP.step_input(r) == RP.Input("line", 121)
+    with pytest.raises(ValueError):  # no Move: the harness clicks it (Harness._click_verb)
+        RP.to_move(RP.Input("line", 121), "say")
+    verbs = [{"id": 121, "slot": 5, "x": 10, "y": 150, "name": "Same."},
+             {"id": 122, "slot": 6, "x": 10, "y": 158, "name": "Same."},
+             {"id": 109, "slot": 7, "x": 300, "y": 150, "name": ""}]
+    boxes = {v["slot"]: (v["x"], v["y"], v["x"] + 8, v["y"] + 6) for v in verbs}
+
+    def at(x, y):
+        return {"verb_slot": next((s for s, (x0, y0, x1, y1) in boxes.items() if x0 <= x < x1 and y0 <= y < y1), 0)}
+    state = {"verbs": verbs}
+    assert RP.verb_point(121, state, at) == (12, 152) and RP.verb_point(122, state, at) == (12, 160)
+    assert RP.verb_point(109, state, at) == (302, 152)
+    assert RP.verb_point(123, state, at) is None  # not in the table: not shown, saved away or off
+    boxes[7] = (0, 0, 0, 0)  # listed but not hit at any of its points
+    assert RP.verb_point(109, state, at) is None
+    assert RP.verb_point(121, {"verbs": verbs + [dict(verbs[0], slot=9)]}, at) is None  # listed twice
 
 
 def test_skip_is_esc_and_an_event_is_a_wait():
