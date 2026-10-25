@@ -3,7 +3,7 @@ and replay.Harness planning through it.
 
 usage: python test_replay_taskcore.py [N] [seed]    (N random tasks, default 200; the summary on stdout)
        pytest test_replay_taskcore.py -m 'not slow'  (the fixed cases, and the same with N = 60)
-       READER_PICKLE=<reading.pkl> python test_replay_taskcore.py kitchen <work dir> [pruned|full ...]
+       READER_PICKLE=<reading.pkl> python test_replay_taskcore.py kitchen <work dir> [pruned|full|plans ...]
                                                      (the kitchen: the bans byte for byte, and plans with bans)
        python test_replay_taskcore.py log <work dir>  (results/taskcore-bans.log from the work dir: the kitchen's
                                                      json files and the random runs' summaries, prop-N-sS.out)
@@ -440,7 +440,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
     """The kitchen (module docstring): for four ban sets, task.py's file of the banned task (the pruned task replay.py's
     python planner bans, and build_task's, which taskcore's planner reads) against taskcore's with the bans, sha1
     and size; then lama-first through plan_taskcore with each of the six ban sets and its plan run on the unreduced
-    banned task. Writes work/kitchen-bans.json (kitchen-bans-<which>.json)."""
+    banned task ("plans": only those). Writes work/kitchen-bans-<which>.json."""
     import hashlib
     import pickle
     import time
@@ -468,7 +468,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
 
     files = ("the walk", "a folded step", "all five", "the walk twice (rooms 28 and 41)")  # task.py: 2-6 minutes each
     tasks = {}
-    if "full" in which:
+    if "full" in which or "plans" in which:
         export_records(work / "kitchen.tc", b, recs, goal, starts={"s17": start})
         tasks["full"] = (full, work / "kitchen.tc")
     if "pruned" in which:
@@ -497,7 +497,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
             out["files"].append(row)
             print(json.dumps(row), flush=True)
             (work / f"kitchen-bans-{'-'.join(which)}.json").write_text(json.dumps(out, indent=1))
-    if "full" in which:
+    if "full" in which or "plans" in which:
         for name, bans in sets.items():
             pieces = RP.ban_pieces(full, bans)
             res = plan_fd.plan_taskcore(work / "kitchen.tc", full.facts, goal, pieces, start, bans,
@@ -523,10 +523,12 @@ def write_log(work: Path) -> None:
          "byte for byte: replay.apply_bans (ban_of's points, cut) + task.write_sas(...).text(start) against taskcore "
          "--bans --start-file --fold off --reduce none --encoding task on the unbanned packed file."]
     rows, plans, bans = [], [], {}
+    only = work / "kitchen-bans-plans.json"  # a later run of the plans alone replaces the others' plans
     for f in sorted(work.glob("kitchen-bans-*.json")):
         d = json.loads(f.read_text())
         rows += d["files"]
-        plans += d["plans"]
+        if not only.exists() or f == only:
+            plans += d["plans"]
         bans.update(d["bans"])
     if bans:
         L += ["", "== the kitchen (the step 5 reading; start s17 = reader.task_start of run B's S1#7 pre) ==",
