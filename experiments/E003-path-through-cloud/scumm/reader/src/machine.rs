@@ -905,13 +905,12 @@ impl Hooks for ReaderHooks {
                 enc_label(&mut b, *l);
             }
         }
-        let mut steps: Vec<(Fact, i64)> = p
-            .writes
-            .iter()
-            .filter(|(_, &v)| is_step(m, v))
-            .map(|(&k, &v)| (k, step_of(m, v)))
+        // reader.py walks every write for a step; only the counters STEP_OPS step ever hold one (a read of a
+        // step anywhere else resolves it or forks), so these three are the same walk
+        let steps: Vec<(Fact, i64)> = [Fact::Var(VAR_CURSORSTATE), Fact::Var(VAR_USERPUT), Fact::Cutscene]
+            .into_iter()
+            .filter_map(|k| p.writes.get(&k).filter(|&&v| is_step(m, v)).map(|&v| (k, step_of(m, v))))
             .collect();
-        steps.sort_unstable();
         b.extend_from_slice(&(steps.len() as u32).to_le_bytes());
         for (k, d) in steps {
             enc_fact(&mut b, k);
