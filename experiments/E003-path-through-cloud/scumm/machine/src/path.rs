@@ -200,6 +200,9 @@ pub struct Sig {
     pub h: u64,
     round: bool,
     words: Vec<u64>,
+    /// what a hook adds to the signature (reader.py's `Reader._join`), encoded; empty without hooks. A hook that
+    /// sets it also mixes it into `h`
+    pub ext: Box<[u8]>,
 }
 
 impl Sig {
@@ -208,7 +211,7 @@ impl Sig {
         let mut st = rustc_hash::FxHasher::default();
         round.hash(&mut st);
         words.hash(&mut st);
-        Sig { h: fmix(st.finish()), round, words }
+        Sig { h: fmix(st.finish()), round, words, ext: Box::default() }
     }
 
     /// `("round", round, position key)`.
@@ -416,6 +419,13 @@ impl Store {
     #[inline]
     pub fn hash_sum(&self) -> u64 {
         self.sum
+    }
+
+    /// `store.pop(k, None)` (a hook's: reader.py deletes writes).
+    pub fn remove(&mut self, k: &Fact) -> Option<Val> {
+        let old = self.map.remove(k)?;
+        self.sum = self.sum.wrapping_sub(fx(&(*k, old)));
+        Some(old)
     }
 }
 
@@ -719,6 +729,21 @@ pub struct Path {
     pub cleared: Option<bool>,
     // --- golden.py's trace bookkeeping
     pub tid: Option<u32>,
+    /// what a hook adds to a path (reader.py's `SymPath` fields); None without hooks. Forks copy it
+    pub ext: Option<Box<dyn PathExt>>,
+}
+
+/// The fields a hook adds to a path (reader.py's `SymPath` subclass of `model.Path`): cloned with the path.
+pub trait PathExt: std::any::Any + std::fmt::Debug {
+    fn clone_box(&self) -> Box<dyn PathExt>;
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
+
+impl Clone for Box<dyn PathExt> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 impl Path {

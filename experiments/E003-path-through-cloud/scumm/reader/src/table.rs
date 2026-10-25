@@ -35,6 +35,7 @@ impl Kind {
     }
 }
 
+#[derive(Clone)]
 pub struct FactTable {
     /// the scope's start with the settings' variables (FactTable.start)
     pub start: Facts,

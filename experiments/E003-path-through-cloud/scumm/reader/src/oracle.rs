@@ -232,6 +232,27 @@ pub fn replay_into<'g>(
     (b, runs)
 }
 
+/// The reading `name` with the Rust machine half (no Python, no playback): the Builder and the seconds it took.
+pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
+    let mut b = builder(game, st, name);
+    let mut m = crate::machine::Reader::new(game);
+    let t = std::time::Instant::now();
+    b.read_all_into(&mut m, true, None, 2, None);
+    (b, t.elapsed().as_secs_f64())
+}
+
+/// Every captured run of the reading `name` against the Rust machine half's run of the same inputs (the Builder
+/// goes on with the captured runs): the first differences (at most `max`), the runs compared, the runs that differ
+/// and the seconds in the Rust machine half.
+pub fn compare_runs(game: &Game, st: &Static, name: &str, max: usize) -> (Vec<String>, usize, usize, f64) {
+    let mut b = builder(game, st, name);
+    let replay = Replay::open(&oracle_dir().join(format!("capture-{name}.jsonl.gz")));
+    let mut m = crate::replay::Compare::new(replay, crate::machine::Reader::new(game), max);
+    b.read_all_into(&mut m, true, None, 2, None);
+    assert!(m.replay.done(), "captured runs left after the reading");
+    (m.diffs, m.replay.runs, m.differing, m.secs)
+}
+
 /// The Builder's reading against golden.py's file, line by line: the first differences (at most `max`) and the
 /// number of lines compared.
 pub fn compare_reading(b: &Builder, golden: &Path, max: usize) -> (Vec<String>, usize) {

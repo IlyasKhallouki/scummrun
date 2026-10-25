@@ -7,7 +7,7 @@ reference. A layer replaces them only once it reproduces their output byte for b
 |---|---|---|
 | `ir` (scumm-ir) | ir.py, facts.py's key scheme, everything model.Game computes from the game files alone | done: 0 mismatches |
 | `machine` (scumm-machine) | model.py's Machine, row by row | rows 0-5 and the three switch runs done: every machine golden run has 0 differences; check.py's model check runs on it (`check_rust.py`) with files byte-identical to results/ (machine/PORT-NOTES.md) |
-| `reader` | reader.py | after |
+| `reader` (scumm-reader) | reader.py (both halves, the machine one as hooks on scumm-machine), domains.py | done: 0 differences on room 33's and the kitchen's readings (reader/PORT-NOTES.md) |
 
 A later crate depends on `ir` with `scumm-ir.workspace = true`.
 

@@ -15,10 +15,12 @@
 mod calls;
 mod dialog;
 mod esc;
+mod hooks;
 mod rooms;
 mod settle;
 
 pub use dialog::{LEFT_CLICK, VERB_CLICK_AREA};
+pub use hooks::Hooks;
 pub use settle::ROUND;
 
 use crate::enc;
@@ -237,6 +239,10 @@ pub struct Machine<'g> {
     ocache: FxHashMap<(Fact, u8), Val>,
     /// a condition's printed text, by expression
     conds: FxHashMap<ExprId, S>,
+    /// a subclass's overrides (hooks.rs); None: model.py's Machine itself
+    pub hooks: Option<&'static dyn Hooks>,
+    /// the hooking side's own state
+    pub ext: Option<Box<dyn std::any::Any>>,
 }
 
 impl<'g> Machine<'g> {
@@ -265,6 +271,8 @@ impl<'g> Machine<'g> {
             next_cid: 0,
             ocache: FxHashMap::default(),
             conds: FxHashMap::default(),
+            hooks: None,
+            ext: None,
         }
     }
 
@@ -305,7 +313,7 @@ impl<'g> Machine<'g> {
     }
 
     /// The oracle's answer as a value (`FactOracle.get`).
-    fn oget(&mut self, o: &FactOracle, k: Fact) -> Val {
+    pub fn oget_base(&mut self, o: &FactOracle, k: Fact) -> Val {
         let (reason, tag) = match o.get(k) {
             OVal::Int(n) => return Val::Int(n),
             OVal::Held => (Reason::Held, 0),
@@ -569,7 +577,7 @@ impl<'g> Machine<'g> {
         t.ev(p, "fork", vec![("children", J::Arr(kids)), ("assume", assume), ("where", wh)]);
     }
 
-    fn advance(&mut self, p: &mut Path, o: &FactOracle) -> Vec<Path> {
+    pub fn advance_base(&mut self, p: &mut Path, o: &FactOracle) -> Vec<Path> {
         match p.stack.last() {
             None => {
                 self.halt(p, "end", rc("nothing left to run"));
@@ -583,7 +591,7 @@ impl<'g> Machine<'g> {
     // --- reading ------------------------------------------------------------------------------------------
 
     /// The path's own write first, else the oracle's (model.py `read`).
-    fn read(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+    pub fn read_base(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
         let v = if let Some(&v) = p.writes.get(&k) {
             v
         } else if p.round != 0 && matches!(k, Fact::Var(n) if TIME_VARS.contains(&n)) {
@@ -624,7 +632,7 @@ impl<'g> Machine<'g> {
         }
     }
 
-    fn val(&mut self, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
+    pub fn val_base(&mut self, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
         let g = self.game;
         match g.ast.expr(e) {
             Expr::Const(v) => Val::Int(v),
@@ -672,7 +680,7 @@ impl<'g> Machine<'g> {
     }
 
     /// A printed condition (model.py `test`): comparisons cast to int16, the zero tests do not.
-    fn test(&mut self, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> Dec {
+    pub fn test_base(&mut self, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> Dec {
         use scumm_ir::CmpOp::*;
         let g = self.game;
         match g.ast.expr(c) {
@@ -745,7 +753,7 @@ impl<'g> Machine<'g> {
         }
     }
 
-    fn getter(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
+    pub fn getter_base(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
         let g = self.game;
         if name == known::FIND_INVENTORY && self.calls {
             return self.find_inventory(p, o, args, x);
@@ -798,7 +806,7 @@ impl<'g> Machine<'g> {
 
     /// The objects whose owner fact is `owner` (model.py `_owned_by`), or the first owner fact, in key
     /// order, whose value is not known, with that value.
-    fn owned_by(&mut self, p: &mut Path, o: &FactOracle, owner: i32) -> Result<Vec<i32>, (Fact, Val)> {
+    pub fn owned_by_base(&mut self, p: &mut Path, o: &FactOracle, owner: i32) -> Result<Vec<i32>, (Fact, Val)> {
         let obj_of = |k: Fact| match k {
             Fact::Owner(n) => n,
             _ => unreachable!(),
@@ -974,7 +982,7 @@ impl<'g> Machine<'g> {
 
     /// The keys with a prefix the oracle or the path's store holds, deduplicated.
     fn prefixed(&self, p: &Path, o: &FactOracle, pre: Prefix) -> Vec<Fact> {
-        let mut keys: Vec<Fact> = o.keys(pre).to_vec();
+        let mut keys: Vec<Fact> = self.okeys(o, pre);
         keys.extend(p.writes.keys().copied().filter(|&k| pre.matches(k)));
         keys.sort_unstable();
         keys.dedup();
@@ -983,7 +991,7 @@ impl<'g> Machine<'g> {
 
     /// Every fact with this prefix that is not 0 goes to 0 (model.py `clear`; FactOracle always lists,
     /// so its note never happens). The order of the keys changes nothing observable.
-    fn clear(&mut self, p: &mut Path, o: &FactOracle, pre: Prefix) {
+    pub fn clear_base(&mut self, p: &mut Path, o: &FactOracle, pre: Prefix) {
         for k in self.prefixed(p, o, pre) {
             if self.read(p, k, o) != Val::Int(0) {
                 self.write(p, k, Val::Int(0));
@@ -1021,7 +1029,7 @@ impl<'g> Machine<'g> {
 
     /// `_arith` in a path: with calls on, a division by a known 0 is the engine's error() (o5_divide and
     /// o5_expression, script_v5.cpp:993-994, 1176-1179): the path ends there.
-    fn arith_at(&mut self, p: &mut Path, op: Op, a: Val, b: Val, x: Option<X>) -> Val {
+    pub fn arith_at_base(&mut self, p: &mut Path, op: Op, a: Val, b: Val, x: Option<X>) -> Val {
         if op == Op::Div && b == Val::Int(0) && self.calls {
             let c = self.cite_of(x);
             self.error(p, "divide by zero", c, "an error() (script_v5.cpp:994, 1179)", true);
@@ -1229,7 +1237,7 @@ impl<'g> Machine<'g> {
         }
     }
 
-    fn jump(&mut self, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> Vec<Path> {
+    pub fn jump_base(&mut self, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> Vec<Path> {
         let g = self.game;
         let ins = &g.ins(x.u)[x.i as usize];
         let Some(cond) = cond else {
@@ -1315,7 +1323,7 @@ impl<'g> Machine<'g> {
 
     /// o5_wait: blocked or not, a fork (model.py `_wait`); in a settle round or turn, a wait for an actor, a
     /// message or the camera blocks now, and WaitForSentence tests the queue and the sentence slot.
-    fn wait(&mut self, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
+    pub fn wait_base(&mut self, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
         let g = self.game;
         let (reason, what) = waits(name);
         let ins = &g.ins(x.u)[x.i as usize];
@@ -1448,7 +1456,7 @@ impl<'g> Machine<'g> {
 
     // --- op rules (model.py HEADS has the cites) -------------------------------------------------------------
 
-    fn op(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
+    pub fn op_base(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
         let g = self.game;
         let Stmt::Op { name, args, subops, flags } = st else { unreachable!() };
         let args = g.ast.kids(args);

@@ -136,6 +136,9 @@ pub struct Builder<'g> {
     unknown_cache: FxHashMap<(String, String), Option<Vec<String>>>,
     cites: Option<FxHashMap<String, (UnitId, u32)>>,
     ego_cache: Option<Vec<Label>>,
+    /// kind and domain of the keys `effect` reads, for one pass (an `args:`, `pos:` or `escpos:` domain grows
+    /// within a pass: not kept)
+    fact_info: FxHashMap<String, std::rc::Rc<(Kind, Option<Domain>)>>,
 }
 
 /// reader.py `_why`: the reason of an assumption's `why` (model.Unknown's text).
@@ -178,6 +181,7 @@ impl<'g> Builder<'g> {
             unknown_cache: FxHashMap::default(),
             cites: None,
             ego_cache: None,
+            fact_info: FxHashMap::default(),
         }
     }
 
@@ -1037,16 +1041,28 @@ impl<'g> Builder<'g> {
         }
     }
 
+    /// `table.kind(key)` and `table.domain(key)`, kept for the pass (`fact_info`).
+    fn fact_info(&mut self, key: &str) -> std::rc::Rc<(Kind, Option<Domain>)> {
+        if let Some(i) = self.fact_info.get(key) {
+            return i.clone();
+        }
+        let i = std::rc::Rc::new((self.kind(key), self.domain(key)));
+        if !(key.starts_with("args:") || key.starts_with("pos:") || key.starts_with("escpos:")) {
+            self.fact_info.insert(key.to_string(), i.clone());
+        }
+        i
+    }
+
     fn effect_or_same(&mut self, key: &str, v: &Val, p: &PathOut) -> EffOut {
-        let dom = self.table.domain(key).map(|d| d.into_owned());
-        let Some(dom) = dom.filter(|_| self.kind(key) != Kind::NonFact) else {
+        let info = self.fact_info(key);
+        let Some(dom) = info.1.as_ref().filter(|_| info.0 != Kind::NonFact) else {
             self.counts.inc("writes to non-facts (left out of the task)");
             return EffOut::None;
         };
         if let Val::Unk(u) = v {
             if u.class != UClass::Unknown {
                 let src = u.what.clone();
-                let s: Option<Label> = if self.kind(&src) == Kind::Const {
+                let s: Option<Label> = if self.fact_info(&src).0 == Kind::Const {
                     Some(Label::Int(self.table.start.get0(&src)))
                 } else {
                     p.pre.get(&src).filter(|s| s.len() == 1).map(|s| s[0])
@@ -1180,6 +1196,7 @@ impl<'g> Builder<'g> {
         self.sig_seen.clear();
         self.folded.clear();
         self.ego_cache = None;
+        self.fact_info.clear();
     }
 
     /// `Builder.extend_domains`: add the written values a domain lacked; returns how many.
@@ -1189,6 +1206,7 @@ impl<'g> Builder<'g> {
             let dom = self.domain(&key).unwrap();
             let mut ints: BTreeSet<i64> = dom.values.iter().filter_map(|v| v.int()).collect();
             ints.extend(vals);
+            self.fact_info.clear();
             let above = dom.values.contains(&Label::Above);
             let below = dom.values.contains(&Label::Below);
             if above {

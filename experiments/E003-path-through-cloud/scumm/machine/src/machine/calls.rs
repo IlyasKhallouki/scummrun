@@ -137,7 +137,7 @@ impl<'g> Machine<'g> {
 
     /// The path's join signature when it stands at a join, else None (model.py `_join`): between two steps
     /// of an opcode's call, and at an instruction some jump goes to.
-    pub(super) fn join(&self, p: &Path, o: &FactOracle) -> Option<Sig> {
+    pub fn join_base(&self, p: &Path, o: &FactOracle) -> Option<Sig> {
         let g = self.game;
         match p.stack.last()? {
             Entry::Call(c) => {
@@ -231,7 +231,7 @@ impl<'g> Machine<'g> {
     /// One path for the paths waiting at one join (model.py `_merge`). model.py's merged path is the first path's
     /// fork, and the first path is dropped after; here the first path itself becomes the merged one, and what the
     /// merge reads from it is worked out before it changes.
-    pub(super) fn merge(&mut self, o: &FactOracle, mut group: Vec<Path>, sig: Rc<Sig>) -> Path {
+    pub fn merge_base(&mut self, o: &FactOracle, mut group: Vec<Path>, sig: Rc<Sig>) -> Path {
         let g = self.game;
         let tids: Vec<J> = match &mut self.trace {
             Some(t) => group.iter_mut().map(|q| J::Int(t.tid(q) as i64)).collect(),
@@ -525,7 +525,7 @@ impl<'g> Machine<'g> {
     }
 
     /// model.py `getattr(self, "_eng_" + step[0])(p, call, oracle, *step[1:])`.
-    fn eng(&mut self, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> Vec<Path> {
+    pub fn eng_base(&mut self, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> Vec<Path> {
         match step {
             Step::Write(k, v) => self.write(p, *k, *v),
             Step::Note(w) => {
@@ -567,7 +567,7 @@ impl<'g> Machine<'g> {
 
     /// runScript(N, F, R, args) (model.py `_eng_script`).
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn eng_script(
+    pub fn eng_script_base(
         &mut self,
         p: &mut Path,
         ci: usize,
@@ -684,7 +684,7 @@ impl<'g> Machine<'g> {
         };
         let uid = unit.and_then(|u| g.id(u));
         let mut waits = Vec::new();
-        for k in o.keys(Prefix::At(name)).to_vec() {
+        for k in self.okeys(o, Prefix::At(name)) {
             if self.read(p, k, o) == Val::Int(1) {
                 waits.push(k);
             }
@@ -919,7 +919,7 @@ impl<'g> Machine<'g> {
 
     /// The running frame's turn is over (model.py `_finish`); then runScriptNested's resume test for the
     /// call below.
-    pub(super) fn finish(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
+    pub fn finish_base(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
         let g = self.game;
         let Some(Entry::Frame(f)) = p.stack.pop() else { panic!("finish: the top is not a frame") };
         let ukey = self.unit_key(f.unit);
@@ -1102,7 +1102,7 @@ impl<'g> Machine<'g> {
     }
 
     /// A slot's freeze count off the stack (model.py `_count`): (count, exact), or None when not known.
-    fn count(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> Option<(i32, bool)> {
+    pub fn count_base(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> Option<(i32, bool)> {
         if let Some(&c) = p.freeze.get(&name) {
             return c;
         }
@@ -1114,7 +1114,7 @@ impl<'g> Machine<'g> {
     }
 
     /// A slot's freeze count off the stack and its `frozen:` fact (model.py `_set_freeze`).
-    pub(super) fn set_freeze(&mut self, p: &mut Path, o: &FactOracle, name: Slot, n: Option<(i32, bool)>, why: &str) {
+    pub fn set_freeze_base(&mut self, p: &mut Path, o: &FactOracle, name: Slot, n: Option<(i32, bool)>, why: &str) {
         p.freeze.insert(name, n);
         let v = match n {
             None => self.v.mk(Reason::Freeze, if why.is_empty() { name.to_string() } else { why.to_string() }),
@@ -1131,7 +1131,7 @@ impl<'g> Machine<'g> {
     }
 
     /// freezeScripts(flag) (model.py `_freeze`).
-    pub(super) fn freeze(&mut self, p: &mut Path, o: &FactOracle, flag: i32, x: X) {
+    pub fn freeze_base(&mut self, p: &mut Path, o: &FactOracle, flag: i32, x: X) {
         let g = self.game;
         let c = self.cite(x);
         let cur = p.top_frame_index();
@@ -1203,7 +1203,7 @@ impl<'g> Machine<'g> {
     }
 
     /// unfreezeScripts (model.py `_unfreeze`): every frozen slot loses 1 from its count.
-    pub(super) fn unfreeze(&mut self, p: &mut Path, o: &FactOracle) {
+    pub fn unfreeze_base(&mut self, p: &mut Path, o: &FactOracle) {
         for f in p.frames_mut() {
             if f.freeze > 0 {
                 f.freeze -= 1;
@@ -1252,7 +1252,7 @@ impl<'g> Machine<'g> {
     // --- getters --------------------------------------------------------------------------------------------------
 
     /// findInventory(owner, n) with calls on (model.py `_find_inventory`).
-    pub(super) fn find_inventory(&mut self, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> Val {
+    pub fn find_inventory_base(&mut self, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> Val {
         let ks = self.game.ast.kids(args);
         assert_eq!(ks.len(), 2, "findInventory takes two values");
         let (a0, a1) = (ks[0], ks[1]);

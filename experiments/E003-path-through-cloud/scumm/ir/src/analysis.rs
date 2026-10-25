@@ -44,6 +44,8 @@ pub enum Reason {
     Counter,
     /// a variable whose value comes from variable N, itself not a fact
     Var(i32),
+    /// a reason model.py does not name (reader.py's: "fact", "not a fact", "step", ...)
+    Other(&'static str),
 }
 
 impl Reason {
@@ -76,6 +78,7 @@ impl Reason {
             Reason::Input => "mouse",
             Reason::Counter => "counter",
             Reason::Var(n) => return std::borrow::Cow::Owned(format!("var {n}")),
+            Reason::Other(s) => s,
         })
     }
 }

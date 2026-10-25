@@ -15,6 +15,7 @@ pub mod builder;
 pub mod domain;
 pub mod domains;
 pub mod facts;
+pub mod machine;
 pub mod oracle;
 pub mod packed;
 pub mod py;
