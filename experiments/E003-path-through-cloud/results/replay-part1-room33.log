@@ -5,7 +5,7 @@ E003 step 5 on Part I: the runner (replay_part1.py) on the reading 'room33'
 reading /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/room33/control.json: 816 actions, 143 facts, packed file 197,908 bytes (sha1 3accd9b0d8ce); goal {'state:428': [1]} (not the Part I end)
 control: precondition sets kept 4,461, dropped 637; replay checks dropped 1856; stepped facts made engine conditions 6
 start: idle stop at frame 2728 (sentence), room 33, boot 4.7 s; checks ok; against the reading's start (results/start-part1.jsonl seed 1): 0 facts differ, 0 of them the task's; taskcore start check: input ok, needed ok
-result: stop 'goal'; goal reached True; verified from boot: True (27 inputs, 4 checkpoints, 0 differ, 4.9 s)
+result: stop 'goal'; goal reached True; verify from boot: 0 differences at 4 checkpoints (27 inputs, 4.9 s), the goal at its end True
 replans 0; bans 0; plans 1; frames 68 (game time 6.8 s); player inputs 27
 steps: 2 in the log, 2 executed (2 played); outcomes {'matched': 2}
 matched (plan.md: the predicted writes and no other tracked fact changed): 0 of 2 executed (0.0); predicted writes held: 2 (1.0); not matched: {'writes held, tracked facts changed': 2}
@@ -24,7 +24,7 @@ landmarks (plan 0, frame 2728): 11 nodes, 11 on game facts, 17 orderings; the ga
 === seed 1 ===
 reading /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/room33/reading.json: 816 actions, 143 facts, packed file 205,552 bytes (sha1 9473d562224a); goal {'state:428': [1]} (not the Part I end)
 start: idle stop at frame 2728 (sentence), room 33, boot 4.9 s; checks ok; against the reading's start (results/start-part1.jsonl seed 1): 0 facts differ, 0 of them the task's; taskcore start check: input ok, needed ok
-result: stop 'goal'; goal reached True; verified from boot: True (27 inputs, 4 checkpoints, 0 differ, 4.9 s)
+result: stop 'goal'; goal reached True; verify from boot: 0 differences at 4 checkpoints (27 inputs, 4.9 s), the goal at its end True
 replans 0; bans 0; plans 1; frames 68 (game time 6.8 s); player inputs 27
 steps: 2 in the log, 2 executed (2 played); outcomes {'matched': 2}
 matched (plan.md: the predicted writes and no other tracked fact changed): 0 of 2 executed (0.0); predicted writes held: 2 (1.0); not matched: {'writes held, tracked facts changed': 2}
