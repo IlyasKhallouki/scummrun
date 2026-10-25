@@ -118,6 +118,7 @@ pub struct Deltas {
     pub unknown_writes: Counter,
     pub unknown_sites: PyCounter,
     pub out_of_domain: BTreeMap<String, BTreeSet<i64>>,
+    pub outside_points: BTreeMap<String, BTreeMap<i64, u64>>,
     pub rd: RdCounts,
     pub sig_ids: BTreeMap<i64, BTreeSet<String>>,
     /// the `args:` values `record` added to the table (`table.args_vals`), in order
@@ -197,6 +198,10 @@ pub struct Builder<'g> {
     pub unknown_writes: Counter,
     pub unknown_sites: PyCounter,
     pub out_of_domain: BTreeMap<String, BTreeSet<i64>>,
+    /// the places written to a slot that are none of the scope's points for its name, in this pass: `pos:<unit>` or
+    /// `escpos:<unit>` -> place -> records (the scope-1 finding, PORT-NOTES.md "ELSEWHERE"; listed whether the
+    /// switch is on or off; not part of the reading)
+    pub outside_points: BTreeMap<String, BTreeMap<i64, u64>>,
     pub rd: RdCounts,
     pub sig_ids: BTreeMap<i64, BTreeSet<String>>,
     pub sig_seen: FxHashMap<(String, i64), Vec<i64>>,
@@ -294,6 +299,7 @@ impl<'g> Builder<'g> {
             unknown_writes: std::mem::take(&mut self.unknown_writes),
             unknown_sites: std::mem::take(&mut self.unknown_sites),
             out_of_domain: std::mem::take(&mut self.out_of_domain),
+            outside_points: std::mem::take(&mut self.outside_points),
             rd: std::mem::take(&mut self.rd),
             sig_ids: std::mem::take(&mut self.sig_ids),
             args: self.args_log.as_mut().map(std::mem::take).unwrap_or_default(),
@@ -312,6 +318,12 @@ impl<'g> Builder<'g> {
         self.unknown_sites.update(&d.unknown_sites);
         for (k, v) in d.out_of_domain {
             self.out_of_domain.entry(k).or_default().extend(v);
+        }
+        for (k, m) in d.outside_points {
+            let e = self.outside_points.entry(k).or_default();
+            for (w, n) in m {
+                *e.entry(w).or_default() += n;
+            }
         }
         self.rd.update(&d.rd);
         for (sig, texts) in d.sig_ids {
@@ -338,6 +350,7 @@ impl<'g> Builder<'g> {
             unknown_writes: Counter::default(),
             unknown_sites: PyCounter::default(),
             out_of_domain: BTreeMap::new(),
+            outside_points: BTreeMap::new(),
             rd: RdCounts::default(),
             sig_ids: BTreeMap::new(),
             sig_seen: FxHashMap::default(),
@@ -1161,7 +1174,9 @@ impl<'g> Builder<'g> {
     }
 
     /// `Builder.positions`: `at:<unit>:W` and `esc:<unit>:W` as one fact per unit, `pos:<unit>` and `escpos:<unit>`.
-    /// A written place is not checked against pos:'s domain (reader.py's own behaviour, a finding: PORT-NOTES.md).
+    /// A written place is not checked against pos:'s domain (reader.py's own behaviour, a finding: PORT-NOTES.md),
+    /// but listed in `outside_points`. With the switch on (`table.elsewhere`) such a place is written as ELSEWHERE,
+    /// and no precondition set holds ELSEWHERE (PORT-NOTES.md, "ELSEWHERE").
     pub fn positions(&mut self, mut pre: Pre, mut effects: Vec<(String, Eff)>) -> (Pre, Vec<(String, Eff)>) {
         for (kind, pos) in [("at", "pos"), ("esc", "escpos")] {
             let prefix = format!("{kind}:");
@@ -1187,15 +1202,28 @@ impl<'g> Builder<'g> {
             effects = kept;
             let names: BTreeSet<String> = ones.keys().cloned().chain(zeros.iter().cloned()).collect();
             for name in names {
+                let key = format!("{pos}:{name}");
+                for &w in ones.get(&name).into_iter().flatten() {
+                    if !self.table.is_point(kind, &name, w) {
+                        *self.outside_points.entry(key.clone()).or_default().entry(w).or_default() += 1;
+                        if self.table.elsewhere {
+                            self.counts.inc(format!("{kind}: a place none of the scope's points written as ELSEWHERE"));
+                        }
+                    }
+                }
                 let e = match ones.get(&name) {
                     Some(ws) if ws.len() > 1 => {
                         self.counts.inc(format!("{kind}: more than one place written for one unit (a guess)"));
-                        Eff::Guess(lab_set(ws.iter().map(|&w| Label::Int(w))))
+                        let labs = lab_set(ws.iter().map(|&w| Label::Int(self.table.place(kind, &name, w))));
+                        if labs.len() == 1 {
+                            Eff::Set(labs[0])
+                        } else {
+                            Eff::Guess(labs)
+                        }
                     }
-                    Some(ws) => Eff::Set(Label::Int(ws[0])),
+                    Some(ws) => Eff::Set(Label::Int(self.table.place(kind, &name, ws[0]))),
                     None => Eff::Set(Label::Int(crate::table::NOWHERE)),
                 };
-                let key = format!("{pos}:{name}");
                 match effects.iter_mut().find(|x| x.0 == key) {
                     Some(x) => x.1 = e,
                     None => effects.push((key, e)),
@@ -1222,6 +1250,9 @@ impl<'g> Builder<'g> {
                     } else if s == [Label::Int(0)] {
                         ok.remove(&Label::Int(w));
                     }
+                }
+                if self.table.elsewhere {
+                    ok.remove(&Label::Int(crate::table::ELSEWHERE));
                 }
                 pre.insert(key, ok.into_iter().collect());
             }
@@ -1405,6 +1436,7 @@ impl<'g> Builder<'g> {
             self.counts.add(k, v);
         }
         self.out_of_domain.clear();
+        self.outside_points.clear();
         self.table.args_vals.clear();
         self.args_doms.borrow_mut().clear();
         self.sig_seen.clear();

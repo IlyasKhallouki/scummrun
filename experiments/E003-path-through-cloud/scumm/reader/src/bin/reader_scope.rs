@@ -5,6 +5,7 @@
 //!
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
+//!                     [--elsewhere]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
@@ -17,6 +18,9 @@
 //!               folded lists) and of the counters' line, to compare readings across thread counts
 //! --keep        keep the records in memory (the Builder's `records`); --lines FILE writes golden.py's reader file
 //!               (with --keep)
+//! --elsewhere   the switch for the scope-1 finding (PORT-NOTES.md, "ELSEWHERE"): a slot's place that is none of the
+//!               scope's points is written as ELSEWHERE, which no precondition accepts. Off by default. The report
+//!               lists such places either way (`outside_points`: fact -> place -> paths).
 //! --sample N --seed S --dump FILE
 //!               the spot-check's jobs: of the last pass, N per stratum (the room a job's unit or object belongs
 //!               to, or "global"), drawn by reservoir sampling with seed S; each written to FILE with what its batch
@@ -252,6 +256,7 @@ fn main() {
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let hash = args.iter().any(|a| a == "--hash");
     let keep = args.iter().any(|a| a == "--keep");
+    let elsewhere = args.iter().any(|a| a == "--elsewhere");
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
     let dump = arg(&args, "--dump");
@@ -282,6 +287,7 @@ fn main() {
         "start": format!("results/start-part1.jsonl seed {}", scaling::SEED),
         "goal": goal.iter().map(|g| g.0.clone()).collect::<Vec<_>>(),
         "threads": threads,
+        "elsewhere": elsewhere,
         "cap_min": cap_s / 60.0,
         "load_at_start": loadavg(),
         "setup_s": 0.0,
@@ -298,6 +304,7 @@ fn main() {
 
     let mut b = Builder::new(&game, scope.clone(), doms);
     b.keep_records = keep;
+    b.table.elsewhere = elsewhere;
     let prog = Arc::new(Mutex::new(Prog { pass: 1, ..Default::default() }));
     {
         let prog = prog.clone();
@@ -480,6 +487,11 @@ fn main() {
         b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
+    r["outside_points"] = json!(b
+        .outside_points
+        .iter()
+        .map(|(k, m)| (k.clone(), m.iter().map(|(w, n)| (w.to_string(), *n)).collect::<BTreeMap<_, _>>()))
+        .collect::<BTreeMap<_, _>>());
     r["read_wall_s"] = json!((read_wall * 10.0).round() / 10.0);
     r["read_cpu_s"] = json!((read_cpu * 10.0).round() / 10.0);
     r["cpu_use"] = json!((read_cpu / read_wall * 100.0).round() / 100.0);

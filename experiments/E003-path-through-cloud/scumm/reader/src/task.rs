@@ -7,7 +7,7 @@ use crate::domain::{Domain, Label, Labels};
 use crate::facts::Facts;
 use crate::py::Counter;
 use crate::record::{Eff, Record};
-use crate::table::{pos_key, FactTable, NOWHERE};
+use crate::table::{pos_key, FactTable, ELSEWHERE, NOWHERE};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -472,7 +472,8 @@ pub fn prune(task: &Task, rel: &Relevance) -> Task {
 }
 
 /// reader.py `task_start`: the start as the task reads it, with `pos:` and `escpos:` (`keys`: the task's facts; a
-/// unit the task names that the oracle's list lacks is NOWHERE).
+/// unit the task names that the oracle's list lacks is NOWHERE). With the switch on (`table.elsewhere`), a unit whose
+/// slot is at a place none of the scope's points, and at none of them, is ELSEWHERE.
 pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<Item = &'k String>) -> Facts {
     let mut out = start.clone();
     for k in keys {
@@ -489,6 +490,33 @@ pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<It
                 b.counts.inc(format!("{kind}: more than one place at the start for one unit (the first taken)"));
             }
             out.insert(format!("{pos}:{name}"), ws.iter().copied().min().unwrap_or(NOWHERE));
+        }
+    }
+    if b.table.elsewhere {
+        // the switch (PORT-NOTES.md, "ELSEWHERE"): a slot at a place none of the scope's points, and at none of them,
+        // starts at ELSEWHERE, not NOWHERE
+        let mut away: BTreeSet<String> = BTreeSet::new();
+        for (k, v) in start.iter() {
+            if v != 1 {
+                continue;
+            }
+            let (kind, pos) = if k.starts_with("at:") {
+                ("at", "pos")
+            } else if k.starts_with("esc:") {
+                ("esc", "escpos")
+            } else {
+                continue;
+            };
+            let Some((name, w)) = k[kind.len() + 1..].rsplit_once(':') else { continue };
+            let Ok(w) = w.parse::<i64>() else { continue };
+            let key = format!("{pos}:{name}");
+            if !b.table.is_point(kind, name, w) && out.get(&key) == Some(NOWHERE) {
+                away.insert(key);
+            }
+        }
+        for key in away {
+            out.insert(key, ELSEWHERE);
+            b.counts.inc("slots at the start at a place none of the scope's points (ELSEWHERE)");
         }
     }
     out

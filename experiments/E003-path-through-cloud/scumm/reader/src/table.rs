@@ -13,6 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// pos: and escpos: of a unit with no live slot, or no override armed.
 pub const NOWHERE: i64 = -1;
+/// pos: and escpos: of a unit whose slot waits (or whose override is armed) at a place that is none of the scope's
+/// points for its name ([`FactTable::elsewhere`], the switch; PORT-NOTES.md, "ELSEWHERE"). No precondition accepts it.
+pub const ELSEWHERE: i64 = -2;
 /// model.py TIME_VARS and MOUSE_VARS: engine variables that change as frames pass.
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
 pub const MOUSE_VARS: [i32; 4] = [20, 21, 44, 45];
@@ -49,6 +52,10 @@ pub struct FactTable {
     /// {"at"/"esc": {unit name: offsets}}
     pub points: BTreeMap<&'static str, BTreeMap<String, BTreeSet<i64>>>,
     pub engine: BTreeSet<i32>,
+    /// The switch for the scope-1 finding (PORT-NOTES.md, "ELSEWHERE"), off by default: every `pos:` and `escpos:`
+    /// domain holds ELSEWHERE, a place written outside the scope's points is written as ELSEWHERE, no precondition
+    /// set holds it, and a start with a slot at such a place starts it there. Off, the reader is reader.py's.
+    pub elsewhere: bool,
     binary: Domain,
 }
 
@@ -132,7 +139,17 @@ impl FactTable {
             let (name, w) = rest.rsplit_once(':').unwrap();
             points.get_mut(kind).unwrap().entry(name.to_string()).or_default().insert(w.parse().unwrap());
         }
-        FactTable { start, extra, counts, args_vals: BTreeMap::new(), doms, points, engine, binary: Domain::binary() }
+        FactTable {
+            start,
+            extra,
+            counts,
+            args_vals: BTreeMap::new(),
+            doms,
+            points,
+            engine,
+            elsewhere: false,
+            binary: Domain::binary(),
+        }
     }
 
     /// `FactTable.domain(key)`.
@@ -148,6 +165,9 @@ impl FactTable {
         if let Some((kind, name)) = pos_key(key) {
             let mut v: BTreeSet<i64> = self.points[kind].get(name).cloned().unwrap_or_default();
             v.insert(NOWHERE);
+            if self.elsewhere {
+                v.insert(ELSEWHERE);
+            }
             return Some(Cow::Owned(Domain::of(v, None, None)));
         }
         self.extra.get(key).or_else(|| self.doms.get(key)).map(Cow::Borrowed)
@@ -234,6 +254,23 @@ impl FactTable {
             ),
             ("start", self.start.py()),
         ])
+    }
+}
+
+impl FactTable {
+    /// Whether `w` is one of the scope's points of `name` (`kind` "at" or "esc").
+    pub fn is_point(&self, kind: &str, name: &str, w: i64) -> bool {
+        self.points.get(kind).and_then(|m| m.get(name)).is_some_and(|s| s.contains(&w))
+    }
+
+    /// The value `pos:`/`escpos:` takes for a place `w` written to a slot: `w`, or ELSEWHERE when the switch is on
+    /// and `w` is none of the scope's points of `name`.
+    pub fn place(&self, kind: &str, name: &str, w: i64) -> i64 {
+        if self.elsewhere && !self.is_point(kind, name, w) {
+            ELSEWHERE
+        } else {
+            w
+        }
     }
 }
 

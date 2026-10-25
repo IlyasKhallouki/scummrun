@@ -204,6 +204,77 @@ fn room33_reading_rust_machine() {
     assert_none("room33 reading, Rust machine", oracle::compare_reading(&b, &oracle::golden_dir().join("room33.jsonl.gz"), 5));
 }
 
+/// The switch for the scope-1 finding (PORT-NOTES.md, "ELSEWHERE"), on room 33's scope: off, a place none of the
+/// scope's points is written as itself and listed; on, it is written as ELSEWHERE, no precondition set holds
+/// ELSEWHERE, and a start with the slot at such a place starts at ELSEWHERE. A place among the points is the same
+/// either way.
+#[test]
+fn elsewhere_switch_positions_and_start() {
+    use scumm_reader::domain::Label;
+    use scumm_reader::record::{Eff, Pre};
+    use scumm_reader::table::{ELSEWHERE, NOWHERE};
+    let (name, inside) = {
+        let b = oracle::builder(game(), static_oracle(), "room33");
+        let (n, ws) = b.table.points["at"].iter().find(|(_, ws)| ws.len() >= 2).expect("a unit with two wait points");
+        (n.clone(), ws.iter().copied().collect::<Vec<i64>>())
+    };
+    let outside = inside.iter().max().unwrap() + 1000;
+    let key = format!("pos:{name}");
+    for on in [false, true] {
+        let mut b = oracle::builder(game(), static_oracle(), "room33");
+        b.table.elsewhere = on;
+        let dom: Vec<Label> = b.table.domain(&key).unwrap().values.clone();
+        assert_eq!(dom.contains(&Label::Int(ELSEWHERE)), on, "the domain holds ELSEWHERE only with the switch on");
+        // a write of a place outside the points, with a precondition "not at the first point"
+        let pre: Pre = [(format!("at:{name}:{}", inside[0]), vec![Label::Int(0)])].into_iter().collect();
+        let eff = vec![(format!("at:{name}:{outside}"), Eff::Set(Label::Int(1)))];
+        let (pre, eff) = b.positions(pre, eff);
+        let want = if on { ELSEWHERE } else { outside };
+        assert_eq!(eff, vec![(key.clone(), Eff::Set(Label::Int(want)))]);
+        let set = &pre[&key];
+        assert!(set.contains(&Label::Int(NOWHERE)) && !set.contains(&Label::Int(inside[0])));
+        assert!(!set.contains(&Label::Int(ELSEWHERE)), "no precondition set holds ELSEWHERE");
+        assert_eq!(b.outside_points[&key][&outside], 1, "listed either way");
+        // a place among the points, needed at a point: the same either way
+        let pre: Pre = [(format!("at:{name}:{}", inside[1]), vec![Label::Int(1)])].into_iter().collect();
+        let eff = vec![(format!("at:{name}:{}", inside[0]), Eff::Set(Label::Int(1)))];
+        let (pre, eff) = b.positions(pre, eff);
+        assert_eq!(eff, vec![(key.clone(), Eff::Set(Label::Int(inside[0])))]);
+        assert_eq!(pre[&key], vec![Label::Int(inside[1])]);
+        // two places, both outside: one ELSEWHERE (on), a guess of both (off)
+        let eff = vec![
+            (format!("at:{name}:{outside}"), Eff::Set(Label::Int(1))),
+            (format!("at:{name}:{}", outside + 1), Eff::Set(Label::Int(1))),
+        ];
+        let (_, eff) = b.positions(Pre::new(), eff);
+        let want = if on {
+            Eff::Set(Label::Int(ELSEWHERE))
+        } else {
+            Eff::Guess(vec![Label::Int(outside), Label::Int(outside + 1)])
+        };
+        assert_eq!(eff, vec![(key.clone(), want)]);
+        // the start: a slot at a place outside the points, then at a point
+        let keys = vec![key.clone()];
+        let st = task::task_start(&mut b, &Facts::from_items([(format!("at:{name}:{outside}"), 1)]), &keys);
+        assert_eq!(st.get(&key), Some(if on { ELSEWHERE } else { NOWHERE }));
+        let st = task::task_start(&mut b, &Facts::from_items([(format!("at:{name}:{}", inside[1]), 1)]), &keys);
+        assert_eq!(st.get(&key), Some(inside[1]));
+    }
+}
+
+/// Room 33 read with the switch on, on 2 workers: no place outside the points, so the reading is golden.py's.
+#[test]
+fn room33_reading_elsewhere_on() {
+    let mut b = oracle::builder(game(), static_oracle(), "room33");
+    b.table.elsewhere = true;
+    let scope = b.scope.clone();
+    scumm_reader::par::with_pool(game(), &scope, 2, |pool| {
+        b.read_all_into(pool, true, None, 2, None);
+    });
+    assert!(b.outside_points.is_empty());
+    assert_none("room33 reading, switch on", oracle::compare_reading(&b, &oracle::golden_dir().join("room33.jsonl.gz"), 5));
+}
+
 #[test]
 #[ignore]
 fn kitchen_records_written_back() {
@@ -248,6 +319,21 @@ fn kitchen_reading_rust_machine() {
     let (b, secs) = oracle::read(game(), static_oracle(), "kitchen");
     eprintln!("kitchen: {} records, reading {secs:.1} s", b.records.len());
     assert_none("kitchen reading, Rust machine", oracle::compare_reading(&b, &oracle::golden_dir().join("kitchen.jsonl.gz"), 5));
+}
+
+/// The kitchen read with the switch on (PORT-NOTES.md, "ELSEWHERE"), on 4 workers: no place outside the points, so the
+/// reading is golden.py's.
+#[test]
+#[ignore]
+fn kitchen_reading_elsewhere_on() {
+    let mut b = oracle::builder(game(), static_oracle(), "kitchen");
+    b.table.elsewhere = true;
+    let scope = b.scope.clone();
+    scumm_reader::par::with_pool(game(), &scope, 4, |pool| {
+        b.read_all_into(pool, true, None, 2, None);
+    });
+    assert!(b.outside_points.is_empty(), "{:?}", b.outside_points);
+    assert_none("kitchen reading, switch on", oracle::compare_reading(&b, &oracle::golden_dir().join("kitchen.jsonl.gz"), 5));
 }
 
 /// The kitchen read by the Rust machine half on 6 worker threads, its records streamed into the packed file on the
