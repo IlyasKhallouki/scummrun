@@ -7,6 +7,7 @@ use crate::facts::{unit_name, unit_py, unit_text, Facts};
 use crate::py::{Counter, Py};
 use rustc_hash::FxHashMap;
 use scumm_ir::{known, Expr, ExprId, Game, RefKind, Stmt, UnitId, UnitKey, Yield};
+use scumm_machine::Switches;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
@@ -419,11 +420,19 @@ pub struct Scope {
     pub writes: Writes,
     pub universe: Vec<String>,
     pub counts: Counter,
+    /// fix round 1's switches the reading runs with (machine.rs `Switches`; reader.py has none): the Reader's machine
+    /// takes them, and `of_with` adds the writes they make
+    pub switches: Switches,
 }
 
 impl Scope {
     /// `Scope.of(game, rooms, start)`.
     pub fn of(game: &Game, rooms: &[i32], start: &Facts) -> Scope {
+        Scope::of_with(game, rooms, start, Switches::default())
+    }
+
+    /// `Scope.of` with fix round 1's switches (fix-round1.md): with them off, `of`.
+    pub fn of_with(game: &Game, rooms: &[i32], start: &Facts, switches: Switches) -> Scope {
         let ast = &game.ast;
         let mut rooms: Vec<i32> = rooms.to_vec();
         rooms.sort_unstable();
@@ -524,7 +533,8 @@ impl Scope {
             })
             .map(|(&v, _)| v as i64)
             .collect();
-        let writes = scope_writes(game, &units, None);
+        let mut writes = scope_writes(game, &units, None);
+        fix1_writes(game, &units, &rooms, switches, &mut writes);
         let mut uni: BTreeSet<String> = BTreeSet::new();
         for &u in &units {
             let k = game.unit(u).key;
@@ -562,6 +572,7 @@ impl Scope {
             writes,
             universe: uni.into_iter().collect(),
             counts,
+            switches,
         }
     }
 
@@ -592,6 +603,35 @@ impl Scope {
             ("counts", self.counts.py()),
             ("writes", self.writes.py()),
         ])
+    }
+}
+
+/// Fix round 1's writes (fix-round1.md), added to `scope_writes`' with each switch on.
+///
+/// F5, draw_clears: loading a scope room puts its movable objects back (`objpos:O` = 0, room.cpp:195), and a
+/// drawObject with setXY moves one, so `objpos:O` of every movable object of the scope's rooms. scope_writes already
+/// has the clearing's `state:` writes of a room's own code (every object of its room); a global script's drawObject
+/// can clear any object of the room it runs in, a scope room: every object of the scope's rooms.
+pub fn fix1_writes(game: &Game, units: &[UnitId], rooms: &[i32], sw: Switches, out: &mut Writes) {
+    if sw.draw_clears {
+        for &r in rooms {
+            for &o in game.room_objects.get(&r).map(|v| v.as_slice()).unwrap_or(&[]) {
+                if game.movable.contains_key(&o) {
+                    out.exact.insert(format!("objpos:{o}"));
+                }
+            }
+        }
+        let global_draws = units.iter().any(|&u| {
+            matches!(game.unit(u).key, UnitKey::Global(_))
+                && game.ins(u).iter().any(|x| matches!(x.st, Some(Stmt::Op { name: known::DRAW_OBJECT, .. })))
+        });
+        if global_draws {
+            for (o, r) in &game.object_room {
+                if rooms.contains(r) {
+                    out.exact.insert(format!("state:{o}"));
+                }
+            }
+        }
     }
 }
 

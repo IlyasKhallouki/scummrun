@@ -1692,6 +1692,8 @@ impl<'g> Reader<'g> {
             s.table = Some(cx.table.clone());
             s.info.clear();
         }
+        // fix round 1's switches, as the reading's scope has them (Scope::of_with)
+        self.m.switches = cx.scope.switches;
     }
 }
 
