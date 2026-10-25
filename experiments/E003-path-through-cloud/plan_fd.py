@@ -273,8 +273,17 @@ def _label(d, v):
     return d.label(int(v)) if isinstance(v, (int, bool)) else v
 
 
-def _holds(pre: dict, state: dict) -> bool:
-    return all(state.get(k) in set(vs) for k, vs in pre.items())
+def _meets(facts: dict, k, vs, state: dict):
+    """Whether ``state`` meets the set ``vs`` on ``k`` (task.py: the set cut to the domain; a set that holds for every
+    value holds whatever the value, an unknown one too): True, False, or None (unknown)."""
+    v = state.get(k)
+    if v in vs or (k in facts and set(facts[k].values) <= set(vs)):
+        return True
+    return None if v == UNKNOWN else False
+
+
+def _holds(facts: dict, pre: dict, state: dict) -> bool:
+    return all(_meets(facts, k, vs, state) for k, vs in pre.items())
 
 
 def _guess(key, vals, guessed, state):
@@ -286,14 +295,15 @@ def _guess(key, vals, guessed, state):
 
 def apply_step(facts: dict, a, guessed, state: dict) -> dict:
     """``state`` after action ``a`` (task.py's meaning: conditions read the state before; a guess of several values,
-    or a step whose result is several values, is the plan's guessed value or UNKNOWN; an effect whose condition
-    reads UNKNOWN makes its fact UNKNOWN)."""
+    or a step whose result is several values, is the plan's guessed value or UNKNOWN; an effect that fires unless a
+    condition on an UNKNOWN value fails makes its fact UNKNOWN)."""
     new = dict(state)
     for e in a.effects:
-        if any(state.get(c) == UNKNOWN for c, _ in e.when):
-            new[e.key] = UNKNOWN
+        met = [_meets(facts, c, s, state) for c, s in e.when]
+        if False in met:
             continue
-        if not all(state.get(c) in s for c, s in e.when):
+        if None in met:
+            new[e.key] = UNKNOWN
             continue
         d = facts[e.key]
         if e.values is None and e.add is None:
@@ -328,7 +338,7 @@ def predict(facts: dict, pieces: list, steps: list, start: dict) -> tuple:
                                           for p in cands):
             raise ValueError(f"step {i + 1}: the packed file's action {s['members'][0]} is {s['name']}, the task's "
                              f"{[p.name for p in cands][:2]}: the file is not this task's")
-        ok = [p for p in cands if _holds(p.pre, state)]
+        ok = [p for p in cands if _holds(facts, p.pre, state)]
         if len(ok) != 1:
             raise PathChoice(f"step {i + 1} ({s['name']}, {s['op']}): {len(ok)} of its {len(cands)} paths hold in "
                              f"the plan's predicted state" + (f": {[p.name for p in ok][:4]}" if ok else ""))

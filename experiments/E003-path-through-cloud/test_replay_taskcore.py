@@ -5,6 +5,8 @@ usage: python test_replay_taskcore.py [N] [seed]    (N random tasks, default 200
        pytest test_replay_taskcore.py -m 'not slow'  (the fixed cases, and the same with N = 60)
        READER_PICKLE=<reading.pkl> python test_replay_taskcore.py kitchen <work dir> [pruned|full ...]
                                                      (the kitchen: the bans byte for byte, and plans with bans)
+       python test_replay_taskcore.py log <work dir>  (results/taskcore-bans.log from the work dir: the kitchen's
+                                                     json files and the random runs' summaries, prop-N-sS.out)
        TASKCORE_BIN=<binary>                         (default taskcore/target/release/taskcore)
 
 1. **The bans, byte for byte.** replay.py's ban (``ban_of``'s point, ``apply_bans``/``cut``) applied in Python and
@@ -96,7 +98,7 @@ def task_facts(work: Path) -> dict:
 
 
 def export(work: Path, task, start) -> None:
-    export_task(work / "t.tc", task, {"s": start}, meta=meta, naming=by_label)
+    export_task(work / "t.tc", task, {"s": start}, meta=meta, naming=by_label, every_fact=True)
     _FACTS[work] = task.facts
 
 
@@ -114,18 +116,20 @@ def run_plan(task, banned, res, start) -> tuple:
     def lab(k, v):
         x = task.facts[k].label(v) if isinstance(v, int) else v
         return x if x in dom[k] else unknown
+    def meets(k, s):  # task.py: a set holds where it holds the value, or every value of the domain
+        return state[k] in set(s) or set(dom[k]) <= set(s)
     state = {k: lab(k, start.get(k, 0)) for k in task.facts}
     for i, (a, st) in enumerate(zip(res.paths, res.steps)):
         if ident(a) not in acts:
             return False, f"step {i + 1}: {a.name} is not an action of the banned task"
-        if not all(state[k] in set(s) for k, s in a.pre.items()):
+        if not all(meets(k, s) for k, s in a.pre.items()):
             return False, f"step {i + 1}: {a.name}'s precondition does not hold"
         new = dict(state)
         for e in a.effects:
-            if any(state[k] is unknown for k, _ in e.when):
-                new[e.key] = unknown
+            if not all(meets(k, s) or state[k] is unknown for k, s in e.when):
                 continue
-            if not all(state[k] in set(s) for k, s in e.when):
+            if not all(meets(k, s) for k, s in e.when):
+                new[e.key] = unknown
                 continue
             d = task.facts[e.key]
             if e.values is None and e.add is None:
@@ -297,6 +301,20 @@ def test_the_start_file_is_the_files_own_start(tmp_path):
     assert b == "out of domain"  # room 33: task.py raises OutOfDomain, so does taskcore
 
 
+def test_a_ban_on_a_fact_no_action_names(tmp_path):
+    """replay.py applies a ban whose keys are the task's facts, also one no action names: with every fact in the file
+    (export_task's every_fact) taskcore does too; without it, the start file names the fact and taskcore stops."""
+    task = fixed_task()
+    task.facts["var:7"] = BINARY  # no action names it
+    bans = [RP.Ban("sentence(1,7)", (("var:7", 0),))]
+    export(tmp_path, task, START)
+    assert taskcore_file(tmp_path, bans, START) == python_file(task, bans, START) != python_file(task, [], START)
+    export_task(tmp_path / "t.tc", task, {"s": START}, meta=meta, naming=by_label)  # var:7 not in the file
+    r = run([BIN, "sas", "--task", tmp_path / "t.tc", "--start-file", write_start(tmp_path / "s.txt", task.facts, START),
+             "--bans", write_bans(tmp_path / "b.txt", bans), "--out", tmp_path / "o.sas"])
+    assert r.returncode != 0 and "the file's facts are not the task's" in r.stderr
+
+
 def test_the_ban_counts(tmp_path):
     """A ban on a key the action lacks and a set of three values: two pieces; taskcore's stats count them."""
     task = fixed_task()
@@ -338,6 +356,18 @@ def test_the_path_choice_is_the_one_path_that_holds():
     twin = [[a] for a in task.actions] + [[T.Action("walk#4", pre={"room": {28}}, what=task.actions[0].what)]]
     with pytest.raises(plan_fd.PathChoice, match="2 of its 2 paths"):
         plan_fd.predict(task.facts, twin, [dict(step, members=[0, 4])], START)
+
+
+def test_a_set_of_the_whole_domain_holds_for_an_unknown_value():
+    """task.py leaves out a set that holds for every value, so it holds where the plan left the value unknown."""
+    task = fixed_task()
+    whole = T.Action("any#4", pre={"bit:6": {0, 1}, "room": {28}}, effects=(T.Effect("room", value=41),),
+                     what=what("sentence(1,8)"))
+    pieces = [[a] for a in task.actions] + [[whole]]
+    st = dict(plan_fd.start_state(task.facts, START), **{"bit:6": plan_fd.UNKNOWN})
+    assert plan_fd._holds(task.facts, whole.pre, st) and not plan_fd._holds(task.facts, task.actions[0].pre, st)
+    s = {"op": "a1", "name": "sentence(1,8)", "members": [4], "guessed": ()}
+    assert [p.name for p in plan_fd.predict(task.facts, pieces, [s], dict(START, **{"bit:6": 7}))[0]] == ["any#4"]
 
 
 def test_a_guess_the_plan_did_not_make_is_unknown():
@@ -482,7 +512,64 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
             (work / f"kitchen-bans-{'-'.join(which)}.json").write_text(json.dumps(out, indent=1))
 
 
+def write_log(work: Path) -> None:
+    """results/taskcore-bans.log from the work directory."""
+    import hashlib
+    L = ["E003 step 5 with taskcore: the harness's bans in taskcore (--bans) against replay.py's own, and plans with bans",
+         "", "sources (sha1, 12 hex): " + ", ".join(
+             f"{n} {hashlib.sha1((HERE / n).read_bytes()).hexdigest()[:12]}" for n in
+             ("replay.py", "plan_fd.py", "export_records.py", "task.py", "taskcore/src/bans.rs", "taskcore/src/main.rs",
+              "taskcore/src/sas.rs", "test_replay_taskcore.py")),
+         "byte for byte: replay.apply_bans (ban_of's points, cut) + task.write_sas(...).text(start) against taskcore "
+         "--bans --start-file --fold off --reduce none --encoding task on the unbanned packed file."]
+    rows, plans, bans = [], [], {}
+    for f in sorted(work.glob("kitchen-bans-*.json")):
+        d = json.loads(f.read_text())
+        rows += d["files"]
+        plans += d["plans"]
+        bans.update(d["bans"])
+    if bans:
+        L += ["", "== the kitchen (the step 5 reading; start s17 = reader.task_start of run B's S1#7 pre) ==",
+              "ban sets (ban_of of these records from s17: label, then the banned point):"]
+        for name, v in bans.items():
+            labels = v[-1]
+            L.append(f"  {name}: " + "; ".join(f"{lab} at {dict(map(tuple, pt))}" for lab, pt in zip(labels, v[:-1])))
+    if rows:
+        L.append("files (task: pruned = test_reader's pruned task, replay.py's python planner; full = build_task's, the "
+                 "packed file taskcore's planner reads):")
+        for r in rows:
+            b = r.get("taskcore bans") or {}
+            L.append(f"  {r['task']:6} {r['bans']:34} {'the same bytes' if r['same'] else 'DIFFERENT'} "
+                     f"({r['bytes']:,} bytes, sha1 {r['sha1']}; taskcore {r['taskcore sha1']}); task.py "
+                     f"{r['python s']:.0f} s, taskcore {r['taskcore s']:.0f} s; actions cut {b.get('actions_hit')}, "
+                     f"pieces {b.get('pieces')}, actions after {b.get('actions_after')}")
+    if plans:
+        L.append("plans: plan_fd.plan_taskcore from s17 with the bans (fold strict, (a)-(f), lama-first), each step "
+                 "the path that holds in the predicted state, run on the unreduced banned task (build_task's, "
+                 "replay.apply_bans):")
+        for r in plans:
+            run_ok = r.get("runs on the unreduced banned task")
+            L.append(f"  {r['bans']:34} {r['status']}, {len(r['steps'])} steps ({r['folded steps']} through a folded "
+                     f"action), taskcore {r['taskcore s']:.0f} s, {r['operators']:,} operators, lama-first "
+                     f"{r['lama-first s']:.0f} s" + (f"; runs on the banned task: {run_ok[0]}" +
+                                                       (f" ({run_ok[1]})" if run_ok[1] else "") if run_ok else ""))
+            if r["steps"]:
+                L.append(f"    {r['steps']}")
+    for prop in sorted(work.glob("prop-*.out")):
+        n, seed = prop.stem.split("-")[1], prop.stem.split("-s")[-1]
+        L += ["", f"== random tasks with random bans: python test_replay_taskcore.py {n} {seed} ==",
+              "  (test_taskcore.py's random tasks; 1-3 bans each, as ban_of makes them, on a point an action holds or "
+              "misses, now and then a key the task lacks, no key, or the same ban twice)",
+              "  " + prop.read_text().strip().replace("\n", "\n  ")]
+    out = HERE / "results" / "taskcore-bans.log"
+    out.write_text("\n".join(L) + "\n")
+    print("\n".join(L))
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["log"]:
+        write_log(Path(sys.argv[2]))
+        sys.exit(0)
     if sys.argv[1:2] == ["kitchen"]:
         kitchen(Path(sys.argv[2]), tuple(sys.argv[3:]) or ("pruned", "full"))
         sys.exit(0)
