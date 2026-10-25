@@ -182,9 +182,42 @@ pub type JobHook = Box<dyn FnMut(&Job, &[Record], &BTreeMap<String, BTreeSet<i64
 /// The `_pin` values: labels, or raw ints for a fact with no domain.
 type PinVals = Vec<Label>;
 
+/// The reader's switches (fix round 1, fix-round1.md): each a rule beyond reader.py, off by default. With every one
+/// off the reading is reader.py's, byte for byte.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Switches {
+    /// F2: the planner rule that a due event goes first (due.rs)
+    pub due_first: bool,
+}
+
+impl Switches {
+    /// Comma-separated switch names.
+    pub fn parse(names: &str) -> Result<Switches, String> {
+        let mut s = Switches::default();
+        for n in names.split(',').map(str::trim).filter(|n| !n.is_empty()) {
+            match n {
+                "due_first" => s.due_first = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first)")),
+            }
+        }
+        Ok(s)
+    }
+    pub fn names(&self) -> Vec<&'static str> {
+        let mut v = Vec::new();
+        if self.due_first {
+            v.push("due_first");
+        }
+        v
+    }
+}
+
 /// reader.py `Builder`.
 pub struct Builder<'g> {
     pub game: &'g Game,
+    /// fix round 1's switches (all off: reader.py's reading)
+    pub switches: Switches,
+    /// switch due_first's due facts, after the reading (due.rs)
+    pub due: Option<crate::due::Due>,
     pub scope: Scope,
     pub table: FactTable,
     pub sig_limit: usize,
@@ -326,6 +359,8 @@ impl<'g> Builder<'g> {
     fn with_table(game: &'g Game, scope: Scope, table: FactTable) -> Builder<'g> {
         Builder {
             game,
+            switches: Switches::default(),
+            due: None,
             scope,
             table,
             sig_limit: SIG_LIMIT,
@@ -1384,6 +1419,9 @@ impl<'g> Builder<'g> {
             self.reset();
         }
         self.counts.set("records", self.n_records as i64);
+        if self.switches.due_first {
+            crate::due::apply(self);
+        }
         self.n_records
     }
 

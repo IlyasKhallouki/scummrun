@@ -234,7 +234,13 @@ pub fn replay_into<'g>(
 
 /// The reading `name` with the Rust machine half (no Python, no playback): the Builder and the seconds it took.
 pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
+    read_with(game, st, name, crate::builder::Switches::default())
+}
+
+/// `read` with fix round 1's switches.
+pub fn read_with<'g>(game: &'g Game, st: &Static, name: &str, switches: crate::builder::Switches) -> (Builder<'g>, f64) {
     let mut b = builder(game, st, name);
+    b.switches = switches;
     let mut m = crate::machine::Reader::new(game);
     let t = std::time::Instant::now();
     b.read_all_into(&mut m, true, None, 2, None);
@@ -244,7 +250,19 @@ pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
 /// `read` on `threads` workers (par.rs; 0: the calling thread alone): the Builder, the seconds and the pool's
 /// stats.
 pub fn read_par<'g>(game: &'g Game, st: &Static, name: &str, threads: usize) -> (Builder<'g>, f64, crate::par::PoolStats) {
+    read_par_with(game, st, name, threads, crate::builder::Switches::default())
+}
+
+/// `read_par` with fix round 1's switches.
+pub fn read_par_with<'g>(
+    game: &'g Game,
+    st: &Static,
+    name: &str,
+    threads: usize,
+    switches: crate::builder::Switches,
+) -> (Builder<'g>, f64, crate::par::PoolStats) {
     let mut b = builder(game, st, name);
+    b.switches = switches;
     let scope = b.scope.clone();
     let t = std::time::Instant::now();
     let stats = crate::par::with_pool(game, &scope, threads, |pool| {

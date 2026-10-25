@@ -13,6 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// pos: and escpos: of a unit with no live slot, or no override armed.
 pub const NOWHERE: i64 = -1;
+/// Fix round 1, F2 (due.rs): `due:<unit>`, 1 while the unit's slot waits where its next turn runs on in the engine's
+/// next frame, before that frame's input. A binary fact of the reader's own; only switch due_first makes one.
+pub const DUE: &str = "due:";
 /// model.py TIME_VARS and MOUSE_VARS: engine variables that change as frames pass.
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
 pub const MOUSE_VARS: [i32; 4] = [20, 21, 44, 45];
@@ -142,7 +145,7 @@ impl FactTable {
             v.insert(0);
             return Some(Cow::Owned(Domain::of(v, None, None)));
         }
-        if key.starts_with("saved:") {
+        if key.starts_with("saved:") || key.starts_with(DUE) {
             return Some(Cow::Borrowed(&self.binary));
         }
         if let Some((kind, name)) = pos_key(key) {
@@ -155,7 +158,7 @@ impl FactTable {
 
     /// `FactTable.kind(key)`.
     pub fn kind(&self, key: &str, scope: &Scope) -> Kind {
-        if key.starts_with("args:") || key.starts_with("saved:") || pos_key(key).is_some() {
+        if key.starts_with("args:") || key.starts_with("saved:") || key.starts_with(DUE) || pos_key(key).is_some() {
             return Kind::Fact;
         }
         if let Some(n) = key.strip_prefix("var:") {

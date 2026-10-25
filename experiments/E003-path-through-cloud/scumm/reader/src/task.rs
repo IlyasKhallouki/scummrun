@@ -249,6 +249,14 @@ pub fn record_action(table: &FactTable, r: &Record, counts: &mut Counter) -> (Ve
                     effects.push(TEffect::set(k, Label::Int(u), vec![(src.clone(), vec![Label::Int(u)])]));
                 }
             }
+            Eff::Cases(cs) => {
+                for (when, vals) in cs {
+                    match vals.as_slice() {
+                        [v] => effects.push(TEffect::set(k, *v, when.clone())),
+                        _ => effects.push(TEffect { key: k.clone(), value: None, add: None, values: Some(vals.clone()), when: when.clone() }),
+                    }
+                }
+            }
             Eff::Add(d) => {
                 let dom = table.domain(k).unwrap();
                 let have: Labels = pre.iter().find(|p| &p.0 == k).map(|p| p.1.clone()).unwrap_or_else(|| dom.values.clone());
@@ -286,7 +294,7 @@ pub fn build_task(b: &mut Builder, records: &[Record], goal: &[(String, Labels)]
         }
         for (k, e) in &r.effects {
             fb.setdefault(k);
-            if let Eff::When(src, _) | Eff::Copy(src) = e {
+            for src in e.sources() {
                 fb.setdefault(src);
             }
         }
@@ -475,9 +483,13 @@ pub fn prune(task: &Task, rel: &Relevance) -> Task {
 /// unit the task names that the oracle's list lacks is NOWHERE).
 pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<Item = &'k String>) -> Facts {
     let mut out = start.clone();
+    let mut due: Vec<String> = Vec::new();
     for k in keys {
         if pos_key(k).is_some() {
             out.insert(k.clone(), NOWHERE);
+        }
+        if k.starts_with(crate::table::DUE) {
+            due.push(k.clone());
         }
     }
     for (kind, pos) in [("at", "pos"), ("esc", "escpos")] {
@@ -489,6 +501,20 @@ pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<It
                 b.counts.inc(format!("{kind}: more than one place at the start for one unit (the first taken)"));
             }
             out.insert(format!("{pos}:{name}"), ws.iter().copied().min().unwrap_or(NOWHERE));
+        }
+    }
+    // fix round 1, switch due_first: each due: fact from the start's position, slot, freeze and test facts
+    if let Some(d) = &b.due {
+        let mut vals = Vec::new();
+        for k in &due {
+            let get = |f: &str| -> Option<Label> {
+                let v = out.get0(f);
+                Some(b.table.label(f, v).unwrap_or(Label::Int(v)))
+            };
+            vals.push((k.clone(), d.start_value(k, &get).unwrap_or(0)));
+        }
+        for (k, v) in vals {
+            out.insert(k, v);
         }
     }
     out
@@ -528,9 +554,7 @@ pub fn record_keys(records: &[Record], goal: &[(String, Labels)]) -> Vec<String>
         keys.extend(r.pre.keys().cloned());
         for (k, e) in &r.effects {
             keys.insert(k.clone());
-            if let Eff::When(src, _) | Eff::Copy(src) = e {
-                keys.insert(src.clone());
-            }
+            keys.extend(e.sources().into_iter().map(String::from));
         }
     }
     keys.into_iter().collect()

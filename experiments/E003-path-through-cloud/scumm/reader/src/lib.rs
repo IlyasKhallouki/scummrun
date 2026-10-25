@@ -14,6 +14,7 @@
 pub mod builder;
 pub mod domain;
 pub mod domains;
+pub mod due;
 pub mod facts;
 pub mod machine;
 pub mod oracle;
