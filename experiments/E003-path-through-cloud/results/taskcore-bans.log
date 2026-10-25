@@ -1,6 +1,6 @@
 E003 step 5 with taskcore: the harness's bans in taskcore (--bans) against replay.py's own, and plans with bans
 
-sources (sha1, 12 hex): replay.py ffa1d5591fa1, plan_fd.py d3ed1020b5e6, export_records.py 1524d2eff8f9, task.py c356a6df633a, taskcore/src/bans.rs 1b261d44f902, taskcore/src/main.rs 69cc00cae79d, taskcore/src/sas.rs 0ee7642b62cf, test_replay_taskcore.py 9389c9ffd383
+sources (sha1, 12 hex): replay.py ffa1d5591fa1, plan_fd.py d3ed1020b5e6, export_records.py 1524d2eff8f9, task.py c356a6df633a, taskcore/src/bans.rs 1b261d44f902, taskcore/src/main.rs a8162cc88ab9, taskcore/src/sas.rs 0ee7642b62cf, test_replay_taskcore.py 9389c9ffd383
 byte for byte: replay.apply_bans (ban_of's points, cut) + task.write_sas(...).text(start) against taskcore --bans --start-file --fold off --reduce none --encoding task on the unbanned packed file.
 
 == the kitchen (the step 5 reading; start s17 = reader.task_start of run B's S1#7 pre) ==
@@ -33,7 +33,7 @@ plans: plan_fd.plan_taskcore from s17 with the bans (fold strict, (a)-(f), lama-
 notes: the second ban of "the walk twice" (room 41) misses every walk's precondition (they test room 28), so its file is the first's. "time": with the walk banned at bit:6 = 0 in room 28, lama-first finds no plan in its 600 s; the python planner found none with that ban either (notes/log/2026-10-25-e003-step5-replay.md, what the review changed).
 
 notes on this log's runs (after the review's fixes: taskcore keeps the set task.py reads where an action writes one fact twice; --start-check needed; the path choice's "may hold"):
-  the kitchen's byte-for-byte rows are the run before these fixes (taskcore c249b9ee1ae7). The fixed binary writes the same bytes as that one on the kitchen: 6 configurations x 2 starts with no new option (file, kept, stats without times, stderr, decode, info), and with --fold off --reduce none --encoding task and 7 bans from two replan starts (329,086,381 and 329,086,380 bytes); so task.py's equality carries over. The kitchen's plans with bans and the random runs below are after the fixes.
+  the kitchen's byte-for-byte rows are the run before these fixes (taskcore c249b9ee1ae7). The fixed binary (25738cbfb7c0) writes the same bytes as that one on the kitchen: 6 configurations x 2 starts with no new option (file, kept, stats without times, stderr, decode, info), and with --fold off --reduce none --encoding task and 7 bans from two replan starts (329,086,381 and 329,086,380 bytes); so task.py's equality carries over. The kitchen's plans with bans ran on c4eed1b1560c, which differs from 25738cbfb7c0 only in speed (the same files on the kitchen, with and without bans); the random runs below on 25738cbfb7c0.
 
 == random tasks with random bans: python test_replay_taskcore.py 1000 11 ==
   (test_taskcore.py's random tasks; 1-3 bans each, as ban_of makes them, on a point an action holds or misses, now and then a key the task lacks, no key, or the same ban twice)
