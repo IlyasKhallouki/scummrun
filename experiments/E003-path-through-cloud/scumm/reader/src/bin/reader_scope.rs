@@ -5,13 +5,14 @@
 //!
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
-//!                     [--elsewhere]
+//!                     [--elsewhere] [--golden FILE] [--max-files-gb G]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
 //! --out DIR     the report, DIR/NAME.json (and the packed file DIR/NAME.tc unless --packed)
 //! --cap-min M   stop the reading after M minutes (default 60); --max-rss-gb G (default 8) and --min-free-gb G
-//!               (MemAvailable, default 3) stop it too; the report then says where it stopped (exit code 3)
+//!               (MemAvailable, default 3) stop it too, and --max-files-gb G (the packed file and --golden's body
+//!               together, default no limit); the report then says where it stopped (exit code 3)
 //! --max-waiting N  records done and waiting for an earlier job past which workers start no new job but that
 //!               one (default 100,000: memory stays bounded when one job runs long)
 //! --hash        sha1 of the records' lines (golden.py's "record" lines, as made, before `_read_once`'s rewrite of
@@ -21,6 +22,10 @@
 //! --elsewhere   the switch for the scope-1 finding (PORT-NOTES.md, "ELSEWHERE"): a slot's place that is none of the
 //!               scope's points is written as ELSEWHERE, which no precondition accepts. Off by default. The report
 //!               lists such places either way (`outside_points`: fact -> place -> paths).
+//! --golden FILE golden.py's reader file streamed as the records are made, with no records kept: the head, one
+//!               "record" line per record (as made, before `_read_once`'s rewrite of folded lists, which changes only
+//!               `args:` values), the builder's counters; gzip. What packed_reading.py from-golden reads with the
+//!               packed file to make the reading the Part I runner (replay_part1.py) plays from.
 //! --sample N --seed S --dump FILE
 //!               the spot-check's jobs: of the last pass, N per stratum (the room a job's unit or object belongs
 //!               to, or "global"), drawn by reservoir sampling with seed S; each written to FILE with what its batch
@@ -85,6 +90,9 @@ struct Tee {
     busy: f64,
     stream: Option<RecordStream>,
     hash: Option<sha1_smol::Sha1>,
+    /// --golden: the records' lines, gzip, in a body file next to the final one (the head comes first and is known
+    /// only at the end)
+    body: Option<(PathBuf, flate2::write::GzEncoder<std::io::BufWriter<std::fs::File>>)>,
     kinds: BTreeMap<String, usize>,
     prog: Arc<Mutex<Prog>>,
 }
@@ -102,6 +110,9 @@ impl RecordSink for Tee {
         if self.hash.is_some() {
             self.hash = Some(sha1_smol::Sha1::new());
         }
+        if let Some((path, _)) = self.body.take() {
+            self.body = Some((path.clone(), body_file(&path)));
+        }
         self.kinds.clear();
         let mut p = self.prog.lock().unwrap();
         p.records = 0;
@@ -115,15 +126,34 @@ impl Tee {
             s.records(first, recs, table).expect("the packed file");
         }
         for (j, r) in recs.iter().enumerate() {
-            if let Some(h) = &mut self.hash {
+            if self.hash.is_some() || self.body.is_some() {
                 let line = Py::dict(vec![("kind", Py::str("record")), ("index", Py::Int((first + j) as i64)), ("record", r.py())]).text();
-                h.update(line.as_bytes());
-                h.update(b"\n");
+                if let Some(h) = &mut self.hash {
+                    h.update(line.as_bytes());
+                    h.update(b"\n");
+                }
+                if let Some((_, gz)) = &mut self.body {
+                    gz.write_all(line.as_bytes()).expect("the golden file");
+                    gz.write_all(b"\n").expect("the golden file");
+                }
             }
             *self.kinds.entry(r.kind.clone()).or_default() += 1;
         }
         self.prog.lock().unwrap().records = first + recs.len();
     }
+}
+
+fn body_file(path: &Path) -> flate2::write::GzEncoder<std::io::BufWriter<std::fs::File>> {
+    let f = std::fs::File::create(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    flate2::write::GzEncoder::new(std::io::BufWriter::with_capacity(1 << 20, f), flate2::Compression::new(6))
+}
+
+/// One gzip member holding `line` and a newline.
+fn gz_member(out: &mut impl Write, line: &str) {
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(6));
+    gz.write_all(line.as_bytes()).unwrap();
+    gz.write_all(b"\n").unwrap();
+    out.write_all(&gz.finish().unwrap()).unwrap();
 }
 
 /// splitmix64
@@ -254,9 +284,11 @@ fn main() {
     let cap_s = arg(&args, "--cap-min").map_or(60.0, |m| m.parse::<f64>().unwrap()) * 60.0;
     let max_rss_kb = (arg(&args, "--max-rss-gb").map_or(8.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
+    let max_files_b = arg(&args, "--max-files-gb").map(|g| (g.parse::<f64>().unwrap() * 1073741824.0) as u64);
     let hash = args.iter().any(|a| a == "--hash");
     let keep = args.iter().any(|a| a == "--keep");
     let elsewhere = args.iter().any(|a| a == "--elsewhere");
+    let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
     let dump = arg(&args, "--dump");
@@ -375,6 +407,11 @@ fn main() {
         busy: 0.0,
         stream: Some(RecordStream::create(&packed).expect("the packed file")),
         hash: hash.then(sha1_smol::Sha1::new),
+        body: golden.as_ref().map(|g| {
+            let p = g.with_extension("body.gz");
+            let f = body_file(&p);
+            (p, f)
+        }),
         kinds: BTreeMap::new(),
         prog: prog.clone(),
     };
@@ -387,6 +424,7 @@ fn main() {
         let base = base.clone();
         let report_path = report_path.clone();
         let packed = packed.clone();
+        let body = arg(&args, "--golden").map(|g| PathBuf::from(g).with_extension("body.gz"));
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(1));
             let wall = t_read.elapsed().as_secs_f64();
@@ -405,6 +443,11 @@ fn main() {
                 Some(format!("the process's RSS passed {:.1} GB", max_rss_kb as f64 / 1048576.0))
             } else if free < min_free_kb {
                 Some(format!("MemAvailable fell under {:.1} GB", min_free_kb as f64 / 1048576.0))
+            } else if let Some(max) = max_files_b.filter(|&max| {
+                let len = |p: &Path| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+                len(&packed) + body.as_deref().map_or(0, len) > max
+            }) {
+                Some(format!("the packed and golden files passed {:.1} GB", max as f64 / 1073741824.0))
             } else {
                 None
             };
@@ -479,6 +522,18 @@ fn main() {
         h.digest().to_string()
     };
     let counters = b.counters_py().text();
+    if let (Some(g), Some((body, gz))) = (&golden, tee.body.take()) {
+        let t = Instant::now();
+        gz.finish().expect("the golden file").flush().expect("the golden file");
+        let mut out = std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(g).expect("the golden file"));
+        let head = Py::dict(vec![("kind", Py::str("reading")), ("reading", b.reading_py(&[("name".to_string(), Py::str(&name))]))]).text();
+        gz_member(&mut out, &head);
+        std::io::copy(&mut std::fs::File::open(&body).expect("the golden body"), &mut out).expect("the golden file");
+        gz_member(&mut out, &Py::dict(vec![("kind", Py::str("builder")), ("builder", b.counters_py())]).text());
+        out.flush().expect("the golden file");
+        std::fs::remove_file(&body).ok();
+        eprintln!("[{name}] golden file {} in {:.1} s", g.display(), t.elapsed().as_secs_f64());
+    }
     let mut r = base;
     r["status"] = json!("done");
     r["records"] = json!(b.n_records);
