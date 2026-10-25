@@ -236,13 +236,94 @@ per-step snapshot, joins and merges), turning each run's paths into the Builder'
 values as the Builder's `Val`) 18%, `Builder.record` 27%, the rest the Builder's own work. `Builder.effect` keeps
 each key's kind and domain for the pass (`fact_info`); before that the reading took 52 s at load 2.
 
+## ELSEWHERE: the fix for the scope-1 finding, as a switch
+
+**The finding** (item 1 below). `Builder.positions` writes `pos:<unit>` := W for the place W a path left a slot
+at. W is a place in the code the machine ran. The domain of `pos:<unit>` holds only NOWHERE and the places of the
+scope's own units with that name (`FactTable.points`, from the scope's universe). The name `local:N` is shared by
+every room's local script N, and the room fact's domain is wider than the scope (every constant room change in
+it). So a path can run the local script of a room outside the scope and leave it at a place the domain lacks.
+taskcore then stops on the task: "an effect writes a value its domain lacks".
+
+**The cases.** `reader-scope` lists them in its report (`outside_points`: fact -> place -> paths), with the switch
+on or off.
+
+- k = 1 (rooms 28, 33, 35, 38): 126 records, all of them global 47's event from offset 35 (`startScript(Var[193])`
+  with var 193 = 200 or 208), each with a room precondition outside the scope (29, 34, 41, 70, 79, 81, 82, 83, 85
+  or 96). `pos:local:200` at 1, 5, 10, 17, 21, 34, 100, 151 and 212; `escpos:local:200` at 6 and 205;
+  `pos:local:208` at 10, 13 and 28.
+- k = 2 (rooms 28, 29, 33, 34, 35, 38, 41, 83, 85, 96): 176 records, again all of them global 47's event from
+  offset 35, each with a room precondition outside the scope (27, 31, 32, 36, 43, 57, 70, 81, 82 or 218).
+  `pos:local:200` at 12, 16, 21, 34 and 45; `escpos:local:200` at 4 and 35; `escpos:local:208` at 47;
+  `pos:local:202` at 56; `pos:local:203` at 20; `pos:local:208` at 13 and 98.
+
+No record at k = 1 or k = 2 writes a room outside its scope: a path that changes to such a room ends there
+(`Reader._eng_scene`, "left the scope"). So from a start inside the scope none of these records can apply. They
+can apply only from a start, or a replan start, in a room outside the scope.
+
+**The switch**: `FactTable.elsewhere` (`reader-scope --elsewhere`), off by default. When it is on:
+
+1. every `pos:` and `escpos:` domain also holds ELSEWHERE (-2, `table::ELSEWHERE`);
+2. a place written to a slot that is none of the scope's points for its name is written as ELSEWHERE (in a guess
+   of several places, each such place; a guess left with one value is a set);
+3. no precondition set on `pos:` or `escpos:` holds ELSEWHERE (`positions` takes it out of every set it builds);
+4. `task_start`: a unit whose slot the start shows at such a place, and at none of the points, starts at ELSEWHERE,
+   not NOWHERE. The harness does the same for a reading whose domains hold ELSEWHERE (`replay.task_start`,
+   `replay.replan_start`, `packed_reading.Points.elsewhere`); a reading made with the switch off is read as before.
+
+**Why a plan never relies on a value the engine might not have.**
+
+- A plan reads a `pos:` or `escpos:` value only through an action's precondition set on it. No condition of an
+  effect is on these facts (none of the k = 1 records has a conditional write or a copy on a place). Every such
+  set is built by `positions`, from the path's reads of `at:<unit>:P`. With
+  the switch, no set holds ELSEWHERE (rule 3). So while a unit is at ELSEWHERE, no action whose path read that
+  unit's place at all can apply. An action that can apply read nothing about the place, so neither its run nor its
+  effects depend on it.
+- ELSEWHERE is written only where the path left the slot at a place W that is none of the points. If the model is
+  right, the engine's slot is at W. "ELSEWHERE" claims only that it is at a place that is none of the points, which
+  is true. The slot fact (`local:N` = 1, running) is written as before.
+- The two other values would claim more. W itself is outside the domain, and the writer raises on it. NOWHERE
+  claims "no live slot", which is false, and a path can read a slot's liveness from its places: a room's entry code
+  is live when one of its `at:entry:` keys is 1 (model.py `_pre_slots`).
+- A unit leaves ELSEWHERE only by a write that does not depend on the old place. A stop or a kill writes NOWHERE. A
+  start or a resumed slot writes its point. A room change kills the room's local slots: it writes the place of
+  every local slot name the scope has points for, NOWHERE or where the new room's code left it (all 6,361 room
+  change records at k = 1 write local places). The engine's stopScript and its room change act on whatever slot
+  runs that number. A name the scope has no point for is not written by a room change; it stays at ELSEWHERE,
+  which blocks, never misleads.
+- The engine's later turns of that slot are not modelled: an event at W would need `pos:<unit>` = {W}, which
+  `positions` cuts to the domain, the empty set, and taskcore drops an action with an empty set. At k = 1 no record
+  has such a set, and none has ELSEWHERE in a set. The replay harness sees the slot's writes as changes with no
+  prediction and replans from the engine's state, as for anything else the model lacks.
+- A start in the engine can have a slot at a place outside the points. reader.py's `task_start` gives NOWHERE
+  there, which rule 4 replaces with ELSEWHERE, by the same argument.
+- A place that happens to equal one of another room's points is in the domain and is written as itself. That needs
+  no rule. Every event of a room's local script has its room in its precondition (all 86,792 such records at
+  k = 1), and a room change writes every local slot's place again. So a place of room A's script never satisfies
+  an event of room B's.
+
+What it costs: an action that only tests "not at P" cannot apply while the unit is at ELSEWHERE. That is
+conservative, never unsound.
+
+**With the switch off**, the reader is reader.py's: room 33 and the kitchen give golden.py's files (the tests
+above), and reader-scope's k = 1 reading is the same as before the switch, byte for byte (records sha1 e1174103...,
+counters 173137f8..., packed file 29bc44eb...). taskcore stops on the full k = 1 task as task.py's writer did:
+"event(script:47@35#a2bf3d907238)#150299: pos:local:200 := 10 is not in its domain".
+
+**With the switch on**, room 33 and the kitchen give golden.py's files too (no place outside their points:
+`room33_reading_elsewhere_on`, and `kitchen_reading_elsewhere_on` under `--ignored`). At k = 1: 237,262 records
+and 620 folded, as before; the 126 records write ELSEWHERE. taskcore writes the whole k = 1 task (fold strict, no
+reductions, `--start-check input`, start "start"): 168,899 actions, 11,349,709 effects, a 1.36 GB SAS file, in
+173 s. With reductions on, both start checks (`input` and `needed`) pass and the task reduces to 0 actions: k = 1
+holds no write of the Part I end's facts (results/task-size-scaling.log, finding 3).
+
 ## Python behaviours kept on purpose, and the differences
 
-1. **The scope-1 finding, kept: the first fix after the port.** `Builder.positions` turns a write of
+1. **The scope-1 finding, kept with the switch off.** `Builder.positions` turns a write of
    `at:<unit>:W` = 1 into `pos:<unit>` := W without checking W against the domain of `pos:<unit>`
    (results/task-size-scaling.log, finding 4: at k = 1, `pos:local:200 := 10` is outside its domain, and
-   write_sas is the first place that sees it). `Builder::positions` does the same. Fix after the port: check the
-   value (or give `pos:` the stop points of every unit with that name) and let `extend_domains` widen it.
+   write_sas is the first place that sees it). `Builder::positions` does the same. The fix is the ELSEWHERE
+   switch (the section above).
 2. `event_pins` lists a unit's other wait points from the Reader's oracle: the scope's universe, then the pins of
    the last run that the universe lacks (`SymOracle.keys`). In Python that last run is the parent process's
    last one (workers run most jobs), here the Builder's last. An event's own wait point is always in the universe,
