@@ -559,7 +559,7 @@ impl<S: RecordSink + Send + 'static> SinkThread<S> {
                             if t.is_some() {
                                 table = t;
                             }
-                            sink.batch(first, &recs, table.as_ref().expect("a table"));
+                            sink.batch_owned(first, recs, table.as_ref().expect("a table"));
                         }
                         SinkMsg::Reset => sink.reset(),
                     }

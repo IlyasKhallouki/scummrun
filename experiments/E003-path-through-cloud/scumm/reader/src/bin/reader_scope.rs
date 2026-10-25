@@ -25,7 +25,9 @@
 //! --golden FILE golden.py's reader file streamed as the records are made, with no records kept: the head, one
 //!               "record" line per record (as made, before `_read_once`'s rewrite of folded lists, which changes only
 //!               `args:` values), the builder's counters; gzip. What packed_reading.py from-golden reads with the
-//!               packed file to make the reading the Part I runner (replay_part1.py) plays from.
+//!               packed file to make the reading the Part I runner (replay_part1.py) plays from. The lines are made
+//!               and compressed on --golden-threads N threads (default --threads, at most 16), one gzip member per
+//!               batch, written in order: the same lines as one stream, other compressed bytes.
 //! --sample N --seed S --dump FILE
 //!               the spot-check's jobs: of the last pass, N per stratum (the room a job's unit or object belongs
 //!               to, or "global"), drawn by reservoir sampling with seed S; each written to FILE with what its batch
@@ -91,8 +93,9 @@ struct Tee {
     stream: Option<RecordStream>,
     hash: Option<sha1_smol::Sha1>,
     /// --golden: the records' lines, gzip, in a body file next to the final one (the head comes first and is known
-    /// only at the end)
-    body: Option<(PathBuf, flate2::write::GzEncoder<std::io::BufWriter<std::fs::File>>)>,
+    /// only at the end), made and compressed on `golden_threads` threads (`GoldenPool`)
+    body: Option<(PathBuf, GoldenPool)>,
+    golden_threads: usize,
     kinds: BTreeMap<String, usize>,
     prog: Arc<Mutex<Prog>>,
 }
@@ -101,6 +104,17 @@ impl RecordSink for Tee {
     fn batch(&mut self, first: usize, recs: &[Record], table: &FactTable) {
         let t = Instant::now();
         self.batch_timed(first, recs, table);
+        if let Some((_, pool)) = &mut self.body {
+            pool.send(first, recs.to_vec());
+        }
+        self.busy += t.elapsed().as_secs_f64();
+    }
+    fn batch_owned(&mut self, first: usize, recs: Vec<Record>, table: &FactTable) {
+        let t = Instant::now();
+        self.batch_timed(first, &recs, table);
+        if let Some((_, pool)) = &mut self.body {
+            pool.send(first, recs);
+        }
         self.busy += t.elapsed().as_secs_f64();
     }
     fn reset(&mut self) {
@@ -110,8 +124,9 @@ impl RecordSink for Tee {
         if self.hash.is_some() {
             self.hash = Some(sha1_smol::Sha1::new());
         }
-        if let Some((path, _)) = self.body.take() {
-            self.body = Some((path.clone(), body_file(&path)));
+        if let Some((path, pool)) = self.body.take() {
+            pool.finish();
+            self.body = Some((path.clone(), GoldenPool::new(&path, self.golden_threads)));
         }
         self.kinds.clear();
         let mut p = self.prog.lock().unwrap();
@@ -121,21 +136,15 @@ impl RecordSink for Tee {
 }
 
 impl Tee {
+    /// The packed file, the hash and the kinds; the golden lines go to the pool (`batch`, `batch_owned`).
     fn batch_timed(&mut self, first: usize, recs: &[Record], table: &FactTable) {
         if let Some(s) = &mut self.stream {
             s.records(first, recs, table).expect("the packed file");
         }
         for (j, r) in recs.iter().enumerate() {
-            if self.hash.is_some() || self.body.is_some() {
-                let line = Py::dict(vec![("kind", Py::str("record")), ("index", Py::Int((first + j) as i64)), ("record", r.py())]).text();
-                if let Some(h) = &mut self.hash {
-                    h.update(line.as_bytes());
-                    h.update(b"\n");
-                }
-                if let Some((_, gz)) = &mut self.body {
-                    gz.write_all(line.as_bytes()).expect("the golden file");
-                    gz.write_all(b"\n").expect("the golden file");
-                }
+            if let Some(h) = &mut self.hash {
+                h.update(record_line(first + j, r).as_bytes());
+                h.update(b"\n");
             }
             *self.kinds.entry(r.kind.clone()).or_default() += 1;
         }
@@ -143,9 +152,82 @@ impl Tee {
     }
 }
 
-fn body_file(path: &Path) -> flate2::write::GzEncoder<std::io::BufWriter<std::fs::File>> {
-    let f = std::fs::File::create(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-    flate2::write::GzEncoder::new(std::io::BufWriter::with_capacity(1 << 20, f), flate2::Compression::new(6))
+/// golden.py's "record" line of record number `index`.
+fn record_line(index: usize, r: &Record) -> String {
+    Py::dict(vec![("kind", Py::str("record")), ("index", Py::Int(index as i64)), ("record", r.py())]).text()
+}
+
+/// --golden's body made off the sink thread: each batch's lines are made and compressed into one gzip member on one
+/// of `n` threads, and a writer thread writes the members in the order the batches came. The lines and their order
+/// are the same as one gzip stream's; only the compressed bytes differ (several members, which every reader of the
+/// golden file reads: lib.rs `MultiGzDecoder`, Python's gzip).
+struct GoldenPool {
+    txs: Vec<std::sync::mpsc::SyncSender<(usize, usize, Vec<Record>)>>,
+    next: usize,
+    workers: Vec<std::thread::JoinHandle<()>>,
+    writer: std::thread::JoinHandle<std::io::Result<()>>,
+}
+
+impl GoldenPool {
+    fn new(path: &Path, n: usize) -> GoldenPool {
+        let f = std::fs::File::create(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let mut out = std::io::BufWriter::with_capacity(1 << 20, f);
+        let (wtx, wrx) = std::sync::mpsc::sync_channel::<(usize, Vec<u8>)>(4 * n.max(1));
+        let writer = std::thread::Builder::new()
+            .name("golden-writer".into())
+            .spawn(move || {
+                let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
+                let mut want = 0usize;
+                for (seq, bytes) in wrx {
+                    pending.insert(seq, bytes);
+                    while let Some(b) = pending.remove(&want) {
+                        out.write_all(&b)?;
+                        want += 1;
+                    }
+                }
+                assert!(pending.is_empty(), "the golden pool lost a batch");
+                out.flush()
+            })
+            .expect("the golden writer");
+        let mut txs = Vec::new();
+        let mut workers = Vec::new();
+        for i in 0..n.max(1) {
+            let (tx, rx) = std::sync::mpsc::sync_channel::<(usize, usize, Vec<Record>)>(8);
+            let wtx = wtx.clone();
+            workers.push(
+                std::thread::Builder::new()
+                    .name(format!("golden-{i}"))
+                    .spawn(move || {
+                        for (seq, first, recs) in rx {
+                            let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::new(6));
+                            for (j, r) in recs.iter().enumerate() {
+                                gz.write_all(record_line(first + j, r).as_bytes()).expect("the golden file");
+                                gz.write_all(b"\n").expect("the golden file");
+                            }
+                            wtx.send((seq, gz.finish().expect("the golden file"))).expect("the golden writer");
+                        }
+                    })
+                    .expect("a golden thread"),
+            );
+            txs.push(tx);
+        }
+        GoldenPool { txs, next: 0, workers, writer }
+    }
+
+    fn send(&mut self, first: usize, recs: Vec<Record>) {
+        let k = self.next % self.txs.len();
+        self.txs[k].send((self.next, first, recs)).expect("a golden thread");
+        self.next += 1;
+    }
+
+    /// Waits for every batch to be written and the file flushed.
+    fn finish(self) {
+        drop(self.txs);
+        for w in self.workers {
+            w.join().expect("a golden thread");
+        }
+        self.writer.join().expect("the golden writer").expect("the golden file");
+    }
 }
 
 /// One gzip member holding `line` and a newline.
@@ -278,6 +360,7 @@ fn main() {
         None => "rooms".to_string(),
     });
     let threads: usize = arg(&args, "--threads").map_or(6, |n| n.parse().unwrap());
+    let golden_threads: usize = arg(&args, "--golden-threads").map_or(threads.clamp(1, 16), |n| n.parse().unwrap());
     let out = PathBuf::from(arg(&args, "--out").unwrap_or_else(|| ".".into()));
     std::fs::create_dir_all(&out).unwrap();
     let packed = arg(&args, "--packed").map_or_else(|| out.join(format!("{name}.tc")), PathBuf::from);
@@ -409,9 +492,10 @@ fn main() {
         hash: hash.then(sha1_smol::Sha1::new),
         body: golden.as_ref().map(|g| {
             let p = g.with_extension("body.gz");
-            let f = body_file(&p);
+            let f = GoldenPool::new(&p, golden_threads);
             (p, f)
         }),
+        golden_threads,
         kinds: BTreeMap::new(),
         prog: prog.clone(),
     };
@@ -522,9 +606,9 @@ fn main() {
         h.digest().to_string()
     };
     let counters = b.counters_py().text();
-    if let (Some(g), Some((body, gz))) = (&golden, tee.body.take()) {
+    if let (Some(g), Some((body, pool))) = (&golden, tee.body.take()) {
         let t = Instant::now();
-        gz.finish().expect("the golden file").flush().expect("the golden file");
+        pool.finish();
         let mut out = std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(g).expect("the golden file"));
         let head = Py::dict(vec![("kind", Py::str("reading")), ("reading", b.reading_py(&[("name".to_string(), Py::str(&name))]))]).text();
         gz_member(&mut out, &head);
