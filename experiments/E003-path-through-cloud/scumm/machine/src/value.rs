@@ -83,6 +83,9 @@ pub struct Unknown {
     pub reason: Reason,
     pub what: Box<str>,
     pub values: Option<Box<[i32]>>,
+    /// the Python class: 0 is model.py's `Unknown`, every value this crate makes; a subclass (reader.py's `Cond`
+    /// and `Copy`, made by a hook) is another number, and never equals an `Unknown` with the same fields
+    pub class: u8,
 }
 
 /// MAX_VALUES: a value set larger than this becomes a plain unknown, counted in the caps.
@@ -123,14 +126,14 @@ impl Vals {
 
     /// `Unknown(reason, what)`.
     pub fn mk(&mut self, reason: Reason, what: impl Into<Box<str>>) -> Val {
-        self.intern(Unknown { reason, what: what.into(), values: None })
+        self.intern(Unknown { reason, what: what.into(), values: None, class: 0 })
     }
 
     /// `Unknown(reason, what, values)` with a value set as given (sorted here).
     pub fn mk_set(&mut self, reason: Reason, what: impl Into<Box<str>>, mut values: Vec<i32>) -> Val {
         values.sort_unstable();
         values.dedup();
-        self.intern(Unknown { reason, what: what.into(), values: Some(values.into_boxed_slice()) })
+        self.intern(Unknown { reason, what: what.into(), values: Some(values.into_boxed_slice()), class: 0 })
     }
 
     #[inline]
@@ -211,7 +214,7 @@ impl Vals {
             self.cap("value set");
             return self.mk(reason, what);
         }
-        self.intern(Unknown { reason, what: what.into(), values: Some(values.into_boxed_slice()) })
+        self.intern(Unknown { reason, what: what.into(), values: Some(values.into_boxed_slice()), class: 0 })
     }
 
     /// `_join_values(vals)`: the value of a fact after merging paths that hold `vals`.

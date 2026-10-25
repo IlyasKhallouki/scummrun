@@ -194,6 +194,9 @@ pub struct Sig {
     pub cut_len: u32,
     pub settle: Option<Box<SettleSig>>,
     pub items: Vec<SigItem>,
+    /// what a hook adds to the signature (reader.py's `Reader._join`), encoded; empty without hooks. A hook that
+    /// sets it also mixes it into `h`
+    pub ext: Box<[u8]>,
 }
 
 impl Sig {
@@ -204,12 +207,12 @@ impl Sig {
         cut_len.hash(&mut st);
         settle.hash(&mut st);
         items.hash(&mut st);
-        Sig { h: fmix(st.finish()), round: None, cut_index, cut_len, settle, items }
+        Sig { h: fmix(st.finish()), round: None, cut_index, cut_len, settle, items, ext: Box::default() }
     }
 
     /// `("round", round, position key)`.
     pub fn round(round: u32, pos: u64) -> Sig {
-        Sig { h: fmix(fx(&(round, pos)) ^ 0x2545_f491_4f6c_dd1d), round: Some((round, pos)), cut_index: None, cut_len: 0, settle: None, items: Vec::new() }
+        Sig { h: fmix(fx(&(round, pos)) ^ 0x2545_f491_4f6c_dd1d), round: Some((round, pos)), cut_index: None, cut_len: 0, settle: None, items: Vec::new(), ext: Box::default() }
     }
 
     pub fn is_round(&self) -> bool {
@@ -299,6 +302,13 @@ impl Store {
     #[inline]
     pub fn hash_sum(&self) -> u64 {
         self.sum
+    }
+
+    /// `store.pop(k, None)` (a hook's: reader.py deletes writes).
+    pub fn remove(&mut self, k: &Fact) -> Option<Val> {
+        let old = self.map.remove(k)?;
+        self.sum = self.sum.wrapping_sub(fx(&(*k, old)));
+        Some(old)
     }
 }
 
@@ -456,6 +466,21 @@ pub struct Path {
     pub cleared: Option<bool>,
     // --- golden.py's trace bookkeeping
     pub tid: Option<u32>,
+    /// what a hook adds to a path (reader.py's `SymPath` fields); None without hooks. Forks copy it
+    pub ext: Option<Box<dyn PathExt>>,
+}
+
+/// The fields a hook adds to a path (reader.py's `SymPath` subclass of `model.Path`): cloned with the path.
+pub trait PathExt: std::any::Any + std::fmt::Debug {
+    fn clone_box(&self) -> Box<dyn PathExt>;
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
+
+impl Clone for Box<dyn PathExt> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 impl Path {
