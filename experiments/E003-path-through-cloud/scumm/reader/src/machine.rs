@@ -1504,6 +1504,7 @@ fn enc_fact(b: &mut Vec<u8>, f: Fact) {
             b.extend_from_slice(&w.to_le_bytes());
         }
         Fact::Verb(n) => one(14, n),
+        Fact::ObjPos(n) => one(15, n),
     }
 }
 

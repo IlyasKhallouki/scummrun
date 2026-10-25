@@ -110,6 +110,10 @@ pub enum Fact {
     Esc(Slot, i32),
     /// `verb:V`: verb V is visible
     Verb(i32),
+    /// `objpos:O` (fix round 1, F5, switch draw_clears; not facts.py's): where object O is drawn in this room visit,
+    /// as an index into `Game::places(O)` (0 is its CDHD place). o5_drawObject's setXY moves it
+    /// (script_v5.cpp:1108-1114); loading the room puts it back (room.cpp:195, object.cpp:1145-1150)
+    ObjPos(i32),
 }
 
 impl fmt::Display for Fact {
@@ -130,6 +134,7 @@ impl fmt::Display for Fact {
             Fact::Cutscene => f.write_str("cutscene"),
             Fact::Esc(u, w) => write!(f, "esc:{u}:{w}"),
             Fact::Verb(v) => write!(f, "verb:{v}"),
+            Fact::ObjPos(o) => write!(f, "objpos:{o}"),
         }
     }
 }
@@ -194,6 +199,7 @@ impl FromStr for Fact {
             "local" => Fact::Local(one(rest)?),
             "objscript" => Fact::ObjScript(one(rest)?),
             "verb" => Fact::Verb(one(rest)?),
+            "objpos" => Fact::ObjPos(one(rest)?),
             "at" | "esc" => {
                 let (u, w) = slot_and_rest(rest).ok_or_else(bad)?;
                 let w = one(w)?;
@@ -235,6 +241,7 @@ impl Fact {
             Fact::Cutscene => "cutscene",
             Fact::Esc(..) => "esc",
             Fact::Verb(_) => "verb",
+            Fact::ObjPos(_) => "objpos",
         }
     }
 

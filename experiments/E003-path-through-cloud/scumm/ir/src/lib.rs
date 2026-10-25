@@ -22,6 +22,7 @@ pub mod facts;
 pub mod game;
 pub mod json;
 pub mod parse;
+pub mod places;
 pub mod py;
 pub mod read;
 pub mod show;
