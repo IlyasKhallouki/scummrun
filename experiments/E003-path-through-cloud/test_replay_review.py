@@ -110,6 +110,12 @@ def test_eval_check_reads_the_dump_and_the_sentence_scripts_inputs():
     assert RP.eval_check(truth, walk, state({103: 0})) is False
     # another sentence script installed: its locals are not the input's
     assert RP.eval_check(c104, walk, state({104: 316, 33: 7})) is None
+    # a variable in other code (the verb, which the input script sets in the click's frame) is not checked
+    verb = ("global/script-012.txt:22 [005D]", "Var[107] == 10", True, "?(not a fact: var:107)")
+    assert RP.eval_check(verb, rec("sentence", "sentence(8,574)", source=("sentence", 8, 574, None)),
+                         state({107: 10})) is None
+    line = ("global/script-004.txt:16 [001E]", "Var[108]", False, "?(not a fact: var:108)")
+    assert RP.eval_check(line, rec("dialog_line", "dialog_line(109)", source=("verb", 109)), state()) is None
     # an event's locals are never known; an indirect read (the reader read another variable) is not checked
     ev = rec("event", "event(script:23@409)")
     assert RP.eval_check(("global/script-023.txt:58 [00F9]", "Local[0] != Var[181]", False,

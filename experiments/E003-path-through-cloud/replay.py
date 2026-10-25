@@ -28,9 +28,10 @@ What the harness does, per plan step (plan.md step 5, with D5):
   prediction, not of the step: replan, no ban. An event whose effects already hold at its turn (it ran during an
   earlier step) counts as done.
 * **The replay checks** (``eval_check``). The record's conditions on non-facts (reader.Record.checks) are checked in
-  the engine's state just before the input where the dump shows their operands: global variables, the sentence
-  script's locals 0-2 in its own code (the verb, A and B: script.cpp:1212-1214), VAR_EGO, and VAR_RESULT of
-  getActorX, getActorY or getActorRoom on an actor the dump lists. Before the input, a failing check on a position
+  the engine's state just before the input where the dump shows their operands: in the sentence script's own code,
+  global variables and its locals 0-2 (the verb, A and B: script.cpp:1212-1214); anywhere, VAR_EGO and VAR_RESULT
+  of getActorX, getActorY or getActorRoom on an actor the dump lists. A variable in other code is not checked: the
+  input script and the running scripts (the hover script) run between the click and the test, and may write it. Before the input, a failing check on a position
   or an actor's state whose actor is moving is waited for (no input), up to ``INPUT_LIMIT`` frames.
 * **The window.** After the input (or from the step's start, for an event) the harness watches every frame and keeps
   every change to a tracked fact with its frame (``History``). The step ends on the first frame all its predicted
@@ -339,6 +340,8 @@ def eval_check(check, rec, state: dict):
             return int(t)
         m = re.fullmatch(r"Var\[(\d+)\]", t)
         if m:
+            if locs is None:
+                return None  # outside the sentence script's own code: another script may write it in the frame
             if read is not None and read[1] != m[1]:
                 return None  # the reader read another variable there (an indirect read): not the text's
             return vs[int(m[1])] if int(m[1]) < len(vs) else None
