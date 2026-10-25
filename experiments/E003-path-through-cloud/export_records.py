@@ -269,7 +269,7 @@ def record_naming(a) -> tuple:
 
 # --- the control (plan.md step 5) ----------------------------------------------------------------------------------------
 
-def control_records(src, lines, dst) -> dict:
+def control_records(src, lines, dst, dst_lines=None) -> dict:
     """The control's packed file (plan.md step 5: "the preconditions taken from the scripts removed, only what makes
     an action usable in the engine kept"): ``src`` with each action's precondition cut to its sets on
 
@@ -282,22 +282,36 @@ def control_records(src, lines, dst) -> dict:
 
     The sets on every other fact (what the scripts tested) are dropped. Everything else is ``src``'s word for word:
     the effects with their conditions, the strings, the facts and their domains, the add tables, the goal and the
-    starts (the tables are copied and the footer's offsets moved). Streams: one action at a time. Returns counts:
-    actions, sets kept and dropped, dropped sets by fact kind (the key's prefix) and by action kind."""
+    starts (the tables are copied and the footer's offsets moved).
+
+    ``dst_lines``: the control's action lines (packed_reading.py's format), ``lines`` with, per action, the scripts'
+    other tests dropped too: ``checks`` empty (the conditions on non-facts the path took a side of, which the harness
+    waits for and reads to tell a retry from a ban), ``pre_keys`` cut to the facts kept, and the stepped facts among
+    them made engine conditions (``engine_pre``), as they are kept for the engine's limit. So the harness plays the
+    control knowing nothing the scripts test, and a ban on a control record names the room alone (replay.ban_of: the
+    record's own facts that are not engine conditions, plus the room).
+
+    Streams: one action at a time. Returns counts: actions, sets kept and dropped, dropped sets by fact kind (the key's
+    prefix) and by action kind, and with ``dst_lines`` the checks dropped and the stepped facts made engine
+    conditions."""
     import mmap
     with open(src, "rb") as fsrc, open(dst, "wb") as fout:
         mm = mmap.mmap(fsrc.fileno(), 0, access=mmap.ACCESS_READ)
         w = memoryview(mm).cast("I")
+        out_lines = open(dst_lines, "w") if dst_lines is not None else None
         try:
-            counts = _control(w, src, lines, fout, mm)
+            counts = _control(w, src, lines, fout, mm, out_lines)
         finally:
             w.release()
             mm.close()
+            if out_lines is not None:
+                out_lines.close()
     return counts
 
 
-def _control(w, src, lines, fout, mm) -> dict:
-    """``control_records``'s pass over the words ``w`` of ``src``, written to ``fout``."""
+def _control(w, src, lines, fout, mm, out_lines=None) -> dict:
+    """``control_records``'s pass over the words ``w`` of ``src``, written to ``fout`` (and the lines to
+    ``out_lines``)."""
     import json
     if w[0] != MAGIC or w[1] != VERSION or w[len(w) - 1] != END_MAGIC:
         raise ValueError(f"{src}: not a taskcore file of version {VERSION}")
@@ -352,6 +366,15 @@ def _control(w, src, lines, fout, mm) -> dict:
             counts["sets kept"] += len(keep)
             counts["sets dropped"] += len(dropped)
             counts["actions with a set dropped"] += bool(dropped)
+            if out_lines is not None:
+                kept = {keys[s[0]] for s in keep}
+                own = [k for k in line["pre_keys"] if k in kept]
+                steps = {keys[f] for f in stepped} & set(own) - engine
+                out_lines.write(json.dumps(dict(line, checks=[], pre_keys=own, engine_pre=sorted(engine | steps)))
+                                + "\n")
+                counts["checks dropped"] = counts.get("checks dropped", 0) + len(line["checks"])
+                counts["stepped facts made engine conditions"] = \
+                    counts.get("stepped facts made engine conditions", 0) + len(steps)
             kind = strings[a[2]]
             by_kind[kind] = by_kind.get(kind, 0) + len(dropped)
             for k in dropped:
