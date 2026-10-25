@@ -1,0 +1,12 @@
+2026-10-25T20:02:24Z stopped by hand: the reading cannot finish, and be planned, before the VM ends
+pid 23502; clock ticks/s 100; /proc/uptime 12989.33 351298.61
+utime_ticks 3652622 stime_ticks 133714 start_ticks 1139660 threads 52
+VmHWM:	61250376 kB
+VmRSS:	12734928 kB
+total 47969784
+-rw-rw-r-- 1 ilyask ilyask  2880953267 Oct 25 20:02 reading.golden.jsonl.body.gz
+-rw-rw-r-- 1 ilyask ilyask 46240104448 Oct 25 20:02 reading.tc
+/dev/root        29G  7.0G   22G  25% /
+tmpfs           126G   46G   81G  37% /dev/shm
+               total        used        free      shared  buff/cache   available
+Mem:             251          65         184          45          49         186

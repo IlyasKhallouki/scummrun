@@ -1,0 +1,10 @@
+[19:35:51] reader-scope --part1 --elsewhere, 32 threads, into /dev/shm/partI
+[part1] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 32 threads; load 8.64 10.86 10.55
+[part1] pass 1 inputs: 34124 runs from 0 events start; RSS 190 MB
+[part1] pass 1 inputs: 34124 runs, 1544657 records, 204.7 s; 1536901 records in the pass, 205 s, RSS 3039 MB
+[part1] pass 1 event round 1: 19847 runs from 30545 events start; RSS 3900 MB
+[part1] pass 1 event round 1: 19847 runs, 1230458 records, 384.1 s; 2771264 records in the pass, 590 s, RSS 5161 MB
+[part1] pass 1 event round 2: 23728 runs from 32736 events start; RSS 5445 MB
+[part1] pass 1 event round 2: 23728 runs, 5176918 records, 857.4 s; 7952033 records in the pass, 1450 s, RSS 6101 MB
+[part1] pass 1 event round 3: 21093 runs from 22730 events start; RSS 6649 MB
+Terminated

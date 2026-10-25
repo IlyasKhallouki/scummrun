@@ -1,0 +1,112 @@
+{
+ "what": "E003 steps 4-5, the first Part I attempt on the cloud VM, seed 1: stopped in the reading (reader-scope --part1 --elsewhere), before any plan",
+ "vm": {
+  "name": "fast-mi-1",
+  "type": "n2-highmem-32",
+  "vcpus": 32,
+  "ram_gb": 251,
+  "dev_shm_gb": 126,
+  "disk_free_gb": 22,
+  "rustc": "1.99.1",
+  "termination_time": "2026-10-25T22:25:48Z",
+  "stopped": "2026-10-25T20:05Z",
+  "hours_used": 3.68,
+  "usd": 4.64
+ },
+ "code": {
+  "branch": "partI",
+  "reader_first_start": "6cbdd9a",
+  "reader_second_start": "1fe9424 (golden lines on their own threads)"
+ },
+ "k1_check_on_vm": {
+  "what": "reader-scope --k 1 --elsewhere, 8 threads, nice 19, next to the part1 reading",
+  "packed_sha1": "3ceabe501fd38dc195246ca20ccc42995a349d3e",
+  "golden_lines_sha1": "213e68f344855a27e4cc8588b1d0990d11495c84",
+  "same_as_laptop": true,
+  "records": 237262,
+  "6cbdd9a": {
+   "read_wall_s": 70.2,
+   "cpu_s": 386.7,
+   "sink_busy_s": 58.9,
+   "golden_gz_bytes": null
+  },
+  "1fe9424": {
+   "read_wall_s": 45.2,
+   "cpu_s": 350.9,
+   "sink_busy_s": 20.8,
+   "golden_gz_bytes": 25250985
+  }
+ },
+ "first_start": {
+  "start": "19:03:57Z",
+  "stopped": "19:35Z (by hand, to restart with 1fe9424)",
+  "bound": "the sink thread: one core at 100%, the 32 workers idle",
+  "batches": [
+   [
+    "pass 1 inputs",
+    34124,
+    1544657,
+    286.9
+   ],
+   [
+    "pass 1 event round 1",
+    19847,
+    1230458,
+    742.6
+   ]
+  ],
+  "records_at_round_2_start": 2770905
+ },
+ "second_start": {
+  "start": "19:35:51Z",
+  "stopped": "20:02:24Z (by hand)",
+  "bound": "CPU: 96-97% user on all 32 vCPUs",
+  "batches": [
+   [
+    "pass 1 inputs",
+    34124,
+    1544657,
+    204.7
+   ],
+   [
+    "pass 1 event round 1",
+    19847,
+    1230458,
+    384.1
+   ],
+   [
+    "pass 1 event round 2",
+    23728,
+    5176918,
+    857.4
+   ]
+  ],
+  "batch_columns": [
+   "batch",
+   "runs",
+   "records",
+   "seconds"
+  ],
+  "records_at_last_batch_end": 7952033,
+  "at_stop": "pass 1, event round 3 (21093 runs from 22730 events)",
+  "wall_s": 1592.7,
+  "cpu_s": 37863.4,
+  "cpu_use": 23.8,
+  "peak_rss_kb": 61250376,
+  "packed_bytes": 46240104448,
+  "golden_body_gz_bytes": 2880953267,
+  "files_in_dev_shm_gb": 46
+ },
+ "why_stopped": [
+  "Pass 1 was still in event round 3 after 26.5 min, with 7.95 M records at the end of round 2; the rounds did not shrink (19,847, 23,728, 21,093 runs).",
+  "The packed file grew about 2 GB a minute in round 2 (46.2 GB at the stop). vm_part1.sh's MAX_FILES_GB=100 and /dev/shm's 126 GB would have stopped pass 1, and the reader's last rewrite needs twice the file.",
+  "A second pass reads everything again (k=1 had two). taskcore's start check took 35 s on k=1's 316 MB file; at 46+ GB the check and the first plan alone would not have ended before the VM's 22:25 stop."
+ ],
+ "not_run": [
+  "from-golden",
+  "replay_part1.py run 1 (full model)",
+  "the control",
+  "verify",
+  "score_part1.py"
+ ]
+}
