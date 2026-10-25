@@ -44,7 +44,8 @@ from export_records import export_task  # noqa: E402
 from task import Action, Effect, OutOfDomain, Task, write_sas  # noqa: E402
 
 BIN = Path(os.environ.get("TASKCORE_BIN", HERE / "taskcore" / "target" / "release" / "taskcore"))
-DOWNWARD = HERE.parents[1] / "third_party" / "downward" / "builds" / "release" / "bin" / "downward"
+DOWNWARD = Path(os.environ.get("DOWNWARD_DIR") or HERE.parents[1] / "third_party" / "downward") / "builds" / "release" / \
+    "bin" / "downward"
 RAW = ["--fold", "off", "--reduce", "none"]
 CONFIGS = [
     ("no lever", RAW),
