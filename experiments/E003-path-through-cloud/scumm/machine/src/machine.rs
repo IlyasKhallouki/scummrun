@@ -14,6 +14,7 @@
 
 mod calls;
 mod dialog;
+mod draw_clears;
 mod esc;
 mod hooks;
 mod rooms;
@@ -130,13 +131,20 @@ impl Features {
     }
 }
 
-/// model.py `SWITCHES`, as flags.
+/// model.py `SWITCHES`, as flags, and fix round 1's switches, which model.py does not have (the Python stays the
+/// frozen reference; fix-round1.md). Every switch is off by default.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 pub struct Switches {
     pub input_after_turns: bool,
     pub const_polls: bool,
     pub esc_key_at_pre: bool,
+    /// F5: drawObject's setXY moves the object (`objpos:O`), and the objects of the room with the drawn object's
+    /// place and size go to state 0 (script_v5.cpp:1108-1128); loading a room puts its objects back (room.cpp:195)
+    pub draw_clears: bool,
 }
+
+/// Fix round 1's switches: in the Rust only (model.py's `SWITCHES` lacks them).
+pub const RUST_SWITCHES: &[&str] = &["draw_clears"];
 
 impl Switches {
     pub fn parse(names: &[String]) -> Result<Switches, String> {
@@ -146,6 +154,7 @@ impl Switches {
                 "input_after_turns" => s.input_after_turns = true,
                 "const_polls" => s.const_polls = true,
                 "esc_key_at_pre" => s.esc_key_at_pre = true,
+                "draw_clears" => s.draw_clears = true,
                 _ => return Err(format!("unknown switch {n}")),
             }
         }
@@ -1629,6 +1638,7 @@ impl<'g> Machine<'g> {
                 }
             }
             known::SET_OBJECT_NAME => self.inventory_hook(p, o, x, 0, "setObjectName"),
+            known::DRAW_OBJECT if self.switches.draw_clears => return self.draw_object_f5(p, o, x, args, subops),
             known::DRAW_OBJECT => {
                 let ob = self.val(p, o, args[0], Some(x));
                 let mut state = Val::Int(1);
