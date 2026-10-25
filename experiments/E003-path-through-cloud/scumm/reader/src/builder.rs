@@ -12,6 +12,7 @@ use crate::table::{FactTable, Kind};
 use rustc_hash::{FxHashMap, FxHashSet};
 use scumm_ir::{known, Expr, Game, Stmt, UnitId, UnitKey};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub const SIG_LIMIT: usize = 1024;
 pub const SPLIT_DEPTH: i64 = 2;
@@ -91,6 +92,47 @@ pub struct RunOut {
 /// precondition.
 pub trait Machine {
     fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut;
+
+    /// A whole batch of jobs (one `_run_jobs` call) run elsewhere (par.rs: on threads): the machine merges each
+    /// job's [`JobOut`] into `b` ([`Builder::merge_job`]) and hands its index and records to `each`, in the jobs'
+    /// order, and returns true. False (the default): the Builder runs the jobs itself, one after another.
+    fn run_batch(&mut self, _b: &mut Builder<'_>, _jobs: &Arc<Vec<Job>>, _each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
+        false
+    }
+
+    /// The runs a split is about to make, in its order (`Builder.run`'s parts): a machine may start them early
+    /// (par.rs) and give each one's result to the `run` call for it. The default does nothing.
+    fn prefetch(&mut self, _cx: &Ctx, _label: &str, _runs: &[(Pins, Pre)], _what: &What) {}
+}
+
+/// What the Builder's counters and sets gained while one job ran (in a worker's Builder, par.rs), merged into the
+/// reading's Builder in the jobs' order ([`Builder::merge_job`]): the same keys in the same order as when the jobs
+/// run one after another in one Builder.
+#[derive(Clone, Debug, Default)]
+pub struct Deltas {
+    pub counts: Counter,
+    pub ends: PyCounter,
+    pub drops: PyCounter,
+    pub nonfact_checks: Counter,
+    pub guesses: Counter,
+    pub unknown_writes: Counter,
+    pub unknown_sites: PyCounter,
+    pub out_of_domain: BTreeMap<String, BTreeSet<i64>>,
+    pub rd: RdCounts,
+    pub sig_ids: BTreeMap<i64, BTreeSet<String>>,
+    /// the `args:` values `record` added to the table (`table.args_vals`), in order
+    pub args: Vec<(String, i64)>,
+}
+
+/// One job's records and what it added to the Builder (par.rs).
+#[derive(Debug, Default)]
+pub struct JobOut {
+    pub records: Vec<Record>,
+    pub deltas: Deltas,
+    /// the pins of the job's last run (`Builder::last_pins`)
+    pub last_pins: Pins,
+    /// the job's wall seconds where it ran
+    pub secs: f64,
 }
 
 /// Takes the records as the Builder makes them (packed.rs `RecordStream`): a batch after each round of runs, `first`
@@ -98,6 +140,11 @@ pub trait Machine {
 pub trait RecordSink {
     fn batch(&mut self, first: usize, recs: &[Record], table: &FactTable);
     fn reset(&mut self);
+    /// The records handed over, when the Builder keeps none (`keep_records` off): a sink may take them to another
+    /// thread (par.rs `SinkThread`). The default lends them to `batch`.
+    fn batch_owned(&mut self, first: usize, recs: Vec<Record>, table: &FactTable) {
+        self.batch(first, &recs, table)
+    }
 }
 
 /// The Builder's read-only state a machine run needs.
@@ -106,6 +153,31 @@ pub struct Ctx<'a> {
     pub scope: &'a Scope,
     pub table: &'a FactTable,
 }
+
+/// The next round's events as the records of a batch give them, in their order, each once: a later event with the
+/// same (unit name, unit, wait point, list of locals, Esc) as an earlier one changes nothing in `_read_once`'s round
+/// (its replan copy is the earlier one's, `_limit` gives it the same key, and `events_done` then skips it), so it is
+/// not kept (at Part I's scale the inputs' records name millions of events, a few tens of thousands of them distinct).
+#[derive(Default)]
+struct NextEvents {
+    events: Vec<Event>,
+    seen: FxHashSet<(String, UnitKey, i64, i64, bool)>,
+}
+
+impl NextEvents {
+    fn add(&mut self, recs: &[Record]) {
+        for r in recs {
+            for e in &r.next_events {
+                if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
+                    self.events.push(e.clone());
+                }
+            }
+        }
+    }
+}
+
+/// `Builder::on_job`: (the job, its records, the batch's `args:` values and folded lists at its start).
+pub type JobHook = Box<dyn FnMut(&Job, &[Record], &BTreeMap<String, BTreeSet<i64>>, &BTreeSet<i64>)>;
 
 /// The `_pin` values: labels, or raw ints for a fact with no domain.
 type PinVals = Vec<Label>;
@@ -139,6 +211,31 @@ pub struct Builder<'g> {
     /// kind and domain of the keys `effect` reads, for one pass (an `args:`, `pos:` or `escpos:` domain grows
     /// within a pass: not kept)
     fact_info: FxHashMap<String, std::rc::Rc<(Kind, Option<Domain>)>>,
+    /// false: the records go to the sink and are not kept (`records` stays empty, so memory does not grow with
+    /// the record count); the reading is the same, `n_records` counts them
+    pub keep_records: bool,
+    /// the pass's records so far (`len(self.records)`)
+    pub n_records: usize,
+    /// with `keep_records` off: the `args:` values the pass's records set (`_read_once`'s last loop reads them)
+    args_set: BTreeMap<String, BTreeSet<i64>>,
+    /// a worker's Builder (par.rs) logs the `args:` values `record` adds to the table here
+    args_log: Option<Vec<(String, i64)>>,
+    /// told after each batch of runs (reader.py `Builder.progress`): what, jobs, records, seconds
+    pub progress: Option<Box<dyn FnMut(&str, usize, usize, f64)>>,
+    /// told before each batch of runs: what, jobs, the events it was made from (the measurements)
+    pub on_batch_start: Option<Box<dyn FnMut(&str, usize, usize)>>,
+    /// wall seconds by phase of `read_once` (the measurements; not part of the reading)
+    pub phase_secs: BTreeMap<&'static str, f64>,
+    /// the values written outside their domains in each pass that widened domains (`out_of_domain` before
+    /// `extend_domains`; the spot-check's dump; not part of the reading)
+    pub widened: Vec<BTreeMap<String, BTreeSet<i64>>>,
+    /// told each job's records as made, with the `args:` values and folded lists its batch started with (the
+    /// spot-check's dump; not part of the reading)
+    pub on_job: Option<JobHook>,
+    /// `oracle_keys`' cache: the universe as a set, and its keys by prefix
+    uni_keys: std::cell::RefCell<(FxHashSet<String>, FxHashMap<String, Vec<String>>)>,
+    /// `args_domain`'s cache: key -> (its count of list numbers, its domain)
+    args_doms: std::cell::RefCell<FxHashMap<String, (usize, Domain)>>,
 }
 
 /// reader.py `_why`: the reason of an assumption's `why` (model.Unknown's text).
@@ -157,6 +254,76 @@ fn lab_set(v: impl IntoIterator<Item = Label>) -> Labels {
 impl<'g> Builder<'g> {
     pub fn new(game: &'g Game, scope: Scope, doms: domains::Domains) -> Builder<'g> {
         let table = FactTable::new(&scope, doms, game);
+        Builder::with_table(game, scope, table)
+    }
+
+    /// A worker's Builder (par.rs): the reading's scope, a copy of its table and folded lists, empty counters. It
+    /// runs jobs (`run_job`) and hands over what each added with [`Builder::take_deltas`].
+    pub fn worker(game: &'g Game, scope: Scope, table: FactTable, folded: BTreeSet<i64>, sig_limit: usize) -> Builder<'g> {
+        let mut b = Builder::with_table(game, scope, table);
+        b.folded = folded;
+        b.sig_limit = sig_limit;
+        b.args_log = Some(Vec::new());
+        b
+    }
+
+    /// A worker's Builder takes the reading's table and folded lists for a new batch: the whole table when a pass
+    /// widened a domain (`base`; each key's kind and domain worked out again), and the `args:` values.
+    pub fn sync_table(&mut self, base: Option<&FactTable>, args_vals: &BTreeMap<String, BTreeSet<i64>>, folded: &BTreeSet<i64>) {
+        if let Some(t) = base {
+            self.table = t.clone();
+            self.fact_info.clear();
+            self.ego_cache = None;
+        }
+        if self.table.args_vals != *args_vals {
+            self.table.args_vals.clone_from(args_vals);
+        }
+        if self.folded != *folded {
+            self.folded.clone_from(folded);
+        }
+    }
+
+    /// What the counters and sets gained since the last call (a worker's Builder after a job); they are left empty.
+    pub fn take_deltas(&mut self) -> Deltas {
+        Deltas {
+            counts: std::mem::take(&mut self.counts),
+            ends: std::mem::take(&mut self.ends),
+            drops: std::mem::take(&mut self.drops),
+            nonfact_checks: std::mem::take(&mut self.nonfact_checks),
+            guesses: std::mem::take(&mut self.guesses),
+            unknown_writes: std::mem::take(&mut self.unknown_writes),
+            unknown_sites: std::mem::take(&mut self.unknown_sites),
+            out_of_domain: std::mem::take(&mut self.out_of_domain),
+            rd: std::mem::take(&mut self.rd),
+            sig_ids: std::mem::take(&mut self.sig_ids),
+            args: self.args_log.as_mut().map(std::mem::take).unwrap_or_default(),
+        }
+    }
+
+    /// A job run elsewhere (par.rs), merged as if it had run here: its counters added in their order, its sets
+    /// joined, its `args:` values added to the table, its last run's pins the last pins.
+    pub fn merge_job(&mut self, d: Deltas, last_pins: Pins) {
+        self.counts.update(&d.counts);
+        self.ends.update(&d.ends);
+        self.drops.update(&d.drops);
+        self.nonfact_checks.update(&d.nonfact_checks);
+        self.guesses.update(&d.guesses);
+        self.unknown_writes.update(&d.unknown_writes);
+        self.unknown_sites.update(&d.unknown_sites);
+        for (k, v) in d.out_of_domain {
+            self.out_of_domain.entry(k).or_default().extend(v);
+        }
+        self.rd.update(&d.rd);
+        for (sig, texts) in d.sig_ids {
+            self.sig_ids.entry(sig).or_default().extend(texts);
+        }
+        for (k, s) in d.args {
+            self.table.args_vals.entry(k).or_default().insert(s);
+        }
+        self.last_pins = last_pins;
+    }
+
+    fn with_table(game: &'g Game, scope: Scope, table: FactTable) -> Builder<'g> {
         Builder {
             game,
             scope,
@@ -182,6 +349,17 @@ impl<'g> Builder<'g> {
             cites: None,
             ego_cache: None,
             fact_info: FxHashMap::default(),
+            keep_records: true,
+            n_records: 0,
+            args_set: BTreeMap::new(),
+            args_log: None,
+            progress: None,
+            on_batch_start: None,
+            phase_secs: BTreeMap::new(),
+            uni_keys: Default::default(),
+            args_doms: Default::default(),
+            on_job: None,
+            widened: Vec::new(),
         }
     }
 
@@ -222,6 +400,21 @@ impl<'g> Builder<'g> {
         out
     }
 
+    /// `table.domain` of an `args:` key, kept while its list numbers do not change (within a pass they only grow,
+    /// so their count tells; `reset` forgets them).
+    fn args_domain(&self, key: &str) -> Domain {
+        let n = self.table.args_vals.get(key).map_or(0, |s| s.len());
+        let mut c = self.args_doms.borrow_mut();
+        if let Some((m, d)) = c.get(key) {
+            if *m == n {
+                return d.clone();
+            }
+        }
+        let d = self.table.domain(key).unwrap().into_owned();
+        c.insert(key.to_string(), (n, d.clone()));
+        d
+    }
+
     /// `Builder._pin`: an engine condition (a constant checked against the start; a fact into the precondition; a
     /// single value also a pin).
     pub fn pin(&self, pins: &mut Pins, pre: &mut Pre, key: &str, values: &[Label]) -> bool {
@@ -229,7 +422,7 @@ impl<'g> Builder<'g> {
         if self.kind(key) == Kind::Const {
             return values.contains(&Label::Int(self.table.start.get0(key)));
         }
-        let dom = self.table.domain(key);
+        let dom = if key.starts_with("args:") { Some(std::borrow::Cow::Owned(self.args_domain(key))) } else { self.table.domain(key) };
         if let Some(dom) = &dom {
             values = lab_set(values.iter().filter_map(|&v| dom.label_of(v)));
             if values.is_empty() {
@@ -629,11 +822,19 @@ impl<'g> Builder<'g> {
     }
 
     /// The slot keys of a unit the oracle lists (`SymOracle.keys(prefix)`): the scope's universe, then the last
-    /// run's pins that the universe lacks, sorted.
+    /// run's pins that the universe lacks, sorted. The universe's part is worked out once per prefix (the scope
+    /// does not change).
     fn oracle_keys(&self, prefix: &str) -> Vec<String> {
-        let mut out: Vec<String> = self.scope.universe.iter().filter(|k| k.starts_with(prefix)).cloned().collect();
-        let uni: BTreeSet<&String> = self.scope.universe.iter().collect();
-        out.extend(self.last_pins.keys().filter(|k| k.starts_with(prefix) && !uni.contains(k)).cloned());
+        let mut cache = self.uni_keys.borrow_mut();
+        let (uni, by_prefix) = &mut *cache;
+        if uni.is_empty() {
+            uni.extend(self.scope.universe.iter().cloned());
+        }
+        let mut out: Vec<String> = by_prefix
+            .entry(prefix.to_string())
+            .or_insert_with(|| self.scope.universe.iter().filter(|k| k.starts_with(prefix)).cloned().collect())
+            .clone();
+        out.extend(self.last_pins.keys().filter(|k| k.starts_with(prefix) && !uni.contains(*k)).cloned());
         out
     }
 
@@ -716,12 +917,19 @@ impl<'g> Builder<'g> {
                 budget.0 -= vals.len() as i64;
                 budget.1 += 1;
                 self.counts.inc("runs past the path limit split on their first fork on a read");
+                let parts: Vec<(Pins, Pre)> = vals
+                    .iter()
+                    .map(|&v| {
+                        let (mut p2, mut pre2) = (pins.clone(), pre.clone());
+                        pre2.insert(key.clone(), vec![v]);
+                        p2.insert(key.clone(), self.table.value(&key, v));
+                        (p2, pre2)
+                    })
+                    .collect();
+                m.prefetch(&self.ctx(), &job.label, &parts, &job.what);
                 let mut out = Vec::new();
-                for v in vals {
-                    let (mut p2, mut pre2) = (pins.clone(), pre.clone());
-                    pre2.insert(key.clone(), vec![v]);
-                    p2.insert(key.clone(), self.table.value(&key, v));
-                    out.extend(self.run(m, job, &p2, &pre2, budget));
+                for (p2, pre2) in &parts {
+                    out.extend(self.run(m, job, p2, pre2, budget));
                 }
                 budget.1 -= 1;
                 return out;
@@ -812,6 +1020,9 @@ impl<'g> Builder<'g> {
             match effects.iter_mut().find(|e| e.0 == args) {
                 Some(e) => e.1 = Eff::Set(Label::Int(sig)),
                 None => effects.push((args.clone(), Eff::Set(Label::Int(sig)))),
+            }
+            if let Some(log) = &mut self.args_log {
+                log.push((args.clone(), sig));
             }
             self.table.args_vals.entry(args).or_default().insert(sig);
             let esc = format!("esc:{name}:");
@@ -1146,7 +1357,8 @@ impl<'g> Builder<'g> {
         self.read_all_into(m, start_events, skip, passes, None)
     }
 
-    /// `read_all`, handing each batch of records to `sink` as it is made (and telling it when a pass starts over).
+    /// `read_all`, handing the records to `sink` as they are made, job by job in the jobs' order (and telling it
+    /// when a pass starts over).
     pub fn read_all_into(
         &mut self,
         m: &mut dyn Machine,
@@ -1162,16 +1374,17 @@ impl<'g> Builder<'g> {
                 }
             }
             self.read_once(m, start_events, skip, &mut sink);
-            self.counts.set(format!("pass {}: records", n + 1), self.records.len() as i64);
+            self.counts.set(format!("pass {}: records", n + 1), self.n_records as i64);
             if self.out_of_domain.is_empty() || n == passes - 1 {
                 break;
             }
+            self.widened.push(self.out_of_domain.clone());
             let added = self.extend_domains();
             self.counts.set(format!("pass {}: domain values added for the next pass", n + 1), added);
             self.reset();
         }
-        self.counts.set("records", self.records.len() as i64);
-        self.records.len()
+        self.counts.set("records", self.n_records as i64);
+        self.n_records
     }
 
     /// `Builder._reset`: forget a pass (the "pass N" counts stay).
@@ -1193,10 +1406,13 @@ impl<'g> Builder<'g> {
         }
         self.out_of_domain.clear();
         self.table.args_vals.clear();
+        self.args_doms.borrow_mut().clear();
         self.sig_seen.clear();
         self.folded.clear();
         self.ego_cache = None;
         self.fact_info.clear();
+        self.n_records = 0;
+        self.args_set.clear();
     }
 
     /// `Builder.extend_domains`: add the written values a domain lacked; returns how many.
@@ -1233,18 +1449,32 @@ impl<'g> Builder<'g> {
     ) {
         self.sig_seen.clear();
         self.folded.clear();
+        self.records.clear();
+        self.n_records = 0;
+        self.args_set.clear();
+        let t0 = std::time::Instant::now();
         let jobs = self.inputs();
-        self.records = self.run_jobs(m, &jobs);
-        if let Some(s) = sink {
-            s.batch(0, &self.records, &self.table);
+        *self.phase_secs.entry("inputs()").or_default() += t0.elapsed().as_secs_f64();
+        let tr = std::time::Instant::now();
+        let n_jobs = jobs.len();
+        if let Some(f) = &mut self.on_batch_start {
+            f("inputs", n_jobs, 0);
         }
+        let mut nexts = NextEvents::default();
+        self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
+            nexts.add(&recs);
+            b.emit(recs, sink);
+        });
+        let jobs_len = n_jobs;
+        let n = self.n_records;
+        *self.phase_secs.entry("runs").or_default() += tr.elapsed().as_secs_f64();
+        self.tell("inputs", jobs_len, n, t0.elapsed().as_secs_f64());
         let mut todo: Vec<Event> = if start_events { self.start_events() } else { vec![] };
-        for r in &self.records {
-            todo.extend(r.next_events.iter().cloned());
-        }
+        todo.extend(nexts.events);
         let mut rounds = 0;
         while !todo.is_empty() {
             rounds += 1;
+            let te = std::time::Instant::now();
             let mut jobs = Vec::new();
             let mut added: FxHashSet<(String, UnitKey, i64, bool)> =
                 todo.iter().filter(|e| e.sig == 0).map(|e| (e.name.clone(), e.unit, e.w, e.abort)).collect();
@@ -1259,6 +1489,8 @@ impl<'g> Builder<'g> {
                     self.counts.inc("events with unknown locals (args 0) added for replans");
                 }
             }
+            *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
+            let mut tp = 0.0;
             for ev in &todo {
                 let ev = self.limit(ev);
                 let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
@@ -1270,7 +1502,9 @@ impl<'g> Builder<'g> {
                     self.counts.inc("events left out by the caller");
                     continue;
                 }
+                let tq = std::time::Instant::now();
                 let (ok, pins, pre) = self.event_pins(&ev);
+                tp += tq.elapsed().as_secs_f64();
                 if !ok {
                     self.counts.inc("events whose conditions never hold (constants)");
                     continue;
@@ -1278,14 +1512,28 @@ impl<'g> Builder<'g> {
                 let kind = if ev.abort { "skip_cutscene" } else { "event" };
                 jobs.push(Job { kind: kind.into(), label: ev.label(), pins, pre, what: What::Event(ev), checks: vec![] });
             }
-            let recs = self.run_jobs(m, &jobs);
-            todo = recs.iter().flat_map(|r| r.next_events.iter().cloned()).collect();
-            if let Some(s) = sink {
-                s.batch(self.records.len(), &recs, &self.table);
+            *self.phase_secs.entry("events").or_default() += te.elapsed().as_secs_f64();
+            *self.phase_secs.entry("events: event_pins").or_default() += tp;
+            let t0 = std::time::Instant::now();
+            let n0 = self.n_records;
+            let n_jobs = jobs.len();
+            let what = format!("event round {rounds}");
+            if let Some(f) = &mut self.on_batch_start {
+                f(&what, n_jobs, todo.len());
             }
-            self.records.extend(recs);
+            drop(todo);
+            let mut nexts = NextEvents::default();
+            self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
+                nexts.add(&recs);
+                b.emit(recs, sink);
+            });
+            todo = nexts.events;
+            *self.phase_secs.entry("runs").or_default() += t0.elapsed().as_secs_f64();
+            let n = self.n_records - n0;
+            self.tell(&what, n_jobs, n, t0.elapsed().as_secs_f64());
         }
         self.counts.set("event rounds", rounds);
+        let tw = std::time::Instant::now();
         let folded = self.folded.clone();
         for r in &mut self.records {
             for (k, e) in r.effects.iter_mut() {
@@ -1303,9 +1551,55 @@ impl<'g> Builder<'g> {
                 }
             }
         }
-        self.add_args_vals_from_records(None);
+        if self.keep_records {
+            self.add_args_vals_from_records(None);
+        } else {
+            // the records are gone: their `args:` values as the rewrite above leaves them
+            for (k, vals) in std::mem::take(&mut self.args_set) {
+                let e = self.table.args_vals.entry(k).or_default();
+                for s in vals {
+                    e.insert(if folded.contains(&s) { 0 } else { s });
+                }
+            }
+        }
         let collisions: i64 = self.sig_ids.values().map(|t| t.len() as i64 - 1).sum();
         self.counts.set("lists of locals sharing a number (hash collisions)", collisions);
+        *self.phase_secs.entry("end of pass").or_default() += tw.elapsed().as_secs_f64();
+    }
+
+    /// One job's records, as made: to the sink, then kept (or, with `keep_records` off, only counted).
+    fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
+        if recs.is_empty() {
+            return;
+        }
+        let t = std::time::Instant::now();
+        let first = self.n_records;
+        self.n_records += recs.len();
+        if self.keep_records {
+            if let Some(s) = sink {
+                s.batch(first, &recs, &self.table);
+            }
+            self.records.extend(recs);
+        } else {
+            for r in &recs {
+                for (k, e) in &r.effects {
+                    if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
+                        self.args_set.entry(k.clone()).or_default().insert(*s);
+                    }
+                }
+            }
+            if let Some(s) = sink {
+                s.batch_owned(first, recs, &self.table);
+            }
+        }
+        *self.phase_secs.entry("emit").or_default() += t.elapsed().as_secs_f64();
+    }
+
+    /// The progress callback (reader.py `Builder.progress`): what ran, its jobs, its records, its seconds.
+    fn tell(&mut self, what: &str, jobs: usize, records: usize, secs: f64) {
+        if let Some(p) = &mut self.progress {
+            p(what, jobs, records, secs);
+        }
     }
 
     fn add_args_vals_from_records(&mut self, from: Option<usize>) {
@@ -1340,28 +1634,54 @@ impl<'g> Builder<'g> {
         ev.unknown_locals(false)
     }
 
-    /// `Builder._run_jobs`, in this process: the event jobs' lists of locals registered first, the records' after.
-    pub fn run_jobs(&mut self, m: &mut dyn Machine, jobs: &[Job]) -> Vec<Record> {
-        for job in jobs {
+    /// `Builder._run_jobs`: the event jobs' lists of locals registered first, the records' after. Each job's
+    /// records go to `each` in the jobs' order, as made: here, one job after another, or where the machine runs
+    /// the batch (`Machine::run_batch`, par.rs).
+    pub fn run_jobs_each(&mut self, m: &mut dyn Machine, jobs: &[Job], each: &mut dyn FnMut(&mut Builder<'_>, Vec<Record>)) {
+        self.run_jobs_shared(m, Arc::new(jobs.to_vec()), each)
+    }
+
+    /// `run_jobs_each` on jobs a machine can share with its threads.
+    pub fn run_jobs_shared(&mut self, m: &mut dyn Machine, jobs: Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, Vec<Record>)) {
+        for job in jobs.iter() {
             if let What::Event(e) = &job.what {
                 if e.sig != 0 {
                     self.table.args_vals.entry(format!("args:{}", e.name)).or_default().insert(e.sig);
                 }
             }
         }
-        let mut out = Vec::new();
-        for job in jobs {
-            out.extend(self.run_job(m, job));
-        }
-        for r in &out {
-            for (k, e) in &r.effects {
-                if k.starts_with("args:") {
-                    if let Eff::Set(Label::Int(s)) = e {
-                        self.table.args_vals.entry(k.clone()).or_default().insert(*s);
+        let start = self.on_job.is_some().then(|| (self.table.args_vals.clone(), self.folded.clone()));
+        let mut args: Vec<(String, i64)> = Vec::new();
+        {
+            let mut each2 = |b: &mut Builder<'_>, i: usize, recs: Vec<Record>| {
+                if let (Some(h), Some((a, f))) = (b.on_job.as_mut(), &start) {
+                    h(&jobs[i], &recs, a, f);
+                }
+                for r in &recs {
+                    for (k, e) in &r.effects {
+                        if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
+                            args.push((k.clone(), *s));
+                        }
                     }
+                }
+                each(b, recs);
+            };
+            if !m.run_batch(self, &jobs, &mut each2) {
+                for (i, job) in jobs.iter().enumerate() {
+                    let recs = self.run_job(m, job);
+                    each2(self, i, recs);
                 }
             }
         }
+        for (k, s) in args {
+            self.table.args_vals.entry(k).or_default().insert(s);
+        }
+    }
+
+    /// `run_jobs_each`, the records returned.
+    pub fn run_jobs(&mut self, m: &mut dyn Machine, jobs: &[Job]) -> Vec<Record> {
+        let mut out = Vec::new();
+        self.run_jobs_each(m, jobs, &mut |_: &mut Builder<'_>, recs: Vec<Record>| out.extend(recs));
         out
     }
 
@@ -1381,7 +1701,7 @@ impl<'g> Builder<'g> {
         put("walk_verb", Py::opt_int(self.scope.walk_verb));
         put("universe", Py::strs(&self.scope.universe));
         put("scope_counts", self.scope.counts.py());
-        put("n_records", Py::Int(self.records.len() as i64));
+        put("n_records", Py::Int(if self.keep_records { self.records.len() } else { self.n_records } as i64));
         Py::Dict(fields)
     }
 

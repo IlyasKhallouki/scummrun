@@ -241,6 +241,19 @@ pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
     (b, t.elapsed().as_secs_f64())
 }
 
+/// `read` on `threads` workers (par.rs; 0: the calling thread alone): the Builder, the seconds and the pool's
+/// stats.
+pub fn read_par<'g>(game: &'g Game, st: &Static, name: &str, threads: usize) -> (Builder<'g>, f64, crate::par::PoolStats) {
+    let mut b = builder(game, st, name);
+    let scope = b.scope.clone();
+    let t = std::time::Instant::now();
+    let stats = crate::par::with_pool(game, &scope, threads, |pool| {
+        b.read_all_into(pool, true, None, 2, None);
+        pool.stats.clone()
+    });
+    (b, t.elapsed().as_secs_f64(), stats)
+}
+
 /// Every captured run of the reading `name` against the Rust machine half's run of the same inputs (the Builder
 /// goes on with the captured runs): the first differences (at most `max`), the runs compared, the runs that differ
 /// and the seconds in the Rust machine half.

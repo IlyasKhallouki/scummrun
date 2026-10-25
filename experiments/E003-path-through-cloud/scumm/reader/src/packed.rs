@@ -115,7 +115,8 @@ impl Writer {
         }
     }
 
-    /// One action (export_records.py `Writer.action`): `effects` as task.py Effects, labelled against `dom`.
+    /// One action (export_records.py `Writer.action`): `effects` as task.py Effects, each value labelled against its
+    /// fact's domain by `lab` (`dom.label(v) if isinstance(v, int) else v`, a value outside the domain kept).
     #[allow(clippy::too_many_arguments)]
     pub fn action(
         &mut self,
@@ -127,7 +128,7 @@ impl Writer {
         cost: u32,
         pre: &[(String, Labels)],
         effects: &[TEffect],
-        dom: &dyn Fn(&str) -> Domain,
+        lab: &dyn Fn(&str, Label) -> Label,
     ) -> io::Result<()> {
         let mut out: Vec<u32> = vec![rec];
         out.push(self.s(label));
@@ -141,19 +142,18 @@ impl Writer {
         }
         out.push(effects.len() as u32);
         for e in effects {
-            let d = dom(&e.key);
             if let Some(v) = e.value {
                 out.push(OP_SET);
                 out.push(self.fact(&e.key));
-                let lab = d.label_of(v).unwrap_or(v);
-                out.push(self.sl(lab));
+                let l = lab(&e.key, v);
+                out.push(self.sl(l));
             } else if let Some(vs) = &e.values {
                 out.push(OP_GUESS);
                 out.push(self.fact(&e.key));
                 let mut ids: Vec<u32> = Vec::new();
                 for &v in vs {
-                    let lab = d.label_of(v).unwrap_or(v);
-                    let s = self.sl(lab);
+                    let l = lab(&e.key, v);
+                    let s = self.sl(l);
                     if !ids.contains(&s) {
                         ids.push(s);
                     }
@@ -320,7 +320,7 @@ pub fn export_records(
                 continue;
             }
             let (pre, effects) = record_action(&b.table, r, &mut counts);
-            w.action(i as u32, &r.label, &r.kind, r.end_text(), &cont(r), 1, &pre, &effects, &dom)?;
+            w.action(i as u32, &r.label, &r.kind, r.end_text(), &cont(r), 1, &pre, &effects, &|k, v| dom(k).label_of(v).unwrap_or(v))?;
         }
     }
     let info = w.close(goal, starts, &table_dom(&b.table))?;
@@ -342,7 +342,7 @@ pub fn export_task(
     let dom = |k: &str| task.fact(k).clone();
     for a in &task.actions {
         let (kind, end, c) = meta(a.what);
-        w.action(NONE, &a.name, &kind, &end, &c, a.cost as u32, &a.pre, &a.effects, &dom)?;
+        w.action(NONE, &a.name, &kind, &end, &c, a.cost as u32, &a.pre, &a.effects, &|k, v| dom(k).label_of(v).unwrap_or(v))?;
     }
     w.close(&task.goal, starts, &dom)
 }
@@ -373,6 +373,9 @@ pub struct RecordStream {
     folded_written: usize,
     /// per written action: its fold key's parts and its count of steps that need room
     written: Vec<(FoldParts, u32)>,
+    /// the bounds of each fact's domain (`low`, `high`), which alone decide how a value is labelled: kept for the
+    /// pass (an `args:`, `pos:` or `escpos:` domain grows within a pass, but never has bounds)
+    bounds: FxHashMap<String, (Option<i64>, Option<i64>)>,
 }
 
 const STEP_ROOM: &str = "steps that need room in their domain (a precondition)";
@@ -385,6 +388,7 @@ impl RecordStream {
             seen: FxHashSet::default(),
             folded_written: 0,
             written: Vec::new(),
+            bounds: FxHashMap::default(),
         })
     }
 
@@ -394,20 +398,51 @@ impl RecordStream {
         self.folded_written
     }
 
+    /// The facts the written records name so far (with the goal's once `finish` adds them): the keys `task_start`
+    /// needs (`task::record_keys` of the records).
+    pub fn fact_keys(&self) -> Vec<String> {
+        self.w.as_ref().map_or_else(Vec::new, |w| w.flist.clone())
+    }
+
+    /// Actions written so far.
+    pub fn actions(&self) -> u32 {
+        self.w.as_ref().map_or(0, |w| w.n_actions)
+    }
+
     /// A new pass: what was written is dropped.
     pub fn reset(&mut self) -> io::Result<()> {
         self.w = Some(Writer::create(&self.path)?);
         self.seen.clear();
         self.folded_written = 0;
         self.written.clear();
+        self.bounds.clear();
         Ok(())
     }
 
     /// Records as made, `first` the index of the first.
     pub fn records(&mut self, first: usize, recs: &[Record], table: &FactTable) -> io::Result<()> {
         let w = self.w.as_mut().unwrap();
-        let dom = table_dom(table);
         let none = BTreeSet::new();
+        for r in recs {
+            for (k, _) in &r.effects {
+                if !self.bounds.contains_key(k) {
+                    let b = if k.starts_with("args:") || crate::table::pos_key(k).is_some() {
+                        (None, None)
+                    } else {
+                        let d = table.domain(k).unwrap_or_else(|| panic!("no domain for {k}"));
+                        (d.low, d.high)
+                    };
+                    self.bounds.insert(k.clone(), b);
+                }
+            }
+        }
+        let bounds = &self.bounds;
+        // `Domain.label` with the domain's bounds: a value past them is collapsed, any other stays as it is
+        let lab = |k: &str, v: Label| match (v, bounds[k]) {
+            (Label::Int(n), (_, Some(h))) if n > h => Label::Above,
+            (Label::Int(n), (Some(l), _)) if n < l => Label::Below,
+            _ => v,
+        };
         let mut counts = Counter::default();
         for (j, r) in recs.iter().enumerate() {
             let parts = fold_parts(r);
@@ -417,7 +452,7 @@ impl RecordStream {
             }
             counts.clear();
             let (pre, effects) = record_action(table, r, &mut counts);
-            w.action((first + j) as u32, &r.label, &r.kind, r.end_text(), &cont(r), 1, &pre, &effects, &dom)?;
+            w.action((first + j) as u32, &r.label, &r.kind, r.end_text(), &cont(r), 1, &pre, &effects, &lab)?;
             self.written.push((parts, counts.get(STEP_ROOM) as u32));
         }
         Ok(())
