@@ -265,13 +265,14 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         return Err(format!("{} facts out of their domains: {:?}", m.len(), &m[..m.len().min(10)]));
     }
     // the facts (e) needs on the banned task (reduce::needed: from the goal back; it reads no start): the operator
-    // table's "needed", and with --start-check needed half of the check
+    // table's "needed", and with --start-check needed half of the check (needed only where the input check stops)
     let needed_of = |t: &Task| -> Vec<String> {
         let nd = reduce::needed(t);
         (0..t.facts.len() as u32).filter(|&f| nd.ncount[f as usize] > 0).map(|f| t.key(f).to_string()).collect()
     };
     let t_needed = Instant::now();
-    let needed = if a.needed_check || a.ops.is_some() { needed_of(&t) } else { Vec::new() };
+    let check = a.needed_check && !input_misses.is_empty();
+    let needed = if check || a.ops.is_some() { needed_of(&t) } else { Vec::new() };
     let mut seconds_needed = t_needed.elapsed().as_secs_f64();
     st.s("fold", &format!("{:?}", a.fold)).s("reduce", &format!("{:?}", a.reduce)).n("product_limit", a.limit);
     st.s("encoding", if a.model { "model" } else { "task" });
@@ -333,19 +334,20 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
             // a value outside the domain is in no path's box. The writer stops if the file names such a fact anyway
             // (sas::pass2)
             let t1 = Instant::now();
-            let after = if a.fold != FoldMode::Off { needed_of(&t) } else { needed.clone() };
-            let need: std::collections::HashSet<&str> = needed.iter().chain(after.iter()).map(|k| k.as_str()).collect();
-            let misses: Vec<&String> = input_misses.iter().filter(|k| need.contains(k.as_str())).collect();
-            if !misses.is_empty() {
-                return Err(format!("{} facts out of their domains: {:?}", misses.len(), &misses[..misses.len().min(10)]));
-            }
-            seconds_needed += t1.elapsed().as_secs_f64();
             let mut j = J::new();
             j.s("on", "the facts the input check stops on that (e) needs, before or after the first fold")
-                .n("needed_facts_before_the_fold", needed.len())
-                .n("needed_facts_after_the_fold", after.len())
-                .n("facts_the_input_check_stops_on", input_misses.len())
-                .f("seconds", seconds_needed);
+                .n("facts_the_input_check_stops_on", input_misses.len());
+            if check {
+                let after = if a.fold != FoldMode::Off { needed_of(&t) } else { needed.clone() };
+                let need: std::collections::HashSet<&str> = needed.iter().chain(after.iter()).map(|k| k.as_str()).collect();
+                let misses: Vec<&String> = input_misses.iter().filter(|k| need.contains(k.as_str())).collect();
+                if !misses.is_empty() {
+                    return Err(format!("{} facts out of their domains: {:?}", misses.len(), &misses[..misses.len().min(10)]));
+                }
+                j.n("needed_facts_before_the_fold", needed.len()).n("needed_facts_after_the_fold", after.len());
+            }
+            seconds_needed += t1.elapsed().as_secs_f64();
+            j.f("seconds", seconds_needed);
             st.raw("start_check", &j.done());
         }
         if a.reduce.any() {

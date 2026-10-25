@@ -22,7 +22,7 @@
 //!   box where no path applies) stays one action per path, counted.
 //! * the writer's PRE_LIMIT: a folded action whose precondition sets alone give more than PRE_LIMIT variants would
 //!   stop the writer (task.py raises on such an action); that sub-group stays one action per path, counted.
-//! * a path that writes a fact twice (reduce::double_writes) needs its set on that fact: where the union on it is
+//! * a path that writes a fact twice (reduce::writes_twice) needs its set on that fact: where the union on it is
 //!   the whole domain (left out), an effect every path has would lose it and the writer would raise; that
 //!   sub-group stays one action per path, counted. build_task writes one effect per fact, so this never happens
 //!   on its tasks.
@@ -129,9 +129,9 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
         }
         if (u.len() as u32) < size {
             pre.push(OSet { fact: k, vals: u.clone() });
-        } else if ix.iter().any(|&i| crate::reduce::double_writes(t.acts.view(i)).contains(&k)) {
+        } else if ix.iter().any(|&i| crate::reduce::writes_twice(t.acts.view(i), k)) {
             // the union holds every value and is left out, so an effect every path has loses the path's set on k,
-            // which a path that writes k twice needs (reduce::double_writes): left unfolded
+            // which a path that writes k twice needs (reduce::writes_twice): left unfolded
             c.double_writes += 1;
             return None;
         }
