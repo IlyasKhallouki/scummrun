@@ -3,6 +3,7 @@
 usage: from export_records import export_records, export_task
        export_records(path, b, records, goal, starts={"s17": start_map})   # reader Records, build_task's rules
        export_task(path, task, starts={"s": start_map}, meta=None)         # a task.Task already built
+       write_start(path, facts, start_map); write_bans(path, bans)          # taskcore's --start-file and --bans
        READER_PICKLE=<reading.pkl> python export_records.py kitchen <out dir>   # the kitchen files
 
 **What it writes.** The task that ``reader.build_task`` makes from the records (one action per record; records of
@@ -229,9 +230,11 @@ def export_records(path, b, records, goal: dict, starts: dict) -> dict:
     return counts
 
 
-def export_task(path, task, starts: dict, meta=None) -> dict:
+def export_task(path, task, starts: dict, meta=None, naming=None) -> dict:
     """Write a task.Task. ``meta(action)`` gives (kind, end, cont) for the fork fold (default: none, so nothing folds
-    unless the caller says what each action's input and continuation are); the action's name is its label."""
+    unless the caller says what each action's input and continuation are); ``naming(action)`` gives (rec, label), the
+    name being ``label#rec`` (rec NONE: the label alone; default: the action's name is its label). taskcore's bans
+    match the label: ``record_naming`` gives a record's label and index, as export_records writes them."""
     w = Writer(path, lambda k: task.facts[k])
     for k in task.goal:
         w.fact(k)
@@ -246,9 +249,53 @@ def export_task(path, task, starts: dict, meta=None) -> dict:
             else:
                 effects.append((OP_SET, e.key, e.value, when))
         kind, end, cont = meta(a) if meta else ("", "", "")
-        w.action(NONE, a.name, kind, end, cont, a.cost, [(k, tuple(s)) for k, s in a.pre.items()], effects)
+        rec, label = naming(a) if naming else (NONE, a.name)
+        w.action(rec, label, kind, end, cont, a.cost, [(k, tuple(s)) for k, s in a.pre.items()], effects)
     w.close(task.goal, starts)
     return {"actions": w.n_actions, "facts": len(w.flist), "bytes": w.words * 4}
+
+
+def record_naming(a) -> tuple:
+    """(rec, label) of a reader.build_task action (name ``label#rec``, ``what`` its record), for export_task."""
+    label, rec = a.name.rsplit("#", 1)
+    assert label == a.what.label, (a.name, a.what.label)
+    return int(rec), label
+
+
+# --- the replay's inputs to taskcore (taskcore/src/bans.rs) -------------------------------------------------------------
+
+def _label_text(d, v):
+    """The text of a start value ``v`` (a facts.py value, absent is 0) in domain ``d``, "" where ``d`` lacks it: the
+    rule of ``Writer.close``'s starts (task.py ``SasTask.state``)."""
+    lab = d.label(int(v)) if isinstance(v, (int, bool)) else v
+    return "" if lab is None or lab not in d.values else _vtext(lab)
+
+
+def write_start(path, facts: dict, start: dict) -> Path:
+    """taskcore's ``--start-file``: one line per fact of ``facts`` (key -> Domain; the packed file's facts), its key
+    and the text of its start value (``start``, a facts.py map, absent is 0), or nothing after the tab where the
+    domain lacks it. Keys in sorted order."""
+    path = Path(path)
+    with open(path, "w") as f:
+        for k in sorted(facts):
+            if "\t" in k or "\n" in k:
+                raise ValueError(f"a fact key with a tab or a newline: {k!r}")
+            f.write(f"{k}\t{_label_text(facts[k], start.get(k, 0))}\n")
+    return path
+
+
+def write_bans(path, bans) -> Path:
+    """taskcore's ``--bans``: one line per ban (replay.Ban, or (label, ((key, value), ...))), in order: the label,
+    then each key and its value's text."""
+    path = Path(path)
+    with open(path, "w") as f:
+        for ban in bans:
+            label, values = (ban.label, ban.values) if hasattr(ban, "label") else ban
+            parts = [label] + [x for k, v in values for x in (k, _vtext(v))]
+            if any("\t" in p or "\n" in p for p in parts):
+                raise ValueError(f"a ban with a tab or a newline: {parts!r}")
+            f.write("\t".join(parts) + "\n")
+    return path
 
 
 def kitchen(out_dir: str) -> None:
