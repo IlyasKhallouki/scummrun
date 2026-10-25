@@ -1,7 +1,7 @@
 """Tests of replay.py's rules after the step 5 review: waits played first, the replay checks, the verdicts, the history
 of a step, the replan's prediction, the checkpoint compare, and play_step on a fake engine (no ban when the record's
 path never started, a ban when it started and a test on facts failed, no ban when a checked non-fact failed, an
-interface failure, a spent input).
+interface failure, a spent input, a step the engine ran past).
 
 usage: uv run pytest experiments/E003-path-through-cloud/test_replay_review.py
 
@@ -178,6 +178,37 @@ def test_history_keeps_every_change_with_its_frame():
     assert h.slots_changed(300, 302) == []
 
 
+# --- the engine ran on ------------------------------------------------------------------------------------------------
+
+def test_ran_on_explains_a_wait_the_engine_went_past_in_one_frame():
+    # ego already stands at the door: the sentence script does not stop at 736, it goes on to 937 in the click's
+    # frame, which the plan's next step (the arrival) predicts; the kitchen's event then changes the room
+    doms = {"script:2": Domain.of({0, 1}), "pos:script:2": Domain.of({-1, 736, 937}), "room": Domain.of({28, 41}),
+            "local:218": Domain.of({0, 1}), "frozen:local:200": Domain.of({0, 1})}
+    walk = rec("walk_to", "walk_to(316)", {"script:2": {0}}, {"script:2": ("set", 1), "pos:script:2": ("set", 736)})
+    arrive = rec("event", "event(script:2@736)", {"pos:script:2": {736}},
+                 {"pos:script:2": ("set", 937), "local:218": ("set", 1), "frozen:local:200": ("set", 1)})
+    kitchen = rec("event", "event(local:218@16)", {"local:218": {1}},
+                  {"room": ("set", 41), "local:218": ("set", 0), "script:2": ("set", 0), "pos:script:2": ("set", -1)})
+    task = T.Task(doms, [act(walk, 0), act(arrive, 1), act(kitchen, 2)], {})
+    before = {"script:2": 0, "pos:script:2": -1, "room": 28, "local:218": 0, "frozen:local:200": 0}
+    exps = RP.expectations(walk, before, doms)
+    h = RP.History(before, 100)
+    h.note(101, dict(before, **{"script:2": 1, "pos:script:2": 937, "local:218": 1}))
+    h.note(106, dict(before, room=41))
+    best = RP.match(exps, {"script:2": 1, "pos:script:2": 937})
+    chain = RP.ran_on(task, doms, exps, best, before, [step(1, "arrive"), step(2, "kitchen")], h)
+    assert [(st.name, [m.key for m in ms]) for st, ms in chain] == [("arrive", ["frozen:local:200"])]
+    end = RP.match(exps, h.frames()[-1][1])  # at the window's end both of the walk's writes differ
+    chain = RP.ran_on(task, doms, exps, end, before, [step(1, "arrive"), step(2, "kitchen")], h)
+    assert [st.name for st, _ in chain] == ["arrive", "kitchen"]
+    # without the arrival's frame the mismatch stands
+    h2 = RP.History(before, 100)
+    h2.note(101, dict(before, **{"script:2": 1, "pos:script:2": 500}))
+    assert RP.ran_on(task, doms, exps, RP.match(exps, h2.frames()[-1][1]), before, [step(1), step(2)], h2) is None
+    assert RP.ran_on(task, doms, exps, [], before, [step(1)], h) is None  # nothing to explain
+
+
 # --- the replan's prediction ------------------------------------------------------------------------------------------
 
 def test_replan_copies_args_only_where_the_plan_put_the_slot():
@@ -274,14 +305,14 @@ def walk_rec(checks=()):
                {"script:2", "room"})
 
 
-def harness(react, r, **kw):
+def harness(react, r, *more, **kw):
     fb = FakeBranch(react, **kw)
     b = types.SimpleNamespace(table=types.SimpleNamespace(
-        points={"at": {"script:2": {736}, "local:203": {58}}, "esc": {}}), counts=collections.Counter())
-    facts = {"script:2": Domain.of({0, 1}), "pos:script:2": Domain.of({-1, 736}), "local:203": Domain.of({0, 1}),
+        points={"at": {"script:2": {736, 937}, "local:203": {58}}, "esc": {}}), counts=collections.Counter())
+    facts = {"script:2": Domain.of({0, 1}), "pos:script:2": Domain.of({-1, 736, 937}), "local:203": Domain.of({0, 1}),
              "pos:local:203": Domain.of({-1, 58}), "room": Domain.of({28, 41}), "bit:6": Domain.of({0, 1}),
              "state:316": Domain.of({0, 1})}
-    task = T.Task(facts, [act(r)], {"state:316": {1}})
+    task = T.Task(facts, [act(x, i) for i, x in enumerate((r,) + more)], {"state:316": {1}})
     h = RP.Harness(b, task, task, fb, {"state:316": {1}})
     h.task = task
     h.observe()
@@ -352,6 +383,19 @@ def test_an_executor_error_twice_is_an_interface_failure_without_a_ban():
     log = h.steps[-1]
     assert log.outcome == "interface failure" and h.bans == [] and h.inputs() == []
     assert [t["kind"] for t in log.tries] == ["first", "replay"] and "interface:" in log.tries[0]["error"]
+
+
+def test_a_step_the_engine_ran_past_is_matched_with_the_next_event_and_never_banned():
+    def past_the_wait(fb, f, clicks):  # the sentence script goes past 736 to 937 in the click's frame
+        if clicks:
+            fb.slots[2] = {"where": WIO_GLOBAL, "number": 2, "code": 937, "frozen": 0}
+    arrive = rec("event", "event(script:2@736)", {"script:2": frozenset({1}), "pos:script:2": frozenset({736})},
+                 {"pos:script:2": ("set", 937)})
+    h, fb = harness(past_the_wait, walk_rec(), arrive)
+    assert h.play_step(0, 0, step(0), [step(1, "arrive")]) == "next"
+    log = h.steps[-1]
+    assert log.outcome == "matched, the engine ran on" and h.bans == [] and len(log.tries) == 1
+    assert [st.name for st, _ in h.ran] == ["arrive"] and h.pred.get("pos:script:2") == 937
 
 
 def test_the_matched_step_updates_the_plans_prediction():

@@ -48,6 +48,9 @@ What the harness does, per plan step (plan.md step 5, with D5):
   - taken but not started: none of the record's tests ran, so its failure says nothing about the values it tested.
     Retried after ``RETRY_WAIT`` frames, up to ``RETRIES`` times, then a replan with no ban. An event that never
     started is a replan with no ban;
+  - started, and the facts that differ were re-written by the plan's next event steps, which the engine ran within
+    the window in order (``ran_on``: a script that went on past a predicted wait in the same frame):
+    the step and those events are done;
   - started, then a mismatch: a replay check that failed in the engine explains it; retried when it is on time or
     a position (``RETRY_REASONS``), and either way never banned (the test is on a non-fact, which a ban cannot
     name). Otherwise, a check that could not be checked with a reason in ``RETRY_REASONS`` makes it a retry, then a
@@ -252,6 +255,18 @@ class History:
         """The slot facts that changed on a frame from ``first`` to ``last``."""
         return sorted(k for k, ch in self.changes.items()
                       if k.startswith(SLOT_PREFIXES) and any(first <= f <= last for f, _ in ch))
+
+    def frames(self) -> list:
+        """(frame, state) at the step's start and after every frame that changed a tracked fact, in frame order."""
+        by = collections.defaultdict(list)
+        for k, ch in self.changes.items():
+            for f, v in ch:
+                by[f].append((k, v))
+        cur, out = dict(self.start), [(self.frame0, dict(self.start))]
+        for f in sorted(by):
+            cur.update(by[f])
+            out.append((f, dict(cur)))
+        return out
 
     def unplanned(self, exps: dict) -> list:
         """The tracked facts that changed on some frame with no predicted write: the value at the step's start, the
@@ -518,6 +533,51 @@ def predict(pred: dict, rec, before: dict) -> dict:
     return out
 
 
+def after(state: dict, exps: dict) -> dict:
+    """``state`` with every predicted write that has one value applied: the plan's state after the step."""
+    out = dict(state)
+    out.update({k: next(iter(x.values)) for k, x in exps.items() if len(x.values) == 1})
+    return out
+
+
+def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict, ahead: list, hist: History):
+    """The engine ran on: the facts this step's mismatches name were re-written, within its window, by the plan's
+    next steps (``ahead``, the event steps after it up to its next input), to the values those steps predict. Each
+    step of that run has its precondition in the plan's state after the steps before it, and holds on some frame no
+    earlier than the one before it: its writes of those facts, or, for a step that writes none of them, any write of
+    it that changes a value. Returns, when the run explains every mismatch, its steps up to the last one needed, each
+    with its own mismatches (its writes that change a value and never held from its frame on); else None."""
+    pending = {m.key for m in mismatches if m.kind == "write"}
+    if not pending:
+        return None
+    state, frames, pos, chain = after(before, exps), hist.frames(), 0, []
+
+    def holds_at(n, es, every=True):
+        test = all if every else any
+        return test(frames[n][1].get(e.key) in e.values for e in es)
+
+    for st in ahead:
+        a = task.actions[st.action]
+        if holds(a.pre, state):
+            return None
+        x = expectations(a.what, state, doms, st.guessed)
+        need = [x[k] for k in pending if k in x]
+        ch = [e for e in x.values() if e.changes]
+        hit = next((n for n in range(pos, len(frames)) if (holds_at(n, need) if need else holds_at(n, ch, False))),
+                   None) if (need or ch) else None
+        if hit is None:
+            return None
+        pos = hit
+        pending -= {e.key for e in need}
+        missed = [Mismatch(e.key, _txt(e.values), frames[-1][1].get(e.key), "write") for e in ch
+                  if not any(frames[n][1].get(e.key) in e.values for n in range(pos, len(frames)))]
+        chain.append((st, missed))
+        state = after(state, x)
+        if not pending:
+            return chain
+    return None
+
+
 def prediction(now: dict, pred: dict) -> dict:
     """What ``reader.replan_start`` takes as the plan's predicted state: the engine's values with the plan's slot
     positions and unobserved facts over them, so its guard compares the engine's slot position with the plan's."""
@@ -652,6 +712,7 @@ class Harness:
         self.pred: dict = {}  # the plan's slot positions and unobserved facts (PREDICTED), for the replan
         self.kept: dict = {}  # the plan's values of the unobserved facts (args:, saved:), for the preconditions
         self.prev_before = None
+        self.ran: list = []  # the steps the engine ran on through in the last step's window (``ran_on``)
         self.frame0 = self.tick0 = None
 
     # --- observing ------------------------------------------------------------------------------------------------
@@ -844,8 +905,9 @@ class Harness:
             self.checkpoint()
         return ok
 
-    def play_step(self, n_plan: int, i: int, step) -> str:
-        """Play one plan step; returns "next", "replan" or "goal" (module docstring)."""
+    def play_step(self, n_plan: int, i: int, step, ahead=()) -> str:
+        """Play one plan step; returns "next", "replan" or "goal" (module docstring). ``ahead``: the plan's event
+        steps after it up to its next input, for ``ran_on`` (the number the engine ran on through is ``self.ran``)."""
         a = self.task.actions[step.action]
         rec = a.what
         inp = step_input(rec)
@@ -937,14 +999,27 @@ class Harness:
                     log.then = "replan"
                     log.add("no ban: the record's path never started, so none of its tests ran")
                     return "replan"
+                chain = ran_on(self.task, self.doms, exps, mism, before, ahead, hist)
+                if chain:
+                    log.outcome, log.then = "matched, the engine ran on", "next"
+                    log.add(f"the facts that differ were re-written within the window by the plan's next steps "
+                            f"{[st.name for st, _ in chain]}, which are done too")
+                    pred, state = predict(self.pred, rec, before), after(before, exps)
+                    for st, _ in chain:
+                        r2 = self.task.actions[st.action].what
+                        x2 = expectations(r2, state, self.doms, st.guessed)
+                        pred, state = predict(pred, r2, state), after(state, x2)
+                    self._set_pred(pred)
+                    self.ran = chain
+                    return "next"
                 log.outcome = "mismatch"
-                first, after = verdict(rec, mism, evals)
+                first, then = verdict(rec, mism, evals)
                 if first == "retry" and retries < RETRIES:
                     retries, kind = retries + 1, "retry"
                     log.add(f"retry {retries} after {RETRY_WAIT} frames")
                     self.advance(RETRY_WAIT)
                     continue
-                v = after if first == "retry" else first
+                v = then if first == "retry" else first
                 if v == "ban":
                     ban = ban_of(rec, before)
                     self.bans.append(ban)
@@ -1000,12 +1075,20 @@ class Harness:
                                       f"{steps[i + len(moved)].name}")
                     self.progress(f"plan {n_plan} step {i + 1}/{len(steps)}: {steps[i].name} (frame "
                                   f"{self.branch.frame})")
-                    how = self.play_step(n_plan, i, steps[i])
+                    ahead = []
+                    while i + 1 + len(ahead) < len(steps) and _is_wait(self.task, steps[i + 1 + len(ahead)]):
+                        ahead.append(steps[i + 1 + len(ahead)])
+                    how = self.play_step(n_plan, i, steps[i], ahead)
                 if how == "goal":
                     self.stop_reason = "goal"
                     break
                 if how == "next":
-                    i += 1
+                    for k, (s, missed) in enumerate(self.ran):  # done within the last step's window
+                        self.steps.append(StepLog(n_plan, i + 1 + k, s.name, "event", "wait", self.branch.frame,
+                                                  end=self.branch.frame, outcome="ran on in the step before",
+                                                  then="next", mismatches=[dataclasses.asdict(m) for m in missed]))
+                    i += 1 + len(self.ran)
+                    self.ran = []
                     continue
                 if self.replans >= self.replan_limit:
                     self.stop_reason = "replan limit"
