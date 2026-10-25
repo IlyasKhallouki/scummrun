@@ -105,6 +105,10 @@ struct Shared {
     sync_ns: AtomicU64,
     /// records of jobs done and not yet handed on (a job before them is still running)
     buffered: AtomicU64,
+    /// past this many waiting records a worker starts no new job but the one the reading waits for
+    max_waiting: AtomicU64,
+    /// the job the reading waits for (the first not handed on)
+    frontier: AtomicU64,
 }
 
 /// What the pool did: for the measurements.
@@ -133,6 +137,9 @@ pub struct PoolStats {
     pub max_buffered: u64,
 }
 
+/// Records done and waiting for an earlier job past which workers start no new job but that one (`Pool::set_max_waiting`).
+pub const DEFAULT_MAX_WAITING: u64 = 100_000;
+
 /// The pool's side of the reading: a [`Machine`] whose `run_batch` runs the batch on the workers.
 pub struct Pool<'a, 'g> {
     sh: &'a Shared,
@@ -154,6 +161,13 @@ fn coarse_key(job: &Job) -> String {
 }
 
 impl<'a, 'g> Pool<'a, 'g> {
+    /// Past `n` records done and waiting for an earlier job (they are handed on in the jobs' order), the workers
+    /// start no new job but the one the reading waits for: memory stays bounded when one job runs long. It changes
+    /// when jobs start, not what they read.
+    pub fn set_max_waiting(&mut self, n: u64) {
+        self.sh.max_waiting.store(n, Ordering::Relaxed);
+    }
+
     fn estimate(&self, job: &Job) -> f64 {
         if let Some(&s) = self.exact.get(&job.label) {
             return s;
@@ -226,6 +240,7 @@ impl Machine for Pool<'_, '_> {
         };
         let snap = Arc::new(Snap { base, args_vals: b.table.args_vals.clone(), folded: b.folded.clone(), sig_limit: b.sig_limit });
         let order = self.order(jobs);
+        self.sh.frontier.store(0, Ordering::Relaxed);
         {
             let mut q = self.sh.q.lock().unwrap();
             q.snap = Some(snap);
@@ -281,6 +296,13 @@ impl Machine for Pool<'_, '_> {
                 each(b, next, o.records);
                 self.stats.each_secs += t2.elapsed().as_secs_f64();
                 next += 1;
+                self.sh.frontier.store(next as u64, Ordering::Relaxed);
+            }
+            // a worker may have stopped taking jobs (too many records waiting): they are fewer now, and the
+            // frontier moved (the lock: no worker is between its check and its wait)
+            {
+                let _q = self.sh.q.lock().unwrap();
+                self.sh.work.notify_all();
             }
             self.stats.merge_secs += tm.elapsed().as_secs_f64();
         }
@@ -386,8 +408,17 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                 if let Some(p) = q.parts.pop_front() {
                     break Task::Part(p);
                 }
-                if let Some(i) = q.order.pop_front() {
-                    break Task::Job(i, q.snap.clone().unwrap(), q.jobs.clone());
+                if !q.order.is_empty() {
+                    if sh.buffered.load(Ordering::Relaxed) <= sh.max_waiting.load(Ordering::Relaxed) {
+                        let i = q.order.pop_front().unwrap();
+                        break Task::Job(i, q.snap.clone().unwrap(), q.jobs.clone());
+                    }
+                    // too many records wait for an earlier job: only that job may start
+                    let f = sh.frontier.load(Ordering::Relaxed) as usize;
+                    if let Some(pos) = q.order.iter().position(|&i| i == f) {
+                        let i = q.order.remove(pos).unwrap();
+                        break Task::Job(i, q.snap.clone().unwrap(), q.jobs.clone());
+                    }
                 }
                 q = sh.work.wait(q).unwrap();
             }
@@ -463,6 +494,8 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
         parts_made: AtomicU64::new(0),
         sync_ns: AtomicU64::new(0),
         buffered: AtomicU64::new(0),
+        max_waiting: AtomicU64::new(DEFAULT_MAX_WAITING),
+        frontier: AtomicU64::new(0),
     };
     std::thread::scope(|s| {
         for w in 0..threads {
