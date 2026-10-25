@@ -107,6 +107,7 @@ dependencies = [
  "flate2",
  "rustc-hash",
  "scumm-ir",
+ "scumm-machine",
  "serde_json",
  "sha1_smol",
 ]
