@@ -128,7 +128,7 @@ def test_match_reports_the_fact_predicted_and_observed():
     x = RP.expectations(r, {"state:316": 0, "var:5": 1}, DOMS, guessed=(("var:5", 2, ()),))
     assert RP.match(x, {"state:316": 1, "var:5": 2}) == []
     assert RP.match(x, {"state:316": 0, "var:5": 2}) == [RP.Mismatch("state:316", ("1",), 0, "write")]
-    assert RP.match(x, {"state:316": 1, "var:5": 0}) == [RP.Mismatch("var:5", ("2",), 0, "guess")]  # not the chosen
+    assert RP.match(x, {"state:316": 1, "var:5": 0}) == [RP.Mismatch("var:5", ("2",), 0, "choice")]  # not the chosen
     assert RP.match(x, {"state:316": 1, "var:5": 1}) == [RP.Mismatch("var:5", ("0", "2"), 1, "guess")]
     un = RP.unplanned({"state:316": 0, "local:214": 0, "room": 28}, {"state:316": 1, "local:214": 1, "room": 28}, x)
     assert un == [RP.Mismatch("local:214", ("0",), 1, "unplanned")]
