@@ -122,13 +122,9 @@ pub fn poll_shape(game: &Game, u: UnitId, idx: u32, lp: &Loop) -> Result<(), &'s
                 if hits && (a.op != AssignOp::Set || ast.constant(a.rhs).is_none()) {
                     return Err("a write of a tested fact that is not a constant");
                 }
-                let mut embed = false;
-                ast.walk(a.rhs, &mut |e| {
-                    embed |= matches!(ast.expr(e), Expr::Embed(_));
-                    !embed
-                });
-                if embed {
-                    return Err("an opcode inside an expression");
+                if !matches!(ast.expr(a.lhs), Expr::Local(_)) {
+                    // a variable the test may read next: its value must be worked out from facts
+                    cond_shape(ast, a.rhs)?;
                 }
                 todo.extend(x.next);
             }
@@ -195,13 +191,15 @@ pub fn exits(game: &Game, u: UnitId, idx: u32, lp: &Loop, val: &dyn Fn(Fact) -> 
                     Expr::Bit(n) => Some(Fact::Bit(n)),
                     _ => None,
                 };
-                if let (Some(k), AssignOp::Set, Some(c)) = (key, a.op, game.ast.constant(a.rhs)) {
-                    let c = if matches!(k, Fact::Bit(_)) { (c != 0) as i64 } else { c as i64 };
-                    env.push((k, c));
-                } else if let Some(k) = key {
-                    if loop_facts(lp).contains(&k) {
-                        return Err("a write of a tested fact that is not a constant");
-                    }
+                if let Some(k) = key {
+                    // model.py's assign: the value worked out on facts; `x op= v` as `x op v`
+                    let v = eval(game, a.rhs, &get)?;
+                    let v = match a.op.arith() {
+                        None => v,
+                        Some(op) => arith(op, get(k).ok_or("a fact with no value")?, v)?,
+                    };
+                    let v = if matches!(k, Fact::Bit(_)) { (v != 0) as i64 } else { v as i32 as i64 };
+                    env.push((k, v));
                 }
                 pc = x.next.ok_or("no fallthrough")?;
             }
