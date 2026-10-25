@@ -203,7 +203,7 @@ impl Machine for Pool<'_, '_> {
         self.main.run(cx, label, pins, pre, what)
     }
 
-    fn run_batch(&mut self, b: &mut Builder<'_>, jobs: &[Job], each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
+    fn run_batch(&mut self, b: &mut Builder<'_>, jobs: &Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
         if self.threads == 0 {
             return false;
         }
@@ -229,7 +229,7 @@ impl Machine for Pool<'_, '_> {
         {
             let mut q = self.sh.q.lock().unwrap();
             q.snap = Some(snap);
-            q.jobs = Arc::new(jobs.to_vec());
+            q.jobs = jobs.clone();
             q.order = order.into();
             q.results = (0..n).map(|_| None).collect();
         }

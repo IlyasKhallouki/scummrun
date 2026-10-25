@@ -12,6 +12,7 @@ use crate::table::{FactTable, Kind};
 use rustc_hash::{FxHashMap, FxHashSet};
 use scumm_ir::{known, Expr, Game, Stmt, UnitId, UnitKey};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub const SIG_LIMIT: usize = 1024;
 pub const SPLIT_DEPTH: i64 = 2;
@@ -95,7 +96,7 @@ pub trait Machine {
     /// A whole batch of jobs (one `_run_jobs` call) run elsewhere (par.rs: on threads): the machine merges each
     /// job's [`JobOut`] into `b` ([`Builder::merge_job`]) and hands its index and records to `each`, in the jobs'
     /// order, and returns true. False (the default): the Builder runs the jobs itself, one after another.
-    fn run_batch(&mut self, _b: &mut Builder<'_>, _jobs: &[Job], _each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
+    fn run_batch(&mut self, _b: &mut Builder<'_>, _jobs: &Arc<Vec<Job>>, _each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
         false
     }
 
@@ -153,6 +154,28 @@ pub struct Ctx<'a> {
     pub table: &'a FactTable,
 }
 
+/// The next round's events as the records of a batch give them, in their order, each once: a later event with the
+/// same (unit name, unit, wait point, list of locals, Esc) as an earlier one changes nothing in `_read_once`'s round
+/// (its replan copy is the earlier one's, `_limit` gives it the same key, and `events_done` then skips it), so it is
+/// not kept (at Part I's scale the inputs' records name millions of events, a few tens of thousands of them distinct).
+#[derive(Default)]
+struct NextEvents {
+    events: Vec<Event>,
+    seen: FxHashSet<(String, UnitKey, i64, i64, bool)>,
+}
+
+impl NextEvents {
+    fn add(&mut self, recs: &[Record]) {
+        for r in recs {
+            for e in &r.next_events {
+                if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
+                    self.events.push(e.clone());
+                }
+            }
+        }
+    }
+}
+
 /// `Builder::on_job`: (the job, its records, the batch's `args:` values and folded lists at its start).
 pub type JobHook = Box<dyn FnMut(&Job, &[Record], &BTreeMap<String, BTreeSet<i64>>, &BTreeSet<i64>)>;
 
@@ -199,6 +222,8 @@ pub struct Builder<'g> {
     args_log: Option<Vec<(String, i64)>>,
     /// told after each batch of runs (reader.py `Builder.progress`): what, jobs, records, seconds
     pub progress: Option<Box<dyn FnMut(&str, usize, usize, f64)>>,
+    /// told before each batch of runs: what, jobs, the events it was made from (the measurements)
+    pub on_batch_start: Option<Box<dyn FnMut(&str, usize, usize)>>,
     /// wall seconds by phase of `read_once` (the measurements; not part of the reading)
     pub phase_secs: BTreeMap<&'static str, f64>,
     /// the values written outside their domains in each pass that widened domains (`out_of_domain` before
@@ -329,6 +354,7 @@ impl<'g> Builder<'g> {
             args_set: BTreeMap::new(),
             args_log: None,
             progress: None,
+            on_batch_start: None,
             phase_secs: BTreeMap::new(),
             uni_keys: Default::default(),
             args_doms: Default::default(),
@@ -1430,18 +1456,21 @@ impl<'g> Builder<'g> {
         let jobs = self.inputs();
         *self.phase_secs.entry("inputs()").or_default() += t0.elapsed().as_secs_f64();
         let tr = std::time::Instant::now();
-        let mut nexts: Vec<Event> = Vec::new();
-        self.run_jobs_each(m, &jobs, &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
-            for r in &recs {
-                nexts.extend(r.next_events.iter().cloned());
-            }
+        let n_jobs = jobs.len();
+        if let Some(f) = &mut self.on_batch_start {
+            f("inputs", n_jobs, 0);
+        }
+        let mut nexts = NextEvents::default();
+        self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
+            nexts.add(&recs);
             b.emit(recs, sink);
         });
+        let jobs_len = n_jobs;
         let n = self.n_records;
         *self.phase_secs.entry("runs").or_default() += tr.elapsed().as_secs_f64();
-        self.tell("inputs", jobs.len(), n, t0.elapsed().as_secs_f64());
+        self.tell("inputs", jobs_len, n, t0.elapsed().as_secs_f64());
         let mut todo: Vec<Event> = if start_events { self.start_events() } else { vec![] };
-        todo.extend(nexts);
+        todo.extend(nexts.events);
         let mut rounds = 0;
         while !todo.is_empty() {
             rounds += 1;
@@ -1487,17 +1516,21 @@ impl<'g> Builder<'g> {
             *self.phase_secs.entry("events: event_pins").or_default() += tp;
             let t0 = std::time::Instant::now();
             let n0 = self.n_records;
-            let mut nexts: Vec<Event> = Vec::new();
-            self.run_jobs_each(m, &jobs, &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
-                for r in &recs {
-                    nexts.extend(r.next_events.iter().cloned());
-                }
+            let n_jobs = jobs.len();
+            let what = format!("event round {rounds}");
+            if let Some(f) = &mut self.on_batch_start {
+                f(&what, n_jobs, todo.len());
+            }
+            drop(todo);
+            let mut nexts = NextEvents::default();
+            self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
+                nexts.add(&recs);
                 b.emit(recs, sink);
             });
-            todo = nexts;
+            todo = nexts.events;
             *self.phase_secs.entry("runs").or_default() += t0.elapsed().as_secs_f64();
             let n = self.n_records - n0;
-            self.tell(&format!("event round {rounds}"), jobs.len(), n, t0.elapsed().as_secs_f64());
+            self.tell(&what, n_jobs, n, t0.elapsed().as_secs_f64());
         }
         self.counts.set("event rounds", rounds);
         let tw = std::time::Instant::now();
@@ -1605,7 +1638,12 @@ impl<'g> Builder<'g> {
     /// records go to `each` in the jobs' order, as made: here, one job after another, or where the machine runs
     /// the batch (`Machine::run_batch`, par.rs).
     pub fn run_jobs_each(&mut self, m: &mut dyn Machine, jobs: &[Job], each: &mut dyn FnMut(&mut Builder<'_>, Vec<Record>)) {
-        for job in jobs {
+        self.run_jobs_shared(m, Arc::new(jobs.to_vec()), each)
+    }
+
+    /// `run_jobs_each` on jobs a machine can share with its threads.
+    pub fn run_jobs_shared(&mut self, m: &mut dyn Machine, jobs: Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, Vec<Record>)) {
+        for job in jobs.iter() {
             if let What::Event(e) = &job.what {
                 if e.sig != 0 {
                     self.table.args_vals.entry(format!("args:{}", e.name)).or_default().insert(e.sig);
@@ -1628,7 +1666,7 @@ impl<'g> Builder<'g> {
                 }
                 each(b, recs);
             };
-            if !m.run_batch(self, jobs, &mut each2) {
+            if !m.run_batch(self, &jobs, &mut each2) {
                 for (i, job) in jobs.iter().enumerate() {
                     let recs = self.run_job(m, job);
                     each2(self, i, recs);
