@@ -1,11 +1,16 @@
 """E003 step 5: a reading as files, which the Part I runner (replay_part1.py) plans and plays from.
 
-usage: from packed_reading import export_reading, load_reading
+usage: from packed_reading import export_reading, load_reading, reading_from_golden, check_reading
        export_reading(out_dir, b, records, goal, start_name)   # a Python reading (reader.py): the three files
+       reading_from_golden(golden, packed, out_dir, start, start_name)   # a reading in golden.py's format and its
+                                                               # packed file (any writer, e.g. the Rust reader)
        rd = load_reading(out_dir / "reading.json")             # the runner's view: no reader objects needed
        rd.task      # a task.Task whose actions are decoded when asked for (``PackedTask``): build_task's task
        rd.b         # what reader.task_start and reader.replan_start read (``Points``)
        rd.packed    # the packed file, for taskcore
+       check_reading(out_dir / "reading.json")                 # the three files against each other and this format
+       python packed_reading.py from-golden GOLDEN PACKED --start-seed N --name NAME --out DIR
+       python packed_reading.py check DIR/reading.json
 
 **Why files.** The Python reader cannot read Part I on this laptop; the Rust reader (branch reader-b) writes the
 packed file directly. A reading is three files, so that either reader can write it and the runner reads both the
@@ -17,6 +22,17 @@ same way, with no reader object in memory:
 * ``reading.actions.jsonl``: one JSON line per action of the packed file, in its order: what the replay harness
   reads from an action's record that the packed file does not hold.
 * ``reading.json``: the reading as a whole.
+
+**From the Rust reader** (``reading_from_golden``). The Rust reader writes the packed file (scumm/reader/src/packed.rs:
+``RecordStream``, whose bytes differ from export_records.py's but whose task is the same) and its records in
+golden.py's reading format (the lines it is compared with: a head, one ``$Record`` per record in ``read_all``'s order,
+the Builder's counters). From those two files, ``reading_from_golden`` writes the other two, with no reading: each
+packed action's line from the record its ``rec`` names (so the lines follow the packed file as it is after the
+rewrite at ``finish``, whatever its order), and reading.json from the golden head (the scope), the packed file (the
+goal, the actions) and the domains' bounds from domains.build and reader.FactTable on the scope and the start (no
+reading: a pass only adds values to a domain, reader.Builder.extend_domains, never moves its bounds), each checked
+against the packed file's values. The check strings and the event sources are then the records' own, as
+``eval_check`` and ``step_input`` read them.
 
 **reading.actions.jsonl**, line i (action i of the packed file), keys:
 
@@ -59,14 +75,21 @@ import collections
 import functools
 import json
 import mmap
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import domains as D
-import reader as R
-import task as T
-from export_records import END_MAGIC, MAGIC, NONE, OP_ADD, OP_GUESS, OP_SET, VERSION, Writer, record_actions
+_HERE = Path(__file__).resolve().parent
+for _p in (str(_HERE.parents[1] / "src"), str(_HERE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import domains as D  # noqa: E402
+import reader as R  # noqa: E402
+import task as T  # noqa: E402
+from export_records import (END_MAGIC, MAGIC, NONE, OP_ADD, OP_GUESS, OP_SET, VERSION, Writer,  # noqa: E402
+                            record_actions)
 
 FORMAT = "E003 reading 1"
 assert sys.byteorder == "little"
@@ -434,3 +457,265 @@ def load_reading(path) -> Reading:
     if goal != task.goal:
         raise ValueError(f"{path}: goal {doc['goal']} is not the packed file's {task.goal}")
     return Reading(path, doc, task, Points(task.facts), packed, lines)
+
+
+# --- from a reading in golden.py's format (the Rust reader) ------------------------------------------------------
+
+def _dec(x):
+    """golden.py's canonical encoding read back: $tuple a tuple, $set a frozenset, $map a dict, a $Class a dict of its
+    fields; anything else as JSON gives it."""
+    if isinstance(x, list):
+        return [_dec(v) for v in x]
+    if not isinstance(x, dict):
+        return x
+    if len(x) == 1:
+        (k, v), = x.items()
+        if k == "$tuple":
+            return tuple(_dec(e) for e in v)
+        if k == "$set":
+            return frozenset(_dec(e) for e in v)
+        if k == "$map":
+            return {_dec(a): _dec(b) for a, b in v}
+        if k.startswith("$"):
+            return {f: _dec(e) for f, e in v.items()}
+    return {k: _dec(v) for k, v in x.items()}
+
+
+def line_of_golden(n: int, rec: int, r: dict) -> dict:
+    """``action_line`` from a decoded golden ``$Record`` (its fields as a dict)."""
+    src = r["source"]
+    if not src:
+        source = []
+    elif src[0] == "event":
+        ev = src[1]
+        source = ["event", ev["name"], ev["w"], ev["sig"], bool(ev["abort"])]
+    else:
+        source = list(src)
+    return {"i": n, "rec": rec, "label": r["label"], "source": source,
+            "checks": [[c[0], c[1], c[2], c[3]] for c in r["checks"]], "pre_keys": sorted(r["pre"]),
+            "engine_pre": sorted(r["engine_pre"])}
+
+
+def _golden_lines(path):
+    import gzip
+    opener = gzip.open if str(path).endswith(".gz") else open
+    with opener(path, "rt") as f:
+        for ln in f:
+            yield json.loads(ln)
+
+
+def python_domains(rooms, start: dict):
+    """``domain(key)`` of the reader's FactTable on ``rooms`` and ``start``, before any reading (module docstring)."""
+    import model
+    game = model.Game.load()
+    return R.FactTable(R.Scope.of(game, tuple(rooms), start), D.build(start), game).domain
+
+
+def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, name: str = "reading",
+                        domain=None, info: dict | None = None) -> dict:
+    """A reading's three files from its records in golden.py's format and its packed file (module docstring).
+    ``start``: the facts.py map it was read from; ``domain``: key -> domains.Domain for the bounds (default
+    ``python_domains`` on the golden head's rooms and ``start``). The packed file is copied next to the others when it
+    is not there. Returns counts and paths."""
+    import shutil
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    tc, acts, head_path = out / f"{name}.tc", out / f"{name}.actions.jsonl", out / f"{name}.json"
+    if Path(packed).resolve() != tc.resolve():
+        shutil.copyfile(packed, tc)
+    pk = Packed(tc)
+    try:
+        want = [(pk.w[o + 1], pk.strings[pk.w[o + 2]]) for o in pk.offsets]  # (rec, label) per action
+        keys, values, goal = list(pk.fact_keys), list(pk.fact_values), dict(pk.goal)
+    finally:
+        pk.close()
+    lines_in = _golden_lines(golden)
+    head = next(lines_in)
+    if head.get("kind") != "reading":
+        raise ValueError(f"{golden}: the first line is not a reading's head")
+    hd = _dec(head["reading"])
+    order = [r for r, _ in want]
+    builder = None
+    n_records = 0
+    if order == sorted(order):
+        # one pass: the records come in index order, the actions name them in the same order
+        it = iter(enumerate(want))
+        nxt = next(it, None)
+        with open(acts, "w") as fa:
+            for ln in lines_in:
+                if ln["kind"] == "builder":
+                    builder = _dec(ln["builder"])
+                    continue
+                n_records += 1
+                while nxt is not None and nxt[1][0] == ln["index"]:
+                    r = _dec(ln["record"])  # a $Record's fields
+                    line = line_of_golden(nxt[0], ln["index"], r)
+                    if line["label"] != nxt[1][1]:
+                        raise ValueError(f"action {nxt[0]}: record {ln['index']} is {line['label']!r}, the packed "
+                                         f"file's {nxt[1][1]!r}")
+                    fa.write(json.dumps(line, default=str) + "\n")
+                    nxt = next(it, None)
+        if nxt is not None:
+            raise ValueError(f"{golden}: no record {nxt[1][0]} for action {nxt[0]} of {packed}")
+    else:
+        need = {}
+        for i, (r, _) in enumerate(want):
+            need.setdefault(r, []).append(i)
+        got = {}
+        for ln in lines_in:
+            if ln["kind"] == "builder":
+                builder = _dec(ln["builder"])
+                continue
+            n_records += 1
+            if ln["index"] in need:
+                got[ln["index"]] = _dec(ln["record"])
+        with open(acts, "w") as fa:
+            for i, (r, label) in enumerate(want):
+                if r not in got:
+                    raise ValueError(f"{golden}: no record {r} for action {i} of {packed}")
+                line = line_of_golden(i, r, got[r])
+                if line["label"] != label:
+                    raise ValueError(f"action {i}: record {r} is {line['label']!r}, the packed file's {label!r}")
+                fa.write(json.dumps(line, default=str) + "\n")
+    if hd.get("n_records") is not None and hd["n_records"] != n_records:
+        raise ValueError(f"{golden}: {n_records} records, its head says {hd['n_records']}")
+    dom = domain or python_domains(hd["rooms"], start)
+    bounds, problems = {}, []
+    for k, vals in zip(keys, values):
+        has_b, has_a = D.BELOW in vals, D.ABOVE in vals
+        if not (has_b or has_a):
+            continue
+        d = dom(k)
+        if d is None or (D.BELOW in d.values) != has_b or (D.ABOVE in d.values) != has_a:
+            problems.append(f"{k}: the packed file's values {vals}, the domain's {None if d is None else d.values}")
+            continue
+        ints = [v for v in vals if isinstance(v, int)]
+        if (has_b and any(v < d.low for v in ints)) or (has_a and any(v > d.high for v in ints)):
+            problems.append(f"{k}: the packed file's values {vals} outside [{d.low}, {d.high}]")
+            continue
+        bounds[k] = [d.low, d.high]
+    if problems:
+        raise ValueError(f"{len(problems)} facts whose bounds the domains do not give: {problems[:5]}")
+    counts = (builder or {}).get("counts", {})
+    doc = {"format": FORMAT, "packed": tc.name, "actions": acts.name, "n_actions": len(want), "n_records": n_records,
+           "folded": n_records - len(want), "goal": {k: sorted(v, key=str) for k, v in goal.items()},
+           "start": {"name": start_name, "facts": dict(sorted(start.items()))},
+           "scope": {"rooms": list(hd["rooms"]), "walk_verb": hd["walk_verb"], "verbs": list(hd["verbs"]),
+                     "dialog_verbs": list(hd["dialog_verbs"])},
+           "bounds": bounds, "counts": dict(sorted((str(k), v) for k, v in counts.items())),
+           "sources": dict(hd.get("sources") or {}), "control": False, "name": hd.get("name"),
+           "from_golden": {"golden": str(golden), "packed": str(packed)}}
+    doc.update({k: v for k, v in (info or {}).items() if k not in doc})
+    head_path.write_text(json.dumps(doc, indent=1, default=str) + "\n")
+    return {"actions": len(want), "records": n_records, "facts": len(keys), "bounds": len(bounds),
+            "json": str(head_path), "packed": str(tc), "lines": str(acts)}
+
+
+# --- the check ------------------------------------------------------------------------------------------------------
+
+SOURCE_SHAPES = {"sentence": "sentence", "walk_to": "sentence", "dialog_line": "verb", "event": "event",
+                 "skip_cutscene": "event"}
+
+
+def _source_ok(kind: str, src: list) -> bool:
+    shape = SOURCE_SHAPES.get(kind)
+    if shape == "sentence":
+        return len(src) == 4 and src[0] == "sentence" and all(isinstance(x, int) for x in src[1:3]) and \
+            (src[3] is None or isinstance(src[3], int))
+    if shape == "verb":
+        return len(src) == 2 and src[0] == "verb" and isinstance(src[1], int)
+    if shape == "event":
+        return len(src) == 5 and src[0] == "event" and isinstance(src[1], str) and isinstance(src[2], int) and \
+            isinstance(src[3], int) and isinstance(src[4], bool) and (src[4] if kind == "skip_cutscene" else True)
+    return False
+
+
+def check_reading(path, limit: int = 10) -> dict:
+    """The three files against each other and this module's format (module docstring): every action's line (its
+    index, record and label; its source's shape for its kind; its checks' shape, and how many read operands
+    replay.eval_check can see; ``engine_pre`` within ``pre_keys`` within the action's precondition), the bounds of
+    every fact that holds "below" or "above", the goal, the start and the scope. Returns the counts and the first
+    ``limit`` problems of each kind; ``ok`` when there are none."""
+    import replay
+    rd = load_reading(path)
+    probs = collections.defaultdict(list)
+    counts = collections.Counter()
+
+    def bad(kind, what):
+        counts[f"problem: {kind}"] += 1
+        if len(probs[kind]) < limit:
+            probs[kind].append(what)
+    try:
+        for k, d in rd.task.facts.items():
+            if not d.exact and (k not in rd.doc["bounds"] or
+                                (D.ABOVE in d.values and d.high is None) or (D.BELOW in d.values and d.low is None)):
+                bad("bounds", k)
+            ints = [v for v in d.values if isinstance(v, int)]
+            if d.high is not None and any(v > d.high for v in ints) or d.low is not None and any(v < d.low for v in ints):
+                bad("bounds", f"{k}: {d.values} outside [{d.low}, {d.high}]")
+        for key in ("rooms", "walk_verb", "verbs", "dialog_verbs"):
+            if key not in rd.doc.get("scope", {}):
+                bad("scope", key)
+        if not isinstance(rd.doc.get("start", {}).get("facts"), dict):
+            bad("start", "no start facts")
+        for i in range(len(rd.task.actions)):
+            try:
+                a = rd.task.actions[i]
+            except ValueError as e:
+                bad("line", str(e))
+                continue
+            r = a.what
+            counts[f"kind {r.kind}"] += 1
+            if not _source_ok(r.kind, list(r.source)):
+                bad("source", f"{a.name}: {r.kind} {list(r.source)}")
+            if not set(r.engine_pre) <= set(r.pre) | set(a.pre):
+                bad("engine_pre", f"{a.name}: {sorted(set(r.engine_pre) - set(a.pre))}")
+            if not set(rd.task.lines[i]["pre_keys"]) <= set(a.pre):
+                bad("pre_keys", f"{a.name}: {sorted(set(rd.task.lines[i]['pre_keys']) - set(a.pre))}")
+            for c in r.checks:
+                counts["checks"] += 1
+                if len(c) != 4 or not isinstance(c[0], str) or not isinstance(c[1], str) or \
+                        c[2] not in (True, False, None) or not isinstance(c[3], str):
+                    bad("check", f"{a.name}: {c}")
+                    continue
+                m = replay._CMP.match(c[1])
+                parts = [m[1], m[3]] if m else [c[1]]
+                if all(re.fullmatch(r"-?\d+|Var\[\d+\]|Local\[\d+\]|VAR_EGO|VAR_RESULT", t.strip()) for t in parts):
+                    counts["checks of a form eval_check reads"] += 1
+    finally:
+        rd.close()
+    return {"ok": not probs, "actions": len(rd.task.actions), "facts": len(rd.task.facts),
+            "counts": dict(sorted(counts.items())), "problems": dict(probs)}
+
+
+def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    g = sub.add_parser("from-golden")
+    g.add_argument("golden", type=Path)
+    g.add_argument("packed", type=Path)
+    g.add_argument("--start-seed", type=int, help="the start: results/start-part1.jsonl's row for this seed")
+    g.add_argument("--start-file", type=Path, help="the start: a JSON facts.py map")
+    g.add_argument("--name", default="reading")
+    g.add_argument("--out", type=Path, required=True)
+    c = sub.add_parser("check")
+    c.add_argument("reading", type=Path)
+    a = ap.parse_args()
+    if a.cmd == "from-golden":
+        here = Path(__file__).resolve().parent
+        if a.start_seed is not None:
+            row = next(json.loads(x) for x in (here / "results" / "start-part1.jsonl").read_text().splitlines()
+                       if json.loads(x)["seed"] == a.start_seed)
+            start, start_name = row["facts"], f"results/start-part1.jsonl seed {a.start_seed}"
+        else:
+            start, start_name = json.loads(a.start_file.read_text()), str(a.start_file)
+        print(json.dumps(reading_from_golden(a.golden, a.packed, a.out, start, start_name, a.name), indent=1))
+    else:
+        out = check_reading(a.reading)
+        print(json.dumps(out, indent=1, default=str))
+        sys.exit(0 if out["ok"] else 1)
+
+
+if __name__ == "__main__":
+    main()
