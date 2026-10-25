@@ -1,8 +1,13 @@
 //! machine-cases: the machine beyond the goldens (wide.py). Reads DIR/cases.json, runs every case with the Rust
-//! machine of its features (row 0, 1, 2 or 3) on the case's state (wide.py's synthetic changes applied), and writes DIR/rust.jsonl.gz and DIR/rust.trace.jsonl.gz in wide.py's
-//! layout.
+//! machine of its features (row 0 to 5) and switches on the case's state (wide.py's synthetic changes applied; an
+//! `arm` case gets its own state, wide.py `armed`), and writes DIR/rust.jsonl.gz and DIR/rust.trace.jsonl.gz in
+//! wide.py's layout.
 //!
-//! usage: machine-cases DIR [--no-trace]   (--no-trace: time the machine alone; rust.trace.jsonl.gz holds case lines only)
+//! usage: machine-cases DIR [--no-trace] [--costs]
+//!   --no-trace: time the machine alone; rust.trace.jsonl.gz holds case lines only.
+//!   --costs: run untraced and write DIR/rust-costs.json alone (no rust files): per case its machine time (ms) and
+//!   its paths' list entries ("items": assumptions, notes, unknown writes, errors, turns, conflicts and writes, wide.py
+//!   --max-items' count), so that wide.py --from-costs can keep the cases Python can afford without encoding them.
 //! then:  golden.py compare-file DIR/python.jsonl.gz DIR/rust.jsonl.gz (and the two trace files)
 
 use flate2::{Compression, GzBuilder};
@@ -41,7 +46,10 @@ impl Sink for Shared {
 
 fn main() {
     let dir = PathBuf::from(std::env::args().nth(1).expect("usage: machine-cases DIR [--no-trace]"));
-    let tracing = std::env::args().nth(2).as_deref() != Some("--no-trace");
+    let flags: Vec<String> = std::env::args().skip(2).collect();
+    let costs = flags.iter().any(|a| a == "--costs");
+    let tracing = !costs && !flags.iter().any(|a| a == "--no-trace");
+    let mut cost_rows: Vec<String> = Vec::new();
     let mut slow: Vec<(f64, usize)> = Vec::new();
     let root = scumm_ir::default_root();
     let v: Value = serde_json::from_slice(&std::fs::read(dir.join("cases.json")).expect("cases.json")).unwrap();
@@ -54,6 +62,10 @@ fn main() {
         })
     };
     let (set_prefix, sets) = (pairs("set_prefix"), pairs("sets"));
+    // wide.py's --unheld: keys the oracle reads as not held
+    let unheld: Vec<scumm_ir::Fact> = v.get("unheld").and_then(|x| x.as_array()).map_or(Vec::new(), |a| {
+        a.iter().map(|k| k.as_str().unwrap().parse().unwrap_or_else(|e| panic!("--unheld {k}: {e}"))).collect()
+    });
     for pre in pres.values_mut() {
         for (p, x) in &set_prefix {
             for (k, val) in pre.iter_mut() {
@@ -73,7 +85,12 @@ fn main() {
         None => vec!["own_entry".to_string()],
     };
     let f = Features::parse(&names).unwrap_or_else(|e| panic!("{e}"));
-    let mut m = Machine::new(&game, f, Switches::default());
+    let switches: Vec<String> = match v.get("switches") {
+        Some(s) => s.as_array().unwrap().iter().map(|s| s.as_str().unwrap().to_string()).collect(),
+        None => Vec::new(),
+    };
+    let sw = Switches::parse(&switches).unwrap_or_else(|e| panic!("{e}"));
+    let mut m = Machine::new(&game, f, sw);
     if let Some(n) = v.get("path_limit").and_then(|n| n.as_u64()) {
         m.path_limit = n as usize;
     }
@@ -91,7 +108,22 @@ fn main() {
     let t0 = Instant::now();
     for (k, c) in cases.iter().enumerate() {
         let row = c["row"].as_i64().unwrap();
-        let o = oracles.entry(row).or_insert_with(|| FactOracle::new(pres[&row].clone(), Some(kinds.clone())));
+        // wide.py --arm: the state with one override armed (the other esc: keys leave it unless "keep")
+        let mut own;
+        let o = match c.get("arm").and_then(|k| k.as_str()) {
+            Some(arm) => {
+                let key: scumm_ir::Fact = arm.parse().unwrap_or_else(|e| panic!("arm {arm}: {e}"));
+                let keep = c["keep"].as_bool().unwrap();
+                let mut state = pres[&row].clone();
+                state.retain(|k, _| keep || !matches!(k, scumm_ir::Fact::Esc(..)));
+                state.insert(key, 1);
+                own = FactOracle::new(state, Some(kinds.clone())).with_unheld(unheld.clone());
+                &mut own
+            }
+            None => oracles
+                .entry(row)
+                .or_insert_with(|| FactOracle::new(pres[&row].clone(), Some(kinds.clone())).with_unheld(unheld.clone())),
+        };
         let mut head = vec![("kind", enc::s("case")), ("index", J::Int(k as i64))];
         for (key, x) in c.as_object().unwrap() {
             head.push((key.as_str(), json_to_j(x)));
@@ -125,6 +157,10 @@ fn main() {
                     m.run_sentence(o, n(0).unwrap(), n(1).unwrap(), n(2))
                 }
                 None if c.get("wait").is_some() => m.run_wait(o),
+                None if c.get("click").is_some() => {
+                    m.run_verb(o, c["click"].as_i64().unwrap() as i32, scumm_machine::machine::LEFT_CLICK)
+                }
+                None if c.get("esc").is_some() => m.run_esc(o),
                 None => m.run_entry(o, c["obj"].as_i64().unwrap() as i32, c["verb"].as_i64().unwrap() as i32, None),
             },
         };
@@ -133,6 +169,23 @@ fn main() {
         slow.push((e, k));
         if let Some(tr) = m.trace.take() {
             tr.finish().unwrap();
+        }
+        if costs {
+            let items: usize = run
+                .paths
+                .iter()
+                .map(|p| {
+                    p.assumptions.len()
+                        + p.notes.len()
+                        + p.unknown_writes.len()
+                        + p.errors.len()
+                        + p.turns.len()
+                        + p.conflicts.len()
+                        + p.writes.len()
+                })
+                .sum();
+            cost_rows.push(format!("{{\"index\":{k},\"ms\":{:.3},\"items\":{items}}}", e * 1e3));
+            continue;
         }
         t.write_all(&buf.borrow()).unwrap();
         let mut lines = vec![enc::line(vec![("kind", enc::s("run")), ("run", enc::run(&run))])];
@@ -151,6 +204,12 @@ fn main() {
     }
     w.finish().unwrap().flush().unwrap();
     t.finish().unwrap().flush().unwrap();
+    if costs {
+        let _ = std::fs::remove_file(dir.join("rust.jsonl.gz"));
+        let _ = std::fs::remove_file(dir.join("rust.trace.jsonl.gz"));
+        let text = format!("{{\"cases\":[\n{}\n]}}\n", cost_rows.join(",\n"));
+        std::fs::write(dir.join("rust-costs.json"), text).expect("rust-costs.json");
+    }
     slow.sort_by(|a, b| b.0.total_cmp(&a.0));
     let top: Vec<String> = slow.iter().take(3).map(|(e, k)| format!("case {k} {:.3} ms", e * 1e3)).collect();
     eprintln!(

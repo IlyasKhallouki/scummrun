@@ -18,3 +18,7 @@ path = "src/bin/machine_run.rs"
 [[bin]]
 name = "machine-cases"
 path = "src/bin/machine_cases.rs"
+
+[[bin]]
+name = "machine-serve"
+path = "src/bin/machine_serve.rs"

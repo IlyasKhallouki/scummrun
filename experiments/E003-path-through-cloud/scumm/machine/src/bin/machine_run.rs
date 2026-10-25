@@ -121,8 +121,9 @@ fn score(
             let tpath = folder.join(format!("{}.trace.jsonl.gz", job.label));
             let ttmp = tpath.with_extension("gz.tmp");
             if trace {
+                // the trace is compared by its text (golden.py hashes the uncompressed lines): the fastest level
                 let f = std::fs::File::create(&ttmp)?;
-                let gz = GzBuilder::new().mtime(0).write(BufWriter::new(f), Compression::new(6));
+                let gz = GzBuilder::new().mtime(0).write(BufWriter::new(f), Compression::fast());
                 m.trace = Some(Tracer::new(Box::new(gz)));
             }
             let t = Instant::now();

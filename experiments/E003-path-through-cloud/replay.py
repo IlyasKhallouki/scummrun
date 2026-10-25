@@ -12,8 +12,9 @@ What the harness does, per plan step (plan.md step 5, with D5):
 * **The input.** A step's record (reader.Record) becomes player input through the Executor (``Executor.play``, no
   fork, so no early inputs, no re-clicks and no delay retries): a sentence (verb, A, B) is the verb's key and clicks
   on A and B, a walk_to the walk click on A (the walk verb is the reader's own, read from the scripts), a dialog line
-  a click on the line its verb shows, a skipped cutscene Esc, and an event no input at all: the harness waits.
-  ``step_input`` and ``to_move`` do the translation.
+  a left click on its verb, by the verb's number, at the point the engine's verb table and hit test give
+  (``verb_point``, ``Harness._click_verb``: no text is read), a skipped cutscene Esc, and an event no input at all:
+  the harness waits. ``step_input``, ``to_move`` and ``verb_point`` do the translation.
 * **Waits first** (``waits_first``). Before an input step, the event steps that follow it up to the next input step
   and that neither read nor write what it and the steps they pass read or write are played first, in their order.
   The plan's order is one order of independent steps; in real time the input's own continuations (ego's arrival)
@@ -76,17 +77,26 @@ What the harness does, per plan step (plan.md step 5, with D5):
   each step is the path of its reduced action whose precondition holds (or may hold) in the plan's predicted state,
   an action of ``apply_bans(task, bans)`` with its effects cut to the facts reduction (e) needs (the planner's task,
   as the pruned task's effects were cut to relevance's facts; ``waits_first`` reads them). "python": task.py's
-  ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``. Each plan's entry keeps
-  the time to write the task (``write_s``), the planner's (``seconds``), the operators and the steps.
+  ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``; a ``write_sas`` error
+  (task.py raises ValueError) stops the run with its reason. Each plan's entry keeps the time to write the task
+  (``write_s``), the planner's (``seconds``), the operators, the steps and the landmarks lama-first dumped
+  (``landmarks``: how many, and the game facts of the first plan's, ``Harness.landmarks``).
+* **A step that is several paths** (taskcore only): a folded step whose paths the plan cannot tell apart, because they
+  differ only on facts the reduced file does not hold and whose predicted value is unknown (``plan_fd.predict`` with
+  ``choices``), is chosen in the engine when it is played: the path whose precondition holds in the engine's state,
+  waited for (no input) up to ``INPUT_LIMIT`` frames; none is a precondition mismatch, two a "path choice"; either is
+  a replan with no ban.
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
   one), a planner timeout, the replan limit, the time limit, a start outside the task's domains (task.OutOfDomain:
   the task would have to be built again; through taskcore only on a fact reduction (e) needs, as the pruned task
   held only facts relevance needs), or, through taskcore, a step whose path is not one (``plan_fd.PathChoice``) or
   a taskcore error (``plan_fd.TaskcoreError``): "planner: ...".
 * **The record**: every input with its frame (the Executor's movie), every step with its tries and their frames,
-  its outcome and its mismatches, the plans, the reorders and the bans; the engine's facts, tick, random state and
-  actor positions at every input and every step's end are kept for ``verify``, which plays the inputs from boot in a
-  fresh engine (no fork, no change to the random state) and compares.
+  its outcome, its mismatches and its wall time (``seconds``), the plans, the reorders and the bans; the engine's
+  facts, tick, random state and actor positions at every input and every step's end are kept for ``verify``, which
+  plays the inputs from boot in a fresh engine (no fork, no change to the random state) and compares. ``watch``
+  ({name: (fact, "==" or "!=", value)}, the caller's, for scoring) is checked on every frame the harness sees: the
+  first frame each holds is ``Harness.reached``.
 
 C1 and C2: the harness gives only player inputs (clicks on verbs, objects and lines, walking, waiting, Esc), and
 names no game's number: the verbs, objects and lines come from the plan's records, the walk verb from the reader,
@@ -154,28 +164,35 @@ def step_input(rec) -> Input:
     raise ValueError(f"no input for a record of kind {rec.kind!r}")
 
 
-def line_text(verb: int, state: dict) -> str | None:
-    """The text a dialog line's verb shows now (the Executor clicks a line by its text), or None when it is not shown
-    or another shown line holds the same text (the click would be ambiguous)."""
-    lines = [v for v in state["verbs"] if DIALOG_FIRST <= v["id"] <= DIALOG_LAST and v.get("name")]
-    mine = [v for v in lines if v["id"] == verb]
+VERB_OFFSETS = ((2, 2), (4, 3), (1, 1), (0, 0))  # points inside a verb's rectangle, from its top left, tried in order
+
+
+def verb_point(verb: int, state: dict, at) -> tuple | None:
+    """Where a click picks verb ``verb`` now, from the engine's verb table: the state dump lists the verbs a click can
+    pick (the bridge's verbVisible: id set, not saved away, mode on, the test findVerbAtPos makes, verbs.cpp), each
+    with its slot and its rectangle's top left; the point is the first of ``VERB_OFFSETS`` from there where the
+    engine's hit test (``at(x, y)``, findVerbAtPos) gives that slot. None when the verb is not listed, is listed twice
+    or is hit at none of them. No text is read."""
+    mine = [v for v in state.get("verbs", []) if v["id"] == verb]
     if len(mine) != 1:
         return None
-    text = mine[0]["name"]
-    return text if sum(text.lower() in v["name"].lower() for v in lines) == 1 else None
+    v = mine[0]
+    for dx, dy in VERB_OFFSETS:
+        p = (v["x"] + dx, v["y"] + dy)
+        if at(*p).get("verb_slot") == v["slot"]:
+            return p
+    return None
 
 
-def to_move(inp: Input, name: str, state: dict | None = None, limit: int = INPUT_LIMIT) -> Move | None:
-    """The Executor's Move for an input (None for a wait). A line needs the state, to read the line's text."""
+def to_move(inp: Input, name: str, limit: int = INPUT_LIMIT) -> Move | None:
+    """The Executor's Move for a click or a key; None for a wait. A dialog line is no Move: the harness clicks its
+    verb by number (``verb_point``, ``Harness._click_verb``)."""
     if inp.kind == "click":
         return Move(name, verb=inp.verb, obj=inp.a, obj2=inp.b, max_frames=limit)
     if inp.kind == "key":
         return Move(name, key=inp.key, max_frames=limit)
     if inp.kind == "line":
-        text = line_text(inp.verb, state or {"verbs": []})
-        if text is None:
-            raise RouteError(f"{name}: dialog line {inp.verb} is not shown, or its text is not unique")
-        return Move(name, choose=text, max_frames=limit)
+        raise ValueError(f"{name}: a dialog line is clicked by its verb number (Harness._click_verb), not as a Move")
     return None
 
 
@@ -562,13 +579,16 @@ def after(state: dict, exps: dict) -> dict:
     return out
 
 
-def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict, ahead: list, hist: History):
+def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict, ahead: list, hist: History,
+           choices=None):
     """The engine ran on: the facts this step's mismatches name were re-written, within its window, by the plan's
     next steps (``ahead``, the event steps after it up to its next input), to the values those steps predict. Each
     step of that run has its precondition in the plan's state after the steps before it, and holds on some frame no
     earlier than the one before it: its writes of those facts, or, for a step that writes none of them, any write of
     it that changes a value. Returns, when the run explains every mismatch, its steps up to the last one needed, each
-    with its own mismatches (its writes that change a value and never held from its frame on); else None."""
+    with its own mismatches (its writes that change a value and never held from its frame on); else None. A step
+    that is several paths (``choices``, the harness's) is the one whose precondition holds in the plan's state there
+    (none or several: None); when the run is returned, ``task.actions`` takes that path and ``choices`` drops it."""
     pending = {m.key for m in mismatches if m.kind == "write"}
     if not pending:
         return None
@@ -578,8 +598,14 @@ def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict,
         test = all if every else any
         return test(frames[n][1].get(e.key) in e.values for e in es)
 
+    picked = {}
     for st in ahead:
         a = task.actions[st.action]
+        if choices and st.action in choices:
+            ok = [p for p in choices[st.action] if not holds(p.pre, state)]
+            if len(ok) != 1:
+                return None
+            a = picked[st.action] = ok[0]
         if holds(a.pre, state):
             return None
         x = expectations(a.what, state, doms, st.guessed)
@@ -596,6 +622,9 @@ def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict,
         chain.append((st, missed))
         state = after(state, x)
         if not pending:
+            for n, p in picked.items():
+                task.actions[n] = p
+                choices.pop(n, None)
             return chain
     return None
 
@@ -698,6 +727,7 @@ class StepLog:
     # result)
     inputs: list = field(default_factory=list)  # the input events it sent
     note: str = ""
+    seconds: float = 0.0  # wall time of the step, from its start to its end
 
     def add(self, note: str) -> None:
         self.note = (self.note + "; " if self.note else "") + note
@@ -711,7 +741,7 @@ class Harness:
     def __init__(self, b, full_task: T.Task, task: T.Task, branch: Branch, goal: dict, *, release: str = "dos-cd",
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
                  progress=None, planner: str = "taskcore", packed=None, search: str = "lama-first", workdir=None,
-                 taskcore_args=(), keep_files: bool = False):
+                 taskcore_args=(), keep_files: bool = False, watch=None):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         self.b, self.base = b, task
@@ -744,6 +774,10 @@ class Harness:
         self.prev_before = None
         self.ran: list = []  # the steps the engine ran on through in the last step's window (``ran_on``)
         self.frame0 = self.tick0 = None
+        self.choices: dict = {}  # step's action index -> its paths, chosen in the engine (module docstring)
+        self.landmarks = None  # the first plan's landmarks (plan_fd.Landmark), lama-first's dump
+        self.watch = dict(watch or {})  # name -> (fact, op, value), the caller's (module docstring)
+        self.reached: dict = {}  # name -> the first frame it held
 
     # --- observing ------------------------------------------------------------------------------------------------
 
@@ -752,6 +786,9 @@ class Harness:
         self.state = s
         self.obs = F.facts_of(s)
         self.now = view(self.b, self.doms, self.obs)
+        for name, (k, op, v) in self.watch.items():
+            if name not in self.reached and (self.obs.get(k, 0) == v) == (op == "=="):
+                self.reached[name] = self.branch.frame
 
     def belief(self) -> dict:
         """The engine's values with the plan's values of the facts the dump does not hold."""
@@ -785,13 +822,22 @@ class Harness:
     def plan(self, first: bool) -> list:
         """A plan from the engine's state (reader.task_start for the first, reader.replan_start after); [] when the
         planner gives none (the stop reason is set)."""
+        self.choices = {}
         if self.planner == "taskcore":
             return self._plan_taskcore(first)
         if self.sas is None or self.sas_bans != len(self.bans):
             self.progress(f"writing the task ({len(self.bans)} bans)")
             self.task = apply_bans(self.base, self.bans)
             t = time.monotonic()
-            self.sas = T.write_sas(self.task)
+            try:
+                self.sas = T.write_sas(self.task)
+            except ValueError as e:  # task.py's writer: a value outside a domain, PRE_LIMIT, two writes of a fact
+                self.plans.append({"plan": len(self.plans), "frame": self.branch.frame, "bans": len(self.bans),
+                                   "write_s": time.monotonic() - t, "start_counts": {}, "reorders": [],
+                                   "status": "write error", "error": str(e), "steps": []})
+                self.sas = None
+                self.stop_reason = f"planner: write_sas: {e}"
+                return []
             self.sas_bans = len(self.bans)
             write_s = time.monotonic() - t
         else:
@@ -813,7 +859,17 @@ class Harness:
         res = plan_fd.plan(self.sas, start, time_limit=self.plan_time)
         entry.update(status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps],
                      operators=self.sas.counts["operators"])
+        self._landmarks(entry, res)
         return self._planned(entry, res, start)
+
+    def _landmarks(self, entry: dict, res) -> None:
+        """The landmarks lama-first dumped for this plan: counted per plan, the first plan's kept."""
+        game = [lm for lm in res.landmarks if not lm.aux]
+        entry.update(landmarks=len(res.landmarks), landmark_orderings=len(res.orderings), game_landmarks=len(game))
+        if self.landmarks is None and res.landmarks:
+            self.landmarks = {"plan": entry["plan"], "frame": entry["frame"],
+                              "nodes": [dataclasses.asdict(lm) for lm in res.landmarks],
+                              "orderings": [list(o) for o in res.orderings]}
 
     def _planned(self, entry: dict, res, start: dict) -> list:
         self.progress(f"plan {entry['plan']}: {res.status}, {len(res.steps)} steps, {res.seconds:.0f} s")
@@ -831,7 +887,9 @@ class Harness:
         """``plan`` through taskcore (module docstring): the start and the bans as files, taskcore's reduced task,
         the search, the plan read back to paths of the banned task; ``self.task`` is the plan's steps' actions."""
         if self.pieces is None or self.pieces_bans != len(self.bans):
-            self.pieces = ban_pieces(self.base, self.bans)
+            # a task read from its packed file (packed_reading.PackedTask) cuts one action at a time, when asked
+            self.pieces = self.base.ban_pieces(self.bans) if hasattr(self.base, "ban_pieces") else \
+                ban_pieces(self.base, self.bans)
             self.pieces_bans = len(self.bans)
         if first:
             start, counts = R.task_start(self.b, self.obs, self.base), {}
@@ -859,12 +917,15 @@ class Harness:
                      operators=res.operators, actions=res.stats.get("actions"), decode_s=res.decode_s,
                      folds=res.folds, predicted_goal=res.predicted_goal, file_facts=len(res.file_facts),
                      needed_facts=len(res.needed_facts),
-                     input_check_misses=sc.get("facts_the_input_check_stops_on"))
+                     input_check_misses=sc.get("facts_the_input_check_stops_on"),
+                     choices={str(i): [p.name for p in ps] for i, ps in res.choices.items()})
+        self._landmarks(entry, res)
         if res.status == "out of domain":
             entry.update(misses=res.misses, steps=[])
             self.stop_reason = f"the engine's state is outside the task's domains ({res.n_misses} facts)"
             return []
-        self.task = T.Task(self.base.facts, res.actions, self.base.goal)
+        self.task = T.Task(self.base.facts, list(res.actions), self.base.goal)
+        self.choices = dict(res.choices)
         return self._planned(entry, res, start)
 
     # --- one step -------------------------------------------------------------------------------------------------
@@ -956,16 +1017,39 @@ class Harness:
         if self.branch.frame > f0:
             log.add(f"waited {self.branch.frame - f0} frames for the record's position checks")
 
+    def _click_verb(self, verb: int, name: str) -> None:
+        """A dialog line: a left click on verb ``verb`` (its number, from the record), at the point ``verb_point``
+        reads from the engine's verb table, on the first frame the engine takes a verb click (user input on:
+        checkExecVerbs, verbs.cpp, and the verb listed and hit), waiting for it (no input) up to ``INPUT_LIMIT``
+        frames; then run to the click's frame, as the Executor does for a click. RouteError when it never comes. The
+        click goes into the Executor's movie, so verify plays it."""
+        end = self.branch.frame + INPUT_LIMIT
+        while True:
+            p = verb_point(verb, self.state, self.watched.at) if self.branch.status.get("up", 0) > 0 else None
+            if p is not None:
+                break
+            if self.branch.frame >= end:
+                raise RouteError(f"{name}: verb {verb} cannot be clicked within {INPUT_LIMIT} frames (not listed in "
+                                 f"the verb table, not hit there, or user input off)")
+            self.advance()
+        ev = [{"frame": self.branch.frame + 1, "click": list(p)}]
+        self.watched.inputs(ev)
+        self.ex.movie.extend(ev)
+        self.advance(1)
+
     def _play_input(self, inp: Input, name: str, log: StepLog, t: dict) -> bool:
-        """The step's input through the Executor; False on an Executor error (logged)."""
+        """The step's input through the Executor (a dialog line: ``_click_verb``); False on an Executor error
+        (logged)."""
         mark = len(self.ex.movie)
         self.watched.before_input = None
         try:
             if inp.kind == "click":
                 self._wait_camera(inp, INPUT_LIMIT, log)
                 self._check_ego(inp)
-            move = to_move(inp, name, self.state)
-            self.ex.play(move)
+            if inp.kind == "line":
+                self._click_verb(inp.verb, name)
+            else:
+                self.ex.play(to_move(inp, name))
             ok = True
         except RouteError as e:
             log.add(f"executor: {e}")
@@ -992,7 +1076,13 @@ class Harness:
         log = StepLog(n_plan, i, step.name, rec.kind, _input_text(inp), self.branch.frame)
         self.steps.append(log)
         retries, replays, kind = 0, 0, "first"
+        t_step = time.monotonic()
         try:
+            if step.action in self.choices:
+                a = self._choose_path(step, log)
+                if a is None:
+                    return "goal" if log.outcome == "goal" else "replan"
+                rec = a.what
             while True:
                 # the precondition (or, for an event, its effects already there)
                 bad = holds(a.pre, self.belief())
@@ -1075,7 +1165,7 @@ class Harness:
                     log.then = "replan"
                     log.add("no ban: the record's path never started, so none of its tests ran")
                     return "replan"
-                chain = ran_on(self.task, self.doms, exps, mism, before, ahead, hist)
+                chain = ran_on(self.task, self.doms, exps, mism, before, ahead, hist, self.choices)
                 if chain:
                     log.outcome, log.then = "matched, the engine ran on", "next"
                     log.add(f"the facts that differ were re-written within the window by the plan's next steps "
@@ -1108,10 +1198,43 @@ class Harness:
             if log.end is None:
                 log.end = self.branch.frame
             log.issue = log.tries[-1].get("issue") if log.tries else None
+            log.seconds = time.monotonic() - t_step
             self.checkpoint()  # the engine's facts at the step's end, for verify
             self.progress(f"  {log.outcome} -> {log.then} at frame {log.end} (tries {len(log.tries)}); mismatches "
                           f"{[(m['key'], m['predicted'], m['observed']) for m in log.mismatches[:6]]}; "
                           f"{len(log.unplanned)} unplanned facts changed; {log.note}")
+
+    def _choose_path(self, step, log: StepLog):
+        """A step that is several paths (module docstring): the one whose precondition holds in the engine's state
+        (and, on the facts the dump does not hold, the plan's value where it has one), waited for (no input) up to
+        ``INPUT_LIMIT`` frames; it replaces the step's action. None when none holds (outcome "precondition") or
+        several do ("path choice"), or the goal came first (outcome "goal")."""
+        cands = self.choices[step.action]
+
+        def held():
+            b = self.belief()
+            return [p for p in cands if not holds(p.pre, b)
+                    and all(b[k] in vs for k, vs in p.pre.items() if k.startswith(UNOBSERVED) and k in b)]
+        if not held():
+            self._wait_for(lambda: bool(held()), INPUT_LIMIT)
+        ok = held()
+        if self.goal_holds():
+            log.outcome, log.then, log.end = "goal", "goal", self.branch.frame
+            return None
+        if len(ok) != 1:
+            b = self.belief()
+            log.outcome, log.then, log.end = ("path choice" if ok else "precondition"), "replan", self.branch.frame
+            log.add(f"the engine's state holds {len(ok)} of the step's {len(cands)} paths "
+                    f"{[p.name for p in (ok or cands)][:4]}: no ban")
+            if not ok:
+                keys = sorted({k for p in cands for k in holds(p.pre, b)})
+                log.mismatches = [dataclasses.asdict(Mismatch(k, _txt(set().union(*(p.pre.get(k, ()) for p in cands))),
+                                                              b.get(k), "precondition")) for k in keys[:12]]
+            return None
+        del self.choices[step.action]
+        self.task.actions[step.action] = ok[0]
+        log.add(f"the path the engine's state holds: {ok[0].name}, of {[p.name for p in cands]}")
+        return ok[0]
 
     def _already(self, rec, step) -> bool:
         """An event whose effects hold at its turn (it ran during the previous step): every write that changes a

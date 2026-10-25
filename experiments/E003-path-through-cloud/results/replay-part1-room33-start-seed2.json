@@ -1,0 +1,86 @@
+{
+ "seed": 2,
+ "reading": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/room33/reading.json",
+ "name": "room33",
+ "stop": {
+  "stop": "idle",
+  "frame": 2728,
+  "tick": 16321,
+  "room": 33,
+  "idle": "sentence",
+  "rng": 1766402948,
+  "up": 1,
+  "cs": 0,
+  "ego": [
+   346,
+   133
+  ]
+ },
+ "dump": {
+  "frame": 2728,
+  "tick": 16321,
+  "room": 33,
+  "ego": 1,
+  "ego_pos": [
+   346,
+   133
+  ],
+  "seed": 2,
+  "boot_param": 0
+ },
+ "trace": {
+  "boot": 1,
+  "cd_track": 4,
+  "control": 1,
+  "room": 5,
+  "segment_start": 1,
+  "stall": 4
+ },
+ "boot_s": 2.2,
+ "check": {
+  "boot checks": "ok",
+  "reading start": {
+   "name": "results/start-part1.jsonl seed 1",
+   "differ": 1,
+   "first": [
+    [
+     "var:100",
+     [
+      134,
+      20
+     ]
+    ]
+   ]
+  },
+  "start-part1": {
+   "differ": 0,
+   "frame": 2728,
+   "same frame": true
+  },
+  "taskcore": {
+   "input": {
+    "seconds": 0.01,
+    "status": "ok"
+   },
+   "needed": {
+    "seconds": 0.01,
+    "status": "ok"
+   }
+  },
+  "taskcore_s": 0.02
+ },
+ "seconds": 2.3,
+ "sources": {
+  "replay_part1.py": "a333612cc306",
+  "replay.py": "8e9d4a9f9042",
+  "packed_reading.py": "6582b0d1bd9d",
+  "export_records.py": "c4660a1490ae",
+  "plan_fd.py": "34285f1d124a",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ }
+}

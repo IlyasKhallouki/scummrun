@@ -267,6 +267,109 @@ def record_naming(a) -> tuple:
     return int(rec), label
 
 
+# --- the control (plan.md step 5) ----------------------------------------------------------------------------------------
+
+def control_records(src, lines, dst) -> dict:
+    """The control's packed file (plan.md step 5: "the preconditions taken from the scripts removed, only what makes
+    an action usable in the engine kept"): ``src`` with each action's precondition cut to its sets on
+
+    * the input's engine conditions: the facts the reading's action line (``lines``, packed_reading.py) lists as
+      ``engine_pre`` (reader.Record.engine_pre: input on, the verb shown, A and B reachable, the sentence script free;
+      a dialog line's verb shown, its verb script and room; an event's slot live at its wait point, not frozen, its
+      locals, its room; Esc's override armed); a set the scripts narrowed further on such a fact stays as it is;
+    * a fact the action steps (an add): build_task's set for the step's room (the engine's own limit, as
+      beginCutscene past kMaxCutsceneNum, script.cpp:1632-1646), which the step's condition repeats anyway.
+
+    The sets on every other fact (what the scripts tested) are dropped. Everything else is ``src``'s word for word:
+    the effects with their conditions, the strings, the facts and their domains, the add tables, the goal and the
+    starts (the tables are copied and the footer's offsets moved). Streams: one action at a time. Returns counts:
+    actions, sets kept and dropped, dropped sets by fact kind (the key's prefix) and by action kind."""
+    import mmap
+    with open(src, "rb") as fsrc, open(dst, "wb") as fout:
+        mm = mmap.mmap(fsrc.fileno(), 0, access=mmap.ACCESS_READ)
+        w = memoryview(mm).cast("I")
+        try:
+            counts = _control(w, src, lines, fout, mm)
+        finally:
+            w.release()
+            mm.close()
+    return counts
+
+
+def _control(w, src, lines, fout, mm) -> dict:
+    """``control_records``'s pass over the words ``w`` of ``src``, written to ``fout``."""
+    import json
+    if w[0] != MAGIC or w[1] != VERSION or w[len(w) - 1] != END_MAGIC:
+        raise ValueError(f"{src}: not a taskcore file of version {VERSION}")
+    body, n, o_str, o_facts, o_adds, o_goal, o_starts, _ = w[len(w) - 8:]
+    ns = w[o_str]
+    lens = list(w[o_str + 1:o_str + 1 + ns])
+    strings, pos = [], (o_str + 1 + ns) * 4
+    for ln in lens:
+        strings.append(mm[pos:pos + ln].decode())
+        pos += ln
+    keys, p = [], o_facts + 1
+    for _ in range(w[o_facts]):
+        keys.append(strings[w[p]])
+        p += 2 + w[p + 1]
+    counts = {"actions": 0, "sets kept": 0, "sets dropped": 0, "actions with a set dropped": 0}
+    by_fact, by_kind = {}, {}
+    fout.write(array.array("I", [MAGIC, VERSION]).tobytes())
+    written = 2
+    p = body
+    with open(lines) as fl:
+        for i in range(n):
+            line = json.loads(fl.readline())
+            nw = w[p]
+            a = w[p + 1:p + 1 + nw].tolist()
+            p += 1 + nw
+            if line["i"] != i or line["rec"] != a[0] or line["label"] != strings[a[1]]:
+                raise ValueError(f"{lines}: line {i} ({line['label']!r}) is not action {i} of {src} "
+                                 f"({strings[a[1]]!r})")
+            npre, q, sets = a[6], 7, []
+            for _ in range(npre):
+                m = a[q + 1]
+                sets.append(a[q:q + 2 + m])
+                q += 2 + m
+            rest = a[q:]
+            stepped, r = set(), 1  # the facts the action's add effects step (rest: neff, then the effects)
+            for _ in range(rest[0]):
+                op, fact = rest[r], rest[r + 1]
+                r += 3 + (rest[r + 2] if op == OP_GUESS else 0)
+                if op == OP_ADD:
+                    stepped.add(fact)
+                nwhen = rest[r]
+                r += 1
+                for _ in range(nwhen):
+                    r += 2 + rest[r + 1]
+            engine = set(line["engine_pre"])
+            keep = [s for s in sets if keys[s[0]] in engine or s[0] in stepped]
+            dropped = [keys[s[0]] for s in sets if not (keys[s[0]] in engine or s[0] in stepped)]
+            new = a[:6] + [len(keep)] + [x for s in keep for x in s] + rest
+            fout.write(array.array("I", [len(new)] + new).tobytes())
+            written += 1 + len(new)
+            counts["actions"] += 1
+            counts["sets kept"] += len(keep)
+            counts["sets dropped"] += len(dropped)
+            counts["actions with a set dropped"] += bool(dropped)
+            kind = strings[a[2]]
+            by_kind[kind] = by_kind.get(kind, 0) + len(dropped)
+            for k in dropped:
+                fk = k.split(":")[0]
+                by_fact[fk] = by_fact.get(fk, 0) + 1
+        if fl.readline():
+            raise ValueError(f"{lines}: more lines than the {n} actions of {src}")
+    if p != o_str:
+        raise ValueError(f"{src}: the actions end at word {p}, the strings start at {o_str}")
+    delta = written - o_str
+    fout.write(mm[o_str * 4:(len(w) - 8) * 4])
+    fout.write(array.array("I", [body, n, o_str + delta, o_facts + delta, o_adds + delta, o_goal + delta,
+                                 o_starts + delta, END_MAGIC]).tobytes())
+    counts.update(bytes=(written + len(w) - o_str) * 4, dropped_by_fact=dict(sorted(by_fact.items())),
+                  dropped_by_kind=dict(sorted(by_kind.items())))
+    return counts
+
+
 # --- the replay's inputs to taskcore (taskcore/src/bans.rs) -------------------------------------------------------------
 
 def _label_text(d, v):

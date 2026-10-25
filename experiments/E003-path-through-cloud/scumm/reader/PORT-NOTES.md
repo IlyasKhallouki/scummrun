@@ -112,21 +112,25 @@ How Python's mechanisms map:
 
 The hooks need these changes outside the reader crate. Each is additive; a machine with no hooks (every caller in
 scumm-machine) runs as before: the machine goldens of rows 0-2 still give 0 differences (717 files, `golden.py
-compare --runs row0,row1,row2 --traces`).
+compare --runs row0,row1,row2 --traces`), and after the merge with main all nine runs (rows 0-5 and the three switch
+runs) give 0 differences in 2,151 files (`golden.py compare --runs row0,...,row5-esc_key_at_pre --traces`).
 
 | file | change |
 |---|---|
 | `machine/src/machine/hooks.rs` (new) | the `Hooks` trait (one default method per hooked method: its `_base`), the dispatchers (`Machine::advance`, `read`, `oget`, `okeys`, `val`, `test`, `getter`, `owned_by`, `find_inventory`, `clear`, `arith_at`, `jump`, `wait`, `op`, `join`, `merge`, `eng`, `eng_script`, `finish`, `count`, `set_freeze`, `freeze`, `unfreeze`), and public wrappers for what a hook calls (`vals`, `vals_ref`, `h_write`, `h_halt`, `h_note`, `h_done`, `h_resource`, `h_push_frame`, `h_stop_script`, `h_live_slots`, `h_cid`, `h_drive`, `h_waits`) |
 | `machine/src/machine.rs` | `mod hooks` and `pub use hooks::Hooks`; `Machine.hooks` and `Machine.ext` (two fields, set to None in `Machine::new`); renamed to `_base` and made public, bodies unchanged: `oget`, `advance`, `read`, `val`, `test`, `getter`, `owned_by`, `clear`, `arith_at`, `jump`, `wait`, `op`; `prefixed` lists the oracle's keys through `self.okeys` (one line) |
 | `machine/src/machine/calls.rs` | renamed to `_base` and made public, bodies unchanged: `join`, `merge`, `eng`, `eng_script`, `finish`, `count`, `set_freeze`, `freeze`, `unfreeze`, `find_inventory`; `eng_resume` lists the oracle's keys through `self.okeys` (one line) |
-| `machine/src/path.rs` | `Path.ext` (a hook's path fields, the `PathExt` trait, `Clone` for its box), `Sig.ext` (a hook's join signature extension; empty in `Sig::new` and `Sig::round`), `Store::remove` |
+| `machine/src/path.rs` | `Path.ext` (a hook's path fields, the `PathExt` trait, `Clone` for its box), `Sig.ext` (a hook's join signature extension; empty in `Sig::from_words`, which `Sig::round` uses), `Store::remove` |
 | `machine/src/value.rs` | `Unknown.class` (0 in `Vals::mk`, `mk_set`, `one_of`) |
 | `ir/src/analysis.rs` | `Reason::Other(&'static str)` and its arm in `Reason::as_str` |
 
-A merge with main (rows 3-5) touches the renamed lines and the struct literals of `Unknown` and `Sig`: a new
-`Unknown { .. }` needs `class: 0`, a new `Sig { .. }` `ext: Box::default()`, and a new caller of a renamed method
-calls the dispatcher (its old name) as before. Once row 4 ports model.py's `("input", ...)` step, `run_click_verb`
-can use it in place of its marked note (`machine.rs` `eng_input` is model.py's `_eng_input` with its switch off).
+**The merge with main (rows 3-5).** Main's rows 3-5 kept every change above. Its `Sig` is now a vector of words and
+a round flag; `ext` stays a field next to them, set in `Sig::from_words`. Its `oget` caches its unknowns per run; the
+cache is `oget_base`'s. It adds no `Unknown { .. }` literal. `Frame.locals` is now `Locals` (shared, sorted); the
+reader reads it with `as_slice()` (three lines of `machine.rs`, the same values). The methods rows 3-5 add (`settle.rs`,
+`dialog.rs`, `esc.rs`) are none that reader.py's `Reader` overrides, and the Reader runs without settle, dialog and
+esc, so none needed a hook. Row 4 now has model.py's `("input", ...)` step (`Step::Input`); `run_click_verb` still
+uses its marked note (`machine.rs` `eng_input`, model.py's `_eng_input` with its switch off).
 
 ## The oracles and the results
 
@@ -157,7 +161,7 @@ it is equal to `out/golden/reader/*.jsonl.gz` (sha256), so the captured runs are
 | the Rust machine half run by run: every captured run made again from its inputs (pins, precondition, what) and compared field by field (`reader-port runs`; the Builder goes on with the captured run) | room 33: 166 runs; kitchen: 18,127 runs (every path's end, pre, writes, kept slots, unknown writes, assumptions and last five notes; limit, value caps, first fork, the Reader's counters) | 0 |
 | the whole reading by the Rust Builder and the Rust machine half, no Python and no playback (`reader-port read`), against golden.py's file | room 33: 880 lines; kitchen: 72,258 lines | 0 |
 | whole runs: `reader_run_dump.py` against `reader-port dump-runs` (every path field: all assumptions, notes, errors, unmodelled statements and turns, end_at, steps) | 6 room 33 runs, 6 kitchen runs (2 of the second pass, made with the first pass's domains on both sides) | 0 |
-| model.Machine rows 0-2 after the machine changes (`machine-run`, `golden.py compare --traces`, machine/PORT-NOTES.md) | 717 files | 0 |
+| model.Machine after the machine changes (`machine-run`, `golden.py compare --traces`, machine/PORT-NOTES.md) | rows 0-2: 717 files; after the merge with main, all nine runs: 2,151 files | 0 |
 | synthetic readings: the frozen Python Builder over a fake machine that makes random paths, captured by reader_port_oracle.py's capture, replayed by the Rust Builder; then build_task, relevance, prune, both starts, export_records and RecordStream through taskcore against write_sas | 40 readings (190 to 16,495 records; room 33 and the kitchen; SIG_LIMIT 1 to 4, lists folded in 22; the caller's skip in 3; dropped domains in 3) and one with 119 labels that two jobs of one batch share (20,740 runs) | 0 in every reading; 120 SAS files equal (where write_sas fails, it fails in both); fold counts equal |
 
 build_task folds 527 records (71,729 actions; no-211: 71,721); relevance keeps 71,324 (no-211: 71,316), as in

@@ -8,7 +8,8 @@
 //! * [`path`] holds `Frame`, `Call`, `Step`, `Path`, `Run` and the join signature `Sig`.
 //! * [`plist`] holds `PList`, the list a fork shares (a path's assumptions, notes, ...).
 //! * [`machine`] holds `Machine` and `predict`; `machine/calls.rs` the calls and dispatch of row 1,
-//!   `machine/rooms.rs` the room change (startScene) of row 2.
+//!   `machine/rooms.rs` the room change (startScene) of row 2, `machine/settle.rs` the rounds of row 3,
+//!   `machine/dialog.rs` the click on a verb of row 4.
 //! * [`enc`] is golden.py's canonical encoding of all of these; [`trace`] is its turn-level trace.
 //! * [`harness`] holds the ground truth's pre states, the jobs file, check.py's `run_model` dispatch.
 

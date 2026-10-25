@@ -950,10 +950,10 @@ impl Hooks for ReaderHooks {
         }
         let g0 = &group[0];
         let x0 = sx(g0);
-        let frames0: Vec<&[(i32, Val)]> = g0.frames().map(|f| &f.locals[..]).collect();
+        let frames0: Vec<&[(i32, Val)]> = g0.frames().map(|f| f.locals.as_slice()).collect();
         let same = group[1..].iter().all(|g| {
             g.writes == g0.writes && {
-                let fl: Vec<&[(i32, Val)]> = g.frames().map(|f| &f.locals[..]).collect();
+                let fl: Vec<&[(i32, Val)]> = g.frames().map(|f| f.locals.as_slice()).collect();
                 fl == frames0
             }
         });
@@ -1093,7 +1093,7 @@ impl Hooks for ReaderHooks {
                 let k = KeptS {
                     unit: f.unit,
                     w,
-                    locals: f.locals.clone(),
+                    locals: f.locals.as_slice().to_vec(),
                     known: f.args_known,
                     rec: f.recursive,
                     res: f.resistant,

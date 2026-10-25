@@ -97,6 +97,8 @@ pub struct Vals {
     list: Vec<Unknown>,
     map: FxHashMap<Unknown, UnkId>,
     pub caps: Vec<(&'static str, u64)>,
+    /// `str(unknown)`, made when first asked for
+    shown: Vec<Option<std::rc::Rc<str>>>,
 }
 
 /// What `_decide` gives: a truth value, or the unknown that decides nothing.
@@ -112,6 +114,22 @@ impl Vals {
         self.list.clear();
         self.map.clear();
         self.caps.clear();
+        self.shown.clear();
+    }
+
+    /// `str(v)` as a shared string, made once per unknown.
+    pub fn show_rc(&mut self, v: Val) -> std::rc::Rc<str> {
+        let Val::Unk(id) = v else { return self.show(v).into() };
+        let i = id.0 as usize;
+        if self.shown.len() <= i {
+            self.shown.resize(i + 1, None);
+        }
+        if let Some(s) = &self.shown[i] {
+            return s.clone();
+        }
+        let s: std::rc::Rc<str> = self.show(v).into();
+        self.shown[i] = Some(s.clone());
+        s
     }
 
     pub fn intern(&mut self, u: Unknown) -> Val {
@@ -189,6 +207,35 @@ impl Vals {
                 write!(s, "{v}").unwrap();
             }
             s.push(']');
+        }
+        s.push(')');
+        s
+    }
+
+    /// Python `repr(v)`: the int, or the dataclass repr `Unknown(reason='...', what='...', values=None)`. A value
+    /// set prints as `frozenset({1, 2})` in ascending order: CPython prints a frozenset in its hash-table order,
+    /// which for small non-negative ints is ascending and otherwise rests on how the set was built (not
+    /// reproduced; PORT-NOTES.md, kept apart).
+    pub fn py_repr(&self, v: Val) -> String {
+        let Val::Unk(id) = v else { return self.show(v) };
+        let u = self.get(id);
+        let mut s = format!(
+            "Unknown(reason={}, what={}, values=",
+            scumm_ir::py::repr(&u.reason.as_str()),
+            scumm_ir::py::repr(&u.what)
+        );
+        match &u.values {
+            None => s.push_str("None"),
+            Some(vs) => {
+                s.push_str("frozenset({");
+                for (k, x) in vs.iter().enumerate() {
+                    if k > 0 {
+                        s.push_str(", ");
+                    }
+                    write!(s, "{x}").unwrap();
+                }
+                s.push_str("})");
+            }
         }
         s.push(')');
         s
@@ -363,6 +410,17 @@ pub fn key_num(v: i64) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Python's `repr` of values, as `_merge`'s `input_drift` sort reads them (the strings are CPython's).
+    #[test]
+    fn py_repr() {
+        let mut v = Vals::default();
+        assert_eq!(v.py_repr(Val::Int(-12)), "-12");
+        let a = v.mk(Reason::Held, "var:53");
+        assert_eq!(v.py_repr(a), "Unknown(reason='not held', what='var:53', values=None)");
+        let b = v.mk_set(Reason::Branch, "it's", vec![2, 1]);
+        assert_eq!(v.py_repr(b), "Unknown(reason='branch', what=\"it's\", values=frozenset({1, 2}))");
+    }
 
     #[test]
     fn show_and_sets() {

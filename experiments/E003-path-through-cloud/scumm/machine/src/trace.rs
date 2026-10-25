@@ -6,7 +6,6 @@
 
 use crate::path::Path;
 use scumm_ir::json::J;
-use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Where trace lines go: a writer that can be closed (a gzip file writes its trailer then).
@@ -52,22 +51,39 @@ impl Tracer {
         }
     }
 
-    /// golden.py `_ev`: {"seq", "tid", "type", "steps", "na", ...kw}, keys sorted.
+    /// golden.py `_ev`: {"seq", "tid", "type", "steps", "na", ...kw}, keys sorted (a key of `kw` given twice keeps
+    /// its last value, as a dict does). The line is written as `J::Obj` writes it, without building the object.
     pub fn ev(&mut self, p: &mut Path, typ: &str, kw: Vec<(&'static str, J)>) {
         let tid = self.tid(p);
-        let mut m = BTreeMap::new();
-        m.insert("seq".to_string(), J::Int(self.seq as i64));
-        m.insert("tid".to_string(), J::Int(tid as i64));
-        m.insert("type".to_string(), J::Str(typ.to_string()));
-        m.insert("steps".to_string(), J::Int(p.steps as i64));
-        m.insert("na".to_string(), J::Int(p.assumptions.len() as i64));
-        for (k, v) in kw {
-            m.insert(k.to_string(), v);
+        let mut items: Vec<(&str, J)> = Vec::with_capacity(5 + kw.len());
+        items.push(("seq", J::Int(self.seq as i64)));
+        items.push(("tid", J::Int(tid as i64)));
+        items.push(("type", J::Str(typ.to_string())));
+        items.push(("steps", J::Int(p.steps as i64)));
+        items.push(("na", J::Int(p.assumptions.len() as i64)));
+        items.extend(kw);
+        // a stable sort, then the last of equal keys wins
+        items.sort_by(|a, b| a.0.cmp(b.0));
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if items[i].0 == items[i + 1].0 {
+                items.remove(i);
+            } else {
+                i += 1;
+            }
         }
         self.seq += 1;
         self.line.clear();
-        J::Obj(m).write(&mut self.line);
-        self.line.push('\n');
+        self.line.push('{');
+        for (k, (key, v)) in items.iter().enumerate() {
+            if k > 0 {
+                self.line.push(',');
+            }
+            scumm_ir::json::write_str(key, &mut self.line);
+            self.line.push(':');
+            v.write(&mut self.line);
+        }
+        self.line.push_str("}\n");
         self.sink.write_all(self.line.as_bytes()).expect("trace sink");
     }
 

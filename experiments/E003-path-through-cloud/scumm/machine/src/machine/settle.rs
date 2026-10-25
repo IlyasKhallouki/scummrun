@@ -14,15 +14,18 @@
 
 use super::calls::sentence_slots;
 use super::*;
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashSet, FxHasher};
 use scumm_ir::analysis::{LoopKind, Read, WaitKind, WaitPoint};
 use std::hash::{Hash, Hasher};
 
 /// The head of a settle round's Call (model.py `ROUND`).
 pub const ROUND: &str = "runAllScripts";
 const ROUND_CITE: &str = "script.cpp:968-987; scumm.cpp:3231-3255";
+const RULE_A: &str = "a: started or resumed by the path";
+/// model.py `R_SETTLE`, as `Path.writer` keeps it
+const R_SETTLE: &str = "not settled";
 /// model.py `MOUSE_VARS`, sorted by number.
-const MOUSE_VARS: [(i32, &str); 4] =
+pub(super) const MOUSE_VARS: [(i32, &str); 4] =
     [(20, "VAR_VIRT_MOUSE_X"), (21, "VAR_VIRT_MOUSE_Y"), (44, "VAR_MOUSE_X"), (45, "VAR_MOUSE_Y")];
 
 /// The slot fact of a unit name: script:N and local:N stay, obj:O is objscript:O, entry and exit code have none.
@@ -180,7 +183,7 @@ impl<'g> Machine<'g> {
         let mut h = FxHasher::default();
         p.slots.len().hash(&mut h);
         for (n, f) in &p.slots {
-            (n, f.unit, f.pc, &f.locals, f.args_known, f.origin, f.owned, f.recursive, f.resistant).hash(&mut h);
+            (n, f.unit, f.pc, f.locals.as_slice(), f.args_known, f.origin, f.owned, f.recursive, f.resistant).hash(&mut h);
         }
         fmix(h.finish())
     }
@@ -248,7 +251,7 @@ impl<'g> Machine<'g> {
             let what = format!("{k} {why}");
             let v = self.settle_unknown(&vals, what);
             Self::put_raw(p, k, v);
-            p.writer.insert(k, rc(Reason::Settle.as_str().as_ref()));
+            p.writer.insert(k, R_SETTLE);
         }
     }
 
@@ -275,7 +278,7 @@ impl<'g> Machine<'g> {
         }
         let v = self.settle_unknown(vals, format!("{k}: {why}"));
         Self::put_raw(p, k, v);
-        p.writer.insert(k, rc(Reason::Settle.as_str().as_ref()));
+        p.writer.insert(k, R_SETTLE);
     }
 
     /// model.py `_close_settle`: what a path that reached settle can no longer claim when it ends.
@@ -431,10 +434,7 @@ impl<'g> Machine<'g> {
         let mut names: Vec<Slot> = p.ambient_pass.iter().copied().collect();
         sort_names(&mut names);
         for name in names {
-            let mut keys: Vec<Fact> = match p.rw.get(&Owner::Slot(name)) {
-                Some((_, w)) => w.iter().copied().collect(),
-                None => Vec::new(),
-            };
+            let mut keys: Vec<Fact> = p.rw.sets(Owner::Slot(name)).1.into_iter().collect();
             sort_str(&mut keys);
             for k in keys {
                 if matches!(k, Fact::At(n, _) if n == name) {
@@ -456,17 +456,20 @@ impl<'g> Machine<'g> {
 
     /// Two slots of one frame, one writing a fact the other read or wrote (model.py `_round_conflicts`).
     fn round_conflicts(&mut self, p: &mut Path) {
-        let mut items: Vec<(String, Owner)> =
-            p.rw.keys().filter(|&&k| k != Owner::Sentence).map(|&k| (enc::owner_name(k), k)).collect();
-        if items.len() < 2 {
+        if p.rw.owners().iter().filter(|&&k| k != Owner::Sentence).count() < 2 {
             return;
         }
-        items.sort();
+        let mut items: Vec<(String, Owner, FxHashSet<Fact>, FxHashSet<Fact>)> = p
+            .rw
+            .all_sets()
+            .into_iter()
+            .filter(|e| e.0 != Owner::Sentence)
+            .map(|(o, r, w)| (enc::owner_name(o), o, r, w))
+            .collect();
+        items.sort_by(|x, y| x.0.cmp(&y.0));
         let mut found = Vec::new();
-        for (i, (_, a)) in items.iter().enumerate() {
-            let (ra, wa) = &p.rw[a];
-            for (_, b) in &items[i + 1..] {
-                let (rb, wb) = &p.rw[b];
+        for (i, (_, a, ra, wa)) in items.iter().enumerate() {
+            for (_, b, rb, wb) in &items[i + 1..] {
                 // (wa & (rb | wb)) | (wb & ra)
                 let mut keys: Vec<Fact> = wa.iter().filter(|k| rb.contains(k) || wb.contains(k)).copied().collect();
                 let more: Vec<Fact> = wb.iter().filter(|k| ra.contains(k) && !wa.contains(k)).copied().collect();
@@ -694,8 +697,8 @@ impl<'g> Machine<'g> {
         }
         let owner = Owner::Slot(name);
         p.owner = Some(owner);
-        p.owner_rule = self.s_empty.clone();
-        p.rw.entry(owner).or_default();
+        p.owner_rule = "";
+        p.rw.add_owner(owner);
         let frame = match self.slot_frame(p, o, name) {
             Ok(f) => f,
             Err(why) => {
@@ -706,7 +709,7 @@ impl<'g> Machine<'g> {
         let u = frame.unit;
         let pc = frame.pc.expect("a slot's pc");
         let wp = g.wait_point(u, pc, cp);
-        let rule: S = if frame.origin == "pre" && frame.sid == 0 {
+        let rule: &'static str = if frame.origin == "pre" && frame.sid == 0 {
             // its first turn, from its pre wait point
             let r = match self.pre_rule(p, o, u, wp) {
                 Ok(r) => r,
@@ -720,12 +723,9 @@ impl<'g> Machine<'g> {
                 self.skip(p, name, "a time-only wait, held in the click's frame");
                 return Vec::new();
             }
-            rc(r)
+            r
         } else {
-            match p.ran_by.get(&name) {
-                Some(r) => r.clone(),
-                None => self.s_rule_a.clone(),
-            }
+            p.ran_by.get(&name).copied().unwrap_or(RULE_A)
         };
         if let Some(li) = wp.loop_ {
             let lp = &g.loops(u, cp)[li as usize];
@@ -739,7 +739,7 @@ impl<'g> Machine<'g> {
                 p.ambient_pass.insert(name);
             }
         }
-        p.ran_by.entry(name).or_insert_with(|| rule.clone());
+        p.ran_by.entry(name).or_insert(rule);
         p.not_run.remove(&name);
         let mut gf = frame;
         gf.nested = false;
@@ -791,7 +791,7 @@ impl<'g> Machine<'g> {
                 ("unit", enc::unit_key(self.unit_key(u))),
                 ("pc", gpc.map_or(J::Null, |i| J::Int(i as i64))),
                 ("offset", offset),
-                ("rule", enc::s(&p.owner_rule)),
+                ("rule", enc::s(p.owner_rule)),
                 ("round", J::Int(p.round as i64)),
             ];
             self.ev(p, "turn", kw);
@@ -852,8 +852,8 @@ impl<'g> Machine<'g> {
         if n != 0 {
             p.sentences += 1;
             p.owner = Some(Owner::Sentence);
-            p.owner_rule = self.s_queue.clone();
-            p.rw.entry(Owner::Sentence).or_default();
+            p.owner_rule = "the sentence queue";
+            p.rw.add_owner(Owner::Sentence);
             let args = [(0, Val::Int(verb)), (1, Val::Int(a)), (2, Val::Int(b))];
             self.eng_script(p, ci, o, n, Some(false), Some(false), &args);
         }

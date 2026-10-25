@@ -9,6 +9,16 @@
 //!   dropped), Python (wide.py) against Rust (machine-cases), traces too.
 //! * `row2_synth`, `row2_limits` (ignored): row 2 on states with live object slots, two of them changed (owners 1, owners
 //!   not held), and with small path and step limits.
+//! * `row3_subset` (fast), `row3_full` and `row3_wide` (ignored): settle; the wide one runs waits from every state and
+//!   sentences from one.
+//! * `row4_subset` and `row4_switch_subset` (fast), `row4_full`, `row4_const_polls_full`, `row4_input_after_turns_full`,
+//!   `row4_wide` and `row4_synth` (ignored): dialog, and the two switch runs of row 4; the wide one clicks every verb
+//!   shown at pre from every state (the cases the Rust machine runs in at most 20 ms), switches off and with
+//!   input_after_turns; the synthetic one clicks with VAR_VERB_SCRIPT 0 or not held, and VAR_USERPUT not held.
+//! * `row5_subset` and `row5_switch_subset` (fast), `row5_full`, `row5_esc_key_at_pre_full`, `row5_wide`, `row5_synth`
+//!   and `row5_arm` (ignored): esc, and the switch run of row 5; the wide one presses Esc from every state, switch off and
+//!   on; the synthetic ones change the key code, the cursor, VAR_USERPUT and VAR_VERB_SCRIPT, and arm an override on
+//!   each slot live at pre.
 //!
 //! Each needs the goldens in ROOT/out/golden (golden.py machine --runs row0,row1,row2) and the experiment's venv.
 
@@ -92,6 +102,32 @@ const SUBSET1: &str = "S1#33,S2#10,S1#40,S1#13,S1#11,S1#43,S1#96,S1#2,S1#95";
 /// row (S1#2), and a move with no action (S1#95).
 const SUBSET2: &str = "S1#11,S1#58,S1#13,S3#78,S1#8,S3#44,S1#42,S1#83,S1#2,S1#95";
 
+/// Moves of row 3 (settle), picked by `survey3.py --cover` on the goldens: rounds, merges at a round's start into value
+/// sets and the second-instance close (S2#48, S1#59), a camera exit that forks once and stays (S3#60), a parked first
+/// end (S1#39), a wait (S2#30), doSentence's queue run at a round's end and an engine error (S1#96), a slot with no
+/// single wait point (S2#49), the round limit (S3#78), a poll whose facts did not change (S1#22), a chained first end
+/// (S2#10), the path limit (S1#33), endCutscene in a settle turn with esc: reads resting on set order (S3#47), an Esc
+/// skip that runs nothing at this row (S1#2), and a move with no action (S1#95).
+const SUBSET3: &str = "S2#48,S3#60,S1#39,S2#30,S1#96,S2#49,S3#78,S1#22,S1#59,S2#10,S1#33,S3#47,S1#2,S1#95";
+
+/// Moves of row 4 (dialog), picked with `survey4.py --per-move` on the goldens: a local input script (S1#19), a turn
+/// that changed VAR_USERPUT before the click (input drift) on a path merged later (S1#34), drift on 32 merged paths
+/// (S2#8), merges after the click (S1#21), a move whose output const_polls changes (S3#14), and moves that run as at
+/// row 3: a wait (S2#30), an Esc skip that runs nothing at this row (S1#2), a move with no action (S1#95).
+const SUBSET4: &str = "S1#19,S1#34,S2#8,S1#21,S3#14,S2#30,S1#2,S1#95";
+
+/// Moves of row 4's switch runs: clicks input_after_turns drops (VAR_USERPUT 0 after the turns: S1#34, S1#53, S2#6,
+/// S2#8), and moves const_polls changes (S2#15, S3#14).
+const SUBSET4_IAT: &str = "S1#34,S1#53,S2#6,S2#8";
+const SUBSET4_CP: &str = "S2#15,S3#14";
+
+/// Moves of row 5 (esc): all 22 Esc moves of the goldens (0.1 s of Rust in all): no override armed (S3#46), the rewound
+/// slot's turn (the other 21), the fork on merged paths that disagree on clearClickedStatus (S1#2, S3#86), the key
+/// dropped with input off (S3#13), wiped (S1#3), taken by input scripts 4 (S3#59) and 14 (S3#16) and by an unknown one
+/// (S3#4); and moves that run as at row 4: a dialog line (S1#19), a wait (S2#30), a move with no action (S1#95).
+const ESC_MOVES: &str = "S1#2,S1#3,S2#14,S2#20,S2#52,S3#2,S3#4,S3#10,S3#13,S3#15,S3#16,S3#21,S3#42,S3#46,S3#48,S3#54,\
+                         S3#56,S3#58,S3#59,S3#61,S3#64,S3#86";
+
 /// machine-run on some moves of a run, compared file by file with the goldens, traces too.
 fn subset(run_name: &str, labels: &str) {
     if !golden_run(run_name).join("index.json").exists() {
@@ -127,14 +163,40 @@ fn full(run_name: &str) {
 
 /// wide.py against machine-cases, one dump per (name, wide.py arguments), traces too.
 fn wide(dumps: &[(&str, Vec<&str>)]) {
+    wide_with(dumps, None);
+}
+
+/// `wide`, keeping only the cases the Rust machine runs in at most `max_ms` milliseconds with at most `max_items`
+/// list entries (wide.py `--plan`, `machine-cases --costs`, then `--from-costs`).
+fn wide_costed(dumps: &[(&str, Vec<&str>)], max_ms: &str, max_items: &str) {
+    wide_with(dumps, Some((max_ms, max_items)));
+}
+
+fn wide_with(dumps: &[(&str, Vec<&str>)], costed: Option<(&str, &str)>) {
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("wide.py");
     for (name, args) in dumps {
         let out = tmp(name);
-        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("wide.py");
+        let mut extra: Vec<String> = Vec::new();
+        let plan = tmp(&format!("{name}-plan"));
+        if let Some((max_ms, max_items)) = costed {
+            let mut c = py(&[script.to_str().unwrap(), "dump", "--out", plan.to_str().unwrap(), "--plan"]);
+            c.args(args);
+            if let Err(e) = run(&mut c) {
+                panic!("wide.py --plan: {e}");
+            }
+            if let Err(e) = run(Command::new(env!("CARGO_BIN_EXE_machine-cases")).arg(&plan).arg("--costs")) {
+                panic!("machine-cases --costs: {e}");
+            }
+            let costs = plan.join("rust-costs.json");
+            extra = vec!["--from-costs".into(), costs.to_str().unwrap().into(), "--max-rust-ms".into(), max_ms.into()];
+            extra.extend(["--max-items".to_string(), max_items.to_string()]);
+        }
         let mut c = py(&[script.to_str().unwrap(), "dump", "--out", out.to_str().unwrap()]);
-        c.args(args);
+        c.args(args).args(&extra);
         if let Err(e) = run(&mut c) {
             panic!("wide.py: {e}");
         }
+        let _ = std::fs::remove_dir_all(&plan);
         if let Err(e) = run(Command::new(env!("CARGO_BIN_EXE_machine-cases")).arg(&out)) {
             panic!("machine-cases: {e}");
         }
@@ -160,6 +222,33 @@ fn row2_subset() {
 }
 
 #[test]
+fn row3_subset() {
+    subset("row3", SUBSET3);
+}
+
+#[test]
+fn row4_subset() {
+    subset("row4", SUBSET4);
+}
+
+#[test]
+fn row4_switch_subset() {
+    subset("row4-input_after_turns", SUBSET4_IAT);
+    subset("row4-const_polls", SUBSET4_CP);
+}
+
+#[test]
+fn row5_subset() {
+    subset("row5", &format!("{},S1#19,S2#30,S1#95", ESC_MOVES.replace(' ', "")));
+}
+
+/// The 22 Esc moves under switch esc_key_at_pre (VAR_USERPUT and VAR_VERB_SCRIPT at pre).
+#[test]
+fn row5_switch_subset() {
+    subset("row5-esc_key_at_pre", &ESC_MOVES.replace(' ', ""));
+}
+
+#[test]
 #[ignore]
 fn row0_full() {
     full("row0");
@@ -175,6 +264,162 @@ fn row1_full() {
 #[ignore]
 fn row2_full() {
     full("row2");
+}
+
+/// Every row-3 move, S2#21 and S2#29 among them (about 10 s each in Rust, traced; 3 minutes in all, most of it
+/// candidate.py check).
+#[test]
+#[ignore]
+fn row3_full() {
+    full("row3");
+}
+
+/// Every row-4 move (the 60 dialog lines, the rest as at row 3), and the same for the two switch runs of row 4.
+#[test]
+#[ignore]
+fn row4_full() {
+    full("row4");
+}
+
+#[test]
+#[ignore]
+fn row4_const_polls_full() {
+    full("row4-const_polls");
+}
+
+#[test]
+#[ignore]
+fn row4_input_after_turns_full() {
+    full("row4-input_after_turns");
+}
+
+/// Every row-5 move (the 22 Esc moves, the rest as at row 4), and the same for the switch run esc_key_at_pre.
+#[test]
+#[ignore]
+fn row5_full() {
+    full("row5");
+}
+
+#[test]
+#[ignore]
+fn row5_esc_key_at_pre_full() {
+    full("row5-esc_key_at_pre");
+}
+
+/// Row 5 beyond the goldens: the Esc key from every ground-truth state, switch off and with esc_key_at_pre (the cases
+/// the Rust machine runs in at most 1 s with at most 200,000 list entries: 247 of 250; about 2 minutes of Python each).
+#[test]
+#[ignore]
+fn row5_wide() {
+    let escs = |sw: &'static str| {
+        vec!["--row", "5", "--rows", "all", "--escs", "--no-objects", "--budget", "60", "--max-mb", "50", "--switches", sw]
+    };
+    wide_costed(&[("wide5-escs", escs("")), ("wide5-escs-pre", escs("esc_key_at_pre"))], "1000", "200000");
+}
+
+/// Row 5 on synthetic states: the key code VAR_CUTSCENEEXIT_KEY 0 (Esc is not the exit key: the key is Esc's ASCII
+/// code), not held, Enter with the cursor as at pre, hidden and not held, Tab, 512 and -1 (not a key) from ten states;
+/// VAR_USERPUT not held (the fork on whether the key is dropped; switch off and on), VAR_VERB_SCRIPT 0 and not held from
+/// every state; and with a path limit of 3 (forks in the Esc frame cut, key routes cut back).
+#[test]
+#[ignore]
+fn row5_synth() {
+    const ROWS: &str = "3,22,37,60,120,131,180,202,215,240";
+    let s = |rows: &'static str, change: Vec<&'static str>, sw: &'static str| {
+        let mut v = vec!["--row", "5", "--rows", rows, "--escs", "--no-objects", "--budget", "60", "--max-mb", "50"];
+        v.extend_from_slice(&["--switches", sw]);
+        v.extend(change);
+        v
+    };
+    wide_costed(
+        &[
+            ("wide5-code0", s(ROWS, vec!["--set", "var:24=0"], "")),
+            ("wide5-codeunk", s(ROWS, vec!["--unheld", "var:24"], "")),
+            ("wide5-enter", s(ROWS, vec!["--set", "var:24=13"], "")),
+            ("wide5-enter-nocursor", s(ROWS, vec!["--set", "var:24=13,var:52=0"], "")),
+            ("wide5-enter-cursorunk", s(ROWS, vec!["--set", "var:24=13", "--unheld", "var:52"], "")),
+            ("wide5-tab", s(ROWS, vec!["--set", "var:24=9"], "")),
+            ("wide5-code512", s(ROWS, vec!["--set", "var:24=512"], "")),
+            ("wide5-codeneg", s(ROWS, vec!["--set", "var:24=-1"], "")),
+            ("wide5-upunk", s("all", vec!["--unheld", "var:53"], "")),
+            ("wide5-upunk-pre", s("all", vec!["--unheld", "var:53"], "esc_key_at_pre")),
+            ("wide5-vs0", s("all", vec!["--set", "var:32=0"], "")),
+            ("wide5-vsunk-pre", s("all", vec!["--unheld", "var:32"], "esc_key_at_pre")),
+            // small path limits: forks in the Esc frame cut, key routes cut back with them
+            ("wide5-limits", s("all", vec!["--unheld", "var:53", "--path-limit", "3", "--step-limit", "2000"], "")),
+        ],
+        "1000",
+        "200000",
+    );
+}
+
+/// Row 5 with an override armed on each slot live at pre at its wait point W and at W + 1 (wide.py `--arm`): global,
+/// local, object and entry slots, override points that are no instruction, overrides of slots not run at pre (script
+/// facts not held), two armed keys (`--keep-armed`, on states that arm one), and a path limit of 2 with VAR_USERPUT
+/// not held (forks in the Esc frame cut, key routes cut back).
+#[test]
+#[ignore]
+fn row5_arm() {
+    let s = |rows: &'static str, extra: Vec<&'static str>| {
+        let mut v = vec!["--row", "5", "--rows", rows, "--arm", "--no-objects", "--budget", "60", "--max-mb", "50"];
+        v.extend(extra);
+        v
+    };
+    wide_costed(
+        &[
+            ("wide5-arm", s("3,22,37,60,120,124,131,180,215,240", vec![])),
+            ("wide5-arm-keep", s("96,158,202,215,240", vec!["--keep-armed"])),
+            ("wide5-arm-unheld", s("3,37,120,215", vec!["--drop-kinds", "script,local"])),
+            ("wide5-arm-limits", s("3,37,120,215,240", vec!["--unheld", "var:53", "--path-limit", "2"])),
+        ],
+        "1000",
+        "200000",
+    );
+}
+
+/// Row 4 beyond the goldens: a click on every verb shown at pre, and on verb 0, from every ground-truth state, with
+/// the switches off and with input_after_turns; the cases the Rust machine runs in at most 20 ms with at most 200,000
+/// list entries (about 2,500 of the 3,038 clicks; some clicks dump over 100 MB, which Python takes minutes to encode).
+#[test]
+#[ignore]
+fn row4_wide() {
+    let clicks = |sw: &'static str| {
+        vec!["--row", "4", "--rows", "all", "--clicks", "--no-objects", "--budget", "20", "--max-mb", "5", "--switches", sw]
+    };
+    wide_costed(&[("wide4-clicks", clicks("")), ("wide4-clicks-iat", clicks("input_after_turns"))], "20", "200000");
+}
+
+/// Row 4 on synthetic states, clicks from seven states: VAR_VERB_SCRIPT 0, VAR_VERB_SCRIPT not held (an unknown
+/// input script), VAR_USERPUT not held (drift from an unknown pre value; with input_after_turns, the fork on whether
+/// the click is dropped); each with the switches off and with input_after_turns.
+#[test]
+#[ignore]
+fn row4_synth() {
+    let s = |change: [&'static str; 2], sw: &'static str| {
+        let mut v = vec!["--row", "4", "--rows", "3,22,60,120,131,180,240", "--clicks", "--no-objects", "--budget", "5"];
+        v.extend_from_slice(&["--max-mb", "5", "--max-items", "2000000", "--switches", sw]);
+        v.extend_from_slice(&change);
+        v
+    };
+    wide(&[
+        ("wide4-vs0", s(["--set", "var:32=0"], "")),
+        ("wide4-vs0-iat", s(["--set", "var:32=0"], "input_after_turns")),
+        ("wide4-vsunk", s(["--unheld", "var:32"], "")),
+        ("wide4-vsunk-iat", s(["--unheld", "var:32"], "input_after_turns")),
+        ("wide4-upunk", s(["--unheld", "var:53"], "")),
+        ("wide4-upunk-iat", s(["--unheld", "var:53"], "input_after_turns")),
+    ]);
+}
+
+/// Row 3 beyond the goldens: the wait action from every ground-truth state (249 cases, about 2 minutes of Python), and
+/// sentences with settle from state 120 (a case over 1 s in Python is dropped).
+#[test]
+#[ignore]
+fn row3_wide() {
+    wide(&[
+        ("wide3-waits", vec!["--row", "3", "--rows", "all", "--waits", "--no-objects", "--budget", "20", "--max-mb", "50"]),
+        ("wide3-sentences", vec!["--row", "3", "--rows", "120", "--sentences", "--no-objects", "--budget", "1", "--max-mb", "20"]),
+    ]);
 }
 
 #[test]

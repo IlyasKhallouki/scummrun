@@ -6,7 +6,7 @@ reference. A layer replaces them only once it reproduces their output byte for b
 | crate | ports | state |
 |---|---|---|
 | `ir` (scumm-ir) | ir.py, facts.py's key scheme, everything model.Game computes from the game files alone | done: 0 mismatches |
-| `machine` (scumm-machine) | model.py's Machine, row by row | rows 0-2 done: 0 differences; rows 3-5 next (machine/PORT-NOTES.md) |
+| `machine` (scumm-machine) | model.py's Machine, row by row | rows 0-5 and the three switch runs done: every machine golden run has 0 differences; check.py's model check runs on it (`check_rust.py`) with files byte-identical to results/ (machine/PORT-NOTES.md) |
 | `reader` (scumm-reader) | reader.py (both halves, the machine one as hooks on scumm-machine), domains.py | done: 0 differences on room 33's and the kitchen's readings (reader/PORT-NOTES.md) |
 
 A later crate depends on `ir` with `scumm-ir.workspace = true`.
@@ -56,6 +56,21 @@ Measured on the laptop on 2026-10-24, with other jobs running:
 | Rust: Game::load (both const_polls settings) | 0.18 s | 22 MB |
 
 The machine's comparison runs through `machine-run` and `golden.py compare`; machine/PORT-NOTES.md says how.
+
+## Run the model check on the Rust machine
+
+`../check_rust.py` runs check.py's own `main` with the Rust machine (`machine-serve`) in place of model.py's. It writes
+check.py's files into `--out DIR`, never into results/. From the experiment folder:
+
+    mkdir -p DIR && cp results/growth.md DIR/      # check.py replaces its row of DIR/growth.md
+    nice -n 10 ../../.venv/bin/python check_rust.py --out DIR --features own_entry,dispatch,calls,room_change,settle,dialog,esc
+    cmp results/check-part1-row5.jsonl DIR/check-part1-row5.jsonl
+    cmp <(tail -n +2 results/check-part1-row5.log) <(tail -n +2 DIR/check-part1-row5.log)   # line 1 holds the time
+
+It takes check.py's options (`--features`, `--switches`, `--jobs`) and builds `machine-serve` first
+(`cargo build --release -p scumm-machine`). Rows 3-5 and the switch runs take 1 to 3 minutes each on one job, by the
+laptop's load, against 29 to 75 minutes for the check.py runs that wrote results/. `cargo test --release -p scumm-machine --test check_rust` checks rows 0-2 against results/
+(`-- --ignored` all nine runs). machine/PORT-NOTES.md ("The model check on Rust") has the details and the times.
 
 ## What the machine port builds on
 
