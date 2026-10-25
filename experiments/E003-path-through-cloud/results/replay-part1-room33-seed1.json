@@ -1,0 +1,1147 @@
+{
+ "seed": 1,
+ "reading": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/room33/reading.json",
+ "name": "room33",
+ "control": false,
+ "goal": {
+  "state:428": [
+   1
+  ]
+ },
+ "goal_is_part1_end": false,
+ "task": {
+  "actions": 816,
+  "facts": 143,
+  "records": 878,
+  "folded": 62,
+  "packed_sha1": "9473d562224a",
+  "packed_bytes": 205552
+ },
+ "control_counts": null,
+ "limits": {
+  "replans": 500,
+  "seconds": 86400,
+  "plan_time": 600,
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60
+ },
+ "sources": {
+  "replay_part1.py": "a333612cc306",
+  "replay.py": "8e9d4a9f9042",
+  "packed_reading.py": "6582b0d1bd9d",
+  "export_records.py": "c4660a1490ae",
+  "plan_fd.py": "34285f1d124a",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ },
+ "taskcore_binary": "25738cbfb7c0",
+ "load_s": 0.01,
+ "start": {
+  "stop": {
+   "stop": "idle",
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "idle": "sentence",
+   "rng": 3182679328,
+   "up": 1,
+   "cs": 0,
+   "ego": [
+    346,
+    133
+   ]
+  },
+  "dump": {
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "ego": 1,
+   "ego_pos": [
+    346,
+    133
+   ],
+   "seed": 1,
+   "boot_param": 0
+  },
+  "trace": {
+   "boot": 1,
+   "cd_track": 4,
+   "control": 1,
+   "room": 5,
+   "segment_start": 1,
+   "stall": 4
+  },
+  "boot_s": 2.3,
+  "check": {
+   "boot checks": "ok",
+   "reading start": {
+    "name": "results/start-part1.jsonl seed 1",
+    "differ": 0,
+    "first": []
+   },
+   "start-part1": {
+    "differ": 0,
+    "frame": 2728,
+    "same frame": true
+   },
+   "taskcore": {
+    "input": {
+     "seconds": 0.01,
+     "status": "ok"
+    },
+    "needed": {
+     "seconds": 0.01,
+     "status": "ok"
+    }
+   },
+   "taskcore_s": 0.02
+  }
+ },
+ "run": {
+  "stop": "goal",
+  "goal": true,
+  "replans": 0,
+  "bans": [],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 2728,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first",
+    "write_s": 0.013767472002655268,
+    "status": "plan",
+    "seconds": 0.08081087799655506,
+    "steps": [
+     "sentence(2,428)#162",
+     "event(script:2@736#527bf977afba)#768"
+    ],
+    "operators": 657,
+    "actions": 275,
+    "decode_s": 0.009241291001671925,
+    "folds": [
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 22,
+    "needed_facts": 24,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 11,
+    "landmark_orderings": 16,
+    "game_landmarks": 11
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "sentence(2,428)#162",
+    "kind": "sentence",
+    "input": "click verb 2 on 428",
+    "start": 2728,
+    "issue": 2776,
+    "end": 2777,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2728,
+      "inputs": [
+       {
+        "frame": 2736,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2751,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2752,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2753,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2754,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2755,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2756,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2757,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2758,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2759,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2760,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2761,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2762,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2763,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2764,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2765,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2766,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2767,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2768,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2769,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2770,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2771,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2772,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2773,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2774,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2775,
+        "key": "o"
+       },
+       {
+        "frame": 2776,
+        "click": [
+         311,
+         107
+        ]
+       }
+      ],
+      "issue": 2776,
+      "end": 2777,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        2775,
+        "above"
+       ]
+      ],
+      "count": 1
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 2736,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2751,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2752,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2753,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2754,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2755,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2756,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2757,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2758,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2759,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2760,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2761,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2762,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2763,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2764,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2765,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2766,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2767,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2768,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2769,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2770,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2771,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2772,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2773,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2774,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2775,
+      "key": "o"
+     },
+     {
+      "frame": 2776,
+      "click": [
+       311,
+       107
+      ]
+     }
+    ],
+    "note": "waited 7 frames for the camera",
+    "seconds": 0.42907857400132343
+   },
+   {
+    "plan": 0,
+    "index": 1,
+    "name": "event(script:2@736#527bf977afba)#768",
+    "kind": "event",
+    "input": "wait",
+    "start": 2777,
+    "issue": null,
+    "end": 2796,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2777,
+      "first_settled": 2796,
+      "end": 2796,
+      "how": "held",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        2780,
+        0
+       ]
+      ],
+      "count": 1
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 0.10384629199688789
+   }
+  ],
+  "frames": 68,
+  "ticks": 408,
+  "frame0": 2728,
+  "frame_end": 2796,
+  "seconds": 0.6502645030050189,
+  "inputs": [
+   {
+    "frame": 2736,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2751,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2752,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2753,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2754,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2755,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2756,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2757,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2758,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2759,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2760,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2761,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2762,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2763,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2764,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2765,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2766,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2767,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2768,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2769,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2770,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2771,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2772,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2773,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2774,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2775,
+    "key": "o"
+   },
+   {
+    "frame": 2776,
+    "click": [
+     311,
+     107
+    ]
+   }
+  ]
+ },
+ "reached": {
+  "#30": 2728,
+  "#51": 2728,
+  "#58": 2728,
+  "#82": 2728,
+  "#87": 2728,
+  "#1": 2796
+ },
+ "landmarks": {
+  "plan": 0,
+  "frame": 2728,
+  "nodes": [
+   {
+    "id": 0,
+    "facts": [
+     [
+      "state:428",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 1,
+    "facts": [
+     [
+      "state:428",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 2,
+    "facts": [
+     [
+      "script:2",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 3,
+    "facts": [
+     [
+      "pos:script:2",
+      736
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 4,
+    "facts": [
+     [
+      "frozen:script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 5,
+    "facts": [
+     [
+      "args:script:2",
+      90692419825594
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 6,
+    "facts": [
+     [
+      "script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 7,
+    "facts": [
+     [
+      "var:53",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 8,
+    "facts": [
+     [
+      "pos:script:2",
+      -1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 9,
+    "facts": [
+     [
+      "verb:2",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 10,
+    "facts": [
+     [
+      "args:script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   }
+  ],
+  "orderings": [
+   [
+    1,
+    3,
+    "r"
+   ],
+   [
+    1,
+    2,
+    "r"
+   ],
+   [
+    1,
+    0,
+    "gn"
+   ],
+   [
+    2,
+    0,
+    "gn"
+   ],
+   [
+    3,
+    0,
+    "gn"
+   ],
+   [
+    4,
+    3,
+    "gn"
+   ],
+   [
+    4,
+    2,
+    "gn"
+   ],
+   [
+    4,
+    0,
+    "gn"
+   ],
+   [
+    5,
+    0,
+    "gn"
+   ],
+   [
+    6,
+    3,
+    "gn"
+   ],
+   [
+    6,
+    2,
+    "gn"
+   ],
+   [
+    7,
+    3,
+    "gn"
+   ],
+   [
+    7,
+    2,
+    "gn"
+   ],
+   [
+    8,
+    3,
+    "n"
+   ],
+   [
+    9,
+    5,
+    "gn"
+   ],
+   [
+    10,
+    5,
+    "n"
+   ]
+  ]
+ },
+ "summary": {
+  "steps": 2,
+  "executed": 2,
+  "played": 2,
+  "outcomes": {
+   "matched": 2
+  },
+  "matched": 2,
+  "matched_share": 1.0,
+  "matched_with_another_guess": 0,
+  "mismatch_steps": 0,
+  "mismatch_steps_per_executed": 0.0,
+  "mismatch_facts": 0,
+  "mismatch_facts_per_executed": 0.0,
+  "final_path": [
+   "sentence(2,428)#162",
+   "event(script:2@736#527bf977afba)#768"
+  ],
+  "final_path_actions": 2,
+  "inputs": 27,
+  "key_goals": {
+   "of": 99,
+   "passed": 6,
+   "held_at_start": 5,
+   "reached_in_the_run": 1,
+   "at_start": [
+    "#30",
+    "#51",
+    "#58",
+    "#82",
+    "#87"
+   ],
+   "reached": {
+    "#1": 2796
+   }
+  },
+  "time": {
+   "step_seconds": {
+    "n": 2,
+    "mean": 0.27,
+    "median": 0.27,
+    "max": 0.43,
+    "sum": 0.5
+   },
+   "step_frames": {
+    "n": 2,
+    "mean": 34,
+    "median": 34.0,
+    "max": 49,
+    "sum": 68
+   },
+   "plan_seconds": {
+    "n": 1,
+    "mean": 0.1,
+    "median": 0.1,
+    "max": 0.1,
+    "sum": 0.1
+   },
+   "plan_write_s": {
+    "n": 1,
+    "mean": 0.01,
+    "median": 0.01,
+    "max": 0.01,
+    "sum": 0.0
+   },
+   "plan_search_s": {
+    "n": 1,
+    "mean": 0.08,
+    "median": 0.08,
+    "max": 0.08,
+    "sum": 0.1
+   },
+   "harness_s": 0.7,
+   "planning_s": 0.1,
+   "playing_s": 0.5
+  }
+ },
+ "verify": {
+  "checkpoints": 4,
+  "differ": [],
+  "inputs": 27,
+  "final": {
+   "state:428": 1
+  },
+  "same": true,
+  "seconds": 2.3,
+  "goal": true
+ },
+ "seconds": 5.3,
+ "game_seconds": 6.800222241242264
+}

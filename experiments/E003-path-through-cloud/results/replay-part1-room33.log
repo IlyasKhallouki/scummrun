@@ -1,0 +1,55 @@
+E003 step 5 on Part I: the runner (replay_part1.py) on the reading 'room33'
+
+(replay-part1-room33-seed1-control.json; sources {'replay_part1.py': 'a333612cc306', 'replay.py': '8e9d4a9f9042', 'packed_reading.py': '6582b0d1bd9d', 'export_records.py': 'c4660a1490ae', 'plan_fd.py': '34285f1d124a', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'start.py': '573ac0069ff6'})
+=== seed 1 (control) ===
+reading /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/room33/control.json: 816 actions, 143 facts, packed file 197,908 bytes (sha1 3accd9b0d8ce); goal {'state:428': [1]} (not the Part I end)
+start: idle stop at frame 2728 (sentence), room 33, boot 2.3 s; checks ok; against the reading's start (results/start-part1.jsonl seed 1): 0 facts differ; taskcore start check: input ok, needed ok
+result: stop 'goal'; goal reached True; verified from boot: True (27 inputs, 4 checkpoints, 0 differ, 2.4 s)
+replans 0; bans 0; plans 1; frames 68 (game time 6.8 s); player inputs 27
+steps: 2 in the log, 2 executed (2 played); outcomes {'matched': 2}
+matched: 2 of 2 executed (1.0); 0 of them with another guessed value
+mismatches: 0 steps (0.0 per executed action), 0 facts (0.0 per executed action)
+final path: 2 actions ['sentence(2,428)#162', 'event(script:2@736#527bf977afba)#768']
+Part I goals passed through: 6 of 99 (5 held at the start ['#30', '#51', '#58', '#82', '#87'], 1 reached in the run: {'#1': 2796})
+time: run 5.3 s: load 0.02 s, boot 2.3 s, start check 0.02 s, harness 0.6 s (planning 0.1 s, playing 0.5 s), verify 2.4 s
+  per step (played): seconds {'n': 2, 'mean': 0.23, 'median': 0.23, 'max': 0.38, 'sum': 0.5}; frames {'n': 2, 'mean': 34, 'median': 34.0, 'max': 49, 'sum': 68}
+  per plan: all {'n': 1, 'mean': 0.09, 'median': 0.09, 'max': 0.09, 'sum': 0.1}; taskcore {'n': 1, 'mean': 0.01, 'median': 0.01, 'max': 0.01, 'sum': 0.0}; lama-first {'n': 1, 'mean': 0.08, 'median': 0.08, 'max': 0.08, 'sum': 0.1}
+landmarks (plan 0, frame 2728): 11 nodes, 11 on game facts, 17 orderings; the game facts: state:428=1 (goal); state:428=0 (start); script:2=1; pos:script:2=736; frozen:script:2=0 (start); args:script:2=90692419825594; script:2=0 (start); var:53=1 (start); pos:script:2=-1 (start); verb:2=1 (start); args:script:2=0 (start)
+  plan 0 at frame 2728: plan, 2 steps, taskcore 0.01 s, lama-first 0.08 s, 415 operators, 0 bans, landmarks 11: ['sentence(2,428)#162', 'event(script:2@736#527bf977afba)#768']
+  0.1 sentence(2,428)#162 [sentence] click verb 2 on 428: frames 2728/2777, 0.4 s; matched -> next; 1 tries; inputs [(2736, [319, 130]), (2751, [319, 130]), (2752, [319, 130]), (2753, [319, 130]), (2754, [319, 130]), (2755, [319, 130]), (2756, [319, 130]), (2757, [319, 130]), (2758, [319, 130]), (2759, [319, 130]), (2760, [319, 130]), (2761, [319, 130]), (2762, [319, 130]), (2763, [319, 130]), (2764, [319, 130]), (2765, [319, 130]), (2766, [319, 130]), (2767, [319, 130]), (2768, [319, 130]), (2769, [319, 130]), (2770, [319, 130]), (2771, [319, 130]), (2772, [319, 130]), (2773, [319, 130]), (2774, [319, 130]), (2775, 'o'), (2776, [311, 107])]; waited 7 frames for the camera
+  0.2 event(script:2@736#527bf977afba)#768 [event] wait: frames 2777/2796, 0.1 s; matched -> next; 1 tries
+
+(replay-part1-room33-seed1.json; sources {'replay_part1.py': 'a333612cc306', 'replay.py': '8e9d4a9f9042', 'packed_reading.py': '6582b0d1bd9d', 'export_records.py': 'c4660a1490ae', 'plan_fd.py': '34285f1d124a', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'start.py': '573ac0069ff6'})
+=== seed 1 ===
+reading /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/room33/reading.json: 816 actions, 143 facts, packed file 205,552 bytes (sha1 9473d562224a); goal {'state:428': [1]} (not the Part I end)
+start: idle stop at frame 2728 (sentence), room 33, boot 2.3 s; checks ok; against the reading's start (results/start-part1.jsonl seed 1): 0 facts differ; taskcore start check: input ok, needed ok
+result: stop 'goal'; goal reached True; verified from boot: True (27 inputs, 4 checkpoints, 0 differ, 2.3 s)
+replans 0; bans 0; plans 1; frames 68 (game time 6.8 s); player inputs 27
+steps: 2 in the log, 2 executed (2 played); outcomes {'matched': 2}
+matched: 2 of 2 executed (1.0); 0 of them with another guessed value
+mismatches: 0 steps (0.0 per executed action), 0 facts (0.0 per executed action)
+final path: 2 actions ['sentence(2,428)#162', 'event(script:2@736#527bf977afba)#768']
+Part I goals passed through: 6 of 99 (5 held at the start ['#30', '#51', '#58', '#82', '#87'], 1 reached in the run: {'#1': 2796})
+time: run 5.3 s: load 0.01 s, boot 2.3 s, start check 0.02 s, harness 0.7 s (planning 0.1 s, playing 0.5 s), verify 2.3 s
+  per step (played): seconds {'n': 2, 'mean': 0.27, 'median': 0.27, 'max': 0.43, 'sum': 0.5}; frames {'n': 2, 'mean': 34, 'median': 34.0, 'max': 49, 'sum': 68}
+  per plan: all {'n': 1, 'mean': 0.1, 'median': 0.1, 'max': 0.1, 'sum': 0.1}; taskcore {'n': 1, 'mean': 0.01, 'median': 0.01, 'max': 0.01, 'sum': 0.0}; lama-first {'n': 1, 'mean': 0.08, 'median': 0.08, 'max': 0.08, 'sum': 0.1}
+landmarks (plan 0, frame 2728): 11 nodes, 11 on game facts, 16 orderings; the game facts: state:428=1 (goal); state:428=0 (start); script:2=1; pos:script:2=736; frozen:script:2=0 (start); args:script:2=90692419825594; script:2=0 (start); var:53=1 (start); pos:script:2=-1 (start); verb:2=1 (start); args:script:2=0 (start)
+  plan 0 at frame 2728: plan, 2 steps, taskcore 0.01 s, lama-first 0.08 s, 657 operators, 0 bans, landmarks 11: ['sentence(2,428)#162', 'event(script:2@736#527bf977afba)#768']
+  0.1 sentence(2,428)#162 [sentence] click verb 2 on 428: frames 2728/2777, 0.4 s; matched -> next; 1 tries; inputs [(2736, [319, 130]), (2751, [319, 130]), (2752, [319, 130]), (2753, [319, 130]), (2754, [319, 130]), (2755, [319, 130]), (2756, [319, 130]), (2757, [319, 130]), (2758, [319, 130]), (2759, [319, 130]), (2760, [319, 130]), (2761, [319, 130]), (2762, [319, 130]), (2763, [319, 130]), (2764, [319, 130]), (2765, [319, 130]), (2766, [319, 130]), (2767, [319, 130]), (2768, [319, 130]), (2769, [319, 130]), (2770, [319, 130]), (2771, [319, 130]), (2772, [319, 130]), (2773, [319, 130]), (2774, [319, 130]), (2775, 'o'), (2776, [311, 107])]; waited 7 frames for the camera
+  0.2 event(script:2@736#527bf977afba)#768 [event] wait: frames 2777/2796, 0.1 s; matched -> next; 1 tries
+
+(replay-part1-room33-start-seed2.json; sources {'replay_part1.py': 'a333612cc306', 'replay.py': '8e9d4a9f9042', 'packed_reading.py': '6582b0d1bd9d', 'export_records.py': 'c4660a1490ae', 'plan_fd.py': '34285f1d124a', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'start.py': '573ac0069ff6'})
+=== start check, seed 2 (no goal run) ===
+idle stop at frame 2728 (tick 16321), kind sentence, room 33, ego 1 at [346, 133], rng 1766402948; boot 2.2 s; start.py's checks: ok; trace records {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+against the reading's start (results/start-part1.jsonl seed 1): 1 facts differ: [['var:100', [134, 20]]]
+against results/start-part1.jsonl: 0 facts differ, the same frame True
+taskcore's start check on the reading: input ok, 0.01 s; needed ok, 0.01 s
+time: 2.3 s in all
+
+(replay-part1-room33-start-seed31.json; sources {'replay_part1.py': 'a333612cc306', 'replay.py': '8e9d4a9f9042', 'packed_reading.py': '6582b0d1bd9d', 'export_records.py': 'c4660a1490ae', 'plan_fd.py': '34285f1d124a', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'start.py': '573ac0069ff6'})
+=== start check, seed 31 (no goal run) ===
+idle stop at frame 2728 (tick 16321), kind sentence, room 33, ego 1 at [346, 133], rng 1735277826; boot 2.1 s; start.py's checks: ok; trace records {'boot': 1, 'cd_track': 4, 'control': 1, 'room': 5, 'segment_start': 1, 'stall': 4}
+against the reading's start (results/start-part1.jsonl seed 1): 1 facts differ: [['var:100', [134, 229]]]
+results/start-part1.jsonl has no row for this seed
+taskcore's start check on the reading: input ok, 0.01 s; needed ok, 0.01 s
+time: 2.2 s in all
