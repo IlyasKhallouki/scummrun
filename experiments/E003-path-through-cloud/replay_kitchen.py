@@ -6,6 +6,7 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_kitchen.py noban all|no211 --reading PICKLE  (the planner at the run's end without its bans, likewise)
        replay_kitchen.py log                               (results/replay-kitchen-taskcore.log from the json files)
        each with --planner taskcore|python (default taskcore) and --search lama-first|anytime (taskcore only)
+       and --files (taskcore only: the task read from the reading's files, as replay_part1.py reads it)
 
 **The planner.** taskcore (the default): the reading's records are exported once to a packed file
 (export_records.py) and every plan goes through taskcore from it (replay.py's module docstring); results
@@ -21,6 +22,11 @@ sees. replay.py names none of them.
 seed 836557856, talkspeed 255, segment start at frame 46, var 19 free, the bridge's automatic '.' and Esc off) and run
 B's recorded inputs (verify-b1/movie-explicit.jsonl) up to that frame, run to it. Its facts are compared with the
 ground truth's S1#7 pre facts.
+
+**The files** (``--files``): the reading is written as files (packed_reading.py: the packed file, the action lines,
+reading.json) and the harness plays from them (packed_reading.PackedTask, its ``Points`` for the starts), with no
+reader object and no build_task in memory: the Part I runner's path (replay_part1.py), checked here against the
+taskcore run, which builds the task in Python (results ``replay-kitchen-taskcore-files-<plan>.json`` and its log).
 
 **The task**: reader.build_task over the reading's records with the goal owner:566 = VAR_EGO's value at the start;
 for the python planner then relevance and reader.prune (test_reader.py's ``pruned``), for taskcore the same records
@@ -48,6 +54,7 @@ sys.path.insert(0, str(HERE.parents[1] / "src"))
 
 import export_records  # noqa: E402
 import groundtruth  # noqa: E402
+import packed_reading  # noqa: E402
 import plan_fd  # noqa: E402
 import reader as R  # noqa: E402
 import relevance  # noqa: E402
@@ -75,11 +82,11 @@ def sha(name: str) -> str:
     return hashlib.sha1((HERE / name).read_bytes()).hexdigest()[:12]
 
 
-def tag_of(planner: str = "python", search: str = "lama-first") -> str:
-    """The results' tag: "" for the python planner, "taskcore" or "taskcore-anytime"."""
+def tag_of(planner: str = "python", search: str = "lama-first", files: bool = False) -> str:
+    """The results' tag: "" for the python planner, "taskcore", "taskcore-anytime" or "taskcore-files"."""
     if planner == "python":
         return ""
-    return "taskcore" if search == "lama-first" else f"taskcore-{search}"
+    return ("taskcore" if search == "lama-first" else f"taskcore-{search}") + ("-files" if files else "")
 
 
 def result_path(variant: str, tag: str = "") -> Path:
@@ -112,17 +119,21 @@ def say(msg: str) -> None:
 
 def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write: bool = True,
         out_dir: Path | None = None, plan_time: int = replay.PLAN_TIME, planner: str = "taskcore",
-        search: str = "lama-first") -> dict:
+        search: str = "lama-first", files: bool = False) -> dict:
     """One plan in the engine and its check from boot; ``write``: the result file (a test passes False and its own
-    ``out_dir`` for the engines' files)."""
+    ``out_dir`` for the engines' files); ``files``: the task from the reading's files (module docstring)."""
     t0 = time.monotonic()
-    tag = tag_of(planner, search)
+    if files and planner != "taskcore":
+        raise ValueError("--files plans through taskcore")
+    tag = tag_of(planner, search, files)
     row = next(r for r in groundtruth.load() if r["name"].startswith(MOVE + " "))
     start, frame = row["pre"], row["pre_frame"]
     goal = {f"owner:{MEAT}": {start["var:1"]}}
     out = {"variant": variant, "move": row["name"], "start_frame": frame,
            "goal": {k: sorted(v) for k, v in goal.items()},
-           "sources": {n: sha(n) for n in SOURCES + (TASKCORE_SOURCES if planner == "taskcore" else ())},
+           "sources": {n: sha(n) for n in SOURCES + (TASKCORE_SOURCES if planner == "taskcore" else ())
+                       + (("packed_reading.py",) if files else ())},
+           "files": files,
            "planner": planner, "search": search if planner == "taskcore" else "lama-first",
            "reading": str(reading), "replan_limit": replan_limit,
            "time_limit": time_limit, "limits": {"input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT,
@@ -135,32 +146,49 @@ def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write
     b, recs, secs = pickle.loads(reading.read_bytes())
     kept = [r for r in recs if not (variant == "no211" and r.label == TIMER_EVENT)]
     out["records"] = {"all": len(recs), "kept": len(kept)}
-    say("building the task")
-    t = time.monotonic()
-    full = R.build_task(b, kept, goal)
     run_dir = out_dir or run_dir_of(variant, tag)
     packed = None
-    if planner == "python":
-        rel = relevance.relevant(full)
-        small = R.prune(full, rel)
-        small.folded = full.folded
-        out["task"] = {"actions": len(full.actions), "facts": len(full.facts), "kept actions": len(small.actions),
-                       "kept facts": len(small.facts), "folded": full.folded, "seconds": time.monotonic() - t}
-    else:
-        small = full
-        out["task"] = {"actions": len(full.actions), "facts": len(full.facts), "folded": full.folded,
-                       "seconds": time.monotonic() - t}
-        say("exporting the records to the packed file")
+    if files:
+        say("writing the reading as files")
         t = time.monotonic()
         run_dir.mkdir(parents=True, exist_ok=True)
-        shutil.rmtree(run_dir / "plans", ignore_errors=True)  # an earlier run's plan files
-        packed = run_dir / "kitchen.tc"
-        out["export"] = export_records.export_records(packed, b, kept, goal, starts={})
+        shutil.rmtree(run_dir / "plans", ignore_errors=True)
+        out["export"] = packed_reading.export_reading(run_dir / "reading", b, kept, goal, f"groundtruth pre of {MOVE}",
+                                                      {"name": f"kitchen-{variant}"})
         out["export"]["seconds"] = time.monotonic() - t
+        t = time.monotonic()
+        rd = packed_reading.load_reading(run_dir / "reading" / "reading.json")
+        full = small = rd.task
+        b, packed = rd.b, rd.packed
         out["export"]["sha1"] = hashlib.sha1(packed.read_bytes()).hexdigest()[:12]
         out["taskcore_binary"] = hashlib.sha1(plan_fd.TASKCORE.read_bytes()).hexdigest()[:12]
-        names = [a.name for a in full.actions]
-        assert len(names) == out["export"]["actions"]  # the packed file's actions are build_task's, in its order
+        out["task"] = {"actions": len(full.actions), "facts": len(full.facts), "folded": rd.doc["folded"],
+                       "seconds": time.monotonic() - t}
+    else:
+        say("building the task")
+        t = time.monotonic()
+        full = R.build_task(b, kept, goal)
+        if planner == "python":
+            rel = relevance.relevant(full)
+            small = R.prune(full, rel)
+            small.folded = full.folded
+            out["task"] = {"actions": len(full.actions), "facts": len(full.facts), "kept actions": len(small.actions),
+                           "kept facts": len(small.facts), "folded": full.folded, "seconds": time.monotonic() - t}
+        else:
+            small = full
+            out["task"] = {"actions": len(full.actions), "facts": len(full.facts), "folded": full.folded,
+                           "seconds": time.monotonic() - t}
+            say("exporting the records to the packed file")
+            t = time.monotonic()
+            run_dir.mkdir(parents=True, exist_ok=True)
+            shutil.rmtree(run_dir / "plans", ignore_errors=True)  # an earlier run's plan files
+            packed = run_dir / "kitchen.tc"
+            out["export"] = export_records.export_records(packed, b, kept, goal, starts={})
+            out["export"]["seconds"] = time.monotonic() - t
+            out["export"]["sha1"] = hashlib.sha1(packed.read_bytes()).hexdigest()[:12]
+            out["taskcore_binary"] = hashlib.sha1(plan_fd.TASKCORE.read_bytes()).hexdigest()[:12]
+            names = [a.name for a in full.actions]
+            assert len(names) == out["export"]["actions"]  # the packed file's actions are build_task's, in its order
     del recs
     say(f"booting to {MOVE} pre (frame {frame})")
     prefix = [e for e in prefix_events() if e["frame"] <= frame]
@@ -270,8 +298,10 @@ def _task_line(o: dict) -> str:
                 f"{t['facts']} facts; relevance keeps {t['kept actions']} actions, {t['kept facts']} facts "
                 f"({t['seconds']:.0f} s)")
     ex = o["export"]
+    how = "the reading's files (packed_reading.py), loaded in" if o.get("files") else "build_task"
     return (f"records {o['records']['kept']} of {o['records']['all']}; task {t['actions']} actions, {t['facts']} facts "
-            f"({t['seconds']:.0f} s); packed file (export_records.py) {ex['bytes']:,} bytes, sha1 {ex['sha1']}, "
+            f"({how} {t['seconds']:.1f} s); packed file ({'packed_reading.py' if o.get('files') else 'export_records.py'})"
+            f" {ex['bytes']:,} bytes, sha1 {ex['sha1']}, "
             f"{ex['seconds']:.0f} s; taskcore binary sha1 {o['taskcore_binary']}; planner taskcore, "
             f"{o['search']}")
 
@@ -416,6 +446,30 @@ def compare_lines(new: dict, old: dict) -> list:
             f"; the same engine trace from boot: {old.get('trace') == new.get('trace')}"]
 
 
+def files_lines(new: dict, old: dict) -> list:
+    """The run from the reading's files against the run on build_task's task: the same plans, steps, inputs and
+    verify."""
+    rn, ro = new["run"], old["run"]
+
+    def steps(r):
+        return [(s["name"], s["outcome"], s["then"], s["start"], s["end"]) for s in r["steps"]]
+    same = {"stop": rn["stop"] == ro["stop"], "plans (steps)": [p.get("steps") for p in rn["plans"]] ==
+            [p.get("steps") for p in ro["plans"]], "steps (name, outcome, then, frames)": steps(rn) == steps(ro),
+            "inputs at the same frames": rn["inputs"] == ro["inputs"], "bans": rn["bans"] == ro["bans"],
+            "checkpoints and verify": (new["verify"]["checkpoints"], len(new["verify"]["differ"])) ==
+            (old["verify"]["checkpoints"], len(old["verify"]["differ"]))}
+    pn = sum(p.get("write_s", 0) + p.get("seconds", 0) + p.get("decode_s", 0) for p in rn["plans"])
+    po = sum(p.get("write_s", 0) + p.get("seconds", 0) + p.get("decode_s", 0) for p in ro["plans"])
+    return [f"plan {new['variant']}: the same {', '.join(k for k, v in same.items() if v) or 'nothing'}"
+            + (f"; DIFFERENT: {', '.join(k for k, v in same.items() if not v)}" if not all(same.values()) else ""),
+            f"  goal {ro['goal']} / {rn['goal']}; replans {ro['replans']} / {rn['replans']}; verify differ "
+            f"{len(old['verify']['differ'])} / {len(new['verify']['differ'])}; planning {po:.0f} s / {pn:.0f} s; "
+            f"task in memory: build_task {old['task'].get('seconds', 0):.0f} s and the packed file "
+            f"{old['export']['seconds']:.0f} s / the files {new['export']['seconds']:.0f} s and their load "
+            f"{new['task']['seconds']:.1f} s; run wall {old['seconds']:.0f} s / {new['seconds']:.0f} s",
+            f"  landmarks per plan: {[p.get('landmarks') for p in rn['plans']]}"]
+
+
 def write_log(tag: str = "") -> None:
     parts = [o for o in (json.loads(result_path(v, tag).read_text()) for v in ("all", "no211")
                          if result_path(v, tag).exists())]
@@ -424,11 +478,22 @@ def write_log(tag: str = "") -> None:
     title = "E003 step 5: the replay harness (replay.py) on the kitchen"
     if tag:
         title += f", planning through taskcore ({parts[0]['search']})"
+    if parts[0].get("files"):
+        title += ", the task read from the reading's files (packed_reading.py)"
     lines = [title, "",
              f"reading: {parts[0]['reading']} (made under {parts[0]['reading_sources']})"]
     lines += [f"sources of the {o['variant']} run (sha1, 12 hex): {o['sources']}" for o in parts] + [""]
     for o in parts:
         lines += plan_lines(o) + [""]
+    if parts[0].get("files"):
+        base = tag[:-len("-files")]
+        lines += [f"=== against the run that builds the task in Python (replay-kitchen-{base}-<plan>.json) ==="]
+        for o in parts:
+            if result_path(o["variant"], base).exists():
+                lines += files_lines(o, json.loads(result_path(o["variant"], base).read_text())) + [""]
+        log_path(tag).write_text("\n".join(lines))
+        print("\n".join(lines))
+        return
     olds = {o["variant"]: json.loads(result_path(o["variant"]).read_text()) for o in parts
             if tag and result_path(o["variant"]).exists()}
     if olds:
@@ -452,13 +517,14 @@ def main() -> None:
     ap.add_argument("--search", choices=["lama-first", "anytime"], default="lama-first",
                     help="taskcore's search: lama-first, or anytime LAMA for the plan time (--plan-time)")
     ap.add_argument("--plan-time", type=int, default=replay.PLAN_TIME, help="seconds per plan (the anytime cap)")
+    ap.add_argument("--files", action="store_true", help="the task from the reading's files (packed_reading.py)")
     a = ap.parse_args()
-    tag = tag_of(a.planner, a.search)
+    tag = tag_of(a.planner, a.search, a.files)
     if a.what == "run":
         if a.variant is None or a.reading is None:
             raise SystemExit("run needs a variant and --reading (or READER_PICKLE)")
         run(a.variant, Path(a.reading), a.replan_limit, a.time_limit, plan_time=a.plan_time, planner=a.planner,
-            search=a.search)
+            search=a.search, files=a.files)
     elif a.what == "noban":
         print(noban(a.variant, Path(a.reading), plan_time=a.plan_time, tag=tag))
     elif a.what == "trace":
