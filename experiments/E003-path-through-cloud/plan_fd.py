@@ -61,7 +61,7 @@ ROOT = HERE.parents[1]
 DOWNWARD = ROOT / "third_party" / "downward"
 DRIVER = DOWNWARD / "fast-downward.py"
 BUILD = "release"
-TASKCORE = Path(os.environ.get("TASKCORE_BIN", HERE / "taskcore" / "target" / "release" / "taskcore"))
+TASKCORE = Path(os.environ.get("TASKCORE_BIN") or HERE / "taskcore" / "target" / "release" / "taskcore")
 ANYTIME = "seq-sat-lama-2011"  # driver/aliases.py: anytime LAMA
 
 # driver/aliases.py:127-132, the "lama-first" alias, as one string
@@ -324,6 +324,10 @@ def predict(facts: dict, pieces: list, steps: list, start: dict) -> tuple:
     state, out = start_state(facts, start), []
     for i, s in enumerate(steps):
         cands = [p for m in dict.fromkeys(s["members"]) for p in pieces[m]]
+        if len(s["members"]) == 1 and any(s["name"] not in (p.name.split("~ban:")[0], getattr(p.what, "label", None))
+                                          for p in cands):
+            raise ValueError(f"step {i + 1}: the packed file's action {s['members'][0]} is {s['name']}, the task's "
+                             f"{[p.name for p in cands][:2]}: the file is not this task's")
         ok = [p for p in cands if _holds(p.pre, state)]
         if len(ok) != 1:
             raise PathChoice(f"step {i + 1} ({s['name']}, {s['op']}): {len(ok)} of its {len(cands)} paths hold in "

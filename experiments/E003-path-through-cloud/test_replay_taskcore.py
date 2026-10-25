@@ -344,7 +344,7 @@ def test_a_guess_the_plan_did_not_make_is_unknown():
     task = fixed_task()
     pieces = [[a] for a in task.actions]
     st = dict(START, **{"state:316": 1})
-    s = {"op": "a1", "name": "open", "members": [2], "guessed": ()}
+    s = {"op": "a1", "name": "sentence(2,316)", "members": [2], "guessed": ()}
     assert plan_fd.predict(task.facts, pieces, [s], st)[1]["var:53"] == plan_fd.UNKNOWN
     s["guessed"] = (("var:53", 2, ()),)
     assert plan_fd.predict(task.facts, pieces, [s], st)[1]["var:53"] == 2
@@ -407,10 +407,10 @@ KITCHEN_BANS = [  # (record label#index, the start it is banned from) as ban_of 
 
 
 def kitchen(work: Path, which=("pruned", "full")) -> None:
-    """The kitchen (module docstring): for each ban set, task.py's file of the banned task (the pruned task replay.py's
+    """The kitchen (module docstring): for four ban sets, task.py's file of the banned task (the pruned task replay.py's
     python planner bans, and build_task's, which taskcore's planner reads) against taskcore's with the bans, sha1
-    and size; then lama-first through plan_taskcore with each ban set and its plan run on the unreduced banned task.
-    Writes work/kitchen-bans.json."""
+    and size; then lama-first through plan_taskcore with each of the six ban sets and its plan run on the unreduced
+    banned task. Writes work/kitchen-bans.json (kitchen-bans-<which>.json)."""
     import hashlib
     import pickle
     import time
@@ -436,6 +436,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
     def sha(text):
         return hashlib.sha1(text.encode()).hexdigest()
 
+    files = ("the walk", "a folded step", "all five", "the walk twice (rooms 28 and 41)")  # task.py: 2-6 minutes each
     tasks = {}
     if "full" in which:
         export_records(work / "kitchen.tc", b, recs, goal, starts={"s17": start})
@@ -448,7 +449,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
     del recs
     for tname in [w for w in ("pruned", "full") if w in which]:
         task, tc = tasks[tname]
-        for name, bans in sets.items():
+        for name, bans in [(n, sets[n]) for n in files]:
             t0 = time.monotonic()
             py = T.write_sas(RP.apply_bans(task, bans)).text(start)
             t1 = time.monotonic()
@@ -465,7 +466,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
             (work / "k.sas").unlink(missing_ok=True)
             out["files"].append(row)
             print(json.dumps(row), flush=True)
-            (work / "kitchen-bans.json").write_text(json.dumps(out, indent=1))
+            (work / f"kitchen-bans-{'-'.join(which)}.json").write_text(json.dumps(out, indent=1))
     if "full" in which:
         for name, bans in sets.items():
             pieces = RP.ban_pieces(full, bans)
@@ -478,7 +479,7 @@ def kitchen(work: Path, which=("pruned", "full")) -> None:
                 row["runs on the unreduced banned task"] = run_plan(full, RP.apply_bans(full, bans), res, start)
             out["plans"].append(row)
             print(json.dumps(row), flush=True)
-            (work / "kitchen-bans.json").write_text(json.dumps(out, indent=1))
+            (work / f"kitchen-bans-{'-'.join(which)}.json").write_text(json.dumps(out, indent=1))
 
 
 if __name__ == "__main__":
