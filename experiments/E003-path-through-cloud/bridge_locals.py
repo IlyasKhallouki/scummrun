@@ -3,6 +3,7 @@ dump.
 
 usage (from this folder, with ../../.venv/bin/python, under nice):
        bridge_locals.py check --new BIN [--old BIN] [--runs room33,bar-door,kitchen] [--margin 300] [--out DIR]
+       bridge_locals.py replans --new BIN [--golden FILE] [--out DIR]   (the kitchen run's replans, below)
 
 **The switch.** SPEEDRUN_DUMP_LOCALS (EngineConfig.dump_locals) makes the bridge's state dump list, per live slot,
 ``locals``: its NUM_SCRIPT_LOCAL locals (vm.localvar, script.h:76, 136), and per cutscene level ``data``: its
@@ -19,6 +20,12 @@ and ``data`` fields are taken out. At the end the three trace.jsonl files are co
 * ``bar-door``: results/replay-part1-bar-door-seed1.json's inputs (seed 1, rooms 33 and 28);
 * ``kitchen``: run B's inputs to frame 235 and the kitchen run's inputs (results/replay-kitchen-taskcore-files-all.json,
   replay_kitchen.cfg_of). It replays recorded inputs, so it is a check of the bridge, not a system run.
+
+**The kitchen's replans** (``replans``): the kitchen run (results/replay-kitchen-taskcore-files-all.json) replanned 9
+times, with 5 to 9 live slots at args 0 each time. Its recorded inputs are played again on the new build with the
+switch on, to each replan's frame, and each live slot whose unit has an ``args:`` fact in the reading (golden.py's
+kitchen file, the reading that run planned on) is matched against the reading's built lists at its wait point
+(replay.match_list). It counts the slots a list matches and the ones a replan would read again; nothing is planned.
 
 Each run goes on ``--margin`` frames past the run's last frame. The report counts the frames, the live slots seen, the
 slots with a nonzero local and the cutscene levels with data, and keeps the first differences.
@@ -219,6 +226,72 @@ def log_lines(doc: dict) -> list:
     return lines
 
 
+def cmd_replans(a) -> dict:
+    """The kitchen run's replans against the kitchen reading's lists (module docstring)."""
+    import packed_reading as PR
+    import replay
+    import replay_kitchen
+    t0 = time.monotonic()
+    lists, args_keys, n = {}, set(), 0
+    for ln in PR._golden_lines(a.golden):
+        if ln["kind"] != "record":
+            continue
+        n += 1
+        rec = ln["record"]["$Record"]
+        args_keys |= {k for k in list(rec["pre"]) + list(rec["effects"]) if k.startswith("args:")}
+        if rec.get("next_events"):
+            for x in PR.lists_of(PR._dec(rec["next_events"]), PR._dec(rec["effects"])):
+                lst = lists.setdefault((x["name"], x["w"]), [])
+                if not any(y["sig"] == x["sig"] for y in lst):
+                    lst.append({"sig": x["sig"], "locals": {i: v for i, v in x["locals"]}, "override": x["override"],
+                                "cut_data": x["cut_data"]})
+    say(f"{a.golden}: {n} records, {sum(map(len, lists.values()))} lists, {len(args_keys)} args: facts")
+    doc = json.loads((RESULTS / "replay-kitchen-taskcore-files-all.json").read_text())
+    run = doc["run"]
+    prefix = [e for e in replay_kitchen.prefix_events() if e["frame"] <= run["frame0"]]
+    inputs = write_inputs(a.out / "kitchen-replans" / "inputs.jsonl", prefix + run["inputs"])
+    paths.SCUMMVM_BIN = Path(a.new)
+    cfg = dataclasses.replace(replay_kitchen.cfg_of(a.out / "kitchen-replans" / "run", inputs), dump_locals=True)
+    rows = []
+    with Controller(cfg, timeout_s=600) as c:
+        for p in run["plans"][1:]:
+            st = c.root.run(frame=p["frame"])
+            if st.get("frame") != p["frame"]:
+                raise SystemExit(f"stopped at {st}, not frame {p['frame']}")
+            dump = replay.dumped_slots(c.root.state())
+            live, matched, unmatched = [], [], []
+            for name, slot in sorted(dump["slots"].items()):
+                if f"args:{name}" not in args_keys:
+                    continue
+                live.append(name)
+                lst = replay.match_list(lists, slot, slot["w"])
+                (matched if lst is not None else unmatched).append(f"{name}@{slot['w']}")
+            rows.append({"plan": p["plan"], "frame": p["frame"],
+                         "run_args0": p["start_counts"].get("live slots with unknown locals (args 0)", 0),
+                         "live": len(live), "matched": matched, "unmatched": unmatched,
+                         "skipped": dump["skipped"]})
+    out = {"golden": str(a.golden), "records": n, "lists": sum(map(len, lists.values())), "new": a.new,
+           "new_sha1": hashlib.sha1(Path(a.new).read_bytes()).hexdigest()[:12], "replans": rows,
+           "seconds": round(time.monotonic() - t0, 1)}
+    lines = [f"F10: the kitchen run's {len(rows)} replans (results/replay-kitchen-taskcore-files-all.json) on the new "
+             f"build (sha1 {out['new_sha1']}) with the locals dump, the live slots against the kitchen reading's "
+             f"{out['lists']:,} built lists ({n:,} records); {out['seconds']} s"]
+    for r in rows:
+        lines.append(f"plan {r['plan']} at frame {r['frame']}: the run had {r['run_args0']} live slots at args 0; "
+                     f"{r['live']} live slots with an args: fact, {len(r['matched'])} match a built list, "
+                     f"{len(r['unmatched'])} would be read again {r['unmatched']}"
+                     + (f"; left out {r['skipped']}" if r["skipped"] else ""))
+    tot = (sum(r["run_args0"] for r in rows), sum(r["live"] for r in rows), sum(len(r["matched"]) for r in rows),
+           sum(len(r["unmatched"]) for r in rows))
+    lines.append(f"in all: {tot[0]} slots at args 0 in the run; {tot[1]} live slots, {tot[2]} matched, {tot[3]} to read "
+                 f"again")
+    if a.results:
+        (RESULTS / "bridge-locals-kitchen-replans.json").write_text(json.dumps(out, indent=1) + "\n")
+        (RESULTS / "bridge-locals-kitchen-replans.log").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -229,8 +302,17 @@ def main() -> None:
     c.add_argument("--margin", type=int, default=300)
     c.add_argument("--out", type=Path, default=paths.OUT_DIR / "E003-bridge-locals")
     c.add_argument("--results", action="store_true", help="write results/bridge-locals-check.json and .log")
+    r = sub.add_parser("replans")
+    r.add_argument("--new", required=True)
+    r.add_argument("--golden", type=Path, default=paths.OUT_DIR / "golden" / "reader" / "kitchen.jsonl.gz")
+    r.add_argument("--out", type=Path, default=paths.OUT_DIR / "E003-bridge-locals")
+    r.add_argument("--results", action="store_true",
+                   help="write results/bridge-locals-kitchen-replans.json and .log")
     a = ap.parse_args()
-    cmd_check(a)
+    if a.cmd == "check":
+        cmd_check(a)
+    else:
+        cmd_replans(a)
 
 
 if __name__ == "__main__":

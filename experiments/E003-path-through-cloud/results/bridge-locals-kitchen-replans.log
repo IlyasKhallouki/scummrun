@@ -1,0 +1,11 @@
+F10: the kitchen run's 9 replans (results/replay-kitchen-taskcore-files-all.json) on the new build (sha1 55970aa0787b) with the locals dump, the live slots against the kitchen reading's 5,409 built lists (72,256 records); 24.2 s
+plan 1 at frame 889: the run had 9 live slots at args 0; 9 live slots with an args: fact, 7 match a built list, 2 would be read again ['local:207@15', 'script:159@5']
+plan 2 at frame 1886: the run had 8 live slots at args 0; 8 live slots with an args: fact, 6 match a built list, 2 would be read again ['local:207@23', 'script:159@5']
+plan 3 at frame 4172: the run had 8 live slots at args 0; 8 live slots with an args: fact, 7 match a built list, 1 would be read again ['script:159@5']
+plan 4 at frame 6354: the run had 8 live slots at args 0; 8 live slots with an args: fact, 7 match a built list, 1 would be read again ['script:159@5']
+plan 5 at frame 7467: the run had 8 live slots at args 0; 8 live slots with an args: fact, 7 match a built list, 1 would be read again ['script:159@5']
+plan 6 at frame 8619: the run had 8 live slots at args 0; 8 live slots with an args: fact, 7 match a built list, 1 would be read again ['script:159@5']
+plan 7 at frame 9506: the run had 7 live slots at args 0; 7 live slots with an args: fact, 6 match a built list, 1 would be read again ['script:159@5']
+plan 8 at frame 11267: the run had 8 live slots at args 0; 8 live slots with an args: fact, 7 match a built list, 1 would be read again ['script:159@5']
+plan 9 at frame 13363: the run had 5 live slots at args 0; 5 live slots with an args: fact, 4 match a built list, 1 would be read again ['script:159@5']
+in all: 69 slots at args 0 in the run; 69 live slots, 58 matched, 11 to read again
