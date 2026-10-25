@@ -200,6 +200,80 @@ def test_ban_writes_a_task_the_planner_reads():
     assert "begin_state" in sas.text({"bit:6": 0, "room": 28, "var:53": 1, "state:316": 0})
 
 
+# --- F10: the slots' dumped locals at a replan ----------------------------------------------------------------------
+
+def dump(slots, depth=0, levels=None, owners=None):
+    """A state dump with the locals (EngineConfig.dump_locals): slots as (where, number, code, locals, override)."""
+    return {"room": 28, "owners": owners or {},
+            "slots": [{"where": w, "number": n, "code": c, "locals": (list(l) + [0] * 25)[:25], "cutscene_override": o}
+                      for w, n, c, l, o in slots],
+            "cutscene": {"depth": depth, "levels": levels or [{"level": 0, "data": 0, "override": None}]}}
+
+
+def test_dumped_slots_name_units_and_take_their_cutscene_data():
+    levels = [{"level": 0, "data": 0, "override": None}, {"level": 1, "data": 5, "override": None},
+              {"level": 2, "data": 9, "override": {"where": 2, "number": 2, "code": 940, "stale": False}}]
+    d = RP.dumped_slots(dump([(2, 2, 736, [2, 428], 1), (3, 211, 33, [], 0), (2, 23, 409, [], 0),
+                              (2, 23, 410, [], 0)], depth=2, levels=levels))
+    assert set(d["slots"]) == {"script:2", "local:211"}
+    assert d["skipped"] == [("two slots", "script:23")] * 2
+    s2 = d["slots"]["script:2"]
+    assert (s2["w"], s2["esc"], s2["override"], s2["cut_data"], s2["locals"][:3]) == (736, 940, 1, [9], [2, 428, 0])
+    assert d["slots"]["local:211"]["esc"] is None
+    no = dump([(2, 2, 736, [], 0)])
+    del no["slots"][0]["locals"]
+    assert RP.dumped_slots(no) is None  # the switch off, or an older build
+
+
+def test_list_match_numbers_missing_zero_and_unknowns():
+    slot = {"name": "script:2", "locals": [2, 428, 0, 1] + [0] * 21, "override": 0, "cut_data": []}
+    lst = lambda locs, **kw: {"sig": kw.get("sig", 1), "locals": locs, "override": kw.get("ov", 0), "cut_data": []}  # noqa: E731
+    assert RP.list_matches(lst({0: 2, 1: 428, 3: 1}), slot)
+    assert not RP.list_matches(lst({0: 2, 1: 428}), slot)  # Local[3] is 1, the list's 0
+    assert RP.list_matches(lst({0: 2, 1: {"unknown": "x", "values": None}, 3: 1}), slot)
+    assert not RP.list_matches(lst({0: 2, 1: {"unknown": "x", "values": [427]}, 3: 1}), slot)
+    assert not RP.list_matches(lst({0: 2, 1: 428, 3: 1}, ov=1), slot)
+    lists = {("script:2", 736): [lst({0: 2, 1: {"unknown": "x", "values": None}, 3: 1}, sig=7),
+                                 lst({0: 2, 1: 428, 3: 1}, sig=8)]}
+    assert RP.match_list(lists, slot, 736)["sig"] == 8  # the most numbers
+    assert RP.match_list(lists, slot, 737) is None
+
+
+def test_replan_start_locals_matches_reads_again_and_falls_back():
+    b = fake_builder({"script:2": {736}, "local:211": {33}, "local:207": {15}})
+    task = types.SimpleNamespace(facts={k: None for k in ("args:script:2", "args:local:211", "args:local:207",
+                                                          "pos:script:2", "pos:local:211", "pos:local:207")})
+    obs = {"at:script:2:736": 1, "at:local:211:33": 1, "at:local:207:15": 1}
+    slots = {"script:2": {"name": "script:2", "w": 736, "locals": [2, 428] + [0] * 23, "override": 0,
+                          "cut_data": []},
+             "local:211": {"name": "local:211", "w": 33, "locals": [5] + [0] * 24, "override": 0, "cut_data": []}}
+    lists = {("script:2", 736): [{"sig": 8, "locals": {0: 2, 1: 428}, "override": 0, "cut_data": []}]}
+    predicted = {"pos:script:2": 736, "args:script:2": 9, "pos:local:207": 15, "args:local:207": 4}
+    start, counts, unmatched = RP.replan_start_locals(b, obs, predicted, task, slots, lists)
+    assert (start["args:script:2"], start["args:local:211"], start["args:local:207"]) == (8, 0, 4)
+    assert [u["name"] for u in unmatched] == ["local:211"]
+    assert counts == {"live slots whose dumped locals match a built list": 1,
+                      "live slots whose dumped locals are not the plan's list": 1,
+                      "live slots with unknown locals (args 0)": 1, "live slots with no locals in the dump": 1,
+                      "args copied from the plan (the slot is where the plan put it)": 1}
+    # no locals at all: reader.replan_start's values
+    import reader as R
+    s2, _, _ = RP.replan_start_locals(b, obs, predicted, task, {}, lists)
+    s3, _ = R.replan_start(b, obs, predicted, task)
+    assert {k: s2[k] for k in task.facts} == {k: s3[k] for k in task.facts}
+
+
+def test_lists_of_keeps_lists_the_record_still_sets():
+    import packed_reading as PR
+    ev = lambda sig, w=4, abort=False: {"name": "local:207", "w": w, "sig": sig, "abort": abort,  # noqa: E731
+                                        "locals": {0: 9, 1: {"reason": "position", "what": "getActorX(1)",
+                                                             "values": None}},
+                                        "override": 0, "cut_data": ()}
+    out = PR.lists_of([ev(21), ev(21, w=7, abort=True), ev(22)], {"args:local:207": ("set", 21)})
+    assert out == [{"name": "local:207", "w": 4, "sig": 21, "override": 0, "cut_data": [],
+                    "locals": [[0, 9], [1, {"unknown": "getActorX(1)", "values": None}]]}]
+
+
 # --- the kitchen in the engine (slow) ---------------------------------------------------------------------------------
 
 @pytest.mark.slow
