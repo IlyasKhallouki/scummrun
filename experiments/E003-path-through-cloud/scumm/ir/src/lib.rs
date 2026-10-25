@@ -17,6 +17,7 @@
 
 pub mod analysis;
 pub mod ast;
+pub mod due;
 pub mod dump;
 pub mod facts;
 pub mod game;
