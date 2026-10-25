@@ -1,8 +1,9 @@
 """E003 step 4: run Fast Downward's lama-first on a task, read the plan and the landmarks (plan step 4).
 
-usage: from plan_fd import plan
+usage: from plan_fd import plan, plan_taskcore
        result = plan(sas, start, time_limit=600)    # sas: task.SasTask; start: a facts.py map
        result.status, result.steps, result.landmarks, result.orderings
+       result = plan_taskcore(packed, facts, goal, pieces, start, bans, workdir=DIR)   # through taskcore (below)
 
 **The planner.** Fast Downward (``third_party/downward``, release 26.6.0, built with ``./build.py release``),
 its search component on our file: the driver runs search only when the one input file looks like translator
@@ -25,9 +26,26 @@ node of the dump, its facts (key, value), whether it is disjunctive (``|``) or c
 the start (``bold``) and true in the goal (``filled``), and ``aux`` when it holds a pick or goal variable of
 the encoding rather than a game fact; ``orderings``: (from, to, kind), kind one of "nec",
 "gn", "n", "r". The facts are the task's, read back from the value names (task.atom).
+
+**Through taskcore** (``plan_taskcore``, the replay harness's planner, replay.py): the task is the packed file
+(export_records.py, the reading's records, build_task's task) and taskcore (taskcore/README.md) writes the SAS file:
+the start as a file (``--start-file``), the harness's bans (``--bans``, replay.py's ``Ban``: taskcore cuts them out of
+the input task before anything else), its fold and reductions for that start, and the operator table (``--ops``).
+Then lama-first (the same search string and limits as ``plan``) or, with ``search="anytime"``, anytime LAMA
+(``seq-sat-lama-2011``) for ``time_limit`` seconds, its last (best) plan. The plan reads back through the operator
+table, as ``parse_plan`` reads task.py's (picks folded into the steps that read them, goal operators left out), to
+the reduced actions and the input actions they stand for. A folded step stands for several paths; the step is the
+path whose precondition holds in the plan's predicted state at that step (``predict``: from the start, each step's
+path with the plan's guessed values; a guess the reduced task does not hold is unknown), and a step where not
+exactly one holds raises ``PathChoice``. ``pieces`` gives each input action's paths under the bans (replay.py
+``ban_pieces``: the same cut, in Python), so the chosen path is an action of the unreduced banned task. Each step's
+action is returned with its effects cut to the facts the file holds (the planner's task, as the pruned task was).
+A start outside a domain the file names: taskcore stops as task.py raises OutOfDomain; status "out of domain".
 """
 
+import dataclasses
 import json
+import os
 import re
 import subprocess
 import sys
@@ -43,6 +61,8 @@ ROOT = HERE.parents[1]
 DOWNWARD = ROOT / "third_party" / "downward"
 DRIVER = DOWNWARD / "fast-downward.py"
 BUILD = "release"
+TASKCORE = Path(os.environ.get("TASKCORE_BIN", HERE / "taskcore" / "target" / "release" / "taskcore"))
+ANYTIME = "seq-sat-lama-2011"  # driver/aliases.py: anytime LAMA
 
 # driver/aliases.py:127-132, the "lama-first" alias, as one string
 LAMA_FIRST = ("let(hlm,eval_modify_costs(landmark_sum(lm_factory=lm_reasonable_orders_hps(lm_rhw()),pref=false),"
@@ -174,6 +194,205 @@ def plan(sas: SasTask, start: dict, time_limit: int = 600, memory_limit: str = "
     nodes, edges = parse_landmarks(log)
     steps = parse_plan(text, sas) if code == 0 else []
     return Result(STATUS.get(code, "error"), code, steps, nodes, edges, seconds, work, log)
+
+
+# --- through taskcore ----------------------------------------------------------------------------------------------
+
+UNKNOWN = "<unknown>"  # a predicted value the plan does not give: a guess the reduced task does not hold
+
+
+class PathChoice(ValueError):
+    """A step of a taskcore plan where not exactly one of its paths holds in the plan's predicted state."""
+
+
+@dataclass
+class TaskcoreResult(Result):
+    actions: list = field(default_factory=list)  # per step: its path (task.Action), effects on the file's facts only
+    paths: list = field(default_factory=list)  # per step: its path as it is in the unreduced banned task
+    write_s: float = 0.0  # taskcore sas: load, bans, start check, fold, reductions, the file and the operator table
+    decode_s: float = 0.0  # the operator table read, the plan read back, the paths chosen
+    operators: int = 0
+    stats: dict = field(default_factory=dict)  # taskcore's
+    misses: list = field(default_factory=list)  # out of domain: (key, start value), the first ten taskcore names
+    n_misses: int = 0
+    file_facts: list = field(default_factory=list)  # the task facts the file holds
+    folds: list = field(default_factory=list)  # per step: the reduced action's name when it stands for several paths
+    predicted_goal: bool | None = None  # the goal holds in the predicted state after the last step
+
+
+def _conds(w) -> tuple:
+    return tuple((k, frozenset(_value(v) for v in vs)) for k, vs in w)
+
+
+def read_ops(path) -> tuple:
+    """taskcore's operator table (sas.rs ``write_ops``): (head, op number -> row, reduced action -> row)."""
+    head, ops, acts = None, {}, {}
+    with open(path) as f:
+        for line in f:
+            d = json.loads(line)
+            if head is None:
+                head = d
+            elif "op" in d:
+                ops[d["op"]] = d
+            else:
+                acts[d["action"]] = d
+    return head, ops, acts
+
+
+def decode_ops(text: str, ops: dict, acts: dict) -> list:
+    """The plan's steps through the operator table, ``parse_plan``'s rules: goal operators left out, each pick folded
+    into the steps that read it (a pick variable starts at its first value). Per step a dict: op, the reduced action
+    and its name, its members (the input actions), chosen and guessed as task.Op holds them."""
+    first = {}
+    for n in sorted(ops):
+        if "pick" in ops[n]:
+            first.setdefault(ops[n]["pick"][0], _value(ops[n]["pick"][1]))
+    steps, picks = [], {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("("):
+            continue
+        d = ops[int(line.strip("()").split()[0][1:])]
+        if d.get("goal"):
+            continue
+        if "pick" in d:
+            picks[d["pick"][0]] = _value(d["pick"][1])
+            continue
+        a = acts[d["action"]]
+        guessed = tuple((k, _value(v), _conds(w)) for k, v, w in d["guessed"])
+        for k, vals, w in a["picked"]:
+            vals = [_value(v) for v in vals]
+            u = picks.get(k, first.get(k))
+            guessed += ((k, u if u in vals else vals[0], _conds(w)),)
+        steps.append({"op": f"a{d['op']}", "action": d["action"], "name": a["name"], "members": a["members"],
+                      "chosen": tuple((k, _value(v)) for k, v in d["chosen"]), "guessed": guessed})
+    return steps
+
+
+def _label(d, v):
+    return d.label(int(v)) if isinstance(v, (int, bool)) else v
+
+
+def _holds(pre: dict, state: dict) -> bool:
+    return all(state.get(k) in set(vs) for k, vs in pre.items())
+
+
+def _guess(key, vals, guessed, state):
+    """The value the plan guessed for ``key`` among ``vals``: the step's guesses on ``key`` whose conditions hold
+    in ``state``; UNKNOWN unless exactly one value."""
+    got = {v for k, v, w in guessed if k == key and v in vals and all(state.get(c) in s for c, s in w)}
+    return next(iter(got)) if len(got) == 1 else UNKNOWN
+
+
+def apply_step(facts: dict, a, guessed, state: dict) -> dict:
+    """``state`` after action ``a`` (task.py's meaning: conditions read the state before; a guess of several values,
+    or a step whose result is several values, is the plan's guessed value or UNKNOWN; an effect whose condition
+    reads UNKNOWN makes its fact UNKNOWN)."""
+    new = dict(state)
+    for e in a.effects:
+        if any(state.get(c) == UNKNOWN for c, _ in e.when):
+            new[e.key] = UNKNOWN
+            continue
+        if not all(state.get(c) in s for c, s in e.when):
+            continue
+        d = facts[e.key]
+        if e.values is None and e.add is None:
+            new[e.key] = _label(d, e.value)
+            continue
+        if e.values is not None:
+            vals = {_label(d, v) for v in e.values}
+        else:
+            cur = state.get(e.key)
+            vals = d.add(cur, e.add) if cur not in (UNKNOWN, None) else frozenset()
+        new[e.key] = next(iter(vals)) if len(vals) == 1 else _guess(e.key, vals, guessed, state) if vals else UNKNOWN
+    return new
+
+
+def start_state(facts: dict, start: dict) -> dict:
+    """``start`` (a facts.py map, absent is 0) as the task's values; UNKNOWN where a domain lacks it."""
+    out = {}
+    for k, d in facts.items():
+        lab = _label(d, start.get(k, 0))
+        out[k] = UNKNOWN if lab is None else lab
+    return out
+
+
+def predict(facts: dict, pieces: list, steps: list, start: dict) -> tuple:
+    """Each step's path: of the paths its members stand for (``pieces[m]`` for input action m), the one whose
+    precondition holds in the plan's predicted state at that step (module docstring); PathChoice when not exactly
+    one does. Returns (the paths, the predicted state after the last step)."""
+    state, out = start_state(facts, start), []
+    for i, s in enumerate(steps):
+        cands = [p for m in dict.fromkeys(s["members"]) for p in pieces[m]]
+        ok = [p for p in cands if _holds(p.pre, state)]
+        if len(ok) != 1:
+            raise PathChoice(f"step {i + 1} ({s['name']}, {s['op']}): {len(ok)} of its {len(cands)} paths hold in "
+                             f"the plan's predicted state" + (f": {[p.name for p in ok][:4]}" if ok else ""))
+        out.append(ok[0])
+        state = apply_step(facts, ok[0], s["guessed"], state)
+    return out, state
+
+
+def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, bans=(), *, time_limit: int = 600,
+                  memory_limit: str = "32G", search: str = "lama-first", workdir, binary=TASKCORE, args=(),
+                  keep: bool = False) -> TaskcoreResult:
+    """A plan through taskcore (module docstring). ``facts``: the packed file's facts (key -> Domain), ``goal`` its
+    goal, ``pieces`` per input action its paths under ``bans`` (replay.ban_pieces), ``start`` a facts.py map (with
+    the task's pos:/escpos:/args: keys), ``bans`` replay.Ban or (label, ((key, value), ...)). ``args``: further
+    taskcore options (the default: fold strict, reductions (a)-(f), the model encoding). ``keep``: keep the SAS file
+    and the operator table in ``workdir``."""
+    from export_records import write_bans, write_start
+    work = Path(workdir)
+    work.mkdir(parents=True, exist_ok=True)
+    sas_file, ops_file, stats_file = work / "task.sas", work / "ops.jsonl", work / "stats.json"
+    cmd = [str(binary), "sas", "--task", str(packed), "--start-file", str(write_start(work / "start.txt", facts, start)),
+           "--out", str(sas_file), "--stats", str(stats_file), "--ops", str(ops_file)] + [str(a) for a in args]
+    if bans:
+        cmd += ["--bans", str(write_bans(work / "bans.txt", bans))]
+    t0 = time.monotonic()
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    write_s = time.monotonic() - t0
+    if p.returncode != 0:
+        m = re.search(r"(\d+) facts out of their domains: \[(.*)\]", p.stderr)
+        if not m:
+            raise RuntimeError(f"{' '.join(cmd)}: {p.stderr.strip()}")
+        keys = [json.loads(f'"{k}"') for k in re.findall(r'"((?:[^"\\]|\\.)*)"', m[2])]
+        return TaskcoreResult("out of domain", -1, write_s=write_s, misses=[(k, start.get(k, 0)) for k in keys],
+                              n_misses=int(m[1]), workdir=str(work))
+    stats = json.loads(stats_file.read_text())
+    fd = work / "fd"
+    for old in fd.glob("sas_plan*"):
+        old.unlink()
+    if search == "lama-first":
+        code, log, text, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, workdir=str(fd))
+        status = STATUS.get(code, "error")
+    elif search == "anytime":
+        code, log, _, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, alias=ANYTIME, workdir=str(fd))
+        found = sorted(fd.glob("sas_plan.*"), key=lambda q: int(q.suffix[1:]))
+        text = found[-1].read_text() if found else ""
+        status = "plan" if found else STATUS.get(code, "error")
+    else:
+        raise ValueError(f"search {search!r}: lama-first or anytime")
+    res = TaskcoreResult(status, code, seconds=seconds, workdir=str(work), log=log, write_s=write_s,
+                         operators=stats["sas"]["operators"], stats=stats)
+    if status == "plan":
+        t1 = time.monotonic()
+        head, ops, acts = read_ops(ops_file)
+        res.file_facts = head["facts"]
+        dec = decode_ops(text, ops, acts)
+        paths, end = predict(facts, pieces, dec, start)
+        held = set(head["facts"])
+        res.paths = paths
+        res.actions = [dataclasses.replace(a, effects=tuple(e for e in a.effects if e.key in held)) for a in paths]
+        res.steps = [Step(s["op"], i, a.name, s["chosen"], s["guessed"]) for i, (s, a) in enumerate(zip(dec, paths))]
+        res.folds = [s["name"] if len(s["members"]) > 1 else None for s in dec]
+        res.predicted_goal = all(end.get(k) in {_label(facts[k], v) for v in vs} for k, vs in goal.items())
+        res.decode_s = time.monotonic() - t1
+    if not keep:
+        for q in (sas_file, ops_file, fd / "task.sas"):
+            if q.exists():
+                q.unlink()
+    return res
 
 
 def main() -> None:

@@ -2,7 +2,8 @@
 
 usage: from replay import Harness, boot, verify
        ctl, branch = boot(cfg_of, prefix_events, frame, out_dir)     # the engine at the test's start, from boot
-       h = Harness(builder, full_task, task, branch, goal, ...)      # task: the planner's (pruned) task
+       h = Harness(builder, full_task, full_task, branch, goal, packed=PACKED, workdir=DIR)   # planner taskcore
+       h = Harness(builder, full_task, task, branch, goal, planner="python")   # task: the planner's (pruned) task
        log = h.run()                                                 # plays, matches, bans, replans; log is a dict
        verify(cfg_of, prefix_events + h.inputs(), h.checkpoints, goal_keys, out_dir2)   # the inputs from boot
 
@@ -67,7 +68,15 @@ What the harness does, per plan step (plan.md step 5, with D5):
   without a new ban only a new start.
 * **The replan**: ``reader.replan_start`` from the engine's facts and the plan's prediction: the slot positions and
   locals the played steps predicted (``Harness.pred``), so ``args:`` is copied only where the engine's slot is where
-  the plan put it; then ``plan_fd.plan``.
+  the plan put it; then the planner.
+* **The planner** (``planner``). "taskcore" (the default): ``plan_fd.plan_taskcore`` on the packed file of the
+  reading's records (export_records.py), which is ``task`` (build_task's): each plan gives taskcore that start and
+  every ban so far (taskcore cuts them as ``cut`` does, tested byte for byte against it), taskcore writes the reduced
+  task for that start, lama-first plans on it (or anytime LAMA for ``plan_time`` seconds, ``search="anytime"``), and
+  each step is the path of its reduced action whose precondition holds in the plan's predicted state, an action of
+  ``apply_bans(task, bans)`` with its effects cut to the facts the reduced file holds (the planner's task). "python":
+  task.py's ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``. Each plan's
+  entry keeps the time to write the task (``write_s``), the planner's (``seconds``), the operators and the steps.
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
   one), a planner timeout, the replan limit, the time limit, or a start outside the task's domains
   (task.OutOfDomain: the task would have to be built again).
@@ -87,6 +96,7 @@ import dataclasses
 import json
 import operator
 import re
+import tempfile
 import time
 import types
 from dataclasses import dataclass, field
@@ -499,19 +509,25 @@ def cut(a: T.Action, ban: Ban, facts: dict) -> list:
     return out
 
 
-def apply_bans(task: T.Task, bans: list) -> T.Task:
-    """The task with every ban applied to every action of the ban's label (``cut``)."""
+def ban_pieces(task: T.Task, bans: list) -> list:
+    """Per action of ``task``, in order, what it is under every ban of its label (``cut``, ban after ban): its
+    pieces, ``[a]`` where no ban cuts it, ``[]`` where the bans leave nothing."""
     by = collections.defaultdict(list)
     for ban in bans:
         by[ban.label].append(ban)
-    actions = []
+    out = []
     for a in task.actions:
         pieces = [a]
         for ban in by.get(getattr(a.what, "label", None), ()):
             if all(k in task.facts for k, _ in ban.values):
                 pieces = [p for q in pieces for p in cut(q, ban, task.facts)]
-        actions += pieces
-    out = T.Task(task.facts, actions, task.goal)
+        out.append(pieces)
+    return out
+
+
+def apply_bans(task: T.Task, bans: list) -> T.Task:
+    """The task with every ban applied to every action of the ban's label (``cut``)."""
+    out = T.Task(task.facts, [p for ps in ban_pieces(task, bans) for p in ps], task.goal)
     out.folded = getattr(task, "folded", 0)
     return out
 
@@ -691,8 +707,16 @@ class Harness:
 
     def __init__(self, b, full_task: T.Task, task: T.Task, branch: Branch, goal: dict, *, release: str = "dos-cd",
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
-                 progress=None):
+                 progress=None, planner: str = "taskcore", packed=None, search: str = "lama-first", workdir=None,
+                 taskcore_args=(), keep_files: bool = False):
+        if planner not in ("taskcore", "python"):
+            raise ValueError(f"planner {planner!r}: taskcore or python")
         self.b, self.base = b, task
+        self.planner, self.packed, self.search, self.taskcore_args = planner, packed, search, tuple(taskcore_args)
+        self.workdir = Path(workdir) if workdir is not None else None
+        self.keep_files = keep_files
+        self.pieces = None  # per action of ``task``, its pieces under the bans (the taskcore planner)
+        self.pieces_bans = None
         self.doms = dict(full_task.facts)
         self.doms.update(task.facts)
         self.goal = goal
@@ -758,6 +782,8 @@ class Harness:
     def plan(self, first: bool) -> list:
         """A plan from the engine's state (reader.task_start for the first, reader.replan_start after); [] when the
         planner gives none (the stop reason is set)."""
+        if self.planner == "taskcore":
+            return self._plan_taskcore(first)
         if self.sas is None or self.sas_bans != len(self.bans):
             self.progress(f"writing the task ({len(self.bans)} bans)")
             self.task = apply_bans(self.base, self.bans)
@@ -782,7 +808,11 @@ class Harness:
             return []
         self.progress(f"planning (plan {entry['plan']}, frame {self.branch.frame})")
         res = plan_fd.plan(self.sas, start, time_limit=self.plan_time)
-        entry.update(status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps])
+        entry.update(status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps],
+                     operators=self.sas.counts["operators"])
+        return self._planned(entry, res, start)
+
+    def _planned(self, entry: dict, res, start: dict) -> list:
         self.progress(f"plan {entry['plan']}: {res.status}, {len(res.steps)} steps, {res.seconds:.0f} s")
         if res.status != "plan":
             why = {"time": f"planner timeout ({self.plan_time} s)", "unsolvable": "no plan (the planner proved none)",
@@ -793,6 +823,42 @@ class Harness:
         self._set_pred({k: self.task.facts[k].label(start.get(k, 0)) for k in self.task.facts
                         if k.startswith(PREDICTED)})
         return list(res.steps)
+
+    def _plan_taskcore(self, first: bool) -> list:
+        """``plan`` through taskcore (module docstring): the start and the bans as files, taskcore's reduced task,
+        the search, the plan read back to paths of the banned task; ``self.task`` is the plan's steps' actions."""
+        if self.pieces is None or self.pieces_bans != len(self.bans):
+            self.pieces = ban_pieces(self.base, self.bans)
+            self.pieces_bans = len(self.bans)
+        if first:
+            start, counts = R.task_start(self.b, self.obs, self.base), {}
+        else:
+            start, counts = R.replan_start(self.b, self.obs, prediction(self.now, self.pred), self.base)
+        n = len(self.plans)
+        entry = {"plan": n, "frame": self.branch.frame, "bans": len(self.bans), "start_counts": dict(counts),
+                 "reorders": [], "planner": "taskcore", "search": self.search}
+        self.plans.append(entry)
+        if self.workdir is None:
+            self.workdir = Path(tempfile.mkdtemp(prefix="replay-taskcore-"))
+        self.progress(f"planning through taskcore (plan {n}, frame {self.branch.frame}, {len(self.bans)} bans)")
+        try:
+            res = plan_fd.plan_taskcore(self.packed, self.base.facts, self.goal, self.pieces, start, self.bans,
+                                        time_limit=self.plan_time, search=self.search,
+                                        workdir=self.workdir / f"plan-{n:03d}", args=self.taskcore_args,
+                                        keep=self.keep_files)
+        except plan_fd.PathChoice as e:
+            entry.update(status="path choice", error=str(e), steps=[])
+            self.stop_reason = f"planner: {e}"
+            return []
+        entry.update(write_s=res.write_s, status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps],
+                     operators=res.operators, actions=res.stats.get("actions"), decode_s=res.decode_s,
+                     folds=res.folds, predicted_goal=res.predicted_goal)
+        if res.status == "out of domain":
+            entry.update(misses=res.misses, steps=[])
+            self.stop_reason = f"the engine's state is outside the task's domains ({res.n_misses} facts)"
+            return []
+        self.task = T.Task(self.base.facts, res.actions, self.base.goal)
+        return self._planned(entry, res, start)
 
     # --- one step -------------------------------------------------------------------------------------------------
 
