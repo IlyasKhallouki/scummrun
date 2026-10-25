@@ -150,6 +150,74 @@ def test_a_wrong_action_line_is_refused(tmp_path):
         E.control_records(tmp_path / "reading.tc", tmp_path / "reading.actions.jsonl", tmp_path / "c.tc")
 
 
+def golden_file(path, recs, head=None):
+    """``recs`` in golden.py's reading format (what the Rust reader is compared with, and writes)."""
+    import golden
+    head = head or {"name": "hand", "rooms": [28, 41], "verbs": [2, 9], "dialog_verbs": [109, 121], "walk_verb": 11,
+                    "n_records": len(recs), "sources": {"reader.py": "x"}}
+    lines = [golden.line({"kind": "reading", "reading": golden.enc(head)})]
+    lines += [golden.line({"kind": "record", "index": i, "record": golden.enc(r)}) for i, r in enumerate(recs)]
+    lines.append(golden.line({"kind": "builder", "builder": golden.enc({"counts": {"a counter": 3}})}))
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def test_a_reading_from_golden_format_records_and_a_packed_file_is_the_python_export(tmp_path):
+    """The Rust reader's path: its packed file and its records in golden.py's format give the action lines and
+    reading.json the Python export writes, byte for byte and field for field, and the runner reads them the same."""
+    b, recs, _ = reading(tmp_path / "py")
+    g = golden_file(tmp_path / "hand.jsonl", recs)
+    out = PR.reading_from_golden(g, tmp_path / "py" / "reading.tc", tmp_path / "g", {"room": 28, "var:53": 1},
+                                 "a hand-made start", domain=DOMS.get)
+    assert out["actions"] == 3 and out["records"] == 4 and out["bounds"] == 1
+    assert (tmp_path / "g" / "reading.actions.jsonl").read_bytes() == \
+        (tmp_path / "py" / "reading.actions.jsonl").read_bytes()
+    a, p = (json.loads((tmp_path / d / "reading.json").read_text()) for d in ("g", "py"))
+    for k in ("format", "packed", "actions", "n_actions", "n_records", "folded", "goal", "start", "scope", "bounds",
+              "counts", "control"):
+        assert a[k] == p[k], k
+    rd, rp = PR.load_reading(tmp_path / "g" / "reading.json"), PR.load_reading(tmp_path / "py" / "reading.json")
+    assert [x.name for x in rd.task.actions] == [x.name for x in rp.task.actions]
+    assert [x.what.checks for x in rd.task.actions] == [x.what.checks for x in rp.task.actions]
+    assert [x.what.source for x in rd.task.actions] == [x.what.source for x in rp.task.actions]
+    rd.close()
+    rp.close()
+    assert PR.check_reading(tmp_path / "g" / "reading.json")["ok"]
+
+
+def test_the_lines_follow_the_packed_files_order_whatever_it_is(tmp_path):
+    """Another writer may put the actions in another order (the Rust RecordStream rewrites the body at finish): each
+    line comes from the record its action's ``rec`` names."""
+    b, recs, _ = reading(tmp_path / "py")
+    full = R.build_task(b, recs, {"state:316": {1}})
+    rev = T.Task(full.facts, list(reversed(full.actions)), full.goal)
+    E.export_task(tmp_path / "rev.tc", rev, {}, meta=lambda a: (a.what.kind, a.what.end, E._cont(a.what)),
+                  naming=E.record_naming)
+    g = golden_file(tmp_path / "hand.jsonl", recs)
+    PR.reading_from_golden(g, tmp_path / "rev.tc", tmp_path / "g", {"room": 28, "var:53": 1}, "a hand-made start",
+                           domain=DOMS.get)
+    lines = [json.loads(x) for x in (tmp_path / "g" / "reading.actions.jsonl").read_text().splitlines()]
+    assert [(x["i"], x["rec"]) for x in lines] == [(0, 3), (1, 1), (2, 0)]
+    rd = PR.load_reading(tmp_path / "g" / "reading.json")
+    assert [a.name for a in rd.task.actions] == [a.name for a in rev.actions]
+    rd.close()
+
+
+def test_the_reading_check_names_what_is_wrong(tmp_path):
+    reading(tmp_path)
+    lines = (tmp_path / "reading.actions.jsonl").read_text().splitlines()
+    first = json.loads(lines[0])
+    first["source"] = ["sentence", 11, "316", None]  # a number written as text
+    first["checks"][0] = first["checks"][0][:3]
+    (tmp_path / "reading.actions.jsonl").write_text("\n".join([json.dumps(first)] + lines[1:]) + "\n")
+    doc = json.loads((tmp_path / "reading.json").read_text())
+    doc["bounds"] = {}
+    (tmp_path / "reading.json").write_text(json.dumps(doc))
+    out = PR.check_reading(tmp_path / "reading.json")
+    assert not out["ok"] and set(out["problems"]) == {"source", "check", "bounds"}
+    assert out["problems"]["bounds"] == ["var:53"]
+
+
 # --- the control -----------------------------------------------------------------------------------------------------
 
 def test_the_control_keeps_the_engine_conditions_and_the_steps_room(tmp_path):
@@ -180,16 +248,48 @@ def test_the_control_keeps_the_engine_conditions_and_the_steps_room(tmp_path):
     rd.close()
 
 
+def test_the_controls_lines_drop_the_scripts_checks_and_make_its_steps_engine_conditions(tmp_path):
+    """The control's action lines: no replay checks (the walk's test on var:104 is the scripts'), the record's own
+    facts cut to the kept ones, and a stepped fact the record named (cutscene, its room kept) an engine condition, so
+    the control's ban names the room alone; the full model's ban on the same record names bit:6 and cutscene too."""
+    b = builder()
+    walk = records()[0]
+    walk = TR.rec("walk_to", "walk_to(316)", dict(walk.pre, cutscene=frozenset({0, 1, 2, 3})), dict(walk.effects),
+                  walk.checks, walk.source, walk.engine_pre)
+    PR.export_reading(tmp_path, b, [walk], {"state:316": {1}}, "a hand-made start", {"name": "hand"})
+    c = E.control_records(tmp_path / "reading.tc", tmp_path / "reading.actions.jsonl", tmp_path / "control.tc",
+                          tmp_path / "control.actions.jsonl")
+    assert c["checks dropped"] == 1 and c["stepped facts made engine conditions"] == 1 and c["sets dropped"] == 1
+    line = json.loads((tmp_path / "control.actions.jsonl").read_text())
+    full = json.loads((tmp_path / "reading.actions.jsonl").read_text())
+    assert line["checks"] == [] and len(full["checks"]) == 1
+    assert line["pre_keys"] == ["cutscene", "room", "script:2", "var:53"] and "bit:6" in full["pre_keys"]
+    assert line["engine_pre"] == ["cutscene", "room", "script:2", "var:53"]
+    assert {k: v for k, v in line.items() if k not in ("checks", "pre_keys", "engine_pre")} == \
+        {k: v for k, v in full.items() if k not in ("checks", "pre_keys", "engine_pre")}
+    rd = PR.load_reading(tmp_path / "reading.json")
+    ct = PR.PackedTask(PR.Packed(tmp_path / "control.tc"), PR.Lines(tmp_path / "control.actions.jsonl"),
+                       rd.doc["bounds"])
+    state = {"room": 28, "bit:6": 0, "script:2": 0, "cutscene": 0, "var:53": 1}
+    assert RP.ban_of(ct.actions[0].what, state) == RP.Ban("walk_to(316)", (("room", 28),))
+    assert RP.ban_of(rd.task.actions[0].what, state) == RP.Ban("walk_to(316)", (("bit:6", 0), ("cutscene", 0),
+                                                                                ("room", 28)))
+    assert ct.actions[0].what.checks == [] and ct.actions[0].pre["cutscene"] == rd.task.actions[0].pre["cutscene"]
+    ct.close()
+    rd.close()
+
+
 def test_the_runner_makes_the_control_once(tmp_path):
     reading(tmp_path)
     out = P1.make_control(tmp_path / "reading.json")
     doc = json.loads(out.read_text())
     assert out.name == "control.json" and doc["control"] and doc["packed"] == "control.tc"
-    assert doc["control_counts"]["sets dropped"] == 3
+    assert doc["actions"] == "control.actions.jsonl" and doc["control_counts"]["sets dropped"] == 3
     mtime = (tmp_path / "control.tc").stat().st_mtime_ns
     assert P1.make_control(tmp_path / "reading.json") == out and (tmp_path / "control.tc").stat().st_mtime_ns == mtime
     rd = PR.load_reading(out)
     assert sorted(rd.task.actions[0].pre) == ["cutscene", "room", "script:2", "var:53"]
+    assert rd.task.actions[0].what.checks == []  # the control's harness reads none of the scripts' checks
     rd.close()
 
 
@@ -350,17 +450,153 @@ def test_ran_on_takes_the_path_the_plans_state_holds():
     assert [st.name for st, _ in chain] == ["fold:arrive"] and task.actions[1] is one and choices == {}
 
 
-def test_the_harness_records_the_first_frame_each_watched_fact_holds():
+def walk_writes(name, args, writes):
+    """A walk whose precondition names args:script:2 (a slot's locals: the dump does not show them) and which
+    writes ``writes``."""
+    rec = TR.rec("walk_to", "walk_to(316)", {"args:script:2": frozenset({args}), "room": frozenset({28})},
+                 {k: ("set", v) for k, v in writes.items()}, (), ("sentence", 11, 316, None), {"room"})
+    return T.Action(name, pre={"args:script:2": {args}, "room": {28}},
+                    effects=tuple(T.Effect(k, value=v) for k, v in writes.items()), what=rec)
+
+
+def test_several_paths_the_engine_cannot_tell_apart_are_played_once_and_the_writes_choose():
+    """Two paths of one step that differ only on args:script:2 (no plan value): both hold, so the walk is clicked once
+    and the step is the path whose writes the engine shows (the door: path 2), with no replan."""
+    one, two = walk_writes("walk_to(316)#1", 0, {"bit:6": 1}), walk_writes("walk_to(316)#2", 9, {"state:316": 1})
+
     def opens(fb, f, clicks):
-        if f == 103:
-            fb.vars[9] = 2
-    h, fb = TR.harness(opens, TR.walk_rec())
-    h.watch = {"#1": ("var:9", "==", 2), "#2": ("var:9", "!=", 5), "#3": ("var:10", "==", 1)}
+        if clicks:
+            fb.door = 1
+    h, fb = TR.harness(opens, one.what)
+    fb.__class__ = DoorBranch
+    h.doms["args:script:2"] = Domain.of({0, 9})
+    h.goal = {"bit:6": {1}}  # not reached: the step is judged on its own
+    h.task = T.Task(h.doms, [plan_fd.either("fold:walk_to(316)#1+1", [one, two])], h.goal)
+    h.choices = {0: [one, two]}
     h.observe()
-    h.advance(5)
-    for _ in range(4):
-        h.advance()
-    assert h.reached == {"#2": 100, "#1": 105}  # seen on the frames the harness observes
+    assert h.play_step(0, 0, plan_fd.Step("a1", 0, "fold:walk_to(316)#1+1", (), ())) == "next"
+    log = h.steps[-1]
+    assert log.outcome == "matched" and len(log.tries) == 1 and log.tries[0]["path"] == "walk_to(316)#2"
+    assert h.task.actions[0] is two and h.choices == {} and h.bans == []
+    assert "played once" in log.note and "walk_to(316)#2" in log.note
+
+
+def test_the_reviews_two_holding_paths_no_longer_spin():
+    """The review's case (two paths whose sets on var:9 overlap, both holding): it replanned at once from the same
+    frame until the replan limit; now the click is played once and the run reaches the goal."""
+    one, two = walk("walk_to(316)#1", {0, 1}), walk("walk_to(316)#2", {0})
+
+    def opens(fb, f, clicks):
+        if clicks:
+            fb.door = 1
+    h, fb = TR.harness(opens, one.what)
+    fb.__class__ = DoorBranch
+    fb.vars[9] = 0
+    h.doms["var:9"] = Domain.of({0, 1, 2})
+    h.doms["state:316"] = BINARY
+    h.goal = {"state:316": {1}}
+    h.replan_limit = 5
+
+    def plan(first):
+        h.task = T.Task(h.doms, [plan_fd.either("fold:walk_to(316)#1+1", [one, two])], {"state:316": {1}})
+        h.choices = {0: [one, two]}
+        h.plans.append({"plan": len(h.plans), "reorders": []})
+        return [plan_fd.Step("a1", 0, "fold:walk_to(316)#1+1", (), ())]
+    h.plan = plan
+    res = h.run()
+    assert res["stop"] == "goal" and res["replans"] == 0 and len(res["plans"]) == 1 and res["bans"] == []
+    assert [s["outcome"] for s in res["steps"]] == ["matched"] and res["inputs"]
+
+
+def test_a_replan_with_the_last_plans_input_on_the_same_frame_stops_the_run(tmp_path):
+    """The planner is deterministic: the same start and bans on the same frame give the same plan, played the same
+    way. The second plan stops the run; a frame later, or with a new ban, it plans."""
+    import test_replay_taskcore as TT
+    b, (r, other, flip), task = TT._harness_task()
+    E.export_task(tmp_path / "k.tc", task, {}, meta=lambda a: (a.what.kind, a.what.end, ""), naming=E.record_naming)
+    h = RP.Harness(b, task, task, TT._fake_branch(), {"state:316": {1}}, packed=tmp_path / "k.tc",
+                   workdir=tmp_path / "plans")
+    h.observe()
+    assert [s.name for s in h.plan(first=True)] == ["walk_to(316)#0"]
+    assert h.plan(first=False) == [] and h.plans[1]["status"] == "same input"
+    assert h.stop_reason.startswith(f"replan at frame {h.branch.frame} with plan 0's start and bans")
+    h.stop_reason = None
+    h.bans.append(RP.ban_of(r, h.belief()))
+    assert [s.name for s in h.plan(first=False)] == ["sentence(1,7)#2", "sentence(2,316)#1"]
+    h.advance(1)
+    assert h.plan(first=False) and h.plans[-1]["status"] == "plan"
+
+
+def test_an_unexpected_error_stops_the_run_and_keeps_its_record():
+    h, fb = TR.harness(lambda fb, f, c: None, TR.walk_rec())
+    seen = []
+
+    def plan(first):
+        h.plans.append({"plan": len(h.plans), "reorders": []})
+        raise KeyError("boom")
+    h.plan = plan
+    h.on_plan = seen.append
+    res = h.run()
+    assert res["stop"] == "error: KeyError: 'boom'" and "Traceback" in res["error"] and len(res["plans"]) == 1
+    assert res["frame0"] == 100 and res["inputs"] == [] and seen == []  # the plan never returned
+
+
+def test_the_snapshot_after_each_plan_is_the_record_so_far():
+    h, fb = TR.harness(lambda fb, f, c: None, TR.walk_rec())
+    snaps = []
+
+    def plan(first):
+        h.plans.append({"plan": len(h.plans), "reorders": []})
+        h.stop_reason = "no plan (the planner proved none)"
+        return []
+    h.plan = plan
+    h.on_plan = lambda hh: snaps.append(hh.result())
+    res = h.run()
+    assert len(snaps) == 1 and snaps[0]["plans"] == res["plans"] and snaps[0]["stop"] == res["stop"]
+
+
+def test_a_step_the_engine_ran_on_through_counts_the_next_events_writes_as_predicted():
+    """The walk's window holds the arrival's writes (the slot past its wait, the door open): they are the plan's next
+    event's, so they are not "changed with no prediction"; local:203, which nothing predicts, is."""
+    def past_the_wait(fb, f, clicks):
+        if clicks:
+            fb.slots[2] = {"where": TR.WIO_GLOBAL, "number": 2, "code": 937, "frozen": 0}
+            fb.slots[203] = {"where": TR.WIO_LOCAL, "number": 203, "code": 58, "frozen": 0}
+            fb.door = 1
+    arrive = TR.rec("event", "event(script:2@736)", {"script:2": frozenset({1}), "pos:script:2": frozenset({736})},
+                    {"pos:script:2": ("set", 937), "state:316": ("set", 1)})
+    h, fb = TR.harness(past_the_wait, TR.walk_rec(), arrive)
+    fb.__class__ = DoorBranch
+    h.goal = {"bit:6": {1}}
+    h.observe()
+    assert h.play_step(0, 0, TR.step(0), [TR.step(1, "arrive")]) == "next"
+    log = h.steps[-1]
+    assert log.outcome == "matched, the engine ran on"
+    assert {u["key"] for u in log.unplanned} == {"local:203", "pos:local:203"}
+    assert all(u["net"] and u["end"] == 1 or u["key"] == "pos:local:203" for u in log.unplanned)
+
+
+def test_history_marks_a_change_that_came_back():
+    hist = RP.History({"var:182": 0, "bit:6": 0}, 10)
+    hist.note(11, {"var:182": "above", "bit:6": 1})
+    hist.note(12, {"var:182": 0, "bit:6": 1})
+    un = {u["key"]: u for u in hist.unplanned(set())}
+    assert un["var:182"]["net"] is False and un["var:182"]["end"] == 0 and un["var:182"]["count"] == 2
+    assert un["bit:6"]["net"] is True and un["bit:6"]["end"] == 1
+
+
+def test_the_start_check_names_the_task_facts_another_start_holds(tmp_path):
+    """A reading serves the start it was read from: a start that differs on a fact of the task (var:53) is named, one
+    that differs only elsewhere (var:100) is not."""
+    reading(tmp_path)
+    rd = PR.load_reading(tmp_path / "reading.json")
+    row = {"seed": 1, "stop": {"frame": 2728}, "checks": [], "facts": {"room": 28, "var:53": 1, "var:100": 20}}
+    chk = P1.start_check(row, rd, tmp_path / "check")
+    assert chk["reading start"]["differ"] == 1 and chk["reading start"]["task facts differ"] == 0
+    row["facts"]["var:53"] = 2
+    chk = P1.start_check(row, rd, tmp_path / "check")
+    assert chk["reading start"]["task facts differ"] == 1 and chk["reading start"]["task first"] == [("var:53", (1, 2))]
+    rd.close()
 
 
 def test_landmarks_come_back_through_taskcore(tmp_path):
@@ -380,32 +616,86 @@ def test_landmarks_come_back_through_taskcore(tmp_path):
 
 # --- the runner's report ------------------------------------------------------------------------------------------
 
-def step_dict(name, outcome, tries=1, mismatches=(), seconds=1.0, start=0, end=10):
-    return {"name": name, "outcome": outcome, "tries": [{}] * tries, "mismatches": list(mismatches),
-            "seconds": seconds, "start": start, "end": end}
+def step_dict(name, outcome, tries=1, mismatches=(), seconds=1.0, start=0, end=10, kind="sentence", unplanned=(),
+              inputs=True):
+    return {"name": name, "outcome": outcome, "kind": kind, "seconds": seconds, "start": start, "end": end,
+            "tries": [{"inputs": [{"frame": 1, "click": [1, 2]}] if inputs and kind != "event" else []}] * tries,
+            "mismatches": list(mismatches), "unplanned": list(unplanned)}
+
+
+def change(key, start, end):
+    return {"key": key, "start": start, "changes": [[5, end]], "count": 1, "end": end, "net": start != end}
 
 
 def test_the_summary_counts_as_the_runners_docstring_says():
+    """plan.md's match: the predicted writes and the tracked facts' changes. A step whose path never started, did not
+    happen or mismatched is a mismatch, and so is a matched step that changed a tracked fact with no prediction; a
+    fact that came back is not; a value inside a guess but not the plan's choice is counted apart."""
+    w = {"kind": "write", "key": "x", "predicted": ["1"], "observed": 0}
     res = {"steps": [step_dict("a", "matched"),
-                     step_dict("b", "matched", mismatches=[{"kind": "guess"}]),
-                     step_dict("c", "ran on in the step before", tries=0, seconds=0),
-                     step_dict("d", "mismatch", mismatches=[{"kind": "write"}, {"kind": "write"}], seconds=3.0),
+                     step_dict("b", "matched", mismatches=[{"kind": "choice", "predicted": ["2"]}]),
+                     step_dict("c", "ran on in the step before", tries=0, seconds=0, kind="event"),
+                     step_dict("d", "mismatch", mismatches=[w, w], seconds=3.0),
                      step_dict("e", "precondition", tries=0, seconds=0),
-                     step_dict("f", "already happened", tries=0, seconds=0),
-                     step_dict("g", "path not started", tries=4, seconds=2.0, end=40)],
+                     step_dict("f", "already happened", tries=0, seconds=0, kind="event"),
+                     step_dict("g", "path not started", tries=4, seconds=2.0, end=40, mismatches=[w]),
+                     step_dict("h", "matched", unplanned=[change("var:182", 0, 255), change("bit:9", 0, 0)]),
+                     step_dict("i", "interface failure", tries=2, inputs=False),
+                     step_dict("j", "did not happen", kind="event", mismatches=[w]),
+                     step_dict("k", "matched, the engine ran on", mismatches=[w], kind="event")],
            "plans": [{"write_s": 1.0, "seconds": 2.0, "decode_s": 0.5}, {"write_s": 1.0, "seconds": 1.0}],
            "inputs": [{"frame": 1, "click": [1, 2]}, {"frame": 2, "key": "o"}, {"frame": 3, "skips": {}}],
            "seconds": 20.0}
-    s = P1.summary(res, {"#5": 100, "#1": 150, "#2": 120}, 100, 99)
-    assert s["executed"] == 6 and s["played"] == 4 and s["matched"] == 4 and s["matched_share"] == round(4 / 6, 3)
-    assert s["matched_with_another_guess"] == 1 and s["mismatch_steps"] == 1 and s["mismatch_facts"] == 2
-    assert s["mismatch_facts_per_executed"] == round(2 / 6, 3) and s["final_path"] == ["a", "b", "c", "f"]
-    assert s["inputs"] == 2 and s["outcomes"]["precondition"] == 1
-    assert s["key_goals"] == {"of": 99, "passed": 3, "held_at_start": 1, "reached_in_the_run": 2, "at_start": ["#5"],
-                              "reached": {"#1": 150, "#2": 120}}
+    s = P1.summary(res)
+    # executed: all but the precondition (no try) and the interface failure (no input reached the engine)
+    assert s["executed"] == 9 and s["played"] == 8
+    assert s["writes_held"] == 6 and s["final_path"] == ["a", "b", "c", "f", "h", "k"]
+    assert s["matched"] == 5 and s["matched_share"] == round(5 / 9, 3)
+    assert s["not_matched"] == {"did not happen": 1, "mismatch": 1, "path not started": 1,
+                                "writes held, tracked facts changed": 1}
+    assert s["mismatched_writes"] == 4 and s["unplanned_changes"] == 1 and s["mismatches"] == 5
+    assert s["mismatches_per_executed"] == round(5 / 9, 3) and s["unplanned_most"] == [("var:182", 1)]
+    assert s["another_guess"] == 1 and s["inputs"] == 2 and s["outcomes"]["precondition"] == 1
     t = s["time"]
-    assert t["planning_s"] == 5.5 and t["playing_s"] == 14.5 and t["step_seconds"]["n"] == 4
+    assert t["planning_s"] == 5.5 and t["playing_s"] == 14.5 and t["step_seconds"]["n"] == 8
     assert t["step_frames"]["max"] == 40
+
+
+def test_the_summary_reads_a_record_from_before_the_net_field():
+    old = {"key": "var:182", "start": 0, "changes": [[5, "above"], [9, 0]], "count": 2}
+    assert not P1.net(old) and P1.net(dict(old, changes=[[5, "above"]], count=1))
+    assert P1.net(dict(old, count=20))  # its last value is not kept: counted
+
+
+def test_the_part1_goal_and_the_key():
+    import score_part1 as SP
+    goal = P1.goal_of("part1", lambda k: Domain.of({1, 15}))
+    assert goal == {"owner:901": {1}, "owner:902": {1}, "owner:903": {1}}
+    assert P1.goal_of("state:428=1,bit:6=0", None) == {"state:428": {1}, "bit:6": {0}}
+    keys, end = SP.key_goals()
+    assert len(keys) == 99 and keys["#1"] == ("state:428", "==", 1) and keys["#97"] == ("owner:901", "==", 1)
+    assert end == ["#97", "#98", "#99"]
+
+
+def test_the_score_counts_goals_reached_after_the_start_on_every_frame():
+    import score_part1 as SP
+    goals = {"#1": ("state:428", "==", 1), "#2": ("bit:6", "!=", 1), "#3": ("owner:5", "==", 1),
+             "#4": ("bit:7", "==", 1)}
+    states = [(100, {"bit:6": 0}), (101, {"state:428": 1}), (102, {"owner:5": 1, "state:428": 1}),
+              (103, {"bit:7": 1, "state:428": 0}), (104, {})]
+    at_start, reached, both = SP.first_frames(states, goals, 100, ["#1", "#3", "#4"])
+    assert at_start == {"#2"} and reached == {"#1": 101, "#3": 102, "#4": 103}  # #4 held for one frame only
+    assert both is None  # #1, #3 and #4 never held on one frame
+    assert SP.first_frames(states, goals, 100, ["#1", "#3"])[2] == 102
+
+
+def test_the_runner_never_reads_the_key():
+    import ast
+    for name in ("replay.py", "replay_part1.py", "packed_reading.py", "export_records.py", "plan_fd.py"):
+        tree = ast.parse((HERE / name).read_text())
+        mods = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names} | \
+            {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
+        assert not mods & {"end_part1", "score_part1"}, name
 
 
 def test_the_runner_refuses_the_any_and_the_test_seeds(tmp_path):
@@ -414,14 +704,6 @@ def test_the_runner_refuses_the_any_and_the_test_seeds(tmp_path):
             P1.cmd_run(seed, tmp_path / "missing.json", False, 1, 1, 1)
     with pytest.raises(ValueError, match="Any%"):
         P1.config(P1.ANY_SEED, tmp_path)
-
-
-def test_the_part1_goal_and_the_key():
-    goal = P1.goal_of("part1", lambda k: Domain.of({1, 15}))
-    assert goal == {"owner:901": {1}, "owner:902": {1}, "owner:903": {1}}
-    assert P1.goal_of("state:428=1,bit:6=0", None) == {"state:428": {1}, "bit:6": {0}}
-    keys = P1.key_goals()
-    assert len(keys) == 99 and keys["#1"] == ("state:428", "==", 1) and keys["#97"] == ("owner:901", "==", 1)
 
 
 # --- the kitchen ------------------------------------------------------------------------------------------------------

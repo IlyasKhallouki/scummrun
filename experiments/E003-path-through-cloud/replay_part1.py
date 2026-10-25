@@ -7,16 +7,19 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
                        results/start-part1.jsonl's seed N; ``--goal part1`` is results/end-part1.json)
        replay_part1.py export-pickle PICKLE --goal ... --name NAME --start-name TEXT --out DIR   (a pickled reading)
        replay_part1.py control DIR/reading.json           (the control's reading next to it: DIR/control.json)
-       replay_part1.py start SEED [SEED ...] --reading DIR/reading.json   (the start check only, no goal run)
+       replay_part1.py start SEED [SEED ...] --reading DIR/reading.json [--results DIR]
+                       (the start check only, no goal run)
        replay_part1.py run SEED --reading DIR/reading.json [--control] [--replan-limit 500] [--time-limit 86400]
-                       [--plan-time 600]
-       replay_part1.py log NAME                           (the log of NAME's runs and start checks, from the json)
+                       [--plan-time 600] [--plan-memory 6G] [--results DIR]
+       replay_part1.py log NAME [--results DIR]           (the log of NAME's runs and start checks, from the json)
+       score_part1.py RESULT.json ...                     (after the run: the key's Part I goals, from boot)
 
 **The input** is a reading as files (packed_reading.py): ``reading.json``, the packed records file in taskcore's
-format and its action lines. The Rust reader (branch reader-b) writes the packed file; with the action lines and
-reading.json beside it, it drops in here with no change. ``export`` and ``export-pickle`` make the files from the
-Python reader, for readings it can make on this laptop (room 33 alone, the kitchen; ``export`` refuses more than two
-rooms: the Python reader needs 16 GB at k=1). The goal is the packed file's: for Part I, the Part I end
+format and its action lines. The Rust reader (branch reader-b) writes the packed file and its records in golden.py's
+format; ``packed_reading.py from-golden`` makes the other two from those, with no reading (tested on the kitchen: the
+Rust reader's packed file gives build_task's task, action by action). ``export`` and ``export-pickle`` make the files
+from the Python reader, for readings it can make on this laptop (one room and a neighbour at most; ``export`` refuses
+more than two rooms: the Python reader needs 16 GB at k=1). The goal is the packed file's: for Part I, the Part I end
 (results/end-part1.json, plan.md step 2, a disclosed human input); a test may give a nearer goal.
 
 **Per seed** (plan.md step 5):
@@ -35,31 +38,50 @@ rooms: the Python reader needs 16 GB at k=1). The goal is the packed file's: for
 4. **Verify**: the harness's inputs from boot in a fresh engine with the same settings, no fork, no change to the
    random state, compared at every checkpoint (replay.verify), and the goal at the end.
 
-**The control** (``--control``): the same run on the control's packed file (export_records.control_records: each
-action's precondition cut to its engine conditions and its steps' room; the scripts' tests dropped), with the same
-action lines, seeds and budget. Its bans follow the same rule on its own records, whose preconditions name only
-those facts: a ban then names the room alone.
+**The reading and the seed.** The reader builds each fact's domain from its start (plan.md step 1: the start value
+closed under the writes), so a reading serves the seed it was read from: ``run`` refuses a seed whose start differs
+from the reading's on a fact the packed file holds (``start_check``: "task facts differ"), and ``start`` reports it.
+On Part I that is every seed but the reading's own (a variable the boot script draws at random differs on every
+seed, and Part I's scripts read it), so each seed needs its own reading, as plan.md step 6 runs steps 1, 2, 4 and 5
+per seed.
+
+**The control** (``--control``): the same run on the control's reading (export_records.control_records, made once
+next to the reading: control.tc, control.actions.jsonl, control.json): each action's precondition cut to its engine
+conditions and its steps' room, the scripts' tests dropped, and its action lines with no replay checks, so the
+harness neither waits for the scripts' position tests nor reads them to tell a retry from a ban. Its bans follow the
+same rule on its own records, which test nothing the scripts test: a ban names the room alone, and so removes that
+action in that room for the rest of the run (the control knows no narrower point; plan.md's rule, on the control's
+model).
 
 **The report per seed** (plan.md step 5), in ``results/replay-part1-<name>-seed<N>[-control].json`` and the log:
 reached the end or not (in the run and verified from boot), the stop reason, replans, mismatches per executed action,
-the share of executed actions whose observed effects matched the model, actions in the final path, Part I goals the
-path passes through (of 99), time per step, and the landmarks of the first plan (Fast Downward's debug output,
-plan_fd.parse_landmarks). Definitions (``summary``):
+the share of executed actions whose observed effects matched the model, actions in the final path, time per step,
+and the landmarks of the first plan (Fast Downward's debug output, plan_fd.parse_landmarks). Definitions
+(``summary``):
 
-* **executed**: the steps the harness played (an input or a wait, at least one try), the events the engine ran on
-  through within the step before, and the events that had already happened at their turn;
-* **matched**: of those, the ones whose observed effects matched the record's predicted writes (outcomes "matched",
-  "matched, the engine ran on", "ran on in the step before", "already happened", and a step during which the goal
-  came); a matched step whose guessed value differed from the plan's choice is counted apart;
-* **mismatches per executed action**: steps with outcome "mismatch" (the path started, then a predicted write did not
-  hold), and the facts those steps' mismatches name, each over the executed steps; every outcome is listed;
-* **the final path**: the matched steps, in order: the actions the engine carried out as the model said, from the
-  start to the stop;
-* **Part I goals passed through**: the key's 99 Part I goals (E001's key.json, mapped to facts as end_part1.py maps
-  them), each checked on every frame the harness observed; those holding at the start are counted apart. The
-  harness only records the first frame each holds: nothing it decides reads them (scoring, plan.md's metric);
+* **executed**: the steps whose input reached the engine (a try that sent an input, or an event's wait), the events
+  the engine ran on through within the step before, and the events that had already happened at their turn. A step
+  whose precondition never held, an Executor error before any input and a step of several paths with no path are
+  not executed (listed under outcomes);
+* **writes held**: the record's predicted writes all held (outcomes "matched", "matched, the engine ran on" (the
+  next events rewrote what differed), "already happened"; "ran on in the step before" and "goal" when none of their
+  writes was missed);
+* **matched** (plan.md's match: "the predicted writes, and the changes to facts the model tracks"): the writes held
+  and no tracked fact ended the step at another value with no predicted write (``History.unplanned``'s ``net``; a
+  fact that changed and came back is listed, not counted);
+* **mismatches per executed action**: the predicted writes not seen (kinds "write" and "guess": outside the model's
+  values) plus the tracked facts changed with no predicted write, over the executed steps; a guessed value inside the
+  model's values but not the plan's choice ("choice") is counted apart;
+* **the final path**: the steps whose writes held, in order: the actions the engine carried out, from the start to
+  the stop;
 * **time per step**: per harness step its wall time and its frames, per plan its writing, search and read-back
   times, and the pieces of the run (boot, start check, harness, planning within it, verify).
+
+**Part I goals the path passes through** (of 99) are scored after the run, by score_part1.py, from the recorded
+inputs replayed from boot: the run never reads E001's key.
+
+**A long run** keeps its record as it goes (``<run dir>/partial.json`` after every plan, outside the repo), and an
+error inside the harness stops it with its reason and traceback in the record; verify still plays what was recorded.
 
 C2: this file names no game number. The seeds are plan.md's; ``run`` refuses the held-out seeds 31-35 (only with
 ``--test-seeds``, for the Part I result itself) and the Any% seed always; ``start`` allows 31-35 (a start check
@@ -67,6 +89,7 @@ plays nothing).
 """
 
 import argparse
+import collections
 import hashlib
 import json
 import pickle
@@ -97,11 +120,9 @@ START_ROWS = HERE / "results" / "start-part1.jsonl"
 END_PART1 = HERE / "results" / "end-part1.json"
 HELD_OUT = frozenset(range(31, 36))  # plan.md: the test seeds
 ANY_SEED = 836557856  # plan.md: the Any% seed, never used by the system's runs
-MAX_PY_ROOMS = 2  # the Python reader's scope on this laptop (room 33 plus one neighbour at most)
+MAX_PY_ROOMS = 2  # the Python reader's scope on this laptop (one room plus one neighbour at most)
 SOURCES = ("replay_part1.py", "replay.py", "packed_reading.py", "export_records.py", "plan_fd.py", "reader.py",
            "model.py", "task.py", "domains.py", "facts.py", "start.py")
-MATCHED = ("matched", "matched, the engine ran on", "ran on in the step before", "already happened", "goal")
-EXECUTED_UNPLAYED = ("ran on in the step before", "already happened")
 
 
 def say(msg: str) -> None:
@@ -186,31 +207,26 @@ def export_pickle(pickle_path: Path, goal_text: str, name: str, start_name: str,
 
 
 def make_control(reading: Path) -> Path:
-    """The control's reading next to ``reading`` (module docstring): control.tc and control.json, made once."""
+    """The control's reading next to ``reading`` (module docstring): control.tc, control.actions.jsonl and
+    control.json, made once."""
     reading = Path(reading)
     doc = json.loads(reading.read_text())
     if doc.get("control"):
         return reading
     out = reading.with_name("control.json")
-    src = reading.parent / doc["packed"]
-    if out.exists() and json.loads(out.read_text()).get("source_sha1") == sha(src):
-        return out
+    src, lines = reading.parent / doc["packed"], reading.parent / doc["actions"]
+    if out.exists():
+        old = json.loads(out.read_text())
+        if old.get("source_sha1") == sha(src) and old.get("lines_sha1") == sha(lines) and \
+                old.get("actions") == "control.actions.jsonl" and (reading.parent / old["actions"]).is_file():
+            return out
     t = time.monotonic()
-    counts = export_records.control_records(src, reading.parent / doc["actions"], reading.parent / "control.tc")
-    ctl = dict(doc, packed="control.tc", control=True, source_sha1=sha(src), control_counts=counts,
-               control_s=round(time.monotonic() - t, 2))
+    counts = export_records.control_records(src, lines, reading.parent / "control.tc",
+                                            reading.parent / "control.actions.jsonl")
+    ctl = dict(doc, packed="control.tc", actions="control.actions.jsonl", control=True, source_sha1=sha(src),
+               lines_sha1=sha(lines), control_counts=counts, control_s=round(time.monotonic() - t, 2))
     out.write_text(json.dumps(ctl, indent=1) + "\n")
     return out
-
-
-# --- scoring: the key's Part I goals ----------------------------------------------------------------------------------
-
-def key_goals() -> dict:
-    """The key's 99 Part I goals as facts ({"#n": (fact, op, value)}), end_part1.py's mapping. Scoring only (module
-    docstring)."""
-    import end_part1
-    key = json.loads(end_part1.KEY.read_text())["key"]
-    return {f"#{n}": end_part1.as_fact(e["fact"]) for n, e in enumerate(key, 1) if e["part"] == end_part1.PART}
 
 
 # --- the start ---------------------------------------------------------------------------------------------------------
@@ -275,11 +291,14 @@ def boot(seed: int, out_dir: Path) -> tuple:
 
 
 def start_check(row: dict, rd, work: Path) -> dict:
-    """The start against the reading's start, results/start-part1.jsonl's row, and taskcore's check."""
+    """The start against the reading's start (every fact, and the facts the packed file holds: a reading serves the
+    start its domains were built from, module docstring), results/start-part1.jsonl's row, and taskcore's check."""
     f = row["facts"]
     out = {"boot checks": row["checks"] or "ok"}
     d = diff(rd.doc["start"]["facts"], f)
-    out["reading start"] = {"name": rd.doc["start"]["name"], "differ": len(d), "first": sorted(d.items())[:20]}
+    task_d = sorted((k, v) for k, v in d.items() if k in rd.task.facts)
+    out["reading start"] = {"name": rd.doc["start"]["name"], "differ": len(d), "first": sorted(d.items())[:20],
+                            "task facts differ": len(task_d), "task first": task_d[:20]}
     known = start_row(row["seed"])
     if known is not None:
         d2 = diff(known["facts"], f)
@@ -291,13 +310,14 @@ def start_check(row: dict, rd, work: Path) -> dict:
     return out
 
 
-def cmd_start(seeds: list, reading: Path) -> list:
+def cmd_start(seeds: list, reading: Path, results: Path = RESULTS, out_root: Path = OUT) -> list:
     rd = PR.load_reading(reading)
     name = rd.doc.get("name", reading.parent.name)
     rows = []
+    results.mkdir(parents=True, exist_ok=True)
     for seed in seeds:
         t0 = time.monotonic()
-        run_dir = OUT / f"{name}-start-seed{seed}"
+        run_dir = out_root / f"{name}-start-seed{seed}"
         say(f"seed {seed}: booting to the first idle stop")
         ctl, b, row = boot(seed, run_dir / "run")
         ctl.close()
@@ -306,27 +326,75 @@ def cmd_start(seeds: list, reading: Path) -> list:
         doc = {"seed": seed, "reading": str(reading), "name": name, "stop": row["stop"], "dump": row["dump"],
                "trace": row["trace"], "boot_s": row["boot_s"], "check": chk, "seconds": round(time.monotonic() - t0, 1),
                "sources": {n: sha(HERE / n) for n in SOURCES}}
-        (RESULTS / f"replay-part1-{name}-start-seed{seed}.json").write_text(json.dumps(doc, indent=1) + "\n")
+        (results / f"replay-part1-{name}-start-seed{seed}.json").write_text(json.dumps(doc, indent=1) + "\n")
         rows.append(doc)
-        say(f"seed {seed}: checks {chk['boot checks']}; {chk['reading start']['differ']} facts differ from the "
-            f"reading's start; taskcore {chk['taskcore']['input']['status']} / {chk['taskcore']['needed']['status']}")
+        rs = chk["reading start"]
+        say(f"seed {seed}: checks {chk['boot checks']}; {rs['differ']} facts differ from the reading's start, "
+            f"{rs['task facts differ']} of them the task's; taskcore {chk['taskcore']['input']['status']} / "
+            f"{chk['taskcore']['needed']['status']}")
     rd.close()
     return rows
 
 
-# --- the run -----------------------------------------------------------------------------------------------------------
+# --- the report ----------------------------------------------------------------------------------------------------------
 
-def summary(res: dict, reached: dict, frame0: int, n_goals: int) -> dict:
-    """The report's numbers from the harness's result (module docstring)."""
+WRITES_HELD = ("matched", "matched, the engine ran on", "already happened")  # every predicted write held
+EXECUTED_UNPLAYED = ("ran on in the step before", "already happened")  # events done without a try of their own
+MODEL_KINDS = ("write", "guess")  # a predicted write not seen: outside the model's values (replay.match)
+
+
+def executed(s: dict) -> bool:
+    """The step's input reached the engine, or it is an event the harness waited for or found done (module
+    docstring)."""
+    if s["outcome"] in EXECUTED_UNPLAYED:
+        return True
+    return any(s["kind"] == "event" or t.get("inputs") for t in s["tries"])
+
+
+def writes_held(s: dict) -> bool:
+    if s["outcome"] in WRITES_HELD:
+        return True
+    if s["outcome"] in ("ran on in the step before", "goal"):
+        return not any(m["kind"] in MODEL_KINDS for m in s["mismatches"])
+    return False
+
+
+def net(u: dict) -> bool:
+    """An unplanned change (replay.History.unplanned) that ended the step at another value. A record from before the
+    harness kept ``net``: from its changes when it holds all of them, else counted."""
+    if "net" in u:
+        return u["net"]
+    if u["count"] <= len(u["changes"]):
+        return u["changes"][-1][1] != u["start"]
+    return True
+
+
+def step_mismatches(s: dict) -> tuple:
+    """(the predicted writes not seen, the tracked facts changed with no predicted write) of an executed step."""
+    if s["outcome"] == "matched, the engine ran on":
+        writes = []  # what differed was rewritten as the next events predict (their own misses are theirs)
+    else:
+        writes = [m for m in s["mismatches"] if m["kind"] in MODEL_KINDS]
+    return writes, [u for u in s.get("unplanned", []) if net(u)]
+
+
+def summary(res: dict) -> dict:
+    """The report's numbers from the harness's record (module docstring)."""
     steps = res["steps"]
-    outcomes = {}
-    for s in steps:
-        outcomes[s["outcome"]] = outcomes.get(s["outcome"], 0) + 1
-    executed = [s for s in steps if s["tries"] or s["outcome"] in EXECUTED_UNPLAYED]
-    matched = [s for s in executed if s["outcome"] in MATCHED]
-    guess = [s for s in matched if any(m["kind"] == "guess" for m in s["mismatches"])]
-    mism = [s for s in executed if s["outcome"] == "mismatch"]
-    n = len(executed)
+    outcomes = collections.Counter(s["outcome"] for s in steps)
+    ex = [s for s in steps if executed(s)]
+    n = len(ex)
+    held = [s for s in ex if writes_held(s)]
+    per = [(s, *step_mismatches(s)) for s in ex]
+    matched = [s for s, w, u in per if writes_held(s) and not u]
+    n_writes = sum(len(w) for _, w, _ in per)
+    n_unplanned = sum(len(u) for _, _, u in per)
+    unplanned_keys = collections.Counter(x["key"] for _, _, u in per for x in u)
+    choice = [s for s in held if any(m["kind"] == "choice" or (m["kind"] == "guess" and len(m["predicted"]) == 1
+                                                                and s["outcome"] in WRITES_HELD)
+                                     for m in s["mismatches"])]
+    not_matched = collections.Counter(("writes held, tracked facts changed" if writes_held(s) else s["outcome"])
+                                      for s, w, u in per if not (writes_held(s) and not u))
     played = [s for s in steps if s["tries"]]
     secs = [s.get("seconds", 0.0) for s in played]
     frames = [s["end"] - s["start"] for s in played if s["end"] is not None]
@@ -336,20 +404,21 @@ def summary(res: dict, reached: dict, frame0: int, n_goals: int) -> dict:
     def stats(xs):
         return {"n": len(xs), "mean": round(statistics.mean(xs), 2), "median": round(statistics.median(xs), 2),
                 "max": round(max(xs), 2), "sum": round(sum(xs), 1)} if xs else {"n": 0}
-    at_start = sorted((k for k, f in reached.items() if f <= frame0), key=lambda k: int(k[1:]))
-    later = sorted((k for k, f in reached.items() if f > frame0), key=lambda k: int(k[1:]))
+
+    def share(k):
+        return round(k / n, 3) if n else None
     return {
         "steps": len(steps), "executed": n, "played": len(played), "outcomes": dict(sorted(outcomes.items())),
-        "matched": len(matched), "matched_share": round(len(matched) / n, 3) if n else None,
-        "matched_with_another_guess": len(guess),
-        "mismatch_steps": len(mism), "mismatch_steps_per_executed": round(len(mism) / n, 3) if n else None,
-        "mismatch_facts": sum(len(s["mismatches"]) for s in mism),
-        "mismatch_facts_per_executed": round(sum(len(s["mismatches"]) for s in mism) / n, 3) if n else None,
-        "final_path": [s["name"] for s in matched], "final_path_actions": len(matched),
+        "writes_held": len(held), "writes_held_share": share(len(held)),
+        "matched": len(matched), "matched_share": share(len(matched)),
+        "not_matched": dict(sorted(not_matched.items())),
+        "mismatches": n_writes + n_unplanned, "mismatches_per_executed": share(n_writes + n_unplanned),
+        "mismatched_writes": n_writes, "mismatched_writes_per_executed": share(n_writes),
+        "unplanned_changes": n_unplanned, "unplanned_changes_per_executed": share(n_unplanned),
+        "unplanned_most": unplanned_keys.most_common(12),
+        "another_guess": len(choice),
+        "final_path": [s["name"] for s in held], "final_path_actions": len(held),
         "inputs": len([e for e in res["inputs"] if replay._is_input(e)]),
-        "key_goals": {"of": n_goals, "passed": len(reached), "held_at_start": len(at_start),
-                      "reached_in_the_run": len(later), "at_start": at_start,
-                      "reached": {k: reached[k] for k in later}},
         "time": {"step_seconds": stats(secs), "step_frames": stats(frames), "plan_seconds": stats(plan_s),
                  "plan_write_s": stats([p.get("write_s", 0) for p in plans]),
                  "plan_search_s": stats([p.get("seconds", 0) for p in plans]),
@@ -358,8 +427,11 @@ def summary(res: dict, reached: dict, frame0: int, n_goals: int) -> dict:
     }
 
 
+# --- the run -----------------------------------------------------------------------------------------------------------
+
 def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_limit: float, plan_time: int,
-            test_seeds: bool = False, out_root: Path = OUT, results: Path = RESULTS) -> dict:
+            test_seeds: bool = False, out_root: Path = OUT, results: Path = RESULTS,
+            plan_memory: str = replay.PLAN_MEMORY) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -368,44 +440,58 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     name = rd.doc.get("name", Path(reading).parent.name)
     tag = f"{name}-seed{seed}" + ("-control" if control else "")
     run_dir = out_root / tag
+    run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
     end = json.loads(END_PART1.read_text())
     out = {"seed": seed, "reading": str(path), "name": name, "control": control,
            "goal": {k: sorted(v, key=str) for k, v in goal.items()},
            "goal_is_part1_end": goal == {k: {v} for k, v in end["goal_all"].items()} and not end["goal_not"],
            "task": {"actions": len(rd.task.actions), "facts": len(rd.task.facts), "records": rd.doc.get("n_records"),
-                    "folded": rd.doc.get("folded"), "packed_sha1": sha(rd.packed), "packed_bytes": rd.packed.stat().st_size},
+                    "folded": rd.doc.get("folded"), "packed_sha1": sha(rd.packed), "packed_bytes": rd.packed.stat().st_size,
+                    "lines_sha1": sha(rd.lines)},
            "control_counts": rd.doc.get("control_counts"),
-           "limits": {"replans": replan_limit, "seconds": time_limit, "plan_time": plan_time,
+           "limits": {"replans": replan_limit, "seconds": time_limit, "plan_time": plan_time, "plan_memory": plan_memory,
                       "input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT, "retries": replay.RETRIES,
                       "retry_wait": replay.RETRY_WAIT},
            "sources": {n: sha(HERE / n) for n in SOURCES}, "taskcore_binary": sha(plan_fd.TASKCORE)}
-    watch = key_goals()
     out["load_s"] = round(time.monotonic() - t0, 2)
     say(f"{tag}: booting to the first idle stop")
     ctl, branch, row = boot(seed, run_dir / "run")
+    h = None
     try:
         out["start"] = {"stop": row["stop"], "dump": row["dump"], "trace": row["trace"], "boot_s": row["boot_s"]}
         say(f"{tag}: idle stop at frame {row['stop']['frame']}; the start check")
-        out["start"]["check"] = start_check(row, rd, run_dir / "start-check")
+        chk = out["start"]["check"] = start_check(row, rd, run_dir / "start-check")
         if row["checks"]:
             raise RuntimeError(f"seed {seed}: the start fails start.py's checks: {row['checks']}")
+        if chk["reading start"]["task facts differ"]:
+            raise SystemExit(f"seed {seed}: the reading was read from another start ({rd.doc['start']['name']}): "
+                             f"{chk['reading start']['task facts differ']} facts of the task differ, first "
+                             f"{chk['reading start']['task first'][:5]}; read the scope from this seed's start "
+                             f"(module docstring)")
+        partial = run_dir / "partial.json"
+
+        def snapshot(hh):
+            partial.write_text(json.dumps(dict(out, run=hh.result(), landmarks=hh.landmarks), default=str) + "\n")
         h = replay.Harness(rd.b, rd.task, rd.task, branch, goal, replan_limit=replan_limit, time_limit=time_limit,
                            plan_time=plan_time, progress=say, planner="taskcore", packed=rd.packed,
-                           workdir=run_dir / "plans", watch=watch)
+                           workdir=run_dir / "plans", memory_limit=plan_memory, on_plan=snapshot)
         res = h.run()
         checkpoints = h.checkpoints
     finally:
         ctl.close()
     out["run"] = res
-    out["reached"] = h.reached
     out["landmarks"] = h.landmarks
-    out["summary"] = summary(res, h.reached, res["frame0"], len(watch))
+    out["summary"] = summary(res)
     say(f"{tag}: stop {res['stop']!r}; verifying from boot ({len(checkpoints)} checkpoints)")
     t = time.monotonic()
-    ver = replay.verify(lambda o, i: config(seed, o, i), res["inputs"], checkpoints, sorted(goal), run_dir / "verify")
+    try:
+        ver = replay.verify(lambda o, i: config(seed, o, i), res["inputs"], checkpoints, sorted(goal),
+                            run_dir / "verify")
+        ver["goal"] = all(ver.get("final", {}).get(k) in v for k, v in goal.items())
+    except Exception as e:  # noqa: BLE001 (the run's record is written either way)
+        ver = {"error": f"{type(e).__name__}: {e}", "goal": False, "differ": [], "inputs": None, "checkpoints": None}
     ver["seconds"] = round(time.monotonic() - t, 1)
-    ver["goal"] = all(ver.get("final", {}).get(k) in v for k, v in goal.items())
     out["verify"] = ver
     out["seconds"] = round(time.monotonic() - t0, 1)
     out["game_seconds"] = releases.get(S.RELEASE).seconds(res["ticks"])
@@ -421,35 +507,50 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
 def run_lines(o: dict) -> list:
     r, s, v = o["run"], o["summary"], o["verify"]
     t = s["time"]
-    kg = s["key_goals"]
     chk = o["start"]["check"]
     rs = chk["reading start"]
     lines = [f"=== seed {o['seed']}{' (control)' if o['control'] else ''} ===",
              f"reading {o['reading']}: {o['task']['actions']:,} actions, {o['task']['facts']:,} facts, packed file "
              f"{o['task']['packed_bytes']:,} bytes (sha1 {o['task']['packed_sha1']}); goal {o['goal']} "
-             f"({'the Part I end' if o['goal_is_part1_end'] else 'not the Part I end'})",
-             f"start: idle stop at frame {o['start']['stop']['frame']} ({o['start']['stop']['idle']}), room "
-             f"{o['start']['stop']['room']}, boot {o['start']['boot_s']} s; checks {chk['boot checks']}; against the "
-             f"reading's start ({rs['name']}): {rs['differ']} facts differ; taskcore start check: input "
-             f"{chk['taskcore']['input']['status']}, needed {chk['taskcore']['needed']['status']}",
-             f"result: stop {r['stop']!r}; goal reached {r['goal']}; verified from boot: {v['goal']} "
-             f"({v['inputs']} inputs, {v['checkpoints']} checkpoints, {len(v['differ'])} differ, {v['seconds']} s)",
-             f"replans {r['replans']}; bans {len(r['bans'])}; plans {len(r['plans'])}; frames {r['frames']} "
-             f"(game time {o['game_seconds']:.1f} s); player inputs {s['inputs']}",
-             f"steps: {s['steps']} in the log, {s['executed']} executed ({s['played']} played); outcomes {s['outcomes']}",
-             f"matched: {s['matched']} of {s['executed']} executed ({s['matched_share']}); "
-             f"{s['matched_with_another_guess']} of them with another guessed value",
-             f"mismatches: {s['mismatch_steps']} steps ({s['mismatch_steps_per_executed']} per executed action), "
-             f"{s['mismatch_facts']} facts ({s['mismatch_facts_per_executed']} per executed action)",
-             f"final path: {s['final_path_actions']} actions {s['final_path'][:30]}"
-             + (" ..." if len(s["final_path"]) > 30 else ""),
-             f"Part I goals passed through: {kg['passed']} of {kg['of']} ({kg['held_at_start']} held at the start "
-             f"{kg['at_start']}, {kg['reached_in_the_run']} reached in the run: {kg['reached']})",
-             f"time: run {o['seconds']} s: load {o['load_s']} s, boot {o['start']['boot_s']} s, start check "
-             f"{chk['taskcore_s']} s, harness {t['harness_s']} s (planning {t['planning_s']} s, playing "
-             f"{t['playing_s']} s), verify {v['seconds']} s",
-             f"  per step (played): seconds {t['step_seconds']}; frames {t['step_frames']}",
-             f"  per plan: all {t['plan_seconds']}; taskcore {t['plan_write_s']}; lama-first {t['plan_search_s']}"]
+             f"({'the Part I end' if o['goal_is_part1_end'] else 'not the Part I end'})"]
+    if o.get("control_counts"):
+        c = o["control_counts"]
+        lines.append(f"control: precondition sets kept {c['sets kept']:,}, dropped {c['sets dropped']:,}; replay "
+                     f"checks dropped {c.get('checks dropped')}; stepped facts made engine conditions "
+                     f"{c.get('stepped facts made engine conditions')}")
+    lines += [f"start: idle stop at frame {o['start']['stop']['frame']} ({o['start']['stop']['idle']}), room "
+              f"{o['start']['stop']['room']}, boot {o['start']['boot_s']} s; checks {chk['boot checks']}; against the "
+              f"reading's start ({rs['name']}): {rs['differ']} facts differ, {rs.get('task facts differ')} of them "
+              f"the task's; taskcore start check: input {chk['taskcore']['input']['status']}, needed "
+              f"{chk['taskcore']['needed']['status']}",
+              f"result: stop {r['stop']!r}; goal reached {r['goal']}; verified from boot: {v['goal']} "
+              f"({v['inputs']} inputs, {v['checkpoints']} checkpoints, {len(v['differ'])} differ, {v['seconds']} s)"
+              + (f"; verify error {v['error']}" if v.get("error") else ""),
+              f"replans {r['replans']}; bans {len(r['bans'])}; plans {len(r['plans'])}; frames {r['frames']} "
+              f"(game time {o['game_seconds']:.1f} s); player inputs {s['inputs']}",
+              f"steps: {s['steps']} in the log, {s['executed']} executed ({s['played']} played); outcomes {s['outcomes']}",
+              f"matched (plan.md: the predicted writes and no other tracked fact changed): {s['matched']} of "
+              f"{s['executed']} executed ({s['matched_share']}); predicted writes held: {s['writes_held']} "
+              f"({s['writes_held_share']}); not matched: {s['not_matched']}",
+              f"mismatches: {s['mismatches']} ({s['mismatches_per_executed']} per executed action): "
+              f"{s['mismatched_writes']} predicted writes not seen ({s['mismatched_writes_per_executed']}), "
+              f"{s['unplanned_changes']} tracked facts changed with no prediction "
+              f"({s['unplanned_changes_per_executed']}; most often {s['unplanned_most'][:8]}); "
+              f"{s['another_guess']} steps with another guessed value than the plan's",
+              f"final path: {s['final_path_actions']} actions {s['final_path'][:30]}"
+              + (" ..." if len(s["final_path"]) > 30 else "")]
+    sc = o.get("score")
+    if sc:
+        lines.append(f"Part I goals passed through (score_part1.py, from boot, every frame): {sc['reached_in_the_run']} "
+                     f"of {sc['of']} reached in the run {sc['reached']}; {sc['held_at_start']} held at the start "
+                     f"{sc['at_start']} (not counted); the Part I end (#97-99) {sc['part1_end']}")
+    else:
+        lines.append("Part I goals passed through: not scored yet (score_part1.py)")
+    lines += [f"time: run {o['seconds']} s: load {o['load_s']} s, boot {o['start']['boot_s']} s, start check "
+              f"{chk['taskcore_s']} s, harness {t['harness_s']} s (planning {t['planning_s']} s, playing "
+              f"{t['playing_s']} s), verify {v['seconds']} s" + (f"; scoring {sc['seconds']} s" if sc else ""),
+              f"  per step (played): seconds {t['step_seconds']}; frames {t['step_frames']}",
+              f"  per plan: all {t['plan_seconds']}; taskcore {t['plan_write_s']}; lama-first {t['plan_search_s']}"]
     lm = o.get("landmarks")
     if lm:
         game = [n for n in lm["nodes"] if not n["aux"]]
@@ -469,11 +570,17 @@ def run_lines(o: dict) -> list:
         lines.append(f"  ban: {b['label']} at {dict(b['values'])}")
     for st in r["steps"]:
         ins = [(e["frame"], e.get("click") or e.get("key")) for t_ in st["tries"] for e in t_.get("inputs", [])]
+        w, u = step_mismatches(st) if executed(st) else ([], [])
         lines.append(f"  {st['plan']}.{st['index'] + 1} {st['name']} [{st['kind']}] {st['input']}: frames "
                      f"{st['start']}/{st['end']}, {st.get('seconds', 0):.1f} s; {st['outcome']} -> {st['then']}; "
                      f"{len(st['tries'])} tries" + (f"; inputs {ins}" if ins else "")
                      + (f"; mismatches {[(m['key'], m['predicted'], m['observed']) for m in st['mismatches'][:6]]}"
-                        if st["mismatches"] else "") + (f"; {st['note']}" if st["note"] else ""))
+                        if st["mismatches"] else "")
+                     + (f"; changed with no prediction {[(x['key'], x['start'], x.get('end')) for x in u[:6]]}"
+                        + (f" (+{len(u) - 6})" if len(u) > 6 else "") if u else "")
+                     + (f"; {st['note']}" if st["note"] else ""))
+    if r.get("error"):
+        lines.append(f"  error: {r['error'].strip().splitlines()[-1]}")
     for d in v["differ"][:5]:
         lines.append(f"  verify differs at {d}")
     return lines
@@ -488,7 +595,9 @@ def start_lines(o: dict) -> list:
             f"idle stop at frame {o['stop']['frame']} (tick {o['stop']['tick']}), kind {o['stop']['idle']}, room "
             f"{o['stop']['room']}, ego {o['dump']['ego']} at {o['dump']['ego_pos']}, rng {o['stop']['rng']}; boot "
             f"{o['boot_s']} s; start.py's checks: {chk['boot checks']}; trace records {o['trace']}",
-            f"against the reading's start ({rs['name']}): {rs['differ']} facts differ: {rs['first']}",
+            f"against the reading's start ({rs['name']}): {rs['differ']} facts differ: {rs['first']}; of them the "
+            f"task's: {rs.get('task facts differ')} {rs.get('task first')} (a goal run "
+            f"{'refuses' if rs.get('task facts differ') else 'takes'} this seed with this reading)",
             (f"against results/start-part1.jsonl: {known['differ']} facts differ, the same frame {known['same frame']}"
              if known else "results/start-part1.jsonl has no row for this seed"),
             f"taskcore's start check on the reading: input {tc['input']['status']}"
@@ -499,8 +608,8 @@ def start_lines(o: dict) -> list:
             f"time: {o['seconds']} s in all"]
 
 
-def cmd_log(name: str) -> None:
-    files = sorted(RESULTS.glob(f"replay-part1-{name}-*.json"))
+def cmd_log(name: str, results: Path = RESULTS) -> None:
+    files = sorted(results.glob(f"replay-part1-{name}-*.json"))
     if not files:
         raise SystemExit(f"no results for {name}")
     lines = [f"E003 step 5 on Part I: the runner (replay_part1.py) on the reading {name!r}", ""]
@@ -508,7 +617,7 @@ def cmd_log(name: str) -> None:
         o = json.loads(f.read_text())
         lines += [f"({f.name}; sources {o.get('sources')})"]
         lines += (start_lines(o) if "check" in o else run_lines(o)) + [""]
-    (RESULTS / f"replay-part1-{name}.log").write_text("\n".join(lines))
+    (results / f"replay-part1-{name}.log").write_text("\n".join(lines))
     print("\n".join(lines))
 
 
@@ -533,6 +642,7 @@ def main() -> None:
     s = sub.add_parser("start")
     s.add_argument("seeds", type=int, nargs="+")
     s.add_argument("--reading", type=Path, required=True)
+    s.add_argument("--results", type=Path, default=RESULTS)
     r = sub.add_parser("run")
     r.add_argument("seed", type=int)
     r.add_argument("--reading", type=Path, required=True)
@@ -540,9 +650,12 @@ def main() -> None:
     r.add_argument("--replan-limit", type=int, default=500)
     r.add_argument("--time-limit", type=float, default=24 * 3600)
     r.add_argument("--plan-time", type=int, default=replay.PLAN_TIME)
+    r.add_argument("--plan-memory", default=replay.PLAN_MEMORY)
+    r.add_argument("--results", type=Path, default=RESULTS)
     r.add_argument("--test-seeds", action="store_true", help="allow the test seeds 31-35 (the Part I result only)")
     lg = sub.add_parser("log")
     lg.add_argument("name")
+    lg.add_argument("--results", type=Path, default=RESULTS)
     a = ap.parse_args()
     if a.cmd == "export":
         print(json.dumps(export_python(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out,
@@ -553,11 +666,12 @@ def main() -> None:
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
     elif a.cmd == "start":
-        cmd_start(a.seeds, a.reading)
+        cmd_start(a.seeds, a.reading, a.results)
     elif a.cmd == "run":
-        cmd_run(a.seed, a.reading, a.control, a.replan_limit, a.time_limit, a.plan_time, a.test_seeds)
+        cmd_run(a.seed, a.reading, a.control, a.replan_limit, a.time_limit, a.plan_time, a.test_seeds,
+                results=a.results, plan_memory=a.plan_memory)
     else:
-        cmd_log(a.name)
+        cmd_log(a.name, a.results)
 
 
 if __name__ == "__main__":
