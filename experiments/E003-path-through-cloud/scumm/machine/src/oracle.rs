@@ -95,6 +95,8 @@ pub struct FactOracle {
     tracks: [bool; 23],
     lists: FxHashMap<Prefix, Vec<Fact>>,
     owned: OnceCell<FxHashMap<i32, Vec<i32>>>,
+    /// keys read as not held whatever their family (wide.py's synthetic `--unheld` states; empty otherwise)
+    unheld: Vec<Fact>,
 }
 
 static EMPTY: Vec<Fact> = Vec::new();
@@ -124,7 +126,14 @@ impl FactOracle {
                 _ => {}
             }
         }
-        FactOracle { facts, kinds, tracks, lists, owned: OnceCell::new() }
+        FactOracle { facts, kinds, tracks, lists, owned: OnceCell::new(), unheld: Vec::new() }
+    }
+
+    /// The same oracle with `keys` read as not held (wide.py's `Unheld` oracle, for synthetic states: model.py has
+    /// no such rule). Their listings by prefix are unchanged.
+    pub fn with_unheld(mut self, keys: Vec<Fact>) -> FactOracle {
+        self.unheld = keys;
+        self
     }
 
     /// `FactOracle.tracks(kind)` for a family string.
@@ -138,6 +147,9 @@ impl FactOracle {
     /// `FactOracle.get(key)`.
     #[inline]
     pub fn get(&self, k: Fact) -> OVal {
+        if !self.unheld.is_empty() && self.unheld.contains(&k) {
+            return OVal::Held;
+        }
         if !self.tracks[family_index(k)] {
             return OVal::Held;
         }

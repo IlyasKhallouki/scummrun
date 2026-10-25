@@ -188,6 +188,11 @@ pub fn frame(g: &Game, v: &Vals, f: &Frame) -> J {
     )
 }
 
+/// `Path.input_drift`: a tuple of (key, pre value, value in the store) tuples (also the trace's input event).
+pub fn drift(v: &Vals, d: &[(Fact, Val, Val)]) -> J {
+    tuple(d.iter().map(|&(k, a, b)| tuple(vec![fact(k), val(v, a), val(v, b)])).collect())
+}
+
 /// A step's args dict ({i: value}): {"$map": ...}, or {} when empty.
 fn args(v: &Vals, a: &[(i32, Val)]) -> J {
     map(a.iter().map(|&(n, x)| (J::Int(n as i64), val(v, x))).collect())
@@ -217,6 +222,13 @@ pub fn step(v: &Vals, st: &Step) -> J {
         Step::SceneEgo(o) => tuple(vec![s("scene_ego"), val(v, *o)]),
         Step::Turn(n) => tuple(vec![s("turn"), slot(*n)]),
         Step::Sentences => tuple(vec![s("sentences")]),
+        Step::Input { area, verb, button } => tuple(vec![s("input"), int(*area), int(*verb), int(*button)]),
+        Step::Abort { armed, code } => {
+            tuple(vec![s("abort"), tuple(armed.iter().map(|&k| fact(k)).collect()), val(v, *code)])
+        }
+        // model.py's W is the str after the key's last ":"
+        Step::Override { name, w } => tuple(vec![s("override"), slot(*name), s(&w.to_string())]),
+        Step::Key(code) => tuple(vec![s("key"), val(v, *code)]),
     }
 }
 
@@ -265,6 +277,11 @@ pub fn store(v: &Vals, m: &crate::path::Store) -> J {
 /// golden.py `path_dict`: every field of model.Path but seen, round_slots, joined and history; plus
 /// history_len and tid.
 pub fn path(g: &Game, v: &Vals, p: &Path) -> J {
+    path_with(g, v, p, true)
+}
+
+/// `path`, with or without the `turns` field (machine-serve sends a path's turns by columns, built without J).
+pub fn path_with(g: &Game, v: &Vals, p: &Path, turns: bool) -> J {
     let mut m: BTreeMap<String, J> = BTreeMap::new();
     let mut put = |k: &str, j: J| {
         m.insert(k.to_string(), j);
@@ -286,7 +303,9 @@ pub fn path(g: &Game, v: &Vals, p: &Path) -> J {
     );
     put("cut_index", opt_int(p.cut_index));
     put("cut_data", J::Arr(p.cut_data.iter().map(|&x| val(v, x)).collect()));
-    put("turns", J::Arr(p.turns.iter().map(|(n, how)| tuple(vec![slot(*n), s(how)])).collect()));
+    if turns {
+        put("turns", J::Arr(p.turns.iter().map(|(n, how)| tuple(vec![slot(*n), s(how)])).collect()));
+    }
     put("errors", J::Arr(p.errors.iter().map(tri).collect()));
     put("depth", J::Int(p.depth as i64));
     put("reentries", J::Int(p.reentries as i64));
@@ -319,13 +338,13 @@ pub fn path(g: &Game, v: &Vals, p: &Path) -> J {
         set(p.ambient_done.iter().map(|&(n, h)| tuple(vec![slot(n), J::Int(h as i64)])).collect()),
     );
     put("owner", p.owner.map_or(J::Null, |o| J::Str(owner_name(o))));
-    put("owner_rule", s(&p.owner_rule));
+    put("owner_rule", s(p.owner_rule));
     put("writer", obj(p.writer.iter().map(|(k, r)| (k.to_string(), s(r)))));
     put(
         "rw",
-        obj(p.rw.iter().map(|(o, (r, w))| {
+        obj(p.rw.all_sets().into_iter().map(|(o, r, w)| {
             (
-                owner_name(*o),
+                owner_name(o),
                 tuple(vec![set(r.iter().map(|&k| fact(k)).collect()), set(w.iter().map(|&k| fact(k)).collect())]),
             )
         })),
@@ -365,10 +384,7 @@ pub fn path(g: &Game, v: &Vals, p: &Path) -> J {
     put("ambient_slots", set(p.ambient_slots.iter().map(|&n| slot(n)).collect()));
     put("multi", set(p.multi.iter().map(|&n| slot(n)).collect()));
     put("closed", J::Bool(p.closed));
-    put(
-        "input_drift",
-        tuple(p.input_drift.iter().map(|&(k, a, b)| tuple(vec![fact(k), val(v, a), val(v, b)])).collect()),
-    );
+    put("input_drift", drift(v, &p.input_drift));
     put("cleared", opt_bool(p.cleared));
     put("history_len", J::Int(p.history.len() as i64));
     put("tid", opt_int(p.tid));

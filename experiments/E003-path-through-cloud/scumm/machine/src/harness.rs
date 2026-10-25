@@ -134,8 +134,8 @@ pub fn run_model(m: &mut Machine, o: &FactOracle, act: &Action) -> Run {
             m.run_entry(o, a, verb, None)
         }
         "wait" if f.settle => m.run_wait(o),
-        "dialog_line" if f.dialog => unreachable!("dialog is not ported"),
-        "skip_cutscene" if f.esc => unreachable!("esc is not ported"),
+        "dialog_line" if f.dialog => m.run_verb(o, act.verb.expect("a verb"), crate::machine::LEFT_CLICK),
+        "skip_cutscene" if f.esc => m.run_esc(o),
         kind => {
             let frame = Frame::new(NONE_UNIT, Some(0), false, Owned::Bool(false), None);
             let mut p = Path::new(vec![Entry::Frame(frame)]);

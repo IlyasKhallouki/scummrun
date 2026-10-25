@@ -85,24 +85,21 @@ impl<T> PList<T> {
         self.tail.last().or_else(|| self.head.as_ref().map(|c| &c.items[CHUNK - 1]))
     }
 
-    /// The chunks, oldest first.
-    fn chunks(&self) -> Vec<&Chunk<T>> {
-        let mut out = Vec::with_capacity(self.frozen / CHUNK);
+    /// The items from index `k` on. Only the chunks from the one that holds item `k` are walked (none when it is in
+    /// the tail).
+    pub fn iter_from(&self, k: usize) -> impl Iterator<Item = &T> {
+        let n = self.frozen / CHUNK;
+        let first = (k / CHUNK).min(n);
+        let mut chunks = Vec::new();
         let mut cur = self.head.as_deref();
-        while let Some(c) = cur {
-            out.push(c);
+        for _ in first..n {
+            let c = cur.expect("a chunk");
+            chunks.push(c);
             cur = c.prev.as_deref();
         }
-        out.reverse();
-        out
-    }
-
-    /// The items from index `k` on.
-    pub fn iter_from(&self, k: usize) -> impl Iterator<Item = &T> {
-        let chunks = self.chunks();
-        let first = (k / CHUNK).min(chunks.len());
-        let skip = if first < chunks.len() { k % CHUNK } else { k.saturating_sub(self.frozen) };
-        let frozen = chunks.into_iter().skip(first).flat_map(|c| c.items.iter());
+        chunks.reverse();
+        let skip = if first < n { k % CHUNK } else { k.saturating_sub(self.frozen) };
+        let frozen = chunks.into_iter().flat_map(|c| c.items.iter());
         frozen.chain(self.tail.iter()).skip(skip)
     }
 
@@ -148,20 +145,70 @@ impl<T: Clone> PList<T> {
     }
 }
 
-impl<T: Clone + PartialEq> PList<T> {
+/// Equality with a fast path: shared strings are compared by pointer first (the same test as `==`).
+pub trait FastEq {
+    fn fast_eq(&self, other: &Self) -> bool;
+}
+
+/// `a == b` for shared strings, by pointer first.
+#[inline]
+pub fn s_eq(a: &std::rc::Rc<str>, b: &std::rc::Rc<str>) -> bool {
+    Rc::ptr_eq(a, b) || **a == **b
+}
+
+impl FastEq for (Rc<str>, Rc<str>, Rc<str>) {
+    #[inline]
+    fn fast_eq(&self, o: &Self) -> bool {
+        s_eq(&self.0, &o.0) && s_eq(&self.1, &o.1) && s_eq(&self.2, &o.2)
+    }
+}
+
+impl<A: PartialEq, B: PartialEq> FastEq for (A, B) {
+    #[inline]
+    fn fast_eq(&self, o: &Self) -> bool {
+        self == o
+    }
+}
+
+impl<A: PartialEq, B: PartialEq, C: PartialEq, D: PartialEq, E: PartialEq> FastEq for (A, B, C, D, E) {
+    #[inline]
+    fn fast_eq(&self, o: &Self) -> bool {
+        self == o
+    }
+}
+
+impl FastEq for usize {
+    fn fast_eq(&self, o: &Self) -> bool {
+        self == o
+    }
+}
+
+impl<T: Clone + PartialEq + FastEq> PList<T> {
     /// The length of the common prefix of two lists, by value (model.py `_merge`'s `while mine[k] == theirs[k]`).
     /// Chunks the two share by pointer are equal; past them, items are compared.
     pub fn common_prefix(a: &PList<T>, b: &PList<T>) -> usize {
-        let (ca, cb) = (a.chunks(), b.chunks());
-        let m = ca.len().min(cb.len());
-        // a chunk's predecessors are shared when it is: the shared chunks are a prefix
-        let mut i = m;
-        while i > 0 && !std::ptr::eq(ca[i - 1], cb[i - 1]) {
+        // a chunk's predecessors are shared when it is: the shared chunks are a prefix. Walk both chains from their
+        // newest chunk, the longer one first down to the other's length, then both until they meet
+        let (na, nb) = (a.frozen / CHUNK, b.frozen / CHUNK);
+        let (mut ca, mut cb) = (a.head.as_deref(), b.head.as_deref());
+        for _ in nb..na {
+            ca = ca.and_then(|c| c.prev.as_deref());
+        }
+        for _ in na..nb {
+            cb = cb.and_then(|c| c.prev.as_deref());
+        }
+        let mut i = na.min(nb);
+        while let (Some(x), Some(y)) = (ca, cb) {
+            if std::ptr::eq(x, y) {
+                break;
+            }
+            ca = x.prev.as_deref();
+            cb = y.prev.as_deref();
             i -= 1;
         }
         let mut k = i * CHUNK;
         for (x, y) in a.iter_from(k).zip(b.iter_from(k)) {
-            if x != y {
+            if !x.fast_eq(y) {
                 break;
             }
             k += 1;
@@ -176,13 +223,22 @@ impl<T: Clone + PartialEq> PList<T> {
     }
 }
 
-impl<T: Clone + Eq + std::hash::Hash> PList<T> {
+impl<T: Clone + Eq + std::hash::Hash + FastEq> PList<T> {
     /// model.py `_merge`'s list rule with settle: what `theirs` holds past its common prefix with `mine` and
     /// `seen` (the items `self` holds, made from it when first needed) does not, all of it checked before any is
     /// added (two equal new items both go in, as model.py's list comprehension takes them).
     pub fn add_branch_new(&mut self, mine: &PList<T>, theirs: &PList<T>, seen: &mut Option<rustc_hash::FxHashSet<T>>) {
         let k = PList::common_prefix(mine, theirs);
         if k >= theirs.len() {
+            return;
+        }
+        let new = theirs.len() - k;
+        if seen.is_none() && new * self.len() <= 512 {
+            // a few items against a short list: compared one by one (the same test as the set's)
+            let add: Vec<T> = theirs.iter_from(k).filter(|x| !self.iter().any(|y| y.fast_eq(x))).cloned().collect();
+            for x in add {
+                self.push(x);
+            }
             return;
         }
         let set = seen.get_or_insert_with(|| self.iter().cloned().collect());

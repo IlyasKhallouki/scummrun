@@ -7,14 +7,18 @@
 //! (PORT-NOTES.md lists them).
 //!
 //! Ported so far: row 0 (feature own_entry, `run_entry`), row 1 (features dispatch and calls,
-//! `run_sentence`; the calls' machinery is in `calls.rs`) and row 2 (feature room_change: startScene's steps,
-//! in `rooms.rs`). The branches of the later features are marked
-//! `not ported` and cannot be reached: [`Features::parse`] refuses those features.
+//! `run_sentence`; the calls' machinery is in `calls.rs`), row 2 (feature room_change: startScene's steps,
+//! in `rooms.rs`), row 3 (feature settle: `run_wait` and the rounds, in `settle.rs`), row 4 (feature dialog:
+//! `run_verb` and the input step, in `dialog.rs`) and row 5 (feature esc: `run_esc` and the abort, override and key
+//! steps, in `esc.rs`). Every feature of model.py is ported.
 
 mod calls;
+mod dialog;
+mod esc;
 mod rooms;
 mod settle;
 
+pub use dialog::{LEFT_CLICK, VERB_CLICK_AREA};
 pub use settle::ROUND;
 
 use crate::enc;
@@ -23,7 +27,7 @@ use crate::oracle::{FactOracle, OVal, Prefix};
 use crate::path::*;
 use crate::trace::Tracer;
 use crate::value::*;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use scumm_ir::analysis::{getter_kind, GetterKind};
 use scumm_ir::json::J;
 use scumm_ir::show::{head as ir_head, py_repr, show_expr};
@@ -83,7 +87,7 @@ pub struct Features {
 }
 
 /// The features this port runs so far (PORT-NOTES.md).
-pub const PORTED: &[&str] = &["own_entry", "dispatch", "calls", "room_change", "settle"];
+pub const PORTED: &[&str] = &["own_entry", "dispatch", "calls", "room_change", "settle", "dialog", "esc"];
 
 impl Features {
     /// The feature set of model.py's names, checked as `Machine.__init__` checks it, then against what is
@@ -229,10 +233,10 @@ pub struct Machine<'g> {
     value_merges: u32,
     /// the next `Call.cid`
     next_cid: u64,
-    // strings settle's turns share (model.py's literals)
-    s_empty: S,
-    s_rule_a: S,
-    s_queue: S,
+    /// the run's unknowns of the oracle and of TIME_VARS, by key (with `v`, a run's)
+    ocache: FxHashMap<(Fact, u8), Val>,
+    /// a condition's printed text, by expression
+    conds: FxHashMap<ExprId, S>,
 }
 
 impl<'g> Machine<'g> {
@@ -259,9 +263,8 @@ impl<'g> Machine<'g> {
             settle_merges: 0,
             value_merges: 0,
             next_cid: 0,
-            s_empty: rc(""),
-            s_rule_a: rc("a: started or resumed by the path"),
-            s_queue: rc("the sentence queue"),
+            ocache: FxHashMap::default(),
+            conds: FxHashMap::default(),
         }
     }
 
@@ -303,16 +306,55 @@ impl<'g> Machine<'g> {
 
     /// The oracle's answer as a value (`FactOracle.get`).
     fn oget(&mut self, o: &FactOracle, k: Fact) -> Val {
-        match o.get(k) {
-            OVal::Int(n) => Val::Int(n),
-            OVal::Held => self.v.mk(Reason::Held, k.to_string()),
-            OVal::Timer => self.v.mk(Reason::Timer, k.to_string()),
+        let (reason, tag) = match o.get(k) {
+            OVal::Int(n) => return Val::Int(n),
+            OVal::Held => (Reason::Held, 0),
+            OVal::Timer => (Reason::Timer, 1),
+        };
+        if let Some(&v) = self.ocache.get(&(k, tag)) {
+            return v;
         }
+        let v = self.v.mk(reason, k.to_string());
+        self.ocache.insert((k, tag), v);
+        v
+    }
+
+    /// `Unknown(reason, name)` of a getter that reads no fact, made once per run.
+    fn getter_unknown(&mut self, r: Reason, name: Sym) -> Val {
+        let k = (Fact::Var(name.0 as i32), 4);
+        if let Some(&v) = self.ocache.get(&k) {
+            return v;
+        }
+        let v = self.v.mk(r, self.sym(name));
+        self.ocache.insert(k, v);
+        v
+    }
+
+    /// `Unknown(R_LOCAL, f"Local[{n}]")`, made once per run.
+    pub(crate) fn unknown_local(&mut self, n: i32) -> Val {
+        let k = (Fact::Var(n), 3);
+        if let Some(&v) = self.ocache.get(&k) {
+            return v;
+        }
+        let v = self.v.mk(Reason::Local, format!("Local[{n}]"));
+        self.ocache.insert(k, v);
+        v
+    }
+
+    /// A condition's printed text (`show(cond)`), made once.
+    fn cond_text(&mut self, e: ExprId) -> S {
+        if let Some(s) = self.conds.get(&e) {
+            return s.clone();
+        }
+        let s = rc(&self.show_e(e));
+        self.conds.insert(e, s.clone());
+        s
     }
 
     /// The Run of an entry point that ran nothing, or of `_drive`: it takes the run's unknowns.
     fn finish_run(&mut self, mut r: Run) -> Run {
         r.vals = std::mem::take(&mut self.v);
+        self.ocache.clear();
         r
     }
 
@@ -358,9 +400,8 @@ impl<'g> Machine<'g> {
         let g = self.game;
         let uid = g.id(unit).unwrap_or_else(|| panic!("no unit {unit}"));
         let mut f = Frame::new(uid, Some(pc), locals.is_some(), owned, recursive);
-        if let Some(mut ls) = locals {
-            ls.sort_by_key(|l| l.0);
-            f.locals = ls;
+        if let Some(ls) = locals {
+            f.locals = Locals::from_vec(ls);
         }
         f.sid = 1;
         let mut first = Path::new(vec![Entry::Frame(f)]);
@@ -392,6 +433,8 @@ impl<'g> Machine<'g> {
         // model.py's dict of signature -> waiting paths, in insertion order (a popped signature that waits
         // again goes last)
         let mut waiting: Vec<(Rc<Sig>, Vec<Path>)> = Vec::new();
+        // a waiting group's place by its signature's hash (a second group of the same hash is found by a scan)
+        let mut index: FxHashMap<u64, usize> = FxHashMap::default();
         let mut n_waiting = 0usize;
         let (mut limit, mut dead) = (0u32, 0usize);
         self.merges = 0;
@@ -416,6 +459,10 @@ impl<'g> Machine<'g> {
                     }
                 }
                 waiting = rest;
+                index.clear();
+                for (i, w) in waiting.iter().enumerate() {
+                    index.entry(w.0.h).or_insert(i);
+                }
                 continue;
             };
             let mut parked: Option<Sig> = None;
@@ -426,13 +473,23 @@ impl<'g> Machine<'g> {
                     break;
                 }
                 if self.calls {
-                    if let Some(sig) = self.join(&p, o) {
-                        if p.joined.as_deref() != Some(&sig) && !p.resumed {
-                            parked = Some(sig);
-                            break;
-                        }
+                    if p.resumed {
+                        // just out of a merge at this join: its signature is the one it merged at (model.py works
+                        // it out again, and gets the same: a merge changes nothing the signature holds)
+                        let sig = p.joined.clone().expect("a merged path's join");
+                        debug_assert!(self.join(&p, o).as_ref() == Some(&*sig));
                         if matches!(p.stack.last(), Some(Entry::Frame(_))) && self.spins(&mut p, &sig) {
                             break;
+                        }
+                    } else {
+                        if let Some(sig) = self.join(&p, o) {
+                            if p.joined.as_deref() != Some(&sig) {
+                                parked = Some(sig);
+                                break;
+                            }
+                            if matches!(p.stack.last(), Some(Entry::Frame(_))) && self.spins(&mut p, &sig) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -457,9 +514,17 @@ impl<'g> Machine<'g> {
             if let Some(sig) = parked {
                 // it waits at a join
                 n_waiting += 1;
-                match waiting.iter_mut().find(|w| *w.0 == sig) {
-                    Some(w) => w.1.push(p),
-                    None => waiting.push((Rc::new(sig), vec![p])),
+                let at = match index.get(&sig.h) {
+                    Some(&i) if *waiting[i].0 == sig => Some(i),
+                    Some(_) => waiting.iter().position(|w| *w.0 == sig),
+                    None => None,
+                };
+                match at {
+                    Some(i) => waiting[i].1.push(p),
+                    None => {
+                        index.entry(sig.h).or_insert(waiting.len());
+                        waiting.push((Rc::new(sig), vec![p]));
+                    }
                 }
                 continue;
             }
@@ -522,15 +587,19 @@ impl<'g> Machine<'g> {
         let v = if let Some(&v) = p.writes.get(&k) {
             v
         } else if p.round != 0 && matches!(k, Fact::Var(n) if TIME_VARS.contains(&n)) {
-            self.v.mk(Reason::Timer, format!("{k}: an engine variable that changes as frames pass"))
+            match self.ocache.get(&(k, 2)) {
+                Some(&v) => v,
+                None => {
+                    let v = self.v.mk(Reason::Timer, format!("{k}: an engine variable that changes as frames pass"));
+                    self.ocache.insert((k, 2), v);
+                    v
+                }
+            }
         } else {
             self.oget(o, k)
         };
         if let Some(ow) = p.owner {
-            let (r, w) = p.rw.get_mut(&ow).expect("the owner's read and write log");
-            if !w.contains(&k) {
-                r.insert(k);
-            }
+            p.rw.read(ow, k);
         }
         v
     }
@@ -538,8 +607,8 @@ impl<'g> Machine<'g> {
     fn write(&mut self, p: &mut Path, k: Fact, v: Val) {
         p.writes.insert(k, v);
         if let Some(ow) = p.owner {
-            p.rw.get_mut(&ow).expect("the owner's read and write log").1.insert(k);
-            p.writer.insert(k, p.owner_rule.clone());
+            p.rw.write(ow, k);
+            p.writer.insert(k, p.owner_rule);
         }
     }
 
@@ -551,7 +620,7 @@ impl<'g> Machine<'g> {
         if f.args_known {
             Val::Int(0)
         } else {
-            self.v.mk(Reason::Local, format!("Local[{n}]"))
+            self.unknown_local(n)
         }
     }
 
@@ -683,8 +752,8 @@ impl<'g> Machine<'g> {
         }
         match getter_kind(name) {
             Some(GetterKind::Fact) => {}
-            Some(GetterKind::NonFact(r)) => return self.v.mk(r, self.sym(name)),
-            None => return self.v.mk(Reason::Work, self.sym(name)),
+            Some(GetterKind::NonFact(r)) => return self.getter_unknown(r, name),
+            None => return self.getter_unknown(Reason::Work, name),
         }
         let mut vals = Vec::new();
         for &a in g.ast.kids(args) {
@@ -896,7 +965,7 @@ impl<'g> Machine<'g> {
                 self.write(p, k, v);
                 if k == Fact::Var(VAR_EGO) {
                     // the dump's ego is _scummVars[VAR_EGO] (speedrun_state.cpp:474)
-                    let w = p.writes[&k];
+                    let w = p.writes.get(&k).copied().expect("just written");
                     self.write(p, Fact::Ego, w);
                 }
             }
@@ -1183,7 +1252,7 @@ impl<'g> Machine<'g> {
             }
             Dec::Unk(u) => {
                 let mut q = p.fork();
-                let (cite, cond_s, why) = (self.cite(x), rc(&self.show_e(cond)), rc(&self.show(u)));
+                let (cite, cond_s, why) = (self.cite(x), self.cond_text(cond), self.v.show_rc(u));
                 p.assumptions.push(Assumption { cite: cite.clone(), cond: cond_s.clone(), side: Side::Bool(true), why: why.clone() });
                 q.assumptions.push(Assumption { cite, cond: cond_s, side: Side::Bool(false), why });
                 p.frame_mut().unwrap().pc = ins.next;

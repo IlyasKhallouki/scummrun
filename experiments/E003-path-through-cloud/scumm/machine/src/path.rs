@@ -23,13 +23,46 @@ pub enum Owned {
     Unk(Val),
 }
 
+/// A frame's locals: Local[n] -> value, sorted by n. Shared by the frame's copies until one writes (a fork copies
+/// every frame of the stack, and the frames below the running one do not change).
+#[derive(Clone, Default, PartialEq, Eq, Hash, Debug)]
+pub struct Locals(Option<Rc<Vec<(i32, Val)>>>);
+
+impl Locals {
+    /// Locals from (n, value) pairs, sorted here.
+    pub fn from_vec(mut v: Vec<(i32, Val)>) -> Locals {
+        v.sort_by_key(|l| l.0);
+        Locals((!v.is_empty()).then(|| Rc::new(v)))
+    }
+
+    pub fn as_slice(&self) -> &[(i32, Val)] {
+        self.0.as_deref().map_or(&[], |v| v.as_slice())
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, (i32, Val)> {
+        self.as_slice().iter()
+    }
+
+    pub fn get(&self, n: i32) -> Option<Val> {
+        self.as_slice().iter().find(|l| l.0 == n).map(|l| l.1)
+    }
+
+    pub fn set(&mut self, n: i32, v: Val) {
+        let vec = Rc::make_mut(self.0.get_or_insert_with(|| Rc::new(Vec::new())));
+        match vec.binary_search_by_key(&n, |l| l.0) {
+            Ok(i) => vec[i].1 = v,
+            Err(i) => vec.insert(i, (n, v)),
+        }
+    }
+}
+
 /// A running script's slot (model.py `Frame`).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Frame {
     pub unit: UnitId,
     pub pc: Option<u32>,
     /// Local[n] -> value, sorted by n
-    pub locals: Vec<(i32, Val)>,
+    pub locals: Locals,
     /// False: a local the path has not written is unknown
     pub args_known: bool,
     pub owned: Owned,
@@ -55,7 +88,7 @@ impl Frame {
         Frame {
             unit,
             pc,
-            locals: Vec::new(),
+            locals: Locals::default(),
             args_known,
             owned,
             recursive,
@@ -71,14 +104,11 @@ impl Frame {
     }
 
     pub fn local(&self, n: i32) -> Option<Val> {
-        self.locals.iter().find(|l| l.0 == n).map(|l| l.1)
+        self.locals.get(n)
     }
 
     pub fn set_local(&mut self, n: i32, v: Val) {
-        match self.locals.binary_search_by_key(&n, |l| l.0) {
-            Ok(i) => self.locals[i].1 = v,
-            Err(i) => self.locals.insert(i, (n, v)),
-        }
+        self.locals.set(n, v)
     }
 }
 
@@ -127,6 +157,17 @@ pub enum Step {
     Turn(Slot),
     /// ("sentences",): checkAndRunSentenceScript on the sentence queue at a round's end
     Sentences,
+    // --- dialog (row 4)
+    /// ("input", area, verb, button): checkExecVerbs' click on a verb, runInputScript
+    Input { area: i32, verb: i32, button: i32 },
+    // --- esc (row 5)
+    /// ("abort", armed esc: keys (string-sorted), VAR_CUTSCENEEXIT_KEY at pre): processInput's abortCutscene
+    Abort { armed: Vec<Fact>, code: Val },
+    /// ("override", unit name, W): the rewound slot's turn from its override point (W dumps as a str, as model.py
+    /// splits it from the key)
+    Override { name: Slot, w: i32 },
+    /// ("key", VAR_CUTSCENEEXIT_KEY at pre): checkExecVerbs takes the key code
+    Key(Val),
 }
 
 /// Engine code between nested script runs (model.py `Call`).
@@ -145,75 +186,38 @@ pub struct Call {
     pub cid: u64,
 }
 
-/// One stack entry of a join signature (model.py `_join`): a frame's slot state, or a call's place.
-/// A call's head and cite are left out: its `cid` fixes them.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum SigItem {
-    F {
-        sid: u32,
-        unit: UnitId,
-        pc: Option<u32>,
-        killed: Option<&'static str>,
-        freeze: i32,
-        override_: i32,
-        /// model.py compares `str(owned)`: for interned values, the same test
-        owned: Owned,
-        recursive: Option<bool>,
-        resistant: Option<bool>,
-        args_known: bool,
-        time_loops: Vec<u32>,
-    },
-    C { cid: u64, i: u32, active: bool, caller: Option<u32> },
-}
-
-/// The settle part of a join signature (model.py `_join`: the round, the kept slots' places, the queue, the
-/// ambient loops run, the slots that ran in this round, the turn's owner, the camera exits forked, `timed`). The
-/// frozensets are kept sorted, so that equal sets compare equal.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct SettleSig {
-    pub round: u32,
-    /// `_slots_sig(p, full=False)`: (name, unit, pc, origin) per kept slot, in the dict's order
-    pub slots: Vec<(Slot, UnitId, Option<u32>, &'static str)>,
-    pub queue: Vec<(i32, i32, i32, i32)>,
-    pub ambient_done: Vec<(Slot, u32)>,
-    pub round_ran: Vec<Slot>,
-    pub owner: Option<Owner>,
-    pub camera_done: Vec<(Slot, u32)>,
-    pub timed: bool,
-}
-
-/// A join signature (model.py `_join`'s tuple): paths with one signature have the same stack. A round's start
-/// (settle) is `("round", round, position key)`: `round` holds the round and the position key, a hash (model.py
-/// compares the hash itself). `h` is a hash of the rest, made once (`Sig::new`): equality tests it first, so the
-/// search for a path's waiting group mostly compares one number per group.
+/// A join signature (model.py `_join`'s tuple): paths with one signature have the same stack (frames at the same
+/// instruction with the same slot state, calls at the same step) and, with settle, the same kept slots' places, queue,
+/// ambient loops run, slots that ran this round, turn owner, camera exits forked and `timed`. A round's start is
+/// `("round", round, position key)`, the key a hash (model.py compares the hash itself).
+///
+/// The signature is kept as one vector of words (`Machine::join` writes each field in a fixed place, and a list with
+/// its length first, so that equal words are equal signatures; frozensets go sorted) and a hash of them, made once:
+/// equality tests the hash first, so the search for a path's waiting group mostly compares one number per group. A
+/// call is named by its `cid` (its head and cite follow from it).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Sig {
     pub h: u64,
-    pub round: Option<(u32, u64)>,
-    pub cut_index: Option<u32>,
-    pub cut_len: u32,
-    pub settle: Option<Box<SettleSig>>,
-    pub items: Vec<SigItem>,
+    round: bool,
+    words: Vec<u64>,
 }
 
 impl Sig {
-    pub fn new(cut_index: Option<u32>, cut_len: u32, settle: Option<Box<SettleSig>>, items: Vec<SigItem>) -> Sig {
+    pub fn from_words(round: bool, words: Vec<u64>) -> Sig {
         use std::hash::{Hash, Hasher};
         let mut st = rustc_hash::FxHasher::default();
-        cut_index.hash(&mut st);
-        cut_len.hash(&mut st);
-        settle.hash(&mut st);
-        items.hash(&mut st);
-        Sig { h: fmix(st.finish()), round: None, cut_index, cut_len, settle, items }
+        round.hash(&mut st);
+        words.hash(&mut st);
+        Sig { h: fmix(st.finish()), round, words }
     }
 
     /// `("round", round, position key)`.
     pub fn round(round: u32, pos: u64) -> Sig {
-        Sig { h: fmix(fx(&(round, pos)) ^ 0x2545_f491_4f6c_dd1d), round: Some((round, pos)), cut_index: None, cut_len: 0, settle: None, items: Vec::new() }
+        Sig::from_words(true, vec![round as u64, pos])
     }
 
     pub fn is_round(&self) -> bool {
-        self.round.is_some()
+        self.round
     }
 }
 
@@ -221,6 +225,80 @@ impl std::hash::Hash for Sig {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.h.hash(state);
     }
+}
+
+/// A unit name as a word.
+#[inline]
+pub fn slot_word(n: Slot) -> u64 {
+    let (kind, v) = match n {
+        Slot::Script(x) => (0u64, x),
+        Slot::Local(x) => (1, x),
+        Slot::Obj(x) => (2, x),
+        Slot::Entry => (3, 0),
+        Slot::Exit => (4, 0),
+    };
+    (kind << 32) | v as u32 as u64
+}
+
+/// An optional number as a word (None is all ones).
+#[inline]
+pub fn opt_word(x: Option<u32>) -> u64 {
+    x.map_or(u64::MAX, |v| v as u64)
+}
+
+/// An optional bool as a word (None 2).
+#[inline]
+pub fn bool_word(x: Option<bool>) -> u64 {
+    x.map_or(2, |b| b as u64)
+}
+
+/// `Frame.owned` as a word: False 0, True 1, an unknown 2 + its id (model.py compares `str(owned)`: for interned
+/// values, the same test).
+#[inline]
+pub fn owned_word(o: Owned) -> u64 {
+    match o {
+        Owned::Bool(b) => b as u64,
+        Owned::Unk(Val::Unk(id)) => 2 + id.0 as u64,
+        Owned::Unk(Val::Int(_)) => unreachable!("an owned unknown"),
+    }
+}
+
+/// `Frame.killed` as a word.
+#[inline]
+pub fn killed_word(k: Option<&'static str>) -> u64 {
+    match k {
+        None => 0,
+        Some("stopped") => 1,
+        Some("chained") => 2,
+        Some("room") => 3,
+        Some(other) => unreachable!("a frame killed as {other}"),
+    }
+}
+
+/// `Path.owner` as a word.
+#[inline]
+pub fn owner_word(o: Option<Owner>) -> u64 {
+    match o {
+        None => u64::MAX,
+        Some(Owner::Sentence) => u64::MAX - 1,
+        Some(Owner::Slot(n)) => slot_word(n),
+    }
+}
+
+/// `Frame.origin` as a word.
+#[inline]
+pub fn origin_word(o: &'static str) -> u64 {
+    match o {
+        "path" => 0,
+        "pre" => 1,
+        other => unreachable!("a frame origin {other}"),
+    }
+}
+
+/// Two ints as one word.
+#[inline]
+pub fn pair_word(a: i32, b: i32) -> u64 {
+    ((a as u32 as u64) << 32) | b as u32 as u64
 }
 
 /// A stack entry: a frame or a call.
@@ -246,6 +324,14 @@ pub struct Assumption {
     pub cond: S,
     pub side: Side,
     pub why: S,
+}
+
+impl crate::plist::FastEq for Assumption {
+    #[inline]
+    fn fast_eq(&self, o: &Self) -> bool {
+        use crate::plist::s_eq;
+        self.side == o.side && s_eq(&self.cite, &o.cite) && s_eq(&self.cond, &o.cond) && s_eq(&self.why, &o.why)
+    }
 }
 
 /// (statement kind or head, cite, text): model.py's `unmodelled`, `notes`, `unknown_writes`, `errors`.
@@ -277,8 +363,8 @@ pub fn fx<T: std::hash::Hash>(t: &T) -> u64 {
     fmix(h.finish())
 }
 
-/// A fact map of writes (model.py's `dict` of fact -> value). It reads as the map (`Deref`) and keeps the sum
-/// of its entries' hashes as they are written, so that a hash of the whole store (`_spins`) costs nothing.
+/// A fact map of writes (model.py's `dict` of fact -> value). It keeps the sum of its entries' hashes as they are
+/// written, so that a hash of the whole store (`_spins`, `_state_key`) costs nothing.
 #[derive(Clone, Debug, Default)]
 pub struct Store {
     map: FxHashMap<Fact, Val>,
@@ -286,6 +372,26 @@ pub struct Store {
 }
 
 impl Store {
+    #[inline]
+    pub fn get(&self, k: &Fact) -> Option<&Val> {
+        self.map.get(k)
+    }
+
+    #[inline]
+    pub fn contains_key(&self, k: &Fact) -> bool {
+        self.map.contains_key(k)
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
     /// `store[k] = v`.
     #[inline]
     pub fn insert(&mut self, k: Fact, v: Val) {
@@ -293,6 +399,17 @@ impl Store {
             self.sum = self.sum.wrapping_sub(fx(&(k, old)));
         }
         self.sum = self.sum.wrapping_add(fx(&(k, v)));
+    }
+
+    /// Every (key, value), in no order.
+    #[inline]
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, Fact, Val> {
+        self.map.iter()
+    }
+
+    #[inline]
+    pub fn keys(&self) -> std::collections::hash_map::Keys<'_, Fact, Val> {
+        self.map.keys()
     }
 
     /// An order-free hash of the entries (the set of items, as model.py's `frozenset(writes.items())`).
@@ -309,11 +426,156 @@ impl PartialEq for Store {
     }
 }
 
-impl std::ops::Deref for Store {
-    type Target = FxHashMap<Fact, Val>;
+/// model.py `Path.rw`: owner -> (keys read before it wrote them, keys written) in this round's turns. One flat map of
+/// (owner, key) -> read and written flags, and the owners `rw.setdefault` added (an owner may hold no key). Shared by
+/// a path's forks until one adds to it: a read or write it already holds changes nothing.
+#[derive(Clone, Debug, Default)]
+pub struct Rw(Rc<RwInner>);
+
+#[derive(Clone, Debug, Default)]
+struct RwInner {
+    owners: Vec<Owner>,
+    map: FxHashMap<(Owner, Fact), u8>,
+}
+
+const RW_READ: u8 = 1;
+const RW_WRITTEN: u8 = 2;
+
+impl Rw {
+    /// `rw.setdefault(owner, (set(), set()))`.
     #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.map
+    pub fn add_owner(&mut self, o: Owner) {
+        if !self.0.owners.contains(&o) {
+            Rc::make_mut(&mut self.0).owners.push(o);
+        }
+    }
+
+    /// `r.add(key)` unless `key in w` (a key it holds already, read or written, changes nothing).
+    #[inline]
+    pub fn read(&mut self, o: Owner, k: Fact) {
+        if !self.0.map.contains_key(&(o, k)) {
+            Rc::make_mut(&mut self.0).map.insert((o, k), RW_READ);
+        }
+    }
+
+    /// `w.add(key)`.
+    #[inline]
+    pub fn write(&mut self, o: Owner, k: Fact) {
+        match self.0.map.get(&(o, k)) {
+            Some(&f) if f & RW_WRITTEN != 0 => {}
+            _ => *Rc::make_mut(&mut self.0).map.entry((o, k)).or_insert(0) |= RW_WRITTEN,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        if !self.is_empty() {
+            self.0 = Rc::default();
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.owners.is_empty() && self.0.map.is_empty()
+    }
+
+    pub fn owners(&self) -> &[Owner] {
+        &self.0.owners
+    }
+
+    pub fn has_owner(&self, o: Owner) -> bool {
+        self.0.owners.contains(&o)
+    }
+
+    /// An owner's (reads, writes).
+    pub fn sets(&self, o: Owner) -> (FxHashSet<Fact>, FxHashSet<Fact>) {
+        let (mut r, mut w) = (FxHashSet::default(), FxHashSet::default());
+        for (&(ow, k), &f) in &self.0.map {
+            if ow == o {
+                if f & RW_READ != 0 {
+                    r.insert(k);
+                }
+                if f & RW_WRITTEN != 0 {
+                    w.insert(k);
+                }
+            }
+        }
+        (r, w)
+    }
+
+    /// Every owner's (reads, writes), in `owners` order.
+    pub fn all_sets(&self) -> Vec<(Owner, FxHashSet<Fact>, FxHashSet<Fact>)> {
+        let mut out: Vec<(Owner, FxHashSet<Fact>, FxHashSet<Fact>)> =
+            self.0.owners.iter().map(|&o| (o, FxHashSet::default(), FxHashSet::default())).collect();
+        for (&(ow, k), &f) in &self.0.map {
+            let e = out.iter_mut().find(|e| e.0 == ow).expect("an owner of rw");
+            if f & RW_READ != 0 {
+                e.1.insert(k);
+            }
+            if f & RW_WRITTEN != 0 {
+                e.2.insert(k);
+            }
+        }
+        out
+    }
+
+    /// model.py `_merge`'s union of each owner's sets.
+    pub fn union(&mut self, other: &Rw) {
+        if Rc::ptr_eq(&self.0, &other.0) {
+            return;
+        }
+        for &o in &other.0.owners {
+            self.add_owner(o);
+        }
+        for (&k, &f) in &other.0.map {
+            match self.0.map.get(&k) {
+                Some(&have) if have | f == have => {}
+                _ => *Rc::make_mut(&mut self.0).map.entry(k).or_insert(0) |= f,
+            }
+        }
+    }
+}
+
+/// model.py `Path.writer`: key -> the rule of the settle turn that last wrote it (model.py's rule strings are
+/// literals). Shared by a path's forks until one changes it: a write by the rule it holds already changes nothing.
+#[derive(Clone, Debug, Default)]
+pub struct Writer(Rc<FxHashMap<Fact, &'static str>>);
+
+impl Writer {
+    /// `writer[k] = rule`.
+    #[inline]
+    pub fn insert(&mut self, k: Fact, rule: &'static str) {
+        if self.0.get(&k) != Some(&rule) {
+            Rc::make_mut(&mut self.0).insert(k, rule);
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Fact, &&'static str)> {
+        self.0.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// model.py `_merge`: `q.writer[k] = rule if q.writer.get(k, rule) == rule else "mixed"` for each of `other`'s.
+    pub fn merge(&mut self, other: &Writer) {
+        if Rc::ptr_eq(&self.0, &other.0) {
+            return;
+        }
+        for (&k, &rule) in other.0.iter() {
+            match self.0.get(&k) {
+                Some(&have) if have == rule || have == "mixed" => {}
+                Some(_) => {
+                    Rc::make_mut(&mut self.0).insert(k, "mixed");
+                }
+                None => {
+                    Rc::make_mut(&mut self.0).insert(k, rule);
+                }
+            }
+        }
     }
 }
 
@@ -427,13 +689,14 @@ pub struct Path {
     pub round_ran: FxHashSet<Slot>,
     pub ambient_done: FxHashSet<(Slot, u32)>,
     pub owner: Option<Owner>,
-    pub owner_rule: S,
-    pub writer: FxHashMap<Fact, S>,
+    /// the rule that slot runs by (model.py's rule strings are literals)
+    pub owner_rule: &'static str,
+    pub writer: Writer,
     /// owner -> (keys read before it wrote them, keys written), this round
-    pub rw: FxHashMap<Owner, (FxHashSet<Fact>, FxHashSet<Fact>)>,
+    pub rw: Rw,
     /// (round, slot, slot, some keys, number of keys)
     pub conflicts: PList<(u32, Owner, Owner, Rc<[Fact]>, u32)>,
-    pub ran_by: FxHashMap<Slot, S>,
+    pub ran_by: FxHashMap<Slot, &'static str>,
     pub not_run: FxHashMap<Slot, S>,
     /// (unit name, origin, why)
     pub skips: FxHashSet<(Slot, S, S)>,

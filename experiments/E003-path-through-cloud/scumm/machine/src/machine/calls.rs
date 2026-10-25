@@ -154,46 +154,53 @@ impl<'g> Machine<'g> {
                 _ => return None,
             },
         }
-        let settle = p.settle.then(|| {
+        let mut w: Vec<u64> = Vec::with_capacity(8 + 6 * p.stack.len() + if p.settle { 12 + 4 * p.slots.len() } else { 0 });
+        w.push(opt_word(p.cut_index));
+        w.push(p.cut_data.len() as u64);
+        w.push(p.settle as u64);
+        if p.settle {
             // the slots off the stack and the queue are part of the state: paths differing there stay apart
-            let mut ambient_done: Vec<(Slot, u32)> = p.ambient_done.iter().copied().collect();
-            ambient_done.sort_unstable();
-            let mut round_ran: Vec<Slot> = p.round_ran.iter().copied().collect();
-            round_ran.sort_unstable();
-            let mut camera_done: Vec<(Slot, u32)> = p.camera_done.iter().copied().collect();
-            camera_done.sort_unstable();
-            Box::new(SettleSig {
-                round: p.round,
-                slots: Self::slots_sig_short(p),
-                queue: p.queue.clone(),
-                ambient_done,
-                round_ran,
-                owner: p.owner,
-                camera_done,
-                timed: p.timed,
-            })
-        });
-        let items = p
-            .stack
-            .iter()
-            .map(|e| match e {
-                Entry::Frame(f) => SigItem::F {
-                    sid: f.sid,
-                    unit: f.unit,
-                    pc: f.pc,
-                    killed: f.killed,
-                    freeze: f.freeze,
-                    override_: f.override_,
-                    owned: f.owned,
-                    recursive: f.recursive,
-                    resistant: f.resistant,
-                    args_known: f.args_known,
-                    time_loops: f.time_loops.clone(),
-                },
-                Entry::Call(c) => SigItem::C { cid: c.cid, i: c.i, active: c.active, caller: c.caller },
-            })
-            .collect();
-        Some(Sig::new(p.cut_index, p.cut_data.len() as u32, settle, items))
+            w.push(p.round as u64);
+            w.push(p.slots.len() as u64);
+            for (n, f) in &p.slots {
+                w.extend([slot_word(*n), f.unit.0 as u64, opt_word(f.pc), origin_word(f.origin)]);
+            }
+            w.push(p.queue.len() as u64);
+            for &(a, b, c, d) in &p.queue {
+                w.extend([pair_word(a, b), pair_word(c, d)]);
+            }
+            let sorted = |w: &mut Vec<u64>, mut items: Vec<u64>| {
+                items.sort_unstable();
+                w.push(items.len() as u64);
+                w.extend(items);
+            };
+            sorted(&mut w, p.ambient_done.iter().map(|&(n, h)| slot_word(n) | ((h as u64) << 35)).collect());
+            sorted(&mut w, p.round_ran.iter().map(|&n| slot_word(n)).collect());
+            w.push(owner_word(p.owner));
+            sorted(&mut w, p.camera_done.iter().map(|&(n, h)| slot_word(n) | ((h as u64) << 35)).collect());
+            w.push(p.timed as u64);
+        }
+        for e in &p.stack {
+            match e {
+                Entry::Frame(f) => {
+                    w.extend([
+                        0,
+                        f.sid as u64,
+                        f.unit.0 as u64,
+                        opt_word(f.pc),
+                        killed_word(f.killed) | (bool_word(f.recursive) << 2) | (bool_word(f.resistant) << 4) | ((f.args_known as u64) << 6),
+                        pair_word(f.freeze, f.override_),
+                        owned_word(f.owned),
+                        f.time_loops.len() as u64,
+                    ]);
+                    w.extend(f.time_loops.iter().map(|&h| h as u64));
+                }
+                Entry::Call(c) => {
+                    w.extend([1, c.cid, c.i as u64 | ((c.active as u64) << 32), opt_word(c.caller)]);
+                }
+            }
+        }
+        Some(Sig::from_words(false, w))
     }
 
     /// A path back at a jump target in a machine state it already had ends as "spin" (model.py `_spins`).
@@ -205,7 +212,7 @@ impl<'g> Machine<'g> {
         let mut h = rustc_hash::FxHasher::default();
         sig.hash(&mut h);
         f.sid.hash(&mut h);
-        f.locals.hash(&mut h); // sorted by local number: the set of its items
+        f.locals.as_slice().hash(&mut h); // sorted by local number: the set of its items
         let w = p.writes.hash_sum();
         let mut z: u64 = 0;
         for e in &p.freeze {
@@ -221,7 +228,9 @@ impl<'g> Machine<'g> {
         false
     }
 
-    /// One path for the paths waiting at one join (model.py `_merge`).
+    /// One path for the paths waiting at one join (model.py `_merge`). model.py's merged path is the first path's
+    /// fork, and the first path is dropped after; here the first path itself becomes the merged one, and what the
+    /// merge reads from it is worked out before it changes.
     pub(super) fn merge(&mut self, o: &FactOracle, mut group: Vec<Path>, sig: Rc<Sig>) -> Path {
         let g = self.game;
         let tids: Vec<J> = match &mut self.trace {
@@ -234,37 +243,43 @@ impl<'g> Machine<'g> {
             q.resumed = true;
             return q;
         }
+        let n = group.len() as u32 - 1;
         let base = &group[0];
         let settle = base.settle;
-        let mut q = base.fork();
         // every key some path wrote gets the join of the paths' values (the oracle's where a path did not write
         // it). model.py goes through the keys sorted; the order shows nothing (the store is a map, and the
         // unknowns a join makes are interned by value), so this goes through the first path's keys, then each
         // other path's keys that no path before it holds. A key whose values all equal the first path's keeps
-        // the value q already has from the fork.
+        // the value the first path has.
+        let mut writes: Vec<(Fact, Val)> = Vec::new();
         let mut vals = Vec::with_capacity(group.len());
-        for (j, gj) in group.iter().enumerate() {
-            for (&k, &vj) in gj.writes.iter() {
-                if group[..j].iter().any(|gp| gp.writes.contains_key(&k)) {
-                    continue; // done with an earlier path's keys
+        let mut join_key = |me: &mut Self, k: Fact, writes: &mut Vec<(Fact, Val)>| {
+            vals.clear();
+            for gp in &group {
+                let v = match gp.writes.get(&k) {
+                    Some(&v) => v,
+                    None => me.oget(o, k),
+                };
+                vals.push(v);
+            }
+            if base.writes.contains_key(&k) && vals.iter().all(|&v| v == vals[0]) {
+                return; // the first path holds it already
+            }
+            writes.push((k, me.v.join_values(&vals)));
+        };
+        {
+            for (j, gj) in group.iter().enumerate() {
+                for &k in gj.writes.keys() {
+                    if j > 0 && (base.writes.contains_key(&k) || group[1..j].iter().any(|gp| gp.writes.contains_key(&k))) {
+                        continue; // done with an earlier path's keys
+                    }
+                    join_key(self, k, &mut writes);
                 }
-                vals.clear();
-                for gp in &group {
-                    let v = match gp.writes.get(&k) {
-                        Some(&v) => v,
-                        None => self.oget(o, k),
-                    };
-                    vals.push(v);
-                }
-                if j == 0 && vals.iter().all(|&v| v == vj) {
-                    continue; // q holds it already
-                }
-                let v = self.v.join_values(&vals);
-                q.writes.insert(k, v);
             }
         }
-        for i in 0..q.stack.len() {
-            if !matches!(q.stack[i], Entry::Frame(_)) {
+        let mut frame_locals: Vec<(usize, Vec<(i32, Val)>)> = Vec::new();
+        for i in 0..base.stack.len() {
+            if !matches!(base.stack[i], Entry::Frame(_)) {
                 continue;
             }
             let frames: Vec<&Frame> = group
@@ -274,24 +289,22 @@ impl<'g> Machine<'g> {
                     Entry::Call(_) => unreachable!("one signature, one stack shape"),
                 })
                 .collect();
-            let locals = self.join_locals(&frames);
-            for (n, v) in locals {
-                q.frame_at(i).set_local(n, v);
+            if frames[1..].iter().all(|f| f.locals == frames[0].locals) {
+                continue; // the same locals in every path: joined, they stay as they are
             }
+            let locals = self.join_locals(&frames);
+            frame_locals.push((i, locals));
         }
         // settle: a slot off the stack, at the same place in every path: its locals are joined as a frame's
-        for i in 0..q.slots.len() {
-            let name = q.slots[i].0;
+        let mut slot_locals: Vec<(Vec<(i32, Val)>, bool)> = Vec::new();
+        for (name, _) in &base.slots {
             let frames: Vec<&Frame> =
-                group.iter().map(|gp| gp.slot(name).expect("one signature, the same kept slots")).collect();
+                group.iter().map(|gp| gp.slot(*name).expect("one signature, the same kept slots")).collect();
             let locals = self.join_locals(&frames);
-            let args_known = frames.iter().all(|f| f.args_known);
-            let f = &mut q.slots[i].1;
-            f.locals = locals;
-            f.args_known = args_known;
+            slot_locals.push((locals, frames.iter().all(|f| f.args_known)));
         }
         let same = group[1..].iter().all(|gp| gp.writes == base.writes && slots_eq(&gp.slots, &base.slots));
-        q.cut_data = (0..base.cut_data.len())
+        let cut_data: Vec<Val> = (0..base.cut_data.len())
             .map(|i| {
                 let vs: Vec<Val> = group.iter().map(|gp| gp.cut_data[i]).collect();
                 self.v.join_values(&vs)
@@ -300,37 +313,85 @@ impl<'g> Machine<'g> {
         let mut names: Vec<Slot> = group.iter().flat_map(|gp| gp.freeze.keys().copied()).collect();
         names.sort_unstable();
         names.dedup();
-        for name in names {
-            let first = base.freeze.get(&name);
-            let same = group[1..].iter().all(|gp| gp.freeze.get(&name) == first);
-            q.freeze.insert(name, if same { *first.unwrap() } else { None });
+        let freeze: Vec<(Slot, Option<(i32, bool)>)> = names
+            .into_iter()
+            .map(|name| {
+                let first = base.freeze.get(&name);
+                let same = group[1..].iter().all(|gp| gp.freeze.get(&name) == first);
+                (name, if same { *first.unwrap() } else { None })
+            })
+            .collect();
+        let input_drift = self.merged_drift(&group);
+        let cleared = if group[1..].iter().any(|gp| gp.cleared != base.cleared) { None } else { base.cleared };
+        let steps = group.iter().map(|gp| gp.steps).max().unwrap();
+        let depth = group.iter().map(|gp| gp.depth).max().unwrap();
+        // settle merges recur every round, so a sum would count the shared history again each time: the most
+        let reentries = if settle {
+            group.iter().map(|gp| gp.reentries).max().unwrap()
+        } else {
+            group.iter().map(|gp| gp.reentries).sum()
+        };
+        let next_sid = group.iter().map(|gp| gp.next_sid).max().unwrap();
+        let merged = group.iter().map(|gp| gp.merged).max().unwrap() + 1;
+        // the first path's lists and immediate snapshot as they are before the merge adds to them
+        let (b_assumptions, b_unmodelled, b_notes, b_unknown_writes, b_errors, b_turns, b_conflicts) = (
+            base.assumptions.clone(),
+            base.unmodelled.clone(),
+            base.notes.clone(),
+            base.unknown_writes.clone(),
+            base.errors.clone(),
+            base.turns.clone(),
+            base.conflicts.clone(),
+        );
+        let b_immediate = base.immediate.clone();
+        let rest = group.split_off(1);
+        let mut q = group.pop().unwrap();
+        q.tid = None; // a new path (model.py's fork of the first)
+        for (k, v) in writes {
+            q.writes.insert(k, v);
+        }
+        for (i, locals) in frame_locals {
+            let f = q.frame_at(i);
+            for (n, v) in locals {
+                f.set_local(n, v);
+            }
+        }
+        for (i, (locals, args_known)) in slot_locals.into_iter().enumerate() {
+            let f = &mut q.slots[i].1;
+            f.locals = Locals::from_vec(locals);
+            f.args_known = args_known;
+        }
+        q.cut_data = cut_data;
+        for (name, c) in freeze {
+            q.freeze.insert(name, c);
         }
         // settle: an entry a merged path already holds is not added again (merges recur every round); the sets
         // are made when first needed (model.py makes them at the first branch: the same sets)
         let mut seen = Seen::default();
-        for gp in &group[1..] {
+        for gp in &rest {
             // each branch's own additions: what follows the history it shares with the first
             if settle {
-                q.assumptions.add_branch_new(&base.assumptions, &gp.assumptions, &mut seen.assumptions);
-                q.unmodelled.add_branch_new(&base.unmodelled, &gp.unmodelled, &mut seen.unmodelled);
-                q.notes.add_branch_new(&base.notes, &gp.notes, &mut seen.notes);
-                q.unknown_writes.add_branch_new(&base.unknown_writes, &gp.unknown_writes, &mut seen.unknown_writes);
-                q.errors.add_branch_new(&base.errors, &gp.errors, &mut seen.errors);
-                q.turns.add_branch(&base.turns, &gp.turns);
-                q.conflicts.add_branch_new(&base.conflicts, &gp.conflicts, &mut seen.conflicts);
+                q.assumptions.add_branch_new(&b_assumptions, &gp.assumptions, &mut seen.assumptions);
+                q.unmodelled.add_branch_new(&b_unmodelled, &gp.unmodelled, &mut seen.unmodelled);
+                q.notes.add_branch_new(&b_notes, &gp.notes, &mut seen.notes);
+                q.unknown_writes.add_branch_new(&b_unknown_writes, &gp.unknown_writes, &mut seen.unknown_writes);
+                q.errors.add_branch_new(&b_errors, &gp.errors, &mut seen.errors);
+                q.turns.add_branch(&b_turns, &gp.turns);
+                q.conflicts.add_branch_new(&b_conflicts, &gp.conflicts, &mut seen.conflicts);
             } else {
-                q.assumptions.add_branch(&base.assumptions, &gp.assumptions);
-                q.unmodelled.add_branch(&base.unmodelled, &gp.unmodelled);
-                q.notes.add_branch(&base.notes, &gp.notes);
-                q.unknown_writes.add_branch(&base.unknown_writes, &gp.unknown_writes);
-                q.errors.add_branch(&base.errors, &gp.errors);
-                q.turns.add_branch(&base.turns, &gp.turns);
-                q.conflicts.add_branch(&base.conflicts, &gp.conflicts);
+                q.assumptions.add_branch(&b_assumptions, &gp.assumptions);
+                q.unmodelled.add_branch(&b_unmodelled, &gp.unmodelled);
+                q.notes.add_branch(&b_notes, &gp.notes);
+                q.unknown_writes.add_branch(&b_unknown_writes, &gp.unknown_writes);
+                q.errors.add_branch(&b_errors, &gp.errors);
+                q.turns.add_branch(&b_turns, &gp.turns);
+                q.conflicts.add_branch(&b_conflicts, &gp.conflicts);
             }
             // settle: a key counts as moved after the immediate part when it did on any branch merged in
             q.after.extend(gp.after.iter().copied());
-            if let (Some(gi), Some(bi)) = (&gp.immediate, &base.immediate) {
-                for &k in gi.keys().chain(bi.keys()) {
+            if let (Some(gi), Some(bi)) = (&gp.immediate, &b_immediate) {
+                // (one snapshot both paths share from before their fork holds no difference)
+                for &k in gi.keys().chain(bi.keys()).filter(|_| !Rc::ptr_eq(gi, bi)) {
                     let differ = match (gi.get(&k), bi.get(&k)) {
                         (Some(x), Some(y)) => x != y,
                         (Some(&x), None) | (None, Some(&x)) => !self.eq_oracle(x, o, k),
@@ -341,13 +402,9 @@ impl<'g> Machine<'g> {
                     }
                 }
             }
-            for (owner, (r, w)) in &gp.rw {
-                let (mr, mw) = q.rw.entry(*owner).or_default();
-                mr.extend(r.iter().copied());
-                mw.extend(w.iter().copied());
-            }
+            q.rw.union(&gp.rw);
             for (name, rule) in &gp.ran_by {
-                q.ran_by.entry(*name).or_insert_with(|| rule.clone());
+                q.ran_by.entry(*name).or_insert(rule);
             }
             q.skips.extend(gp.skips.iter().cloned());
             q.ambient_pass.extend(gp.ambient_pass.iter().copied());
@@ -361,34 +418,21 @@ impl<'g> Machine<'g> {
                     }
                 }
             }
-            for (k, rule) in &gp.writer {
-                let r = match q.writer.get(k) {
-                    Some(have) if have != rule => rc("mixed"),
-                    _ => rule.clone(),
-                };
-                q.writer.insert(*k, r);
-            }
+            q.writer.merge(&gp.writer);
             q.sentences = q.sentences.max(gp.sentences);
         }
-        if group.iter().any(|gp| !gp.input_drift.is_empty()) {
-            unreachable!("dialog's merges are not ported");
+        drop(rest);
+        if let Some(d) = input_drift {
+            q.input_drift = d;
         }
-        if group[1..].iter().any(|gp| gp.cleared != base.cleared) {
-            q.cleared = None;
-        }
-        q.steps = group.iter().map(|gp| gp.steps).max().unwrap();
-        q.depth = group.iter().map(|gp| gp.depth).max().unwrap();
-        // settle merges recur every round, so a sum would count the shared history again each time: the most
-        q.reentries = if settle {
-            group.iter().map(|gp| gp.reentries).max().unwrap()
-        } else {
-            group.iter().map(|gp| gp.reentries).sum()
-        };
-        q.next_sid = group.iter().map(|gp| gp.next_sid).max().unwrap();
-        q.merged = group.iter().map(|gp| gp.merged).max().unwrap() + 1;
+        q.cleared = cleared;
+        q.steps = steps;
+        q.depth = depth;
+        q.reentries = reentries;
+        q.next_sid = next_sid;
+        q.merged = merged;
         q.joined = Some(sig.clone());
         q.resumed = true;
-        let n = group.len() as u32 - 1;
         self.merges += n;
         if sig.is_round() {
             // a round's start: its fixed point and cycle tests compare with the merged state
@@ -422,7 +466,7 @@ impl<'g> Machine<'g> {
                 let v = match f.local(n) {
                     Some(v) => v,
                     None if f.args_known => Val::Int(0),
-                    None => self.v.mk(Reason::Local, format!("Local[{n}]")),
+                    None => self.unknown_local(n),
                 };
                 vals.push(v);
             }
@@ -513,6 +557,10 @@ impl<'g> Machine<'g> {
             Step::SceneEgo(obj) => self.eng_scene_ego(p, ci, o, *obj),
             Step::Turn(name) => return self.eng_turn(p, ci, o, *name),
             Step::Sentences => self.eng_sentences(p, ci, o),
+            Step::Input { area, verb, button } => return self.eng_input(p, ci, o, *area, *verb, *button),
+            Step::Abort { armed, code } => self.eng_abort(p, ci, o, armed, *code),
+            Step::Override { name, w } => return self.eng_override(p, ci, o, *name, *w),
+            Step::Key(code) => return self.eng_key(p, ci, o, *code),
         }
         Vec::new()
     }
@@ -682,9 +730,9 @@ impl<'g> Machine<'g> {
             // settle: its turn is one of the click frame's runAllScripts turns (order conflicts), with rows 1-2's
             // rules for what it meets (a WaitFor op forks)
             p.owner = Some(Owner::Slot(name));
-            p.owner_rule = self.s_rule_a.clone();
+            p.owner_rule = "a: started or resumed by the path";
             p.timed = false;
-            p.rw.entry(Owner::Slot(name)).or_default();
+            p.rw.add_owner(Owner::Slot(name));
             p.round_ran.insert(name);
         }
         self.clear(p, o, Prefix::At(name)); // it runs from its wait point now
@@ -836,8 +884,7 @@ impl<'g> Machine<'g> {
             p.reentries += 1;
         }
         let mut f = Frame::new(unit, Some(pc), args_known, owned, recursive);
-        f.locals = locals.to_vec();
-        f.locals.sort_by_key(|l| l.0);
+        f.locals = Locals::from_vec(locals.to_vec());
         f.resistant = resistant;
         f.sid = p.next_sid;
         f.nested = nested;
