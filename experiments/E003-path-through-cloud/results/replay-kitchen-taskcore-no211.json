@@ -8,23 +8,23 @@
   ]
  },
  "sources": {
-  "replay.py": "4cfec9a50b4c",
-  "replay_kitchen.py": "34522dff2c23",
+  "replay.py": "ffa1d5591fa1",
+  "replay_kitchen.py": "b8475ab14a5c",
   "reader.py": "94d495853f07",
   "model.py": "cc630446bdbe",
   "task.py": "c356a6df633a",
   "relevance.py": "3c50167cb0c8",
-  "plan_fd.py": "ff816ac0821c",
+  "plan_fd.py": "d3ed1020b5e6",
   "domains.py": "19932b58530a",
   "facts.py": "c06fc3489018",
   "export_records.py": "1524d2eff8f9",
-  "taskcore/src/main.rs": "971119b68480",
+  "taskcore/src/main.rs": "a8162cc88ab9",
   "taskcore/src/model.rs": "2ea8a9fbd2f8",
   "taskcore/src/packed.rs": "93da9b504549",
   "taskcore/src/bans.rs": "1b261d44f902",
-  "taskcore/src/fold.rs": "30018cd3fa65",
-  "taskcore/src/reduce.rs": "531154a792e4",
-  "taskcore/src/sas.rs": "0d799e0a60f5"
+  "taskcore/src/fold.rs": "7469307010cf",
+  "taskcore/src/reduce.rs": "310f1f9c17f0",
+  "taskcore/src/sas.rs": "0ee7642b62cf"
  },
  "planner": "taskcore",
  "search": "lama-first",
@@ -47,7 +47,7 @@
   "actions": 71721,
   "facts": 716,
   "folded": 527,
-  "seconds": 51.31197798699941
+  "seconds": 55.905942135999794
  },
  "export": {
   "folded": 527,
@@ -55,10 +55,10 @@
   "facts": 716,
   "strings": 16298,
   "bytes": 44786508,
-  "seconds": 36.06737679399885,
+  "seconds": 42.249714135999966,
   "sha1": "00832f489510"
  },
- "taskcore_binary": "c249b9ee1ae7",
+ "taskcore_binary": "25738cbfb7c0",
  "start_check": {
   "facts": 3651,
   "differ": 0,
@@ -78,9 +78,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.120254740999371,
+    "write_s": 7.266128864001075,
     "status": "plan",
-    "seconds": 3.218567043000803,
+    "seconds": 3.5055340440012515,
     "steps": [
      "sentence(2,316)#262",
      "event(script:2@736#6b02ec868a25)#30822",
@@ -103,7 +103,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 2.0433317579991126,
+    "decode_s": 2.145171381998807,
     "folds": [
      null,
      "fold:event(script:2@736#6b02ec868a25)#30822+1",
@@ -124,7 +124,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 1,
@@ -136,9 +139,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 5.509983364001528,
+    "write_s": 6.325421240006108,
     "status": "plan",
-    "seconds": 2.224426681001205,
+    "seconds": 2.5607296359958127,
     "steps": [
      "event(local:212@4)#51212",
      "event(local:212@8)#51797",
@@ -154,7 +157,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 0.2643828990003385,
+    "decode_s": 0.3419329390017083,
     "folds": [
      null,
      null,
@@ -168,7 +171,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 2,
@@ -180,9 +186,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 5.632776152000588,
+    "write_s": 7.260698701000365,
     "status": "plan",
-    "seconds": 3.390074802999152,
+    "seconds": 3.5535184769978514,
     "steps": [
      "sentence(2,316)#262",
      "event(script:2@736#6b02ec868a25)#30822",
@@ -205,7 +211,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 1.9752430919979815,
+    "decode_s": 2.0186585120027303,
     "folds": [
      null,
      "fold:event(script:2@736#6b02ec868a25)#30822+1",
@@ -226,7 +232,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 3,
@@ -238,9 +247,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.658766568001738,
+    "write_s": 6.739678582998749,
     "status": "plan",
-    "seconds": 2.4701751339998737,
+    "seconds": 2.392394449998392,
     "steps": [
      "walk_to(316)#478",
      "event(script:2@736#a8c69122caf2)#30908",
@@ -254,7 +263,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 0.37722589500117465,
+    "decode_s": 0.33089021799969487,
     "folds": [
      null,
      null,
@@ -266,7 +275,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 4,
@@ -278,9 +290,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.78236413400009,
+    "write_s": 6.834592401995906,
     "status": "plan",
-    "seconds": 3.4789775560020644,
+    "seconds": 3.2614150289955433,
     "steps": [
      "sentence(2,316)#262",
      "event(script:2@736#6b02ec868a25)#30822",
@@ -303,7 +315,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 2.091624975997547,
+    "decode_s": 1.943208478995075,
     "folds": [
      null,
      "fold:event(script:2@736#6b02ec868a25)#30822+1",
@@ -324,7 +336,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 5,
@@ -336,9 +351,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.933472119999351,
+    "write_s": 6.601256696005294,
     "status": "plan",
-    "seconds": 2.5998064929990505,
+    "seconds": 2.473074911002186,
     "steps": [
      "event(local:212@4)#51212",
      "event(local:212@8)#51797",
@@ -354,7 +369,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 0.40270838899959926,
+    "decode_s": 0.33939149000070756,
     "folds": [
      null,
      null,
@@ -368,7 +383,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 6,
@@ -380,9 +398,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.857098599000892,
+    "write_s": 6.424316611002723,
     "status": "plan",
-    "seconds": 3.6948651610000525,
+    "seconds": 2.8744502129993634,
     "steps": [
      "sentence(2,316)#262",
      "event(script:2@736#6b02ec868a25)#30822",
@@ -405,7 +423,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 2.0939559649996227,
+    "decode_s": 2.1151592199967126,
     "folds": [
      null,
      "fold:event(script:2@736#6b02ec868a25)#30822+1",
@@ -426,7 +444,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 7,
@@ -438,9 +459,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.887386340000376,
+    "write_s": 6.326066697998613,
     "status": "plan",
-    "seconds": 2.73452005800209,
+    "seconds": 2.023486389000027,
     "steps": [
      "event(local:212@4)#51212",
      "event(local:212@8)#51797",
@@ -456,7 +477,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 0.3823455300007481,
+    "decode_s": 0.25770403999922564,
     "folds": [
      null,
      null,
@@ -470,7 +491,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 8,
@@ -482,9 +506,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.651724810995802,
+    "write_s": 6.422799275002035,
     "status": "plan",
-    "seconds": 3.3689224410045426,
+    "seconds": 3.0653401579984347,
     "steps": [
      "sentence(2,316)#262",
      "event(script:2@736#6b02ec868a25)#30822",
@@ -507,7 +531,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 2.0104420729985577,
+    "decode_s": 1.8828508049991797,
     "folds": [
      null,
      "fold:event(script:2@736#6b02ec868a25)#30822+1",
@@ -528,7 +552,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 9,
@@ -540,9 +567,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 6.398361429994111,
+    "write_s": 6.117402162002691,
     "status": "plan",
-    "seconds": 2.8187485840026056,
+    "seconds": 2.351883925999573,
     "steps": [
      "event(local:212@4)#51212",
      "event(local:212@8)#51797",
@@ -558,7 +585,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 0.3763298640042194,
+    "decode_s": 0.3043544350002776,
     "folds": [
      null,
      null,
@@ -572,7 +599,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 10,
@@ -584,9 +614,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "lama-first",
-    "write_s": 7.070148788996448,
+    "write_s": 6.641941822999797,
     "status": "plan",
-    "seconds": 3.5826846290001413,
+    "seconds": 3.0856903419989976,
     "steps": [
      "sentence(2,316)#262",
      "event(script:2@736#6b02ec868a25)#30822",
@@ -609,7 +639,7 @@
     ],
     "operators": 17820,
     "actions": 12026,
-    "decode_s": 2.0244945109952823,
+    "decode_s": 1.8645369880032376,
     "folds": [
      null,
      "fold:event(script:2@736#6b02ec868a25)#30822+1",
@@ -630,7 +660,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34377+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    }
   ],
   "steps": [
@@ -15129,7 +15162,7 @@
   "ticks": 49720,
   "frame0": 235,
   "frame_end": 10179,
-  "seconds": 185.20078321800247,
+  "seconds": 179.80541338799958,
   "inputs": [
    {
     "frame": 271,
@@ -15531,17 +15564,17 @@
   ]
  },
  "ban_task_sizes": [
-  6.120254740999371,
-  5.509983364001528,
-  5.632776152000588,
-  6.658766568001738,
-  6.78236413400009,
-  6.933472119999351,
-  6.857098599000892,
-  6.887386340000376,
-  6.651724810995802,
-  6.398361429994111,
-  7.070148788996448
+  7.266128864001075,
+  6.325421240006108,
+  7.260698701000365,
+  6.739678582998749,
+  6.834592401995906,
+  6.601256696005294,
+  6.424316611002723,
+  6.326066697998613,
+  6.422799275002035,
+  6.117402162002691,
+  6.641941822999797
  ],
  "verify": {
   "checkpoints": 61,
@@ -15551,10 +15584,10 @@
    "owner:566": 15
   },
   "same": true,
-  "seconds": 7.252276700004586,
+  "seconds": 6.959464421997836,
   "goal": false
  },
- "seconds": 282.8349589849968,
+ "seconds": 288.63635619900015,
  "game_seconds": 828.693749594523,
  "trace": [
   "236: {'room': 28, 'state:316': 0, 'script:2': 0, 'local:203': 0, 'local:211': 1, 'local:212': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'owner:566': 15}; at ['local:211:33']; cook not in the room; ego [330, 136]",
