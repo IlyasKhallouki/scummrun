@@ -729,17 +729,19 @@ def kitchen_control(work: Path) -> dict:
     export_s = time.monotonic() - t
     del recs
     t = time.monotonic()
-    c = E.control_records(work / "reading.tc", work / "reading.actions.jsonl", work / "control.tc")
+    c = E.control_records(work / "reading.tc", work / "reading.actions.jsonl", work / "control.tc",
+                          work / "control.actions.jsonl")
     c["seconds"] = round(time.monotonic() - t, 2)
     rd = PR.load_reading(work / "reading.json")
-    ct = PR.PackedTask(PR.Packed(work / "control.tc"), PR.Lines(work / "reading.actions.jsonl"), rd.doc["bounds"])
+    ct = PR.PackedTask(PR.Packed(work / "control.tc"), PR.Lines(work / "control.actions.jsonl"), rd.doc["bounds"])
     seen = {}
     by_key = collections.Counter()
     for i, line in enumerate(rd.task.lines):
         name = f"{line['label']}#{line['rec']}"
         if name in KITCHEN_CONTROL:
             a, q = rd.task.actions[i], ct.actions[i]
-            seen[name] = (sorted(q.pre), sorted(set(a.pre) - set(q.pre)), sorted(a.what.engine_pre))
+            seen[name] = (sorted(q.pre), sorted(set(a.pre) - set(q.pre)), sorted(a.what.engine_pre),
+                          len(a.what.checks), len(q.what.checks), sorted(q.what.engine_pre))
     for a, q in zip(rd.task.actions, ct.actions):
         assert a.effects == q.effects and set(q.pre) <= set(a.pre)
         by_key.update(set(a.pre) - set(q.pre))
@@ -768,12 +770,16 @@ def write_control_log(work: Path) -> None:
              f"control: {c['actions']:,} actions; precondition sets kept {c['sets kept']:,}, dropped "
              f"{c['sets dropped']:,} on {c['actions with a set dropped']:,} actions; {c['bytes']:,} bytes; "
              f"{c['seconds']} s",
+             f"control's action lines: replay checks dropped {c['checks dropped']:,}; stepped facts made engine "
+             f"conditions {c['stepped facts made engine conditions']:,}",
              f"dropped sets by fact kind: {c['dropped_by_fact']}",
              f"dropped sets by action kind: {c['dropped_by_kind']}",
              f"the facts dropped most often: {out['most_dropped']}", "",
-             "the main plan's records (kept by the control | dropped | the record's engine conditions):"]
-    for name, (keep, drop, eng) in out["records"].items():
-        lines.append(f"  {name}: kept {keep} | dropped {drop} | engine {eng}")
+             "the main plan's records (kept by the control | dropped | the record's engine conditions | replay checks "
+             "in the full model and the control | the control's engine conditions):"]
+    for name, (keep, drop, eng, nc, cc, ceng) in out["records"].items():
+        lines.append(f"  {name}: kept {keep} | dropped {drop} | engine {eng} | checks {nc} and {cc} | control engine "
+                     f"{ceng}")
     (HERE / "results" / "control-kitchen.log").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 

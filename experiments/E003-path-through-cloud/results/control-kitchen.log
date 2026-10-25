@@ -1,12 +1,13 @@
 E003 step 5: the control on the kitchen (export_records.control_records; test_replay_part1.py)
 
-reading: READER_PICKLE /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/step5/reading.pkl as files (packed_reading.export_reading): 71,729 actions, 716 facts, 44,789,992 bytes, 31.6 s
-control: 71,729 actions; precondition sets kept 407,661, dropped 189,174 on 59,780 actions; 42,519,840 bytes; 2.03 s
+reading: READER_PICKLE /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/step5/reading.pkl as files (packed_reading.export_reading): 71,729 actions, 716 facts, 44,789,992 bytes, 95.9 s
+control: 71,729 actions; precondition sets kept 407,661, dropped 189,174 on 59,780 actions; 42,519,840 bytes; 11.97 s
+control's action lines: replay checks dropped 105,955; stepped facts made engine conditions 2,226
 dropped sets by fact kind: {'bit': 77624, 'class': 4275, 'cutscene': 4, 'local': 130, 'owner': 3305, 'room': 2904, 'script': 420, 'state': 270, 'var': 100242}
 dropped sets by action kind: {'dialog_line': 702, 'event': 69502, 'sentence': 53702, 'skip_cutscene': 62016, 'walk_to': 3252}
-the facts dropped most often: [('bit:6', 25673), ('var:102', 25586), ('bit:349', 25280), ('bit:87', 25280), ('var:201', 20216), ('var:200', 19992), ('var:199', 19805), ('var:197', 13542), ('class:322:5', 3060), ('room', 2904), ('owner:0', 2088), ('class:0:12', 723), ('var:52', 606), ('bit:563', 558), ('owner:568', 499)]
+the facts dropped most often: [('bit:6', 25673), ('var:102', 25586), ('bit:87', 25280), ('bit:349', 25280), ('var:201', 20216), ('var:200', 19992), ('var:199', 19805), ('var:197', 13542), ('class:322:5', 3060), ('room', 2904), ('owner:0', 2088), ('class:0:12', 723), ('var:52', 606), ('bit:563', 558), ('owner:568', 499)]
 
-the main plan's records (kept by the control | dropped | the record's engine conditions):
-  walk_to(316)#478: kept ['class:316:32', 'frozen:obj:2', 'frozen:script:2', 'room', 'script:2', 'var:53'] | dropped ['bit:6'] | engine ['class:316:32', 'frozen:obj:2', 'frozen:script:2', 'room', 'script:2', 'var:53']
-  sentence(9,566)#12118: kept ['class:566:32', 'frozen:obj:2', 'frozen:script:2', 'owner:566', 'room', 'script:2', 'var:53', 'verb:9'] | dropped ['bit:6'] | engine ['class:566:32', 'frozen:obj:2', 'frozen:script:2', 'owner:566', 'room', 'script:2', 'var:53', 'verb:9']
-  event(local:211@33)#30568: kept ['frozen:local:211', 'local:211', 'pos:local:211', 'room'] | dropped ['class:316:6', 'local:203', 'local:220', 'state:316'] | engine ['frozen:local:211', 'local:211', 'pos:local:211', 'room']
+the main plan's records (kept by the control | dropped | the record's engine conditions | replay checks in the full model and the control | the control's engine conditions):
+  walk_to(316)#478: kept ['class:316:32', 'frozen:obj:2', 'frozen:script:2', 'room', 'script:2', 'var:53'] | dropped ['bit:6'] | engine ['class:316:32', 'frozen:obj:2', 'frozen:script:2', 'room', 'script:2', 'var:53'] | checks 1 and 0 | control engine ['class:316:32', 'frozen:obj:2', 'frozen:script:2', 'room', 'script:2', 'var:53']
+  sentence(9,566)#12118: kept ['class:566:32', 'frozen:obj:2', 'frozen:script:2', 'owner:566', 'room', 'script:2', 'var:53', 'verb:9'] | dropped ['bit:6'] | engine ['class:566:32', 'frozen:obj:2', 'frozen:script:2', 'owner:566', 'room', 'script:2', 'var:53', 'verb:9'] | checks 1 and 0 | control engine ['class:566:32', 'frozen:obj:2', 'frozen:script:2', 'owner:566', 'room', 'script:2', 'var:53', 'verb:9']
+  event(local:211@33)#30568: kept ['frozen:local:211', 'local:211', 'pos:local:211', 'room'] | dropped ['class:316:6', 'local:203', 'local:220', 'state:316'] | engine ['frozen:local:211', 'local:211', 'pos:local:211', 'room'] | checks 2 and 0 | control engine ['frozen:local:211', 'local:211', 'pos:local:211', 'room']
