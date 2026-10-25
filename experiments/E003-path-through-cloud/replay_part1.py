@@ -523,8 +523,9 @@ def run_lines(o: dict) -> list:
               f"reading's start ({rs['name']}): {rs['differ']} facts differ, {rs.get('task facts differ')} of them "
               f"the task's; taskcore start check: input {chk['taskcore']['input']['status']}, needed "
               f"{chk['taskcore']['needed']['status']}",
-              f"result: stop {r['stop']!r}; goal reached {r['goal']}; verified from boot: {v['goal']} "
-              f"({v['inputs']} inputs, {v['checkpoints']} checkpoints, {len(v['differ'])} differ, {v['seconds']} s)"
+              f"result: stop {r['stop']!r}; goal reached {r['goal']}; verify from boot: {len(v['differ'])} differences "
+              f"at {v['checkpoints']} checkpoints ({v['inputs']} inputs, {v['seconds']} s), the goal at its end "
+              f"{v['goal']}"
               + (f"; verify error {v['error']}" if v.get("error") else ""),
               f"replans {r['replans']}; bans {len(r['bans'])}; plans {len(r['plans'])}; frames {r['frames']} "
               f"(game time {o['game_seconds']:.1f} s); player inputs {s['inputs']}",
