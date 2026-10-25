@@ -204,6 +204,14 @@ def test_a_reading_from_golden_format_records_and_a_packed_file_is_the_python_ex
     rd.close()
     rp.close()
     assert PR.check_reading(tmp_path / "g" / "reading.json")["ok"]
+    # on worker processes: the same files
+    out2 = PR.reading_from_golden(g, tmp_path / "py" / "reading.tc", tmp_path / "w", {"room": 28, "var:53": 1},
+                                  "a hand-made start", domain=DOMS.get, workers=3)
+    assert out2["actions"] == 3 and out2["records"] == 4
+    for f in ("reading.actions.jsonl", "reading.tc"):
+        assert (tmp_path / "w" / f).read_bytes() == (tmp_path / "g" / f).read_bytes(), f
+    w, a = (json.loads((tmp_path / d / "reading.json").read_text()) for d in ("w", "g"))
+    assert w == a
 
 
 def test_the_lines_follow_the_packed_files_order_whatever_it_is(tmp_path):

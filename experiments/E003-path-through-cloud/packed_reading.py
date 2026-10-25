@@ -9,7 +9,7 @@ usage: from packed_reading import export_reading, load_reading, reading_from_gol
        rd.b         # what reader.task_start and reader.replan_start read (``Points``)
        rd.packed    # the packed file, for taskcore
        check_reading(out_dir / "reading.json")                 # the three files against each other and this format
-       python packed_reading.py from-golden GOLDEN PACKED --start-seed N --name NAME --out DIR
+       python packed_reading.py from-golden GOLDEN PACKED --start-seed N --name NAME --out DIR [--workers N]
        python packed_reading.py check DIR/reading.json
 
 **Why files.** The Python reader cannot read Part I on this laptop; the Rust reader (branch reader-b) writes the
@@ -518,12 +518,60 @@ def python_domains(rooms, start: dict):
     return R.FactTable(R.Scope.of(game, tuple(rooms), start), D.build(start), game).domain
 
 
+def _decode_chunk(chunk: list) -> list:
+    """golden.py lines, decoded in a worker (``reading_from_golden`` with workers): per line ("builder", its
+    counters) or ("record", index, ``line_of_golden``'s line with "i" 0)."""
+    out = []
+    for text in chunk:
+        ln = json.loads(text)
+        if ln["kind"] == "builder":
+            out.append(("builder", _dec(ln["builder"])))
+        else:
+            out.append(("record", ln["index"], line_of_golden(0, ln["index"], _dec(ln["record"]))))
+    return out
+
+
+def _lines_in_order(golden, want: list, fa, workers: int, chunk: int = 2000) -> tuple:
+    """The one-pass branch of ``reading_from_golden`` on ``workers`` processes: the golden file's records decoded in
+    windows of ``workers * 4`` chunks, written in the file's order, so the action lines are the one-process
+    branch's, byte for byte. Returns (builder counters, records, the first action left with no record)."""
+    import gzip
+    import itertools
+    import multiprocessing
+    it = iter(enumerate(want))
+    nxt = next(it, None)
+    builder, n_records = None, 0
+    opener = gzip.open if str(golden).endswith(".gz") else open
+    with opener(golden, "rt") as f, multiprocessing.get_context("fork").Pool(workers) as pool:
+        next(f)  # the head
+        while True:
+            window = [c for c in (list(itertools.islice(f, chunk)) for _ in range(workers * 4)) if c]
+            if not window:
+                break
+            for res in pool.map(_decode_chunk, window):
+                for item in res:
+                    if item[0] == "builder":
+                        builder = item[1]
+                        continue
+                    _, index, line = item
+                    n_records += 1
+                    while nxt is not None and nxt[1][0] == index:
+                        line = dict(line, i=nxt[0])
+                        if line["label"] != nxt[1][1]:
+                            raise ValueError(f"action {nxt[0]}: record {index} is {line['label']!r}, the packed "
+                                             f"file's {nxt[1][1]!r}")
+                        fa.write(json.dumps(line, default=str) + "\n")
+                        nxt = next(it, None)
+    return builder, n_records, nxt
+
+
 def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, name: str = "reading",
-                        domain=None, info: dict | None = None) -> dict:
+                        domain=None, info: dict | None = None, workers: int = 1) -> dict:
     """A reading's three files from its records in golden.py's format and its packed file (module docstring).
     ``start``: the facts.py map it was read from; ``domain``: key -> domains.Domain for the bounds (default
     ``python_domains`` on the golden head's rooms and ``start``). The packed file is copied next to the others when it
-    is not there. Returns counts and paths."""
+    is not there. ``workers`` > 1 decodes the records on that many processes when the actions name them in order
+    (the same files). Returns counts and paths."""
     import shutil
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -544,7 +592,13 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
     order = [r for r, _ in want]
     builder = None
     n_records = 0
-    if order == sorted(order):
+    if order == sorted(order) and workers > 1:
+        lines_in.close()
+        with open(acts, "w") as fa:
+            builder, n_records, nxt = _lines_in_order(golden, want, fa, workers)
+        if nxt is not None:
+            raise ValueError(f"{golden}: no record {nxt[1][0]} for action {nxt[0]} of {packed}")
+    elif order == sorted(order):
         # one pass: the records come in index order, the actions name them in the same order
         it = iter(enumerate(want))
         nxt = next(it, None)
@@ -706,6 +760,7 @@ def main() -> None:
     g.add_argument("--start-file", type=Path, help="the start: a JSON facts.py map")
     g.add_argument("--name", default="reading")
     g.add_argument("--out", type=Path, required=True)
+    g.add_argument("--workers", type=int, default=1, help="processes decoding the records (the same files)")
     c = sub.add_parser("check")
     c.add_argument("reading", type=Path)
     a = ap.parse_args()
@@ -717,7 +772,8 @@ def main() -> None:
             start, start_name = row["facts"], f"results/start-part1.jsonl seed {a.start_seed}"
         else:
             start, start_name = json.loads(a.start_file.read_text()), str(a.start_file)
-        print(json.dumps(reading_from_golden(a.golden, a.packed, a.out, start, start_name, a.name), indent=1))
+        print(json.dumps(reading_from_golden(a.golden, a.packed, a.out, start, start_name, a.name,
+                                             workers=a.workers), indent=1))
     else:
         out = check_reading(a.reading)
         print(json.dumps(out, indent=1, default=str))
