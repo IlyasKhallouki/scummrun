@@ -91,6 +91,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "scumm-machine"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "rustc-hash",
+ "scumm-ir",
+ "serde_json",
+]
+
+[[package]]
 name = "scumm-reader"
 version = "0.1.0"
 dependencies = [

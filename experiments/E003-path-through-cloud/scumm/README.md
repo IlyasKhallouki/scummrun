@@ -6,7 +6,7 @@ reference. A layer replaces them only once it reproduces their output byte for b
 | crate | ports | state |
 |---|---|---|
 | `ir` (scumm-ir) | ir.py, facts.py's key scheme, everything model.Game computes from the game files alone | done: 0 mismatches |
-| `machine` | model.py's Machine | next; depends on `ir` |
+| `machine` (scumm-machine) | model.py's Machine, row by row | rows 0-2 done: 0 differences; rows 3-5 next (machine/PORT-NOTES.md) |
 | `reader` | reader.py | after |
 
 A later crate depends on `ir` with `scumm-ir.workspace = true`.
@@ -54,6 +54,8 @@ Measured on the laptop on 2026-10-24, with other jobs running:
 |---|---|---|
 | Python: Game.load, then every loop, wait point and time exit | 15.2 s (3.3 s + 11.9 s) | 71 MB |
 | Rust: Game::load (both const_polls settings) | 0.18 s | 22 MB |
+
+The machine's comparison runs through `machine-run` and `golden.py compare`; machine/PORT-NOTES.md says how.
 
 ## What the machine port builds on
 

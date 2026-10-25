@@ -3,7 +3,7 @@
 #   machine - model.py's Machine (row by row; machine/PORT-NOTES.md)
 #   reader  - reader.py (after)
 [workspace]
-members = ["ir", "reader"]
+members = ["ir", "machine", "reader"]
 resolver = "2"
 
 [workspace.package]
