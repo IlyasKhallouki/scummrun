@@ -8,23 +8,23 @@
   ]
  },
  "sources": {
-  "replay.py": "4cfec9a50b4c",
-  "replay_kitchen.py": "34522dff2c23",
+  "replay.py": "ffa1d5591fa1",
+  "replay_kitchen.py": "b8475ab14a5c",
   "reader.py": "94d495853f07",
   "model.py": "cc630446bdbe",
   "task.py": "c356a6df633a",
   "relevance.py": "3c50167cb0c8",
-  "plan_fd.py": "ff816ac0821c",
+  "plan_fd.py": "d3ed1020b5e6",
   "domains.py": "19932b58530a",
   "facts.py": "c06fc3489018",
   "export_records.py": "1524d2eff8f9",
-  "taskcore/src/main.rs": "971119b68480",
+  "taskcore/src/main.rs": "a8162cc88ab9",
   "taskcore/src/model.rs": "2ea8a9fbd2f8",
   "taskcore/src/packed.rs": "93da9b504549",
   "taskcore/src/bans.rs": "1b261d44f902",
-  "taskcore/src/fold.rs": "30018cd3fa65",
-  "taskcore/src/reduce.rs": "531154a792e4",
-  "taskcore/src/sas.rs": "0d799e0a60f5"
+  "taskcore/src/fold.rs": "7469307010cf",
+  "taskcore/src/reduce.rs": "310f1f9c17f0",
+  "taskcore/src/sas.rs": "0ee7642b62cf"
  },
  "planner": "taskcore",
  "search": "anytime",
@@ -47,7 +47,7 @@
   "actions": 71729,
   "facts": 716,
   "folded": 527,
-  "seconds": 76.70475650700246
+  "seconds": 53.94872020599723
  },
  "export": {
   "folded": 527,
@@ -55,10 +55,10 @@
   "facts": 716,
   "strings": 16299,
   "bytes": 44789992,
-  "seconds": 65.62542854800267,
+  "seconds": 37.832770166001865,
   "sha1": "329c1f39d911"
  },
- "taskcore_binary": "c249b9ee1ae7",
+ "taskcore_binary": "25738cbfb7c0",
  "start_check": {
   "facts": 3651,
   "differ": 0,
@@ -78,9 +78,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 13.845993707000162,
+    "write_s": 6.630653373002133,
     "status": "plan",
-    "seconds": 30.517912385999807,
+    "seconds": 30.293208608003624,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -92,7 +92,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 2.9632943230026285,
+    "decode_s": 2.0372948119984358,
     "folds": [
      null,
      null,
@@ -102,7 +102,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 1,
@@ -114,9 +117,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 12.684748731000582,
+    "write_s": 6.569678943997133,
     "status": "plan",
-    "seconds": 30.504628431001038,
+    "seconds": 30.278891099005705,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -128,7 +131,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 0.7449823779970757,
+    "decode_s": 0.31160052299674135,
     "folds": [
      null,
      null,
@@ -138,7 +141,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 2,
@@ -150,9 +156,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 13.124513589995331,
+    "write_s": 6.320916140997724,
     "status": "plan",
-    "seconds": 30.432080425001914,
+    "seconds": 30.27868811799999,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -164,7 +170,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 3.309078997997858,
+    "decode_s": 1.8401416330016218,
     "folds": [
      null,
      null,
@@ -174,7 +180,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 3,
@@ -186,9 +195,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 14.023236881999765,
+    "write_s": 6.276412659994094,
     "status": "plan",
-    "seconds": 30.472693004994653,
+    "seconds": 30.273552480000944,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -200,7 +209,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 0.47393386700423434,
+    "decode_s": 0.31914898499962874,
     "folds": [
      null,
      null,
@@ -210,7 +219,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 4,
@@ -222,9 +234,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 14.221818696998525,
+    "write_s": 6.429342413000995,
     "status": "plan",
-    "seconds": 30.50300939999579,
+    "seconds": 30.308247724002285,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -236,7 +248,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 2.8438830529994448,
+    "decode_s": 1.9520335470006103,
     "folds": [
      null,
      null,
@@ -246,7 +258,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 5,
@@ -258,9 +273,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 14.671347956005775,
+    "write_s": 6.165654832002474,
     "status": "plan",
-    "seconds": 30.631035865997546,
+    "seconds": 30.271088943001814,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -272,7 +287,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 0.7575930469974992,
+    "decode_s": 0.31545222100248793,
     "folds": [
      null,
      null,
@@ -282,7 +297,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 6,
@@ -294,9 +312,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 14.236239739002485,
+    "write_s": 6.814809336006874,
     "status": "plan",
-    "seconds": 30.56157463300042,
+    "seconds": 30.294304297000053,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -308,7 +326,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 3.421893294995243,
+    "decode_s": 1.8804942520000623,
     "folds": [
      null,
      null,
@@ -318,7 +336,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 7,
@@ -330,9 +351,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 9.350379849995079,
+    "write_s": 6.548612104001222,
     "status": "plan",
-    "seconds": 30.448719142004848,
+    "seconds": 30.31062990400096,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -344,7 +365,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 0.522960238995438,
+    "decode_s": 0.32831132099818205,
     "folds": [
      null,
      null,
@@ -354,7 +375,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 8,
@@ -366,9 +390,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 12.071854393994727,
+    "write_s": 6.204162733993144,
     "status": "plan",
-    "seconds": 30.509943026001565,
+    "seconds": 30.27287216900004,
     "steps": [
      "event(local:211@33)#30568",
      "walk_to(316)#478",
@@ -380,7 +404,7 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 3.472123866995389,
+    "decode_s": 1.7814079299932928,
     "folds": [
      null,
      null,
@@ -390,7 +414,10 @@
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    },
    {
     "plan": 9,
@@ -402,9 +429,9 @@
     "reorders": [],
     "planner": "taskcore",
     "search": "anytime",
-    "write_s": 12.916415890998906,
+    "write_s": 6.810196232996532,
     "status": "plan",
-    "seconds": 30.485434307003743,
+    "seconds": 30.274807025998598,
     "steps": [
      "sentence(9,566)#12118",
      "event(script:2@736#1db02ba5a8ab)#34384",
@@ -412,13 +439,16 @@
     ],
     "operators": 17823,
     "actions": 12029,
-    "decode_s": 0.7817163340005209,
+    "decode_s": 0.3003504669977701,
     "folds": [
      null,
      "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
      null
     ],
-    "predicted_goal": true
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0
    }
   ],
   "steps": [
@@ -15918,7 +15948,7 @@
   "ticks": 65705,
   "frame0": 235,
   "frame_end": 13376,
-  "seconds": 654.1213055350017,
+  "seconds": 461.2514423219982,
   "inputs": [
    {
     "frame": 637,
@@ -16228,16 +16258,16 @@
   ]
  },
  "ban_task_sizes": [
-  13.845993707000162,
-  12.684748731000582,
-  13.124513589995331,
-  14.023236881999765,
-  14.221818696998525,
-  14.671347956005775,
-  14.236239739002485,
-  9.350379849995079,
-  12.071854393994727,
-  12.916415890998906
+  6.630653373002133,
+  6.569678943997133,
+  6.320916140997724,
+  6.276412659994094,
+  6.429342413000995,
+  6.165654832002474,
+  6.814809336006874,
+  6.548612104001222,
+  6.204162733993144,
+  6.810196232996532
  ],
  "verify": {
   "checkpoints": 65,
@@ -16247,10 +16277,10 @@
    "owner:566": 1
   },
   "same": true,
-  "seconds": 17.796248687001935,
+  "seconds": 8.116644342000654,
   "goal": true
  },
- "seconds": 818.1340126620053,
+ "seconds": 564.4431445330047,
  "game_seconds": 1095.1191234333896,
  "trace": [
   "236: {'room': 28, 'state:316': 0, 'script:2': 0, 'local:203': 0, 'local:211': 1, 'local:212': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'owner:566': 15}; at ['local:211:33']; cook not in the room; ego [330, 136]",

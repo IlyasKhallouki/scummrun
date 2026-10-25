@@ -1,41 +1,41 @@
 E003 step 5: the replay harness (replay.py) on the kitchen, planning through taskcore (anytime)
 
 reading: /var/tmp/fast-mi/scratchpad/step5/reading.pkl (made under {'model.py': 'cc630446bdbe', 'reader.py': '94d495853f07', 'ir.py': 'c6ccf01059f1', 'facts.py': 'c06fc3489018', 'actions.py': 'ddbd1aaa2207', 'domains.py': '19932b58530a', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8'})
-sources of the all run (sha1, 12 hex): {'replay.py': '4cfec9a50b4c', 'replay_kitchen.py': '34522dff2c23', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8', 'plan_fd.py': 'ff816ac0821c', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'export_records.py': '1524d2eff8f9', 'taskcore/src/main.rs': '971119b68480', 'taskcore/src/model.rs': '2ea8a9fbd2f8', 'taskcore/src/packed.rs': '93da9b504549', 'taskcore/src/bans.rs': '1b261d44f902', 'taskcore/src/fold.rs': '30018cd3fa65', 'taskcore/src/reduce.rs': '531154a792e4', 'taskcore/src/sas.rs': '0d799e0a60f5'}
+sources of the all run (sha1, 12 hex): {'replay.py': 'ffa1d5591fa1', 'replay_kitchen.py': 'b8475ab14a5c', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'relevance.py': '3c50167cb0c8', 'plan_fd.py': 'd3ed1020b5e6', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'export_records.py': '1524d2eff8f9', 'taskcore/src/main.rs': 'a8162cc88ab9', 'taskcore/src/model.rs': '2ea8a9fbd2f8', 'taskcore/src/packed.rs': '93da9b504549', 'taskcore/src/bans.rs': '1b261d44f902', 'taskcore/src/fold.rs': '7469307010cf', 'taskcore/src/reduce.rs': '310f1f9c17f0', 'taskcore/src/sas.rs': '0ee7642b62cf'}
 
 === plan all ===
-records 72256 of 72256; task 71729 actions, 716 facts (77 s); packed file (export_records.py) 44,789,992 bytes, sha1 329c1f39d911, 66 s; taskcore binary sha1 c249b9ee1ae7; planner taskcore, anytime
+records 72256 of 72256; task 71729 actions, 716 facts (54 s); packed file (export_records.py) 44,789,992 bytes, sha1 329c1f39d911, 38 s; taskcore binary sha1 25738cbfb7c0; planner taskcore, anytime
 start: engine at S1#7 provoke the cook (Open kitchen door while he is inside) pre (frame 235) from boot with run B's inputs: 0 of 3651 facts differ from the ground truth
 goal {'owner:566': [1]}; budget 10 replans, 10800 s; limits {'input': 600, 'wait': 3600, 'retries': 3, 'retry_wait': 60, 'plan_time': 30}
-result: stop 'goal'; goal reached True; 22 steps played; 9 replans; 0 bans; frames 13141 (from 235 to 13376), game time 1095.1 s; wall 818 s (harness 654 s)
-  plan 0 at frame 235: plan, 7 steps, taskcore 13.8 s (12,029 actions, 17,823 operators), anytime LAMA 30.5 s, read back 2.96 s, 0 bans; start {}; the goal holds in the plan's predicted end state
+result: stop 'goal'; goal reached True; 22 steps played; 9 replans; 0 bans; frames 13141 (from 235 to 13376), game time 1095.1 s; wall 564 s (harness 461 s)
+  plan 0 at frame 235: plan, 7 steps, taskcore 6.6 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 2.04 s, 0 bans; start {}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 1 at frame 889: plan, 7 steps, taskcore 12.7 s (12,029 actions, 17,823 operators), anytime LAMA 30.5 s, read back 0.74 s, 0 bans; start {'live slots with unknown locals (args 0)': 9}; the goal holds in the plan's predicted end state
+  plan 1 at frame 889: plan, 7 steps, taskcore 6.6 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 0.31 s, 0 bans; start {'live slots with unknown locals (args 0)': 9}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 2 at frame 1886: plan, 7 steps, taskcore 13.1 s (12,029 actions, 17,823 operators), anytime LAMA 30.4 s, read back 3.31 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; the goal holds in the plan's predicted end state
+  plan 2 at frame 1886: plan, 7 steps, taskcore 6.3 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 1.84 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 3 at frame 4172: plan, 7 steps, taskcore 14.0 s (12,029 actions, 17,823 operators), anytime LAMA 30.5 s, read back 0.47 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; the goal holds in the plan's predicted end state
+  plan 3 at frame 4172: plan, 7 steps, taskcore 6.3 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 0.32 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 4 at frame 6354: plan, 7 steps, taskcore 14.2 s (12,029 actions, 17,823 operators), anytime LAMA 30.5 s, read back 2.84 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; the goal holds in the plan's predicted end state
+  plan 4 at frame 6354: plan, 7 steps, taskcore 6.4 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 1.95 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 5 at frame 7467: plan, 7 steps, taskcore 14.7 s (12,029 actions, 17,823 operators), anytime LAMA 30.6 s, read back 0.76 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; the goal holds in the plan's predicted end state
+  plan 5 at frame 7467: plan, 7 steps, taskcore 6.2 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 0.32 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 6 at frame 8619: plan, 7 steps, taskcore 14.2 s (12,029 actions, 17,823 operators), anytime LAMA 30.6 s, read back 3.42 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; the goal holds in the plan's predicted end state
+  plan 6 at frame 8619: plan, 7 steps, taskcore 6.8 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 1.88 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 7 at frame 9506: plan, 7 steps, taskcore 9.4 s (12,029 actions, 17,823 operators), anytime LAMA 30.4 s, read back 0.52 s, 0 bans; start {'live slots with unknown locals (args 0)': 7}; the goal holds in the plan's predicted end state
+  plan 7 at frame 9506: plan, 7 steps, taskcore 6.5 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 0.33 s, 0 bans; start {'live slots with unknown locals (args 0)': 7}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 8 at frame 11267: plan, 7 steps, taskcore 12.1 s (12,029 actions, 17,823 operators), anytime LAMA 30.5 s, read back 3.47 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; the goal holds in the plan's predicted end state
+  plan 8 at frame 11267: plan, 7 steps, taskcore 6.2 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 1.78 s, 0 bans; start {'live slots with unknown locals (args 0)': 8}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 6: fold:event(script:2@736#1db02ba5a8ab)#34384+1
-  plan 9 at frame 13363: plan, 3 steps, taskcore 12.9 s (12,029 actions, 17,823 operators), anytime LAMA 30.5 s, read back 0.78 s, 0 bans; start {'live slots with unknown locals (args 0)': 5}; the goal holds in the plan's predicted end state
+  plan 9 at frame 13363: plan, 3 steps, taskcore 6.8 s (12,029 actions, 17,823 operators), anytime LAMA 30.3 s, read back 0.30 s, 0 bans; start {'live slots with unknown locals (args 0)': 5}; facts: 131 in the file, 244 needed; the goal holds in the plan's predicted end state
     ['sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
     steps through a folded action (step: the reduced action): 2: fold:event(script:2@736#1db02ba5a8ab)#34384+1
 steps (plan.index name [kind] input: frames start/end; outcome -> then), then each try (kind: frames start/input/end, first idle or menu stop, how the window ended, taken, started):
@@ -155,7 +155,7 @@ steps (plan.index name [kind] input: frames start/end; outcome -> then), then ea
   9.2 event(script:2@736#1db02ba5a8ab)#34384 [event] wait: frames 13366/13376; goal -> goal; 1 tries
       try 1 (first): frames 13366/None/13376, settled 13376, goal, taken False, started True
       tracked facts changed with no predicted write, last try (10; start value, then frame: value): class:566:32 0, 13376: 1; owner:566 15, 13376: 1; script:2 1, 13376: 0; state:566 0, 13376: 1; state:571 1, 13367: 0, 13369: 1, 13370: 0, 13372: 1, 13373: 0, 13375: 1, 13376: 0; state:572 0, 13367: 1, 13368: 0, 13370: 1, 13371: 0, 13373: 1, 13374: 0, 13376: 1; state:573 0, 13368: 1, 13369: 0, 13371: 1, 13372: 0, 13374: 1, 13375: 0; var:133 0, 13376: None; var:182 above, 13376: 0; var:376 1036, 13376: 996
-verify from boot (run B's inputs to frame 235 plus the harness's 44 inputs, 99 in all): 65 checkpoints (facts, tick, random state, actor positions), 0 differ; final {'owner:566': 1}, goal True (18 s)
+verify from boot (run B's inputs to frame 235 plus the harness's 44 inputs, 99 in all): 65 checkpoints (facts, tick, random state, actor positions), 0 differ; final {'owner:566': 1}, goal True (8 s)
 what the engine did (the inputs replayed from boot; frames where the room, door 316, the sentence script, locals 203 and 211-218 or the meat's owner change; slot positions; the cook's x, y):
   236: {'room': 28, 'state:316': 0, 'script:2': 0, 'local:203': 0, 'local:211': 1, 'local:212': 0, 'local:214': 0, 'local:215': 0, 'local:216': 0, 'local:217': 0, 'local:218': 0, 'owner:566': 15}; at ['local:211:33']; cook not in the room; ego [330, 136]
   636: {'state:316': 1, 'local:211': 0, 'local:216': 1}; at ['local:216:33']; cook (660, 100); ego [330, 137]
@@ -311,12 +311,12 @@ plan all:
   game time                                              1095.1 s                       1095.1 s
   plan lengths                       [7, 7, 7, 7, 7, 7, 7, 7, 7, 3]   [7, 7, 7, 7, 7, 7, 7, 7, 7, 3]
   operators                                               583,670                         17,823
-  task written, per plan                              0.0-133.7 s                     9.4-14.7 s
-  planner, per plan                                 120.1-186.7 s                    30.4-30.6 s
-  read back and paths, per plan                                 -                      0.5-3.5 s
-  planning in all                                          1615 s                          456 s
-  harness wall                                             1816 s                          654 s
-  run wall (with the task, boot, verify)                       2042 s                          818 s
+  task written, per plan                              0.0-133.7 s                      6.2-6.8 s
+  planner, per plan                                 120.1-186.7 s                    30.3-30.3 s
+  read back and paths, per plan                                 -                      0.3-2.0 s
+  planning in all                                          1615 s                          379 s
+  harness wall                                             1816 s                          461 s
+  run wall (with the task, boot, verify)                       2042 s                          564 s
   verify from boot: inputs                                     99                             99
   verify from boot: checkpoints                                65                             65
   verify from boot: differ                                      0                              0
