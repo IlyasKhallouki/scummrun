@@ -51,10 +51,11 @@ STOP_AT = 19.50  # the ledger refuses anything past this, leaving room for price
 EGRESS_RESERVE = 0.25  # copies back are megabytes; Internet egress is about $0.12 per GB
 REMOTE = "fast-mi"  # the repo copy, in the VM user's home
 
-# What the model check, the reader and the planner read. Game-derived files (the decompiled scripts
-# and the room blocks) go to the VM's private disk, which is deleted at the end.
+# What the model check, the reader, the planner and the engine read. Game-derived files (the decompiled
+# scripts, the room blocks) and the game files themselves go to the VM's private disk, which is deleted at
+# the end. The engine's bridge patch goes too; ScummVM and Fast Downward are cloned on the VM at their pins.
 UP = ["src", "scripts", "experiments", "data", "build/blocks-dos-cd", "runs/anypercent/noslide-p7",
-      "runs/anypercent/verify-b1", "pyproject.toml", "uv.lock", "README.md"]
+      "runs/anypercent/verify-b1", "pyproject.toml", "uv.lock", "README.md", "patches", "game/dos-cd"]
 
 COMPUTE = "6F81-5844-456A"
 SKU = {"core": "Spot Preemptible N2 Instance Core running in Americas",
@@ -319,7 +320,8 @@ def up(a) -> None:
     lock(a.job)
     ip, opts = ssh_target()
     user = subprocess.check_output(["whoami"], text=True).strip()
-    subprocess.run(["ssh", *opts, f"{user}@{ip}", f"mkdir -p {REMOTE}/build {REMOTE}/runs/anypercent"], check=True)
+    subprocess.run(["ssh", *opts, f"{user}@{ip}", f"mkdir -p {REMOTE}/build {REMOTE}/runs/anypercent {REMOTE}/game"],
+                   check=True)
     for item in UP:
         dest = f"{user}@{ip}:{REMOTE}/{Path(item).parent}/" if "/" in item else f"{user}@{ip}:{REMOTE}/"
         # Cargo's target/ dirs stay out: the laptop's binaries are built for its own system, and --delete would
