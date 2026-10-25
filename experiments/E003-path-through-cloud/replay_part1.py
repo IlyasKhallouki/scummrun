@@ -238,11 +238,17 @@ def taskcore_start_check(rd, start_facts: dict, work: Path) -> dict:
     st = replay.task_start(rd.b, start_facts, rd.task)
     sf = export_records.write_start(work / "start.txt", rd.task.facts, st)
     out = {}
+    # the two modes at once, each in its own folder: at Part I's scale each is a whole taskcore pass over the file
+    procs = {}
     for mode in ("input", "needed"):
+        (work / mode).mkdir(exist_ok=True)
         cmd = [str(plan_fd.TASKCORE), "sas", "--task", str(rd.packed), "--start-file", str(sf), "--out",
-               str(work / "task.sas"), "--stats", str(work / "stats.json"), "--start-check", mode]
-        t = time.monotonic()
-        p = subprocess.run(cmd, capture_output=True, text=True)
+               str(work / mode / "task.sas"), "--stats", str(work / mode / "stats.json"), "--start-check", mode]
+        procs[mode] = (time.monotonic(), subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                          text=True))
+    for mode, (t, proc) in procs.items():
+        stdout, stderr = proc.communicate()
+        p = subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr)
         row = {"seconds": round(time.monotonic() - t, 2)}
         if p.returncode == 0:
             row["status"] = "ok"
@@ -256,7 +262,7 @@ def taskcore_start_check(rd, start_facts: dict, work: Path) -> dict:
                 row["misses"] = int(m[1])
                 row["first"] = [(k, start_facts.get(k, 0)) for k in keys[:10]]
         out[mode] = row
-    (work / "task.sas").unlink(missing_ok=True)
+        (work / mode / "task.sas").unlink(missing_ok=True)
     return out
 
 
