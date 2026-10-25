@@ -91,6 +91,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "scumm-reader"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "rustc-hash",
+ "scumm-ir",
+ "serde_json",
+ "sha1_smol",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
