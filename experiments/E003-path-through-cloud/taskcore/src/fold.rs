@@ -22,6 +22,10 @@
 //!   box where no path applies) stays one action per path, counted.
 //! * the writer's PRE_LIMIT: a folded action whose precondition sets alone give more than PRE_LIMIT variants would
 //!   stop the writer (task.py raises on such an action); that sub-group stays one action per path, counted.
+//! * a path that writes a fact twice (reduce::double_writes) needs its set on that fact: where the union on it is
+//!   the whole domain (left out), an effect every path has would lose it and the writer would raise; that
+//!   sub-group stays one action per path, counted. build_task writes one effect per fact, so this never happens
+//!   on its tasks.
 //!
 //! **Soundness (exact).** In a state where the folded action applies, the state is in the union box, so (cover) in
 //! exactly one path's box (disjoint): that path applies, no other does. Conversely where a path applies, the folded
@@ -52,6 +56,7 @@ pub struct FoldCounts {
     pub overflow: u64,       // sub-groups left unfolded: the volume does not fit in 128 bits
     pub pre_limit: u64,      // sub-groups left unfolded: the folded precondition passes the writer's PRE_LIMIT
     pub dead_effects: u64,   // conditional effects whose conditions cannot hold together (left out)
+    pub double_writes: u64,  // sub-groups left unfolded: a union of the whole domain on a fact a path writes twice
 }
 
 fn boxes(t: &Task, i: usize) -> Vec<(u32, Vec<u32>)> {
@@ -124,6 +129,11 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
         }
         if (u.len() as u32) < size {
             pre.push(OSet { fact: k, vals: u.clone() });
+        } else if ix.iter().any(|&i| crate::reduce::double_writes(t.acts.view(i)).contains(&k)) {
+            // the union holds every value and is left out, so an effect every path has loses the path's set on k,
+            // which a path that writes k twice needs (reduce::double_writes): left unfolded
+            c.double_writes += 1;
+            return None;
         }
         differ.push((k, u.len() as u128));
     }

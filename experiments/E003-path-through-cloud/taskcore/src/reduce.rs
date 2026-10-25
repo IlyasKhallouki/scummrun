@@ -93,6 +93,36 @@ fn is_full(t: &Task, f: u32, s: &[u32]) -> bool {
     s.len() as u32 == t.facts.size(f)
 }
 
+/// Whether two effects can both happen: no fact on which both have a condition, with disjoint sets.
+fn can_both(a: &EffView, b: &EffView) -> bool {
+    a.when().all(|(f, s)| b.when().all(|(g, r)| f != g || intersects(s, r)))
+}
+
+/// The facts on which action `v` has two effects that can both happen and can write different values (not both a
+/// write of one same value). task.py's writer takes such an action only where it leaves one of the two out as a
+/// write of the value the fact already has, a value it knows from the action's precondition set on that fact or
+/// from the effect's own condition on it (`task._expand`; test_taskcore's state search reads the action the same
+/// way: a write of the value the fact has changes nothing). Dropping that set (a set that holds for every value
+/// once (d) has cut the domain, or a fold's union) would make the writer raise on a task whose input it writes, so
+/// (d) and the fold keep it (`red_d`, fold.rs). build_task writes one effect per fact, so the kitchen has none.
+pub fn double_writes(v: View) -> Vec<u32> {
+    let effs: Vec<EffView> = v.effs().filter(|e| e.kind != K_BAD).collect();
+    let mut out = Vec::new();
+    for i in 0..effs.len() {
+        for j in i + 1..effs.len() {
+            let (a, b) = (&effs[i], &effs[j]);
+            if a.fact != b.fact || out.contains(&a.fact) {
+                continue;
+            }
+            let same = a.vals.len() == 1 && b.vals == a.vals;
+            if !same && can_both(a, b) {
+                out.push(a.fact);
+            }
+        }
+    }
+    out
+}
+
 /// Sets that hold for every value, left out (module docstring).
 pub fn normalize(t: Task, c: &mut Counts) -> Task {
     let mut n = 0u64;
@@ -262,6 +292,11 @@ pub fn red_c(t: Task, c: &mut Counts) -> (Task, bool) {
 /// actions that apply in them and what they do are unchanged. The result depends on the start: a replan from a
 /// state outside the reached values needs the task reduced again.
 ///
+/// A fact an action writes twice (`double_writes`) keeps its whole domain where the cut would make that action's
+/// precondition set on it, or a condition on it of its effects on it, hold for every value: the set stays, so the
+/// writer still leaves out the write of the value the fact has, as task.py does on the input. Keeping values in a
+/// domain changes no state; only fewer values leave it.
+///
 /// This needs a start value in the domain of every fact the task reads or writes. A start with a value outside
 /// a fact's domain (NONE) reaches nothing on that fact: an action that needs it would be dropped (the task looks
 /// unsolvable), or, if some effect writes the fact, its domain would shrink to the written values and a
@@ -345,6 +380,35 @@ pub fn red_d(t: Task, start: usize, c: &mut Counts) -> (Task, bool) {
             }
         }
     }
+    // a fact an action writes twice (double_writes) keeps its whole domain where the cut would make that action's
+    // precondition set on it, or a condition set on it of one of its effects on it, hold for every value: normalize
+    // and the writer would leave the set out, and with it task.py's leaving out of one of the two writes
+    let mut whole = 0u64;
+    for i in 0..n {
+        if !applied[i] {
+            continue;
+        }
+        let v = t.acts.view(i);
+        for k in double_writes(v) {
+            let (kf, size) = (k as usize, t.facts.size(k));
+            let r = base[kf]..base[kf] + size as usize;
+            let kept_n = keep[r.clone()].iter().filter(|&&b| b).count();
+            if kept_n == size as usize {
+                continue;
+            }
+            let becomes_whole =
+                |s: &[u32]| (s.len() as u32) < size && s.iter().filter(|&&x| keep[base[kf] + x as usize]).count() == kept_n;
+            let hit = v.pre().any(|(f, s)| f == k && becomes_whole(s))
+                || v.effs().any(|e| e.fact == k && e.when().any(|(f, s)| f == k && becomes_whole(s)));
+            if hit {
+                for p in r {
+                    keep[p] = true;
+                }
+                whole += 1;
+            }
+        }
+    }
+    add(c, "(d) facts an action writes twice, kept whole (a set on them would hold for every value)", whole);
     // new domains
     let mut remap = vec![NONE; keep.len()];
     let mut facts = Facts { key: t.facts.key.clone(), dom_off: vec![0], dom: Vec::new() };

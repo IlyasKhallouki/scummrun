@@ -272,9 +272,11 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
                 .n("subgroups_with_a_hole_left_unfolded", fc.holes)
                 .n("subgroups_past_128_bits_left_unfolded", fc.overflow)
                 .n("subgroups_past_pre_limit_left_unfolded", fc.pre_limit)
-                .n("dead_conditional_effects", fc.dead_effects)
-                .n("actions_after", t.acts.len())
-                .n("effects_after", t.acts.n_effects());
+                .n("dead_conditional_effects", fc.dead_effects);
+            if fc.double_writes > 0 {
+                j.n("subgroups_writing_a_fact_twice_left_unfolded", fc.double_writes);
+            }
+            j.n("actions_after", t.acts.len()).n("effects_after", t.acts.n_effects());
             st.raw(&format!("fold_counts{}", tag), &j.done());
             if let Some(orig) = keep {
                 let t2 = Instant::now();

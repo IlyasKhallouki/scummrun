@@ -91,6 +91,14 @@ start, or dropped the actions that need the fact; and a fold whose paths cover t
 **The fold and PRE_LIMIT.** A sub-group whose folded precondition would pass the writer's PRE_LIMIT (task.py raises
 on such an action) stays one action per path, counted (`subgroups_past_pre_limit_left_unfolded`).
 
+**Two writes of one fact.** task.py's writer takes an action with two effects on one fact that can both happen with
+different values where it leaves one out as a write of the value the fact has, a value it knows from the action's
+precondition set on that fact or the effect's own condition on it (`reduce::double_writes`). Dropping that set
+would make the writer raise: (d) keeps such a fact's whole domain where its cut would make that set hold for every
+value (counted in `reduce_counts`), and the fold leaves a sub-group unfolded where its union on such a fact is the
+whole domain (`subgroups_writing_a_fact_twice_left_unfolded`). build_task writes one effect per fact, so neither
+happens on its tasks; the random tests make such actions (test_taskcore.py's `bad` actions).
+
 ## The packed file (version 1)
 
 Little-endian u32 words. Strings are UTF-8. A value is written as the string `str(v)` of a domain value (ints,
