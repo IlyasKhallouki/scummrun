@@ -2,12 +2,14 @@
 //! Downward's SAS file. See README.md.
 //!
 //! usage:
-//!   taskcore sas    --task F.tc [--start NAME] [--fold strict|every|off] [--reduce all|none|a,b,..]
-//!                   [--product-limit N] [--encoding model|task] --out F.sas [--stats F.json] [--check-fold N]
+//!   taskcore sas    --task F.tc [--start NAME | --start-file F] [--bans F] [--fold strict|every|off]
+//!                   [--reduce all|none|a,b,..] [--product-limit N] [--encoding model|task] --out F.sas
+//!                   [--stats F.json] [--check-fold N] [--ops F.jsonl]
 //!   taskcore decode (the same options) --plan sas_plan --out steps.json
 //!   taskcore validate (the same options) --names plan.txt --out result.json
 //!   taskcore info   --task F.tc
 
+mod bans;
 mod fold;
 mod model;
 mod packed;
@@ -36,6 +38,9 @@ struct Args {
     check_fold: usize,
     kept: Option<PathBuf>,
     model: bool,
+    start_file: Option<PathBuf>,
+    bans: Option<PathBuf>,
+    ops: Option<PathBuf>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -55,6 +60,9 @@ fn parse() -> Result<Args, String> {
         check_fold: 0,
         kept: None,
         model: true,
+        start_file: None,
+        bans: None,
+        ops: None,
     };
     while let Some(k) = it.next() {
         let v = it.next().ok_or(format!("{} needs a value", k))?;
@@ -77,6 +85,9 @@ fn parse() -> Result<Args, String> {
             "--check-fold" => a.check_fold = v.parse().map_err(|e| format!("--check-fold: {}", e))?,
             "--kept" => a.kept = Some(v.into()),
             "--names" => a.names = Some(v.into()),
+            "--start-file" => a.start_file = Some(v.into()),
+            "--bans" => a.bans = Some(v.into()),
+            "--ops" => a.ops = Some(v.into()),
             "--encoding" => {
                 a.model = match v.as_str() {
                     "model" => true,
@@ -86,6 +97,9 @@ fn parse() -> Result<Args, String> {
             }
             _ => return Err(format!("unknown option {}", k)),
         }
+    }
+    if a.start.is_some() && a.start_file.is_some() {
+        return Err("--start and --start-file: give one".into());
     }
     Ok(a)
 }
@@ -200,8 +214,30 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         .f("seconds_load", t0.elapsed().as_secs_f64())
         .n("rss_after_load", peak_rss());
     let mut replaced = Vec::new();
+    // a start given as a file, and the bans (bans.rs): before the start check, so that it and everything after it
+    // read the banned task as their input
+    if let Some(path) = &a.start_file {
+        let vals = bans::read_start(&t, path)?;
+        let name = t.strs.intern(&format!("file:{}", path.display()));
+        t.starts.push((name, vals));
+    }
+    if let Some(path) = &a.bans {
+        let t1 = Instant::now();
+        let list = bans::read_bans(path)?;
+        let mut bc = bans::BanCounts::default();
+        t = bans::apply(t, &list, &mut bc);
+        let mut j = J::new();
+        j.n("bans", bc.bans)
+            .n("not_applied", bc.not_applied)
+            .n("actions_hit", bc.actions_hit)
+            .n("pieces", bc.pieces)
+            .n("actions_after", bc.actions_after)
+            .f("seconds", t1.elapsed().as_secs_f64());
+        st.raw("bans", &j.done());
+    }
     let start = match &a.start {
         Some(name) => t.start_index(name).ok_or(format!("no start named {}", name))?,
+        None if a.start_file.is_some() => t.starts.len() - 1,
         None => 0,
     };
     st.s("start", t.strs.get(t.starts.get(start).ok_or("the file has no start")?.0));
@@ -307,6 +343,12 @@ fn run() -> Result<(), String> {
             let f = std::fs::File::create(&out).map_err(|e| format!("{}: {}", out.display(), e))?;
             let bytes = sas::pass2(&mut x, &plan, &p.task.starts[p.start].1, BufWriter::with_capacity(4 << 20, f))?;
             let s2 = t2.elapsed().as_secs_f64();
+            if let Some(path) = &a.ops {
+                let t3 = Instant::now();
+                let f = std::fs::File::create(path).map_err(|e| format!("{}: {}", path.display(), e))?;
+                sas::write_ops(&mut x, &plan, BufWriter::with_capacity(1 << 20, f))?;
+                p.stats.f("seconds_ops", t3.elapsed().as_secs_f64());
+            }
             let mut c = plan.counts.clone();
             c.bytes = bytes;
             p.stats

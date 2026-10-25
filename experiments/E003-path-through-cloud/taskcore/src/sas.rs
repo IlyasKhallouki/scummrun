@@ -64,6 +64,11 @@ pub struct Variant<'b> {
     pub effs: &'b [u32],
     pub ranges: &'b [(usize, usize)],
     pub cost: u32,
+    // per guessed write, its live conditions (task.py's `Op.guessed` when): a range of `conds`, each a (fact,
+    // offset, length) of `arena`; read only by `write_ops`
+    pub guess_conds: &'b [(usize, usize)],
+    pub conds: &'b [(u32, usize, usize)],
+    pub arena: &'b [u32],
 }
 
 #[derive(Clone, Copy)]
@@ -77,8 +82,8 @@ struct XEff {
     glen: usize,
 }
 
-/// An action's guesses written through pick variables: (key, its values).
-pub type Picked = Vec<(u32, Vec<u32>)>;
+/// An action's guesses written through pick variables: (key, its values, its conditions as (fact, values)).
+pub type Picked = Vec<(u32, Vec<u32>, Vec<(u32, Vec<u32>)>)>;
 
 pub struct Expander<'t> {
     pub t: &'t Task,
@@ -228,7 +233,9 @@ impl<'t> Expander<'t> {
                 }
                 self.picks[x.key as usize] = true;
                 let g: Vec<u32> = arena[x.gstart..x.gstart + x.glen].to_vec();
-                picked.push((x.key, g.clone()));
+                let when: Vec<(u32, Vec<u32>)> =
+                    wl[x.ws..x.we].iter().map(|&(cf, off, len)| (cf, arena[off..off + len].to_vec())).collect();
+                picked.push((x.key, g.clone(), when));
                 for u in 0..size(x.key) {
                     let ws = wl.len();
                     for j in x.ws..x.we {
@@ -251,6 +258,7 @@ impl<'t> Expander<'t> {
         let mut lw: Vec<(u32, usize, usize)> = Vec::new();
         let mut guesses: Vec<usize> = Vec::new();
         let mut guessed: Vec<(u32, u32)> = Vec::new();
+        let mut gconds: Vec<(usize, usize)> = Vec::new();
         let mut effbuf: Vec<u32> = Vec::new();
         let mut ranges: Vec<(usize, usize)> = Vec::new();
         let mut kept: Vec<(usize, usize)> = Vec::new();
@@ -294,6 +302,7 @@ impl<'t> Expander<'t> {
                 effbuf.clear();
                 ranges.clear();
                 guessed.clear();
+                gconds.clear();
                 let mut gi = 0;
                 for (li, &(xi, ls, le)) in live.iter().enumerate() {
                     let x = &xs[xi];
@@ -303,6 +312,7 @@ impl<'t> Expander<'t> {
                         }
                         let val = arena[x.gstart + gidx[gi]];
                         guessed.push((x.key, val));
+                        gconds.push((ls, le));
                         val
                     } else {
                         x.val
@@ -380,7 +390,16 @@ impl<'t> Expander<'t> {
                             break 'pre;
                         }
                     }
-                    let var = Variant { chosen: &chosen, guessed: &guessed, effs: &effbuf, ranges: &kept, cost };
+                    let var = Variant {
+                        chosen: &chosen,
+                        guessed: &guessed,
+                        effs: &effbuf,
+                        ranges: &kept,
+                        cost,
+                        guess_conds: &gconds,
+                        conds: &lw,
+                        arena: &arena,
+                    };
                     if let Err(e) = cb(&var) {
                         result = Err(e);
                         break 'pre;
@@ -864,7 +883,7 @@ pub fn decode(x: &mut Expander, plan_ops: &[u64]) -> Result<Vec<Step>, String> {
         };
         let mut g = guessed.clone();
         let mut p = Vec::new();
-        for (key, vals) in picked {
+        for (key, vals, _) in picked {
             let u = *picks.get(key).unwrap_or(&0);
             g.push((*key, if vals.contains(&u) { u } else { vals[0] }));
             p.push((*key, vals.clone(), u));
@@ -872,4 +891,99 @@ pub fn decode(x: &mut Expander, plan_ops: &[u64]) -> Result<Vec<Step>, String> {
         steps.push(Step { op, action: *ai, chosen: chosen.clone(), guessed: g, picked: p });
     }
     Ok(steps)
+}
+
+fn json_str(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for ch in s.chars() {
+        match ch {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            '\n' => o.push_str("\\n"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+/// The operator table (`sas --ops`), so that a plan reads back without a second run: JSON lines, in this order.
+///
+/// * `{"operators": N, "facts": [...]}`: the operator count and the file's task facts (its variables but the pick
+///   and goal ones), in file order;
+/// * per operator of an action: `{"op": n, "action": i, "chosen": [[key, value]...], "guessed": [[key, value,
+///   [[key, [values]]...]]...]}`, the variant's precondition values and guessed values, each guess with its live
+///   conditions (task.py's `Op.chosen` and `Op.guessed`);
+/// * per action, after its operators: `{"action": i, "name": ..., "members": [...], "picked": [[key, [values],
+///   [[key, [values]]...]]...]}`, the input actions it stands for and its guesses written through pick variables
+///   with their conditions (task.py's `Op.picked`);
+/// * per pick operator `{"op": n, "pick": [key, value]}`, per goal operator `{"op": n, "goal": true}`.
+///
+/// Values are the domain's value texts. Operators are numbered as in the file (pass 2's order).
+pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, mut w: W) -> Result<(), String> {
+    let io = |e: std::io::Error| e.to_string();
+    let t = x.t;
+    let nf = x.nf;
+    let key = |f: u32| json_str(t.key(f));
+    let val = |f: u32, v: u32| json_str(t.strs.get(t.facts.dom(f)[v as usize]));
+    let set = |f: u32, vs: &[u32]| format!("[{}, [{}]]", key(f), vs.iter().map(|&v| val(f, v)).collect::<Vec<_>>().join(", "));
+    let facts: Vec<String> = plan.vars.iter().filter(|&&v| v < nf).map(|&v| key(v)).collect();
+    writeln!(w, "{{\"operators\": {}, \"facts\": [{}]}}", plan.n_ops, facts.join(", ")).map_err(io)?;
+    let mut n = 0u64;
+    let mut ioerr: Option<std::io::Error> = None;
+    for ai in 0..t.acts.len() {
+        let picked = x
+            .expand(ai, &mut |v: &Variant| {
+                let ch: Vec<String> = v.chosen.iter().map(|&(f, u)| format!("[{}, {}]", key(f), val(f, u))).collect();
+                let gu: Vec<String> = v
+                    .guessed
+                    .iter()
+                    .zip(v.guess_conds)
+                    .map(|(&(f, u), &(ls, le))| {
+                        let c: Vec<String> =
+                            v.conds[ls..le].iter().map(|&(cf, off, len)| set(cf, &v.arena[off..off + len])).collect();
+                        format!("[{}, {}, [{}]]", key(f), val(f, u), c.join(", "))
+                    })
+                    .collect();
+                if let Err(e) = writeln!(w, "{{\"op\": {}, \"action\": {}, \"chosen\": [{}], \"guessed\": [{}]}}", n, ai, ch.join(", "), gu.join(", ")) {
+                    ioerr = Some(e);
+                    return Err("write".into());
+                }
+                n += 1;
+                Ok(())
+            })
+            .map_err(|e| if let Some(ie) = ioerr.take() { ie.to_string() } else { e })?;
+        let mem: Vec<String> = t.acts.members(ai).iter().map(|m| m.to_string()).collect();
+        let pk: Vec<String> = picked
+            .iter()
+            .map(|(f, vals, when)| {
+                let vs: Vec<String> = vals.iter().map(|&u| val(*f, u)).collect();
+                let c: Vec<String> = when.iter().map(|(cf, cs)| set(*cf, cs)).collect();
+                format!("[{}, [{}], [{}]]", key(*f), vs.join(", "), c.join(", "))
+            })
+            .collect();
+        writeln!(w, "{{\"action\": {}, \"name\": {}, \"members\": [{}], \"picked\": [{}]}}", ai, json_str(&t.name(ai)), mem.join(", "), pk.join(", "))
+            .map_err(io)?;
+    }
+    let mut pick_facts: Vec<u32> = (0..nf).filter(|&f| x.picks[f as usize]).collect();
+    pick_facts.sort_by(|&a, &b| t.key(a).cmp(t.key(b)));
+    for f in pick_facts {
+        for u in 0..t.facts.size(f) {
+            writeln!(w, "{{\"op\": {}, \"pick\": [{}, {}]}}", n, key(f), val(f, u)).map_err(io)?;
+            n += 1;
+        }
+    }
+    if !plan.goal_sets.is_empty() {
+        let ops: u64 = plan.goal_sets.iter().map(|(_, v)| v.len() as u64).product();
+        for _ in 0..ops {
+            writeln!(w, "{{\"op\": {}, \"goal\": true}}", n).map_err(io)?;
+            n += 1;
+        }
+    }
+    if n != plan.n_ops {
+        return Err(format!("the operator table has {} operators, pass 1 counted {}", n, plan.n_ops));
+    }
+    w.flush().map_err(io)
 }

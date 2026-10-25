@@ -51,6 +51,10 @@ impl Strings {
     pub fn get(&self, i: u32) -> &str {
         &self.list[i as usize]
     }
+    /// The id of a string, if the table has it.
+    pub fn find(&self, s: &str) -> Option<u32> {
+        self.map.get(s).copied()
+    }
 }
 
 #[derive(Clone, Default)]

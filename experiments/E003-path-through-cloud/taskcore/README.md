@@ -8,6 +8,7 @@ cargo build --release
 taskcore sas    --task kitchen.tc --start s17 --out task.sas [--stats stats.json]
                 [--fold strict|every|off] [--reduce all|none|a,b,...] [--product-limit 64]
                 [--encoding model|task] [--check-fold N] [--kept kept.json]
+                [--start-file start.txt] [--bans bans.txt] [--ops ops.jsonl]   (the replay harness's, below)
 taskcore decode (same options) --plan sas_plan --out steps.json
 taskcore validate (same options) --names plan.txt --out result.json   (a plan as input action names, run on the reduced task)
 taskcore info   --task kitchen.tc
@@ -26,8 +27,27 @@ writer's two passes. Memory is the flat arrays (about 1.5 times the packed file 
 plus one action's variants; the SAS file is never held.
 
 Sources: `model.rs` (the arrays), `packed.rs` (reading the file), `sas.rs` (the writer: task.py's `_expand` and
-`write_sas`, rule for rule; the two encodings; the start check), `fold.rs` (the fork fold and its check),
-`reduce.rs` (reductions (a)-(f); each has its soundness argument in its doc comment).
+`write_sas`, rule for rule; the two encodings; the start check; the operator table), `fold.rs` (the fork fold and
+its check), `reduce.rs` (reductions (a)-(f); each has its soundness argument in its doc comment), `bans.rs` (the
+start file and the bans).
+
+## The replay harness's options
+
+replay.py plans through taskcore (plan_fd.py `plan_taskcore`): the reading is exported once to the packed file, and
+each replan runs `sas` from it with three options. Without them every output is as before, byte for byte (the old
+and the new binary on the kitchen and test_taskcore.py's property test).
+
+- `--start-file F`: the start as a file, one line per fact, `key<TAB>value` (the value's text), `key<TAB>` for a
+  value the domain lacks (export_records.py `write_start`). It replaces `--start`; the start check reads it as it
+  reads a start of the file.
+- `--bans F`: replay.py's bans, one per line, `label<TAB>key<TAB>value...` (export_records.py `write_bans`), cut
+  out of the input task before the start check, the fold and the reductions: replay.py's `cut`, rule for rule
+  (`bans.rs`). Each piece keeps its action's name and members, so plans read back to the input actions. With
+  `--fold off --reduce none --encoding task` the file is task.py's `write_sas` of replay.py's `apply_bans`, byte for
+  byte (test_replay_taskcore.py: hand-made cases, random tasks, the kitchen). The stats count the bans and pieces.
+- `--ops F`: the operator table, JSON lines (`sas::write_ops`): per operator its action, precondition values and
+  guessed values with their conditions (task.py's `Op`), per action its name, members and picked guesses; the pick
+  and goal operators. A plan reads back from it without a second run (`decode` loads, folds and reduces again).
 
 ## What the reductions keep, and the two encodings
 
