@@ -104,6 +104,27 @@ pub fn part1_goal(root: &Path) -> Vec<(String, Vec<i64>)> {
     items.iter().map(|(k, x)| (k.clone(), vec![x.int().expect("an int goal value")])).collect()
 }
 
+/// The Part I scope's rooms: every room a Part I move of results/groundtruth-part1.jsonl starts, ends or is
+/// checked in (`room_pre`, `room_done`, `room_post`), a pseudo room as its room resource, room 0 left out, sorted.
+pub fn part1_rooms(game: &Game, root: &Path) -> Vec<i32> {
+    let p = root.join("experiments/E003-path-through-cloud/results/groundtruth-part1.jsonl");
+    let text = std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+    let mut rooms = BTreeSet::new();
+    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+        let v = Json::parse(line);
+        for k in ["room_pre", "room_done", "room_post"] {
+            if let Some(r) = v.get(k).and_then(Json::int) {
+                let r = r as i32;
+                let r = game.pseudo.get(&r).copied().unwrap_or(r);
+                if r != 0 {
+                    rooms.insert(r);
+                }
+            }
+        }
+    }
+    rooms.into_iter().collect()
+}
+
 /// A JSON value whose objects keep their keys in the text's order (serde_json's map sorts them, and Python's dict
 /// order is the start's: reader.Scope.of walks it).
 #[derive(Clone, Debug, PartialEq)]

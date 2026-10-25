@@ -1,14 +1,18 @@
 //! reader-scope: the reading of a scope at Part I's scale (size_scaling.py's start, goal and scopes), on N threads
 //! (par.rs), its records streamed into taskcore's packed file as made (packed.rs `RecordStream`), measured. It
-//! reads the game files and results/start-part1.jsonl and results/end-part1.json only (no oracle file).
+//! reads the game files, results/start-part1.jsonl and results/end-part1.json (with --part1 also
+//! results/groundtruth-part1.jsonl) only, no oracle file.
 //!
-//! usage: reader-scope (--k K | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
+//! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
 //!
+//! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
 //! --out DIR     the report, DIR/NAME.json (and the packed file DIR/NAME.tc unless --packed)
 //! --cap-min M   stop the reading after M minutes (default 60); --max-rss-gb G (default 8) and --min-free-gb G
 //!               (MemAvailable, default 3) stop it too; the report then says where it stopped (exit code 3)
+//! --max-waiting N  records done and waiting for an earlier job past which workers start no new job but that
+//!               one (default 100,000: memory stays bounded when one job runs long)
 //! --hash        sha1 of the records' lines (golden.py's "record" lines, as made, before `_read_once`'s rewrite of
 //!               folded lists) and of the counters' line, to compare readings across thread counts
 //! --keep        keep the records in memory (the Builder's `records`); --lines FILE writes golden.py's reader file
@@ -61,6 +65,11 @@ fn loadavg() -> String {
 /// What the reading has done so far (the progress callback and the sink write it; the watchdog reads it).
 #[derive(Default)]
 struct Prog {
+    /// the highest RSS the watchdog saw (MB), and where the reading was then (the pass, the batch it was in)
+    rss_peak_mb: u64,
+    rss_peak_at: String,
+    /// the batch running now
+    current: String,
     records: usize,
     pass: usize,
     batches: Vec<(String, usize, usize, f64)>,
@@ -222,12 +231,18 @@ fn main() {
     let start = scaling::start_facts(&root, scaling::SEED);
     let goal = scaling::part1_goal(&root);
     let k: Option<usize> = arg(&args, "--k").map(|k| k.parse().unwrap());
+    let part1 = args.iter().any(|a| a == "--part1");
     let rooms: Vec<i32> = match (&k, arg(&args, "--rooms")) {
         (Some(k), _) => scaling::scopes(&game, start.get0("room") as i32)[*k].clone(),
         (None, Some(r)) => r.split(',').map(|x| x.parse().unwrap()).collect(),
-        _ => panic!("--k K or --rooms R,R,..."),
+        _ if part1 => scaling::part1_rooms(&game, &root),
+        _ => panic!("--k K, --part1 or --rooms R,R,..."),
     };
-    let name = arg(&args, "--name").unwrap_or_else(|| k.map_or("rooms".to_string(), |k| format!("k{k}")));
+    let name = arg(&args, "--name").unwrap_or_else(|| match k {
+        Some(k) => format!("k{k}"),
+        None if part1 => "part1".to_string(),
+        None => "rooms".to_string(),
+    });
     let threads: usize = arg(&args, "--threads").map_or(6, |n| n.parse().unwrap());
     let out = PathBuf::from(arg(&args, "--out").unwrap_or_else(|| ".".into()));
     std::fs::create_dir_all(&out).unwrap();
@@ -334,6 +349,21 @@ fn main() {
             });
         }));
     }
+    {
+        let prog = prog.clone();
+        let name = name.clone();
+        b.on_batch_start = Some(Box::new(move |what: &str, jobs: usize, events: usize| {
+            let mut p = prog.lock().unwrap();
+            p.current = format!("{what} ({jobs} jobs)");
+            if jobs >= 1000 {
+                eprintln!(
+                    "[{name}] pass {} {what}: {jobs} runs from {events} events start; RSS {} MB",
+                    p.pass,
+                    status_kb("VmRSS:") / 1024
+                );
+            }
+        }));
+    }
     let mut tee = Tee {
         busy: 0.0,
         stream: Some(RecordStream::create(&packed).expect("the packed file")),
@@ -355,6 +385,13 @@ fn main() {
             let wall = t_read.elapsed().as_secs_f64();
             let rss = status_kb("VmRSS:");
             let free = mem_available_kb();
+            {
+                let mut p = prog.lock().unwrap();
+                if rss / 1024 > p.rss_peak_mb {
+                    p.rss_peak_mb = rss / 1024;
+                    p.rss_peak_at = format!("pass {}, {}, {:.0} s", p.pass, p.current, wall);
+                }
+            }
             let why = if wall > cap_s {
                 Some(format!("the reading passed {:.0} minutes", cap_s / 60.0))
             } else if rss > max_rss_kb {
@@ -373,6 +410,7 @@ fn main() {
                 r["read_cpu_s"] = json!((cpu * 10.0).round() / 10.0);
                 r["cpu_use"] = json!((cpu / wall * 100.0).round() / 100.0);
                 r["peak_rss_mb"] = json!(status_kb("VmHWM:") / 1024);
+                r["rss_peak_seen"] = json!({"mb": p.rss_peak_mb, "at": p.rss_peak_at});
                 r["pass"] = json!(p.pass);
                 r["records_in_pass"] = json!(p.records);
                 r["runs_done_in_finished_batches"] = json!(p.jobs);
@@ -388,14 +426,17 @@ fn main() {
 
     // the records are written on their own thread (par.rs `SinkThread`), unless they are kept or the reading has
     // no workers (one thread in all)
+    let max_waiting: u64 = arg(&args, "--max-waiting").map_or(par::DEFAULT_MAX_WAITING, |n| n.parse().unwrap());
     let stats = if keep || threads == 0 {
         par::with_pool(&game, &scope, threads, |pool| {
+            pool.set_max_waiting(max_waiting);
             b.read_all_into(pool, true, None, 2, Some(&mut tee));
             pool.stats.clone()
         })
     } else {
         let mut sink = par::SinkThread::new(tee, 256);
         let stats = par::with_pool(&game, &scope, threads, |pool| {
+            pool.set_max_waiting(max_waiting);
             b.read_all_into(pool, true, None, 2, Some(&mut sink));
             pool.stats.clone()
         });
@@ -474,7 +515,11 @@ fn main() {
     });
     r["sink_thread_busy_s"] = json!((tee.busy * 10.0).round() / 10.0);
     r["phases_s"] = json!(b.phase_secs.iter().map(|(k, v)| (k.to_string(), (v * 100.0).round() / 100.0)).collect::<BTreeMap<_, _>>());
-    r["batches"] = batches_json(&prog.lock().unwrap().batches, &stats.per_batch);
+    {
+        let p = prog.lock().unwrap();
+        r["batches"] = batches_json(&p.batches, &stats.per_batch);
+        r["rss_peak_seen"] = json!({"mb": p.rss_peak_mb, "at": p.rss_peak_at});
+    }
     r["peak_rss_mb"] = json!(peak_rss_kb().unwrap_or(0) / 1024);
     r["total_s"] = json!((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0);
     r["load_at_end"] = json!(loadavg());
