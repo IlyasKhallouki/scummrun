@@ -1,0 +1,363 @@
+{
+ "seed": 1,
+ "reading": "/var/tmp/fast-mi/partI-scratch/vmk1/reading.json",
+ "name": "k1",
+ "control": false,
+ "goal": {
+  "owner:901": [
+   1
+  ],
+  "owner:902": [
+   1
+  ],
+  "owner:903": [
+   1
+  ]
+ },
+ "goal_is_part1_end": true,
+ "task": {
+  "actions": 236642,
+  "facts": 1519,
+  "records": 237262,
+  "folded": 620,
+  "packed_sha1": "3ceabe501fd3",
+  "packed_bytes": 315833520,
+  "lines_sha1": "6b2258208c18"
+ },
+ "control_counts": null,
+ "limits": {
+  "replans": 3,
+  "seconds": 1800.0,
+  "plan_time": 600,
+  "plan_memory": "3G",
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60
+ },
+ "sources": {
+  "replay_part1.py": "8219c685c95a",
+  "replay.py": "6d5ea3503bf9",
+  "packed_reading.py": "db586b476659",
+  "export_records.py": "f0aa97ff0b22",
+  "plan_fd.py": "437d4a703ec8",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ },
+ "taskcore_binary": "25738cbfb7c0",
+ "load_s": 2.43,
+ "start": {
+  "stop": {
+   "stop": "idle",
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "idle": "sentence",
+   "rng": 3182679328,
+   "up": 1,
+   "cs": 0,
+   "ego": [
+    346,
+    133
+   ]
+  },
+  "dump": {
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "ego": 1,
+   "ego_pos": [
+    346,
+    133
+   ],
+   "seed": 1,
+   "boot_param": 0
+  },
+  "trace": {
+   "boot": 1,
+   "cd_track": 4,
+   "control": 1,
+   "room": 5,
+   "segment_start": 1,
+   "stall": 4
+  },
+  "boot_s": 4.2,
+  "check": {
+   "boot checks": "ok",
+   "reading start": {
+    "name": "results/start-part1.jsonl seed 1",
+    "differ": 0,
+    "first": [],
+    "task facts differ": 0,
+    "task first": []
+   },
+   "start-part1": {
+    "differ": 0,
+    "frame": 2728,
+    "same frame": true
+   },
+   "taskcore": {
+    "input": {
+     "seconds": 35.25,
+     "status": "ok"
+    },
+    "needed": {
+     "seconds": 30.95,
+     "status": "ok"
+    }
+   },
+   "taskcore_s": 66.21
+  }
+ },
+ "run": {
+  "stop": "no plan (the planner proved none)",
+  "goal": false,
+  "replans": 0,
+  "bans": [],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 2728,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first",
+    "input_key": "104102233b4b0282",
+    "write_s": 33.80078616899846,
+    "status": "unsolvable",
+    "seconds": 0.2133142480015522,
+    "steps": [],
+    "operators": 0,
+    "actions": 0,
+    "decode_s": 0.0,
+    "folds": [],
+    "predicted_goal": null,
+    "file_facts": 0,
+    "needed_facts": 0,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 6,
+    "landmark_orderings": 9,
+    "game_landmarks": 6
+   }
+  ],
+  "steps": [],
+  "frames": 0,
+  "ticks": 0,
+  "frame0": 2728,
+  "frame_end": 2728,
+  "seconds": 34.1132844370004,
+  "inputs": []
+ },
+ "landmarks": {
+  "plan": 0,
+  "frame": 2728,
+  "nodes": [
+   {
+    "id": 0,
+    "facts": [
+     [
+      "owner:901",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 1,
+    "facts": [
+     [
+      "owner:902",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 2,
+    "facts": [
+     [
+      "owner:903",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 3,
+    "facts": [
+     [
+      "owner:901",
+      15
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 4,
+    "facts": [
+     [
+      "owner:902",
+      15
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 5,
+    "facts": [
+     [
+      "owner:903",
+      15
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   }
+  ],
+  "orderings": [
+   [
+    0,
+    1,
+    "n"
+   ],
+   [
+    0,
+    2,
+    "n"
+   ],
+   [
+    1,
+    0,
+    "n"
+   ],
+   [
+    1,
+    2,
+    "n"
+   ],
+   [
+    2,
+    0,
+    "n"
+   ],
+   [
+    2,
+    1,
+    "n"
+   ],
+   [
+    3,
+    0,
+    "n"
+   ],
+   [
+    4,
+    1,
+    "n"
+   ],
+   [
+    5,
+    2,
+    "n"
+   ]
+  ]
+ },
+ "summary": {
+  "steps": 0,
+  "executed": 0,
+  "played": 0,
+  "outcomes": {},
+  "writes_held": 0,
+  "writes_held_share": null,
+  "matched": 0,
+  "matched_share": null,
+  "not_matched": {},
+  "mismatches": 0,
+  "mismatches_per_executed": null,
+  "mismatched_writes": 0,
+  "mismatched_writes_per_executed": null,
+  "unplanned_changes": 0,
+  "unplanned_changes_per_executed": null,
+  "unplanned_most": [],
+  "another_guess": 0,
+  "final_path": [],
+  "final_path_actions": 0,
+  "inputs": 0,
+  "time": {
+   "step_seconds": {
+    "n": 0
+   },
+   "step_frames": {
+    "n": 0
+   },
+   "plan_seconds": {
+    "n": 1,
+    "mean": 34.01,
+    "median": 34.01,
+    "max": 34.01,
+    "sum": 34.0
+   },
+   "plan_write_s": {
+    "n": 1,
+    "mean": 33.8,
+    "median": 33.8,
+    "max": 33.8,
+    "sum": 33.8
+   },
+   "plan_search_s": {
+    "n": 1,
+    "mean": 0.21,
+    "median": 0.21,
+    "max": 0.21,
+    "sum": 0.2
+   },
+   "harness_s": 34.1,
+   "planning_s": 34.0,
+   "playing_s": 0.1
+  }
+ },
+ "verify": {
+  "checkpoints": 1,
+  "differ": [],
+  "inputs": 0,
+  "final": {
+   "owner:901": 15,
+   "owner:902": 15,
+   "owner:903": 15
+  },
+  "same": true,
+  "goal": false,
+  "seconds": 5.7
+ },
+ "seconds": 112.7,
+ "game_seconds": 0.0
+}

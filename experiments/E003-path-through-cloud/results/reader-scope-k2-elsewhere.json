@@ -1,0 +1,342 @@
+{
+  "batches": [
+    {
+      "job_s": 986.8,
+      "jobs": 4702,
+      "longest_job_s": 25.9,
+      "records": 163981,
+      "s": 254.4,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 2829.8,
+      "jobs": 5042,
+      "longest_job_s": 53.2,
+      "records": 229680,
+      "s": 731.8,
+      "what": "pass 1: event round 1"
+    },
+    {
+      "job_s": 301.8,
+      "jobs": 1372,
+      "longest_job_s": 38.5,
+      "records": 14603,
+      "s": 97.7,
+      "what": "pass 1: event round 2"
+    },
+    {
+      "job_s": 92.1,
+      "jobs": 519,
+      "longest_job_s": 33.3,
+      "records": 5775,
+      "s": 45.0,
+      "what": "pass 1: event round 3"
+    },
+    {
+      "job_s": 182.5,
+      "jobs": 692,
+      "longest_job_s": 5.0,
+      "records": 24734,
+      "s": 50.8,
+      "what": "pass 1: event round 4"
+    },
+    {
+      "job_s": 104.7,
+      "jobs": 753,
+      "longest_job_s": 2.6,
+      "records": 8576,
+      "s": 26.9,
+      "what": "pass 1: event round 5"
+    },
+    {
+      "job_s": 490.5,
+      "jobs": 18229,
+      "longest_job_s": 4.9,
+      "records": 70817,
+      "s": 154.6,
+      "what": "pass 1: later rounds (1022)"
+    },
+    {
+      "job_s": 1148.7,
+      "jobs": 4956,
+      "longest_job_s": 29.3,
+      "records": 175609,
+      "s": 293.3,
+      "what": "pass 2: inputs"
+    },
+    {
+      "job_s": 3258.4,
+      "jobs": 5071,
+      "longest_job_s": 52.4,
+      "records": 232294,
+      "s": 826.6,
+      "what": "pass 2: event round 1"
+    },
+    {
+      "job_s": 206.8,
+      "jobs": 1387,
+      "longest_job_s": 27.4,
+      "records": 14411,
+      "s": 61.2,
+      "what": "pass 2: event round 2"
+    },
+    {
+      "job_s": 79.6,
+      "jobs": 445,
+      "longest_job_s": 26.9,
+      "records": 4984,
+      "s": 36.2,
+      "what": "pass 2: event round 3"
+    },
+    {
+      "job_s": 113.2,
+      "jobs": 656,
+      "longest_job_s": 3.3,
+      "records": 25959,
+      "s": 32.4,
+      "what": "pass 2: event round 4"
+    },
+    {
+      "job_s": 77.8,
+      "jobs": 698,
+      "longest_job_s": 4.0,
+      "records": 7439,
+      "s": 20.4,
+      "what": "pass 2: event round 5"
+    },
+    {
+      "job_s": 492.5,
+      "jobs": 18004,
+      "longest_job_s": 7.4,
+      "records": 71470,
+      "s": 177.9,
+      "what": "pass 2: later rounds (1022)"
+    }
+  ],
+  "cap_min": 60.0,
+  "cpu_use": 1.72,
+  "elsewhere": true,
+  "goal": [
+    "owner:901",
+    "owner:902",
+    "owner:903"
+  ],
+  "k": 2,
+  "load_at_end": "20.77 19.87 19.51",
+  "load_at_start": "12.00 12.09 12.57",
+  "n_rooms": 10,
+  "n_units": 283,
+  "name": "k2",
+  "objects": 146,
+  "out_of_domain_keys": 0,
+  "outside_points": {
+    "escpos:local:200": {
+      "35": 11,
+      "4": 11
+    },
+    "escpos:local:208": {
+      "47": 11
+    },
+    "pos:local:200": {
+      "12": 22,
+      "16": 11,
+      "21": 22,
+      "34": 22,
+      "45": 11
+    },
+    "pos:local:202": {
+      "56": 22
+    },
+    "pos:local:203": {
+      "20": 11
+    },
+    "pos:local:208": {
+      "13": 11,
+      "98": 11
+    }
+  },
+  "packed": {
+    "actions": 531174,
+    "args_values_zeroed": 22472,
+    "bytes": 1047624564,
+    "facts": 2252,
+    "file": "/var/tmp/fast-mi/partI-scratch/k2-on.tc",
+    "finish_s": 37.33,
+    "folded": 992,
+    "sha1": "d97ffcb0cc9218bfba3edb5ddf4b3d25f1194f77",
+    "strings": 49288
+  },
+  "peak_rss_mb": 2960,
+  "phases_s": {
+    "emit": 247.71,
+    "end of pass": 0.04,
+    "events": 20.79,
+    "events: event_pins": 19.55,
+    "events: replans": 0.28,
+    "inputs()": 0.6,
+    "runs": 2808.57
+  },
+  "pool": {
+    "batches": 2056,
+    "job_s": 10365.1,
+    "jobs": 62526,
+    "longest_jobs": [
+      [
+        53.21,
+        "event(script:2@721#12e130c6c7d3)",
+        1
+      ],
+      [
+        52.44,
+        "event(obj:486@85#6379162634cd)",
+        1029
+      ],
+      [
+        48.04,
+        "event(script:2@702#12e130c6c7d3)",
+        1
+      ],
+      [
+        47.89,
+        "event(obj:486@85#2c752014ab95)",
+        1029
+      ],
+      [
+        47.31,
+        "event(script:2@736#12e130c6c7d3)",
+        1
+      ],
+      [
+        45.32,
+        "event(obj:486@85#e1d2be1dc3d1)",
+        1029
+      ],
+      [
+        45.24,
+        "event(script:2@721#9353bebf0184)",
+        1
+      ],
+      [
+        42.38,
+        "event(obj:486@85#d94214f48d56)",
+        1029
+      ],
+      [
+        41.75,
+        "event(obj:486@85#a96fab4a4b17)",
+        1029
+      ],
+      [
+        40.29,
+        "event(script:2@702#9353bebf0184)",
+        1
+      ],
+      [
+        40.15,
+        "event(script:2@736#9353bebf0184)",
+        1
+      ],
+      [
+        39.76,
+        "event(obj:486@85#8f59bdcbeb11)",
+        1029
+      ],
+      [
+        39.0,
+        "event(obj:486@85#6379162634cd)",
+        1
+      ],
+      [
+        38.46,
+        "event(obj:451@21)",
+        2
+      ],
+      [
+        38.29,
+        "event(obj:486@85#8f84fae690f4)",
+        1029
+      ],
+      [
+        38.27,
+        "event(obj:486@85)",
+        1
+      ],
+      [
+        37.8,
+        "event(obj:486@85#c29af42292a8)",
+        1029
+      ],
+      [
+        37.61,
+        "event(obj:486@85#ef7182c61d87)",
+        2
+      ],
+      [
+        37.29,
+        "event(script:2@702#12e130c6c7d3)",
+        1029
+      ],
+      [
+        36.6,
+        "event(obj:486@85#8f84fae690f4)",
+        1
+      ]
+    ],
+    "max_records_waiting": 17332,
+    "merge_and_stream_s": 259.7,
+    "merge_counters_s": 4.56,
+    "snapshots_s": 2.55,
+    "split_parts_queued": 9,
+    "split_parts_run_elsewhere": 7,
+    "stream_records_s": 253.84,
+    "workers_sync_s": 5.31
+  },
+  "read_cpu_s": 4861.2,
+  "read_peak_rss_mb": 2960,
+  "read_wall_s": 2830.9,
+  "reader_counts": {
+    "event rounds": 1027,
+    "pass 1: domain values added for the next pass": 46,
+    "pass 1: records": 518166,
+    "pass 2: records": 532166,
+    "records": 532166
+  },
+  "records": 532166,
+  "records_by_kind": {
+    "dialog_line": 11061,
+    "event": 327879,
+    "sentence": 156396,
+    "skip_cutscene": 28678,
+    "walk_to": 8152
+  },
+  "rooms": [
+    28,
+    29,
+    33,
+    34,
+    35,
+    38,
+    41,
+    83,
+    85,
+    96
+  ],
+  "rss_peak_seen": {
+    "at": "pass 2, event round 1 (5071 jobs), 2448 s",
+    "mb": 2910
+  },
+  "setup_s": 0.23,
+  "sink_thread_busy_s": 1606.6,
+  "slot_facts": 6846,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "done",
+  "threads": 4,
+  "total_s": 2897.4,
+  "units": {
+    "entry": 10,
+    "exit": 10,
+    "global": 82,
+    "local": 91,
+    "obj": 90
+  }
+}
