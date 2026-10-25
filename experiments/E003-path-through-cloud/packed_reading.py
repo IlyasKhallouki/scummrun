@@ -92,6 +92,7 @@ from export_records import (END_MAGIC, MAGIC, NONE, OP_ADD, OP_GUESS, OP_SET, VE
                             record_actions)
 
 FORMAT = "E003 reading 1"
+ELSEWHERE = -2  # replay.ELSEWHERE (scumm/reader/src/table.rs): a slot at a place none of the scope's points
 assert sys.byteorder == "little"
 
 
@@ -415,14 +416,20 @@ class PackedTask(T.Task):
 class Points:
     """What reader.task_start and reader.replan_start read from a Builder: the wait points and Esc points of each
     unit (``table.points``), here from the domains of the task's ``pos:`` and ``escpos:`` facts, which build_task
-    gives the reader's own domain ({NOWHERE} and those points); and a counter."""
+    gives the reader's own domain ({NOWHERE} and those points); and a counter. ``elsewhere``: the facts whose domain
+    also holds ELSEWHERE (the Rust reader's switch, replay.ELSEWHERE), which replay.task_start starts there when the
+    engine shows the slot at a place none of the points."""
 
     def __init__(self, facts: dict):
         pts = {"at": {}, "esc": {}}
+        self.elsewhere = set()
         for k, d in facts.items():
             kind, _, name = k.partition(":")
             if kind in R.POS_KINDS:
-                pts[R.POS_KINDS[kind]][name] = {v for v in d.values if isinstance(v, int) and v != R.NOWHERE}
+                pts[R.POS_KINDS[kind]][name] = {v for v in d.values
+                                                if isinstance(v, int) and v not in (R.NOWHERE, ELSEWHERE)}
+                if ELSEWHERE in d.values:
+                    self.elsewhere.add(k)
         self.table = type("Table", (), {"points": pts})()
         self.counts = collections.Counter()
 

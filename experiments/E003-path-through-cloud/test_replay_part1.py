@@ -127,6 +127,27 @@ def test_the_reading_files_give_build_tasks_task(tmp_path):
     rd.close()
 
 
+def test_a_reading_with_elsewhere_starts_a_slot_at_a_place_none_of_its_points_there():
+    """The Rust reader's switch (scumm/reader/PORT-NOTES.md, "ELSEWHERE"): where pos:'s domain holds ELSEWHERE, a slot
+    the engine shows at a place none of the points, and at none of them, starts at ELSEWHERE (task_start, and
+    replan_start with args 0); at a point, or where the domain lacks ELSEWHERE, the start is reader.task_start's."""
+    facts = {"pos:script:2": Domain.of({-1, 736, 937}), "pos:local:200": Domain.of({RP.ELSEWHERE, -1, 4, 11}),
+             "args:local:200": Domain.of({0, 7})}
+    task = types.SimpleNamespace(facts=facts)
+    b = PR.Points(facts)
+    assert b.elsewhere == {"pos:local:200"}
+    assert b.table.points["at"] == {"script:2": {736, 937}, "local:200": {4, 11}}
+    obs = {"at:local:200:10": 1, "at:script:2:5": 1}
+    assert R.task_start(b, obs, task)["pos:local:200"] == R.NOWHERE  # reader.py's own
+    st = RP.task_start(b, obs, task)
+    assert st["pos:local:200"] == RP.ELSEWHERE and st["pos:script:2"] == R.NOWHERE  # no ELSEWHERE in its domain
+    st, _ = RP.replan_start(b, obs, {"pos:local:200": RP.ELSEWHERE, "args:local:200": 7}, task)
+    assert st["pos:local:200"] == RP.ELSEWHERE and st["args:local:200"] == 0
+    assert RP.task_start(b, {"at:local:200:11": 1, "at:local:200:10": 1}, task)["pos:local:200"] == 11
+    assert RP.task_start(b, {}, task)["pos:local:200"] == R.NOWHERE
+    assert RP.view(b, facts, obs)["pos:local:200"] == RP.ELSEWHERE
+
+
 def test_a_ban_cuts_the_packed_tasks_actions_as_replays(tmp_path):
     b, recs, _ = reading(tmp_path)
     full = R.build_task(b, recs, {"state:316": {1}})

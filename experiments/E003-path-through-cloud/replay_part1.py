@@ -235,7 +235,7 @@ def taskcore_start_check(rd, start_facts: dict, work: Path) -> dict:
     """taskcore's start check on the reading's packed file (module docstring): per mode, "ok" or the facts outside
     their domains (the first ten) and how many, and the seconds."""
     work.mkdir(parents=True, exist_ok=True)
-    st = R.task_start(rd.b, start_facts, rd.task)
+    st = replay.task_start(rd.b, start_facts, rd.task)
     sf = export_records.write_start(work / "start.txt", rd.task.facts, st)
     out = {}
     for mode in ("input", "needed"):

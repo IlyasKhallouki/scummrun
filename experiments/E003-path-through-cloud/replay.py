@@ -149,6 +149,10 @@ PREDICTED = ("pos:", "escpos:") + UNOBSERVED  # the plan's values kept for the r
 SLOT_PREFIXES = ("script:", "local:", "objscript:", "pos:", "escpos:", "frozen:", "cutscene")  # the input taken
 EXECUTOR_EGO = 1  # the actor the Executor's approach and stepping stone take as ego (executor.py:1008, 1011, 1099)
 HISTORY_CAP = 12  # changes kept per fact and step in the log
+# pos: and escpos: of a slot at a place none of the scope's points: the Rust reader's switch for the scope-1 finding
+# (scumm/reader/src/table.rs ELSEWHERE, scumm/reader/PORT-NOTES.md "ELSEWHERE"); a reading without it holds no such value
+ELSEWHERE = -2
+POS_OF = {kind: pos for pos, kind in R.POS_KINDS.items()}  # "at" -> "pos", "esc" -> "escpos"
 
 
 # --- a step as player input ------------------------------------------------------------------------------------------
@@ -256,11 +260,45 @@ def waits_first(task: T.Task, steps: list, i: int, now: dict | None = None) -> t
 
 # --- observing --------------------------------------------------------------------------------------------------------
 
+def task_start(b, obs: dict, task) -> dict:
+    """reader.task_start, with the ELSEWHERE start rule (``elsewhere``)."""
+    return elsewhere(b, obs, R.task_start(b, obs, task))
+
+
+def replan_start(b, obs: dict, predicted: dict, task) -> tuple:
+    """reader.replan_start, with the ELSEWHERE start rule (``elsewhere``): a slot it moves to ELSEWHERE keeps args 0,
+    as reader.replan_start gives a slot at NOWHERE."""
+    out, counts = R.replan_start(b, obs, predicted, task)
+    return elsewhere(b, obs, out), counts
+
+
+def elsewhere(b, obs: dict, out: dict) -> dict:
+    """The Rust reader's start rule under its switch (scumm/reader/src/task.rs ``task_start``): a unit whose slot the
+    engine shows at a place none of the scope's points, and at none of them, starts at ELSEWHERE, not NOWHERE. Only the
+    ``pos:``/``escpos:`` facts whose domain holds ELSEWHERE (``b.elsewhere``, packed_reading.Points) change: a reading
+    made without the switch is read as before."""
+    keys = getattr(b, "elsewhere", None)
+    if not keys:
+        return out
+    pts = b.table.points
+    for k, v in obs.items():
+        if v != 1 or not k.startswith(("at:", "esc:")):
+            continue
+        kind, rest = k.split(":", 1)
+        name, w = rest.rsplit(":", 1)
+        key = f"{POS_OF[kind]}:{name}"
+        if key in keys and out.get(key) == R.NOWHERE and w.lstrip("-").isdigit() and \
+                int(w) not in pts[kind].get(name, ()):
+            out[key] = ELSEWHERE
+            b.counts["slots at the start at a place none of the scope's points (ELSEWHERE)"] += 1
+    return out
+
+
 def view(b, doms: dict, obs: dict) -> dict:
     """The engine's facts (a facts.py map) as the task's values: every key of ``doms`` (key -> Domain) but the
     unobserved ones, slot positions as ``pos:``/``escpos:`` (reader.task_start), each value labelled by its domain
     (None: the domain does not hold it)."""
-    st = R.task_start(b, obs, types.SimpleNamespace(facts=doms))
+    st = task_start(b, obs, types.SimpleNamespace(facts=doms))
     out = {}
     for k, dom in doms.items():
         if k.startswith(UNOBSERVED) or dom is None:
@@ -856,9 +894,9 @@ class Harness:
         else:
             write_s = 0.0
         if first:
-            start, counts = R.task_start(self.b, self.obs, self.task), {}
+            start, counts = task_start(self.b, self.obs, self.task), {}
         else:
-            start, counts = R.replan_start(self.b, self.obs, prediction(self.now, self.pred), self.task)
+            start, counts = replan_start(self.b, self.obs, prediction(self.now, self.pred), self.task)
         entry = {"plan": len(self.plans), "frame": self.branch.frame, "bans": len(self.bans), "write_s": write_s,
                  "start_counts": dict(counts), "reorders": []}
         self.plans.append(entry)
@@ -923,9 +961,9 @@ class Harness:
                 ban_pieces(self.base, self.bans)
             self.pieces_bans = len(self.bans)
         if first:
-            start, counts = R.task_start(self.b, self.obs, self.base), {}
+            start, counts = task_start(self.b, self.obs, self.base), {}
         else:
-            start, counts = R.replan_start(self.b, self.obs, prediction(self.now, self.pred), self.base)
+            start, counts = replan_start(self.b, self.obs, prediction(self.now, self.pred), self.base)
         n = len(self.plans)
         entry = {"plan": n, "frame": self.branch.frame, "bans": len(self.bans), "start_counts": dict(counts),
                  "reorders": [], "planner": "taskcore", "search": self.search}
