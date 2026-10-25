@@ -230,14 +230,19 @@ def export_records(path, b, records, goal: dict, starts: dict) -> dict:
     return counts
 
 
-def export_task(path, task, starts: dict, meta=None, naming=None) -> dict:
+def export_task(path, task, starts: dict, meta=None, naming=None, every_fact=False) -> dict:
     """Write a task.Task. ``meta(action)`` gives (kind, end, cont) for the fork fold (default: none, so nothing folds
     unless the caller says what each action's input and continuation are); ``naming(action)`` gives (rec, label), the
     name being ``label#rec`` (rec NONE: the label alone; default: the action's name is its label). taskcore's bans
-    match the label: ``record_naming`` gives a record's label and index, as export_records writes them."""
+    match the label: ``record_naming`` gives a record's label and index, as export_records writes them.
+    ``every_fact``: write every fact of ``task.facts``, also those no action names (by default the file holds the
+    goal's and those the actions name); taskcore's bans need the file's facts to be the task's (taskcore/src/bans.rs)."""
     w = Writer(path, lambda k: task.facts[k])
     for k in task.goal:
         w.fact(k)
+    if every_fact:
+        for k in task.facts:
+            w.fact(k)
     for a in task.actions:
         effects = []
         for e in a.effects:

@@ -216,16 +216,18 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
     let mut replaced = Vec::new();
     // a start given as a file, and the bans (bans.rs): before the start check, so that it and everything after it
     // read the banned task as their input
+    let mut named = None;
     if let Some(path) = &a.start_file {
-        let vals = bans::read_start(&t, path)?;
+        let (vals, keys) = bans::read_start(&t, path)?;
         let name = t.strs.intern(&format!("file:{}", path.display()));
         t.starts.push((name, vals));
+        named = Some(keys);
     }
     if let Some(path) = &a.bans {
         let t1 = Instant::now();
         let list = bans::read_bans(path)?;
         let mut bc = bans::BanCounts::default();
-        t = bans::apply(t, &list, &mut bc);
+        t = bans::apply(t, &list, named.as_ref(), &mut bc)?;
         let mut j = J::new();
         j.n("bans", bc.bans)
             .n("not_applied", bc.not_applied)

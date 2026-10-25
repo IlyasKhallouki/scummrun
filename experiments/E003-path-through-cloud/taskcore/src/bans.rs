@@ -15,15 +15,18 @@
 //! miss the point (some value not in `cur[k]`) is left as it is; otherwise it becomes the disjoint pieces `i` =
 //! 0, 1, ...: piece `i` holds keys `0..i` at their banned values and key `i` at any other value of `cur[i]` (none
 //! when that is empty), its other precondition sets and its effects as the action's. A ban that names a key the
-//! file lacks is not applied at all (replay.py: `all(k in task.facts ...)`). Each piece keeps the action's
-//! name, label and members, so a plan reads back to the input actions.
+//! file lacks is not applied at all (replay.py: `all(k in task.facts ...)`). That is replay.py's rule only when the
+//! file's facts are the task's: export_records writes build_task's facts, which are every key its actions name;
+//! a task.Task can hold facts no action names (export_task writes them with `every_fact`). So a ban key the file
+//! lacks but the start file names (write_start writes every fact of the caller's task) is an error. Each piece
+//! keeps the action's name, label and members, so a plan reads back to the input actions.
 //!
 //! One difference that cannot reach the file: task.py's precondition sets may hold values their domain lacks (they
 //! are cut to the domain when the file is written); here they were cut on reading. A piece whose set would hold
 //! only such values is dropped here and written by task.py as an action no value meets, which it drops too.
 
 use crate::model::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// The index of value text `v` in fact `f`'s domain, NONE when the domain lacks it.
@@ -38,8 +41,9 @@ fn read_lines(path: &Path) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| format!("{}: {}", path.display(), e))
 }
 
-/// The start in a start file (module docstring): per fact its value index, NONE where the domain lacks it.
-pub fn read_start(t: &Task, path: &Path) -> Result<Vec<u32>, String> {
+/// The start in a start file (module docstring): per fact its value index, NONE where the domain lacks it; and the
+/// keys the file names.
+pub fn read_start(t: &Task, path: &Path) -> Result<(Vec<u32>, HashSet<String>), String> {
     let text = read_lines(path)?;
     let mut by: HashMap<&str, &str> = HashMap::new();
     for (n, line) in text.lines().enumerate() {
@@ -56,7 +60,7 @@ pub fn read_start(t: &Task, path: &Path) -> Result<Vec<u32>, String> {
         let v = by.get(t.key(f)).ok_or(format!("{}: no value for fact {}", path.display(), t.key(f)))?;
         out.push(if v.is_empty() { NONE } else { value_index(t, f, v) });
     }
-    Ok(out)
+    Ok((out, by.keys().map(|k| k.to_string()).collect()))
 }
 
 pub struct Ban {
@@ -126,8 +130,8 @@ fn cut(t: &Task, a: &OAct, point: &[(u32, u32)]) -> Option<Vec<OAct>> {
     Some(out)
 }
 
-/// The task with every ban applied to every action of its label (module docstring).
-pub fn apply(t: Task, bans: &[Ban], c: &mut BanCounts) -> Task {
+/// The task with every ban applied to every action of its label (module docstring). `named`: the start file's keys.
+pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut BanCounts) -> Result<Task, String> {
     let key_of: HashMap<&str, u32> = (0..t.facts.len() as u32).map(|f| (t.key(f), f)).collect();
     let mut by: FxMap<u32, Vec<Vec<(u32, u32)>>> = FxMap::default();
     for ban in bans {
@@ -135,6 +139,10 @@ pub fn apply(t: Task, bans: &[Ban], c: &mut BanCounts) -> Task {
         let point: Option<Vec<(u32, u32)>> =
             ban.point.iter().map(|(k, v)| key_of.get(k.as_str()).map(|&f| (f, value_index(&t, f, v)))).collect();
         let Some(point) = point else {
+            if let Some((k, _)) = ban.point.iter().find(|(k, _)| !key_of.contains_key(k.as_str()) && named.map_or(false, |n| n.contains(k))) {
+                return Err(format!("a ban on {} names fact {}, which the start file names and the packed file lacks: \
+                                    the file's facts are not the task's", ban.label, k));
+            }
             c.not_applied += 1;
             continue;
         };
@@ -172,5 +180,5 @@ pub fn apply(t: Task, bans: &[Ban], c: &mut BanCounts) -> Task {
         }
     }
     c.actions_after = acts.len() as u64;
-    Task { acts, ..t }
+    Ok(Task { acts, ..t })
 }
