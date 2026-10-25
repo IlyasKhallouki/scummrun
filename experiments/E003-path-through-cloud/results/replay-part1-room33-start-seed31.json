@@ -36,7 +36,7 @@
   "segment_start": 1,
   "stall": 4
  },
- "boot_s": 2.1,
+ "boot_s": 6.6,
  "check": {
   "boot checks": "ok",
   "reading start": {
@@ -50,26 +50,28 @@
       229
      ]
     ]
-   ]
+   ],
+   "task facts differ": 0,
+   "task first": []
   },
   "taskcore": {
    "input": {
-    "seconds": 0.01,
+    "seconds": 0.07,
     "status": "ok"
    },
    "needed": {
-    "seconds": 0.01,
+    "seconds": 0.11,
     "status": "ok"
    }
   },
-  "taskcore_s": 0.02
+  "taskcore_s": 0.19
  },
- "seconds": 2.2,
+ "seconds": 6.9,
  "sources": {
-  "replay_part1.py": "a333612cc306",
-  "replay.py": "8e9d4a9f9042",
-  "packed_reading.py": "6582b0d1bd9d",
-  "export_records.py": "c4660a1490ae",
+  "replay_part1.py": "e6006c9f7147",
+  "replay.py": "960c03a79ec0",
+  "packed_reading.py": "5275fd170b47",
+  "export_records.py": "f0aa97ff0b22",
   "plan_fd.py": "34285f1d124a",
   "reader.py": "94d495853f07",
   "model.py": "cc630446bdbe",
