@@ -1409,6 +1409,9 @@ class Harness:
                 if self.replans >= self.replan_limit:
                     self.stop_reason = "replan limit"
                     break
+                if time.monotonic() - self.t0 > self.time_limit:  # no new plan past the limit
+                    self.stop_reason = "time limit"
+                    break
                 self.replans += 1
                 steps = self._plan(first=False)
                 n_plan, i = len(self.plans) - 1, 0

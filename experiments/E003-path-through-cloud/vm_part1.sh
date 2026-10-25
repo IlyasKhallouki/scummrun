@@ -30,7 +30,8 @@
 # moment, more than the VM's 30 GB disk holds after the builds); RES=out/partI/results; CAP_MIN=240 (the reader's
 # own time cap); MAX_RSS_GB=200; MIN_FREE_GB=8 (MemAvailable); MAX_FILES_GB=100 (the packed and golden files
 # together); REPLANS=500;
-# TIME_LIMIT=10800 (the run's seconds); PLAN_TIME=600 (plan.md step 4); PLAN_MEMORY=64G (Fast Downward per plan).
+# TIME_LIMIT=10800 (the run's seconds); PLAN_TIME=600 (plan.md step 4); PLAN_MEMORY=64G (Fast Downward per plan);
+# DEADLINE (UTC epoch seconds, optional: the harness's time limit ends there at the latest).
 # Only seed 1: reader-scope reads results/start-part1.jsonl's seed 1, and a reading serves the seed it was read from.
 #
 # C2: this file names no game number. The reading and the results stay on the VM's private disk and RAM until
@@ -119,15 +120,15 @@ check() {
 run() {
     mkdir -p "$RES"
     (cd "$HERE" && "$PY" replay_part1.py run 1 --reading "$READ/reading.json" --results "$RES" \
-        --replan-limit "$REPLANS" --time-limit "$TIME_LIMIT" --plan-time "$PLAN_TIME" --plan-memory "$PLAN_MEMORY") \
-        2>&1 | tee "$RES/run-seed1.log"
+        --replan-limit "$REPLANS" --time-limit "$TIME_LIMIT" --plan-time "$PLAN_TIME" --plan-memory "$PLAN_MEMORY" \
+        ${DEADLINE:+--deadline "$DEADLINE"}) 2>&1 | tee "$RES/run-seed1.log"
 }
 
 control() {
     mkdir -p "$RES"
     (cd "$HERE" && "$PY" replay_part1.py run 1 --reading "$READ/reading.json" --control --results "$RES" \
-        --replan-limit "$REPLANS" --time-limit "$TIME_LIMIT" --plan-time "$PLAN_TIME" --plan-memory "$PLAN_MEMORY") \
-        2>&1 | tee "$RES/run-seed1-control.log"
+        --replan-limit "$REPLANS" --time-limit "$TIME_LIMIT" --plan-time "$PLAN_TIME" --plan-memory "$PLAN_MEMORY" \
+        ${DEADLINE:+--deadline "$DEADLINE"}) 2>&1 | tee "$RES/run-seed1-control.log"
 }
 
 case "${1:-}" in

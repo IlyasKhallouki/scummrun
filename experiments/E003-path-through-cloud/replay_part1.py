@@ -10,7 +10,7 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_part1.py start SEED [SEED ...] --reading DIR/reading.json [--results DIR]
                        (the start check only, no goal run)
        replay_part1.py run SEED --reading DIR/reading.json [--control] [--replan-limit 500] [--time-limit 86400]
-                       [--plan-time 600] [--plan-memory 6G] [--results DIR]
+                       [--plan-time 600] [--plan-memory 6G] [--results DIR] [--deadline EPOCH]
        replay_part1.py log NAME [--results DIR]           (the log of NAME's runs and start checks, from the json)
        score_part1.py RESULT.json ...                     (after the run: the key's Part I goals, from boot)
 
@@ -437,7 +437,7 @@ def summary(res: dict) -> dict:
 
 def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_limit: float, plan_time: int,
             test_seeds: bool = False, out_root: Path = OUT, results: Path = RESULTS,
-            plan_memory: str = replay.PLAN_MEMORY) -> dict:
+            plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -479,6 +479,9 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
 
         def snapshot(hh):
             partial.write_text(json.dumps(dict(out, run=hh.result(), landmarks=hh.landmarks), default=str) + "\n")
+        if deadline is not None:  # the harness's time limit ends at the deadline at the latest, counted from here
+            time_limit = min(time_limit, max(0.0, deadline - time.time()))
+            out["limits"].update(seconds=round(time_limit, 1), deadline=deadline)
         h = replay.Harness(rd.b, rd.task, rd.task, branch, goal, replan_limit=replan_limit, time_limit=time_limit,
                            plan_time=plan_time, progress=say, planner="taskcore", packed=rd.packed,
                            workdir=run_dir / "plans", memory_limit=plan_memory, on_plan=snapshot)
@@ -660,6 +663,8 @@ def main() -> None:
     r.add_argument("--plan-memory", default=replay.PLAN_MEMORY)
     r.add_argument("--results", type=Path, default=RESULTS)
     r.add_argument("--test-seeds", action="store_true", help="allow the test seeds 31-35 (the Part I result only)")
+    r.add_argument("--deadline", type=float, default=None,
+                   help="UTC epoch seconds: the harness's time limit ends there at the latest (a VM's end, less a plan)")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -676,7 +681,7 @@ def main() -> None:
         cmd_start(a.seeds, a.reading, a.results)
     elif a.cmd == "run":
         cmd_run(a.seed, a.reading, a.control, a.replan_limit, a.time_limit, a.plan_time, a.test_seeds,
-                results=a.results, plan_memory=a.plan_memory)
+                results=a.results, plan_memory=a.plan_memory, deadline=a.deadline)
     else:
         cmd_log(a.name, a.results)
 
