@@ -1,0 +1,52 @@
+E003 step 5 with taskcore: the harness's bans in taskcore (--bans) against replay.py's own, and plans with bans
+
+sources (sha1, 12 hex): replay.py 4cfec9a50b4c, plan_fd.py ff816ac0821c, export_records.py 1524d2eff8f9, task.py c356a6df633a, taskcore/src/bans.rs 1b261d44f902, taskcore/src/main.rs 971119b68480, taskcore/src/sas.rs 0d799e0a60f5, test_replay_taskcore.py 9723f738db98
+byte for byte: replay.apply_bans (ban_of's points, cut) + task.write_sas(...).text(start) against taskcore --bans --start-file --fold off --reduce none --encoding task on the unbanned packed file.
+
+== the kitchen (the step 5 reading; start s17 = reader.task_start of run B's S1#7 pre) ==
+ban sets (ban_of of these records from s17: label, then the banned point):
+  the walk: walk_to(316) at {'bit:6': 0, 'room': 28}
+  the meat: sentence(9,566) at {'bit:6': 0, 'room': 28}
+  the timer: event(local:211@33) at {'class:316:6': 0, 'local:203': 0, 'local:220': 0, 'room': 28, 'state:316': 0}
+  a folded step: event(script:2@736#1db02ba5a8ab) at {'bit:6': 0, 'owner:566': 15, 'room': 28}
+  all five: walk_to(316) at {'bit:6': 0, 'room': 28}; sentence(9,566) at {'bit:6': 0, 'room': 28}; event(local:211@33) at {'class:316:6': 0, 'local:203': 0, 'local:220': 0, 'room': 28, 'state:316': 0}; event(script:2@736#1db02ba5a8ab) at {'bit:6': 0, 'owner:566': 15, 'room': 28}; sentence(2,564) at {'bit:6': 0, 'room': 28}
+  the walk twice (rooms 28 and 41): walk_to(316) at {'bit:6': 0, 'room': 28}; walk_to(316) at {'bit:6': 0, 'room': 41}
+files (task: pruned = test_reader's pruned task, replay.py's python planner; full = build_task's, the packed file taskcore's planner reads):
+  full   the walk                           the same bytes (328,618,077 bytes, sha1 a0d717952642; taskcore a0d717952642); task.py 174 s, taskcore 9 s; actions cut 8, pieces 2, actions after 71723
+  full   a folded step                      the same bytes (328,701,712 bytes, sha1 9a60576aa2f8; taskcore 9a60576aa2f8); task.py 174 s, taskcore 12 s; actions cut 2, pieces 4, actions after 71731
+  full   all five                           the same bytes (328,698,498 bytes, sha1 06e296c92fd3; taskcore 06e296c92fd3); task.py 167 s, taskcore 9 s; actions cut 13, pieces 10, actions after 71726
+  full   the walk twice (rooms 28 and 41)   the same bytes (328,618,077 bytes, sha1 a0d717952642; taskcore a0d717952642); task.py 171 s, taskcore 10 s; actions cut 8, pieces 2, actions after 71723
+  pruned the walk                           the same bytes (163,789,073 bytes, sha1 30b5a8c2c11e; taskcore 30b5a8c2c11e); task.py 68 s, taskcore 2 s; actions cut 8, pieces 2, actions after 71318
+  pruned a folded step                      the same bytes (163,818,768 bytes, sha1 f4b51547437c; taskcore f4b51547437c); task.py 86 s, taskcore 4 s; actions cut 2, pieces 4, actions after 71326
+  pruned all five                           the same bytes (163,816,361 bytes, sha1 8353ec94d636; taskcore 8353ec94d636); task.py 64 s, taskcore 3 s; actions cut 13, pieces 10, actions after 71321
+  pruned the walk twice (rooms 28 and 41)   the same bytes (163,789,073 bytes, sha1 30b5a8c2c11e; taskcore 30b5a8c2c11e); task.py 66 s, taskcore 2 s; actions cut 8, pieces 2, actions after 71318
+plans: plan_fd.plan_taskcore from s17 with the bans (fold strict, (a)-(f), lama-first), each step the path that holds in the predicted state, run on the unreduced banned task (build_task's, replay.apply_bans):
+  the walk                           time, 0 steps (0 through a folded action), taskcore 7 s, 17,817 operators, lama-first 615 s
+  the meat                           plan, 10 steps (2 through a folded action), taskcore 12 s, 17,823 operators, lama-first 4 s; runs on the banned task: True
+    ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(2,564)#11592', 'event(script:2@736#b743d861667c)#34210', 'event(script:2@915#e3d84ac8767a)#34221', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
+  the timer                          plan, 18 steps (4 through a folded action), taskcore 9 s, 17,825 operators, lama-first 5 s; runs on the banned task: True
+    ['sentence(2,316)#262', 'event(script:2@736#6b02ec868a25)#30829', 'event(script:2@915#d1973d557d7f)#30833', 'event(local:214@15#326429017871)#35384', 'event(local:214@57#326429017871)#39493', 'event(local:214@66#326429017871)#39695', 'event(local:212@4#ebe3061d6db8)#49590', 'event(local:212@8#ebe3061d6db8)#51233', 'event(script:2@937#ef7210b381c)#35386', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(2,564)#11592', 'event(script:2@736#b743d861667c)#34210', 'event(script:2@915#e3d84ac8767a)#34221', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384', 'event(script:2@915#ef19a1f9cb92)#34395']
+  a folded step                      plan, 10 steps (1 through a folded action), taskcore 10 s, 17,824 operators, lama-first 4 s; runs on the banned task: True
+    ['event(local:211@33)#30568', 'walk_to(316)#478', 'event(script:2@736#a8c69122caf2)#30915', 'event(local:218@16#86dcd5f97351)#35417', 'sentence(2,564)#11592', 'event(script:2@736#b743d861667c)#34210', 'event(script:2@915#e3d84ac8767a)#34221', 'sentence(9,566)#12118', 'event(script:2@736#1db02ba5a8ab)#34384~ban:room', 'event(script:2@915#ef19a1f9cb92)#34395']
+  all five                           time, 0 steps (0 through a folded action), taskcore 8 s, 17,820 operators, lama-first 607 s
+  the walk twice (rooms 28 and 41)   time, 0 steps (0 through a folded action), taskcore 6 s, 17,817 operators, lama-first 612 s
+notes: the second ban of "the walk twice" (room 41) misses every walk's precondition (they test room 28), so its file is the first's. "time": with the walk banned at bit:6 = 0 in room 28, lama-first finds no plan in its 600 s; the python planner found none with that ban either (notes/log/2026-10-25-e003-step5-replay.md, what the review changed).
+
+== random tasks with random bans: python test_replay_taskcore.py 1000 11 ==
+  (test_taskcore.py's random tasks; 1-3 bans each, as ban_of makes them, on a point an action holds or misses, now and then a key the task lacks, no key, or the same ban twice)
+       647  PRODUCT_LIMIT 1: lama-first's plan runs on the unreduced banned task
+       824  PRODUCT_LIMIT 1: the banned task's optimum
+      1462  actions the bans cut
+         1  both raise: task.py on a rule of its writer, taskcore on the start
+        32  both: None
+       143  both: out of domain
+       647  default: lama-first's plan runs on the unreduced banned task
+       824  default: the banned task's optimum
+       647  fold every: lama-first's plan runs on the unreduced banned task
+       824  fold every: the banned task's optimum
+       112  plan steps through a folded action
+       824  same bytes
+       647  solvable
+      1000  tasks
+       177  unsolvable
+  failures: 0

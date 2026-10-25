@@ -557,12 +557,16 @@ def write_log(work: Path) -> None:
                                                        (f" ({run_ok[1]})" if run_ok[1] else "") if run_ok else ""))
             if r["steps"]:
                 L.append(f"    {r['steps']}")
+        L += ["notes: the second ban of \"the walk twice\" (room 41) misses every walk's precondition (they test room 28), "
+              "so its file is the first's. \"time\": with the walk banned at bit:6 = 0 in room 28, lama-first finds no "
+              "plan in its 600 s; the python planner found none with that ban either (notes/log/2026-10-25-e003-step5-"
+              "replay.md, what the review changed)."]
     for prop in sorted(work.glob("prop-*.out")):
         n, seed = prop.stem.split("-")[1], prop.stem.split("-s")[-1]
         L += ["", f"== random tasks with random bans: python test_replay_taskcore.py {n} {seed} ==",
               "  (test_taskcore.py's random tasks; 1-3 bans each, as ban_of makes them, on a point an action holds or "
               "misses, now and then a key the task lacks, no key, or the same ban twice)",
-              "  " + prop.read_text().strip().replace("\n", "\n  ")]
+              "  " + prop.read_text().rstrip().replace("\n", "\n  ")]
     out = HERE / "results" / "taskcore-bans.log"
     out.write_text("\n".join(L) + "\n")
     print("\n".join(L))
