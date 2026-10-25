@@ -18,9 +18,11 @@ pub mod facts;
 pub mod machine;
 pub mod oracle;
 pub mod packed;
+pub mod par;
 pub mod py;
 pub mod record;
 pub mod replay;
+pub mod scaling;
 pub mod scope;
 pub mod table;
 pub mod task;
@@ -36,6 +38,15 @@ pub use table::FactTable;
 /// Peak resident memory of this process so far, in kB (VmHWM).
 pub fn peak_rss_kb() -> Option<u64> {
     scumm_ir::peak_rss_kb()
+}
+
+/// CPU seconds of this process so far, all its threads (utime + stime of /proc/self/stat, at 100 ticks a second).
+pub fn cpu_secs() -> f64 {
+    let s = std::fs::read_to_string("/proc/self/stat").unwrap_or_default();
+    let Some(i) = s.rfind(')') else { return 0.0 };
+    let f: Vec<&str> = s[i + 2..].split_whitespace().collect();
+    let tick = |j: usize| f.get(j).and_then(|x| x.parse::<f64>().ok()).unwrap_or(0.0);
+    (tick(11) + tick(12)) / 100.0
 }
 
 /// Reads a gzip JSON-lines file (golden.py's and the oracle's), every gzip member, line by line.

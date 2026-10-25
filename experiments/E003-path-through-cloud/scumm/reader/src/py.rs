@@ -335,6 +335,12 @@ impl PyCounter {
         self.0.clear();
         self.1.clear();
     }
+    /// `Counter.update(other)`: `other`'s keys in its order, new ones appended (also those with 0).
+    pub fn update(&mut self, other: &PyCounter) {
+        for (k, v) in &other.0 {
+            self.add(k.clone(), *v);
+        }
+    }
     pub fn py(&self) -> Py {
         if self.0.iter().all(|(k, _)| matches!(k, Py::Str(_))) {
             return Py::Dict(self.0.iter().map(|(k, v)| (k.as_str().to_string(), Py::Int(*v))).collect());

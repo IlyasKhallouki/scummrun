@@ -104,9 +104,39 @@ pub fn fold_key(r: &Record) -> String {
 
 /// A set's values as the fold key writes them: texts, sorted.
 fn set_text(v: &[Label]) -> String {
-    let mut vals: Vec<String> = v.iter().map(|l| l.text()).collect();
-    vals.sort();
-    vals.join(",")
+    let mut s = String::new();
+    push_set_text(&mut s, v);
+    s
+}
+
+/// `set_text` written into `s`: the values' texts (an int's decimal digits, "above", "below") sorted as strings and
+/// joined by commas, made in one buffer per set (a set of a precondition can hold hundreds of values).
+fn push_set_text(s: &mut String, v: &[Label]) {
+    let mut items: Vec<([u8; 24], u8)> = Vec::with_capacity(v.len());
+    for l in v {
+        let mut buf = [0u8; 24];
+        let n = match l {
+            Label::Int(n) => {
+                use std::io::Write;
+                let mut c = std::io::Cursor::new(&mut buf[..]);
+                write!(c, "{n}").unwrap();
+                c.position() as usize
+            }
+            other => {
+                let t = other.text();
+                buf[..t.len()].copy_from_slice(t.as_bytes());
+                t.len()
+            }
+        };
+        items.push((buf, n as u8));
+    }
+    items.sort_unstable_by(|a, b| a.0[..a.1 as usize].cmp(&b.0[..b.1 as usize]));
+    for (i, (b, n)) in items.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(std::str::from_utf8(&b[..*n as usize]).unwrap());
+    }
 }
 
 /// The fold key; with `slots`, the parts `_read_once`'s rewrite of folded lists can change (an `args:` key's
@@ -123,7 +153,7 @@ fn fold_text(r: &Record, mut slots: Option<&mut ArgSlots>) -> String {
                 s.push('\u{3}');
                 sl.pre.push(v.clone());
             }
-            _ => s.push_str(&set_text(v)),
+            _ => push_set_text(&mut s, v),
         }
         s.push('\u{2}');
     }
@@ -509,6 +539,17 @@ pub fn record_keys(records: &[Record], goal: &[(String, Labels)]) -> Vec<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `set_text` is the old one's text: the values' texts sorted as strings.
+    #[test]
+    fn set_text_sorts_texts() {
+        let v = vec![Label::Below, Label::Int(-3), Label::Int(0), Label::Int(9), Label::Int(10), Label::Int(123456789012), Label::Above];
+        let mut want: Vec<String> = v.iter().map(|l| l.text()).collect();
+        want.sort();
+        assert_eq!(set_text(&v), want.join(","));
+        assert_eq!(set_text(&[]), "");
+        assert_eq!(set_text(&[Label::Int(0)]), "0");
+    }
     use crate::record::What;
 
     fn rec(pre_args: &[i64], eff_args: i64, other: i64) -> Record {
