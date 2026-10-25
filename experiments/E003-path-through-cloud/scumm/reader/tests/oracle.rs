@@ -2,12 +2,15 @@
 //!
 //! Fast (seconds): the static oracle (domains.build for four starts, Scope.of for seven scopes, the inventory hook
 //! summaries, the Builder's machine-free parts for room 33 and the kitchen), room 33's golden records written back,
-//! and room 33's whole reading by the Rust Builder over the captured machine runs against golden.py's file.
+//! room 33's whole reading by the Rust Builder over the captured machine runs against golden.py's file, every
+//! captured run of room 33 against the Rust machine half's, and room 33's reading with the Rust machine half (no
+//! Python) against golden.py's file.
 //!
-//! Slow (`cargo test --release -p scumm-reader -- --ignored`, about 6 minutes): the kitchen's golden records written
-//! back, the kitchen's whole reading against golden.py's file, and the kitchen's task: Rust build_task (and prune)
-//! -> packed file -> taskcore's SAS file, against the sha1 of task.py write_sas's file for each start and variant,
-//! and the same for the packed file written as the records are made (RecordStream) and by export_records.
+//! Slow (`cargo test --release -p scumm-reader -- --ignored`, about 10 minutes): the kitchen's golden records written
+//! back, the kitchen's whole reading against golden.py's file (over the captured runs, and with the Rust machine
+//! half), every captured run of the kitchen against the Rust machine half's, and the kitchen's task: Rust build_task
+//! (and prune) -> packed file -> taskcore's SAS file, against the sha1 of task.py write_sas's file for each start and
+//! variant, and the same for the packed file written as the records are made (RecordStream) and by export_records.
 
 use scumm_reader::oracle::{self, Static};
 use scumm_reader::{packed, task, Facts};
@@ -122,6 +125,23 @@ fn room33_reading_against_golden() {
     assert_none("room33 reading", oracle::compare_reading(&b, &oracle::golden_dir().join("room33.jsonl.gz"), 5));
 }
 
+/// Every captured machine run of room 33 against the Rust machine half's run of the same inputs (166 runs).
+#[test]
+fn room33_runs_rust_machine() {
+    ensure(&["capture", "room33"], "capture-room33.jsonl.gz");
+    let (diffs, runs, differing, _) = oracle::compare_runs(game(), static_oracle(), "room33", 5);
+    assert!(runs > 0, "no run compared");
+    assert!(differing == 0, "{differing} of {runs} runs differ; first:\n{}", diffs.join("\n"));
+    eprintln!("room33: {runs} runs, 0 differ");
+}
+
+/// Room 33's reading by the Rust Builder and the Rust machine half (no Python, no playback) against golden.py's.
+#[test]
+fn room33_reading_rust_machine() {
+    let (b, _) = oracle::read(game(), static_oracle(), "room33");
+    assert_none("room33 reading, Rust machine", oracle::compare_reading(&b, &oracle::golden_dir().join("room33.jsonl.gz"), 5));
+}
+
 #[test]
 #[ignore]
 fn kitchen_records_written_back() {
@@ -146,6 +166,26 @@ fn kitchen_reading_against_golden() {
     let (b, runs) = oracle::replay(game(), static_oracle(), "kitchen");
     eprintln!("kitchen: {runs} runs replayed");
     assert_none("kitchen reading", oracle::compare_reading(&b, &oracle::golden_dir().join("kitchen.jsonl.gz"), 5));
+}
+
+/// Every captured machine run of the kitchen against the Rust machine half's (18,127 runs; about 2.5 minutes).
+#[test]
+#[ignore]
+fn kitchen_runs_rust_machine() {
+    kitchen_capture();
+    let (diffs, runs, differing, _) = oracle::compare_runs(game(), static_oracle(), "kitchen", 5);
+    assert!(runs > 0, "no run compared");
+    assert!(differing == 0, "{differing} of {runs} runs differ; first:\n{}", diffs.join("\n"));
+    eprintln!("kitchen: {runs} runs, 0 differ");
+}
+
+/// The kitchen's reading by the Rust Builder and the Rust machine half against golden.py's (about a minute).
+#[test]
+#[ignore]
+fn kitchen_reading_rust_machine() {
+    let (b, secs) = oracle::read(game(), static_oracle(), "kitchen");
+    eprintln!("kitchen: {} records, reading {secs:.1} s", b.records.len());
+    assert_none("kitchen reading, Rust machine", oracle::compare_reading(&b, &oracle::golden_dir().join("kitchen.jsonl.gz"), 5));
 }
 
 fn taskcore() -> PathBuf {

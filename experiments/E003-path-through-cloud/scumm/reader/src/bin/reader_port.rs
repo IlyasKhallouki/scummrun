@@ -73,6 +73,56 @@ fn main() {
                 oracle::compare_reading(&b, &oracle::golden_dir().join(format!("{name}.jsonl.gz")), 5),
             );
         }
+        "runs" => {
+            // every captured machine run against the Rust machine half's
+            let name = &args[1];
+            let max: usize = arg(&args, "--max").map_or(20, |m| m.parse().unwrap());
+            let t = Instant::now();
+            let (diffs, runs, differing, secs) = oracle::compare_runs(&game, &st, name, max);
+            println!("{name}: {runs} runs compared, {differing} differ; Rust machine half {secs:.2} s, all {:.2} s", t.elapsed().as_secs_f64());
+            for d in &diffs {
+                println!("  {d}");
+            }
+            ok &= differing == 0;
+        }
+        "dump-runs" => {
+            // chosen captured runs made again by the Rust machine half, whole (reader_run_dump.py's lines)
+            let name = &args[1];
+            let want: Vec<usize> = arg(&args, "--runs").expect("--runs N,...").split(',').map(|n| n.parse().unwrap()).collect();
+            let b = oracle::builder(&game, &st, name);
+            let mut rd = scumm_reader::machine::Reader::new(&game);
+            let mut out: Box<dyn Write> = match arg(&args, "--out") {
+                Some(f) => Box::new(std::fs::File::create(f).unwrap()),
+                None => Box::new(std::io::stdout()),
+            };
+            let cap = oracle::oracle_dir().join(format!("capture-{name}.jsonl.gz"));
+            let last = *want.iter().max().unwrap();
+            for (i, l) in scumm_reader::gz_lines(&cap).enumerate().take(last + 1) {
+                if !want.contains(&i) {
+                    continue;
+                }
+                let c = scumm_reader::Py::from_text(&l);
+                let line = scumm_reader::machine::dump_capture_run(&mut rd, &b.ctx(), i, &c);
+                writeln!(out, "{}", line.text()).unwrap();
+            }
+        }
+        "read" => {
+            // the reading with the Rust machine half, against golden.py's file
+            let name = &args[1];
+            let (b, secs) = oracle::read(&game, &st, name);
+            println!("{name}: {} records, reading {secs:.2} s, peak RSS {} MB", b.records.len(), peak_rss_kb().unwrap_or(0) / 1024);
+            let golden = oracle::golden_dir().join(format!("{name}.jsonl.gz"));
+            if let Some(out) = arg(&args, "--out") {
+                let f = std::fs::File::create(&out).unwrap();
+                let mut gz = flate2::write::GzEncoder::new(std::io::BufWriter::new(f), flate2::Compression::new(6));
+                for l in b.reading_lines(&oracle::golden_info(&golden)) {
+                    gz.write_all(l.as_bytes()).unwrap();
+                    gz.write_all(b"\n").unwrap();
+                }
+                gz.finish().unwrap();
+            }
+            ok &= report(&format!("{name} reading against golden.py's"), oracle::compare_reading(&b, &golden, 5));
+        }
         "task" => {
             let out = PathBuf::from(arg(&args, "--out").expect("--out DIR"));
             std::fs::create_dir_all(&out).unwrap();
@@ -232,7 +282,7 @@ fn main() {
             println!("peak RSS {} MB", peak_rss_kb().unwrap_or(0) / 1024);
         }
         _ => {
-            eprintln!("usage: reader-port static | records NAME | replay NAME [--out F] | task --out DIR | stream --out F | bench-task --out DIR | bench");
+            eprintln!("usage: reader-port static | records NAME | replay NAME [--out F] | runs NAME [--max N] | dump-runs NAME --runs N,.. [--out F] | read NAME [--out F] | task --out DIR | stream --out F | bench-task --out DIR | bench");
             std::process::exit(2);
         }
     }
