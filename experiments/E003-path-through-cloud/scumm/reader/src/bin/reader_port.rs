@@ -14,6 +14,10 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 
+/// mimalloc, as reader-scope: the reading on threads allocates and frees many small objects at once
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn report(what: &str, (diffs, n): (Vec<String>, usize)) -> bool {
     if diffs.is_empty() {
         println!("{what}: {n} compared, 0 differences");
@@ -29,6 +33,34 @@ fn report(what: &str, (diffs, n): (Vec<String>, usize)) -> bool {
 
 fn arg(args: &[String], flag: &str) -> Option<String> {
     args.iter().position(|a| a == flag).map(|i| args[i + 1].clone())
+}
+
+/// The pool's batches by size: wall seconds, the longest jobs' seconds, the jobs' seconds.
+fn print_batches(stats: &scumm_reader::par::PoolStats) {
+    println!(
+        "  snapshots {:.2} s, workers taking them {:.2} s, merging and streaming {:.2} s",
+        stats.snap_secs, stats.sync_secs, stats.merge_secs
+    );
+    let mut rows: Vec<(String, usize, f64, f64, f64)> = Vec::new();
+    for (lo, hi) in [(0, 0), (1, 2), (3, 11), (12, 99), (100, 999), (1000, usize::MAX)] {
+        let bs: Vec<_> = stats.per_batch.iter().filter(|b| b.0 >= lo && b.0 <= hi).collect();
+        if bs.is_empty() {
+            continue;
+        }
+        rows.push((
+            format!("{lo}-{}", if hi == usize::MAX { "".to_string() } else { hi.to_string() }),
+            bs.len(),
+            bs.iter().map(|b| b.1).sum(),
+            bs.iter().map(|b| b.2).sum(),
+            bs.iter().map(|b| b.3).sum(),
+        ));
+    }
+    for (what, n, wall, longest, sum) in rows {
+        println!("  batches of {what} jobs: {n}, wall {wall:.2} s, longest jobs {longest:.2} s, jobs {sum:.2} s");
+    }
+    for (s, l, b) in stats.longest.iter().take(8) {
+        println!("  longest: {s:.2} s {l} (batch {b})");
+    }
 }
 
 fn main() {
@@ -109,8 +141,25 @@ fn main() {
         "read" => {
             // the reading with the Rust machine half, against golden.py's file
             let name = &args[1];
-            let (b, secs) = oracle::read(&game, &st, name);
-            println!("{name}: {} records, reading {secs:.2} s, peak RSS {} MB", b.records.len(), peak_rss_kb().unwrap_or(0) / 1024);
+            let cpu0 = scumm_reader::cpu_secs();
+            let (b, secs) = match arg(&args, "--threads") {
+                None => oracle::read(&game, &st, name),
+                Some(n) => {
+                    let (b, secs, stats) = oracle::read_par(&game, &st, name, n.parse().unwrap());
+                    println!(
+                        "pool: {} batches, {} jobs, {:.1} job s, {} split parts made, {} of them on another worker",
+                        stats.batches, stats.jobs, stats.job_secs, stats.parts_made, stats.parts_elsewhere
+                    );
+                    print_batches(&stats);
+                    (b, secs)
+                }
+            };
+            println!(
+                "{name}: {} records, reading {secs:.2} s, {:.1} CPU s, peak RSS {} MB",
+                b.records.len(),
+                scumm_reader::cpu_secs() - cpu0,
+                peak_rss_kb().unwrap_or(0) / 1024
+            );
             let golden = oracle::golden_dir().join(format!("{name}.jsonl.gz"));
             if let Some(out) = arg(&args, "--out") {
                 let f = std::fs::File::create(&out).unwrap();

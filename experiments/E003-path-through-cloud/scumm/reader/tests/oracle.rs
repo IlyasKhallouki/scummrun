@@ -110,6 +110,47 @@ fn check_machine_lists() {
     );
 }
 
+/// Room 33's reading on worker threads (par.rs) against golden.py's file, for 1 to 4 workers: the same records in
+/// the same order and the same counters as with no workers.
+#[test]
+fn room33_reading_threads() {
+    for threads in 1..=4 {
+        let (b, _, _) = oracle::read_par(game(), static_oracle(), "room33", threads);
+        assert_none(
+            &format!("room33 reading, {threads} threads"),
+            oracle::compare_reading(&b, &oracle::golden_dir().join("room33.jsonl.gz"), 5),
+        );
+    }
+}
+
+/// Room 33's records streamed into the packed file and not kept (`keep_records` off), on 3 workers: the same
+/// packed file and counters as the reading that keeps them, on no workers.
+#[test]
+fn room33_streamed_not_kept() {
+    let dir = std::env::temp_dir().join(format!("reader-stream-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut out = Vec::new();
+    for (threads, keep) in [(0, true), (3, false)] {
+        let mut b = oracle::builder(game(), static_oracle(), "room33");
+        b.keep_records = keep;
+        let path = dir.join(format!("r{threads}.tc"));
+        let mut stream = packed::RecordStream::create(&path).unwrap();
+        let scope = b.scope.clone();
+        scumm_reader::par::with_pool(game(), &scope, threads, |pool| {
+            b.read_all_into(pool, true, None, 2, Some(&mut stream));
+        });
+        assert_eq!(b.records.len(), if keep { 878 } else { 0 });
+        let start = Facts::from_py(static_oracle().named("builder", "room33").get("start_items"));
+        let keys = stream.fact_keys();
+        let s0 = task::task_start(&mut b, &start, &keys);
+        stream.finish(&mut b, &[], &[("start".to_string(), s0)]).unwrap();
+        out.push((std::fs::read(&path).unwrap(), b.counters_py().text(), b.n_records));
+    }
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(out[0].2, 878);
+    assert_eq!(out[0], out[1], "the packed file, the counters and the record count");
+}
+
 #[test]
 fn room33_records_written_back() {
     let (recs, bad) = oracle::golden_records(&oracle::golden_dir().join("room33.jsonl.gz"));
@@ -186,6 +227,46 @@ fn kitchen_reading_rust_machine() {
     let (b, secs) = oracle::read(game(), static_oracle(), "kitchen");
     eprintln!("kitchen: {} records, reading {secs:.1} s", b.records.len());
     assert_none("kitchen reading, Rust machine", oracle::compare_reading(&b, &oracle::golden_dir().join("kitchen.jsonl.gz"), 5));
+}
+
+/// The kitchen read by the Rust machine half on 6 worker threads, its records streamed into the packed file on the
+/// sink thread and not kept: taskcore's SAS file of it (start s17) against task.py write_sas's on the Python reading.
+#[test]
+#[ignore]
+fn kitchen_streamed_threads_against_write_sas() {
+    let py_path = oracle::oracle_dir().join("python-sas.json");
+    assert!(py_path.exists(), "{} is missing: run reader_port_oracle.py sas (PORT-NOTES.md)", py_path.display());
+    let py: serde_json::Value = serde_json::from_slice(&std::fs::read(&py_path).unwrap()).unwrap();
+    let st = static_oracle();
+    let kt = oracle::kitchen_task(st);
+    let work = std::env::temp_dir().join(format!("scumm-reader-stream-{}", std::process::id()));
+    std::fs::create_dir_all(&work).unwrap();
+    let tc = taskcore();
+    let mut b = oracle::builder(game(), st, "kitchen");
+    b.keep_records = false;
+    let scope = b.scope.clone();
+    let mut sink = scumm_reader::par::SinkThread::new(packed::RecordStream::create(&work.join("made.tc")).unwrap(), 64);
+    scumm_reader::par::with_pool(game(), &scope, 6, |pool| {
+        b.read_all_into(pool, true, None, 2, Some(&mut sink));
+    });
+    let stream = sink.finish();
+    assert_eq!((b.records.len(), b.n_records), (0, 72256));
+    let keys = stream.fact_keys();
+    let s17 = task::task_start(&mut b, &kt.s17, keys.iter().chain(kt.goal.iter().map(|g| &g.0)));
+    stream.finish(&mut b, &kt.goal, &[("s17".to_string(), s17)]).unwrap();
+    let (sha, bytes) = sas_sha1(&tc, &work.join("made.tc"), "s17", &work);
+    std::fs::remove_dir_all(&work).unwrap();
+    assert_eq!(sha, py["full-all"]["files"]["s17"]["sha1"].as_str().unwrap(), "the SAS file differs from write_sas's");
+    eprintln!("kitchen on 6 threads, streamed: SAS s17 {bytes} bytes, sha1 {sha}: equal to write_sas");
+}
+
+/// The kitchen's reading on 6 worker threads against golden.py's.
+#[test]
+#[ignore]
+fn kitchen_reading_threads() {
+    let (b, secs, stats) = oracle::read_par(game(), static_oracle(), "kitchen", 6);
+    eprintln!("kitchen: {} records, reading {secs:.1} s on 6 threads, {} jobs", b.records.len(), stats.jobs);
+    assert_none("kitchen reading, 6 threads", oracle::compare_reading(&b, &oracle::golden_dir().join("kitchen.jsonl.gz"), 5));
 }
 
 fn taskcore() -> PathBuf {

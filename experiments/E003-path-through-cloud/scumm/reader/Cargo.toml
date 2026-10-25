@@ -12,6 +12,7 @@ flate2.workspace = true
 rustc-hash.workspace = true
 serde_json.workspace = true
 sha1_smol.workspace = true
+mimalloc = { version = "0.1", default-features = false }
 
 [[bin]]
 name = "reader-port"
