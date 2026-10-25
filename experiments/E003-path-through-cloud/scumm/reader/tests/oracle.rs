@@ -110,6 +110,27 @@ fn check_machine_lists() {
     );
 }
 
+/// size_scaling.py's scopes (the room graph from the IR) against the oracle's k = 0..3, and its start (seed 1, the
+/// facts in the file's order) and goal against the oracle's "part1" start.
+#[test]
+fn size_scaling_scopes_against_python() {
+    use scumm_reader::scaling;
+    let st = static_oracle();
+    let start = scaling::start_facts(&oracle::root(), scaling::SEED);
+    let l = st.named("domains", "part1");
+    assert_eq!(start, Facts::from_py(l.get("start_items")), "the start's facts and their order");
+    let goal = scaling::part1_goal(&oracle::root());
+    let want: Vec<(String, Vec<i64>)> =
+        l.get("goals").dict_items().iter().map(|(k, v)| (k.clone(), v.items().iter().map(|x| x.int()).collect())).collect();
+    assert_eq!(goal, want, "the goal");
+    let sc = scaling::scopes(game(), start.get0("room") as i32);
+    for k in 0..4 {
+        let rooms: Vec<i32> = st.named("scope", &format!("k{k}")).get("rooms").items().iter().map(|r| r.int() as i32).collect();
+        assert_eq!(sc[k], rooms, "scope k={k}");
+    }
+    eprintln!("size_scaling scopes k=0..3, start and goal: equal");
+}
+
 /// Room 33's reading on worker threads (par.rs) against golden.py's file, for 1 to 4 workers: the same records in
 /// the same order and the same counters as with no workers.
 #[test]

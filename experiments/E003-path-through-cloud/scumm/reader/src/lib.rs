@@ -22,6 +22,7 @@ pub mod par;
 pub mod py;
 pub mod record;
 pub mod replay;
+pub mod scaling;
 pub mod scope;
 pub mod table;
 pub mod task;

@@ -17,3 +17,7 @@ mimalloc = { version = "0.1", default-features = false }
 [[bin]]
 name = "reader-port"
 path = "src/bin/reader_port.rs"
+
+[[bin]]
+name = "reader-scope"
+path = "src/bin/reader_scope.rs"
