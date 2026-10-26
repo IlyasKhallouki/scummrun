@@ -336,8 +336,24 @@ target of a plain `Local[n] = ...`. `+=`, `-=`, `*=`, `/=`, `++` and `--` read t
 expression (`Embed`) reads its target back. S(u) is "all locals" when the IR does not show the reads exactly:
 a local read through an index (`Local[base + x]`, an `Index` of kind local, read or updated), an instruction the IR
 did not parse, a code descumm did not decode (`unknownN(..)`, `...Unknown...`) with an operand that is not a
-constant, or an IR note that some bytes are in no instruction ("closer gap", "else gap not a multiple of 3", "jump
-line not 3 bytes").
+constant, a code inside a text whose operand bytes the engine may read as text (below), or any IR note but six that
+leave every byte the engine runs in a shown instruction (`locals::EXACT_NOTES`: else-if targets read from the bytes,
+else chains, a global's name read from the bytes or left as printed, a unit with no instruction). So a gap ("closer
+gap", "else gap not a multiple of 3", "jump line not 3 bytes", "while without a closer at its end", "two instructions
+at one offset"), a place the engine can start decoding that is no shown instruction's start ("jump to the end",
+"target not an instruction offset", "verb entry not an instruction offset", "else-if target from the text rule,
+unverified", "beginOverride not followed by a jump", whose 3 next bytes the engine skips, script.cpp:1711-1722), and
+any note added later keep all locals.
+
+*A code inside a text* (`locals::text_code_exact`). The engine converts a text in convertMessageToString
+(string.cpp:1573-1706): 0xFF, then a code; codes 1, 2, 3 and 8 take no operand, 4 to 7, 9, 10 and 12 to 14 a 2-byte
+word, any other code none (string.cpp:1690-1693); 0xFE is plain text there. descumm (descumm-common.cpp get_string)
+takes a word after 8, 11, 0 and 15 and up (`unknownN(k)`) and reads 0xFE as 0xFF. Bytes descumm took as an operand can
+so be plain text to the engine, and a plain 0xFF there starts an escape the IR does not show (`unknown8(1279)` is FF
+04: with 0x4003 next, the engine reads Local[3]). A text code is exact only when no operand byte is 0xFF (a constant,
+or a plain variable: Var[n] is the word n, Local[n] 0x4000 + n, Bit[n] 0x8000 + n), the operand has no index (descumm
+reads the index word from the text, the engine's readVar from the script), the code is not 0xFF, and it is not
+`sound(..)` (descumm skips bytes it does not show).
 
 **The switch** `FactTable.live_locals` (`reader-scope --live-locals`, `reader-port read NAME --live-locals`), off
 (None) by default. When it is on, `Builder.record` (where rule (a), "Local[i] from a fact", lives) drops from each
@@ -360,25 +376,48 @@ packed_reading.py copies it into reading.json. With the switch off the field is 
 
 In MI1 (tests only): of 1,195 units, 1,193 have S(u) known exactly (750 read no local at all) and 2 keep all locals,
 both for an indexed local: global 153 (`Local[0 + Var[300]]`) and room 75's local 200 (`Local[6 + Local[5]]`). The six
-decompiles with descumm warnings all carry `unknown8(8224)` inside a verb's text: a constant operand, and the engine
-copies text code 8 with no operand (string.cpp:1643-1646), so their reads are exact (room 31's local 202 is not one of
-them). Room 31's local 202 reads {0}, the sentence script {0, 1, 2, 3, 4, 6, 7}.
+decompiles with descumm warnings all carry `unknown8(8224)` inside a verb's text: bytes 20 20, which the engine reads
+as plain text after code 8 (no 0xFF), so their reads are exact (room 31's local 202 is not one of them). No text code
+in MI1 has an operand byte 0xFF, an index, code 0xFF or `sound`, and every IR note in MI1 is one of the six (1,111
+else-if targets that the text rule agrees with, 2 it does not, 9 else chains, 2 names from the bytes, 2 empty units).
+Room 31's local 202 reads {0}, the sentence script {0, 1, 2, 3, 4, 6, 7}.
 
 **Why it is sound.**
 
-1. *The engine reads a slot's locals only through its own instructions.* A slot's locals are `vm.localvar[slot]`. They
-   are written when a script starts (`initializeLocals`, script.cpp:156-165, from the starter's argument list) and by
-   `writeVar` (script.cpp:834-846). They are read only by `readVar` for a variable number with bit 0x4000, and only the
-   running slot's (`vm.localvar[_currentScript]`, script.cpp:669-706). Every such number comes from the running
-   instruction's own bytes: an operand (`getVarOrDirectByte/Word`, script_v5.cpp:371-381), a result's index word
-   (`getResultPos`, script_v5.cpp:383-396), an indexed variable's index (script.cpp:573-580), or a text's escape codes 4
-   to 6 (`convertIntMessage`, `convertVerbMessage`, `convertNameMessage`, string.cpp:1647-1657, 1795-1890; code 7 names
-   a string, not a variable, in v5). descumm prints each of these as `Local[n]` or `Local[n + x]` (and
-   `getInt(Local[n])` in a text), which the IR parses into `Local(n)` and `Index { kind: Local, .. }`; a constant offset
-   is folded at parse time (`Local[1 + 1]` is `Local(2)`). Saving and loading copy the locals; that is no script read.
-   Three workarounds read the running slot's locals inside other ops for particular games (script_v5.cpp:1578 and
-   1599-1610 for MI2's Ultimate Talkie edition, 3807 for Indy3's FM-TOWNS release); none applies to MI1, and a game one
-   applies to needs those locals in S(u) of the units those ops run in.
+1. *The engine reads a slot's locals through its own instructions, and in two cases the model does not follow.* A
+   slot's locals are `vm.localvar[slot]`. They are written when a script starts (`initializeLocals`, script.cpp:156-165,
+   from the starter's argument list) and by `writeVar` (script.cpp:834-846). They are read only by `readVar` for a
+   variable number with bit 0x4000, and only the running slot's (`vm.localvar[_currentScript]`, script.cpp:669-706).
+   The number comes from the running instruction's own bytes: an operand (`getVarOrDirectByte/Word`,
+   script_v5.cpp:371-381), a result's index word (`getResultPos`, script_v5.cpp:383-396), an indexed variable's index
+   (script.cpp:573-580), or the codes 4 to 6 of a text it prints (`convertIntMessage`, `convertVerbMessage`,
+   `convertNameMessage`, string.cpp:1647-1657, 1795-1890; code 7 names a string, not a variable, in v5). descumm prints
+   each of these as `Local[n]` or `Local[n + x]` (and `getInt(Local[n])` in a text), which the IR parses into
+   `Local(n)` and `Index { kind: Local, .. }`; a constant offset is folded at parse time (`Local[1 + 1]` is
+   `Local(2)`); a text's codes are the IR's when their bytes read alike (above). Saving and loading copy the locals;
+   that is no script read. Three workarounds read the running slot's locals inside other ops for particular games
+   (script_v5.cpp:1578 and 1599-1610 for MI2's Ultimate Talkie edition, 3807 for Indy3's FM-TOWNS release); none
+   applies to MI1, and a game one applies to needs those locals in S(u) of the units those ops run in.
+
+   Two engine reads of a local are not in the running instruction's bytes. In both the model already reads something
+   else, with the switch or without it, so the switch keeps exactly what the model reads (point 3) and adds no
+   difference from the engine.
+   - *A stored text.* An object's or actor's name, a verb's text or a string resource is converted when it is printed
+     or drawn (`convertVerbMessage`, `convertNameMessage`, `convertStringMessage`: string.cpp:1875, 1904, 1971;
+     `drawVerb`: verbs.cpp:1075), and its codes 4 to 6 read the locals of the slot running then, which may be another
+     unit's slot and a local outside its S(u). That changes only the text shown (its digits, names and length): a
+     conversion writes no variable, and the model gives every text an unknown value (machine.rs `val_base`).
+     `locals::stored_text_locals` lists the locals that texts stored by an instruction (setObjectName, VerbOps,
+     actorOps, PutCodeInString, anything but print and printEgo) name. MI1 has none: its 10 local codes are in print
+     and printEgo lines, which the engine converts at once with the printing slot's own locals. A text built at run
+     time (SetStringChar; MI1 sets characters of string 37 from Local[0]) is not listed, and needs the same argument.
+   - *An index that carries.* readVar adds the index k to the whole base word, flag 0x2000 included, then clears 0x2000
+     (script.cpp:573-580). A carry or a borrow can so give a local's word: for Var[b + k] when b + k is 0x2000 to 0x5FFF
+     (or -0xE000 to -0xA001), for Bit[b + k] when it is 0xA000 to 0xDFFF (or -0x6000 to -0x2001); the engine then reads
+     Local[(b + k) & 0xFFF], or stops with an error past Local[20]; getResultPos does the same for a write. The model
+     reads Var[b + k] or Bit[b + k] there (scumm-machine's `val_base`), a variable no instruction writes, so a
+     constant, and writes it. In MI1 the bases are at most 396 (Var, 71 reads) and 521 (Bit, 617 reads), so only an index of
+     7,796 or more in size could (`locals::tests::indexed_variables`).
 2. *The model reads them the same way.* scumm-machine reads a local only in `Machine::local`, from `val_base`'s
    `Expr::Local` and `Expr::Index { kind: Local }`; no hook of the reader reads a local's value to decide anything.
    A unit's slot runs only that unit's code (a start or a chainScript pushes a frame of another unit, with its own
@@ -413,8 +452,30 @@ them). Room 31's local 202 reads {0}, the sentence script {0, 1, 2, 3, 4, 6, 7}.
    equal (the readings below count them). Keying the recursive flag as it is would double room 31's local 202 in rooms
    31 and 33 (78,518 records against 47,052): it is started both with recursive false and with it unknown, which
    nothing tells apart.
-6. *Folding.* SIG_LIMIT now counts classes, not lists, so it folds fewer lists into args 0; that only keeps more
-   lists known. Its rule and the rewrite are unchanged.
+6. *Folding.* With the switch, SIG_LIMIT counts a wait point's lists apart from the slot's flags (`builder::flag_free`:
+   unit name, read locals, override count, cutscene data). That is a function of the list of all locals, so a wait
+   point has no more of these than lists of all locals, and the switch folds lists only where their lists of all
+   locals pass SIG_LIMIT too: a list's flag variants share one place. Counting the numbers instead (the first
+   version) could fold more than the reading without the switch: at k = 1, 19 wait points have more numbered lists with
+   the switch (room 38's local 202 at 1,740: 110 against 105), and one just under 1,024 would have folded lists the
+   reading without the switch kept. The rule for which lists fold (the first met are kept) and the rewrite are
+   unchanged, and without the switch the limit counts numbers as reader.py does.
+7. *What the switch leaves as it was.* Three behaviours of reader.py's rule are the same with the switch and without
+   it; the switch neither causes nor fixes them, and fixing them would change the reading without the switch.
+   - *Folding still loses paths.* At k = 1, 6 wait points have more than 1,024 lists either way (room 35's local 204
+     at 86 and local 205 at 66: 1,032; room 28's local 208 at 21 and 41: 1,026; local 209 at 56 and 33: 1,025): those
+     units read the locals that vary. Both readings fold 22 lists. Part I may have more such wait points.
+   - *An args-0 event with a known local.* At a wait point only the first args-0 event runs (`events_done` is keyed
+     (name, unit, w, 0, Esc)), and it can carry a local known as a number (a slot whose args are unknown set it before
+     waiting). Then a slot met there with another value of that local is not run, and no args-0 copy with unknown
+     locals is added for replans. Kitchen: room 28's local 220 at 16 wait points (2,292-2,300, 4,077-4,085,
+     5,173-5,181, 6,491-6,499) runs only Local[2] = 1, and at 4 of them an args-0 event with Local[2] = 2 is met and
+     not run. k = 1: 34 such wait points, with the switch and without.
+   - *The args-0 copy's flags.* The replan copy of a wait point's event takes the R and owned flags of the first known
+     list met there. At k = 1, 41 wait points have known lists with both R flags and an args-0 event with one, with
+     the switch and without (room 33's local 202 at 1 and 21; room 35's local 202 at 51, 52 and 98).
+   A replan slot at args 0 is where these matter; fix round 1's F10 replaces args 0 with the dumped slot's list
+   (below).
 
 **Measured** (the laptop, 2026-10-26, nice 10, other jobs running: wall times vary with the load).
 
@@ -450,6 +511,15 @@ them). Room 31's local 202 reads {0}, the sentence script {0, 1, 2, 3, 4, 6, 7}.
   count with its text rule was 10,015). Round 1's records were not measured: both attempts stopped at the 4.8 GB RSS
   guard at the same point, 193,710 records into round 1 (1,738,367 in the pass; peak VmHWM 4,952 and 5,022 MB), the
   second with `--max-waiting 2000` instead of 20,000, so one job's own run, not the records waiting, takes the memory.
+- *After the review's fixes* (the IR notes, the text codes' bytes, `list_number`, the flag-free SIG_LIMIT, `reader-port
+  read --packed`; 2026-10-26, load 1 to 5). No MI1 unit's S(u) changes. Without the switch: the fast tests, room 33
+  and the kitchen (`kitchen_reading_rust_machine`) are golden.py's; `reader-port read room33 --packed` and `read
+  kitchen --packed` give 0 differences (880 and 72,258 lines; the kitchen's packed file 71,729 actions, 527 folded); k =
+  1 with `--elsewhere` is the VM's (packed 3ceabe50..., golden lines 213e68f3..., 237,264 lines; 137 s on 3 threads).
+  With the switch, the readings are the ones before the fixes: room 33 and the kitchen give the same records and lists
+  (`room33_live_locals_on`, `kitchen_live_locals_on`), k = 1 and k = 2 the same packed files byte for byte (k = 1:
+  packed 590c6acf..., golden lines 8a1e143e..., 237,467 lines, 145 s, 1,079 MB; k = 2: packed 39200a67..., 519,755
+  records, 582 s, 2,894 MB). The harness tests: 88 passed, 2 slow ones deselected.
 - *Projection for Part I* (the diagnosis's per-run record counts on the measured runs): pass 1 about 3.0 M records
   (2.9 to 3.3 M): the inputs' 1.54 M, round 1 about 0.84 M (the sentence script's 7,732 runs at 103.5 records each, the
   2,364 others about 0.04 M), room 31's local 202 about 0.19 M, the other rounds 0.4 to 0.6 M. Both passes about 20 to
@@ -472,9 +542,11 @@ the switch (`task.live_locals`).
 **For fix round 1's F10** (branch fr1-c, which matches slots' dumped locals to built lists at a replan; not merged
 yet). Under this switch its matching must change, in Rust and in Python alike:
 
-- `dumped_events` (builder.rs) must restrict a dumped slot's locals with `LiveLocals::keep(unit, ..)` and number the
-  list with the slot's flags (`locals::recursive` for recursive), as `record` does, or the dumped slot's event gets a
-  number no record's list has and is read again.
+- `dumped_events` (builder.rs) must number a dumped slot's list with `Builder::list_number`, as `record` does: it
+  restricts the locals to S(u) and puts the slot's flags in the number (`locals::recursive` for recursive). Merging
+  F10 does not compile as it is (`sig` takes the flags now), and `sig` stops when the switch is on and no flags are
+  given (`live_locals_sig_needs_the_flags`), so passing `&[]` cannot give the dumped slot's event a number no record's
+  list has.
 - `list_matches` (task.rs, replay.py) must compare only the locals in S(u): skip every dumped local outside S(u)
   (`read_view` on the dump), keep "0 where the list lacks it" for a local in S(u), and keep the override count and
   cutscene data. Without this, no built list would match a slot whose unread locals are nonzero (the lists lack them,
