@@ -12,6 +12,7 @@
 //! `run_verb` and the input step, in `dialog.rs`) and row 5 (feature esc: `run_esc` and the abort, override and key
 //! steps, in `esc.rs`). Every feature of model.py is ported.
 
+mod actor_rooms;
 mod calls;
 mod dialog;
 mod draw_clears;
@@ -141,10 +142,14 @@ pub struct Switches {
     /// F5: drawObject's setXY moves the object (`objpos:O`), and the objects of the room with the drawn object's
     /// place and size go to state 0 (script_v5.cpp:1108-1128); loading a room puts its objects back (room.cpp:195)
     pub draw_clears: bool,
+    /// F9: an actor's room is a fact, `actorroom:A`: putActorInRoom and loadRoomWithEgo write it
+    /// (script_v5.cpp:2160-2196, 1857-1866), getActorRoom and actorFollowCamera read it (script_v5.cpp:1289-1322;
+    /// camera.cpp:62-70)
+    pub actor_rooms: bool,
 }
 
 /// Fix round 1's switches: in the Rust only (model.py's `SWITCHES` lacks them).
-pub const RUST_SWITCHES: &[&str] = &["draw_clears"];
+pub const RUST_SWITCHES: &[&str] = &["draw_clears", "actor_rooms"];
 
 impl Switches {
     pub fn parse(names: &[String]) -> Result<Switches, String> {
@@ -155,6 +160,7 @@ impl Switches {
                 "const_polls" => s.const_polls = true,
                 "esc_key_at_pre" => s.esc_key_at_pre = true,
                 "draw_clears" => s.draw_clears = true,
+                "actor_rooms" => s.actor_rooms = true,
                 _ => return Err(format!("unknown switch {n}")),
             }
         }
@@ -769,6 +775,8 @@ impl<'g> Machine<'g> {
         }
         match getter_kind(name) {
             Some(GetterKind::Fact) => {}
+            // F9 (switch actor_rooms): getActorRoom reads the actor's room fact (actor_rooms.rs)
+            Some(GetterKind::NonFact(_)) if name == known::GET_ACTOR_ROOM && self.switches.actor_rooms => {}
             Some(GetterKind::NonFact(r)) => return self.getter_unknown(r, name),
             None => return self.getter_unknown(Reason::Work, name),
         }
@@ -779,6 +787,11 @@ impl<'g> Machine<'g> {
             }
         }
         if let Some(&bad) = vals.iter().find(|&&v| self.v.is_plain(v)) {
+            if name == known::GET_ACTOR_ROOM {
+                // F9: the room of an actor not known is getActorRoom's non-fact, as with the switch off (the actor's
+                // unknown would say nothing of the room)
+                return self.getter_unknown(Reason::Actor, name);
+            }
             return bad;
         }
         if let Some(&s0) = vals.iter().find(|v| v.is_unknown()) {
@@ -867,6 +880,7 @@ impl<'g> Machine<'g> {
         match name {
             known::GET_OBJECT_OWNER => self.read(p, Fact::Owner(int(vals[0])), o),
             known::GET_OBJECT_STATE => self.read(p, Fact::State(int(vals[0])), o),
+            known::GET_ACTOR_ROOM => self.actor_room(p, o, int(vals[0])),
             known::IS_SCRIPT_RUNNING => {
                 let n = int(vals[0]);
                 if n == 0 {
@@ -1207,6 +1221,10 @@ impl<'g> Machine<'g> {
                         self.end(p, o, "unmodelled", c, false, None);
                     }
                     Effect::Write | Effect::End | Effect::Deferred => more = self.op(p, o, x, st),
+                    // F9 (switch actor_rooms): putActorInRoom writes the actor's room (actor_rooms.rs)
+                    Effect::None if name == known::PUT_ACTOR_IN_ROOM && self.switches.actor_rooms => {
+                        more = self.op(p, o, x, st)
+                    }
                     Effect::None => {}
                 }
                 if eff == Effect::End {
@@ -1639,6 +1657,7 @@ impl<'g> Machine<'g> {
             }
             known::SET_OBJECT_NAME => self.inventory_hook(p, o, x, 0, "setObjectName"),
             known::DRAW_OBJECT if self.switches.draw_clears => return self.draw_object_f5(p, o, x, args, subops),
+            known::PUT_ACTOR_IN_ROOM => return self.put_actor_in_room(p, o, x, args),
             known::DRAW_OBJECT => {
                 let ob = self.val(p, o, args[0], Some(x));
                 let mut state = Val::Int(1);
@@ -1752,6 +1771,7 @@ impl<'g> Machine<'g> {
             known::LOAD_ROOM_WITH_EGO => {
                 let obj = self.val(p, o, args[0], Some(x));
                 let room = self.val(p, o, args[1], Some(x));
+                self.ego_room(p, o, x, room); // F9 (switch actor_rooms), actor_rooms.rs
                 if self.calls {
                     // o5_loadRoomWithEgo (script_v5.cpp:1857-1902): VAR_WALKTO_OBJ = obj, startScene(room, ego,
                     // obj), VAR_WALKTO_OBJ = 0 (room_change), then setCameraFollows(ego): a possible setCameraAt
@@ -1777,12 +1797,48 @@ impl<'g> Machine<'g> {
             }
             known::ACTOR_FOLLOW_CAMERA => {
                 let a = self.val(p, o, args[0], Some(x));
-                let mut q = p.fork();
                 let what = format!("room of actor {}", self.show(a));
-                let why = rc(&format!("?(actor state: {what})"));
-                let cond = rc(&format!("actor {} in the current room", self.show_e(args[0])));
-                p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
-                q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+                // F9 (switch actor_rooms): the actor's room against the current room (camera.cpp:68-70), and the room
+                // a change goes to (actor_rooms.rs). With the switch off, an actor not known, or a room not known (a
+                // plain unknown: not held, or the reader's non-fact), model.py's fork on a non-fact
+                let (inroom, aroom) = match a {
+                    Val::Int(n) if self.switches.actor_rooms => {
+                        if !(0..NUM_ACTORS).contains(&n) {
+                            let d = format!("actorFollowCamera: actor {n} is no actor (derefActor's error(), actor.cpp:2281-2293)");
+                            self.error(p, "no such actor", cite, &d, true);
+                            return Vec::new();
+                        }
+                        // decided only on rooms the path already has: these reads never fork (`read_soft`; a
+                        // reader would fork on every pair of the actor's rooms and the current room's), and the
+                        // current room is read only when the actor's is known
+                        let r = self.read_soft(p, Fact::ActorRoom(n), o);
+                        match r {
+                            Val::Int(_) => {
+                                let cur = self.read_soft(p, Fact::Room, o);
+                                (Some(self.v.decide(&[r, cur], |v| v[0] == v[1])), Some(r))
+                            }
+                            Val::Unk(_) if self.v.is_plain(r) => (None, None),
+                            Val::Unk(_) => (Some(Dec::Unk(r)), Some(r)),
+                        }
+                    }
+                    _ => (None, None),
+                };
+                // the sides: in the current room (no room change), elsewhere (the room change)
+                let (stay, go) = match inroom {
+                    Some(Dec::Bool(true)) => (true, None),
+                    Some(Dec::Bool(false)) => (false, None),
+                    _ => {
+                        let mut q = p.fork();
+                        let why = match inroom {
+                            Some(Dec::Unk(u)) => rc(&self.show(u)),
+                            _ => rc(&format!("?(actor state: {what})")),
+                        };
+                        let cond = rc(&format!("actor {} in the current room", self.show_e(args[0])));
+                        p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
+                        q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+                        (true, Some(q))
+                    }
+                };
                 if self.calls {
                     // actorFollowCamera (camera.cpp:201-212): setCameraFollows (camera.cpp:62-86) changes the room
                     // when the actor is elsewhere and then always calls setCameraAt, so the scroll hook runs
@@ -1794,22 +1850,52 @@ impl<'g> Machine<'g> {
                         Step::Note(rc("a second inventory hook run when the followed actor changed (camera.cpp:207-208) \
                                        is not run: camera._follows is not a fact")),
                     ];
+                    let change = |m: &mut Self, q: &mut Path| {
+                        let r = match aroom {
+                            Some(r) => r,
+                            None => m.v.mk(Reason::Actor, what.clone()),
+                        };
+                        let mut steps = m.scene_steps(r, None);
+                        steps.push(Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() });
+                        steps.extend(tail.iter().cloned());
+                        m.push_call(q, rc("actorFollowCamera"), cite.clone(), steps, true);
+                    };
+                    if !stay {
+                        change(self, p);
+                        return Vec::new();
+                    }
                     self.push_call(p, rc("actorFollowCamera"), cite.clone(), tail.to_vec(), true);
-                    let r = self.v.mk(Reason::Actor, what);
-                    let mut steps = self.scene_steps(r, None);
-                    steps.push(Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() });
-                    steps.extend(tail);
-                    self.push_call(&mut q, rc("actorFollowCamera"), cite, steps, true);
-                    return vec![q];
+                    return match go {
+                        Some(mut q) => {
+                            change(self, &mut q);
+                            vec![q]
+                        }
+                        None => Vec::new(),
+                    };
                 }
                 // setCameraFollows runs the inventory hook last, also after a room change (camera.cpp:61-86)
-                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
-                self.hook(&mut q, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
-                if q.end.is_none() {
-                    let r = self.v.mk(Reason::Actor, what);
-                    self.room_change(&mut q, o, r, x, "actorFollowCamera");
+                let change = |m: &mut Self, q: &mut Path| {
+                    m.hook(q, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
+                    if q.end.is_none() {
+                        let r = match aroom {
+                            Some(r) => r,
+                            None => m.v.mk(Reason::Actor, what.clone()),
+                        };
+                        m.room_change(q, o, r, x, "actorFollowCamera");
+                    }
+                };
+                if !stay {
+                    change(self, p);
+                    return Vec::new();
                 }
-                return vec![q];
+                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
+                return match go {
+                    Some(mut q) => {
+                        change(self, &mut q);
+                        vec![q]
+                    }
+                    None => Vec::new(),
+                };
             }
             known::SET_CAMERA_AT => {
                 if self.calls {

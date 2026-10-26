@@ -181,3 +181,164 @@ fn f5_room_load_resets_places() {
     let r = m.run_entry(&o, 911, 11, None);
     assert!(r.paths.iter().all(|p| movable.iter().all(|&ob| w(p, Fact::ObjPos(ob)).is_none())));
 }
+
+// --- F9, actor_rooms ---------------------------------------------------------------------------------------------
+
+fn holds(p: &Path, what: &str) -> bool {
+    p.assumptions.iter().any(|a| a.why.contains(what))
+}
+
+/// The bar door's local 203 tests the cook's room (getActorRoom(6) == 28), then his x in 28, or waits for the ego
+/// elsewhere: three outcomes, four paths (WaitForActor forks on whether the ego still moves). On, every path holds
+/// `actorroom:6` (here not held, as in the ground truth); off, getActorRoom's non-fact. With the room known the room
+/// test is decided: 28 leaves the two x paths, 0 the two waiting paths (no sentence script on either).
+#[test]
+fn f9_local_203_paths_hold_the_cooks_room() {
+    let g = game();
+    let door = UnitKey::Local(28, 203);
+    let base = [(Fact::Room, 28), (Fact::Var(196), 0), (Fact::Var(1), 1)];
+    let room_side = |p: &Path| p.assumptions.iter().find(|a| a.cond.as_ref() == "VAR_RESULT == 28").map(|a| format!("{:?}", a.side));
+    let x_test = |p: &Path| p.assumptions.iter().any(|a| a.cond.as_ref() == "VAR_RESULT > 310");
+    let gt = oracle(&base, Some(GROUND_TRUTH));
+    let mut m = Machine::new(g, features(0), switches(&["actor_rooms"]));
+    let r = run_at(&mut m, &gt, door, 0, vec![], 5000);
+    assert_eq!(r.paths.len(), 4);
+    for p in &r.paths {
+        assert!(holds(p, "actorroom:6"), "every path holds the cook's room");
+        let in28 = room_side(p).expect("the room test") == "Bool(true)";
+        assert_eq!(in28, x_test(p), "the x test only in room 28");
+    }
+    let mut m = Machine::new(g, features(0), Switches::default());
+    let r = run_at(&mut m, &gt, door, 0, vec![], 5000);
+    assert_eq!(r.paths.len(), 4);
+    assert!(r.paths.iter().all(|p| !holds(p, "actorroom:6") && holds(p, "getActorRoom")));
+    for (room, in28) in [(28, true), (0, false)] {
+        let mut facts = base.to_vec();
+        facts.push((Fact::ActorRoom(6), room));
+        let o = oracle(&facts, None);
+        let mut m = Machine::new(g, features(0), switches(&["actor_rooms"]));
+        let r = run_at(&mut m, &o, door, 0, vec![], 5000);
+        assert_eq!(r.paths.len(), 2, "cook in room {room}");
+        assert!(r.paths.iter().all(|p| room_side(p).is_none() && x_test(p) == in28), "cook in room {room}: decided");
+    }
+}
+
+/// putActorInRoom writes the actor's room (local 211's first statement puts the cook in room 0); local 216 then reads
+/// it: in 28 already it does nothing, elsewhere it puts him in 28.
+#[test]
+fn f9_put_actor_in_room_and_read_back() {
+    let g = game();
+    let o = oracle(&[(Fact::Room, 28)], None);
+    for on in [false, true] {
+        let sw = if on { switches(&["actor_rooms"]) } else { Switches::default() };
+        let mut m = Machine::new(g, features(0), sw);
+        let r = run_at(&mut m, &o, UnitKey::Local(28, 211), 0, vec![], 1);
+        assert_eq!(w(&r.paths[0], Fact::ActorRoom(6)), if on { Some(Val::Int(0)) } else { None });
+    }
+    for (room, writes) in [(28, None), (0, Some(Val::Int(28)))] {
+        let o = oracle(&[(Fact::Room, 28), (Fact::ActorRoom(6), room)], None);
+        let mut m = Machine::new(g, features(0), switches(&["actor_rooms"]));
+        let r = run_at(&mut m, &o, UnitKey::Local(28, 216), 0, vec![], 4);
+        assert_eq!(r.paths.len(), 1, "the room test is decided");
+        assert_eq!(w(&r.paths[0], Fact::ActorRoom(6)), writes, "cook in room {room}");
+    }
+}
+
+/// The assumptions of each path, as text: (where, condition, side, why).
+fn sides(r: &Run) -> Vec<Vec<String>> {
+    r.paths.iter().map(|p| p.assumptions.iter().map(|a| format!("{} {} {:?} {}", a.cite, a.cond, a.side, a.why)).collect()).collect()
+}
+
+/// actorFollowCamera(VAR_EGO) (global 34): with the ego's room known it is decided, no fork; the room change goes to
+/// the ego's room. Not held (the ground truth), the room is not known: model.py's fork on "room of actor 1", the same
+/// paths as with the switch off.
+#[test]
+fn f9_actor_follow_camera() {
+    let g = game();
+    let unit = UnitKey::Global(34);
+    let base = [(Fact::Room, 28), (Fact::Var(1), 1)];
+    for (ego_room, change) in [(28, None), (33, Some(Val::Int(33)))] {
+        let mut facts = base.to_vec();
+        facts.push((Fact::ActorRoom(1), ego_room));
+        let o = oracle(&facts, None);
+        let mut m = Machine::new(g, features(0), switches(&["actor_rooms"]));
+        let r = run_at(&mut m, &o, unit, 0x0068, vec![], 1);
+        assert_eq!(r.paths.len(), 1, "decided");
+        assert_eq!(w(&r.paths[0], Fact::Room), change, "the ego in room {ego_room}");
+    }
+    let gt = oracle(&base, Some(GROUND_TRUTH));
+    let runs: Vec<Run> = [true, false]
+        .into_iter()
+        .map(|on| {
+            let sw = if on { switches(&["actor_rooms"]) } else { Switches::default() };
+            run_at(&mut Machine::new(g, features(0), sw), &gt, unit, 0x0068, vec![], 1)
+        })
+        .collect();
+    assert_eq!(runs[0].paths.len(), 2, "a fork");
+    assert!(runs[0].paths.iter().all(|p| holds(p, "room of actor 1")));
+    assert_eq!(sides(&runs[0]), sides(&runs[1]), "on and off fork alike");
+    let rooms = |r: &Run| r.paths.iter().map(|p| w(p, Fact::Room).map(|v| v.is_unknown())).collect::<Vec<_>>();
+    assert_eq!(rooms(&runs[0]), vec![None, Some(true)], "stays, or changes to the actor's unknown room");
+    assert_eq!(rooms(&runs[0]), rooms(&runs[1]));
+}
+
+/// The end of a sword fight (global 114 after its fight script ends): putActorInRoom(VAR_EGO, 85) and
+/// actorFollowCamera(VAR_EGO) in room 49. On, the ego's room is written, so the camera's test is decided: the room
+/// changes to 85, one path. Off, model.py's fork: a path that stays in 49 (which the engine cannot take) and one that
+/// changes to the unknown "room of actor 1".
+#[test]
+fn f9_fight_end_changes_the_room() {
+    let g = game();
+    let gt = oracle(&[(Fact::Room, 49), (Fact::Var(1), 1)], Some(GROUND_TRUTH));
+    let mut m = Machine::new(g, features(0), switches(&["actor_rooms"]));
+    let r = run_at(&mut m, &gt, UnitKey::Global(114), 0x006E, vec![(0, Val::Int(100)), (1, Val::Int(120))], 3);
+    assert_eq!(r.paths.len(), 1, "decided");
+    assert_eq!(w(&r.paths[0], Fact::ActorRoom(1)), Some(Val::Int(85)));
+    assert_eq!(w(&r.paths[0], Fact::Room), Some(Val::Int(85)));
+    assert!(!holds(&r.paths[0], "room of actor"));
+    let mut m = Machine::new(g, features(0), Switches::default());
+    let r = run_at(&mut m, &gt, UnitKey::Global(114), 0x006E, vec![(0, Val::Int(100)), (1, Val::Int(120))], 3);
+    assert_eq!(r.paths.len(), 2, "model.py's fork");
+    assert!(r.paths.iter().all(|p| holds(p, "room of actor 1")));
+}
+
+/// getActorRoom(VAR_EGO) (global 37) with VAR_EGO not held: the actor is not known, so the room reads as
+/// getActorRoom's non-fact, on as off. With VAR_EGO held (1) and the ego's room (28 = VAR_ROOM), the test is decided.
+#[test]
+fn f9_get_actor_room_of_an_unknown_actor() {
+    let g = game();
+    let unit = UnitKey::Global(37);
+    let o = oracle(&[(Fact::Room, 28), (Fact::ActorRoom(1), 28)], Some(&["room", "actorroom"]));
+    let runs: Vec<Run> = [true, false]
+        .into_iter()
+        .map(|on| {
+            let sw = if on { switches(&["actor_rooms"]) } else { Switches::default() };
+            run_at(&mut Machine::new(g, features(0), sw), &o, unit, 0x007C, vec![], 2)
+        })
+        .collect();
+    assert_eq!(runs[0].paths.len(), 2);
+    assert!(runs[0].paths.iter().all(|p| holds(p, "getActorRoom")));
+    assert_eq!(sides(&runs[0]), sides(&runs[1]), "on and off alike");
+    let o = oracle(&[(Fact::Room, 28), (Fact::Var(1), 1), (Fact::Var(4), 28), (Fact::ActorRoom(1), 28)], None);
+    let mut m = Machine::new(g, features(0), switches(&["actor_rooms"]));
+    let r = run_at(&mut m, &o, unit, 0x007C, vec![], 2);
+    assert_eq!(r.paths.len(), 1, "the ego is in room 28: the test is decided");
+}
+
+/// loadRoomWithEgo puts the ego in the new room before its startScene (script_v5.cpp:1866): Mêlée's fork walks the
+/// ego (actor 1) into pseudo room 218.
+#[test]
+fn f9_load_room_with_ego() {
+    let g = game();
+    let facts = [(Fact::Room, 85), (Fact::Var(1), 1), (Fact::Ego, 1), (Fact::Owner(911), 15), (Fact::Owner(687), 15)];
+    let o = oracle(&facts, Some(GROUND_TRUTH));
+    for on in [false, true] {
+        let sw = if on { switches(&["actor_rooms"]) } else { Switches::default() };
+        let mut m = Machine::new(g, features(2), sw);
+        let r = m.run_entry(&o, 911, 11, None);
+        assert!(!r.paths.is_empty());
+        for p in &r.paths {
+            assert_eq!(w(p, Fact::ActorRoom(1)), if on { Some(Val::Int(218)) } else { None });
+        }
+    }
+}
