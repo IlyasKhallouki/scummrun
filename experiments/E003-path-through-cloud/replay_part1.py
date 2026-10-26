@@ -7,8 +7,10 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
                        results/start-part1.jsonl's seed N; ``--goal part1`` is results/end-part1.json)
        replay_part1.py export-pickle PICKLE --goal ... --name NAME --start-name TEXT --out DIR   (a pickled reading)
        replay_part1.py read-rust ROOMS --seed N --goal FACT=V[,FACT=V] --name NAME --out DIR [--threads 3]
+                       [--elsewhere] [--live-locals]
                        (a reading from the Rust reader, scumm/target/release/reader-scope, with golden.read_scope's
-                       domains (no goal), made into the three files and the lists by packed_reading.reading_from_golden)
+                       domains (no goal), made into the three files and the lists by packed_reading.reading_from_golden;
+                       the two switches are reader-scope's, off by default)
        replay_part1.py control DIR/reading.json           (the control's reading next to it: DIR/control.json)
        replay_part1.py start SEED [SEED ...] --reading DIR/reading.json [--results DIR]
                        (the start check only, no goal run)
@@ -238,11 +240,14 @@ def goal_text_of(goal: dict) -> str:
 
 
 def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, threads: int = 3,
-              slot_locals: list | None = None, domain_goals: str = "none") -> Path:
+              slot_locals: list | None = None, domain_goals: str = "none", elsewhere: bool = False,
+              live_locals: bool = False) -> Path:
     """A reading from the Rust reader (module docstring): reader-scope on ``rooms`` from results/start-part1.jsonl's
     seed ``seed`` (``domain_goals`` "none": golden.read_scope's domains), its records kept and written in golden.py's
     format, then packed_reading.reading_from_golden: the three files and the lists. ``slot_locals`` (F10): slots
-    whose events are read from their dumped locals (reader-scope ``--slot-locals``). Returns reading.json."""
+    whose events are read from their dumped locals (reader-scope ``--slot-locals``). ``elsewhere`` and
+    ``live_locals``: reader-scope's switches ``--elsewhere`` and ``--live-locals`` (reading.json then says
+    ``"elsewhere": true``, and has ``live_locals``). Returns reading.json."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     row = start_row(seed)
@@ -252,6 +257,10 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
            "--domain-goals", domain_goals, "--goal", goal_text, "--name", name, "--threads", str(threads),
            "--out", str(out), "--packed", str(out / f"{name}.rust.tc"), "--keep", "--lines",
            str(out / f"{name}.golden.jsonl.gz")]
+    if elsewhere:
+        cmd.append("--elsewhere")
+    if live_locals:
+        cmd.append("--live-locals")
     if slot_locals:
         sl = out / "slot-locals.jsonl"
         sl.write_text("".join(json.dumps(x) + "\n" for x in slot_locals))
@@ -272,7 +281,8 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
                                                                                  "peak_rss_mb", "threads",
                                                                                  "slot_locals")},
                                         "slot_locals": slot_locals or [],
-                                        "sources": {n: sha(HERE / n) for n in ("packed_reading.py",)}})
+                                        "sources": {n: sha(HERE / n) for n in ("packed_reading.py",)},
+                                        **({"elsewhere": True} if elsewhere else {})})
     (out / f"{name}.rust.tc").unlink(missing_ok=True)  # reading_from_golden copied it to reading.tc
     # the lists the dumped slots' events were read with: no record's next event, so the lists file lacks them
     head = Path(info["json"])
@@ -295,19 +305,23 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
 
 def rereader(rd, run_dir: Path, control: bool, threads: int):
     """F10's ``reread`` for the harness (module docstring): the reading's scope again, from its start, with the
-    slots' dumped locals; its control too with ``control``. Each in run_dir/reread-NN."""
+    slots' dumped locals and the reading's own switches (``--elsewhere``: reading.json says so, or its domains hold
+    ELSEWHERE; ``--live-locals``: reading.json has ``live_locals``); its control too with ``control``. Each in
+    run_dir/reread-NN."""
     doc = rd.doc
     m = re.fullmatch(r"results/start-part1\.jsonl seed (\d+)", doc["start"]["name"])
     if m is None:
         raise SystemExit(f"--reread needs a reading of results/start-part1.jsonl's starts, not {doc['start']['name']}")
     seed, rooms = int(m[1]), tuple(doc["scope"]["rooms"])
     goal = goal_text_of(doc["goal"])
+    elsewhere = bool(doc.get("elsewhere")) or bool(getattr(rd.b, "elsewhere", None))
+    live_locals = doc.get("live_locals") is not None
     count = [0]
 
     def reread(slots: list, h) -> PR.Reading:
         count[0] += 1
         path = read_rust(rooms, seed, goal, f"reread-{count[0]:02d}", run_dir / f"reread-{count[0]:02d}", threads,
-                         slots, doc.get("domain_goals", "none"))
+                         slots, doc.get("domain_goals", "none"), elsewhere=elsewhere, live_locals=live_locals)
         if control:
             path = make_control(path)
         return PR.load_reading(path)
@@ -786,6 +800,8 @@ def main() -> None:
     rr.add_argument("--name", required=True)
     rr.add_argument("--out", type=Path, required=True)
     rr.add_argument("--threads", type=int, default=3)
+    rr.add_argument("--elsewhere", action="store_true", help="reader-scope's switch --elsewhere")
+    rr.add_argument("--live-locals", action="store_true", help="reader-scope's switch --live-locals")
     c = sub.add_parser("control")
     c.add_argument("reading", type=Path)
     s = sub.add_parser("start")
@@ -817,7 +833,8 @@ def main() -> None:
     elif a.cmd == "export-pickle":
         print(json.dumps(export_pickle(a.pickle, a.goal, a.name, a.start_name, a.out), indent=1))
     elif a.cmd == "read-rust":
-        print(read_rust(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out, a.threads))
+        print(read_rust(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out, a.threads,
+                        elsewhere=a.elsewhere, live_locals=a.live_locals))
     elif a.cmd == "control":
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
