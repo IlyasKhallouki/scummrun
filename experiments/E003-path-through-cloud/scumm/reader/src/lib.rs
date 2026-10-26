@@ -12,6 +12,7 @@
 //!   from the Python reading (the oracle for the Builder's half until the Rust machine lands).
 
 pub mod builder;
+pub mod costs;
 pub mod domain;
 pub mod domains;
 pub mod due;

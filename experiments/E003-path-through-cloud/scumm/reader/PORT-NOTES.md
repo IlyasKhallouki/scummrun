@@ -573,6 +573,36 @@ replan. The control's one replan (frame 6376) starts with 1 live slot at args 0 
 from its dumped locals and flags, and then 0 slots are at args 0 (local 202 and global 23 match a built list). Both
 verify from boot with 0 differences (results/replay-part1-bar-door-ll.log).
 
+## Frame costs, as a switch
+
+**The finding.** Every action cost 1 (build_task's `cost: 1`), so the planner minimized records, not game time. The
+step 5 kitchen run took 13,141 frames (1,095 s) for a 7-step plan.
+
+**The switch**: `--frame-costs` (`reader-port read`, `reader-scope`), off by default; `Builder.frame_costs` and
+`RecordStream.costs` (`costs.rs`). Each record gets a cost in engine frames that is a lower bound of its own duration,
+from the engine source and the scripts (the rule and its source lines are in `costs.rs`' module docstring):
+
+- an input: one frame per key or click the harness plays (a sentence 2, or 3 with B; a walk, a dialog line, an Esc 1);
+- an event: the frames from its slot's yield to its turn: breakHere 1; delay N `floor(N / dmax) + 1`; delayVariable
+  the same with the event's value, or the least value of the last assignment on the straight code before it;
+  WaitForMessage after a talk on text slot 0 on the straight code before it `sum over parts of max(1, ceil((60 + n *
+  VAR_CHARINC) / dmax)) + 1`; any other wait 1;
+- `dmax` = VAR_TIMER_NEXT (at most 15) where no unit of the scope writes it, else 15; VAR_CHARINC likewise, else each
+  message part counts 1 frame.
+
+Every cost is at least 1, so taskcore's soundness notes (costs of at least 1) still hold. The cost goes into build_task's
+fold key (`task::fold_key_cost`, `fold_hash_cost`, `fold_parts_cost`): two records that differ only in cost stay two
+actions. The packed format already had a cost word. The reading's head gets the parameters (`frame_costs`), which
+`packed_reading.py from-golden` copies into reading.json; the records are unchanged.
+
+**With the switch off** every output is as before: the kitchen reading's packed file is byte for byte main's
+(`reader-port read kitchen --packed`, sha1 279b7a24, the same with the binary built from main), and the reading equals
+golden.py's (72,258 lines, 0 differences). **With it on** the records still equal golden.py's (the head's
+`frame_costs` key left out of the comparison), and the kitchen gives the same 71,729 actions (527 folded): no two of
+its records differ in cost alone. `tests/frame_costs.rs` checks the kitchen's clock (dmax 5, VAR_CHARINC 0 at S1#7)
+and its wait points, and costs every golden record (each at least 1; the cook's timer, room 28's local 211 at
+[0021], at least 361 frames).
+
 ## Python behaviours kept on purpose, and the differences
 
 1. **The scope-1 finding, kept with the switch off.** `Builder.positions` turns a write of
@@ -739,7 +769,8 @@ for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
 - `src/`: the modules above; `src/bin/reader_port.rs` (`reader-port static | records NAME | replay NAME |
   runs NAME | dump-runs NAME --runs N,... | read NAME [--switches S] [--live-locals] [--elsewhere] | task --out DIR |
   stream --out FILE | bench-task --out DIR | bench | due-engine FRAMES`).
-- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens.
+- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens;
+  `tests/frame_costs.rs`: the switch `--frame-costs` (`src/costs.rs`) on the kitchen.
 - `../../reader_port_oracle.py`: the Python oracles (new file; no existing .py file changed).
 - `../../reader_run_dump.py`: chosen runs made again in Python and written whole (new file).
 - `../machine/src/machine/hooks.rs`: the hook points (Machine changes, above).

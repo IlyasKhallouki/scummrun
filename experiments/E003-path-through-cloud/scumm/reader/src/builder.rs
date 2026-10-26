@@ -321,6 +321,8 @@ pub struct Builder<'g> {
     fact_info: FxHashMap<String, std::rc::Rc<(Kind, Option<Domain>)>>,
     /// false: the records go to the sink and are not kept (`records` stays empty, so memory does not grow with
     /// the record count); the reading is the same, `n_records` counts them
+    /// the switch `--frame-costs` (costs.rs): each record's cost in engine frames; None: every record costs 1
+    pub frame_costs: Option<std::sync::Arc<crate::costs::FrameCosts>>,
     pub keep_records: bool,
     /// the pass's records so far (`len(self.records)`)
     pub n_records: usize,
@@ -499,6 +501,7 @@ impl<'g> Builder<'g> {
             widened: Vec::new(),
             slot_locals: Vec::new(),
             slot_events: Vec::new(),
+            frame_costs: None,
         }
     }
 
@@ -1983,6 +1986,10 @@ impl<'g> Builder<'g> {
         put("universe", Py::strs(&self.scope.universe));
         put("scope_counts", self.scope.counts.py());
         put("n_records", Py::Int(if self.keep_records { self.records.len() } else { self.n_records } as i64));
+        if let Some(fc) = &self.frame_costs {
+            // the switch --frame-costs: its parameters (costs.rs); absent with the switch off
+            put("frame_costs", fc.py());
+        }
         if let Some(ll) = &self.table.live_locals {
             // the switch --live-locals: every unit's read locals (None: all), keyed by its slot's name in the engine's
             // state (`local:N@R`, `entry@R`, `exit@R` for room R's code); absent with the switch off

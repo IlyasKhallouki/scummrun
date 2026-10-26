@@ -12,7 +12,8 @@ use crate::facts::Facts;
 use crate::py::Counter;
 use crate::record::Record;
 use crate::table::FactTable;
-use crate::task::{fold_hash, fold_parts, record_action, FoldParts, TEffect, Task};
+use crate::costs::FrameCosts;
+use crate::task::{fold_hash_cost, fold_parts_cost, record_action, FoldParts, TEffect, Task};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeSet;
 use std::fs::File;
@@ -312,15 +313,17 @@ pub fn export_records(
     let mut seen: FxHashSet<[u8; 16]> = FxHashSet::default();
     let mut folded = 0;
     let mut counts = Counter::default();
+    let costs = b.frame_costs.clone();
     {
         let dom = table_dom(&b.table);
         for (i, r) in records.iter().enumerate() {
-            if !seen.insert(fold_hash(r)) {
+            let cost = costs.as_ref().map(|fc| fc.cost(r));
+            if !seen.insert(fold_hash_cost(r, cost)) {
                 folded += 1;
                 continue;
             }
             let (pre, effects) = record_action(&b.table, r, &mut counts);
-            w.action(i as u32, &r.label, &r.kind, r.end_text(), &cont(r), 1, &pre, &effects, &|k, v| dom(k).label_of(v).unwrap_or(v))?;
+            w.action(i as u32, &r.label, &r.kind, r.end_text(), &cont(r), cost.unwrap_or(1), &pre, &effects, &|k, v| dom(k).label_of(v).unwrap_or(v))?;
         }
     }
     let info = w.close(goal, starts, &table_dom(&b.table))?;
@@ -376,6 +379,8 @@ pub struct RecordStream {
     /// the bounds of each fact's domain (`low`, `high`), which alone decide how a value is labelled: kept for the
     /// pass (an `args:`, `pos:` or `escpos:` domain grows within a pass, but never has bounds)
     bounds: FxHashMap<String, (Option<i64>, Option<i64>)>,
+    /// the switch `--frame-costs` (costs.rs): each record's cost, in its fold key too; None: every record costs 1
+    pub costs: Option<std::sync::Arc<FrameCosts>>,
 }
 
 const STEP_ROOM: &str = "steps that need room in their domain (a precondition)";
@@ -389,6 +394,7 @@ impl RecordStream {
             folded_written: 0,
             written: Vec::new(),
             bounds: FxHashMap::default(),
+            costs: None,
         })
     }
 
@@ -445,14 +451,15 @@ impl RecordStream {
         };
         let mut counts = Counter::default();
         for (j, r) in recs.iter().enumerate() {
-            let parts = fold_parts(r);
+            let cost = self.costs.as_ref().map(|fc| fc.cost(r));
+            let parts = fold_parts_cost(r, cost);
             if !self.seen.insert(parts.hash_after(&none)) {
                 self.folded_written += 1;
                 continue;
             }
             counts.clear();
             let (pre, effects) = record_action(table, r, &mut counts);
-            w.action((first + j) as u32, &r.label, &r.kind, r.end_text(), &cont(r), 1, &pre, &effects, &lab)?;
+            w.action((first + j) as u32, &r.label, &r.kind, r.end_text(), &cont(r), cost.unwrap_or(1), &pre, &effects, &lab)?;
             self.written.push((parts, counts.get(STEP_ROOM) as u32));
         }
         Ok(())
