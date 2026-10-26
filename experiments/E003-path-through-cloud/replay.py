@@ -92,7 +92,10 @@ What the harness does, per plan step (plan.md step 5, with D5):
   ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``; a ``write_sas`` error
   (task.py raises ValueError) stops the run with its reason. Each plan's entry keeps the time to write the task
   (``write_s``), the planner's (``seconds``), the operators, the steps and the landmarks lama-first dumped
-  (``landmarks``: how many, and the game facts of the first plan's, ``Harness.landmarks``).
+  (``landmarks``: how many, and the game facts of the first plan's, ``Harness.landmarks``). With
+  ``taskcore_serve`` (off by default) the taskcore planner keeps one taskcore process per packed file and replans
+  without loading the reading again (plan_fd ``serve``): the same files, so the same plans; each plan's entry also
+  keeps the server's reply (``serve``).
 * **A step that is several paths** (taskcore only): a folded step whose paths the plan cannot tell apart, because they
   differ only on facts the reduced file does not hold and whose predicted value is unknown (``plan_fd.predict`` with
   ``choices``), is chosen in the engine when it is played: the path whose precondition holds in the engine's state,
@@ -969,7 +972,7 @@ class Harness:
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
                  progress=None, planner: str = "taskcore", packed=None, search: str = "lama-first", workdir=None,
                  taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None,
-                 slot_locals: bool = False, lists: dict | None = None, reread=None):
+                 slot_locals: bool = False, lists: dict | None = None, reread=None, taskcore_serve: bool = False):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         if reread is not None and planner != "taskcore":
@@ -983,6 +986,11 @@ class Harness:
         self.rereads: list = []  # per reading made again: the plan, the frame, the slots, the seconds, the actions
         self.slot_detail = None  # the last F10 replan's live slots (``_replan_locals``), for the plan's entry
         self.planner, self.packed, self.search, self.taskcore_args = planner, packed, search, tuple(taskcore_args)
+        # the taskcore planner without reloading (plan_fd ``serve``, off by default): one long-lived taskcore per
+        # packed file keeps what does not depend on the start; the files and so the plans are the same
+        self.taskcore_serve = taskcore_serve
+        if taskcore_serve and planner != "taskcore":
+            raise ValueError("taskcore_serve is the taskcore planner's")
         self.memory_limit = memory_limit
         self.on_plan = on_plan  # called with the harness after each plan (the caller's snapshot of ``result``)
         self.workdir = Path(workdir) if workdir is not None else None
@@ -1224,7 +1232,7 @@ class Harness:
             res = plan_fd.plan_taskcore(self.packed, self.base.facts, self.goal, self.pieces, start, self.bans,
                                         time_limit=self.plan_time, memory_limit=self.memory_limit,
                                         search=self.search, workdir=self.workdir / f"plan-{n:03d}",
-                                        args=self.taskcore_args, keep=self.keep_files)
+                                        args=self.taskcore_args, keep=self.keep_files, serve=self.taskcore_serve)
         except (plan_fd.PathChoice, plan_fd.TaskcoreError) as e:
             entry.update(status="path choice" if isinstance(e, plan_fd.PathChoice) else "taskcore error",
                          error=str(e), steps=[])
@@ -1237,6 +1245,8 @@ class Harness:
                      needed_facts=len(res.needed_facts),
                      input_check_misses=sc.get("facts_the_input_check_stops_on"),
                      choices={str(i): [p.name for p in ps] for i, ps in res.choices.items()})
+        if self.taskcore_serve:
+            entry["serve"] = res.serve
         self._landmarks(entry, res)
         if res.status == "out of domain":
             entry.update(misses=res.misses, steps=[])
