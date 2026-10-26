@@ -165,3 +165,33 @@ fn screen_lefts() {
     assert_eq!(screen_lefts(1008), (0, 688));
     assert_eq!(screen_lefts(8), (-312, 0));
 }
+
+// F9 and F12 together (fix round 1's merge): getActorRoom of actorFromPos's value set reads each actor's room fact
+// (here all 0: the oracle holds every family), so a test on it is decided; getActorRoom of a range (the mouse x) is an
+// actor not known, so it reads as getActorRoom's non-fact, as with actor_rooms off, and the test forks.
+const ACTOR_ROOM: &str = "[0000] (D5) Local[3] = actorFromPos(VAR_VIRT_MOUSE_X,VAR_VIRT_MOUSE_Y);\n\
+                          [0007] (03) Local[4] = getActorRoom(Local[3]);\n\
+                          [000B] (48) if (Local[4] == 5) /*0015*/ {\n\
+                          [0012] (1A)   Var[305] = 1;\n\
+                          [0015] (**) }\n\
+                          [0015] (03) Local[5] = getActorRoom(VAR_VIRT_MOUSE_X);\n\
+                          [0019] (48) if (Local[5] == 5) /*0023*/ {\n\
+                          [0020] (1A)   Var[306] = 1;\n\
+                          [0023] (**) }\n\
+                          [0023] (A0) stopObjectCode();";
+
+#[test]
+fn actor_room_of_value_sets() {
+    let g = game(&[(13, ACTOR_ROOM)]);
+    let both = click(&g, 13, "value_sets,actor_rooms");
+    let c = all_conds(&both);
+    assert!(!c.contains(&"Local[4] == 5".to_string()), "both: every actor's room is 0: {c:?}");
+    assert!((0..both.paths.len()).all(|p| var(&both, p, 305).is_none()));
+    assert!(c.contains(&"Local[5] == 5".to_string()), "both: the room of a range forks: {c:?}");
+    let why: Vec<String> = both.paths.iter().flat_map(|p| p.assumptions.iter().map(|a| a.why.to_string())).collect();
+    assert!(why.iter().any(|w| w.contains("getActorRoom")), "both: getActorRoom's non-fact: {why:?}");
+    for sw in ["value_sets", ""] {
+        let c = all_conds(&click(&g, 13, sw));
+        assert!(c.contains(&"Local[4] == 5".to_string()), "{sw}: getActorRoom is a non-fact: {c:?}");
+    }
+}
