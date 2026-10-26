@@ -172,6 +172,40 @@ fn room33_streamed_not_kept() {
     assert_eq!(out[0], out[1], "the packed file, the counters and the record count");
 }
 
+/// A pass that writes less than the one before: after `reset` the packed file is the later pass's alone, the same
+/// as a stream that wrote only that pass. (The last pass's writer used to be dropped after the file was made again,
+/// and flushed its buffer into it at its old offset.)
+#[test]
+fn stream_reset_to_a_shorter_pass() {
+    let dir = std::env::temp_dir().join(format!("reader-reset-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut b = oracle::builder(game(), static_oracle(), "room33");
+    b.keep_records = true;
+    let scope = b.scope.clone();
+    scumm_reader::par::with_pool(game(), &scope, 0, |pool| {
+        b.read_all(pool, true, None, 2);
+    });
+    let recs = b.records.clone();
+    assert_eq!(recs.len(), 878);
+    let start = Facts::from_py(static_oracle().named("builder", "room33").get("start_items"));
+    let mut out = Vec::new();
+    for long_first in [false, true] {
+        let path = dir.join(format!("s{long_first}.tc"));
+        let mut s = packed::RecordStream::create(&path).unwrap();
+        if long_first {
+            s.records(0, &recs, &b.table).unwrap();
+            s.reset().unwrap();
+        }
+        s.records(0, &recs[..10], &b.table).unwrap();
+        let keys = s.fact_keys();
+        let s0 = task::task_start(&mut b, &start, &keys);
+        s.finish(&mut b, &[], &[("start".to_string(), s0)]).unwrap();
+        out.push(std::fs::read(&path).unwrap());
+    }
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(out[0] == out[1], "the file after a reset is the later pass's alone: {} bytes, not {}", out[1].len(), out[0].len());
+}
+
 /// `reader-port read room33 --packed F` (the switch off): the reading is golden.py's, 0 differences, though the
 /// packed file's start and `finish` add a builder counter after the reading ("steps that need room in their domain").
 #[test]

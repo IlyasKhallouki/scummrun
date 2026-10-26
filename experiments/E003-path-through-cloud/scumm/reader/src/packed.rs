@@ -410,7 +410,12 @@ impl RecordStream {
     }
 
     /// A new pass: what was written is dropped.
+    ///
+    /// The last pass's writer is dropped before the file is made again. Dropped after, it would flush its buffer
+    /// into the new file at its own offset: when the new pass writes less than the last, the file ends with a hole
+    /// and the last pass's words where the footer should be.
     pub fn reset(&mut self) -> io::Result<()> {
+        drop(self.w.take());
         self.w = Some(Writer::create(&self.path)?);
         self.seen.clear();
         self.folded_written = 0;
