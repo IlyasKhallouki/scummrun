@@ -529,36 +529,49 @@ Room 31's local 202 reads {0}, the sentence script {0, 1, 2, 3, 4, 6, 7}.
   back.
 
 **What the harness must do** (replay.py, packed_reading.py). A replan starts each live slot from the engine's state.
-Today nothing compares a slot's locals: `task_start` gives every live slot args 0, and `replan_start` copies the plan's
-`args:` number when the slot is where the plan put it, else 0 (the state dump has no locals). Under the switch the
+Without F10's dumped locals nothing compares a slot's locals: `task_start` gives every live slot args 0, and
+`replan_start` copies the plan's `args:` number when the slot is where the plan put it, else 0. Under the switch the
 plan's number names the list restricted to S(u), with the slot's flags, which is all a run of the slot can depend on, so
-this rule needs no change. Anything that matches a live slot's locals to a list must compare S(u) only:
-`replay.read_view(b, name, room, locals)` gives a slot's locals as the reading keyed them (from reading.json's
-`live_locals`, `Points.read_locals`): only S(u) under the switch; every local for a reading made without it, for a unit
-whose reads are not known exactly, or for a slot the reading does not list. The read set is per unit, so a local script
-is looked up with the room the engine is in (`local:202@31`). The run's record says whether its reading was made with
-the switch (`task.live_locals`).
+this rule needs no change. Anything that matches a live slot's locals to a list compares S(u) only: `Points.read_locals`
+gives the read set of a slot (from reading.json's `live_locals`): S(u) under the switch; None (every local) for a reading
+made without it, for a unit whose reads are not known exactly, or for a slot the reading does not list. The read set is
+per unit, so a local script is looked up with the room the engine is in (`local:202@31`). The run's record says whether
+its reading was made with the switch (`task.live_locals`).
 
-**For fix round 1's F10** (branch fr1-c, which matches slots' dumped locals to built lists at a replan; not merged
-yet). Under this switch its matching must change, in Rust and in Python alike:
+**F10 with this switch** (fix round 1's slots' dumped locals, merged with it on fr1-main; "Fix round 1, F10" below).
+Under the switch a list's number covers the read locals and the slot's flags, so a dumped slot is numbered and matched
+on both, in Rust and in Python alike:
 
-- `dumped_events` (builder.rs) must number a dumped slot's list with `Builder::list_number`, as `record` does: it
-  restricts the locals to S(u) and puts the slot's flags in the number (`locals::recursive` for recursive). Merging
-  F10 does not compile as it is (`sig` takes the flags now), and `sig` stops when the switch is on and no flags are
-  given (`live_locals_sig_needs_the_flags`), so passing `&[]` cannot give the dumped slot's event a number no record's
-  list has.
-- `list_matches` (task.rs, replay.py) must compare only the locals in S(u): skip every dumped local outside S(u)
-  (`read_view` on the dump), keep "0 where the list lacks it" for a local in S(u), and keep the override count and
-  cutscene data. Without this, no built list would match a slot whose unread locals are nonzero (the lists lack them,
-  so they would be compared with 0), and every such slot would be read again.
-- Under the switch a list's number also covers the slot's flags, so a match must compare them: `owned` is in F10's
-  slot (from the owners), the R flag and recursive are the engine slot's `freezeResistant` and `recursive`
-  (script.h:91), which the dump would need to list; until it does, a slot whose read locals match lists with other flags
-  must take args 0 (unknown) or be read again, not the first such list.
-- `built_lists` and `slot_lists` then hold restricted lists; nothing else changes there. `match_list`'s choice (the
-  list with the most locals known as numbers) is unaffected.
-- The lists file F10 writes next to a reading should say the switch, or the harness should read it from reading.json's
-  `live_locals`, so a reading made without the switch keeps today's full comparison.
+- The bridge dumps the flags: with `SPEEDRUN_DUMP_LOCALS` each live slot also has `resistant` (ScriptSlot's
+  freezeResistant) and `recursive` (script.h:91). The owned flag is the slot's `where`, in the dump already: an object's
+  slot started from the inventory (WIO_INVENTORY) survives a room change (killScriptsAndResources,
+  script.cpp:1083-1106), as the model's owned flag says (scumm-machine `room_slot`). replay.py `dumped_slots` gives
+  them as the slot's `flags` (`SlotFlags` in Rust).
+- `dumped_events` numbers a dumped slot's list with `Builder::list_number`, as `record` does: the locals restricted to
+  S(u), the number over them and the dump's flags (recursive as "true or not"). A dumped slot without flags stops the
+  reading (a panic that names the slot): its number cannot be known. Without the switch the flags stay the start's
+  (`start_events`' rule: the R flag from the unit's starts, recursive unknown, owned from the object's owner), as F10
+  had them, so F10's readings without the switch are unchanged.
+- `list_matches` (task.rs, replay.py) under the switch skips every dumped local outside S(u), keeps "0 where the list
+  lacks it" for a local in S(u), keeps the override count and cutscene data, and needs the list's flags to be the
+  dump's as the number takes them: resistant and owned equal, recursive true for a recursive slot and unknown (None)
+  for the others. A list flag the model holds as an unknown value matches no dump. `live_match` makes what a match
+  compares, and stops on a dumped slot without flags (Rust: a panic; Python: a ValueError). A slot no list matches
+  takes args 0 and is read again (`--reread`), as without the switch.
+- The lists carry the flags under the switch: `BuiltList` has the event's three flags, packed_reading.py's list lines
+  get `"flags"` when the reading's head has `live_locals`, and reader-scope's `slot_events` too. A reading made
+  without the switch writes the lists as before.
+- `match_list`'s choice (the list with the most locals known as numbers) is unchanged.
+
+Measured (fr1-main, 2026-10-26): the bridge with the flags changes nothing but the dump (`bridge_locals.py check`,
+results/bridge-locals-check-flags.log: 0 frames differ on room 33, the bar door and the kitchen's inputs, 20,198
+frames). Rooms 33 and 28 from seed 1 read with `--live-locals` (66,030 records, 65,516 actions, 5,100 lists, against
+66,106, 65,592 and 5,166 without), then run by replay_part1.py with `--slot-locals --reread` on the build with the
+flags: both runs are the committed F10 runs (results/replay-part1-bar-door-rust-seed1-*locals.json) step for step,
+frame for frame and input for input, up to the lists' numbers. The full run reaches the goal at frame 3129 with no
+replan. The control's one replan (frame 6376) starts with 1 live slot at args 0 (global 159); it is read again
+from its dumped locals and flags, and then 0 slots are at args 0 (local 202 and global 23 match a built list). Both
+verify from boot with 0 differences (results/replay-part1-bar-door-ll.log).
 
 ## Python behaviours kept on purpose, and the differences
 
@@ -631,6 +644,24 @@ comparison above still finds 0 differences. A switch's reading has its own golde
 `reader-port read NAME --switches S --out FILE` and checked by `reader-port read NAME --switches S --golden FILE` and
 `tests/fix_round1.rs` (room 33 fast; the kitchen, one thread and three, ignored).
 
+**With main's two switches** (fr1-main). ELSEWHERE and `--live-locals` are the FactTable's (`elsewhere`,
+`live_locals`), not `Switches`, and every switch combines with every other. `reader-port read` takes `--elsewhere` and
+`--live-locals` beside `--switches`; reader-scope takes `--elsewhere`, `--live-locals` and F10's `--slot-locals`, not
+`--switches`. `task_start` applies the ELSEWHERE start rule first, then gives the `due:` facts from that start (a
+slot at ELSEWHERE is at no due wait). A slot at ELSEWHERE at a replan takes args 0 and is not read again from its
+locals (no list is built at a place none of the points). `reader-port read --packed` streams the records as made,
+before due_first writes `due:` on the kept records, so it refuses due_first: its task goes through `--task-out`.
+With due_first and `--elsewhere`, ELSEWHERE is a value of every `pos:` domain, so the `due:` writes' cases list it
+among a slot's places where it is not due, as NOWHERE; no precondition holds it.
+
+Measured on the kitchen (3 threads, fr1-main, 2026-10-26), with the four reader switches (A), with them and
+`--elsewhere` (C), and with them, `--elsewhere` and `--live-locals` (B). A gives 71,408 records, the fr1 branch's.
+C gives the same 71,408 records once ELSEWHERE is taken out of the 16,012 value sets of `due:` cases that hold it,
+and the same task (start s17: 12,019 reduced actions, 17,877 operators) and 10-step plan. B against C, renumbered
+(`live_locals_check.py`): 5,299 lists onto 5,222, 71,408 records onto 71,278 (71,274 distinct either way), 0 records
+on one side only. B's task has 11,977 reduced actions and 17,702 operators, and lama-first gives the same 10 steps
+up to the lists' numbers. The due writes match a direct evaluation on 20.5 to 20.8 million states in each.
+
 **`draw_clears` (F5) and `actor_rooms` (F9)** are scumm-machine's switches of the same names, and they change the
 reading's facts too, so the Builder's scope and domains are made with them (`oracle::builder_with`:
 `Switches::scope()` into `Scope::of_with` and `domains::build_with`; the Reader's machine takes them from the scope in
@@ -678,12 +709,15 @@ reading over the captured runs and with the Rust machine half, every captured ru
 for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
 
 - **The bridge** (patches/0001, `SPEEDRUN_DUMP_LOCALS`, EngineConfig.dump_locals): the state dump lists each live
-  slot's 25 locals and each cutscene level's cutSceneData. `bridge_locals.py check` shows it changes nothing else.
+  slot's 25 locals and its two flags (`resistant`: freezeResistant, `recursive`), and each cutscene level's
+  cutSceneData. `bridge_locals.py check` shows it changes nothing else (results/bridge-locals-check.log for the locals,
+  results/bridge-locals-check-flags.log with the flags).
 - **`Builder.slot_locals`** (`SlotLocals`: unit name, room, wait point, armed Esc point, locals, cutscene count and
-  data, owned): `read_once` adds `dumped_events()` to the start events. Each is the slot's event with its locals
-  known, numbered as `record` numbers a list (the zero locals left out: a missing local reads 0 with known args), with
-  its Esc event where the override is armed; the number goes into the `args:` domain before the event is pinned.
-  `slot_events` keeps them (`task::slot_lists`).
+  data, owned, and the dump's flags when it has them): `read_once` adds `dumped_events()` to the start events. Each is
+  the slot's event with its locals known, numbered as `record` numbers a list (`Builder::list_number`; the zero locals
+  left out: a missing local reads 0 with known args), with its Esc event where the override is armed; the number goes
+  into the `args:` domain before the event is pinned. `slot_events` keeps them (`task::slot_lists`). Under
+  `--live-locals` the event's flags are the dump's ("F10 with this switch", in "Live locals" above).
 - **`task::replan_start_locals`**: `task_start`, then each live slot's `args:<unit>` is the number of the built list
   its locals match at its wait point (`match_list`: every dumped local equals the list's number, 0 where the list lacks
   it, or the list's local is unknown and its value set, if any, holds it; override count and cutscene data equal; the
@@ -703,8 +737,8 @@ for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
 ## Files
 
 - `src/`: the modules above; `src/bin/reader_port.rs` (`reader-port static | records NAME | replay NAME |
-  runs NAME | dump-runs NAME --runs N,... | read NAME [--switches S] | task --out DIR | stream --out FILE |
-  bench-task --out DIR | bench | due-engine FRAMES`).
+  runs NAME | dump-runs NAME --runs N,... | read NAME [--switches S] [--live-locals] [--elsewhere] | task --out DIR |
+  stream --out FILE | bench-task --out DIR | bench | due-engine FRAMES`).
 - `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens.
 - `../../reader_port_oracle.py`: the Python oracles (new file; no existing .py file changed).
 - `../../reader_run_dump.py`: chosen runs made again in Python and written whole (new file).
