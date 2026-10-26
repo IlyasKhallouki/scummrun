@@ -1,0 +1,178 @@
+{
+ "golden": "/var/tmp/fast-mi/wt-fr1-c/out/golden/reader/kitchen.jsonl.gz",
+ "records": 72256,
+ "lists": 5409,
+ "new": "/var/tmp/fast-mi/svm-fr1-c/build/scummvm/scummvm",
+ "new_sha1": "55970aa0787b",
+ "replans": [
+  {
+   "plan": 1,
+   "frame": 889,
+   "run_args0": 9,
+   "live": 9,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:208@21",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "local:207@15",
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 2,
+   "frame": 1886,
+   "run_args0": 8,
+   "live": 8,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "local:207@23",
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 3,
+   "frame": 4172,
+   "run_args0": 8,
+   "live": 8,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:209@56",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 4,
+   "frame": 6354,
+   "run_args0": 8,
+   "live": 8,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:209@56",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 5,
+   "frame": 7467,
+   "run_args0": 8,
+   "live": 8,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:208@41",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 6,
+   "frame": 8619,
+   "run_args0": 8,
+   "live": 8,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:209@33",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 7,
+   "frame": 9506,
+   "run_args0": 7,
+   "live": 7,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 8,
+   "frame": 11267,
+   "run_args0": 8,
+   "live": 8,
+   "matched": [
+    "local:200@43",
+    "local:201@22",
+    "local:206@49",
+    "local:208@41",
+    "local:210@62",
+    "local:211@33",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  },
+  {
+   "plan": 9,
+   "frame": 13363,
+   "run_args0": 5,
+   "live": 5,
+   "matched": [
+    "local:200@10",
+    "local:201@35",
+    "local:204@18",
+    "script:23@409"
+   ],
+   "unmatched": [
+    "script:159@5"
+   ],
+   "skipped": []
+  }
+ ],
+ "seconds": 24.2
+}

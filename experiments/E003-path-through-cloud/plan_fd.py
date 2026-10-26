@@ -72,7 +72,9 @@ from task import GOAL_KEY, PICK, SasTask
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-DOWNWARD = ROOT / "third_party" / "downward"
+# FAST_MI_DOWNWARD: a Fast Downward checkout other than this one's submodule (a worktree whose submodules are not
+# checked out uses the main checkout's build, read only)
+DOWNWARD = Path(os.environ.get("FAST_MI_DOWNWARD") or ROOT / "third_party" / "downward")
 DRIVER = DOWNWARD / "fast-downward.py"
 BUILD = "release"
 TASKCORE = Path(os.environ.get("TASKCORE_BIN") or HERE / "taskcore" / "target" / "release" / "taskcore")

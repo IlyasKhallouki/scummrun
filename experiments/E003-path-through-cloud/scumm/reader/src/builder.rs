@@ -235,6 +235,38 @@ impl Switches {
     }
 }
 
+/// Fix round 1, F10: a slot live in the engine, with the locals the bridge dumped (SPEEDRUN_DUMP_LOCALS:
+/// vm.localvar, script.h:136; its cutsceneOverride and the cutSceneData of the levels it began, script.cpp:1640).
+/// The reading builds this slot's events from these locals (`Builder::dumped_events`), as `record` builds the
+/// events of a slot a path left waiting with known locals.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SlotLocals {
+    /// the unit's name as facts.py names it: script:N, local:N, obj:N, entry, exit
+    pub name: String,
+    /// the room the engine is in (a local script or the room's entry and exit code is that room's)
+    pub room: i32,
+    /// where the slot waits (facts.py `at:<unit>:W`)
+    pub w: i64,
+    /// the override armed in this slot at the top cutscene level (facts.py `esc:<unit>:W`)
+    pub esc: Option<i64>,
+    /// Local[0..NUM_SCRIPT_LOCAL]
+    pub locals: Vec<i64>,
+    /// cutscenes the slot began and has not ended (ScriptSlot.cutsceneOverride; Frame.override)
+    pub override_: i64,
+    /// their cutSceneData, the bottom level first (Path.cut_data's order)
+    pub cut_data: Vec<i64>,
+    /// an object's script whose object is not in the room (`start_events`' owned)
+    pub owned: bool,
+}
+
+impl SlotLocals {
+    /// The locals as a list of a known slot holds them: Local[n] -> value, the zeros left out (with known args a
+    /// local the list lacks reads 0, model.py `Machine.local`).
+    pub fn list(&self) -> Vec<(i64, Val)> {
+        self.locals.iter().enumerate().filter(|(_, &v)| v != 0).map(|(i, &v)| (i as i64, Val::Int(v))).collect()
+    }
+}
+
 /// reader.py `Builder`.
 pub struct Builder<'g> {
     pub game: &'g Game,
@@ -293,6 +325,11 @@ pub struct Builder<'g> {
     uni_keys: std::cell::RefCell<(FxHashSet<String>, FxHashMap<String, Vec<String>>)>,
     /// `args_domain`'s cache: key -> (its count of list numbers, its domain)
     args_doms: std::cell::RefCell<FxHashMap<String, (usize, Domain)>>,
+    /// F10: slots live in the engine with their dumped locals; their events are read with the start's (empty: the
+    /// reading is reader.py's)
+    pub slot_locals: Vec<SlotLocals>,
+    /// F10: the events `dumped_events` made in the last pass (not the Esc ones), with their lists' numbers
+    pub slot_events: Vec<Event>,
 }
 
 /// reader.py `_why`: the reason of an assumption's `why` (model.Unknown's text).
@@ -419,6 +456,8 @@ impl<'g> Builder<'g> {
             args_doms: Default::default(),
             on_job: None,
             widened: Vec::new(),
+            slot_locals: Vec::new(),
+            slot_events: Vec::new(),
         }
     }
 
@@ -803,6 +842,24 @@ impl<'g> Builder<'g> {
 
     // --- events ------------------------------------------------------------------------------------------------------
 
+    /// The unit a slot's name (facts.py's) names, in the room resource `res`.
+    fn unit_of_name(name: &str, res: Option<i32>) -> Option<UnitKey> {
+        if let Some(n) = name.strip_prefix("script:") {
+            Some(UnitKey::Global(n.parse().unwrap()))
+        } else if let Some(n) = name.strip_prefix("local:") {
+            res.map(|r| UnitKey::Local(r, n.parse().unwrap()))
+        } else if let Some(o) = name.strip_prefix("obj:") {
+            Some(UnitKey::Obj(o.parse().unwrap()))
+        } else {
+            // (name, room): any other name is no unit of the scope
+            res.and_then(|r| match name {
+                "entry" => Some(UnitKey::Entry(r)),
+                "exit" => Some(UnitKey::Exit(r)),
+                _ => None,
+            })
+        }
+    }
+
     /// `Builder.start_events`: the slots live at the start, with unknown locals (args 0).
     pub fn start_events(&mut self) -> Vec<Event> {
         let mut out = Vec::new();
@@ -816,20 +873,7 @@ impl<'g> Builder<'g> {
             }
             let (name, w) = k[3..].rsplit_once(':').unwrap();
             let w: i64 = w.parse().unwrap();
-            let unit = if let Some(n) = name.strip_prefix("script:") {
-                Some(UnitKey::Global(n.parse().unwrap()))
-            } else if let Some(n) = name.strip_prefix("local:") {
-                res.map(|r| UnitKey::Local(r, n.parse().unwrap()))
-            } else if let Some(o) = name.strip_prefix("obj:") {
-                Some(UnitKey::Obj(o.parse().unwrap()))
-            } else {
-                // (name, room): any other name is no unit of the scope
-                res.and_then(|r| match name {
-                    "entry" => Some(UnitKey::Entry(r)),
-                    "exit" => Some(UnitKey::Exit(r)),
-                    _ => None,
-                })
-            };
+            let unit = Self::unit_of_name(name, res);
             let Some(unit) = unit.filter(|u| self.scope.has_unit(*u)) else {
                 self.counts.inc("slots live at the start outside the scope (no events)");
                 continue;
@@ -856,6 +900,50 @@ impl<'g> Builder<'g> {
                 override_: 0,
                 cut_data: vec![],
             });
+        }
+        out
+    }
+
+    /// F10: the events of the slots in `slot_locals`, with their dumped locals known (`args_known`), numbered as
+    /// `record` numbers a list (`sig`), and an Esc event where the slot's override is armed. A slot outside the
+    /// scope gets none (counted).
+    pub fn dumped_events(&mut self) -> Vec<Event> {
+        let mut out = Vec::new();
+        self.slot_events.clear();
+        for s in self.slot_locals.clone() {
+            let res = self.game.resource(s.room);
+            let Some(unit) = Self::unit_of_name(&s.name, res).filter(|u| self.scope.has_unit(*u)) else {
+                self.counts.inc("F10: dumped slots outside the scope (no events)");
+                continue;
+            };
+            let locals = s.list();
+            let cd: Vec<CutData> = s.cut_data.iter().map(|&c| CutData::Int(c)).collect();
+            let sig = self.sig(&s.name, &locals, s.override_, &cd, true);
+            // the domain of args:<unit> holds the list's number before its events are pinned (as `record` adds it)
+            self.table.args_vals.entry(format!("args:{}", s.name)).or_default().insert(sig);
+            let res_flag = match self.game.lifecycle_key(unit) {
+                Some(f) => self.game.resistant(f, res),
+                None => Some(false),
+            };
+            let ev = Event {
+                name: s.name.clone(),
+                unit,
+                w: s.w,
+                sig,
+                locals,
+                args_known: true,
+                recursive: Py::None,
+                resistant: Py::opt_bool(res_flag),
+                owned: Py::Bool(s.owned),
+                abort: false,
+                override_: s.override_,
+                cut_data: s.cut_data.clone(),
+            };
+            self.counts.inc("F10: dumped slots read from their locals");
+            let esc = s.esc.map(|w| Event { w, abort: true, ..ev.clone() });
+            self.slot_events.push(ev.clone());
+            out.push(ev);
+            out.extend(esc);
         }
         out
     }
@@ -1533,6 +1621,10 @@ impl<'g> Builder<'g> {
         *self.phase_secs.entry("runs").or_default() += tr.elapsed().as_secs_f64();
         self.tell("inputs", jobs_len, n, t0.elapsed().as_secs_f64());
         let mut todo: Vec<Event> = if start_events { self.start_events() } else { vec![] };
+        if start_events && !self.slot_locals.is_empty() {
+            let dumped = self.dumped_events();
+            todo.extend(dumped);
+        }
         todo.extend(nexts.events);
         let mut rounds = 0;
         while !todo.is_empty() {

@@ -307,6 +307,12 @@ comparison above still finds 0 differences. A switch's reading has its own golde
 `reader-port read NAME --switches S --out FILE` and checked by `reader-port read NAME --switches S --golden FILE` and
 `tests/fix_round1.rs` (room 33 fast; the kitchen, one thread and three, ignored).
 
+**`draw_clears` (F5) and `actor_rooms` (F9)** are scumm-machine's switches of the same names, and they change the
+reading's facts too, so the Builder's scope and domains are made with them (`oracle::builder_with`:
+`Switches::scope()` into `Scope::of_with` and `domains::build_with`; the Reader's machine takes them from the scope in
+`sync`). Their rules, readings and tests are in `../fixes/F5-draw-clears.md` and `../fixes/F9-actor-rooms.md`; their
+tests pin the reading against golden.py's files, not a golden of their own.
+
 **`due_first` (F2): a due event goes first.** `due.rs` (module docs) and scumm-ir's `due.rs` (the wait classes).
 After the reading, `due:<unit>` (binary) is 1 while the unit's slot is live, unfrozen and at a pure poll whose test
 holds or a plain breakHere, at a wait an input meets; every record that writes the unit's position, slot, freeze count,
@@ -339,6 +345,36 @@ that narrows), with findObject over the scope's objects. On the reader's side (`
   Most of the gain is the fork into value sets: without it (the machine's ranges and sets alone, a measurement with
   that part turned off) the kitchen gives 72,223 records and 170,452 forks on non-fact tests. Room 33: 819 records
   (878), forks on non-fact tests 2,329 (2,930).
+
+## Fix round 1, F10: the slots' dumped locals
+
+The first fix made on the port (fix-round1.md F10, decision D8). Off by default: with `Builder.slot_locals` empty the
+reading is reader.py's: the twelve fast tests and the five kitchen tests the base ran (records written back, the
+reading over the captured runs and with the Rust machine half, every captured run, the six SAS files) pass, in 586 s
+for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
+
+- **The bridge** (patches/0001, `SPEEDRUN_DUMP_LOCALS`, EngineConfig.dump_locals): the state dump lists each live
+  slot's 25 locals and each cutscene level's cutSceneData. `bridge_locals.py check` shows it changes nothing else.
+- **`Builder.slot_locals`** (`SlotLocals`: unit name, room, wait point, armed Esc point, locals, cutscene count and
+  data, owned): `read_once` adds `dumped_events()` to the start events. Each is the slot's event with its locals
+  known, numbered as `record` numbers a list (the zero locals left out: a missing local reads 0 with known args), with
+  its Esc event where the override is armed; the number goes into the `args:` domain before the event is pinned.
+  `slot_events` keeps them (`task::slot_lists`).
+- **`task::replan_start_locals`**: `task_start`, then each live slot's `args:<unit>` is the number of the built list
+  its locals match at its wait point (`match_list`: every dumped local equals the list's number, 0 where the list lacks
+  it, or the list's local is unknown and its value set, if any, holds it; override count and cutscene data equal; the
+  list with the most numbers wins). A slot no list matches gets 0 and is returned for a reading again; a slot the dump
+  gives no locals keeps `replan_start`'s rule. `built_lists` takes the lists from the records' next events whose
+  `args:` write the record kept (a folded list is none).
+- **reader-scope**: `--slot-locals FILE`, `--start-seed N`, `--domain-goals part1|none` (none: golden.read_scope's
+  domains) and `--goal`; the report lists the dumped slots' lists (`slot_events`).
+- **What the reading changes.** The new number widens the `args:<unit>` domain, so the unit's args-0 records now
+  hold `args:<unit> = 0` in their precondition and their `args:<unit> := 0` write is no change and goes; a record
+  whose only write that was is dropped (room 33 with its three start slots dumped: 24 such records; `room33_slot_locals`
+  checks every other record is kept).
+- The harness side is Python (replay.py `replan_start_locals`, the same rule; replay_part1.py `--slot-locals
+  --reread`, which runs reader-scope and `reading_from_golden`). On rooms 33 and 28 from seed 1, reader-scope's reading
+  equals the Python reader's action for action (66,106 records, 65,592 actions) in 30 s on 3 threads (Python: 2,434 s).
 
 ## Files
 
