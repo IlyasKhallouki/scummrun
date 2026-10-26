@@ -196,6 +196,11 @@ pub struct Switches {
     pub draw_clears: bool,
     /// F9: scumm-machine's actor_rooms; the scope's writes and the table's domains of it (Scope::of_with, table.rs)
     pub actor_rooms: bool,
+    /// A run past the path limit is split on its first fork on a read, again and again, until no part passes the
+    /// limit; a run that passes it with no fact left to split on, or a path the step limit ended, stops the reading
+    /// (`Builder::run_split`). Off: reader.py's rule, which leaves a run unsplit when it forked more on non-facts,
+    /// past SPLIT_DEPTH levels or SPLIT_BUDGET parts, and drops the paths the limit ended.
+    pub split_limit: bool,
 }
 
 impl Switches {
@@ -208,7 +213,8 @@ impl Switches {
                 "value_sets" => s.value_sets = true,
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms)")),
+                "split_limit" => s.split_limit = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit)")),
             }
         }
         Ok(s)
@@ -226,6 +232,9 @@ impl Switches {
         }
         if self.actor_rooms {
             v.push("actor_rooms");
+        }
+        if self.split_limit {
+            v.push("split_limit");
         }
         v
     }
@@ -1150,7 +1159,17 @@ impl<'g> Builder<'g> {
         self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
         let facts = self.rd.counts.get(FORKS_ON_READ) - facts0;
         let nonfacts = self.rd.counts.get(FORKS_ON_NONFACTS) - nonfacts0;
-        if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
+        if self.table.split_limit {
+            if run.limit != 0 {
+                return self.run_split(m, job, pins, pre, budget, run.first_fork.clone(), run.limit);
+            }
+            // scumm-machine's step limit ends a path "limit" too; in a run the path limit cut nothing (limit 0)
+            // every such end is the step limit's, and no split lifts it
+            let n = run.paths.iter().filter(|p| p.end.as_deref() == Some("limit")).count();
+            if n != 0 {
+                panic!("split_limit: {} has {n} paths the step limit ended; the reading stops", job.label);
+            }
+        } else if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
             self.counts.inc("runs past the path limit not split (more forks on non-facts than on facts)");
         } else if run.limit != 0 && run.first_fork.is_some() {
             let key = run.first_fork.clone().unwrap();
@@ -1207,6 +1226,63 @@ impl<'g> Builder<'g> {
             rec.engine_pre = rec.pre.keys().filter(|k| budget.2.contains(*k) || own.contains(*k)).cloned().collect();
             out.push(rec);
         }
+        out
+    }
+
+    /// The switch split_limit: a run past the path limit is run again once per value of its first fork on a read
+    /// (the values its precondition leaves), that fact pinned to the value, and each part that passes the limit is
+    /// split again, with no cap on depth or parts and whatever its forks on non-facts. In any state the engine runs
+    /// one path of the run, and the parts' preconditions divide the run's states by the pinned fact's values: they
+    /// do not overlap and together cover them. So the parts' records cover every state the run can start in, and
+    /// no path the limit ended is dropped. A part that passes the limit with no fact left to split on stops the
+    /// reading (a panic naming the job).
+    #[allow(clippy::too_many_arguments)]
+    fn run_split(
+        &mut self,
+        m: &mut dyn Machine,
+        job: &Job,
+        pins: &Pins,
+        pre: &Pre,
+        budget: &mut (i64, i64, BTreeSet<String>),
+        first_fork: Option<String>,
+        limit: i64,
+    ) -> Vec<Record> {
+        let vals: Labels = match &first_fork {
+            Some(key) => {
+                let dom = self.domain(key).unwrap_or_else(|| panic!("split_limit: {}'s first fork {key} has no domain", job.label));
+                match pre.get(key) {
+                    Some(s) => dom.values.iter().copied().filter(|v| s.contains(v)).collect(),
+                    None => dom.values.clone(),
+                }
+            }
+            None => Labels::new(),
+        };
+        if vals.len() < 2 {
+            panic!(
+                "split_limit: {} passed the path limit ({limit} paths cut) with no fact left to split on (first fork {first_fork:?}, {} splits deep); the reading stops",
+                job.label, budget.1
+            );
+        }
+        let key = first_fork.unwrap();
+        budget.1 += 1;
+        self.counts.inc("runs past the path limit split on their first fork on a read");
+        self.counts.inc(format!("split_limit: runs split at depth {}", budget.1));
+        self.counts.add("split_limit: parts run", vals.len() as i64);
+        let parts: Vec<(Pins, Pre)> = vals
+            .iter()
+            .map(|&v| {
+                let (mut p2, mut pre2) = (pins.clone(), pre.clone());
+                pre2.insert(key.clone(), vec![v]);
+                p2.insert(key.clone(), self.table.value(&key, v));
+                (p2, pre2)
+            })
+            .collect();
+        m.prefetch(&self.ctx(), &job.label, &parts, &job.what);
+        let mut out = Vec::new();
+        for (p2, pre2) in &parts {
+            out.extend(self.run(m, job, p2, pre2, budget));
+        }
+        budget.1 -= 1;
         out
     }
 
@@ -1636,6 +1712,7 @@ impl<'g> Builder<'g> {
         mut sink: Option<&mut dyn RecordSink>,
     ) -> usize {
         self.table.value_sets = self.switches.value_sets;
+        self.table.split_limit = self.switches.split_limit;
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {

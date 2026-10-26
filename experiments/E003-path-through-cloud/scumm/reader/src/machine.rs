@@ -1973,7 +1973,12 @@ impl RunMachine for Reader<'_> {
     fn run(&mut self, cx: &Ctx, _label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
-        let paths = run.paths.iter().map(|p| path_out(game, &run, p)).collect();
+        // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths
+        let paths = if cx.table.split_limit && run.limit != 0 {
+            Vec::new()
+        } else {
+            run.paths.iter().map(|p| path_out(game, &run, p)).collect()
+        };
         RunOut { paths, limit: run.limit as i64, value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(), first_fork, rd }
     }
 }
