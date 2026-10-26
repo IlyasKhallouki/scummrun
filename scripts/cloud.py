@@ -52,10 +52,13 @@ EGRESS_RESERVE = 0.25  # copies back are megabytes; Internet egress is about $0.
 REMOTE = "fast-mi"  # the repo copy, in the VM user's home
 
 # What the model check, the reader, the planner and the engine read. Game-derived files (the decompiled
-# scripts, the room blocks) and the game files themselves go to the VM's private disk, which is deleted at
-# the end. The engine's bridge patch goes too; ScummVM and Fast Downward are cloned on the VM at their pins.
-UP = ["src", "scripts", "experiments", "data", "build/blocks-dos-cd", "runs/anypercent/noslide-p7",
-      "runs/anypercent/verify-b1", "pyproject.toml", "uv.lock", "README.md", "patches", "game/dos-cd"]
+# scripts, the room blocks, the objects' verb blocks) and the game files themselves go to the VM's private disk,
+# which is deleted at the end. The engine's bridge patch goes too; ScummVM and Fast Downward are cloned on the VM
+# at their pins. The IR reads an object's else-if targets from its verb block (data/scripts-dos-cd/index.json's
+# verb_block); without the block it takes them from the text rule, unverified.
+UP = ["src", "scripts", "experiments", "data", "build/blocks-dos-cd", "build/verb-blocks-dos-cd",
+      "runs/anypercent/noslide-p7", "runs/anypercent/verify-b1", "pyproject.toml", "uv.lock", "README.md", "patches",
+      "game/dos-cd"]
 
 COMPUTE = "6F81-5844-456A"
 SKU = {"core": "Spot Preemptible N2 Instance Core running in Americas",
