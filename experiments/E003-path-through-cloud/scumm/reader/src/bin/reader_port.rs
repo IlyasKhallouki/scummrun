@@ -72,6 +72,141 @@ fn print_batches(stats: &scumm_reader::par::PoolStats) {
     }
 }
 
+/// `read NAME --count-only`: the reading with its records counted, not kept (`Builder.keep_records` off), so memory does
+/// not grow with them: records per kind and per label (the label before `#` and `@`), per pass. A watchdog stops it
+/// (exit 3) past `--cap-min M` minutes (default 30), an RSS of `--max-rss-gb G` (default 3.8) or MemAvailable under 3 GB,
+/// and prints what it has. Not with due_first (its writes go on the kept records).
+fn count_only(game: &scumm_ir::Game, st: &Static, name: &str, sw: Switches, args: &[String], elsewhere: bool, live: bool) {
+    use scumm_reader::builder::RecordSink;
+    use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
+    assert!(!sw.due_first, "--count-only keeps no records, and due_first writes on the kept records");
+    #[derive(Default)]
+    struct Counts {
+        pass: usize,
+        n: usize,
+        kinds: BTreeMap<String, usize>,
+        labels: BTreeMap<String, usize>,
+        passes: Vec<usize>,
+    }
+    fn show(c: &Counts, wall: f64, cpu: f64, why: &str) {
+        println!("{why}: pass {}, {} records in it ({:?} in earlier passes), wall {wall:.1} s, CPU {cpu:.1} s, peak RSS {} MB", c.pass + 1, c.n, c.passes, scumm_reader::peak_rss_kb().unwrap_or(0) / 1024);
+        println!("  by kind: {:?}", c.kinds);
+        let mut top: Vec<(&String, &usize)> = c.labels.iter().collect();
+        top.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        for (l, n) in top.iter().take(40) {
+            println!("  {n} {l}");
+        }
+    }
+    struct Sink(Arc<Mutex<Counts>>, Option<packed::RecordStream>);
+    impl RecordSink for Sink {
+        fn batch(&mut self, first: usize, recs: &[scumm_reader::record::Record], t: &scumm_reader::table::FactTable) {
+            if let Some(s) = &mut self.1 {
+                RecordSink::batch(s, first, recs, t);
+            }
+            let mut c = self.0.lock().unwrap();
+            for r in recs {
+                c.n += 1;
+                *c.kinds.entry(r.kind.clone()).or_default() += 1;
+                let l = r.label.split('#').next().unwrap().split('@').next().unwrap().to_string();
+                *c.labels.entry(l).or_default() += 1;
+            }
+        }
+        fn reset(&mut self) {
+            if let Some(s) = &mut self.1 {
+                RecordSink::reset(s);
+            }
+            let mut c = self.0.lock().unwrap();
+            let n = c.n;
+            c.passes.push(n);
+            c.pass += 1;
+            c.n = 0;
+            c.kinds.clear();
+            c.labels.clear();
+        }
+    }
+    let threads: usize = arg(args, "--threads").map_or(0, |n| n.parse().unwrap());
+    let cap_s = arg(args, "--cap-min").map_or(30.0, |m| m.parse::<f64>().unwrap()) * 60.0;
+    let max_rss_kb = (arg(args, "--max-rss-gb").map_or(3.8, |g| g.parse::<f64>().unwrap()) * 1048576.0) as u64;
+    let mut b = oracle::builder_with(game, st, name, sw);
+    b.keep_records = false;
+    b.table.elsewhere = elsewhere;
+    if live {
+        b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(game)));
+    }
+    let counts = Arc::new(Mutex::new(Counts::default()));
+    let t = Instant::now();
+    let cpu0 = scumm_reader::cpu_secs();
+    {
+        let counts = counts.clone();
+        std::thread::spawn(move || {
+            let mut last = 0.0;
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                let wall = t.elapsed().as_secs_f64();
+                let field = |f: &str, k: &str| -> u64 {
+                    std::fs::read_to_string(f).unwrap_or_default().lines().find(|l| l.starts_with(k)).and_then(|l| l.split_whitespace().nth(1)).and_then(|x| x.parse().ok()).unwrap_or(0)
+                };
+                let rss = field("/proc/self/status", "VmRSS:");
+                let free = field("/proc/meminfo", "MemAvailable:");
+                let why = if wall > cap_s {
+                    Some(format!("stopped: the reading passed {:.0} minutes", cap_s / 60.0))
+                } else if rss > max_rss_kb {
+                    Some(format!("stopped: RSS {} MB", rss / 1024))
+                } else if free < 3 * 1048576 {
+                    Some(format!("stopped: MemAvailable {} MB", free / 1024))
+                } else {
+                    None
+                };
+                let c = counts.lock().unwrap();
+                if let Some(why) = why {
+                    show(&c, wall, scumm_reader::cpu_secs() - cpu0, &why);
+                    std::process::exit(3);
+                }
+                if wall - last >= 120.0 {
+                    last = wall;
+                    println!("progress: pass {}, {} records, wall {wall:.0} s, CPU {:.0} s, RSS {} MB", c.pass + 1, c.n, scumm_reader::cpu_secs() - cpu0, rss / 1024);
+                }
+            }
+        });
+    }
+    // --packed FILE: the records streamed into taskcore's packed file as made (the kitchen's goal and start s17;
+    // another scope's start as "start")
+    let packed_out = arg(args, "--packed");
+    let mut sink = Sink(counts.clone(), packed_out.as_ref().map(|p| packed::RecordStream::create(&PathBuf::from(p)).unwrap()));
+    let scope = b.scope.clone();
+    scumm_reader::par::with_pool(game, &scope, threads, |pool| {
+        b.read_all_into(pool, true, None, oracle::passes(sw), Some(&mut sink));
+    });
+    let c = counts.lock().unwrap();
+    show(&c, t.elapsed().as_secs_f64(), scumm_reader::cpu_secs() - cpu0, "done");
+    if let Some(stream) = sink.1.take() {
+        let (goal, start_name, start) = if name == "kitchen" {
+            let kt = oracle::kitchen_task(st);
+            (kt.goal, "s17", kt.s17)
+        } else {
+            (Vec::new(), "start", Facts::from_py(st.named("builder", name).get("start_items")))
+        };
+        let keys = stream.fact_keys();
+        let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+        let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
+        println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+    }
+    let mut keys: Vec<(&String, &i64)> = b.counts.0.iter().collect();
+    keys.sort();
+    for (k, v) in keys {
+        println!("  builder: {k}: {v}");
+    }
+    for (k, v) in &b.rd.counts.0 {
+        println!("  rd: {k}: {v}");
+    }
+    let mut fk: Vec<(&String, &i64)> = b.rd.fork_keys.0.iter().collect();
+    fk.sort_by(|a, b| b.1.cmp(a.1));
+    for (k, v) in fk.iter().take(30) {
+        println!("  fork key: {k}: {v}");
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = args.first().map(|s| s.as_str()).unwrap_or("");
@@ -167,6 +302,10 @@ fn main() {
             // the packed file's stream, finished after the comparison: its start (`task_start`) and `finish` add
             // builder counters, which the reading (golden.py's file) must not have
             let mut packing: Option<packed::RecordStream> = None;
+            if args.iter().any(|a| a == "--count-only") {
+                count_only(&game, &st, name, sw, &args, elsewhere, live);
+                return;
+            }
             let (mut b, secs) = match arg(&args, "--threads") {
                 _ if live || elsewhere || packed_out.is_some() => {
                     // a switch on, or the packed file written as made: on `--threads` workers (default 0)
@@ -180,7 +319,7 @@ fn main() {
                     let scope = b.scope.clone();
                     let t = Instant::now();
                     scumm_reader::par::with_pool(&game, &scope, threads, |pool| {
-                        b.read_all_into(pool, true, None, 2, stream.as_mut().map(|s| s as &mut dyn scumm_reader::builder::RecordSink));
+                        b.read_all_into(pool, true, None, oracle::passes(sw), stream.as_mut().map(|s| s as &mut dyn scumm_reader::builder::RecordSink));
                     });
                     let secs = t.elapsed().as_secs_f64();
                     packing = stream;
