@@ -50,10 +50,10 @@ impl Prefix {
 }
 
 /// The families model.py's `family` gives, as indices.
-const FAMILIES: [&str; 25] = [
+const FAMILIES: [&str; 26] = [
     "var", "bit", "owner", "state", "class", "room", "ego", "script", "local", "objscript", "at:script", "at:local",
     "at:obj", "at:entry", "at:exit", "frozen", "cutscene", "esc:script", "esc:local", "esc:obj", "esc:entry",
-    "esc:exit", "verb", "objpos", "actorroom",
+    "esc:exit", "verb", "objpos", "actorroom", "mouse",
 ];
 
 fn slot_kind_index(s: Slot) -> usize {
@@ -86,6 +86,7 @@ pub fn family_index(k: Fact) -> usize {
         Fact::Verb(_) => 22,
         Fact::ObjPos(_) => 23,
         Fact::ActorRoom(_) => 24,
+        Fact::Mouse => 25,
     }
 }
 
@@ -94,7 +95,7 @@ pub fn family_index(k: Fact) -> usize {
 pub struct FactOracle {
     pub facts: FactMap,
     kinds: Option<Vec<String>>,
-    tracks: [bool; 25],
+    tracks: [bool; 26],
     lists: FxHashMap<Prefix, Vec<Fact>>,
     owned: OnceCell<FxHashMap<i32, Vec<i32>>>,
     /// keys read as not held whatever their family (wide.py's synthetic `--unheld` states; empty otherwise)
@@ -106,7 +107,7 @@ static EMPTY: Vec<Fact> = Vec::new();
 impl FactOracle {
     /// The oracle over `facts`; `kinds` the families the map holds (None: all).
     pub fn new(facts: FactMap, kinds: Option<Vec<String>>) -> FactOracle {
-        let mut tracks = [true; 25];
+        let mut tracks = [true; 26];
         if let Some(ks) = &kinds {
             for (i, fam) in FAMILIES.iter().enumerate() {
                 tracks[i] = tracks_family(ks, fam);

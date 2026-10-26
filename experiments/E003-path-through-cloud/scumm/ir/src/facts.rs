@@ -118,6 +118,9 @@ pub enum Fact {
     /// which only o5_putActorInRoom and, for the ego, o5_loadRoomWithEgo change (script_v5.cpp:2160-2196,
     /// 1857-1883). Not `room:A`: model.py's `family` would put that key in the ground truth's `room` family
     ActorRoom(i32),
+    /// `mouse` (fix round 1, F1, switch input_script; not facts.py's): the cell or verb the mouse is over after an
+    /// input, where the reading knows it (the reader's numbering: scumm-reader `inputs.rs`)
+    Mouse,
 }
 
 impl fmt::Display for Fact {
@@ -140,6 +143,7 @@ impl fmt::Display for Fact {
             Fact::Verb(v) => write!(f, "verb:{v}"),
             Fact::ObjPos(o) => write!(f, "objpos:{o}"),
             Fact::ActorRoom(a) => write!(f, "actorroom:{a}"),
+            Fact::Mouse => f.write_str("mouse"),
         }
     }
 }
@@ -192,6 +196,7 @@ impl FromStr for Fact {
             "room" if rest.is_empty() && !s.contains(':') => Fact::Room,
             "ego" if !s.contains(':') => Fact::Ego,
             "cutscene" if !s.contains(':') => Fact::Cutscene,
+            "mouse" if !s.contains(':') => Fact::Mouse,
             "var" => Fact::Var(one(rest)?),
             "bit" => Fact::Bit(one(rest)?),
             "owner" => Fact::Owner(one(rest)?),
@@ -249,6 +254,7 @@ impl Fact {
             Fact::Verb(_) => "verb",
             Fact::ObjPos(_) => "objpos",
             Fact::ActorRoom(_) => "actorroom",
+            Fact::Mouse => "mouse",
         }
     }
 

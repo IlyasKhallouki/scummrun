@@ -158,6 +158,10 @@ impl<'g> Machine<'g> {
         w.push(opt_word(p.cut_index));
         w.push(p.cut_data.len() as u64);
         w.push(p.settle as u64);
+        if let Some((r, c)) = p.cell {
+            // F1: paths with the mouse at different cells stay apart (with the switch off no path has a cell)
+            w.push(pair_word(r, c as i32) | (1 << 63));
+        }
         if p.settle {
             // the slots off the stack and the queue are part of the state: paths differing there stay apart
             w.push(p.round as u64);

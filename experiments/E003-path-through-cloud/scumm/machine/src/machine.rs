@@ -18,6 +18,7 @@ mod dialog;
 mod draw_clears;
 mod esc;
 mod hooks;
+mod inputs;
 mod rooms;
 mod settle;
 
@@ -45,6 +46,11 @@ pub const VAR_EGO: i32 = 1;
 pub const VAR_ROOM: i32 = 4;
 pub const VAR_OVERRIDE: i32 = 5;
 pub const VAR_CAMERA_MIN_X: i32 = 17;
+/// the mouse variables (vars.cpp; updateScummVars, scumm.cpp:3385-3388)
+pub const VAR_VIRT_MOUSE_X: i32 = 20;
+pub const VAR_VIRT_MOUSE_Y: i32 = 21;
+pub const VAR_MOUSE_X: i32 = 44;
+pub const VAR_MOUSE_Y: i32 = 45;
 pub const VAR_CAMERA_MAX_X: i32 = 18;
 pub const VAR_ROOM_RESOURCE: i32 = 22;
 pub const VAR_CUTSCENEEXIT_KEY: i32 = 24;
@@ -150,10 +156,13 @@ pub struct Switches {
     /// and actorFromPos as value sets, tests on ranges and on value sets past MAX_VALUES decided where every value
     /// agrees, and a forked test on a variable or local that holds a range or a set narrowing it on each side
     pub value_sets: bool,
+    /// fix round 1, F1 (Rust only): an input is one frame from the input script (machine/inputs.rs): findObject at
+    /// the mouse's cell decided by facts, doSentence queuing for the frame's checkAndRunSentenceScript
+    pub input_script: bool,
 }
 
 /// Fix round 1's switches: in the Rust only (model.py's `SWITCHES` lacks them).
-pub const RUST_SWITCHES: &[&str] = &["draw_clears", "actor_rooms", "value_sets"];
+pub const RUST_SWITCHES: &[&str] = &["draw_clears", "actor_rooms", "value_sets", "input_script"];
 
 impl Switches {
     pub fn parse(names: &[String]) -> Result<Switches, String> {
@@ -166,6 +175,7 @@ impl Switches {
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
                 "value_sets" => s.value_sets = true,
+                "input_script" => s.input_script = true,
                 _ => return Err(format!("unknown switch {n}")),
             }
         }
@@ -886,6 +896,19 @@ impl<'g> Machine<'g> {
         let g = self.game;
         if name == known::FIND_INVENTORY && self.calls {
             return self.find_inventory(p, o, args, x);
+        }
+        if (name == known::FIND_OBJECT || name == known::ACTOR_FROM_POS) && self.switches.input_script && p.cell.is_some() {
+            // F1: findObject at the mouse's cell is decided by facts; actorFromPos there is 0, a replay check
+            // (inputs.rs)
+            let vals: Vec<Val> = g.ast.kids(args).iter().map(|&a| self.val(p, o, a, x)).collect();
+            let v = if name == known::FIND_OBJECT {
+                self.find_object_at_cell(p, o, &vals)
+            } else {
+                self.actor_at_cell(p, &vals, x)
+            };
+            if let Some(v) = v {
+                return v;
+            }
         }
         match getter_kind(name) {
             Some(GetterKind::Fact) => {}
@@ -1737,7 +1760,7 @@ impl<'g> Machine<'g> {
             known::DO_SENTENCE => {
                 if g.ast.flags(flags).contains(&known::STOP) {
                     // stops VAR_SENTENCE_SCRIPT (script_v5.cpp:1004-1008)
-                    if p.settle {
+                    if p.settle || self.switches.input_script {
                         // it also empties the sentence queue (_sentenceNum = 0, script_v5.cpp:1005)
                         p.queue.clear();
                     }
@@ -1763,9 +1786,9 @@ impl<'g> Machine<'g> {
                     }
                     return Vec::new();
                 }
-                if p.settle {
+                if p.settle || self.switches.input_script {
                     // doSentence (script.cpp:1145-1172) pushes (verb, A, B) with freeze count 0; v5 drops no
-                    // duplicate. checkAndRunSentenceScript pops the top at the end of a later frame
+                    // duplicate. checkAndRunSentenceScript pops the top at the end of a frame (F1: this one's)
                     let mut vals = Vec::with_capacity(args.len());
                     for &a in args {
                         vals.push(self.val(p, o, a, Some(x)));

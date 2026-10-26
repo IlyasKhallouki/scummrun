@@ -831,6 +831,10 @@ impl<'g> Machine<'g> {
         };
         let (busy, unknown) = if n != 0 { self.sentence_waits(p, o, n) } else { (Vec::new(), Vec::new()) };
         if !busy.is_empty() {
+            if self.switches.input_script && !p.settle {
+                // F1: the sentence stays queued past the input's frame (inputs.rs)
+                self.sentence_held(p, ci, &busy);
+            }
             return;
         }
         if !unknown.is_empty() {

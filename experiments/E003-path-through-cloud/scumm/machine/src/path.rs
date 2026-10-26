@@ -727,6 +727,9 @@ pub struct Path {
     // --- esc
     /// False, True, or None when merged paths disagree
     pub cleared: Option<bool>,
+    // --- fix round 1, F1 (switch input_script)
+    /// the mouse's cell: (room resource, index into `Game::cells`), set by an input's mouse step
+    pub cell: Option<(i32, u16)>,
     // --- golden.py's trace bookkeeping
     pub tid: Option<u32>,
     /// what a hook adds to a path (reader.py's `SymPath` fields); None without hooks. Forks copy it
