@@ -141,6 +141,23 @@ pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut Ban
     Ok(Task { acts, ..t })
 }
 
+/// The error `apply` stops with for these bans and the start file's keys `named`, if any (its first: a ban that names a
+/// fact the packed file lacks and the start file names); serve.rs checks it per request, as the keys are the
+/// request's.
+pub fn named_error(t: &Task, bans: &[Ban], named: Option<&HashSet<String>>) -> Option<String> {
+    let keys: HashSet<&str> = (0..t.facts.len() as u32).map(|f| t.key(f)).collect();
+    for ban in bans {
+        if ban.point.iter().all(|(k, _)| keys.contains(k.as_str())) {
+            continue;
+        }
+        if let Some((k, _)) = ban.point.iter().find(|(k, _)| !keys.contains(k.as_str()) && named.map_or(false, |n| n.contains(k))) {
+            return Some(format!("a ban on {} names fact {}, which the start file names and the packed file lacks: \
+                                the file's facts are not the task's", ban.label, k));
+        }
+    }
+    None
+}
+
 /// The banned task as a view over the input's actions (`apply` without the copy, for serve.rs): the actions of a
 /// banned label replaced by their pieces, in place; every other action is the input's own.
 pub struct Banned<'a> {

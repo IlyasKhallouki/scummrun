@@ -8,7 +8,9 @@
 //!   taskcore decode (the same options) --plan sas_plan --out steps.json
 //!   taskcore validate (the same options) --names plan.txt --out result.json
 //!   taskcore info   --task F.tc
-//!   --goal K=V[|V..][,K=V..]: the goal instead of the file's (sas, decode, validate)
+//!   taskcore serve  --task F.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
+//!                   (then one `sas` request per line on stdin: serve.rs)
+//!   --goal K=V[|V..][,K=V..]: the goal instead of the file's (sas, decode, validate, serve)
 
 mod bans;
 mod fold;
@@ -16,6 +18,7 @@ mod model;
 mod packed;
 mod reduce;
 mod sas;
+mod serve;
 
 use fold::FoldMode;
 use model::*;
@@ -25,6 +28,7 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 use std::time::Instant;
 
+#[derive(Clone)]
 struct Args {
     names: Option<PathBuf>,
     cmd: String,
@@ -48,7 +52,7 @@ struct Args {
 
 fn parse() -> Result<Args, String> {
     let mut it = std::env::args().skip(1);
-    let cmd = it.next().ok_or("usage: taskcore sas|decode|info --task F.tc ...")?;
+    let cmd = it.next().ok_or("usage: taskcore sas|decode|info|serve --task F.tc ...")?;
     let mut a = Args {
         names: None,
         cmd,
@@ -486,6 +490,7 @@ fn run() -> Result<(), String> {
             let p = prepare(&a)?;
             write_out(&a, p, t0)
         }
+        "serve" => serve::run(&a),
         "decode" => {
             let p = prepare(&a)?;
             let plan_text = std::fs::read_to_string(a.plan.as_ref().ok_or("--plan is needed")?).map_err(|e| e.to_string())?;
