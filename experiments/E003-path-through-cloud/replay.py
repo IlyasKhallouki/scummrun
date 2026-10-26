@@ -102,6 +102,15 @@ What the harness does, per plan step (plan.md step 5, with D5):
   writes the engine shows (``_watch`` with one ``exps`` per path; the one with the most writes held when none holds
   all), judged as a single step from there. Several with different inputs (not met so far: a fold is of one label)
   stop the run ("path choice"): a replan would give the same plan from the same frame.
+* **Frame costs** (``cost_caps``, off by default; a reading made with the reader's switch ``--frame-costs``, whose
+  actions cost their records' frames, scumm/reader/src/costs.rs). An event's cost counts its slot's whole wait from
+  the yield. A slot already waiting at the plan's start has spent part of it, so at each plan the harness caps the
+  cost of every event of a live slot at its wait point with what the engine's dump shows is left
+  (``cost_caps_of``): a paused slot with delay D jiffies runs ``floor(D / dmax) + 1`` frames on at the earliest
+  (script.cpp:1513-1542, scumm.cpp:3129-3132; ``dmax`` the reading's), any other live slot 1 frame. The cap holds for
+  any later turn of the slot at that point too (it only lowers a lower bound). taskcore applies the caps
+  (``--cost-caps``). Each plan's entry keeps its steps' costs (``costs``, capped) and Fast Downward's plan cost
+  (``plan_cost``).
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
   one), a planner timeout, the planner's memory limit (``memory_limit``: Fast Downward's search memory, this
   laptop's budget), the replan limit, the time limit, a start outside the task's domains (task.OutOfDomain: the task
@@ -713,6 +722,29 @@ NUM_SCRIPT_LOCAL = 25  # script.h:76
 WIO_INVENTORY = 0  # scumm.h:213: an object's slot started from the inventory, which a room change leaves alive
 
 
+def cost_caps_of(state: dict, dmax: int) -> dict:
+    """The frame-cost caps at a plan's start (module docstring, "Frame costs"): {"event(NAME@W": frames} for every live
+    slot of the engine's state dump at its wait point W: ``floor(delay / dmax) + 1`` for a paused slot (status 1,
+    ssPaused), 1 for any other. Two slots of one name and point: the lesser."""
+    out: dict = {}
+    for sl in state["slots"]:
+        name = F.unit_of(sl["where"], sl["number"])
+        if name is None or sl["code"] < 0:
+            continue
+        cap = sl["delay"] // max(1, dmax) + 1 if sl["status"] == 1 and sl["delay"] > 0 else 1
+        key = f"event({name}@{sl['code']}"
+        out[key] = min(cap, out.get(key, cap))
+    return out
+
+
+def capped_cost(name: str, cost: int, caps: dict) -> int:
+    """An action's cost under the caps (taskcore bans.rs ``apply_caps``: a label ``P)`` or ``P#...``)."""
+    label = name.rsplit("#", 1)[0] if "#" in name else name
+    head = label.split("#", 1)[0]
+    prefix = head[:-1] if head.endswith(")") else head
+    return min(cost, caps[prefix]) if prefix in caps else cost
+
+
 def dumped_slots(state: dict) -> dict | None:
     """The live slots of a state dump made with EngineConfig.dump_locals, by unit name (facts.py's): {"name", "room",
     "w", "esc", "locals", "override", "cut_data", "owned"} (reader's ``Builder.slot_locals``), and "flags":
@@ -969,7 +1001,8 @@ class Harness:
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
                  progress=None, planner: str = "taskcore", packed=None, search: str = "lama-first", workdir=None,
                  taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None,
-                 slot_locals: bool = False, lists: dict | None = None, reread=None):
+                 slot_locals: bool = False, lists: dict | None = None, reread=None, cost_caps: bool = False,
+                 cost_dmax: int | None = None):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         if reread is not None and planner != "taskcore":
@@ -983,6 +1016,10 @@ class Harness:
         self.rereads: list = []  # per reading made again: the plan, the frame, the slots, the seconds, the actions
         self.slot_detail = None  # the last F10 replan's live slots (``_replan_locals``), for the plan's entry
         self.planner, self.packed, self.search, self.taskcore_args = planner, packed, search, tuple(taskcore_args)
+        # frame costs (module docstring): the caps at each plan from the engine's dump, and the reading's dmax
+        if cost_caps and (planner != "taskcore" or not cost_dmax):
+            raise ValueError("cost caps: the taskcore planner and the reading's dmax (reading.json frame_costs)")
+        self.cost_caps, self.cost_dmax = cost_caps, cost_dmax
         self.memory_limit = memory_limit
         self.on_plan = on_plan  # called with the harness after each plan (the caller's snapshot of ``result``)
         self.workdir = Path(workdir) if workdir is not None else None
@@ -1220,17 +1257,26 @@ class Harness:
         if self.workdir is None:
             self.workdir = Path(tempfile.mkdtemp(prefix="replay-taskcore-"))
         self.progress(f"planning through taskcore (plan {n}, frame {self.branch.frame}, {len(self.bans)} bans)")
+        args, caps = list(self.taskcore_args), {}
+        if self.cost_caps:
+            caps = cost_caps_of(self.state, self.cost_dmax)
+            cdir = self.workdir / f"plan-{n:03d}"
+            cdir.mkdir(parents=True, exist_ok=True)
+            (cdir / "caps.txt").write_text("".join(f"{k}\t{v}\n" for k, v in sorted(caps.items())))
+            args += ["--cost-caps", str(cdir / "caps.txt")]
+            entry["cost_caps"] = {k: v for k, v in sorted(caps.items()) if v > 1}
         try:
             res = plan_fd.plan_taskcore(self.packed, self.base.facts, self.goal, self.pieces, start, self.bans,
                                         time_limit=self.plan_time, memory_limit=self.memory_limit,
                                         search=self.search, workdir=self.workdir / f"plan-{n:03d}",
-                                        args=self.taskcore_args, keep=self.keep_files)
+                                        args=args, keep=self.keep_files)
         except (plan_fd.PathChoice, plan_fd.TaskcoreError) as e:
             entry.update(status="path choice" if isinstance(e, plan_fd.PathChoice) else "taskcore error",
                          error=str(e), steps=[])
             self.stop_reason = f"planner: {e}"
             return []
         sc = res.stats.get("start_check", {})
+        entry.update(costs=[capped_cost(a.name, a.cost, caps) for a in res.paths], plan_cost=res.plan_cost)
         entry.update(write_s=res.write_s, status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps],
                      operators=res.operators, actions=res.stats.get("actions"), decode_s=res.decode_s,
                      folds=res.folds, predicted_goal=res.predicted_goal, file_facts=len(res.file_facts),

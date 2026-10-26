@@ -66,6 +66,9 @@ the packed file's), ``start`` ({"name": what it is, "facts": the facts.py map th
 packed file whose domain holds "below" or "above": domains.Domain's low and high, which the packed file does not
 hold and the harness needs to label an engine value), ``counts`` (the reader's counters), ``sources`` (what made it),
 ``control`` (false; true for the control's file, export_records.control_records). A reading the Rust reader made with
+its switch ``--frame-costs`` (scumm/reader/src/costs.rs: each action of the packed file costs its record's frames)
+has ``frame_costs``, the parameters copied from the golden head (``dmax``: the most jiffies a frame takes off a delay;
+``charinc``; the wait points by rule), which the harness's cost caps read (replay.py). A reading made with
 its switch ``--live-locals`` (scumm/reader/PORT-NOTES.md, "Live locals") also has ``live_locals``, copied from the
 golden head: ``{"switch": "--live-locals", "slots": {slot: [the locals its unit's code reads] or null (all)}}``, a
 slot named as the engine's state names it (``script:N``, ``obj:N``; ``local:N@R``, ``entry@R``, ``exit@R`` for room
@@ -802,6 +805,8 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
            "from_golden": {"golden": str(golden), "packed": str(packed)}}
     if hd.get("live_locals") is not None:
         doc["live_locals"] = hd["live_locals"]  # the Rust reader's switch --live-locals (module docstring)
+    if hd.get("frame_costs") is not None:
+        doc["frame_costs"] = hd["frame_costs"]  # the Rust reader's switch --frame-costs (module docstring)
     doc.update({k: v for k, v in (info or {}).items() if k not in doc})
     head_path.write_text(json.dumps(doc, indent=1, default=str) + "\n")
     return {"actions": len(want), "records": n_records, "facts": len(keys), "bounds": len(bounds), "lists": lw.n,
