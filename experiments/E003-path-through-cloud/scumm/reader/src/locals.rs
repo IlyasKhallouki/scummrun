@@ -23,8 +23,8 @@ pub enum All {
     Unparsed,
     /// a code descumm did not decode (`unknownN(..)`, `...Unknown...`) with an operand that is not a constant
     Undecoded,
-    /// bytes no instruction accounts for (the IR's notes "closer gap", "else gap not a multiple of 3", "jump line not
-    /// 3 bytes")
+    /// an IR note that the engine may run bytes no instruction shows: any note but [`EXACT_NOTES`] ("closer gap",
+    /// "jump to the end", "target not an instruction offset", "verb entry not an instruction offset", ...)
     Gap,
 }
 
@@ -34,7 +34,7 @@ impl All {
             All::Indexed => "a local read through an index",
             All::Unparsed => "an instruction the IR did not parse",
             All::Undecoded => "a code descumm did not decode, with an operand that is not a constant",
-            All::Gap => "bytes no instruction accounts for",
+            All::Gap => "an IR note that the engine may run bytes no instruction shows",
         }
     }
 }
@@ -42,8 +42,24 @@ impl All {
 /// The locals a unit's code reads (their numbers), or why it keeps all of them.
 pub type Reads = Result<BTreeSet<i32>, All>;
 
-/// The IR notes that say some bytes of the unit are in no instruction.
-const GAP_NOTES: [&str; 3] = ["closer gap", "else gap not a multiple of 3", "jump line not 3 bytes"];
+/// The IR notes (ir/src/read.rs) that leave every byte the engine runs in an instruction the IR shows: a jump target
+/// read from the bytes (it is an instruction's start, or the note "target not an instruction offset" follows), the
+/// hidden jumps of an else chain (their bytes a multiple of 3, or "else gap not a multiple of 3" follows), a global
+/// variable's name read from the bytes or left as printed (no local), and a unit with no instruction (no slot of it
+/// ever waits, so no list of it is keyed). Any other note keeps all locals ([`All::Gap`]): a gap ("closer gap", "else
+/// gap not a multiple of 3", "jump line not 3 bytes", "while without a closer at its end", "two instructions at one
+/// offset"), a start the engine can take inside or past the shown code ("jump to the end", "target not an instruction
+/// offset", "verb entry not an instruction offset", "else-if target from the text rule, unverified", "beginOverride not
+/// followed by a jump": the engine skips the next 3 bytes as that jump, script_v5.cpp beginOverride), and any note
+/// added later. "unparsed" is the instruction's own ([`All::Unparsed`]).
+pub const EXACT_NOTES: [&str; 6] = [
+    "else-if target from bytes, text rule agrees",
+    "else-if target from bytes, text rule differs",
+    "else chain",
+    "ambiguous name from bytes",
+    "ambiguous name, unverified",
+    "empty unit",
+];
 
 /// A name descumm gives a code it could not decode (dump_scripts.py's SOFT_WARN_RE: `unknownN(`,
 /// UnknownCursorCommand, SetBoxUnknown, UnknownWait, StringFuncUnknown).
@@ -165,7 +181,7 @@ impl Walk<'_> {
 /// entries), but the target of a plain `Local[n] = ...`; "all" when the IR does not show the reads exactly ([`All`]).
 pub fn unit_reads(game: &Game, u: UnitId) -> Reads {
     let unit = game.unit(u);
-    if unit.notes.iter().any(|n| GAP_NOTES.contains(&n.class)) {
+    if unit.notes.iter().any(|n| n.class != "unparsed" && !EXACT_NOTES.contains(&n.class)) {
         return Err(All::Gap);
     }
     let mut w = Walk { ast: &game.ast, syms: &game.syms, out: BTreeSet::new() };
@@ -329,6 +345,39 @@ mod tests {
         assert_eq!(slots["script:153"], None);
         assert_eq!(slots["obj:486"], Some(vec![]));
         assert!(slots.contains_key("entry@33") && slots.contains_key("exit@33"));
+    }
+
+    /// Room 31's local 202 (reads {0}) with one IR note added: a note of [`EXACT_NOTES`] leaves its reads; any other,
+    /// the three that say the engine can start decoding where no shown instruction starts among them, keeps all.
+    #[test]
+    fn notes_keep_all_but_exact_ones() {
+        let k = UnitKey::Local(31, 202);
+        let with_note = |class: &'static str| {
+            let mut g = game().clone();
+            let u = g.id(k).unwrap();
+            g.script.units[u.0 as usize].notes.push(scumm_ir::Note { class, line: 1, detail: String::new() });
+            unit_reads(&g, u)
+        };
+        for class in EXACT_NOTES {
+            assert_eq!(with_note(class), set(&[0]), "{class}");
+        }
+        for class in [
+            "jump to the end",
+            "target not an instruction offset",
+            "verb entry not an instruction offset",
+            "closer gap",
+            "else-if target from the text rule, unverified",
+            "beginOverride not followed by a jump",
+            "a note added later",
+        ] {
+            assert_eq!(with_note(class), Err(All::Gap), "{class}");
+        }
+        // MI1's notes are all of EXACT_NOTES
+        for u in game().ids() {
+            for n in &game().unit(u).notes {
+                assert!(EXACT_NOTES.contains(&n.class), "{:?}: {}", game().unit(u).key, n.class);
+            }
+        }
     }
 
     /// The recursive flag: only whether it is true.
