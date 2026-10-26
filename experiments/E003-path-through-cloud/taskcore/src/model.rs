@@ -272,15 +272,6 @@ impl Actions {
         self.mem.extend_from_slice(members);
         self.mem_off.push(self.mem.len());
     }
-    /// The same action again (no change), into another Actions.
-    pub fn copy_from(&mut self, src: &Actions, i: usize) {
-        let w = &src.words[src.off[i]..src.off[i + 1]];
-        self.words.extend_from_slice(w);
-        self.off.push(self.words.len());
-        self.meta.push(src.meta[i]);
-        self.mem.extend_from_slice(src.members(i));
-        self.mem_off.push(self.mem.len());
-    }
     pub fn n_effects(&self) -> u64 {
         (0..self.len()).map(|i| self.view(i).neff() as u64).sum()
     }

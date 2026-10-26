@@ -73,24 +73,74 @@ enum Edit {
 }
 
 /// The task with each action kept, dropped or replaced by `f`; true when something changed.
-fn rebuild(t: Task, mut f: impl FnMut(&Task, usize, View) -> Edit) -> (Task, bool) {
-    let mut acts = Actions::default();
+///
+/// In place: each action's new words are no more than its old ones (every reduction here only leaves out sets,
+/// values, conditions, effects or actions), so they are written over the arrays at or before where the action was
+/// read, and the arrays are cut to their new length at the end. The arrays are the ones a copy would make, word for
+/// word; the peak memory is the task's, not twice it.
+fn rebuild(t: Task, mut f: impl FnMut(&Facts, usize, View) -> Edit) -> (Task, bool) {
+    let mut t = t;
+    let n = t.acts.len();
     let mut changed = false;
-    for i in 0..t.acts.len() {
-        match f(&t, i, t.acts.view(i)) {
-            Edit::Same => acts.copy_from(&t.acts, i),
-            Edit::Drop => changed = true,
+    let facts = &t.facts;
+    let acts = &mut t.acts;
+    let (mut w, mut wm, mut k) = (0usize, 0usize, 0usize);
+    let (mut start, mut mstart) = (acts.off[0], acts.mem_off[0]);
+    let mut buf = Actions::default();
+    for i in 0..n {
+        let (end, mend) = (acts.off[i + 1], acts.mem_off[i + 1]);
+        let edit = f(facts, i, View { w: &acts.words[start..end] });
+        let keep = match edit {
+            Edit::Same => {
+                acts.words.copy_within(start..end, w);
+                w += end - start;
+                true
+            }
+            Edit::Drop => {
+                changed = true;
+                false
+            }
             Edit::New(a) => {
                 changed = true;
-                acts.push(t.acts.meta[i], t.acts.members(i), &a);
+                buf.words.clear();
+                buf.off.truncate(1);
+                buf.meta.clear();
+                buf.mem_off.truncate(1);
+                buf.mem.clear();
+                buf.push(acts.meta[i], &[], &a);
+                let len = buf.words.len();
+                assert!(w + len <= end, "a reduction made an action longer ({} words, was {})", len, end - start);
+                acts.words[w..w + len].copy_from_slice(&buf.words);
+                w += len;
+                true
             }
+        };
+        if keep {
+            acts.mem.copy_within(mstart..mend, wm);
+            wm += mend - mstart;
+            acts.meta[k] = acts.meta[i];
+            acts.off[k + 1] = w;
+            acts.mem_off[k + 1] = wm;
+            k += 1;
         }
+        start = end;
+        mstart = mend;
     }
-    (Task { acts, ..t }, changed)
+    acts.words.truncate(w);
+    acts.words.shrink_to_fit();
+    acts.off.truncate(k + 1);
+    acts.off.shrink_to_fit();
+    acts.meta.truncate(k);
+    acts.meta.shrink_to_fit();
+    acts.mem.truncate(wm);
+    acts.mem.shrink_to_fit();
+    acts.mem_off.truncate(k + 1);
+    acts.mem_off.shrink_to_fit();
+    (t, changed)
 }
 
-fn is_full(t: &Task, f: u32, s: &[u32]) -> bool {
-    s.len() as u32 == t.facts.size(f)
+fn is_full(facts: &Facts, f: u32, s: &[u32]) -> bool {
+    s.len() as u32 == facts.size(f)
 }
 
 /// Whether two effects can both happen: no fact on which both have a condition, with disjoint sets.
