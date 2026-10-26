@@ -252,3 +252,47 @@ fn kitchen_actor_rooms() {
         "the new records hold the cook's room"
     );
 }
+
+/// F9's kitchen task (start s17, the oracle's goal): the cook's room is a task fact whose domain holds NOT_KNOWN,
+/// the start gives NOT_KNOWN, and taskcore writes the SAS file of the full and the pruned task (folded and reduced,
+/// its defaults), so the planner reads the switch's task. Slow (ignored): the reading, about 100 s on 3 threads.
+#[test]
+#[ignore]
+fn kitchen_task_actor_rooms() {
+    use std::process::Command;
+    let st = static_oracle();
+    let kt = oracle::kitchen_task(st);
+    let (mut b, _, _) = oracle::read_par_with(game(), st, "kitchen", 3, switches(&["actor_rooms"]));
+    let here = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
+    let tc_dir = here.join("taskcore");
+    let ok = Command::new("cargo").args(["build", "--release", "--quiet"]).current_dir(&tc_dir).status().unwrap();
+    assert!(ok.success(), "taskcore does not build");
+    let tc = tc_dir.join("target").join("release").join("taskcore");
+    let work = std::env::temp_dir().join(format!("scumm-reader-f9-{}", std::process::id()));
+    std::fs::create_dir_all(&work).unwrap();
+    let recs = std::mem::take(&mut b.records);
+    let full = scumm_reader::task::build_task(&mut b, &recs, &kt.goal);
+    let cook = full.facts.iter().find(|f| f.0 == "actorroom:6").expect("the cook's room is a task fact");
+    assert!(cook.1.values.contains(&scumm_reader::Label::Int(scumm_reader::table::NOT_KNOWN)));
+    let small = scumm_reader::task::prune(&full, &scumm_reader::task::relevant(&full));
+    for (name, t) in [("full", &full), ("pruned", &small)] {
+        let keys: Vec<String> = t.facts.iter().map(|f| f.0.clone()).collect();
+        let s17 = scumm_reader::task::task_start(&mut b, &kt.s17, &keys);
+        if keys.iter().any(|k| k == "actorroom:6") {
+            assert_eq!(s17.get0("actorroom:6"), scumm_reader::table::NOT_KNOWN, "{name}");
+        }
+        let path = work.join(format!("{name}.tc"));
+        let meta = |i: usize| (recs[i].kind.clone(), recs[i].end_text().to_string(), scumm_reader::packed::cont(&recs[i]));
+        scumm_reader::packed::export_task(&path, t, &[("s17".to_string(), s17)], &meta).unwrap();
+        let out = Command::new(&tc)
+            .args(["sas", "--task"])
+            .arg(&path)
+            .args(["--start", "s17", "--out"])
+            .arg(work.join(format!("{name}.sas")))
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{name}: {}", String::from_utf8_lossy(&out.stderr));
+        assert!(work.join(format!("{name}.sas")).metadata().unwrap().len() > 0);
+    }
+    std::fs::remove_dir_all(&work).unwrap();
+}
