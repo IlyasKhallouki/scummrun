@@ -30,7 +30,8 @@ apart) when the Rust machine matches model.py.
 and compared with them; it stops at the first difference (slower; the decoding's own check). ``--canonical``: the
 server sends the canonical lines instead of the columns (slower; for comparison). ``--no-build``: skip
 ``cargo build --release -p scumm-machine --bin machine-serve`` (run in scumm/ otherwise; quick when nothing changed).
-``--bin PATH``: another machine-serve binary (the tests pass cargo's own), not built here. ``--resume`` is refused: check.py's resume folder keys records by the
+``--bin PATH``: another machine-serve binary (the tests pass cargo's own), not built here. ``--switches`` also takes
+the Rust machine's own switches (fix round 1, ``RUST_SWITCHES``: ``value_sets``), which model.py does not have. ``--resume`` is refused: check.py's resume folder keys records by the
 Python sources only, so it would mix records of both machines.
 
 Besides check.py's files it writes DIR/<stem>.rust-times.tsv (stem: ``check.times_stem``): per counted move with an
@@ -78,6 +79,14 @@ import golden  # noqa: E402
 import groundtruth  # noqa: E402
 import model  # noqa: E402
 
+# Switches of the Rust machine alone (fix round 1: the fixes are made in Rust only, D7). model.py has no rule for them,
+# so this process adds their names to model.SWITCHES before check.py builds its Machine: check.py then takes them with
+# --switches, names its files and log after them, and the Rust machine runs them. A run with one on is not model.py's.
+RUST_SWITCHES = {
+    "value_sets": "F12 (fix-round1.md): the mouse variables are ranges and findObject and actorFromPos value sets; a "
+                  "test every value agrees on is decided, else the fork narrows the tested variable or local on each "
+                  "side; +, -, * and / by a constant map a range to a range (scumm/machine, Switches::value_sets)",
+}
 _ARGS = {"verify": False, "canonical": False, "dir": None, "bin": BIN}
 _WIDTH = {2: "H", 4: "I"}  # the array type codes of the wire's index widths
 assert all(array.array(c).itemsize == w for w, c in _WIDTH.items())
@@ -319,6 +328,8 @@ def main() -> None:
     check.OUT = out
     check.run_model = run_model
     check.score_move = score_move
+    for name, what in RUST_SWITCHES.items():
+        model.SWITCHES.setdefault(name, what)
     sys.argv = [str(HERE / "check.py")] + rest
     t = time.perf_counter()
     try:
