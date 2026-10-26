@@ -830,6 +830,11 @@ Kept apart (decided where a row reached them):
 Fix round 1 (fix-round1.md, D8) is made in Rust only (D7). Each fix is a switch, off by default; with every switch
 off the machine is model.py's, and every golden above still compares with 0 differences.
 
+**`draw_clears` (F5) and `actor_rooms` (F9)** have their own notes: `../fixes/F5-draw-clears.md` and
+`../fixes/F9-actor-rooms.md`. With `actor_rooms` and `value_sets` on together, getActorRoom of a value set of actors
+(actorFromPos's) reads each actor's room fact, and getActorRoom of a range (an actor not known) reads as getActorRoom's
+non-fact, as with `actor_rooms` off (`getter_base`; `tests/value_sets.rs` `actor_room_of_value_sets`).
+
 **`value_sets` (F12).** Forks by value sets, the mouse as ranges:
 
 - A range is an interned plain unknown (no value set) whose `what` ends in its bounds (`Vals::mk_range`), with the
