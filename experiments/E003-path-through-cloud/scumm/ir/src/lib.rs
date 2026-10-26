@@ -17,6 +17,7 @@
 
 pub mod analysis;
 pub mod ast;
+pub mod cells;
 pub mod due;
 pub mod dump;
 pub mod facts;
