@@ -30,8 +30,9 @@ apart) when the Rust machine matches model.py.
 and compared with them; it stops at the first difference (slower; the decoding's own check). ``--canonical``: the
 server sends the canonical lines instead of the columns (slower; for comparison). ``--no-build``: skip
 ``cargo build --release -p scumm-machine --bin machine-serve`` (run in scumm/ otherwise; quick when nothing changed).
-``--bin PATH``: another machine-serve binary (the tests pass cargo's own), not built here. ``--resume`` is refused: check.py's resume folder keys records by the
-Python sources only, so it would mix records of both machines.
+``--bin PATH``: another machine-serve binary (the tests pass cargo's own), not built here. ``--resume`` is refused:
+check.py's resume folder keys records by the Python sources only, so it would mix records of both machines.
+``--switches`` also takes fix round 1's switches (``RUST_SWITCHES``), which model.py lacks.
 
 Besides check.py's files it writes DIR/<stem>.rust-times.tsv (stem: ``check.times_stem``): per counted move with an
 action, the Rust machine's seconds, the encoding's, the bytes sent, the decoding's seconds, the whole move's
@@ -77,6 +78,19 @@ import check  # noqa: E402  (imports parallel first, which hashes the sources as
 import golden  # noqa: E402
 import groundtruth  # noqa: E402
 import model  # noqa: E402
+
+# Fix round 1's switches (fix-round1.md): rules of the Rust machine that model.py does not have (scumm/machine/src/
+# machine.rs RUST_SWITCHES). check.py's Machine refuses a switch model.SWITCHES lacks; it never runs a move here
+# (check.run_model is the Rust's), so main() adds these names to that table in this process and the workers it forks.
+# A run with one of them has no Python reference: its files are new rows, not a comparison.
+RUST_SWITCHES = {
+    "draw_clears": "F5: drawObject's setXY moves the object (objpos:O, an index into its places), and every other "
+                   "object of the room with the drawn object's place and size goes to state 0 (script_v5.cpp:1108-1128); "
+                   "loading a room puts its objects back (room.cpp:195)",
+    "actor_rooms": "F9: an actor's room is a fact (actorroom:A): putActorInRoom and loadRoomWithEgo write it "
+                   "(script_v5.cpp:2160-2196, 1857-1866), getActorRoom and actorFollowCamera read it "
+                   "(script_v5.cpp:1289-1322; camera.cpp:62-70)",
+}
 
 _ARGS = {"verify": False, "canonical": False, "dir": None, "bin": BIN}
 _WIDTH = {2: "H", 4: "I"}  # the array type codes of the wire's index widths
@@ -316,6 +330,8 @@ def main() -> None:
     _ARGS.update(verify=a.verify, canonical=a.canonical, dir=out, bin=a.bin.resolve())
     for f in out.glob(".rust-times.*.jsonl"):
         f.unlink()
+    for k, v in RUST_SWITCHES.items():
+        model.SWITCHES.setdefault(k, v)
     check.OUT = out
     check.run_model = run_model
     check.score_move = score_move

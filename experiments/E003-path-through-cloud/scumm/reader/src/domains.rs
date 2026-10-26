@@ -10,6 +10,7 @@ use crate::facts::Facts;
 use crate::py::{Counter, Py};
 use rustc_hash::{FxHashMap, FxHashSet};
 use scumm_ir::{known, ArithOp, AssignOp, Ast, Expr, ExprId, Game, RefKind, Span, Stmt, UnitId, UnitKey};
+use scumm_machine::Switches;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const MAX_CUTSCENE: i64 = 5; // kMaxCutsceneNum, script.h:111
@@ -504,6 +505,13 @@ pub fn meta_rooms(root: &std::path::Path) -> Vec<i32> {
 
 /// domains.py `build(start, goals)` over every unit of the game, with the default settings.
 pub fn build(game: &Game, rooms_meta: &[i32], start: &Facts, goals: &[(String, Vec<i64>)]) -> Domains {
+    build_with(game, rooms_meta, start, goals, Switches::default())
+}
+
+/// `build` with fix round 1's switches (fix-round1.md; domains.py has none): with them off, `build`. F5
+/// (draw_clears): a global script's drawObject clears objects of the room it runs in, so their states take 0 too (a
+/// room's own code already adds its room's: `draw_rooms`); `objpos:O` of a movable object has its places' indices.
+pub fn build_with(game: &Game, rooms_meta: &[i32], start: &Facts, goals: &[(String, Vec<i64>)], sw: Switches) -> Domains {
     let ast = &game.ast;
     let settings = settings_env();
     let mut caps = 0i64;
@@ -872,6 +880,13 @@ pub fn build(game: &Game, rooms_meta: &[i32], start: &Facts, goals: &[(String, V
             } else {
                 let img = ast.subs(subops).iter().find(|s| s.name == known::SET_IMAGE).copied();
                 draw_rooms.insert(game.unit(u).room);
+                if sw.draw_clears && game.unit(u).room.is_none() {
+                    // F5: the rooms of the objects a global script draws (any room when the object does not fold)
+                    match objs.as_ref() {
+                        Some(os) => draw_rooms.extend(os.iter().map(|&o| game.object_room.get(&(o as i32)).copied())),
+                        None => draw_rooms.extend(game.object_room.values().map(|&r| Some(r))),
+                    }
+                }
                 match img {
                     Some(s) => fold(ast, ast.kids(s.args)[0], e, Some(&exact), &mut caps),
                     None => Some(vec![1]),
@@ -975,6 +990,14 @@ pub fn build(game: &Game, rooms_meta: &[i32], start: &Facts, goals: &[(String, V
         doms.insert(format!("state:{o}"), Domain::of(vals, None, None));
     }
     doms.insert("cutscene".into(), Domain::of(0..=MAX_CUTSCENE, None, None));
+    if sw.draw_clears {
+        for (o, places) in &game.movable {
+            let k = format!("objpos:{o}");
+            let mut vals: BTreeSet<i64> = (0..places.len() as i64).collect();
+            vals.insert(start.get0(&k));
+            doms.insert(k, Domain::of(vals, None, None));
+        }
+    }
 
     if caps > 0 {
         counts.add("expressions past MAX_SET values (not worked out)", caps);

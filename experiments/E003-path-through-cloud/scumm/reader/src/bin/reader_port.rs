@@ -3,6 +3,9 @@
 //! reader-port static                  domains, scopes, hook summaries, the Builder's machine-free parts
 //! reader-port records NAME            golden records parsed and written back
 //! reader-port replay NAME [--out F]   the reading by the Rust Builder over the captured runs, against golden.py's
+//! reader-port read NAME [--threads N] [--switches S,...] [--out F]
+//!                                     the reading by the Rust machine half (fix round 1's switches on), against
+//!                                     golden.py's
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
@@ -142,10 +145,13 @@ fn main() {
             // the reading with the Rust machine half, against golden.py's file
             let name = &args[1];
             let cpu0 = scumm_reader::cpu_secs();
+            // fix round 1's switches (fix-round1.md); with any on, the golden comparison reports the differences
+            let names: Vec<String> = arg(&args, "--switches").map_or(Vec::new(), |s| s.split(',').map(String::from).collect());
+            let sw = scumm_machine::Switches::parse(&names).unwrap_or_else(|e| panic!("{e}"));
             let (b, secs) = match arg(&args, "--threads") {
-                None => oracle::read(&game, &st, name),
+                None => oracle::read_with(&game, &st, name, sw),
                 Some(n) => {
-                    let (b, secs, stats) = oracle::read_par(&game, &st, name, n.parse().unwrap());
+                    let (b, secs, stats) = oracle::read_par_with(&game, &st, name, n.parse().unwrap(), sw);
                     println!(
                         "pool: {} batches, {} jobs, {:.1} job s, {} split parts made, {} of them on another worker",
                         stats.batches, stats.jobs, stats.job_secs, stats.parts_made, stats.parts_elsewhere

@@ -6,13 +6,16 @@ use crate::domains::{self, Domains, SETTINGS};
 use crate::facts::Facts;
 use crate::py::{Counter, Py};
 use crate::record::{Unknown, Val, R_COLLAPSED, R_FACT};
-use crate::scope::{Scope, VAR_CURSORSTATE, VAR_USERPUT};
+use crate::scope::{self, Scope, NUM_ACTORS, VAR_CURSORSTATE, VAR_USERPUT};
 use scumm_ir::{known, Expr, Game, Stmt};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// pos: and escpos: of a unit with no live slot, or no override armed.
 pub const NOWHERE: i64 = -1;
+/// Fix round 1, F9 (switch actor_rooms): `actorroom:A` while the reading does not know the actor's room (the start
+/// holds none). No room: Actor::_room is a byte. The Reader reads it as getActorRoom's non-fact, as with the switch off.
+pub const NOT_KNOWN: i64 = -1;
 /// model.py TIME_VARS and MOUSE_VARS: engine variables that change as frames pass.
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
 pub const MOUSE_VARS: [i32; 4] = [20, 21, 44, 45];
@@ -58,6 +61,15 @@ impl FactTable {
         let mut start = scope.start.clone();
         for (n, v) in SETTINGS {
             start.insert(format!("var:{n}"), v);
+        }
+        if scope.switches.actor_rooms {
+            // F9: an actor's room the start does not give is not known (NOT_KNOWN), not room 0
+            for a in 0..NUM_ACTORS {
+                let k = format!("actorroom:{a}");
+                if !start.contains(&k) {
+                    start.insert(k, NOT_KNOWN);
+                }
+            }
         }
         let mut extra = BTreeMap::new();
         let mut counts = Counter::default();
@@ -112,6 +124,9 @@ impl FactTable {
             let mut v = rooms.clone();
             v.insert(start.get0(&format!("var:{n}")));
             extra.insert(format!("var:{n}"), Domain::of(v, None, None));
+        }
+        if scope.switches.actor_rooms {
+            actor_room_domains(scope, game, &start, &doms, &mut extra, &mut counts);
         }
         let mut engine: BTreeSet<i32> = domains::ENGINE.iter().map(|e| e.0).collect();
         engine.extend(TIME_VARS);
@@ -234,6 +249,56 @@ impl FactTable {
             ),
             ("start", self.start.py()),
         ])
+    }
+}
+
+/// Fix round 1, F9 (switch actor_rooms): the reader's domain of `actorroom:A` for each actor the scope writes, from
+/// the scope's own code (the reading runs no other): its start (NOT_KNOWN when the start has none) and every room a
+/// write of `scope::actor_room_writes` that can reach the actor gives it. An operand is a constant or a variable with
+/// its values in the reading: a setting's value, the start's value of a variable the scope does not write, or the
+/// values of its domain (VAR_ROOM's are the `room` domain's: the engine writes it with the room, room.cpp:148, 154).
+/// An actor that a write with a room not worked out can reach gets no domain: its room stays a non-fact, read as
+/// with the switch off.
+fn actor_room_domains(
+    scope: &Scope,
+    game: &Game,
+    start: &Facts,
+    doms: &Domains,
+    extra: &mut BTreeMap<String, Domain>,
+    counts: &mut Counter,
+) {
+    let var = |n: i32| -> Option<BTreeSet<i64>> {
+        let k = format!("var:{n}");
+        if let Some(&(_, v)) = SETTINGS.iter().find(|s| s.0 == n) {
+            return Some([v].into_iter().collect());
+        }
+        if domains::ENGINE.iter().any(|e| e.0 == n) || TIME_VARS.contains(&n) || MOUSE_VARS.contains(&n) {
+            return None;
+        }
+        if !scope.writes.has(&k) {
+            return Some([start.get0(&k)].into_iter().collect());
+        }
+        let d = extra.get(&k).or_else(|| doms.get(&k))?;
+        d.values.iter().map(|l| match l {
+            Label::Int(v) => Some(*v),
+            _ => None,
+        }).collect()
+    };
+    let writes = scope::actor_room_writes(game, &scope.units, &var);
+    for a in 0..NUM_ACTORS {
+        let k = format!("actorroom:{a}");
+        if !scope.writes.has(&k) {
+            continue;
+        }
+        let mine: Vec<&Option<BTreeSet<i64>>> =
+            writes.iter().filter(|w| w.0.as_ref().is_none_or(|who| who.contains(&a))).map(|w| &w.1).collect();
+        if mine.iter().any(|r| r.is_none()) {
+            counts.inc("actors a room write that is not worked out can reach (actorroom: left a non-fact; reader, F9)");
+            continue;
+        }
+        let mut vals: BTreeSet<i64> = [start.get0(&k)].into_iter().collect();
+        vals.extend(mine.into_iter().flat_map(|r| r.as_ref().unwrap().iter().copied()));
+        extra.insert(k, Domain::of(vals, None, None));
     }
 }
 

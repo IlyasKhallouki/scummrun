@@ -532,6 +532,104 @@ fn forget(m: &mut Machine<'_>, q: &mut Path, op: Option<&str>, var_writes: bool)
     }
 }
 
+/// `Reader.read` (the hook's body; the hook adds F9's not-known actor rooms, `actor_room_value`).
+fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+    let stepping = st(m).step_key == Some(k);
+    if let Some(&v) = p.writes.get(&k) {
+        if !stepping && is_step(m, v) {
+            // a counter the path stepped is read: its value is needed now
+            let base = sx(p).pre.get(&PKey::F(k)).filter(|b| b.len() == 1).map(|b| b[0]);
+            match base {
+                Some(b) => {
+                    let d = step_of(m, v);
+                    return stepped(m, k, b, d);
+                }
+                None => fork(k),
+            }
+        }
+        return v;
+    }
+    match k {
+        Fact::At(s @ (Slot::Entry | Slot::Exit), _) => {
+            if let Some(&v) = p.writes.get(&Fact::At(s, MARK)) {
+                return v;
+            }
+        }
+        Fact::Esc(s @ (Slot::Entry | Slot::Exit), _) => {
+            if let Some(&v) = p.writes.get(&Fact::Esc(s, MARK)) {
+                return v;
+            }
+        }
+        _ => {}
+    }
+    if let Some(s) = sx(p).pre.get(&PKey::F(k)) {
+        if s.len() == 1 {
+            let l = s[0];
+            let i = info(m, k);
+            return value(m, &i, l);
+        }
+        if stepping {
+            return step0(m);
+        }
+        if st(m).lazy > 0 {
+            let s = s.clone();
+            let i = info(m, k);
+            return lazy_of(m, &i, Some(&s));
+        }
+        fork(k);
+    }
+    if let Some(&v) = st(m).pins.get(&k) {
+        return v;
+    }
+    if k == Fact::Var(VAR_ROOM) {
+        // the engine writes it with the room (room.cpp:149, 155): the same fact
+        return m.read(p, Fact::Room, o);
+    }
+    if k == Fact::Var(VAR_ROOM_RESOURCE) {
+        let r = m.read(p, Fact::Room, o);
+        return m.h_resource(r);
+    }
+    let i = info(m, k);
+    match i.kind {
+        Kind::Const => Val::Int(i.start as i32),
+        Kind::Fact => {
+            let d = i.dom.as_ref().unwrap();
+            if d.values.len() == 1 {
+                return value(m, &i, d.values[0]);
+            }
+            if stepping {
+                return step0(m);
+            }
+            if st(m).lazy > 0 {
+                return lazy_of(m, &i, None);
+            }
+            fork(k)
+        }
+        Kind::NonFact => m.vals().mk(R_NONFACT, &*i.key),
+    }
+}
+
+/// F9 (switch actor_rooms): an actor's room the reading does not know (crate::table::NOT_KNOWN, a lazy set holding it, or
+/// the room of an actor whose room is no fact) reads as getActorRoom's non-fact, named as `Reader.getter` names it
+/// with the switch off, so the frame's non-fact tests are remembered as before (`memo_ident`).
+fn actor_room_value(m: &mut Machine<'_>, a: i32, v: Val) -> Val {
+    let not_known = match v {
+        Val::Int(n) => n as i64 == crate::table::NOT_KNOWN,
+        Val::Unk(_) => {
+            let u = m.vals_ref().unk(v).unwrap();
+            match &u.values {
+                Some(vs) => vs.iter().any(|&n| n as i64 == crate::table::NOT_KNOWN),
+                None => u.reason == R_NONFACT && *u.what == *format!("actorroom:{a}"),
+            }
+        }
+    };
+    if not_known {
+        m.vals().mk(Reason::Actor, format!("getActorRoom({a})"))
+    } else {
+        v
+    }
+}
+
 // --- the hooks: reader.py's Reader methods ---------------------------------------------------------------------------
 
 /// reader.py `Reader`'s overrides of model.Machine.
@@ -584,79 +682,16 @@ impl Hooks for ReaderHooks {
     }
 
     fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
-        let stepping = st(m).step_key == Some(k);
-        if let Some(&v) = p.writes.get(&k) {
-            if !stepping && is_step(m, v) {
-                // a counter the path stepped is read: its value is needed now
-                let base = sx(p).pre.get(&PKey::F(k)).filter(|b| b.len() == 1).map(|b| b[0]);
-                match base {
-                    Some(b) => {
-                        let d = step_of(m, v);
-                        return stepped(m, k, b, d);
-                    }
-                    None => fork(k),
-                }
-            }
-            return v;
-        }
+        let v = read_fact(m, p, k, o);
         match k {
-            Fact::At(s @ (Slot::Entry | Slot::Exit), _) => {
-                if let Some(&v) = p.writes.get(&Fact::At(s, MARK)) {
-                    return v;
-                }
-            }
-            Fact::Esc(s @ (Slot::Entry | Slot::Exit), _) => {
-                if let Some(&v) = p.writes.get(&Fact::Esc(s, MARK)) {
-                    return v;
-                }
-            }
-            _ => {}
+            Fact::ActorRoom(a) => actor_room_value(m, a, v),
+            _ => v,
         }
-        if let Some(s) = sx(p).pre.get(&PKey::F(k)) {
-            if s.len() == 1 {
-                let l = s[0];
-                let i = info(m, k);
-                return value(m, &i, l);
-            }
-            if stepping {
-                return step0(m);
-            }
-            if st(m).lazy > 0 {
-                let s = s.clone();
-                let i = info(m, k);
-                return lazy_of(m, &i, Some(&s));
-            }
-            fork(k);
-        }
-        if let Some(&v) = st(m).pins.get(&k) {
-            return v;
-        }
-        if k == Fact::Var(VAR_ROOM) {
-            // the engine writes it with the room (room.cpp:149, 155): the same fact
-            return m.read(p, Fact::Room, o);
-        }
-        if k == Fact::Var(VAR_ROOM_RESOURCE) {
-            let r = m.read(p, Fact::Room, o);
-            return m.h_resource(r);
-        }
-        let i = info(m, k);
-        match i.kind {
-            Kind::Const => Val::Int(i.start as i32),
-            Kind::Fact => {
-                let d = i.dom.as_ref().unwrap();
-                if d.values.len() == 1 {
-                    return value(m, &i, d.values[0]);
-                }
-                if stepping {
-                    return step0(m);
-                }
-                if st(m).lazy > 0 {
-                    return lazy_of(m, &i, None);
-                }
-                fork(k)
-            }
-            Kind::NonFact => m.vals().mk(R_NONFACT, &*i.key),
-        }
+    }
+
+    /// Fix round 1: a read that does not fork (the machine's `read_soft`): the fact's values as a set, lazily.
+    fn read_soft(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+        lazily(m, |m| m.read(p, k, o))
     }
 
     /// `SymOracle.get`.
@@ -1504,6 +1539,8 @@ fn enc_fact(b: &mut Vec<u8>, f: Fact) {
             b.extend_from_slice(&w.to_le_bytes());
         }
         Fact::Verb(n) => one(14, n),
+        Fact::ObjPos(n) => one(15, n),
+        Fact::ActorRoom(n) => one(16, n),
     }
 }
 
@@ -1691,6 +1728,8 @@ impl<'g> Reader<'g> {
             s.table = Some(cx.table.clone());
             s.info.clear();
         }
+        // fix round 1's switches, as the reading's scope has them (Scope::of_with)
+        self.m.switches = cx.scope.switches;
     }
 }
 

@@ -18,6 +18,12 @@ pub trait Hooks {
     fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
         m.read_base(p, k, o)
     }
+    /// Fix round 1 (no model.py method): a read that must not fork, for a rule that decides only on a value it
+    /// already has (F9's actorFollowCamera). A machine's read never forks, so the default is `read`; the reader
+    /// reads lazily (the fact's values as a set).
+    fn read_soft(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+        m.read(p, k, o)
+    }
     /// `oracle.get(k)`
     fn oget(&self, m: &mut Machine<'_>, o: &FactOracle, k: Fact) -> Val {
         m.oget_base(o, k)
@@ -112,6 +118,13 @@ impl<'g> Machine<'g> {
     pub fn read(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
         match self.hooks {
             Some(h) => h.read(self, p, k, o),
+            None => self.read_base(p, k, o),
+        }
+    }
+    #[inline]
+    pub fn read_soft(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+        match self.hooks {
+            Some(h) => h.read_soft(self, p, k, o),
             None => self.read_base(p, k, o),
         }
     }

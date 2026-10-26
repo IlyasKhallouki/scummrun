@@ -478,6 +478,9 @@ pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<It
     for k in keys {
         if pos_key(k).is_some() {
             out.insert(k.clone(), NOWHERE);
+        } else if b.scope.switches.actor_rooms && k.starts_with("actorroom:") && !start.contains(k) {
+            // F9: an actor's room the start does not give is not known (table::NOT_KNOWN), not room 0
+            out.insert(k.clone(), crate::table::NOT_KNOWN);
         }
     }
     for (kind, pos) in [("at", "pos"), ("esc", "escpos")] {
