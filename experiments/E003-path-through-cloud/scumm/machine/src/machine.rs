@@ -159,6 +159,9 @@ pub struct Switches {
     /// fix round 1, F1 (Rust only): an input is one frame from the input script (machine/inputs.rs): findObject at
     /// the mouse's cell decided by facts, doSentence queuing for the frame's checkAndRunSentenceScript
     pub input_script: bool,
+    /// fix round 1, F1b (the reader's switch of the same name, scumm-reader builder.rs): it reaches the reader's scope
+    /// and domains through here; no rule of the machine reads it, and it is no switch of machine-serve or machine-run
+    pub sentence_queue: bool,
 }
 
 /// Fix round 1's switches: in the Rust only (model.py's `SWITCHES` lacks them).

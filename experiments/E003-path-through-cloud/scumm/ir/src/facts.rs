@@ -121,7 +121,15 @@ pub enum Fact {
     /// `mouse` (fix round 1, F1, switch input_script; not facts.py's): the cell or verb the mouse is over after an
     /// input, where the reading knows it (the reader's numbering: scumm-reader `inputs.rs`)
     Mouse,
+    /// `queue`, `queue:verb`, `queue:a`, `queue:b` (fix round 1, F1b, the reader's switch sentence_queue; not
+    /// facts.py's): the sentence queue (script.cpp:1145-1172, 1174-1247). Field 0 is its state (0 empty, 1 a sentence
+    /// that the next checkAndRunSentenceScript runs, 2 one a live, unfrozen sentence script holds); 1 to 3 are the top
+    /// entry's verb, object A and object B
+    Queue(u8),
 }
+
+/// The names of `Fact::Queue`'s fields.
+pub const QUEUE_FIELDS: [&str; 4] = ["", "verb", "a", "b"];
 
 impl fmt::Display for Fact {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -144,6 +152,8 @@ impl fmt::Display for Fact {
             Fact::ObjPos(o) => write!(f, "objpos:{o}"),
             Fact::ActorRoom(a) => write!(f, "actorroom:{a}"),
             Fact::Mouse => f.write_str("mouse"),
+            Fact::Queue(0) => f.write_str("queue"),
+            Fact::Queue(i) => write!(f, "queue:{}", QUEUE_FIELDS[i as usize]),
         }
     }
 }
@@ -197,6 +207,8 @@ impl FromStr for Fact {
             "ego" if !s.contains(':') => Fact::Ego,
             "cutscene" if !s.contains(':') => Fact::Cutscene,
             "mouse" if !s.contains(':') => Fact::Mouse,
+            "queue" if rest.is_empty() && !s.contains(':') => Fact::Queue(0),
+            "queue" => Fact::Queue(QUEUE_FIELDS.iter().skip(1).position(|f| *f == rest).ok_or_else(bad)? as u8 + 1),
             "var" => Fact::Var(one(rest)?),
             "bit" => Fact::Bit(one(rest)?),
             "owner" => Fact::Owner(one(rest)?),
@@ -255,6 +267,7 @@ impl Fact {
             Fact::ObjPos(_) => "objpos",
             Fact::ActorRoom(_) => "actorroom",
             Fact::Mouse => "mouse",
+            Fact::Queue(_) => "queue",
         }
     }
 
