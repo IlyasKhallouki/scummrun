@@ -5,6 +5,7 @@
 use crate::analysis::{self, Analyses, Ctx, Loop, Reason, WaitPoint, Write};
 use crate::ast::*;
 use crate::facts::{Fact, Slot};
+use crate::places::{self, ObjBox};
 use crate::read::{self, by_int_key, Script};
 use crate::sym::known;
 use rustc_hash::FxHashMap;
@@ -46,6 +47,8 @@ pub struct GameData {
     pub pseudo_conflicts: Vec<(String, String)>,
     pub resistance: FxHashMap<UnitKey, Resist>,
     pub wild_starts: Vec<(String, Option<bool>)>,
+    pub object_box: FxHashMap<i32, ObjBox>,
+    pub movable: FxHashMap<i32, Vec<(i32, i32)>>,
 }
 
 /// model.py `Game`, with every analysis computed for both settings of switch const_polls.
@@ -81,6 +84,12 @@ pub struct Game {
     pub joins: Vec<bool>,
     /// (unit, head) of every loop switch const_polls reclassifies
     pub const_poll_loops: Vec<(UnitId, u32)>,
+    /// fix round 1, F5 (switch draw_clears; not model.py's): object -> its CDHD box (places.rs)
+    pub object_box: FxHashMap<i32, ObjBox>,
+    /// F5: room resource -> its objects with a box, sorted
+    pub room_objects: FxHashMap<i32, Vec<i32>>,
+    /// F5: object -> its places, when a drawObject with setXY can move it (`places::movable`); `objpos:O` indexes it
+    pub movable: FxHashMap<i32, Vec<(i32, i32)>>,
 }
 
 impl std::ops::Deref for Game {
@@ -146,6 +155,8 @@ impl Game {
             }
         }
         let first_local = local_rooms.keys().next().copied().unwrap_or(1 << 16);
+        let object_box = places::read_boxes(root, meta)?;
+        let movable = places::movable(&script, &object_room, &object_box, &places::room_objects(&object_room, &object_box));
         let data = GameData {
             first_local,
             local_rooms,
@@ -155,6 +166,8 @@ impl Game {
             room_width,
             pseudo,
             pseudo_conflicts,
+            object_box,
+            movable,
             ..Default::default()
         };
         let mut g = Game::new(script, data);
@@ -169,6 +182,7 @@ impl Game {
     pub fn new(script: Script, data: GameData) -> Game {
         let script_writes = analysis::script_writes(&script);
         let nonfacts = analysis::non_fact_vars(&script, &script_writes);
+        let room_objects = places::room_objects(&data.object_room, &data.object_box);
         let mut g = Game {
             script,
             first_local: data.first_local,
@@ -186,6 +200,9 @@ impl Game {
             analyses: Default::default(),
             joins: Vec::new(),
             const_poll_loops: Vec::new(),
+            room_objects,
+            object_box: data.object_box,
+            movable: data.movable,
         };
         let mut joins = vec![false; g.points()];
         for u in g.ids() {

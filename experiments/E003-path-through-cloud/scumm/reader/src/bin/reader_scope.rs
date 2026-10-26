@@ -34,13 +34,24 @@
 //!               packed file to make the reading the Part I runner (replay_part1.py) plays from. The lines are made
 //!               and compressed on --golden-threads N threads (default --threads, at most 16), one gzip member per
 //!               batch, written in order: the same lines as one stream, other compressed bytes.
+//! --start-seed N  the start: results/start-part1.jsonl's seed N (default 1)
+//! --domain-goals part1|none
+//!               the goal domains.build counts as compared constants: results/end-part1.json (default), or none
+//!               (golden.read_scope's and replay_part1.py export's readings)
+//! --goal part1|FACT=V,...
+//!               the packed file's goal (default results/end-part1.json's)
+//! --slot-locals FILE
+//!               fix round 1, F10: slots live in the engine with the locals the bridge dumped, one JSON object per
+//!               line ({"name", "room", "w", "esc", "locals", "override", "cut_data", "owned"}, and "flags":
+//!               {"resistant", "recursive", "owned"} from a dump that has them, which --live-locals needs); their
+//!               events are read with the start's (`Builder.slot_locals`). Without it the reading is as before.
 //! --sample N --seed S --dump FILE
 //!               the spot-check's jobs: of the last pass, N per stratum (the room a job's unit or object belongs
 //!               to, or "global"), drawn by reservoir sampling with seed S; each written to FILE with what its batch
 //!               started with (the `args:` values, the folded lists) and its records (golden.py's encoding), for
 //!               reader_job_dump.py to make again in Python
 
-use scumm_reader::builder::{Builder, RecordSink};
+use scumm_reader::builder::{Builder, RecordSink, SlotFlags, SlotLocals};
 use scumm_reader::domain::Label;
 use scumm_reader::packed::RecordStream;
 use scumm_reader::py::Py;
@@ -339,6 +350,46 @@ fn batches_json(batches: &[(String, usize, usize, f64)], per_batch: &[(usize, f6
     Value::Array(out)
 }
 
+/// `--goal`: "part1" (results/end-part1.json) or "FACT=V,FACT=V".
+fn goal_arg(text: &str, root: &Path) -> Vec<(String, Vec<i64>)> {
+    if text == "part1" {
+        return scaling::part1_goal(root);
+    }
+    text.split(',')
+        .map(|p| {
+            let (k, v) = p.split_once('=').expect("FACT=V");
+            (k.trim().to_string(), vec![v.trim().parse().expect("an int goal value")])
+        })
+        .collect()
+}
+
+/// `--slot-locals`: one slot per line (module docstring).
+fn slot_locals(path: &str) -> Vec<SlotLocals> {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let ints = |v: &Value| -> Vec<i64> { v.as_array().expect("a list").iter().map(|x| x.as_i64().expect("an int")).collect() };
+    text.lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let v: Value = serde_json::from_str(l).expect("a JSON line");
+            SlotLocals {
+                name: v["name"].as_str().expect("name").to_string(),
+                room: v["room"].as_i64().expect("room") as i32,
+                w: v["w"].as_i64().expect("w"),
+                esc: v["esc"].as_i64(),
+                locals: ints(&v["locals"]),
+                override_: v["override"].as_i64().unwrap_or(0),
+                cut_data: v.get("cut_data").map_or(vec![], ints),
+                owned: v["owned"].as_bool().unwrap_or(false),
+                flags: v.get("flags").filter(|f| !f.is_null()).map(|f| SlotFlags {
+                    resistant: f["resistant"].as_bool().expect("flags.resistant"),
+                    recursive: f["recursive"].as_bool().expect("flags.recursive"),
+                    owned: f["owned"].as_bool().expect("flags.owned"),
+                }),
+            }
+        })
+        .collect()
+}
+
 fn write_json(path: &Path, v: &Value) {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, serde_json::to_string_pretty(v).unwrap() + "\n").unwrap();
@@ -350,8 +401,16 @@ fn main() {
     let t_all = Instant::now();
     let root = scumm_ir::default_root();
     let game = scumm_ir::Game::load(&root).expect("the game");
-    let start = scaling::start_facts(&root, scaling::SEED);
-    let goal = scaling::part1_goal(&root);
+    let start_seed: i64 = arg(&args, "--start-seed").map_or(scaling::SEED, |n| n.parse().unwrap());
+    let start = scaling::start_facts(&root, start_seed);
+    let goal = goal_arg(&arg(&args, "--goal").unwrap_or_else(|| "part1".into()), &root);
+    let domain_goals = arg(&args, "--domain-goals").unwrap_or_else(|| "part1".into());
+    let dom_goals = match domain_goals.as_str() {
+        "part1" => scaling::part1_goal(&root),
+        "none" => vec![],
+        x => panic!("--domain-goals part1|none, not {x}"),
+    };
+    let slots = arg(&args, "--slot-locals").map(|p| slot_locals(&p)).unwrap_or_default();
     let k: Option<usize> = arg(&args, "--k").map(|k| k.parse().unwrap());
     let part1 = args.iter().any(|a| a == "--part1");
     let rooms: Vec<i32> = match (&k, arg(&args, "--rooms")) {
@@ -384,7 +443,7 @@ fn main() {
     let dump = arg(&args, "--dump");
 
     let t_setup = Instant::now();
-    let doms = domains::build(&game, &domains::meta_rooms(&root), &start, &goal);
+    let doms = domains::build(&game, &domains::meta_rooms(&root), &start, &dom_goals);
     let scope = Scope::of(&game, &rooms, &start);
     let mut kinds: BTreeMap<&str, usize> = BTreeMap::new();
     for &u in &scope.units {
@@ -406,8 +465,10 @@ fn main() {
         "n_units": scope.units.len(),
         "objects": scope.objects.len(),
         "slot_facts": scope.universe.len(),
-        "start": format!("results/start-part1.jsonl seed {}", scaling::SEED),
+        "start": format!("results/start-part1.jsonl seed {start_seed}"),
         "goal": goal.iter().map(|g| g.0.clone()).collect::<Vec<_>>(),
+        "domain_goals": domain_goals,
+        "slot_locals": slots.len(),
         "threads": threads,
         "elsewhere": elsewhere,
         "live_locals": live_locals,
@@ -433,6 +494,7 @@ fn main() {
         base["live_locals_units"] = json!(ll.counts(&game, &scope));
         b.table.live_locals = Some(Arc::new(ll));
     }
+    b.slot_locals = slots;
     let prog = Arc::new(Mutex::new(Prog { pass: 1, ..Default::default() }));
     {
         let prog = prog.clone();
@@ -684,6 +746,32 @@ fn main() {
         r["batches"] = batches_json(&p.batches, &stats.per_batch);
         r["rss_peak_seen"] = json!({"mb": p.rss_peak_mb, "at": p.rss_peak_at});
     }
+    // F10: the lists the dumped slots' events were read with (the harness matches the slots against them after a
+    // reading made again), each as packed_reading's list lines
+    // (under --live-locals with the slot's flags, which the number covers, as packed_reading.py's lines have them)
+    let flag = |p: &Py| match p {
+        Py::Bool(x) => json!(x),
+        Py::None => Value::Null,
+        other => json!({"unknown": other.text()}),
+    };
+    r["slot_events"] = json!(task::slot_lists(&b)
+        .into_iter()
+        .flat_map(|((name, w), ls)| ls.into_iter().map(move |l| (name.clone(), w, l)))
+        .map(|(name, w, l)| {
+            let mut x = json!({
+                "name": name,
+                "w": w,
+                "sig": l.sig,
+                "locals": l.locals.iter().map(|(n, v)| json!([n, v.int().expect("a dumped local is a number")])).collect::<Vec<_>>(),
+                "override": l.override_,
+                "cut_data": l.cut_data,
+            });
+            if live_locals {
+                x["flags"] = json!({"recursive": flag(&l.recursive), "resistant": flag(&l.resistant), "owned": flag(&l.owned)});
+            }
+            x
+        })
+        .collect::<Vec<_>>());
     r["peak_rss_mb"] = json!(peak_rss_kb().unwrap_or(0) / 1024);
     r["total_s"] = json!((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0);
     r["load_at_end"] = json!(loadavg());
@@ -701,7 +789,7 @@ fn main() {
             ("kind", Py::str("head")),
             ("name", Py::str(&name)),
             ("rooms", Py::List(rooms.iter().map(|&r| Py::Int(r as i64)).collect())),
-            ("seed", Py::Int(scaling::SEED)),
+            ("seed", Py::Int(start_seed)),
             ("pass", Py::Int(smp.pass as i64)),
             ("widened", widened),
             ("per_stratum", Py::Int(smp.per as i64)),

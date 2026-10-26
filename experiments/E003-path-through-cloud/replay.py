@@ -74,6 +74,14 @@ What the harness does, per plan step (plan.md step 5, with D5):
   locals the played steps predicted (``Harness.pred``), so ``args:`` is copied only where the engine's slot is where
   the plan put it; then the planner. Under the Rust reader's switch ``--live-locals`` an ``args:`` number names a
   list of only the locals the slot's unit reads (``read_view``); the copy rule compares no locals and is unchanged.
+* **The slots' locals at a replan** (fix round 1, F10; ``slot_locals``, off by default; the engine runs with
+  EngineConfig.dump_locals): the bridge's state dump lists each live slot's locals, its cutscene count and the
+  cutscene levels' data (``dumped_slots``). ``replan_start_locals`` gives a live slot the ``args:`` number of the
+  built list its locals match (the reading's ``lists``; ``match_list``: numbers equal, a local the list lacks 0, an
+  unknown local any value its set allows), whatever the plan predicted. A slot whose locals match no list has its
+  events read again from its dumped locals (``reread``, the caller's: the reader with ``Builder.slot_locals``), the
+  task is replaced by that reading, and the start is made again; a slot still unmatched then gets 0 and is counted
+  ("live slots with unknown locals (args 0)"). A live slot the dump gives no locals for keeps reader.py's rule.
 * **The planner** (``planner``). "taskcore" (the default): ``plan_fd.plan_taskcore`` on the packed file of the
   reading's records (export_records.py), which is ``task`` (build_task's): each plan gives taskcore that start and
   every ban so far (taskcore cuts them as ``cut`` does, tested byte for byte against it), taskcore writes the reduced
@@ -699,6 +707,155 @@ def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict,
     return None
 
 
+# --- F10: the slots' dumped locals at a replan -----------------------------------------------------------------------
+
+NUM_SCRIPT_LOCAL = 25  # script.h:76
+WIO_INVENTORY = 0  # scumm.h:213: an object's slot started from the inventory, which a room change leaves alive
+
+
+def dumped_slots(state: dict) -> dict | None:
+    """The live slots of a state dump made with EngineConfig.dump_locals, by unit name (facts.py's): {"name", "room",
+    "w", "esc", "locals", "override", "cut_data", "owned"} (reader's ``Builder.slot_locals``), and "flags":
+    {"resistant", "recursive", "owned"} when the dump has the slot's flags (reader's ``SlotFlags``: freezeResistant,
+    recursive, and owned as the engine has it, an object's slot started from the inventory, ``where`` WIO_INVENTORY;
+    "owned" outside the flags is the object's owner now, the start's rule, which the reading uses off
+    ``--live-locals``). None when the dump has no locals (the switch off, or an older build). A unit with two live
+    slots, or a slot facts.py names no unit or wait point for, is left out (``"two slots"``, ``"no unit"`` in the
+    result's ``skipped``)."""
+    if any("locals" not in sl for sl in state["slots"]):
+        return None
+    cs = state["cutscene"]
+    depth, levels = cs["depth"], cs["levels"]
+    top = levels[-1]["override"]
+    esc_unit = F.unit_of(top["where"], top["number"]) if top and not top["stale"] and top["code"] >= 0 else None
+    out, skipped, names = {}, [], collections.Counter()
+    for sl in state["slots"]:
+        names[F.unit_of(sl["where"], sl["number"])] += 1
+    for sl in state["slots"]:
+        name = F.unit_of(sl["where"], sl["number"])
+        if name is None or sl["code"] < 0:
+            skipped.append(("no unit", sl["where"], sl["number"]))
+            continue
+        if names[name] > 1:
+            skipped.append(("two slots", name))
+            continue
+        ov = sl["cutscene_override"]
+        cut = [lv.get("data", 0) for lv in levels[depth - ov + 1:depth + 1]] if 0 < ov <= depth else []
+        obj = name[4:] if name.startswith("obj:") else None
+        out[name] = {"name": name, "room": state["room"], "w": sl["code"],
+                     "esc": top["code"] if esc_unit == name else None, "locals": list(sl["locals"]),
+                     "override": ov if len(cut) == ov else 0, "cut_data": cut,
+                     "owned": obj is not None and state["owners"].get(obj, 0) != R.OF_OWNER_ROOM}
+        if "resistant" in sl and "recursive" in sl:
+            out[name]["flags"] = {"resistant": bool(sl["resistant"]), "recursive": bool(sl["recursive"]),
+                                  "owned": obj is not None and sl["where"] == WIO_INVENTORY}
+    return {"slots": out, "skipped": skipped}
+
+
+def live_match(b, slot: dict):
+    """What a match of ``slot``'s dumped locals compares (reader's ``task::live_match``): None for a reading made
+    without ``--live-locals`` (every local, no flags); under it (reads, flags): the locals the slot's unit reads
+    (``Points.read_locals``; None: all of them) and the dump's flags. A slot without flags under the switch stops the
+    run: a list's number covers them, so no list could be told to be the slot's."""
+    if not getattr(b, "live_locals", None):
+        return None
+    if "flags" not in slot:
+        raise ValueError(f"F10 under --live-locals: the dump gives slot {slot['name']} no flags (resistant, recursive), "
+                         f"and a list's number covers them; dump the slots with a build whose SPEEDRUN_DUMP_LOCALS "
+                         f"lists them")
+    return b.read_locals(slot["name"], slot["room"]), slot["flags"]
+
+
+def list_matches(lst: dict, slot: dict, live=None) -> bool:
+    """Whether a slot's dumped locals are a built list's (packed_reading.load_lists' entry): each dumped local equals
+    the list's number (0 where the list lacks it), or the list's local is unknown and its value set, if it has one,
+    holds it; the override count and the cutscene data are equal (reader's ``task::list_matches``). Under
+    ``--live-locals`` (``live``: ``live_match``'s) only the locals the slot's unit reads are compared (the list holds no
+    other), and the list's flags must be the dump's as the number takes them: resistant and owned as they are,
+    recursive as true or not (null)."""
+    if lst["override"] != slot["override"] or list(lst["cut_data"]) != list(slot["cut_data"]):
+        return False
+    reads = None
+    if live is not None:
+        reads, f = live
+        if "flags" not in lst:
+            raise ValueError("F10 under --live-locals: the reading's lists file has no slot flags (an older "
+                             "packed_reading.py made it)")
+        want = {"recursive": True if f["recursive"] else None, "resistant": bool(f["resistant"]),
+                "owned": bool(f["owned"])}
+        if lst["flags"] != want:
+            return False
+    locs = lst["locals"]
+    if any(not 0 <= n < len(slot["locals"]) for n in locs):
+        return False
+    for n, x in enumerate(slot["locals"]):
+        if reads is not None and n not in reads:
+            continue
+        v = locs.get(n, 0)
+        if isinstance(v, dict):
+            if v.get("values") is not None and x not in v["values"]:
+                return False
+        elif v != x:
+            return False
+    return True
+
+
+def match_list(lists: dict, slot: dict, w: int, live=None) -> dict | None:
+    """The built list a slot's locals match at wait point ``w``: the one with the most locals known as numbers, the
+    first built among equals (reader's ``task::match_list``). ``live``: ``live_match``'s."""
+    best = None
+    for lst in (lists or {}).get((slot["name"], w), []):
+        if list_matches(lst, slot, live):
+            known = sum(1 for v in lst["locals"].values() if not isinstance(v, dict))
+            if best is None or known > best[0]:
+                best = (known, lst)
+    return best[1] if best else None
+
+
+def replan_start_locals(b, observed: dict, predicted: dict, task, slots: dict, lists: dict) -> tuple:
+    """reader.replan_start with F10's dumped locals (reader's ``task::replan_start_locals``): ``task_start`` (with
+    the ELSEWHERE start rule; a slot it starts at ELSEWHERE keeps args 0); under ``--live-locals`` a match compares
+    the slot's read locals and its flags (``live_match``; a dumped slot without flags stops the run); then
+    each live slot's ``args:<unit>`` is the number of the built list its dumped locals match (``match_list``),
+    whatever the plan predicted; a slot whose locals match none gets 0 and is returned for its events to be read
+    again; a live slot ``slots`` lacks keeps reader.replan_start's rule. Returns (start, counts, unmatched slots)."""
+    out = task_start(b, observed, task)
+    counts = collections.Counter()
+    unmatched = []
+    for k in [k for k in task.facts if k.startswith("args:")]:
+        name = k[5:]
+        pos = out.get(f"pos:{name}", R.NOWHERE)
+        if pos == R.NOWHERE:
+            out[k] = 0
+            continue
+        if pos == ELSEWHERE:
+            # a place none of the scope's points (the ELSEWHERE switch): no list is built there, as replan_start
+            out[k] = 0
+            counts["live slots at ELSEWHERE (args 0)"] += 1
+            continue
+        slot = slots.get(name)
+        if slot is None:
+            counts["live slots with no locals in the dump"] += 1
+            if predicted.get(f"pos:{name}") == pos and predicted.get(k, 0):
+                out[k] = predicted[k]
+                counts["args copied from the plan (the slot is where the plan put it)"] += 1
+            else:
+                out[k] = 0
+                counts["live slots with unknown locals (args 0)"] += 1
+            continue
+        lst = match_list(lists, slot, pos, live_match(b, slot))
+        if lst is not None:
+            out[k] = lst["sig"]
+            counts["live slots whose dumped locals match a built list"] += 1
+            if predicted.get(f"pos:{name}") == pos and predicted.get(k, 0) and predicted[k] != lst["sig"]:
+                counts["live slots whose dumped locals are not the plan's list"] += 1
+        else:
+            out[k] = 0
+            counts["live slots with unknown locals (args 0)"] += 1
+            unmatched.append(dict(slot, w=pos))
+    return out, counts, unmatched
+
+
 def prediction(now: dict, pred: dict) -> dict:
     """What ``reader.replan_start`` takes as the plan's predicted state: the engine's values with the plan's slot
     positions and unobserved facts over them, so its guard compares the engine's slot position with the plan's."""
@@ -811,10 +968,20 @@ class Harness:
     def __init__(self, b, full_task: T.Task, task: T.Task, branch: Branch, goal: dict, *, release: str = "dos-cd",
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
                  progress=None, planner: str = "taskcore", packed=None, search: str = "lama-first", workdir=None,
-                 taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None):
+                 taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None,
+                 slot_locals: bool = False, lists: dict | None = None, reread=None):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
+        if reread is not None and planner != "taskcore":
+            raise ValueError("reading slots again (F10) replaces the packed task: the taskcore planner only")
         self.b, self.base = b, task
+        # F10 (module docstring): the slots' dumped locals at a replan; ``lists`` the reading's built lists;
+        # ``reread(unmatched slots, harness)`` a reading with those slots' events (an object with task, packed, b,
+        # lists and doc, as packed_reading.Reading), or None
+        self.slot_locals, self.lists, self.reread = slot_locals, lists, reread
+        self.base_lists = lists  # the first reading's lists: a slot none of them matches is read again each time
+        self.rereads: list = []  # per reading made again: the plan, the frame, the slots, the seconds, the actions
+        self.slot_detail = None  # the last F10 replan's live slots (``_replan_locals``), for the plan's entry
         self.planner, self.packed, self.search, self.taskcore_args = planner, packed, search, tuple(taskcore_args)
         self.memory_limit = memory_limit
         self.on_plan = on_plan  # called with the harness after each plan (the caller's snapshot of ``result``)
@@ -912,6 +1079,8 @@ class Harness:
             write_s = 0.0
         if first:
             start, counts = task_start(self.b, self.obs, self.task), {}
+        elif self.slot_locals:
+            start, counts = self._replan_locals(self.task)
         else:
             start, counts = replan_start(self.b, self.obs, prediction(self.now, self.pred), self.task)
         entry = {"plan": len(self.plans), "frame": self.branch.frame, "bans": len(self.bans), "write_s": write_s,
@@ -931,6 +1100,63 @@ class Harness:
                      operators=self.sas.counts["operators"])
         self._landmarks(entry, res)
         return self._planned(entry, res, start)
+
+    def _replan_locals(self, task) -> tuple:
+        """F10's replan start (module docstring): the dumped locals matched against the built lists; the slots no
+        list matches read again (``reread``), the task replaced, the start made again. Returns (start, counts)."""
+        dump = dumped_slots(self.state)
+        if dump is None:
+            start, counts = replan_start(self.b, self.obs, prediction(self.now, self.pred), task)
+            counts = collections.Counter(counts)
+            counts["replans with no locals in the dump"] += 1
+            return start, counts
+        slots = dump["slots"]
+        start, counts, unmatched = replan_start_locals(self.b, self.obs, prediction(self.now, self.pred), task, slots,
+                                                       self.lists)
+        for why in dump["skipped"]:
+            counts[f"live slots left out of the locals ({why[0]})"] += 1
+        first = dict(counts)
+        if unmatched and self.reread is not None:
+            # every live slot the first reading has no list for, so that slots read again at an earlier replan keep
+            # their events in the new reading
+            need = []
+            for k in [k for k in task.facts if k.startswith("args:")]:
+                name = k[5:]
+                pos, slot = start.get(f"pos:{name}", R.NOWHERE), slots.get(name)
+                if pos not in (R.NOWHERE, ELSEWHERE) and slot is not None and \
+                        match_list(self.base_lists, slot, pos, live_match(self.b, slot)) is None:
+                    need.append(dict(slot, w=pos))
+            self.progress(f"reading {len(need)} slots again from their dumped locals: {[u['name'] for u in need]}")
+            t = time.monotonic()
+            new = self.reread(need, self)
+            secs = time.monotonic() - t
+            self._swap(new)
+            start, counts2, still = replan_start_locals(self.b, self.obs, prediction(self.now, self.pred), self.base,
+                                                        slots, self.lists)
+            for why in dump["skipped"]:
+                counts2[f"live slots left out of the locals ({why[0]})"] += 1
+            counts2["live slots read again from their dumped locals"] += len(need)
+            self.rereads.append({"plan": len(self.plans), "frame": self.branch.frame, "counts_before": first,
+                                 "slots": [{k: u[k] for k in ("name", "w", "esc", "override")} for u in need],
+                                 "still_unmatched": [u["name"] for u in still], "seconds": round(secs, 1),
+                                 "actions": len(new.task.actions), "reading": str(getattr(new, "path", ""))})
+            counts = counts2
+        # per live slot the task has an args: fact for: where it waits, its args value, and whether the dump gave it
+        # locals and a list matched them (the plan's entry keeps it)
+        self.slot_detail = {k[5:]: {"w": start.get(f"pos:{k[5:]}"), "args": start[k],
+                                    "dumped": k[5:] in slots,
+                                    "nonzero_locals": sum(1 for x in slots[k[5:]]["locals"] if x) if k[5:] in slots
+                                    else None}
+                            for k in self.base.facts if k.startswith("args:")
+                            and start.get(f"pos:{k[5:]}", R.NOWHERE) != R.NOWHERE}
+        return start, counts
+
+    def _swap(self, new) -> None:
+        """The task of a reading made again (F10): the packed file, the points, the lists, the tracked facts."""
+        self.base, self.packed, self.b, self.lists = new.task, new.packed, new.b, new.lists
+        self.pieces = self.pieces_bans = None
+        self.doms = dict(new.task.facts)
+        self.now = view(self.b, self.doms, self.obs)
 
     def _same_input(self, entry: dict, start: dict) -> bool:
         """The planner's input (the start, the bans) at this frame is the previous plan's, on the same frame: the
@@ -979,11 +1205,15 @@ class Harness:
             self.pieces_bans = len(self.bans)
         if first:
             start, counts = task_start(self.b, self.obs, self.base), {}
+        elif self.slot_locals:
+            start, counts = self._replan_locals(self.base)
         else:
             start, counts = replan_start(self.b, self.obs, prediction(self.now, self.pred), self.base)
         n = len(self.plans)
         entry = {"plan": n, "frame": self.branch.frame, "bans": len(self.bans), "start_counts": dict(counts),
                  "reorders": [], "planner": "taskcore", "search": self.search}
+        if self.slot_detail is not None:
+            entry["slot_locals"], self.slot_detail = self.slot_detail, None
         self.plans.append(entry)
         if self._same_input(entry, start):
             return []
@@ -1464,6 +1694,7 @@ class Harness:
             "frames": st.get("frame", 0) - (self.frame0 or 0), "ticks": (st.get("tick") or 0) - (self.tick0 or 0),
             "frame0": self.frame0, "frame_end": st.get("frame"),
             "seconds": time.monotonic() - self.t0 if self.t0 is not None else 0.0, "inputs": self.inputs(),
+            **({"rereads": self.rereads} if self.slot_locals else {}),
         }
 
     def inputs(self) -> list:

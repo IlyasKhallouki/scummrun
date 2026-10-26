@@ -172,7 +172,10 @@ pub fn pins_from_py(p: &Py) -> Pins {
 }
 
 /// An effect of a record (reader.py's tuples): `("set", v)`, `("guess", values)`, `("add", d)`, `("when", fact, v)`
-/// (key := v where binary fact `fact` is 1) or `("copy", fact)`.
+/// (key := v where binary fact `fact` is 1) or `("copy", fact)`. Fix round 1 adds `("cases", [(conditions,
+/// values), ...])` (`Cases`): key := the case's value (one of its values: a guess) where its conditions hold before
+/// the action ({fact: values}, all of them); the cases' conditions are disjoint and cover every state the record's
+/// precondition allows. Only switch due_first makes it (due.rs), so no reading with the switches off holds one.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Eff {
     Set(Label),
@@ -180,6 +183,37 @@ pub enum Eff {
     Add(i64),
     When(String, i64),
     Copy(String),
+    Cases(Vec<Case>),
+}
+
+/// One case of an [`Eff::Cases`]: (conditions in key order, the values written: one, or several for a guess).
+pub type Case = (Vec<(String, Labels)>, Labels);
+
+fn case_py(c: &Case) -> Py {
+    Py::Tuple(vec![
+        Py::Tuple(c.0.iter().map(|(k, v)| Py::Tuple(vec![Py::str(k), labels_py(v)])).collect()),
+        labels_py(&c.1),
+    ])
+}
+
+fn case_from_py(p: &Py) -> Case {
+    let t = p.items();
+    let conds = t[0]
+        .items()
+        .iter()
+        .map(|kv| {
+            let kv = kv.items();
+            (kv[0].as_str().to_string(), labels_from_py(&kv[1]))
+        })
+        .collect();
+    (conds, labels_from_py(&t[1]))
+}
+
+/// A set's text in a fold key: the values' texts, sorted.
+fn labels_key(ls: &[Label]) -> String {
+    let mut v: Vec<String> = ls.iter().map(|l| l.repr()).collect();
+    v.sort();
+    format!("{{{}}}", v.join(", "))
 }
 
 impl Eff {
@@ -190,6 +224,7 @@ impl Eff {
             Eff::Add(d) => Py::Tuple(vec![Py::str("add"), Py::Int(*d)]),
             Eff::When(k, v) => Py::Tuple(vec![Py::str("when"), Py::str(k), Py::Int(*v)]),
             Eff::Copy(k) => Py::Tuple(vec![Py::str("copy"), Py::str(k)]),
+            Eff::Cases(cs) => Py::Tuple(vec![Py::str("cases"), Py::List(cs.iter().map(case_py).collect())]),
         }
     }
     pub fn from_py(p: &Py) -> Eff {
@@ -200,6 +235,7 @@ impl Eff {
             "add" => Eff::Add(t[1].int()),
             "when" => Eff::When(t[1].as_str().to_string(), t[2].int()),
             "copy" => Eff::Copy(t[1].as_str().to_string()),
+            "cases" => Eff::Cases(t[1].items().iter().map(case_from_py).collect()),
             k => panic!("not an effect kind: {k}"),
         }
     }
@@ -214,6 +250,29 @@ impl Eff {
             Eff::Add(d) => format!("('add', {d})"),
             Eff::When(k, v) => format!("('when', {}, {v})", repr_str(k)),
             Eff::Copy(k) => format!("('copy', {})", repr_str(k)),
+            Eff::Cases(cs) => {
+                let parts: Vec<String> = cs
+                    .iter()
+                    .map(|(conds, vals)| {
+                        let c: Vec<String> = conds.iter().map(|(k, v)| format!("{}={}", repr_str(k), labels_key(v))).collect();
+                        format!("[{}]->{}", c.join(" "), labels_key(vals))
+                    })
+                    .collect();
+                format!("('cases', {})", parts.join("; "))
+            }
+        }
+    }
+    /// The facts the effect reads besides its own key (a `when` or `copy` source, the cases' conditions).
+    pub fn sources(&self) -> Vec<&str> {
+        match self {
+            Eff::When(k, _) | Eff::Copy(k) => vec![k.as_str()],
+            Eff::Cases(cs) => {
+                let mut v: Vec<&str> = cs.iter().flat_map(|c| c.0.iter().map(|w| w.0.as_str())).collect();
+                v.sort_unstable();
+                v.dedup();
+                v
+            }
+            _ => vec![],
         }
     }
 }
@@ -467,6 +526,8 @@ pub fn effect_order(k: &str) -> (u8, &str) {
         2
     } else if k.starts_with("escpos:") {
         3
+    } else if k.starts_with("due:") {
+        4 // fix round 1's due facts, added after the reading (due.rs); none with the switches off
     } else {
         0
     };

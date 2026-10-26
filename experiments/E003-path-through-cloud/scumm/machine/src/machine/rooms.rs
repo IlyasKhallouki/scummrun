@@ -187,6 +187,7 @@ impl<'g> Machine<'g> {
                 Val::Unk(_) => self.v.mk(Reason::Cache, what),
             };
             self.write(p, Fact::Var(VAR_ROOM_FLAG), v);
+            self.objpos_reset(p, res); // F5 (switch draw_clears): resetRoomObjects, room.cpp:195 (draw_clears.rs)
         }
         self.write(p, Fact::Var(VAR_CAMERA_MIN_X), Val::Int(SCREEN_WIDTH / 2));
         let width = res.int().and_then(|r| g.room_width.get(&r).copied());

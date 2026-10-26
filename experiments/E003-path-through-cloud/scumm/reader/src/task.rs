@@ -2,11 +2,11 @@
 //! `prune`, `task_start` and `replan_start`, over task.py's `Task`, `Action` and `Effect`. task.py's `write_sas` is
 //! taskcore's (`--fold off --reduce none`, byte for byte); the task reaches it through the packed format (packed.rs).
 
-use crate::builder::Builder;
+use crate::builder::{Builder, SlotFlags, SlotLocals};
 use crate::domain::{Domain, Label, Labels};
 use crate::facts::Facts;
-use crate::py::Counter;
-use crate::record::{Eff, Record};
+use crate::py::{Counter, Py};
+use crate::record::{Eff, Record, Val};
 use crate::table::{pos_key, FactTable, ELSEWHERE, NOWHERE};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::{BTreeMap, BTreeSet};
@@ -249,6 +249,14 @@ pub fn record_action(table: &FactTable, r: &Record, counts: &mut Counter) -> (Ve
                     effects.push(TEffect::set(k, Label::Int(u), vec![(src.clone(), vec![Label::Int(u)])]));
                 }
             }
+            Eff::Cases(cs) => {
+                for (when, vals) in cs {
+                    match vals.as_slice() {
+                        [v] => effects.push(TEffect::set(k, *v, when.clone())),
+                        _ => effects.push(TEffect { key: k.clone(), value: None, add: None, values: Some(vals.clone()), when: when.clone() }),
+                    }
+                }
+            }
             Eff::Add(d) => {
                 let dom = table.domain(k).unwrap();
                 let have: Labels = pre.iter().find(|p| &p.0 == k).map(|p| p.1.clone()).unwrap_or_else(|| dom.values.clone());
@@ -286,7 +294,7 @@ pub fn build_task(b: &mut Builder, records: &[Record], goal: &[(String, Labels)]
         }
         for (k, e) in &r.effects {
             fb.setdefault(k);
-            if let Eff::When(src, _) | Eff::Copy(src) = e {
+            for src in e.sources() {
                 fb.setdefault(src);
             }
         }
@@ -476,9 +484,16 @@ pub fn prune(task: &Task, rel: &Relevance) -> Task {
 /// slot is at a place none of the scope's points, and at none of them, is ELSEWHERE.
 pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<Item = &'k String>) -> Facts {
     let mut out = start.clone();
+    let mut due: Vec<String> = Vec::new();
     for k in keys {
         if pos_key(k).is_some() {
             out.insert(k.clone(), NOWHERE);
+        } else if b.scope.switches.actor_rooms && k.starts_with("actorroom:") && !start.contains(k) {
+            // F9: an actor's room the start does not give is not known (table::NOT_KNOWN), not room 0
+            out.insert(k.clone(), crate::table::NOT_KNOWN);
+        }
+        if k.starts_with(crate::table::DUE) {
+            due.push(k.clone());
         }
     }
     for (kind, pos) in [("at", "pos"), ("esc", "escpos")] {
@@ -519,6 +534,20 @@ pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<It
             b.counts.inc("slots at the start at a place none of the scope's points (ELSEWHERE)");
         }
     }
+    // fix round 1, switch due_first: each due: fact from the start's position, slot, freeze and test facts
+    if let Some(d) = &b.due {
+        let mut vals = Vec::new();
+        for k in &due {
+            let get = |f: &str| -> Option<Label> {
+                let v = out.get0(f);
+                Some(b.table.label(f, v).unwrap_or(Label::Int(v)))
+            };
+            vals.push((k.clone(), d.start_value(k, &get).unwrap_or(0)));
+        }
+        for (k, v) in vals {
+            out.insert(k, v);
+        }
+    }
     out
 }
 
@@ -548,6 +577,202 @@ pub fn replan_start<'k>(
     (out, counts)
 }
 
+/// F10: a list of locals the reading built for a unit at a wait point: the locals of a record's next event whose
+/// `args:<unit>` the record still sets to the list's number (a list SIG_LIMIT folded into 0 is no list).
+#[derive(Clone, Debug, PartialEq)]
+pub struct BuiltList {
+    pub sig: i64,
+    /// Local[n] -> value, as the event holds them (a local the list lacks is 0: its args are known)
+    pub locals: Vec<(i64, Val)>,
+    pub override_: i64,
+    pub cut_data: Vec<i64>,
+    /// the event's slot flags, which the number covers under the switch --live-locals (`Builder::list_number`)
+    pub recursive: Py,
+    pub resistant: Py,
+    pub owned: Py,
+}
+
+impl BuiltList {
+    fn of(e: &crate::record::Event) -> BuiltList {
+        BuiltList {
+            sig: e.sig,
+            locals: e.locals.clone(),
+            override_: e.override_,
+            cut_data: e.cut_data.clone(),
+            recursive: e.recursive.clone(),
+            resistant: e.resistant.clone(),
+            owned: e.owned.clone(),
+        }
+    }
+}
+
+/// F10 under the switch --live-locals: what a match compares besides the override and the cutscene data: the locals
+/// the slot's unit reads (None: all of them) and the slot's flags from the dump.
+#[derive(Clone, Copy, Debug)]
+pub struct LiveMatch<'a> {
+    pub reads: Option<&'a BTreeSet<i32>>,
+    pub flags: SlotFlags,
+}
+
+/// F10: what a match of `slot`'s dumped locals compares: None off the switch --live-locals (every local, no flags);
+/// under it the slot's unit's read locals and the dump's flags. A slot without flags under the switch stops here: a
+/// list's number covers them, so no list could be told to be the slot's.
+pub fn live_match<'a>(b: &'a Builder, slot: &SlotLocals) -> Option<LiveMatch<'a>> {
+    let ll = b.table.live_locals.as_ref()?;
+    let flags = slot.flags.unwrap_or_else(|| {
+        panic!(
+            "F10 under --live-locals: the dump gives slot {} no flags (resistant, recursive), and a list's number \
+             covers them; dump the slots with a build whose SPEEDRUN_DUMP_LOCALS lists them",
+            slot.name
+        )
+    });
+    let unit = Builder::unit_of_name(&slot.name, b.game.resource(slot.room));
+    Some(LiveMatch { reads: unit.and_then(|u| ll.get(u)), flags })
+}
+
+/// (unit name, wait point) -> the lists built there, each once, in the records' order.
+pub type BuiltLists = BTreeMap<(String, i64), Vec<BuiltList>>;
+
+/// F10: the lists of locals the records built (`BuiltList`), by unit name and wait point. Esc events share their
+/// slot's list and are not listed apart.
+pub fn built_lists(records: &[Record]) -> BuiltLists {
+    let mut out = BuiltLists::new();
+    for r in records {
+        for e in r.next_events.iter().filter(|e| e.sig != 0 && !e.abort) {
+            let set = r.effects.iter().any(|(k, x)| k.strip_prefix("args:") == Some(e.name.as_str()) && *x == Eff::Set(Label::Int(e.sig)));
+            if !set {
+                continue;
+            }
+            let v = out.entry((e.name.clone(), e.w)).or_default();
+            if !v.iter().any(|l| l.sig == e.sig) {
+                v.push(BuiltList::of(e));
+            }
+        }
+    }
+    out
+}
+
+/// F10: the lists of the events read from dumped locals (`Builder.slot_events`), by unit name and wait point, but
+/// a list SIG_LIMIT folded. They are no record's next event, so `built_lists` lacks them.
+pub fn slot_lists(b: &Builder) -> BuiltLists {
+    let mut out = BuiltLists::new();
+    for e in b.slot_events.iter().filter(|e| e.sig != 0 && !b.folded.contains(&e.sig)) {
+        let v = out.entry((e.name.clone(), e.w)).or_default();
+        if !v.iter().any(|l| l.sig == e.sig) {
+            v.push(BuiltList::of(e));
+        }
+    }
+    out
+}
+
+/// F10: whether a slot's dumped locals are a built list's: each of the dump's locals equals the list's number (0
+/// where the list lacks it), or the list's local is unknown and its value set, if it has one, holds the dumped value;
+/// a local past the dump's end, the override count and the cutscene data must be equal too. Under the switch
+/// --live-locals (`live`) only the locals the slot's unit reads are compared (the list holds no other), and the
+/// list's flags must be the dump's as the number takes them (`locals::recursive` for recursive): the number covers
+/// them.
+pub fn list_matches(list: &BuiltList, slot: &SlotLocals, live: Option<&LiveMatch>) -> bool {
+    if list.override_ != slot.override_ || list.cut_data != slot.cut_data {
+        return false;
+    }
+    if let Some(lm) = live {
+        let f = lm.flags;
+        if list.recursive != crate::locals::recursive(&Py::Bool(f.recursive))
+            || list.resistant != Py::Bool(f.resistant)
+            || list.owned != Py::Bool(f.owned)
+        {
+            return false;
+        }
+    }
+    if list.locals.iter().any(|(n, _)| *n < 0 || *n as usize >= slot.locals.len()) {
+        return false;
+    }
+    let reads = live.and_then(|lm| lm.reads);
+    slot.locals
+        .iter()
+        .enumerate()
+        .filter(|(n, _)| reads.is_none_or(|r| r.contains(&(*n as i32))))
+        .all(|(n, &x)| match list.locals.iter().find(|(i, _)| *i == n as i64) {
+            None => x == 0,
+            Some((_, Val::Int(v))) => *v == x,
+            Some((_, Val::Unk(u))) => u.values.as_ref().map_or(true, |vs| vs.contains(&x)),
+        })
+}
+
+/// F10: the list a slot's dumped locals match at its wait point: the one with the most locals known as numbers, the
+/// first built among equals; None when none matches. `live`: `live_match`'s.
+pub fn match_list<'a>(lists: &'a BuiltLists, slot: &SlotLocals, w: i64, live: Option<&LiveMatch>) -> Option<&'a BuiltList> {
+    let known = |l: &BuiltList| l.locals.iter().filter(|(_, v)| matches!(v, Val::Int(_))).count();
+    let mut best: Option<&BuiltList> = None;
+    for l in lists.get(&(slot.name.clone(), w)).into_iter().flatten().filter(|l| list_matches(l, slot, live)) {
+        if best.map_or(true, |b| known(l) > known(b)) {
+            best = Some(l);
+        }
+    }
+    best
+}
+
+/// reader.py `replan_start` with F10's dumped locals: `task_start` of the engine's state; then each `args:<unit>`
+/// of a live slot (`pos:<unit>` not NOWHERE) is the number of the built list its dumped locals match
+/// (`match_list`), whatever the plan predicted. A slot whose locals match no list gets 0 and is returned, for its
+/// events to be read again from its dumped locals (`Builder.slot_locals`). A live slot the dump gives no locals for
+/// (`slots` lacks it) keeps reader.py's rule: the plan's number when it is where the plan put it, else 0. A slot at
+/// ELSEWHERE (the switch, `task_start`) gets 0: no list is built there. Under --live-locals a match compares the
+/// slot's read locals and its flags (`live_match`; a dumped slot without flags stops here). Returns (start, counts,
+/// the slots no list matches).
+pub fn replan_start_locals<'k>(
+    b: &mut Builder,
+    observed: &Facts,
+    predicted: &Facts,
+    keys: impl IntoIterator<Item = &'k String> + Clone,
+    slots: &BTreeMap<String, SlotLocals>,
+    lists: &BuiltLists,
+) -> (Facts, Counter, Vec<SlotLocals>) {
+    let mut out = task_start(b, observed, keys.clone());
+    let mut counts = Counter::default();
+    let mut unmatched = Vec::new();
+    for k in keys.into_iter().filter(|k| k.starts_with("args:")) {
+        let name = &k[5..];
+        let pos = out.get(&format!("pos:{name}")).unwrap_or(NOWHERE);
+        if pos == NOWHERE {
+            out.insert(k.clone(), 0);
+            continue;
+        }
+        if pos == ELSEWHERE {
+            out.insert(k.clone(), 0);
+            counts.inc("live slots at ELSEWHERE (args 0)");
+            continue;
+        }
+        let Some(slot) = slots.get(name) else {
+            counts.inc("live slots with no locals in the dump");
+            if predicted.get(&format!("pos:{name}")) == Some(pos) && predicted.get0(k) != 0 {
+                out.insert(k.clone(), predicted.get0(k));
+                counts.inc("args copied from the plan (the slot is where the plan put it)");
+            } else {
+                out.insert(k.clone(), 0);
+                counts.inc("live slots with unknown locals (args 0)");
+            }
+            continue;
+        };
+        let live = live_match(b, slot);
+        match match_list(lists, slot, pos, live.as_ref()) {
+            Some(l) => {
+                out.insert(k.clone(), l.sig);
+                counts.inc("live slots whose dumped locals match a built list");
+                if predicted.get(&format!("pos:{name}")) == Some(pos) && predicted.get0(k) != 0 && predicted.get0(k) != l.sig {
+                    counts.inc("live slots whose dumped locals are not the plan's list");
+                }
+            }
+            None => {
+                out.insert(k.clone(), 0);
+                counts.inc("live slots with unknown locals (args 0)");
+                unmatched.push(SlotLocals { w: pos, ..slot.clone() });
+            }
+        }
+    }
+    (out, counts, unmatched)
+}
+
 /// The keys build_task's facts hold, without building the task (export_records.py `kitchen`): the goal's, and
 /// every record's precondition, effect and condition keys.
 pub fn record_keys(records: &[Record], goal: &[(String, Labels)]) -> Vec<String> {
@@ -556,9 +781,7 @@ pub fn record_keys(records: &[Record], goal: &[(String, Labels)]) -> Vec<String>
         keys.extend(r.pre.keys().cloned());
         for (k, e) in &r.effects {
             keys.insert(k.clone());
-            if let Eff::When(src, _) | Eff::Copy(src) = e {
-                keys.insert(src.clone());
-            }
+            keys.extend(e.sources().into_iter().map(String::from));
         }
     }
     keys.into_iter().collect()
@@ -633,5 +856,112 @@ mod tests {
         }
         // with nothing folded, the parts' hash tells records apart as the key does
         assert_ne!(fold_parts(&recs[0]).hash_after(&BTreeSet::new()), fold_parts(&recs[1]).hash_after(&BTreeSet::new()));
+    }
+
+    fn slot(name: &str, w: i64, locals: &[i64]) -> SlotLocals {
+        let mut l = locals.to_vec();
+        l.resize(25, 0);
+        SlotLocals { name: name.into(), room: 33, w, esc: None, locals: l, override_: 0, cut_data: vec![], owned: false, flags: None }
+    }
+
+    fn list(sig: i64, locals: Vec<(i64, Val)>) -> BuiltList {
+        BuiltList { sig, locals, override_: 0, cut_data: vec![], recursive: Py::None, resistant: Py::Bool(false), owned: Py::Bool(false) }
+    }
+
+    /// F10's match: numbers equal, a missing local is 0, an unknown local takes what its set allows, the cutscene
+    /// fields equal.
+    #[test]
+    fn dumped_locals_match_a_built_list() {
+        use crate::record::Unknown;
+        let s = slot("script:2", 736, &[2, 428, 0, 1]);
+        assert!(list_matches(&list(1, vec![(0, Val::Int(2)), (1, Val::Int(428)), (3, Val::Int(1))]), &s, None));
+        assert!(list_matches(&list(1, vec![(0, Val::Int(2)), (1, Val::Int(428)), (2, Val::Int(0)), (3, Val::Int(1))]), &s, None));
+        assert!(!list_matches(&list(1, vec![(0, Val::Int(2)), (1, Val::Int(428))]), &s, None), "Local[3] is 1, the list's 0");
+        assert!(!list_matches(&list(1, vec![(0, Val::Int(2)), (1, Val::Int(427)), (3, Val::Int(1))]), &s, None));
+        let any = Val::Unk(Unknown::new("local", "Local[1] from a fact", None));
+        let set = |v: Vec<i64>| Val::Unk(Unknown::new("local", "Local[1]", Some(v)));
+        assert!(list_matches(&list(1, vec![(0, Val::Int(2)), (1, any), (3, Val::Int(1))]), &s, None));
+        assert!(list_matches(&list(1, vec![(0, Val::Int(2)), (1, set(vec![427, 428])), (3, Val::Int(1))]), &s, None));
+        assert!(!list_matches(&list(1, vec![(0, Val::Int(2)), (1, set(vec![427])), (3, Val::Int(1))]), &s, None));
+        assert!(!list_matches(&list(1, vec![(30, Val::Int(0))]), &slot("script:2", 736, &[]), None), "a local past the dump");
+        let mut c = list(1, vec![]);
+        c.override_ = 1;
+        c.cut_data = vec![5];
+        let mut s2 = slot("script:2", 736, &[]);
+        assert!(!list_matches(&c, &s2, None));
+        s2.override_ = 1;
+        s2.cut_data = vec![5];
+        assert!(list_matches(&c, &s2, None));
+        // at the slot's wait point only; the list with more numbers wins
+        let mut lists = BuiltLists::new();
+        let loose = list(7, vec![(0, Val::Int(2)), (1, Val::Unk(Unknown::new("local", "x", None))), (3, Val::Int(1))]);
+        let tight = list(8, vec![(0, Val::Int(2)), (1, Val::Int(428)), (3, Val::Int(1))]);
+        lists.insert(("script:2".into(), 736), vec![loose.clone(), tight.clone()]);
+        assert_eq!(match_list(&lists, &s, 736, None).map(|l| l.sig), Some(8));
+        assert_eq!(match_list(&lists, &s, 740, None), None);
+        lists.insert(("script:2".into(), 736), vec![loose]);
+        assert_eq!(match_list(&lists, &s, 736, None).map(|l| l.sig), Some(7));
+    }
+
+    /// F10 under --live-locals: only the read locals are compared, and the list's flags must be the dump's as the
+    /// number takes them (recursive false and unknown alike).
+    #[test]
+    fn dumped_locals_match_under_live_locals() {
+        let s = slot("script:2", 736, &[2, 428, 0, 1]);
+        let reads: BTreeSet<i32> = [0, 3].into_iter().collect();
+        let flags = SlotFlags { resistant: false, recursive: false, owned: false };
+        let lm = LiveMatch { reads: Some(&reads), flags };
+        // the list holds only the read locals: Local[1] = 428 is not read, so it is not compared
+        let l = list(1, vec![(0, Val::Int(2)), (3, Val::Int(1))]);
+        assert!(!list_matches(&l, &s, None), "every local compared off the switch");
+        assert!(list_matches(&l, &s, Some(&lm)));
+        assert!(!list_matches(&list(1, vec![(0, Val::Int(2))]), &s, Some(&lm)), "Local[3] is read and is 1");
+        // the flags: resistant and owned as they are, recursive as true or not
+        let mut r = l.clone();
+        r.resistant = Py::Bool(true);
+        assert!(!list_matches(&r, &s, Some(&lm)));
+        let lm_r = LiveMatch { reads: Some(&reads), flags: SlotFlags { resistant: true, ..flags } };
+        assert!(list_matches(&r, &s, Some(&lm_r)));
+        let mut o = l.clone();
+        o.owned = Py::Bool(true);
+        assert!(!list_matches(&o, &s, Some(&lm)));
+        let lm_rec = LiveMatch { reads: Some(&reads), flags: SlotFlags { recursive: true, ..flags } };
+        assert!(!list_matches(&l, &s, Some(&lm_rec)), "a recursive slot is not a list with recursive unknown");
+        let mut t = l.clone();
+        t.recursive = Py::Bool(true);
+        assert!(list_matches(&t, &s, Some(&lm_rec)));
+        assert!(!list_matches(&t, &s, Some(&lm)));
+        // a unit whose reads are not known exactly: every local compared, the flags too
+        let all = LiveMatch { reads: None, flags };
+        assert!(!list_matches(&l, &s, Some(&all)));
+        assert!(list_matches(&list(1, vec![(0, Val::Int(2)), (1, Val::Int(428)), (3, Val::Int(1))]), &s, Some(&all)));
+    }
+
+    /// `built_lists` keeps a next event's list only where its record still sets args:<unit> to it.
+    #[test]
+    fn built_lists_skip_folded_lists() {
+        let ev = |sig: i64| crate::record::Event {
+            name: "local:7".into(),
+            unit: scumm_ir::UnitKey::Local(33, 7),
+            w: 4,
+            sig,
+            locals: vec![(0, Val::Int(9))],
+            args_known: true,
+            recursive: crate::py::Py::None,
+            resistant: crate::py::Py::None,
+            owned: crate::py::Py::Bool(false),
+            abort: false,
+            override_: 0,
+            cut_data: vec![],
+        };
+        let mut a = rec(&[0], 0, 0);
+        a.effects = vec![("args:local:7".into(), Eff::Set(Label::Int(21)))];
+        a.next_events = vec![ev(21)];
+        let mut b = a.clone();
+        b.effects = vec![("args:local:7".into(), Eff::Set(Label::Int(0)))];
+        b.next_events = vec![ev(22)];
+        let lists = built_lists(&[a.clone(), b, a]);
+        assert_eq!(lists.len(), 1);
+        assert_eq!(lists[&("local:7".to_string(), 4)].iter().map(|l| l.sig).collect::<Vec<_>>(), vec![21]);
     }
 }

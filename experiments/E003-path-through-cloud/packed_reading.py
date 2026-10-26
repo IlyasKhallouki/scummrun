@@ -50,6 +50,15 @@ against the packed file's values. The check strings and the event sources are th
 
 The precondition sets, the effects, the kind, the path's end and the label's text are the packed file's.
 
+**reading.lists.jsonl** (fix round 1, F10; written by both writers, optional when loading): the lists of locals the
+reading built, one per line: ``{"name", "w", "sig", "locals": [[n, value], ...], "override", "cut_data"}``, from the
+next events of the records (a slot a path left waiting with known locals), each (name, w, sig) once, and only where
+the record still sets ``args:<name>`` to that number (a list SIG_LIMIT folded into 0 is none). A value is an int, or
+``{"unknown": text, "values": [...] or null}`` for an unknown local. A reading made with ``--live-locals`` also gives
+each line ``"flags": {"recursive", "resistant", "owned"}`` (true, false, null, or ``{"unknown": text}``), the event's
+slot flags, which that switch's numbers cover. The replay harness matches a live slot's dumped locals against them at
+a replan (replay.replan_start_locals).
+
 **reading.json**: ``format`` ("E003 reading 1"), ``packed`` and ``actions`` (the two file names, next to it),
 ``n_actions``, ``n_records`` (records read), ``folded`` (records folded by build_task's rule), ``goal`` ({fact: [values]},
 the packed file's), ``start`` ({"name": what it is, "facts": the facts.py map the domains were built from}),
@@ -128,6 +137,83 @@ def action_line(n: int, i: int, r) -> dict:
             "engine_pre": sorted(r.engine_pre)}
 
 
+# --- F10: the lists of locals ------------------------------------------------------------------------------------
+
+def _local_json(v):
+    """A local of a list as JSON: an int, or an unknown (a model.Unknown, or a golden-decoded one as a dict)."""
+    if isinstance(v, int) and not isinstance(v, bool):
+        return v
+    if isinstance(v, dict):
+        vals, text = v.get("values"), v.get("what") or v.get("reason")
+    else:
+        vals, text = v.values, str(v)
+    return {"unknown": str(text), "values": sorted(vals) if vals is not None else None}
+
+
+def _flag_json(v):
+    """A slot flag as JSON: true, false or null (a bool or None), or ``{"unknown": text}`` for a flag the model holds
+    as an unknown value (an object's owner it did not know), which no dumped flag matches."""
+    if v is None or isinstance(v, bool):
+        return v
+    return {"unknown": str(v.get("what") or v.get("reason") or v) if isinstance(v, dict) else str(v)}
+
+
+def lists_of(next_events, effects, flags: bool = False) -> list:
+    """The list lines (module docstring) of one record: its next events (reader.Event, or golden-decoded dicts) whose
+    ``args:<name>`` the record's effects still set to their number. ``flags``: with the slot flags (a reading made with
+    ``--live-locals``)."""
+    out = []
+    for e in next_events:
+        get = e.get if isinstance(e, dict) else (lambda k, e=e: getattr(e, k))
+        name, sig = get("name"), get("sig")
+        if not sig or get("abort"):
+            continue
+        eff = effects.get(f"args:{name}")
+        if eff is None or tuple(eff) != ("set", sig):
+            continue
+        locs = get("locals")
+        ln = {"name": name, "w": get("w"), "sig": sig,
+              "locals": [[n, _local_json(v)] for n, v in sorted(locs.items())],
+              "override": get("override"), "cut_data": [c for c in get("cut_data") if isinstance(c, int)]}
+        if flags:
+            ln["flags"] = {k: _flag_json(get(k)) for k in ("recursive", "resistant", "owned")}
+        out.append(ln)
+    return out
+
+
+class _ListWriter:
+    """Writes the list lines, each (name, w, sig) once."""
+
+    def __init__(self, path):
+        self.f = open(path, "w")
+        self.seen = set()
+        self.n = 0
+
+    def add(self, lines) -> None:
+        for ln in lines:
+            k = (ln["name"], ln["w"], ln["sig"])
+            if k not in self.seen:
+                self.seen.add(k)
+                self.f.write(json.dumps(ln) + "\n")
+                self.n += 1
+
+    def close(self) -> None:
+        self.f.close()
+
+
+def load_lists(path) -> dict:
+    """reading.lists.jsonl as {(name, w): [{"sig", "locals": {n: value}, "override", "cut_data"}, ...]}."""
+    out = {}
+    for ln in Path(path).read_text().splitlines():
+        if not ln.strip():
+            continue
+        d = json.loads(ln)
+        out.setdefault((d["name"], d["w"]), []).append(
+            {"sig": d["sig"], "locals": {n: v for n, v in d["locals"]}, "override": d["override"],
+             "cut_data": list(d["cut_data"]), **({"flags": d["flags"]} if "flags" in d else {})})
+    return out
+
+
 def export_reading(out_dir, b, records, goal: dict, start_name: str, info: dict | None = None,
                    name: str = "reading") -> dict:
     """Write a Python reading (reader.Builder ``b`` and its records) as the three files (module docstring), with
@@ -136,6 +222,11 @@ def export_reading(out_dir, b, records, goal: dict, start_name: str, info: dict 
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     tc, acts, head = out / f"{name}.tc", out / f"{name}.actions.jsonl", out / f"{name}.json"
+    lists = out / f"{name}.lists.jsonl"
+    lw = _ListWriter(lists)
+    for r in records:
+        lw.add(lists_of(r.next_events, r.effects))
+    lw.close()
     counts = {}
     w = Writer(tc, b.table.domain)
     for k in goal:
@@ -153,7 +244,8 @@ def export_reading(out_dir, b, records, goal: dict, start_name: str, info: dict 
         if d is not None and not d.exact:
             bounds[k] = [d.low, d.high]
     sc = b.scope
-    doc = {"format": FORMAT, "packed": tc.name, "actions": acts.name, "n_actions": n, "n_records": len(records),
+    doc = {"format": FORMAT, "packed": tc.name, "actions": acts.name, "lists": lists.name, "n_lists": lw.n,
+           "n_actions": n, "n_records": len(records),
            "folded": counts.get("folded", 0), "goal": {k: sorted(v, key=str) for k, v in goal.items()},
            "start": {"name": start_name, "facts": dict(sorted(sc.start.items()))},
            "scope": {"rooms": list(sc.rooms), "walk_verb": sc.walk_verb, "verbs": list(sc.verbs),
@@ -460,6 +552,7 @@ class Reading:
     b: Points
     packed: Path
     lines: Path
+    lists: dict | None = None  # F10: load_lists of reading.lists.jsonl, when the reading has one
 
     @property
     def dialog_verbs(self) -> list:
@@ -481,7 +574,8 @@ def load_reading(path) -> Reading:
     goal = {k: set(v) for k, v in doc["goal"].items()}
     if goal != task.goal:
         raise ValueError(f"{path}: goal {doc['goal']} is not the packed file's {task.goal}")
-    return Reading(path, doc, task, Points(task.facts, doc.get("live_locals")), packed, lines)
+    lists = load_lists(path.parent / doc["lists"]) if doc.get("lists") else None
+    return Reading(path, doc, task, Points(task.facts, doc.get("live_locals")), packed, lines, lists)
 
 
 # --- from a reading in golden.py's format (the Rust reader) ------------------------------------------------------
@@ -536,26 +630,36 @@ def python_domains(rooms, start: dict):
     return R.FactTable(R.Scope.of(game, tuple(rooms), start), D.build(start), game).domain
 
 
-def _decode_chunk(chunk: list) -> list:
+def _record_lists(ln, flags: bool = False) -> list:
+    """The list lines (F10) of one golden.py record line; ``flags``: lists_of's."""
+    rec = ln["record"]["$Record"]
+    return lists_of(_dec(rec["next_events"]), _dec(rec["effects"]), flags) if rec.get("next_events") else []
+
+
+def _decode_chunk(chunk: list, flags: bool = False) -> list:
     """golden.py lines, decoded in a worker (``reading_from_golden`` with workers): per line ("builder", its
-    counters) or ("record", index, ``line_of_golden``'s line with "i" 0)."""
+    counters) or ("record", index, ``line_of_golden``'s line with "i" 0, its list lines)."""
     out = []
     for text in chunk:
         ln = json.loads(text)
         if ln["kind"] == "builder":
             out.append(("builder", _dec(ln["builder"])))
         else:
-            out.append(("record", ln["index"], line_of_golden(0, ln["index"], _dec(ln["record"]))))
+            out.append(("record", ln["index"], line_of_golden(0, ln["index"], _dec(ln["record"])),
+                        _record_lists(ln, flags)))
     return out
 
 
-def _lines_in_order(golden, want: list, fa, workers: int, chunk: int = 2000) -> tuple:
+def _lines_in_order(golden, want: list, fa, workers: int, chunk: int = 2000, lw=None, flags: bool = False) -> tuple:
     """The one-pass branch of ``reading_from_golden`` on ``workers`` processes: the golden file's records decoded in
     windows of ``workers * 4`` chunks, written in the file's order, so the action lines are the one-process
-    branch's, byte for byte. Returns (builder counters, records, the first action left with no record)."""
+    branch's, byte for byte, and so are the list lines given to ``lw`` (a _ListWriter). Returns (builder counters,
+    records, the first action left with no record)."""
+    import functools
     import gzip
     import itertools
     import multiprocessing
+    decode = functools.partial(_decode_chunk, flags=flags)
     it = iter(enumerate(want))
     nxt = next(it, None)
     builder, n_records = None, 0
@@ -566,13 +670,15 @@ def _lines_in_order(golden, want: list, fa, workers: int, chunk: int = 2000) -> 
             window = [c for c in (list(itertools.islice(f, chunk)) for _ in range(workers * 4)) if c]
             if not window:
                 break
-            for res in pool.map(_decode_chunk, window):
+            for res in pool.map(decode, window):
                 for item in res:
                     if item[0] == "builder":
                         builder = item[1]
                         continue
-                    _, index, line = item
+                    _, index, line, lists = item
                     n_records += 1
+                    if lw is not None:
+                        lw.add(lists)
                     while nxt is not None and nxt[1][0] == index:
                         line = dict(line, i=nxt[0])
                         if line["label"] != nxt[1][1]:
@@ -594,6 +700,11 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     tc, acts, head_path = out / f"{name}.tc", out / f"{name}.actions.jsonl", out / f"{name}.json"
+    lists = out / f"{name}.lists.jsonl"
+    lw = _ListWriter(lists)
+
+    def note_lists(ln):
+        lw.add(_record_lists(ln, flags))
     if Path(packed).resolve() != tc.resolve():
         shutil.copyfile(packed, tc)
     pk = Packed(tc)
@@ -607,13 +718,14 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
     if head.get("kind") != "reading":
         raise ValueError(f"{golden}: the first line is not a reading's head")
     hd = _dec(head["reading"])
+    flags = hd.get("live_locals") is not None  # the lists carry the slot flags the numbers cover (module docstring)
     order = [r for r, _ in want]
     builder = None
     n_records = 0
     if order == sorted(order) and workers > 1:
         lines_in.close()
         with open(acts, "w") as fa:
-            builder, n_records, nxt = _lines_in_order(golden, want, fa, workers)
+            builder, n_records, nxt = _lines_in_order(golden, want, fa, workers, lw=lw, flags=flags)
         if nxt is not None:
             raise ValueError(f"{golden}: no record {nxt[1][0]} for action {nxt[0]} of {packed}")
     elif order == sorted(order):
@@ -626,6 +738,7 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
                     builder = _dec(ln["builder"])
                     continue
                 n_records += 1
+                note_lists(ln)
                 while nxt is not None and nxt[1][0] == ln["index"]:
                     r = _dec(ln["record"])  # a $Record's fields
                     line = line_of_golden(nxt[0], ln["index"], r)
@@ -646,6 +759,7 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
                 builder = _dec(ln["builder"])
                 continue
             n_records += 1
+            note_lists(ln)
             if ln["index"] in need:
                 got[ln["index"]] = _dec(ln["record"])
         with open(acts, "w") as fa:
@@ -656,6 +770,7 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
                 if line["label"] != label:
                     raise ValueError(f"action {i}: record {r} is {line['label']!r}, the packed file's {label!r}")
                 fa.write(json.dumps(line, default=str) + "\n")
+    lw.close()
     if hd.get("n_records") is not None and hd["n_records"] != n_records:
         raise ValueError(f"{golden}: {n_records} records, its head says {hd['n_records']}")
     dom = domain or python_domains(hd["rooms"], start)
@@ -676,7 +791,8 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
     if problems:
         raise ValueError(f"{len(problems)} facts whose bounds the domains do not give: {problems[:5]}")
     counts = (builder or {}).get("counts", {})
-    doc = {"format": FORMAT, "packed": tc.name, "actions": acts.name, "n_actions": len(want), "n_records": n_records,
+    doc = {"format": FORMAT, "packed": tc.name, "actions": acts.name, "lists": lists.name, "n_lists": lw.n,
+           "n_actions": len(want), "n_records": n_records,
            "folded": n_records - len(want), "goal": {k: sorted(v, key=str) for k, v in goal.items()},
            "start": {"name": start_name, "facts": dict(sorted(start.items()))},
            "scope": {"rooms": list(hd["rooms"]), "walk_verb": hd["walk_verb"], "verbs": list(hd["verbs"]),
@@ -688,7 +804,7 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
         doc["live_locals"] = hd["live_locals"]  # the Rust reader's switch --live-locals (module docstring)
     doc.update({k: v for k, v in (info or {}).items() if k not in doc})
     head_path.write_text(json.dumps(doc, indent=1, default=str) + "\n")
-    return {"actions": len(want), "records": n_records, "facts": len(keys), "bounds": len(bounds),
+    return {"actions": len(want), "records": n_records, "facts": len(keys), "bounds": len(bounds), "lists": lw.n,
             "json": str(head_path), "packed": str(tc), "lines": str(acts)}
 
 
