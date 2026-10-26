@@ -274,6 +274,72 @@ def test_lists_of_keeps_lists_the_record_still_sets():
                     "locals": [[0, 9], [1, {"unknown": "getActorX(1)", "values": None}]]}]
 
 
+
+# --- F10 under --live-locals: the slots' flags -----------------------------------------------------------------------
+
+def test_dumped_slots_take_the_flags_when_the_dump_has_them():
+    d = dump([(2, 2, 736, [2], 0), (1, 428, 5, [], 0), (0, 429, 7, [], 0)], owners={"428": 15, "429": 1})
+    assert all("flags" not in s for s in RP.dumped_slots(d)["slots"].values())  # an older dump: none
+    for sl, (res, rec) in zip(d["slots"], [(True, False), (False, True), (False, False)]):
+        sl["resistant"], sl["recursive"] = res, rec
+    got = RP.dumped_slots(d)["slots"]
+    assert got["script:2"]["flags"] == {"resistant": True, "recursive": False, "owned": False}
+    assert got["obj:428"]["flags"] == {"resistant": False, "recursive": True, "owned": False}  # where 1: in the room
+    assert got["obj:429"]["flags"] == {"resistant": False, "recursive": False, "owned": True}  # where 0: inventory
+    assert got["obj:429"]["owned"] is True  # the owner rule, kept for readings without --live-locals
+
+
+def test_list_match_under_live_locals_reads_and_flags():
+    slot = {"name": "script:2", "room": 28, "locals": [2, 428, 0, 1] + [0] * 21, "override": 0, "cut_data": [],
+            "flags": {"resistant": False, "recursive": False, "owned": False}}
+    flags = {"recursive": None, "resistant": False, "owned": False}
+    lst = lambda locs, **kw: {"sig": 1, "locals": locs, "override": 0, "cut_data": [],  # noqa: E731
+                              "flags": dict(flags, **kw)}
+    live = (frozenset({0, 3}), slot["flags"])
+    assert not RP.list_matches(lst({0: 2, 3: 1}), slot)  # off the switch every local is compared
+    assert RP.list_matches(lst({0: 2, 3: 1}), slot, live)  # Local[1] is not read
+    assert not RP.list_matches(lst({0: 2}), slot, live)  # Local[3] is read and is 1
+    assert not RP.list_matches(lst({0: 2, 3: 1}, resistant=True), slot, live)
+    assert not RP.list_matches(lst({0: 2, 3: 1}, owned=True), slot, live)
+    assert not RP.list_matches(lst({0: 2, 3: 1}, recursive=True), slot, live)
+    rec = (frozenset({0, 3}), dict(slot["flags"], recursive=True))
+    assert RP.list_matches(lst({0: 2, 3: 1}, recursive=True), slot, rec)
+    assert not RP.list_matches(lst({0: 2, 3: 1}), slot, rec)  # a recursive slot: not a list with recursive unknown
+    assert not RP.list_matches(lst({0: 2, 3: 1}, owned={"unknown": "x"}), slot, live)
+    assert not RP.list_matches(lst({0: 2, 3: 1}), slot, (None, slot["flags"]))  # reads not known: all compared
+    with pytest.raises(ValueError):
+        RP.list_matches({"sig": 1, "locals": {}, "override": 0, "cut_data": []}, slot, live)  # a lists file w/o flags
+
+
+def test_replan_start_locals_under_live_locals():
+    b = fake_builder({"script:2": {736}})
+    b.live_locals = {"switch": "--live-locals", "slots": {"script:2": [0, 3]}}
+    b.read_locals = lambda name, room: frozenset(b.live_locals["slots"][name])
+    task = types.SimpleNamespace(facts={k: None for k in ("args:script:2", "pos:script:2")})
+    obs = {"at:script:2:736": 1}
+    slot = {"name": "script:2", "room": 28, "w": 736, "locals": [2, 428, 0, 1] + [0] * 21, "override": 0,
+            "cut_data": [], "flags": {"resistant": False, "recursive": False, "owned": False}}
+    lists = {("script:2", 736): [{"sig": 8, "locals": {0: 2, 3: 1}, "override": 0, "cut_data": [],
+                                  "flags": {"recursive": None, "resistant": False, "owned": False}}]}
+    start, counts, unmatched = RP.replan_start_locals(b, obs, {}, task, {"script:2": slot}, lists)
+    assert start["args:script:2"] == 8 and not unmatched
+    start, _, unmatched = RP.replan_start_locals(b, obs, {}, task, {"script:2": dict(slot, flags=dict(
+        slot["flags"], resistant=True))}, lists)
+    assert start["args:script:2"] == 0 and [u["name"] for u in unmatched] == ["script:2"]
+    no_flags = {k: v for k, v in slot.items() if k != "flags"}
+    with pytest.raises(ValueError, match="no flags"):
+        RP.replan_start_locals(b, obs, {}, task, {"script:2": no_flags}, lists)
+
+
+def test_lists_of_gives_the_flags_under_live_locals():
+    import packed_reading as PR
+    ev = {"name": "local:207", "w": 4, "sig": 21, "abort": False, "locals": {0: 9}, "override": 0, "cut_data": (),
+          "recursive": None, "resistant": True, "owned": False}
+    out = PR.lists_of([ev], {"args:local:207": ("set", 21)}, flags=True)
+    assert out[0]["flags"] == {"recursive": None, "resistant": True, "owned": False}
+    assert "flags" not in PR.lists_of([ev], {"args:local:207": ("set", 21)})[0]
+
+
 # --- the kitchen in the engine (slow) ---------------------------------------------------------------------------------
 
 @pytest.mark.slow

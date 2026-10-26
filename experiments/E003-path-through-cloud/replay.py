@@ -710,13 +710,18 @@ def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict,
 # --- F10: the slots' dumped locals at a replan -----------------------------------------------------------------------
 
 NUM_SCRIPT_LOCAL = 25  # script.h:76
+WIO_INVENTORY = 0  # scumm.h:213: an object's slot started from the inventory, which a room change leaves alive
 
 
 def dumped_slots(state: dict) -> dict | None:
     """The live slots of a state dump made with EngineConfig.dump_locals, by unit name (facts.py's): {"name", "room",
-    "w", "esc", "locals", "override", "cut_data", "owned"} (reader's ``Builder.slot_locals``). None when the dump
-    has no locals (the switch off, or an older build). A unit with two live slots, or a slot facts.py names no unit
-    or wait point for, is left out (``"two slots"``, ``"no unit"`` in the result's ``skipped``)."""
+    "w", "esc", "locals", "override", "cut_data", "owned"} (reader's ``Builder.slot_locals``), and "flags":
+    {"resistant", "recursive", "owned"} when the dump has the slot's flags (reader's ``SlotFlags``: freezeResistant,
+    recursive, and owned as the engine has it, an object's slot started from the inventory, ``where`` WIO_INVENTORY;
+    "owned" outside the flags is the object's owner now, the start's rule, which the reading uses off
+    ``--live-locals``). None when the dump has no locals (the switch off, or an older build). A unit with two live
+    slots, or a slot facts.py names no unit or wait point for, is left out (``"two slots"``, ``"no unit"`` in the
+    result's ``skipped``)."""
     if any("locals" not in sl for sl in state["slots"]):
         return None
     cs = state["cutscene"]
@@ -741,19 +746,51 @@ def dumped_slots(state: dict) -> dict | None:
                      "esc": top["code"] if esc_unit == name else None, "locals": list(sl["locals"]),
                      "override": ov if len(cut) == ov else 0, "cut_data": cut,
                      "owned": obj is not None and state["owners"].get(obj, 0) != R.OF_OWNER_ROOM}
+        if "resistant" in sl and "recursive" in sl:
+            out[name]["flags"] = {"resistant": bool(sl["resistant"]), "recursive": bool(sl["recursive"]),
+                                  "owned": obj is not None and sl["where"] == WIO_INVENTORY}
     return {"slots": out, "skipped": skipped}
 
 
-def list_matches(lst: dict, slot: dict) -> bool:
+def live_match(b, slot: dict):
+    """What a match of ``slot``'s dumped locals compares (reader's ``task::live_match``): None for a reading made
+    without ``--live-locals`` (every local, no flags); under it (reads, flags): the locals the slot's unit reads
+    (``Points.read_locals``; None: all of them) and the dump's flags. A slot without flags under the switch stops the
+    run: a list's number covers them, so no list could be told to be the slot's."""
+    if not getattr(b, "live_locals", None):
+        return None
+    if "flags" not in slot:
+        raise ValueError(f"F10 under --live-locals: the dump gives slot {slot['name']} no flags (resistant, recursive), "
+                         f"and a list's number covers them; dump the slots with a build whose SPEEDRUN_DUMP_LOCALS "
+                         f"lists them")
+    return b.read_locals(slot["name"], slot["room"]), slot["flags"]
+
+
+def list_matches(lst: dict, slot: dict, live=None) -> bool:
     """Whether a slot's dumped locals are a built list's (packed_reading.load_lists' entry): each dumped local equals
     the list's number (0 where the list lacks it), or the list's local is unknown and its value set, if it has one,
-    holds it; the override count and the cutscene data are equal (reader's ``task::list_matches``)."""
+    holds it; the override count and the cutscene data are equal (reader's ``task::list_matches``). Under
+    ``--live-locals`` (``live``: ``live_match``'s) only the locals the slot's unit reads are compared (the list holds no
+    other), and the list's flags must be the dump's as the number takes them: resistant and owned as they are,
+    recursive as true or not (null)."""
     if lst["override"] != slot["override"] or list(lst["cut_data"]) != list(slot["cut_data"]):
         return False
+    reads = None
+    if live is not None:
+        reads, f = live
+        if "flags" not in lst:
+            raise ValueError("F10 under --live-locals: the reading's lists file has no slot flags (an older "
+                             "packed_reading.py made it)")
+        want = {"recursive": True if f["recursive"] else None, "resistant": bool(f["resistant"]),
+                "owned": bool(f["owned"])}
+        if lst["flags"] != want:
+            return False
     locs = lst["locals"]
     if any(not 0 <= n < len(slot["locals"]) for n in locs):
         return False
     for n, x in enumerate(slot["locals"]):
+        if reads is not None and n not in reads:
+            continue
         v = locs.get(n, 0)
         if isinstance(v, dict):
             if v.get("values") is not None and x not in v["values"]:
@@ -763,12 +800,12 @@ def list_matches(lst: dict, slot: dict) -> bool:
     return True
 
 
-def match_list(lists: dict, slot: dict, w: int) -> dict | None:
+def match_list(lists: dict, slot: dict, w: int, live=None) -> dict | None:
     """The built list a slot's locals match at wait point ``w``: the one with the most locals known as numbers, the
-    first built among equals (reader's ``task::match_list``)."""
+    first built among equals (reader's ``task::match_list``). ``live``: ``live_match``'s."""
     best = None
     for lst in (lists or {}).get((slot["name"], w), []):
-        if list_matches(lst, slot):
+        if list_matches(lst, slot, live):
             known = sum(1 for v in lst["locals"].values() if not isinstance(v, dict))
             if best is None or known > best[0]:
                 best = (known, lst)
@@ -777,12 +814,11 @@ def match_list(lists: dict, slot: dict, w: int) -> dict | None:
 
 def replan_start_locals(b, observed: dict, predicted: dict, task, slots: dict, lists: dict) -> tuple:
     """reader.replan_start with F10's dumped locals (reader's ``task::replan_start_locals``): ``task_start`` (with
-    the ELSEWHERE start rule; a slot it starts at ELSEWHERE keeps args 0); then
+    the ELSEWHERE start rule; a slot it starts at ELSEWHERE keeps args 0); under ``--live-locals`` a match compares
+    the slot's read locals and its flags (``live_match``; a dumped slot without flags stops the run); then
     each live slot's ``args:<unit>`` is the number of the built list its dumped locals match (``match_list``),
     whatever the plan predicted; a slot whose locals match none gets 0 and is returned for its events to be read
     again; a live slot ``slots`` lacks keeps reader.replan_start's rule. Returns (start, counts, unmatched slots)."""
-    if getattr(b, "live_locals", None):
-        raise ValueError("F10's dumped locals under --live-locals need the slots' flags in the dump; not merged yet")
     out = task_start(b, observed, task)
     counts = collections.Counter()
     unmatched = []
@@ -807,7 +843,7 @@ def replan_start_locals(b, observed: dict, predicted: dict, task, slots: dict, l
                 out[k] = 0
                 counts["live slots with unknown locals (args 0)"] += 1
             continue
-        lst = match_list(lists, slot, pos)
+        lst = match_list(lists, slot, pos, live_match(b, slot))
         if lst is not None:
             out[k] = lst["sig"]
             counts["live slots whose dumped locals match a built list"] += 1
@@ -1088,7 +1124,7 @@ class Harness:
                 name = k[5:]
                 pos, slot = start.get(f"pos:{name}", R.NOWHERE), slots.get(name)
                 if pos not in (R.NOWHERE, ELSEWHERE) and slot is not None and \
-                        match_list(self.base_lists, slot, pos) is None:
+                        match_list(self.base_lists, slot, pos, live_match(self.b, slot)) is None:
                     need.append(dict(slot, w=pos))
             self.progress(f"reading {len(need)} slots again from their dumped locals: {[u['name'] for u in need]}")
             t = time.monotonic()
