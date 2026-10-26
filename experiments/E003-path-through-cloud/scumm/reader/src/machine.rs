@@ -1505,6 +1505,7 @@ fn enc_fact(b: &mut Vec<u8>, f: Fact) {
         }
         Fact::Verb(n) => one(14, n),
         Fact::ObjPos(n) => one(15, n),
+        Fact::ActorRoom(n) => one(16, n),
     }
 }
 
