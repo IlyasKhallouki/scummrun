@@ -422,6 +422,57 @@ fn live_locals_sig_needs_the_flags() {
     b.sig("local:202", &[(0, Val::Int(1))], 0, &[], true, &[]);
 }
 
+/// `Builder::list_number` and `Builder::limit` (SIG_LIMIT) with the switch --live-locals, on room 31's local 202,
+/// which reads only Local[0]. Off, list_number is `sig` on the list as it is. On, an unread local gives no other list,
+/// the R flag gives another number, and the limit counts a list's flag variants once: with a limit of 2, the lists
+/// Local[0] = 5 (R false and R true) and Local[0] = 6 are kept and Local[0] = 7 is folded; counting numbers, as
+/// without the switch, would fold Local[0] = 6, which the reading without the switch keeps.
+#[test]
+fn live_locals_list_number_and_limit() {
+    use scumm_ir::UnitKey;
+    use scumm_reader::builder::Builder;
+    use scumm_reader::record::{Event, Val};
+    use scumm_reader::Py;
+    let unit = UnitKey::Local(31, 202);
+    let l = |a: i64, c: i64| vec![(0, Val::Int(a)), (1, Val::Int(c))];
+    let f = Py::Bool(false);
+    let mut off = oracle::builder(game(), static_oracle(), "room33");
+    let (lo, so, ro) = off.list_number("local:202", unit, l(5, 7), 0, &[], true, &f, &f, &f);
+    assert_eq!((lo, ro), (l(5, 7), f.clone()));
+    assert_eq!(so, off.sig("local:202", &l(5, 7), 0, &[], true, &[]));
+    let mut b = oracle::builder(game(), static_oracle(), "room33");
+    b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(game())));
+    let num = |b: &mut Builder, a: i64, c: i64, r: bool| b.list_number("local:202", unit, l(a, c), 0, &[], true, &f, &Py::Bool(r), &f);
+    let (l1, s1, r1) = num(&mut b, 5, 7, false);
+    assert_eq!((l1, r1), (vec![(0, Val::Int(5))], Py::None));
+    assert_eq!(num(&mut b, 5, 8, false).1, s1, "an unread local: the same list");
+    let s1r = num(&mut b, 5, 7, true).1;
+    let s2 = num(&mut b, 6, 7, false).1;
+    let s3 = num(&mut b, 7, 7, false).1;
+    assert!(s1r != s1 && s2 != s1 && s3 != s2);
+    let ev = |sig: i64, a: i64, r: bool| Event {
+        name: "local:202".into(),
+        unit,
+        w: 3,
+        sig,
+        locals: vec![(0, Val::Int(a))],
+        args_known: true,
+        recursive: Py::None,
+        resistant: Py::Bool(r),
+        owned: f.clone(),
+        abort: false,
+        override_: 0,
+        cut_data: vec![],
+    };
+    b.sig_limit = 2;
+    let kept: Vec<i64> = [ev(s1, 5, false), ev(s1r, 5, true), ev(s2, 6, false), ev(s3, 7, false), ev(s1r, 5, true)]
+        .iter()
+        .map(|e| b.limit(e).sig)
+        .collect();
+    assert_eq!(kept, vec![s1, s1r, s2, 0, s1r]);
+    assert_eq!(b.folded.iter().copied().collect::<Vec<_>>(), vec![s3]);
+}
+
 /// The kitchen read with the switch --live-locals on 3 workers, against golden.py's reading (about 2 minutes):
 /// 72,256 golden records, 72,124 of them distinct once renumbered, are the switch's 72,126 records (72,124
 /// distinct); 5,298 lists onto 5,221.

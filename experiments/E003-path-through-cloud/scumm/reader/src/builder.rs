@@ -243,6 +243,20 @@ pub struct Builder<'g> {
     args_doms: std::cell::RefCell<FxHashMap<String, (usize, Domain)>>,
 }
 
+/// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
+/// of its unit name, locals, override count and cutscene data, as its number has them but for the flags. A function
+/// of the list of all locals (the restriction to the read locals is one), so a wait point has no more of these than
+/// lists of all locals.
+pub fn flag_free(ev: &Event) -> i64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = rustc_hash::FxHasher::default();
+    ev.name.hash(&mut h);
+    ev.locals.hash(&mut h);
+    ev.override_.hash(&mut h);
+    ev.cut_data.hash(&mut h);
+    h.finish() as i64
+}
+
 /// reader.py `_why`: the reason of an assumption's `why` (model.Unknown's text).
 pub fn why_of(s: &str) -> String {
     let s = s.strip_prefix("?(").unwrap_or(s);
@@ -1692,17 +1706,21 @@ impl<'g> Builder<'g> {
         }
     }
 
-    /// `Builder._limit`: past SIG_LIMIT a wait point's further lists of locals are folded into 0.
+    /// `Builder._limit`: past SIG_LIMIT a wait point's further lists of locals are folded into 0. With the switch
+    /// --live-locals the limit counts lists apart from the slot's flags ([`flag_free`]): a list's flag variants take one
+    /// place, so the switch folds a wait point's lists only where their lists of all locals pass SIG_LIMIT too
+    /// (PORT-NOTES.md, "Live locals", point 6).
     pub fn limit(&mut self, ev: &Event) -> Event {
         if ev.sig == 0 {
             return ev.clone();
         }
+        let key = if self.table.live_locals.is_some() { flag_free(ev) } else { ev.sig };
         let seen = self.sig_seen.entry((ev.name.clone(), ev.w)).or_default();
-        if seen.contains(&ev.sig) {
+        if seen.contains(&key) {
             return ev.clone();
         }
         if !self.folded.contains(&ev.sig) && seen.len() < self.sig_limit {
-            seen.push(ev.sig);
+            seen.push(key);
             return ev.clone();
         }
         if !self.folded.contains(&ev.sig) {
