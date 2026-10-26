@@ -53,6 +53,9 @@ Not built:
   the ego put it in their own room, so this changes nothing there.
 - putActorInRoom's stopTalk for a talking actor that leaves the current room (2165-2167), as with the switch off.
 - script_v5.cpp:2990-3005 (an actor put in room 39 by o5_startScript) is an enhancement for the floppy VGA release only.
+- The game's static analyses (ir/src/analysis.rs: loop classes, non-fact variables) still read getActorRoom as a
+  non-fact. A waiting loop whose exit tests only an actor's room stays a "time" loop for settle; at run time its test
+  is decided when the room is known. About 13 getActorRoom sites in 7 units sit in waiting loops (a text count).
 
 ## Off: byte-identical
 
@@ -93,9 +96,11 @@ in room 49 ([006E]-[0079]). The engine always changes to room 85 there. Off, mod
 which the engine cannot take, and one goes to an unknown room, where no room code runs. On, every such path goes to
 85, and settle runs room 85's code: its wandering pirate (local 202) places itself in a loop on getDist, which ends
 as "spin" (the same state again with no yield), and meets the ego, which starts the next fight. In S2#23, S2#31 and
-S2#37 the fight does not end in run B at all; settle ended the fight script inside the move. The lost hits came from
-the impossible stay-in-49 paths. F7 (no settle) and the spin rule on loops that draw random numbers are where this is
-fixed; F9 is right on the engine here.
+S2#37 the fight goes on in run B (room 49, scripts 73 and 114 still live at done); settle ended the fight script
+inside the move, and the lost hits came from the impossible stay-in-49 paths. In S2#28 the fight does end (room 85
+at done); there the spin paths stop inside room 85's entry, before global 114 ends, and other paths start the next
+fight, so 8 predictions that held off become possible. F7 (no settle) and the spin rule on loops that draw random
+numbers are where this is fixed; F9 is right on the engine here.
 
 The other 26 moves change only paths and possible sets. In the bar (S1#5 to S1#13) local 216 and 217 test the
 cook's room after local 211 or 216 wrote it, so the cook's scripts stop recalling each other: S1#7 has 66 paths
@@ -110,6 +115,9 @@ With F5 on as well, S1#12 also gains a hit (state:324 = 0).
   actor's room, with every actorroom key taken out, are golden.py's. The 72 new records come from local 216's test
   of the cook's room ([0004], reached from the events of locals 211, 212, 216, 217 and script 2): 27 hold the cook in
   room 0, 18 in 28, 27 in 72. 86 records of the old ones add an actorroom write.
+- The same file on 1 and 3 threads (173 s and 14 s).
+- The kitchen task with the switch (s17, the oracle's goal; taskcore's defaults; Fast Downward's lama-first): the
+  same 10-step plan as with the switch off, by labels, in 39 s each.
 - Domains on the kitchen: the cook (6) {not known, 0, 28, 72}; the ego (1) {not known, 28, 33, 41, 79, 81, 82, 85};
   actor 3 {not known, 0, 28}; actors no write reaches are constants.
 
@@ -122,7 +130,8 @@ With F5 on as well, S1#12 also gains a hit (state:324 = 0).
   actor not known equals off; loadRoomWithEgo writes the ego's pseudo room 218.
 - `reader/tests/fix_round1.rs`: room 33 unchanged; the kitchen's actor room domains; bar local 203 run from its
   start: 67 records, each holding `actorroom:6` (not known, 0, 28 or 72), the room test a check only when not known;
-  the kitchen reading (ignored, about 100 s on 3 threads) as above.
+  the kitchen reading (ignored, about 100 s on 3 threads) as above; the kitchen task (ignored): the cook's room is
+  a task fact with NOT_KNOWN in its domain and at the start, and taskcore writes the full and the pruned task.
 
 ## What the design had wrong
 

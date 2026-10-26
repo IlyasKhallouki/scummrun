@@ -31,6 +31,11 @@ Facts and tables:
 Not built: the walk point setXY also moves (1109, 1111). Nothing in the model reads it (walkActorToObject has no
 effect, getDist is a non-fact), so it has no fact. F1's cells will need the place, which `objpos:O` gives.
 
+A limit (found in the lane's review): a setXY whose target is not a constant writes an unknown `objpos:O`, and the
+clearing then compares only the places of the table (the CDHD place and the constant targets). Such a move can land
+on another object's place outside the table, and that clearing is missed. MI1 has no such target (all 409 are
+constants), so no MI1 number changes; a game that has one needs a "may be anywhere" place for the objects it reaches.
+
 Code: `machine/src/machine/draw_clears.rs`, the drawObject arm and the room-load resets (`machine.rs`, `rooms.rs`,
 `calls.rs`), `ir/src/places.rs`; reader: `Scope::of_with` (`fix1_writes`: `objpos:` of the scope rooms' movable
 objects; a global script's draws can clear any object of a scope room), `domains::build_with` (a global script's
