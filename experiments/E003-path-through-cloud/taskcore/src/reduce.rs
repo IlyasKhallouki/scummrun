@@ -545,13 +545,18 @@ pub struct Needed {
     pub rounds: u64,
 }
 
-#[allow(unused_assignments)]
 pub fn needed(t: &Task) -> Needed {
-    let nf = t.facts.len();
-    let base: Vec<usize> = (0..nf as u32).map(|f| t.facts.base(f)).collect();
-    let mut need = vec![false; t.facts.total_values()];
+    needed_src(&t.acts, &t.facts, &t.goal)
+}
+
+/// `needed` on the actions of any source (the banned task as a view, serve.rs), with the task's facts and goal.
+#[allow(unused_assignments)]
+pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32>)]) -> Needed {
+    let nf = facts.len();
+    let base: Vec<usize> = (0..nf as u32).map(|f| facts.base(f)).collect();
+    let mut need = vec![false; facts.total_values()];
     let mut ncount = vec![0u32; nf];
-    let n = t.acts.len();
+    let n = src.n();
     let mut kept = vec![false; n];
     let mut ch = false;
     // a visit of an action reads the needed values only of the facts it writes: it is skipped while none of them
@@ -570,7 +575,7 @@ pub fn needed(t: &Task) -> Needed {
             }
         }};
     }
-    for (f, vals) in &t.goal {
+    for (f, vals) in goal {
         for &x in vals {
             set!(*f, x);
         }
@@ -578,7 +583,7 @@ pub fn needed(t: &Task) -> Needed {
     let mut wf_off = vec![0usize; n + 1];
     let mut wf: Vec<u32> = Vec::new();
     for i in 0..n {
-        let mut fs: Vec<u32> = t.acts.view(i).effs().filter(|e| e.kind != K_BAD).map(|e| e.fact).collect();
+        let mut fs: Vec<u32> = src.view(i).effs().filter(|e| e.kind != K_BAD).map(|e| e.fact).collect();
         fs.sort_unstable();
         fs.dedup();
         wf.extend_from_slice(&fs);
@@ -595,7 +600,7 @@ pub fn needed(t: &Task) -> Needed {
                 continue;
             }
             seen[i] = clock;
-            let v = t.acts.view(i);
+            let v = src.view(i);
             if !kept[i] {
                 let hit = v.effs().any(|e| e.kind != K_BAD && e.vals.iter().any(|&x| need[base[e.fact as usize] + x as usize]));
                 if !hit {
@@ -635,7 +640,7 @@ pub fn needed(t: &Task) -> Needed {
                         }
                     }
                     if case_ii {
-                        for x in 0..t.facts.size(cf) {
+                        for x in 0..facts.size(cf) {
                             if !contains(cs, x) {
                                 set!(cf, x);
                             }

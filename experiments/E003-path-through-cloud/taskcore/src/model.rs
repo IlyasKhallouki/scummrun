@@ -284,6 +284,41 @@ impl Actions {
     pub fn n_effects(&self) -> u64 {
         (0..self.len()).map(|i| self.view(i).neff() as u64).sum()
     }
+    /// Action `i` of a source, as it is (no change), into this Actions: `copy_from` for any `Src`.
+    pub fn copy_src<S: Src + ?Sized>(&mut self, src: &S, i: usize) {
+        self.words.extend_from_slice(src.view(i).w);
+        self.off.push(self.words.len());
+        self.meta.push(src.meta(i));
+        self.mem.extend_from_slice(src.members(i));
+        self.mem_off.push(self.mem.len());
+    }
+}
+
+/// A read-only list of actions: an `Actions`, or the banned task as a view over the input's (bans::Banned), so that
+/// the fold, (e)'s needed values and the start check can read the banned task without a copy of it (serve.rs).
+pub trait Src {
+    fn n(&self) -> usize;
+    fn view(&self, i: usize) -> View<'_>;
+    fn meta(&self, i: usize) -> Meta;
+    fn members(&self, i: usize) -> &[u32];
+    fn get(&self, i: usize) -> OAct {
+        self.view(i).to_owned()
+    }
+}
+
+impl Src for Actions {
+    fn n(&self) -> usize {
+        self.len()
+    }
+    fn view(&self, i: usize) -> View<'_> {
+        Actions::view(self, i)
+    }
+    fn meta(&self, i: usize) -> Meta {
+        self.meta[i]
+    }
+    fn members(&self, i: usize) -> &[u32] {
+        Actions::members(self, i)
+    }
 }
 
 #[derive(Clone)]

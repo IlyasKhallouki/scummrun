@@ -59,12 +59,11 @@ pub struct FoldCounts {
     pub double_writes: u64,  // sub-groups left unfolded: a union of the whole domain on a fact a path writes twice
 }
 
-fn boxes(t: &Task, i: usize) -> Vec<(u32, Vec<u32>)> {
-    let mut b: Vec<(u32, Vec<u32>)> = t
-        .acts
+fn boxes<S: Src + ?Sized>(acts: &S, facts: &Facts, i: usize) -> Vec<(u32, Vec<u32>)> {
+    let mut b: Vec<(u32, Vec<u32>)> = acts
         .view(i)
         .pre()
-        .filter(|(f, s)| (s.len() as u32) < t.facts.size(*f))
+        .filter(|(f, s)| (s.len() as u32) < facts.size(*f))
         .map(|(f, s)| (f, s.to_vec()))
         .collect();
     b.sort();
@@ -102,7 +101,14 @@ fn get<'a>(b: &'a [(u32, Vec<u32>)], f: u32) -> Option<&'a Vec<u32>> {
 /// The folded action of sub-group `ix` (module docstring), or None when the paths do not cover the union box. With
 /// `build` false it only decides (and returns an empty action): the fold builds each folded action when it writes it,
 /// so it never holds them all.
-fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCounts, build: bool) -> Option<OAct> {
+fn fold_one<S: Src + ?Sized>(
+    acts: &S,
+    facts: &Facts,
+    ix: &[usize],
+    bx: &[Vec<(u32, Vec<u32>)>],
+    c: &mut FoldCounts,
+    build: bool,
+) -> Option<OAct> {
     let mut keys: Vec<u32> = bx.iter().flat_map(|b| b.iter().map(|x| x.0)).collect();
     keys.sort_unstable();
     keys.dedup();
@@ -116,7 +122,7 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
             }
             continue;
         }
-        let size = t.facts.size(k);
+        let size = facts.size(k);
         let mut u: Vec<u32> = Vec::new();
         for s in &sets {
             match s {
@@ -129,7 +135,7 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
         }
         if (u.len() as u32) < size {
             pre.push(OSet { fact: k, vals: u.clone() });
-        } else if ix.iter().any(|&i| crate::reduce::writes_twice(t.acts.view(i), k)) {
+        } else if ix.iter().any(|&i| crate::reduce::writes_twice(acts.view(i), k)) {
             // the union holds every value and is left out, so an effect every path has loses the path's set on k,
             // which a path that writes k twice needs (reduce::writes_twice): left unfolded
             c.double_writes += 1;
@@ -161,7 +167,7 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
     for b in bx {
         let mut vol: u128 = 1;
         for &(k, _) in &differ {
-            let n = get(b, k).map(|s| s.len() as u128).unwrap_or(t.facts.size(k) as u128);
+            let n = get(b, k).map(|s| s.len() as u128).unwrap_or(facts.size(k) as u128);
             vol = vol.checked_mul(n)?;
         }
         total = total.checked_add(vol)?;
@@ -173,18 +179,18 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
     if !build {
         return Some(OAct::default());
     }
-    let acts: Vec<OAct> = ix.iter().map(|&i| t.acts.get(i)).collect();
-    let sets: Vec<HashSet<OEff>> = acts.iter().map(|a| a.eff.iter().map(canon).collect()).collect();
+    let paths: Vec<OAct> = ix.iter().map(|&i| acts.get(i)).collect();
+    let sets: Vec<HashSet<OEff>> = paths.iter().map(|a| a.eff.iter().map(canon).collect()).collect();
     let shared: HashSet<OEff> = sets[0].iter().filter(|e| sets[1..].iter().all(|s| s.contains(*e))).cloned().collect();
     let mut eff = Vec::new();
     let mut done: HashSet<OEff> = HashSet::new();
-    for e in &acts[0].eff {
+    for e in &paths[0].eff {
         let ce = canon(e);
         if shared.contains(&ce) && done.insert(ce) {
             eff.push(e.clone());
         }
     }
-    for (a, b) in acts.iter().zip(bx) {
+    for (a, b) in paths.iter().zip(bx) {
         let cond: Vec<OSet> = differ.iter().filter_map(|&(k, _)| get(b, k).map(|s| OSet { fact: k, vals: s.clone() })).collect();
         let mut mine: HashSet<OEff> = HashSet::new();
         for e in &a.eff {
@@ -213,20 +219,32 @@ fn fold_one(t: &Task, ix: &[usize], bx: &[Vec<(u32, Vec<u32>)>], c: &mut FoldCou
 /// The fold (module docstring). Returns the new task and, per folded action, (its index, its paths' indices in
 /// `t`).
 pub fn fold(t: Task, mode: FoldMode) -> (Task, FoldCounts, Vec<(usize, Vec<usize>)>) {
-    let mut c = FoldCounts::default();
     if mode == FoldMode::Off {
-        return (t, c, Vec::new());
+        return (t, FoldCounts::default(), Vec::new());
     }
-    let n = t.acts.len();
-    let yield_s = t.strs.list.iter().position(|s| s == "yield").map(|p| p as u32);
+    let (acts, c, map) = fold_src(&t.acts, &t.facts, &t.strs, mode);
+    (Task { acts, ..t }, c, map)
+}
+
+/// `fold` on the actions of any source (the banned task as a view, serve.rs), with the task's facts and strings:
+/// the folded actions, the counts and the map. `mode` is not Off.
+pub fn fold_src<S: Src + ?Sized>(
+    src: &S,
+    facts: &Facts,
+    strs: &Strings,
+    mode: FoldMode,
+) -> (Actions, FoldCounts, Vec<(usize, Vec<usize>)>) {
+    let mut c = FoldCounts::default();
+    let n = src.n();
+    let yield_s = strs.list.iter().position(|s| s == "yield").map(|p| p as u32);
     let mut gid: FxMap<(u32, u32, u32, u32, u32), usize> = FxMap::default();
     let mut groups: Vec<Vec<usize>> = Vec::new();
     for i in 0..n {
-        let m = t.acts.meta[i];
+        let m = src.meta(i);
         if mode == FoldMode::Strict && Some(m.end) != yield_s {
             continue;
         }
-        let v = t.acts.view(i);
+        let v = src.view(i);
         if v.pre().any(|(_, s)| s.is_empty()) || v.effs().any(|e| e.kind == K_BAD) {
             continue;
         }
@@ -245,7 +263,7 @@ pub fn fold(t: Task, mode: FoldMode) -> (Task, FoldCounts, Vec<(usize, Vec<usize
         }
         c.groups += 1;
         c.grouped += g.len() as u64;
-        let bx: Vec<Vec<(u32, Vec<u32>)>> = g.iter().map(|&i| boxes(&t, i)).collect();
+        let bx: Vec<Vec<(u32, Vec<u32>)>> = g.iter().map(|&i| boxes(src, facts, i)).collect();
         let mut subs: Vec<Vec<usize>> = Vec::new(); // positions in g
         for p in 0..g.len() {
             match subs.iter_mut().find(|sg| sg.iter().all(|&q| disjoint(&bx[p], &bx[q]))) {
@@ -260,7 +278,7 @@ pub fn fold(t: Task, mode: FoldMode) -> (Task, FoldCounts, Vec<(usize, Vec<usize
             c.subgroups += 1;
             let ix: Vec<usize> = sg.iter().map(|&p| g[p]).collect();
             let sb: Vec<Vec<(u32, Vec<u32>)>> = sg.iter().map(|&p| bx[p].clone()).collect();
-            if fold_one(&t, &ix, &sb, &mut c, false).is_some() {
+            if fold_one(src, facts, &ix, &sb, &mut c, false).is_some() {
                 c.folded_actions += 1;
                 c.folded_paths += ix.len() as u64;
                 for &i in &ix[1..] {
@@ -277,18 +295,18 @@ pub fn fold(t: Task, mode: FoldMode) -> (Task, FoldCounts, Vec<(usize, Vec<usize
             continue;
         }
         if let Some(ix) = lead.remove(&i) {
-            let sb: Vec<Vec<(u32, Vec<u32>)>> = ix.iter().map(|&j| boxes(&t, j)).collect();
+            let sb: Vec<Vec<(u32, Vec<u32>)>> = ix.iter().map(|&j| boxes(src, facts, j)).collect();
             let mut scratch = FoldCounts::default();
-            let a = fold_one(&t, &ix, &sb, &mut scratch, true).expect("decided above");
+            let a = fold_one(src, facts, &ix, &sb, &mut scratch, true).expect("decided above");
             c.dead_effects += scratch.dead_effects;
-            let members: Vec<u32> = ix.iter().flat_map(|&j| t.acts.members(j).iter().copied()).collect();
+            let members: Vec<u32> = ix.iter().flat_map(|&j| src.members(j).iter().copied()).collect();
             map.push((acts.len(), ix));
-            acts.push(t.acts.meta[i], &members, &a);
+            acts.push(src.meta(i), &members, &a);
         } else {
-            acts.copy_from(&t.acts, i);
+            acts.copy_src(src, i);
         }
     }
-    (Task { acts, ..t }, c, map)
+    (acts, c, map)
 }
 
 #[derive(Default, Debug, Clone)]
