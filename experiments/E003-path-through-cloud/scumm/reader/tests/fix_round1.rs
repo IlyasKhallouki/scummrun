@@ -195,3 +195,60 @@ fn kitchen_local_203_holds_the_cooks_room() {
     assert!(recs.iter().all(|r| !r.pre.contains_key("actorroom:6")));
     assert!(recs.iter().any(|r| tests_room(r)));
 }
+
+/// F9 on the kitchen: 72,328 records, 72 more than golden.py's. Per label, the records whose precondition does not
+/// know an actor's room (NOT_KNOWN or no actorroom key), with every actorroom key taken out of their precondition
+/// and effects, are exactly golden.py's (as multisets). The 72 new records each hold the cook's room 0, 28 or 72.
+#[test]
+#[ignore]
+fn kitchen_actor_rooms() {
+    use std::collections::BTreeMap;
+    let (b, _, _) = oracle::read_par_with(game(), static_oracle(), "kitchen", 3, switches(&["actor_rooms"]));
+    assert_eq!(b.records.len(), 72_328);
+    let golden = oracle::golden_dir().join("kitchen.jsonl.gz");
+    let info = oracle::golden_info(&golden);
+    let by_label = |lines: &mut dyn Iterator<Item = String>, strip: bool| {
+        let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut known: BTreeMap<String, usize> = BTreeMap::new();
+        for l in lines {
+            let mut v: Value = serde_json::from_str(&l).unwrap();
+            let Some(r) = v.get_mut("record").and_then(|r| r.get_mut("$Record")).and_then(|r| r.as_object_mut()) else {
+                continue;
+            };
+            if strip {
+                let pre = r["pre"].as_object_mut().unwrap();
+                let held: Vec<String> = pre
+                    .iter()
+                    .filter(|(k, v)| k.starts_with("actorroom:") && **v != serde_json::json!({"$set": [-1]}))
+                    .map(|(_, v)| v.to_string())
+                    .collect();
+                if !held.is_empty() {
+                    for h in held {
+                        *known.entry(h).or_default() += 1;
+                    }
+                    continue;
+                }
+                pre.retain(|k, _| !k.starts_with("actorroom:"));
+                r["effects"].as_object_mut().unwrap().retain(|k, _| !k.starts_with("actorroom:"));
+            }
+            let label = r["label"].as_str().unwrap().to_string();
+            out.entry(label).or_default().push(serde_json::to_string(&r).unwrap());
+        }
+        for v in out.values_mut() {
+            v.sort();
+        }
+        (out, known)
+    };
+    let (g, _) = by_label(&mut scumm_reader::gz_lines(&golden), false);
+    let (c, known) = by_label(&mut b.reading_lines(&info), true);
+    assert_eq!(g.len(), c.len(), "the same labels");
+    for (label, recs) in &g {
+        assert_eq!(Some(recs), c.get(label), "{label}");
+    }
+    let held: BTreeMap<&str, usize> = known.iter().map(|(k, n)| (k.as_str(), *n)).collect();
+    assert_eq!(
+        held,
+        [(r#"{"$set":[0]}"#, 27), (r#"{"$set":[28]}"#, 18), (r#"{"$set":[72]}"#, 27)].into_iter().collect(),
+        "the new records hold the cook's room"
+    );
+}
