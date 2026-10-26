@@ -4,6 +4,7 @@ usage: from plan_fd import plan, plan_taskcore
        result = plan(sas, start, time_limit=600)    # sas: task.SasTask; start: a facts.py map
        result.status, result.steps, result.landmarks, result.orderings
        result = plan_taskcore(packed, facts, goal, pieces, start, bans, workdir=DIR)   # through taskcore (below)
+       result = plan_taskcore(..., serve=True)   # the same, through one long-lived taskcore per packed file (below)
 
 **The planner.** Fast Downward (``third_party/downward``, release 26.6.0, built with ``./build.py release``),
 its search component on our file: the driver runs search only when the one input file looks like translator
@@ -55,8 +56,18 @@ effects cut to the facts (e) needs (the operator table's ``needed``): the python
 effects on the facts relevance.py needs, and on the kitchen (e) alone gives that task exactly
 (results/taskcore-kitchen.log). A start outside a domain on a needed fact: taskcore stops as task.py raises
 OutOfDomain; status "out of domain". Any other taskcore error raises ``TaskcoreError``.
+
+**Without reloading** (``serve=True``, off by default): instead of one ``taskcore sas`` process per plan, the request
+goes to one ``taskcore serve`` process per packed file (``TaskcoreServer``, ``server_for``), which keeps the loaded
+task and, for the bans and goal it was last asked for, the banned task as a view, the fold and the reduction loop up
+to (d), none of which reads the start (taskcore/src/serve.rs). Each plan then redoes only the start check, (d) from
+the new start and what follows. It writes the same files, byte for byte, and stops with the same errors, so the rest
+of ``plan_taskcore`` is unchanged. One server lives at a time: asking for another packed file (F10's reading made
+again) or other options closes the old one. ``write_s`` is then the request's time; ``serve`` the server's reply (its
+seconds, whether it built or kept, its memory).
 """
 
+import atexit
 import dataclasses
 import json
 import os
@@ -248,6 +259,76 @@ class TaskcoreResult(Result):
     predicted_goal: bool | None = None  # the goal holds in the predicted state after the last step
     choices: dict = field(default_factory=dict)  # step index -> its paths (effects cut as ``actions``), left to the
     # engine (module docstring); that step's entry in ``actions`` and ``paths`` is ``either`` of them
+    serve: dict = field(default_factory=dict)  # with serve=True: the server's reply (taskcore/src/serve.rs)
+
+
+class TaskcoreServer:
+    """One ``taskcore serve`` process on ``packed`` with the options ``args`` (module docstring): ``request(argv)``
+    sends one ``sas`` request (its per-plan options) and returns (ok, the reply's json or the error message)."""
+
+    def __init__(self, packed, args=(), binary=TASKCORE):
+        self.key = (str(binary), str(packed), tuple(str(a) for a in args))
+        cmd = [str(binary), "serve", "--task", str(packed)] + list(self.key[2])
+        self.p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True)
+        t0 = time.monotonic()
+        line = self.p.stdout.readline()
+        if not line.startswith("ready\t"):
+            err = self.p.stderr.read() if self.p.poll() is not None or not line else ""
+            self.close()
+            raise TaskcoreError((err or line).strip() or "taskcore serve did not start", " ".join(cmd))
+        self.hello = json.loads(line.split("\t", 1)[1])
+        self.hello["seconds"] = round(time.monotonic() - t0, 3)
+        self.cmd = " ".join(cmd)
+
+    def request(self, argv) -> tuple:
+        parts = [str(a) for a in argv]
+        if any("\t" in a or "\n" in a for a in parts):
+            raise TaskcoreError(f"a request argument with a tab or a newline: {parts!r}", self.cmd)
+        try:
+            self.p.stdin.write("\t".join(parts) + "\n")
+            self.p.stdin.flush()
+            line = self.p.stdout.readline()
+        except (BrokenPipeError, OSError):
+            line = ""
+        if not line:
+            err = self.p.stderr.read() if self.p.poll() is not None else ""
+            raise TaskcoreError(f"taskcore serve stopped (exit {self.p.poll()}): {err.strip()[-2000:]}", self.cmd)
+        kind, rest = line.rstrip("\n").split("\t", 1)
+        return kind == "ok", (json.loads(rest) if kind == "ok" else rest)
+
+    def close(self) -> None:
+        if self.p.poll() is None:
+            try:
+                self.p.stdin.close()
+            except OSError:
+                pass
+            try:
+                self.p.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                self.p.kill()
+                self.p.wait()
+
+
+_SERVER: list = []  # the one live server (module docstring)
+
+
+def server_for(packed, args=(), binary=TASKCORE) -> TaskcoreServer:
+    """The live server for (binary, packed, args), started if needed; any other one is closed first."""
+    key = (str(binary), str(packed), tuple(str(a) for a in args))
+    if _SERVER and _SERVER[0].key == key and _SERVER[0].p.poll() is None:
+        return _SERVER[0]
+    close_servers()
+    _SERVER.append(TaskcoreServer(packed, args, binary))
+    return _SERVER[0]
+
+
+def close_servers() -> None:
+    while _SERVER:
+        _SERVER.pop().close()
+
+
+atexit.register(close_servers)
 
 
 def _conds(w) -> tuple:
@@ -416,25 +497,34 @@ def predict(facts: dict, pieces: list, steps: list, start: dict, held=None, choi
 
 def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, bans=(), *, time_limit: int = 600,
                   memory_limit: str = "32G", search: str = "lama-first", workdir, binary=TASKCORE, args=(),
-                  start_check: str = "needed", keep: bool = False, engine_choice: bool = True) -> TaskcoreResult:
+                  start_check: str = "needed", keep: bool = False, engine_choice: bool = True,
+                  serve: bool = False) -> TaskcoreResult:
     """A plan through taskcore (module docstring). ``facts``: the packed file's facts (key -> Domain), ``goal`` its
     goal, ``pieces`` per input action its paths under ``bans`` (replay.ban_pieces), ``start`` a facts.py map (with
     the task's pos:/escpos:/args: keys), ``bans`` replay.Ban or (label, ((key, value), ...)). ``args``: further
     taskcore options (the default: fold strict, reductions (a)-(f), the model encoding). ``start_check``: taskcore's
     ``--start-check`` (needed: on the facts (e) needs; input: on every fact the input's file names). ``keep``: keep
     the SAS file and the operator table in ``workdir``. ``engine_choice``: a step whose paths differ only on facts
-    the file does not hold is left to the engine (``choices``) instead of raising PathChoice."""
+    the file does not hold is left to the engine (``choices``) instead of raising PathChoice. ``serve``: through the
+    long-lived server (module docstring) instead of a taskcore process of its own."""
     from export_records import write_bans, write_start
     work = Path(workdir)
     work.mkdir(parents=True, exist_ok=True)
     sas_file, ops_file, stats_file = work / "task.sas", work / "ops.jsonl", work / "stats.json"
-    cmd = [str(binary), "sas", "--task", str(packed), "--start-file", str(write_start(work / "start.txt", facts, start)),
-           "--out", str(sas_file), "--stats", str(stats_file), "--ops", str(ops_file), "--start-check",
-           start_check] + [str(a) for a in args]
-    if bans:
-        cmd += ["--bans", str(write_bans(work / "bans.txt", bans))]
+    per = ["--start-file", str(write_start(work / "start.txt", facts, start)), "--out", str(sas_file), "--stats",
+           str(stats_file), "--ops", str(ops_file), "--start-check", start_check]
+    with_bans = ["--bans", str(write_bans(work / "bans.txt", bans))] if bans else []
+    cmd = [str(binary), "sas", "--task", str(packed)] + per + [str(a) for a in args] + with_bans
     t0 = time.monotonic()
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    reply = {}
+    if serve:
+        # the per-plan options to the server; the others (args) are the server's own
+        ok, reply = server_for(packed, args, binary).request(per + with_bans)
+        p = subprocess.CompletedProcess(cmd, 0 if ok else 2, "", "" if ok else f"taskcore: {reply}\n")
+        if not ok:
+            reply = {}
+    else:
+        p = subprocess.run(cmd, capture_output=True, text=True)
     write_s = time.monotonic() - t0
     if p.returncode != 0:
         m = re.search(r"(\d+) facts out of their domains: \[(.*)\]", p.stderr)
@@ -458,7 +548,7 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
     else:
         raise ValueError(f"search {search!r}: lama-first or anytime")
     res = TaskcoreResult(status, code, seconds=seconds, workdir=str(work), log=log, write_s=write_s,
-                         operators=stats["sas"]["operators"], stats=stats)
+                         operators=stats["sas"]["operators"], stats=stats, serve=reply)
     res.landmarks, res.orderings = parse_landmarks(log)  # lama-first's dump (anytime LAMA's alias has none)
     if status == "plan":
         t1 = time.monotonic()
