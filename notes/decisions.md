@@ -125,11 +125,3 @@ Decided by: Ilyas.
 stuff." Moves that lead to nothing are dead-end branches of the cloud, and they come from the scripts' structure.
 So the search is not guided or pruned by a written list of genre or speedrun rules; what removes or orders paths
 must be proven, as in D4 (clarified).
-
-## D10 (2026-10-26): A full run takes a few hours at most, on the laptop
-
-Decided by: Ilyas.
-
-"Max a few hours. And if it's a few hours, it's gonna be here. That means optimize." A run of the system
-(reading, task, search) must finish within a few hours on the laptop, not over days on a bigger machine. The
-way to get there is optimizing, within D9 (proven reductions only).
