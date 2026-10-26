@@ -72,7 +72,8 @@ What the harness does, per plan step (plan.md step 5, with D5):
   without a new ban only a new start.
 * **The replan**: ``reader.replan_start`` from the engine's facts and the plan's prediction: the slot positions and
   locals the played steps predicted (``Harness.pred``), so ``args:`` is copied only where the engine's slot is where
-  the plan put it; then the planner.
+  the plan put it; then the planner. Under the Rust reader's switch ``--live-locals`` an ``args:`` number names a
+  list of only the locals the slot's unit reads (``read_view``); the copy rule compares no locals and is unchanged.
 * **The planner** (``planner``). "taskcore" (the default): ``plan_fd.plan_taskcore`` on the packed file of the
   reading's records (export_records.py), which is ``task`` (build_task's): each plan gives taskcore that start and
   every ban so far (taskcore cuts them as ``cut`` does, tested byte for byte against it), taskcore writes the reduced
@@ -261,15 +262,31 @@ def waits_first(task: T.Task, steps: list, i: int, now: dict | None = None) -> t
 # --- observing --------------------------------------------------------------------------------------------------------
 
 def task_start(b, obs: dict, task) -> dict:
-    """reader.task_start, with the ELSEWHERE start rule (``elsewhere``)."""
+    """reader.task_start, with the ELSEWHERE start rule (``elsewhere``). Every live slot starts with args 0 (its
+    locals unknown), with the switch ``--live-locals`` or without."""
     return elsewhere(b, obs, R.task_start(b, obs, task))
 
 
 def replan_start(b, obs: dict, predicted: dict, task) -> tuple:
     """reader.replan_start, with the ELSEWHERE start rule (``elsewhere``): a slot it moves to ELSEWHERE keeps args 0,
-    as reader.replan_start gives a slot at NOWHERE."""
+    as reader.replan_start gives a slot at NOWHERE. A live slot gets the plan's ``args:`` number when it is where the
+    plan put it, else 0: no slot's locals are compared (the state dump has none), so a reading made with the switch
+    ``--live-locals`` needs no other rule here. The plan's number then names the list of the locals the slot's unit
+    reads (``read_view``), which is all a run of the slot can depend on (scumm/reader/PORT-NOTES.md, "Live locals")."""
     out, counts = R.replan_start(b, obs, predicted, task)
     return elsewhere(b, obs, out), counts
+
+
+def read_view(b, name: str, room: int, locals_: dict) -> dict:
+    """A slot's locals (number -> value) as a list of the reading holds them: under the Rust reader's switch
+    ``--live-locals`` only the locals the slot's unit reads (packed_reading.Points.read_locals), the others left
+    out; all of them for a reading made without the switch, or for a unit whose reads the IR does not show exactly.
+    Whatever matches a live slot's locals to a list compares this view of both sides, and nothing else
+    (scumm/reader/PORT-NOTES.md, "Live locals")."""
+    reads = b.read_locals(name, room) if hasattr(b, "read_locals") else None
+    if reads is None:
+        return dict(locals_)
+    return {n: v for n, v in locals_.items() if n in reads}
 
 
 def elsewhere(b, obs: dict, out: dict) -> dict:

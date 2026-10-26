@@ -38,6 +38,10 @@ more than two rooms: the Python reader needs 16 GB at k=1). The goal is the pack
 4. **Verify**: the harness's inputs from boot in a fresh engine with the same settings, no fork, no change to the
    random state, compared at every checkpoint (replay.verify), and the goal at the end.
 
+**The reader's switches.** A reading the Rust reader made with ``--live-locals`` says so in reading.json
+(packed_reading.py); the run's record says it too (``task.live_locals``), and the harness reads the reading's slot
+read sets from it (replay.read_view). Nothing else in the run changes: the starts compare no slot's locals.
+
 **The reading and the seed.** The reader builds each fact's domain from its start (plan.md step 1: the start value
 closed under the writes), so a reading serves the seed it was read from: ``run`` refuses a seed whose start differs
 from the reading's on a fact the packed file holds (``start_check``: "task facts differ"), and ``start`` reports it.
@@ -454,7 +458,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
            "goal_is_part1_end": goal == {k: {v} for k, v in end["goal_all"].items()} and not end["goal_not"],
            "task": {"actions": len(rd.task.actions), "facts": len(rd.task.facts), "records": rd.doc.get("n_records"),
                     "folded": rd.doc.get("folded"), "packed_sha1": sha(rd.packed), "packed_bytes": rd.packed.stat().st_size,
-                    "lines_sha1": sha(rd.lines)},
+                    "lines_sha1": sha(rd.lines), "live_locals": rd.doc.get("live_locals") is not None},
            "control_counts": rd.doc.get("control_counts"),
            "limits": {"replans": replan_limit, "seconds": time_limit, "plan_time": plan_time, "plan_memory": plan_memory,
                       "input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT, "retries": replay.RETRIES,
@@ -521,7 +525,8 @@ def run_lines(o: dict) -> list:
     lines = [f"=== seed {o['seed']}{' (control)' if o['control'] else ''} ===",
              f"reading {o['reading']}: {o['task']['actions']:,} actions, {o['task']['facts']:,} facts, packed file "
              f"{o['task']['packed_bytes']:,} bytes (sha1 {o['task']['packed_sha1']}); goal {o['goal']} "
-             f"({'the Part I end' if o['goal_is_part1_end'] else 'not the Part I end'})"]
+             f"({'the Part I end' if o['goal_is_part1_end'] else 'not the Part I end'})"
+             f"{'; read with --live-locals' if o['task'].get('live_locals') else ''}"]
     if o.get("control_counts"):
         c = o["control_counts"]
         lines.append(f"control: precondition sets kept {c['sets kept']:,}, dropped {c['sets dropped']:,}; replay "

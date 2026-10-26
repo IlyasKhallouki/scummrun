@@ -56,7 +56,12 @@ the packed file's), ``start`` ({"name": what it is, "facts": the facts.py map th
 ``scope`` ({"rooms", "walk_verb", "verbs", "dialog_verbs"}), ``bounds`` ({fact: [low, high]} for every fact of the
 packed file whose domain holds "below" or "above": domains.Domain's low and high, which the packed file does not
 hold and the harness needs to label an engine value), ``counts`` (the reader's counters), ``sources`` (what made it),
-``control`` (false; true for the control's file, export_records.control_records).
+``control`` (false; true for the control's file, export_records.control_records). A reading the Rust reader made with
+its switch ``--live-locals`` (scumm/reader/PORT-NOTES.md, "Live locals") also has ``live_locals``, copied from the
+golden head: ``{"switch": "--live-locals", "slots": {slot: [the locals its unit's code reads] or null (all)}}``, a
+slot named as the engine's state names it (``script:N``, ``obj:N``; ``local:N@R``, ``entry@R``, ``exit@R`` for room
+R's code). Its lists of locals, and so its ``args:`` numbers, hold only those locals (``Points.read_locals``). A
+reading made without the switch has no such key.
 
 **The task** (``PackedTask``): its facts are domains.Domain (values from the packed file, low and high from
 ``bounds``), its goal the packed file's, its actions task.Action decoded on demand (``task.actions[i]``), named
@@ -418,10 +423,12 @@ class Points:
     unit (``table.points``), here from the domains of the task's ``pos:`` and ``escpos:`` facts, which build_task
     gives the reader's own domain ({NOWHERE} and those points); and a counter. ``elsewhere``: the facts whose domain
     also holds ELSEWHERE (the Rust reader's switch, replay.ELSEWHERE), which replay.task_start starts there when the
-    engine shows the slot at a place none of the points."""
+    engine shows the slot at a place none of the points. ``live_locals``: reading.json's ``live_locals`` (module
+    docstring), None for a reading made without that switch."""
 
-    def __init__(self, facts: dict):
+    def __init__(self, facts: dict, live_locals: dict | None = None):
         pts = {"at": {}, "esc": {}}
+        self.live_locals = live_locals
         self.elsewhere = set()
         for k, d in facts.items():
             kind, _, name = k.partition(":")
@@ -432,6 +439,17 @@ class Points:
                     self.elsewhere.add(k)
         self.table = type("Table", (), {"points": pts})()
         self.counts = collections.Counter()
+
+    def read_locals(self, name: str, room: int):
+        """The locals (their numbers) the reading keyed slot ``name``'s lists on, when the engine is in room ``room``:
+        a frozenset under ``--live-locals``; None (every local) for a slot whose unit's reads the IR does not show
+        exactly, a slot the reading does not list, or a reading made without the switch."""
+        if not self.live_locals:
+            return None
+        slots = self.live_locals["slots"]
+        key = name if name.startswith(("script:", "obj:")) else f"{name}@{room}"
+        reads = slots.get(key)
+        return None if reads is None else frozenset(reads)
 
 
 @dataclass
@@ -463,7 +481,7 @@ def load_reading(path) -> Reading:
     goal = {k: set(v) for k, v in doc["goal"].items()}
     if goal != task.goal:
         raise ValueError(f"{path}: goal {doc['goal']} is not the packed file's {task.goal}")
-    return Reading(path, doc, task, Points(task.facts), packed, lines)
+    return Reading(path, doc, task, Points(task.facts, doc.get("live_locals")), packed, lines)
 
 
 # --- from a reading in golden.py's format (the Rust reader) ------------------------------------------------------
@@ -666,6 +684,8 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
            "bounds": bounds, "counts": dict(sorted((str(k), v) for k, v in counts.items())),
            "sources": dict(hd.get("sources") or {}), "control": False, "name": hd.get("name"),
            "from_golden": {"golden": str(golden), "packed": str(packed)}}
+    if hd.get("live_locals") is not None:
+        doc["live_locals"] = hd["live_locals"]  # the Rust reader's switch --live-locals (module docstring)
     doc.update({k: v for k, v in (info or {}).items() if k not in doc})
     head_path.write_text(json.dumps(doc, indent=1, default=str) + "\n")
     return {"actions": len(want), "records": n_records, "facts": len(keys), "bounds": len(bounds),

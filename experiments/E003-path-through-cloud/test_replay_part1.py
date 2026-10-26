@@ -214,6 +214,45 @@ def test_a_reading_from_golden_format_records_and_a_packed_file_is_the_python_ex
     assert w == a
 
 
+def test_a_reading_with_live_locals_carries_each_slots_read_locals(tmp_path):
+    """The Rust reader's switch --live-locals (scumm/reader/PORT-NOTES.md, "Live locals"): the golden head's
+    ``live_locals`` goes into reading.json unchanged and the harness reads it (Points.read_locals, replay.read_view):
+    a slot's locals as a list holds them are the ones its unit reads; every local for a unit whose reads are not known
+    exactly, a slot the reading does not list, or a reading made without the switch (no ``live_locals`` key at all).
+    The starts do not change: task_start gives a live slot args 0, replan_start copies the plan's number where the
+    slot is where the plan put it."""
+    b, recs, _ = reading(tmp_path / "py")
+    ll = {"switch": "--live-locals", "slots": {"script:2": [0, 1, 2], "local:202@31": [0], "local:202@52": [],
+                                              "script:153": None}}
+    head = {"name": "hand", "rooms": [28, 41], "verbs": [2, 9], "dialog_verbs": [109, 121], "walk_verb": 11,
+            "n_records": len(recs), "sources": {"reader.py": "x"}, "live_locals": ll}
+    on = golden_file(tmp_path / "on.jsonl", recs, head)
+    off = golden_file(tmp_path / "off.jsonl", recs)
+    for g, d in ((on, "on"), (off, "off")):
+        PR.reading_from_golden(g, tmp_path / "py" / "reading.tc", tmp_path / d, {"room": 28, "var:53": 1},
+                               "a hand-made start", domain=DOMS.get)
+    a, o = (json.loads((tmp_path / d / "reading.json").read_text()) for d in ("on", "off"))
+    assert a["live_locals"] == ll and "live_locals" not in o
+    assert {k: v for k, v in a.items() if k not in ("live_locals", "from_golden")} == \
+        {k: v for k, v in o.items() if k != "from_golden"}
+    rd, ro = PR.load_reading(tmp_path / "on" / "reading.json"), PR.load_reading(tmp_path / "off" / "reading.json")
+    locs = {0: 202, 1: 7, 2: 9, 3: 1}
+    assert rd.b.read_locals("local:202", 31) == frozenset({0}) and rd.b.read_locals("local:202", 52) == frozenset()
+    assert RP.read_view(rd.b, "local:202", 31, locs) == {0: 202}
+    assert RP.read_view(rd.b, "local:202", 52, locs) == {}
+    assert RP.read_view(rd.b, "script:2", 31, locs) == {0: 202, 1: 7, 2: 9}
+    assert RP.read_view(rd.b, "script:153", 31, locs) == locs  # reads not known exactly: all
+    assert RP.read_view(rd.b, "local:202", 33, locs) == locs  # a slot the reading does not list: all
+    assert ro.b.read_locals("local:202", 31) is None and RP.read_view(ro.b, "local:202", 31, locs) == locs
+    assert RP.read_view(b, "local:202", 31, locs) == locs  # a Python reading: no switch
+    obs, pred = {"at:script:2:736": 1}, {"pos:script:2": 736, "args:script:2": 9}
+    assert RP.task_start(rd.b, obs, rd.task) == RP.task_start(ro.b, obs, ro.task)
+    assert RP.replan_start(rd.b, obs, pred, rd.task) == RP.replan_start(ro.b, obs, pred, ro.task)
+    assert RP.replan_start(rd.b, obs, pred, rd.task)[0]["args:script:2"] == 9
+    rd.close()
+    ro.close()
+
+
 def test_the_lines_follow_the_packed_files_order_whatever_it_is(tmp_path):
     """Another writer may put the actions in another order (the Rust RecordStream rewrites the body at finish): each
     line comes from the record its action's ``rec`` names."""
