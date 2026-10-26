@@ -1,0 +1,111 @@
+{
+ "old": "/var/tmp/fast-mi/wt-main-fr1/build/scummvm/scummvm",
+ "old_sha1": "fe647588c036",
+ "new": "/var/tmp/fast-mi/svm-fr1-main/build/scummvm/scummvm",
+ "new_sha1": "17864effa489",
+ "margin": 300,
+ "runs": [
+  {
+   "run": "room33",
+   "inputs": 27,
+   "last_frame": 3096,
+   "old": "/var/tmp/fast-mi/wt-main-fr1/build/scummvm/scummvm",
+   "new": "/var/tmp/fast-mi/svm-fr1-main/build/scummvm/scummvm",
+   "first_stop": {
+    "old": 1,
+    "new-off": 1,
+    "new-on": 1
+   },
+   "frames": 3095,
+   "to_frame": 3096,
+   "status_differ": 0,
+   "switch_off_differ": 0,
+   "switch_on_differ": 0,
+   "first_differences": [],
+   "counts": {
+    "slot or level without the new field": 0,
+    "live slots seen": 10014,
+    "live slots with a nonzero local": 1739,
+    "live slots freeze-resistant": 459,
+    "live slots recursive": 356,
+    "cutscene levels seen": 4428,
+    "cutscene levels with nonzero data": 374
+   },
+   "trace_sha1": {
+    "old": "8453e91e3c3702047209f03fc463fc6447623a82",
+    "new-off": "8453e91e3c3702047209f03fc463fc6447623a82",
+    "new-on": "8453e91e3c3702047209f03fc463fc6447623a82"
+   },
+   "traces_equal": true,
+   "seconds": 31.9
+  },
+  {
+   "run": "bar-door",
+   "inputs": 28,
+   "last_frame": 3429,
+   "old": "/var/tmp/fast-mi/wt-main-fr1/build/scummvm/scummvm",
+   "new": "/var/tmp/fast-mi/svm-fr1-main/build/scummvm/scummvm",
+   "first_stop": {
+    "old": 1,
+    "new-off": 1,
+    "new-on": 1
+   },
+   "frames": 3428,
+   "to_frame": 3429,
+   "status_differ": 0,
+   "switch_off_differ": 0,
+   "switch_on_differ": 0,
+   "first_differences": [],
+   "counts": {
+    "slot or level without the new field": 0,
+    "live slots seen": 14685,
+    "live slots with a nonzero local": 6673,
+    "live slots freeze-resistant": 3832,
+    "live slots recursive": 829,
+    "cutscene levels seen": 4761,
+    "cutscene levels with nonzero data": 374
+   },
+   "trace_sha1": {
+    "old": "8fa707f1faac9ce3df282ab961ddc1cf21f8d2f6",
+    "new-off": "8fa707f1faac9ce3df282ab961ddc1cf21f8d2f6",
+    "new-on": "8fa707f1faac9ce3df282ab961ddc1cf21f8d2f6"
+   },
+   "traces_equal": true,
+   "seconds": 43.3
+  },
+  {
+   "run": "kitchen",
+   "inputs": 99,
+   "last_frame": 13676,
+   "old": "/var/tmp/fast-mi/wt-main-fr1/build/scummvm/scummvm",
+   "new": "/var/tmp/fast-mi/svm-fr1-main/build/scummvm/scummvm",
+   "first_stop": {
+    "old": 1,
+    "new-off": 1,
+    "new-on": 1
+   },
+   "frames": 13675,
+   "to_frame": 13676,
+   "status_differ": 0,
+   "switch_off_differ": 0,
+   "switch_on_differ": 0,
+   "first_differences": [],
+   "counts": {
+    "slot or level without the new field": 0,
+    "live slots seen": 104999,
+    "live slots with a nonzero local": 87109,
+    "live slots freeze-resistant": 63331,
+    "live slots recursive": 7713,
+    "cutscene levels seen": 14151,
+    "cutscene levels with nonzero data": 432
+   },
+   "trace_sha1": {
+    "old": "facce5df4c27a5118ae614950075087a4661e507",
+    "new-off": "facce5df4c27a5118ae614950075087a4661e507",
+    "new-on": "facce5df4c27a5118ae614950075087a4661e507"
+   },
+   "traces_equal": true,
+   "seconds": 207.6
+  }
+ ]
+}

@@ -1143,7 +1143,7 @@ index 00000000..69447187
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..3edac446
+index 00000000..ff09fe43
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
 @@ -0,0 +1,521 @@
@@ -1557,7 +1557,7 @@ index 00000000..3edac446
 +	bool _skipCutscenes = false;    // SPEEDRUN_SKIP_CUTSCENES
 +	Common::Array<int32> _skipSpare; // the last skips event's "spare" (textSpared())
 +	bool _stepStates = false;       // SPEEDRUN_STEP_STATES
-+	bool _dumpLocals = false;       // SPEEDRUN_DUMP_LOCALS: slot locals and cutscene data in the state dump
++	bool _dumpLocals = false;       // SPEEDRUN_DUMP_LOCALS: slot locals and flags, cutscene data in the state dump
 +	Common::Array<SpeedrunInterrupt> _interrupts; // SPEEDRUN_INTERRUPTS
 +	Common::Array<SpeedrunInput> _inputs; // SPEEDRUN_INPUTS
 +	uint _inputIndex = 0;           // next event to deliver
@@ -4201,10 +4201,10 @@ index 00000000..7263e24f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..ac38e8d2
+index 00000000..27e72a34
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,752 @@
+@@ -0,0 +1,757 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -4756,7 +4756,11 @@ index 00000000..ac38e8d2
 +	// SPEEDRUN_DUMP_LOCALS also "locals": the slot's NUM_SCRIPT_LOCAL locals
 +	// (vm.localvar, script.h:136: initializeLocals sets them from the call's
 +	// args, script.cpp:155-164; the scripts read and write them through
-+	// readVar and writeVar, script.cpp:706, 846).
++	// readVar and writeVar, script.cpp:706, 846), and the slot's two flags
++	// (script.h:91; runScript and runObjectScript set them, script.cpp:98-99,
++	// 145-146): "resistant", freezeResistant (freezeScripts skips the slot,
++	// script.cpp:919, 928), and "recursive" (chainScript passes it on,
++	// script_v5.cpp:850). Whether a room change kills the slot is its "where".
 +	JsonArray slots;
 +	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
 +		const ScriptSlot &ss = e.vm.slot[i];
@@ -4771,6 +4775,7 @@ index 00000000..ac38e8d2
 +			for (int n = 0; n < NUM_SCRIPT_LOCAL; n++)
 +				locals.add((int)e.vm.localvar[i][n]);
 +			o.addRaw("locals", locals.str());
++			o.add("resistant", ss.freezeResistant).add("recursive", ss.recursive);
 +		}
 +		slots.addRaw(o.str());
 +	}

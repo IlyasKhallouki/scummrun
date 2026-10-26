@@ -6,15 +6,19 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        bridge_locals.py replans --new BIN [--golden FILE] [--out DIR]   (the kitchen run's replans, below)
 
 **The switch.** SPEEDRUN_DUMP_LOCALS (EngineConfig.dump_locals) makes the bridge's state dump list, per live slot,
-``locals``: its NUM_SCRIPT_LOCAL locals (vm.localvar, script.h:76, 136), and per cutscene level ``data``: its
-cutSceneData (script.h:131; beginCutscene stores it, endCutscene hands it to the end hook, script.cpp:1640, 1658).
-Nothing else in the bridge reads the switch. Off, the dump is as before.
+``locals``: its NUM_SCRIPT_LOCAL locals (vm.localvar, script.h:76, 136), and its two flags ``resistant``
+(freezeResistant) and ``recursive`` (script.h:91; runScript and runObjectScript set them, script.cpp:98-99, 145-146),
+and per cutscene level ``data``: its cutSceneData (script.h:131; beginCutscene stores it, endCutscene hands it to the
+end hook, script.cpp:1640, 1658). Whether a room change kills a slot is its ``where``, in the dump already
+(killScriptsAndResources, script.cpp:1083-1106). Nothing else in the bridge reads the switch. Off, the dump is as
+before.
 
 **The check.** Three engines play the same recorded inputs from boot in lockstep, one frame at a time: the old build
 (``--old``, the shared build/scummvm by default), the new build with the switch off, and the new build with it on.
 At every frame, every engine's stop status and state dump are compared: the old build's and the new build's with the
-switch off must be equal (the JSON text, key order included); the switch-on dump must equal them once its ``locals``
-and ``data`` fields are taken out. At the end the three trace.jsonl files are compared too. The runs:
+switch off must be equal (the JSON text, key order included); the switch-on dump must equal them once its ``locals``,
+``resistant``, ``recursive`` and ``data`` fields are taken out. At the end the three trace.jsonl files are compared
+too. ``--tag T`` writes the results as results/bridge-locals-check-T.json and .log. The runs:
 
 * ``room33``: results/replay-part1-room33-seed1.json's inputs (seed 1, plan.md's settings, replay_part1.config);
 * ``bar-door``: results/replay-part1-bar-door-seed1.json's inputs (seed 1, rooms 33 and 28);
@@ -48,7 +52,7 @@ from speedrun import paths  # noqa: E402
 from speedrun.control import Controller  # noqa: E402
 
 RESULTS = HERE / "results"
-NEW_FIELDS = {"slots": "locals", "levels": "data"}  # the fields the switch adds: per slot, per cutscene level
+NEW_FIELDS = {"slots": ("locals", "resistant", "recursive"), "levels": ("data",)}  # the switch's: per slot, per level
 
 
 def say(msg: str) -> None:
@@ -58,9 +62,9 @@ def say(msg: str) -> None:
 def strip(state: dict) -> dict:
     """The state dump without the fields the switch adds."""
     s = dict(state)
-    s["slots"] = [{k: v for k, v in sl.items() if k != "locals"} for sl in state["slots"]]
+    s["slots"] = [{k: v for k, v in sl.items() if k not in NEW_FIELDS["slots"]} for sl in state["slots"]]
     cs = dict(state["cutscene"])
-    cs["levels"] = [{k: v for k, v in lv.items() if k != "data"} for lv in cs["levels"]]
+    cs["levels"] = [{k: v for k, v in lv.items() if k not in NEW_FIELDS["levels"]} for lv in cs["levels"]]
     s["cutscene"] = cs
     return s
 
@@ -157,11 +161,14 @@ def check_run(name: str, cfg_of, events: list, last: int, old: Path, new: Path, 
                 on_diff += 1
                 if len(diffs) < keep:
                     diffs.append({"frame": frame, "what": "switch on", "where": first_diff(s_old, bare)})
-            missing = sum(1 for sl in s_on["slots"] if len(sl.get("locals", [])) != 25) + \
+            missing = sum(1 for sl in s_on["slots"] if len(sl.get("locals", [])) != 25
+                          or not isinstance(sl.get("resistant"), bool) or not isinstance(sl.get("recursive"), bool)) + \
                 sum(1 for lv in s_on["cutscene"]["levels"] if "data" not in lv)
             counts["slot or level without the new field"] += missing
             counts["live slots seen"] += len(s_on["slots"])
             counts["live slots with a nonzero local"] += sum(1 for sl in s_on["slots"] if any(sl["locals"]))
+            counts["live slots freeze-resistant"] += sum(1 for sl in s_on["slots"] if sl.get("resistant"))
+            counts["live slots recursive"] += sum(1 for sl in s_on["slots"] if sl.get("recursive"))
             counts["cutscene levels seen"] += len(s_on["cutscene"]["levels"])
             counts["cutscene levels with nonzero data"] += sum(1 for lv in s_on["cutscene"]["levels"] if lv["data"])
             if n % 2000 == 0:
@@ -196,8 +203,9 @@ def cmd_check(a) -> dict:
            "new_sha1": hashlib.sha1(new.read_bytes()).hexdigest()[:12], "margin": a.margin, "runs": rows}
     if a.results:
         RESULTS.mkdir(exist_ok=True)
-        (RESULTS / "bridge-locals-check.json").write_text(json.dumps(doc, indent=1) + "\n")
-        (RESULTS / "bridge-locals-check.log").write_text("\n".join(log_lines(doc)) + "\n")
+        stem = "bridge-locals-check" + (f"-{a.tag}" if a.tag else "")
+        (RESULTS / f"{stem}.json").write_text(json.dumps(doc, indent=1) + "\n")
+        (RESULTS / f"{stem}.log").write_text("\n".join(log_lines(doc)) + "\n")
     print("\n".join(log_lines(doc)))
     return doc
 
@@ -220,7 +228,9 @@ def log_lines(doc: dict) -> list:
                      f"{c.get('live slots with a nonzero local', 0):,}; cutscene levels seen "
                      f"{c.get('cutscene levels seen', 0):,}, with nonzero data "
                      f"{c.get('cutscene levels with nonzero data', 0):,}; slots or levels without the new field "
-                     f"{c.get('slot or level without the new field', 0)}")
+                     f"{c.get('slot or level without the new field', 0)}"
+                     + (f"; slots freeze-resistant {c.get('live slots freeze-resistant', 0):,}, recursive "
+                        f"{c.get('live slots recursive', 0):,}" if "live slots freeze-resistant" in c else ""))
         for d in r["first_differences"]:
             lines.append(f"  differs at frame {d['frame']} ({d['what']}): {d['where']}")
     return lines
@@ -301,7 +311,8 @@ def main() -> None:
     c.add_argument("--runs", default="room33,bar-door,kitchen")
     c.add_argument("--margin", type=int, default=300)
     c.add_argument("--out", type=Path, default=paths.OUT_DIR / "E003-bridge-locals")
-    c.add_argument("--results", action="store_true", help="write results/bridge-locals-check.json and .log")
+    c.add_argument("--results", action="store_true", help="write results/bridge-locals-check[-TAG].json and .log")
+    c.add_argument("--tag", default="", help="the results' name: results/bridge-locals-check-TAG.json")
     r = sub.add_parser("replans")
     r.add_argument("--new", required=True)
     r.add_argument("--golden", type=Path, default=paths.OUT_DIR / "golden" / "reader" / "kitchen.jsonl.gz")
