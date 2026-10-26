@@ -1,0 +1,88 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 34124,
+      "longest_job_s": 0.0,
+      "records": 1544657,
+      "s": 1962.3,
+      "what": "pass 1: inputs"
+    }
+  ],
+  "cap_min": 240.0,
+  "cpu_use": 2.77,
+  "elsewhere": true,
+  "goal": [
+    "owner:901",
+    "owner:902",
+    "owner:903"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 318,
+    "reads some locals, known": 255
+  },
+  "load_at_end": "5.77 6.03 7.41",
+  "load_at_start": "3.06 7.43 10.01",
+  "n_rooms": 31,
+  "n_units": 573,
+  "name": "part1",
+  "objects": 384,
+  "packed_bytes_so_far": 3140485120,
+  "pass": 1,
+  "peak_rss_mb": 5022,
+  "read_cpu_s": 5939.7,
+  "read_wall_s": 2147.7,
+  "records_in_pass": 1738367,
+  "rooms": [
+    10,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    41,
+    42,
+    43,
+    44,
+    48,
+    49,
+    51,
+    52,
+    53,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    64,
+    76,
+    83,
+    85,
+    96
+  ],
+  "rss_peak_seen": {
+    "at": "pass 1, event round 1 (10096 jobs), 2148 s",
+    "mb": 5019
+  },
+  "runs_done_in_finished_batches": 34124,
+  "setup_s": 0.08,
+  "slot_facts": 12169,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "stopped: the process's RSS passed 4.8 GB",
+  "threads": 3,
+  "units": {
+    "entry": 31,
+    "exit": 31,
+    "global": 94,
+    "local": 215,
+    "obj": 202
+  }
+}

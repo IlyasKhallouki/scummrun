@@ -1,0 +1,69 @@
+E003, the reader's switch --live-locals (scumm/reader/PORT-NOTES.md, "Live locals"), checks on the laptop, 2026-10-26.
+Branch live-locals; nice 10, 3 threads at most, other jobs running (load in each report).
+
+== switch off: unchanged
+cargo test --release -p scumm-reader: 11 unit tests, 15 oracle tests ok; kitchen_reading_rust_machine (--ignored) ok
+reader-scope --k 1 --elsewhere --threads 3 --golden: packed sha1 3ceabe501fd38dc195246ca20ccc42995a349d3e, golden lines sha1 213e68f344855a27e4cc8588b1d0990d11495c84, 237264 lines (the VM's: 3ceabe50, 213e68f3)
+pytest -m 'not slow' test_replay_part1 test_replay test_replay_review test_replay_taskcore: 88 passed, 2 deselected in 77.26s (0:01:17)
+
+== room 33 (cargo test room33_live_locals_on): 878 golden records, 878 with the switch; 38 lists onto 38; renumbered equal
+
+== the kitchen: live_locals_check.py golden kitchen.jsonl.gz against reader-port read kitchen --live-locals --threads 3
+lists: OFF 5298, ON 5221; OFF lists carrying two flag sets 0; ON keys with two numbers 0; OFF (list, flags) with no ON list 0; OFF (list, flags) mapped 5298 onto 5221 ON lists
+records: OFF 72256, ON 72126; OFF renumbered distinct 72124, ON distinct 72124; OFF renumbered not in ON 0, ON not in OFF renumbered 0; unmapped lists used 0; events of units the ON head lacks 0
+OFF records that became copies of another once renumbered: 132
+  runs: event: OFF 7098, ON 6990
+  runs: skip_cutscene: OFF 68, ON 68
+  event rounds: OFF 1028, ON 1028
+  records: OFF 72256, ON 72126
+  lists of locals past SIG_LIMIT (taken as unknown): OFF 4, ON 4
+  lists of locals with locals their unit never reads (left out: live locals): OFF None, ON 190
+ON-only records by cause: {}; by unit: {}
+kitchen task, start s17, taskcore sas (default) + lama-first:
+  off operators 17823 reduced actions 12029 plan 10 steps: ['event(local:211@33)', 'walk_to(316)', 'event(script:2@736', 'event(local:218@16', 'sentence(2,564)', 'fold:event(script:2@736', 'event(script:2@915', 'sentence(9,566)', 'fold:event(script:2@736', 'event(script:2@915']
+  on operators 17648 reduced actions 11987 plan 10 steps: ['event(local:211@33)', 'walk_to(316)', 'event(script:2@736', 'event(local:218@16', 'sentence(2,564)', 'fold:event(script:2@736', 'event(script:2@915', 'sentence(9,566)', 'fold:event(script:2@736', 'event(script:2@915']
+
+== rooms 31 and 33: reader-scope --rooms 31,33 --elsewhere --threads 3 --golden, off and on; live_locals_check.py
+lists: OFF 191, ON 191; OFF lists carrying two flag sets 0; ON keys with two numbers 0; OFF (list, flags) with no ON list 0; OFF (list, flags) mapped 191 onto 191 ON lists
+records: OFF 57866, ON 57866; OFF renumbered distinct 57866, ON distinct 57866; OFF renumbered not in ON 0, ON not in OFF renumbered 0; unmapped lists used 0; events of units the ON head lacks 0
+OFF records that became copies of another once renumbered: 0
+  runs: event: OFF 861, ON 861
+  runs: skip_cutscene: OFF 45, ON 45
+  event rounds: OFF 32, ON 32
+  records: OFF 57866, ON 57866
+  lists of locals past SIG_LIMIT (taken as unknown): OFF None, ON None
+  lists of locals with locals their unit never reads (left out: live locals): OFF None, ON 828
+ON-only records by cause: {}; by unit: {}
+
+== k = 1 with --elsewhere: live_locals_check.py off against on
+lists: OFF 9710, ON 9580; OFF lists carrying two flag sets 10; ON keys with two numbers 0; OFF (list, flags) with no ON list 0; OFF (list, flags) mapped 9720 onto 9575 ON lists
+records: OFF 237262, ON 237465; OFF renumbered distinct 237143, ON distinct 237463; OFF renumbered not in ON 0, ON not in OFF renumbered 320; unmapped lists used 0; events of units the ON head lacks 0
+  ON only: kinds {'event': 320}, labels [('event(local:202@3886#.)', 105), ('event(local:202@1740#.)', 70), ('event(local:202@2610#.)', 40), ('event(local:202@3249#.)', 33), ('event(local:202@3593#.)', 15), ('event(local:202@3631#.)', 12), ('event(local:202@1896#.)', 10), ('event(local:202@1818#.)', 5)]
+OFF records that became copies of another once renumbered: 119
+  runs: event: OFF 18225, ON 18149
+  runs: skip_cutscene: OFF 192, ON 192
+  event rounds: OFF 1027, ON 1027
+  records: OFF 237262, ON 237465
+  lists of locals past SIG_LIMIT (taken as unknown): OFF 22, ON 22
+  lists of locals with locals their unit never reads (left out: live locals): OFF None, ON 11509
+ON-only records by cause: {'list of an OFF list with two flag sets': 215, 'a list OFF never built (a later wait point of such a variant)': 105}; by unit: {"('obj', 442) R=False": 2, "('local', 28, 200) R=True": 5, "('local', 38, 202) R=False": 313}
+  k1off records 237262 runs (both passes) 41313 rounds 1027 wall s 291.0 CPU s 853.2 peak RSS MB 1026 load 6.65 8.32 8.43 packed 315833520 3ceabe50
+  k1on records 237465 runs (both passes) 41161 rounds 1027 wall s 160.7 CPU s 569.8 peak RSS MB 1072 load 3.33 6.31 7.42 packed 316555676 590c6acf
+replay_part1.py run 1 --replan-limit 3 --time-limit 1800 --plan-time 600 --plan-memory 3G on each reading:
+  off live_locals False actions 236642 lines 6b2258208c18 | boot ok | reading start differ 0 | start-part1 differ 0 | taskcore input ok needed ok | stop: no plan (the planner proved none) | operators 0 | verify same True
+  on live_locals True actions 236840 lines 4793b8deb14b | boot ok | reading start differ 0 | start-part1 differ 0 | taskcore input ok needed ok | stop: no plan (the planner proved none) | operators 0 | verify same True
+
+== k = 2 with --elsewhere: reader-scope --k 2 --elsewhere --threads 3, off then on (no --golden)
+  k2off records 532166 pass 1 518166 runs (both passes) 62526 event runs pass 2 26261 event records pass 2 356557 rounds 1027 wall s 1449.6 CPU s 3465.4 peak RSS MB 2935 load 12.06 12.62 13.44 packed 1047624564
+  k2on records 519755 pass 1 505760 runs (both passes) 58788 event runs pass 2 24392 event records pass 2 344146 rounds 1027 wall s 1404.3 CPU s 3106.7 peak RSS MB 2836 load 16.68 16.90 15.88 packed 964062528
+
+== Part I: reader-scope --part1 --elsewhere --live-locals --threads 3 --max-rss-gb 4.8, pass 1 up to round 1 (p1on: --max-waiting 20000, p1on2: --max-waiting 2000)
+  p1on: [part1] pass 1 inputs: 34124 runs, 1544657 records, 2580.9 s; 1541372 records in the pass, 2581 s, RSS 808 MB
+  p1on: [part1] pass 1 event round 1: 10096 runs from 17151 events start; RSS 959 MB
+  p1on: STOPPED: the process's RSS passed 4.8 GB; 1738367 records in pass 1; report /var/tmp/fast-mi/scratchpad/live-locals/p1on/part1.json
+  p1on: wall s 3097.2 CPU s 7484.6 peak RSS MB 4952 load 4.26 5.54 5.84
+  p1on2: [part1] pass 1 inputs: 34124 runs, 1544657 records, 1962.3 s; 1541372 records in the pass, 1962 s, RSS 1667 MB
+  p1on2: [part1] pass 1 event round 1: 10096 runs from 17151 events start; RSS 1014 MB
+  p1on2: STOPPED: the process's RSS passed 4.8 GB; 1738367 records in pass 1; report /var/tmp/fast-mi/scratchpad/live-locals/p1on2/part1.json
+  p1on2: wall s 2147.7 CPU s 5939.7 peak RSS MB 5022 load 3.06 7.43 10.01
+  the VM, without the switch (results/vm-part1-seed1.json): inputs 34,124 runs, 1,544,657 records; round 1 19,847 runs from 30,545 events, 1,230,458 records
