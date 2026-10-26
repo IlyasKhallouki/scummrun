@@ -125,3 +125,13 @@ Decided by: Ilyas.
 stuff." Moves that lead to nothing are dead-end branches of the cloud, and they come from the scripts' structure.
 So the search is not guided or pruned by a written list of genre or speedrun rules; what removes or orders paths
 must be proven, as in D4 (clarified).
+
+## D10 (2026-10-26): F1b, and what comes before the next Part I run
+
+Decided by: Ilyas.
+
+"Go ahead with everything you need before you get to the part 1, which is also replanning without reloading.
+And dropping the time for the kitchen." Approved: F1b (a click's record ends where the room's input script queues
+the sentence, which then runs as its own event, as sentence records do today), the start-state bug fix,
+replanning on a task kept in memory instead of rebuilding it from the reading, and bringing the kitchen run's game
+time down. The next Part I run waits until the whole chain finds and plays a plan on a small scope on the laptop.
