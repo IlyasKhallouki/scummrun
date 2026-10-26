@@ -396,6 +396,9 @@ pub enum What {
     Sentence { verb: i64, a: i64, b: Option<i64> },
     Verb(i64),
     Event(Event),
+    /// fix round 1, F1: one input's frame from the input script (inputs.rs): runInputScript's area, value and button,
+    /// and for a click in a room the room and the cell (-1 for a verb)
+    Input { area: i64, value: i64, button: i64, room: i64, cell: i64 },
 }
 
 impl What {
@@ -406,6 +409,14 @@ impl What {
             }
             What::Verb(v) => Py::Tuple(vec![Py::str("verb"), Py::Int(*v)]),
             What::Event(e) => Py::Tuple(vec![Py::str("event"), e.py()]),
+            What::Input { area, value, button, room, cell } => Py::Tuple(vec![
+                Py::str("input"),
+                Py::Int(*area),
+                Py::Int(*value),
+                Py::Int(*button),
+                Py::Int(*room),
+                Py::Int(*cell),
+            ]),
         }
     }
     pub fn from_py(p: &Py) -> What {
@@ -414,6 +425,7 @@ impl What {
             "sentence" => What::Sentence { verb: t[1].int(), a: t[2].int(), b: (!t[3].is_none()).then(|| t[3].int()) },
             "verb" => What::Verb(t[1].int()),
             "event" => What::Event(Event::from_py(&t[1])),
+            "input" => What::Input { area: t[1].int(), value: t[2].int(), button: t[3].int(), room: t[4].int(), cell: t[5].int() },
             k => panic!("not a run kind: {k}"),
         }
     }

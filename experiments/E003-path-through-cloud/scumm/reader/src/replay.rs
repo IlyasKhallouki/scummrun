@@ -63,6 +63,8 @@ fn what_py(w: &What) -> Py {
         What::Sentence { verb, a, b } => Py::Tuple(vec![Py::str("run_sentence_sym"), Py::Int(*verb), Py::Int(*a), Py::opt_int(*b)]),
         What::Verb(v) => Py::Tuple(vec![Py::str("run_click_verb"), Py::Int(*v)]),
         What::Event(e) => Py::Tuple(vec![Py::str("run_event"), e.py()]),
+        // F1 has no Python oracle: the capture never holds one
+        What::Input { .. } => w.py(),
     }
 }
 

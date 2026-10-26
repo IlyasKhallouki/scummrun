@@ -37,6 +37,8 @@ use std::rc::Rc;
 
 /// reader.py `PATH_LIMIT`: paths per run.
 pub const PATH_LIMIT: usize = 1024;
+/// F1 (switch input_script): paths per input run (`What::Input`); PATH_LIMIT unless a caller sets it (the size probe)
+pub static INPUT_PATH_LIMIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(PATH_LIMIT);
 const STEP_BIG: i32 = 1 << 20;
 pub const R_FACT: Reason = Reason::Other("fact");
 pub const R_NONFACT: Reason = Reason::Other("not a fact");
@@ -55,6 +57,10 @@ const SAVED: i32 = i32::MIN;
 /// `("resume_at", ev)`)
 const INPUT_STEP: &str = "\u{1}reader: _eng_input";
 const RESUME_STEP: &str = "\u{1}reader: _eng_resume_at";
+/// F1's steps of an input's frame (`What::Input`): the mouse moves, a mouse loop's turn (its index follows), checkExecVerbs
+const F1_MOUSE_STEP: &str = "\u{1}reader: F1 mouse";
+const F1_TURN_STEP: &str = "\u{1}reader: F1 turn ";
+const F1_INPUT_STEP: &str = "\u{1}reader: F1 checkExecVerbs";
 const VERB_CLICK_AREA: i32 = 1; // model.py, verbs.h:35
 const LEFT_CLICK: i32 = 1; // model.py, verbs.cpp:666
 const VAR_VERB_SCRIPT: i32 = 32;
@@ -288,6 +294,8 @@ struct St {
     seed: Rc<BTreeMap<PKey, Labels>>,
     event: Option<Event>,
     verb: i32,
+    /// F1: the run's input (`What::Input`)
+    input: Option<What>,
     first_fork: Option<String>,
     rd: RdCounts,
     // inside a step
@@ -1162,6 +1170,12 @@ impl Hooks for ReaderHooks {
         match step {
             Step::Note(s) if &**s == INPUT_STEP => eng_input(m, p, ci, o),
             Step::Note(s) if &**s == RESUME_STEP => eng_resume_at(m, p, ci, o),
+            Step::Note(s) if &**s == F1_MOUSE_STEP => f1_mouse(m, p),
+            Step::Note(s) if &**s == F1_INPUT_STEP => f1_input(m, p, ci, o),
+            Step::Note(s) if s.starts_with(F1_TURN_STEP) => {
+                let i: usize = s[F1_TURN_STEP.len()..].parse().unwrap();
+                f1_turn(m, p, ci, o, i)
+            }
             Step::Scene { room, .. } => {
                 // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
                 let res = match *room {
@@ -1560,6 +1574,13 @@ fn eng_resume_at(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -
     if g.ins(uid)[idx as usize].yields == Some(Yield::Wait) {
         sx_mut(p).resume_wait = Some((uid, ev.w as i32));
     }
+    if !ev.abort && is_mouse_loop(m, ev.unit) {
+        // F1: a mouse loop's later turn reads where the mouse stayed
+        let id = m.read(p, Fact::Mouse, o);
+        if let Val::Int(id) = id {
+            set_mouse(m, p, o, id as i64);
+        }
+    }
     let locals: Vec<(i32, Val)> = ev.locals.iter().map(|(n, v)| (*n as i32, mval(m, v))).collect();
     let owned = match &ev.owned {
         Py::Bool(b) => Owned::Bool(*b),
@@ -1575,6 +1596,258 @@ fn eng_resume_at(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -
         p.frame_at(top).override_ = (if ev.abort { ov - 1 } else { ov }) as i32;
         p.cut_data = ev.cut_data.iter().map(|&c| Val::Int(c as i32)).collect();
         count(m, "events resuming a slot with its own open cutscenes (cutscene data carried)");
+    }
+    Vec::new()
+}
+
+// --- fix round 1, F1: an input's frame (inputs.rs) ------------------------------------------------------------------
+
+fn is_mouse_loop(m: &Machine<'_>, unit: UnitKey) -> bool {
+    st(m).scope.as_ref().unwrap().inputs.as_ref().is_some_and(|i| i.mouse_loops.iter().any(|(k, _)| *k == unit))
+}
+
+/// F1: a mouse value: its range with F12 (value_sets), else a plain unknown of the same name.
+fn mouse_val(m: &mut Machine<'_>, what: &str, lo: i32, hi: i32) -> Val {
+    let (lo, hi) = (lo.min(hi), lo.max(hi));
+    if m.switches.value_sets {
+        m.vals().mk_range(Reason::Input, what, lo, hi)
+    } else if lo == hi {
+        Val::Int(lo)
+    } else {
+        m.vals().mk(Reason::Input, format!("{what} in [{lo}..{hi}]"))
+    }
+}
+
+/// F1: the four mouse variables and the path's cell where the mouse is over `id` (inputs.rs's numbering), as
+/// processInput and updateScummVars leave them (input.cpp:414-434; scumm.cpp:3385-3388): over a cell of the room
+/// the path is in, VAR_VIRT_MOUSE_X/Y are the cell's rectangle and VAR_MOUSE_X/Y that less the main screen's left
+/// edge (fixed in a room no wider than the screen, else its range) and top line; over a verb, VAR_MOUSE_X/Y are
+/// its place (the verb area where its place is not one constant), VAR_VIRT_MOUSE_Y is -1 (off the main screen) and
+/// VAR_VIRT_MOUSE_X is not known. NOWHERE, or a cell of another room: the variables stay as they are.
+fn set_mouse(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, id: i64) {
+    use crate::inputs::{cell_of, fixed_left, verb_of, SCREEN_WIDTH};
+    use scumm_machine::machine::{VAR_MOUSE_X, VAR_MOUSE_Y, VAR_VIRT_MOUSE_X, VAR_VIRT_MOUSE_Y};
+    let g = m.game;
+    let (screen, xy) = {
+        let inp = st(m).scope.as_ref().unwrap().inputs.as_ref().unwrap();
+        (inp.screen, verb_of(id).and_then(|v| inp.verb_xy.get(&v).copied()))
+    };
+    let (top, height) = screen.unwrap_or((0, 200));
+    if let Some((res, ci)) = cell_of(id) {
+        let room = lazily(m, |m| m.read(p, Fact::Room, o));
+        let here = match room {
+            Val::Int(r) => g.resource(r) == Some(res),
+            Val::Unk(_) => false,
+        };
+        let Some(c) = g.cells[m.switches.draw_clears as usize].get(&res).and_then(|cs| cs.get(ci)).cloned() else { return };
+        if !here {
+            return;
+        }
+        let name = format!("cell {res}.{ci}");
+        let vx = mouse_val(m, &format!("VAR_VIRT_MOUSE_X: {name}"), c.x.0, c.x.1);
+        let vy = mouse_val(m, &format!("VAR_VIRT_MOUSE_Y: {name}"), c.y.0, c.y.1);
+        let w = g.room_width.get(&res).copied().unwrap_or(SCREEN_WIDTH);
+        let (lo, hi) = match fixed_left(w) {
+            Some(left) => (c.x.0 - left, c.x.1 - left),
+            None => {
+                let (l0, l1) = scumm_machine::machine::screen_lefts(w);
+                ((c.x.0 - l1).max(0), (c.x.1 - l0).min(SCREEN_WIDTH - 1))
+            }
+        };
+        let mx = mouse_val(m, &format!("VAR_MOUSE_X: {name}"), lo, hi);
+        let my = mouse_val(m, &format!("VAR_MOUSE_Y: {name}"), c.y.0 + top, c.y.1 + top);
+        for (k, v) in [(VAR_VIRT_MOUSE_X, vx), (VAR_VIRT_MOUSE_Y, vy), (VAR_MOUSE_X, mx), (VAR_MOUSE_Y, my)] {
+            m.h_write(p, Fact::Var(k), v);
+        }
+        p.cell = Some((res, ci as u16));
+    } else if let Some(v) = verb_of(id) {
+        let name = format!("verb {v}");
+        let ((x0, x1), (y0, y1)) = match xy {
+            Some((x, y)) => ((x, x + 7), (y, y + 7)),
+            None => ((0, SCREEN_WIDTH - 1), (top + height, 199)),
+        };
+        let mx = mouse_val(m, &format!("VAR_MOUSE_X: {name}"), x0, x1);
+        let my = mouse_val(m, &format!("VAR_MOUSE_Y: {name}"), y0, y1);
+        let vx = m.vals().mk(Reason::Input, format!("VAR_VIRT_MOUSE_X: {name}"));
+        for (k, v) in [(VAR_VIRT_MOUSE_X, vx), (VAR_VIRT_MOUSE_Y, Val::Int(-1)), (VAR_MOUSE_X, mx), (VAR_MOUSE_Y, my)] {
+            m.h_write(p, Fact::Var(k), v);
+        }
+        p.cell = None;
+    }
+}
+
+/// F1, the frame's first step: the mouse moves to the input's target (`set_mouse`), and `mouse` holds it after the
+/// frame where the camera cannot move (a room no wider than the screen; else NOWHERE). A verb click leaves `mouse` at
+/// the verb.
+fn f1_mouse(m: &mut Machine<'_>, p: &mut Path) -> Vec<Path> {
+    use crate::inputs::{cell_id, fixed_left, verb_id, NOWHERE, VERB_CLICK_AREA};
+    let Some(What::Input { area, value, room, cell, .. }) = st(m).input.clone() else { panic!("an input step outside an input run") };
+    let g = m.game;
+    let o = FactOracle::new(FactMap::default(), None);
+    let id = if area == VERB_CLICK_AREA {
+        verb_id(value)
+    } else {
+        let res = g.resource(room as i32).expect("a scope room");
+        cell_id(res, cell as usize)
+    };
+    set_mouse(m, p, &o, id);
+    let stays = if area == VERB_CLICK_AREA {
+        id
+    } else {
+        let res = g.resource(room as i32).unwrap();
+        match g.room_width.get(&res).and_then(|&w| fixed_left(w)) {
+            Some(_) => id,
+            None => NOWHERE,
+        }
+    };
+    m.h_write(p, Fact::Mouse, Val::Int(stays as i32));
+    Vec::new()
+}
+
+/// F1: a test of fact `k` the engine makes (no jump of the scripts): decided, or a fork into the value sets it
+/// separates (`ForkOn` with sets); None where `k` is no fact and its value is not known.
+fn test_fact(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, k: Fact, pred: &dyn Fn(i64) -> bool) -> Option<bool> {
+    let v = lazily(m, |m| m.read(p, k, o));
+    if let Val::Int(n) = v {
+        return Some(pred(n as i64));
+    }
+    if p.writes.get(&k).is_some() {
+        // a value the path wrote and does not know
+        return m.vals_ref().values_of(v).and_then(|vs| {
+            let r: BTreeSet<bool> = vs.iter().map(|&x| pred(x as i64)).collect();
+            (r.len() == 1).then(|| *r.iter().next().unwrap())
+        });
+    }
+    let i = info(m, k);
+    if i.kind != Kind::Fact {
+        return None;
+    }
+    let d = i.dom.as_ref()?;
+    let cands: Labels = match sx(p).pre.get(&PKey::F(k)) {
+        Some(s) => s.clone(),
+        None => d.values.clone(),
+    };
+    let val = |l: Label| match l {
+        Label::Int(n) => n,
+        Label::Above => d.high.unwrap() + 1,
+        Label::Below => d.low.unwrap() - 1,
+    };
+    let (yes, no): (Labels, Labels) = cands.iter().partition(|&&l| pred(val(l)));
+    if no.is_empty() {
+        return Some(true);
+    }
+    if yes.is_empty() {
+        return Some(false);
+    }
+    count(m, "F1: forks on an engine test into the value sets it separates");
+    panic::resume_unwind(Box::new(ForkOn(k, Some(vec![yes, no]))))
+}
+
+/// F1: a mouse loop's turn in the input's frame (runAllScripts before checkExecVerbs, scumm.cpp:3231-3232): the
+/// slot's turn when it is live, not frozen, and waits in the loop that reads the mouse; it runs from there with the
+/// locals it has (not known: the turn's own writes come first in such a loop) to its next yield, which the record
+/// keeps. A slot waiting anywhere else takes its turn as an event, as before.
+fn f1_turn(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle, i: usize) -> Vec<Path> {
+    let g = m.game;
+    let (ukey, ws) = st(m).scope.as_ref().unwrap().inputs.as_ref().unwrap().mouse_loops[i].clone();
+    let Some(uid) = g.id(ukey) else { return Vec::new() };
+    if let UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) = ukey {
+        let room = m.read(p, Fact::Room, o);
+        if m.h_resource(room) != Val::Int(r) {
+            return Vec::new();
+        }
+    }
+    let name = Game::unit_name(ukey);
+    let key = g.lifecycle_key(ukey);
+    if let Some(k) = key {
+        if m.read(p, k, o) != Val::Int(1) {
+            return Vec::new();
+        }
+    }
+    if m.read(p, Fact::Frozen(name), o) != Val::Int(0) {
+        return Vec::new();
+    }
+    // where it waits: one of the loop's waits (`at:` W = 1), else elsewhere (its turn is an event)
+    let mut at = None;
+    for &w in &ws {
+        if m.read(p, Fact::At(name, w as i32), o) == Val::Int(1) {
+            at = Some(w as i32);
+            break;
+        }
+    }
+    let Some(w) = at else { return Vec::new() };
+    let w = &w;
+    let Some(idx) = g.at(uid, *w) else { return Vec::new() };
+    count(m, "F1: mouse loop turns in an input's frame");
+    if idx > 0 {
+        let prev = &g.ins(uid)[idx as usize - 1];
+        let delay = matches!(prev.st, Some(Stmt::Op { name: known::DELAY | known::DELAY_VARIABLE, .. }));
+        if prev.next == Some(idx) && delay {
+            let c = m.cite(X { u: uid, i: idx - 1 });
+            let cond = format!("{name}'s delay is over");
+            let why = format!("?({}: {name}'s delay count)", Reason::Timer.as_str());
+            p.assumptions.push(Assumption { cite: c, cond: cond.into(), side: Side::Bool(true), why: why.into() });
+        }
+    }
+    m.clear(p, o, Prefix::At(name));
+    if g.ins(uid)[idx as usize].yields == Some(Yield::Wait) {
+        sx_mut(p).resume_wait = Some((uid, *w));
+    }
+    let res = match key {
+        Some(k) => {
+            let room = lazily(m, |m| m.read(p, Fact::Room, o));
+            let rr = match m.h_resource(room) {
+                Val::Int(r) => Some(r),
+                Val::Unk(_) => None,
+            };
+            g.resistant(k, rr)
+        }
+        None => Some(false),
+    };
+    m.h_push_frame(p, ci, uid, idx, &[], scumm_machine::path::Owned::Bool(false), None, res, key, false, false);
+    Vec::new()
+}
+
+/// F1: checkExecVerbs after the frame's turns (verbs.cpp:586-692, F2's order): the click is dropped while
+/// _userPut <= 0 (590); a verb's click needs the verb shown (findVerbAtPos, 681-686: pinned at the input); then
+/// runInputScript runs the script VAR_VERB_SCRIPT holds now with [area, value, button] (script.cpp:1478-1511), to its
+/// first yield or end (runScriptNested).
+fn f1_input(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> Vec<Path> {
+    let Some(What::Input { area, value, button, .. }) = st(m).input.clone() else { panic!("an input step outside an input run") };
+    let (_, cite) = call_at(p, ci);
+    match test_fact(m, p, o, Fact::Var(VAR_USERPUT), &|v| v > 0) {
+        Some(true) => {}
+        Some(false) => {
+            // the frame is then the events' own (its turns are events): no input record
+            m.h_halt(p, crate::builder::INPUT_DROPPED, "_userPut <= 0 after the turns: checkExecVerbs drops the click (verbs.cpp:590)".into());
+            return Vec::new();
+        }
+        None => {
+            let why = "?(not a fact: VAR_USERPUT after the frame's turns)";
+            p.assumptions.push(Assumption { cite: cite.clone(), cond: "_userPut > 0".into(), side: Side::Bool(true), why: why.into() });
+        }
+    }
+    let n = m.read(p, Fact::Var(VAR_VERB_SCRIPT), o);
+    match n {
+        Val::Unk(_) => {
+            let w = format!("input script {}", m.vals_ref().show(n));
+            p.unknown_writes.push(("runInputScript".into(), cite, w.into()));
+        }
+        Val::Int(0) => m.h_note(p, cite, "runInputScript", "VAR_VERB_SCRIPT is 0: no input script runs"),
+        Val::Int(n) => {
+            let args = vec![(0, Val::Int(area as i32)), (1, Val::Int(value as i32)), (2, Val::Int(button as i32))];
+            let step = Step::Script { n, resistant: Some(false), recursive: Some(false), args };
+            let cid = m.h_cid();
+            p.stack.push(Entry::Call(Call {
+                head: "runInputScript".into(),
+                cite: "script.cpp:1478-1511".into(),
+                steps: vec![step].into(),
+                caller: None,
+                active: false,
+                i: 0,
+                cid,
+            }));
+        }
     }
     Vec::new()
 }
@@ -1750,7 +2023,7 @@ fn tri_py(t: &(S, S, S)) -> Py {
 fn path_out(game: &Game, run: &Run, p: &Path) -> PathOut {
     let end = p.end.map(|e| e.to_string());
     let sym = p.ext.is_some();
-    if !sym || end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) {
+    if !sym || end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e) || e == crate::builder::INPUT_DROPPED) {
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
@@ -1850,6 +2123,7 @@ impl<'g> Reader<'g> {
         // table instead (run_full), with the machine's wide sets and findObject's objects
         self.m.switches.draw_clears = cx.scope.switches.draw_clears;
         self.m.switches.actor_rooms = cx.scope.switches.actor_rooms;
+        self.m.switches.input_script = cx.scope.switches.input_script;
     }
 }
 
@@ -1877,6 +2151,10 @@ impl Reader<'_> {
             self.m.vals().wide = cx.table.value_sets;
             self.m.find_objects = cx.table.value_sets.then(|| cx.scope.objects.iter().map(|&o| o as i32).collect());
         }
+        self.m.path_limit = match what {
+            What::Input { .. } => INPUT_PATH_LIMIT.load(std::sync::atomic::Ordering::Relaxed),
+            _ => PATH_LIMIT,
+        };
         let m = &mut self.m;
         let mut mpins = FxHashMap::default();
         let mut extra: Vec<(String, Fact)> = Vec::new();
@@ -1903,6 +2181,7 @@ impl Reader<'_> {
             s.pending = None;
             s.view = None;
             s.event = None;
+            s.input = None;
         }
         let o = &self.o;
         let run = match what {
@@ -1921,6 +2200,28 @@ impl Reader<'_> {
                 };
                 let first = first_path(m, call);
                 m.h_drive(o, first, format!("click on verb {v}"), None)
+            }
+            What::Input { .. } => {
+                // F1: one frame: the mouse moves, the mouse loops take their turns, checkExecVerbs runs the input
+                // script, checkAndRunSentenceScript runs what it queued (scumm.cpp:3177-3255)
+                st_mut(m).input = Some(what.clone());
+                let n = st(m).scope.as_ref().unwrap().inputs.as_ref().map_or(0, |i| i.mouse_loops.len());
+                let mut steps = vec![Step::Note(F1_MOUSE_STEP.into())];
+                steps.extend((0..n).map(|i| Step::Note(format!("{F1_TURN_STEP}{i}").into())));
+                steps.push(Step::Note(F1_INPUT_STEP.into()));
+                steps.push(Step::Sentences);
+                let cid = m.h_cid();
+                let call = Call {
+                    head: "click".into(),
+                    cite: "scumm.cpp:3177-3255".into(),
+                    steps: steps.into(),
+                    caller: None,
+                    active: false,
+                    i: 0,
+                    cid,
+                };
+                let first = first_path(m, call);
+                m.h_drive(o, first, format!("input {}", what.py().text()), None)
             }
             What::Event(ev) => {
                 st_mut(m).event = Some(ev.clone());

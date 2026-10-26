@@ -490,6 +490,9 @@ pub fn task_start<'k>(b: &mut Builder, start: &Facts, keys: impl IntoIterator<It
         } else if b.scope.switches.actor_rooms && k.starts_with("actorroom:") && !start.contains(k) {
             // F9: an actor's room the start does not give is not known (table::NOT_KNOWN), not room 0
             out.insert(k.clone(), crate::table::NOT_KNOWN);
+        } else if b.scope.switches.input_script && k == "mouse" && !start.contains(k) {
+            // F1: where the mouse is, when the start does not give it, is not known (inputs.rs NOWHERE)
+            out.insert(k.clone(), crate::inputs::NOWHERE);
         }
         if k.starts_with(crate::table::DUE) {
             due.push(k.clone());

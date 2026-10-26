@@ -423,6 +423,9 @@ pub struct Scope {
     /// fix round 1's switches the reading runs with (machine.rs `Switches`; reader.py has none): the Reader's machine
     /// takes them, and `of_with` adds the writes they make
     pub switches: Switches,
+    /// fix round 1, F1 (switch input_script): the input scripts, mouse loops, sentence-building variables, slot
+    /// verbs and cells (inputs.rs); None with the switch off
+    pub inputs: Option<crate::inputs::InputScope>,
 }
 
 impl Scope {
@@ -535,6 +538,11 @@ impl Scope {
             .collect();
         let mut writes = scope_writes(game, &units, None);
         fix1_writes(game, &units, &rooms, start, switches, &mut writes);
+        let inputs = switches.input_script.then(|| {
+            let shown: Vec<i64> = verbs.iter().chain(dialog_verbs.iter()).copied().collect();
+            crate::inputs::writes(&mut writes);
+            crate::inputs::input_scope(game, &units, &rooms, start, &shown, switches.draw_clears)
+        });
         let mut uni: BTreeSet<String> = BTreeSet::new();
         for &u in &units {
             let k = game.unit(u).key;
@@ -573,6 +581,7 @@ impl Scope {
             universe: uni.into_iter().collect(),
             counts,
             switches,
+            inputs,
         }
     }
 
