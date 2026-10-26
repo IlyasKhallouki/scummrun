@@ -265,8 +265,9 @@ impl PathExt for SymX {
     }
 }
 
-/// The payload of reader.py's `Fork`: the fact a step read with more than one value left.
-pub struct ForkOn(pub Fact);
+/// The payload of reader.py's `Fork`: the fact a step read with more than one value left, and (fix round 1, F12)
+/// the value sets to fork into where a comparison alone reads it (None: one path per value).
+pub struct ForkOn(pub Fact, pub Option<Vec<Labels>>);
 
 /// The Reader's state (the machine's `ext`).
 #[derive(Default)]
@@ -294,6 +295,8 @@ struct St {
     step_key: Option<Fact>,
     pending: Option<(Ident, (COp, i64))>,
     view: Option<Rc<BTreeMap<PKey, Labels>>>,
+    /// F12: the instruction the step being run runs (None: an engine step)
+    cur: Option<X>,
 }
 
 fn st<'a>(m: &'a Machine<'_>) -> &'a St {
@@ -324,7 +327,88 @@ fn lazily<R>(m: &mut Machine<'_>, f: impl FnOnce(&mut Machine<'_>) -> R) -> R {
 }
 
 fn fork(k: Fact) -> ! {
-    panic::resume_unwind(Box::new(ForkOn(k)))
+    panic::resume_unwind(Box::new(ForkOn(k, None)))
+}
+
+/// F12: a read of fact `k`, whose values left are `cands`, that only a comparison with a constant (or a zero test)
+/// of the step's jump reads: the value sets the comparison separates. None where the step uses the value otherwise
+/// (a copy, an object or script number, an index, arithmetic: one path per value).
+fn compare_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Vec<Labels>> {
+    let x = st(m).cur?;
+    let g = m.game;
+    let Some(Stmt::Jump { cond: Some(c), .. }) = g.ins(x.u)[x.i as usize].st else { return None };
+    let ast = &g.ast;
+    let reads = |e: ExprId| -> bool {
+        match ast.expr(e) {
+            Expr::Var(n) => k == Fact::Var(n) || (n == VAR_ROOM && k == Fact::Room),
+            Expr::Bit(n) => k == Fact::Bit(n),
+            Expr::Getter { name, args } => {
+                let o = ast.kids(args).first().and_then(|&a| ast.constant(a));
+                match (name, o) {
+                    (known::GET_OBJECT_STATE, Some(o)) => k == Fact::State(o),
+                    (known::GET_OBJECT_OWNER, Some(o)) => k == Fact::Owner(o),
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    };
+    let cmp = |op: CmpOp, y: i64, z: i64| {
+        let (y, z) = (i16w(y as i32), i16w(z as i32));
+        match op {
+            CmpOp::Eq => y == z,
+            CmpOp::Ne => y != z,
+            CmpOp::Lt => y < z,
+            CmpOp::Le => y <= z,
+            CmpOp::Gt => y > z,
+            CmpOp::Ge => y >= z,
+        }
+    };
+    let test: Box<dyn Fn(i64) -> bool> = match ast.expr(c) {
+        Expr::Cmp { op, a, b } => match (reads(a), ast.constant(b), reads(b), ast.constant(a)) {
+            (true, Some(c), _, _) => Box::new(move |v| cmp(op, v, c as i64)),
+            (_, _, true, Some(c)) => Box::new(move |v| cmp(op, c as i64, v)),
+            _ => return None,
+        },
+        Expr::Not(a) if reads(a) => Box::new(|v| v == 0),
+        Expr::Truth(a) if reads(a) => Box::new(|v| v != 0),
+        _ => return None,
+    };
+    let i = info(m, k);
+    let d = i.dom.as_ref()?;
+    let val = |l: Label| match l {
+        Label::Int(n) => n,
+        Label::Above => d.high.unwrap() + 1,
+        Label::Below => d.low.unwrap() - 1,
+    };
+    let (yes, no): (Labels, Labels) = cands.iter().partition(|&&l| test(val(l)));
+    Some([yes, no].into_iter().filter(|s| !s.is_empty()).collect())
+}
+
+/// F12 at a fork on read: a comparison alone reads the fact. One value set left: its value set, no fork (the test
+/// decides on it); more: a fork into them.
+fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Val> {
+    if !st(m).table.as_ref().unwrap().value_sets {
+        return None;
+    }
+    let Some(sets) = compare_sets(m, k, cands) else {
+        let at = match st(m).cur.and_then(|x| m.game.ins(x.u)[x.i as usize].st) {
+            None => "an engine step",
+            Some(Stmt::Jump { .. }) => "a jump's other test",
+            Some(Stmt::Assign(_)) => "an assignment",
+            Some(Stmt::Start { .. }) => "a script start",
+            Some(Stmt::Op { .. }) => "an op",
+        };
+        count(m, &format!("F12: fact reads forked per value: {at}"));
+        return None;
+    };
+    if sets.len() == 1 {
+        count(m, "F12: fact reads a comparison alone reads, decided on their value set (no fork)");
+        let i = info(m, k);
+        return Some(lazy_of(m, &i, Some(cands)));
+    }
+    count(m, "F12: forks on read into value sets");
+    panic::resume_unwind(Box::new(ForkOn(k, Some(sets))))
 }
 
 fn info(m: &mut Machine<'_>, k: Fact) -> Rc<Info> {
@@ -462,6 +546,9 @@ fn consistent(tests: &[Test]) -> bool {
 
 /// `Reader._memo_ident`.
 fn memo_ident(m: &Machine<'_>, v: Val, mode: Mode) -> Option<Ident> {
+    if m.vals_ref().range(v).is_some() {
+        return None; // F12: a range is narrowed on the path, not kept as a test
+    }
     let u = m.vals_ref().unk(v)?;
     if u.values.is_some() {
         return None;
@@ -550,13 +637,19 @@ impl Hooks for ReaderHooks {
         }
         let snap = p.clone();
         let op = if sx(p).nf.is_empty() { None } else { op_at(m, p) };
+        st_mut(m).cur = match p.stack.last() {
+            Some(Entry::Frame(f)) if f.unit != scumm_machine::path::NONE_UNIT => {
+                f.pc.filter(|&pc| pc < m.game.unit(f.unit).ins_len).map(|pc| X { u: f.unit, i: pc })
+            }
+            _ => None,
+        };
         let unknown = p.unknown_writes.len();
         let res = panic::catch_unwind(AssertUnwindSafe(|| m.advance_base(p, o)));
         let mut more = match res {
             Ok(more) => more,
             Err(e) => {
-                let key = match e.downcast::<ForkOn>() {
-                    Ok(f) => f.0,
+                let (key, sets) = match e.downcast::<ForkOn>() {
+                    Ok(f) => (f.0, f.1),
                     Err(e) => panic::resume_unwind(e),
                 };
                 // the `finally` blocks of the methods the Fork went through
@@ -565,7 +658,7 @@ impl Hooks for ReaderHooks {
                 s.step_key = None;
                 s.pending = None;
                 s.view = None;
-                return on_fork(m, p, snap, key);
+                return on_fork(m, p, snap, key, sets);
             }
         };
         let now = p.unknown_writes.len();
@@ -626,6 +719,10 @@ impl Hooks for ReaderHooks {
                 let i = info(m, k);
                 return lazy_of(m, &i, Some(&s));
             }
+            let s = s.clone();
+            if let Some(v) = read_by_sets(m, k, &s) {
+                return v;
+            }
             fork(k);
         }
         if let Some(&v) = st(m).pins.get(&k) {
@@ -653,9 +750,20 @@ impl Hooks for ReaderHooks {
                 if st(m).lazy > 0 {
                     return lazy_of(m, &i, None);
                 }
+                let all = d.values.clone();
+                if let Some(v) = read_by_sets(m, k, &all) {
+                    return v;
+                }
                 fork(k)
             }
-            Kind::NonFact => m.vals().mk(R_NONFACT, &*i.key),
+            Kind::NonFact => {
+                if let (true, Fact::Var(n @ (20 | 21 | 44 | 45))) = (st(m).table.as_ref().unwrap().value_sets, k) {
+                    // F12: the mouse is a range (scumm-machine `mouse_range`)
+                    let (lo, hi) = m.mouse_range(n);
+                    return m.vals().mk_range(R_NONFACT, &i.key, lo, hi);
+                }
+                m.vals().mk(R_NONFACT, &*i.key)
+            }
         }
     }
 
@@ -693,7 +801,7 @@ impl Hooks for ReaderHooks {
     /// `Reader.val`: a negated non-fact gets a name of its own.
     fn val(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
         let v = m.val_base(p, o, e, x);
-        if matches!(m.game.ast.expr(e), Expr::Neg(_)) {
+        if matches!(m.game.ast.expr(e), Expr::Neg(_)) && m.vals_ref().range(v).is_none() {
             if let Some((r, what)) = plain(m, v) {
                 return m.vals().mk(r, format!("-({what})"));
             }
@@ -829,6 +937,9 @@ impl Hooks for ReaderHooks {
     /// `Reader._arith_at`: a value computed from a non-fact gets a name of its own.
     fn arith_at(&self, m: &mut Machine<'_>, p: &mut Path, op: Op, a: Val, b: Val, x: Option<X>) -> Val {
         let out = m.arith_at_base(p, op, a, b, x);
+        if m.vals_ref().range(out).is_some() {
+            return out; // F12: a range keeps its bounds
+        }
         if let Some((r, what)) = plain(m, out) {
             let ops = match op {
                 Op::Add => "+",
@@ -1220,13 +1331,17 @@ fn first_path(m: &mut Machine<'_>, call: Call) -> Path {
     p
 }
 
-/// `Reader._advance`'s `except Fork`.
-fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact) -> Vec<Path> {
+/// `Reader._advance`'s `except Fork`; with F12's value sets (`sets`), one path per set instead of per value.
+fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Option<Vec<Labels>>) -> Vec<Path> {
     let i = info(m, key);
     let dom = i.dom.as_ref().unwrap_or_else(|| panic!("a fork on {} with no domain", i.key));
     let vals: Labels = match sx(p).pre.get(&PKey::F(key)) {
         Some(s) => dom.values.iter().copied().filter(|v| s.contains(v)).collect(),
         None => dom.values.clone(),
+    };
+    let groups: Vec<Labels> = match sets {
+        Some(sets) => sets,
+        None => vals.iter().map(|&v| vec![v]).collect(),
     };
     let fam = family(key);
     let s = st_mut(m);
@@ -1236,7 +1351,7 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact) -> Vec<Path
     s.rd.forks.inc(&fam);
     s.rd.fork_keys.inc(&*i.key);
     s.rd.counts.inc("forks on read");
-    s.rd.counts.add("paths from forks on read", vals.len() as i64);
+    s.rd.counts.add("paths from forks on read", groups.len() as i64);
     if vals.is_empty() {
         // no value of the fact is left: the path cannot happen
         s.rd.counts.inc(&format!("paths with no value left for a fact ({fam})"));
@@ -1244,14 +1359,14 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact) -> Vec<Path
         m.h_halt(p, "no value", (*i.key).into());
         return Vec::new();
     }
-    let mut forks = Vec::with_capacity(vals.len());
-    for v in vals.iter().skip(1) {
+    let mut forks = Vec::with_capacity(groups.len());
+    for g in groups.iter().skip(1) {
         let mut q = snap.clone();
-        Rc::make_mut(&mut sx_mut(&mut q).pre).insert(PKey::F(key), vec![*v]);
+        Rc::make_mut(&mut sx_mut(&mut q).pre).insert(PKey::F(key), g.clone());
         forks.push(q);
     }
     let mut first = snap;
-    Rc::make_mut(&mut sx_mut(&mut first).pre).insert(PKey::F(key), vec![vals[0]]);
+    Rc::make_mut(&mut sx_mut(&mut first).pre).insert(PKey::F(key), groups[0].clone());
     *p = first;
     forks
 }
@@ -1712,6 +1827,12 @@ impl Reader<'_> {
     /// forked on and the Reader's counters' increments.
     pub fn run_full(&mut self, cx: &Ctx, pins: &Pins, pre: &Pre, what: &What) -> (Run, Option<String>, RdCounts) {
         self.sync(cx);
+        // fix round 1, F12: the machine's switch value_sets follows the reading's (findObject over the scope's objects)
+        if self.m.switches.value_sets != cx.table.value_sets {
+            self.m.switches.value_sets = cx.table.value_sets;
+            self.m.vals().wide = cx.table.value_sets;
+            self.m.find_objects = cx.table.value_sets.then(|| cx.scope.objects.iter().map(|&o| o as i32).collect());
+        }
         let m = &mut self.m;
         let mut mpins = FxHashMap::default();
         let mut extra: Vec<(String, Fact)> = Vec::new();

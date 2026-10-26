@@ -2,8 +2,8 @@
 //! in out/golden/reader-fr1/ (made by `reader-port read NAME --switches S --out FILE`, PORT-NOTES.md "Fix round 1");
 //! with every switch off the reading is checked against golden.py's files by tests/oracle.rs.
 //!
-//! Fast: room 33 with due_first. Slow (`-- --ignored`): the kitchen with due_first on one thread and on three, and
-//! the due rule against the engine's frames (due_engine.py's file).
+//! Fast: room 33 with due_first, room 33 with value_sets. Slow (`-- --ignored`): the kitchen with due_first and with
+//! value_sets, each on one thread and on three, and the due rule against the engine's frames (due_engine.py's file).
 
 use scumm_reader::builder::Switches;
 use scumm_reader::oracle::{self, Static};
@@ -32,6 +32,15 @@ fn assert_none(what: &str, (diffs, n): (Vec<String>, usize)) {
 
 fn due_first() -> Switches {
     Switches { due_first: true, ..Default::default() }
+}
+
+fn value_sets() -> Switches {
+    Switches { value_sets: true, ..Default::default() }
+}
+
+/// A reading's own counter (the machine half's `rd.counts`, or the Builder's).
+fn rd_count(b: &scumm_reader::Builder, key: &str) -> i64 {
+    b.rd.counts.get(key)
 }
 
 /// The due writes of a reading against a direct evaluation (due.rs `verify`).
@@ -80,4 +89,28 @@ fn due_against_the_engine() {
     let explained = count("disagreement:");
     eprintln!("due slots: {due}, of them stayed {due_stayed}; disagreements {explained}, all explained");
     assert!(due > 1000);
+}
+
+/// F12: room 33 with value_sets against its golden; the fork into value sets happens, and the mouse ranges and
+/// findObject's value set leave fewer forks on non-fact tests than reader.py's reading (2,930).
+#[test]
+fn room33_value_sets() {
+    let (b, _) = oracle::read_with(game(), static_oracle(), "room33", value_sets());
+    assert_none("room 33, value_sets", oracle::compare_reading(&b, &fr1_dir().join("room33-value_sets.jsonl.gz"), 5));
+    assert!(rd_count(&b, "F12: forks on read into value sets") > 0);
+    assert!(rd_count(&b, "forks on non-fact tests") < 2930, "{}", rd_count(&b, "forks on non-fact tests"));
+}
+
+/// F12: the kitchen with value_sets against its golden, on one thread and on three.
+#[test]
+#[ignore]
+fn kitchen_value_sets() {
+    let gold = fr1_dir().join("kitchen-value_sets.jsonl.gz");
+    let (b, _) = oracle::read_with(game(), static_oracle(), "kitchen", value_sets());
+    assert_none("kitchen, value_sets", oracle::compare_reading(&b, &gold, 5));
+    for k in ["F12: forks on read into value sets", "F12: fact reads a comparison alone reads, decided on their value set (no fork)"] {
+        eprintln!("kitchen, value_sets: {k}: {}", rd_count(&b, k));
+    }
+    let (b3, _, _) = oracle::read_par_with(game(), static_oracle(), "kitchen", 3, value_sets());
+    assert_none("kitchen, value_sets, 3 threads", oracle::compare_reading(&b3, &gold, 5));
 }

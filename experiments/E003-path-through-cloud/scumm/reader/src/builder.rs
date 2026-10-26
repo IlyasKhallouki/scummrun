@@ -188,6 +188,9 @@ type PinVals = Vec<Label>;
 pub struct Switches {
     /// F2: the planner rule that a due event goes first (due.rs)
     pub due_first: bool,
+    /// F12: forks by value sets, the mouse as ranges, findObject and actorFromPos as value sets (machine.rs, and
+    /// scumm-machine's switch of the same name)
+    pub value_sets: bool,
 }
 
 impl Switches {
@@ -197,7 +200,8 @@ impl Switches {
         for n in names.split(',').map(str::trim).filter(|n| !n.is_empty()) {
             match n {
                 "due_first" => s.due_first = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first)")),
+                "value_sets" => s.value_sets = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets)")),
             }
         }
         Ok(s)
@@ -206,6 +210,9 @@ impl Switches {
         let mut v = Vec::new();
         if self.due_first {
             v.push("due_first");
+        }
+        if self.value_sets {
+            v.push("value_sets");
         }
         v
     }
@@ -1402,6 +1409,7 @@ impl<'g> Builder<'g> {
         passes: usize,
         mut sink: Option<&mut dyn RecordSink>,
     ) -> usize {
+        self.table.value_sets = self.switches.value_sets;
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {

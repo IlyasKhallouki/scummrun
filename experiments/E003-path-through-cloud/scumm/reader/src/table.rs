@@ -53,6 +53,9 @@ pub struct FactTable {
     pub points: BTreeMap<&'static str, BTreeMap<String, BTreeSet<i64>>>,
     pub engine: BTreeSet<i32>,
     binary: Domain,
+    /// fix round 1, F12 (switch value_sets, the Builder's): the machine half forks a fact read that only a
+    /// comparison reads into the value sets it separates, and reads the mouse as ranges (machine.rs)
+    pub value_sets: bool,
 }
 
 impl FactTable {
@@ -135,7 +138,7 @@ impl FactTable {
             let (name, w) = rest.rsplit_once(':').unwrap();
             points.get_mut(kind).unwrap().entry(name.to_string()).or_default().insert(w.parse().unwrap());
         }
-        FactTable { start, extra, counts, args_vals: BTreeMap::new(), doms, points, engine, binary: Domain::binary() }
+        FactTable { start, extra, counts, args_vals: BTreeMap::new(), doms, points, engine, binary: Domain::binary(), value_sets: false }
     }
 
     /// `FactTable.domain(key)`.
