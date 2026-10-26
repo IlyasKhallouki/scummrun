@@ -67,3 +67,17 @@ replay_part1.py run 1 --replan-limit 3 --time-limit 1800 --plan-time 600 --plan-
   p1on2: STOPPED: the process's RSS passed 4.8 GB; 1738367 records in pass 1; report /var/tmp/fast-mi/scratchpad/live-locals/p1on2/part1.json
   p1on2: wall s 2147.7 CPU s 5939.7 peak RSS MB 5022 load 3.06 7.43 10.01
   the VM, without the switch (results/vm-part1-seed1.json): inputs 34,124 runs, 1,544,657 records; round 1 19,847 runs from 30,545 events, 1,230,458 records
+
+== after the review's fixes (2026-10-26, load 1 to 5; nice 10, 3 threads)
+fixes: IR notes by an allow list (EXACT_NOTES); text codes exact only when the engine reads their bytes alike; Builder::list_number and sig's guard; SIG_LIMIT counts flag-free lists under the switch; reader-port read --packed compares before finishing
+MI1 units: 1,193 known exactly, 2 all locals (global 153, room 75's local 200), as before; stored texts naming a local 0; IR notes 1,111 + 2 else-if targets from bytes, 9 else chains, 2 names from bytes, 2 empty units (all exact)
+cargo test --release -p scumm-reader: 15 unit tests, 18 oracle tests ok; --ignored kitchen_reading_rust_machine ok (72258 lines, 0 differences), kitchen_live_locals_on ok (72256 golden, 72126 on, 5298 lists onto 5221)
+reader-port read room33 --packed: 880 compared, 0 differences (before the fix: 1, builder.counts "steps that need room in their domain")
+reader-port read kitchen --threads 3 --packed: 72258 compared, 0 differences; 71729 actions (527 folded)
+reader-scope --k 1 --elsewhere --threads 3 --golden, off: packed sha1 3ceabe501fd38dc195246ca20ccc42995a349d3e, golden lines sha1 213e68f344855a27e4cc8588b1d0990d11495c84, 237264 lines; 137.3 s, 1048 MB
+reader-scope --k 1 --elsewhere --live-locals --threads 3 --golden: packed sha1 590c6acf4011f04c9d77e6d3273ee5dcd216b7a8, golden lines sha1 8a1e143e23b88b79b9fda9162abcdda0303c9c45, 237467 lines (the same as before the fixes); 145.2 s, 1079 MB
+reader-scope --k 2 --elsewhere --live-locals --threads 3: 519755 records, packed sha1 39200a67a377965e21001d8c191024720590909a, 964062528 bytes (the same as before the fixes); 582.1 s, 2894 MB
+k = 1 lists per wait point (records' events): 19 wait points with more numbered lists on than off, 0 with more flag-free lists on than numbered lists off; past 1024 either way: 6 (local:204@86, local:205@66 1032; local:208@21, @41 1026; local:209@33, @56 1025)
+args-0 events with a local known as a number (the first one met runs): kitchen golden 16 wait points; k = 1 34, off and on
+wait points with known lists of both R flags and an args-0 event of one: kitchen 0; k = 1 41, off and on
+pytest -m 'not slow' test_replay_part1 test_replay test_replay_review test_replay_taskcore (DOWNWARD_DIR at the main checkout's build): 88 passed, 2 deselected
