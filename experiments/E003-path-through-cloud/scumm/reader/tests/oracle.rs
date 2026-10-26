@@ -483,6 +483,102 @@ fn kitchen_live_locals_on() {
     assert_eq!((g, n, lists, on), (72256, 72126, 5298, 5221));
 }
 
+/// F10: room 33 read with the dumped locals of the slots live at its start (`Builder.slot_locals`): the
+/// reading keeps every record of the reading without them and adds the records of those slots' events from their
+/// locals; at a replan each slot's locals match the list its events were read with (`task::replan_start_locals`),
+/// and with no locals in the dump the rule is reader.py's.
+#[test]
+fn room33_slot_locals() {
+    use scumm_reader::builder::SlotLocals;
+    use scumm_reader::{Eff, Label, Record};
+    use std::collections::BTreeMap;
+    let st = static_oracle();
+    let (b0, _) = oracle::read(game(), st, "room33");
+    let mut b1 = oracle::builder(game(), st, "room33");
+    let start = b1.table.start.clone();
+    // the slots live at the start (room 33, seed 1: globals 159 and 23 and room 33's local 202, their locals all 0
+    // in the engine), here with Local[0] = 7
+    let slots: Vec<SlotLocals> = start
+        .iter()
+        .filter(|(k, v)| k.starts_with("at:") && *v == 1)
+        .map(|(k, _)| {
+            let (n, w) = k[3..].rsplit_once(':').unwrap();
+            let mut locals = vec![0i64; 25];
+            locals[0] = 7;
+            SlotLocals { name: n.to_string(), room: start.get0("room") as i32, w: w.parse().unwrap(), esc: None, locals, override_: 0, cut_data: vec![], owned: false }
+        })
+        .collect();
+    assert!(!slots.is_empty());
+    b1.slot_locals = slots.clone();
+    let mut m = scumm_reader::machine::Reader::new(game());
+    b1.read_all_into(&mut m, true, None, 2, None);
+    assert_eq!(b1.counts.get("F10: dumped slots read from their locals"), slots.len() as i64);
+    assert_eq!(b1.slot_events.len(), slots.len());
+    assert!(b1.slot_events.iter().all(|e| e.sig != 0 && e.args_known));
+    // every record of the reading without the slots' locals is still there. The domain of args:<unit> now holds
+    // the list's number, so a record that read the unit with args 0 says so in its precondition (an engine
+    // condition of an event), and its write args:<unit> := 0 is then no change and goes, as `record` drops any write
+    // of the value its precondition holds; a record whose one effect that was changes nothing and is dropped
+    let argkeys: Vec<String> = slots.iter().map(|s| format!("args:{}", s.name)).collect();
+    let zero = |k: &String, e: &Eff| argkeys.contains(k) && *e == Eff::Set(Label::Int(0));
+    let noop = |r: &Record| r.effects.iter().all(|(k, e)| zero(k, e));
+    let text = |r: &Record| {
+        let mut r = r.clone();
+        for k in &argkeys {
+            r.pre.remove(k);
+        }
+        r.engine_pre.retain(|k| !argkeys.contains(k));
+        r.effects.retain(|(k, e)| !zero(k, e));
+        r.py().text()
+    };
+    let mut have: BTreeMap<String, i64> = BTreeMap::new();
+    for r in &b1.records {
+        *have.entry(text(r)).or_default() += 1;
+    }
+    let mut dropped = 0;
+    for r in &b0.records {
+        match have.get_mut(&text(r)) {
+            Some(n) if *n > 0 => *n -= 1,
+            _ if noop(r) => dropped += 1,
+            _ => {
+                let same: Vec<String> = b1.records.iter().filter(|x| x.label == r.label).map(|x| text(x)).collect();
+                panic!("record {} is gone: {}\nWITH LOCALS:\n{}", r.label, text(r), same.join("\n"))
+            }
+        }
+    }
+    let own: Vec<(String, usize)> = b1
+        .slot_events
+        .iter()
+        .map(|e| (e.label(), b1.records.iter().filter(|r| r.label == e.label()).count()))
+        .collect();
+    eprintln!("room33 with dumped locals: {} records ({} before, {dropped} of them now no-ops); the slots' own: {own:?}", b1.records.len(), b0.records.len());
+    assert!(own.iter().any(|o| o.1 > 0), "no record of a slot's events from its locals");
+    // the replan: each slot whose events made records has its list's number; a slot with no record has no args:
+    // fact in the task
+    let mut lists = task::built_lists(&b1.records);
+    for (k, v) in task::slot_lists(&b1) {
+        lists.entry(k).or_default().extend(v);
+    }
+    let keys = task::record_keys(&b1.records, &[]);
+    let by_name: BTreeMap<String, SlotLocals> = slots.iter().map(|s| (s.name.clone(), s.clone())).collect();
+    let (s1, counts, unmatched) = task::replan_start_locals(&mut b1, &start, &Facts::new(), &keys, &by_name, &lists);
+    let in_task: Vec<&scumm_reader::Event> = b1.slot_events.iter().filter(|e| keys.contains(&format!("args:{}", e.name))).collect();
+    assert!(!in_task.is_empty());
+    for e in &in_task {
+        assert_eq!(s1.get0(&format!("args:{}", e.name)), e.sig, "{}", e.name);
+    }
+    assert!(unmatched.is_empty());
+    assert_eq!(counts.get("live slots whose dumped locals match a built list"), in_task.len() as i64);
+    assert_eq!(counts.get("live slots with unknown locals (args 0)"), 0);
+    // no locals in the dump: reader.py's replan_start
+    let (s2, c2, _) = task::replan_start_locals(&mut b1, &start, &Facts::new(), &keys, &BTreeMap::new(), &lists);
+    let (s3, c3) = task::replan_start(&mut b1, &start, &Facts::new(), &keys);
+    for k in keys.iter().filter(|k| k.starts_with("args:")) {
+        assert_eq!(s2.get(k), s3.get(k), "{k}");
+    }
+    assert_eq!(c2.get("live slots with unknown locals (args 0)"), c3.get("live slots with unknown locals (args 0)"));
+}
+
 #[test]
 #[ignore]
 fn kitchen_records_written_back() {

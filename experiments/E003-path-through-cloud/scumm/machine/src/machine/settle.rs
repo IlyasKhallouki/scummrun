@@ -143,7 +143,7 @@ impl<'g> Machine<'g> {
     pub(super) fn sentence_frame_steps(&mut self, o: &FactOracle, steps: Vec<Step>) -> Vec<Step> {
         let mut out = Vec::new();
         for (v, name) in MOUSE_VARS {
-            let u = self.v.mk(Reason::Input, format!("{name}: the mouse moved to the click"));
+            let u = self.mouse_value(o, v, name);
             out.push(Step::Write(Fact::Var(v), u));
         }
         out.extend(steps.iter().filter(|st| matches!(st, Step::Note(_))).cloned());

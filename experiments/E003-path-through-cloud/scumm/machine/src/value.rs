@@ -99,7 +99,17 @@ pub struct Vals {
     pub caps: Vec<(&'static str, u64)>,
     /// `str(unknown)`, made when first asked for
     shown: Vec<Option<std::rc::Rc<str>>>,
+    /// fix round 1, F12 (switch value_sets; off: model.py's values, unchanged): ranges, and tests and arithmetic on
+    /// ranges and on value sets past MAX_VALUES (`decide`, `arith`, `join_values`)
+    pub wide: bool,
+    /// F12's ranges: unknown id -> (what it is a range of, low, high). A range is an unknown with no value set whose
+    /// `what` ends in its bounds (`mk_range`), so model.py's code (and the Python decoder) sees a plain unknown.
+    ranges: FxHashMap<u32, (Box<str>, i32, i32)>,
 }
+
+/// F12: the most combinations `decide` walks on ranges and large value sets (one range is at most a screen's
+/// width or a room's).
+pub const WIDE_LIMIT: usize = 1 << 16;
 
 /// What `_decide` gives: a truth value, or the unknown that decides nothing.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -115,6 +125,88 @@ impl Vals {
         self.map.clear();
         self.caps.clear();
         self.shown.clear();
+        self.ranges.clear();
+    }
+
+    /// F12: the range `low..=high` of `base` as an unknown whose `what` is `<base> in [low..high]`; one value is that
+    /// int.
+    pub fn mk_range(&mut self, reason: Reason, base: &str, lo: i32, hi: i32) -> Val {
+        if lo == hi {
+            return Val::Int(lo);
+        }
+        let v = self.mk(reason, format!("{base} in [{lo}..{hi}]"));
+        if let Val::Unk(id) = v {
+            self.ranges.insert(id.0, (base.into(), lo, hi));
+        }
+        v
+    }
+
+    /// F12: a value's range, if it is one.
+    pub fn range(&self, v: Val) -> Option<(i32, i32)> {
+        match v {
+            Val::Unk(id) => self.ranges.get(&id.0).map(|r| (r.1, r.2)),
+            Val::Int(_) => None,
+        }
+    }
+
+    /// F12: what a range is a range of.
+    pub fn range_base(&self, v: Val) -> Option<&str> {
+        match v {
+            Val::Unk(id) => self.ranges.get(&id.0).map(|r| &*r.0),
+            Val::Int(_) => None,
+        }
+    }
+
+    /// F12: a plain unknown that is no range (one nothing bounds).
+    pub fn is_unbounded(&self, v: Val) -> bool {
+        self.is_plain(v) && self.range(v).is_none()
+    }
+
+    /// F12: how many ints a value can be (None for an unbounded unknown).
+    pub fn count_of(&self, v: Val) -> Option<u64> {
+        if let Some((lo, hi)) = self.range(v) {
+            return Some((hi as i64 - lo as i64 + 1) as u64);
+        }
+        match v {
+            Val::Int(_) => Some(1),
+            Val::Unk(id) => self.get(id).values.as_ref().map(|vs| vs.len() as u64),
+        }
+    }
+
+    /// F12: the ints a value can be: an int, a value set's, a range's (None for an unbounded unknown).
+    pub fn ints_of(&self, v: Val) -> Option<Vec<i32>> {
+        if let Some((lo, hi)) = self.range(v) {
+            return Some((lo..=hi).collect());
+        }
+        self.values_of(v)
+    }
+
+    /// F12: the value `v` holds where `keep` holds: the int, a smaller set, or a smaller range (None: no value
+    /// left, or not one range or set: the caller keeps `v`).
+    pub fn restrict(&mut self, v: Val, keep: impl Fn(i32) -> bool) -> Option<Val> {
+        if let Some((lo, hi)) = self.range(v) {
+            if self.count_of(v).unwrap() > WIDE_LIMIT as u64 {
+                return None;
+            }
+            let base: Box<str> = self.range_base(v).unwrap().into();
+            let reason = self.unk(v).unwrap().reason;
+            let kept: Vec<i32> = (lo..=hi).filter(|&x| keep(x)).collect();
+            let (&a, &b) = (kept.first()?, kept.last()?);
+            if (b as i64 - a as i64 + 1) as usize == kept.len() {
+                return Some(self.mk_range(reason, &base, a, b));
+            }
+            if kept.len() <= MAX_VALUES {
+                return Some(self.one_of(kept, reason, base));
+            }
+            return None;
+        }
+        let u = self.unk(v)?.clone();
+        let vs = u.values.as_ref()?;
+        let kept: Vec<i32> = vs.iter().copied().filter(|&x| keep(x)).collect();
+        if kept.is_empty() {
+            return None;
+        }
+        Some(if kept.len() == 1 { Val::Int(kept[0]) } else { self.mk_set(u.reason, u.what.clone(), kept) })
     }
 
     /// `str(v)` as a shared string, made once per unknown.
@@ -270,6 +362,23 @@ impl Vals {
         if vals[1..].iter().all(|&v| v == first) {
             return first;
         }
+        if self.wide && vals.iter().any(|&v| self.range(v).is_some()) {
+            // F12: ranges join into the range that holds them all (an unbounded unknown stays unbounded)
+            if let Some(&plain) = vals.iter().find(|&&v| self.is_unbounded(v)) {
+                return plain;
+            }
+            let (mut lo, mut hi) = (i32::MAX, i32::MIN);
+            for &v in vals {
+                let (a, b) = self.range(v).unwrap_or_else(|| {
+                    let xs = self.values_of(v).unwrap();
+                    (*xs.iter().min().unwrap(), *xs.iter().max().unwrap())
+                });
+                lo = lo.min(a);
+                hi = hi.max(b);
+            }
+            let reason = vals.iter().find_map(|&v| self.unk(v).map(|u| u.reason)).unwrap_or(Reason::Branch);
+            return self.mk_range(reason, "merged paths", lo, hi);
+        }
         if let Some(&plain) = vals.iter().find(|&&v| self.is_plain(v)) {
             return plain;
         }
@@ -284,6 +393,11 @@ impl Vals {
     /// `_decide(test, *vals)`: True or False, also on value sets when every combination agrees; else
     /// the first unknown (a plain one first).
     pub fn decide(&mut self, vals: &[Val], test: impl Fn(&[i32]) -> bool) -> Dec {
+        if self.wide {
+            if let Some(d) = self.decide_wide(vals, &test) {
+                return d;
+            }
+        }
         if let Some(&plain) = vals.iter().find(|&&v| self.is_plain(v)) {
             return Dec::Unk(plain);
         }
@@ -317,8 +431,115 @@ impl Vals {
         }
     }
 
+    /// F12's `decide` where a range takes part or the combinations pass MAX_VALUES (None: the usual rule): every
+    /// combination of the ranges' and sets' values, up to WIDE_LIMIT; agreed, a truth value; else the first range
+    /// or set. An unbounded unknown decides nothing.
+    fn decide_wide(&mut self, vals: &[Val], test: &impl Fn(&[i32]) -> bool) -> Option<Dec> {
+        if vals.iter().any(|&v| self.is_unbounded(v)) {
+            return None;
+        }
+        // the combinations' count first: a range is not listed past the limit
+        let n = vals.iter().try_fold(1u64, |n, &v| n.checked_mul(self.count_of(v).unwrap())).unwrap_or(u64::MAX);
+        let has_range = vals.iter().any(|&v| self.range(v).is_some());
+        if !has_range && n <= MAX_VALUES as u64 {
+            return None;
+        }
+        let first = *vals.iter().find(|v| v.is_unknown())?;
+        if n > WIDE_LIMIT as u64 {
+            self.cap("test past the wide limit");
+            return Some(Dec::Unk(first));
+        }
+        let sets: Vec<Vec<i32>> = vals.iter().map(|&v| self.ints_of(v).unwrap()).collect();
+        let mut idx = vec![0usize; sets.len()];
+        let mut cur: Vec<i32> = sets.iter().map(|s| s[0]).collect();
+        let want = test(&cur);
+        loop {
+            // the next combination, the last value fastest
+            let mut k = sets.len();
+            loop {
+                if k == 0 {
+                    return Some(Dec::Bool(want));
+                }
+                k -= 1;
+                idx[k] += 1;
+                if idx[k] < sets[k].len() {
+                    cur[k] = sets[k][idx[k]];
+                    break;
+                }
+                idx[k] = 0;
+                cur[k] = sets[k][0];
+            }
+            if test(&cur) != want {
+                return Some(Dec::Unk(first));
+            }
+        }
+    }
+
+    /// F12's `arith` on a range (None: the usual rule): a range and an int give a range (o5's int32 arithmetic is
+    /// monotone in each operand for a fixed other, so the ends map to the ends; a division by 0 is not one), two
+    /// ranges added or subtracted give the range of the sums.
+    fn arith_wide(&mut self, op: Op, a: Val, b: Val) -> Option<Val> {
+        let (ra, rb) = (self.range(a), self.range(b));
+        if ra.is_none() && rb.is_none() {
+            return None;
+        }
+        let sym = match op {
+            Op::Add => "+",
+            Op::Sub => "-",
+            Op::Mul => "*",
+            Op::Div => "/",
+        };
+        let reason = self.unk(if ra.is_some() { a } else { b }).unwrap().reason;
+        let name = |v: Val, s: &Vals| -> String {
+            match v {
+                Val::Int(n) => n.to_string(),
+                _ => s.range_base(v).map(|b| format!("({b})")).unwrap_or_else(|| "?".into()),
+            }
+        };
+        let base = format!("{} {sym} {}", name(a, self), name(b, self));
+        let ends = |v: Val, r: Option<(i32, i32)>| -> Option<[i32; 2]> {
+            match (v, r) {
+                (Val::Int(n), _) => Some([n, n]),
+                (_, Some((lo, hi))) => Some([lo, hi]),
+                _ => None,
+            }
+        };
+        let (Some(ea), Some(eb)) = (ends(a, ra), ends(b, rb)) else {
+            return Some(self.mk(reason, format!("{base}: a range with an unbounded value")));
+        };
+        if ra.is_some() && rb.is_some() && !matches!(op, Op::Add | Op::Sub) {
+            return Some(self.mk(reason, base));
+        }
+        if op == Op::Div && eb[0] <= 0 && eb[1] >= 0 {
+            return Some(self.mk(Reason::Work, "divide by zero among the values"));
+        }
+        // the ends in i64: past int32 the wrap breaks the order, and the value is not a range
+        let mut out: Vec<i64> = Vec::with_capacity(4);
+        for &x in &ea {
+            for &y in &eb {
+                let (x, y) = (x as i64, y as i64);
+                out.push(match op {
+                    Op::Add => x + y,
+                    Op::Sub => x - y,
+                    Op::Mul => x * y,
+                    Op::Div => (x.abs() / y.abs()) * if (x >= 0) == (y >= 0) { 1 } else { -1 },
+                });
+            }
+        }
+        let (lo, hi) = (*out.iter().min().unwrap(), *out.iter().max().unwrap());
+        if lo < i32::MIN as i64 || hi > i32::MAX as i64 {
+            return Some(self.mk(reason, format!("{base}: past int32")));
+        }
+        Some(self.mk_range(reason, &base, lo as i32, hi as i32))
+    }
+
     /// `_arith(op, a, b)`: o5's arithmetic on int32 values, value by value on sets.
     pub fn arith(&mut self, op: Op, a: Val, b: Val) -> Val {
+        if self.wide {
+            if let Some(v) = self.arith_wide(op, a, b) {
+                return v;
+            }
+        }
         if self.is_plain(a) {
             return a;
         }
@@ -449,5 +670,63 @@ mod tests {
         assert_eq!(arith_int(Op::Add, i32::MAX, 1), Some(i32::MIN));
         assert_eq!(i16w(0x8000), -0x8000);
         assert_eq!(i16w(-1), -1);
+    }
+
+    /// F12 (switch value_sets): ranges through arithmetic, tests, narrowing and joins; off, a large value set decides
+    /// nothing, as in model.py.
+    #[test]
+    fn ranges() {
+        let mut v = Vals { wide: true, ..Default::default() };
+        let y = v.mk_range(Reason::Input, "VAR_MOUSE_Y", 0, 199);
+        assert_eq!(v.show(y), "?(mouse: VAR_MOUSE_Y in [0..199])");
+        assert!(v.is_plain(y) && !v.is_unbounded(y), "model.py's code sees a plain unknown");
+        assert_eq!(v.mk_range(Reason::Input, "x", 4, 4), Val::Int(4));
+        // a dialog list's line from the click, (y - 161) / 10 + 120: integer division toward 0, as o5 divides
+        let d = v.arith(Op::Sub, y, Val::Int(161));
+        assert_eq!(v.range(d), Some((-161, 38)));
+        let d = v.arith(Op::Div, d, Val::Int(10));
+        assert_eq!(v.range(d), Some((-16, 3)));
+        let line = v.arith(Op::Add, Val::Int(120), d);
+        assert_eq!(v.range(line), Some((104, 123)));
+        let neg = v.arith(Op::Mul, line, Val::Int(-2));
+        assert_eq!(v.range(neg), Some((-246, -208)));
+        let q = v.arith(Op::Div, Val::Int(100), y);
+        assert_eq!(v.range(q), None, "a divisor range with 0 in it");
+        let both = v.arith(Op::Add, line, y);
+        assert_eq!(v.range(both), Some((104, 322)), "two ranges add up");
+        let big = v.arith(Op::Mul, y, Val::Int(i32::MAX));
+        assert!(v.range(big).is_none() && v.is_unbounded(big), "past int32 the ends do not bound");
+        // a test the whole range agrees on decides; else the range decides nothing
+        assert_eq!(v.decide(&[line, Val::Int(123)], |x| x[0] > x[1]), Dec::Bool(false));
+        assert_eq!(v.decide(&[y, Val::Int(-1)], |x| x[0] > x[1]), Dec::Bool(true));
+        assert_eq!(v.decide(&[y, Val::Int(152)], |x| x[0] > x[1]), Dec::Unk(y));
+        let free = v.mk(Reason::Input, "free");
+        assert_eq!(v.decide(&[y, free], |x| x[0] > x[1]), Dec::Unk(y), "an unbounded unknown decides nothing");
+        // a range larger than the limit is not listed: it decides nothing and is not narrowed
+        let wide = v.mk_range(Reason::Input, "wide", 0, i32::MAX);
+        assert_eq!(v.decide(&[wide, Val::Int(-1)], |x| x[0] > x[1]), Dec::Unk(wide));
+        assert_eq!(v.restrict(wide, |x| x > 5), None);
+        // narrowing: a range stays a range where the kept values are one run, else a value set
+        let hi = v.restrict(y, |x| x > 152).unwrap();
+        assert_eq!(v.range(hi), Some((153, 199)));
+        let off = v.arith(Op::Sub, hi, Val::Int(152));
+        let row = v.arith(Op::Div, off, Val::Int(24));
+        assert_eq!(v.range(row), Some((0, 1)));
+        let ne = v.restrict(line, |x| x != 110).unwrap();
+        assert_eq!(v.values_of(ne).unwrap().len(), 19);
+        assert_eq!(v.restrict(y, |x| x == 7), Some(Val::Int(7)));
+        assert_eq!(v.restrict(y, |x| x > 500), None);
+        // joins: the range that holds them all; an unbounded unknown stays unbounded
+        let j = v.join_values(&[hi, Val::Int(3)]);
+        assert_eq!(v.range(j), Some((3, 199)));
+        assert_eq!(v.join_values(&[hi, free]), free);
+        // value sets past MAX_VALUES decide where every value agrees (findObject in a room of many objects)
+        let objs = v.mk_set(Reason::Position, "findObject", (0..100).collect());
+        assert_eq!(v.decide(&[objs, Val::Int(-1)], |x| x[0] != x[1]), Dec::Bool(true));
+        assert_eq!(v.decide(&[objs, Val::Int(5)], |x| x[0] == x[1]), Dec::Unk(objs));
+        let mut model = Vals::default();
+        let objs = model.mk_set(Reason::Position, "findObject", (0..100).collect());
+        let Dec::Unk(u) = model.decide(&[objs, Val::Int(-1)], |x| x[0] != x[1]) else { panic!("off: decided") };
+        assert!(model.is_plain(u), "off: model.py's rule, a plain unknown past MAX_VALUES");
     }
 }

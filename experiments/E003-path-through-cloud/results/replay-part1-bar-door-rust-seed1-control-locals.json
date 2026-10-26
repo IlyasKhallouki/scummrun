@@ -1,0 +1,1280 @@
+{
+ "seed": 1,
+ "reading": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/control.json",
+ "name": "bar-door-rust",
+ "control": true,
+ "goal": {
+  "state:316": [
+   1
+  ]
+ },
+ "goal_is_part1_end": false,
+ "task": {
+  "actions": 65592,
+  "facts": 664,
+  "records": 66106,
+  "folded": 514,
+  "packed_sha1": "c4e1289430f2",
+  "packed_bytes": 39944872,
+  "lines_sha1": "6776538038ce"
+ },
+ "control_counts": {
+  "actions": 65592,
+  "sets kept": 365572,
+  "sets dropped": 177908,
+  "actions with a set dropped": 54136,
+  "checks dropped": 90754,
+  "stepped facts made engine conditions": 1920,
+  "bytes": 39944872,
+  "dropped_by_fact": {
+   "bit": 73703,
+   "class": 3688,
+   "cutscene": 3,
+   "local": 69,
+   "owner": 1342,
+   "room": 2807,
+   "script": 418,
+   "state": 249,
+   "var": 95629
+  },
+  "dropped_by_kind": {
+   "dialog_line": 702,
+   "event": 68566,
+   "sentence": 43712,
+   "skip_cutscene": 62016,
+   "walk_to": 2912
+  }
+ },
+ "limits": {
+  "replans": 500,
+  "seconds": 86400,
+  "plan_time": 600,
+  "plan_memory": "6G",
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60
+ },
+ "sources": {
+  "replay_part1.py": "92f059850422",
+  "replay.py": "e19cbfe107ab",
+  "packed_reading.py": "b4f7b7acea3a",
+  "export_records.py": "f0aa97ff0b22",
+  "plan_fd.py": "99a4f2a2ecf6",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ },
+ "taskcore_binary": "25738cbfb7c0",
+ "slot_locals": {
+  "reread": true,
+  "threads": 3,
+  "lists": 5166,
+  "scummvm": "/var/tmp/fast-mi/svm-fr1-c/build/scummvm/scummvm",
+  "scummvm_sha1": "55970aa0787b",
+  "reader_scope": "/var/tmp/fast-mi/wt-fr1-c/experiments/E003-path-through-cloud/scumm/target/release/reader-scope",
+  "reader_scope_sha1": "6db34fc28028"
+ },
+ "load_s": 0.94,
+ "start": {
+  "stop": {
+   "stop": "idle",
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "idle": "sentence",
+   "rng": 3182679328,
+   "up": 1,
+   "cs": 0,
+   "ego": [
+    346,
+    133
+   ]
+  },
+  "dump": {
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "ego": 1,
+   "ego_pos": [
+    346,
+    133
+   ],
+   "seed": 1,
+   "boot_param": 0
+  },
+  "trace": {
+   "boot": 1,
+   "cd_track": 4,
+   "control": 1,
+   "room": 5,
+   "segment_start": 1,
+   "stall": 4
+  },
+  "boot_s": 3.4,
+  "check": {
+   "boot checks": "ok",
+   "reading start": {
+    "name": "results/start-part1.jsonl seed 1",
+    "differ": 0,
+    "first": [],
+    "task facts differ": 0,
+    "task first": []
+   },
+   "start-part1": {
+    "differ": 0,
+    "frame": 2728,
+    "same frame": true
+   },
+   "taskcore": {
+    "input": {
+     "seconds": 3.14,
+     "status": "ok"
+    },
+    "needed": {
+     "seconds": 2.71,
+     "status": "ok"
+    }
+   },
+   "taskcore_s": 5.87
+  }
+ },
+ "run": {
+  "stop": "no plan (the planner proved none)",
+  "goal": false,
+  "replans": 1,
+  "bans": [
+   {
+    "label": "event(script:2@736#796edf56058c)",
+    "values": [
+     [
+      "room",
+      33
+     ]
+    ]
+   }
+  ],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 2728,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first",
+    "input_key": "233f28c27d1c8159",
+    "write_s": 4.063241099007428,
+    "status": "plan",
+    "seconds": 5.310429363002186,
+    "steps": [
+     "walk_to(428)#11964",
+     "event(script:2@736#796edf56058c)#29554",
+     "event(local:211@4#ec2e4e2ceed4)#31163",
+     "event(local:211@33#d8feea141239)#33775"
+    ],
+    "operators": 134993,
+    "actions": 8958,
+    "decode_s": 2.7990085539931897,
+    "folds": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 76,
+    "needed_facts": 138,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 2,
+    "landmark_orderings": 1,
+    "game_landmarks": 2
+   },
+   {
+    "plan": 1,
+    "frame": 6376,
+    "bans": 1,
+    "start_counts": {
+     "live slots whose dumped locals match a built list": 2,
+     "live slots read again from their dumped locals": 1
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first",
+    "slot_locals": {
+     "local:202": {
+      "w": 1,
+      "args": 116169035371989,
+      "dumped": true,
+      "nonzero_locals": 0
+     },
+     "script:23": {
+      "w": 409,
+      "args": 111395094500691,
+      "dumped": true,
+      "nonzero_locals": 0
+     }
+    },
+    "input_key": "842a355f13b05537",
+    "write_s": 2.9587782629969297,
+    "status": "unsolvable",
+    "seconds": 0.2238692069950048,
+    "steps": [],
+    "operators": 0,
+    "actions": 0,
+    "decode_s": 0.0,
+    "folds": [],
+    "predicted_goal": null,
+    "file_facts": 0,
+    "needed_facts": 0,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 2,
+    "landmark_orderings": 1,
+    "game_landmarks": 2
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "walk_to(428)#11964",
+    "kind": "walk_to",
+    "input": "click verb 11 on 428",
+    "start": 2728,
+    "issue": 2775,
+    "end": 2776,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2728,
+      "inputs": [
+       {
+        "frame": 2736,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2751,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2752,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2753,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2754,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2755,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2756,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2757,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2758,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2759,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2760,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2761,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2762,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2763,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2764,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2765,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2766,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2767,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2768,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2769,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2770,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2771,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2772,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2773,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2774,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2775,
+        "click": [
+         315,
+         107
+        ]
+       }
+      ],
+      "issue": 2775,
+      "end": 2776,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        2774,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [
+     {
+      "frame": 2736,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2751,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2752,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2753,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2754,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2755,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2756,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2757,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2758,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2759,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2760,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2761,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2762,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2763,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2764,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2765,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2766,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2767,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2768,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2769,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2770,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2771,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2772,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2773,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2774,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2775,
+      "click": [
+       315,
+       107
+      ]
+     }
+    ],
+    "note": "waited 7 frames for the camera",
+    "seconds": 0.5217463160079205
+   },
+   {
+    "plan": 0,
+    "index": 1,
+    "name": "event(script:2@736#796edf56058c)#29554",
+    "kind": "event",
+    "input": "wait",
+    "start": 2776,
+    "issue": null,
+    "end": 6376,
+    "outcome": "mismatch",
+    "then": "ban",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2776,
+      "first_settled": 2796,
+      "end": 6376,
+      "how": "limit",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "local:200",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:202",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "write"
+     },
+     {
+      "key": "local:206",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:207",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:210",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:211",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "room",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "state:324",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:330",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:333",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:336",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:339",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:342",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:345",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:348",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:351",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:354",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:357",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:359",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "var:22",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "var:32",
+      "predicted": [
+       "202"
+      ],
+      "observed": 4,
+      "kind": "write"
+     },
+     {
+      "key": "var:4",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "var:72",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "pos:entry",
+      "predicted": [
+       "141"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:200",
+      "predicted": [
+       "43"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:202",
+      "predicted": [
+       "-1"
+      ],
+      "observed": 1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:206",
+      "predicted": [
+       "49"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:207",
+      "predicted": [
+       "5"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:210",
+      "predicted": [
+       "0"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:211",
+      "predicted": [
+       "4"
+      ],
+      "observed": -1,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        2779,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "ban event(script:2@736#796edf56058c) at {'room': 33}",
+    "seconds": 21.101100553991273
+   }
+  ],
+  "frames": 3648,
+  "ticks": 21888,
+  "frame0": 2728,
+  "frame_end": 6376,
+  "seconds": 120.875972171998,
+  "inputs": [
+   {
+    "frame": 2736,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2751,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2752,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2753,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2754,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2755,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2756,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2757,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2758,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2759,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2760,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2761,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2762,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2763,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2764,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2765,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2766,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2767,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2768,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2769,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2770,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2771,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2772,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2773,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2774,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2775,
+    "click": [
+     315,
+     107
+    ]
+   }
+  ],
+  "rereads": [
+   {
+    "plan": 1,
+    "frame": 6376,
+    "counts_before": {
+     "live slots whose dumped locals match a built list": 2,
+     "live slots with unknown locals (args 0)": 1
+    },
+    "slots": [
+     {
+      "name": "script:159",
+      "w": 5,
+      "esc": null,
+      "override": 0
+     }
+    ],
+    "still_unmatched": [],
+    "seconds": 83.6,
+    "actions": 65591,
+    "reading": "/var/tmp/fast-mi/wt-fr1-c/out/E003-part1/bar-door-rust-seed1-control-locals/reread-01/control.json"
+   }
+  ]
+ },
+ "landmarks": {
+  "plan": 0,
+  "frame": 2728,
+  "nodes": [
+   {
+    "id": 0,
+    "facts": [
+     [
+      "state:316",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 1,
+    "facts": [
+     [
+      "state:316",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   }
+  ],
+  "orderings": [
+   [
+    1,
+    0,
+    "gn"
+   ]
+  ]
+ },
+ "summary": {
+  "steps": 2,
+  "executed": 2,
+  "played": 2,
+  "outcomes": {
+   "matched": 1,
+   "mismatch": 1
+  },
+  "writes_held": 1,
+  "writes_held_share": 0.5,
+  "matched": 0,
+  "matched_share": 0.0,
+  "not_matched": {
+   "mismatch": 1,
+   "writes held, tracked facts changed": 1
+  },
+  "mismatches": 32,
+  "mismatches_per_executed": 16.0,
+  "mismatched_writes": 30,
+  "mismatched_writes_per_executed": 15.0,
+  "unplanned_changes": 2,
+  "unplanned_changes_per_executed": 1.0,
+  "unplanned_most": [
+   [
+    "var:182",
+    2
+   ]
+  ],
+  "another_guess": 0,
+  "final_path": [
+   "walk_to(428)#11964"
+  ],
+  "final_path_actions": 1,
+  "inputs": 26,
+  "time": {
+   "step_seconds": {
+    "n": 2,
+    "mean": 10.81,
+    "median": 10.81,
+    "max": 21.1,
+    "sum": 21.6
+   },
+   "step_frames": {
+    "n": 2,
+    "mean": 1824,
+    "median": 1824.0,
+    "max": 3600,
+    "sum": 3648
+   },
+   "plan_seconds": {
+    "n": 2,
+    "mean": 7.68,
+    "median": 7.68,
+    "max": 12.17,
+    "sum": 15.4
+   },
+   "plan_write_s": {
+    "n": 2,
+    "mean": 3.51,
+    "median": 3.51,
+    "max": 4.06,
+    "sum": 7.0
+   },
+   "plan_search_s": {
+    "n": 2,
+    "mean": 2.77,
+    "median": 2.77,
+    "max": 5.31,
+    "sum": 5.5
+   },
+   "harness_s": 120.9,
+   "planning_s": 15.4,
+   "playing_s": 105.5
+  }
+ },
+ "verify": {
+  "checkpoints": 4,
+  "differ": [],
+  "inputs": 26,
+  "final": {
+   "state:316": 0
+  },
+  "same": true,
+  "goal": false,
+  "seconds": 6.5
+ },
+ "seconds": 137.6,
+ "game_seconds": 364.81192258899677
+}

@@ -339,10 +339,10 @@ index 6c161ccd..e62dc05f 100644
  	void playCDTrack(int track, int numLoops, int startFrame, int duration);
 diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
 new file mode 100644
-index 00000000..ad7e69a2
+index 00000000..69447187
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.cpp
-@@ -0,0 +1,796 @@
+@@ -0,0 +1,798 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -514,6 +514,8 @@ index 00000000..ad7e69a2
 +		{"SPEEDRUN_SKIP_CUTSCENES", &SpeedrunBridge::_skipCutscenes},
 +		{"SPEEDRUN_STEP_STATES", &SpeedrunBridge::_stepStates},
 +		{"SPEEDRUN_FRAME_LOG", &SpeedrunBridge::_frameLog},
++		// Observation only: the state dump gains fields, nothing else changes.
++		{"SPEEDRUN_DUMP_LOCALS", &SpeedrunBridge::_dumpLocals},
 +	};
 +	for (const auto &var : kBoolVars) {
 +		const char *value = envValue(var.name);
@@ -1141,10 +1143,10 @@ index 00000000..ad7e69a2
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..a493d1f6
+index 00000000..3edac446
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,520 @@
+@@ -0,0 +1,521 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1555,6 +1557,7 @@ index 00000000..a493d1f6
 +	bool _skipCutscenes = false;    // SPEEDRUN_SKIP_CUTSCENES
 +	Common::Array<int32> _skipSpare; // the last skips event's "spare" (textSpared())
 +	bool _stepStates = false;       // SPEEDRUN_STEP_STATES
++	bool _dumpLocals = false;       // SPEEDRUN_DUMP_LOCALS: slot locals and cutscene data in the state dump
 +	Common::Array<SpeedrunInterrupt> _interrupts; // SPEEDRUN_INTERRUPTS
 +	Common::Array<SpeedrunInput> _inputs; // SPEEDRUN_INPUTS
 +	uint _inputIndex = 0;           // next event to deliver
@@ -4198,10 +4201,10 @@ index 00000000..7263e24f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..3152c00a
+index 00000000..ac38e8d2
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,738 @@
+@@ -0,0 +1,752 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -4749,7 +4752,11 @@ index 00000000..3152c00a
 +
 +	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
 +	// PC offset, frozen count and cutscene override count. "code" is the PC
-+	// from the script's first opcode (scriptCode()), or -1.
++	// from the script's first opcode (scriptCode()), or -1. With
++	// SPEEDRUN_DUMP_LOCALS also "locals": the slot's NUM_SCRIPT_LOCAL locals
++	// (vm.localvar, script.h:136: initializeLocals sets them from the call's
++	// args, script.cpp:155-164; the scripts read and write them through
++	// readVar and writeVar, script.cpp:706, 846).
 +	JsonArray slots;
 +	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
 +		const ScriptSlot &ss = e.vm.slot[i];
@@ -4759,6 +4766,12 @@ index 00000000..3152c00a
 +		o.add("slot", i).add("number", (int)ss.number).add("where", (int)ss.where).add("status", (int)ss.status)
 +		 .add("offs", (uint64)ss.offs).add("code", scriptCode(i, ss.offs)).add("frozen", (int)ss.freezeCount)
 +		 .add("delay", (int)ss.delay).add("cutscene_override", (int)ss.cutsceneOverride);
++		if (_dumpLocals) {
++			JsonArray locals;
++			for (int n = 0; n < NUM_SCRIPT_LOCAL; n++)
++				locals.add((int)e.vm.localvar[i][n]);
++			o.addRaw("locals", locals.str());
++		}
 +		slots.addRaw(o.str());
 +	}
 +	s.addRaw("slots", slots.str());
@@ -4782,6 +4795,10 @@ index 00000000..3152c00a
 +		const int slot = e.vm.cutSceneScript[level];
 +		JsonObject l;
 +		l.add("level", level);
++		// With SPEEDRUN_DUMP_LOCALS: the level's cutSceneData, the beginCutscene
++		// argument that endCutscene hands to the end hook (script.cpp:1640, 1658).
++		if (_dumpLocals)
++			l.add("data", (int)e.vm.cutSceneData[level]);
 +		if (!ptr || slot >= NUM_SCRIPT_SLOT) {
 +			l.addNull("override");
 +		} else {

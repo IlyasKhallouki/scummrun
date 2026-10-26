@@ -7,6 +7,7 @@ use crate::facts::{unit_name, unit_py, unit_text, Facts};
 use crate::py::{Counter, Py};
 use rustc_hash::FxHashMap;
 use scumm_ir::{known, Expr, ExprId, Game, RefKind, Stmt, UnitId, UnitKey, Yield};
+use scumm_machine::Switches;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
@@ -419,11 +420,19 @@ pub struct Scope {
     pub writes: Writes,
     pub universe: Vec<String>,
     pub counts: Counter,
+    /// fix round 1's switches the reading runs with (machine.rs `Switches`; reader.py has none): the Reader's machine
+    /// takes them, and `of_with` adds the writes they make
+    pub switches: Switches,
 }
 
 impl Scope {
     /// `Scope.of(game, rooms, start)`.
     pub fn of(game: &Game, rooms: &[i32], start: &Facts) -> Scope {
+        Scope::of_with(game, rooms, start, Switches::default())
+    }
+
+    /// `Scope.of` with fix round 1's switches (fix-round1.md): with them off, `of`.
+    pub fn of_with(game: &Game, rooms: &[i32], start: &Facts, switches: Switches) -> Scope {
         let ast = &game.ast;
         let mut rooms: Vec<i32> = rooms.to_vec();
         rooms.sort_unstable();
@@ -524,7 +533,8 @@ impl Scope {
             })
             .map(|(&v, _)| v as i64)
             .collect();
-        let writes = scope_writes(game, &units, None);
+        let mut writes = scope_writes(game, &units, None);
+        fix1_writes(game, &units, &rooms, start, switches, &mut writes);
         let mut uni: BTreeSet<String> = BTreeSet::new();
         for &u in &units {
             let k = game.unit(u).key;
@@ -562,6 +572,7 @@ impl Scope {
             writes,
             universe: uni.into_iter().collect(),
             counts,
+            switches,
         }
     }
 
@@ -593,6 +604,91 @@ impl Scope {
             ("writes", self.writes.py()),
         ])
     }
+}
+
+/// Fix round 1's writes (fix-round1.md), added to `scope_writes`' with each switch on.
+///
+/// F5, draw_clears: loading a scope room puts its movable objects back (`objpos:O` = 0, room.cpp:195), and a
+/// drawObject with setXY moves one, so `objpos:O` of every movable object of the scope's rooms. scope_writes already
+/// has the clearing's `state:` writes of a room's own code (every object of its room); a global script's drawObject
+/// can clear any object of the room it runs in, a scope room: every object of the scope's rooms.
+///
+/// F9, actor_rooms: `actorroom:A` of each actor a write of `actor_room_writes` can reach. An actor operand is worked
+/// out here when it is a constant or a variable the scope does not write (its start value); any other reaches every
+/// actor. The FactTable works the operands out again with the reading's domains (`table::actor_room_domains`).
+pub fn fix1_writes(game: &Game, units: &[UnitId], rooms: &[i32], start: &Facts, sw: Switches, out: &mut Writes) {
+    if sw.draw_clears {
+        for &r in rooms {
+            for &o in game.room_objects.get(&r).map(|v| v.as_slice()).unwrap_or(&[]) {
+                if game.movable.contains_key(&o) {
+                    out.exact.insert(format!("objpos:{o}"));
+                }
+            }
+        }
+        let global_draws = units.iter().any(|&u| {
+            matches!(game.unit(u).key, UnitKey::Global(_))
+                && game.ins(u).iter().any(|x| matches!(x.st, Some(Stmt::Op { name: known::DRAW_OBJECT, .. })))
+        });
+        if global_draws {
+            for (o, r) in &game.object_room {
+                if rooms.contains(r) {
+                    out.exact.insert(format!("state:{o}"));
+                }
+            }
+        }
+    }
+    if sw.actor_rooms {
+        let var = |n: i32| -> Option<BTreeSet<i64>> {
+            let k = format!("var:{n}");
+            (!out.has(&k)).then(|| [start.get0(&k)].into_iter().collect())
+        };
+        let mut actors: BTreeSet<i64> = BTreeSet::new();
+        for (who, _) in actor_room_writes(game, units, &var) {
+            actors.extend(who.unwrap_or_else(|| (0..NUM_ACTORS).collect()));
+        }
+        for a in actors {
+            out.exact.insert(format!("actorroom:{a}"));
+        }
+    }
+}
+
+/// F9 (switch actor_rooms): every write of an actor's room (Actor::_room, a byte) in `units`: o5_putActorInRoom's
+/// (script_v5.cpp:2160-2196) and o5_loadRoomWithEgo's, the ego's (1857-1866); no other v5 opcode changes it
+/// (actorOps' Init is initActor(0), which keeps the room: actor.cpp:160-192). Each as (the actors it can write, None:
+/// any; the rooms it can write, as bytes, None: not worked out). An operand is worked out when it is a constant or
+/// a variable whose values `var` gives (VAR_EGO for loadRoomWithEgo's actor). An actor number that is no actor is
+/// left out: the engine stops with derefActor's error() (actor.cpp:2281-2293).
+pub fn actor_room_writes(
+    game: &Game,
+    units: &[UnitId],
+    var: &dyn Fn(i32) -> Option<BTreeSet<i64>>,
+) -> Vec<(Option<BTreeSet<i64>>, Option<BTreeSet<i64>>)> {
+    let ast = &game.ast;
+    let vals = |e: ExprId| -> Option<BTreeSet<i64>> {
+        match ast.expr(e) {
+            Expr::Const(c) => Some([c as i64].into_iter().collect()),
+            Expr::Var(n) => var(n),
+            _ => None,
+        }
+    };
+    let mut out = Vec::new();
+    for &u in units {
+        for x in game.ins(u) {
+            let Some(Stmt::Op { name, args, .. }) = x.st else { continue };
+            let a = ast.kids(args);
+            let who = if name == known::PUT_ACTOR_IN_ROOM {
+                vals(a[0])
+            } else if name == known::LOAD_ROOM_WITH_EGO {
+                var(domains::VAR_EGO)
+            } else {
+                continue;
+            };
+            let who = who.map(|s| s.into_iter().filter(|a| (0..NUM_ACTORS).contains(a)).collect());
+            let rooms = vals(a[1]).map(|s| s.into_iter().map(|r| r & 0xFF).collect());
+            out.push((who, rooms));
+        }
+    }
+    out
 }
 
 /// i16 wrap (model.py `i16`).

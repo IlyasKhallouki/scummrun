@@ -3,16 +3,19 @@
 //! reader-port static                  domains, scopes, hook summaries, the Builder's machine-free parts
 //! reader-port records NAME            golden records parsed and written back
 //! reader-port replay NAME [--out F]   the reading by the Rust Builder over the captured runs, against golden.py's
-//! reader-port read NAME [--threads N] [--out F] [--live-locals] [--packed F]
-//!                                     the reading with the Rust machine half, against golden.py's; --live-locals
-//!                                     reads with that switch (PORT-NOTES.md, "Live locals"; the comparison then
-//!                                     shows the renumbered lists), --packed writes its packed file as made (the
-//!                                     kitchen's goal and start s17; room 33's start as "start")
+//! reader-port read NAME [--threads N] [--switches S,...] [--live-locals] [--out F] [--golden F] [--packed F]
+//!                  [--task-out DIR]
+//!                                     the reading with the Rust machine half (fix round 1's switches on), against
+//!                                     golden.py's (switches off) or --golden's; --live-locals reads with that switch
+//!                                     (PORT-NOTES.md, "Live locals"; the comparison then shows the renumbered
+//!                                     lists), --packed writes its packed file as made (the kitchen's goal and start
+//!                                     s17; room 33's start as "start")
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
 //! reader-port bench                   time and memory of domains.build and Scope.of
 
+use scumm_reader::builder::Switches;
 use scumm_reader::oracle::{self, Static};
 use scumm_reader::{domains, packed, peak_rss_kb, task, Facts, Scope};
 use std::io::Write;
@@ -146,6 +149,8 @@ fn main() {
         "read" => {
             // the reading with the Rust machine half, against golden.py's file
             let name = &args[1];
+            // fix round 1's switches (fix-round1.md); with any on, the reading is checked against --golden, if given
+            let sw = Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
             let cpu0 = scumm_reader::cpu_secs();
             let live = args.iter().any(|a| a == "--live-locals");
             let packed_out = arg(&args, "--packed");
@@ -156,7 +161,7 @@ fn main() {
                 _ if live || packed_out.is_some() => {
                     // the switch on, or the packed file written as made: on `--threads` workers (default 0)
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
-                    let mut b = oracle::builder(&game, &st, name);
+                    let mut b = oracle::builder_with(&game, &st, name, sw);
                     if live {
                         b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(&game)));
                     }
@@ -170,9 +175,9 @@ fn main() {
                     packing = stream;
                     (b, secs)
                 }
-                None => oracle::read(&game, &st, name),
+                None => oracle::read_with(&game, &st, name, sw),
                 Some(n) => {
-                    let (b, secs, stats) = oracle::read_par(&game, &st, name, n.parse().unwrap());
+                    let (b, secs, stats) = oracle::read_par_with(&game, &st, name, n.parse().unwrap(), sw);
                     println!(
                         "pool: {} batches, {} jobs, {:.1} job s, {} split parts made, {} of them on another worker",
                         stats.batches, stats.jobs, stats.job_secs, stats.parts_made, stats.parts_elsewhere
@@ -197,7 +202,15 @@ fn main() {
                 }
                 gz.finish().unwrap();
             }
-            ok &= report(&format!("{name} reading against golden.py's"), oracle::compare_reading(&b, &golden, 5));
+            if sw == Switches::default() {
+                ok &= report(&format!("{name} reading against golden.py's"), oracle::compare_reading(&b, &golden, 5));
+            } else if let Some(g) = arg(&args, "--golden") {
+                // a switch's own golden (fix round 1): the reading with the same switches, written by --out
+                ok &= report(&format!("{name} reading with {} against {g}", sw.names().join(",")), oracle::compare_reading(&b, std::path::Path::new(&g), 5));
+            } else {
+                let (diffs, n) = oracle::compare_reading(&b, &golden, usize::MAX);
+                println!("{name} with {}: {} of {n} lines differ from golden.py's (switches on; not a check)", sw.names().join(","), diffs.len());
+            }
             if let Some(stream) = packing {
                 let (goal, start_name, start) = if name == "kitchen" {
                     let kt = oracle::kitchen_task(&st);
@@ -209,6 +222,51 @@ fn main() {
                 let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
                 let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
                 println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+            }
+            if let Some(d) = &b.due {
+                for (k, v) in &d.counts.0 {
+                    println!("  {k}: {v}");
+                }
+                let t = Instant::now();
+                let (n, bad) = scumm_reader::due::verify(&b, 4096);
+                println!("due writes against a direct evaluation: {n} states, {} differences ({:.1} s)", bad.len(), t.elapsed().as_secs_f64());
+                for d in bad.iter().take(5) {
+                    println!("  {d}");
+                }
+                ok &= bad.is_empty();
+            }
+            if let Some(dir) = arg(&args, "--task-out") {
+                // the kitchen's packed task (export_records, starts s17 and replan) and its pruned task, to plan
+                let dir = PathBuf::from(dir);
+                std::fs::create_dir_all(&dir).unwrap();
+                let kt = oracle::kitchen_task(&st);
+                let recs = std::mem::take(&mut b.records);
+                let keys = task::record_keys(&recs, &kt.goal);
+                let s17 = task::task_start(&mut b, &kt.s17, &keys);
+                let replan = task::replan_start(&mut b, &kt.replan, &Facts::new(), &keys).0;
+                let starts = vec![("s17".to_string(), s17), ("replan".to_string(), replan)];
+                let (info, folded) = packed::export_records(&dir.join(format!("{name}.tc")), &mut b, &recs, &kt.goal, &starts).unwrap();
+                println!("{name}.tc: {} actions ({folded} folded), {} facts, {} bytes", info.actions, info.facts, info.bytes);
+                let full = task::build_task(&mut b, &recs, &kt.goal);
+                let rel = task::relevant(&full);
+                let small = task::prune(&full, &rel);
+                let s = vec![
+                    ("s17".to_string(), task::task_start(&mut b, &kt.s17, small.facts.iter().map(|f| &f.0))),
+                    ("replan".to_string(), task::replan_start(&mut b, &kt.replan, &Facts::new(), small.facts.iter().map(|f| &f.0)).0),
+                ];
+                let meta = |i: usize| (recs[i].kind.clone(), recs[i].end_text().to_string(), packed::cont(&recs[i]));
+                let info = packed::export_task(&dir.join(format!("{name}-pruned.tc")), &small, &s, &meta).unwrap();
+                println!("{name}-pruned.tc: {} actions of {}, {} facts, {} bytes", info.actions, full.actions.len(), small.facts.len(), info.bytes);
+            }
+        }
+        "due-engine" => {
+            // fix round 1, F2: the due rule against the engine, frame by frame (due_engine.py's frames)
+            let (tally, examples) = scumm_reader::due::engine_check(&game, std::path::Path::new(&args[1]));
+            for (k, n) in &tally {
+                println!("{n:8}  {k}");
+            }
+            for e in &examples {
+                println!("  {e}");
             }
         }
         "task" => {
@@ -370,7 +428,7 @@ fn main() {
             println!("peak RSS {} MB", peak_rss_kb().unwrap_or(0) / 1024);
         }
         _ => {
-            eprintln!("usage: reader-port static | records NAME | replay NAME [--out F] | runs NAME [--max N] | dump-runs NAME --runs N,.. [--out F] | read NAME [--out F] | task --out DIR | stream --out F | bench-task --out DIR | bench");
+            eprintln!("usage: reader-port static | records NAME | replay NAME [--out F] | runs NAME [--max N] | dump-runs NAME --runs N,.. [--out F] | read NAME [--threads N] [--switches S,..] [--out F] [--golden F] [--task-out DIR] | task --out DIR | stream --out F | bench-task --out DIR | bench");
             std::process::exit(2);
         }
     }

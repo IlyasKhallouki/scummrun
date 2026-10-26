@@ -17,11 +17,13 @@
 
 pub mod analysis;
 pub mod ast;
+pub mod due;
 pub mod dump;
 pub mod facts;
 pub mod game;
 pub mod json;
 pub mod parse;
+pub mod places;
 pub mod py;
 pub mod read;
 pub mod show;

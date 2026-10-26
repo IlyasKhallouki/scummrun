@@ -154,12 +154,19 @@ pub fn compare_hooks(game: &Game, st: &Static) -> (Vec<String>, usize) {
 
 /// A Builder for the oracle's scope `name` (room33, kitchen) as read_all's first pass starts it.
 pub fn builder<'g>(game: &'g Game, st: &Static, name: &str) -> Builder<'g> {
+    builder_with(game, st, name, crate::builder::Switches::default())
+}
+
+/// `builder` with fix round 1's switches (fix-round1.md): with them off, `builder`.
+pub fn builder_with<'g>(game: &'g Game, st: &Static, name: &str, sw: crate::builder::Switches) -> Builder<'g> {
     let l = st.named("builder", name);
     let start = Facts::from_py(l.get("start_items"));
     let rooms: Vec<i32> = l.get("rooms").items().iter().map(|r| r.int() as i32).collect();
-    let doms = domains::build(game, &domains::meta_rooms(&root()), &start, &[]);
-    let sc = Scope::of(game, &rooms, &start);
-    Builder::new(game, sc, doms)
+    let doms = domains::build_with(game, &domains::meta_rooms(&root()), &start, &[], sw.scope());
+    let sc = Scope::of_with(game, &rooms, &start, sw.scope());
+    let mut b = Builder::new(game, sc, doms);
+    b.switches = sw;
+    b
 }
 
 /// The Builder's machine-free parts for scope `name`: the fact table, every fact's kind and domain, the sentence
@@ -234,7 +241,12 @@ pub fn replay_into<'g>(
 
 /// The reading `name` with the Rust machine half (no Python, no playback): the Builder and the seconds it took.
 pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
-    let mut b = builder(game, st, name);
+    read_with(game, st, name, crate::builder::Switches::default())
+}
+
+/// `read` with fix round 1's switches.
+pub fn read_with<'g>(game: &'g Game, st: &Static, name: &str, sw: crate::builder::Switches) -> (Builder<'g>, f64) {
+    let mut b = builder_with(game, st, name, sw);
     let mut m = crate::machine::Reader::new(game);
     let t = std::time::Instant::now();
     b.read_all_into(&mut m, true, None, 2, None);
@@ -244,7 +256,18 @@ pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
 /// `read` on `threads` workers (par.rs; 0: the calling thread alone): the Builder, the seconds and the pool's
 /// stats.
 pub fn read_par<'g>(game: &'g Game, st: &Static, name: &str, threads: usize) -> (Builder<'g>, f64, crate::par::PoolStats) {
-    let mut b = builder(game, st, name);
+    read_par_with(game, st, name, threads, crate::builder::Switches::default())
+}
+
+/// `read_par` with fix round 1's switches.
+pub fn read_par_with<'g>(
+    game: &'g Game,
+    st: &Static,
+    name: &str,
+    threads: usize,
+    sw: crate::builder::Switches,
+) -> (Builder<'g>, f64, crate::par::PoolStats) {
+    let mut b = builder_with(game, st, name, sw);
     let scope = b.scope.clone();
     let t = std::time::Instant::now();
     let stats = crate::par::with_pool(game, &scope, threads, |pool| {

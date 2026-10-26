@@ -822,6 +822,11 @@ impl<'g> Machine<'g> {
     /// `_eng_room1`).
     fn eng_room1(&mut self, p: &mut Path, ci: usize, o: &FactOracle, room: Val) {
         self.write(p, Fact::Room, room);
+        if self.switches.draw_clears {
+            // F5: resetRoomObjects, room.cpp:195 (draw_clears.rs)
+            let res = self.resource(room);
+            self.objpos_reset(p, res);
+        }
         let (head, cite) = Self::head_cite(p, ci);
         self.note(
             p,

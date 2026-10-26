@@ -1,0 +1,486 @@
+E003 model check, Part I of run B: features ['calls', 'dialog', 'dispatch', 'esc', 'own_entry', 'room_change', 'settle']; path limit 256, step limit 5000; switches on: actor_rooms, const_polls, draw_clears, input_after_turns; 135.4 s
+ground truth: 250 rows, groundtruth-part1.jsonl (605361 bytes, modified 2026-10-22 22:12:24, sha256 824021824d99); fact families held: at:entry, at:exit, at:local, at:obj, at:script, bit, class, cutscene, ego, esc:entry, esc:exit, esc:local, esc:obj, esc:script, frozen, local, objscript, owner, room, script, state, var, verb
+
+denominator: 239 counted moves = 250 rows - 11 excluded
+  excluded S1#1: glitch (README table)
+  excluded S1#48: glitch (README table)
+  excluded S1#49: glitch (README table)
+  excluded S1#50: glitch (README table)
+  excluded S1#51: glitch (README table)
+  excluded S1#90: glitch (README table)
+  excluded S3#70: skipped door (results.jsonl)
+  excluded S3#75: skipped door (results.jsonl)
+  excluded S3#90: skipped door (results.jsonl)
+  excluded S3#118: composite (via holds several actions)
+  excluded S3#123: composite (via holds several actions)
+  counted moves with no action kind: 7
+    S2#2: walk to a floor point
+    S2#3: walk to a floor point
+    S2#22: walk to a floor point
+    S1#95: walk to a floor point
+    S2#50: walk to a floor point
+    S3#51: walk to a floor point
+    S3#67: walk to a floor point
+  S3#97: via auto: walk to exit 434 -> room 31
+  S3#98: via auto: verb 7 mug
+  S3#119: via auto: wait until idle
+
+kind           moves        accepted   prec. done (hits/certain)   prec. post (hits/certain)            recall   recall+possible  no pred.
+sentence          44    43     97.7%               92.3% (72/78)               94.9% (74/78)    72/1108   6.5%   607/1108  54.8%         2
+walk_to           86    86    100.0%             88.9% (176/198)             88.9% (176/198)   176/2517   7.0%  1722/2517  68.4%         6
+dialog_line       60    60    100.0%             62.3% (203/326)             67.8% (221/326)   202/1216  16.6%   674/1216  55.4%        14
+skip_cutscene     22    21     95.5%             90.2% (222/246)             93.5% (230/246)   220/550   40.0%   294/550   53.5%         0
+wait              20    20    100.0%             78.4% (160/204)             79.4% (162/204)   159/400   39.8%   200/400   50.0%         0
+none               7     0      0.0%                   n/a (0/0)                   n/a (0/0)     0/89     0.0%     0/89     0.0%         0
+all              239   230     96.2%            79.2% (833/1052)            82.0% (863/1052)   829/5880  14.1%  3497/5880  59.5%        22
+
+acceptance: 230 of 239 counted moves (96.2%); of the 232 with an action kind: 99.1%; of the 232 the model runs at this row (sentence, walk_to, wait, dialog_line, skip_cutscene): 230 (99.1%)
+precision (certain predicted changes, micro; hits/certain predictions): done 79.2% (833/1052); post 82.0% (863/1052)
+precision over the facts recall scores (the engine variables and non-facts below left out of both; not the rules' number): done 79.2% (829/1047); post 82.0% (859/1047)
+recall over counted moves: certain 829/5880 = 14.1%; with possible 3497/5880 = 59.5%
+recall over accepted moves: certain 829/5750 = 14.4%; with possible 3497/5750 = 60.8%
+accepted moves with no certain prediction: 22 of 230 (22 with possible ones only)
+not accepted, by reason:
+     7 no action kind
+     1 not usable: object N reachable
+     1 not usable: override armed
+    S3#45 {'kind': 'sentence', 'verb': 4, 'a': 907, 'b': 744}: not usable: object 744 reachable (Untouchable)
+    S3#46 {'kind': 'skip_cutscene', 'verb': None, 'a': None, 'b': None}: not usable: override armed (no esc: fact is 1)
+
+recall exclusions:
+  engine variables written outside opcode handlers (13):
+    var   2 VAR_CAMERA_POS_X: scumm.cpp:3379 every frame (scummLoop_updateScummVars); also camera.cpp:164 moveCamera, every frame; also camera.cpp:53 setCameraAt, inside opcodes
+    var   3 VAR_HAVE_MSG: scumm.cpp:3382 every frame; also actorTalk inside print (actor.cpp:3446)
+    var   5 VAR_OVERRIDE: script.cpp:1706 abortCutscene, from Esc in processInput (input.cpp:1423-1424); also beginOverride, endOverride and endCutscene, opcodes
+    var  20 VAR_VIRT_MOUSE_X: scumm.cpp:3385 every frame
+    var  21 VAR_VIRT_MOUSE_Y: scumm.cpp:3386 every frame
+    var  23 VAR_LAST_SOUND: sound.cpp:121-122 from actor walk sounds, playActorSounds every frame (scumm.cpp:3312, actor.cpp:2267); also startSound, an opcode
+    var  25 VAR_TALK_ACTOR: actor.cpp:3368 setTalkingActor, from stopTalk (actor.cpp:3564-3592) on the message timer (string.cpp:1125-1128); also actorTalk inside print, and stopTalk inside startScene (room.cpp:53)
+    var  26 VAR_CAMERA_FAST_X: input.cpp:1283, 1439 (the snap-scroll key toggles it; vars.cpp:62)
+    var  37 VAR_CHARINC: input.cpp:1150-1156 (text speed keys)
+    var  39 VAR_DEBUGMODE: scumm.cpp:3391 every frame
+    var  44 VAR_MOUSE_X: scumm.cpp:3387 every frame
+    var  45 VAR_MOUSE_Y: scumm.cpp:3388 every frame
+    var  71 VAR_GAME_LOADED: scumm.cpp:3415-3445 on save and load
+  engine variables written only inside an opcode, left in recall (7; row 0's first run left them out, the rules file's correction note):
+    var   0 VAR_KEYPRESS: showMessageDialog, the message box of a print to actor 252, inside o5_print (script_v5.cpp:3448-3449; string.cpp:119, 164-169); input.cpp:931-936 is ScummEngine_v2::processKeyboard (input.cpp:887-960), which v5 does not run. Also the scripts' result register, VAR_RESULT
+    var   4 VAR_ROOM: room.cpp:149, 155 in startScene, inside loadRoom, loadRoomWithEgo (script_v5.cpp:1850, 1875) and actorFollowCamera (camera.cpp:70)
+    var  17 VAR_CAMERA_MIN_X: room.cpp:203 in startScene (the room change opcodes); also the RoomScroll opcode (script_v5.cpp:2374)
+    var  18 VAR_CAMERA_MAX_X: room.cpp:205 in startScene; also the RoomScroll opcode (script_v5.cpp:2375)
+    var  22 VAR_ROOM_RESOURCE: room.cpp:172 in startScene
+    var  70 VAR_ROOM_FLAG: resource.cpp:644 when startScene loads the room resource (room.cpp:175)
+    var  72 VAR_NEW_ROOM: room.cpp:76 in startScene
+    save and load also call startScene (scumm.cpp:3900) and write VAR_ROOM_FLAG (saveload.cpp:937-938); run B never saves or loads, so in this run these variables change only inside opcodes
+  engine-triggers.json names 43 variables at non-boot sites; 11 are in the table; 7 are written only inside opcodes (IN_OPCODES, left in recall); hook numbers and clocks the engine reads: VAR_CUTSCENE_END_SCRIPT, VAR_CUTSCENE_START_SCRIPT, VAR_ENTRY_SCRIPT, VAR_ENTRY_SCRIPT2, VAR_EXIT_SCRIPT, VAR_EXIT_SCRIPT2, VAR_INVENTORY_SCRIPT, VAR_MUSIC_TIMER, VAR_SCROLL_SCRIPT, VAR_SENTENCE_SCRIPT, VAR_TIMER, VAR_TIMER_TOTAL, VAR_TMR_1, VAR_TMR_2, VAR_TMR_3, VAR_VERB_SCRIPT
+  left in recall: VAR_CAMERA_MIN: the site's text for VAR_CAMERA_MIN_X
+  left in recall: VAR_CHARCOUNT: not a v5 variable
+  left in recall: VAR_CURSORSTATE: written only by o5_cursorCommand (script_v5.cpp:935-938), an opcode
+  left in recall: VAR_CUTSCENEEXIT_KEY: read by the Esc handler, not written
+  left in recall: VAR_EGO: read, not written (pickupObject)
+  left in recall: VAR_RESULT: the scripts' result register, var 0: in IN_OPCODES as VAR_KEYPRESS
+  left in recall: VAR_SOUNDRESULT: written by o5_soundKludge's iMUSE command (sound.cpp:178-182), an opcode
+  left in recall: VAR_USERPUT: written only by o5_cursorCommand (script_v5.cpp:935-938), an opcode
+  left in recall: VAR_WALKTO_OBJ: written inside o5_loadRoomWithEgo (script_v5.cpp:1874-1876), an opcode
+  named there, neither in the table nor explained: none
+  in the table but not named there (cited from ScummVM directly): ['VAR_CAMERA_FAST_X', 'VAR_GAME_LOADED']
+  the model's non-facts (model.non_fact_vars: every script write unknown by its rules): 2: var 297 (random draw), var 359 (timer)
+  changed facts left out of recall: 866 of 6746; by variable: engine var VAR_VIRT_MOUSE_X 152, engine var VAR_MOUSE_X 145, engine var VAR_MOUSE_Y 145, engine var VAR_VIRT_MOUSE_Y 122, engine var VAR_HAVE_MSG 98, engine var VAR_LAST_SOUND 91, engine var VAR_CAMERA_POS_X 55, engine var VAR_TALK_ACTOR 53, engine var VAR_OVERRIDE 5
+  changes of the IN_OPCODES variables, now scored (changed / predicted certain): VAR_KEYPRESS 99/0, VAR_ROOM 98/5, VAR_CAMERA_MIN_X 15/0, VAR_CAMERA_MAX_X 49/1, VAR_ROOM_RESOURCE 82/5, VAR_ROOM_FLAG 10/0, VAR_NEW_ROOM 98/5
+  the excluded changes the model predicted anyway (certain): 4 of 866
+
+model runs (counted moves with an action):
+  paths per move: max 661, total 8743; moves that hit the path limit: 8; path ends: spin 4298, settled 2214, limit 1110, nesting 889, error 114, cycle 108, round limit 10
+  unmodelled statements met (moves): none
+  notes, partial or deferred effects (paths): findInventory 47192, endCutscene 28018, freezeScripts 28006, resume 7951, getInventoryCount 5899, end 2963, assumption: F flag 1119, actorFollowCamera 892, assumption: cutsceneOverride 111, Esc key 96, print 44, doSentence 35, Esc 20, checkExecVerbs 8, loadRoomWithEgo 4, startScene 1
+  writes with an unknown target: 59556; predictions in kinds the ground truth does not hold (or clocks): 1024
+  forks on a WaitFor* op (moves with one): 221
+  assumptions by kind (distinct decisions per move: where, condition, side taken; moves): random draw 4926 (113), position 2052 (166), wait over by time 1638 (222), branch 1022 (171), actor state 754 (154), mouse 696 (147), cannot work out 392 (171), loop exit by time 234 (88), timer 168 (24), message state 144 (67), sound 106 (53), cutscene data 104 (13), local 104 (33), not held 40 (19), string 30 (15), the slot kind is not a fact 11 (11), camera position 8 (4)
+  value sets past model.MAX_VALUES (64) made plain unknowns, by site: none (moves: 0)
+  F flags from constant start sites (model.Game.resistance): started both ways, so unknown when a freeze meets a slot live before the move: 19 global scripts; 247 of 377 room-local scripts, keyed by room (a start from global or object code, or a hook, counts for every room with that local number; merged over rooms by number it would be 360); starts with a variable script number, not counted: 6
+  script turns that ended, nested ones included (over paths): yield 771876, end 710072, stopped 238321, room 19503, parked 8688, chained 73
+  nesting: deepest stack 16 frames (the engine's limit is 15 nested runs; a slot runAllScripts resumes is one frame more, not nested); moves that reached it: 7; starts of a unit already on the stack (recursion guard): 163016 in 45 moves; most instructions on one path 11113 (limit 5000)
+  paths left out of the predictions (model.INFEASIBLE: an engine error() or the nesting limit aborts the game, which run B did not; a spin meets a state again and adds nothing): 5301 in 128 moves (spin 4298, nesting 889, error 114); moves with no path left: 0
+  merges (paths folded into another where they met): 1655356 in 225 moves; paths that spin (back at a jump target in a state they had, with no yield): 4298 in 121 moves
+  the engine's error()/warning() cases met, counted not raised (over paths; moves): nesting 889 (7), room change in an open cutscene 114 (3)
+    S1#5: nesting at room-028-bar/local-217.txt:11 [000E]: Too many nested scripts starting local:216 (script.cpp:351-352)
+    S1#6: nesting at global/script-025.txt:14 [001F]: Too many nested scripts starting script:18 (script.cpp:351-352)
+    S1#6: nesting at room-028-bar/local-216.txt:16 [001B]: Too many nested scripts starting obj:316 (script.cpp:351-352)
+    S1#7: nesting at global/script-025.txt:14 [001F]: Too many nested scripts starting script:18 (script.cpp:351-352)
+    S1#7: nesting at room-028-bar/local-216.txt:16 [001B]: Too many nested scripts starting obj:316 (script.cpp:351-352)
+    S1#8: nesting at room-028-bar/local-216.txt:16 [001B]: Too many nested scripts starting obj:316 (script.cpp:351-352)
+    S1#8: nesting at room-028-bar/local-216.txt:28 [0050]: Too many nested scripts starting local:217 (script.cpp:351-352)
+    S1#11: nesting at room-028-bar/local-216.txt:16 [001B]: Too many nested scripts starting obj:316 (script.cpp:351-352)
+    S1#11: nesting at room-028-bar/local-216.txt:28 [0050]: Too many nested scripts starting local:217 (script.cpp:351-352)
+    S1#12: nesting at room-028-bar/local-216.txt:16 [001B]: Too many nested scripts starting obj:316 (script.cpp:351-352)
+    S1#12: nesting at room-028-bar/local-216.txt:28 [0050]: Too many nested scripts starting local:217 (script.cpp:351-352)
+    S1#13: nesting at room-028-bar/local-217.txt:11 [000E]: Too many nested scripts starting local:216 (script.cpp:351-352)
+    S1#58: room change in an open cutscene at room.cpp:42-260: obj:436 (room.cpp:61-62, 67-68, an error())
+    S1#67: room change in an open cutscene at room.cpp:42-260: obj:435 (room.cpp:61-62, 67-68, an error())
+    S1#74: room change in an open cutscene at room.cpp:42-260: obj:436 (room.cpp:61-62, 67-68, an error())
+    S1#5: nesting 398
+    S1#6: nesting 13
+    S1#7: nesting 53
+    S1#8: nesting 12
+    S1#11: limit 255, nesting 405
+    S1#12: nesting 6
+    S1#13: nesting 2
+    S1#25: spin 10
+    S1#26: spin 39
+    S1#27: spin 12
+    S1#28: spin 39
+    S1#29: spin 9
+    S1#32: spin 32
+    S1#33: limit 119, spin 36
+    S1#35: spin 40
+    S1#36: limit 45, spin 42
+    S1#37: limit 60, spin 39
+    S1#40: spin 24
+    S1#41: spin 22
+    S1#42: spin 309
+    S1#43: spin 1
+    S1#44: limit 185, spin 224
+    S1#45: limit 10, spin 470
+    S1#46: spin 202
+    S2#8: spin 20
+    S1#56: spin 50
+    S1#57: limit 198, spin 208
+    S1#58: spin 354
+    S1#67: spin 66
+    S1#68: spin 84
+    S1#69: spin 1
+    S1#70: spin 1
+    S1#71: spin 1
+    S1#72: spin 1
+    S1#73: spin 65
+    S1#74: spin 76
+    S1#83: spin 12
+    S2#10: spin 4
+    S2#21: spin 36
+    S2#23: spin 15
+    S2#24: limit 238, spin 4
+    S2#25: spin 12
+    S2#28: spin 6
+    S1#84: spin 22
+    S1#85: spin 39
+    S1#86: spin 39
+    S1#87: spin 39
+    S1#88: spin 39
+    S1#89: spin 39
+    S1#91: spin 39
+    S1#92: spin 39
+    S1#93: spin 39
+    S1#94: spin 9
+    S2#29: spin 36
+    S2#31: spin 15
+    S2#32: spin 4
+    S2#33: spin 2
+    S2#34: spin 4
+    S2#35: spin 24
+    S2#37: spin 15
+    S2#38: spin 4
+    S2#39: spin 4
+    S2#40: spin 24
+    S2#41: spin 22
+    S2#42: spin 39
+    S2#43: spin 39
+    S2#44: spin 39
+    S2#45: spin 39
+    S2#46: spin 39
+    S2#47: spin 39
+    S2#48: spin 9
+    S2#49: spin 6
+    S3#8: spin 325
+    S3#9: spin 30
+    S3#10: spin 5
+    S3#11: spin 5
+    S3#12: spin 30
+    S3#13: spin 5
+    S3#14: spin 5
+    S3#15: spin 5
+    S3#16: spin 5
+    S3#17: spin 5
+    S3#18: spin 30
+    S3#19: spin 5
+    S3#20: spin 30
+    S3#21: spin 5
+    S3#22: spin 5
+    S3#23: spin 30
+    S3#24: spin 5
+    S3#25: spin 30
+    S3#26: spin 5
+    S3#27: spin 30
+    S3#28: spin 5
+    S3#29: spin 30
+    S3#30: spin 5
+    S3#31: spin 30
+    S3#32: spin 5
+    S3#33: spin 30
+    S3#34: spin 5
+    S3#35: spin 30
+    S3#36: spin 5
+    S3#37: spin 30
+    S3#38: spin 5
+    S3#39: spin 30
+    S3#40: spin 5
+    S3#41: spin 30
+    S3#42: spin 5
+    S3#43: spin 5
+    S3#53: spin 14
+    S3#54: spin 1
+    S3#55: spin 1
+    S3#56: spin 1
+    S3#57: spin 1
+    S3#58: spin 1
+    S3#59: spin 2
+    S3#60: spin 1
+    S3#61: spin 1
+    S3#62: spin 1
+    S3#63: spin 1
+    S3#83: spin 51
+    S3#84: spin 1
+    S3#85: spin 1
+    S3#86: spin 1
+    S3#87: spin 1
+    S3#88: spin 3
+    S3#89: spin 1
+    S3#97: spin 51
+    S3#98: spin 1
+  sentence slots live and not frozen at pre, run for their turn before the sentence (runAllScripts): 9 moves: S1#40, S1#44, S1#57, S1#59, S1#61, S1#68, S1#75, S2#49, S3#78
+  the input script (VAR_VERB_SCRIPT) is not run (the action is the sentence): 130 moves; its number at pre is a room's local script in 26, where it may do more than queue the sentence (a doSentence(STOP), a start of its own, a sentence it does not queue): S1#6 (202), S1#7 (202), S1#8 (202), S1#12 (202), S1#13 (202), S1#16 (201), S1#22 (200), S1#25 (201), S1#30 (201), S1#61 (203), S1#80 (204), S2#9 (201), S2#10 (201), S2#11 (201), S1#84 (201), S2#41 (201), S3#1 (201), S3#8 (201), S3#44 (201), S3#49 (201), S3#69 (201), S3#72 (202), S3#73 (202), S3#74 (202), S3#76 (202), S3#79 (202)
+
+settle (model.Machine._next_round; the accepted moves this row runs, then lets time pass in rounds: 209, the sentences, walks, waits and dialog lines; the counts below also take in the 21 accepted moves that run nothing at this row, one empty path each):
+  how paths end: spin 4298, settled 2177, limit 1110, nesting 889, error 114, cycle 108, round limit 10
+  how their immediate part (the click's frame, rows 1-2's run) ended: yield 3780, stopped 3388, None 869, wait 463, end 103, parked 78, chained 19, room 6
+  paths settled (no fact changed in a round) while a kept slot's locals still moved (a counter loop the path knows; the engine goes on): 251 in 24 moves: S2#4, S1#19, S1#21, S1#32, S1#33, S1#35, S1#36, S1#37, S1#40, S1#41, S1#59, S2#12, S2#20, S3#3, S3#4, S3#40, S3#41, S3#42, S3#57, S3#58 ...
+  moves with a path at ROUND_LIMIT (400 rounds; the facts its last round changed made unknown): 5: S3#77 (2), S3#78 (1), S3#79 (1), S3#83 (5), S3#84 (1)
+  moves with a path that cycles (a state met again at a round's start; the facts that vary around it made unknown): 39 (108 paths)
+  rounds per move: max 400, median 8
+  moves that hit the path limit (256 paths that carry predictions; paths that end in an error, the nesting limit or a spin are not counted toward it): 8: S1#11 (255 forks cut), S1#33 (119 forks cut), S1#36 (45 forks cut), S1#37 (60 forks cut), S1#44 (185 forks cut), S1#45 (10 forks cut), S1#57 (198 forks cut), S2#24 (238 forks cut)
+  assumed loop exits (a time-only loop taken to exit; distinct sites per move): 234 in 88 moves; by what the exit test read: position 125, local 54, actor state 37, random draw 8, branch 5, sound 4, timer 1
+  time-only loops whose exit test reads a variable or bit the body writes only with constants (a reset it then waits on; switch const_polls reads it as a polled fact, on in this run), over the IR: 99 of 314 time-only loops, in 31 units
+  waits resolved by time (a WaitFor op that falls through or a delay that ends, distinct sites): 1611 in 220 moves
+  slots run, by the rule they first ran by (move, slot pairs): a: started or resumed by the path 733, b: an ambient loop 436, c: polls facts the path changed 95, b: a delay 91, b: a time-only loop 77, b: a breakHere outside any loop 40, b: a WaitFor op 37, a: rewound by Esc (abortCutscene) 21, b: parked after an opcode, waits for nothing 16, b: a loop on the camera position (its exit forks once) 1
+  slots live at pre that settle never ran (on any path): 75 in 36 moves; why: its freeze count is not known 33, polls facts the path has not changed 30, frozen 6, it has no single wait point 2, a time-only wait, held in the click's frame 2, never reached a round 2
+  slots a round passed over (model.Machine._skip; distinct move, slot, origin and why, any path, any round): 1488 in 230 moves; by origin and why:
+    pre, first turn: 463: a time-only wait, held in the click's frame 198, polls facts the path has not changed 126, its freeze count is not known 90, frozen 45, it has no single wait point 4
+    pre, ran before: 776: the ambient cap: its loop with no exit ran once 528, frozen 139, its freeze count is not known 109
+    path: 249: the ambient cap: its loop with no exit ran once 161, frozen 88
+    of these, frozen (engine behaviour: a frozen slot does not run, script.cpp:979): 272 in 83 moves; the ambient cap: 689 in 225 moves
+    moves with a slot passed over because its freeze count is not known: 70: S1#2 (entry, script:1, script:159, script:23), S1#4 (local:202), S1#6 (local:200, local:201, local:206, local:207, local:208, local:210), S1#7 (local:200, local:201, local:206, local:207, local:210), S1#8 (local:200, local:201, local:206, local:207, local:210, local:217), S2#1 (local:200, local:201, local:204), S2#4 (local:200, local:201, local:203), S1#9 (local:200, local:201, local:203, local:208), S1#10 (local:200, local:201, local:203), S1#11 (local:200, local:201), S1#12 (local:200, local:206, local:210), S1#13 (local:200, local:201, local:206, local:210), S1#23 (local:201), S1#33 (local:201, local:209), S1#34 (local:201), S1#35 (local:201), S1#36 (local:201, local:209), S1#37 (local:201, local:209), S1#38 (local:200, local:202), S1#39 (local:200, local:202) ...
+  ambient loops run once (the cap; at settle's end the facts their pass wrote and, while live, their at: keys become unknown with the values seen): 666 slots in 225 moves; facts made unknown at settle's end: an ambient loop run once 2872, two instances 98
+  units a recursive start gave a second live instance (one Frame tracked; their at: keys, and a slot fact the tracked instance cleared, unknown at settle's end): 57 in 38 moves: S1#13 (local:203), S1#16 (local:200), S1#23 (local:200), S1#25 (local:201, local:202), S1#26 (local:201, local:202), S1#28 (local:201, local:202), S1#32 (local:202), S1#41 (local:205), S1#42 (local:207), S1#59 (local:202), S1#68 (local:207), S2#21 (local:202) ...
+  loop exits on the camera position (forked once, the side that stays stays): 8 decisions in 4 moves
+  the mouse variables unknown from the click's frame on (the click moved the mouse): 189 moves; waits that keep pre's mouse (an assumption: no mouse move during '.'): 20 moves
+  order conflicts (two slots run in one round, one writing a fact the other read or wrote; read-read left out): moves with one, by the conflicting key's group: var:0 135, slot or freeze 178, other 129; moves with any: 188; with one on another fact: 129
+    top keys (conflicts): var:0 4093, frozen:script:159 998, frozen:script:23 843, script:101 495, script:100 314, script:74 313, local:206 297, local:207 288, local:202 286, local:200 206
+    certain predictions on a key that had an order conflict in their move: 78 (57 right at done)
+  merges at a round's start (paths with the same slot positions): 14566 in 193 moves, of which 13243 folded stores that differed into value sets (rows 1-2's join rule at the frame boundary) and the rest were the same state
+  queued sentences settle ran (doSentence, or the click's sentence that had to wait): 3 in 3 moves
+  precision (certain, done; hits/certain predictions) by when the prediction was made ("before the first yield": the click's frame, its runAllScripts turns and then the sentence or the input script; a wait has none): before the first yield 98.6% (433/439) (post 97.9% (430/439)); after the first yield 65.3% (400/613) (post 70.6% (433/613))
+  after the first yield, by the rule of the settle turn that last wrote the fact (done, post): c: polls facts the path changed 47.5% (96/202), 56.9% (115/202); b: a WaitFor op 79.3% (153/193), 80.3% (155/193); a: rewound by Esc (abortCutscene) 81.7% (58/71), 85.9% (61/71); a: started or resumed by the path 60.8% (31/51), 66.7% (34/51); b: a time-only loop 71.8% (28/39), 71.8% (28/39); b: a delay 91.3% (21/23), 91.3% (21/23); b: a breakHere outside any loop 26.3% (5/19), 26.3% (5/19); mixed 46.2% (6/13), 92.3% (12/13); b: parked after an opcode, waits for nothing 100.0% (2/2), 100.0% (2/2)
+  top misses after the first yield (fact, rule): at:entry:2605 [b: a breakHere outside any loop] 14, var:229 [c: polls facts the path changed] 8, var:230 [c: polls facts the path changed] 8, script:23 [a: started or resumed by the path] 6, var:207 [c: polls facts the path changed] 6, var:52 [b: a WaitFor op] 5, var:53 [b: a WaitFor op] 5, var:202 [c: polls facts the path changed] 5, var:101 [c: polls facts the path changed] 4, bit:387 [c: polls facts the path changed] 4, at:script:68:145 [b: a time-only loop] 4, script:68 [b: a time-only loop] 4
+
+dialog lines (model.Machine.run_verb: a left click on the line's verb, so the input script installed at pre runs with [kVerbClickArea, verb, 1]): 60 of 60 accepted
+  input script at pre (number, kind: moves): 14 global: 59, 209 room-local: 1
+  how the input script's first turn ended (paths; "did not run": the path ended in a turn before the click, by how): yield 813, did not run (spin) 75, did not run (settled) 8, end 4
+  decisions the input script forked on (distinct per move): 174 in 58 moves, by kind: message state 116, wait over by time 58; writes with an unknown target at its instructions: 0 in 0 moves
+  paths whose click-frame turns changed what checkExecVerbs reads, before the click (model.Path.input_drift; usable and the input script read them at pre, the spec; switch input_after_turns reads them after the turns): 8 paths in 8 moves: var:53 1->0 (8 moves); S1#34 (1 of 3), S1#35 (1 of 113), S1#53 (1 of 3), S2#6 (1 of 3), S2#7 (1 of 3), S1#54 (1 of 3), S1#55 (1 of 3), S2#8 (1 of 33)
+  slots that resumed by settle's rule c (live at pre, polling a fact the path changed: the script waiting on the menu, found by running the scripts): in 60 of 60 moves; moves with one of each kind: local 20, script 43
+  by whether a room-local or object script was live at pre (moves, accepted, precision done and post, recall certain and with possible):
+    a room-local or object script live: 37 moves, 37 accepted; precision done 51.7% (119/230), post 58.7% (135/230); recall 119/744 = 16.0%, with possible 43.5%
+    neither live: 23 moves, 23 accepted; precision done 87.5% (84/96), post 89.6% (86/96); recall 83/472 = 17.6%, with possible 74.2%
+  frames from the click to done: median 6; within 4 frames in 29 moves, 29 of them with a '.' after the click (run B's inputs, below; not modelled)
+  per move (label, verb, input script, slots resumed by rule c, precision done and post, paths; frames from the click to done; run B's keys after the click up to done, and after done up to post):
+    S1#19   verb 120 input 209 (local); rule c: local:207; done 21.4% (3/14), post 28.6% (4/14); paths 1; 0 frames; keys to done: . 1; after done: . 1, esc 1
+    S1#20   verb 120 input 14; rule c: local:207; done 57.1% (4/7), post 100.0% (7/7); paths 2; 7 frames; keys to done: . 2; after done: . 1
+    S1#21   verb 120 input 14; rule c: local:207; done 100.0% (9/9), post 100.0% (9/9); paths 8; 6 frames; keys to done: . 1, esc 1; after done: none
+    S1#23   verb 120 input 14; rule c: local:207; done 66.7% (8/12), post 100.0% (12/12); paths 3; 4 frames; keys to done: . 1, esc 1; after done: esc 1
+    S1#34   verb 123 input 14; rule c: local:218; done 100.0% (2/2), post 100.0% (2/2); paths 3; 6 frames; keys to done: . 2; after done: esc 1
+    S1#35   verb 121 input 14; rule c: local:218; done n/a (0/0), post n/a (0/0); paths 113; 8 frames; keys to done: . 1; after done: . 1
+    S1#53   verb 124 input 14; rule c: local:211; done n/a (0/0), post n/a (0/0); paths 3; 10 frames; keys to done: . 2, esc 1; after done: . 1
+    S2#6    verb 120 input 14; rule c: local:211; done n/a (0/0), post n/a (0/0); paths 3; 4 frames; keys to done: . 1; after done: . 1
+    S2#7    verb 120 input 14; rule c: local:206, local:211; done n/a (0/0), post n/a (0/0); paths 3; 12 frames; keys to done: . 4; after done: none
+    S1#54   verb 121 input 14; rule c: local:211; done n/a (0/0), post n/a (0/0); paths 3; 4 frames; keys to done: . 1; after done: . 1
+    S1#55   verb 120 input 14; rule c: local:206, local:211; done n/a (0/0), post n/a (0/0); paths 3; 7 frames; keys to done: . 1, esc 1; after done: . 1
+    S2#8    verb 125 input 14; rule c: local:211; done n/a (0/0), post n/a (0/0); paths 33; 6 frames; keys to done: . 1, esc 1; after done: none
+    S1#70   verb 127 input 14; rule c: local:202; done 61.5% (8/13), post 100.0% (13/13); paths 5; 4 frames; keys to done: . 1; after done: esc 1
+    S1#78   verb 120 input 14; rule c: local:212; done 28.6% (2/7), post 71.4% (5/7); paths 4; 4 frames; keys to done: . 1; after done: . 2, esc 2
+    S2#13   verb 120 input 14; rule c: script:57; done 53.8% (7/13), post 53.8% (7/13); paths 2; 9 frames; keys to done: . 3; after done: none
+    S2#15   verb 120 input 14; rule c: script:57; done n/a (0/0), post n/a (0/0); paths 4; 4 frames; keys to done: . 1; after done: . 1
+    S2#16   verb 120 input 14; rule c: script:57; done n/a (0/0), post n/a (0/0); paths 4; 4 frames; keys to done: . 1; after done: . 1
+    S2#17   verb 120 input 14; rule c: script:57; done n/a (0/0), post n/a (0/0); paths 4; 4 frames; keys to done: . 1; after done: . 6
+    S2#18   verb 120 input 14; rule c: script:57; done 77.8% (7/9), post 100.0% (9/9); paths 2; 4 frames; keys to done: . 1; after done: . 2
+    S2#19   verb 120 input 14; rule c: script:57; done 50.0% (9/18), post 50.0% (9/18); paths 2; 10 frames; keys to done: . 3; after done: none
+    S2#23   verb 127 input 14; rule c: local:200, script:114, script:73; done n/a (0/0), post n/a (0/0); paths 29; 14 frames; keys to done: . 1; after done: none
+    S2#24   verb 120 input 14; rule c: script:80, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 249, 238 forks cut by the path limit; 51 frames; keys to done: . 2; after done: none
+    S2#25   verb 120 input 14; rule c: script:80, script:90; done 100.0% (2/2), post 100.0% (2/2); paths 27; 44 frames; keys to done: . 2; after done: none
+    S2#26   verb 120 input 14; rule c: script:80, script:90; done 100.0% (26/26), post 100.0% (26/26); paths 1; 34 frames; keys to done: . 4; after done: none
+    S2#27   verb 122 input 14; rule c: script:79, script:90; done 100.0% (2/2), post 100.0% (2/2); paths 1; 30 frames; keys to done: . 2; after done: none
+    S2#28   verb 121 input 14; rule c: script:114, script:73, script:79, script:90; done 100.0% (12/12), post 100.0% (12/12); paths 12; 21 frames; keys to done: . 2; after done: none
+    S2#31   verb 127 input 14; rule c: local:200, script:114, script:73; done n/a (0/0), post n/a (0/0); paths 29; 14 frames; keys to done: . 1; after done: none
+    S2#32   verb 122 input 14; rule c: script:80, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 9; 33 frames; keys to done: . 3; after done: none
+    S2#33   verb 120 input 14; rule c: script:79, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 4; 27 frames; keys to done: . 1; after done: none
+    S2#34   verb 120 input 14; rule c: script:80, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 9; 30 frames; keys to done: . 2; after done: none
+    S2#35   verb 120 input 14; rule c: script:114, script:73, script:80, script:90; done 100.0% (4/4), post 100.0% (4/4); paths 49; 24 frames; keys to done: . 3; after done: none
+    S2#37   verb 127 input 14; rule c: local:200, script:114, script:73; done n/a (0/0), post n/a (0/0); paths 29; 14 frames; keys to done: . 1; after done: none
+    S2#38   verb 120 input 14; rule c: script:80, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 9; 30 frames; keys to done: . 2; after done: none
+    S2#39   verb 120 input 14; rule c: script:80, script:90; done 50.0% (1/2), post 50.0% (1/2); paths 9; 30 frames; keys to done: . 2; after done: none
+    S2#40   verb 120 input 14; rule c: script:114, script:73, script:80, script:90; done 100.0% (4/4), post 100.0% (4/4); paths 49; 25 frames; keys to done: . 3; after done: none
+    S2#53   verb 121 input 14; rule c: script:116, script:58, script:73; done 100.0% (8/8), post 100.0% (8/8); paths 7; 23 frames; keys to done: . 5; after done: none
+    S2#54   verb 120 input 14; rule c: script:79, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 1; 30 frames; keys to done: . 2; after done: none
+    S2#55   verb 122 input 14; rule c: script:79, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 1; 30 frames; keys to done: . 2; after done: none
+    S2#56   verb 121 input 14; rule c: script:79, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 1; 30 frames; keys to done: . 2; after done: none
+    S2#57   verb 122 input 14; rule c: script:79, script:90; done 100.0% (1/1), post 100.0% (1/1); paths 1; 30 frames; keys to done: . 2; after done: none
+    S2#58   verb 122 input 14; rule c: script:116, script:73, script:79, script:90; done n/a (0/0), post n/a (0/0); paths 3; 27 frames; keys to done: . 6; after done: none
+    S3#3    verb 121 input 14; rule c: local:203; done 68.8% (11/16), post 68.8% (11/16); paths 8; 4 frames; keys to done: . 1; after done: none
+    S3#11   verb 122 input 14; rule c: script:56; done 25.0% (2/8), post 25.0% (2/8); paths 8; 4 frames; keys to done: . 1; after done: none
+    S3#14   verb 124 input 14; rule c: script:56; done 100.0% (3/3), post 100.0% (3/3); paths 9; 4 frames; keys to done: . 1; after done: none
+    S3#17   verb 123 input 14; rule c: script:56; done 70.0% (7/10), post 70.0% (7/10); paths 7; 4 frames; keys to done: . 2; after done: none
+    S3#19   verb 120 input 14; rule c: script:56; done 14.3% (1/7), post 14.3% (1/7); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#22   verb 120 input 14; rule c: script:56; done 57.1% (4/7), post 57.1% (4/7); paths 7; 4 frames; keys to done: . 2; after done: none
+    S3#24   verb 121 input 14; rule c: script:56; done 0.0% (0/2), post 0.0% (0/2); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#26   verb 121 input 14; rule c: script:56; done 0.0% (0/3), post 0.0% (0/3); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#28   verb 121 input 14; rule c: script:56; done 0.0% (0/3), post 0.0% (0/3); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#30   verb 121 input 14; rule c: script:56; done 0.0% (0/3), post 0.0% (0/3); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#32   verb 121 input 14; rule c: script:56; done 0.0% (0/3), post 0.0% (0/3); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#34   verb 121 input 14; rule c: script:56; done 0.0% (0/3), post 0.0% (0/3); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#36   verb 122 input 14; rule c: script:56; done 20.0% (1/5), post 20.0% (1/5); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#38   verb 121 input 14; rule c: script:56; done 20.0% (1/5), post 20.0% (1/5); paths 7; 4 frames; keys to done: . 1; after done: none
+    S3#40   verb 123 input 14; rule c: script:56; done 68.4% (13/19), post 68.4% (13/19); paths 33; 4 frames; keys to done: . 1; after done: none
+    S3#55   verb 120 input 14; rule c: script:60; done 75.0% (6/8), post 75.0% (6/8); paths 13; 4 frames; keys to done: . 2; after done: none
+    S3#57   verb 122 input 14; rule c: script:60; done 46.2% (12/26), post 46.2% (12/26); paths 3; 4 frames; keys to done: . 1; after done: none
+    S3#85   verb 123 input 14; rule c: local:202; done 100.0% (5/5), post 100.0% (5/5); paths 13; 4 frames; keys to done: . 1; after done: none
+    S3#87   verb 123 input 14; rule c: local:202; done 58.8% (10/17), post 58.8% (10/17); paths 2; 4 frames; keys to done: . 1; after done: none
+
+skipped cutscenes (model.Machine.run_esc: the Esc key; abortCutscene rewinds the override armed at the top level at pre, then the Esc frame and settle): 21 of 22 accepted
+  not accepted: S3#46: not usable: override armed (no esc: fact is 1); at pre cutscene depth 1, esc: facts none; run B's keys after the first up to done: esc 1
+  the top level of the overrides rewound (cutscene depth at pre: moves): 0: 12, 1: 9
+  how the rewound slot's first turn ended (paths): yield 60, did not run (spin) 34, did not run (settled) 20, end 10, room 7
+  where the key went at checkExecVerbs (paths as they reached it, model.Run.key_routes, and the paths that ended before it; moves): not reached (spin) 37 (12), wiped by clearClickedStatus 24 (14), dropped with input off 16 (9), input script 14 12 (8), input script 4 4 (3), input script not known 2 (2)
+  the forks each way of the key rests on: the kinds of the forks its path had taken before the key (paths, a path once per kind; moves), cutscene data and actor room first (a cutscene's data, model.R_CUTDATA, and an actor's room are not facts):
+    wiped by clearClickedStatus 24: cutscene data 18 (8), actor room 20 (10), branch 9 (7), random draw 9 (5), position 4 (2), the slot kind is not a fact 4 (2), sound 3 (3), message state 2 (2), actor state 2 (1), local 2 (1), cannot work out 1 (1)
+    dropped with input off 16: random draw 11 (6), message state 8 (4), actor state 4 (2), position 2 (1)
+    input script 14 12: cutscene data 4 (3), actor room 5 (4), random draw 8 (5), branch 5 (4), message state 5 (2), cannot work out 4 (1), local 2 (1), actor state 1 (1)
+    input script 4 4: cutscene data 4 (3), actor room 4 (3), branch 4 (3), random draw 3 (2), position 2 (1)
+    input script not known 2: actor room 1 (1), no fork 1 (1), random draw 1 (1)
+  ways of the key resting on a fork on cutscene data: 26 paths in 8 moves (S1#2, S3#2, S3#48, S3#54, S3#59, S3#61, S3#64, S3#86)
+  ways of the key resting on a fork on actor room: 30 paths in 10 moves (S1#2, S2#52, S3#2, S3#42, S3#48, S3#54, S3#59, S3#61, S3#64, S3#86)
+  certain predictions that are abortCutscene's own writes (the armed esc: fact to 0, script.cpp:1707; the rewound slot's wait point at pre to 0, 1699), which hold whenever the skip happens: 42 (hits 42 at done, 42 at post); the skips' precision without them: done 88.2% (180/204), post 92.2% (188/204); with them: done 90.2% (222/246), post 93.5% (230/246)
+  VerbOps Key sub-ops in the IR that could give a shown verb the key code [27] (a verb's key is not a fact: actions.VERB_KEY): a variable 575, another constant 34
+    Var[230] at 575 sites: start value 0, constants [49], steps [1]: the closure of these from the start value reaches the code; other writes, not worked out here: an indexed write that may hit it 44
+  per move (label, the override rewound: its jump and where it goes, the rewound slot's first turn, the key and the forks of each way, cutscene data and actor room only, precision done and post, paths; run B's keys after the first up to done and after done):
+    S1#2    esc:local:203:7 room-038-lookout/local-203.txt:11 [0007] -> room-038-lookout/local-203.txt:61 [02BF]; turn end 2, room 1; key input script 4 1 [cutscene data 1, actor room 1], wiped by clearClickedStatus 2 [cutscene data 2, actor room 2]; done 77.8% (7/9), post 77.8% (7/9); paths 3; keys to done: none; after done: none
+    S1#3    esc:local:200:6 room-096-part1/local-200.txt:12 [0006] -> room-096-part1/local-200.txt:21 [0033]; turn room 1; key wiped by clearClickedStatus 1; done 100.0% (14/14), post 100.0% (14/14); paths 1; keys to done: none; after done: none
+    S2#14   esc:script:57:1445 global/script-057.txt:160 [05A5] -> global/script-057.txt:196 [0758]; turn yield 2; key dropped with input off 1, wiped by clearClickedStatus 1; done 100.0% (16/16), post 100.0% (16/16); paths 2; keys to done: . 1; after done: none
+    S2#20   esc:script:57:4156 global/script-057.txt:411 [103C] -> global/script-057.txt:654 [1E4B]; turn yield 2; key wiped by clearClickedStatus 1; done 76.5% (13/17), post 100.0% (17/17); paths 2; keys to done: none; after done: . 2
+    S2#52   esc:script:58:2 global/script-058.txt:9 [0002] -> global/script-058.txt:29 [00FA]; turn yield 2; key input script 14 1 [actor room 1], wiped by clearClickedStatus 1 [actor room 1]; done 100.0% (13/13), post 100.0% (13/13); paths 2; keys to done: none; after done: none
+    S3#2    esc:local:203:142 room-083-cu-dock/local-203.txt:46 [008E] -> room-083-cu-dock/local-203.txt:85 [021A]; turn room 1, yield 6; key dropped with input off 1, input script 14 1 [cutscene data 1, actor room 1], wiped by clearClickedStatus 2 [cutscene data 2, actor room 2]; done 100.0% (8/8), post 100.0% (8/8); paths 7; keys to done: none; after done: none
+    S3#4    esc:local:203:1115 room-083-cu-dock/local-203.txt:147 [045B] -> room-083-cu-dock/local-203.txt:189 [0705]; turn end 2; key input script not known 1; done 100.0% (9/9), post 100.0% (9/9); paths 2; keys to done: none; after done: none
+    S3#10   esc:script:56:603 global/script-056.txt:87 [025B] -> global/script-056.txt:125 [0467]; turn did not run (spin) 5, yield 1; key dropped with input off 1, not reached (spin) 5; done 100.0% (14/14), post 100.0% (14/14); paths 6; keys to done: . 2; after done: none
+    S3#13   esc:script:56:4158 global/script-056.txt:389 [103E] -> global/script-056.txt:411 [1332]; turn did not run (spin) 5, yield 2; key dropped with input off 4, input script 14 4, not reached (spin) 5; done 100.0% (9/9), post 100.0% (9/9); paths 7; keys to done: . 1; after done: none
+    S3#15   esc:script:56:7527 global/script-056.txt:581 [1D67] -> global/script-056.txt:608 [1EE7]; turn did not run (spin) 5, yield 3; key dropped with input off 2, input script 14 1, not reached (spin) 5; done 23.1% (3/13), post 23.1% (3/13); paths 8; keys to done: . 1; after done: none
+    S3#16   esc:script:56:9675 global/script-056.txt:751 [25CB] -> global/script-056.txt:778 [2A5B]; turn did not run (spin) 5, yield 1; key input script 14 1, not reached (spin) 5; done 100.0% (12/12), post 100.0% (12/12); paths 6; keys to done: none; after done: none
+    S3#21   esc:script:56:9675 global/script-056.txt:751 [25CB] -> global/script-056.txt:778 [2A5B]; turn did not run (spin) 5, yield 1; key input script 14 1, not reached (spin) 5; done 100.0% (12/12), post 100.0% (12/12); paths 6; keys to done: none; after done: none
+    S3#42   esc:script:56:14960 global/script-056.txt:1083 [3A70] -> global/script-056.txt:1150 [3EC2]; turn did not run (spin) 5, end 4; key input script not known 1 [actor room 1], not reached (spin) 5, wiped by clearClickedStatus 1 [actor room 1]; done 100.0% (11/11), post 100.0% (11/11); paths 9; keys to done: none; after done: none
+    S3#46   no esc: fact; turn did not run (settled) 20; key dropped with input off 3; not accepted; paths 20; keys to done: esc 1; after done: none
+    S3#48   esc:script:121:17 global/script-121.txt:14 [0011] -> global/script-121.txt:184 [0602]; turn end 1; key wiped by clearClickedStatus 1 [cutscene data 1, actor room 1]; done 100.0% (7/7), post 100.0% (7/7); paths 1; keys to done: none; after done: none
+    S3#54   esc:script:60:67 global/script-060.txt:24 [0043] -> global/script-060.txt:27 [0076]; turn did not run (spin) 1, yield 3; key input script 14 1 [cutscene data 1, actor room 1], not reached (spin) 1, wiped by clearClickedStatus 2 [cutscene data 2, actor room 2]; done 100.0% (14/14), post 100.0% (14/14); paths 4; keys to done: none; after done: none
+    S3#56   esc:script:60:1803 global/script-060.txt:178 [070B] -> global/script-060.txt:259 [085F]; turn did not run (spin) 1, yield 4; key dropped with input off 1, not reached (spin) 1; done 100.0% (12/12), post 100.0% (12/12); paths 5; keys to done: . 1; after done: none
+    S3#58   esc:script:60:2918 global/script-060.txt:333 [0B66] -> global/script-060.txt:356 [0C2D]; turn did not run (spin) 1, end 1, yield 1; key dropped with input off 1, not reached (spin) 1, wiped by clearClickedStatus 1; done 75.0% (12/16), post 75.0% (12/16); paths 3; keys to done: . 1; after done: none
+    S3#59   esc:local:201:31 room-037-meats-hou/local-201.txt:16 [001F] -> room-037-meats-hou/local-201.txt:206 [05D1]; turn room 1, yield 17; key dropped with input off 2, input script 4 2 [cutscene data 2, actor room 2], not reached (spin) 2, wiped by clearClickedStatus 3 [cutscene data 3, actor room 3]; done 60.0% (6/10), post 100.0% (10/10); paths 18; keys to done: none; after done: none
+    S3#61   esc:script:49:51 global/script-049.txt:21 [0033] -> global/script-049.txt:43 [0097]; turn did not run (spin) 1, yield 12; key input script 4 1 [cutscene data 1, actor room 1], not reached (spin) 1, wiped by clearClickedStatus 3 [cutscene data 3, actor room 3]; done 100.0% (7/7), post 100.0% (7/7); paths 13; keys to done: none; after done: none
+    S3#64   esc:local:205:126 room-037-meats-hou/local-205.txt:32 [007E] -> room-037-meats-hou/local-205.txt:132 [04B7]; turn room 2; key wiped by clearClickedStatus 2 [cutscene data 2, actor room 2]; done 100.0% (19/19), post 100.0% (19/19); paths 2; keys to done: none; after done: none
+    S3#86   esc:local:202:4173 room-031-jail/local-202.txt:410 [104D] -> room-031-jail/local-202.txt:485 [11A6]; turn room 1, yield 3; key input script 14 2 [cutscene data 2, actor room 2], not reached (spin) 1, wiped by clearClickedStatus 3 [cutscene data 3, actor room 3]; done 100.0% (4/4), post 100.0% (4/4); paths 4; keys to done: none; after done: none
+
+run B's inputs inside each move's window that the scored action does not hold (check.run_b_inputs; the explicit movie the ground truth replays; own: the executor's movie, auto: the bridge's automatic '.' and Esc). The engine ran them; the model runs only the action, so they are not modelled:
+  after the first input, up to done:
+    sentence: 44 moves; with a key 19, with a click 44; inputs by kind and source: click own 166, . auto 16, esc auto 6, g own 3, o own 3, p own 1, u own 1
+      S1#4 (o 1); S1#7 (o 1); S1#22 (. 1); S1#33 (. 1); S1#36 (. 1); S1#39 (. 1); S1#45 (. 1); S1#52 (esc 1); S1#60 (g 1); S1#69 (esc 1); S1#71 (. 4); S1#79 (esc 3, o 1); S1#80 (. 2); S2#10 (. 2, g 1); S2#12 (. 3); S1#96 (esc 1); S3#45 (g 1); S3#50 (u 1); S3#73 (p 1)
+    walk_to: 86 moves; with a key 5, with a click 21; inputs by kind and source: click own 411, . auto 4, esc auto 3
+      S1#13 (esc 1); S1#58 (. 2); S1#64 (esc 1); S1#77 (. 1, esc 1); S3#78 (. 1)
+    dialog_line: 60 moves; with a key 60, with a click 0; inputs by kind and source: . auto 102, esc auto 5
+    skip_cutscene: 22 moves; with a key 7, with a click 0; inputs by kind and source: . auto 7, esc auto 1
+      S2#14 (. 1); S3#10 (. 2); S3#13 (. 1); S3#15 (. 1); S3#46 (esc 1); S3#56 (. 1); S3#58 (. 1)
+    wait: 20 moves; with a key 13, with a click 0; inputs by kind and source: . auto 31
+      S3#12 (. 4); S3#18 (. 2); S3#20 (. 2); S3#23 (. 4); S3#25 (. 2); S3#27 (. 2); S3#29 (. 3); S3#31 (. 3); S3#33 (. 2); S3#35 (. 2); S3#39 (. 1); S3#66 (. 1); S3#88 (. 3)
+    none: 7 moves; with a key 0, with a click 0; inputs by kind and source: none
+  after done, up to post:
+    sentence: 44 moves; with a key 7, with a click 0; inputs by kind and source: . auto 23, esc auto 3
+      S1#7 (. 2); S1#22 (. 6, esc 1); S1#43 (esc 1); S1#52 (. 1); S1#69 (. 1); S1#80 (esc 1); S3#98 (. 13)
+    walk_to: 86 moves; with a key 3, with a click 0; inputs by kind and source: . auto 17, esc auto 2
+      S1#18 (. 11, esc 1); S1#64 (. 2); S1#77 (. 4, esc 1)
+    dialog_line: 60 moves; with a key 15, with a click 0; inputs by kind and source: . auto 19, esc auto 6
+    skip_cutscene: 22 moves; with a key 1, with a click 0; inputs by kind and source: . auto 2
+      S2#20 (. 2)
+    wait: 20 moves; with a key 2, with a click 0; inputs by kind and source: . auto 2
+      S2#30 (. 1); S2#36 (. 1)
+    none: 7 moves; with a key 1, with a click 0; inputs by kind and source: . auto 1
+      S2#22 (. 1)
+
+engine conditions an accepted move rests on but does not test (actions.UNCHECKED), of 129 sentences and walks and 60 dialog lines (a click on the line's verb: actions.CLICK) and 21 skips (the Esc key: actions.ESC):
+  parent state: 0 moves
+  on screen, first under the click: 125 moves
+  shown in an inventory slot: 13 moves
+  a virtual screen under the click: 60 moves
+  the verb's rectangle under the click, no later slot's over it: 60 moves
+  no sentence armed or cleared an override after the decision point: 21 moves
+  no shown verb's key is the Esc key code: 21 moves
+  input on reads VAR_USERPUT for _userPut, which o5_cursorCommand copies into it (script_v5.cpp:935-938): script writes of VAR_USERPUT itself in the IR, which would break that: 0
+
+the engine's last sentence at done (the sentence script's copies of its objects: global/script-002.txt:21 [0030], global/script-002.txt:22 [0035]) against the scored action: 130 of 130 sentences and walks read; 123 match; 7 do not (7 of them accepted). The rules' table decides the action; this changes no number
+  S1#7 {'kind': 'sentence', 'verb': 2, 'a': 316, 'b': None}: pre [323, 0], done [323, 0]: no new sentence by done
+  S1#17 {'kind': 'walk_to', 'verb': 11, 'a': 621, 'b': None}: pre [912, 0], done [912, 0]: no new sentence by done
+  S1#22 {'kind': 'sentence', 'verb': 7, 'a': 568, 'b': None}: pre [621, 0], done [621, 0]: no new sentence by done
+  S2#9 {'kind': 'walk_to', 'verb': 11, 'a': 914, 'b': None}: pre [487, 0], done [487, 0]: no new sentence by done
+  S1#96 {'kind': 'sentence', 'verb': 7, 'a': 396, 'b': 749}: pre [685, 0], done [749, 396]: another sentence ran
+  S3#50 {'kind': 'sentence', 'verb': 7, 'a': 603, 'b': 377}: pre [910, 0], done [601, 0]: another sentence ran
+  S3#65 {'kind': 'sentence', 'verb': 7, 'a': 603, 'b': 377}: pre [478, 0], done [600, 0]: another sentence ran
+
+precision misses (certain, done), by fact kind: var 80, bit 38, at:script 20, script 17, at:entry 14, local 11, at:local 9, class 8, state 7, verb 5, owner 5, cutscene 2, frozen 2, esc:local 1
+  top 10 by fact (moves): at:entry:2605 14, var:229 11, var:230 11, var:52 9, var:53 9, script:23 7, bit:387 7, var:207 6, script:68 6, bit:386 5
+  top 10 by fact and wrong value (predicted -> done): at:entry:2605 0->1 14, var:52 1->0 9, var:53 1->0 9, script:23 1->0 7, bit:387 1->0 7, script:68 0->1 6, bit:386 1->0 5, bit:385 1->0 5, at:script:68:145 0->1 5, bit:384 1->0 4
+  S1#2 var:52: predicted 1, done 0
+  S1#2 var:53: predicted 1, done 0
+  S1#7 var:103: predicted 316, done 323
+  S1#10 local:211: predicted 0, done 1
+  S1#12 local:207: predicted 0, done 1
+  S1#17 var:103: predicted 621, done 912
+  S1#19 at:local:207:931: predicted 0, done 1
+  S1#19 at:local:207:978: predicted 1, done 0
+  S1#19 at:local:208:79: predicted 1, done 0
+  S1#19 local:208: predicted 1, done 0
+  S1#19 var:19: predicted 1, done 5
+  S1#19 var:32: predicted 14, done 209
+  S1#19 verb:120: predicted 0, done 1
+  S1#19 verb:121: predicted 0, done 1
+  S1#19 verb:122: predicted 0, done 1
+  S1#19 verb:123: predicted 0, done 1
+  S1#19 verb:124: predicted 0, done 1
+  S1#20 at:local:207:3007: predicted 1, done 0
+  S1#20 var:229: predicted 161, done 169
+  S1#20 var:230: predicted 51, done 52
+  S1#22 var:103: predicted 568, done 621
+  S1#23 local:207: predicted 0, done 1
+  S1#23 var:101: predicted 51, done 52
+  S1#23 var:17: predicted 160, done 224
+  S1#23 var:32: predicted 4, done 14
+  S1#26 at:entry:2605: predicted 0, done 1
+  S1#70 at:local:202:1458: predicted 0, done 1
+  S1#70 local:200: predicted 1, done 0
+  S1#70 local:202: predicted 0, done 1
+  S1#70 state:406: predicted 0, done 1
+  S1#78 at:local:212:1107: predicted 0, done 1
+  S1#78 local:212: predicted 0, done 1
+  S1#78 var:101: predicted 53, done 36
+  S1#78 var:113: predicted 0, done 633
+  S1#78 var:27: predicted 0, done 202
+  S2#9 var:103: predicted 914, done 487
+  S2#13 at:script:57:2263: predicted 1, done 0
+  S2#13 bit:386: predicted 1, done 0
+  S2#13 bit:483: predicted 1, done 0
+  S2#13 bit:505: predicted 1, done 0
+
+recall misses by fact kind (counted moves): var 824, verb 675, state 335, bit 98, at:local 92, frozen 84, at:script 64, local 52, at:entry 33, cutscene 24, script 22, at:obj 17, objscript 16, room 15, class 13, esc:script 11, esc:local 5, owner 3
+recall misses by fact kind (accepted moves): var 748, verb 675, state 328, bit 97, at:local 82, frozen 77, at:script 60, local 44, at:entry 30, cutscene 21, script 18, at:obj 17, objscript 16, room 12, esc:script 11, class 9, esc:local 5, owner 3
+top 10 missed facts (accepted moves): var:100 164, var:7 71, var:0 69, var:181 64, verb:120 49, var:52 48, var:53 48, verb:121 48, var:108 46, verb:122 40
+next 10: verb:100 32, frozen:script:159 31, verb:200 29, verb:201 29, verb:202 29, verb:203 29, verb:204 29, verb:205 29, verb:206 29, verb:207 29

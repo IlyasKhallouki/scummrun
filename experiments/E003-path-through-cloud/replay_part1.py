@@ -6,11 +6,15 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
                        (a reading from the Python reader: ROOMS comma-separated, at most two rooms; the start is
                        results/start-part1.jsonl's seed N; ``--goal part1`` is results/end-part1.json)
        replay_part1.py export-pickle PICKLE --goal ... --name NAME --start-name TEXT --out DIR   (a pickled reading)
+       replay_part1.py read-rust ROOMS --seed N --goal FACT=V[,FACT=V] --name NAME --out DIR [--threads 3]
+                       (a reading from the Rust reader, scumm/target/release/reader-scope, with golden.read_scope's
+                       domains (no goal), made into the three files and the lists by packed_reading.reading_from_golden)
        replay_part1.py control DIR/reading.json           (the control's reading next to it: DIR/control.json)
        replay_part1.py start SEED [SEED ...] --reading DIR/reading.json [--results DIR]
                        (the start check only, no goal run)
        replay_part1.py run SEED --reading DIR/reading.json [--control] [--replan-limit 500] [--time-limit 86400]
                        [--plan-time 600] [--plan-memory 6G] [--results DIR] [--deadline EPOCH]
+                       [--slot-locals [--reread]]
        replay_part1.py log NAME [--results DIR]           (the log of NAME's runs and start checks, from the json)
        score_part1.py RESULT.json ...                     (after the run: the key's Part I goals, from boot)
 
@@ -87,6 +91,14 @@ inputs replayed from boot: the run never reads E001's key.
 **A long run** keeps its record as it goes (``<run dir>/partial.json`` after every plan, outside the repo), and an
 error inside the harness stops it with its reason and traceback in the record; verify still plays what was recorded.
 
+**The slots' locals** (fix round 1, F10; ``--slot-locals``, off by default): the engine runs with the bridge's
+locals dump (EngineConfig.dump_locals; a build with it: FAST_MI_SCUMMVM_BIN or the shared build once switched), and
+at a replan the harness gives each live slot the ``args:`` number of the built list its dumped locals match (the
+reading's lists file; replay.replan_start_locals). With ``--reread``, a slot whose locals match no list has its events
+read again: the Rust reader reads the reading's scope again from its start with those slots' dumped locals
+(reader-scope ``--slot-locals``), and the harness goes on with that reading (and its control with ``--control``). The
+run's file then ends in ``-locals``. Without the flag the run is as before.
+
 C2: this file names no game number. The seeds are plan.md's; ``run`` refuses the held-out seeds 31-35 (only with
 ``--test-seeds``, for the Part I result itself) and the Any% seed always; ``start`` allows 31-35 (a start check
 plays nothing).
@@ -96,7 +108,9 @@ import argparse
 import collections
 import hashlib
 import json
+import os
 import pickle
+import re
 import statistics
 import subprocess
 import sys
@@ -137,15 +151,15 @@ def sha(path: Path) -> str:
     return hashlib.sha1(Path(path).read_bytes()).hexdigest()[:12]
 
 
-def config(seed: int, out_dir: Path, inputs: Path | None = None) -> EngineConfig:
-    """plan.md's engine settings for ``seed`` (start.py ``config``), with ``inputs`` as the raw input file (verify).
-    The Any% seed is refused."""
+def config(seed: int, out_dir: Path, inputs: Path | None = None, dump_locals: bool = False) -> EngineConfig:
+    """plan.md's engine settings for ``seed`` (start.py ``config``), with ``inputs`` as the raw input file (verify)
+    and ``dump_locals`` the bridge's locals dump (F10: observation only). The Any% seed is refused."""
     if seed == ANY_SEED:
         raise ValueError("the Any% seed is never used by the system's runs (plan.md)")
     rel = releases.get(S.RELEASE)
     return EngineConfig(out_dir=out_dir, game_path=releases.game_dir(rel), release=S.RELEASE, seed=seed,
                         boot_param=S.BOOT_PARAM, max_ticks=S.MAX_TICKS, timer_next="any", skip_text=False,
-                        skip_cutscenes=False, raw_inputs=inputs)
+                        skip_cutscenes=False, raw_inputs=inputs, dump_locals=dump_locals)
 
 
 def goal_of(text: str, domain) -> dict:
@@ -210,6 +224,96 @@ def export_pickle(pickle_path: Path, goal_text: str, name: str, start_name: str,
     return info
 
 
+READER_SCOPE = Path(os.environ.get("READER_SCOPE_BIN") or HERE / "scumm" / "target" / "release" / "reader-scope")
+
+
+def goal_text_of(goal: dict) -> str:
+    """A reading's goal ({fact: [value]}) as reader-scope's ``--goal`` (one value per fact)."""
+    parts = []
+    for k, vs in sorted(goal.items()):
+        if len(vs) != 1:
+            raise SystemExit(f"reader-scope's --goal takes one value per fact; {k} has {vs}")
+        parts.append(f"{k}={next(iter(vs))}")
+    return ",".join(parts)
+
+
+def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, threads: int = 3,
+              slot_locals: list | None = None, domain_goals: str = "none") -> Path:
+    """A reading from the Rust reader (module docstring): reader-scope on ``rooms`` from results/start-part1.jsonl's
+    seed ``seed`` (``domain_goals`` "none": golden.read_scope's domains), its records kept and written in golden.py's
+    format, then packed_reading.reading_from_golden: the three files and the lists. ``slot_locals`` (F10): slots
+    whose events are read from their dumped locals (reader-scope ``--slot-locals``). Returns reading.json."""
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    row = start_row(seed)
+    if row is None:
+        raise SystemExit(f"no start for seed {seed} in {START_ROWS}")
+    cmd = ["nice", "-n", "10", str(READER_SCOPE), "--rooms", ",".join(map(str, rooms)), "--start-seed", str(seed),
+           "--domain-goals", domain_goals, "--goal", goal_text, "--name", name, "--threads", str(threads),
+           "--out", str(out), "--packed", str(out / f"{name}.rust.tc"), "--keep", "--lines",
+           str(out / f"{name}.golden.jsonl.gz")]
+    if slot_locals:
+        sl = out / "slot-locals.jsonl"
+        sl.write_text("".join(json.dumps(x) + "\n" for x in slot_locals))
+        cmd += ["--slot-locals", str(sl)]
+    t = time.monotonic()
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    (out / "reader-scope.err").write_text(p.stderr)
+    if p.returncode != 0:
+        raise RuntimeError(f"reader-scope failed ({p.returncode}): {p.stderr.strip()[-600:]}")
+    read_s = time.monotonic() - t
+    rep = json.loads((out / f"{name}.json").read_text())
+    t = time.monotonic()
+    info = PR.reading_from_golden(out / f"{name}.golden.jsonl.gz", out / f"{name}.rust.tc", out, row["facts"],
+                                  f"results/start-part1.jsonl seed {seed}", name="reading",
+                                  info={"name": name, "rooms": list(rooms), "domain_goals": domain_goals,
+                                        "reader": "rust", "read_s": round(read_s, 1),
+                                        "reader_scope": {k: rep.get(k) for k in ("records", "read_wall_s",
+                                                                                 "peak_rss_mb", "threads",
+                                                                                 "slot_locals")},
+                                        "slot_locals": slot_locals or [],
+                                        "sources": {n: sha(HERE / n) for n in ("packed_reading.py",)}})
+    (out / f"{name}.rust.tc").unlink(missing_ok=True)  # reading_from_golden copied it to reading.tc
+    # the lists the dumped slots' events were read with: no record's next event, so the lists file lacks them
+    head = Path(info["json"])
+    doc = json.loads(head.read_text())
+    lists = out / doc["lists"]
+    have = {(x["name"], x["w"], x["sig"]) for x in (json.loads(ln) for ln in lists.read_text().splitlines()
+                                                     if ln.strip())}
+    extra = [x for x in rep.get("slot_events", []) if (x["name"], x["w"], x["sig"]) not in have]
+    with open(lists, "a") as f:
+        f.write("".join(json.dumps(x) + "\n" for x in extra))
+    doc["n_lists"] += len(extra)
+    doc["slot_lists"] = len(rep.get("slot_events", []))
+    head.write_text(json.dumps(doc, indent=1, default=str) + "\n")
+    info["lists"] += len(extra)
+    say(f"read {name}: {rep.get('records')} records in {read_s:.1f} s ({threads} threads, peak "
+        f"{rep.get('peak_rss_mb')} MB), files in {time.monotonic() - t:.1f} s: {info['actions']} actions, "
+        f"{info['lists']} lists")
+    return Path(info["json"])
+
+
+def rereader(rd, run_dir: Path, control: bool, threads: int):
+    """F10's ``reread`` for the harness (module docstring): the reading's scope again, from its start, with the
+    slots' dumped locals; its control too with ``control``. Each in run_dir/reread-NN."""
+    doc = rd.doc
+    m = re.fullmatch(r"results/start-part1\.jsonl seed (\d+)", doc["start"]["name"])
+    if m is None:
+        raise SystemExit(f"--reread needs a reading of results/start-part1.jsonl's starts, not {doc['start']['name']}")
+    seed, rooms = int(m[1]), tuple(doc["scope"]["rooms"])
+    goal = goal_text_of(doc["goal"])
+    count = [0]
+
+    def reread(slots: list, h) -> PR.Reading:
+        count[0] += 1
+        path = read_rust(rooms, seed, goal, f"reread-{count[0]:02d}", run_dir / f"reread-{count[0]:02d}", threads,
+                         slots, doc.get("domain_goals", "none"))
+        if control:
+            path = make_control(path)
+        return PR.load_reading(path)
+    return reread
+
+
 def make_control(reading: Path) -> Path:
     """The control's reading next to ``reading`` (module docstring): control.tc, control.actions.jsonl and
     control.json, made once."""
@@ -270,11 +374,11 @@ def taskcore_start_check(rd, start_facts: dict, work: Path) -> dict:
     return out
 
 
-def boot(seed: int, out_dir: Path) -> tuple:
+def boot(seed: int, out_dir: Path, dump_locals: bool = False) -> tuple:
     """A fresh engine on ``seed`` run to its first idle stop: (Controller, root Branch, row). The row holds start.py's
     fields and checks (module docstring)."""
     t = time.monotonic()
-    ctl = Controller(config(seed, out_dir), timeout_s=S.TIMEOUT_S)
+    ctl = Controller(config(seed, out_dir, dump_locals=dump_locals), timeout_s=S.TIMEOUT_S)
     ctl.start()
     b = ctl.root
     st = b.run(idle=True, max_frame=S.MAX_FRAME)
@@ -441,14 +545,19 @@ def summary(res: dict) -> dict:
 
 def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_limit: float, plan_time: int,
             test_seeds: bool = False, out_root: Path = OUT, results: Path = RESULTS,
-            plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None) -> dict:
+            plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None, slot_locals: bool = False,
+            reread: bool = False, threads: int = 3) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
     path = make_control(reading) if control else Path(reading)
     rd = PR.load_reading(path)
     name = rd.doc.get("name", Path(reading).parent.name)
-    tag = f"{name}-seed{seed}" + ("-control" if control else "")
+    if reread and not slot_locals:
+        raise SystemExit("--reread needs --slot-locals")
+    if slot_locals and rd.lists is None:
+        raise SystemExit(f"{path}: the reading has no lists file (make it with read-rust or export)")
+    tag = f"{name}-seed{seed}" + ("-control" if control else "") + ("-locals" if slot_locals else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
@@ -464,9 +573,14 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
                       "input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT, "retries": replay.RETRIES,
                       "retry_wait": replay.RETRY_WAIT},
            "sources": {n: sha(HERE / n) for n in SOURCES}, "taskcore_binary": sha(plan_fd.TASKCORE)}
+    if slot_locals:
+        out["slot_locals"] = {"reread": reread, "threads": threads, "lists": sum(map(len, rd.lists.values())),
+                              "scummvm": str(paths.SCUMMVM_BIN), "scummvm_sha1": sha(paths.SCUMMVM_BIN),
+                              "reader_scope": str(READER_SCOPE) if reread else None,
+                              "reader_scope_sha1": sha(READER_SCOPE) if reread else None}
     out["load_s"] = round(time.monotonic() - t0, 2)
     say(f"{tag}: booting to the first idle stop")
-    ctl, branch, row = boot(seed, run_dir / "run")
+    ctl, branch, row = boot(seed, run_dir / "run", dump_locals=slot_locals)
     h = None
     try:
         out["start"] = {"stop": row["stop"], "dump": row["dump"], "trace": row["trace"], "boot_s": row["boot_s"]}
@@ -488,7 +602,9 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             out["limits"].update(seconds=round(time_limit, 1), deadline=deadline)
         h = replay.Harness(rd.b, rd.task, rd.task, branch, goal, replan_limit=replan_limit, time_limit=time_limit,
                            plan_time=plan_time, progress=say, planner="taskcore", packed=rd.packed,
-                           workdir=run_dir / "plans", memory_limit=plan_memory, on_plan=snapshot)
+                           workdir=run_dir / "plans", memory_limit=plan_memory, on_plan=snapshot,
+                           slot_locals=slot_locals, lists=rd.lists,
+                           reread=rereader(rd, run_dir, control, threads) if reread else None)
         res = h.run()
         checkpoints = h.checkpoints
     finally:
@@ -581,6 +697,17 @@ def run_lines(o: dict) -> list:
                      f"taskcore {p.get('write_s', 0):.2f} s, lama-first {p.get('seconds', 0):.2f} s, "
                      f"{p.get('operators') or 0:,} operators, {p['bans']} bans, landmarks {p.get('landmarks')}"
                      + (f"; {p['error']}" if p.get("error") else "") + f": {p.get('steps', [])[:12]}")
+        if p.get("start_counts"):
+            lines.append(f"    start: {p['start_counts']}" + (f"; live slots {p['slot_locals']}" if p.get("slot_locals")
+                                                              else ""))
+    if o.get("slot_locals"):
+        sl = o["slot_locals"]
+        lines.append(f"  F10, the slots' dumped locals: {sl['lists']:,} built lists; read again {sl['reread']} "
+                     f"({sl['threads']} threads); ScummVM {sl['scummvm']} (sha1 {sl['scummvm_sha1']})")
+    for x in r.get("rereads", []):
+        lines.append(f"  read again at plan {x['plan']}, frame {x['frame']}: {x['slots']} in {x['seconds']} s, "
+                     f"{x['actions']:,} actions; before it {x.get('counts_before')}; still unmatched "
+                     f"{x['still_unmatched']}")
     for b in r["bans"]:
         lines.append(f"  ban: {b['label']} at {dict(b['values'])}")
     for st in r["steps"]:
@@ -652,6 +779,13 @@ def main() -> None:
     ep.add_argument("--name", required=True)
     ep.add_argument("--start-name", required=True)
     ep.add_argument("--out", type=Path, required=True)
+    rr = sub.add_parser("read-rust")
+    rr.add_argument("rooms")
+    rr.add_argument("--seed", type=int, required=True)
+    rr.add_argument("--goal", required=True)
+    rr.add_argument("--name", required=True)
+    rr.add_argument("--out", type=Path, required=True)
+    rr.add_argument("--threads", type=int, default=3)
     c = sub.add_parser("control")
     c.add_argument("reading", type=Path)
     s = sub.add_parser("start")
@@ -670,6 +804,9 @@ def main() -> None:
     r.add_argument("--test-seeds", action="store_true", help="allow the test seeds 31-35 (the Part I result only)")
     r.add_argument("--deadline", type=float, default=None,
                    help="UTC epoch seconds: the harness's time limit ends there at the latest (a VM's end, less a plan)")
+    r.add_argument("--slot-locals", action="store_true", help="F10: the slots' dumped locals at a replan")
+    r.add_argument("--reread", action="store_true", help="F10: read slots no list matches again (Rust reader)")
+    r.add_argument("--threads", type=int, default=3, help="the Rust reader's threads for --reread")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -679,6 +816,8 @@ def main() -> None:
                                        a.workers), indent=1))
     elif a.cmd == "export-pickle":
         print(json.dumps(export_pickle(a.pickle, a.goal, a.name, a.start_name, a.out), indent=1))
+    elif a.cmd == "read-rust":
+        print(read_rust(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out, a.threads))
     elif a.cmd == "control":
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
@@ -686,7 +825,8 @@ def main() -> None:
         cmd_start(a.seeds, a.reading, a.results)
     elif a.cmd == "run":
         cmd_run(a.seed, a.reading, a.control, a.replan_limit, a.time_limit, a.plan_time, a.test_seeds,
-                results=a.results, plan_memory=a.plan_memory, deadline=a.deadline)
+                results=a.results, plan_memory=a.plan_memory, deadline=a.deadline, slot_locals=a.slot_locals,
+                reread=a.reread, threads=a.threads)
     else:
         cmd_log(a.name, a.results)
 

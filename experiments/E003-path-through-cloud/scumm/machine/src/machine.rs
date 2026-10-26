@@ -12,8 +12,10 @@
 //! `run_verb` and the input step, in `dialog.rs`) and row 5 (feature esc: `run_esc` and the abort, override and key
 //! steps, in `esc.rs`). Every feature of model.py is ported.
 
+mod actor_rooms;
 mod calls;
 mod dialog;
+mod draw_clears;
 mod esc;
 mod hooks;
 mod rooms;
@@ -130,13 +132,28 @@ impl Features {
     }
 }
 
-/// model.py `SWITCHES`, as flags.
+/// model.py `SWITCHES`, as flags, and fix round 1's switches, which model.py does not have (the Python stays the
+/// frozen reference; fix-round1.md). Every switch is off by default.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 pub struct Switches {
     pub input_after_turns: bool,
     pub const_polls: bool,
     pub esc_key_at_pre: bool,
+    /// F5: drawObject's setXY moves the object (`objpos:O`), and the objects of the room with the drawn object's
+    /// place and size go to state 0 (script_v5.cpp:1108-1128); loading a room puts its objects back (room.cpp:195)
+    pub draw_clears: bool,
+    /// F9: an actor's room is a fact, `actorroom:A`: putActorInRoom and loadRoomWithEgo write it
+    /// (script_v5.cpp:2160-2196, 1857-1866), getActorRoom and actorFollowCamera read it (script_v5.cpp:1289-1322;
+    /// camera.cpp:62-70)
+    pub actor_rooms: bool,
+    /// fix round 1, F12 (fix-round1.md; Rust only, no model.py switch): the mouse variables as ranges, findObject
+    /// and actorFromPos as value sets, tests on ranges and on value sets past MAX_VALUES decided where every value
+    /// agrees, and a forked test on a variable or local that holds a range or a set narrowing it on each side
+    pub value_sets: bool,
 }
+
+/// Fix round 1's switches: in the Rust only (model.py's `SWITCHES` lacks them).
+pub const RUST_SWITCHES: &[&str] = &["draw_clears", "actor_rooms", "value_sets"];
 
 impl Switches {
     pub fn parse(names: &[String]) -> Result<Switches, String> {
@@ -146,6 +163,9 @@ impl Switches {
                 "input_after_turns" => s.input_after_turns = true,
                 "const_polls" => s.const_polls = true,
                 "esc_key_at_pre" => s.esc_key_at_pre = true,
+                "draw_clears" => s.draw_clears = true,
+                "actor_rooms" => s.actor_rooms = true,
+                "value_sets" => s.value_sets = true,
                 _ => return Err(format!("unknown switch {n}")),
             }
         }
@@ -243,6 +263,104 @@ pub struct Machine<'g> {
     pub hooks: Option<&'static dyn Hooks>,
     /// the hooking side's own state
     pub ext: Option<Box<dyn std::any::Any>>,
+    /// F12: the objects findObject can give besides 0 (the reader's scope); None: the room's objects
+    pub find_objects: Option<Rc<[i32]>>,
+    /// F12: the tallest main screen the scripts set (`mouse_range`), worked out once
+    screen_h: std::cell::Cell<Option<i32>>,
+}
+
+/// F12: the engine's mouse bounds for SCUMM v5 (input.cpp:414-434): the mouse is clipped to the screen,
+/// _screenWidth x _screenHeight (scumm.cpp:395-396), VAR_VIRT_MOUSE_X adds the main screen's left edge (`screen_lefts`),
+/// and VAR_VIRT_MOUSE_Y subtracts the main screen's top and is -1 off it
+/// (its height set by resetScumm, initScreens(16, 144) for v5 (scumm.cpp:2053), then by the scripts' roomOps
+/// SetScreen, script_v5.cpp:2392-2397, gfx.cpp:386).
+pub const SCREEN_HEIGHT: i32 = 200;
+/// F12: the main screen's height resetScumm sets for SCUMM v5 (initScreens(16, 144), scumm.cpp:2053).
+pub const RESET_MAIN_HEIGHT: i32 = 144 - 16;
+
+/// F12: the main screen's left edge in a room `w` wide, lowest and highest, for SCUMM v5 (camera.cpp:169-192):
+/// cameraMoved clamps the camera to 160 where it is left of that, else to `w` - 160 where it is right of that, and the
+/// screen starts at the camera's strip less half the strips (40 of 8 pixels). A room narrower than the screen can
+/// start left of 0. C's division truncates toward zero, as Rust's does.
+pub fn screen_lefts(w: i32) -> (i32, i32) {
+    let half = SCREEN_WIDTH / 2;
+    let left = |cx: i32| (cx / 8 - SCREEN_WIDTH / 16) * 8;
+    if w >= SCREEN_WIDTH {
+        (left(half), left(w - half))
+    } else {
+        (left(w - half).min(left(half)), left(half))
+    }
+}
+
+impl<'g> Machine<'g> {
+    /// F12: the range of mouse variable `n` (VAR_VIRT_MOUSE_X/Y, VAR_MOUSE_X/Y), from the game: the main screen's
+    /// left edges in `rooms` (room resources; None or none known: every room of the game), the tallest main screen
+    /// the scripts set (the screen's height where one is not a constant).
+    pub fn mouse_range(&self, n: i32, rooms: Option<&[i32]>) -> (i32, i32) {
+        let g = self.game;
+        match n {
+            44 => (0, SCREEN_WIDTH - 1),
+            45 => (0, SCREEN_HEIGHT - 1),
+            20 => {
+                let mut ws: Vec<i32> = rooms.unwrap_or(&[]).iter().filter_map(|r| g.room_width.get(r).copied()).collect();
+                if ws.is_empty() {
+                    ws = g.room_width.values().copied().collect();
+                }
+                let lefts: Vec<(i32, i32)> = ws.into_iter().map(screen_lefts).collect();
+                let lo = lefts.iter().map(|l| l.0).min().unwrap_or(0);
+                let hi = lefts.iter().map(|l| l.1).max().unwrap_or(0);
+                (lo, hi + SCREEN_WIDTH - 1)
+            }
+            21 => {
+                if let Some(h) = self.screen_h.get() {
+                    return (-1, h - 1);
+                }
+                // resetScumm's main screen, then every roomOps SetScreen(top, bottom) of the scripts: the main screen
+                // is bottom - top high
+                let mut h = RESET_MAIN_HEIGHT;
+                let mut seen = |args: Span| {
+                    let a: Vec<Option<i32>> = g.ast.kids(args).iter().map(|&e| g.ast.constant(e)).collect();
+                    h = match a.as_slice() {
+                        [Some(t), Some(b)] => h.max(b - t),
+                        _ => SCREEN_HEIGHT,
+                    };
+                };
+                for x in g.ins.iter() {
+                    if let Some(Stmt::Op { name, args, subops, .. }) = x.st {
+                        if name == known::SET_SCREEN {
+                            seen(args);
+                        }
+                        for sub in g.ast.subs(subops) {
+                            if sub.name == known::SET_SCREEN {
+                                seen(sub.args);
+                            }
+                        }
+                    }
+                }
+                let h = h.clamp(1, SCREEN_HEIGHT);
+                self.screen_h.set(Some(h));
+                (-1, h - 1)
+            }
+            _ => panic!("var {n} is not a mouse variable"),
+        }
+    }
+
+    /// F12: the value a mouse variable has at a click: its range (switch value_sets; in the room the oracle gives,
+    /// where processInput worked it out), else model.py's unknown.
+    pub(crate) fn mouse_value(&mut self, o: &FactOracle, n: i32, name: &str) -> Val {
+        let what = format!("{name}: the mouse moved to the click");
+        if self.switches.value_sets {
+            let room = self.oget(o, Fact::Room);
+            let res = match self.resource(room) {
+                Val::Int(r) => vec![r],
+                Val::Unk(_) => vec![],
+            };
+            let (lo, hi) = self.mouse_range(n, Some(&res));
+            self.v.mk_range(Reason::Input, &what, lo, hi)
+        } else {
+            self.v.mk(Reason::Input, what)
+        }
+    }
 }
 
 impl<'g> Machine<'g> {
@@ -273,7 +391,16 @@ impl<'g> Machine<'g> {
             conds: FxHashMap::default(),
             hooks: None,
             ext: None,
+            find_objects: None,
+            screen_h: Default::default(),
         }
+        .with_wide()
+    }
+
+    /// The run's values follow switch value_sets (F12).
+    fn with_wide(mut self) -> Self {
+        self.v.wide = self.switches.value_sets;
+        self
     }
 
     // --- helpers ----------------------------------------------------------------------------------------
@@ -362,6 +489,7 @@ impl<'g> Machine<'g> {
     /// The Run of an entry point that ran nothing, or of `_drive`: it takes the run's unknowns.
     fn finish_run(&mut self, mut r: Run) -> Run {
         r.vals = std::mem::take(&mut self.v);
+        self.v.wide = self.switches.value_sets;
         self.ocache.clear();
         r
     }
@@ -663,6 +791,7 @@ impl<'g> Machine<'g> {
             }
             Expr::Neg(a) => match self.val(p, o, a, x) {
                 Val::Int(v) => Val::Int(wrap32(-(v as i64))),
+                u if self.v.wide && self.v.range(u).is_some() => self.v.arith(Op::Sub, Val::Int(0), u),
                 u => u,
             },
             Expr::Getter { name, args } => self.getter(p, o, name, args, x),
@@ -760,7 +889,16 @@ impl<'g> Machine<'g> {
         }
         match getter_kind(name) {
             Some(GetterKind::Fact) => {}
-            Some(GetterKind::NonFact(r)) => return self.getter_unknown(r, name),
+            // F9 (switch actor_rooms): getActorRoom reads the actor's room fact (actor_rooms.rs)
+            Some(GetterKind::NonFact(_)) if name == known::GET_ACTOR_ROOM && self.switches.actor_rooms => {}
+            Some(GetterKind::NonFact(r)) => {
+                if self.switches.value_sets {
+                    if let Some(v) = self.getter_set(p, o, name) {
+                        return v;
+                    }
+                }
+                return self.getter_unknown(r, name);
+            }
             None => return self.getter_unknown(Reason::Work, name),
         }
         let mut vals = Vec::new();
@@ -770,6 +908,16 @@ impl<'g> Machine<'g> {
             }
         }
         if let Some(&bad) = vals.iter().find(|&&v| self.v.is_plain(v)) {
+            if name == known::GET_ACTOR_ROOM {
+                // F9: the room of an actor not known is getActorRoom's non-fact, as with the switch off (the actor's
+                // unknown would say nothing of the room); with value_sets an actor's range reads the same way
+                return self.getter_unknown(Reason::Actor, name);
+            }
+            if self.v.range(bad).is_some() {
+                // F12: a range is no fact getter's value: the getter on it is not known
+                let what = format!("{} of {}", self.sym(name), self.v.unk(bad).unwrap().what);
+                return self.v.mk(Reason::Work, what);
+            }
             return bad;
         }
         if let Some(&s0) = vals.iter().find(|v| v.is_unknown()) {
@@ -802,6 +950,28 @@ impl<'g> Machine<'g> {
             return self.v.one_of(ints, s0.reason, what);
         }
         self.getter_on(p, o, name, args, &vals, x)
+    }
+
+    /// F12: findObject's value, 0 or an object (the reader's scope, else the room's: object.cpp:557-597), and
+    /// actorFromPos's, 0 or an actor (actor.cpp:2115-2147, _numActors); None: the room is not known.
+    fn getter_set(&mut self, p: &mut Path, o: &FactOracle, name: Sym) -> Option<Val> {
+        let g = self.game;
+        let mut vals: Vec<i32> = vec![0];
+        match name {
+            known::FIND_OBJECT => match &self.find_objects {
+                Some(objs) => vals.extend(objs.iter().copied()),
+                None => {
+                    let room = self.read(p, Fact::Room, o);
+                    let Val::Int(res) = self.resource(room) else { return None };
+                    let mut objs: Vec<i32> = g.object_room.iter().filter(|e| *e.1 == res).map(|e| *e.0).collect();
+                    objs.sort_unstable();
+                    vals.extend(objs);
+                }
+            },
+            known::ACTOR_FROM_POS => vals.extend(1..NUM_ACTORS),
+            _ => return None,
+        }
+        Some(self.v.mk_set(Reason::Position, self.sym(name), vals))
     }
 
     /// The objects whose owner fact is `owner` (model.py `_owned_by`), or the first owner fact, in key
@@ -858,6 +1028,7 @@ impl<'g> Machine<'g> {
         match name {
             known::GET_OBJECT_OWNER => self.read(p, Fact::Owner(int(vals[0])), o),
             known::GET_OBJECT_STATE => self.read(p, Fact::State(int(vals[0])), o),
+            known::GET_ACTOR_ROOM => self.actor_room(p, o, int(vals[0])),
             known::IS_SCRIPT_RUNNING => {
                 let n = int(vals[0]);
                 if n == 0 {
@@ -1198,6 +1369,10 @@ impl<'g> Machine<'g> {
                         self.end(p, o, "unmodelled", c, false, None);
                     }
                     Effect::Write | Effect::End | Effect::Deferred => more = self.op(p, o, x, st),
+                    // F9 (switch actor_rooms): putActorInRoom writes the actor's room (actor_rooms.rs)
+                    Effect::None if name == known::PUT_ACTOR_IN_ROOM && self.switches.actor_rooms => {
+                        more = self.op(p, o, x, st)
+                    }
                     Effect::None => {}
                 }
                 if eff == Effect::End {
@@ -1265,7 +1440,68 @@ impl<'g> Machine<'g> {
                 q.assumptions.push(Assumption { cite, cond: cond_s, side: Side::Bool(false), why });
                 p.frame_mut().unwrap().pc = ins.next;
                 q.frame_mut().unwrap().pc = ins.target;
+                if self.switches.value_sets {
+                    self.narrow(p, &mut q, cond, u);
+                }
                 vec![q]
+            }
+        }
+    }
+
+    /// F12: a fork on a test of a variable or local that holds a range or a value set (against a constant, or a
+    /// zero test) leaves it on each side with the values that side allows, so a later test on it in the same path
+    /// is decided (a comparison chain, a range split at its bound). A variable the path has not written is not
+    /// narrowed (it is the oracle's, or the reader's fact, forked on read). Only the value the test decided on
+    /// (`u`) is narrowed, and only model.py's own unknowns (class 0): not a hook's (a reader step counter, a
+    /// conditional write or a copy), whose value the location does not hold as such.
+    fn narrow(&mut self, yes: &mut Path, no: &mut Path, cond: ExprId, u: Val) {
+        let g = self.game;
+        use scumm_ir::CmpOp::*;
+        let cmp = |op: scumm_ir::CmpOp, y: i32, z: i32| {
+            let (y, z) = (i16w(y), i16w(z));
+            match op {
+                Eq => y == z,
+                Ne => y != z,
+                Lt => y < z,
+                Le => y <= z,
+                Gt => y > z,
+                Ge => y >= z,
+            }
+        };
+        // (the location, the test on its value)
+        let (loc, test): (ExprId, Box<dyn Fn(i32) -> bool>) = match g.ast.expr(cond) {
+            Expr::Cmp { op, a, b } => match (g.ast.constant(a), g.ast.constant(b)) {
+                (None, Some(c)) => (a, Box::new(move |v| cmp(op, v, c))),
+                (Some(c), None) => (b, Box::new(move |v| cmp(op, c, v))),
+                _ => return,
+            },
+            Expr::Not(a) => (a, Box::new(|v| v == 0)),
+            Expr::Truth(a) => (a, Box::new(|v| v != 0)),
+            _ => return,
+        };
+        let get = |p: &Path| -> Option<Val> {
+            match g.ast.expr(loc) {
+                Expr::Var(n) => p.writes.get(&Fact::Var(n)).copied(),
+                Expr::Local(n) => p.frame().and_then(|f| f.local(n)),
+                _ => None,
+            }
+        };
+        let Some(v) = get(yes) else { return };
+        if v != u || self.v.unk(v).is_none_or(|x| x.class != 0) {
+            return;
+        }
+        if self.v.range(v).is_none() && self.v.values_of(v).is_none_or(|vs| vs.len() < 2) {
+            return;
+        }
+        for (side, q) in [(true, yes), (false, no)] {
+            if get(q) != Some(v) {
+                continue;
+            }
+            let Some(nv) = self.v.restrict(v, |x| test(x) == side) else { continue };
+            match g.ast.expr(loc) {
+                Expr::Var(n) => q.writes.insert(Fact::Var(n), nv),
+                Expr::Local(n) => q.frame_mut().unwrap().set_local(n, nv),
+                _ => {}
             }
         }
     }
@@ -1629,6 +1865,8 @@ impl<'g> Machine<'g> {
                 }
             }
             known::SET_OBJECT_NAME => self.inventory_hook(p, o, x, 0, "setObjectName"),
+            known::DRAW_OBJECT if self.switches.draw_clears => return self.draw_object_f5(p, o, x, args, subops),
+            known::PUT_ACTOR_IN_ROOM => return self.put_actor_in_room(p, o, x, args),
             known::DRAW_OBJECT => {
                 let ob = self.val(p, o, args[0], Some(x));
                 let mut state = Val::Int(1);
@@ -1742,6 +1980,7 @@ impl<'g> Machine<'g> {
             known::LOAD_ROOM_WITH_EGO => {
                 let obj = self.val(p, o, args[0], Some(x));
                 let room = self.val(p, o, args[1], Some(x));
+                self.ego_room(p, o, x, room); // F9 (switch actor_rooms), actor_rooms.rs
                 if self.calls {
                     // o5_loadRoomWithEgo (script_v5.cpp:1857-1902): VAR_WALKTO_OBJ = obj, startScene(room, ego,
                     // obj), VAR_WALKTO_OBJ = 0 (room_change), then setCameraFollows(ego): a possible setCameraAt
@@ -1767,12 +2006,48 @@ impl<'g> Machine<'g> {
             }
             known::ACTOR_FOLLOW_CAMERA => {
                 let a = self.val(p, o, args[0], Some(x));
-                let mut q = p.fork();
                 let what = format!("room of actor {}", self.show(a));
-                let why = rc(&format!("?(actor state: {what})"));
-                let cond = rc(&format!("actor {} in the current room", self.show_e(args[0])));
-                p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
-                q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+                // F9 (switch actor_rooms): the actor's room against the current room (camera.cpp:68-70), and the room
+                // a change goes to (actor_rooms.rs). With the switch off, an actor not known, or a room not known (a
+                // plain unknown: not held, or the reader's non-fact), model.py's fork on a non-fact
+                let (inroom, aroom) = match a {
+                    Val::Int(n) if self.switches.actor_rooms => {
+                        if !(0..NUM_ACTORS).contains(&n) {
+                            let d = format!("actorFollowCamera: actor {n} is no actor (derefActor's error(), actor.cpp:2281-2293)");
+                            self.error(p, "no such actor", cite, &d, true);
+                            return Vec::new();
+                        }
+                        // decided only on rooms the path already has: these reads never fork (`read_soft`; a
+                        // reader would fork on every pair of the actor's rooms and the current room's), and the
+                        // current room is read only when the actor's is known
+                        let r = self.read_soft(p, Fact::ActorRoom(n), o);
+                        match r {
+                            Val::Int(_) => {
+                                let cur = self.read_soft(p, Fact::Room, o);
+                                (Some(self.v.decide(&[r, cur], |v| v[0] == v[1])), Some(r))
+                            }
+                            Val::Unk(_) if self.v.is_plain(r) => (None, None),
+                            Val::Unk(_) => (Some(Dec::Unk(r)), Some(r)),
+                        }
+                    }
+                    _ => (None, None),
+                };
+                // the sides: in the current room (no room change), elsewhere (the room change)
+                let (stay, go) = match inroom {
+                    Some(Dec::Bool(true)) => (true, None),
+                    Some(Dec::Bool(false)) => (false, None),
+                    _ => {
+                        let mut q = p.fork();
+                        let why = match inroom {
+                            Some(Dec::Unk(u)) => rc(&self.show(u)),
+                            _ => rc(&format!("?(actor state: {what})")),
+                        };
+                        let cond = rc(&format!("actor {} in the current room", self.show_e(args[0])));
+                        p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
+                        q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+                        (true, Some(q))
+                    }
+                };
                 if self.calls {
                     // actorFollowCamera (camera.cpp:201-212): setCameraFollows (camera.cpp:62-86) changes the room
                     // when the actor is elsewhere and then always calls setCameraAt, so the scroll hook runs
@@ -1784,22 +2059,52 @@ impl<'g> Machine<'g> {
                         Step::Note(rc("a second inventory hook run when the followed actor changed (camera.cpp:207-208) \
                                        is not run: camera._follows is not a fact")),
                     ];
+                    let change = |m: &mut Self, q: &mut Path| {
+                        let r = match aroom {
+                            Some(r) => r,
+                            None => m.v.mk(Reason::Actor, what.clone()),
+                        };
+                        let mut steps = m.scene_steps(r, None);
+                        steps.push(Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() });
+                        steps.extend(tail.iter().cloned());
+                        m.push_call(q, rc("actorFollowCamera"), cite.clone(), steps, true);
+                    };
+                    if !stay {
+                        change(self, p);
+                        return Vec::new();
+                    }
                     self.push_call(p, rc("actorFollowCamera"), cite.clone(), tail.to_vec(), true);
-                    let r = self.v.mk(Reason::Actor, what);
-                    let mut steps = self.scene_steps(r, None);
-                    steps.push(Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() });
-                    steps.extend(tail);
-                    self.push_call(&mut q, rc("actorFollowCamera"), cite, steps, true);
-                    return vec![q];
+                    return match go {
+                        Some(mut q) => {
+                            change(self, &mut q);
+                            vec![q]
+                        }
+                        None => Vec::new(),
+                    };
                 }
                 // setCameraFollows runs the inventory hook last, also after a room change (camera.cpp:61-86)
-                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
-                self.hook(&mut q, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
-                if q.end.is_none() {
-                    let r = self.v.mk(Reason::Actor, what);
-                    self.room_change(&mut q, o, r, x, "actorFollowCamera");
+                let change = |m: &mut Self, q: &mut Path| {
+                    m.hook(q, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
+                    if q.end.is_none() {
+                        let r = match aroom {
+                            Some(r) => r,
+                            None => m.v.mk(Reason::Actor, what.clone()),
+                        };
+                        m.room_change(q, o, r, x, "actorFollowCamera");
+                    }
+                };
+                if !stay {
+                    change(self, p);
+                    return Vec::new();
                 }
-                return vec![q];
+                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
+                return match go {
+                    Some(mut q) => {
+                        change(self, &mut q);
+                        vec![q]
+                    }
+                    None => Vec::new(),
+                };
             }
             known::SET_CAMERA_AT => {
                 if self.calls {
