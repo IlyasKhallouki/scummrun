@@ -3,13 +3,14 @@
 //! reader-port static                  domains, scopes, hook summaries, the Builder's machine-free parts
 //! reader-port records NAME            golden records parsed and written back
 //! reader-port replay NAME [--out F]   the reading by the Rust Builder over the captured runs, against golden.py's
-//! reader-port read NAME [--threads N] [--switches S,...] [--live-locals] [--out F] [--golden F] [--packed F]
-//!                  [--task-out DIR]
+//! reader-port read NAME [--threads N] [--switches S,...] [--live-locals] [--elsewhere] [--out F] [--golden F]
+//!                  [--packed F] [--task-out DIR]
 //!                                     the reading with the Rust machine half (fix round 1's switches on), against
-//!                                     golden.py's (switches off) or --golden's; --live-locals reads with that switch
-//!                                     (PORT-NOTES.md, "Live locals"; the comparison then shows the renumbered
-//!                                     lists), --packed writes its packed file as made (the kitchen's goal and start
-//!                                     s17; room 33's start as "start")
+//!                                     golden.py's (switches off) or --golden's; --live-locals and --elsewhere read
+//!                                     with those switches (PORT-NOTES.md, "Live locals", "ELSEWHERE"; the comparison
+//!                                     then shows the renumbered lists), --packed writes its packed file as made (the
+//!                                     kitchen's goal and start s17; room 33's start as "start"; not with due_first,
+//!                                     whose writes go on the kept records after the reading: use --task-out)
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
@@ -153,15 +154,21 @@ fn main() {
             let sw = Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
             let cpu0 = scumm_reader::cpu_secs();
             let live = args.iter().any(|a| a == "--live-locals");
+            let elsewhere = args.iter().any(|a| a == "--elsewhere");
             let packed_out = arg(&args, "--packed");
+            assert!(
+                !(sw.due_first && packed_out.is_some()),
+                "--packed streams the records as made, and due_first writes due: on the kept records after the reading; use --task-out"
+            );
             // the packed file's stream, finished after the comparison: its start (`task_start`) and `finish` add
             // builder counters, which the reading (golden.py's file) must not have
             let mut packing: Option<packed::RecordStream> = None;
             let (mut b, secs) = match arg(&args, "--threads") {
-                _ if live || packed_out.is_some() => {
-                    // the switch on, or the packed file written as made: on `--threads` workers (default 0)
+                _ if live || elsewhere || packed_out.is_some() => {
+                    // a switch on, or the packed file written as made: on `--threads` workers (default 0)
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
                     let mut b = oracle::builder_with(&game, &st, name, sw);
+                    b.table.elsewhere = elsewhere;
                     if live {
                         b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(&game)));
                     }
