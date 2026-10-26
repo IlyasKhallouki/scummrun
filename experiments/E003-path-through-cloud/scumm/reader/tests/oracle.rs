@@ -275,6 +275,130 @@ fn room33_reading_elsewhere_on() {
     assert_none("room33 reading, switch on", oracle::compare_reading(&b, &oracle::golden_dir().join("room33.jsonl.gz"), 5));
 }
 
+/// The switch --live-locals (PORT-NOTES.md, "Live locals") on scope `name`, on `threads` workers, against golden.py's
+/// reading (made without it). Each list of locals the golden reading built, with the slot's flags its event carries,
+/// maps to the list of the locals its unit reads with those flags (same unit name, read locals, override, cutscene
+/// data, resistant, owned, and recursive as the switch keys it: true or not); that map must be a function and lose no list, and
+/// the golden records with
+/// their lists renumbered by it must be exactly the switch's records, as sets (lists that differ only in unread locals
+/// gave the same records). Returns (golden records, the switch's records, golden lists with their flags, the switch's
+/// lists).
+fn live_locals_against_golden(name: &str, threads: usize) -> (usize, usize, usize, usize) {
+    use scumm_reader::domain::Label;
+    use scumm_reader::locals::LiveLocals;
+    use scumm_reader::record::{Eff, Event, Val, What};
+    use std::collections::{BTreeMap, BTreeSet};
+    let ll = std::sync::Arc::new(LiveLocals::of(game()));
+    let mut b = oracle::builder(game(), static_oracle(), name);
+    b.table.live_locals = Some(ll.clone());
+    let scope = b.scope.clone();
+    scumm_reader::par::with_pool(game(), &scope, threads, |pool| {
+        b.read_all_into(pool, true, None, 2, None);
+    });
+    let (golden, bad) = oracle::golden_records(&oracle::golden_dir().join(format!("{name}.jsonl.gz")));
+    assert!(bad.is_empty(), "golden records written back: {bad:?}");
+    let events = |r: &scumm_reader::Record| -> Vec<Event> {
+        let mut v = r.next_events.clone();
+        if let What::Event(e) = &r.source {
+            v.push(e.clone());
+        }
+        v
+    };
+    let flags = |e: &Event| format!("{}|{}|{}", scumm_reader::locals::recursive(&e.recursive).text(), e.resistant.text(), e.owned.text());
+    let key = |e: &Event, locals: &[(i64, Val)]| {
+        let l: Vec<String> = locals.iter().map(|(i, v)| format!("{i}={}", v.show())).collect();
+        format!("{}|{}|{}|{:?}|{}", e.name, l.join(","), e.override_, e.cut_data, flags(e))
+    };
+    let mut off: BTreeMap<(i64, String), BTreeSet<String>> = BTreeMap::new();
+    for r in &golden {
+        for e in events(r).iter().filter(|e| e.sig != 0) {
+            off.entry((e.sig, flags(e))).or_default().insert(key(e, &ll.keep(e.unit, e.locals.clone()).0));
+        }
+    }
+    let mut on: BTreeMap<String, BTreeSet<i64>> = BTreeMap::new();
+    for r in &b.records {
+        for e in events(r).iter().filter(|e| e.sig != 0) {
+            on.entry(key(e, &e.locals)).or_default().insert(e.sig);
+        }
+    }
+    assert!(on.values().all(|s| s.len() == 1), "a list with two numbers");
+    let map: BTreeMap<(i64, String), i64> = off
+        .iter()
+        .map(|((s, f), keys)| {
+            assert_eq!(keys.len(), 1, "golden list {s:x}: two lists of read locals");
+            let k = keys.iter().next().unwrap();
+            let t = on.get(k).unwrap_or_else(|| panic!("golden list {s:x}: no list with its read locals")).iter().next().unwrap();
+            ((*s, f.clone()), *t)
+        })
+        .collect();
+    let m = |s: i64, f: &str| if s == 0 { 0 } else { map[&(s, f.to_string())] };
+    let renum_event = |e: &Event| -> Event {
+        let mut e2 = e.clone();
+        e2.sig = m(e.sig, &flags(e));
+        e2.locals = ll.keep(e.unit, e.locals.clone()).0;
+        e2.recursive = scumm_reader::locals::recursive(&e.recursive);
+        e2
+    };
+    let mut renumbered: BTreeSet<String> = BTreeSet::new();
+    for r in &golden {
+        let mut r = r.clone();
+        let next: BTreeMap<String, String> = r.next_events.iter().map(|e| (format!("args:{}", e.name), flags(e))).collect();
+        for (k, e) in r.effects.iter_mut() {
+            if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), &*e) {
+                *e = Eff::Set(Label::Int(m(*s, &next[k])));
+            }
+        }
+        if let What::Event(e) = &r.source {
+            let (own, f) = (format!("args:{}", e.name), flags(e));
+            for (k, set) in r.pre.iter_mut() {
+                if *k == own {
+                    let mut v: Vec<Label> = set.iter().map(|l| if let Label::Int(s) = l { Label::Int(m(*s, &f)) } else { *l }).collect();
+                    v.sort();
+                    v.dedup();
+                    *set = v;
+                }
+            }
+            let e2 = renum_event(e);
+            r.label = r.label.replace(&format!("#{:x})", e.sig), &format!("#{:x})", e2.sig));
+            r.source = What::Event(e2);
+        }
+        r.next_events = r.next_events.iter().map(|e| renum_event(e)).collect();
+        renumbered.insert(r.py().text());
+    }
+    let mine: BTreeSet<String> = b.records.iter().map(|r| r.py().text()).collect();
+    let lost = renumbered.difference(&mine).count();
+    let added = mine.difference(&renumbered).count();
+    assert!(lost == 0 && added == 0, "{name}: {lost} golden records renumbered not in the switch's reading, {added} the other way");
+    let on_lists: BTreeSet<i64> = map.values().copied().collect();
+    eprintln!(
+        "{name}, switch on: {} golden records ({} distinct renumbered), {} records; {} golden lists onto {} lists",
+        golden.len(),
+        renumbered.len(),
+        b.records.len(),
+        map.len(),
+        on_lists.len()
+    );
+    (golden.len(), b.records.len(), map.len(), on_lists.len())
+}
+
+/// Room 33 read with the switch --live-locals on 2 workers: the golden records, renumbered, exactly (38 lists onto 38:
+/// one list drops locals its unit never reads, and no two lists merge).
+#[test]
+fn room33_live_locals_on() {
+    let (g, n, lists, on) = live_locals_against_golden("room33", 2);
+    assert_eq!((g, n, lists, on), (878, 878, 38, 38));
+}
+
+/// The kitchen read with the switch --live-locals on 3 workers, against golden.py's reading (about 2 minutes):
+/// 72,256 golden records, 72,124 of them distinct once renumbered, are the switch's 72,126 records (72,124
+/// distinct); 5,298 lists onto 5,221.
+#[test]
+#[ignore]
+fn kitchen_live_locals_on() {
+    let (g, n, lists, on) = live_locals_against_golden("kitchen", 3);
+    assert_eq!((g, n, lists, on), (72256, 72126, 5298, 5221));
+}
+
 #[test]
 #[ignore]
 fn kitchen_records_written_back() {
