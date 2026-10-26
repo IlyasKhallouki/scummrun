@@ -42,15 +42,16 @@
 //!               the packed file's goal (default results/end-part1.json's)
 //! --slot-locals FILE
 //!               fix round 1, F10: slots live in the engine with the locals the bridge dumped, one JSON object per
-//!               line ({"name", "room", "w", "esc", "locals", "override", "cut_data", "owned"}); their events are
-//!               read with the start's (`Builder.slot_locals`). Without it the reading is as before.
+//!               line ({"name", "room", "w", "esc", "locals", "override", "cut_data", "owned"}, and "flags":
+//!               {"resistant", "recursive", "owned"} from a dump that has them, which --live-locals needs); their
+//!               events are read with the start's (`Builder.slot_locals`). Without it the reading is as before.
 //! --sample N --seed S --dump FILE
 //!               the spot-check's jobs: of the last pass, N per stratum (the room a job's unit or object belongs
 //!               to, or "global"), drawn by reservoir sampling with seed S; each written to FILE with what its batch
 //!               started with (the `args:` values, the folded lists) and its records (golden.py's encoding), for
 //!               reader_job_dump.py to make again in Python
 
-use scumm_reader::builder::{Builder, RecordSink, SlotLocals};
+use scumm_reader::builder::{Builder, RecordSink, SlotFlags, SlotLocals};
 use scumm_reader::domain::Label;
 use scumm_reader::packed::RecordStream;
 use scumm_reader::py::Py;
@@ -379,6 +380,11 @@ fn slot_locals(path: &str) -> Vec<SlotLocals> {
                 override_: v["override"].as_i64().unwrap_or(0),
                 cut_data: v.get("cut_data").map_or(vec![], ints),
                 owned: v["owned"].as_bool().unwrap_or(false),
+                flags: v.get("flags").filter(|f| !f.is_null()).map(|f| SlotFlags {
+                    resistant: f["resistant"].as_bool().expect("flags.resistant"),
+                    recursive: f["recursive"].as_bool().expect("flags.recursive"),
+                    owned: f["owned"].as_bool().expect("flags.owned"),
+                }),
             }
         })
         .collect()
@@ -742,17 +748,29 @@ fn main() {
     }
     // F10: the lists the dumped slots' events were read with (the harness matches the slots against them after a
     // reading made again), each as packed_reading's list lines
+    // (under --live-locals with the slot's flags, which the number covers, as packed_reading.py's lines have them)
+    let flag = |p: &Py| match p {
+        Py::Bool(x) => json!(x),
+        Py::None => Value::Null,
+        other => json!({"unknown": other.text()}),
+    };
     r["slot_events"] = json!(task::slot_lists(&b)
         .into_iter()
         .flat_map(|((name, w), ls)| ls.into_iter().map(move |l| (name.clone(), w, l)))
-        .map(|(name, w, l)| json!({
-            "name": name,
-            "w": w,
-            "sig": l.sig,
-            "locals": l.locals.iter().map(|(n, v)| json!([n, v.int().expect("a dumped local is a number")])).collect::<Vec<_>>(),
-            "override": l.override_,
-            "cut_data": l.cut_data,
-        }))
+        .map(|(name, w, l)| {
+            let mut x = json!({
+                "name": name,
+                "w": w,
+                "sig": l.sig,
+                "locals": l.locals.iter().map(|(n, v)| json!([n, v.int().expect("a dumped local is a number")])).collect::<Vec<_>>(),
+                "override": l.override_,
+                "cut_data": l.cut_data,
+            });
+            if live_locals {
+                x["flags"] = json!({"recursive": flag(&l.recursive), "resistant": flag(&l.resistant), "owned": flag(&l.owned)});
+            }
+            x
+        })
         .collect::<Vec<_>>());
     r["peak_rss_mb"] = json!(peak_rss_kb().unwrap_or(0) / 1024);
     r["total_s"] = json!((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0);

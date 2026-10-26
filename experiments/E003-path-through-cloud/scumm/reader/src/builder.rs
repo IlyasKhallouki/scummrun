@@ -236,6 +236,18 @@ impl Switches {
     }
 }
 
+/// Fix round 1, F10: the flags of a slot live in the engine, as the bridge dumps them (SPEEDRUN_DUMP_LOCALS):
+/// ScriptSlot's freezeResistant and recursive (script.h:91), and whether a room change leaves it alive, which is its
+/// `where` (an object's slot in the inventory, WIO_INVENTORY; killScriptsAndResources, script.cpp:1083-1106) and the
+/// model's owned flag (scumm-machine `room_slot`). Under the switch --live-locals a list's number covers them
+/// (`Builder::list_number`), so a dumped slot's list is numbered and matched with them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SlotFlags {
+    pub resistant: bool,
+    pub recursive: bool,
+    pub owned: bool,
+}
+
 /// Fix round 1, F10: a slot live in the engine, with the locals the bridge dumped (SPEEDRUN_DUMP_LOCALS:
 /// vm.localvar, script.h:136; its cutsceneOverride and the cutSceneData of the levels it began, script.cpp:1640).
 /// The reading builds this slot's events from these locals (`Builder::dumped_events`), as `record` builds the
@@ -258,6 +270,8 @@ pub struct SlotLocals {
     pub cut_data: Vec<i64>,
     /// an object's script whose object is not in the room (`start_events`' owned)
     pub owned: bool,
+    /// the slot's flags from the dump (None: a dump without them); needed under the switch --live-locals
+    pub flags: Option<SlotFlags>,
 }
 
 impl SlotLocals {
@@ -870,7 +884,7 @@ impl<'g> Builder<'g> {
     // --- events ------------------------------------------------------------------------------------------------------
 
     /// The unit a slot's name (facts.py's) names, in the room resource `res`.
-    fn unit_of_name(name: &str, res: Option<i32>) -> Option<UnitKey> {
+    pub fn unit_of_name(name: &str, res: Option<i32>) -> Option<UnitKey> {
         if let Some(n) = name.strip_prefix("script:") {
             Some(UnitKey::Global(n.parse().unwrap()))
         } else if let Some(n) = name.strip_prefix("local:") {
@@ -967,7 +981,10 @@ impl<'g> Builder<'g> {
 
     /// F10: the events of the slots in `slot_locals`, with their dumped locals known (`args_known`), numbered as
     /// `record` numbers a list (`list_number`), and an Esc event where the slot's override is armed. A slot outside
-    /// the scope gets none (counted).
+    /// the scope gets none (counted). Off --live-locals the slot's flags are the start's (`start_events`: the R flag
+    /// from the unit's starts, recursive unknown, owned from the object's owner), as the reading had them before the
+    /// dump had flags. Under --live-locals a list's number covers the flags, so they are the dump's (`SlotFlags`), and
+    /// a slot without them stops the reading: no number would be known for it.
     pub fn dumped_events(&mut self) -> Vec<Event> {
         let mut out = Vec::new();
         self.slot_events.clear();
@@ -977,19 +994,26 @@ impl<'g> Builder<'g> {
                 self.counts.inc("F10: dumped slots outside the scope (no events)");
                 continue;
             };
-            assert!(
-                self.table.live_locals.is_none(),
-                "F10's dumped slots under --live-locals need the slots' flags in the dump; not merged yet"
-            );
             let cd: Vec<CutData> = s.cut_data.iter().map(|&c| CutData::Int(c)).collect();
-            let res_flag = match self.game.lifecycle_key(unit) {
-                Some(f) => self.game.resistant(f, res),
-                None => Some(false),
+            let (recursive, resistant, owned) = if self.table.live_locals.is_some() {
+                let f = s.flags.unwrap_or_else(|| {
+                    panic!(
+                        "F10 under --live-locals: the dump gives slot {} no flags (resistant, recursive), and a list's \
+                         number covers them; dump the slots with a build whose SPEEDRUN_DUMP_LOCALS lists them",
+                        s.name
+                    )
+                });
+                (Py::Bool(f.recursive), Py::Bool(f.resistant), Py::Bool(f.owned))
+            } else {
+                let res_flag = match self.game.lifecycle_key(unit) {
+                    Some(f) => self.game.resistant(f, res),
+                    None => Some(false),
+                };
+                (Py::None, Py::opt_bool(res_flag), Py::Bool(s.owned))
             };
-            let (resistant, owned) = (Py::opt_bool(res_flag), Py::Bool(s.owned));
             // numbered as `record` numbers a list (`list_number`)
             let (locals, sig, recursive) =
-                self.list_number(&s.name, unit, s.list(), s.override_, &cd, true, &Py::None, &resistant, &owned);
+                self.list_number(&s.name, unit, s.list(), s.override_, &cd, true, &recursive, &resistant, &owned);
             // the domain of args:<unit> holds the list's number before its events are pinned (as `record` adds it)
             self.table.args_vals.entry(format!("args:{}", s.name)).or_default().insert(sig);
             let ev = Event {

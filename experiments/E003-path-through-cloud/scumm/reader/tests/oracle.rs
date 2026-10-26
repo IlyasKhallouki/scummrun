@@ -505,7 +505,7 @@ fn room33_slot_locals() {
             let (n, w) = k[3..].rsplit_once(':').unwrap();
             let mut locals = vec![0i64; 25];
             locals[0] = 7;
-            SlotLocals { name: n.to_string(), room: start.get0("room") as i32, w: w.parse().unwrap(), esc: None, locals, override_: 0, cut_data: vec![], owned: false }
+            SlotLocals { name: n.to_string(), room: start.get0("room") as i32, w: w.parse().unwrap(), esc: None, locals, override_: 0, cut_data: vec![], owned: false, flags: None }
         })
         .collect();
     assert!(!slots.is_empty());
@@ -577,6 +577,113 @@ fn room33_slot_locals() {
         assert_eq!(s2.get(k), s3.get(k), "{k}");
     }
     assert_eq!(c2.get("live slots with unknown locals (args 0)"), c3.get("live slots with unknown locals (args 0)"));
+}
+
+/// F10 under --live-locals: room 33 read with the switch and the start's slots dumped with their flags. Each slot's
+/// event keeps only its unit's read locals and carries the dump's flags; at a replan each slot matches the list its
+/// events were read with, also when a local its unit never reads differs, and no list when a flag differs (the
+/// number covers the flags), so it is read again.
+#[test]
+fn room33_slot_locals_live_locals() {
+    use scumm_reader::builder::{SlotFlags, SlotLocals};
+    use scumm_reader::Py;
+    use std::collections::BTreeMap;
+    let st = static_oracle();
+    let ll = std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(game()));
+    let mut b = oracle::builder(game(), st, "room33");
+    b.table.live_locals = Some(ll.clone());
+    let start = b.table.start.clone();
+    let flags = SlotFlags { resistant: false, recursive: false, owned: false };
+    let room = start.get0("room") as i32;
+    let slots: Vec<SlotLocals> = start
+        .iter()
+        .filter(|(k, v)| k.starts_with("at:") && *v == 1)
+        .map(|(k, _)| {
+            let (n, w) = k[3..].rsplit_once(':').unwrap();
+            let mut locals = vec![0i64; 25];
+            locals[0] = 7;
+            SlotLocals { name: n.to_string(), room, w: w.parse().unwrap(), esc: None, locals, override_: 0, cut_data: vec![], owned: false, flags: Some(flags) }
+        })
+        .collect();
+    assert!(!slots.is_empty());
+    b.slot_locals = slots.clone();
+    let mut m = scumm_reader::machine::Reader::new(game());
+    b.read_all_into(&mut m, true, None, 2, None);
+    assert_eq!(b.slot_events.len(), slots.len());
+    let res = game().resource(room);
+    for e in &b.slot_events {
+        let reads = ll.get(e.unit);
+        assert!(e.locals.iter().all(|(i, _)| reads.is_none_or(|r| r.contains(&(*i as i32)))), "{}: an unread local", e.name);
+        assert_eq!((&e.recursive, &e.resistant, &e.owned), (&Py::None, &Py::Bool(false), &Py::Bool(false)), "{}", e.name);
+        assert_eq!(scumm_reader::Builder::unit_of_name(&e.name, res), Some(e.unit));
+    }
+    let mut lists = task::built_lists(&b.records);
+    for (k, v) in task::slot_lists(&b) {
+        lists.entry(k).or_default().extend(v);
+    }
+    let keys = task::record_keys(&b.records, &[]);
+    let by_name: BTreeMap<String, SlotLocals> = slots.iter().map(|s| (s.name.clone(), s.clone())).collect();
+    let in_task: Vec<scumm_reader::Event> =
+        b.slot_events.iter().filter(|e| keys.contains(&format!("args:{}", e.name))).cloned().collect();
+    assert!(!in_task.is_empty());
+    let (s1, counts, unmatched) = task::replan_start_locals(&mut b, &start, &Facts::new(), &keys, &by_name, &lists);
+    for e in &in_task {
+        assert_eq!(s1.get0(&format!("args:{}", e.name)), e.sig, "{}", e.name);
+    }
+    assert!(unmatched.is_empty());
+    assert_eq!(counts.get("live slots whose dumped locals match a built list"), in_task.len() as i64);
+    // a local the unit never reads, other in the dump: the same list
+    let mut unread = by_name.clone();
+    let mut changed = 0;
+    for s in unread.values_mut() {
+        let unit = scumm_reader::Builder::unit_of_name(&s.name, res).unwrap();
+        if let Some(r) = ll.get(unit) {
+            if let Some(n) = (0..25).find(|n| !r.contains(n)) {
+                s.locals[n as usize] = 99;
+                changed += 1;
+            }
+        }
+    }
+    assert!(changed > 0);
+    let (s2, _, un2) = task::replan_start_locals(&mut b, &start, &Facts::new(), &keys, &unread, &lists);
+    for e in &in_task {
+        assert_eq!(s2.get0(&format!("args:{}", e.name)), e.sig, "{}", e.name);
+    }
+    assert!(un2.is_empty());
+    // a flag other than the list's: no list, read again
+    let mut flipped = by_name.clone();
+    for s in flipped.values_mut() {
+        s.flags = Some(SlotFlags { resistant: true, ..flags });
+    }
+    let (s3, _, un3) = task::replan_start_locals(&mut b, &start, &Facts::new(), &keys, &flipped, &lists);
+    for e in &in_task {
+        assert_eq!(s3.get0(&format!("args:{}", e.name)), 0, "{}", e.name);
+    }
+    assert_eq!(un3.len(), in_task.len());
+}
+
+/// F10 under --live-locals: a dumped slot without flags stops the reading (a list's number covers them).
+#[test]
+#[should_panic(expected = "no flags")]
+fn live_locals_dumped_slot_needs_flags() {
+    use scumm_reader::builder::SlotLocals;
+    let mut b = oracle::builder(game(), static_oracle(), "room33");
+    b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(game())));
+    let start = b.table.start.clone();
+    let (k, _) = start.iter().find(|(k, v)| k.starts_with("at:") && *v == 1).expect("a live slot at the start");
+    let (n, w) = k[3..].rsplit_once(':').unwrap();
+    b.slot_locals = vec![SlotLocals {
+        name: n.to_string(),
+        room: start.get0("room") as i32,
+        w: w.parse().unwrap(),
+        esc: None,
+        locals: vec![0; 25],
+        override_: 0,
+        cut_data: vec![],
+        owned: false,
+        flags: None,
+    }];
+    b.dumped_events();
 }
 
 #[test]
