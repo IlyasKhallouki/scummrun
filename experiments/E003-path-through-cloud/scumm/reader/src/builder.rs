@@ -182,9 +182,66 @@ pub type JobHook = Box<dyn FnMut(&Job, &[Record], &BTreeMap<String, BTreeSet<i64
 /// The `_pin` values: labels, or raw ints for a fact with no domain.
 type PinVals = Vec<Label>;
 
+/// The reader's switches (fix round 1, fix-round1.md): each a rule beyond reader.py, off by default. With every one
+/// off the reading is reader.py's, byte for byte.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Switches {
+    /// F2: the planner rule that a due event goes first (due.rs)
+    pub due_first: bool,
+    /// F12: forks by value sets, the mouse as ranges, findObject and actorFromPos as value sets (machine.rs, and
+    /// scumm-machine's switch of the same name)
+    pub value_sets: bool,
+    /// F5: scumm-machine's draw_clears; the scope's and the domains' writes of it (Scope::of_with, domains::build_with)
+    pub draw_clears: bool,
+    /// F9: scumm-machine's actor_rooms; the scope's writes and the table's domains of it (Scope::of_with, table.rs)
+    pub actor_rooms: bool,
+}
+
+impl Switches {
+    /// Comma-separated switch names.
+    pub fn parse(names: &str) -> Result<Switches, String> {
+        let mut s = Switches::default();
+        for n in names.split(',').map(str::trim).filter(|n| !n.is_empty()) {
+            match n {
+                "due_first" => s.due_first = true,
+                "value_sets" => s.value_sets = true,
+                "draw_clears" => s.draw_clears = true,
+                "actor_rooms" => s.actor_rooms = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms)")),
+            }
+        }
+        Ok(s)
+    }
+    pub fn names(&self) -> Vec<&'static str> {
+        let mut v = Vec::new();
+        if self.due_first {
+            v.push("due_first");
+        }
+        if self.value_sets {
+            v.push("value_sets");
+        }
+        if self.draw_clears {
+            v.push("draw_clears");
+        }
+        if self.actor_rooms {
+            v.push("actor_rooms");
+        }
+        v
+    }
+    /// The machine's switches the scope and the domains take (Scope::of_with, domains::build_with): F5's and F9's.
+    /// value_sets reaches the Reader's machine through the table (FactTable::value_sets, Reader::run_full).
+    pub fn scope(&self) -> scumm_machine::Switches {
+        scumm_machine::Switches { draw_clears: self.draw_clears, actor_rooms: self.actor_rooms, ..Default::default() }
+    }
+}
+
 /// reader.py `Builder`.
 pub struct Builder<'g> {
     pub game: &'g Game,
+    /// fix round 1's switches (all off: reader.py's reading)
+    pub switches: Switches,
+    /// switch due_first's due facts, after the reading (due.rs)
+    pub due: Option<crate::due::Due>,
     pub scope: Scope,
     pub table: FactTable,
     pub sig_limit: usize,
@@ -326,6 +383,8 @@ impl<'g> Builder<'g> {
     fn with_table(game: &'g Game, scope: Scope, table: FactTable) -> Builder<'g> {
         Builder {
             game,
+            switches: Switches::default(),
+            due: None,
             scope,
             table,
             sig_limit: SIG_LIMIT,
@@ -1367,6 +1426,7 @@ impl<'g> Builder<'g> {
         passes: usize,
         mut sink: Option<&mut dyn RecordSink>,
     ) -> usize {
+        self.table.value_sets = self.switches.value_sets;
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -1384,6 +1444,9 @@ impl<'g> Builder<'g> {
             self.reset();
         }
         self.counts.set("records", self.n_records as i64);
+        if self.switches.due_first {
+            crate::due::apply(self);
+        }
         self.n_records
     }
 

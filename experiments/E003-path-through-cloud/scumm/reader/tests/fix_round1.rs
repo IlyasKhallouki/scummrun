@@ -1,12 +1,18 @@
-//! Fix round 1 (fix-round1.md): readings with the Rust-only switches on, against the frozen goldens (golden.py's
-//! files, made with every switch off). Each test pins what the switch changes and that nothing else moves.
+//! Fix round 1 (fix-round1.md): readings with the switches on. F5 (draw_clears) and F9 (actor_rooms) are pinned
+//! against golden.py's files (made with every switch off): each test pins what the switch changes and that nothing
+//! else moves. F2 (due_first) and F12 (value_sets) are checked against their own goldens in out/golden/reader-fr1/
+//! (made by `reader-port read NAME --switches S --out FILE`, PORT-NOTES.md "Fix round 1"). With every switch off the
+//! reading is checked against golden.py's files by tests/oracle.rs.
 //!
-//! Fast: room 33 with each switch on. Slow (`-- --ignored`, about 2 minutes each on 3 threads): the kitchen.
+//! Fast: room 33 with each switch on. Slow (`-- --ignored`): the kitchen with each switch, on one thread or three,
+//! the kitchen task with actor_rooms, and the due rule against the engine's frames (due_engine.py's file).
 //! MI1's object and room numbers appear here as test data only (D1, plan.md's C2).
 
+use scumm_reader::builder::Switches;
 use scumm_reader::oracle::{self, Static};
 use scumm_reader::Builder;
 use serde_json::Value;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 fn game() -> &'static scumm_ir::Game {
@@ -19,8 +25,8 @@ fn static_oracle() -> &'static Static {
     S.get_or_init(Static::load)
 }
 
-fn switches(names: &[&str]) -> scumm_machine::Switches {
-    scumm_machine::Switches::parse(&names.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap()
+fn switches(names: &[&str]) -> Switches {
+    Switches::parse(&names.join(",")).unwrap()
 }
 
 /// The records of a reading against the golden file's, line by line: (lines, the golden and candidate record of
@@ -44,6 +50,36 @@ fn differing(b: &Builder, name: &str) -> (usize, Vec<(usize, Value, Value)>) {
 
 fn record(v: &Value) -> Option<&serde_json::Map<String, Value>> {
     v.get("record")?.get("$Record")?.as_object()
+}
+
+fn fr1_dir() -> PathBuf {
+    oracle::golden_dir().parent().unwrap().join("reader-fr1")
+}
+
+fn assert_none(what: &str, (diffs, n): (Vec<String>, usize)) {
+    assert!(n > 0, "{what}: nothing compared");
+    assert!(diffs.is_empty(), "{what}: {} of {n} differ; first:\n{}", diffs.len(), diffs[..diffs.len().min(5)].join("\n"));
+    eprintln!("{what}: {n} compared, 0 differences");
+}
+
+fn due_first() -> Switches {
+    Switches { due_first: true, ..Default::default() }
+}
+
+fn value_sets() -> Switches {
+    Switches { value_sets: true, ..Default::default() }
+}
+
+/// A reading's own counter (the machine half's `rd.counts`, or the Builder's).
+fn rd_count(b: &scumm_reader::Builder, key: &str) -> i64 {
+    b.rd.counts.get(key)
+}
+
+/// The due writes of a reading against a direct evaluation (due.rs `verify`).
+fn verify(b: &scumm_reader::Builder) -> u64 {
+    let (n, bad) = scumm_reader::due::verify(b, 4096);
+    assert!(bad.is_empty(), "due writes: {} differences; first:\n{}", bad.len(), bad[..bad.len().min(5)].join("\n"));
+    n
 }
 
 #[test]
@@ -295,4 +331,71 @@ fn kitchen_task_actor_rooms() {
         assert!(work.join(format!("{name}.sas")).metadata().unwrap().len() > 0);
     }
     std::fs::remove_dir_all(&work).unwrap();
+}
+
+// --- F2, due_first, and F12, value_sets ------------------------------------------------------------------------
+
+#[test]
+fn room33_due_first() {
+    let (b, _) = oracle::read_with(game(), static_oracle(), "room33", due_first());
+    assert_none("room 33, due_first", oracle::compare_reading(&b, &fr1_dir().join("room33-due_first.jsonl.gz"), 5));
+    verify(&b);
+}
+
+#[test]
+#[ignore]
+fn kitchen_due_first() {
+    let gold = fr1_dir().join("kitchen-due_first.jsonl.gz");
+    let (b, _) = oracle::read_with(game(), static_oracle(), "kitchen", due_first());
+    assert_none("kitchen, due_first", oracle::compare_reading(&b, &gold, 5));
+    let n = verify(&b);
+    eprintln!("kitchen, due_first: due writes checked on {n} states");
+    let d = b.due.as_ref().unwrap();
+    assert!(!d.units.is_empty());
+    let (b3, _, _) = oracle::read_par_with(game(), static_oracle(), "kitchen", 3, due_first());
+    assert_none("kitchen, due_first, 3 threads", oracle::compare_reading(&b3, &gold, 5));
+}
+
+/// The rule's premise against the engine: every frame where a slot's turn went against what the rule says from the
+/// frame before is explained by the frame itself (a slot earlier in the frame changed a fact the test reads or froze
+/// the slot, or Esc's abortCutscene ran first), and the rule decides the slot in every other case.
+#[test]
+#[ignore]
+fn due_against_the_engine() {
+    let frames = fr1_dir().join("due-engine-frames.jsonl.gz");
+    assert!(frames.exists(), "{} is missing: run due_engine.py --out DIR and copy DIR/frames.jsonl.gz", frames.display());
+    let (tally, _) = scumm_reader::due::engine_check(game(), &frames);
+    let unexplained: u64 = tally.iter().filter(|(k, _)| k.ends_with("unexplained")).map(|(_, n)| n).sum();
+    assert_eq!(unexplained, 0, "{tally:?}");
+    let count = |pre: &str| -> u64 { tally.iter().filter(|(k, _)| k.starts_with(pre)).map(|(_, n)| n).sum() };
+    // the rule's due slots ran on (or ended) in the next frame, but where the frame itself changed the test
+    let due = count("plain | due") + count("polled | due");
+    let due_stayed = count("plain | due | stayed") + count("polled | due | stayed");
+    let explained = count("disagreement:");
+    eprintln!("due slots: {due}, of them stayed {due_stayed}; disagreements {explained}, all explained");
+    assert!(due > 1000);
+}
+
+/// F12: room 33 with value_sets against its golden; the fork into value sets happens, and the mouse ranges and
+/// findObject's value set leave fewer forks on non-fact tests than reader.py's reading (2,930).
+#[test]
+fn room33_value_sets() {
+    let (b, _) = oracle::read_with(game(), static_oracle(), "room33", value_sets());
+    assert_none("room 33, value_sets", oracle::compare_reading(&b, &fr1_dir().join("room33-value_sets.jsonl.gz"), 5));
+    assert!(rd_count(&b, "F12: forks on read into value sets") > 0);
+    assert!(rd_count(&b, "forks on non-fact tests") < 2930, "{}", rd_count(&b, "forks on non-fact tests"));
+}
+
+/// F12: the kitchen with value_sets against its golden, on one thread and on three.
+#[test]
+#[ignore]
+fn kitchen_value_sets() {
+    let gold = fr1_dir().join("kitchen-value_sets.jsonl.gz");
+    let (b, _) = oracle::read_with(game(), static_oracle(), "kitchen", value_sets());
+    assert_none("kitchen, value_sets", oracle::compare_reading(&b, &gold, 5));
+    for k in ["F12: forks on read into value sets", "F12: fact reads a comparison alone reads, decided on their value set (no fork)"] {
+        eprintln!("kitchen, value_sets: {k}: {}", rd_count(&b, k));
+    }
+    let (b3, _, _) = oracle::read_par_with(game(), static_oracle(), "kitchen", 3, value_sets());
+    assert_none("kitchen, value_sets, 3 threads", oracle::compare_reading(&b3, &gold, 5));
 }

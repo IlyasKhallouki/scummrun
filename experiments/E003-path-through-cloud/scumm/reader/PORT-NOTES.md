@@ -299,12 +299,53 @@ each key's kind and domain for the pass (`fact_info`); before that the reading t
     (`cutscene`, VAR_USERPUT, VAR_CURSORSTATE): a read of a step anywhere else resolves it or forks, and a merge
     joins only paths with the same steps, so no other key holds one. The readings are equal.
 
+## Fix round 1
+
+Fix round 1 (fix-round1.md, D8) is made in Rust only (D7). Each fix is a reader switch (`builder::Switches`, set
+on the Builder before `read_all`), off by default; with every switch off the reading is reader.py's, and every
+comparison above still finds 0 differences. A switch's reading has its own golden in `out/golden/reader-fr1/`, made by
+`reader-port read NAME --switches S --out FILE` and checked by `reader-port read NAME --switches S --golden FILE` and
+`tests/fix_round1.rs` (room 33 fast; the kitchen, one thread and three, ignored).
+
+**`due_first` (F2): a due event goes first.** `due.rs` (module docs) and scumm-ir's `due.rs` (the wait classes).
+After the reading, `due:<unit>` (binary) is 1 while the unit's slot is live, unfrozen and at a pure poll whose test
+holds or a plain breakHere, at a wait an input meets; every record that writes the unit's position, slot, freeze count,
+room (two units of one name) or a test fact writes it by `Eff::Cases` (conditions on the facts before the action);
+every input (sentence, walk, dialog line) that meets such a wait's next part needs `due:<unit>` = 0; an input a time
+wait's work could change gets one replay check. Kitchen: 13 due facts over 22 waits, 30,553 inputs with a `due:` 0,
+30,073 with a time check; `due::verify` checks the writes on 20.4 million states. `reader-port due-engine` checks the
+rule's premise against run B's frames (`due_engine.py`).
+
+**`value_sets` (F12): forks by value sets, the mouse as ranges.** The machine half turns on scumm-machine's switch of
+the same name (its PORT-NOTES.md: ranges, findObject and actorFromPos as value sets, tests decided on them, the fork
+that narrows), with findObject over the scope's objects. On the reader's side (`machine.rs`):
+
+- A read of a fact with several values left, made by a jump whose condition is a comparison of that fact with a
+  constant (or a zero test of it), forks into the value sets the comparison separates (`compare_sets`, `ForkOn`'s
+  sets, `on_fork`), not into one path per value; the path's precondition holds the set. A read where only one set is
+  left is that set's value (the test decides; no fork). Every other read forks per value, as reader.py does, and is
+  counted by where it is ("F12: fact reads forked per value: ...").
+- A mouse variable (a non-fact) is its range. A range is no memo identity (`memo_ident`) and keeps its bounds through
+  the naming hooks (`val`, `arith_at`).
+- Not done: a fact copied into a variable or local and then only compared (`VAR_RESULT = getObjectOwner(o)`, then a
+  comparison) still forks per value: in the kitchen 3,077 such reads at an assignment (most of them `Var++` or a
+  number, some owner and state reads). The mouse is not narrowed in the reader (it is read, not written, there): a
+  second test of it forks again.
+- Kitchen (one thread; reader.py's reading in brackets): 71,336 records (72,256); forks on non-fact tests 154,944
+  (174,727); forks on read 41,683 (38,454): 25,530 into value sets, 4,154 reads decided on their set with no fork,
+  and per value 12,737 in a jump's other test (indexed bits and classOfIs: binary facts, where sets gain nothing),
+  3,077 at an assignment, 339 in an engine step; var forks 8,390 (4,354), because a comparison chain now forks once
+  per comparison; unknown-target startScript writes 264 (1,134), startObject 266 (1,136). Reading 102.7 CPU s (105.8).
+  Most of the gain is the fork into value sets: without it (the machine's ranges and sets alone, a measurement with
+  that part turned off) the kitchen gives 72,223 records and 170,452 forks on non-fact tests. Room 33: 819 records
+  (878), forks on non-fact tests 2,329 (2,930).
+
 ## Files
 
 - `src/`: the modules above; `src/bin/reader_port.rs` (`reader-port static | records NAME | replay NAME |
-  runs NAME | dump-runs NAME --runs N,... | read NAME | task --out DIR | stream --out FILE | bench-task --out DIR |
-  bench`).
-- `tests/oracle.rs`: the comparisons as tests.
+  runs NAME | dump-runs NAME --runs N,... | read NAME [--switches S] | task --out DIR | stream --out FILE |
+  bench-task --out DIR | bench | due-engine FRAMES`).
+- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens.
 - `../../reader_port_oracle.py`: the Python oracles (new file; no existing .py file changed).
 - `../../reader_run_dump.py`: chosen runs made again in Python and written whole (new file).
 - `../machine/src/machine/hooks.rs`: the hook points (Machine changes, above).

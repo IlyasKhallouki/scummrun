@@ -825,6 +825,53 @@ Kept apart (decided where a row reached them):
   10 with the code not held, 16 of 34 with two armed keys (`--keep-armed`). Kept with `--keep-order-cases`, the 34
   armed cases are equal too, traces included (one Python process, one hash seed).
 
+## Fix round 1: switches of the Rust machine alone
+
+Fix round 1 (fix-round1.md, D8) is made in Rust only (D7). Each fix is a switch, off by default; with every switch
+off the machine is model.py's, and every golden above still compares with 0 differences.
+
+**`value_sets` (F12).** Forks by value sets, the mouse as ranges:
+
+- A range is an interned plain unknown (no value set) whose `what` ends in its bounds (`Vals::mk_range`), with the
+  bounds kept beside it in `Vals.ranges`. model.py's code, the encoding and check_rust.py's decoder see a plain
+  unknown. `Vals.wide` (the switch) turns on the rules below; off, `Vals` never makes a range.
+- At a click (row 4's `run_verb`, the sentence frame), the four mouse variables are ranges instead of model.py's
+  unknowns (`Machine::mouse_range`; input.cpp:414-434): VAR_MOUSE_X [0..319] and VAR_MOUSE_Y [0..199] (the screen,
+  scumm.cpp:395-396), VAR_VIRT_MOUSE_X the screen moved by the main screen's left edge in the click's room
+  (`screen_lefts`, camera.cpp:169-192: 0 to the width less 320, and below 0 in a room narrower than the screen; every
+  room of the game where the room is not known, the scope's rooms in the reader), VAR_VIRT_MOUSE_Y [-1..h - 1], h the
+  tallest main screen: resetScumm's 128 for v5 (initScreens(16, 144),
+  scumm.cpp:2053) or a roomOps SetScreen of the scripts (gfx.cpp:386; a SetScreen whose bounds are not constants gives
+  the screen's 200).
+- findObject is the value set 0 and the room's objects (object.cpp:557-597: the room's local objects), or the
+  reader's scope objects (`Machine.find_objects`); actorFromPos is 0 to 12 (actor.cpp:2115-2147, _numActors 13 for
+  v5).
+- `decide` on ranges, and on value sets whose combinations pass MAX_VALUES, walks every combination up to
+  WIDE_LIMIT (65,536, counted from the sizes before any is listed): a test they all agree on is decided. `arith`
+  maps a range and a constant (+, -, *, / toward 0) to the range of its ends, two ranges added or subtracted to the
+  range of the sums; past int32, or a divisor range with 0 in it, gives a plain unknown. A negated range is 0 minus it.
+  `join_values` joins ranges (and ints and sets with them) into the range that holds them all. A fact getter on a
+  range is a new plain unknown (model.py would give the range itself, which is no state or owner).
+- A fork on a comparison of a written variable or a local with a constant, or a zero test, narrows it on each side
+  (`Machine::narrow`) when it holds the unknown the test decided on, a class-0 unknown with a range or a value set:
+  the range splits at the bound, a set keeps the values each side allows. A variable the path did not write is not
+  narrowed (it is the oracle's). model.py's merges still join paths at join points, so the narrowing holds until
+  the next join (an else-if chain, nested tests), not past it.
+- Not done: a range or set used as a number (an index, an object or script number) is not split per value; an
+  index on one is model.py's unknown, a getter on a set is model.py's per-combination rule. MI1's hover script (an
+  index by a mouse band, then startObject of the object found) is where this shows in the model check.
+- check_rust.py adds the Rust-only switches to `model.SWITCHES` in its own process (`RUST_SWITCHES`), so check.py
+  takes `--switches ...,value_sets` and names its files after it.
+- Tests: `value::tests::ranges` (arithmetic, tests, narrowing, joins, the limits, the switch off) and
+  `tests/value_sets.rs` (the design's synthetic cases, each a click whose input script is a hand-made unit, off and
+  on: a comparison chain on findObject and a test of actorFromPos, a mouse division, a walk, a put and a stored x).
+- Rows (2026-10-26, check_rust.py, `--jobs 2`): row 5 with const_polls, input_after_turns and value_sets: 78.9%
+  (855/1084), the same as without value_sets; row 4 the same, 75.5% (633/838); row 4 with const_polls and value_sets
+  against results/' row-4 const_polls run: 75.1% (696/927) both. No move's certain predictions change. Paths fall from
+  9,820 to 9,394 (row 5), possible predictions change in 44 moves (the hover variables get the hovered object's
+  values, where there were none), and recall with possible gains one fact (S2#30). Logs:
+  results/check-part1-row{4,5}-const_polls-input_after_turns-value_sets.log, results/check-part1-row4-const_polls-value_sets.log.
+
 ## Notes for the next stage
 
 The machine is ported: all seven features, all nine golden runs at 0 differences. What a later stage can do here:

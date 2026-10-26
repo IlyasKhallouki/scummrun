@@ -90,6 +90,9 @@ RUST_SWITCHES = {
     "actor_rooms": "F9: an actor's room is a fact (actorroom:A): putActorInRoom and loadRoomWithEgo write it "
                    "(script_v5.cpp:2160-2196, 1857-1866), getActorRoom and actorFollowCamera read it "
                    "(script_v5.cpp:1289-1322; camera.cpp:62-70)",
+    "value_sets": "F12: the mouse variables are ranges and findObject and actorFromPos value sets; a test every value "
+                  "agrees on is decided, else the fork narrows the tested variable or local on each side; +, -, * and / "
+                  "by a constant map a range to a range (input.cpp:414-434, object.cpp:557-597, actor.cpp:2115-2147)",
 }
 
 _ARGS = {"verify": False, "canonical": False, "dir": None, "bin": BIN}

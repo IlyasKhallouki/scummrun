@@ -16,6 +16,9 @@ pub const NOWHERE: i64 = -1;
 /// Fix round 1, F9 (switch actor_rooms): `actorroom:A` while the reading does not know the actor's room (the start
 /// holds none). No room: Actor::_room is a byte. The Reader reads it as getActorRoom's non-fact, as with the switch off.
 pub const NOT_KNOWN: i64 = -1;
+/// Fix round 1, F2 (due.rs): `due:<unit>`, 1 while the unit's slot waits where its next turn runs on in the engine's
+/// next frame, before that frame's input. A binary fact of the reader's own; only switch due_first makes one.
+pub const DUE: &str = "due:";
 /// model.py TIME_VARS and MOUSE_VARS: engine variables that change as frames pass.
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
 pub const MOUSE_VARS: [i32; 4] = [20, 21, 44, 45];
@@ -53,6 +56,9 @@ pub struct FactTable {
     pub points: BTreeMap<&'static str, BTreeMap<String, BTreeSet<i64>>>,
     pub engine: BTreeSet<i32>,
     binary: Domain,
+    /// fix round 1, F12 (switch value_sets, the Builder's): the machine half forks a fact read that only a
+    /// comparison reads into the value sets it separates, and reads the mouse as ranges (machine.rs)
+    pub value_sets: bool,
 }
 
 impl FactTable {
@@ -147,7 +153,7 @@ impl FactTable {
             let (name, w) = rest.rsplit_once(':').unwrap();
             points.get_mut(kind).unwrap().entry(name.to_string()).or_default().insert(w.parse().unwrap());
         }
-        FactTable { start, extra, counts, args_vals: BTreeMap::new(), doms, points, engine, binary: Domain::binary() }
+        FactTable { start, extra, counts, args_vals: BTreeMap::new(), doms, points, engine, binary: Domain::binary(), value_sets: false }
     }
 
     /// `FactTable.domain(key)`.
@@ -157,7 +163,7 @@ impl FactTable {
             v.insert(0);
             return Some(Cow::Owned(Domain::of(v, None, None)));
         }
-        if key.starts_with("saved:") {
+        if key.starts_with("saved:") || key.starts_with(DUE) {
             return Some(Cow::Borrowed(&self.binary));
         }
         if let Some((kind, name)) = pos_key(key) {
@@ -170,7 +176,7 @@ impl FactTable {
 
     /// `FactTable.kind(key)`.
     pub fn kind(&self, key: &str, scope: &Scope) -> Kind {
-        if key.starts_with("args:") || key.starts_with("saved:") || pos_key(key).is_some() {
+        if key.starts_with("args:") || key.starts_with("saved:") || key.starts_with(DUE) || pos_key(key).is_some() {
             return Kind::Fact;
         }
         if let Some(n) = key.strip_prefix("var:") {
