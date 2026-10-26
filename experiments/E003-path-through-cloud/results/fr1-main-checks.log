@@ -1,0 +1,37 @@
+E003, branch fr1-main: main (b440cde) with fix round 1 (fr1, bb45504) merged, and F10 under --live-locals. Checks on
+the laptop, 2026-10-26; nice 10, 3 threads at most, other jobs running (load 10 to 57).
+
+== every switch off
+machine golden runs, all nine (machine-run per row, then golden.py's comparison): row0 row1 row2 row3 row4 row4-const_polls row4-input_after_turns row5 row5-esc_key_at_pre: 0 of 239 moves differ each; files compared 2151, differing 0, missing moves 0
+check_rust_all (cargo test --release --test check_rust check_rust_all -- --ignored): rows 0-5, row4-const_polls, row4-input_after_turns, row5-esc_key_at_pre: jsonl and log equal to results/ (386 s)
+cargo test --release (scumm workspace, at aae4df3): 92 passed, 0 failed (reader: 20 unit, 21 oracle, 6 fix_round1; machine: 9 unit, 10 fix_round1, 8 golden, 5 value_sets, 1 check_rust; ir: 1 unit, 5 due, 3 facts, 3 oracle)
+cargo test --release -p scumm-reader --test oracle -- --ignored: 9 passed (kitchen_reading_against_golden, kitchen_reading_rust_machine, kitchen_reading_threads, kitchen_records_written_back, kitchen_runs_rust_machine, kitchen_streamed_threads_against_write_sas, kitchen_task_against_write_sas, kitchen_reading_elsewhere_on, kitchen_live_locals_on) in 954 s
+reader-scope --k 1 --elsewhere --threads 3 --golden: packed sha1 3ceabe501fd38dc195246ca20ccc42995a349d3e, golden lines sha1 213e68f344855a27e4cc8588b1d0990d11495c84, 237264 lines (the VM's: 3ceabe50, 213e68f3); 237262 records, 1258 s at load 21, peak RSS 903 MB (a first attempt stopped at the 3 GB MemAvailable guard while other jobs held the memory)
+pytest -m 'not slow' test_replay_part1 test_replay test_replay_review test_replay_taskcore test_taskcore (DOWNWARD_DIR at the main checkout's build): 100 passed, 2 deselected in 312 s
+
+== the lanes' switches on (cargo test --release -p scumm-reader --test fix_round1 -- --ignored --test-threads=1)
+due_against_the_engine ok, kitchen_actor_rooms ok, kitchen_draw_clears ok, kitchen_due_first ok, kitchen_task_actor_rooms ok, kitchen_value_sets ok: 6 passed in 1887 s
+
+== F10's bridge dump with the slots' flags (bridge_locals.py check --new /var/tmp/fast-mi/svm-fr1-main/build/scummvm/scummvm --results --tag flags)
+old build sha1 fe647588c036 (the shared build), new build sha1 17864effa489 (patches/0001 at fr1-main, built with --no-reset in its own folder)
+room33: 3095 frames; status differs 0, dump off differs 0, dump on without its new fields differs 0; traces equal; live slots 10,014, freeze-resistant 459, recursive 356
+bar-door: 3428 frames; 0, 0, 0; traces equal; live slots 14,685, freeze-resistant 3,832, recursive 829
+kitchen: 13675 frames; 0, 0, 0; traces equal; live slots 104,999, freeze-resistant 63,331, recursive 7,713
+
+== the kitchen with the switches on together: reader-port read kitchen --threads 3 --switches due_first,value_sets,draw_clears,actor_rooms (A), with --elsewhere (C), with --elsewhere --live-locals (B); --task-out
+A: 71408 records, reading 51.7 s, 103.9 CPU s; due writes against a direct evaluation 20460869 states, 0 differences; kitchen.tc 71224 actions (184 folded), 733 facts
+C: 71408 records, reading 92.9 s, 135.8 CPU s; due writes 20840373 states, 0 differences; kitchen.tc 71224 actions (184 folded), 733 facts
+B: 71278 records, reading 55.0 s, 99.2 CPU s; due writes 20790851 states, 0 differences; kitchen.tc 71094 actions (184 folded), 733 facts
+A against C, ELSEWHERE (-2) taken out of the value sets that hold it: 16012 sets, all in due: effects, none in a precondition; then A only 0, C only 0
+C against B, renumbered (live_locals_check.py): lists 5299 onto 5222, OFF lists carrying two flag sets 0, OFF (list, flags) with no ON list 0; records 71408 against 71278, 71274 distinct either way, on one side only 0 and 0; lists that lost unread locals 186; event runs 7099 against 6991, rounds 1028 either way
+A against B, renumbered without that: 2638 records on each side only, all differing only in the due: cases' ELSEWHERE (the C step above)
+taskcore sas --start s17 (default reductions) and lama-first:
+  A: 12019 reduced actions, 17877 operators, plan 10 steps: event(local:211@33), walk_to(316), event(script:2@736), event(local:218@16), sentence(2,564), fold:event(script:2@736), event(script:2@915), sentence(9,566), fold:event(script:2@736), event(script:2@915)
+  C: 12019 reduced actions, 17877 operators, the same plan, label for label
+  B: 11977 reduced actions, 17702 operators, the same 10 steps up to the lists' numbers (and event(local:218@16)'s action index, 35283 against 35294)
+
+== rooms 33 and 28 from seed 1, F10 with --live-locals (replay_part1.py read-rust 33,28 --seed 1 --goal state:316=1 --live-locals; run 1 [--control] --slot-locals --reread --threads 3 --plan-memory 4G; FAST_MI_SCUMMVM_BIN at the new build)
+reading: 66030 records in 141.7 s (3 threads, peak 675 MB), 65516 actions, 5100 lists (without the switch: 66106, 65592, 5166)
+against the committed F10 runs (replay-part1-bar-door-rust-seed1-locals.json and -control-locals.json), labels without list numbers and action indices; compared: stop, goal, frames, replans, bans, inputs, each step (kind, label, input, frames, outcome, inputs, mismatches, unplanned changes), each plan (frame, status, steps, start counts, live slots: place, args 0 or not, dumped, nonzero locals), rereads, verify, start check
+full: 0 differences but the start check's seconds; goal at frame 3129, 3 steps, 401 frames, 0 replans; verify 0 differences at 6 checkpoints
+control: 0 differences but the start check's seconds; 2 steps, 3648 frames, 1 replan (frame 6376), no plan; at the replan 2 live slots match a built list (local:202, script:23), 1 at args 0 (script:159) is read again from its dumped locals and flags (155 s), then 0 at args 0; verify 0 differences at 4 checkpoints
