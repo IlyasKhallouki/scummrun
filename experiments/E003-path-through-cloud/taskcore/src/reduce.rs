@@ -646,18 +646,30 @@ pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32
         rounds += 1;
         ch = false;
         for i in 0..n {
-            if seen[i] != 0 && wf[wf_off[i]..wf_off[i + 1]].iter().all(|&f| fact_clock[f as usize] <= seen[i]) {
+            let prev = seen[i];
+            if prev != 0 && wf[wf_off[i]..wf_off[i + 1]].iter().all(|&f| fact_clock[f as usize] <= prev) {
                 continue;
             }
             seen[i] = clock;
             let v = src.view(i);
+            // an effect on a fact whose needed values have not changed since the action's last visit began reads
+            // what it read then: no hit then means none now, and what it set then is set; so a visit reads only the
+            // effects on facts that changed since, but every effect on the first visit and on the visit that keeps
+            // the action. The visit sets the same values in the same order as reading every effect, so the passes,
+            // their count and the result are the same
+            let mut every = prev == 0;
             if !kept[i] {
-                let hit = v.effs().any(|e| e.kind != K_BAD && e.vals.iter().any(|&x| need[base[e.fact as usize] + x as usize]));
+                let hit = v.effs().any(|e| {
+                    e.kind != K_BAD
+                        && (every || fact_clock[e.fact as usize] > prev)
+                        && e.vals.iter().any(|&x| need[base[e.fact as usize] + x as usize])
+                });
                 if !hit {
                     continue;
                 }
                 kept[i] = true;
                 ch = true;
+                every = true;
                 for (f, s) in v.pre() {
                     for &x in s {
                         set!(f, x);
@@ -668,6 +680,9 @@ pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32
             prefs.extend(v.pre().map(|(f, _)| f));
             for e in v.effs() {
                 if e.kind == K_BAD || e.nwhen() == 0 {
+                    continue;
+                }
+                if !every && fact_clock[e.fact as usize] <= prev {
                     continue;
                 }
                 let k = e.fact as usize;
