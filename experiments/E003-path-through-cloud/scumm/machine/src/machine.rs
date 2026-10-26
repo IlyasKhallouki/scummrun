@@ -136,6 +136,10 @@ pub struct Switches {
     pub input_after_turns: bool,
     pub const_polls: bool,
     pub esc_key_at_pre: bool,
+    /// fix round 1, F12 (fix-round1.md; Rust only, no model.py switch): the mouse variables as ranges, findObject
+    /// and actorFromPos as value sets, tests on ranges and on value sets past MAX_VALUES decided where every value
+    /// agrees, and a forked test on a variable or local that holds a range or a set narrowing it on each side
+    pub value_sets: bool,
 }
 
 impl Switches {
@@ -146,6 +150,7 @@ impl Switches {
                 "input_after_turns" => s.input_after_turns = true,
                 "const_polls" => s.const_polls = true,
                 "esc_key_at_pre" => s.esc_key_at_pre = true,
+                "value_sets" => s.value_sets = true,
                 _ => return Err(format!("unknown switch {n}")),
             }
         }
@@ -243,6 +248,74 @@ pub struct Machine<'g> {
     pub hooks: Option<&'static dyn Hooks>,
     /// the hooking side's own state
     pub ext: Option<Box<dyn std::any::Any>>,
+    /// F12: the objects findObject can give besides 0 (the reader's scope); None: the room's objects
+    pub find_objects: Option<Rc<[i32]>>,
+    /// F12: the tallest main screen the scripts set (`mouse_range`), worked out once
+    screen_h: std::cell::Cell<Option<i32>>,
+}
+
+/// F12: the engine's mouse bounds for SCUMM v5 (input.cpp:414-434): the mouse is clipped to the screen,
+/// _screenWidth x _screenHeight (scumm.cpp:395-396), VAR_VIRT_MOUSE_X adds the camera's left edge (at most a
+/// room's width less the screen's), and VAR_VIRT_MOUSE_Y subtracts the main screen's top and is -1 off it
+/// (its height set by resetScumm, initScreens(16, 144) for v5 (scumm.cpp:2053), then by the scripts' roomOps
+/// SetScreen, script_v5.cpp:2392-2397, gfx.cpp:386).
+pub const SCREEN_HEIGHT: i32 = 200;
+/// F12: the main screen's height resetScumm sets for SCUMM v5 (initScreens(16, 144), scumm.cpp:2053).
+pub const RESET_MAIN_HEIGHT: i32 = 144 - 16;
+
+impl<'g> Machine<'g> {
+    /// F12: the range of mouse variable `n` (VAR_VIRT_MOUSE_X/Y, VAR_MOUSE_X/Y), from the game: the widest room, the
+    /// tallest main screen the scripts set (the screen's height where one is not a constant).
+    pub fn mouse_range(&self, n: i32) -> (i32, i32) {
+        let g = self.game;
+        match n {
+            44 => (0, SCREEN_WIDTH - 1),
+            45 => (0, SCREEN_HEIGHT - 1),
+            20 => (0, g.room_width.values().copied().max().unwrap_or(SCREEN_WIDTH).max(SCREEN_WIDTH) - 1),
+            21 => {
+                if let Some(h) = self.screen_h.get() {
+                    return (-1, h - 1);
+                }
+                // resetScumm's main screen, then every roomOps SetScreen(top, bottom) of the scripts: the main screen
+                // is bottom - top high
+                let mut h = RESET_MAIN_HEIGHT;
+                let mut seen = |args: Span| {
+                    let a: Vec<Option<i32>> = g.ast.kids(args).iter().map(|&e| g.ast.constant(e)).collect();
+                    h = match a.as_slice() {
+                        [Some(t), Some(b)] => h.max(b - t),
+                        _ => SCREEN_HEIGHT,
+                    };
+                };
+                for x in g.ins.iter() {
+                    if let Some(Stmt::Op { name, args, subops, .. }) = x.st {
+                        if name == known::SET_SCREEN {
+                            seen(args);
+                        }
+                        for sub in g.ast.subs(subops) {
+                            if sub.name == known::SET_SCREEN {
+                                seen(sub.args);
+                            }
+                        }
+                    }
+                }
+                let h = h.clamp(1, SCREEN_HEIGHT);
+                self.screen_h.set(Some(h));
+                (-1, h - 1)
+            }
+            _ => panic!("var {n} is not a mouse variable"),
+        }
+    }
+
+    /// F12: the value a mouse variable has at a click: its range (switch value_sets), else model.py's unknown.
+    pub(crate) fn mouse_value(&mut self, n: i32, name: &str) -> Val {
+        let what = format!("{name}: the mouse moved to the click");
+        if self.switches.value_sets {
+            let (lo, hi) = self.mouse_range(n);
+            self.v.mk_range(Reason::Input, &what, lo, hi)
+        } else {
+            self.v.mk(Reason::Input, what)
+        }
+    }
 }
 
 impl<'g> Machine<'g> {
@@ -273,7 +346,16 @@ impl<'g> Machine<'g> {
             conds: FxHashMap::default(),
             hooks: None,
             ext: None,
+            find_objects: None,
+            screen_h: Default::default(),
         }
+        .with_wide()
+    }
+
+    /// The run's values follow switch value_sets (F12).
+    fn with_wide(mut self) -> Self {
+        self.v.wide = self.switches.value_sets;
+        self
     }
 
     // --- helpers ----------------------------------------------------------------------------------------
@@ -362,6 +444,7 @@ impl<'g> Machine<'g> {
     /// The Run of an entry point that ran nothing, or of `_drive`: it takes the run's unknowns.
     fn finish_run(&mut self, mut r: Run) -> Run {
         r.vals = std::mem::take(&mut self.v);
+        self.v.wide = self.switches.value_sets;
         self.ocache.clear();
         r
     }
@@ -663,6 +746,7 @@ impl<'g> Machine<'g> {
             }
             Expr::Neg(a) => match self.val(p, o, a, x) {
                 Val::Int(v) => Val::Int(wrap32(-(v as i64))),
+                u if self.v.wide && self.v.range(u).is_some() => self.v.arith(Op::Sub, Val::Int(0), u),
                 u => u,
             },
             Expr::Getter { name, args } => self.getter(p, o, name, args, x),
@@ -760,7 +844,14 @@ impl<'g> Machine<'g> {
         }
         match getter_kind(name) {
             Some(GetterKind::Fact) => {}
-            Some(GetterKind::NonFact(r)) => return self.getter_unknown(r, name),
+            Some(GetterKind::NonFact(r)) => {
+                if self.switches.value_sets {
+                    if let Some(v) = self.getter_set(p, o, name) {
+                        return v;
+                    }
+                }
+                return self.getter_unknown(r, name);
+            }
             None => return self.getter_unknown(Reason::Work, name),
         }
         let mut vals = Vec::new();
@@ -770,6 +861,11 @@ impl<'g> Machine<'g> {
             }
         }
         if let Some(&bad) = vals.iter().find(|&&v| self.v.is_plain(v)) {
+            if self.v.range(bad).is_some() {
+                // F12: a range is no fact getter's value: the getter on it is not known
+                let what = format!("{} of {}", self.sym(name), self.v.unk(bad).unwrap().what);
+                return self.v.mk(Reason::Work, what);
+            }
             return bad;
         }
         if let Some(&s0) = vals.iter().find(|v| v.is_unknown()) {
@@ -802,6 +898,28 @@ impl<'g> Machine<'g> {
             return self.v.one_of(ints, s0.reason, what);
         }
         self.getter_on(p, o, name, args, &vals, x)
+    }
+
+    /// F12: findObject's value, 0 or an object (the reader's scope, else the room's: object.cpp:557-597), and
+    /// actorFromPos's, 0 or an actor (actor.cpp:2115-2147, _numActors); None: the room is not known.
+    fn getter_set(&mut self, p: &mut Path, o: &FactOracle, name: Sym) -> Option<Val> {
+        let g = self.game;
+        let mut vals: Vec<i32> = vec![0];
+        match name {
+            known::FIND_OBJECT => match &self.find_objects {
+                Some(objs) => vals.extend(objs.iter().copied()),
+                None => {
+                    let room = self.read(p, Fact::Room, o);
+                    let Val::Int(res) = self.resource(room) else { return None };
+                    let mut objs: Vec<i32> = g.object_room.iter().filter(|e| *e.1 == res).map(|e| *e.0).collect();
+                    objs.sort_unstable();
+                    vals.extend(objs);
+                }
+            },
+            known::ACTOR_FROM_POS => vals.extend(1..NUM_ACTORS),
+            _ => return None,
+        }
+        Some(self.v.mk_set(Reason::Position, self.sym(name), vals))
     }
 
     /// The objects whose owner fact is `owner` (model.py `_owned_by`), or the first owner fact, in key
@@ -1265,7 +1383,68 @@ impl<'g> Machine<'g> {
                 q.assumptions.push(Assumption { cite, cond: cond_s, side: Side::Bool(false), why });
                 p.frame_mut().unwrap().pc = ins.next;
                 q.frame_mut().unwrap().pc = ins.target;
+                if self.switches.value_sets {
+                    self.narrow(p, &mut q, cond, u);
+                }
                 vec![q]
+            }
+        }
+    }
+
+    /// F12: a fork on a test of a variable or local that holds a range or a value set (against a constant, or a
+    /// zero test) leaves it on each side with the values that side allows, so a later test on it in the same path
+    /// is decided (a comparison chain, a range split at its bound). A variable the path has not written is not
+    /// narrowed (it is the oracle's, or the reader's fact, forked on read). Only the value the test decided on
+    /// (`u`) is narrowed, and only model.py's own unknowns (class 0): not a hook's (a reader step counter, a
+    /// conditional write or a copy), whose value the location does not hold as such.
+    fn narrow(&mut self, yes: &mut Path, no: &mut Path, cond: ExprId, u: Val) {
+        let g = self.game;
+        use scumm_ir::CmpOp::*;
+        let cmp = |op: scumm_ir::CmpOp, y: i32, z: i32| {
+            let (y, z) = (i16w(y), i16w(z));
+            match op {
+                Eq => y == z,
+                Ne => y != z,
+                Lt => y < z,
+                Le => y <= z,
+                Gt => y > z,
+                Ge => y >= z,
+            }
+        };
+        // (the location, the test on its value)
+        let (loc, test): (ExprId, Box<dyn Fn(i32) -> bool>) = match g.ast.expr(cond) {
+            Expr::Cmp { op, a, b } => match (g.ast.constant(a), g.ast.constant(b)) {
+                (None, Some(c)) => (a, Box::new(move |v| cmp(op, v, c))),
+                (Some(c), None) => (b, Box::new(move |v| cmp(op, c, v))),
+                _ => return,
+            },
+            Expr::Not(a) => (a, Box::new(|v| v == 0)),
+            Expr::Truth(a) => (a, Box::new(|v| v != 0)),
+            _ => return,
+        };
+        let get = |p: &Path| -> Option<Val> {
+            match g.ast.expr(loc) {
+                Expr::Var(n) => p.writes.get(&Fact::Var(n)).copied(),
+                Expr::Local(n) => p.frame().and_then(|f| f.local(n)),
+                _ => None,
+            }
+        };
+        let Some(v) = get(yes) else { return };
+        if v != u || self.v.unk(v).is_none_or(|x| x.class != 0) {
+            return;
+        }
+        if self.v.range(v).is_none() && self.v.values_of(v).is_none_or(|vs| vs.len() < 2) {
+            return;
+        }
+        for (side, q) in [(true, yes), (false, no)] {
+            if get(q) != Some(v) {
+                continue;
+            }
+            let Some(nv) = self.v.restrict(v, |x| test(x) == side) else { continue };
+            match g.ast.expr(loc) {
+                Expr::Var(n) => q.writes.insert(Fact::Var(n), nv),
+                Expr::Local(n) => q.frame_mut().unwrap().set_local(n, nv),
+                _ => {}
             }
         }
     }

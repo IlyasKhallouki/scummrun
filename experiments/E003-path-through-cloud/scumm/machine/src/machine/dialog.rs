@@ -22,7 +22,7 @@ impl<'g> Machine<'g> {
         self.pre = self.pre_slots(o);
         let mut steps = Vec::with_capacity(MOUSE_VARS.len() + self.pre.len() + 2);
         for (v, name) in MOUSE_VARS {
-            let u = self.v.mk(Reason::Input, format!("{name}: the mouse moved to the click"));
+            let u = self.mouse_value(v, name);
             steps.push(Step::Write(Fact::Var(v), u));
         }
         steps.extend(self.pre.iter().map(|&name| Step::Turn(name)));
