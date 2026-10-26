@@ -61,6 +61,10 @@ const RESUME_STEP: &str = "\u{1}reader: _eng_resume_at";
 const F1_MOUSE_STEP: &str = "\u{1}reader: F1 mouse";
 const F1_TURN_STEP: &str = "\u{1}reader: F1 turn ";
 const F1_INPUT_STEP: &str = "\u{1}reader: F1 checkExecVerbs";
+/// F1b's steps (switch sentence_queue): a sentence event pops the queue first; every run ends with the queue's state
+/// where its record ends (`f1b_end`)
+const F1B_POP_STEP: &str = "\u{1}reader: F1b pop";
+const F1B_END_STEP: &str = "\u{1}reader: F1b end";
 const VERB_CLICK_AREA: i32 = 1; // model.py, verbs.h:35
 const LEFT_CLICK: i32 = 1; // model.py, verbs.cpp:666
 const VAR_VERB_SCRIPT: i32 = 32;
@@ -1044,6 +1048,7 @@ impl Hooks for ReaderHooks {
             known::SAVE_VERBS => save_verbs(m, p, o, x, st, args),
             known::RESTORE_VERBS => restore_verbs(m, p, o, x, st, args),
             known::VERB_OPS => lazily(m, |m| m.op_base(p, o, x, st)),
+            known::DO_SENTENCE if f1b(m) => do_sentence(m, p, o, x, st),
             _ => m.op_base(p, o, x, st),
         }
     }
@@ -1176,6 +1181,11 @@ impl Hooks for ReaderHooks {
                 let i: usize = s[F1_TURN_STEP.len()..].parse().unwrap();
                 f1_turn(m, p, ci, o, i)
             }
+            Step::Note(s) if &**s == F1B_POP_STEP => {
+                m.h_write(p, Fact::Queue(0), Val::Int(QUEUE_EMPTY as i32));
+                Vec::new()
+            }
+            Step::Note(s) if &**s == F1B_END_STEP => f1b_end(m, p, o),
             Step::Scene { room, .. } => {
                 // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
                 let res = match *room {
@@ -1628,9 +1638,9 @@ fn set_mouse(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, id: i64) {
     use crate::inputs::{cell_of, fixed_left, verb_of, SCREEN_WIDTH};
     use scumm_machine::machine::{VAR_MOUSE_X, VAR_MOUSE_Y, VAR_VIRT_MOUSE_X, VAR_VIRT_MOUSE_Y};
     let g = m.game;
-    let (screen, xy) = {
+    let (screen, xy, verb_top) = {
         let inp = st(m).scope.as_ref().unwrap().inputs.as_ref().unwrap();
-        (inp.screen, verb_of(id).and_then(|v| inp.verb_xy.get(&v).copied()))
+        (inp.screen, verb_of(id).and_then(|v| inp.verb_xy.get(&v).copied()), inp.verb_top)
     };
     let (top, height) = screen.unwrap_or((0, 200));
     if let Some((res, ci)) = cell_of(id) {
@@ -1664,6 +1674,10 @@ fn set_mouse(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, id: i64) {
         let name = format!("verb {v}");
         let ((x0, x1), (y0, y1)) = match xy {
             Some((x, y)) => ((x, x + 7), (y, y + 7)),
+            // a verb with no one constant place: anywhere on the verb screen (the size probe took the main screen's
+            // bottom, 200 where the game's SetScreen calls disagree: an empty range). With F1b's switch, the verb
+            // screen's highest top (InputScope::verb_top); without it, the probe's rule
+            None if f1b(m) => ((0, SCREEN_WIDTH - 1), (verb_top, 199)),
             None => ((0, SCREEN_WIDTH - 1), (top + height, 199)),
         };
         let mx = mouse_val(m, &format!("VAR_MOUSE_X: {name}"), x0, x1);
@@ -1852,6 +1866,123 @@ fn f1_input(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> Vec
     Vec::new()
 }
 
+// --- fix round 1, F1b: the sentence queue as facts (fix-round1.md, F1b) ----------------------------------------------
+
+use crate::inputs::{QUEUE_EMPTY, QUEUE_HELD, QUEUE_NOT_KNOWN, QUEUE_RELEASE, QUEUE_RUNS};
+
+/// Switch sentence_queue (F1b), as the reading's scope has it.
+fn f1b(m: &Machine<'_>) -> bool {
+    st(m).scope.as_ref().is_some_and(|s| s.switches.sentence_queue)
+}
+
+/// F1b: doSentence (o5_doSentence, script_v5.cpp:1000-1015; doSentence, script.cpp:1145-1172). STOP writes `queue` 0
+/// and is the machine's own op otherwise (it stops the sentence script). A push writes the entry as facts: each value
+/// as the path has it, where a value the path did not write is the fact it reads, read without a fork (so the record
+/// copies it, `Builder::effect`), and a value that is no fact is QUEUE_NOT_KNOWN; then `queue` 1 (`f1b_end` decides
+/// whether it is held). A push onto a queue that holds a sentence is not modelled: the path ends "unmodelled".
+fn do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, s: Stmt) -> Vec<Path> {
+    let Stmt::Op { args, flags, .. } = s else { unreachable!() };
+    let g = m.game;
+    if g.ast.flags(flags).contains(&known::STOP) {
+        m.h_write(p, Fact::Queue(0), Val::Int(QUEUE_EMPTY as i32));
+        return m.op_base(p, o, x, s);
+    }
+    let cite = m.cite(x);
+    let state = m.read(p, Fact::Queue(0), o);
+    if state != Val::Int(QUEUE_EMPTY as i32) {
+        count(m, "F1b: pushes onto a queue that holds a sentence (not modelled: the path is dropped)");
+        let at = format!("{cite}: doSentence onto a queue that holds a sentence ({})", m.vals_ref().show(state));
+        m.h_halt(p, "unmodelled", at.into());
+        return Vec::new();
+    }
+    let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
+    for (i, &a) in kids.iter().enumerate().take(3) {
+        let v = lazily(m, |m| m.val(p, o, a, Some(x)));
+        let v = match m.vals_ref().unk(v) {
+            Some(u) if u.values.is_none() => {
+                count(m, "F1b: queued values that are no fact (QUEUE_NOT_KNOWN)");
+                Val::Int(QUEUE_NOT_KNOWN as i32)
+            }
+            _ => v,
+        };
+        m.h_write(p, Fact::Queue(i as u8 + 1), v);
+    }
+    m.h_write(p, Fact::Queue(0), Val::Int(QUEUE_RUNS as i32));
+    m.h_note(p, cite, "doSentence", "sentence queued (F1b): the queue's facts");
+    Vec::new()
+}
+
+/// The slot facts of sentence script `n` and their freeze facts (isScriptInUse matches the number in any slot,
+/// scumm-machine `sentence_slots`).
+fn sentence_keys(g: &Game, n: i32) -> Vec<Fact> {
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (k, s) in [(g.script_key(n), Slot::Script(n)), (Fact::ObjScript(n), Slot::Obj(n))] {
+        out.push(k);
+        out.push(Fact::Frozen(match k {
+            Fact::Local(l) => Slot::Local(l),
+            _ => s,
+        }));
+    }
+    out
+}
+
+/// F1b, where a record ends (fix-round1.md, F1b rule 3; checkAndRunSentenceScript's hold test, script.cpp:1186-1191):
+/// a sentence the path queued is held (`queue` 2) while a slot of the sentence script is live and not frozen, else the
+/// next checkAndRunSentenceScript runs it (1); a path that leaves the queue alone but writes the sentence script's slot
+/// or freeze facts, and leaves it stopped or frozen, turns a held sentence (2) into 1.
+fn f1b_end(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> Vec<Path> {
+    let g = m.game;
+    let q = p.writes.get(&Fact::Queue(0)).copied();
+    if matches!(q, Some(Val::Int(n)) if n as i64 != QUEUE_RUNS) {
+        return Vec::new();
+    }
+    let n = match lazily(m, |m| m.read(p, Fact::Var(scumm_machine::machine::VAR_SENTENCE_SCRIPT), o)) {
+        Val::Int(n) => n,
+        _ => m.read(p, Fact::Var(scumm_machine::machine::VAR_SENTENCE_SCRIPT), o).int().unwrap_or(0),
+    };
+    if n == 0 {
+        return Vec::new();
+    }
+    if q.is_none() && !sentence_keys(g, n).iter().any(|k| p.writes.get(k).is_some()) {
+        return Vec::new();
+    }
+    // the hold test (script.cpp:1186-1191), a slot's freeze read only where it is live (a frozen dead slot holds
+    // nothing, and the read would fork for nothing)
+    let keys = sentence_keys(g, n);
+    let mut busy = false;
+    for pair in keys.chunks(2) {
+        let live = m.read(p, pair[0], o);
+        if live == Val::Int(0) {
+            continue;
+        }
+        let frozen = m.read(p, pair[1], o);
+        if live.is_unknown() || frozen.is_unknown() {
+            count(m, "F1b: whether a queued sentence is held is not known where the record ends (left as it is)");
+            return Vec::new();
+        }
+        busy |= frozen == Val::Int(0);
+    }
+    match q {
+        Some(_) => {
+            if busy {
+                count(m, "F1b: sentences held where the record ends");
+                m.h_write(p, Fact::Queue(0), Val::Int(QUEUE_HELD as i32));
+            }
+        }
+        None if !busy => {
+            // a held sentence (2) now runs (1): a conditional write on the queue's state before the record, made by
+            // the Builder (QUEUE_RELEASE), so the path does not fork on it
+            count(m, "F1b: records that let a held sentence run (a conditional write)");
+            m.h_write(p, Fact::Queue(0), Val::Int(QUEUE_RELEASE as i32));
+        }
+        None => {}
+    }
+    Vec::new()
+}
+
 fn opt_bool(p: &Py) -> Option<bool> {
     match p {
         Py::Bool(b) => Some(*b),
@@ -1932,6 +2063,10 @@ fn enc_fact(b: &mut Vec<u8>, f: Fact) {
         Fact::ObjPos(n) => one(15, n),
         Fact::ActorRoom(n) => one(16, n),
         Fact::Mouse => b.push(17),
+        Fact::Queue(i) => {
+            b.push(18);
+            b.push(i);
+        }
     }
 }
 
@@ -2185,6 +2320,37 @@ impl Reader<'_> {
         }
         let o = &self.o;
         let run = match what {
+            What::Sentence { verb, a, b } if f1b(m) => {
+                // F1b: the queued sentence's event: checkAndRunSentenceScript pops the queue's top and runs the
+                // sentence script with [verb, A, B] (script.cpp:1193-1246); its pins hold the queue and the sentence
+                // script idle or frozen (`Builder::queued_jobs`)
+                let n = m.oget(o, Fact::Var(scumm_machine::machine::VAR_SENTENCE_SCRIPT));
+                let unit = match n {
+                    Val::Int(n) if n != 0 && matches!(m.game.script_key(n), Fact::Script(_)) => Some(UnitKey::Global(n)),
+                    _ => None,
+                };
+                let start = match unit.and_then(|u| m.game.id(u)) {
+                    Some(u) if m.game.unit(u).ins_len > 0 => m.game.cite(u, 0),
+                    _ => format!("sentence script {}", m.vals_ref().show(n)),
+                };
+                let steps = vec![
+                    Step::Note(F1B_POP_STEP.into()),
+                    Step::Sentence { verb: *verb as i32, a: *a as i32, b: b.map(|b| b as i32) },
+                    Step::Note(F1B_END_STEP.into()),
+                ];
+                let cid = m.h_cid();
+                let call = Call {
+                    head: "checkAndRunSentenceScript".into(),
+                    cite: "script.cpp:1174-1246".into(),
+                    steps: steps.into(),
+                    caller: None,
+                    active: false,
+                    i: 0,
+                    cid,
+                };
+                let first = first_path(m, call);
+                m.h_drive(o, first, start, unit)
+            }
             What::Sentence { verb, a, b } => m.run_sentence(o, *verb as i32, *a as i32, b.map(|b| b as i32)),
             What::Verb(v) => {
                 st_mut(m).verb = *v as i32;
@@ -2209,7 +2375,12 @@ impl Reader<'_> {
                 let mut steps = vec![Step::Note(F1_MOUSE_STEP.into())];
                 steps.extend((0..n).map(|i| Step::Note(format!("{F1_TURN_STEP}{i}").into())));
                 steps.push(Step::Note(F1_INPUT_STEP.into()));
-                steps.push(Step::Sentences);
+                if f1b(m) {
+                    // F1b: the record ends before checkAndRunSentenceScript; the queued sentence is its own event
+                    steps.push(Step::Note(F1B_END_STEP.into()));
+                } else {
+                    steps.push(Step::Sentences);
+                }
                 let cid = m.h_cid();
                 let call = Call {
                     head: "click".into(),
@@ -2229,7 +2400,11 @@ impl Reader<'_> {
                 let call = Call {
                     head: "runAllScripts".into(),
                     cite: "script.cpp:968-987".into(),
-                    steps: vec![Step::Note(RESUME_STEP.into())].into(),
+                    steps: if f1b(m) {
+                        vec![Step::Note(RESUME_STEP.into()), Step::Note(F1B_END_STEP.into())].into()
+                    } else {
+                        vec![Step::Note(RESUME_STEP.into())].into()
+                    },
                     caller: None,
                     active: false,
                     i: 0,

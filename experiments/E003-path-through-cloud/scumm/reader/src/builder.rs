@@ -201,6 +201,10 @@ pub struct Switches {
     pub actor_rooms: bool,
     /// F1 with F11: an input is one record from the input script (inputs.rs; scumm-machine's switch of the same name)
     pub input_script: bool,
+    /// F1b (fix-round1.md, decision D10; needs input_script): a click's record ends before checkAndRunSentenceScript,
+    /// the queued sentence is facts (`queue`, `queue:verb`, `queue:a`, `queue:b`), and it runs as its own event
+    /// (`queued` jobs, machine.rs `do_sentence` and `f1b_end`)
+    pub sentence_queue: bool,
 }
 
 impl Switches {
@@ -214,10 +218,14 @@ impl Switches {
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
                 "input_script" => s.input_script = true,
+                "sentence_queue" => s.sentence_queue = true,
                 _ => return Err(format!(
-                    "unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, input_script)"
+                    "unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, input_script, sentence_queue)"
                 )),
             }
+        }
+        if s.sentence_queue && !s.input_script {
+            return Err("sentence_queue (F1b) needs input_script".into());
         }
         Ok(s)
     }
@@ -238,6 +246,9 @@ impl Switches {
         if self.input_script {
             v.push("input_script");
         }
+        if self.sentence_queue {
+            v.push("sentence_queue");
+        }
         v
     }
     /// The machine's switches the scope and the domains take (Scope::of_with, domains::build_with): F5's, F9's and
@@ -247,6 +258,7 @@ impl Switches {
             draw_clears: self.draw_clears,
             actor_rooms: self.actor_rooms,
             input_script: self.input_script,
+            sentence_queue: self.sentence_queue,
             ..Default::default()
         }
     }
@@ -717,6 +729,14 @@ impl<'g> Builder<'g> {
 
     /// `Builder.b_values`: B for (verb, A).
     pub fn b_values(&mut self, a: i64, verb: i64, ns: &[i64]) -> Vec<i64> {
+        let (mut out, _, other) = self.b_parts(a, verb, ns);
+        out.extend(other);
+        out
+    }
+
+    /// `b_values` in its parts: the B values the scripts tell apart that the reading builds, every B value they tell
+    /// apart (the constants A's code compares Local[0] with, and the handlers), and the stand-in for the others.
+    pub fn b_parts(&mut self, a: i64, verb: i64, ns: &[i64]) -> (Vec<i64>, BTreeSet<i64>, Option<i64>) {
         let game = self.game;
         let ast = &game.ast;
         let mut consts: BTreeSet<i64> = BTreeSet::new();
@@ -750,7 +770,7 @@ impl<'g> Builder<'g> {
             }
         }
         if consts.is_empty() && handlers.is_empty() {
-            return vec![];
+            return (vec![], BTreeSet::new(), None);
         }
         let inside: Vec<i64> =
             consts.iter().copied().filter(|b| self.scope.objects.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
@@ -763,9 +783,8 @@ impl<'g> Builder<'g> {
         if other.is_some() {
             self.counts.inc("B = other (a stand-in object)");
         }
-        let mut out: Vec<i64> = inside_set.union(&handlers).copied().collect();
-        out.extend(other);
-        out
+        let out: Vec<i64> = inside_set.union(&handlers).copied().collect();
+        (out, all, other)
     }
 
     pub fn sentence_scripts(&self) -> Vec<i64> {
@@ -822,10 +841,92 @@ impl<'g> Builder<'g> {
         out
     }
 
+    /// Fix round 1, F1b (switch sentence_queue, fix-round1.md): the queued sentence's events, kind `queued`. Per
+    /// sentence script and engine variant (the script idle, or live and frozen: checkAndRunSentenceScript's hold test,
+    /// script.cpp:1186-1191), per verb of the scope (the walk verb with them), object A of the scope and B: none, each
+    /// value the reading builds today (`b_parts`), and the stand-in for the values the scripts do not tell apart, whose
+    /// precondition is every such value `queue:b` holds (not 0, A, QUEUE_NOT_KNOWN or one they tell apart). The
+    /// precondition holds the queue's top (`queue` 1 or 2); the run pops it and runs the sentence script with [verb, A,
+    /// B] (machine.rs). No player input: no verb shown, no place of A, no VAR_USERPUT (the click's record has those).
+    fn queued_jobs(&mut self) -> Vec<Job> {
+        use crate::inputs::{QUEUE_HELD, QUEUE_NOT_KNOWN, QUEUE_RUNS};
+        let mut out = Vec::new();
+        let ns = self.sentence_scripts();
+        let objects = self.scope.objects.clone();
+        let mut verbs = self.scope.verbs.clone();
+        if let Some(w) = self.scope.walk_verb {
+            if !verbs.contains(&w) {
+                verbs.push(w);
+            }
+        }
+        let bdom: Labels = self.domain("queue:b").map(|d| d.values).unwrap_or_default();
+        for &n in &ns {
+            let key = self.game.script_key(n as i32).to_string();
+            for (variant, live, frozen) in [("", 0, 0), ("~frozen", 1, 1)] {
+                let (mut base_pins, mut base_pre) = (Pins::new(), Pre::new());
+                let mut ok = self.pin(&mut base_pins, &mut base_pre, &format!("var:{VAR_SENTENCE_SCRIPT}"), &[Label::Int(n)]);
+                for (k, v) in [
+                    (key.clone(), live),
+                    (format!("frozen:{}", slot_name(&key)), frozen),
+                    (format!("objscript:{n}"), 0),
+                    (format!("frozen:obj:{n}"), 0),
+                ] {
+                    ok = ok && self.pin(&mut base_pins, &mut base_pre, &k, &[Label::Int(v)]);
+                }
+                ok = ok && self.pin(&mut base_pins, &mut base_pre, "queue", &[Label::Int(QUEUE_RUNS), Label::Int(QUEUE_HELD)]);
+                if !ok {
+                    self.counts.inc(format!("F1b: sentence scripts whose base conditions never hold{variant}"));
+                    continue;
+                }
+                for &a in &objects {
+                    for &verb in &verbs {
+                        let (built, all, other) = self.b_parts(a, verb, &ns);
+                        let mut bs: Vec<(Option<i64>, Vec<Label>)> = vec![(None, vec![Label::Int(0)])];
+                        bs.extend(built.iter().map(|&b| (Some(b), vec![Label::Int(b)])));
+                        if let Some(o) = other {
+                            let rest: Vec<Label> = bdom
+                                .iter()
+                                .copied()
+                                .filter(|l| match l {
+                                    Label::Int(x) => *x != 0 && *x != a && *x != QUEUE_NOT_KNOWN && !all.contains(x) && !built.contains(x),
+                                    _ => false,
+                                })
+                                .collect();
+                            if !rest.is_empty() {
+                                bs.push((Some(o), rest));
+                            }
+                        }
+                        for (b, bset) in bs {
+                            let (mut pins, mut pre) = (base_pins.clone(), base_pre.clone());
+                            let ok = self.pin(&mut pins, &mut pre, "queue:verb", &[Label::Int(verb)])
+                                && self.pin(&mut pins, &mut pre, "queue:a", &[Label::Int(a)])
+                                && self.pin(&mut pins, &mut pre, "queue:b", &bset);
+                            if !ok {
+                                self.counts.inc("F1b: queued sentences outside the queue's domains");
+                                continue;
+                            }
+                            let label = match b {
+                                Some(b) => format!("queued({verb},{a},{b}){variant}"),
+                                None => format!("queued({verb},{a}){variant}"),
+                            };
+                            out.push(Job { kind: "queued".into(), label, pins, pre, what: What::Sentence { verb, a, b }, checks: vec![] });
+                        }
+                    }
+                }
+            }
+        }
+        self.counts.add("F1b: queued sentence jobs", out.len() as i64);
+        out
+    }
+
     /// `Builder.inputs`: every player input of the scope, in reader.py's order.
     pub fn inputs(&mut self) -> Vec<Job> {
         if let Some(inp) = self.scope.inputs.clone() {
-            return self.input_jobs(&inp);
+            let mut jobs = self.input_jobs(&inp);
+            if self.scope.switches.sentence_queue {
+                jobs.extend(self.queued_jobs());
+            }
+            return jobs;
         }
         let mut out = Vec::new();
         let ns = self.sentence_scripts();
@@ -1284,6 +1385,18 @@ impl<'g> Builder<'g> {
                 }
             }
         }
+        if self.scope.switches.sentence_queue && kind != "queued" {
+            // F1b rule 5: a queued sentence the next checkAndRunSentenceScript runs goes before any later turn or input
+            use crate::inputs::{QUEUE_EMPTY, QUEUE_HELD};
+            let dom = self.table.domain("queue").unwrap().into_owned();
+            let have = pre.get("queue").cloned().unwrap_or_else(|| dom.values.clone());
+            let ok: Labels = have.into_iter().filter(|l| *l == Label::Int(QUEUE_EMPTY) || *l == Label::Int(QUEUE_HELD)).collect();
+            if ok.is_empty() {
+                self.counts.inc("F1b: paths that start with a sentence the next checkAndRunSentenceScript runs (no record)");
+                return None;
+            }
+            pre.insert("queue".into(), ok);
+        }
         let mut effects: Vec<(String, Eff)> = Vec::new();
         for (k, v) in &p.writes {
             if let Some(e) = self.effect(k, v, p) {
@@ -1602,6 +1715,23 @@ impl<'g> Builder<'g> {
             self.counts.inc("writes to non-facts (left out of the task)");
             return EffOut::None;
         };
+        if self.scope.switches.sentence_queue && key == "queue" && *v == Val::Int(crate::inputs::QUEUE_RELEASE) {
+            // F1b rule 4: a held sentence runs once the record leaves the sentence script stopped or frozen
+            use crate::inputs::{QUEUE_EMPTY, QUEUE_HELD, QUEUE_RUNS};
+            let q = |n: i64| vec![("queue".to_string(), vec![Label::Int(n)])];
+            return EffOut::Eff(Eff::Cases(vec![
+                (q(QUEUE_EMPTY), vec![Label::Int(QUEUE_EMPTY)]),
+                (q(QUEUE_HELD), vec![Label::Int(QUEUE_RUNS)]),
+            ]));
+        }
+        if self.scope.switches.sentence_queue && key.starts_with("queue:") {
+            if let Val::Unk(u) = v {
+                if u.class == UClass::Unknown && u.reason == R_FACT && u.what != key {
+                    let dom = dom.clone();
+                    return self.queue_copy(key, u, &dom);
+                }
+            }
+        }
         if let Val::Unk(u) = v {
             if u.class != UClass::Unknown {
                 let src = u.what.clone();
@@ -1686,6 +1816,49 @@ impl<'g> Builder<'g> {
                 EffOut::Eff(Eff::Guess(dom.values.clone()))
             }
         }
+    }
+
+    /// F1b: `key` (a queue entry) := the value fact `u.what` has before the action, which doSentence read without a
+    /// fork (machine.rs `do_sentence`): one case per value the path allows it (`u.values`, the path's precondition set
+    /// or the whole domain), so the cases are disjoint and cover every state the record allows. A value the entry's
+    /// domain lacks widens it (the pass reads again); a collapsed value (above or below the domain) is
+    /// QUEUE_NOT_KNOWN.
+    fn queue_copy(&mut self, key: &str, u: &Unknown, dom: &Domain) -> EffOut {
+        use crate::inputs::QUEUE_NOT_KNOWN;
+        let src = u.what.clone();
+        let Some(sdom) = self.fact_info(&src).1.clone() else {
+            self.counts.inc("F1b: queue copies of a fact with no domain (QUEUE_NOT_KNOWN)");
+            return EffOut::Eff(Eff::Set(Label::Int(QUEUE_NOT_KNOWN)));
+        };
+        let mut cases: Vec<Case> = Vec::new();
+        let mut missing = false;
+        for &x in u.values.as_ref().unwrap() {
+            let Some(sl) = sdom.label(x) else { continue };
+            let kl = match sl {
+                Label::Int(_) => match dom.label(x) {
+                    Some(l @ Label::Int(_)) => l,
+                    _ => {
+                        self.out_of_domain.entry(key.to_string()).or_default().insert(x);
+                        missing = true;
+                        continue;
+                    }
+                },
+                _ => Label::Int(QUEUE_NOT_KNOWN),
+            };
+            cases.push((vec![(src.clone(), vec![sl])], vec![kl]));
+        }
+        if missing {
+            return EffOut::None;
+        }
+        self.counts.inc("F1b: queue entries copied from a fact (conditional writes)");
+        let first = cases.first().map(|c| c.1.clone());
+        if cases.iter().all(|c| Some(&c.1) == first.as_ref()) {
+            return match first {
+                Some(v) => EffOut::Eff(Eff::Set(v[0])),
+                None => EffOut::None,
+            };
+        }
+        EffOut::Eff(Eff::Cases(cases))
     }
 
     // --- everything ----------------------------------------------------------------------------------------------------

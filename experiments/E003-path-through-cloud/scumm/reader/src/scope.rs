@@ -541,6 +541,9 @@ impl Scope {
         let inputs = switches.input_script.then(|| {
             let shown: Vec<i64> = verbs.iter().chain(dialog_verbs.iter()).copied().collect();
             crate::inputs::writes(&mut writes);
+            if switches.sentence_queue {
+                crate::inputs::queue_writes(&mut writes);
+            }
             crate::inputs::input_scope(game, &units, &rooms, start, &shown, switches.draw_clears)
         });
         let mut uni: BTreeSet<String> = BTreeSet::new();

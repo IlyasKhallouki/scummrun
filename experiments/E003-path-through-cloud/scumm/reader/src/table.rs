@@ -402,6 +402,53 @@ fn input_domains(
         extra.insert(k, Domain::of(vals, None, None));
         counts.inc("F1: sentence-building variables given the domain start + constant writes (reader)");
     }
+    if scope.switches.sentence_queue {
+        queue_domains(scope, game, start, doms, extra, counts);
+    }
+}
+
+/// Fix round 1, F1b (switch sentence_queue, fix-round1.md): the queue's state ({0, 1, 2}) and its top entry's verb, A
+/// and B. Each entry's domain: 0, QUEUE_NOT_KNOWN, the constants the scope's doSentence sites push there, the domain
+/// of each variable they push there, and the scope's verbs (with the walk verb) or objects and actors; the passes add
+/// what paths push (`Builder::extend_domains`). The start's queue is empty where it gives none (the bridge dumps no
+/// queue).
+fn queue_domains(scope: &Scope, game: &Game, start: &mut Facts, doms: &Domains, extra: &mut BTreeMap<String, Domain>, counts: &mut Counter) {
+    use crate::inputs::{QUEUE_EMPTY, QUEUE_HELD, QUEUE_KEYS, QUEUE_NOT_KNOWN, QUEUE_RUNS};
+    let ast = &game.ast;
+    for k in QUEUE_KEYS {
+        if !start.contains(k) {
+            start.insert(k.to_string(), 0);
+        }
+    }
+    extra.insert("queue".into(), Domain::of([QUEUE_EMPTY, QUEUE_RUNS, QUEUE_HELD], None, None));
+    let mut vals: [BTreeSet<i64>; 3] = Default::default();
+    for (i, v) in vals.iter_mut().enumerate() {
+        v.extend([0, QUEUE_NOT_KNOWN, start.get0(QUEUE_KEYS[i + 1])]);
+    }
+    vals[0].extend(scope.verbs.iter().copied().chain(scope.walk_verb));
+    for v in &mut vals[1..] {
+        v.extend(scope.objects.iter().copied());
+        v.extend(1..NUM_ACTORS);
+    }
+    for &u in &scope.units {
+        for x in game.ins(u) {
+            let Some(Stmt::Op { name: known::DO_SENTENCE, args, .. }) = x.st else { continue };
+            for (i, &a) in ast.kids(args).iter().enumerate().take(3) {
+                if let Some(c) = ast.constant(a) {
+                    vals[i].insert(c as i64);
+                } else if let Expr::Var(n) = ast.expr(a) {
+                    let k = format!("var:{n}");
+                    if let Some(d) = extra.get(&k).or_else(|| doms.get(&k)) {
+                        vals[i].extend(d.values.iter().filter_map(|l| l.int()));
+                    }
+                }
+            }
+        }
+    }
+    for (i, v) in vals.into_iter().enumerate() {
+        extra.insert(QUEUE_KEYS[i + 1].into(), Domain::of(v, None, None));
+    }
+    counts.inc("F1b: queue facts given their domains (reader)");
 }
 
 /// ("at" or "esc", unit name) for a `pos:<unit>` or `escpos:<unit>` key.

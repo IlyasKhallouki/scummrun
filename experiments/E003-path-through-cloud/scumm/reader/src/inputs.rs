@@ -90,6 +90,11 @@ pub struct InputScope {
     /// the main screen's top line and height, where every roomOps SetScreen of the game gives the same constants
     /// (gfx.cpp:386: initScreens(top, bottom))
     pub screen: Option<(i32, i32)>,
+    /// the highest line the verb screen can start at: the least bottom (below 200) of the game's constant SetScreen
+    /// calls (o5_roomOps' SetScreen(b, h) is initScreens(b, h), script_v5.cpp:2397, which puts the verb screen from h
+    /// to the screen's bottom, gfx.cpp:386-388; with h at 200 it is empty and no verb can be clicked); 0 where a
+    /// SetScreen is not constant
+    pub verb_top: i32,
 }
 
 fn reads_mouse(game: &Game, st: &Stmt) -> bool {
@@ -305,12 +310,38 @@ pub fn input_scope(game: &Game, units: &[UnitId], rooms: &[i32], start: &Facts, 
     if screens.len() == 1 {
         out.screen = *screens.iter().next().unwrap();
     }
+    out.verb_top = if screens.contains(&None) {
+        0
+    } else {
+        screens.iter().flatten().map(|&(t, h)| t + h).filter(|&b| b < 200).min().unwrap_or(0)
+    };
     out
 }
 
 /// F1's writes, added to the scope's: the `mouse` fact.
 pub fn writes(out: &mut Writes) {
     out.exact.insert("mouse".to_string());
+}
+
+/// F1b's facts (switch sentence_queue): the sentence queue's state and its top entry (scumm-ir `Fact::Queue`).
+pub const QUEUE_KEYS: [&str; 4] = ["queue", "queue:verb", "queue:a", "queue:b"];
+/// `queue`'s values: empty, a sentence the next checkAndRunSentenceScript runs, a sentence a live, unfrozen sentence
+/// script holds (script.cpp:1186-1194)
+pub const QUEUE_EMPTY: i64 = 0;
+pub const QUEUE_RUNS: i64 = 1;
+pub const QUEUE_HELD: i64 = 2;
+/// The machine half's mark for "a held sentence now runs": `queue` 2 becomes 1, 0 stays 0 (a conditional write,
+/// `Builder::effect`); never a value of the domain
+pub const QUEUE_RELEASE: i64 = 3;
+/// `queue:verb`, `queue:a`, `queue:b` where the reading does not know the value doSentence pushed (a value that is
+/// no fact): no sentence event reads it, so such a sentence blocks the plan instead of running as a guess
+pub const QUEUE_NOT_KNOWN: i64 = -1;
+
+/// F1b's writes, added to the scope's: the queue facts.
+pub fn queue_writes(out: &mut Writes) {
+    for k in QUEUE_KEYS {
+        out.exact.insert(k.to_string());
+    }
 }
 
 /// The left edge of the main screen in a room `w` wide when the camera cannot move (a room no wider than the
