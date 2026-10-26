@@ -21,6 +21,13 @@
 //! lacks but the start file names (write_start writes every fact of the caller's task) is an error. Each piece
 //! keeps the action's name, label and members, so a plan reads back to the input actions.
 //!
+//! **Cost caps** (`--cost-caps`, the replay harness's frame costs: replay.py `cost_caps`). One cap per line:
+//! `prefix<TAB>frames`. An action whose label is `prefix)` or starts with `prefix#` costs at most `frames` (at least
+//! 1). The harness writes `event(NAME@W` for each slot the engine's dump shows waiting at W at the plan's start, with
+//! the frames the dump shows it still needs: an event of that slot at W costs no more, a lower bound both for the
+//! slot's first turn and for any later one. Applied first, before the bans; the file's other actions keep their
+//! costs.
+//!
 //! One difference that cannot reach the file: task.py's precondition sets may hold values their domain lacks (they
 //! are cut to the domain when the file is written); here they were cut on reading. A piece whose set would hold
 //! only such values is dropped here and written by task.py as an action no value meets, which it drops too.
@@ -181,4 +188,50 @@ pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut Ban
     }
     c.actions_after = acts.len() as u64;
     Ok(Task { acts, ..t })
+}
+
+/// The cost caps in a caps file (module docstring): (label prefix, frames).
+pub fn read_caps(path: &Path) -> Result<Vec<(String, u32)>, String> {
+    let text = read_lines(path)?;
+    let mut out = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        if line.is_empty() {
+            continue;
+        }
+        let (p, c) = line.split_once('\t').ok_or(format!("{}:{}: no tab", path.display(), n + 1))?;
+        let c: u32 = c.trim().parse().map_err(|e| format!("{}:{}: {}", path.display(), n + 1, e))?;
+        out.push((p.to_string(), c.max(1)));
+    }
+    Ok(out)
+}
+
+/// Each action whose label a cap names costs at most the cap (module docstring); returns the actions whose cost went
+/// down.
+pub fn apply_caps(t: &mut Task, caps: &[(String, u32)]) -> usize {
+    if caps.is_empty() {
+        return 0;
+    }
+    let mut by: HashMap<&str, u32> = HashMap::new();
+    for (p, c) in caps {
+        let e = by.entry(p.as_str()).or_insert(*c);
+        *e = (*e).min(*c);
+    }
+    let mut lowered = 0;
+    for m in t.acts.meta.iter_mut() {
+        let label = t.strs.get(m.label);
+        let prefix = match label.find('#') {
+            Some(i) => &label[..i],
+            None => match label.strip_suffix(')') {
+                Some(p) => p,
+                None => continue,
+            },
+        };
+        if let Some(&c) = by.get(prefix) {
+            if c < m.cost {
+                m.cost = c;
+                lowered += 1;
+            }
+        }
+    }
+    lowered
 }
