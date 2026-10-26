@@ -645,6 +645,7 @@ impl Hooks for ReaderHooks {
         };
         let unknown = p.unknown_writes.len();
         let res = panic::catch_unwind(AssertUnwindSafe(|| m.advance_base(p, o)));
+        st_mut(m).cur = None; // a read outside a step is not the step's
         let mut more = match res {
             Ok(more) => more,
             Err(e) => {
@@ -758,8 +759,9 @@ impl Hooks for ReaderHooks {
             }
             Kind::NonFact => {
                 if let (true, Fact::Var(n @ (20 | 21 | 44 | 45))) = (st(m).table.as_ref().unwrap().value_sets, k) {
-                    // F12: the mouse is a range (scumm-machine `mouse_range`)
-                    let (lo, hi) = m.mouse_range(n);
+                    // F12: the mouse is a range (scumm-machine `mouse_range`), in the scope's rooms
+                    let rooms: Vec<i32> = st(m).scope_rooms.iter().flatten().copied().collect();
+                    let (lo, hi) = m.mouse_range(n, Some(&rooms));
                     return m.vals().mk_range(R_NONFACT, &i.key, lo, hi);
                 }
                 m.vals().mk(R_NONFACT, &*i.key)

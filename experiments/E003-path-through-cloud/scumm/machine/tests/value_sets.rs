@@ -150,7 +150,18 @@ fn walk_to_mouse() {
         assert!(p.assumptions.is_empty() && p.unknown_writes.is_empty(), "{sw}: a walk or put to the mouse forks and writes nothing");
         let x = var(&r, 0, 164).unwrap();
         assert!(r.vals.is_plain(x), "{sw}: the stored x is a non-fact");
-        // on: the widest room's x (640 wide); off: model.py's unknown
+        // on: the click's room's x (640 wide); off: model.py's unknown
         assert_eq!(r.vals.range(x), if sw.is_empty() { None } else { Some((0, 639)) }, "{sw}");
     }
+}
+
+/// The main screen's left edge by the room's width (camera.cpp:169-192): 0 up to the width less the screen's, and a
+/// room narrower than the screen can start left of 0 (its camera is clamped to its width less 160).
+#[test]
+fn screen_lefts() {
+    use scumm_machine::machine::screen_lefts;
+    assert_eq!(screen_lefts(320), (0, 0));
+    assert_eq!(screen_lefts(640), (0, 320));
+    assert_eq!(screen_lefts(1008), (0, 688));
+    assert_eq!(screen_lefts(8), (-312, 0));
 }

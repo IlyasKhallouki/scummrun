@@ -255,23 +255,47 @@ pub struct Machine<'g> {
 }
 
 /// F12: the engine's mouse bounds for SCUMM v5 (input.cpp:414-434): the mouse is clipped to the screen,
-/// _screenWidth x _screenHeight (scumm.cpp:395-396), VAR_VIRT_MOUSE_X adds the camera's left edge (at most a
-/// room's width less the screen's), and VAR_VIRT_MOUSE_Y subtracts the main screen's top and is -1 off it
+/// _screenWidth x _screenHeight (scumm.cpp:395-396), VAR_VIRT_MOUSE_X adds the main screen's left edge (`screen_lefts`),
+/// and VAR_VIRT_MOUSE_Y subtracts the main screen's top and is -1 off it
 /// (its height set by resetScumm, initScreens(16, 144) for v5 (scumm.cpp:2053), then by the scripts' roomOps
 /// SetScreen, script_v5.cpp:2392-2397, gfx.cpp:386).
 pub const SCREEN_HEIGHT: i32 = 200;
 /// F12: the main screen's height resetScumm sets for SCUMM v5 (initScreens(16, 144), scumm.cpp:2053).
 pub const RESET_MAIN_HEIGHT: i32 = 144 - 16;
 
+/// F12: the main screen's left edge in a room `w` wide, lowest and highest, for SCUMM v5 (camera.cpp:169-192):
+/// cameraMoved clamps the camera to 160 where it is left of that, else to `w` - 160 where it is right of that, and the
+/// screen starts at the camera's strip less half the strips (40 of 8 pixels). A room narrower than the screen can
+/// start left of 0. C's division truncates toward zero, as Rust's does.
+pub fn screen_lefts(w: i32) -> (i32, i32) {
+    let half = SCREEN_WIDTH / 2;
+    let left = |cx: i32| (cx / 8 - SCREEN_WIDTH / 16) * 8;
+    if w >= SCREEN_WIDTH {
+        (left(half), left(w - half))
+    } else {
+        (left(w - half).min(left(half)), left(half))
+    }
+}
+
 impl<'g> Machine<'g> {
-    /// F12: the range of mouse variable `n` (VAR_VIRT_MOUSE_X/Y, VAR_MOUSE_X/Y), from the game: the widest room, the
-    /// tallest main screen the scripts set (the screen's height where one is not a constant).
-    pub fn mouse_range(&self, n: i32) -> (i32, i32) {
+    /// F12: the range of mouse variable `n` (VAR_VIRT_MOUSE_X/Y, VAR_MOUSE_X/Y), from the game: the main screen's
+    /// left edges in `rooms` (room resources; None or none known: every room of the game), the tallest main screen
+    /// the scripts set (the screen's height where one is not a constant).
+    pub fn mouse_range(&self, n: i32, rooms: Option<&[i32]>) -> (i32, i32) {
         let g = self.game;
         match n {
             44 => (0, SCREEN_WIDTH - 1),
             45 => (0, SCREEN_HEIGHT - 1),
-            20 => (0, g.room_width.values().copied().max().unwrap_or(SCREEN_WIDTH).max(SCREEN_WIDTH) - 1),
+            20 => {
+                let mut ws: Vec<i32> = rooms.unwrap_or(&[]).iter().filter_map(|r| g.room_width.get(r).copied()).collect();
+                if ws.is_empty() {
+                    ws = g.room_width.values().copied().collect();
+                }
+                let lefts: Vec<(i32, i32)> = ws.into_iter().map(screen_lefts).collect();
+                let lo = lefts.iter().map(|l| l.0).min().unwrap_or(0);
+                let hi = lefts.iter().map(|l| l.1).max().unwrap_or(0);
+                (lo, hi + SCREEN_WIDTH - 1)
+            }
             21 => {
                 if let Some(h) = self.screen_h.get() {
                     return (-1, h - 1);
@@ -306,11 +330,17 @@ impl<'g> Machine<'g> {
         }
     }
 
-    /// F12: the value a mouse variable has at a click: its range (switch value_sets), else model.py's unknown.
-    pub(crate) fn mouse_value(&mut self, n: i32, name: &str) -> Val {
+    /// F12: the value a mouse variable has at a click: its range (switch value_sets; in the room the oracle gives,
+    /// where processInput worked it out), else model.py's unknown.
+    pub(crate) fn mouse_value(&mut self, o: &FactOracle, n: i32, name: &str) -> Val {
         let what = format!("{name}: the mouse moved to the click");
         if self.switches.value_sets {
-            let (lo, hi) = self.mouse_range(n);
+            let room = self.oget(o, Fact::Room);
+            let res = match self.resource(room) {
+                Val::Int(r) => vec![r],
+                Val::Unk(_) => vec![],
+            };
+            let (lo, hi) = self.mouse_range(n, Some(&res));
             self.v.mk_range(Reason::Input, &what, lo, hi)
         } else {
             self.v.mk(Reason::Input, what)

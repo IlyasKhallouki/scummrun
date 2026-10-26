@@ -837,8 +837,10 @@ off the machine is model.py's, and every golden above still compares with 0 diff
   unknown. `Vals.wide` (the switch) turns on the rules below; off, `Vals` never makes a range.
 - At a click (row 4's `run_verb`, the sentence frame), the four mouse variables are ranges instead of model.py's
   unknowns (`Machine::mouse_range`; input.cpp:414-434): VAR_MOUSE_X [0..319] and VAR_MOUSE_Y [0..199] (the screen,
-  scumm.cpp:395-396), VAR_VIRT_MOUSE_X [0..widest room - 1] (the camera's left edge is at most a room's width less the
-  screen's), VAR_VIRT_MOUSE_Y [-1..h - 1], h the tallest main screen: resetScumm's 128 for v5 (initScreens(16, 144),
+  scumm.cpp:395-396), VAR_VIRT_MOUSE_X the screen moved by the main screen's left edge in the click's room
+  (`screen_lefts`, camera.cpp:169-192: 0 to the width less 320, and below 0 in a room narrower than the screen; every
+  room of the game where the room is not known, the scope's rooms in the reader), VAR_VIRT_MOUSE_Y [-1..h - 1], h the
+  tallest main screen: resetScumm's 128 for v5 (initScreens(16, 144),
   scumm.cpp:2053) or a roomOps SetScreen of the scripts (gfx.cpp:386; a SetScreen whose bounds are not constants gives
   the screen's 200).
 - findObject is the value set 0 and the room's objects (object.cpp:557-597: the room's local objects), or the
