@@ -116,3 +116,12 @@ replay's match measure: an unpredicted change counts against a step only when a 
 made it, and the strict count is reported next to it.
 
 Also today: "Do the vm if it's faster, why wait" (the first Part I attempt runs on the cloud VM, within D6's cap).
+
+## D9 (2026-10-26): Only proven reductions, no hand-written rules
+
+Decided by: Ilyas.
+
+"I don't really go with the idea of writing down like specific rules. I'm more into some mathematically proven
+stuff." Moves that lead to nothing are dead-end branches of the cloud, and they come from the scripts' structure.
+So the search is not guided or pruned by a written list of genre or speedrun rules; what removes or orders paths
+must be proven, as in D4 (clarified).
