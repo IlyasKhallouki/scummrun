@@ -25,6 +25,7 @@ task.py c356a6df633a. `tests/oracle.rs` regenerates the static oracle when one o
 | `machine.rs` | reader.py `Reader` (the subclass of model.Machine: every override, wrapper and method of its own), `SymOracle`, `SymPath`, `Fork`, `_to_sym`, `_consistent`, `MEMO_GETTERS`, `STEP_OPS`, `LAZY_METHODS`, `ESC_KEY`; model.py `_eng_input` (its switch off), which the machine port lacks (row 4's); the `builder::Machine` the Builder reads with |
 | `replay.rs` | a `Machine` that plays back the Python reading's machine runs; `Compare`, which runs the Rust machine half on each captured run too and compares the two |
 | `oracle.rs` | the comparisons; `bin/reader_port.rs` runs them and the timings |
+| `locals.rs` | the switch `--live-locals` (below, "Live locals"): the locals a unit's code reads, from the IR; not in reader.py |
 
 `write_sas` is taskcore's: with `--fold off --reduce none --encoding task` its file is task.py's, byte for byte.
 taskcore's default encoding is now `model` (metric 1 when the file has pick or goal operators), so the
@@ -316,6 +317,176 @@ and 620 folded, as before; the 126 records write ELSEWHERE. taskcore writes the 
 reductions, `--start-check input`, start "start"): 168,899 actions, 11,349,709 effects, a 1.36 GB SAS file, in
 173 s. With reductions on, both start checks (`input` and `needed`) pass and the task reduces to 0 actions: k = 1
 holds no write of the Part I end's facts (results/task-size-scaling.log, finding 3).
+
+## Live locals: events keyed on the locals their unit reads, as a switch
+
+**The finding** (the first Part I attempt, results/vm-part1-seed1.json, and a diagnosis of it on the laptop).
+An event's key is (unit name, unit, wait point, list of locals, Esc), and the list's number (`Builder.sig`) is a hash
+of every local the slot holds. A unit that is started with arguments it never reads gets one list per value of those
+arguments. In MI1 the sentence script starts a room's local 202 with `startScript(Var[116],[Local[1],Local[3],
+Local[2]])`; room 31's local 202 (a long dialog, 105 wait points) reads only its Local[0], so its events were keyed
+by up to 1,440 lists per wait point (SIG_LIMIT keeps 1,024), and each list walked the whole dialog. Folding such lists
+into args 0 or lowering SIG_LIMIT is not sound: the args-0 event names none of a loop's next wait points, and a lower
+limit folds the sentence script's real object arguments.
+
+**The rule** (`locals.rs`). For each unit, S(u) is the set of locals any instruction of its code can read, from the
+IR, over all its code (every verb entry of an object, every path; no flow): every `Local[n]` node in any
+instruction's operands, conditions, start arguments, sub-ops and texts (`getInt(Local[0])` inside a text), but the
+target of a plain `Local[n] = ...`. `+=`, `-=`, `*=`, `/=`, `++` and `--` read their target; an opcode inside an
+expression (`Embed`) reads its target back. S(u) is "all locals" when the IR does not show the reads exactly:
+a local read through an index (`Local[base + x]`, an `Index` of kind local, read or updated), an instruction the IR
+did not parse, a code descumm did not decode (`unknownN(..)`, `...Unknown...`) with an operand that is not a
+constant, or an IR note that some bytes are in no instruction ("closer gap", "else gap not a multiple of 3", "jump
+line not 3 bytes").
+
+**The switch** `FactTable.live_locals` (`reader-scope --live-locals`, `reader-port read NAME --live-locals`), off
+(None) by default. When it is on, `Builder.record` (where rule (a), "Local[i] from a fact", lives) drops from each
+kept slot's list every local outside S(u) before the list is numbered, and numbers it together with the slot's
+flags (`Builder.sig`'s text gets them, only with the switch on): resistant (the R flag) and owned as they are, and
+recursive only as "true or not" (`locals::recursive`: true stays, false and unknown are written unknown, in the
+event too). That is all anything reads of it: the engine reads a slot's recursive flag only in chainScript, which
+passes it to runScript, which tests it (script_v5.cpp:834-850, script.cpp:65-66), and the model only compares it with
+true (a start that is not recursive stops the running instance, the note at the slot's end). So the event's key, its
+number (the `args:` write and the `args:` precondition of the event's own records) and the locals its run starts with
+(`Event.locals`, which `machine.rs` `eng_resume_at` puts in the frame) hold only S(u), and two slots with the same
+read locals but other flags keep two numbers. A dropped local is absent from the list: with
+known args it would read 0, without them an unknown; no instruction reads it. Events with unknown locals (args 0:
+the start's slots, the replans' copies, folded lists) are as before. The counter "lists of locals with locals their
+unit never reads (left out: live locals)" counts the lists it changed. The reading's head (golden.py's file) gets a
+field `live_locals`: `{"switch": "--live-locals", "slots": {slot: S(u) or null}}` for every unit of the game (a scope's
+records can name events of room code outside the scope, the ELSEWHERE cases), a slot named as the engine's state names
+it (`script:N`, `obj:N`; `local:N@R`, `entry@R`, `exit@R` for the unit's room R and each pseudo room on its resource);
+packed_reading.py copies it into reading.json. With the switch off the field is absent and nothing else changes.
+
+In MI1 (tests only): of 1,195 units, 1,193 have S(u) known exactly (750 read no local at all) and 2 keep all locals,
+both for an indexed local: global 153 (`Local[0 + Var[300]]`) and room 75's local 200 (`Local[6 + Local[5]]`). The six
+decompiles with descumm warnings all carry `unknown8(8224)` inside a verb's text: a constant operand, and the engine
+copies text code 8 with no operand (string.cpp:1643-1646), so their reads are exact (room 31's local 202 is not one of
+them). Room 31's local 202 reads {0}, the sentence script {0, 1, 2, 3, 4, 6, 7}.
+
+**Why it is sound.**
+
+1. *The engine reads a slot's locals only through its own instructions.* A slot's locals are `vm.localvar[slot]`. They
+   are written when a script starts (`initializeLocals`, script.cpp:156-165, from the starter's argument list) and by
+   `writeVar` (script.cpp:834-846). They are read only by `readVar` for a variable number with bit 0x4000, and only the
+   running slot's (`vm.localvar[_currentScript]`, script.cpp:669-706). Every such number comes from the running
+   instruction's own bytes: an operand (`getVarOrDirectByte/Word`, script_v5.cpp:371-381), a result's index word
+   (`getResultPos`, script_v5.cpp:383-396), an indexed variable's index (script.cpp:573-580), or a text's escape codes 4
+   to 6 (`convertIntMessage`, `convertVerbMessage`, `convertNameMessage`, string.cpp:1647-1657, 1795-1890; code 7 names
+   a string, not a variable, in v5). descumm prints each of these as `Local[n]` or `Local[n + x]` (and
+   `getInt(Local[n])` in a text), which the IR parses into `Local(n)` and `Index { kind: Local, .. }`; a constant offset
+   is folded at parse time (`Local[1 + 1]` is `Local(2)`). Saving and loading copy the locals; that is no script read.
+   Three workarounds read the running slot's locals inside other ops for particular games (script_v5.cpp:1578 and
+   1599-1610 for MI2's Ultimate Talkie edition, 3807 for Indy3's FM-TOWNS release); none applies to MI1, and a game one
+   applies to needs those locals in S(u) of the units those ops run in.
+2. *The model reads them the same way.* scumm-machine reads a local only in `Machine::local`, from `val_base`'s
+   `Expr::Local` and `Expr::Index { kind: Local }`; no hook of the reader reads a local's value to decide anything.
+   A unit's slot runs only that unit's code (a start or a chainScript pushes a frame of another unit, with its own
+   locals, from argument values the starter's instruction reads). So a run of a slot of u, from any wait point, on any
+   path, reads no local outside S(u).
+3. *So two lists that agree on S(u) give the same paths.* Take the same wait point and the same facts. Step by step,
+   each instruction reads the same facts and the same locals in S(u), so it makes the same forks, the same writes to
+   facts and the same writes to locals in S(u) (a write's value is computed from what the instruction reads). A local
+   outside S(u) may hold different values in the two runs, but nothing reads it. So the paths take the same branches,
+   write the same facts, start the same slots with the same arguments, and leave the same slots at the same places.
+   Their records are equal except where the list itself appears: the `args:` number, and the kept slot's own list,
+   which the rule restricts to S(u) again, so the next events agree too. Lists that differ only outside S(u) therefore
+   give the same records apart from the `args:` number. The switch keeps one list per class (the restriction to S(u))
+   and numbers it; the records of every list of the class are that list's records. No plan is lost (a plan that used
+   an event of one list of the class can use the class's event) and none is added (every record of the class's event is
+   a record of each of its lists).
+4. *What the model's bookkeeping compares.* The machine compares whole frames in two places: `merge` joins the locals
+   of paths that meet at a join (calls.rs `merge_base`, `join_locals`), and the spin test hashes the frame's locals
+   (calls.rs `spins`). There an unread local whose value happens to equal another path's can make two paths merge, or
+   a loop count as a spin, one turn earlier than with the local absent. That changes how the model groups paths, not
+   what the engine does, and a merge only joins values. Measured: on room 33, the kitchen and rooms 31 and 33 the two
+   readings give exactly the same set of records once renumbered, and at k = 1 none is lost (below).
+5. *The slot's flags.* An event's key never held the slot's flags, yet its run starts with them: the R flag decides
+   whether a freeze stops the slot (calls.rs, the freeze), owned whether an object's slot survives a room change
+   (machine.rs `room_change`), and recursive is read by chainScript and by the note at the slot's end. Without the
+   switch two lists of one unit and wait point with equal locals and other flags share a key, and the first one met
+   runs (reader.py's rule, kept). Lists that differ in unread locals can differ in their flags too (two call sites start
+   the unit with other arguments and other flags), so keying on S(u) alone merges them and runs only the first flag
+   set: at k = 1 that lost 2 records, which differ from the kept ones only in their next event's R flag. So the switch
+   numbers each list with the flags its unit's run can read (above). That keeps every flag set the reading without the
+   switch ran where it can matter, and also runs the R and owned variants reader.py's rule dropped where locals were
+   equal (the readings below count them). Keying the recursive flag as it is would double room 31's local 202 in rooms
+   31 and 33 (78,518 records against 47,052): it is started both with recursive false and with it unknown, which
+   nothing tells apart.
+6. *Folding.* SIG_LIMIT now counts classes, not lists, so it folds fewer lists into args 0; that only keeps more
+   lists known. Its rule and the rewrite are unchanged.
+
+**Measured** (the laptop, 2026-10-26, nice 10, other jobs running: wall times vary with the load).
+
+- *With the switch off* the reader is unchanged: room 33's and the kitchen's readings are golden.py's (the fast tests,
+  `kitchen_reading_rust_machine`), and reader-scope's k = 1 reading with `--elsewhere` is the VM's byte for byte
+  (packed file sha1 3ceabe50..., golden lines sha1 213e68f3..., 237,264 lines).
+- *Room 33* (`room33_live_locals_on`): 878 records either way; 38 lists onto 38 (one loses a local its unit never
+  reads, none merge); the golden records renumbered are exactly the switch's.
+- *The kitchen* (`kitchen_live_locals_on`): 72,256 records against 72,126; 5,298 lists onto 5,221; event runs in the
+  last pass 7,098 against 6,990; the golden records renumbered are 72,124 distinct records, exactly the switch's 72,126
+  records (72,124 distinct). Its task (start S1#7, taskcore's default reductions, lama-first): 17,823 operators
+  against 17,648, 12,029 reduced actions against 11,987, and the same 10-step plan, step for step.
+- *Rooms 31 and 33* (`reader-scope --rooms 31,33 --elsewhere`): the same either way: 57,866 records, 906 event runs
+  (861 events, 45 Esc) in 32 rounds; room 31's local 202 315 runs, 47,052 records, 105 wait points, at most 3 lists
+  each (it reads Local[0], the saved VAR_VERB_SCRIPT, whose 3 values give the 3 lists). The switch changed 828 lists,
+  merged none; the records renumbered are equal.
+- *k = 1 with `--elsewhere`*: 237,262 records against 237,465; event runs of the last pass 18,225 against 18,149; 1,027
+  rounds either way; 9,710 lists onto 9,580; no record lost: the 237,143 distinct records renumbered are all in the
+  switch's reading. Its 320 more come from flag sets reader.py's rule dropped: 215 from 10 lists that carried two flag
+  sets without the switch (room 38's local 202, room 28's local 200, object 442), 105 from those variants' later wait
+  points (`live_locals_check.py`). Read on 3 threads: 291.0 s and 853 CPU s at load 6.7 without, 160.7 s and 570 CPU s
+  at load 3.3 with; peak RSS 1,026 and 1,072 MB. Seed 1 through replay_part1.py on each: the start checks pass (0 facts
+  differ, taskcore's `input` and `needed` checks ok), taskcore reduces the task to 0 operators, lama-first proves no
+  plan, verify from boot 0 differences: the VM's result, either way.
+- *k = 2 with `--elsewhere`* (3 threads each, one after the other): 532,166 records (the committed reading's count)
+  against 519,755; runs in both passes 62,526 against 58,788, event runs of the last pass 26,261 against 24,392, its
+  event records 356,557 against 344,146; 1,027 rounds either way; the packed file 1.048 GB against 0.964 GB. Wall
+  1,450 s and 3,465 CPU s at load 12 without, 1,404 s and 3,107 CPU s at load 17 with; peak RSS 2,935 and 2,836 MB.
+  The diagnosis's estimate with its text rule was 26,434 to 23,693 event runs and 356,557 to 342,516 event records.
+- *Part I* (`reader-scope --part1 --elsewhere --live-locals`, pass 1, 3 threads): the inputs are the VM's, as they
+  must be (the switch changes no input): 34,124 runs, 1,544,657 records (2,581 s and 1,962 s here in two attempts).
+  Event round 1 has 10,096 runs from 17,151 events, against the VM's 19,847 runs from 30,545 events (the diagnosis's
+  count with its text rule was 10,015). Round 1's records were not measured: both attempts stopped at the 4.8 GB RSS
+  guard at the same point, 193,710 records into round 1 (1,738,367 in the pass; peak VmHWM 4,952 and 5,022 MB), the
+  second with `--max-waiting 2000` instead of 20,000, so one job's own run, not the records waiting, takes the memory.
+- *Projection for Part I* (the diagnosis's per-run record counts on the measured runs): pass 1 about 3.0 M records
+  (2.9 to 3.3 M): the inputs' 1.54 M, round 1 about 0.84 M (the sentence script's 7,732 runs at 103.5 records each, the
+  2,364 others about 0.04 M), room 31's local 202 about 0.19 M, the other rounds 0.4 to 0.6 M. Both passes about 20 to
+  28 minutes on the VM's 32 vCPUs, a packed file of about 10 to 11 GB. Keying the R and owned flags adds little: 0.1 %
+  of k = 1's records, and k = 2 with it is 2.3 % smaller than without the switch. One round-1 job needs more than
+  4.8 GB on its own here; on the VM (n2-highmem-32) that is no limit, but its unexplained 61 GB peak in round 3 may come
+  back.
+
+**What the harness must do** (replay.py, packed_reading.py). A replan starts each live slot from the engine's state.
+Today nothing compares a slot's locals: `task_start` gives every live slot args 0, and `replan_start` copies the plan's
+`args:` number when the slot is where the plan put it, else 0 (the state dump has no locals). Under the switch the
+plan's number names the list restricted to S(u), with the slot's flags, which is all a run of the slot can depend on, so
+this rule needs no change. Anything that matches a live slot's locals to a list must compare S(u) only:
+`replay.read_view(b, name, room, locals)` gives a slot's locals as the reading keyed them (from reading.json's
+`live_locals`, `Points.read_locals`): only S(u) under the switch; every local for a reading made without it, for a unit
+whose reads are not known exactly, or for a slot the reading does not list. The read set is per unit, so a local script
+is looked up with the room the engine is in (`local:202@31`). The run's record says whether its reading was made with
+the switch (`task.live_locals`).
+
+**For fix round 1's F10** (branch fr1-c, which matches slots' dumped locals to built lists at a replan; not merged
+yet). Under this switch its matching must change, in Rust and in Python alike:
+
+- `dumped_events` (builder.rs) must restrict a dumped slot's locals with `LiveLocals::keep(unit, ..)` and number the
+  list with the slot's flags (`locals::recursive` for recursive), as `record` does, or the dumped slot's event gets a
+  number no record's list has and is read again.
+- `list_matches` (task.rs, replay.py) must compare only the locals in S(u): skip every dumped local outside S(u)
+  (`read_view` on the dump), keep "0 where the list lacks it" for a local in S(u), and keep the override count and
+  cutscene data. Without this, no built list would match a slot whose unread locals are nonzero (the lists lack them,
+  so they would be compared with 0), and every such slot would be read again.
+- Under the switch a list's number also covers the slot's flags, so a match must compare them: `owned` is in F10's
+  slot (from the owners), the R flag and recursive are the engine slot's `freezeResistant` and `recursive`
+  (script.h:91), which the dump would need to list; until it does, a slot whose read locals match lists with other flags
+  must take args 0 (unknown) or be read again, not the first such list.
+- `built_lists` and `slot_lists` then hold restricted lists; nothing else changes there. `match_list`'s choice (the
+  list with the most locals known as numbers) is unaffected.
+- The lists file F10 writes next to a reading should say the switch, or the harness should read it from reading.json's
+  `live_locals`, so a reading made without the switch keeps today's full comparison.
 
 ## Python behaviours kept on purpose, and the differences
 
