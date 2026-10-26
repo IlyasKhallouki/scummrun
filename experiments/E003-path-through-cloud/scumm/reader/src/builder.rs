@@ -814,9 +814,49 @@ impl<'g> Builder<'g> {
         out
     }
 
+    /// A kept slot's list of locals as its event keys it, and the list's number: what `record` makes of a slot a path
+    /// left waiting, and what any other maker of a slot's event must use (fix round 1's F10, PORT-NOTES.md "Live
+    /// locals"). Off: the list as it is, numbered by `sig` (reader.py's `_sig`), the recursive flag as it is. With the
+    /// switch --live-locals: only the locals unit `unit`'s code reads, numbered with the slot's flags (resistant, owned,
+    /// and recursive only as "true or not", `locals::recursive`). Returns (locals, number, recursive flag).
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_number(
+        &mut self,
+        name: &str,
+        unit: UnitKey,
+        locals: Vec<(i64, Val)>,
+        ov: i64,
+        cd: &[CutData],
+        known: bool,
+        recursive: &Py,
+        resistant: &Py,
+        owned: &Py,
+    ) -> (Vec<(i64, Val)>, i64, Py) {
+        let (locals, flags, recursive) = match &self.table.live_locals {
+            Some(ll) => {
+                let (kept, dropped) = ll.keep(unit, locals);
+                if dropped {
+                    self.counts.inc("lists of locals with locals their unit never reads (left out: live locals)");
+                }
+                let recursive = crate::locals::recursive(recursive);
+                let flags = vec![("recursive", recursive.text()), ("resistant", resistant.text()), ("owned", owned.text())];
+                (kept, flags, recursive)
+            }
+            None => (locals, Vec::new(), recursive.clone()),
+        };
+        let sig = self.sig(name, &locals, ov, cd, known, &flags);
+        (locals, sig, recursive)
+    }
+
     /// `Builder._sig`: the number of a list of locals (48 bits of its text's SHA-1; 0: not known). `flags`: more
-    /// (name, text) pairs in the text; empty but with the switch --live-locals (`record`).
+    /// (name, text) pairs in the text, given exactly when the switch --live-locals is on (`list_number` gives them;
+    /// a call without them under the switch would number a list as no record does, so it stops here).
     pub fn sig(&mut self, name: &str, locals: &[(i64, Val)], ov: i64, cd: &[CutData], args_known: bool, flags: &[(&str, String)]) -> i64 {
+        assert_eq!(
+            flags.is_empty(),
+            self.table.live_locals.is_none(),
+            "Builder::sig: a list's flags are in its number exactly when the switch --live-locals is on; number a slot's list with Builder::list_number"
+        );
         if !args_known {
             return 0;
         }
@@ -1011,24 +1051,9 @@ impl<'g> Builder<'g> {
             // the switch --live-locals (PORT-NOTES.md, "Live locals"): only the locals the unit's code reads, and the
             // slot's flags in the list's number (lists that differed in unread locals may differ there), its recursive
             // flag only as "true or not", all the model and the engine read of it
-            let (locs, flags, recursive) = match &self.table.live_locals {
-                Some(ll) => {
-                    let (kept_locs, dropped) = ll.keep(kept.unit, locs);
-                    if dropped {
-                        self.counts.inc("lists of locals with locals their unit never reads (left out: live locals)");
-                    }
-                    let recursive = crate::locals::recursive(&kept.recursive);
-                    let flags = vec![
-                        ("recursive", recursive.text()),
-                        ("resistant", kept.resistant.text()),
-                        ("owned", kept.owned.text()),
-                    ];
-                    (kept_locs, flags, recursive)
-                }
-                None => (locs, Vec::new(), kept.recursive.clone()),
-            };
             let cd: Vec<CutData> = kept.cut_data.iter().map(cut_text).collect();
-            let mut sig = self.sig(name, &locs, kept.override_, &cd, kept.known, &flags);
+            let (locs, mut sig, recursive) =
+                self.list_number(name, kept.unit, locs, kept.override_, &cd, kept.known, &kept.recursive, &kept.resistant, &kept.owned);
             if self.folded.contains(&sig) {
                 sig = 0;
             }

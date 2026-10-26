@@ -410,6 +410,18 @@ fn room33_live_locals_on() {
     assert_eq!((g, n, lists, on), (878, 878, 38, 38));
 }
 
+/// Under the switch --live-locals a slot's list is numbered only through `Builder::list_number`, which puts the slot's
+/// flags in the number: `sig` without them stops (fix round 1's F10 must not give a dumped slot a number no record's
+/// list has).
+#[test]
+#[should_panic(expected = "Builder::list_number")]
+fn live_locals_sig_needs_the_flags() {
+    use scumm_reader::record::Val;
+    let mut b = oracle::builder(game(), static_oracle(), "room33");
+    b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(game())));
+    b.sig("local:202", &[(0, Val::Int(1))], 0, &[], true, &[]);
+}
+
 /// The kitchen read with the switch --live-locals on 3 workers, against golden.py's reading (about 2 minutes):
 /// 72,256 golden records, 72,124 of them distinct once renumbered, are the switch's 72,126 records (72,124
 /// distinct); 5,298 lists onto 5,221.
