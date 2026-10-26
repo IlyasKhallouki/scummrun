@@ -1,11 +1,17 @@
 //! The `--live-locals` switch (PORT-NOTES.md, "Live locals"): which of a slot's locals its unit's code can read.
 //!
-//! A SCUMM v5 slot's locals are read only by its own code: the engine's readVar reads `vm.localvar[_currentScript]`
-//! for a variable number with bit 0x4000 (script.cpp:568-706), and every such number comes from the running
-//! instruction's operands, directly or as the index of an indexed variable (script.cpp:573-580, script_v5.cpp:383-396),
-//! or from a code inside a text it prints (string.cpp:1573-1706, [`text_code_exact`]). So a local no instruction of the
-//! unit reads cannot change any of its paths. [`unit_reads`] gives the locals a unit's instructions read, from the IR
-//! over all its code (every verb entry of an object, every path), or "all" when the IR does not show them exactly.
+//! A SCUMM v5 slot's locals are `vm.localvar[slot]`. The engine's readVar reads them for a variable number with bit
+//! 0x4000, and only the running slot's (`vm.localvar[_currentScript]`, script.cpp:568-706). The number comes from the
+//! running instruction's bytes: an operand, a result's index word, an indexed variable's index (script.cpp:573-580,
+//! script_v5.cpp:371-396), or a code inside a text the instruction prints (string.cpp:1573-1706, [`text_code_exact`]).
+//! [`unit_reads`] gives the locals a unit's instructions read, from the IR over all its code (every verb entry of an
+//! object, every path), or "all" when the IR does not show them exactly ([`All`]). So a local no instruction of the
+//! unit reads changes none of its paths in the model. In the engine it can in two cases, where the model already
+//! differs from the engine, with the switch or without it (PORT-NOTES.md, "Live locals", point 1): a stored text (an
+//! object's or actor's name, a verb's text, a string) whose codes name a local is converted later, with the locals of
+//! the slot that prints or draws it ([`stored_text_locals`]), which changes only the text shown; and an indexed
+//! variable whose base plus index reaches 0x2000 carries into bit 0x4000 and reads a local where the model reads a
+//! variable.
 
 use crate::py::Py;
 use crate::record::Val;
@@ -237,6 +243,39 @@ pub fn unit_reads(game: &Game, u: UnitId) -> Reads {
         }
     }
     Ok(w.out)
+}
+
+/// The locals named inside texts that an instruction stores rather than prints at once: every `Local[n]` operand of
+/// getInt, getVerb, getName or getString inside an operand of any instruction but print and printEgo (setObjectName,
+/// VerbOps, actorOps, PutCodeInString, ...), as (unit, n). The engine converts such a text when it is printed or drawn
+/// (convertVerbMessage, convertNameMessage, convertStringMessage: string.cpp:1875, 1904, 1971; drawVerb: verbs.cpp:1075),
+/// reading the locals of whatever slot runs then, which may be another unit's slot and a local outside its reads. That
+/// changes only the text shown (its digits, names and length): a conversion writes no variable, and the model gives
+/// every text an unknown value. A text built at run time (SetStringChar) can hold such codes too; this lists only the
+/// ones the code spells out. MI1 has none (tests).
+pub fn stored_text_locals(game: &Game) -> Vec<(UnitKey, i32)> {
+    let mut out = Vec::new();
+    for u in game.ids() {
+        for x in game.ins(u) {
+            let Some(st @ Stmt::Op { name, .. }) = &x.st else { continue };
+            if matches!(game.syms.str(*name), "print" | "printEgo") {
+                continue;
+            }
+            game.ast.walk_stmt(st, &mut |e| {
+                if let Expr::Getter { name, args } = game.ast.expr(e) {
+                    if matches!(game.syms.str(name), "getInt" | "getVerb" | "getName" | "getString") {
+                        for &k in game.ast.kids(args) {
+                            if let Expr::Local(n) = game.ast.expr(k) {
+                                out.push((game.unit(u).key, n));
+                            }
+                        }
+                    }
+                }
+                true
+            });
+        }
+    }
+    out
 }
 
 /// A kept slot's recursive flag as the switch keys it: true, or None for anything else. The model reads the flag only
@@ -483,6 +522,93 @@ mod tests {
         // MI1: no code inside a text has an operand byte 0xFF, an index, code 0xFF or `sound`
         let ll = LiveLocals::of(game());
         assert!(game().ids().all(|u| !matches!(ll.reads[&game().unit(u).key], Err(All::TextBytes))));
+    }
+
+    /// Texts stored with a code naming a local: none in MI1 (its local codes are in 10 print and printEgo lines, which
+    /// the engine converts at once with the printing slot's own locals). With a stored text's getInt operand made
+    /// Local[2], the list has it.
+    #[test]
+    fn stored_texts_name_no_local() {
+        assert_eq!(stored_text_locals(game()), vec![]);
+        // where MI1's local codes are: print and printEgo only
+        let mut printed = 0;
+        for u in game().ids() {
+            for x in game().ins(u) {
+                if let Some(st @ Stmt::Op { name, .. }) = &x.st {
+                    game().ast.walk_stmt(st, &mut |e| {
+                        if let Expr::Getter { name: c, args } = game().ast.expr(e) {
+                            if matches!(game().syms.str(c), "getInt" | "getVerb" | "getName" | "getString")
+                                && game().ast.kids(args).iter().any(|&k| matches!(game().ast.expr(k), Expr::Local(_)))
+                            {
+                                assert!(matches!(game().syms.str(*name), "print" | "printEgo"));
+                                printed += 1;
+                            }
+                        }
+                        true
+                    });
+                }
+            }
+        }
+        assert_eq!(printed, 10);
+        // a stored text with a code on a global: made Local[2]
+        let mut found = None;
+        for u in game().ids() {
+            for x in game().ins(u) {
+                if let Some(st @ Stmt::Op { name, .. }) = &x.st {
+                    if matches!(game().syms.str(*name), "print" | "printEgo") || found.is_some() {
+                        continue;
+                    }
+                    game().ast.walk_stmt(st, &mut |e| {
+                        if let Expr::Getter { name: c, args } = game().ast.expr(e) {
+                            if matches!(game().syms.str(c), "getInt" | "getName") {
+                                if let Some(&k) = game().ast.kids(args).iter().find(|&&k| matches!(game().ast.expr(k), Expr::Var(_))) {
+                                    found.get_or_insert((game().unit(u).key, k));
+                                }
+                            }
+                        }
+                        true
+                    });
+                }
+            }
+        }
+        let (k, e) = found.expect("a stored text with a code on a variable");
+        let mut g = game().clone();
+        g.script.ast.exprs[e.0 as usize] = Expr::Local(2);
+        assert_eq!(stored_text_locals(&g), vec![(k, 2)]);
+    }
+
+    /// MI1's indexed variables (PORT-NOTES.md, "Live locals", point 1): the engine adds the index k to the whole base
+    /// word, flags included, then clears 0x2000 (script.cpp:573-580), so a carry or a borrow can turn the word into a
+    /// local's: for Var[b + k] when b + k is 0x2000 to 0x5FFF (or -0xE000 to -0xA001), for Bit[b + k] when it is 0xA000
+    /// to 0xDFFF (or -0x6000 to -0x2001); never while |b + k| < 0x2000. MI1's bases are 396 at most for Var (so an
+    /// index of 7,796 or more) and 521 for Bit (an index of 40,439 or more, or -8,198 or less).
+    #[test]
+    fn indexed_variables() {
+        let (mut var, mut bit, mut max_base, mut max_bit) = (0, 0, 0, 0);
+        for u in game().ids() {
+            for x in game().ins(u) {
+                if let Some(st) = &x.st {
+                    game().ast.walk_stmt(st, &mut |e| {
+                        if let Expr::Index { kind, base, .. } = game().ast.expr(e) {
+                            match kind {
+                                RefKind::Var => {
+                                    var += 1;
+                                    max_base = max_base.max(base);
+                                }
+                                RefKind::Bit => {
+                                    bit += 1;
+                                    max_bit = max_bit.max(base);
+                                }
+                                RefKind::Local => {}
+                            }
+                        }
+                        true
+                    });
+                }
+            }
+        }
+        assert_eq!((var, bit, max_base, max_bit), (71, 617, 396, 521));
+        assert_eq!(0x2000 - max_base, 7796);
     }
 
     /// The recursive flag: only whether it is true.
