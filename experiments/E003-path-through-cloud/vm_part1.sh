@@ -27,7 +27,9 @@
 # Settings (environment, with their defaults): SCOPE="--part1"; NAME=part1 (the reading's name, which the run's
 # records carry: replay-part1-NAME-seed1.json); THREADS=all CPUs; READ=/dev/shm/partI (the reading
 # lives in RAM: the packed file is about 1.8 KB a record and the reader's last rewrite of it needs twice that for a
-# moment, more than the VM's 30 GB disk holds after the builds); RES=out/partI/results; CAP_MIN=240 (the reader's
+# moment, more than the VM's 30 GB disk holds after the builds; `read` and `run` keep the VM user lingering first,
+# because systemd-logind's RemoveIPC deletes a user's /dev/shm files once their last login session ends, and so
+# removed a finished reading 36 s after its step ended); RES=out/partI/results; CAP_MIN=240 (the reader's
 # own time cap); MAX_RSS_GB=200; MIN_FREE_GB=8 (MemAvailable); MAX_FILES_GB=100 (the packed and golden files
 # together); REPLANS=500;
 # TIME_LIMIT=10800 (the run's seconds); PLAN_TIME=600 (plan.md step 4); PLAN_MEMORY=64G (Fast Downward per plan);
@@ -103,7 +105,14 @@ setup() {
     free -g
 }
 
+# The reading in /dev/shm outlives the ssh session that started it only if the user lingers (systemd-logind's
+# RemoveIPC removes the user's /dev/shm files when the user's last session ends).
+linger() {
+    loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q '=yes' || sudo loginctl enable-linger "$USER"
+}
+
 read_scope() {
+    linger
     mkdir -p "$READ" "$RES"
     local live=()
     [[ "$LIVE_LOCALS" == 1 ]] && live=(--live-locals)
@@ -123,6 +132,7 @@ check() {
 }
 
 run() {
+    linger
     mkdir -p "$RES"
     (cd "$HERE" && "$PY" replay_part1.py run 1 --reading "$READ/reading.json" --results "$RES" \
         --replan-limit "$REPLANS" --time-limit "$TIME_LIMIT" --plan-time "$PLAN_TIME" --plan-memory "$PLAN_MEMORY" \
@@ -142,5 +152,5 @@ case "${1:-}" in
     check) check ;;
     run) run ;;
     control) control ;;
-    *) sed -n '2,39p' "${BASH_SOURCE[0]}"; exit 2 ;;
+    *) sed -n '2,42p' "${BASH_SOURCE[0]}"; exit 2 ;;
 esac
