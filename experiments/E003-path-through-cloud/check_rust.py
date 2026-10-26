@@ -87,6 +87,9 @@ RUST_SWITCHES = {
     "draw_clears": "F5: drawObject's setXY moves the object (objpos:O, an index into its places), and every other "
                    "object of the room with the drawn object's place and size goes to state 0 (script_v5.cpp:1108-1128); "
                    "loading a room puts its objects back (room.cpp:195)",
+    "actor_rooms": "F9: an actor's room is a fact (actorroom:A): putActorInRoom and loadRoomWithEgo write it "
+                   "(script_v5.cpp:2160-2196, 1857-1866), getActorRoom and actorFollowCamera read it "
+                   "(script_v5.cpp:1289-1322; camera.cpp:62-70)",
 }
 
 _ARGS = {"verify": False, "canonical": False, "dir": None, "bin": BIN}
