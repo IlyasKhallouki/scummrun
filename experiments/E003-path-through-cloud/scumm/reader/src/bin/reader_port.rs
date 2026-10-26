@@ -152,6 +152,10 @@ fn main() {
             let name = &args[1];
             // fix round 1's switches (fix-round1.md); with any on, the reading is checked against --golden, if given
             let sw = Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
+            if let Some(n) = arg(&args, "--input-path-limit") {
+                // F1's size probe: paths per input run
+                scumm_reader::machine::INPUT_PATH_LIMIT.store(n.parse().unwrap(), std::sync::atomic::Ordering::Relaxed);
+            }
             let cpu0 = scumm_reader::cpu_secs();
             let live = args.iter().any(|a| a == "--live-locals");
             let elsewhere = args.iter().any(|a| a == "--elsewhere");

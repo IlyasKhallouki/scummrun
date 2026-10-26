@@ -24,6 +24,9 @@ pub const VAR_EGO: i32 = 1;
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
+/// F1 (switch input_script): a click checkExecVerbs drops is no action (its frame is the events' own); no path of
+/// reader.py's ends so, so DROP_ENDS stays reader.py's list
+pub const INPUT_DROPPED: &str = "input dropped";
 /// The Reader's counters the Builder reads to decide a split.
 pub const FORKS_ON_READ: &str = "forks on read";
 pub const FORKS_ON_NONFACTS: &str = "forks on non-fact tests";
@@ -196,6 +199,8 @@ pub struct Switches {
     pub draw_clears: bool,
     /// F9: scumm-machine's actor_rooms; the scope's writes and the table's domains of it (Scope::of_with, table.rs)
     pub actor_rooms: bool,
+    /// F1 with F11: an input is one record from the input script (inputs.rs; scumm-machine's switch of the same name)
+    pub input_script: bool,
 }
 
 impl Switches {
@@ -208,7 +213,10 @@ impl Switches {
                 "value_sets" => s.value_sets = true,
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms)")),
+                "input_script" => s.input_script = true,
+                _ => return Err(format!(
+                    "unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, input_script)"
+                )),
             }
         }
         Ok(s)
@@ -227,12 +235,20 @@ impl Switches {
         if self.actor_rooms {
             v.push("actor_rooms");
         }
+        if self.input_script {
+            v.push("input_script");
+        }
         v
     }
-    /// The machine's switches the scope and the domains take (Scope::of_with, domains::build_with): F5's and F9's.
-    /// value_sets reaches the Reader's machine through the table (FactTable::value_sets, Reader::run_full).
+    /// The machine's switches the scope and the domains take (Scope::of_with, domains::build_with): F5's, F9's and
+    /// F1's. value_sets reaches the Reader's machine through the table (FactTable::value_sets, Reader::run_full).
     pub fn scope(&self) -> scumm_machine::Switches {
-        scumm_machine::Switches { draw_clears: self.draw_clears, actor_rooms: self.actor_rooms, ..Default::default() }
+        scumm_machine::Switches {
+            draw_clears: self.draw_clears,
+            actor_rooms: self.actor_rooms,
+            input_script: self.input_script,
+            ..Default::default()
+        }
     }
 }
 
@@ -761,8 +777,56 @@ impl<'g> Builder<'g> {
         vals.into_iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect()
     }
 
+    /// Fix round 1, F1 (switch input_script, inputs.rs): every input of the scope, each one record from the input
+    /// script: a click on each shown verb (the scope's verbs, its dialog lines and the slot verbs) and on each cell
+    /// of each scope room, with each button. A verb click needs the verb shown (findVerbAtPos, verbs.cpp:681-686); a
+    /// cell click needs its room. VAR_USERPUT and VAR_VERB_SCRIPT are read in the run, after the frame's turns
+    /// (checkExecVerbs, F2). The sentence-script pins and "~frozen" are gone: the sentence is whatever the scripts
+    /// queue.
+    fn input_jobs(&mut self, inp: &crate::inputs::InputScope) -> Vec<Job> {
+        use crate::inputs::{BUTTONS, SCENE_CLICK_AREA, VERB_CLICK_AREA};
+        let mut out = Vec::new();
+        let mut verbs: Vec<i64> =
+            self.scope.verbs.iter().chain(self.scope.dialog_verbs.iter()).chain(inp.slot_verbs.iter()).copied().collect();
+        verbs.sort_unstable();
+        verbs.dedup();
+        // a verb click is in one of the scope's rooms (the room's input script, a local one, is the room's)
+        let rooms: Vec<Label> = inp.rooms.iter().map(|&(r, _, _)| Label::Int(r as i64)).collect();
+        for v in verbs {
+            for b in BUTTONS {
+                let (mut pins, mut pre) = (Pins::new(), Pre::new());
+                if !self.pin(&mut pins, &mut pre, "room", &rooms) {
+                    continue;
+                }
+                if !self.pin(&mut pins, &mut pre, &format!("verb:{v}"), &[Label::Int(1)]) {
+                    self.counts.inc("F1: verb clicks whose verb is never shown (constants)");
+                    continue;
+                }
+                let what = What::Input { area: VERB_CLICK_AREA, value: v, button: b, room: -1, cell: -1 };
+                out.push(Job { kind: "input".into(), label: format!("click(v{v},{b})"), pins, pre, what, checks: vec![] });
+            }
+        }
+        for &(r, _, n) in &inp.rooms {
+            for c in 0..n {
+                for b in BUTTONS {
+                    let (mut pins, mut pre) = (Pins::new(), Pre::new());
+                    if !self.pin(&mut pins, &mut pre, "room", &[Label::Int(r as i64)]) {
+                        continue;
+                    }
+                    let what = What::Input { area: SCENE_CLICK_AREA, value: 0, button: b, room: r as i64, cell: c as i64 };
+                    out.push(Job { kind: "input".into(), label: format!("click({r}.{c},{b})"), pins, pre, what, checks: vec![] });
+                }
+            }
+        }
+        self.counts.add("F1: input jobs", out.len() as i64);
+        out
+    }
+
     /// `Builder.inputs`: every player input of the scope, in reader.py's order.
     pub fn inputs(&mut self) -> Vec<Job> {
+        if let Some(inp) = self.scope.inputs.clone() {
+            return self.input_jobs(&inp);
+        }
         let mut out = Vec::new();
         let ns = self.sentence_scripts();
         let objects = self.scope.objects.clone();
@@ -1186,7 +1250,7 @@ impl<'g> Builder<'g> {
         let mut out = Vec::new();
         for p in &run.paths {
             self.ends.add(Py::Tuple(vec![Py::str(&job.kind), end_py(&p.end)]), 1);
-            if p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym {
+            if p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e) || e == INPUT_DROPPED) || !p.sym {
                 let base = job.label.split('#').next().unwrap().split('@').next().unwrap();
                 let lab = format!("{base}{}", if job.label.contains('@') { ")" } else { "" });
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
@@ -1581,8 +1645,15 @@ impl<'g> Builder<'g> {
             },
             Val::Unk(u) => {
                 if u.reason == R_COLLAPSED && u.values.as_ref().is_some_and(|v| v.len() == 1) {
-                    return match dom.label(u.values.as_ref().unwrap()[0]) {
+                    let x = u.values.as_ref().unwrap()[0];
+                    return match dom.label(x) {
                         Some(l) => EffOut::Eff(Eff::Set(l)),
+                        None if self.scope.switches.input_script && u.what != key => {
+                            // F1: another fact's collapsed value copied here (a sentence-building variable's seed
+                            // domain lacks it): the pass widens the domain, as for a number
+                            self.out_of_domain.entry(key.to_string()).or_default().insert(x);
+                            EffOut::None
+                        }
                         // reader.py writes ("set", None) here; a collapsed value is always its domain's own
                         None => panic!("a collapsed value outside its domain: {key}"),
                     };

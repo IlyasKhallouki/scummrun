@@ -16,6 +16,7 @@ pub mod domain;
 pub mod domains;
 pub mod due;
 pub mod facts;
+pub mod inputs;
 pub mod locals;
 pub mod machine;
 pub mod oracle;

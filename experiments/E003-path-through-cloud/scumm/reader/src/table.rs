@@ -145,6 +145,9 @@ impl FactTable {
         if scope.switches.actor_rooms {
             actor_room_domains(scope, game, &start, &doms, &mut extra, &mut counts);
         }
+        if let Some(inp) = &scope.inputs {
+            input_domains(scope, inp, game, &mut start, &doms, &mut extra, &mut counts);
+        }
         let mut engine: BTreeSet<i32> = domains::ENGINE.iter().map(|e| e.0).collect();
         engine.extend(TIME_VARS);
         engine.extend(MOUSE_VARS);
@@ -348,6 +351,56 @@ fn actor_room_domains(
         let mut vals: BTreeSet<i64> = [start.get0(&k)].into_iter().collect();
         vals.extend(mine.into_iter().flat_map(|r| r.as_ref().unwrap().iter().copied()));
         extra.insert(k, Domain::of(vals, None, None));
+    }
+}
+
+/// Fix round 1, F1 (switch input_script, inputs.rs): the `mouse` fact's domain (NOWHERE, the cells of the scope's
+/// rooms no wider than the screen, the verbs an input clicks) and its start (NOWHERE where the start has none); the
+/// sentence-building variables with no domain get their start value and every constant the scope's code writes them
+/// (the passes add the values paths write, `Builder::extend_domains`).
+fn input_domains(
+    scope: &Scope,
+    inp: &crate::inputs::InputScope,
+    game: &Game,
+    start: &mut Facts,
+    doms: &Domains,
+    extra: &mut BTreeMap<String, Domain>,
+    counts: &mut Counter,
+) {
+    use crate::inputs::{cell_id, fixed_left, verb_id, NOWHERE};
+    let ast = &game.ast;
+    if !start.contains("mouse") {
+        start.insert("mouse".to_string(), NOWHERE);
+    }
+    let mut vals: BTreeSet<i64> = [NOWHERE, start.get0("mouse")].into_iter().collect();
+    for &(_, res, n) in &inp.rooms {
+        if game.room_width.get(&res).and_then(|&w| fixed_left(w)).is_some() {
+            vals.extend((0..n).map(|i| cell_id(res, i)));
+        }
+    }
+    for v in scope.verbs.iter().chain(scope.dialog_verbs.iter()).chain(inp.slot_verbs.iter()) {
+        vals.insert(verb_id(*v));
+    }
+    extra.insert("mouse".into(), Domain::of(vals, None, None));
+    for &n in &inp.vars {
+        let k = format!("var:{n}");
+        if doms.get(&k).is_some() || extra.contains_key(&k) {
+            continue;
+        }
+        let mut vals: BTreeSet<i64> = [start.get0(&k)].into_iter().collect();
+        for &u in &scope.units {
+            for x in game.ins(u) {
+                if let Some(Stmt::Assign(a)) = x.st {
+                    if ast.expr(a.lhs) == Expr::Var(n) {
+                        if let Some(c) = ast.constant(a.rhs) {
+                            vals.insert(c as i64);
+                        }
+                    }
+                }
+            }
+        }
+        extra.insert(k, Domain::of(vals, None, None));
+        counts.inc("F1: sentence-building variables given the domain start + constant writes (reader)");
     }
 }
 

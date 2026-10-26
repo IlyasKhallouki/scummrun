@@ -308,7 +308,7 @@ fn stratum(job: &Job, object_room: &rustc_hash::FxHashMap<i32, i32>) -> String {
             UnitKey::Global(_) => return "global".into(),
         },
         What::Sentence { a, .. } => object_room.get(&(*a as i32)).copied(),
-        What::Verb(_) => match job.pins.get("room") {
+        What::Verb(_) | What::Input { .. } => match job.pins.get("room") {
             Some(Val::Int(r)) => Some(*r as i32),
             _ => None,
         },

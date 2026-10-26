@@ -244,12 +244,22 @@ pub fn read<'g>(game: &'g Game, st: &Static, name: &str) -> (Builder<'g>, f64) {
     read_with(game, st, name, crate::builder::Switches::default())
 }
 
+/// The reading's passes: reader.py's two; F1 (switch input_script) gives the sentence-building variables a seed
+/// domain that the passes widen, so it takes more (each pass that widens nothing ends the reading).
+pub fn passes(sw: crate::builder::Switches) -> usize {
+    if sw.input_script {
+        6
+    } else {
+        2
+    }
+}
+
 /// `read` with fix round 1's switches.
 pub fn read_with<'g>(game: &'g Game, st: &Static, name: &str, sw: crate::builder::Switches) -> (Builder<'g>, f64) {
     let mut b = builder_with(game, st, name, sw);
     let mut m = crate::machine::Reader::new(game);
     let t = std::time::Instant::now();
-    b.read_all_into(&mut m, true, None, 2, None);
+    b.read_all_into(&mut m, true, None, passes(sw), None);
     (b, t.elapsed().as_secs_f64())
 }
 
@@ -271,7 +281,7 @@ pub fn read_par_with<'g>(
     let scope = b.scope.clone();
     let t = std::time::Instant::now();
     let stats = crate::par::with_pool(game, &scope, threads, |pool| {
-        b.read_all_into(pool, true, None, 2, None);
+        b.read_all_into(pool, true, None, passes(sw), None);
         pool.stats.clone()
     });
     (b, t.elapsed().as_secs_f64(), stats)

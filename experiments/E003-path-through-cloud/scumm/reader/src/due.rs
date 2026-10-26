@@ -48,7 +48,7 @@ const TABLE_LIMIT: usize = 4096;
 /// pre-state valuations past which one record's `due:` write is a guess (counted)
 const CASE_LIMIT: usize = 1 << 16;
 /// the input kinds checkExecVerbs reads after the frame's scripts
-const INPUT_KINDS: [&str; 3] = ["sentence", "walk_to", "dialog_line"];
+const INPUT_KINDS: [&str; 4] = ["sentence", "walk_to", "dialog_line", "input"];
 
 /// A wait a slot can be due at: the facts its test reads (none for a plain breakHere) and, per valuation of them
 /// (labels in `reads` order), whether the next turn runs on.
@@ -627,14 +627,25 @@ pub fn apply(b: &mut Builder) {
     // the inputs: due: 0 where they meet a due wait's next part (they write what it reads or writes, or read what it
     // works on), a replay check where a time wait's work could change them (it writes what they read or write)
     let mut met_waits: BTreeSet<(String, usize, i64)> = BTreeSet::new();
+    // F1 (switch input_script): a mouse loop's turn in the input's frame is part of the input's record
+    let mouse_names: BTreeSet<String> = b
+        .scope
+        .inputs
+        .as_ref()
+        .map(|inp| inp.mouse_loops.iter().map(|(k, _)| unit_name(*k)).collect())
+        .unwrap_or_default();
     for i in 0..n {
         if !INPUT_KINDS.contains(&b.records[i].kind.as_str()) {
             continue;
         }
         let r = b.records[i].clone();
+        let in_frame = |name: &str| r.kind == "input" && mouse_names.contains(name);
         let rw = reads_writes(b, &r);
         let mut pre_add: Vec<String> = Vec::new();
         for (name, slot, ps) in &parts {
+            if in_frame(name) {
+                continue;
+            }
             let mut hit = false;
             for p in ps {
                 if admits(&r, name, p.w, slot.as_deref(), p.rooms.as_ref())
@@ -650,6 +661,9 @@ pub fn apply(b: &mut Builder) {
         }
         let mut met: Vec<String> = Vec::new();
         for (name, w, tw, work) in &time_parts {
+            if in_frame(name) {
+                continue;
+            }
             if admits(&r, name, *w, tw.slot.as_deref(), tw.rooms.as_ref()) && work.iter().any(|k| rw.0.contains(k) || rw.1.contains(k)) {
                 if std::env::var_os("DUE_DEBUG").is_some() {
                     let mut ks: Vec<&String> = work.iter().filter(|k| rw.0.contains(*k) || rw.1.contains(*k)).collect();

@@ -3,6 +3,7 @@
 //! map), the F flags each script's slots can have, and every static analysis, computed once.
 
 use crate::analysis::{self, Analyses, Ctx, Loop, Reason, WaitPoint, Write};
+use crate::cells;
 use crate::ast::*;
 use crate::facts::{Fact, Slot};
 use crate::places::{self, ObjBox};
@@ -49,6 +50,10 @@ pub struct GameData {
     pub wild_starts: Vec<(String, Option<bool>)>,
     pub object_box: FxHashMap<i32, ObjBox>,
     pub movable: FxHashMap<i32, Vec<(i32, i32)>>,
+    /// fix round 1, F1: room -> height (RMHD)
+    pub room_height: FxHashMap<i32, i32>,
+    /// F1: room resource -> its `_objs` list (cells.rs)
+    pub room_list: FxHashMap<i32, Vec<cells::ListObj>>,
 }
 
 /// model.py `Game`, with every analysis computed for both settings of switch const_polls.
@@ -90,6 +95,12 @@ pub struct Game {
     pub room_objects: FxHashMap<i32, Vec<i32>>,
     /// F5: object -> its places, when a drawObject with setXY can move it (`places::movable`); `objpos:O` indexes it
     pub movable: FxHashMap<i32, Vec<(i32, i32)>>,
+    /// fix round 1, F1 (switch input_script; not model.py's): room -> height (RMHD)
+    pub room_height: FxHashMap<i32, i32>,
+    /// F1: room resource -> its `_objs` list, in the engine's order (cells.rs)
+    pub room_list: FxHashMap<i32, Vec<cells::ListObj>>,
+    /// F1: room resource -> its cells, [each object at its CDHD place, each object at each of its places (F5)]
+    pub cells: [FxHashMap<i32, Vec<cells::Cell>>; 2],
 }
 
 impl std::ops::Deref for Game {
@@ -131,12 +142,14 @@ impl Game {
             rs.dedup();
         }
         let mut room_width = FxHashMap::default();
+        let mut room_height = FxHashMap::default();
         for (r, room) in meta["rooms"].as_object().expect("rooms") {
             let path = root.join(room["lflf"].as_str().expect("lflf")).join("ROOM").join("RMHD");
             if path.exists() {
                 // after the 8-byte block header, RMHD holds width, height, objects (room.cpp:343)
                 let data = std::fs::read(path)?;
                 room_width.insert(r.parse().expect("room"), crate::py::from_le(crate::py::slice(&data, 8, 10), false) as i32);
+                room_height.insert(r.parse().expect("room"), crate::py::from_le(crate::py::slice(&data, 10, 12), false) as i32);
             }
         }
         let (pseudo, pseudo_conflicts) = pseudo_rooms(&script);
@@ -157,6 +170,7 @@ impl Game {
         let first_local = local_rooms.keys().next().copied().unwrap_or(1 << 16);
         let object_box = places::read_boxes(root, meta)?;
         let movable = places::movable(&script, &object_room, &object_box, &places::room_objects(&object_room, &object_box));
+        let room_list = cells::read_room_lists(root, meta, &object_room)?;
         let data = GameData {
             first_local,
             local_rooms,
@@ -168,6 +182,8 @@ impl Game {
             pseudo_conflicts,
             object_box,
             movable,
+            room_height,
+            room_list,
             ..Default::default()
         };
         let mut g = Game::new(script, data);
@@ -203,7 +219,11 @@ impl Game {
             room_objects,
             object_box: data.object_box,
             movable: data.movable,
+            room_height: data.room_height,
+            room_list: data.room_list,
+            cells: Default::default(),
         };
+        g.cells = g.compute_cells();
         let mut joins = vec![false; g.points()];
         for u in g.ids() {
             for x in g.ins(u) {
@@ -218,6 +238,19 @@ impl Game {
         g.analyses = analyses;
         g.const_poll_loops = g.compute_const_poll_loops();
         g
+    }
+
+    /// F1: every room's cells (cells.rs), with the objects at their CDHD places and at all their places.
+    fn compute_cells(&self) -> [FxHashMap<i32, Vec<cells::Cell>>; 2] {
+        let mut out: [FxHashMap<i32, Vec<cells::Cell>>; 2] = Default::default();
+        for (&r, list) in &self.room_list {
+            let (Some(&w), Some(&h)) = (self.room_width.get(&r), self.room_height.get(&r)) else { continue };
+            let home = |o: i32| vec![(self.object_box[&o].x, self.object_box[&o].y)];
+            let all = |o: i32| self.movable.get(&o).cloned().unwrap_or_else(|| home(o));
+            out[0].insert(r, cells::room_cells(list, &self.object_box, &home, w, h));
+            out[1].insert(r, cells::room_cells(list, &self.object_box, &all, w, h));
+        }
+        out
     }
 
     /// model.py `Game._resistance` (its docstring has the engine rules and cites): the F flags of each
