@@ -172,6 +172,27 @@ fn room33_streamed_not_kept() {
     assert_eq!(out[0], out[1], "the packed file, the counters and the record count");
 }
 
+/// `reader-port read room33 --packed F` (the switch off): the reading is golden.py's, 0 differences, though the
+/// packed file's start and `finish` add a builder counter after the reading ("steps that need room in their domain").
+#[test]
+fn reader_port_read_packed_room33() {
+    let dir = std::env::temp_dir().join(format!("reader-port-packed-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let packed = dir.join("room33.tc");
+    let out = Command::new(env!("CARGO_BIN_EXE_reader-port"))
+        .args(["read", "room33", "--packed"])
+        .arg(&packed)
+        .current_dir(here())
+        .output()
+        .expect("reader-port");
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let wrote = packed.exists();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(out.status.success(), "reader-port read room33 --packed failed:\n{text}{}", String::from_utf8_lossy(&out.stderr));
+    assert!(text.contains("room33 reading against golden.py's: 880 compared, 0 differences"), "{text}");
+    assert!(wrote && text.contains(" actions ("), "no packed file:\n{text}");
+}
+
 #[test]
 fn room33_records_written_back() {
     let (recs, bad) = oracle::golden_records(&oracle::golden_dir().join("room33.jsonl.gz"));

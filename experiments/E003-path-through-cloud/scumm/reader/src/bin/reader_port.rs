@@ -149,7 +149,10 @@ fn main() {
             let cpu0 = scumm_reader::cpu_secs();
             let live = args.iter().any(|a| a == "--live-locals");
             let packed_out = arg(&args, "--packed");
-            let (b, secs) = match arg(&args, "--threads") {
+            // the packed file's stream, finished after the comparison: its start (`task_start`) and `finish` add
+            // builder counters, which the reading (golden.py's file) must not have
+            let mut packing: Option<packed::RecordStream> = None;
+            let (mut b, secs) = match arg(&args, "--threads") {
                 _ if live || packed_out.is_some() => {
                     // the switch on, or the packed file written as made: on `--threads` workers (default 0)
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
@@ -164,18 +167,7 @@ fn main() {
                         b.read_all_into(pool, true, None, 2, stream.as_mut().map(|s| s as &mut dyn scumm_reader::builder::RecordSink));
                     });
                     let secs = t.elapsed().as_secs_f64();
-                    if let Some(stream) = stream {
-                        let (goal, start_name, start) = if name == "kitchen" {
-                            let kt = oracle::kitchen_task(&st);
-                            (kt.goal, "s17", kt.s17)
-                        } else {
-                            (Vec::new(), "start", Facts::from_py(st.named("builder", name).get("start_items")))
-                        };
-                        let keys = stream.fact_keys();
-                        let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
-                        let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
-                        println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
-                    }
+                    packing = stream;
                     (b, secs)
                 }
                 None => oracle::read(&game, &st, name),
@@ -206,6 +198,18 @@ fn main() {
                 gz.finish().unwrap();
             }
             ok &= report(&format!("{name} reading against golden.py's"), oracle::compare_reading(&b, &golden, 5));
+            if let Some(stream) = packing {
+                let (goal, start_name, start) = if name == "kitchen" {
+                    let kt = oracle::kitchen_task(&st);
+                    (kt.goal, "s17", kt.s17)
+                } else {
+                    (Vec::new(), "start", Facts::from_py(st.named("builder", name).get("start_items")))
+                };
+                let keys = stream.fact_keys();
+                let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+                let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
+                println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+            }
         }
         "task" => {
             let out = PathBuf::from(arg(&args, "--out").expect("--out DIR"));
