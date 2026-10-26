@@ -1,0 +1,132 @@
+E003: frame costs on the kitchen (reader switch --frame-costs, scumm/reader/src/costs.rs): each plan's predicted cost in frames against the frames the engine spent playing it
+
+=== replay-kitchen-rust-costs-lama-first-caps-seed1-all.json: search lama-first, cost caps True, seed 1 ===
+reading /var/tmp/fast-mi/costs-scratch/kitchen-costs/reading: 71,729 actions; frame costs dmax 5, charinc 0
+start: frame 235, 10 of 3651 facts differ from run B's S1#7 pre: [['at:local:208:41', [0, 1]], ['local:208', [0, 1]], ['state:317', [0, 1]], ['state:318', [1, 0]], ['state:339', [1, 0]], ['state:341', [0, 1]], ['state:354', [0, 1]], ['state:356', [1, 0]], ['var:0', [1, 0]], ['var:100', [23, 191]]]
+result: stop 'replan limit', goal False, 10 replans, 0 bans, 49 inputs; frames 9350 (from 235 to 9585), game time 779.2 s; verify from boot: 0 differences at 72 checkpoints, goal False
+  plan 0 at frame 235: 10 steps, predicted 380 frames (FD plan cost 380), played 642 frames until the next plan (path not started)
+    event(local:211@33)#30568 361, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 1 at frame 877: 10 steps, predicted 363 frames (FD plan cost 363), played 576 frames until the next plan (path not started)
+    event(local:211@33)#30568 344, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 2 at frame 1453: 10 steps, predicted 252 frames (FD plan cost 252), played 465 frames until the next plan (path not started)
+    event(local:211@33)#30568 233, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 3 at frame 1918: 10 steps, predicted 312 frames (FD plan cost 312), played 525 frames until the next plan (path not started)
+    event(local:211@33)#30568 293, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 4 at frame 2443: 10 steps, predicted 312 frames (FD plan cost 312), played 1126 frames until the next plan (path not started)
+    event(local:211@33)#30568 293, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 5 at frame 3569: 10 steps, predicted 252 frames (FD plan cost 252), played 465 frames until the next plan (path not started)
+    event(local:211@33)#30568 233, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 6 at frame 4034: 10 steps, predicted 380 frames (FD plan cost 380), played 1222 frames until the next plan (path not started)
+    event(local:211@33)#30568 361, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 7 at frame 5256: 10 steps, predicted 246 frames (FD plan cost 246), played 1060 frames until the next plan (path not started)
+    event(local:211@33)#30568 227, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 8 at frame 6316: 10 steps, predicted 190 frames (FD plan cost 190), played 403 frames until the next plan (path not started)
+    event(local:211@33)#30568 171, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 9 at frame 6719: 10 steps, predicted 192 frames (FD plan cost 192), played 1604 frames until the next plan (nothing happened)
+    event(local:211@33)#30568 173, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 10 at frame 8323: 10 steps, predicted 380 frames (FD plan cost 380), played 1262 frames until the next plan (path not started)
+    event(local:211@33)#30568 361, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(2,564)#11592 2, event(script:2@736#b743d861667c)#34210 1, event(script:2@915#e3d84ac8767a)#34221 5, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  by outcome (steps, their costs, their frames): path not started 10, 10, 4745; matched 11, 3050, 3174; nothing happened 1, 1, 1431
+  steps played (plan.index name: outcome; cost / frames, frames - cost):
+    0.1 event(local:211@33)#30568: matched; 361 / 389, +28
+    0.2 walk_to(316)#478: path not started; 1 / 253, +252
+    1.1 event(local:211@33)#30568: matched; 344 / 344, +0
+    1.2 walk_to(316)#478: path not started; 1 / 232, +231
+    2.1 event(local:211@33)#30568: matched; 233 / 233, +0
+    2.2 walk_to(316)#478: path not started; 1 / 232, +231
+    3.1 event(local:211@33)#30568: matched; 293 / 293, +0
+    3.2 walk_to(316)#478: path not started; 1 / 232, +231
+    4.1 event(local:211@33)#30568: matched; 293 / 293, +0
+    4.2 walk_to(316)#478: path not started; 1 / 833, +832
+    5.1 event(local:211@33)#30568: matched; 233 / 233, +0
+    5.2 walk_to(316)#478: path not started; 1 / 232, +231
+    6.1 event(local:211@33)#30568: matched; 361 / 389, +28
+    6.2 walk_to(316)#478: path not started; 1 / 833, +832
+    7.1 event(local:211@33)#30568: matched; 227 / 227, +0
+    7.2 walk_to(316)#478: path not started; 1 / 833, +832
+    8.1 event(local:211@33)#30568: matched; 171 / 171, +0
+    8.2 walk_to(316)#478: path not started; 1 / 232, +231
+    9.1 event(local:211@33)#30568: matched; 173 / 173, +0
+    9.2 walk_to(316)#478: nothing happened; 1 / 1431, +1430
+    10.1 event(local:211@33)#30568: matched; 361 / 429, +68
+    10.2 walk_to(316)#478: path not started; 1 / 833, +832
+
+=== replay-kitchen-rust-costs-lama-first-costs-caps-seed1-all.json: search lama-first-costs, cost caps True, seed 1 ===
+reading /var/tmp/fast-mi/costs-scratch/kitchen-costs/reading: 71,729 actions; frame costs dmax 5, charinc 0
+start: frame 235, 10 of 3651 facts differ from run B's S1#7 pre: [['at:local:208:41', [0, 1]], ['local:208', [0, 1]], ['state:317', [0, 1]], ['state:318', [1, 0]], ['state:339', [1, 0]], ['state:341', [0, 1]], ['state:354', [0, 1]], ['state:356', [1, 0]], ['var:0', [1, 0]], ['var:100', [23, 191]]]
+result: stop 'goal', goal True, 5 replans, 0 bans, 10 inputs; frames 10101 (from 235 to 10336), game time 841.8 s; verify from boot: 0 differences at 22 checkpoints, goal True
+  plan 0 at frame 235: 11 steps, predicted 377 frames (FD plan cost 377), played 991 frames until the next plan (precondition)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30828 1, event(script:2@759#6b02ec868a25)#30831 1, event(local:211@33)#30565 361, event(local:217@18)#39438 1, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 1 at frame 1226: 9 steps, predicted 15 frames (FD plan cost 15), played 253 frames until the next plan (path not started)
+    walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(7,564)#11710 2, event(script:2@736#40ff02d1dcd8)#34267 1, event(script:2@759#40ff02d1dcd8)#34270 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 2 at frame 1479: 11 steps, predicted 300 frames (FD plan cost 300), played 886 frames until the next plan (precondition)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30828 1, event(script:2@759#6b02ec868a25)#30831 1, event(local:211@33)#30565 284, event(local:217@18)#39438 1, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 3 at frame 2365: 11 steps, predicted 68 frames (FD plan cost 68), played 654 frames until the next plan (precondition)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30828 1, event(script:2@759#6b02ec868a25)#30831 1, event(local:211@33)#30565 52, event(local:217@18)#39438 1, walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 4 at frame 3019: 9 steps, predicted 15 frames (FD plan cost 15), played 7295 frames until the next plan (did not happen)
+    walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(7,564)#11710 2, event(script:2@736#40ff02d1dcd8)#34267 1, event(script:2@759#40ff02d1dcd8)#34270 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 5 at frame 10314: 3 steps, predicted 8 frames (FD plan cost 8), played 22 frames until the goal (goal)
+    sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  by outcome (steps, their costs, their frames): matched, the engine ran on 1, 1, 3600; did not happen 1, 1, 3600; precondition 3, 3, 1800; matched 6, 702, 829; path not started 1, 1, 253; goal 1, 1, 19; ran on in the step before 1, 1, 0
+  steps played (plan.index name: outcome; cost / frames, frames - cost):
+    0.1 event(local:211@33)#30565: matched; 361 / 391, +30
+    0.2 event(local:217@18)#39438: precondition; 1 / 600, +599
+    1.1 walk_to(316)#478: path not started; 1 / 253, +252
+    2.1 event(local:211@33)#30565: matched; 284 / 286, +2
+    2.2 event(local:217@18)#39438: precondition; 1 / 600, +599
+    3.1 event(local:211@33)#30565: matched; 52 / 54, +2
+    3.2 event(local:217@18)#39438: precondition; 1 / 600, +599
+    4.1 walk_to(316)#478: matched; 1 / 92, +91
+    4.2 event(script:2@736#a8c69122caf2)#30915: matched, the engine ran on; 1 / 3600, +3599
+    4.3 event(local:218@16#86dcd5f97351)#35417: ran on in the step before; 1 / 0, -1
+    4.4 sentence(7,564)#11710: matched; 2 / 3, +1
+    4.5 event(script:2@736#40ff02d1dcd8)#34267: did not happen; 1 / 3600, +3599
+    5.1 sentence(9,566)#12118: matched; 2 / 3, +1
+    5.2 event(script:2@736#1db02ba5a8ab)#34384: goal; 1 / 19, +18
+
+=== replay-kitchen-rust-costs-anytime-caps-seed1-no211.json: search anytime, cost caps True, seed 1 ===
+reading /var/tmp/fast-mi/costs-scratch/kitchen-costs/reading: 71,729 actions; frame costs dmax 5, charinc 0
+start: frame 235, 10 of 3651 facts differ from run B's S1#7 pre: [['at:local:208:41', [0, 1]], ['local:208', [0, 1]], ['state:317', [0, 1]], ['state:318', [1, 0]], ['state:339', [1, 0]], ['state:341', [0, 1]], ['state:354', [0, 1]], ['state:356', [1, 0]], ['var:0', [1, 0]], ['var:100', [23, 191]]]
+result: stop 'replan limit', goal False, 10 replans, 1 bans, 65 inputs; frames 8019 (from 235 to 8254), game time 668.3 s; verify from boot: 0 differences at 59 checkpoints, goal False
+  plan 0 at frame 235: 15 steps, predicted 175 frames (FD plan cost 175), played 391 frames until the next plan (path not started)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30829 1, event(script:2@915#d1973d557d7f)#30833 5, event(local:214@15#326429017871)#35384 7, event(local:214@57#326429017871)#39493 25, event(local:214@66#326429017871)#39695 1, event(script:2@937#ef7210b381c)#35386 1, walk_to(316)#478 1, event(local:212@4#ebe3061d6db8)#49590 61, event(local:212@8#ebe3061d6db8)#51233 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 1 at frame 626: 8 steps, predicted 132 frames (FD plan cost 132), played 353 frames until the next plan (path not started)
+    walk_to(316)#478 1, event(local:212@4)#51219 60, event(local:212@8)#51804 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 2 at frame 979: 15 steps, predicted 175 frames (FD plan cost 175), played 324 frames until the next plan (path not started)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30829 1, event(script:2@915#d1973d557d7f)#30833 5, event(local:214@15#326429017871)#35384 7, event(local:214@57#326429017871)#39493 25, event(local:214@66#326429017871)#39695 1, event(script:2@937#ef7210b381c)#35386 1, walk_to(316)#478 1, event(local:212@4#ebe3061d6db8)#49590 61, event(local:212@8#ebe3061d6db8)#51233 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 3 at frame 1303: 8 steps, predicted 132 frames (FD plan cost 132), played 3600 frames until the next plan (did not happen)
+    walk_to(316)#478 1, event(local:212@4)#51219 60, event(local:212@8)#51804 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 4 at frame 4903: 15 steps, predicted 175 frames (FD plan cost 175), played 319 frames until the next plan (path not started)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30829 1, event(script:2@915#d1973d557d7f)#30833 5, event(local:214@15#326429017871)#35384 7, event(local:214@57#326429017871)#39493 25, event(local:214@66#326429017871)#39695 1, event(script:2@937#ef7210b381c)#35386 1, walk_to(316)#478 1, event(local:212@4#ebe3061d6db8)#49590 61, event(local:212@8#ebe3061d6db8)#51233 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 5 at frame 5222: 6 steps, predicted 11 frames (FD plan cost 11), played 221 frames until the next plan (path not started)
+    walk_to(316)#478 1, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 6 at frame 5443: 15 steps, predicted 175 frames (FD plan cost 175), played 324 frames until the next plan (path not started)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30829 1, event(script:2@915#d1973d557d7f)#30833 5, event(local:214@15#326429017871)#35384 7, event(local:214@57#326429017871)#39493 25, event(local:214@66#326429017871)#39695 1, event(script:2@937#ef7210b381c)#35386 1, walk_to(316)#478 1, event(local:212@4#ebe3061d6db8)#49590 61, event(local:212@8#ebe3061d6db8)#51233 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 7 at frame 5767: 8 steps, predicted 132 frames (FD plan cost 132), played 302 frames until the next plan (path not started)
+    walk_to(316)#478 1, event(local:212@4)#51219 60, event(local:212@8)#51804 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 8 at frame 6069: 15 steps, predicted 175 frames (FD plan cost 175), played 324 frames until the next plan (path not started)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30829 1, event(script:2@915#d1973d557d7f)#30833 5, event(local:214@15#326429017871)#35384 7, event(local:214@57#326429017871)#39493 25, event(local:214@66#326429017871)#39695 1, event(script:2@937#ef7210b381c)#35386 1, walk_to(316)#478 1, event(local:212@4#ebe3061d6db8)#49590 61, event(local:212@8#ebe3061d6db8)#51233 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 9 at frame 6393: 8 steps, predicted 132 frames (FD plan cost 132), played 1537 frames until the next plan (nothing happened)
+    walk_to(316)#478 1, event(local:212@4)#51219 60, event(local:212@8)#51804 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  plan 10 at frame 7930: 15 steps, predicted 175 frames (FD plan cost 175), played 324 frames until the next plan (path not started)
+    sentence(2,316)#262 2, event(script:2@736#6b02ec868a25)#30829 1, event(script:2@915#d1973d557d7f)#30833 5, event(local:214@15#326429017871)#35384 7, event(local:214@57#326429017871)#39493 25, event(local:214@66#326429017871)#39695 1, event(script:2@937#ef7210b381c)#35386 1, walk_to(316)#478 1, event(local:212@4#ebe3061d6db8)#49590 61, event(local:212@8#ebe3061d6db8)#51233 61, event(script:2@736#a8c69122caf2)#30915 1, event(local:218@16#86dcd5f97351)#35417 1, sentence(9,566)#12118 2, event(script:2@736#1db02ba5a8ab)#34384 1, event(script:2@915#ef19a1f9cb92)#34395 5
+  by outcome (steps, their costs, their frames): did not happen 1, 60, 3600; path not started 9, 15, 2691; nothing happened 1, 1, 1472; matched 6, 363, 256
+  steps played (plan.index name: outcome; cost / frames, frames - cost):
+    0.1 sentence(2,316)#262: path not started; 2 / 391, +389
+    1.1 event(local:212@4)#51219: matched; 60 / 60, +0
+    1.2 event(local:212@8)#51804: matched; 61 / 61, +0
+    1.3 walk_to(316)#478: path not started; 1 / 232, +231
+    2.1 sentence(2,316)#262: path not started; 2 / 324, +322
+    3.1 event(local:212@4)#51219: did not happen; 60 / 3600, +3540
+    4.1 sentence(2,316)#262: path not started; 2 / 319, +317
+    5.1 walk_to(316)#478: path not started; 1 / 221, +220
+    6.1 sentence(2,316)#262: path not started; 2 / 324, +322
+    7.1 event(local:212@4)#51219: matched; 60 / 60, +0
+    7.2 event(local:212@8)#51804: matched; 61 / 10, -51
+    7.3 walk_to(316)#478: path not started; 1 / 232, +231
+    8.1 sentence(2,316)#262: path not started; 2 / 324, +322
+    9.1 event(local:212@4)#51219: matched; 60 / 60, +0
+    9.2 event(local:212@8)#51804: matched; 61 / 5, -56
+    9.3 walk_to(316)#478: nothing happened; 1 / 1472, +1471
+    10.1 sentence(2,316)#262: path not started; 2 / 324, +322
+

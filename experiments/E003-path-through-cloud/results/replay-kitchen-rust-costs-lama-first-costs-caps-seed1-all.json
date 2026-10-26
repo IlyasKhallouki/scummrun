@@ -1,0 +1,6362 @@
+{
+ "variant": "all",
+ "move": "S1#7 provoke the cook (Open kitchen door while he is inside)",
+ "start_frame": 235,
+ "goal": {
+  "owner:566": [
+   1
+  ]
+ },
+ "sources": {
+  "replay.py": "dccdf6c91538",
+  "replay_kitchen.py": "739fde2e92ee",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "relevance.py": "3c50167cb0c8",
+  "plan_fd.py": "36ef0d9a7e19",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "export_records.py": "f0aa97ff0b22",
+  "taskcore/src/main.rs": "d3fe379066a9",
+  "taskcore/src/model.rs": "2ea8a9fbd2f8",
+  "taskcore/src/packed.rs": "93da9b504549",
+  "taskcore/src/bans.rs": "2cfa9a9c2e52",
+  "taskcore/src/fold.rs": "7469307010cf",
+  "taskcore/src/reduce.rs": "310f1f9c17f0",
+  "taskcore/src/sas.rs": "0ee7642b62cf",
+  "packed_reading.py": "d945f6fcb09d"
+ },
+ "files": true,
+ "reading_dir": "/var/tmp/fast-mi/costs-scratch/kitchen-costs/reading",
+ "seed": 1,
+ "frame_costs": {
+  "charinc": 0,
+  "dmax": 5,
+  "rules": {
+   "WaitForActor, WaitForCamera, WaitForSentence: 1 frame": 433,
+   "WaitForMessage after a talk: the talk delay's frames + 1": 1472,
+   "WaitForMessage, message not known: 1 frame": 258,
+   "breakHere: 1 frame": 4625,
+   "delay N: floor(N / dmax) + 1 frames": 616,
+   "delayVariable, least value from the code before it": 31,
+   "delayVariable, value from the event's locals or 1 frame": 10
+  },
+  "switch": "--frame-costs",
+  "talk_delay": 60,
+  "wait_points": 7427
+ },
+ "cost_caps": true,
+ "planner": "taskcore",
+ "search": "lama-first-costs",
+ "reading": "None",
+ "replan_limit": 10,
+ "time_limit": 10800,
+ "memory_limit": "3500M",
+ "limits": {
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60,
+  "plan_time": 600
+ },
+ "reading_sources": null,
+ "records": {
+  "all": 72256,
+  "kept": 72256
+ },
+ "export": {
+  "bytes": 44792868,
+  "seconds": 0.0,
+  "sha1": "bbf8b4d9775b"
+ },
+ "taskcore_binary": "418871f6b8a9",
+ "task": {
+  "actions": 71729,
+  "facts": 716,
+  "folded": 527,
+  "seconds": 1.427481889986666
+ },
+ "start_check": {
+  "facts": 3651,
+  "differ": 10,
+  "differences": [
+   [
+    "at:local:208:41",
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    "local:208",
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    "state:317",
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    "state:318",
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    "state:339",
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    "state:341",
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    "state:354",
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    "state:356",
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    "var:0",
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    "var:100",
+    [
+     23,
+     191
+    ]
+   ]
+  ]
+ },
+ "run": {
+  "stop": "goal",
+  "goal": true,
+  "replans": 5,
+  "bans": [],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 235,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [
+     {
+      "input": "sentence(2,316)#262",
+      "moved": [
+       "event(local:211@33)#30565",
+       "event(local:217@18)#39438"
+      ]
+     }
+    ],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "36f208bfcc39263b",
+    "cost_caps": {
+     "event(local:207@23": 5,
+     "event(local:210@62": 2,
+     "event(local:211@33": 389
+    },
+    "costs": [
+     2,
+     1,
+     1,
+     361,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     5
+    ],
+    "plan_cost": 377,
+    "write_s": 21.514038584020454,
+    "status": "plan",
+    "seconds": 80.38476953099598,
+    "steps": [
+     "sentence(2,316)#262",
+     "event(script:2@736#6b02ec868a25)#30828",
+     "event(script:2@759#6b02ec868a25)#30831",
+     "event(local:211@33)#30565",
+     "event(local:217@18)#39438",
+     "walk_to(316)#478",
+     "event(script:2@736#a8c69122caf2)#30915",
+     "event(local:218@16#86dcd5f97351)#35417",
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ],
+    "operators": 17823,
+    "actions": 12029,
+    "decode_s": 2.264307566016214,
+    "folds": [
+     null,
+     null,
+     null,
+     null,
+     "fold:event(local:217@18)#39437+2",
+     null,
+     null,
+     null,
+     null,
+     "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 26,
+    "landmark_orderings": 88,
+    "game_landmarks": 26
+   },
+   {
+    "plan": 1,
+    "frame": 1226,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 8
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "084cd78dc5e5b839",
+    "cost_caps": {
+     "event(local:207@15": 12
+    },
+    "costs": [
+     1,
+     1,
+     1,
+     2,
+     1,
+     1,
+     2,
+     1,
+     5
+    ],
+    "plan_cost": 15,
+    "write_s": 26.739839402987855,
+    "status": "plan",
+    "seconds": 9.325118615000974,
+    "steps": [
+     "walk_to(316)#478",
+     "event(script:2@736#a8c69122caf2)#30915",
+     "event(local:218@16#86dcd5f97351)#35417",
+     "sentence(7,564)#11710",
+     "event(script:2@736#40ff02d1dcd8)#34267",
+     "event(script:2@759#40ff02d1dcd8)#34270",
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ],
+    "operators": 17823,
+    "actions": 12029,
+    "decode_s": 1.8708581079845317,
+    "folds": [
+     null,
+     null,
+     null,
+     "fold:sentence(7,564)#11710+1",
+     null,
+     null,
+     null,
+     "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 25,
+    "landmark_orderings": 82,
+    "game_landmarks": 25
+   },
+   {
+    "plan": 2,
+    "frame": 1479,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 9
+    },
+    "reorders": [
+     {
+      "input": "sentence(2,316)#262",
+      "moved": [
+       "event(local:211@33)#30565",
+       "event(local:217@18)#39438"
+      ]
+     }
+    ],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "eaa2c890317e5609",
+    "cost_caps": {
+     "event(local:207@23": 12,
+     "event(local:210@62": 6,
+     "event(local:211@33": 284
+    },
+    "costs": [
+     2,
+     1,
+     1,
+     284,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     5
+    ],
+    "plan_cost": 300,
+    "write_s": 31.54006733300048,
+    "status": "plan",
+    "seconds": 92.43272484198678,
+    "steps": [
+     "sentence(2,316)#262",
+     "event(script:2@736#6b02ec868a25)#30828",
+     "event(script:2@759#6b02ec868a25)#30831",
+     "event(local:211@33)#30565",
+     "event(local:217@18)#39438",
+     "walk_to(316)#478",
+     "event(script:2@736#a8c69122caf2)#30915",
+     "event(local:218@16#86dcd5f97351)#35417",
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ],
+    "operators": 17823,
+    "actions": 12029,
+    "decode_s": 2.57635894001578,
+    "folds": [
+     null,
+     null,
+     null,
+     null,
+     "fold:event(local:217@18)#39437+2",
+     null,
+     null,
+     null,
+     null,
+     "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 26,
+    "landmark_orderings": 88,
+    "game_landmarks": 26
+   },
+   {
+    "plan": 3,
+    "frame": 2365,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 8
+    },
+    "reorders": [
+     {
+      "input": "sentence(2,316)#262",
+      "moved": [
+       "event(local:211@33)#30565",
+       "event(local:217@18)#39438"
+      ]
+     }
+    ],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "2d5ec1b822ed42e1",
+    "cost_caps": {
+     "event(local:207@15": 13,
+     "event(local:210@62": 3,
+     "event(local:211@33": 52
+    },
+    "costs": [
+     2,
+     1,
+     1,
+     52,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     5
+    ],
+    "plan_cost": 68,
+    "write_s": 36.52307504499913,
+    "status": "plan",
+    "seconds": 94.68177231200389,
+    "steps": [
+     "sentence(2,316)#262",
+     "event(script:2@736#6b02ec868a25)#30828",
+     "event(script:2@759#6b02ec868a25)#30831",
+     "event(local:211@33)#30565",
+     "event(local:217@18)#39438",
+     "walk_to(316)#478",
+     "event(script:2@736#a8c69122caf2)#30915",
+     "event(local:218@16#86dcd5f97351)#35417",
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ],
+    "operators": 17823,
+    "actions": 12029,
+    "decode_s": 2.4739494620007463,
+    "folds": [
+     null,
+     null,
+     null,
+     null,
+     "fold:event(local:217@18)#39437+2",
+     null,
+     null,
+     null,
+     null,
+     "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 26,
+    "landmark_orderings": 88,
+    "game_landmarks": 26
+   },
+   {
+    "plan": 4,
+    "frame": 3019,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 9
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "4792068fb5b55770",
+    "cost_caps": {
+     "event(local:207@15": 5,
+     "event(local:210@62": 6
+    },
+    "costs": [
+     1,
+     1,
+     1,
+     2,
+     1,
+     1,
+     2,
+     1,
+     5
+    ],
+    "plan_cost": 15,
+    "write_s": 26.962489329016535,
+    "status": "plan",
+    "seconds": 10.71945930700167,
+    "steps": [
+     "walk_to(316)#478",
+     "event(script:2@736#a8c69122caf2)#30915",
+     "event(local:218@16#86dcd5f97351)#35417",
+     "sentence(7,564)#11710",
+     "event(script:2@736#40ff02d1dcd8)#34267",
+     "event(script:2@759#40ff02d1dcd8)#34270",
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ],
+    "operators": 17823,
+    "actions": 12029,
+    "decode_s": 2.102624029008439,
+    "folds": [
+     null,
+     null,
+     null,
+     "fold:sentence(7,564)#11710+1",
+     null,
+     null,
+     null,
+     "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 131,
+    "needed_facts": 244,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 25,
+    "landmark_orderings": 82,
+    "game_landmarks": 25
+   },
+   {
+    "plan": 5,
+    "frame": 10314,
+    "bans": 0,
+    "start_counts": {
+     "args copied from the plan (the slot is where the plan put it)": 2,
+     "live slots with unknown locals (args 0)": 3
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "ff7a3befcbeaf8a8",
+    "cost_caps": {
+     "event(local:201@35": 2
+    },
+    "costs": [
+     2,
+     1,
+     5
+    ],
+    "plan_cost": 8,
+    "write_s": 28.801047148997895,
+    "status": "plan",
+    "seconds": 5.773274261999177,
+    "steps": [
+     "sentence(9,566)#12118",
+     "event(script:2@736#1db02ba5a8ab)#34384",
+     "event(script:2@915#ef19a1f9cb92)#34395"
+    ],
+    "operators": 16964,
+    "actions": 11834,
+    "decode_s": 3.0519472979940474,
+    "folds": [
+     null,
+     "fold:event(script:2@736#1db02ba5a8ab)#34384+1",
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 120,
+    "needed_facts": 244,
+    "input_check_misses": 0,
+    "choices": {},
+    "landmarks": 14,
+    "landmark_orderings": 28,
+    "game_landmarks": 14
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "event(local:211@33)#30565",
+    "kind": "event",
+    "input": "wait",
+    "start": 235,
+    "issue": null,
+    "end": 626,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 235,
+      "first_settled": 237,
+      "end": 626,
+      "how": "held",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "local:208",
+      "start": 1,
+      "changes": [
+       [
+        236,
+        0
+       ],
+       [
+        275,
+        1
+       ],
+       [
+        281,
+        0
+       ],
+       [
+        283,
+        1
+       ],
+       [
+        289,
+        0
+       ],
+       [
+        295,
+        1
+       ],
+       [
+        307,
+        0
+       ],
+       [
+        309,
+        1
+       ],
+       [
+        315,
+        0
+       ],
+       [
+        317,
+        1
+       ],
+       [
+        323,
+        0
+       ],
+       [
+        325,
+        1
+       ]
+      ],
+      "count": 55,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:209",
+      "start": 0,
+      "changes": [
+       [
+        288,
+        1
+       ],
+       [
+        291,
+        0
+       ],
+       [
+        338,
+        1
+       ],
+       [
+        341,
+        0
+       ],
+       [
+        375,
+        1
+       ],
+       [
+        378,
+        0
+       ],
+       [
+        384,
+        1
+       ],
+       [
+        387,
+        0
+       ],
+       [
+        402,
+        1
+       ],
+       [
+        405,
+        0
+       ],
+       [
+        436,
+        1
+       ],
+       [
+        439,
+        0
+       ]
+      ],
+      "count": 38,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "pos:local:207",
+      "start": 23,
+      "changes": [
+       [
+        240,
+        5
+       ],
+       [
+        275,
+        15
+       ],
+       [
+        288,
+        23
+       ],
+       [
+        313,
+        15
+       ],
+       [
+        326,
+        23
+       ],
+       [
+        351,
+        15
+       ],
+       [
+        364,
+        23
+       ],
+       [
+        389,
+        15
+       ],
+       [
+        402,
+        23
+       ],
+       [
+        427,
+        15
+       ],
+       [
+        440,
+        23
+       ],
+       [
+        465,
+        15
+       ]
+      ],
+      "count": 20,
+      "end": 15,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": 41,
+      "changes": [
+       [
+        236,
+        -1
+       ],
+       [
+        275,
+        21
+       ],
+       [
+        278,
+        41
+       ],
+       [
+        281,
+        -1
+       ],
+       [
+        283,
+        21
+       ],
+       [
+        286,
+        41
+       ],
+       [
+        289,
+        -1
+       ],
+       [
+        295,
+        21
+       ],
+       [
+        298,
+        41
+       ],
+       [
+        301,
+        21
+       ],
+       [
+        304,
+        41
+       ],
+       [
+        307,
+        -1
+       ]
+      ],
+      "count": 88,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:209",
+      "start": -1,
+      "changes": [
+       [
+        288,
+        56
+       ],
+       [
+        291,
+        -1
+       ],
+       [
+        338,
+        56
+       ],
+       [
+        341,
+        -1
+       ],
+       [
+        375,
+        33
+       ],
+       [
+        378,
+        -1
+       ],
+       [
+        384,
+        33
+       ],
+       [
+        387,
+        -1
+       ],
+       [
+        402,
+        33
+       ],
+       [
+        405,
+        -1
+       ],
+       [
+        436,
+        56
+       ],
+       [
+        439,
+        -1
+       ]
+      ],
+      "count": 38,
+      "end": -1,
+      "net": false
+     },
+     {
+      "key": "pos:local:210",
+      "start": 62,
+      "changes": [
+       [
+        237,
+        0
+       ],
+       [
+        275,
+        62
+       ]
+      ],
+      "count": 2,
+      "end": 62,
+      "net": false
+     },
+     {
+      "key": "state:316",
+      "start": 0,
+      "changes": [
+       [
+        624,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:324",
+      "start": 0,
+      "changes": [
+       [
+        238,
+        1
+       ],
+       [
+        239,
+        0
+       ],
+       [
+        244,
+        1
+       ],
+       [
+        245,
+        0
+       ],
+       [
+        250,
+        1
+       ],
+       [
+        251,
+        0
+       ],
+       [
+        256,
+        1
+       ],
+       [
+        257,
+        0
+       ],
+       [
+        262,
+        1
+       ],
+       [
+        263,
+        0
+       ],
+       [
+        268,
+        1
+       ],
+       [
+        269,
+        0
+       ]
+      ],
+      "count": 130,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        239,
+        1
+       ],
+       [
+        240,
+        0
+       ],
+       [
+        245,
+        1
+       ],
+       [
+        246,
+        0
+       ],
+       [
+        251,
+        1
+       ],
+       [
+        252,
+        0
+       ],
+       [
+        257,
+        1
+       ],
+       [
+        258,
+        0
+       ],
+       [
+        263,
+        1
+       ],
+       [
+        264,
+        0
+       ],
+       [
+        269,
+        1
+       ],
+       [
+        270,
+        0
+       ]
+      ],
+      "count": 130,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        240,
+        1
+       ],
+       [
+        241,
+        0
+       ],
+       [
+        246,
+        1
+       ],
+       [
+        247,
+        0
+       ],
+       [
+        252,
+        1
+       ],
+       [
+        253,
+        0
+       ],
+       [
+        258,
+        1
+       ],
+       [
+        259,
+        0
+       ],
+       [
+        264,
+        1
+       ],
+       [
+        265,
+        0
+       ],
+       [
+        270,
+        1
+       ],
+       [
+        271,
+        0
+       ]
+      ],
+      "count": 130,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:327",
+      "start": 1,
+      "changes": [
+       [
+        236,
+        0
+       ],
+       [
+        241,
+        1
+       ],
+       [
+        242,
+        0
+       ],
+       [
+        247,
+        1
+       ],
+       [
+        248,
+        0
+       ],
+       [
+        253,
+        1
+       ],
+       [
+        254,
+        0
+       ],
+       [
+        259,
+        1
+       ],
+       [
+        260,
+        0
+       ],
+       [
+        265,
+        1
+       ],
+       [
+        266,
+        0
+       ],
+       [
+        271,
+        1
+       ]
+      ],
+      "count": 131,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:328",
+      "start": 0,
+      "changes": [
+       [
+        236,
+        1
+       ],
+       [
+        237,
+        0
+       ],
+       [
+        242,
+        1
+       ],
+       [
+        243,
+        0
+       ],
+       [
+        248,
+        1
+       ],
+       [
+        249,
+        0
+       ],
+       [
+        254,
+        1
+       ],
+       [
+        255,
+        0
+       ],
+       [
+        260,
+        1
+       ],
+       [
+        261,
+        0
+       ],
+       [
+        266,
+        1
+       ],
+       [
+        267,
+        0
+       ]
+      ],
+      "count": 131,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:329",
+      "start": 0,
+      "changes": [
+       [
+        237,
+        1
+       ],
+       [
+        238,
+        0
+       ],
+       [
+        243,
+        1
+       ],
+       [
+        244,
+        0
+       ],
+       [
+        249,
+        1
+       ],
+       [
+        250,
+        0
+       ],
+       [
+        255,
+        1
+       ],
+       [
+        256,
+        0
+       ],
+       [
+        261,
+        1
+       ],
+       [
+        262,
+        0
+       ],
+       [
+        267,
+        1
+       ],
+       [
+        268,
+        0
+       ]
+      ],
+      "count": 130,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:330",
+      "start": 1,
+      "changes": [
+       [
+        302,
+        0
+       ],
+       [
+        306,
+        1
+       ],
+       [
+        310,
+        0
+       ],
+       [
+        314,
+        1
+       ],
+       [
+        348,
+        0
+       ],
+       [
+        352,
+        1
+       ],
+       [
+        430,
+        0
+       ],
+       [
+        434,
+        1
+       ],
+       [
+        452,
+        0
+       ],
+       [
+        456,
+        1
+       ]
+      ],
+      "count": 10,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:333",
+      "start": 0,
+      "changes": [
+       [
+        447,
+        1
+       ],
+       [
+        502,
+        0
+       ],
+       [
+        521,
+        1
+       ],
+       [
+        542,
+        0
+       ],
+       [
+        564,
+        1
+       ],
+       [
+        624,
+        0
+       ]
+      ],
+      "count": 6,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:336",
+      "start": 1,
+      "changes": [
+       [
+        480,
+        0
+       ],
+       [
+        484,
+        1
+       ],
+       [
+        487,
+        0
+       ],
+       [
+        491,
+        1
+       ],
+       [
+        570,
+        0
+       ],
+       [
+        574,
+        1
+       ],
+       [
+        585,
+        0
+       ],
+       [
+        589,
+        1
+       ],
+       [
+        599,
+        0
+       ],
+       [
+        603,
+        1
+       ]
+      ],
+      "count": 10,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:339",
+      "start": 0,
+      "changes": [
+       [
+        340,
+        1
+       ],
+       [
+        376,
+        0
+       ],
+       [
+        460,
+        1
+       ],
+       [
+        472,
+        0
+       ],
+       [
+        537,
+        1
+       ],
+       [
+        550,
+        0
+       ],
+       [
+        592,
+        1
+       ]
+      ],
+      "count": 7,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:342",
+      "start": 1,
+      "changes": [
+       [
+        296,
+        0
+       ],
+       [
+        300,
+        1
+       ],
+       [
+        394,
+        0
+       ],
+       [
+        398,
+        1
+       ],
+       [
+        423,
+        0
+       ],
+       [
+        427,
+        1
+       ],
+       [
+        465,
+        0
+       ],
+       [
+        469,
+        1
+       ],
+       [
+        528,
+        0
+       ],
+       [
+        532,
+        1
+       ],
+       [
+        576,
+        0
+       ],
+       [
+        580,
+        1
+       ]
+      ],
+      "count": 14,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:345",
+      "start": 0,
+      "changes": [
+       [
+        290,
+        1
+       ],
+       [
+        385,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:348",
+      "start": 1,
+      "changes": [
+       [
+        276,
+        0
+       ],
+       [
+        280,
+        1
+       ],
+       [
+        284,
+        0
+       ],
+       [
+        288,
+        1
+       ],
+       [
+        318,
+        0
+       ],
+       [
+        322,
+        1
+       ],
+       [
+        326,
+        0
+       ],
+       [
+        330,
+        1
+       ],
+       [
+        363,
+        0
+       ],
+       [
+        367,
+        1
+       ],
+       [
+        409,
+        0
+       ],
+       [
+        413,
+        1
+       ]
+      ],
+      "count": 12,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:351",
+      "start": 1,
+      "changes": [
+       [
+        333,
+        0
+       ],
+       [
+        337,
+        1
+       ],
+       [
+        355,
+        0
+       ],
+       [
+        359,
+        1
+       ],
+       [
+        370,
+        0
+       ],
+       [
+        374,
+        1
+       ],
+       [
+        416,
+        0
+       ],
+       [
+        420,
+        1
+       ],
+       [
+        495,
+        0
+       ],
+       [
+        499,
+        1
+       ],
+       [
+        508,
+        0
+       ],
+       [
+        512,
+        1
+       ]
+      ],
+      "count": 14,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:354",
+      "start": 1,
+      "changes": [
+       [
+        403,
+        0
+       ],
+       [
+        438,
+        1
+       ],
+       [
+        557,
+        0
+       ],
+       [
+        616,
+        1
+       ]
+      ],
+      "count": 4,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:357",
+      "start": 1,
+      "changes": [
+       [
+        275,
+        0
+       ],
+       [
+        288,
+        1
+       ],
+       [
+        313,
+        0
+       ],
+       [
+        326,
+        1
+       ],
+       [
+        351,
+        0
+       ],
+       [
+        364,
+        1
+       ],
+       [
+        389,
+        0
+       ],
+       [
+        402,
+        1
+       ],
+       [
+        427,
+        0
+       ],
+       [
+        440,
+        1
+       ],
+       [
+        465,
+        0
+       ],
+       [
+        478,
+        1
+       ]
+      ],
+      "count": 19,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:358",
+      "start": 0,
+      "changes": [
+       [
+        275,
+        1
+       ],
+       [
+        288,
+        0
+       ],
+       [
+        313,
+        1
+       ],
+       [
+        326,
+        0
+       ],
+       [
+        351,
+        1
+       ],
+       [
+        364,
+        0
+       ],
+       [
+        389,
+        1
+       ],
+       [
+        402,
+        0
+       ],
+       [
+        427,
+        1
+       ],
+       [
+        440,
+        0
+       ],
+       [
+        465,
+        1
+       ],
+       [
+        478,
+        0
+       ]
+      ],
+      "count": 19,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 1,
+      "changes": [
+       [
+        236,
+        0
+       ],
+       [
+        238,
+        1
+       ],
+       [
+        239,
+        0
+       ],
+       [
+        241,
+        1
+       ],
+       [
+        242,
+        0
+       ],
+       [
+        244,
+        1
+       ],
+       [
+        245,
+        0
+       ],
+       [
+        247,
+        1
+       ],
+       [
+        248,
+        0
+       ],
+       [
+        250,
+        1
+       ],
+       [
+        251,
+        0
+       ],
+       [
+        253,
+        1
+       ]
+      ],
+      "count": 261,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        236,
+        1
+       ],
+       [
+        237,
+        0
+       ],
+       [
+        239,
+        1
+       ],
+       [
+        240,
+        0
+       ],
+       [
+        242,
+        1
+       ],
+       [
+        243,
+        0
+       ],
+       [
+        245,
+        1
+       ],
+       [
+        246,
+        0
+       ],
+       [
+        248,
+        1
+       ],
+       [
+        249,
+        0
+       ],
+       [
+        251,
+        1
+       ],
+       [
+        252,
+        0
+       ]
+      ],
+      "count": 261,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:361",
+      "start": 0,
+      "changes": [
+       [
+        237,
+        1
+       ],
+       [
+        238,
+        0
+       ],
+       [
+        240,
+        1
+       ],
+       [
+        241,
+        0
+       ],
+       [
+        243,
+        1
+       ],
+       [
+        244,
+        0
+       ],
+       [
+        246,
+        1
+       ],
+       [
+        247,
+        0
+       ],
+       [
+        249,
+        1
+       ],
+       [
+        250,
+        0
+       ],
+       [
+        252,
+        1
+       ],
+       [
+        253,
+        0
+       ]
+      ],
+      "count": 260,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:570",
+      "start": 0,
+      "changes": [
+       [
+        624,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        240,
+        0
+       ],
+       [
+        260,
+        "above"
+       ],
+       [
+        267,
+        0
+       ],
+       [
+        271,
+        "above"
+       ],
+       [
+        275,
+        0
+       ]
+      ],
+      "count": 5,
+      "end": 0,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 10.42614658799721
+   },
+   {
+    "plan": 0,
+    "index": 1,
+    "name": "event(local:217@18)#39438",
+    "kind": "event",
+    "input": "wait",
+    "start": 626,
+    "issue": null,
+    "end": 1226,
+    "outcome": "precondition",
+    "then": "replan",
+    "tries": [],
+    "mismatches": [
+     {
+      "key": "local:217",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "precondition"
+     },
+     {
+      "key": "pos:local:217",
+      "predicted": [
+       "18"
+      ],
+      "observed": -1,
+      "kind": "precondition"
+     },
+     {
+      "key": "state:316",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "precondition"
+     }
+    ],
+    "unplanned": [],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 15.858129894011654
+   },
+   {
+    "plan": 1,
+    "index": 0,
+    "name": "walk_to(316)#478",
+    "kind": "walk_to",
+    "input": "click verb 11 on 316",
+    "start": 1226,
+    "issue": 1477,
+    "end": 1479,
+    "outcome": "path not started",
+    "then": "replan",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 1226,
+      "inputs": [
+       {
+        "frame": 1227,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 1227,
+      "first_settled": 1269,
+      "end": 1269,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     },
+     {
+      "try": 2,
+      "kind": "retry",
+      "start": 1329,
+      "inputs": [
+       {
+        "frame": 1330,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 1330,
+      "first_settled": 1353,
+      "end": 1353,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     },
+     {
+      "try": 3,
+      "kind": "retry",
+      "start": 1413,
+      "inputs": [
+       {
+        "frame": 1414,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 1414,
+      "first_settled": 1415,
+      "end": 1416,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     },
+     {
+      "try": 4,
+      "kind": "retry",
+      "start": 1476,
+      "inputs": [
+       {
+        "frame": 1477,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 1477,
+      "first_settled": 1478,
+      "end": 1479,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "script:2",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "pos:script:2",
+      "predicted": [
+       "736"
+      ],
+      "observed": -1,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "local:208",
+      "start": 0,
+      "changes": [
+       [
+        1478,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": -1,
+      "changes": [
+       [
+        1478,
+        21
+       ]
+      ],
+      "count": 1,
+      "end": 21,
+      "net": true
+     },
+     {
+      "key": "state:326",
+      "start": 1,
+      "changes": [
+       [
+        1477,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:327",
+      "start": 0,
+      "changes": [
+       [
+        1477,
+        1
+       ],
+       [
+        1478,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:328",
+      "start": 0,
+      "changes": [
+       [
+        1478,
+        1
+       ],
+       [
+        1479,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:329",
+      "start": 0,
+      "changes": [
+       [
+        1479,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:342",
+      "start": 1,
+      "changes": [
+       [
+        1479,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 0,
+      "changes": [
+       [
+        1477,
+        1
+       ],
+       [
+        1478,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        1478,
+        1
+       ],
+       [
+        1479,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:361",
+      "start": 1,
+      "changes": [
+       [
+        1477,
+        0
+       ],
+       [
+        1479,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 1227,
+      "click": [
+       287,
+       103
+      ]
+     },
+     {
+      "frame": 1330,
+      "click": [
+       287,
+       103
+      ]
+     },
+     {
+      "frame": 1414,
+      "click": [
+       287,
+       103
+      ]
+     },
+     {
+      "frame": 1477,
+      "click": [
+       287,
+       103
+      ]
+     }
+    ],
+    "note": "retry 1 after 60 frames (the record's path never started); retry 2 after 60 frames (the record's path never started); retry 3 after 60 frames (the record's path never started); no ban: the record's path never started, so none of its tests ran",
+    "seconds": 3.4646313069970347
+   },
+   {
+    "plan": 2,
+    "index": 0,
+    "name": "event(local:211@33)#30565",
+    "kind": "event",
+    "input": "wait",
+    "start": 1479,
+    "issue": null,
+    "end": 1765,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 1479,
+      "first_settled": 1480,
+      "end": 1765,
+      "how": "held",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "local:208",
+      "start": 1,
+      "changes": [
+       [
+        1484,
+        0
+       ],
+       [
+        1494,
+        1
+       ],
+       [
+        1500,
+        0
+       ],
+       [
+        1502,
+        1
+       ],
+       [
+        1514,
+        0
+       ],
+       [
+        1522,
+        1
+       ],
+       [
+        1540,
+        0
+       ],
+       [
+        1547,
+        1
+       ],
+       [
+        1559,
+        0
+       ],
+       [
+        1562,
+        1
+       ],
+       [
+        1568,
+        0
+       ],
+       [
+        1584,
+        1
+       ]
+      ],
+      "count": 27,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:209",
+      "start": 0,
+      "changes": [
+       [
+        1485,
+        1
+       ],
+       [
+        1488,
+        0
+       ],
+       [
+        1516,
+        1
+       ],
+       [
+        1519,
+        0
+       ],
+       [
+        1541,
+        1
+       ],
+       [
+        1544,
+        0
+       ],
+       [
+        1570,
+        1
+       ],
+       [
+        1573,
+        0
+       ],
+       [
+        1577,
+        1
+       ],
+       [
+        1580,
+        0
+       ],
+       [
+        1593,
+        1
+       ],
+       [
+        1596,
+        0
+       ]
+      ],
+      "count": 41,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "pos:local:207",
+      "start": 23,
+      "changes": [
+       [
+        1491,
+        15
+       ],
+       [
+        1504,
+        23
+       ],
+       [
+        1529,
+        15
+       ],
+       [
+        1542,
+        23
+       ],
+       [
+        1567,
+        15
+       ],
+       [
+        1580,
+        23
+       ],
+       [
+        1605,
+        15
+       ],
+       [
+        1618,
+        23
+       ],
+       [
+        1643,
+        15
+       ],
+       [
+        1656,
+        23
+       ],
+       [
+        1681,
+        15
+       ],
+       [
+        1694,
+        23
+       ]
+      ],
+      "count": 15,
+      "end": 15,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": 21,
+      "changes": [
+       [
+        1481,
+        41
+       ],
+       [
+        1484,
+        -1
+       ],
+       [
+        1494,
+        21
+       ],
+       [
+        1497,
+        41
+       ],
+       [
+        1500,
+        -1
+       ],
+       [
+        1502,
+        21
+       ],
+       [
+        1505,
+        41
+       ],
+       [
+        1508,
+        21
+       ],
+       [
+        1511,
+        41
+       ],
+       [
+        1514,
+        -1
+       ],
+       [
+        1522,
+        21
+       ],
+       [
+        1525,
+        41
+       ]
+      ],
+      "count": 53,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:209",
+      "start": -1,
+      "changes": [
+       [
+        1485,
+        33
+       ],
+       [
+        1488,
+        -1
+       ],
+       [
+        1516,
+        33
+       ],
+       [
+        1519,
+        -1
+       ],
+       [
+        1541,
+        56
+       ],
+       [
+        1544,
+        -1
+       ],
+       [
+        1570,
+        56
+       ],
+       [
+        1573,
+        -1
+       ],
+       [
+        1577,
+        56
+       ],
+       [
+        1580,
+        -1
+       ],
+       [
+        1593,
+        33
+       ],
+       [
+        1596,
+        -1
+       ]
+      ],
+      "count": 41,
+      "end": 56,
+      "net": true
+     },
+     {
+      "key": "state:316",
+      "start": 0,
+      "changes": [
+       [
+        1763,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:324",
+      "start": 0,
+      "changes": [
+       [
+        1480,
+        1
+       ],
+       [
+        1481,
+        0
+       ],
+       [
+        1486,
+        1
+       ],
+       [
+        1487,
+        0
+       ],
+       [
+        1492,
+        1
+       ],
+       [
+        1493,
+        0
+       ],
+       [
+        1498,
+        1
+       ],
+       [
+        1499,
+        0
+       ],
+       [
+        1504,
+        1
+       ],
+       [
+        1505,
+        0
+       ],
+       [
+        1510,
+        1
+       ],
+       [
+        1511,
+        0
+       ]
+      ],
+      "count": 96,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        1481,
+        1
+       ],
+       [
+        1482,
+        0
+       ],
+       [
+        1487,
+        1
+       ],
+       [
+        1488,
+        0
+       ],
+       [
+        1493,
+        1
+       ],
+       [
+        1494,
+        0
+       ],
+       [
+        1499,
+        1
+       ],
+       [
+        1500,
+        0
+       ],
+       [
+        1505,
+        1
+       ],
+       [
+        1506,
+        0
+       ],
+       [
+        1511,
+        1
+       ],
+       [
+        1512,
+        0
+       ]
+      ],
+      "count": 96,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        1482,
+        1
+       ],
+       [
+        1483,
+        0
+       ],
+       [
+        1488,
+        1
+       ],
+       [
+        1489,
+        0
+       ],
+       [
+        1494,
+        1
+       ],
+       [
+        1495,
+        0
+       ],
+       [
+        1500,
+        1
+       ],
+       [
+        1501,
+        0
+       ],
+       [
+        1506,
+        1
+       ],
+       [
+        1507,
+        0
+       ],
+       [
+        1512,
+        1
+       ],
+       [
+        1513,
+        0
+       ]
+      ],
+      "count": 96,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:327",
+      "start": 0,
+      "changes": [
+       [
+        1483,
+        1
+       ],
+       [
+        1484,
+        0
+       ],
+       [
+        1489,
+        1
+       ],
+       [
+        1490,
+        0
+       ],
+       [
+        1495,
+        1
+       ],
+       [
+        1496,
+        0
+       ],
+       [
+        1501,
+        1
+       ],
+       [
+        1502,
+        0
+       ],
+       [
+        1507,
+        1
+       ],
+       [
+        1508,
+        0
+       ],
+       [
+        1513,
+        1
+       ],
+       [
+        1514,
+        0
+       ]
+      ],
+      "count": 95,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:328",
+      "start": 0,
+      "changes": [
+       [
+        1484,
+        1
+       ],
+       [
+        1485,
+        0
+       ],
+       [
+        1490,
+        1
+       ],
+       [
+        1491,
+        0
+       ],
+       [
+        1496,
+        1
+       ],
+       [
+        1497,
+        0
+       ],
+       [
+        1502,
+        1
+       ],
+       [
+        1503,
+        0
+       ],
+       [
+        1508,
+        1
+       ],
+       [
+        1509,
+        0
+       ],
+       [
+        1514,
+        1
+       ],
+       [
+        1515,
+        0
+       ]
+      ],
+      "count": 94,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:329",
+      "start": 1,
+      "changes": [
+       [
+        1480,
+        0
+       ],
+       [
+        1485,
+        1
+       ],
+       [
+        1486,
+        0
+       ],
+       [
+        1491,
+        1
+       ],
+       [
+        1492,
+        0
+       ],
+       [
+        1497,
+        1
+       ],
+       [
+        1498,
+        0
+       ],
+       [
+        1503,
+        1
+       ],
+       [
+        1504,
+        0
+       ],
+       [
+        1509,
+        1
+       ],
+       [
+        1510,
+        0
+       ],
+       [
+        1515,
+        1
+       ]
+      ],
+      "count": 95,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:330",
+      "start": 1,
+      "changes": [
+       [
+        1503,
+        0
+       ],
+       [
+        1507,
+        1
+       ],
+       [
+        1523,
+        0
+       ],
+       [
+        1527,
+        1
+       ],
+       [
+        1529,
+        0
+       ],
+       [
+        1533,
+        1
+       ],
+       [
+        1535,
+        0
+       ],
+       [
+        1539,
+        1
+       ],
+       [
+        1585,
+        0
+       ],
+       [
+        1589,
+        1
+       ],
+       [
+        1616,
+        0
+       ],
+       [
+        1620,
+        1
+       ]
+      ],
+      "count": 18,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:333",
+      "start": 1,
+      "changes": [
+       [
+        1517,
+        0
+       ],
+       [
+        1572,
+        1
+       ],
+       [
+        1636,
+        0
+       ],
+       [
+        1730,
+        1
+       ]
+      ],
+      "count": 4,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:336",
+      "start": 1,
+      "changes": [
+       [
+        1509,
+        0
+       ],
+       [
+        1513,
+        1
+       ],
+       [
+        1548,
+        0
+       ],
+       [
+        1552,
+        1
+       ],
+       [
+        1554,
+        0
+       ],
+       [
+        1558,
+        1
+       ],
+       [
+        1696,
+        0
+       ],
+       [
+        1700,
+        1
+       ],
+       [
+        1708,
+        0
+       ],
+       [
+        1712,
+        1
+       ]
+      ],
+      "count": 10,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:339",
+      "start": 1,
+      "changes": [
+       [
+        1486,
+        0
+       ],
+       [
+        1543,
+        1
+       ],
+       [
+        1610,
+        0
+       ],
+       [
+        1658,
+        1
+       ],
+       [
+        1680,
+        0
+       ],
+       [
+        1689,
+        1
+       ],
+       [
+        1722,
+        0
+       ],
+       [
+        1750,
+        1
+       ]
+      ],
+      "count": 8,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:342",
+      "start": 0,
+      "changes": [
+       [
+        1483,
+        1
+       ],
+       [
+        1563,
+        0
+       ],
+       [
+        1567,
+        1
+       ]
+      ],
+      "count": 3,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:345",
+      "start": 1,
+      "changes": [
+       [
+        1594,
+        0
+       ],
+       [
+        1703,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:348",
+      "start": 1,
+      "changes": [
+       [
+        1495,
+        0
+       ],
+       [
+        1499,
+        1
+       ],
+       [
+        1622,
+        0
+       ],
+       [
+        1626,
+        1
+       ]
+      ],
+      "count": 4,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:351",
+      "start": 1,
+      "changes": [
+       [
+        1631,
+        0
+       ],
+       [
+        1635,
+        1
+       ],
+       [
+        1757,
+        0
+       ],
+       [
+        1761,
+        1
+       ]
+      ],
+      "count": 4,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:354",
+      "start": 0,
+      "changes": [
+       [
+        1579,
+        1
+       ],
+       [
+        1601,
+        0
+       ],
+       [
+        1643,
+        1
+       ],
+       [
+        1649,
+        0
+       ],
+       [
+        1664,
+        1
+       ],
+       [
+        1736,
+        0
+       ],
+       [
+        1765,
+        1
+       ]
+      ],
+      "count": 7,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:357",
+      "start": 1,
+      "changes": [
+       [
+        1491,
+        0
+       ],
+       [
+        1504,
+        1
+       ],
+       [
+        1529,
+        0
+       ],
+       [
+        1542,
+        1
+       ],
+       [
+        1567,
+        0
+       ],
+       [
+        1580,
+        1
+       ],
+       [
+        1605,
+        0
+       ],
+       [
+        1618,
+        1
+       ],
+       [
+        1643,
+        0
+       ],
+       [
+        1656,
+        1
+       ],
+       [
+        1681,
+        0
+       ],
+       [
+        1694,
+        1
+       ]
+      ],
+      "count": 15,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:358",
+      "start": 0,
+      "changes": [
+       [
+        1491,
+        1
+       ],
+       [
+        1504,
+        0
+       ],
+       [
+        1529,
+        1
+       ],
+       [
+        1542,
+        0
+       ],
+       [
+        1567,
+        1
+       ],
+       [
+        1580,
+        0
+       ],
+       [
+        1605,
+        1
+       ],
+       [
+        1618,
+        0
+       ],
+       [
+        1643,
+        1
+       ],
+       [
+        1656,
+        0
+       ],
+       [
+        1681,
+        1
+       ],
+       [
+        1694,
+        0
+       ]
+      ],
+      "count": 15,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 0,
+      "changes": [
+       [
+        1480,
+        1
+       ],
+       [
+        1481,
+        0
+       ],
+       [
+        1483,
+        1
+       ],
+       [
+        1484,
+        0
+       ],
+       [
+        1486,
+        1
+       ],
+       [
+        1487,
+        0
+       ],
+       [
+        1489,
+        1
+       ],
+       [
+        1490,
+        0
+       ],
+       [
+        1492,
+        1
+       ],
+       [
+        1493,
+        0
+       ],
+       [
+        1495,
+        1
+       ],
+       [
+        1496,
+        0
+       ]
+      ],
+      "count": 191,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        1481,
+        1
+       ],
+       [
+        1482,
+        0
+       ],
+       [
+        1484,
+        1
+       ],
+       [
+        1485,
+        0
+       ],
+       [
+        1487,
+        1
+       ],
+       [
+        1488,
+        0
+       ],
+       [
+        1490,
+        1
+       ],
+       [
+        1491,
+        0
+       ],
+       [
+        1493,
+        1
+       ],
+       [
+        1494,
+        0
+       ],
+       [
+        1496,
+        1
+       ],
+       [
+        1497,
+        0
+       ]
+      ],
+      "count": 190,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:361",
+      "start": 1,
+      "changes": [
+       [
+        1480,
+        0
+       ],
+       [
+        1482,
+        1
+       ],
+       [
+        1483,
+        0
+       ],
+       [
+        1485,
+        1
+       ],
+       [
+        1486,
+        0
+       ],
+       [
+        1488,
+        1
+       ],
+       [
+        1489,
+        0
+       ],
+       [
+        1491,
+        1
+       ],
+       [
+        1492,
+        0
+       ],
+       [
+        1494,
+        1
+       ],
+       [
+        1495,
+        0
+       ],
+       [
+        1497,
+        1
+       ]
+      ],
+      "count": 191,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:570",
+      "start": 0,
+      "changes": [
+       [
+        1763,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 9.87833217199659
+   },
+   {
+    "plan": 2,
+    "index": 1,
+    "name": "event(local:217@18)#39438",
+    "kind": "event",
+    "input": "wait",
+    "start": 1765,
+    "issue": null,
+    "end": 2365,
+    "outcome": "precondition",
+    "then": "replan",
+    "tries": [],
+    "mismatches": [
+     {
+      "key": "local:217",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "precondition"
+     },
+     {
+      "key": "pos:local:217",
+      "predicted": [
+       "18"
+      ],
+      "observed": -1,
+      "kind": "precondition"
+     }
+    ],
+    "unplanned": [],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 21.562209447991336
+   },
+   {
+    "plan": 3,
+    "index": 0,
+    "name": "event(local:211@33)#30565",
+    "kind": "event",
+    "input": "wait",
+    "start": 2365,
+    "issue": null,
+    "end": 2419,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2365,
+      "first_settled": 2366,
+      "end": 2419,
+      "how": "held",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "local:208",
+      "start": 0,
+      "changes": [
+       [
+        2374,
+        1
+       ],
+       [
+        2380,
+        0
+       ],
+       [
+        2385,
+        1
+       ],
+       [
+        2391,
+        0
+       ],
+       [
+        2392,
+        1
+       ],
+       [
+        2398,
+        0
+       ],
+       [
+        2409,
+        1
+       ],
+       [
+        2415,
+        0
+       ],
+       [
+        2416,
+        1
+       ]
+      ],
+      "count": 9,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:209",
+      "start": 0,
+      "changes": [
+       [
+        2368,
+        1
+       ],
+       [
+        2371,
+        0
+       ],
+       [
+        2380,
+        1
+       ],
+       [
+        2383,
+        0
+       ],
+       [
+        2401,
+        1
+       ],
+       [
+        2404,
+        0
+       ]
+      ],
+      "count": 6,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "pos:local:207",
+      "start": 15,
+      "changes": [
+       [
+        2378,
+        23
+       ],
+       [
+        2403,
+        15
+       ],
+       [
+        2416,
+        23
+       ]
+      ],
+      "count": 3,
+      "end": 23,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": -1,
+      "changes": [
+       [
+        2374,
+        21
+       ],
+       [
+        2377,
+        41
+       ],
+       [
+        2380,
+        -1
+       ],
+       [
+        2385,
+        21
+       ],
+       [
+        2388,
+        41
+       ],
+       [
+        2391,
+        -1
+       ],
+       [
+        2392,
+        21
+       ],
+       [
+        2395,
+        41
+       ],
+       [
+        2398,
+        -1
+       ],
+       [
+        2409,
+        21
+       ],
+       [
+        2412,
+        41
+       ],
+       [
+        2415,
+        -1
+       ]
+      ],
+      "count": 14,
+      "end": 41,
+      "net": true
+     },
+     {
+      "key": "pos:local:209",
+      "start": -1,
+      "changes": [
+       [
+        2368,
+        33
+       ],
+       [
+        2371,
+        -1
+       ],
+       [
+        2380,
+        56
+       ],
+       [
+        2383,
+        -1
+       ],
+       [
+        2401,
+        33
+       ],
+       [
+        2404,
+        -1
+       ]
+      ],
+      "count": 6,
+      "end": -1,
+      "net": false
+     },
+     {
+      "key": "state:316",
+      "start": 0,
+      "changes": [
+       [
+        2417,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:324",
+      "start": 0,
+      "changes": [
+       [
+        2368,
+        1
+       ],
+       [
+        2369,
+        0
+       ],
+       [
+        2374,
+        1
+       ],
+       [
+        2375,
+        0
+       ],
+       [
+        2380,
+        1
+       ],
+       [
+        2381,
+        0
+       ],
+       [
+        2386,
+        1
+       ],
+       [
+        2387,
+        0
+       ],
+       [
+        2392,
+        1
+       ],
+       [
+        2393,
+        0
+       ],
+       [
+        2398,
+        1
+       ],
+       [
+        2399,
+        0
+       ]
+      ],
+      "count": 18,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        2369,
+        1
+       ],
+       [
+        2370,
+        0
+       ],
+       [
+        2375,
+        1
+       ],
+       [
+        2376,
+        0
+       ],
+       [
+        2381,
+        1
+       ],
+       [
+        2382,
+        0
+       ],
+       [
+        2387,
+        1
+       ],
+       [
+        2388,
+        0
+       ],
+       [
+        2393,
+        1
+       ],
+       [
+        2394,
+        0
+       ],
+       [
+        2399,
+        1
+       ],
+       [
+        2400,
+        0
+       ]
+      ],
+      "count": 18,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        2370,
+        1
+       ],
+       [
+        2371,
+        0
+       ],
+       [
+        2376,
+        1
+       ],
+       [
+        2377,
+        0
+       ],
+       [
+        2382,
+        1
+       ],
+       [
+        2383,
+        0
+       ],
+       [
+        2388,
+        1
+       ],
+       [
+        2389,
+        0
+       ],
+       [
+        2394,
+        1
+       ],
+       [
+        2395,
+        0
+       ],
+       [
+        2400,
+        1
+       ],
+       [
+        2401,
+        0
+       ]
+      ],
+      "count": 18,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:327",
+      "start": 1,
+      "changes": [
+       [
+        2366,
+        0
+       ],
+       [
+        2371,
+        1
+       ],
+       [
+        2372,
+        0
+       ],
+       [
+        2377,
+        1
+       ],
+       [
+        2378,
+        0
+       ],
+       [
+        2383,
+        1
+       ],
+       [
+        2384,
+        0
+       ],
+       [
+        2389,
+        1
+       ],
+       [
+        2390,
+        0
+       ],
+       [
+        2395,
+        1
+       ],
+       [
+        2396,
+        0
+       ],
+       [
+        2401,
+        1
+       ]
+      ],
+      "count": 18,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:328",
+      "start": 0,
+      "changes": [
+       [
+        2366,
+        1
+       ],
+       [
+        2367,
+        0
+       ],
+       [
+        2372,
+        1
+       ],
+       [
+        2373,
+        0
+       ],
+       [
+        2378,
+        1
+       ],
+       [
+        2379,
+        0
+       ],
+       [
+        2384,
+        1
+       ],
+       [
+        2385,
+        0
+       ],
+       [
+        2390,
+        1
+       ],
+       [
+        2391,
+        0
+       ],
+       [
+        2396,
+        1
+       ],
+       [
+        2397,
+        0
+       ]
+      ],
+      "count": 18,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:329",
+      "start": 0,
+      "changes": [
+       [
+        2367,
+        1
+       ],
+       [
+        2368,
+        0
+       ],
+       [
+        2373,
+        1
+       ],
+       [
+        2374,
+        0
+       ],
+       [
+        2379,
+        1
+       ],
+       [
+        2380,
+        0
+       ],
+       [
+        2385,
+        1
+       ],
+       [
+        2386,
+        0
+       ],
+       [
+        2391,
+        1
+       ],
+       [
+        2392,
+        0
+       ],
+       [
+        2397,
+        1
+       ],
+       [
+        2398,
+        0
+       ]
+      ],
+      "count": 18,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:333",
+      "start": 1,
+      "changes": [
+       [
+        2402,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:342",
+      "start": 1,
+      "changes": [
+       [
+        2386,
+        0
+       ],
+       [
+        2390,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:345",
+      "start": 1,
+      "changes": [
+       [
+        2369,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:348",
+      "start": 1,
+      "changes": [
+       [
+        2417,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:351",
+      "start": 1,
+      "changes": [
+       [
+        2375,
+        0
+       ],
+       [
+        2379,
+        1
+       ],
+       [
+        2393,
+        0
+       ],
+       [
+        2397,
+        1
+       ],
+       [
+        2410,
+        0
+       ],
+       [
+        2414,
+        1
+       ]
+      ],
+      "count": 6,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:354",
+      "start": 0,
+      "changes": [
+       [
+        2382,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:357",
+      "start": 0,
+      "changes": [
+       [
+        2378,
+        1
+       ],
+       [
+        2403,
+        0
+       ],
+       [
+        2416,
+        1
+       ]
+      ],
+      "count": 3,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:358",
+      "start": 1,
+      "changes": [
+       [
+        2378,
+        0
+       ],
+       [
+        2403,
+        1
+       ],
+       [
+        2416,
+        0
+       ]
+      ],
+      "count": 3,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 1,
+      "changes": [
+       [
+        2366,
+        0
+       ],
+       [
+        2368,
+        1
+       ],
+       [
+        2369,
+        0
+       ],
+       [
+        2371,
+        1
+       ],
+       [
+        2372,
+        0
+       ],
+       [
+        2374,
+        1
+       ],
+       [
+        2375,
+        0
+       ],
+       [
+        2377,
+        1
+       ],
+       [
+        2378,
+        0
+       ],
+       [
+        2380,
+        1
+       ],
+       [
+        2381,
+        0
+       ],
+       [
+        2383,
+        1
+       ]
+      ],
+      "count": 36,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        2366,
+        1
+       ],
+       [
+        2367,
+        0
+       ],
+       [
+        2369,
+        1
+       ],
+       [
+        2370,
+        0
+       ],
+       [
+        2372,
+        1
+       ],
+       [
+        2373,
+        0
+       ],
+       [
+        2375,
+        1
+       ],
+       [
+        2376,
+        0
+       ],
+       [
+        2378,
+        1
+       ],
+       [
+        2379,
+        0
+       ],
+       [
+        2381,
+        1
+       ],
+       [
+        2382,
+        0
+       ]
+      ],
+      "count": 36,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:361",
+      "start": 0,
+      "changes": [
+       [
+        2367,
+        1
+       ],
+       [
+        2368,
+        0
+       ],
+       [
+        2370,
+        1
+       ],
+       [
+        2371,
+        0
+       ],
+       [
+        2373,
+        1
+       ],
+       [
+        2374,
+        0
+       ],
+       [
+        2376,
+        1
+       ],
+       [
+        2377,
+        0
+       ],
+       [
+        2379,
+        1
+       ],
+       [
+        2380,
+        0
+       ],
+       [
+        2382,
+        1
+       ],
+       [
+        2383,
+        0
+       ]
+      ],
+      "count": 36,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:570",
+      "start": 0,
+      "changes": [
+       [
+        2417,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 2.0646458720148075
+   },
+   {
+    "plan": 3,
+    "index": 1,
+    "name": "event(local:217@18)#39438",
+    "kind": "event",
+    "input": "wait",
+    "start": 2419,
+    "issue": null,
+    "end": 3019,
+    "outcome": "precondition",
+    "then": "replan",
+    "tries": [],
+    "mismatches": [
+     {
+      "key": "local:217",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "precondition"
+     },
+     {
+      "key": "pos:local:217",
+      "predicted": [
+       "18"
+      ],
+      "observed": -1,
+      "kind": "precondition"
+     },
+     {
+      "key": "state:316",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "precondition"
+     }
+    ],
+    "unplanned": [],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 15.597410804999527
+   },
+   {
+    "plan": 4,
+    "index": 0,
+    "name": "walk_to(316)#478",
+    "kind": "walk_to",
+    "input": "click verb 11 on 316",
+    "start": 3019,
+    "issue": 3110,
+    "end": 3111,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 3019,
+      "inputs": [
+       {
+        "frame": 3020,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 3020,
+      "first_settled": 3049,
+      "end": 3049,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     },
+     {
+      "try": 2,
+      "kind": "retry",
+      "start": 3109,
+      "inputs": [
+       {
+        "frame": 3110,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 3110,
+      "end": 3111,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "local:216",
+      "start": 1,
+      "changes": [
+       [
+        3110,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "pos:local:216",
+      "start": 105,
+      "changes": [
+       [
+        3110,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "state:327",
+      "start": 1,
+      "changes": [
+       [
+        3110,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:328",
+      "start": 0,
+      "changes": [
+       [
+        3110,
+        1
+       ],
+       [
+        3111,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:329",
+      "start": 0,
+      "changes": [
+       [
+        3111,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 1,
+      "changes": [
+       [
+        3110,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        3110,
+        1
+       ],
+       [
+        3111,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:361",
+      "start": 0,
+      "changes": [
+       [
+        3111,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 3020,
+      "click": [
+       287,
+       103
+      ]
+     },
+     {
+      "frame": 3110,
+      "click": [
+       287,
+       103
+      ]
+     }
+    ],
+    "note": "retry 1 after 60 frames (the record's path never started)",
+    "seconds": 1.5230448819929734
+   },
+   {
+    "plan": 4,
+    "index": 1,
+    "name": "event(script:2@736#a8c69122caf2)#30915",
+    "kind": "event",
+    "input": "wait",
+    "start": 3111,
+    "issue": null,
+    "end": 6711,
+    "outcome": "matched, the engine ran on",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 3111,
+      "first_settled": 3120,
+      "end": 6711,
+      "how": "limit",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "frozen:local:200",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:201",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:206",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:207",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:210",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "state:324",
+      "start": 0,
+      "changes": [
+       [
+        3112,
+        1
+       ],
+       [
+        3113,
+        0
+       ],
+       [
+        3118,
+        1
+       ],
+       [
+        3119,
+        0
+       ]
+      ],
+      "count": 4,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        3113,
+        1
+       ],
+       [
+        3114,
+        0
+       ],
+       [
+        3119,
+        1
+       ]
+      ],
+      "count": 3,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        3114,
+        1
+       ],
+       [
+        3115,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:327",
+      "start": 0,
+      "changes": [
+       [
+        3115,
+        1
+       ],
+       [
+        3116,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:328",
+      "start": 0,
+      "changes": [
+       [
+        3116,
+        1
+       ],
+       [
+        3117,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:329",
+      "start": 1,
+      "changes": [
+       [
+        3112,
+        0
+       ],
+       [
+        3117,
+        1
+       ],
+       [
+        3118,
+        0
+       ]
+      ],
+      "count": 3,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:339",
+      "start": 1,
+      "changes": [
+       [
+        3113,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 0,
+      "changes": [
+       [
+        3112,
+        1
+       ],
+       [
+        3113,
+        0
+       ],
+       [
+        3115,
+        1
+       ],
+       [
+        3116,
+        0
+       ],
+       [
+        3118,
+        1
+       ],
+       [
+        3119,
+        0
+       ]
+      ],
+      "count": 6,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        3113,
+        1
+       ],
+       [
+        3114,
+        0
+       ],
+       [
+        3116,
+        1
+       ],
+       [
+        3117,
+        0
+       ],
+       [
+        3119,
+        1
+       ]
+      ],
+      "count": 5,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:361",
+      "start": 1,
+      "changes": [
+       [
+        3112,
+        0
+       ],
+       [
+        3114,
+        1
+       ],
+       [
+        3115,
+        0
+       ],
+       [
+        3117,
+        1
+       ],
+       [
+        3118,
+        0
+       ]
+      ],
+      "count": 5,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:572",
+      "start": 0,
+      "changes": [
+       [
+        3120,
+        1
+       ],
+       [
+        3121,
+        0
+       ],
+       [
+        3123,
+        1
+       ],
+       [
+        3124,
+        0
+       ],
+       [
+        3126,
+        1
+       ],
+       [
+        3127,
+        0
+       ],
+       [
+        3129,
+        1
+       ],
+       [
+        3130,
+        0
+       ],
+       [
+        3132,
+        1
+       ],
+       [
+        3133,
+        0
+       ],
+       [
+        3135,
+        1
+       ],
+       [
+        3136,
+        0
+       ]
+      ],
+      "count": 2395,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        3121,
+        1
+       ],
+       [
+        3122,
+        0
+       ],
+       [
+        3124,
+        1
+       ],
+       [
+        3125,
+        0
+       ],
+       [
+        3127,
+        1
+       ],
+       [
+        3128,
+        0
+       ],
+       [
+        3130,
+        1
+       ],
+       [
+        3131,
+        0
+       ],
+       [
+        3133,
+        1
+       ],
+       [
+        3134,
+        0
+       ],
+       [
+        3136,
+        1
+       ],
+       [
+        3137,
+        0
+       ]
+      ],
+      "count": 2394,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        3120,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "the facts that differ were re-written within the window by the plan's next steps ['event(local:218@16#86dcd5f97351)#35417'], which are done too",
+    "seconds": 110.31256833201041
+   },
+   {
+    "plan": 4,
+    "index": 2,
+    "name": "event(local:218@16#86dcd5f97351)#35417",
+    "kind": "event",
+    "input": "wait",
+    "start": 6711,
+    "issue": null,
+    "end": 6711,
+    "outcome": "ran on in the step before",
+    "then": "next",
+    "tries": [],
+    "mismatches": [],
+    "unplanned": [],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 0.0
+   },
+   {
+    "plan": 4,
+    "index": 3,
+    "name": "sentence(7,564)#11710",
+    "kind": "sentence",
+    "input": "click verb 7 on 564",
+    "start": 6711,
+    "issue": 6713,
+    "end": 6714,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 6711,
+      "inputs": [
+       {
+        "frame": 6712,
+        "key": "u"
+       },
+       {
+        "frame": 6713,
+        "click": [
+         207,
+         103
+        ]
+       }
+      ],
+      "issue": 6713,
+      "end": 6714,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "state:571",
+      "start": 0,
+      "changes": [
+       [
+        6713,
+        1
+       ],
+       [
+        6714,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:572",
+      "start": 1,
+      "changes": [
+       [
+        6712,
+        0
+       ],
+       [
+        6714,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        6712,
+        1
+       ],
+       [
+        6713,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        6713,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 6712,
+      "key": "u"
+     },
+     {
+      "frame": 6713,
+      "click": [
+       207,
+       103
+      ]
+     }
+    ],
+    "note": "",
+    "seconds": 0.17145086100208573
+   },
+   {
+    "plan": 4,
+    "index": 4,
+    "name": "event(script:2@736#40ff02d1dcd8)#34267",
+    "kind": "event",
+    "input": "wait",
+    "start": 6714,
+    "issue": null,
+    "end": 10314,
+    "outcome": "did not happen",
+    "then": "replan",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 6714,
+      "first_settled": 6734,
+      "end": 10314,
+      "how": "limit",
+      "started": false,
+      "taken": false
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "pos:script:2",
+      "predicted": [
+       "759"
+      ],
+      "observed": 736,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "bit:424",
+      "start": 0,
+      "changes": [
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "class:564:32",
+      "start": 0,
+      "changes": [
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "class:568:32",
+      "start": 1,
+      "changes": [
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "cutscene",
+      "start": 0,
+      "changes": [
+       [
+        6729,
+        1
+       ],
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "frozen:local:204",
+      "start": 0,
+      "changes": [
+       [
+        6729,
+        1
+       ],
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "frozen:script:159",
+      "start": 0,
+      "changes": [
+       [
+        6729,
+        1
+       ],
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "frozen:script:23",
+      "start": 0,
+      "changes": [
+       [
+        6729,
+        1
+       ],
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "local:203",
+      "start": 0,
+      "changes": [
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:204",
+      "start": 1,
+      "changes": [
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:205",
+      "start": 0,
+      "changes": [
+       [
+        6734,
+        1
+       ],
+       [
+        6751,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "pos:local:203",
+      "start": -1,
+      "changes": [
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "pos:local:204",
+      "start": 18,
+      "changes": [
+       [
+        6734,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:205",
+      "start": -1,
+      "changes": [
+       [
+        6734,
+        15
+       ],
+       [
+        6745,
+        28
+       ],
+       [
+        6746,
+        29
+       ],
+       [
+        6747,
+        30
+       ],
+       [
+        6748,
+        31
+       ],
+       [
+        6749,
+        32
+       ],
+       [
+        6750,
+        33
+       ],
+       [
+        6751,
+        -1
+       ]
+      ],
+      "count": 8,
+      "end": -1,
+      "net": false
+     },
+     {
+      "key": "script:2",
+      "start": 1,
+      "changes": [
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:564",
+      "start": 0,
+      "changes": [
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:571",
+      "start": 0,
+      "changes": [
+       [
+        6716,
+        1
+       ],
+       [
+        6717,
+        0
+       ],
+       [
+        6719,
+        1
+       ],
+       [
+        6720,
+        0
+       ],
+       [
+        6722,
+        1
+       ],
+       [
+        6723,
+        0
+       ],
+       [
+        6725,
+        1
+       ],
+       [
+        6726,
+        0
+       ],
+       [
+        6728,
+        1
+       ],
+       [
+        6729,
+        0
+       ],
+       [
+        6731,
+        1
+       ],
+       [
+        6732,
+        0
+       ]
+      ],
+      "count": 2400,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:572",
+      "start": 1,
+      "changes": [
+       [
+        6715,
+        0
+       ],
+       [
+        6717,
+        1
+       ],
+       [
+        6718,
+        0
+       ],
+       [
+        6720,
+        1
+       ],
+       [
+        6721,
+        0
+       ],
+       [
+        6723,
+        1
+       ],
+       [
+        6724,
+        0
+       ],
+       [
+        6726,
+        1
+       ],
+       [
+        6727,
+        0
+       ],
+       [
+        6729,
+        1
+       ],
+       [
+        6730,
+        0
+       ],
+       [
+        6732,
+        1
+       ]
+      ],
+      "count": 2400,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        6715,
+        1
+       ],
+       [
+        6716,
+        0
+       ],
+       [
+        6718,
+        1
+       ],
+       [
+        6719,
+        0
+       ],
+       [
+        6721,
+        1
+       ],
+       [
+        6722,
+        0
+       ],
+       [
+        6724,
+        1
+       ],
+       [
+        6725,
+        0
+       ],
+       [
+        6727,
+        1
+       ],
+       [
+        6728,
+        0
+       ],
+       [
+        6730,
+        1
+       ],
+       [
+        6731,
+        0
+       ]
+      ],
+      "count": 2400,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        6734,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "var:52",
+      "start": 1,
+      "changes": [
+       [
+        6729,
+        0
+       ],
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "var:53",
+      "start": 1,
+      "changes": [
+       [
+        6729,
+        0
+       ],
+       [
+        6734,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "no ban: none of the event's writes held, so its path never ran",
+    "seconds": 101.43976458298857
+   },
+   {
+    "plan": 5,
+    "index": 0,
+    "name": "sentence(9,566)#12118",
+    "kind": "sentence",
+    "input": "click verb 9 on 566",
+    "start": 10314,
+    "issue": 10316,
+    "end": 10317,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 10314,
+      "inputs": [
+       {
+        "frame": 10315,
+        "key": "p"
+       },
+       {
+        "frame": 10316,
+        "click": [
+         79,
+         99
+        ]
+       }
+      ],
+      "issue": 10316,
+      "end": 10317,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "state:571",
+      "start": 0,
+      "changes": [
+       [
+        10316,
+        1
+       ],
+       [
+        10317,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:572",
+      "start": 1,
+      "changes": [
+       [
+        10315,
+        0
+       ],
+       [
+        10317,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        10315,
+        1
+       ],
+       [
+        10316,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        10316,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 10315,
+      "key": "p"
+     },
+     {
+      "frame": 10316,
+      "click": [
+       79,
+       99
+      ]
+     }
+    ],
+    "note": "",
+    "seconds": 0.1889126670139376
+   },
+   {
+    "plan": 5,
+    "index": 1,
+    "name": "event(script:2@736#1db02ba5a8ab)#34384",
+    "kind": "event",
+    "input": "wait",
+    "start": 10317,
+    "issue": null,
+    "end": 10336,
+    "outcome": "goal",
+    "then": "goal",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 10317,
+      "first_settled": 10336,
+      "end": 10336,
+      "how": "goal",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "frozen:local:200",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:201",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "class:566:32",
+      "start": 0,
+      "changes": [
+       [
+        10336,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "owner:566",
+      "start": 15,
+      "changes": [
+       [
+        10336,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "script:2",
+      "start": 1,
+      "changes": [
+       [
+        10336,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:566",
+      "start": 0,
+      "changes": [
+       [
+        10336,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:571",
+      "start": 0,
+      "changes": [
+       [
+        10319,
+        1
+       ],
+       [
+        10320,
+        0
+       ],
+       [
+        10322,
+        1
+       ],
+       [
+        10323,
+        0
+       ],
+       [
+        10325,
+        1
+       ],
+       [
+        10326,
+        0
+       ],
+       [
+        10328,
+        1
+       ],
+       [
+        10329,
+        0
+       ],
+       [
+        10331,
+        1
+       ],
+       [
+        10332,
+        0
+       ],
+       [
+        10334,
+        1
+       ],
+       [
+        10335,
+        0
+       ]
+      ],
+      "count": 12,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:572",
+      "start": 1,
+      "changes": [
+       [
+        10318,
+        0
+       ],
+       [
+        10320,
+        1
+       ],
+       [
+        10321,
+        0
+       ],
+       [
+        10323,
+        1
+       ],
+       [
+        10324,
+        0
+       ],
+       [
+        10326,
+        1
+       ],
+       [
+        10327,
+        0
+       ],
+       [
+        10329,
+        1
+       ],
+       [
+        10330,
+        0
+       ],
+       [
+        10332,
+        1
+       ],
+       [
+        10333,
+        0
+       ],
+       [
+        10335,
+        1
+       ]
+      ],
+      "count": 13,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        10318,
+        1
+       ],
+       [
+        10319,
+        0
+       ],
+       [
+        10321,
+        1
+       ],
+       [
+        10322,
+        0
+       ],
+       [
+        10324,
+        1
+       ],
+       [
+        10325,
+        0
+       ],
+       [
+        10327,
+        1
+       ],
+       [
+        10328,
+        0
+       ],
+       [
+        10330,
+        1
+       ],
+       [
+        10331,
+        0
+       ],
+       [
+        10333,
+        1
+       ],
+       [
+        10334,
+        0
+       ]
+      ],
+      "count": 13,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "var:133",
+      "start": 0,
+      "changes": [
+       [
+        10336,
+        null
+       ]
+      ],
+      "count": 1,
+      "end": null,
+      "net": true
+     },
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        10336,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "var:376",
+      "start": 1036,
+      "changes": [
+       [
+        10336,
+        996
+       ]
+      ],
+      "count": 1,
+      "end": 996,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 0.4451696739997715
+   }
+  ],
+  "frames": 10101,
+  "ticks": 50505,
+  "frame0": 235,
+  "frame_end": 10336,
+  "seconds": 774.480495892989,
+  "inputs": [
+   {
+    "frame": 1227,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 1330,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 1414,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 1477,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 3020,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 3110,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 6712,
+    "key": "u"
+   },
+   {
+    "frame": 6713,
+    "click": [
+     207,
+     103
+    ]
+   },
+   {
+    "frame": 10315,
+    "key": "p"
+   },
+   {
+    "frame": 10316,
+    "click": [
+     79,
+     99
+    ]
+   }
+  ]
+ },
+ "ban_task_sizes": [
+  21.514038584020454,
+  26.739839402987855,
+  31.54006733300048,
+  36.52307504499913,
+  26.962489329016535,
+  28.801047148997895
+ ],
+ "verify": {
+  "checkpoints": 22,
+  "differ": [],
+  "inputs": 65,
+  "final": {
+   "owner:566": 1
+  },
+  "same": true,
+  "seconds": 33.27629767797771,
+  "goal": true
+ },
+ "seconds": 812.1815316900029,
+ "game_seconds": 841.7775105243641
+}
