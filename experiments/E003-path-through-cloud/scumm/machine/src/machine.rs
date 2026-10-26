@@ -142,6 +142,9 @@ pub struct Switches {
     pub value_sets: bool,
 }
 
+/// Fix round 1's switches: in the Rust only (model.py's `SWITCHES` lacks them).
+pub const RUST_SWITCHES: &[&str] = &["value_sets"];
+
 impl Switches {
     pub fn parse(names: &[String]) -> Result<Switches, String> {
         let mut s = Switches::default();

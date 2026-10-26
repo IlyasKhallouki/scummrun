@@ -30,9 +30,9 @@ apart) when the Rust machine matches model.py.
 and compared with them; it stops at the first difference (slower; the decoding's own check). ``--canonical``: the
 server sends the canonical lines instead of the columns (slower; for comparison). ``--no-build``: skip
 ``cargo build --release -p scumm-machine --bin machine-serve`` (run in scumm/ otherwise; quick when nothing changed).
-``--bin PATH``: another machine-serve binary (the tests pass cargo's own), not built here. ``--switches`` also takes
-the Rust machine's own switches (fix round 1, ``RUST_SWITCHES``: ``value_sets``), which model.py does not have. ``--resume`` is refused: check.py's resume folder keys records by the
-Python sources only, so it would mix records of both machines.
+``--bin PATH``: another machine-serve binary (the tests pass cargo's own), not built here. ``--resume`` is refused:
+check.py's resume folder keys records by the Python sources only, so it would mix records of both machines.
+``--switches`` also takes fix round 1's switches (``RUST_SWITCHES``), which model.py lacks.
 
 Besides check.py's files it writes DIR/<stem>.rust-times.tsv (stem: ``check.times_stem``): per counted move with an
 action, the Rust machine's seconds, the encoding's, the bytes sent, the decoding's seconds, the whole move's
@@ -79,14 +79,16 @@ import golden  # noqa: E402
 import groundtruth  # noqa: E402
 import model  # noqa: E402
 
-# Switches of the Rust machine alone (fix round 1: the fixes are made in Rust only, D7). model.py has no rule for them,
-# so this process adds their names to model.SWITCHES before check.py builds its Machine: check.py then takes them with
-# --switches, names its files and log after them, and the Rust machine runs them. A run with one on is not model.py's.
+# Fix round 1's switches (fix-round1.md): rules of the Rust machine that model.py does not have (scumm/machine/src/
+# machine.rs RUST_SWITCHES). check.py's Machine refuses a switch model.SWITCHES lacks; it never runs a move here
+# (check.run_model is the Rust's), so main() adds these names to that table in this process and the workers it forks.
+# A run with one of them has no Python reference: its files are new rows, not a comparison.
 RUST_SWITCHES = {
-    "value_sets": "F12 (fix-round1.md): the mouse variables are ranges and findObject and actorFromPos value sets; a "
-                  "test every value agrees on is decided, else the fork narrows the tested variable or local on each "
-                  "side; +, -, * and / by a constant map a range to a range (scumm/machine, Switches::value_sets)",
+    "value_sets": "F12: the mouse variables are ranges and findObject and actorFromPos value sets; a test every value "
+                  "agrees on is decided, else the fork narrows the tested variable or local on each side; +, -, * and / "
+                  "by a constant map a range to a range (input.cpp:414-434, object.cpp:557-597, actor.cpp:2115-2147)",
 }
+
 _ARGS = {"verify": False, "canonical": False, "dir": None, "bin": BIN}
 _WIDTH = {2: "H", 4: "I"}  # the array type codes of the wire's index widths
 assert all(array.array(c).itemsize == w for w, c in _WIDTH.items())
@@ -325,11 +327,11 @@ def main() -> None:
     _ARGS.update(verify=a.verify, canonical=a.canonical, dir=out, bin=a.bin.resolve())
     for f in out.glob(".rust-times.*.jsonl"):
         f.unlink()
+    for k, v in RUST_SWITCHES.items():
+        model.SWITCHES.setdefault(k, v)
     check.OUT = out
     check.run_model = run_model
     check.score_move = score_move
-    for name, what in RUST_SWITCHES.items():
-        model.SWITCHES.setdefault(name, what)
     sys.argv = [str(HERE / "check.py")] + rest
     t = time.perf_counter()
     try:
