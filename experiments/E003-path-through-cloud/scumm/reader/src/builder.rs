@@ -814,14 +814,16 @@ impl<'g> Builder<'g> {
         out
     }
 
-    /// `Builder._sig`: the number of a list of locals (48 bits of its text's SHA-1; 0: not known).
-    pub fn sig(&mut self, name: &str, locals: &[(i64, Val)], ov: i64, cd: &[CutData], args_known: bool) -> i64 {
+    /// `Builder._sig`: the number of a list of locals (48 bits of its text's SHA-1; 0: not known). `flags`: more
+    /// (name, text) pairs in the text; empty but with the switch --live-locals (`record`).
+    pub fn sig(&mut self, name: &str, locals: &[(i64, Val)], ov: i64, cd: &[CutData], args_known: bool, flags: &[(&str, String)]) -> i64 {
         if !args_known {
             return 0;
         }
         let mut pairs: Vec<(String, String)> = locals.iter().map(|(i, v)| (i.to_string(), v.show())).collect();
         pairs.push(("override".into(), ov.to_string()));
         pairs.push(("cut_data".into(), cut_tuple_str(cd)));
+        pairs.extend(flags.iter().map(|(k, v)| (k.to_string(), v.clone())));
         pairs.sort();
         let inner: Vec<String> = pairs.iter().map(|(a, b)| repr_tuple(&[repr_str(a), repr_str(b)])).collect();
         let text = repr_tuple(&[repr_str(name), repr_tuple(&inner)]);
@@ -1006,8 +1008,27 @@ impl<'g> Builder<'g> {
                     (*i, if fact { Val::Unk(Unknown::new(R_LOCAL, format!("Local[{i}] from a fact"), None)) } else { v.clone() })
                 })
                 .collect();
+            // the switch --live-locals (PORT-NOTES.md, "Live locals"): only the locals the unit's code reads, and the
+            // slot's flags in the list's number (lists that differed in unread locals may differ there), its recursive
+            // flag only as "true or not", all the model and the engine read of it
+            let (locs, flags, recursive) = match &self.table.live_locals {
+                Some(ll) => {
+                    let (kept_locs, dropped) = ll.keep(kept.unit, locs);
+                    if dropped {
+                        self.counts.inc("lists of locals with locals their unit never reads (left out: live locals)");
+                    }
+                    let recursive = crate::locals::recursive(&kept.recursive);
+                    let flags = vec![
+                        ("recursive", recursive.text()),
+                        ("resistant", kept.resistant.text()),
+                        ("owned", kept.owned.text()),
+                    ];
+                    (kept_locs, flags, recursive)
+                }
+                None => (locs, Vec::new(), kept.recursive.clone()),
+            };
             let cd: Vec<CutData> = kept.cut_data.iter().map(cut_text).collect();
-            let mut sig = self.sig(name, &locs, kept.override_, &cd, kept.known);
+            let mut sig = self.sig(name, &locs, kept.override_, &cd, kept.known, &flags);
             if self.folded.contains(&sig) {
                 sig = 0;
             }
@@ -1018,7 +1039,7 @@ impl<'g> Builder<'g> {
                 sig,
                 locals: locs,
                 args_known: kept.known && sig != 0,
-                recursive: kept.recursive.clone(),
+                recursive,
                 resistant: kept.resistant.clone(),
                 owned: kept.owned.clone(),
                 abort: false,
@@ -1734,6 +1755,11 @@ impl<'g> Builder<'g> {
         put("universe", Py::strs(&self.scope.universe));
         put("scope_counts", self.scope.counts.py());
         put("n_records", Py::Int(if self.keep_records { self.records.len() } else { self.n_records } as i64));
+        if let Some(ll) = &self.table.live_locals {
+            // the switch --live-locals: every unit's read locals (None: all), keyed by its slot's name in the engine's
+            // state (`local:N@R`, `entry@R`, `exit@R` for room R's code); absent with the switch off
+            put("live_locals", Py::dict(vec![("switch", Py::str("--live-locals")), ("slots", ll.slots_py(self.game))]));
+        }
         Py::Dict(fields)
     }
 

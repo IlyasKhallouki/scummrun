@@ -56,6 +56,10 @@ pub struct FactTable {
     /// domain holds ELSEWHERE, a place written outside the scope's points is written as ELSEWHERE, no precondition
     /// set holds it, and a start with a slot at such a place starts it there. Off, the reader is reader.py's.
     pub elsewhere: bool,
+    /// The switch `--live-locals` (PORT-NOTES.md, "Live locals"), off (None) by default: each unit's read locals
+    /// ([`crate::locals::LiveLocals`]); an event's list of locals, its number and the locals its run starts with keep
+    /// only the locals its unit's code reads, and the number covers the slot's flags. Off, the reader is reader.py's.
+    pub live_locals: Option<std::sync::Arc<crate::locals::LiveLocals>>,
     binary: Domain,
 }
 
@@ -148,6 +152,7 @@ impl FactTable {
             points,
             engine,
             elsewhere: false,
+            live_locals: None,
             binary: Domain::binary(),
         }
     }

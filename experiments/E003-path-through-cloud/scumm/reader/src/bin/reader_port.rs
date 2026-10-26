@@ -3,6 +3,11 @@
 //! reader-port static                  domains, scopes, hook summaries, the Builder's machine-free parts
 //! reader-port records NAME            golden records parsed and written back
 //! reader-port replay NAME [--out F]   the reading by the Rust Builder over the captured runs, against golden.py's
+//! reader-port read NAME [--threads N] [--out F] [--live-locals] [--packed F]
+//!                                     the reading with the Rust machine half, against golden.py's; --live-locals
+//!                                     reads with that switch (PORT-NOTES.md, "Live locals"; the comparison then
+//!                                     shows the renumbered lists), --packed writes its packed file as made (the
+//!                                     kitchen's goal and start s17; room 33's start as "start")
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
@@ -142,7 +147,37 @@ fn main() {
             // the reading with the Rust machine half, against golden.py's file
             let name = &args[1];
             let cpu0 = scumm_reader::cpu_secs();
+            let live = args.iter().any(|a| a == "--live-locals");
+            let packed_out = arg(&args, "--packed");
             let (b, secs) = match arg(&args, "--threads") {
+                _ if live || packed_out.is_some() => {
+                    // the switch on, or the packed file written as made: on `--threads` workers (default 0)
+                    let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
+                    let mut b = oracle::builder(&game, &st, name);
+                    if live {
+                        b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(&game)));
+                    }
+                    let mut stream = packed_out.as_ref().map(|p| packed::RecordStream::create(&PathBuf::from(p)).unwrap());
+                    let scope = b.scope.clone();
+                    let t = Instant::now();
+                    scumm_reader::par::with_pool(&game, &scope, threads, |pool| {
+                        b.read_all_into(pool, true, None, 2, stream.as_mut().map(|s| s as &mut dyn scumm_reader::builder::RecordSink));
+                    });
+                    let secs = t.elapsed().as_secs_f64();
+                    if let Some(stream) = stream {
+                        let (goal, start_name, start) = if name == "kitchen" {
+                            let kt = oracle::kitchen_task(&st);
+                            (kt.goal, "s17", kt.s17)
+                        } else {
+                            (Vec::new(), "start", Facts::from_py(st.named("builder", name).get("start_items")))
+                        };
+                        let keys = stream.fact_keys();
+                        let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+                        let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
+                        println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+                    }
+                    (b, secs)
+                }
                 None => oracle::read(&game, &st, name),
                 Some(n) => {
                     let (b, secs, stats) = oracle::read_par(&game, &st, name, n.parse().unwrap());
