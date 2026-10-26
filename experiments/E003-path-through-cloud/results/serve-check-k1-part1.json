@@ -1,0 +1,174 @@
+{
+ "name": "k1-part1",
+ "packed": "/var/tmp/fast-mi/partI-scratch/vmk1/reading.tc",
+ "args": [],
+ "server_ready_s": 35.33,
+ "hello": {
+  "task": "/var/tmp/fast-mi/partI-scratch/vmk1/reading.tc",
+  "input_actions": 236642,
+  "facts": 1519,
+  "seconds_load": 35.322,
+  "cpu_seconds": 13.7839,
+  "rss": 386785280,
+  "peak_rss": 387743744
+ },
+ "server_max_rss_mb": 728.1,
+ "rows": [
+  {
+   "i": 0,
+   "req": {
+    "start": "/var/tmp/fast-mi/noreload-scratch/k1-starts/start-0.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 45.687,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 43.5467,
+     "seconds": 45.6861,
+     "cpu_seconds": 19.4605,
+     "peak_rss": 758034432,
+     "rss": 565260288
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 65.39,
+    "cpu_seconds": 31.82,
+    "max_rss_mb": 723.5,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 68.418,
+    "cpu_seconds": 34.85,
+    "max_rss_mb": 723.0,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "bd9f4322da269f33"
+  },
+  {
+   "i": 1,
+   "req": {
+    "start": "/var/tmp/fast-mi/noreload-scratch/k1-starts/start-1.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 0.839,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 0.8357,
+     "cpu_seconds": 0.4104,
+     "peak_rss": 593960960,
+     "rss": 564015104
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 65.715,
+    "cpu_seconds": 34.585,
+    "max_rss_mb": 724.4,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 59.838,
+    "cpu_seconds": 35.233,
+    "max_rss_mb": 723.1,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "bd9f4322da269f33"
+  },
+  {
+   "i": 2,
+   "req": {
+    "start": "/var/tmp/fast-mi/noreload-scratch/k1-starts/start-0.txt",
+    "bans": "/var/tmp/fast-mi/noreload-scratch/ban-A.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 24.112,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 22.6026,
+     "seconds": 24.1113,
+     "cpu_seconds": 18.6235,
+     "peak_rss": 763469824,
+     "rss": 581238784
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 51.285,
+    "cpu_seconds": 32.385,
+    "max_rss_mb": 725.7,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 45.998,
+    "cpu_seconds": 33.726,
+    "max_rss_mb": 722.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "bd9f4322da269f33"
+  }
+ ]
+}

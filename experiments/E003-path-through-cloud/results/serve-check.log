@@ -1,0 +1,78 @@
+E003: replanning without reloading (serve_check.py compare; log from results/serve-check-*.json). main's taskcore sha1 25738cbfb7c0, the new 14882d1e67c5.
+Wall and CPU seconds per request on a shared laptop (load 12 to 20 on 8 cores, each process one thread at nice 10); peak MB: a sas process's maximum resident, the server's peak within the request.
+kept: the server kept what does not read the start; built: it built it (the first request, new bans or another goal).
+
+== kitchen: /var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/kitchen.tc 
+server: load 2.2 s, 57 MB resident after the load, 110 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built    20.46   11.45    116     23.97   12.03    116     25.30   15.00    117   yes
+  1  no    kept      9.32    5.37    116     14.97   11.96    116     22.24   14.17    120   yes
+  2  no    kept     10.50    5.67    116     24.00   12.03    118     19.70   14.10    118   yes
+  3  no    kept     12.36    5.41    116     22.88   12.01    118     18.96   14.28    118   yes
+  4  no    kept      7.22    5.29    116     16.73   12.03    116     20.73   14.90    116   yes
+  5  no    kept      5.95    5.20    109     13.65   11.43    119     15.24   13.07    119   yes
+  6  no    kept      7.68    5.52    109     15.52   11.93    117     16.37   13.96    119   yes
+  7  no    kept      5.50    5.03    109     11.45   10.72    117     20.39   13.89    117   yes
+  8  no    kept      9.88    5.64    109     22.02   12.53    116     28.85   15.20    116   yes
+  9  no    kept      9.81    5.53    109     16.85   12.03    116     19.96   14.54    117   yes
+
+== kitchen-bans: /var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/kitchen.tc 
+server: load 1.2 s, 56 MB resident after the load, 134 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  yes   built    13.02   11.27    114     17.20   12.36    117     26.94   15.06    117   yes
+  1  yes   kept      9.96    5.87    113     24.57   13.04    117     31.94   15.48    117   yes
+  2  yes   built    17.83   11.44    131     19.65   12.86    117     25.36   15.25    117   yes
+  3  yes   built    23.73   11.76    134     25.68   12.90    116     33.33   15.30    117   yes
+  4  no    built    20.00   11.70    134     34.91   13.67    116     39.76   16.57    116   yes
+
+== bar-control: /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/control.tc 
+server: load 2.3 s, 52 MB resident after the load, 113 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built    13.51    7.14    100      9.84    7.81    112     14.26    8.23    112   yes
+  1  yes   built     3.81    2.50    112      5.45    3.29    113      9.04    3.41    113   yes
+  2  no    built    11.75    6.48    113     14.93    7.73    112     13.52    7.52    113   yes
+
+== bar: /home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/reading.tc 
+server: load 3.2 s, 53 MB resident after the load, 105 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built    20.63   10.12    105     24.71   10.87    110     22.57   13.17    111   yes
+  1  no    kept      7.80    4.30    105     25.23   10.88    110     25.84   13.41    110   yes
+
+== k1-part1: /var/tmp/fast-mi/partI-scratch/vmk1/reading.tc 
+server: load 35.3 s, 369 MB resident after the load, 728 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built    45.69   19.46    723     65.39   31.82    724     68.42   34.85    723   yes
+  1  no    kept      0.84    0.41    566     65.72   34.59    724     59.84   35.23    723   yes
+  2  yes   built    24.11   18.62    728     51.28   32.38    726     46.00   33.73    723   yes
+
+== k1-316: /var/tmp/fast-mi/partI-scratch/vmk1/reading.tc --goal state:316=1
+server: load 23.8 s, 369 MB resident after the load, 736 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built    36.05   22.94    724     50.28   36.01    723          -   yes
+  1  no    kept      0.23    0.20    550     58.45   36.61    724          -   yes
+  2  no    kept     14.00    7.87    568     68.73   44.90    723          -   yes
+  3  no    kept      9.55    7.46    572     71.62   43.71    723          -   yes
+  4  yes   built    38.27   22.92    728     73.48   37.35    726          -   yes
+  5  yes   kept     12.29    7.29    572     81.19   44.28    724          -   yes
+  6  yes   built    37.11   29.64    734     68.04   44.63    724          -   yes
+  7  no    built    43.49   24.37    736     86.42   36.66    723          -   yes
+
+== k2-316: /var/tmp/fast-mi/partI-scratch/k2-on.tc --goal state:316=1
+server: load 118.2 s, 1218 MB resident after the load, 2385 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built   168.98   89.47   2378    206.17  138.19   2380          -   yes
+  1  no    kept      0.53    0.42   1768    158.95  135.22   2378          -   yes
+  2  no    kept      1.80    1.69   1593    137.77  124.16   2378          -   yes
+  3  no    kept      1.75    1.68   1466    194.85  130.45   2380          -   yes
+  4  yes   built   123.06   88.49   2380    177.52  130.50   2421          -   yes
+  5  yes   kept      2.28    1.79   1776    110.45  105.37   2421          -   yes
+  6  yes   built   117.17   80.59   2396    245.07  149.95   2421          -   yes
+  7  no    built   188.84   97.61   2385    338.05  163.64   2374          -   yes
+
+== k2-part1: /var/tmp/fast-mi/partI-scratch/k2-on.tc 
+server: load 178.6 s, 1218 MB resident after the load, 2380 MB peak over the session
+req  bans  kept   serve s / cpu s / peak MB   sas(new) s / cpu s / MB   sas(main) s / cpu s / MB   same bytes
+  0  no    built    88.31   60.19   2382          -    194.87  108.21   2374   yes
+  1  no    kept      2.46    1.97   1405          -    272.38  115.67   2380   yes
+  2  yes   built    77.30   56.88   2380          -    177.02  115.49   2419   yes
+

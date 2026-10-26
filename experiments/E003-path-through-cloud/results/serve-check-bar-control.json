@@ -1,0 +1,174 @@
+{
+ "name": "bar-control",
+ "packed": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/control.tc",
+ "args": [],
+ "server_ready_s": 2.33,
+ "hello": {
+  "task": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/control.tc",
+  "input_actions": 65592,
+  "facts": 664,
+  "seconds_load": 2.3225,
+  "cpu_seconds": 0.9112,
+  "rss": 54050816,
+  "peak_rss": 54939648
+ },
+ "server_max_rss_mb": 113.2,
+ "rows": [
+  {
+   "i": 0,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-part1/bar-door-rust-seed1-control/plans/plan-000/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 13.509,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 3.2485,
+     "seconds": 13.5072,
+     "cpu_seconds": 7.1373,
+     "peak_rss": 104861696,
+     "rss": 93454336
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 9.844,
+    "cpu_seconds": 7.808,
+    "max_rss_mb": 111.7,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 14.257,
+    "cpu_seconds": 8.226,
+    "max_rss_mb": 112.4,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "f57c2e7f776aff2b"
+  },
+  {
+   "i": 1,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-part1/bar-door-rust-seed1-control/plans/plan-001/start.txt",
+    "bans": "/var/tmp/fast-mi/out/E003-part1/bar-door-rust-seed1-control/plans/plan-001/bans.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 3.81,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 2.46,
+     "seconds": 3.8094,
+     "cpu_seconds": 2.4994,
+     "peak_rss": 117592064,
+     "rss": 91885568
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 5.45,
+    "cpu_seconds": 3.295,
+    "max_rss_mb": 112.9,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 9.042,
+    "cpu_seconds": 3.409,
+    "max_rss_mb": 112.6,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "b277a0749d24e67f"
+  },
+  {
+   "i": 2,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-part1/bar-door-rust-seed1-control/plans/plan-000/start.txt",
+    "bans": null,
+    "check": "input"
+   },
+   "serve": {
+    "seconds": 11.749,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 2.0507,
+     "seconds": 11.7482,
+     "cpu_seconds": 6.4773,
+     "peak_rss": 118743040,
+     "rss": 104583168
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 14.928,
+    "cpu_seconds": 7.729,
+    "max_rss_mb": 112.0,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 13.524,
+    "cpu_seconds": 7.521,
+    "max_rss_mb": 112.6,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "f57c2e7f776aff2b"
+  }
+ ]
+}
