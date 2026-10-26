@@ -16,6 +16,7 @@ section answers the critique point by point.
 | | item | order |
 |---|---|---|
 | F1 | an input is one record, and it starts at the input script | after F2, F5, F9, F12 |
+| F1b | F1's record ends where the sentence is queued; the sentence is its own event (D10) | after F1's size probe |
 | F2 | where in the frame an input is read (open choice), and the planner rule | before F1 |
 | F3 | an input's engine conditions are read in its frame (S3#45) | verified on F1, F2, F7 |
 | F4 | '.' is the talk-stop key (PI decision on C1) | any time |
@@ -117,6 +118,86 @@ record). Replay: the kitchen door clicks stop failing.
 
 **Cost.** Tables: cells, verb rectangles, room widths, mouse loops. Facts: `mouse` and the input variables. Records:
 measured first.
+
+## F1b. A click's record ends where the sentence is queued (D10)
+
+**Why.** F1's size probe (notes/log/2026-10-26-e003-f1-size-probe.md) ran the queued sentence inside the click's
+record. The kitchen's reading then took 4.5 to 6.9 times as long, and its task had no path to the goal. Most of the
+growth was the sentence run once per value of the variables that make it. D10 approves this rule instead.
+
+**Engine.**
+- The frame (scumm.cpp): processInput (3177), updateScummVars (3198), every live slot's turn (runAllScripts, 3231),
+  checkExecVerbs (3232), the bridge's stop (3254), checkAndRunSentenceScript (3255).
+- checkExecVerbs (verbs.cpp:586-692) does nothing while _userPut <= 0 (590). A shown verb's key gives
+  runInputScript(kVerbClickArea, verb, 1) (608-615); another key (kKeyClickArea, key, 1) (663). A click has code 1 (left)
+  or 2 (right) (666). On a verb it gives (kVerbClickArea, verb, code) (681-684); elsewhere (kSceneClickArea, 0, code) on
+  the main screen, else (kVerbClickArea, 0, code) (685-688).
+- runInputScript (script.cpp:1478-1511) runs VAR_VERB_SCRIPT's script with [area, value, code]. runScript (38-106)
+  stops a running copy unless recursive (65-66), takes a slot and runs it at once (runScriptNested, 344-389) to its
+  first yield or its end. So the input script, and every script it starts or chains to before it yields, runs inside
+  checkExecVerbs.
+- o5_doSentence (script_v5.cpp:1000-1015): verb 0xFE (STOP) empties the queue (_sentenceNum = 0), stops
+  VAR_SENTENCE_SCRIPT and clears the click (1004-1008). Any other verb calls doSentence(verb, A, B) (script.cpp:1145-1172),
+  which pushes (verb, A, B) with freezeCount 0 on a stack of NUM_SENTENCE (6) entries (1164-1171). v5 drops no
+  duplicate (1148-1162 are v7 and later). The script goes on after doSentence.
+- checkAndRunSentenceScript (script.cpp:1174-1247) does nothing while a slot of VAR_SENTENCE_SCRIPT is live and not
+  frozen (1186-1191), or while the queue is empty or its top is frozen (1193-1194). Else it pops the top (1196-1197). For
+  v5 it drops a sentence whose B is A and not 0 (1202-1204). Else it runs VAR_SENTENCE_SCRIPT with [verb, A, B]
+  (1212-1214, 1244-1246), to its first yield or end. It pops at most one sentence per frame.
+- 1199 is an engine fix for one game (monkey1HermanNoteWorkaround, 1275-1296). It needs kEnhMinorBugFixes, which the
+  system's runs turn off (enhancements=0, start.py), so it never runs.
+- freezeScripts raises every queued sentence's freezeCount (934-935); unfreezeScripts lowers it (961-964).
+  WaitForSentence reads the queue (script_v5.cpp:3296-3301).
+
+**When the queued sentence runs.** A sentence the input script queues in a click's frame runs at the end of that same
+frame (scumm.cpp:3255), after checkExecVerbs and before any slot's next turn. It waits only if a slot of
+VAR_SENTENCE_SCRIPT is then live and not frozen, or the top is frozen. Then it runs at the end of the first later frame
+where neither holds. A sentence queued during checkAndRunSentenceScript (by the sentence script, or by code it starts)
+runs at the end of the next frame at the earliest, since the queue pops once per frame; that frame's slots and input
+come first.
+
+**Rule.**
+1. A click's record (F1 rules 1-3, 5-7) is its frame up to checkAndRunSentenceScript: the mouse, the mouse loops'
+   turns, checkExecVerbs, and the input script with everything it starts or chains to, to its first yield or its end.
+   What the script does after doSentence in that run is in the record. In MI1, global 4 runs startScript(11) after its
+   push ([0407], [043D]), and script 11 resets the sentence variables.
+2. The queue is four facts: `queue` (0 empty; 1 a sentence the next checkAndRunSentenceScript runs; 2 a sentence that a
+   live, unfrozen sentence script holds) and `queue:verb`, `queue:a`, `queue:b`, the top entry. doSentence(STOP) writes
+   `queue` 0 and does what it did before. doSentence(V, A, B) writes the three values as the path has them, then
+   `queue` 1. A value the path did not write is the fact it reads, taken without a fork: the record copies it (one
+   conditional write per value the record allows). So the record does not split on the verb or the objects. A value
+   that is no fact is NOT_KNOWN (-1), which no sentence event reads: such a sentence blocks the plan.
+3. A push onto a queue that holds a sentence is not modelled; the path is dropped and counted. In MI1 the input
+   scripts empty the queue (doSentence(STOP)) before they push.
+4. Where any record ends, a sentence it queued is held (2) if a slot of VAR_SENTENCE_SCRIPT is live and not frozen,
+   else it is 1. A record that leaves the queue alone but writes the sentence script's slot or freeze facts, and leaves
+   it stopped or frozen, turns a held sentence (2) into 1.
+5. The sentence event (kind `queued`): per sentence script, with the script idle or live and frozen (today's two
+   variants), per verb of the scope (with the walk verb), object A of the scope and B. B is none (0), each B value
+   today's reading builds, or one stand-in for the values the scripts do not tell apart (its precondition: every such
+   value `queue:b` holds). Its precondition is `queue` 1 or 2 and the three values. Its run pops the queue (`queue` 0)
+   and runs the sentence script with [verb, A, B], as today's sentence run does. It needs no shown verb, no place of A
+   and no VAR_USERPUT: the click's record has those.
+6. Every other record, input or event, needs `queue` 0 or 2. So a sentence that runs at the next
+   checkAndRunSentenceScript comes before any later turn or input.
+7. A start has `queue` 0: the bridge does not dump the queue, and at an idle stop it is empty.
+8. A slot verb (no one constant place) is clicked anywhere on the verb screen: y from the least bottom below 200 of the
+   game's constant SetScreen calls (initScreens, gfx.cpp:386-388; script_v5.cpp:2397) to 199. The probe took 200 to
+   199 where the calls disagree (MI1: SetScreen(0,144) and SetScreen(0,200)).
+
+**What it leaves.**
+- The click's record still splits where the input script tests a sentence variable (F12's value sets) or uses it as a
+  number before doSentence (global 4 starts script 12, which tests the verb against 10 constants).
+- A sentence queued during checkAndRunSentenceScript runs before the next frame's turns in the model; the engine runs
+  those turns first.
+- A queued sentence whose B is A has no event, and neither has a (verb, A, B) outside today's sentence inputs. Both
+  block the plan; neither is a wrong plan.
+- WaitForSentence still reads the machine's own queue (room 48's local 207 only).
+
+**Tests.** The bar door clicks of run B's S1#7 with the cook at x > 310, at x <= 310 and away; local 203's three
+paths; room 57's and room 85's cases; key 23 gives no record; the probe's two gaps. The kitchen door click's record
+holds local 203's tests on the cook; the kitchen task with F1b plans to owner:566 = ego. Size gate: the kitchen's
+reading time or its taskcore operators at most 3 times today's (fix round 1's switches on).
 
 ## F2. Where in the frame an input is read (open choice)
 
