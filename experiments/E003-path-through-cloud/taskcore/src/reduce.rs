@@ -60,6 +60,17 @@ impl Enabled {
     }
 }
 
+/// TASKCORE_PROFILE set: each reduction's seconds and the task's size after it, on stderr (no output changes).
+pub fn prof<F: FnOnce(Task) -> (Task, bool)>(name: &str, t: Task, f: F) -> (Task, bool) {
+    if std::env::var_os("TASKCORE_PROFILE").is_none() {
+        return f(t);
+    }
+    let t0 = std::time::Instant::now();
+    let r = f(t);
+    eprintln!("profile {} {:.3} s, {} actions, {} words, changed {}", name, t0.elapsed().as_secs_f64(), r.0.acts.len(), r.0.acts.words.len(), r.1);
+    r
+}
+
 fn add(c: &mut Counts, k: &str, n: u64) {
     if n > 0 {
         *c.entry(k.to_string()).or_insert(0) += n;
@@ -863,7 +874,7 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
 /// same task, so the same result: `run` is `prefix`, (d), `finish`).
 pub fn run(t: Task, en: Enabled, start: usize, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> Result<Task, String> {
     let (t, changed) = prefix(t, en, c)?;
-    let (t, ch) = if en.d { red_d(t, start, c) } else { (t, false) };
+    let (t, ch) = if en.d { prof("d", t, |t| red_d(t, start, c)) } else { (t, false) };
     Ok(finish(t, en, start, c, replaced, changed | ch))
 }
 
@@ -892,9 +903,9 @@ pub fn prefix(t: Task, en: Enabled, c: &mut Counts) -> Result<(Task, bool), Stri
         changed |= ch;
         nt
     };
-    t = step(t, en.a, &mut |t| red_a(t, c));
-    t = step(t, en.b, &mut |t| red_b(t, c));
-    t = step(t, en.c, &mut |t| red_c(t, c));
+    t = step(t, en.a, &mut |t| prof("a", t, |t| red_a(t, c)));
+    t = step(t, en.b, &mut |t| prof("b", t, |t| red_b(t, c)));
+    t = step(t, en.c, &mut |t| prof("c", t, |t| red_c(t, c)));
     Ok((t, changed))
 }
 
@@ -920,13 +931,13 @@ pub fn finish(t: Task, en: Enabled, start: usize, c: &mut Counts, replaced: &mut
             nt
         };
         if !first {
-            t = step(t, en.a, &mut |t| red_a(t, c));
-            t = step(t, en.b, &mut |t| red_b(t, c));
-            t = step(t, en.c, &mut |t| red_c(t, c));
-            t = step(t, en.d, &mut |t| red_d(t, start, c));
+            t = step(t, en.a, &mut |t| prof("a", t, |t| red_a(t, c)));
+            t = step(t, en.b, &mut |t| prof("b", t, |t| red_b(t, c)));
+            t = step(t, en.c, &mut |t| prof("c", t, |t| red_c(t, c)));
+            t = step(t, en.d, &mut |t| prof("d", t, |t| red_d(t, start, c)));
         }
-        t = step(t, en.e, &mut |t| red_e(t, c));
-        t = step(t, en.f, &mut |t| red_f(t, c, replaced));
+        t = step(t, en.e, &mut |t| prof("e", t, |t| red_e(t, c)));
+        t = step(t, en.f, &mut |t| prof("f", t, |t| red_f(t, c, replaced)));
         first = false;
         if !changed {
             break;
