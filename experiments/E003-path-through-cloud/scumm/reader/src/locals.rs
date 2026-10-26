@@ -2,10 +2,10 @@
 //!
 //! A SCUMM v5 slot's locals are read only by its own code: the engine's readVar reads `vm.localvar[_currentScript]`
 //! for a variable number with bit 0x4000 (script.cpp:568-706), and every such number comes from the running
-//! instruction's operands, directly or as the index of an indexed variable (script.cpp:573-580, script_v5.cpp:383-396).
-//! So a local no instruction of the unit reads cannot change any of its paths. [`unit_reads`] gives the locals a
-//! unit's instructions read, from the IR over all its code (every verb entry of an object, every path), or "all"
-//! when the IR does not show them exactly.
+//! instruction's operands, directly or as the index of an indexed variable (script.cpp:573-580, script_v5.cpp:383-396),
+//! or from a code inside a text it prints (string.cpp:1573-1706, [`text_code_exact`]). So a local no instruction of the
+//! unit reads cannot change any of its paths. [`unit_reads`] gives the locals a unit's instructions read, from the IR
+//! over all its code (every verb entry of an object, every path), or "all" when the IR does not show them exactly.
 
 use crate::py::Py;
 use crate::record::Val;
@@ -23,6 +23,8 @@ pub enum All {
     Unparsed,
     /// a code descumm did not decode (`unknownN(..)`, `...Unknown...`) with an operand that is not a constant
     Undecoded,
+    /// a code inside a text whose operand bytes the engine may read as text that starts an escape ([`text_code_exact`])
+    TextBytes,
     /// an IR note that the engine may run bytes no instruction shows: any note but [`EXACT_NOTES`] ("closer gap",
     /// "jump to the end", "target not an instruction offset", "verb entry not an instruction offset", ...)
     Gap,
@@ -34,6 +36,7 @@ impl All {
             All::Indexed => "a local read through an index",
             All::Unparsed => "an instruction the IR did not parse",
             All::Undecoded => "a code descumm did not decode, with an operand that is not a constant",
+            All::TextBytes => "a text code whose operand bytes the engine may read as text",
             All::Gap => "an IR note that the engine may run bytes no instruction shows",
         }
     }
@@ -50,7 +53,7 @@ pub type Reads = Result<BTreeSet<i32>, All>;
 /// gap not a multiple of 3", "jump line not 3 bytes", "while without a closer at its end", "two instructions at one
 /// offset"), a start the engine can take inside or past the shown code ("jump to the end", "target not an instruction
 /// offset", "verb entry not an instruction offset", "else-if target from the text rule, unverified", "beginOverride not
-/// followed by a jump": the engine skips the next 3 bytes as that jump, script_v5.cpp beginOverride), and any note
+/// followed by a jump": the engine skips the next 3 bytes as that jump, script.cpp:1711-1722), and any note
 /// added later. "unparsed" is the instruction's own ([`All::Unparsed`]).
 pub const EXACT_NOTES: [&str; 6] = [
     "else-if target from bytes, text rule agrees",
@@ -66,6 +69,43 @@ pub const EXACT_NOTES: [&str; 6] = [
 fn undecoded(syms: &Interner, name: Sym) -> bool {
     let s = syms.str(name);
     s.strip_prefix("unknown").is_some_and(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_digit())) || s.contains("Unknown")
+}
+
+/// descumm's names for the codes inside a text (descumm-common.cpp get_string, 0xFF or 0xFE then the code): newline(),
+/// keepText(), wait(), getInt(v), getVerb(v), getName(v), getString(v), startAnim(k), sound(..), setColor(k),
+/// unknown13(k), setFont(k), and unknownN(k) for any other code N.
+fn text_code(syms: &Interner, name: Sym) -> bool {
+    const CODES: [&str; 11] = ["newline", "keepText", "wait", "getInt", "getVerb", "getName", "getString", "startAnim", "sound", "setColor", "setFont"];
+    let s = syms.str(name);
+    CODES.contains(&s) || s.strip_prefix("unknown").is_some_and(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_digit()))
+}
+
+/// Whether a text code reads in the engine as descumm printed it, so the text's local reads are the IR's.
+///
+/// The engine converts a text in convertMessageToString (string.cpp:1573-1706): a byte 0xFF, then a code; codes 1, 2,
+/// 3 and 8 take no operand, 4 to 7, 9, 10 and 12 to 14 a 2-byte word, and any other code none (string.cpp:1690-1693:
+/// `num -= 2`, then `+= 2`); a byte 0xFE is plain text there. descumm takes a 2-byte word after 8, 11, 0 and 15 and up
+/// (its default branch, `unknownN(k)`), and reads 0xFE as 0xFF. So the engine reads some bytes descumm took as an
+/// operand as plain text, and a plain text byte 0xFF there starts an escape the IR does not show: bytes FF 04 then
+/// 0x4003 read Local[3]. Exact when no operand byte is 0xFF (each operand a constant or a plain variable: Var[n] is
+/// the word n, Local[n] 0x4000 + n, Bit[n] 0x8000 + n), the code is not 0xFF (`unknown255`, the 0xFE form), the operand
+/// has no index (descumm reads the index word from the text, the engine's readVar fetches it from the script,
+/// script.cpp:573-580), and the code is not `sound` (descumm skips bytes it does not show).
+fn text_code_exact(ast: &Ast, syms: &Interner, name: Sym, args: &[ExprId]) -> bool {
+    let s = syms.str(name);
+    if s == "sound" || s == "unknown255" {
+        return false;
+    }
+    args.iter().all(|&k| {
+        let w = match ast.expr(k) {
+            Expr::Const(c) => c as u32 & 0xFFFF,
+            Expr::Var(n) => n as u32,
+            Expr::Local(n) => 0x4000 | n as u32,
+            Expr::Bit(n) => 0x8000 | n as u32,
+            _ => return false,
+        };
+        w & 0xFF != 0xFF && (w >> 8) & 0xFF != 0xFF
+    })
 }
 
 struct Walk<'a> {
@@ -99,7 +139,11 @@ impl Walk<'_> {
             }
             Expr::Neg(x) | Expr::Not(x) | Expr::Truth(x) => self.expr(x)?,
             Expr::Getter { name, args } => {
-                if undecoded(self.syms, name) && !self.args_const(ast.kids(args)) {
+                if text_code(self.syms, name) {
+                    if !text_code_exact(ast, self.syms, name, ast.kids(args)) {
+                        return Err(All::TextBytes);
+                    }
+                } else if undecoded(self.syms, name) && !self.args_const(ast.kids(args)) {
                     return Err(All::Undecoded);
                 }
                 for &k in ast.kids(args) {
@@ -318,7 +362,8 @@ mod tests {
         // `Local[0 + Var[300]]`, `Local[6 + Local[5]]`: a local whose number the IR does not fix
         assert_eq!(reads(UnitKey::Global(153)), Err(All::Indexed));
         assert_eq!(reads(UnitKey::Local(75, 200)), Err(All::Indexed));
-        // the six decompiles with descumm warnings: `unknown8(8224)` inside a text, a constant operand
+        // the six decompiles with descumm warnings: `unknown8(8224)` inside a text, bytes 20 20 (no 0xFF), which the
+        // engine reads as plain text after code 8
         for k in [
             UnitKey::Local(38, 202),
             UnitKey::Local(19, 204),
@@ -378,6 +423,66 @@ mod tests {
                 assert!(EXACT_NOTES.contains(&n.class), "{:?}: {}", game().unit(u).key, n.class);
             }
         }
+    }
+
+    /// The operands of the codes inside a unit's texts, by code name: (expression, its node).
+    fn text_operands(g: &Game, k: UnitKey, code: &str) -> Vec<(Expr, ExprId)> {
+        let mut out = Vec::new();
+        for x in g.ins(g.id(k).unwrap()) {
+            if let Some(st) = &x.st {
+                g.ast.walk_stmt(st, &mut |e| {
+                    if let Expr::Getter { name, args } = g.ast.expr(e) {
+                        if g.syms.str(name) == code {
+                            out.extend(g.ast.kids(args).iter().map(|&a| (g.ast.expr(a), a)));
+                        }
+                    }
+                    true
+                });
+            }
+        }
+        out
+    }
+
+    /// A code inside a text keeps its unit's reads exact only when the engine reads its bytes as descumm did: room 38's
+    /// local 202 has `unknown8(8224)` (bytes 20 20: plain text to the engine, which takes no operand after code 8);
+    /// with bytes FF 04 (1279) or 20 FF the engine would start an escape there, so the unit keeps all locals. The same
+    /// for a variable operand whose word has a byte 0xFF (Var[255]), an indexed operand, and `sound(..)`.
+    #[test]
+    fn text_codes_by_their_bytes() {
+        let k = UnitKey::Local(38, 202);
+        let ops = text_operands(game(), k, "unknown8");
+        assert_eq!(ops.iter().map(|o| o.0).collect::<Vec<_>>(), vec![Expr::Const(8224)]);
+        let with = |e: ExprId, x: Expr| {
+            let mut g = game().clone();
+            g.script.ast.exprs[e.0 as usize] = x;
+            let u = g.id(k).unwrap();
+            unit_reads(&g, u)
+        };
+        let exact = reads(k);
+        assert!(exact.is_ok());
+        let e = ops[0].1;
+        assert_eq!(with(e, Expr::Const(0x2020)), exact);
+        assert_eq!(with(e, Expr::Const(0x04FF)), Err(All::TextBytes));
+        assert_eq!(with(e, Expr::Const(0xFF20)), Err(All::TextBytes));
+        assert_eq!(with(e, Expr::Const(-1)), Err(All::TextBytes));
+        // a variable operand: Var[255] is the word 00FF; Local[n] (0x4000 + n) and Var[100] have no byte 0xFF
+        let (k2, v) = game()
+            .ids()
+            .map(|u| game().unit(u).key)
+            .find_map(|k| text_operands(game(), k, "getInt").into_iter().find(|o| matches!(o.0, Expr::Var(_))).map(|o| (k, o.1)))
+            .expect("a getInt(Var[..])");
+        let with2 = |x: Expr| {
+            let mut g = game().clone();
+            g.script.ast.exprs[v.0 as usize] = x;
+            unit_reads(&g, g.id(k2).unwrap())
+        };
+        assert!(reads(k2).is_ok());
+        assert_eq!(with2(Expr::Var(100)), reads(k2));
+        assert_eq!(with2(Expr::Var(255)), Err(All::TextBytes));
+        assert_eq!(with2(Expr::Var(0x1FF)), Err(All::TextBytes));
+        // MI1: no code inside a text has an operand byte 0xFF, an index, code 0xFF or `sound`
+        let ll = LiveLocals::of(game());
+        assert!(game().ids().all(|u| !matches!(ll.reads[&game().unit(u).key], Err(All::TextBytes))));
     }
 
     /// The recursive flag: only whether it is true.
