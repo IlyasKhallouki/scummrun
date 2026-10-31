@@ -1,0 +1,298 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 0: event round 1"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 154,
+      "s": 0.0,
+      "what": "pass 0: event round 2"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 141,
+      "longest_job_s": 0.0,
+      "records": 273,
+      "s": 0.0,
+      "what": "pass 0: event round 3"
+    },
+    {
+      "job_s": 0.7,
+      "jobs": 469,
+      "longest_job_s": 0.0,
+      "records": 2409,
+      "s": 0.2,
+      "what": "pass 0: event round 4"
+    },
+    {
+      "job_s": 0.2,
+      "jobs": 174,
+      "longest_job_s": 0.0,
+      "records": 402,
+      "s": 0.1,
+      "what": "pass 0: event round 5"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 0: event round 1"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 154,
+      "s": 0.0,
+      "what": "pass 0: event round 2"
+    },
+    {
+      "job_s": 0.2,
+      "jobs": 141,
+      "longest_job_s": 0.0,
+      "records": 273,
+      "s": 0.1,
+      "what": "pass 0: event round 3"
+    },
+    {
+      "job_s": 1.0,
+      "jobs": 469,
+      "longest_job_s": 0.0,
+      "records": 2411,
+      "s": 0.4,
+      "what": "pass 0: event round 4"
+    },
+    {
+      "job_s": 0.3,
+      "jobs": 174,
+      "longest_job_s": 0.0,
+      "records": 402,
+      "s": 0.1,
+      "what": "pass 0: event round 5"
+    },
+    {
+      "job_s": 30.3,
+      "jobs": 10996,
+      "longest_job_s": 0.3,
+      "records": 46264,
+      "s": 12.9,
+      "what": "pass 0: later rounds (2048)"
+    }
+  ],
+  "cap_min": 60.0,
+  "cpu_use": 3.18,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "state:316"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 33,
+    "reads some locals, known": 51
+  },
+  "load_at_end": "5.06 8.98 8.73",
+  "load_at_start": "3.84 8.96 8.72",
+  "n_rooms": 2,
+  "n_units": 84,
+  "name": "baron",
+  "objects": 57,
+  "out_of_domain_keys": 0,
+  "outside_points": {},
+  "packed": {
+    "actions": 26185,
+    "args_values_zeroed": 4,
+    "bytes": 18892488,
+    "facts": 595,
+    "file": "/var/tmp/fast-mi/reach-scratch/bar/baron.tc",
+    "finish_s": 0.09,
+    "folded": 275,
+    "sha1": "00960d7d8330c558774cbb146b75a8a8c1fb809a",
+    "strings": 12256
+  },
+  "peak_rss_mb": 269,
+  "phases_s": {
+    "emit": 0.21,
+    "end of pass": 0.0,
+    "events": 1.44,
+    "events: event_pins": 1.37,
+    "events: replans": 0.01,
+    "runs": 13.91
+  },
+  "pool": {
+    "batches": 2058,
+    "job_s": 33.1,
+    "jobs": 12830,
+    "longest_jobs": [
+      [
+        0.26,
+        "esc(local:220@5516#10da9722e437)",
+        1038
+      ],
+      [
+        0.22,
+        "esc(local:220@5379#8a9e2250af84)",
+        1038
+      ],
+      [
+        0.22,
+        "esc(local:220@5379#df39e61ce709)",
+        1038
+      ],
+      [
+        0.21,
+        "esc(local:220@5216#8a9e2250af84)",
+        1038
+      ],
+      [
+        0.19,
+        "esc(local:220@5516#df39e61ce709)",
+        1038
+      ],
+      [
+        0.18,
+        "event(local:220@5350#8a9e2250af84)",
+        1038
+      ],
+      [
+        0.17,
+        "esc(local:220@5379#10da9722e437)",
+        1038
+      ],
+      [
+        0.15,
+        "esc(local:220@5379#f80af5444b8a)",
+        1053
+      ],
+      [
+        0.15,
+        "event(local:220@5483#df39e61ce709)",
+        1038
+      ],
+      [
+        0.15,
+        "esc(local:220@5379)",
+        1038
+      ],
+      [
+        0.15,
+        "esc(local:220@5516#8a9e2250af84)",
+        1038
+      ],
+      [
+        0.15,
+        "esc(local:220@5379#5b0e4b31be68)",
+        1053
+      ],
+      [
+        0.15,
+        "esc(local:220@5216#56a7ecc31925)",
+        1053
+      ],
+      [
+        0.15,
+        "esc(local:220@5216#5b0e4b31be68)",
+        1053
+      ],
+      [
+        0.15,
+        "esc(local:220@5216#f80af5444b8a)",
+        1053
+      ],
+      [
+        0.14,
+        "esc(local:220@5379#56a7ecc31925)",
+        24
+      ],
+      [
+        0.14,
+        "esc(local:220@5516#5b0e4b31be68)",
+        1053
+      ],
+      [
+        0.14,
+        "esc(local:220@993#116606b30e2)",
+        1038
+      ],
+      [
+        0.14,
+        "event(local:220@2374#10da9722e437)",
+        1038
+      ],
+      [
+        0.13,
+        "esc(local:220@5216#df39e61ce709)",
+        1038
+      ]
+    ],
+    "max_records_waiting": 2090,
+    "merge_and_stream_s": 4.81,
+    "merge_counters_s": 0.23,
+    "snapshots_s": 0.09,
+    "split_parts_queued": 0,
+    "split_parts_run_elsewhere": 0,
+    "stream_records_s": 4.51,
+    "workers_sync_s": 0.48
+  },
+  "reach": true,
+  "read_cpu_s": 49.6,
+  "read_peak_rss_mb": 269,
+  "read_wall_s": 15.6,
+  "reader_counts": {
+    "event rounds": 1029,
+    "pass 1: domain values added for the next pass": 19,
+    "pass 1: records": 26458,
+    "pass 2: records": 26460,
+    "reach: branches and jobs still held at the end": 6238,
+    "reach: most branches held at once": 6238,
+    "reach: records of a rerun already written": 274,
+    "reach: reruns": 263,
+    "reach: values reached (facts written or seeded)": 8897,
+    "records": 26460
+  },
+  "records": 26460,
+  "records_by_kind": {
+    "dialog_line": 126,
+    "event": 17144,
+    "sentence": 2484,
+    "skip_cutscene": 6490,
+    "walk_to": 216
+  },
+  "rooms": [
+    33,
+    28
+  ],
+  "rss_peak_seen": {
+    "at": "pass 1, event round 25 (73 jobs), 3 s",
+    "mb": 237
+  },
+  "setup_s": 0.05,
+  "sink_thread_busy_s": 3.1,
+  "slot_events": [],
+  "slot_facts": 2718,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "done",
+  "threads": 3,
+  "total_s": 16.0,
+  "units": {
+    "entry": 2,
+    "exit": 2,
+    "global": 32,
+    "local": 25,
+    "obj": 23
+  }
+}

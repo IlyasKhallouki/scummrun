@@ -1,0 +1,324 @@
+{
+  "batches": [
+    {
+      "job_s": 0.5,
+      "jobs": 44,
+      "longest_job_s": 0.2,
+      "records": 88,
+      "s": 0.3,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 0.2,
+      "jobs": 89,
+      "longest_job_s": 0.1,
+      "records": 154,
+      "s": 0.1,
+      "what": "pass 1: event round 1"
+    },
+    {
+      "job_s": 0.2,
+      "jobs": 141,
+      "longest_job_s": 0.0,
+      "records": 273,
+      "s": 0.1,
+      "what": "pass 1: event round 2"
+    },
+    {
+      "job_s": 1.2,
+      "jobs": 469,
+      "longest_job_s": 0.1,
+      "records": 2409,
+      "s": 0.7,
+      "what": "pass 1: event round 3"
+    },
+    {
+      "job_s": 0.6,
+      "jobs": 174,
+      "longest_job_s": 0.1,
+      "records": 402,
+      "s": 0.3,
+      "what": "pass 1: event round 4"
+    },
+    {
+      "job_s": 0.2,
+      "jobs": 167,
+      "longest_job_s": 0.0,
+      "records": 186,
+      "s": 0.1,
+      "what": "pass 1: event round 5"
+    },
+    {
+      "job_s": 26.3,
+      "jobs": 5331,
+      "longest_job_s": 0.4,
+      "records": 22946,
+      "s": 15.9,
+      "what": "pass 1: later rounds (1023)"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 2: inputs"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 154,
+      "s": 0.1,
+      "what": "pass 2: event round 1"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 141,
+      "longest_job_s": 0.0,
+      "records": 273,
+      "s": 0.1,
+      "what": "pass 2: event round 2"
+    },
+    {
+      "job_s": 1.1,
+      "jobs": 469,
+      "longest_job_s": 0.0,
+      "records": 2411,
+      "s": 0.6,
+      "what": "pass 2: event round 3"
+    },
+    {
+      "job_s": 0.3,
+      "jobs": 174,
+      "longest_job_s": 0.0,
+      "records": 402,
+      "s": 0.2,
+      "what": "pass 2: event round 4"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 167,
+      "longest_job_s": 0.0,
+      "records": 186,
+      "s": 0.1,
+      "what": "pass 2: event round 5"
+    },
+    {
+      "job_s": 23.7,
+      "jobs": 5331,
+      "longest_job_s": 1.0,
+      "records": 22946,
+      "s": 14.7,
+      "what": "pass 2: later rounds (1023)"
+    }
+  ],
+  "cap_min": 60.0,
+  "counters_sha1": "c72a6e85602e8f86a06734974f05ace99dcc34c5",
+  "cpu_use": 1.59,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "state:316"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 33,
+    "reads some locals, known": 51
+  },
+  "load_at_end": "11.47 10.76 9.67",
+  "load_at_start": "11.98 10.73 9.62",
+  "n_rooms": 2,
+  "n_units": 84,
+  "name": "barA",
+  "objects": 57,
+  "out_of_domain_keys": 0,
+  "outside_points": {},
+  "packed": {
+    "actions": 26185,
+    "args_values_zeroed": 4,
+    "bytes": 18892488,
+    "facts": 595,
+    "file": "/var/tmp/fast-mi/reach-scratch/p2/barA.tc",
+    "finish_s": 0.16,
+    "folded": 275,
+    "sha1": "00960d7d8330c558774cbb146b75a8a8c1fb809a",
+    "strings": 12256
+  },
+  "peak_rss_mb": 202,
+  "phases_s": {
+    "emit": 0.5,
+    "end of pass": 0.0,
+    "events": 1.58,
+    "events: event_pins": 1.49,
+    "events: replans": 0.01,
+    "runs": 33.13
+  },
+  "pool": {
+    "batches": 2058,
+    "job_s": 54.8,
+    "jobs": 12830,
+    "longest_jobs": [
+      [
+        1.01,
+        "esc(local:220@5216#8a9e2250af84)",
+        1038
+      ],
+      [
+        0.42,
+        "event(local:220@2374#8a9e2250af84)",
+        8
+      ],
+      [
+        0.38,
+        "event(local:220@5350#10da9722e437)",
+        9
+      ],
+      [
+        0.36,
+        "esc(local:220@5379#8a9e2250af84)",
+        9
+      ],
+      [
+        0.34,
+        "event(local:220@2374#df39e61ce709)",
+        8
+      ],
+      [
+        0.32,
+        "esc(local:220@5216#10da9722e437)",
+        9
+      ],
+      [
+        0.28,
+        "esc(local:220@5516#8a9e2250af84)",
+        9
+      ],
+      [
+        0.26,
+        "event(local:220@6630#5b0e4b31be68)",
+        25
+      ],
+      [
+        0.24,
+        "esc(local:220@5673#df39e61ce709)",
+        9
+      ],
+      [
+        0.24,
+        "esc(local:220@5216#56a7ecc31925)",
+        1053
+      ],
+      [
+        0.24,
+        "esc(local:220@5673#df39e61ce709)",
+        1038
+      ],
+      [
+        0.24,
+        "esc(local:220@5516#f80af5444b8a)",
+        24
+      ],
+      [
+        0.24,
+        "esc(local:220@5516#f80af5444b8a)",
+        1053
+      ],
+      [
+        0.23,
+        "esc(local:220@5216#10da9722e437)",
+        1038
+      ],
+      [
+        0.22,
+        "sentence(4,426)",
+        0
+      ],
+      [
+        0.22,
+        "esc(local:220@5216#f80af5444b8a)",
+        24
+      ],
+      [
+        0.22,
+        "sentence(3,426)",
+        0
+      ],
+      [
+        0.22,
+        "esc(local:220@5216#56a7ecc31925)",
+        24
+      ],
+      [
+        0.21,
+        "esc(local:220@5673#10da9722e437)",
+        1038
+      ],
+      [
+        0.21,
+        "event(local:220@5637#8a9e2250af84)",
+        9
+      ]
+    ],
+    "max_records_waiting": 1414,
+    "merge_and_stream_s": 8.78,
+    "merge_counters_s": 0.3,
+    "snapshots_s": 0.13,
+    "split_parts_queued": 0,
+    "split_parts_run_elsewhere": 0,
+    "stream_records_s": 8.38,
+    "workers_sync_s": 0.49
+  },
+  "reach": true,
+  "read_cpu_s": 56.1,
+  "read_peak_rss_mb": 202,
+  "read_wall_s": 35.2,
+  "reader_counts": {
+    "event rounds": 1028,
+    "pass 1: domain values added for the next pass": 19,
+    "pass 1: records": 26458,
+    "pass 2: records": 26460,
+    "reach: branches and jobs still held at the end": 6238,
+    "reach: most branches held at once": 6238,
+    "reach: records of a rerun already written": 274,
+    "reach: reruns": 263,
+    "reach: values reached (facts written or seeded)": 8897,
+    "records": 26460
+  },
+  "records": 26460,
+  "records_by_kind": {
+    "dialog_line": 126,
+    "event": 17144,
+    "sentence": 2484,
+    "skip_cutscene": 6490,
+    "walk_to": 216
+  },
+  "records_sha1": "ed8177322c6ec25e545f7fdce165d8b681401590",
+  "rooms": [
+    33,
+    28
+  ],
+  "rss_peak_seen": {
+    "at": "pass 2, event round 9 (134 jobs), 23 s",
+    "mb": 194
+  },
+  "setup_s": 0.12,
+  "sink_thread_busy_s": 16.1,
+  "slot_events": [],
+  "slot_facts": 2718,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "done",
+  "threads": 2,
+  "total_s": 36.0,
+  "units": {
+    "entry": 2,
+    "exit": 2,
+    "global": 32,
+    "local": 25,
+    "obj": 23
+  }
+}
