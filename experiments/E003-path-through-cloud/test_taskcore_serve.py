@@ -228,7 +228,7 @@ def test_cost_caps_go_with_each_request(tmp_path):
         for serve in (False, True):
             res[serve] = plan_fd.plan_taskcore(tmp_path / "t.tc", task.facts, task.goal, [[a] for a in task.actions],
                                                FC.START, workdir=tmp_path / f"p{n}-{serve}", search="astar-lmcp",
-                                               args=["--cost-caps", f], serve=serve)
+                                               args=["--cost-caps", f], serve=serve, keep=True)
         assert res[True].plan_cost == res[False].plan_cost == cost
         assert [s.name for s in res[True].steps] == [s.name for s in res[False].steps]
         if steps:
