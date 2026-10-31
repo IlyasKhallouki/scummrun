@@ -60,6 +60,17 @@ impl Enabled {
     }
 }
 
+/// TASKCORE_PROFILE set: each reduction's seconds and the task's size after it, on stderr (no output changes).
+pub fn prof<F: FnOnce(Task) -> (Task, bool)>(name: &str, t: Task, f: F) -> (Task, bool) {
+    if std::env::var_os("TASKCORE_PROFILE").is_none() {
+        return f(t);
+    }
+    let t0 = std::time::Instant::now();
+    let r = f(t);
+    eprintln!("profile {} {:.3} s, {} actions, {} words, changed {}", name, t0.elapsed().as_secs_f64(), r.0.acts.len(), r.0.acts.words.len(), r.1);
+    r
+}
+
 fn add(c: &mut Counts, k: &str, n: u64) {
     if n > 0 {
         *c.entry(k.to_string()).or_insert(0) += n;
@@ -73,24 +84,74 @@ enum Edit {
 }
 
 /// The task with each action kept, dropped or replaced by `f`; true when something changed.
-fn rebuild(t: Task, mut f: impl FnMut(&Task, usize, View) -> Edit) -> (Task, bool) {
-    let mut acts = Actions::default();
+///
+/// In place: each action's new words are no more than its old ones (every reduction here only leaves out sets,
+/// values, conditions, effects or actions), so they are written over the arrays at or before where the action was
+/// read, and the arrays are cut to their new length at the end. The arrays are the ones a copy would make, word for
+/// word; the peak memory is the task's, not twice it.
+fn rebuild(t: Task, mut f: impl FnMut(&Facts, usize, View) -> Edit) -> (Task, bool) {
+    let mut t = t;
+    let n = t.acts.len();
     let mut changed = false;
-    for i in 0..t.acts.len() {
-        match f(&t, i, t.acts.view(i)) {
-            Edit::Same => acts.copy_from(&t.acts, i),
-            Edit::Drop => changed = true,
+    let facts = &t.facts;
+    let acts = &mut t.acts;
+    let (mut w, mut wm, mut k) = (0usize, 0usize, 0usize);
+    let (mut start, mut mstart) = (acts.off[0], acts.mem_off[0]);
+    let mut buf = Actions::default();
+    for i in 0..n {
+        let (end, mend) = (acts.off[i + 1], acts.mem_off[i + 1]);
+        let edit = f(facts, i, View { w: &acts.words[start..end] });
+        let keep = match edit {
+            Edit::Same => {
+                acts.words.copy_within(start..end, w);
+                w += end - start;
+                true
+            }
+            Edit::Drop => {
+                changed = true;
+                false
+            }
             Edit::New(a) => {
                 changed = true;
-                acts.push(t.acts.meta[i], t.acts.members(i), &a);
+                buf.words.clear();
+                buf.off.truncate(1);
+                buf.meta.clear();
+                buf.mem_off.truncate(1);
+                buf.mem.clear();
+                buf.push(acts.meta[i], &[], &a);
+                let len = buf.words.len();
+                assert!(w + len <= end, "a reduction made an action longer ({} words, was {})", len, end - start);
+                acts.words[w..w + len].copy_from_slice(&buf.words);
+                w += len;
+                true
             }
+        };
+        if keep {
+            acts.mem.copy_within(mstart..mend, wm);
+            wm += mend - mstart;
+            acts.meta[k] = acts.meta[i];
+            acts.off[k + 1] = w;
+            acts.mem_off[k + 1] = wm;
+            k += 1;
         }
+        start = end;
+        mstart = mend;
     }
-    (Task { acts, ..t }, changed)
+    acts.words.truncate(w);
+    acts.words.shrink_to_fit();
+    acts.off.truncate(k + 1);
+    acts.off.shrink_to_fit();
+    acts.meta.truncate(k);
+    acts.meta.shrink_to_fit();
+    acts.mem.truncate(wm);
+    acts.mem.shrink_to_fit();
+    acts.mem_off.truncate(k + 1);
+    acts.mem_off.shrink_to_fit();
+    (t, changed)
 }
 
-fn is_full(t: &Task, f: u32, s: &[u32]) -> bool {
-    s.len() as u32 == t.facts.size(f)
+fn is_full(facts: &Facts, f: u32, s: &[u32]) -> bool {
+    s.len() as u32 == facts.size(f)
 }
 
 /// Whether two effects can both happen: no fact on which both have a condition, with disjoint sets.
@@ -296,9 +357,48 @@ pub fn red_c(t: Task, c: &mut Counts) -> (Task, bool) {
 /// raises OutOfDomain on such a start (build the task again with that value); taskcore stops the same way before
 /// the fold and the reductions (sas::start_misses), so (d) never sees such a fact in use.
 pub fn red_d(t: Task, start: usize, c: &mut Counts) -> (Task, bool) {
+    let st = t.starts[start].1.clone();
+    let d = red_d_core(&t, &st, c);
+    let starts = t.starts.iter().map(|(name, vals)| (*name, d.remap_start(vals))).collect();
+    (Task { strs: t.strs, facts: d.facts, goal: d.goal, starts, acts: d.acts, n_orig: t.n_orig }, d.changed)
+}
+
+/// `red_d` on a task kept for many starts (serve.rs), read, not consumed: with `push`, the task `red_d` gives for `t`
+/// with that start pushed last onto its starts and (d) reaching from it (`start` is then its index,
+/// `t.starts.len()`); without, the task `red_d` gives for `t` from its start `start`.
+pub fn red_d_from(t: &Task, push: Option<(u32, Vec<u32>)>, start: usize, c: &mut Counts) -> (Task, bool) {
+    let st: &[u32] = match &push {
+        Some((_, vals)) => vals,
+        None => &t.starts[start].1,
+    };
+    let d = red_d_core(t, st, c);
+    let mut starts: Vec<(u32, Vec<u32>)> = t.starts.iter().map(|(name, vals)| (*name, d.remap_start(vals))).collect();
+    if let Some((name, vals)) = push {
+        starts.push((name, d.remap_start(&vals)));
+    }
+    (Task { strs: t.strs.clone(), facts: d.facts, goal: d.goal, starts, acts: d.acts, n_orig: t.n_orig }, d.changed)
+}
+
+/// What (d) makes of a task: the new domains, goal and actions, and how a start's values move.
+struct DOut {
+    facts: Facts,
+    goal: Vec<(u32, Vec<u32>)>,
+    acts: Actions,
+    base: Vec<usize>,
+    remap: Vec<u32>,
+    changed: bool,
+}
+
+impl DOut {
+    fn remap_start(&self, vals: &[u32]) -> Vec<u32> {
+        vals.iter().enumerate().map(|(f, &x)| if x == NONE { NONE } else { self.remap[self.base[f] + x as usize] }).collect()
+    }
+}
+
+/// (d) from the start `st` (`red_d`'s doc comment), on `t` as read.
+fn red_d_core(t: &Task, st: &[u32], c: &mut Counts) -> DOut {
     let nf = t.facts.len();
     let base: Vec<usize> = (0..nf as u32).map(|f| t.facts.base(f)).collect();
-    let st = t.starts[start].1.clone();
     let mut reached = vec![false; t.facts.total_values()];
     for f in 0..nf {
         if st[f] != NONE {
@@ -467,19 +567,12 @@ pub fn red_d(t: Task, start: usize, c: &mut Counts) -> (Task, bool) {
         acts.push(t.acts.meta[i], t.acts.members(i), &a);
     }
     let goal: Vec<(u32, Vec<u32>)> = t.goal.iter().map(|(f, vals)| (*f, rm_keep(*f, vals))).collect();
-    let starts: Vec<(u32, Vec<u32>)> = t
-        .starts
-        .iter()
-        .map(|(name, vals)| {
-            (*name, vals.iter().enumerate().map(|(f, &x)| if x == NONE { NONE } else { remap[base[f] + x as usize] }).collect())
-        })
-        .collect();
     add(c, "(d) actions whose precondition cannot hold, left out", dropped_actions);
     add(c, "(d) effects whose conditions cannot hold, left out", dropped_effects);
     add(c, "(d) values never reached, left out of the domains", dropped_values);
     add(c, "(d) precondition and condition sets cut to reached values", cut_sets);
     let changed = dropped_actions + dropped_effects + dropped_values + cut_sets > 0;
-    (Task { strs: t.strs, facts, goal, starts, acts, n_orig: t.n_orig }, changed)
+    DOut { facts, goal, acts, base, remap, changed }
 }
 
 /// (e) Backward relevance by (fact, value). Needed values N, from the goal back:
@@ -545,13 +638,18 @@ pub struct Needed {
     pub rounds: u64,
 }
 
-#[allow(unused_assignments)]
 pub fn needed(t: &Task) -> Needed {
-    let nf = t.facts.len();
-    let base: Vec<usize> = (0..nf as u32).map(|f| t.facts.base(f)).collect();
-    let mut need = vec![false; t.facts.total_values()];
+    needed_src(&t.acts, &t.facts, &t.goal)
+}
+
+/// `needed` on the actions of any source (the banned task as a view, serve.rs), with the task's facts and goal.
+#[allow(unused_assignments)]
+pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32>)]) -> Needed {
+    let nf = facts.len();
+    let base: Vec<usize> = (0..nf as u32).map(|f| facts.base(f)).collect();
+    let mut need = vec![false; facts.total_values()];
     let mut ncount = vec![0u32; nf];
-    let n = t.acts.len();
+    let n = src.n();
     let mut kept = vec![false; n];
     let mut ch = false;
     // a visit of an action reads the needed values only of the facts it writes: it is skipped while none of them
@@ -570,7 +668,7 @@ pub fn needed(t: &Task) -> Needed {
             }
         }};
     }
-    for (f, vals) in &t.goal {
+    for (f, vals) in goal {
         for &x in vals {
             set!(*f, x);
         }
@@ -578,7 +676,7 @@ pub fn needed(t: &Task) -> Needed {
     let mut wf_off = vec![0usize; n + 1];
     let mut wf: Vec<u32> = Vec::new();
     for i in 0..n {
-        let mut fs: Vec<u32> = t.acts.view(i).effs().filter(|e| e.kind != K_BAD).map(|e| e.fact).collect();
+        let mut fs: Vec<u32> = src.view(i).effs().filter(|e| e.kind != K_BAD).map(|e| e.fact).collect();
         fs.sort_unstable();
         fs.dedup();
         wf.extend_from_slice(&fs);
@@ -591,18 +689,30 @@ pub fn needed(t: &Task) -> Needed {
         rounds += 1;
         ch = false;
         for i in 0..n {
-            if seen[i] != 0 && wf[wf_off[i]..wf_off[i + 1]].iter().all(|&f| fact_clock[f as usize] <= seen[i]) {
+            let prev = seen[i];
+            if prev != 0 && wf[wf_off[i]..wf_off[i + 1]].iter().all(|&f| fact_clock[f as usize] <= prev) {
                 continue;
             }
             seen[i] = clock;
-            let v = t.acts.view(i);
+            let v = src.view(i);
+            // an effect on a fact whose needed values have not changed since the action's last visit began reads
+            // what it read then: no hit then means none now, and what it set then is set; so a visit reads only the
+            // effects on facts that changed since, but every effect on the first visit and on the visit that keeps
+            // the action. The visit sets the same values in the same order as reading every effect, so the passes,
+            // their count and the result are the same
+            let mut every = prev == 0;
             if !kept[i] {
-                let hit = v.effs().any(|e| e.kind != K_BAD && e.vals.iter().any(|&x| need[base[e.fact as usize] + x as usize]));
+                let hit = v.effs().any(|e| {
+                    e.kind != K_BAD
+                        && (every || fact_clock[e.fact as usize] > prev)
+                        && e.vals.iter().any(|&x| need[base[e.fact as usize] + x as usize])
+                });
                 if !hit {
                     continue;
                 }
                 kept[i] = true;
                 ch = true;
+                every = true;
                 for (f, s) in v.pre() {
                     for &x in s {
                         set!(f, x);
@@ -613,6 +723,9 @@ pub fn needed(t: &Task) -> Needed {
             prefs.extend(v.pre().map(|(f, _)| f));
             for e in v.effs() {
                 if e.kind == K_BAD || e.nwhen() == 0 {
+                    continue;
+                }
+                if !every && fact_clock[e.fact as usize] <= prev {
                     continue;
                 }
                 let k = e.fact as usize;
@@ -635,7 +748,7 @@ pub fn needed(t: &Task) -> Needed {
                         }
                     }
                     if case_ii {
-                        for x in 0..t.facts.size(cf) {
+                        for x in 0..facts.size(cf) {
                             if !contains(cs, x) {
                                 set!(cf, x);
                             }
@@ -755,18 +868,60 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
 }
 
 /// The reductions in a loop until none changes the task. `start` is the start (d) reaches from.
+///
+/// The loop's first round reads no start until (d): `prefix` is the check and that round's normalize, (a), (b) and
+/// (c); `finish` is the rest from (d)'s result. serve.rs keeps `prefix`'s task for many starts (the same steps on the
+/// same task, so the same result: `run` is `prefix`, (d), `finish`).
 pub fn run(t: Task, en: Enabled, start: usize, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> Result<Task, String> {
+    let (t, changed) = prefix(t, en, c)?;
+    let (t, ch) = if en.d { prof("d", t, |t| red_d(t, start, c)) } else { (t, false) };
+    Ok(finish(t, en, start, c, replaced, changed | ch))
+}
+
+/// The check (an effect that writes a value its domain lacks), then the first round's normalize, (a), (b) and (c):
+/// the task and whether (a), (b) or (c) changed it.
+pub fn bad_effect(t: &Task) -> Option<String> {
     for i in 0..t.acts.len() {
         if t.acts.view(i).effs().any(|e| e.kind == K_BAD) {
-            return Err(format!("{}: an effect writes a value its domain lacks (the writer raises; reductions refuse)", t.name(i)));
+            return Some(format!("{}: an effect writes a value its domain lacks (the writer raises; reductions refuse)", t.name(i)));
         }
     }
+    None
+}
+
+pub fn prefix(t: Task, en: Enabled, c: &mut Counts) -> Result<(Task, bool), String> {
+    if let Some(e) = bad_effect(&t) {
+        return Err(e);
+    }
+    let mut t = normalize(t, c);
+    let mut changed = false;
+    let mut step = |t: Task, on: bool, f: &mut dyn FnMut(Task) -> (Task, bool)| -> Task {
+        if !on {
+            return t;
+        }
+        let (nt, ch) = f(t);
+        changed |= ch;
+        nt
+    };
+    t = step(t, en.a, &mut |t| prof("a", t, |t| red_a(t, c)));
+    t = step(t, en.b, &mut |t| prof("b", t, |t| red_b(t, c)));
+    t = step(t, en.c, &mut |t| prof("c", t, |t| red_c(t, c)));
+    Ok((t, changed))
+}
+
+/// The first round after (d): (e) and (f), `changed` what that round changed so far; then the next rounds as the
+/// loop runs them, until a round changes nothing.
+pub fn finish(t: Task, en: Enabled, start: usize, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, changed: bool) -> Task {
     let mut t = t;
-    let mut rounds = 0u64;
+    let mut rounds = 1u64;
+    let mut changed = changed;
+    let mut first = true;
     loop {
-        rounds += 1;
-        t = normalize(t, c);
-        let mut changed = false;
+        if !first {
+            rounds += 1;
+            t = normalize(t, c);
+            changed = false;
+        }
         let mut step = |t: Task, on: bool, f: &mut dyn FnMut(Task) -> (Task, bool)| -> Task {
             if !on {
                 return t;
@@ -775,16 +930,19 @@ pub fn run(t: Task, en: Enabled, start: usize, c: &mut Counts, replaced: &mut Ve
             changed |= ch;
             nt
         };
-        t = step(t, en.a, &mut |t| red_a(t, c));
-        t = step(t, en.b, &mut |t| red_b(t, c));
-        t = step(t, en.c, &mut |t| red_c(t, c));
-        t = step(t, en.d, &mut |t| red_d(t, start, c));
-        t = step(t, en.e, &mut |t| red_e(t, c));
-        t = step(t, en.f, &mut |t| red_f(t, c, replaced));
+        if !first {
+            t = step(t, en.a, &mut |t| prof("a", t, |t| red_a(t, c)));
+            t = step(t, en.b, &mut |t| prof("b", t, |t| red_b(t, c)));
+            t = step(t, en.c, &mut |t| prof("c", t, |t| red_c(t, c)));
+            t = step(t, en.d, &mut |t| prof("d", t, |t| red_d(t, start, c)));
+        }
+        t = step(t, en.e, &mut |t| prof("e", t, |t| red_e(t, c)));
+        t = step(t, en.f, &mut |t| prof("f", t, |t| red_f(t, c, replaced)));
+        first = false;
         if !changed {
             break;
         }
     }
     *c.entry("rounds of the reduction loop".into()).or_insert(0) += rounds;
-    Ok(t)
+    t
 }

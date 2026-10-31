@@ -13,7 +13,12 @@ taskcore sas    --task kitchen.tc --start s17 --out task.sas [--stats stats.json
 taskcore decode (same options) --plan sas_plan --out steps.json
 taskcore validate (same options) --names plan.txt --out result.json   (a plan as input action names, run on the reduced task)
 taskcore info   --task kitchen.tc
+taskcore serve  --task kitchen.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
+                (then one `sas` request per line on stdin: replanning without reloading, below)
 ```
+
+`--goal K=V[|V..][,K=V..]` (sas, decode, validate, serve) plans to that goal instead of the file's: per fact its
+values by their text (`state:316=1`). Without it the goal is the file's, as before.
 
 Defaults: `--fold strict`, `--reduce all`, `--product-limit 64` (task.py's `PRODUCT_LIMIT`), `--encoding model`.
 With `--fold off --reduce none --encoding task` the file is task.py `write_sas`'s, byte for byte. `decode` reads a
@@ -55,6 +60,48 @@ and the new binary on the kitchen and test_taskcore.py's property test).
 - `--start-check needed` (default `input`): the start check only on the facts (e) needs (below). It needs (e) on.
   Where the input check passes it changes nothing (the same file and operator table on the kitchen's replan
   starts, with and without bans); the stats count what the input check would have stopped on.
+
+## Replanning without reloading (`serve`)
+
+At every replan the harness used to run `taskcore sas` again: load the packed file, apply the bans, the start check,
+the fold, the reduction loop, the second fold and loop, the writer. On Part I's reading (11.9 GB, 3.9 million
+actions) the load alone took 213 s, the fold 69 s and the reductions 141 s, at 13 to 26 GB, and the start check ran
+two such passes. `taskcore serve` (src/serve.rs) is one process per packed file that does each step that does not read
+the start once, and per request only what does.
+
+**What reads the start.** The start enters `sas` only at the start check and at reduction (d): the start file's
+start is pushed onto the task's starts after the load, and nothing before (d) reads starts. The fold reads the
+actions' sets and the facts' domains; normalize, (a), (b) and (c) read the actions (and (b) the goal); (e) reads the
+goal; (f) the actions and their costs. None reads the start. The bans and the goal come before the fold, so all of
+these depend on them.
+
+**What the server keeps**, for the last (bans, goal) it was asked for: the loaded task (always); the banned task as a
+view over it (`bans::Banned`: the pieces only, no copy); the facts (e) needs on the banned task (the operator table's
+head; asked once); the fold's counts; and the reduction loop's first round up to (d) (`reduce::prefix`: the check
+for a written value outside its domain, normalize, (a), (b), (c)) with its counts. **Per request** it redoes the
+start check on the banned view (only when the start has a value outside a domain), (d) from the new start on the kept
+task (`reduce::red_d_from`, which reads the kept task and leaves it as it is), the rest of the loop
+(`reduce::finish`), the second fold and loop, and the writer. New bans or another goal rebuild what is kept from the
+loaded task; no file is read again.
+
+**Why its files are `sas`'s, byte for byte.** `reduce::run` is now `prefix`, (d), `finish`: the same steps in the same
+order on the same task. The fold reads the banned view action by action as it read the banned copy (`fold::fold_src`),
+and `reduce::needed_src` and `sas::start_misses_src` likewise. `red_d_from` gives the task `red_d` gives with the start
+pushed last. From (d) on, the code is `sas`'s. The test (`../test_taskcore_serve.py`) checks it on random tasks,
+starts, bans and goals under six configurations (the SAS file, the operator table, the kept list, and the stats but
+for times, memory and paths, or the same error).
+
+**Why (e) and (f) are not kept**, though they read no start: the loop runs them after (d). Run before it, they would
+hand (d) another task. Each is still exact for every start, but (d)'s relaxed reachability can then reach fewer values
+in the first round (an effect whose condition is on a precondition fact fires there on a value only an action (e)
+drops writes), so the first round's (f) can see other sets and keep the other of two equal actions. The files would
+then differ, and the plan could.
+
+**Memory.** The reductions now rewrite the task in place (`reduce::rebuild`: an action's new words are never more
+than its old ones), so a reduction's peak is the task's size, not twice it; the arrays are the same word for word. The
+server holds the loaded task and the kept task (smaller: (b) drops the effects nothing reads); a request adds (d)'s
+result. Its stats give this request's peak (the process's peak is reset before each request), and its reply the
+process's resident memory and CPU seconds.
 
 ## What the reductions keep, and the two encodings
 
@@ -170,4 +217,5 @@ write per current value its condition admits, a guess where the result is severa
 - A byte-for-byte target for a Rust reader: the packed file is now the same in every run, so it can be compared
   whole.
 - (d) makes the reduced task depend on its start: each replan is a taskcore run from the packed file (about 10 to
-  16 s on the kitchen), not a new initial state in one translated file.
+  16 s on the kitchen), not a new initial state in one translated file. `serve` keeps everything before (d) in one
+  process, so a replan redoes (d) and what follows only.

@@ -12,11 +12,11 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
                        domains (no goal), made into the three files and the lists by packed_reading.reading_from_golden;
                        the three switches are reader-scope's, off by default)
        replay_part1.py control DIR/reading.json           (the control's reading next to it: DIR/control.json)
-       replay_part1.py start SEED [SEED ...] --reading DIR/reading.json [--results DIR]
+       replay_part1.py start SEED [SEED ...] --reading DIR/reading.json [--results DIR] [--serve]
                        (the start check only, no goal run)
        replay_part1.py run SEED --reading DIR/reading.json [--control] [--replan-limit 500] [--time-limit 86400]
                        [--plan-time 600] [--plan-memory 6G] [--results DIR] [--deadline EPOCH]
-                       [--slot-locals [--reread]]
+                       [--slot-locals [--reread]] [--serve]
        replay_part1.py log NAME [--results DIR]           (the log of NAME's runs and start checks, from the json)
        score_part1.py RESULT.json ...                     (after the run: the key's Part I goals, from boot)
 
@@ -101,6 +101,11 @@ reading's lists file; replay.replan_start_locals). With ``--reread``, a slot who
 read again: the Rust reader reads the reading's scope again from its start with those slots' dumped locals
 (reader-scope ``--slot-locals``), and the harness goes on with that reading (and its control with ``--control``). The
 run's file then ends in ``-locals``. Without the flag the run is as before.
+
+**Without reloading** (``--serve``, off by default): taskcore runs as one long-lived process per packed file
+(plan_fd ``serve``, taskcore/src/serve.rs), which keeps the loaded reading and what does not depend on the start, for
+the start check (its two modes are two requests) and every plan of the run. The files it writes, and so the plans,
+are the ones ``taskcore sas`` writes. The run's file then ends in ``-serve`` and its record says ``taskcore_serve``.
 
 C2: this file names no game number. The seeds are plan.md's; ``run`` refuses the held-out seeds 31-35 (only with
 ``--test-seeds``, for the Part I result itself) and the Any% seed always; ``start`` allows 31-35 (a start check
@@ -361,13 +366,36 @@ def make_control(reading: Path) -> Path:
 
 # --- the start ---------------------------------------------------------------------------------------------------------
 
-def taskcore_start_check(rd, start_facts: dict, work: Path) -> dict:
+def taskcore_start_check(rd, start_facts: dict, work: Path, serve: bool = False) -> dict:
     """taskcore's start check on the reading's packed file (module docstring): per mode, "ok" or the facts outside
-    their domains (the first ten) and how many, and the seconds."""
+    their domains (the first ten) and how many, and the seconds. ``serve``: as two requests to the long-lived
+    taskcore (module docstring), one after the other."""
     work.mkdir(parents=True, exist_ok=True)
     st = replay.task_start(rd.b, start_facts, rd.task)
     sf = export_records.write_start(work / "start.txt", rd.task.facts, st)
     out = {}
+    if serve:
+        for mode in ("input", "needed"):
+            (work / mode).mkdir(exist_ok=True)
+            t = time.monotonic()
+            ok, reply = plan_fd.server_for(rd.packed).request(
+                ["--start-file", sf, "--out", work / mode / "task.sas", "--stats", work / mode / "stats.json",
+                 "--start-check", mode])
+            row = {"seconds": round(time.monotonic() - t, 2)}
+            if ok:
+                row["status"] = "ok"
+                row["serve"] = reply
+            else:
+                m = re.search(r"(\d+) facts out of their domains: \[(.*)\]", reply)
+                row["status"] = "out of domain" if m else "error"
+                row["error"] = reply.strip()[-400:] if not m else None
+                if m:
+                    keys = re.findall(r'"((?:[^"\\]|\\.)*)"', m[2])
+                    row["misses"] = int(m[1])
+                    row["first"] = [(k, start_facts.get(k, 0)) for k in keys[:10]]
+            out[mode] = row
+            (work / mode / "task.sas").unlink(missing_ok=True)
+        return out
     # the two modes at once, each in its own folder: at Part I's scale each is a whole taskcore pass over the file
     procs = {}
     for mode in ("input", "needed"):
@@ -426,7 +454,7 @@ def boot(seed: int, out_dir: Path, dump_locals: bool = False) -> tuple:
     return ctl, b, row
 
 
-def start_check(row: dict, rd, work: Path) -> dict:
+def start_check(row: dict, rd, work: Path, serve: bool = False) -> dict:
     """The start against the reading's start (every fact, and the facts the packed file holds: a reading serves the
     start its domains were built from, module docstring), results/start-part1.jsonl's row, and taskcore's check."""
     f = row["facts"]
@@ -441,12 +469,12 @@ def start_check(row: dict, rd, work: Path) -> dict:
         out["start-part1"] = {"differ": len(d2), "frame": known["stop"]["frame"],
                               "same frame": known["stop"]["frame"] == row["stop"]["frame"]}
     t = time.monotonic()
-    out["taskcore"] = taskcore_start_check(rd, f, work)
+    out["taskcore"] = taskcore_start_check(rd, f, work, serve)
     out["taskcore_s"] = round(time.monotonic() - t, 2)
     return out
 
 
-def cmd_start(seeds: list, reading: Path, results: Path = RESULTS, out_root: Path = OUT) -> list:
+def cmd_start(seeds: list, reading: Path, results: Path = RESULTS, out_root: Path = OUT, serve: bool = False) -> list:
     rd = PR.load_reading(reading)
     name = rd.doc.get("name", reading.parent.name)
     rows = []
@@ -458,7 +486,7 @@ def cmd_start(seeds: list, reading: Path, results: Path = RESULTS, out_root: Pat
         ctl, b, row = boot(seed, run_dir / "run")
         ctl.close()
         say(f"seed {seed}: idle stop at frame {row['stop']['frame']}; checking the start")
-        chk = start_check(row, rd, run_dir / "taskcore")
+        chk = start_check(row, rd, run_dir / "taskcore", serve)
         doc = {"seed": seed, "reading": str(reading), "name": name, "stop": row["stop"], "dump": row["dump"],
                "trace": row["trace"], "boot_s": row["boot_s"], "check": chk, "seconds": round(time.monotonic() - t0, 1),
                "sources": {n: sha(HERE / n) for n in SOURCES}}
@@ -568,7 +596,7 @@ def summary(res: dict) -> dict:
 def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_limit: float, plan_time: int,
             test_seeds: bool = False, out_root: Path = OUT, results: Path = RESULTS,
             plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None, slot_locals: bool = False,
-            reread: bool = False, threads: int = 3) -> dict:
+            reread: bool = False, threads: int = 3, serve: bool = False) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -579,7 +607,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         raise SystemExit("--reread needs --slot-locals")
     if slot_locals and rd.lists is None:
         raise SystemExit(f"{path}: the reading has no lists file (make it with read-rust or export)")
-    tag = f"{name}-seed{seed}" + ("-control" if control else "") + ("-locals" if slot_locals else "")
+    tag = f"{name}-seed{seed}" + ("-control" if control else "") + ("-locals" if slot_locals else "") + \
+        ("-serve" if serve else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
@@ -595,6 +624,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
                       "input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT, "retries": replay.RETRIES,
                       "retry_wait": replay.RETRY_WAIT},
            "sources": {n: sha(HERE / n) for n in SOURCES}, "taskcore_binary": sha(plan_fd.TASKCORE)}
+    if serve:
+        out["taskcore_serve"] = True
     if slot_locals:
         out["slot_locals"] = {"reread": reread, "threads": threads, "lists": sum(map(len, rd.lists.values())),
                               "scummvm": str(paths.SCUMMVM_BIN), "scummvm_sha1": sha(paths.SCUMMVM_BIN),
@@ -607,7 +638,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     try:
         out["start"] = {"stop": row["stop"], "dump": row["dump"], "trace": row["trace"], "boot_s": row["boot_s"]}
         say(f"{tag}: idle stop at frame {row['stop']['frame']}; the start check")
-        chk = out["start"]["check"] = start_check(row, rd, run_dir / "start-check")
+        chk = out["start"]["check"] = start_check(row, rd, run_dir / "start-check", serve)
         if row["checks"]:
             raise RuntimeError(f"seed {seed}: the start fails start.py's checks: {row['checks']}")
         if chk["reading start"]["task facts differ"]:
@@ -626,7 +657,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
                            plan_time=plan_time, progress=say, planner="taskcore", packed=rd.packed,
                            workdir=run_dir / "plans", memory_limit=plan_memory, on_plan=snapshot,
                            slot_locals=slot_locals, lists=rd.lists,
-                           reread=rereader(rd, run_dir, control, threads) if reread else None)
+                           reread=rereader(rd, run_dir, control, threads) if reread else None,
+                           taskcore_serve=serve)
         res = h.run()
         checkpoints = h.checkpoints
     finally:
@@ -817,6 +849,7 @@ def main() -> None:
     s.add_argument("seeds", type=int, nargs="+")
     s.add_argument("--reading", type=Path, required=True)
     s.add_argument("--results", type=Path, default=RESULTS)
+    s.add_argument("--serve", action="store_true", help="taskcore as one long-lived process (no reload)")
     r = sub.add_parser("run")
     r.add_argument("seed", type=int)
     r.add_argument("--reading", type=Path, required=True)
@@ -832,6 +865,7 @@ def main() -> None:
     r.add_argument("--slot-locals", action="store_true", help="F10: the slots' dumped locals at a replan")
     r.add_argument("--reread", action="store_true", help="F10: read slots no list matches again (Rust reader)")
     r.add_argument("--threads", type=int, default=3, help="the Rust reader's threads for --reread")
+    r.add_argument("--serve", action="store_true", help="taskcore as one long-lived process: replans without reloading")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -848,11 +882,11 @@ def main() -> None:
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
     elif a.cmd == "start":
-        cmd_start(a.seeds, a.reading, a.results)
+        cmd_start(a.seeds, a.reading, a.results, serve=a.serve)
     elif a.cmd == "run":
         cmd_run(a.seed, a.reading, a.control, a.replan_limit, a.time_limit, a.plan_time, a.test_seeds,
                 results=a.results, plan_memory=a.plan_memory, deadline=a.deadline, slot_locals=a.slot_locals,
-                reread=a.reread, threads=a.threads)
+                reread=a.reread, threads=a.threads, serve=a.serve)
     else:
         cmd_log(a.name, a.results)
 

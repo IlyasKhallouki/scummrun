@@ -1,0 +1,278 @@
+{
+ "name": "kitchen-bans",
+ "packed": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/kitchen.tc",
+ "args": [],
+ "server_ready_s": 1.24,
+ "hello": {
+  "task": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/kitchen.tc",
+  "input_actions": 71729,
+  "facts": 716,
+  "seconds_load": 1.2342,
+  "cpu_seconds": 0.9291,
+  "rss": 59187200,
+  "peak_rss": 60157952
+ },
+ "server_max_rss_mb": 134.1,
+ "rows": [
+  {
+   "i": 0,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-001/start.txt",
+    "bans": "/var/tmp/fast-mi/noreload-scratch/kitchen-bans/bans-0.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 13.024,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 4.9744,
+     "seconds": 13.0238,
+     "cpu_seconds": 11.2682,
+     "peak_rss": 119590912,
+     "rss": 112390144
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 17.205,
+    "cpu_seconds": 12.359,
+    "max_rss_mb": 117.0,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 26.941,
+    "cpu_seconds": 15.062,
+    "max_rss_mb": 116.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "186bffea1922789e"
+  },
+  {
+   "i": 1,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-002/start.txt",
+    "bans": "/var/tmp/fast-mi/noreload-scratch/kitchen-bans/bans-1.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 9.955,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 9.9533,
+     "cpu_seconds": 5.8735,
+     "peak_rss": 118083584,
+     "rss": 118083584
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 24.565,
+    "cpu_seconds": 13.04,
+    "max_rss_mb": 116.9,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 31.937,
+    "cpu_seconds": 15.48,
+    "max_rss_mb": 116.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "4a1b18e374438ef2"
+  },
+  {
+   "i": 2,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-003/start.txt",
+    "bans": "/var/tmp/fast-mi/noreload-scratch/kitchen-bans/bans-2.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 17.829,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 7.9706,
+     "seconds": 17.8287,
+     "cpu_seconds": 11.4427,
+     "peak_rss": 137138176,
+     "rss": 122544128
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 19.654,
+    "cpu_seconds": 12.863,
+    "max_rss_mb": 116.8,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 25.362,
+    "cpu_seconds": 15.251,
+    "max_rss_mb": 116.7,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "4d27d3eda347ca4c"
+  },
+  {
+   "i": 3,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-004/start.txt",
+    "bans": "/var/tmp/fast-mi/noreload-scratch/kitchen-bans/bans-3.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 23.725,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 7.9111,
+     "seconds": 23.7116,
+     "cpu_seconds": 11.7613,
+     "peak_rss": 140517376,
+     "rss": 122544128
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 25.677,
+    "cpu_seconds": 12.897,
+    "max_rss_mb": 116.5,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 33.327,
+    "cpu_seconds": 15.303,
+    "max_rss_mb": 116.7,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "2d8278313c67d53e"
+  },
+  {
+   "i": 4,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-005/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 20.0,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 8.1684,
+     "seconds": 19.9955,
+     "cpu_seconds": 11.6991,
+     "peak_rss": 140578816,
+     "rss": 122593280
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 34.908,
+    "cpu_seconds": 13.672,
+    "max_rss_mb": 116.4,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 39.756,
+    "cpu_seconds": 16.571,
+    "max_rss_mb": 115.7,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "b9f6ca9b4ea5f53a"
+  }
+ ]
+}
