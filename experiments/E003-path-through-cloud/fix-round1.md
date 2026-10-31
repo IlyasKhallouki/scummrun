@@ -199,6 +199,12 @@ paths; room 57's and room 85's cases; key 23 gives no record; the probe's two ga
 holds local 203's tests on the cook; the kitchen task with F1b plans to owner:566 = ego. Size gate: the kitchen's
 reading time or its taskcore operators at most 3 times today's (fix round 1's switches on).
 
+**Measured** (notes/log/2026-10-26-e003-f1b.md). The kitchen's reading takes 6.8 times today's wall time and 9.9
+times its CPU time (527,449 records against 71,408), past the gate, and its task cannot reach the goal: the path
+limit cuts the door click's paths where the cursor and the hover are as at the start. On single clicks the rule gives
+local 203's three paths and room 57's and room 85's cases (scumm/reader/tests/f1b.rs). Rule 3 dropped 1,130 paths in
+the kitchen (a push read `queue` as 1 or 2; those with 1 rule 6 drops anyway).
+
 ## F2. Where in the frame an input is read (open choice)
 
 **Engine.** processInput acts on two keys itself: Esc's abortCutscene, which tests the armed override before the
