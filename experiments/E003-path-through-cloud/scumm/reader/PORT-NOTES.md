@@ -573,6 +573,65 @@ replan. The control's one replan (frame 6376) starts with 1 live slot at args 0 
 from its dumped locals and flags, and then 0 slots are at args 0 (local 202 and global 23 match a built list). Both
 verify from boot with 0 differences (results/replay-part1-bar-door-ll.log).
 
+## The path limit: split until no part passes it, as a switch
+
+**The finding** (Part I attempt 2 on the VM, results/vm-part1-2-*.json, and a diagnosis on the laptop). The machine
+ends a path where a fork would pass PATH_LIMIT (1,024 paths): neither side runs, the path ends "limit"
+(scumm-machine `machine.rs`, `drive`). reader.py's `Builder.run` then splits such a run on its first fork on a read,
+but not when the run forked more on non-facts than on facts, and not past SPLIT_DEPTH (2) levels or SPLIT_BUDGET (4)
+parts; DROP_ENDS drops the paths that end "limit". So every state of a run that only a cut path covered has no
+record. In the bar with room 35 (rooms 33, 28 and 35, seed 1, `--elsewhere --live-locals`), room 35 makes the classes
+of the kitchen door and var:196 facts, and the event that walks through the door (`event(script:2@736...)`, the
+sentence script's wait after the walk) makes 1,024 paths in pass 2 and cuts 532 (506 forks on read, 1,353 on
+non-facts: not split). The start's case (classes 15 and 16 of the door at 0) is among the cut ones: no record writes
+room 28 from the start, and the delete relaxation reaches rooms 33 and 35 only, against 33, 28 and 38 with room 38
+in place of 35. At k = 1, 30,065 paths are cut and 101 runs are refused by the non-fact rule; in the Part I scope
+every walk through a door of room 33 is cut, and from the start the relaxation reaches rooms 33 and 38 only.
+
+**The rule** (`Builder::run_split`, switch `split_limit`; reader-scope `--split-limit`, reader-port
+`--switches split_limit`). A run past the path limit is run again once per value of its first fork on a read (the
+values its precondition leaves), that fact pinned; a part that passes the limit is split again, with no cap on depth
+or parts and whatever its forks on non-facts. A part that passes the limit with no fact left to split on stops the
+reading (a panic naming the job), and so does a path the step limit ended (STEP_LIMIT, 5,000 steps; with no path
+cut by the path limit, every "limit" end is the step limit's, so the machine needs no change). Why it is exact: in
+any state the engine runs one path of the job; the parts' preconditions divide the job's states by the pinned fact's
+values, so they do not overlap and together cover them, and each part runs the same code with that fact known. So
+the parts' records cover every state the job can start in. Each record of a part carries the pinned value in its
+precondition, also when its path never read that fact.
+
+What it changes besides: with the switch the machine half hands over no path of a run the limit cut
+(`Reader::run`), since the Builder splits it and reads none of them; the counters gain "split_limit: runs split at
+depth N" and "split_limit: parts run"; "paths ended by the path limit" stays 0.
+
+**With the switch off** the reading is reader.py's: the Builder and the machine half take the old branches, and the
+goldens are unchanged (below).
+
+Measured (stuck, 2026-10-26; the laptop at load 10 to 20 from other jobs; results/split-limit-checks.log):
+
+- **Off, unchanged.** The reader's fast tests (20 unit, 21 oracle with room 33's goldens, 6 fix_round1) and the
+  kitchen's nine oracle tests (`--ignored`: the reading against golden.py's, over the captured runs and with the Rust
+  machine half, on threads, the SAS files against write_sas) pass. k = 2 with `--elsewhere --live-locals` gives the
+  committed packed file (sha1 39200a67). The machine crate is unchanged.
+- **Room 33 with the limit at 32** (tests/split_limit.rs): the cut reading has 806 records and reaches 363 (fact,
+  value) pairs ignoring deletes; the split one 900 records, 18 splits, and 364 pairs, the uncut reading's (878
+  records). At 24 and below a part passes the limit on non-fact forks alone and the reading stops.
+- **The kitchen** (s17): 2 runs passed the limit (318 paths cut), both `sentence(8,574)`; with the switch each is
+  split once into 5 parts (on var:102), 0 cut. 72,220 records against 72,256, and only those two runs' records
+  change, 108 of each into 90: with var:102 pinned, the paths the full run kept apart on a non-fact test
+  (`Var[103] == Local[2]`) merge, and the part writes var:102 as a guess of both values. The delete relaxation
+  applies 27,910 actions against 27,912 and reaches the same rooms; taskcore keeps 12,027 actions (12,029), and
+  lama-first gives the same 10 steps. With due_first, value_sets, draw_clears, actor_rooms, `--elsewhere` and `--live-locals` too: 71,242
+  records against 71,278, 11,975 actions against 11,977, the same 10 steps.
+- **Rooms 33, 28 and 35 from seed 1** (`--elsewhere --live-locals`): 269,868 actions (208,950 without the switch),
+  packed sha1 28abab45; 921 splits in the last pass, 8 levels deep; 0 paths cut. Room 28 and state:316 = 1
+  are reached ignoring deletes. 1,840 CPU s and 2.2 GB on 6 threads, against 744 CPU s and 0.9 GB without.
+- **k = 1** (`--elsewhere --live-locals`, goal state:316 = 1): 299,617 records (237,465 without), 973 splits, 0 cut.
+  taskcore's (d) no longer proves the goal unreachable: reductions a-d keep 31,939 actions (16,052 without, and
+  unsolvable); all reductions keep 24,059 (67,234 operators), and lama-first finds 6 steps: open the bar door, the
+  sentence script's two waits, walk through the kitchen door, the cook's timer at 4 and 33. 2,164 CPU s and 1.8 GB
+  on 5 threads, against 570 CPU s and 1.1 GB without.
+- K2_TBD
+
 ## Python behaviours kept on purpose, and the differences
 
 1. **The scope-1 finding, kept with the switch off.** `Builder.positions` turns a write of
@@ -739,7 +798,9 @@ for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
 - `src/`: the modules above; `src/bin/reader_port.rs` (`reader-port static | records NAME | replay NAME |
   runs NAME | dump-runs NAME --runs N,... | read NAME [--switches S] [--live-locals] [--elsewhere] | task --out DIR |
   stream --out FILE | bench-task --out DIR | bench | due-engine FRAMES`).
-- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens.
+- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens;
+  `tests/split_limit.rs`: the switch split_limit (a fake machine for the rule; room 33 with the limit lowered; rooms 33,
+  28 and 35 from seed 1, ignored).
 - `../../reader_port_oracle.py`: the Python oracles (new file; no existing .py file changed).
 - `../../reader_run_dump.py`: chosen runs made again in Python and written whole (new file).
 - `../machine/src/machine/hooks.rs`: the hook points (Machine changes, above).
