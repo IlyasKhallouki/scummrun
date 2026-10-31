@@ -701,6 +701,44 @@ that narrows), with findObject over the scope's objects. On the reader's side (`
   that part turned off) the kitchen gives 72,223 records and 170,452 forks on non-fact tests. Room 33: 819 records
   (878), forks on non-fact tests 2,329 (2,930).
 
+## Fix round 1, F1 and F1b: inputs from the input script, the sentence queue
+
+**F1 (switch `input_script`, the size probe's; notes/log/2026-10-26-e003-f1-size-probe.md).** An input is a click on
+a cell of a scope room (scumm-ir `cells.rs`) or on a shown verb, with each button. Its run (`What::Input`) is one
+frame: the mouse moves (`f1_mouse`), the mouse loops take their turns (`f1_turn`), checkExecVerbs runs the input
+script (`f1_input`), then the queued sentence runs (`Step::Sentences`). `inputs.rs` works out the input scripts, the
+mouse loops, the sentence-building variables (facts, with domains the passes widen; `oracle::passes` gives 6 passes)
+and the slot verbs.
+
+**F1b (switch `sentence_queue`, needs `input_script`; fix-round1.md F1b, decision D10).** The click's run ends before
+checkAndRunSentenceScript, and the queued sentence runs as its own event.
+
+- Facts: `queue`, `queue:verb`, `queue:a`, `queue:b` (scumm-ir `Fact::Queue`; domains in `table.rs`
+  `queue_domains`: 0, QUEUE_NOT_KNOWN, the doSentence sites' constants and their variables' domains, the scope's
+  verbs or objects and actors).
+- `machine.rs`: `do_sentence` (the op hook, doSentence): STOP writes `queue` 0 and runs the machine's own op; a push
+  reads its values without a fork (`lazily`) and writes them, a value that is no fact as QUEUE_NOT_KNOWN, and `queue`
+  1; a push onto a queue that holds a sentence ends the path "unmodelled". `f1b_end`, the last step of every run
+  (inputs, events, queued sentences): the hold test (script.cpp:1186-1191) turns a push into 2; a run that leaves
+  the queue alone but writes the sentence script's slot or freeze facts and leaves it not running writes
+  QUEUE_RELEASE. The queued sentence's run is the reader's own call: pop (`queue` 0), `Step::Sentence`, `f1b_end`.
+- `builder.rs`: `queued_jobs` (per sentence script, its two variants, verb, A and B as `b_parts` gives them; the
+  stand-in B's precondition is every value `queue:b` holds that the scripts do not tell apart); `record` adds `queue`
+  {0, 2} to every record that is not a queued sentence; `effect` turns a push's copy of a fact into `Eff::Cases`
+  (`queue_copy`) and QUEUE_RELEASE into the cases 0 -> 0, 2 -> 1.
+- A slot verb with no one constant place is clicked anywhere on the verb screen, y from `InputScope::verb_top`.
+- With `input_script` off nothing here runs; with it on and `sentence_queue` off the reading is the probe's.
+
+`reader-port read NAME --count-only [--packed FILE] [--cap-min M] [--max-rss-gb G]` counts the records per kind and
+label instead of keeping them (`Builder.keep_records` off), with a watchdog, and can stream them into a packed file
+(not with due_first). `reader-port read` with `--live-locals` or `--elsewhere` now reads `oracle::passes(sw)` passes
+(2 unless `input_script`: unchanged).
+
+Measured (notes/log/2026-10-26-e003-f1b.md): the kitchen with F1b gives 527,449 records against 71,408, 6.8 times the
+wall time and 9.9 times the CPU time, and its task cannot reach the goal; the path limit cuts the door click's paths
+where the cursor and the hover are as at the start. `tests/f1b.rs` runs single jobs: local 203's three paths, rooms
+57 and 85, keys, the queue facts.
+
 ## Fix round 1, F10: the slots' dumped locals
 
 The first fix made on the port (fix-round1.md F10, decision D8). Off by default: with `Builder.slot_locals` empty the
