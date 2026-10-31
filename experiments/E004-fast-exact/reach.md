@@ -170,6 +170,24 @@ them, and then its records name a list the full reading has folded into 0. The c
 allowed: the full reading's folded record stands for a set of lists, `--reach`'s for one of them. A list that `--reach`
 folds sets `args:X = 0` in `R`, since `RecordStream::finish` rewrites the written number to 0.
 
+## What is not exact, and why it cannot be made so
+
+Three classes separate `--reach` from `(d)` on a full reading. Each comes from something `(d)` sees only because the
+full reading ran code from which the start cannot reach. `reach_check.py` tests that these classes are all there is: it
+applies the closure with event naming over what `(d)` keeps, with each guess cut to `--reach`'s domains, and compares that
+with what `--reach` writes.
+
+1. **Event naming** (Lemma 2). A list and a wait point each reached on their own, whose pair only an unkept record names.
+2. **A guess over a domain only unkept records widened.** Pass 1 of a full reading runs everything, so a value written
+   anywhere enters the domain, and a guess over the whole domain then lists it. `(d)` counts it as reached. The
+   justification can be circular: a record writes the value, the value enters the domain, a guess lists it, and that
+   guess is what makes the record reachable. Without running the unreachable code no reader can know that value exists,
+   so this class cannot be closed by any change to `--reach`. What it costs: a plan that picks such a value at a guess is
+   in the full reading's task and not in `--reach`'s. The value is a candidate only by coincidence. The guess stands
+   for an unknown write, and the domain was never a bound on it.
+3. **A job read otherwise** (a split in one reading only, and the lists that come from it). The records for that job
+   differ. Both readings are exact for that job, and `--reach`'s records are the finer ones.
+
 ## A replan start with a value the first start did not reach
 
 `(d)` from a later start keeps every plan from that start if `R` already holds the start's values, by monotonicity

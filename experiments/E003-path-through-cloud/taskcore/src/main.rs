@@ -530,7 +530,9 @@ fn run() -> Result<(), String> {
             use std::io::Write as _;
             for k in 0..t.facts.len() as u32 {
                 let all: Vec<u32> = (0..t.facts.size(k)).collect();
-                writeln!(o, "{{\"fact\":{},\"values\":{}}}", esc(t.key(k)), text(k, &all)).map_err(|e| e.to_string())?;
+                let st = t.starts[p.start].1[k as usize];
+                let st = if st == NONE { "null".to_string() } else { esc(t.strs.get(t.facts.dom(k)[st as usize])) };
+                writeln!(o, "{{\"fact\":{},\"values\":{},\"start\":{}}}", esc(t.key(k)), text(k, &all), st).map_err(|e| e.to_string())?;
             }
             for i in 0..t.acts.len() {
                 let v = t.acts.view(i);
