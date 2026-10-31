@@ -311,6 +311,9 @@ struct St {
     reach: Option<std::sync::Arc<crate::reach::Reached>>,
     guides: Option<std::sync::Arc<Vec<crate::reach::Guide>>>,
     held: Vec<crate::reach::Held>,
+    /// the held branches of this run so far: a fork reached again on another path holds the same branch, which is
+    /// kept once, where it was first held (the waits are a set: `add_wait`, reach.rs)
+    held_seen: FxHashSet<crate::reach::Held>,
     /// the switch pass2_reuse, in pass 1: log what the run consults (memo.rs)
     track: bool,
     touched: FxHashSet<Fact>,
@@ -1490,7 +1493,12 @@ fn reach_groups(m: &mut Machine<'_>, p: &Path, key: Fact, text: &str, groups: Ve
         }
     }
     let s = st_mut(m);
-    s.held.extend(held);
+    for h in held {
+        if !s.held_seen.contains(&h) {
+            s.held_seen.insert(h.clone());
+            s.held.push(h);
+        }
+    }
     s.queries.extend(queries);
     keep
 }
@@ -2270,6 +2278,7 @@ impl RunMachine for Reader<'_> {
             s.guides = r.guides_of(label);
             s.reach = Some(r.clone());
             s.held.clear();
+            s.held_seen.clear();
         }
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
