@@ -1,0 +1,46 @@
+E003, branch kitchen: origin/main (e926bd2) with stuck, noreload and costs merged, and taskcore serve taking --cost-caps
+per request. Checks on the laptop, 2026-10-31; nice 10, at most 6 threads, nothing else of ours running.
+
+== every switch off
+scumm/machine and scumm/ir: no diff from main, so the nine machine golden runs and check_rust_all were not rerun
+frozen files (model, reader, ir, facts, actions, check, domains, task, relevance, golden): no diff from main
+cargo test --release (scumm workspace): all pass: reader 22 unit, 21 oracle (room 33's goldens), 6 fix_round1, 1
+  frame_costs, 5 split_limit; machine 9 unit, 10 fix_round1, 8 golden, 5 value_sets, 1 check_rust; ir 1 unit, 5 due,
+  3 facts, 3 oracle (269 s)
+cargo test --release -p scumm-reader --test oracle -- --ignored --test-threads 1: 9 passed (the kitchen against
+  golden.py's) in 414 s
+reader-port read kitchen --packed: sha1 279b7a24, main's
+reader-scope --k 2 --elsewhere --live-locals --threads 3: 519755 records, packed sha1 39200a67, the committed one;
+  878.6 s wall, 2839.0 CPU s, peak 2806 MB (a try on 6 threads stopped at the 1.5 GB free guard, 4052 MB, 231 s)
+serve_check compare on that kitchen file, the 6 replans of the recorded seed-1 lama-first-costs run, caps left out:
+  main's taskcore sas (sha1 of the binary at wt-main-fr1), the new sas and one serve: task.sas, ops.jsonl, kept.json
+  and stats the same on all 6; serve built 1, kept 5; CPU s per request: built 10.15, kept 4.13, new sas 9.52
+pytest -m 'not slow' test_replay_part1 test_replay test_replay_review test_replay_taskcore test_taskcore
+  test_taskcore_serve test_frame_costs: 108 passed, 2 deselected in 143 s
+test_taskcore_serve.py 200 1 (cost caps included): 18024 the same files, 4776 the same error, 0 failures
+
+== switches on, one at a time
+cargo test --release -p scumm-reader --test frame_costs -- --ignored: 1 passed
+cargo test --release -p scumm-reader --test fix_round1 -- --ignored --test-threads 1: 6 passed in 513 s
+cargo test --release -p scumm-reader --test split_limit -- --ignored: not finished; the kernel killed the test at
+  5.3 GB resident, 247 s, with 3 GB available on the machine. It holds the records in memory. In its place:
+reader-scope --rooms 33,28,35 --elsewhere --live-locals --split-limit --threads 3: 270473 records, records sha1
+  39ac5a3c, packed sha1 28abab45, 269868 actions: stuck's; 605.5 s wall, 1620.2 CPU s, peak 1332 MB
+
+== the three on together on the kitchen (reader-port read kitchen --threads 2, s17)
+| reading | records | actions | packed sha1 | operators |
+| split_limit | 72220 | 71693 | c32c8577, stuck's | 17859 |
+| --frame-costs | 72256 | 71729 | bbf8b4d9, costs' | 17823 |
+| split_limit --frame-costs | 72220 | 71693 | 1d29a58d | 17859 |
+the record lines of split_limit alone and of both are equal, 72222 lines but for the head's frame_costs; split_limit
+  alone's file is stuck's byte for byte; frame costs dmax 5, charinc 0
+from S1#7's pre, on the reading made with both (committed plans: results/kitchen-costs-plans.jsonl):
+  lama-first: plan, cost 380, 10 steps, the committed plan's labels and costs
+  lama-first-costs: plan, cost 377, 11 steps, the committed plan's labels and costs
+serve_check compare --skip-old on the file made with both, 28 recorded replans of the seed-1 runs with frame costs
+  (start, bans and caps from their plan folders; 27 different SAS files):
+  serve against sas: task.sas, ops.jsonl, kept.json and stats the same on all 28, 0 errors
+  serve built 28, kept 0, since the caps changed each time: CPU s per request 8.19, sas 8.89; load 0.86 s, peak 135 MB
+lama-first-costs on serve's SAS file for the 6 replans of the run that reached the goal, against the plans it recorded:
+  frame 235 cost 377, 1226 cost 15, 1479 cost 300, 2365 cost 68, 3019 cost 15, 10314 cost 8: the same costs and step
+  labels (11, 9, 11, 11, 9, 3 steps) on all 6
