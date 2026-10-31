@@ -522,12 +522,9 @@ impl Builder<'_> {
             gs.sort();
             gs.dedup();
             let j = self.reach_state.as_ref().unwrap().jobs[id as usize].clone();
-            // the same job first run in this round (a job freed) has no guides: its run writes everything
-            if !out.iter().any(|x: &Job| x.label == j.label) {
-                map.insert(j.label.clone(), Arc::new(gs));
-                out.push(j);
-                self.counts.inc("reach: reruns");
-            }
+            map.insert(j.label.clone(), Arc::new(gs));
+            out.push(j);
+            self.counts.inc("reach: reruns");
         }
         reach.inner.write().unwrap().guides = map;
         out
@@ -586,22 +583,23 @@ impl Builder<'_> {
         // the start's values (and the dumped slots' lists, as the harness's start file has them) are in at round 0
         let starts = self.reach_starts.clone();
         let mut seeds = Vec::new();
-        for s in &starts {
-            seeds.extend(self.reach_seed_values(s));
+        for (n, s) in starts.iter().enumerate() {
+            seeds.extend(self.reach_seed_values(s).into_iter().map(|(k, l)| (n, k, l)));
         }
         let mut events: Vec<Event> = if start_events { self.start_events() } else { vec![] };
         if start_events && !self.slot_locals.is_empty() {
             let dumped = self.dumped_events();
             for e in dumped.iter().filter(|e| !e.abort) {
-                seeds.push((format!("args:{}", e.name), Label::Int(e.sig)));
+                seeds.push((0, format!("args:{}", e.name), Label::Int(e.sig)));
             }
             events.extend(dumped);
         }
         {
             let mut i = reach.inner.write().unwrap();
-            for (k, l) in seeds {
+            for (n, k, l) in seeds {
                 if !i.vals.contains_key(&k) {
-                    let m: FxHashMap<Label, u32> = FxHashMap::default();
+                    // the first start names this fact, or an earlier one holds its default value
+                    let m: FxHashMap<Label, u32> = if n > 0 { default_of(&self.table, &k).into_iter().map(|d| (d, 0)).collect() } else { FxHashMap::default() };
                     i.vals.insert(k.clone(), m);
                 }
                 i.vals.get_mut(&k).unwrap().insert(l, 0);

@@ -634,6 +634,26 @@ Measured (stuck, 2026-10-26; the laptop at load 10 to 20 from other jobs; result
   253,933 records (off: 227 s, 163,981 records). The reading was stopped at 3,517 s wall and 17,733 CPU s, inside pass
   1's event round 1 (off: 363 s). Pass 2 takes about what pass 1 takes, so the two passes project past 8,000 s.
 
+## Forward reachability: the switch `reach`
+
+`reach` (reader-scope `--reach`, reader-port `--switches reach`), off by default, needs `split_limit`. The proof is in
+`experiments/E004-fast-exact/reach.md`. With it off, none of `reach.rs` runs, `read_once` takes its old path and
+`on_fork` makes its groups as before.
+
+- `reach.rs`: `Reached`, the values reached with the round each arrived in, shared with the workers and written only
+  between batches. `ReachState`, what waits on what, on the reading's thread.
+- `read_once_reach` replaces the rounds of `read_once`. A batch reads one round's values, so the reading is the same for
+  any number of threads. The inputs run first and the start's events after them, as in `read_once`.
+- `machine.rs` `on_fork` asks `reach_groups` which groups to follow. A group that meets no reached value is sent back as
+  a `Held` in `RunOut.held`, with its guide. If no group is left the path ends "no value", which the Builder drops as it
+  drops any such path. Paths of different preconditions never merge (`join`'s signature holds the whole of `pre`), so
+  this changes nothing else in the run.
+- `Builder::run`: `reach_path` holds a path whose precondition as a record does not meet (two sets on one unit), before
+  a record is made of it. `reach_record` then decides on the action's precondition, and in a rerun drops what the round
+  before already met. `run_split` makes parts only for the values reached.
+- The precondition on `args:X` is always written under the switch (`pin`, `record`).
+- `NAME.reached` next to the packed file, for `taskcore --reached`. `Builder::reach_extend` goes on from a new start.
+
 ## Frame costs, as a switch
 
 **The finding.** Every action cost 1 (build_task's `cost: 1`), so the planner minimized records, not game time. The
