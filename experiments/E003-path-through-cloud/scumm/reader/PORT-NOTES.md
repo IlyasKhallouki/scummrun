@@ -659,6 +659,26 @@ The proof is in `experiments/E004-fast-exact/pass2-reuse.md`. `memo.rs` keeps ea
 (`RunLog`). `Builder::run_job` takes a run of pass 2 from there when all of it agrees. `machine.rs` logs through `info`.
 The output is byte for byte the same; the peak memory holds pass 1's records.
 
+## A run past the limit with no fact to split on: the switch `grow_limit`
+
+`grow_limit` (reader-scope `--switches grow_limit`, reader-port `--switches grow_limit`), off by default, needs
+`split_limit`. Under `split_limit` a part that passes the path limit with no fact left to split on stops the reading.
+With `grow_limit` the run is read again whole with the limit 4 times larger (`Machine::set_path_limit`), up to
+GROW_MAX (16,384), and the reading stops only past that. Why it is exact: the limit only ends paths, so a run it cuts
+nothing of is the whole run, and its records cover every state it can start in, as an uncut run's do. Parts of a split
+under the larger limit run on the worker that split, in order (no prefetch), so the reading does not depend on the
+number of threads. The counter "grow_limit: runs read again with the path limit at N" counts them.
+`tests/grow_limit.rs`: a run of 5,000 paths is read whole at 16,384; off, or past GROW_MAX, the reading stops.
+
+Under `reach`, a fork reached again on another path of the same run holds the same branch again. `reach_groups`
+keeps each held branch once per run, where it was first held (`held_seen`). The waits were already a set
+(`add_wait`), in the order first held, so the output is unchanged: the bar's packed sha1s with and without fix round
+1's switches are the same (00960d7d, 1da422ac).
+
+reader-scope `--switches S,...` takes reader switches by name as reader-port does (value_sets, draw_clears,
+actor_rooms, grow_limit; not due_first). `READER_TRACE=1` writes to stderr each job's start, each split down to depth
+8, each run of 1 s or more with its paths, cut paths, held branches and largest counters, and each job of 1 s or more.
+
 ## Frame costs, as a switch
 
 **The finding.** Every action cost 1 (build_task's `cost: 1`), so the planner minimized records, not game time. The
