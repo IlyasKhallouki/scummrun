@@ -825,6 +825,21 @@ for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
   --reread`, which runs reader-scope and `reading_from_golden`). On rooms 33 and 28 from seed 1, reader-scope's reading
   equals the Python reader's action for action (66,106 records, 65,592 actions) in 30 s on 3 threads (Python: 2,434 s).
 
+## F1c (switch input_settled)
+
+Off by default; with it off no job, run or path changes (`Builder::settled_jobs`, `FactTable.settled`, the machine half's
+`f1c_*` steps are not reached, and a join hashes as before). The rule, with its engine lines, is fix-round1.md's F1c.
+scumm-machine and scumm-ir have no change: the click's steps are the reader's hooks on the machine (`eng`, `op`, `getter`).
+
+- `inputs.rs` reads the plain input script, the hover and the variables' roles from the IR (`settled_rule`). No number.
+- `settled_jobs` splits each sentence and walk on var:32: a plain value is today's job with var:32 pinned; another value n
+  is a job labelled `[n]` with the hover's and the guards' pins, and the pin `SETTLED_PIN` (no fact has that name, so it stays
+  in the Builder; a split keeps it). The record's source stays `What::Sentence`, so the harness plays it as it plays today's.
+- `Reader::run_full` runs such a job as steps: `f1c_click` for A (and B), `f1c_end`. A path's `settled_target` and `queued`
+  are in its join's signature.
+- A waiting slot's constants sit in its list of locals from `SETTLED_LOCAL` (1000) up: `f1c_carry` adds them, the list's
+  number covers them, `LiveLocals::keep` keeps them and `eng_resume_at` writes them on the later turn's path.
+
 ## Files
 
 - `src/`: the modules above; `src/bin/reader_port.rs` (`reader-port static | records NAME | replay NAME |
@@ -834,6 +849,7 @@ for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
   `tests/split_limit.rs`: the switch split_limit (a fake machine for the rule; room 33 with the limit lowered; rooms 33,
   28 and 35 from seed 1, ignored).
   `tests/frame_costs.rs`: the switch `--frame-costs` (`src/costs.rs`) on the kitchen.
+  `tests/input_settled.rs`: the switch input_settled on single jobs (fix-round1.md, F1c).
 - `../../reader_port_oracle.py`: the Python oracles (new file; no existing .py file changed).
 - `../../reader_run_dump.py`: chosen runs made again in Python and written whole (new file).
 - `../machine/src/machine/hooks.rs`: the hook points (Machine changes, above).
