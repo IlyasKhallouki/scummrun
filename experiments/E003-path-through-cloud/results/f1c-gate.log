@@ -1,0 +1,62 @@
+E003, F1c, switch input_settled, branch kitchen. Laptop, 2026-10-31; nice 10, 3 threads per reading; load 6 to 9 with other
+jobs (a reader-scope from /var/tmp/fast-mi/wt-reach ran part of the time), so wall times are not clean.
+Base switches: value_sets,draw_clears,actor_rooms,split_limit with --elsewhere --live-locals.
+reader-port read NAME --threads 3 --switches S --elsewhere --live-locals --packed F; taskcore sas --start s17 for operators.
+
+== the gate
+| reading | records | actions | wall s | CPU s | peak MB | operators s17 | lama-first |
+| room 33, base | 819 | 800 | 0.53 | 0.9 | 117 | | |
+| room 33, input_settled | 819 | 800 | 0.31 | 0.5 | 121 | | |
+| kitchen, base (1st) | 71242 | 71058 | 32.67 | 80.8 | 748 | 17712 | plan, 10 steps, 7.2 s |
+| kitchen, base (2nd) | 71242 | | 26.67 | 71.4 | 766 | | |
+| kitchen, input_settled (1st) | 475441 | 442665 | 148.02 | 435.7 | 4176 | 44839 | plan, 10 steps, 13.0 s |
+| kitchen, input_settled (2nd) | 475441 | | 188.81 | 424.0 | 4104 | | |
+room 33's two packed files are the same, sha1 94cf7ee7: no value of var:32 but the plain one makes a record there.
+kitchen, input_settled over base: records 6.7, wall 4.5 (1st over 1st), CPU 5.4, operators 2.53. THE GATE (3 times) FAILS ON
+READING TIME.
+
+== records by kind, kitchen
+| kind | base | input_settled |
+| sentence | 28076 | 413108 |
+| walk_to | 1892 | 20780 |
+| dialog_line | 549 | 549 |
+| event | 28045 | 28324 |
+| skip_cutscene | 12680 | 12680 |
+sentence and walk_to with the switch: 400116 var:32 = 202, 3900 var:32 = 14, 25488 plain, 4384 inventory (as today).
+
+== one input, sentence(7,320): 44 records today, 792 with var:32 = 202, 18 times
+3 from global 4's [0000]-[0023]: bit:547 = 0 (264), bit:547 = 1 with var:182 = 0 (264), with var:182 above (264). No record of the
+  reading writes bit:547; it is a fact only because some Bit writes have an index that does not fold (bit: is wild).
+6 from local 202's [0034]-[005B]: actorroom:6 in 28, 72, 0, -1 with its replay checks, x <= 310 and not moving (local 216 starts) or not.
+
+== experiment, not in the branch: the same with bit:547 pinned to 0 on var:32 != plain's jobs (a hard-coded pin, removed again)
+kitchen: 211537 records, 200489 actions, 57.57 s wall, 169.2 CPU s, 1937 MB, operators 43363, lama-first plan in 10.2 s
+over base (2nd, the same hour): records 3.0, wall 2.2, CPU 2.4, operators 2.45
+
+== F1b's records F1c leaves out (F1b's packed file, 527302 actions, by each action's precondition)
+all 185069 of F1b's click records need a state rule 3 excludes: 57905 script:23 = 0, 57905 frozen:script:23 = 1, 57855 pos:script:23
+  not 409, 11404 var:52 <= 0. None has the hover and the cursor as rule 3 needs them: F1b's path limit cut those.
+
+== tests: cargo test --release -p scumm-reader --test input_settled -- --include-ignored: 7 passed
+sentence(2,316)[202]: 125 records: cook away 3 (local 203 waits at [003A], the verb carried), in room 28 at x > 310 2 (local 215), at
+  x <= 310 120 (the door's sentence, run in the record)
+walk_to(316)[202]: 87 records: 3, 2, 82
+local 203's later turn with verb 2: the door's Open entry: 3 records wait at obj:316@36, 3 run script 25, no sentence script
+room 57, local 201: 4 records inside, 164 outside, 168 on a box across the bound (replay checks on VAR_VIRT_MOUSE)
+room 85, local 201: 914 walks and waits at [0029]; 909: 20 records, none waits
+key 23: no job
+
+== the plan with the switch, s17 to owner:566 = ego (lama-first, 44839 operators)
+event(local:211@33), walk_to(316)[202] (fold of actorroom:6 = -1 with its checks and = 28: local 203's x <= 310 path), event(script:2@736),
+event(local:218@16), sentence(2,564), event(script:2@736), event(script:2@915), sentence(9,566), event(script:2@736), event(script:2@915)
+Not played: the harness runs only the plan's input through Executor.play; no replay was run.
+
+== every switch off
+scumm/machine, scumm/ir and the frozen Python files: no diff from 865d4c6's parent, so no model-check row and no rerun of the nine machine
+  golden runs or check_rust_all
+reader-port read kitchen --packed: 72256 records, 71729 actions, sha1 279b7a24, main's; reading against golden.py's: 72258 lines, 0 differences
+cargo test --release -p scumm-reader: all pass (21 oracle with room 33's goldens, 6 fix_round1, 5 split_limit, 1 frame_costs)
+cargo test --release -p scumm-reader --test oracle -- --ignored: 9 passed (the kitchen against golden.py's), 799 s
+pytest -m 'not slow' test_replay_part1 test_replay test_replay_review test_replay_taskcore test_taskcore test_taskcore_serve test_frame_costs:
+  108 passed, 2 deselected, with DOWNWARD_DIR set (19 failed without it: a worktree has no third_party/downward)
+reader-scope --k 2 was not rerun
