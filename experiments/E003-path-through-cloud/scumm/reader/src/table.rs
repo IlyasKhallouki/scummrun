@@ -73,6 +73,9 @@ pub struct FactTable {
     /// the switch split_limit (the Builder's): a run past the path limit is split until no part passes it
     /// (`Builder::run_split`); the machine half then hands over no path of a run the limit cut (machine.rs)
     pub split_limit: bool,
+    /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
+    /// (inputs.rs); None with the switch off
+    pub settled: Option<std::sync::Arc<crate::inputs::SettledRule>>,
 }
 
 impl FactTable {
@@ -180,6 +183,7 @@ impl FactTable {
             binary: Domain::binary(),
             value_sets: false,
             split_limit: false,
+            settled: None,
         }
     }
 

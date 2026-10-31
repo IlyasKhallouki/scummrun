@@ -201,6 +201,9 @@ pub struct Switches {
     /// (`Builder::run_split`). Off: reader.py's rule, which leaves a run unsplit when it forked more on non-facts,
     /// past SPLIT_DEPTH levels or SPLIT_BUDGET parts, and drops the paths the limit ended.
     pub split_limit: bool,
+    /// F1c (fix-round1.md): a sentence or a walk with a room's input script that is not plain starts at that script,
+    /// from the sentence variables as constants (inputs.rs; machine.rs `f1c_click`; `Builder::settled_jobs`)
+    pub input_settled: bool,
 }
 
 impl Switches {
@@ -214,7 +217,8 @@ impl Switches {
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
                 "split_limit" => s.split_limit = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit)")),
+                "input_settled" => s.input_settled = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, input_settled)")),
             }
         }
         Ok(s)
@@ -235,6 +239,9 @@ impl Switches {
         }
         if self.split_limit {
             v.push("split_limit");
+        }
+        if self.input_settled {
+            v.push("input_settled");
         }
         v
     }
@@ -773,6 +780,121 @@ impl<'g> Builder<'g> {
         vals.into_iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect()
     }
 
+    /// F1c: the switch's reading of the scripts (inputs.rs), once.
+    pub fn settled_rule(&mut self) -> Option<std::sync::Arc<crate::inputs::SettledRule>> {
+        if self.table.settled.is_none() {
+            let rule = crate::inputs::settled_rule(self.game, &self.scope.units, &self.table.start);
+            self.table.settled = rule.map(std::sync::Arc::new);
+        }
+        self.table.settled.clone()
+    }
+
+    /// F1c rule 2 and 3 (fix-round1.md): each sentence or walk on room objects and actors, per value of VAR_VERB_SCRIPT:
+    /// a plain value keeps today's job with var:32 pinned; any other value n gets a job labelled [n] that needs the
+    /// hover live, not frozen and at its wait, and its guards, and carries `SETTLED_PIN`. An input with an object in the
+    /// inventory stays as it is.
+    fn settled_jobs(&mut self, jobs: Vec<Job>) -> Vec<Job> {
+        use crate::inputs::SETTLED_PIN;
+        let Some(rule) = self.settled_rule() else {
+            self.counts.inc("F1c: no plain input script or no hover (the switch changes nothing)");
+            return jobs;
+        };
+        let key32 = format!("var:{VAR_VERB_SCRIPT}");
+        let values: Vec<i64> = match self.domain(&key32) {
+            Some(d) if self.kind(&key32) != Kind::Const => d.values.iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect(),
+            _ => vec![self.table.start.get0(&key32)],
+        };
+        let hover_key = self.game.lifecycle_key(rule.hover).map(|k| k.to_string());
+        let hover = slot_name(hover_key.as_deref().unwrap_or(""));
+        let mut base = (Pins::new(), Pre::new());
+        let mut ok = true;
+        if let Some(k) = &hover_key {
+            ok = self.pin(&mut base.0, &mut base.1, k, &[Label::Int(1)]);
+        }
+        ok = ok && self.pin(&mut base.0, &mut base.1, &format!("frozen:{hover}"), &[Label::Int(0)]);
+        ok = ok && self.pin(&mut base.0, &mut base.1, &format!("at:{hover}:{}", rule.wait), &[Label::Int(1)]);
+        for g in &rule.guards {
+            let vals: Labels = match self.domain(&g.key) {
+                Some(d) => {
+                    let value = |l: &Label| match *l {
+                        Label::Int(n) => n,
+                        Label::Above => d.high.unwrap() + 1,
+                        Label::Below => d.low.unwrap() - 1,
+                    };
+                    d.values.iter().filter(|l| g.holds(value(l))).copied().collect()
+                }
+                None => vec![Label::Int(self.table.start.get0(&g.key))].into_iter().filter(|l| matches!(l, Label::Int(n) if g.holds(*n))).collect(),
+            };
+            ok = ok && !vals.is_empty() && self.pin(&mut base.0, &mut base.1, &g.key, &vals);
+        }
+        let mut out = Vec::with_capacity(jobs.len() * 2);
+        for job in jobs {
+            let What::Sentence { a, .. } = job.what else { unreachable!("today's sentence jobs") };
+            if job.label.contains("[inv]") {
+                out.push(job);
+                continue;
+            }
+            for &n in &values {
+                let mut j = job.clone();
+                let n_label = Label::Int(n);
+                if !self.pin(&mut j.pins, &mut j.pre, &key32, &[n_label]) {
+                    continue;
+                }
+                if rule.plain.contains(&n) {
+                    out.push(j);
+                    continue;
+                }
+                if !ok {
+                    self.counts.inc("F1c: inputs whose hover or guards never hold (constants)");
+                    continue;
+                }
+                // a local input script: the job's rooms it can run in
+                let mut rooms: Labels = self
+                    .scope
+                    .rooms
+                    .iter()
+                    .filter(|&&r| rule.runs_in(self.game, n, self.game.resource(r)))
+                    .map(|&r| Label::Int(r as i64))
+                    .collect();
+                if a >= NUM_ACTORS {
+                    let home = self.game.object_room.get(&(a as i32)).copied();
+                    rooms.retain(|r| matches!(r, Label::Int(x) if self.game.resource(*x as i32) == home));
+                }
+                if rooms.is_empty() {
+                    self.counts.inc("F1c: inputs whose input script no room of theirs installs");
+                    continue;
+                }
+                if (n as i32) >= self.game.first_local && !self.pin(&mut j.pins, &mut j.pre, "room", &rooms) {
+                    continue;
+                }
+                if j.pre.get("room").is_some_and(|s| s.is_empty()) {
+                    self.counts.inc("F1c: inputs whose input script no room of theirs installs");
+                    continue;
+                }
+                let mut fine = true;
+                for (k, v) in &base.1 {
+                    fine = fine && self.pin(&mut j.pins, &mut j.pre, k, v);
+                }
+                for (k, v) in &base.0 {
+                    if !j.pre.contains_key(k) {
+                        j.pins.insert(k.clone(), v.clone());
+                    }
+                }
+                if !fine {
+                    continue;
+                }
+                j.pins.insert(SETTLED_PIN.to_string(), Val::Int(n));
+                j.label = match j.label.strip_suffix("~frozen") {
+                    Some(l) => format!("{l}[{n}]~frozen"),
+                    None => format!("{}[{n}]", j.label),
+                };
+                self.counts.inc("F1c: inputs that start at the input script");
+                out.push(j);
+            }
+        }
+        out
+    }
+
     /// `Builder.inputs`: every player input of the scope, in reader.py's order.
     pub fn inputs(&mut self) -> Vec<Job> {
         let mut out = Vec::new();
@@ -859,6 +981,9 @@ impl<'g> Builder<'g> {
                     }
                 }
             }
+        }
+        if self.switches.input_settled {
+            out = self.settled_jobs(out);
         }
         let key32 = format!("var:{VAR_VERB_SCRIPT}");
         let vs: Vec<i64> = match self.domain(&key32) {
@@ -1716,6 +1841,9 @@ impl<'g> Builder<'g> {
     ) -> usize {
         self.table.value_sets = self.switches.value_sets;
         self.table.split_limit = self.switches.split_limit;
+        if self.switches.input_settled {
+            self.settled_rule();
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
