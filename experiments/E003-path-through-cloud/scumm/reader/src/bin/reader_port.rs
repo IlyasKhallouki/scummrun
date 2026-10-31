@@ -168,11 +168,19 @@ fn main() {
             // builder counters, which the reading (golden.py's file) must not have
             let mut packing: Option<packed::RecordStream> = None;
             let (mut b, secs) = match arg(&args, "--threads") {
-                _ if live || elsewhere || frame_costs || packed_out.is_some() => {
+                _ if live || elsewhere || frame_costs || sw.reach || packed_out.is_some() => {
                     // a switch on, or the packed file written as made: on `--threads` workers (default 0)
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
                     let mut b = oracle::builder_with(&game, &st, name, sw);
                     b.table.elsewhere = elsewhere;
+                    if sw.reach {
+                        // the start the packed file gets: the kitchen's s17, another scope's own
+                        b.reach_starts.push(if name == "kitchen" {
+                            oracle::kitchen_task(&st).s17
+                        } else {
+                            Facts::from_py(st.named("builder", name).get("start_items"))
+                        });
+                    }
                     if live {
                         b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(&game)));
                     }
@@ -243,8 +251,13 @@ fn main() {
                 };
                 let keys = stream.fact_keys();
                 let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+                let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
                 let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
                 println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+                if let Some(reached) = &b.table.reach {
+                    let path = PathBuf::from(packed_out.as_ref().unwrap()).with_extension("reached");
+                    std::fs::write(&path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").unwrap();
+                }
             }
             if let Some(d) = &b.due {
                 for (k, v) in &d.counts.0 {

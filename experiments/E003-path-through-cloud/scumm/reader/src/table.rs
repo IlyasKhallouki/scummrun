@@ -73,6 +73,8 @@ pub struct FactTable {
     /// the switch split_limit (the Builder's): a run past the path limit is split until no part passes it
     /// (`Builder::run_split`); the machine half then hands over no path of a run the limit cut (machine.rs)
     pub split_limit: bool,
+    /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
+    pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
 }
 
 impl FactTable {
@@ -180,6 +182,7 @@ impl FactTable {
             binary: Domain::binary(),
             value_sets: false,
             split_limit: false,
+            reach: None,
         }
     }
 

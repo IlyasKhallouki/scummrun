@@ -32,6 +32,10 @@
 //!               split on its first fork on a read until no part passes the limit, and a run that passes it with no
 //!               fact left to split on, or a path the step limit ended, stops the reading. Off by default (reader.py's
 //!               rule: some runs past the limit are not split, and the paths the limit ended are dropped).
+//! --reach       forward reachability (reach.rs, experiments/E004-fast-exact/reach.md): a job or a fork's branch that needs
+//!               a value not reached from the start does not run, and runs when the value arrives. Needs --split-limit.
+//!               Writes NAME.reached next to the packed file (taskcore --reached). Off by default.
+//! --reach-also FILE  a further start to read from (taskcore's --start-file format, key<TAB>value), with --reach
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
 //!               lower bound of its duration from the engine source, and the fold key holds the cost; the reading's
 //!               head (--golden) gives the parameters (`frame_costs`), which packed_reading.py copies into
@@ -447,6 +451,7 @@ fn main() {
     let live_locals = args.iter().any(|a| a == "--live-locals");
     let split_limit = args.iter().any(|a| a == "--split-limit");
     let frame_costs = args.iter().any(|a| a == "--frame-costs");
+    let reach = args.iter().any(|a| a == "--reach");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
@@ -483,6 +488,7 @@ fn main() {
         "elsewhere": elsewhere,
         "live_locals": live_locals,
         "split_limit": split_limit,
+        "reach": reach,
         "frame_costs": frame_costs,
         "cap_min": cap_s / 60.0,
         "load_at_start": loadavg(),
@@ -502,6 +508,13 @@ fn main() {
     b.keep_records = keep;
     b.table.elsewhere = elsewhere;
     b.switches.split_limit = split_limit;
+    b.switches.reach = reach;
+    if reach {
+        b.reach_starts.push(start.clone());
+        if let Some(f) = arg(&args, "--reach-also") {
+            b.reach_starts.push(scumm_reader::reach::start_file(&f));
+        }
+    }
     if live_locals {
         let ll = scumm_reader::locals::LiveLocals::of(&game);
         base["live_locals_units"] = json!(ll.counts(&game, &scope));
@@ -687,7 +700,13 @@ fn main() {
     let keys = stream.fact_keys();
     let goal_labels: Vec<(String, Vec<Label>)> = goal.iter().map(|(k, v)| (k.clone(), v.iter().map(|&x| Label::Int(x)).collect())).collect();
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+    let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
     let (info, folded) = stream.finish(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+    if let Some(reached) = &b.table.reach {
+        let path = packed.with_extension("reached");
+        std::fs::write(&path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").expect("the reached values");
+        eprintln!("[{name}] reached values: {}", path.display());
+    }
     let fin_s = t_fin.elapsed().as_secs_f64();
     let packed_sha1 = {
         let mut h = sha1_smol::Sha1::new();
@@ -720,7 +739,7 @@ fn main() {
     r["records"] = json!(b.n_records);
     r["records_by_kind"] = json!(tee.kinds);
     let pass_counts: BTreeMap<String, i64> =
-        b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
+        b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
     r["outside_points"] = json!(b

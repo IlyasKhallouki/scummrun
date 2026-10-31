@@ -85,6 +85,8 @@ pub struct RunOut {
     pub first_fork: Option<String>,
     /// the Reader's counters' increments during the run (keys added with 0 included)
     pub rd: RdCounts,
+    /// the switch --reach: the branches this run held back (reach.rs)
+    pub held: Vec<crate::reach::Held>,
 }
 
 /// What the machine-dependent half provides: one run of an input or event (reader.py `Reader.run_sentence_sym`,
@@ -123,6 +125,8 @@ pub struct Deltas {
     pub sig_ids: BTreeMap<i64, BTreeSet<String>>,
     /// the `args:` values `record` added to the table (`table.args_vals`), in order
     pub args: Vec<(String, i64)>,
+    /// the switch --reach: the branches the job held back
+    pub held: Vec<crate::reach::Held>,
 }
 
 /// One job's records and what it added to the Builder (par.rs).
@@ -160,13 +164,13 @@ pub struct Ctx<'a> {
 /// (its replan copy is the earlier one's, `_limit` gives it the same key, and `events_done` then skips it), so it is
 /// not kept (at Part I's scale the inputs' records name millions of events, a few tens of thousands of them distinct).
 #[derive(Default)]
-struct NextEvents {
-    events: Vec<Event>,
+pub(crate) struct NextEvents {
+    pub(crate) events: Vec<Event>,
     seen: FxHashSet<(String, UnitKey, i64, i64, bool)>,
 }
 
 impl NextEvents {
-    fn add(&mut self, recs: &[Record]) {
+    pub(crate) fn add(&mut self, recs: &[Record]) {
         for r in recs {
             for e in &r.next_events {
                 if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
@@ -201,6 +205,9 @@ pub struct Switches {
     /// (`Builder::run_split`). Off: reader.py's rule, which leaves a run unsplit when it forked more on non-facts,
     /// past SPLIT_DEPTH levels or SPLIT_BUDGET parts, and drops the paths the limit ended.
     pub split_limit: bool,
+    /// Forward reachability (reach.rs, experiments/E004-fast-exact/reach.md): a job or a fork's branch that needs a
+    /// value not reached from the start does not run, and runs when the value arrives. Needs split_limit.
+    pub reach: bool,
 }
 
 impl Switches {
@@ -214,7 +221,8 @@ impl Switches {
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
                 "split_limit" => s.split_limit = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit)")),
+                "reach" => s.reach = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach)")),
             }
         }
         Ok(s)
@@ -235,6 +243,9 @@ impl Switches {
         }
         if self.split_limit {
             v.push("split_limit");
+        }
+        if self.reach {
+            v.push("reach");
         }
         v
     }
@@ -360,6 +371,12 @@ pub struct Builder<'g> {
     pub slot_locals: Vec<SlotLocals>,
     /// F10: the events `dumped_events` made in the last pass (not the Esc ones), with their lists' numbers
     pub slot_events: Vec<Event>,
+    /// the switch --reach: the starts the reached values are seeded from
+    pub reach_starts: Vec<crate::facts::Facts>,
+    /// the switch --reach: the rounds' state (reach.rs)
+    pub(crate) reach_state: Option<Box<crate::reach::ReachState>>,
+    /// the switch --reach: the branches the job being run held back
+    pub(crate) reach_out: Vec<crate::reach::Held>,
 }
 
 /// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
@@ -436,6 +453,7 @@ impl<'g> Builder<'g> {
             rd: std::mem::take(&mut self.rd),
             sig_ids: std::mem::take(&mut self.sig_ids),
             args: self.args_log.as_mut().map(std::mem::take).unwrap_or_default(),
+            held: std::mem::take(&mut self.reach_out),
         }
     }
 
@@ -465,6 +483,7 @@ impl<'g> Builder<'g> {
         for (k, s) in d.args {
             self.table.args_vals.entry(k).or_default().insert(s);
         }
+        self.reach_out.extend(d.held);
         self.last_pins = last_pins;
     }
 
@@ -511,6 +530,9 @@ impl<'g> Builder<'g> {
             slot_locals: Vec::new(),
             slot_events: Vec::new(),
             frame_costs: None,
+            reach_starts: Vec::new(),
+            reach_state: None,
+            reach_out: Vec::new(),
         }
     }
 
@@ -1162,6 +1184,9 @@ impl<'g> Builder<'g> {
         self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
         let facts = self.rd.counts.get(FORKS_ON_READ) - facts0;
         let nonfacts = self.rd.counts.get(FORKS_ON_NONFACTS) - nonfacts0;
+        if run.limit == 0 {
+            self.reach_out.extend(run.held);
+        }
         if self.table.split_limit {
             if run.limit != 0 {
                 return self.run_split(m, job, pins, pre, budget, run.first_fork.clone(), run.limit);
@@ -1214,6 +1239,9 @@ impl<'g> Builder<'g> {
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
                 continue;
             }
+            if self.table.reach.is_some() && !self.reach_path(job, p) {
+                continue;
+            }
             let Some(mut rec) = self.record(&job.kind, &job.label, p, &job.what) else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
                 continue;
@@ -1227,6 +1255,9 @@ impl<'g> Builder<'g> {
                 _ => BTreeSet::new(),
             };
             rec.engine_pre = rec.pre.keys().filter(|k| budget.2.contains(*k) || own.contains(*k)).cloned().collect();
+            if self.table.reach.is_some() && !self.reach_record(job, p, &rec) {
+                continue;
+            }
             out.push(rec);
         }
         out
@@ -1267,6 +1298,7 @@ impl<'g> Builder<'g> {
             );
         }
         let key = first_fork.unwrap();
+        let vals = if self.table.reach.is_some() { self.reach_parts(job, pre, &key, vals) } else { vals };
         budget.1 += 1;
         self.counts.inc("runs past the path limit split on their first fork on a read");
         self.counts.inc(format!("split_limit: runs split at depth {}", budget.1));
@@ -1716,6 +1748,14 @@ impl<'g> Builder<'g> {
     ) -> usize {
         self.table.value_sets = self.switches.value_sets;
         self.table.split_limit = self.switches.split_limit;
+        if self.switches.reach {
+            assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
+            assert!(!self.switches.due_first, "--reach reads no due: facts");
+            self.table.reach = Some(Arc::new(crate::reach::Reached::default()));
+            if self.reach_starts.is_empty() {
+                self.reach_starts.push(self.scope.start.clone());
+            }
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -1805,6 +1845,11 @@ impl<'g> Builder<'g> {
         self.records.clear();
         self.n_records = 0;
         self.args_set.clear();
+        if self.table.reach.is_some() {
+            self.read_once_reach(m, start_events, skip, sink);
+            self.end_of_pass();
+            return;
+        }
         let t0 = std::time::Instant::now();
         let jobs = self.inputs();
         *self.phase_secs.entry("inputs()").or_default() += t0.elapsed().as_secs_f64();
@@ -1831,46 +1876,7 @@ impl<'g> Builder<'g> {
         let mut rounds = 0;
         while !todo.is_empty() {
             rounds += 1;
-            let te = std::time::Instant::now();
-            let mut jobs = Vec::new();
-            let mut added: FxHashSet<(String, UnitKey, i64, bool)> =
-                todo.iter().filter(|e| e.sig == 0).map(|e| (e.name.clone(), e.unit, e.w, e.abort)).collect();
-            let n0 = todo.len();
-            for i in 0..n0 {
-                let ev = &todo[i];
-                let k = (ev.name.clone(), ev.unit, ev.w, ev.abort);
-                if ev.sig != 0 && !added.contains(&k) && !self.events_done.contains(&(ev.name.clone(), ev.unit, ev.w, 0, ev.abort)) {
-                    added.insert(k);
-                    let copy = ev.unknown_locals(true);
-                    todo.push(copy);
-                    self.counts.inc("events with unknown locals (args 0) added for replans");
-                }
-            }
-            *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
-            let mut tp = 0.0;
-            for ev in &todo {
-                let ev = self.limit(ev);
-                let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
-                if self.events_done.contains(&k) {
-                    continue;
-                }
-                self.events_done.insert(k);
-                if skip.is_some_and(|f| f(&ev)) {
-                    self.counts.inc("events left out by the caller");
-                    continue;
-                }
-                let tq = std::time::Instant::now();
-                let (ok, pins, pre) = self.event_pins(&ev);
-                tp += tq.elapsed().as_secs_f64();
-                if !ok {
-                    self.counts.inc("events whose conditions never hold (constants)");
-                    continue;
-                }
-                let kind = if ev.abort { "skip_cutscene" } else { "event" };
-                jobs.push(Job { kind: kind.into(), label: ev.label(), pins, pre, what: What::Event(ev), checks: vec![] });
-            }
-            *self.phase_secs.entry("events").or_default() += te.elapsed().as_secs_f64();
-            *self.phase_secs.entry("events: event_pins").or_default() += tp;
+            let jobs = self.event_jobs(&mut todo, skip);
             let t0 = std::time::Instant::now();
             let n0 = self.n_records;
             let n_jobs = jobs.len();
@@ -1890,6 +1896,60 @@ impl<'g> Builder<'g> {
             self.tell(&what, n_jobs, n, t0.elapsed().as_secs_f64());
         }
         self.counts.set("event rounds", rounds);
+        self.end_of_pass();
+    }
+
+    /// The jobs of one round's events: each event's copy with unknown locals, its list past SIG_LIMIT folded, those
+    /// not yet run, and their pins. `todo` gains the copies.
+    pub(crate) fn event_jobs(&mut self, todo: &mut Vec<Event>, skip: Option<&dyn Fn(&Event) -> bool>) -> Vec<Job> {
+        let te = std::time::Instant::now();
+        let mut jobs = Vec::new();
+        let mut added: FxHashSet<(String, UnitKey, i64, bool)> =
+            todo.iter().filter(|e| e.sig == 0).map(|e| (e.name.clone(), e.unit, e.w, e.abort)).collect();
+        let n0 = todo.len();
+        for i in 0..n0 {
+            let ev = &todo[i];
+            let k = (ev.name.clone(), ev.unit, ev.w, ev.abort);
+            if ev.sig != 0 && !added.contains(&k) && !self.events_done.contains(&(ev.name.clone(), ev.unit, ev.w, 0, ev.abort)) {
+                added.insert(k);
+                let copy = ev.unknown_locals(true);
+                todo.push(copy);
+                self.counts.inc("events with unknown locals (args 0) added for replans");
+            }
+        }
+        *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
+        let mut tp = 0.0;
+        for ev0 in todo.iter() {
+            let ev = self.limit(ev0);
+            if ev.sig == 0 && ev0.sig != 0 {
+                self.reach_folded(&ev.name);
+            }
+            let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
+            if self.events_done.contains(&k) {
+                continue;
+            }
+            self.events_done.insert(k);
+            if skip.is_some_and(|f| f(&ev)) {
+                self.counts.inc("events left out by the caller");
+                continue;
+            }
+            let tq = std::time::Instant::now();
+            let (ok, pins, pre) = self.event_pins(&ev);
+            tp += tq.elapsed().as_secs_f64();
+            if !ok {
+                self.counts.inc("events whose conditions never hold (constants)");
+                continue;
+            }
+            let kind = if ev.abort { "skip_cutscene" } else { "event" };
+            jobs.push(Job { kind: kind.into(), label: ev.label(), pins, pre, what: What::Event(ev), checks: vec![] });
+        }
+        *self.phase_secs.entry("events").or_default() += te.elapsed().as_secs_f64();
+        *self.phase_secs.entry("events: event_pins").or_default() += tp;
+        jobs
+    }
+
+    /// `_read_once`'s last loop: the folded lists' numbers rewritten, the `args:` values, the collisions.
+    fn end_of_pass(&mut self) {
         let tw = std::time::Instant::now();
         let folded = self.folded.clone();
         for r in &mut self.records {
@@ -1925,7 +1985,7 @@ impl<'g> Builder<'g> {
     }
 
     /// One job's records, as made: to the sink, then kept (or, with `keep_records` off, only counted).
-    fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
+    pub(crate) fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
         if recs.is_empty() {
             return;
         }
@@ -1953,7 +2013,7 @@ impl<'g> Builder<'g> {
     }
 
     /// The progress callback (reader.py `Builder.progress`): what ran, its jobs, its records, its seconds.
-    fn tell(&mut self, what: &str, jobs: usize, records: usize, secs: f64) {
+    pub(crate) fn tell(&mut self, what: &str, jobs: usize, records: usize, secs: f64) {
         if let Some(p) = &mut self.progress {
             p(what, jobs, records, secs);
         }

@@ -23,6 +23,7 @@ pub mod oracle;
 pub mod packed;
 pub mod par;
 pub mod py;
+pub mod reach;
 pub mod record;
 pub mod replay;
 pub mod scaling;

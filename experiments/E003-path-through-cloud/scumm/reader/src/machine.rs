@@ -127,7 +127,7 @@ fn slot_of(name: &str) -> Slot {
     }
 }
 
-fn pkey_of(s: &str) -> PKey {
+pub(crate) fn pkey_of(s: &str) -> PKey {
     if let Some(name) = s.strip_prefix("args:") {
         return PKey::Args(slot_of(name));
     }
@@ -297,6 +297,10 @@ struct St {
     view: Option<Rc<BTreeMap<PKey, Labels>>>,
     /// F12: the instruction the step being run runs (None: an engine step)
     cur: Option<X>,
+    /// the switch --reach: the reached values, this rerun's guides, the branches this run held back (reach.rs)
+    reach: Option<std::sync::Arc<crate::reach::Reached>>,
+    guides: Option<std::sync::Arc<Vec<crate::reach::Guide>>>,
+    held: Vec<crate::reach::Held>,
 }
 
 fn st<'a>(m: &'a Machine<'_>) -> &'a St {
@@ -1380,6 +1384,7 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
         Some(sets) => sets,
         None => vals.iter().map(|&v| vec![v]).collect(),
     };
+    let groups = if st(m).reach.is_some() { reach_groups(m, p, key, &i.key, groups) } else { groups };
     let fam = family(key);
     let s = st_mut(m);
     if s.first_fork.is_none() {
@@ -1396,6 +1401,12 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
         m.h_halt(p, "no value", (*i.key).into());
         return Vec::new();
     }
+    if groups.is_empty() {
+        // the switch --reach: every branch of this fork is held back or ran before
+        *p = snap;
+        m.h_halt(p, "no value", (*i.key).into());
+        return Vec::new();
+    }
     let mut forks = Vec::with_capacity(groups.len());
     for g in groups.iter().skip(1) {
         let mut q = snap.clone();
@@ -1406,6 +1417,31 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
     Rc::make_mut(&mut sx_mut(&mut first).pre).insert(PKey::F(key), groups[0].clone());
     *p = first;
     forks
+}
+
+/// The switch --reach at a fork: the groups to follow. A group no guide of this rerun agrees with ran before, or belongs
+/// to another rerun; a group that meets no reached value is held back (reach.rs).
+fn reach_groups(m: &mut Machine<'_>, p: &Path, key: Fact, text: &str, groups: Vec<Labels>) -> Vec<Labels> {
+    use crate::reach::{agrees, make_guide, Held};
+    let pk = PKey::F(key);
+    let pre = sx(p).pre.clone();
+    let s = st(m);
+    let (reach, guides, seed) = (s.reach.clone().unwrap(), s.guides.clone(), s.seed.clone());
+    let table = s.table.as_ref().unwrap();
+    let mut keep = Vec::with_capacity(groups.len());
+    let mut held = Vec::new();
+    for g in groups {
+        if !agrees(guides.as_deref(), &pre, pk, &g) {
+            continue;
+        }
+        if reach.meets(table, text, &g) {
+            keep.push(g);
+        } else {
+            held.push(Held { guide: make_guide(&pre, &seed, Some((pk, &g))), key: text.to_string(), set: g });
+        }
+    }
+    st_mut(m).held.extend(held);
+    keep
 }
 
 /// reader.py `_make_step`: the op with its counter kept as a step until something reads it.
@@ -1970,7 +2006,13 @@ impl Reader<'_> {
 
 impl RunMachine for Reader<'_> {
     /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`.
-    fn run(&mut self, cx: &Ctx, _label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+    fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+        if let Some(r) = &cx.table.reach {
+            let s = st_mut(&mut self.m);
+            s.guides = r.guides_of(label);
+            s.reach = Some(r.clone());
+            s.held.clear();
+        }
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
         // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths
@@ -1979,7 +2021,8 @@ impl RunMachine for Reader<'_> {
         } else {
             run.paths.iter().map(|p| path_out(game, &run, p)).collect()
         };
-        RunOut { paths, limit: run.limit as i64, value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(), first_fork, rd }
+        let held = std::mem::take(&mut st_mut(&mut self.m).held);
+        RunOut { paths, limit: run.limit as i64, value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(), first_fork, rd, held }
     }
 }
 
