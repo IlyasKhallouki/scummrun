@@ -652,7 +652,12 @@ Measured (stuck, 2026-10-26; the laptop at load 10 to 20 from other jobs; result
   a record is made of it. `reach_record` then decides on the action's precondition, and in a rerun drops what the round
   before already met. `run_split` makes parts only for the values reached.
 - The precondition on `args:X` is always written under the switch (`pin`, `record`).
-- `NAME.reached` next to the packed file, for `taskcore --reached`. `Builder::reach_extend` goes on from a new start.
+- `NAME.reached` next to the packed file, which taskcore reads on its own. `Builder::reach_extend` goes on from a new start.
+
+`pass2_reuse` (reader-scope `--pass2-reuse`, reader-port `--switches pass2_reuse`), off by default, needs worker threads.
+The proof is in `experiments/E004-fast-exact/pass2-reuse.md`. `memo.rs` keeps each run of pass 1 with what it depended on
+(`RunLog`). `Builder::run_job` takes a run of pass 2 from there when all of it agrees. `machine.rs` logs through `info`.
+The output is byte for byte the same; the peak memory holds pass 1's records.
 
 ## Frame costs, as a switch
 
