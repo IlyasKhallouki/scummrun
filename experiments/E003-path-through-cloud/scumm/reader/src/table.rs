@@ -75,6 +75,11 @@ pub struct FactTable {
     pub split_limit: bool,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
+    /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
+    pub memo: Option<std::sync::Arc<crate::memo::RunMemo>>,
+    /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
+    /// (inputs.rs); None with the switch off
+    pub settled: Option<std::sync::Arc<crate::inputs::SettledRule>>,
 }
 
 impl FactTable {
@@ -183,6 +188,8 @@ impl FactTable {
             value_sets: false,
             split_limit: false,
             reach: None,
+            memo: None,
+            settled: None,
         }
     }
 

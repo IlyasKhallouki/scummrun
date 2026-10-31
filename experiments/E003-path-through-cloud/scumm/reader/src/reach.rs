@@ -7,6 +7,7 @@ use crate::builder::{Builder, Job, Machine, RecordSink};
 use crate::domain::{Label, Labels};
 use crate::facts::Facts;
 use crate::machine::{pkey_of, PKey};
+use crate::memo::{Query, RunLog};
 use crate::py::Counter;
 use crate::record::{Event, PathOut, Pre, Record};
 use crate::table::{pos_key, FactTable, NOWHERE};
@@ -136,21 +137,48 @@ impl Reached {
         Self::meets_at(&i, table, key, set, t)
     }
 
-    /// The first set of `pre` that no reached value meets.
-    pub fn first_unmet<'a, I>(&self, table: &FactTable, pre: I) -> Option<(String, Labels)>
+    /// The first set of `pre` that no reached value meets. The questions asked go to `log` (memo.rs).
+    pub fn first_unmet<'a, I>(&self, table: &FactTable, pre: I, log: Option<&mut RunLog>) -> Option<(String, Labels)>
     where
         I: IntoIterator<Item = (&'a String, &'a Labels)>,
     {
         let i = self.inner.read().unwrap();
         let t = i.now as i64;
-        pre.into_iter().find(|(k, s)| !Self::meets_at(&i, table, k, s, t)).map(|(k, s)| (k.clone(), s.clone()))
+        let mut log = log;
+        for (k, s) in pre {
+            let answer = Self::meets_at(&i, table, k, s, t);
+            if let Some(l) = log.as_deref_mut() {
+                l.queries.push(Query { key: k.clone(), set: s.clone(), before: false, answer });
+            }
+            if !answer {
+                return Some((k.clone(), s.clone()));
+            }
+        }
+        None
     }
 
     /// Whether every set of `pre` met the values of the round before: the record was written then.
-    pub fn was_met(&self, table: &FactTable, pre: &[(String, Labels)]) -> bool {
+    pub fn was_met(&self, table: &FactTable, pre: &[(String, Labels)], log: Option<&mut RunLog>) -> bool {
         let i = self.inner.read().unwrap();
         let t = i.now as i64 - 1;
-        pre.iter().all(|(k, s)| Self::meets_at(&i, table, k, s, t))
+        let mut log = log;
+        for (k, s) in pre {
+            let answer = Self::meets_at(&i, table, k, s, t);
+            if let Some(l) = log.as_deref_mut() {
+                l.queries.push(Query { key: k.clone(), set: s.clone(), before: true, answer });
+            }
+            if !answer {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Every question gets the answer it got (memo.rs).
+    pub fn answers_hold(&self, table: &FactTable, queries: &[Query]) -> bool {
+        let i = self.inner.read().unwrap();
+        let now = i.now as i64;
+        queries.iter().all(|q| Self::meets_at(&i, table, &q.key, &q.set, if q.before { now - 1 } else { now }) == q.answer)
     }
 
     pub fn guides_of(&self, label: &str) -> Option<Arc<Vec<Guide>>> {
@@ -259,7 +287,7 @@ impl Builder<'_> {
             }
         }
         let (pre, _) = self.positions(pre, Vec::new());
-        match reach.first_unmet(&self.table, pre.iter()) {
+        match reach.first_unmet(&self.table, pre.iter(), self.memo_log.as_mut()) {
             None => true,
             Some((key, set)) => {
                 self.reach_hold_path(job, p, key, set);
@@ -280,11 +308,11 @@ impl Builder<'_> {
         let reach = self.reach_arc();
         let mut c = Counter::default();
         let (pre, _) = record_action(&self.table, rec, &mut c);
-        if let Some((key, set)) = reach.first_unmet(&self.table, pre.iter().map(|(k, s)| (k, s))) {
+        if let Some((key, set)) = reach.first_unmet(&self.table, pre.iter().map(|(k, s)| (k, s)), self.memo_log.as_mut()) {
             self.reach_hold_path(job, p, key, set);
             return false;
         }
-        if reach.guides_of(&job.label).is_some() && reach.was_met(&self.table, &pre) {
+        if reach.guides_of(&job.label).is_some() && reach.was_met(&self.table, &pre, self.memo_log.as_mut()) {
             self.counts.inc("reach: records of a rerun already written");
             return false;
         }
@@ -304,7 +332,11 @@ impl Builder<'_> {
             if !agrees(guides.as_deref(), &raw, pk, &g) {
                 continue;
             }
-            if reach.meets(&self.table, key, &g) {
+            let answer = reach.meets(&self.table, key, &g);
+            if let Some(l) = &mut self.memo_log {
+                l.queries.push(Query { key: key.to_string(), set: g.clone(), before: false, answer });
+            }
+            if answer {
                 keep.push(v);
             } else {
                 self.reach_out.push(Held { guide: make_guide(&raw, &seed, Some((pk, &g))), key: key.to_string(), set: g });
@@ -339,7 +371,7 @@ impl Builder<'_> {
 
     /// One of (d)'s effects: fired if its conditions hold, else it waits on the first that does not.
     fn reach_effect(&mut self, reach: &Reached, when: Vec<(String, Labels)>, key: &str, vals: Labels) {
-        match reach.first_unmet(&self.table, when.iter().map(|(k, s)| (k, s))) {
+        match reach.first_unmet(&self.table, when.iter().map(|(k, s)| (k, s)), None) {
             None => {
                 let st = self.reach_state.as_mut().unwrap();
                 st.fresh.extend(vals.into_iter().map(|v| (key.to_string(), v)));
@@ -415,7 +447,7 @@ impl Builder<'_> {
 
     /// A job that does not meet the reached values waits on the first set that fails; true: it can run.
     fn reach_job_ready(&mut self, reach: &Reached, job: &Job) -> bool {
-        match reach.first_unmet(&self.table, job.pre.iter()) {
+        match reach.first_unmet(&self.table, job.pre.iter(), None) {
             None => true,
             Some((key, set)) => {
                 let st = self.reach_state.as_mut().unwrap();
@@ -542,7 +574,7 @@ impl Builder<'_> {
         while !jobs.is_empty() {
             let st = self.reach_state.as_mut().unwrap();
             st.rounds += 1;
-            let what = format!("event round {}", st.rounds);
+            let what = if st.rounds == 1 { "inputs".to_string() } else { format!("event round {}", st.rounds - 1) };
             let t0 = std::time::Instant::now();
             let n0 = self.n_records;
             let n_jobs = jobs.len();
@@ -620,7 +652,7 @@ impl Builder<'_> {
             let st = self.reach_state.as_ref().unwrap();
             (st.rounds, st.max_waits, st.wait_set.len())
         };
-        self.counts.set("event rounds", rounds);
+        self.counts.set("event rounds", rounds - 1);
         self.counts.set("reach: most branches held at once", waits as i64);
         self.counts.set("reach: branches and jobs still held at the end", left as i64);
         let vals: i64 = reach.inner.read().unwrap().vals.values().map(|m| m.len() as i64).sum();

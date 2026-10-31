@@ -87,6 +87,9 @@ pub struct RunOut {
     pub rd: RdCounts,
     /// the switch --reach: the branches this run held back (reach.rs)
     pub held: Vec<crate::reach::Held>,
+    /// the switch pass2_reuse, in pass 1: the facts the machine half consulted, and its questions (memo.rs)
+    pub touched: Vec<String>,
+    pub queries: Vec<crate::memo::Query>,
 }
 
 /// What the machine-dependent half provides: one run of an input or event (reader.py `Reader.run_sentence_sym`,
@@ -208,6 +211,12 @@ pub struct Switches {
     /// Forward reachability (reach.rs, experiments/E004-fast-exact/reach.md): a job or a fork's branch that needs a
     /// value not reached from the start does not run, and runs when the value arrives. Needs split_limit.
     pub reach: bool,
+    /// F1c (fix-round1.md): a sentence or a walk with a room's input script that is not plain starts at that script,
+    /// from the sentence variables as constants (inputs.rs; machine.rs `f1c_click`; `Builder::settled_jobs`)
+    pub input_settled: bool,
+    /// Pass 2 reruns only what a widened value touches (memo.rs, experiments/E004-fast-exact/pass2-reuse.md); the output
+    /// is byte for byte the same.
+    pub pass2_reuse: bool,
 }
 
 impl Switches {
@@ -222,7 +231,9 @@ impl Switches {
                 "actor_rooms" => s.actor_rooms = true,
                 "split_limit" => s.split_limit = true,
                 "reach" => s.reach = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach)")),
+                "pass2_reuse" => s.pass2_reuse = true,
+                "input_settled" => s.input_settled = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled)")),
             }
         }
         Ok(s)
@@ -246,6 +257,12 @@ impl Switches {
         }
         if self.reach {
             v.push("reach");
+        }
+        if self.pass2_reuse {
+            v.push("pass2_reuse");
+        }
+        if self.input_settled {
+            v.push("input_settled");
         }
         v
     }
@@ -377,6 +394,8 @@ pub struct Builder<'g> {
     pub(crate) reach_state: Option<Box<crate::reach::ReachState>>,
     /// the switch --reach: the branches the job being run held back
     pub(crate) reach_out: Vec<crate::reach::Held>,
+    /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs)
+    pub(crate) memo_log: Option<crate::memo::RunLog>,
 }
 
 /// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
@@ -457,6 +476,23 @@ impl<'g> Builder<'g> {
         }
     }
 
+    /// What `take_deltas` took, back on the counters (a worker's Builder, whose counters are empty between jobs).
+    pub(crate) fn set_deltas(&mut self, d: Deltas) {
+        self.counts = d.counts;
+        self.ends = d.ends;
+        self.drops = d.drops;
+        self.nonfact_checks = d.nonfact_checks;
+        self.guesses = d.guesses;
+        self.unknown_writes = d.unknown_writes;
+        self.unknown_sites = d.unknown_sites;
+        self.out_of_domain = d.out_of_domain;
+        self.outside_points = d.outside_points;
+        self.rd = d.rd;
+        self.sig_ids = d.sig_ids;
+        self.args_log = Some(d.args);
+        self.reach_out = d.held;
+    }
+
     /// A job run elsewhere (par.rs), merged as if it had run here: its counters added in their order, its sets
     /// joined, its `args:` values added to the table, its last run's pins the last pins.
     pub fn merge_job(&mut self, d: Deltas, last_pins: Pins) {
@@ -533,6 +569,7 @@ impl<'g> Builder<'g> {
             reach_starts: Vec::new(),
             reach_state: None,
             reach_out: Vec::new(),
+            memo_log: None,
         }
     }
 
@@ -795,6 +832,121 @@ impl<'g> Builder<'g> {
         vals.into_iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect()
     }
 
+    /// F1c: the switch's reading of the scripts (inputs.rs), once.
+    pub fn settled_rule(&mut self) -> Option<std::sync::Arc<crate::inputs::SettledRule>> {
+        if self.table.settled.is_none() {
+            let rule = crate::inputs::settled_rule(self.game, &self.scope.units, &self.table.start);
+            self.table.settled = rule.map(std::sync::Arc::new);
+        }
+        self.table.settled.clone()
+    }
+
+    /// F1c rule 2 and 3 (fix-round1.md): each sentence or walk on room objects and actors, per value of VAR_VERB_SCRIPT:
+    /// a plain value keeps today's job with var:32 pinned; any other value n gets a job labelled [n] that needs the
+    /// hover live, not frozen and at its wait, and its guards, and carries `SETTLED_PIN`. An input with an object in the
+    /// inventory stays as it is.
+    fn settled_jobs(&mut self, jobs: Vec<Job>) -> Vec<Job> {
+        use crate::inputs::SETTLED_PIN;
+        let Some(rule) = self.settled_rule() else {
+            self.counts.inc("F1c: no plain input script or no hover (the switch changes nothing)");
+            return jobs;
+        };
+        let key32 = format!("var:{VAR_VERB_SCRIPT}");
+        let values: Vec<i64> = match self.domain(&key32) {
+            Some(d) if self.kind(&key32) != Kind::Const => d.values.iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect(),
+            _ => vec![self.table.start.get0(&key32)],
+        };
+        let hover_key = self.game.lifecycle_key(rule.hover).map(|k| k.to_string());
+        let hover = slot_name(hover_key.as_deref().unwrap_or(""));
+        let mut base = (Pins::new(), Pre::new());
+        let mut ok = true;
+        if let Some(k) = &hover_key {
+            ok = self.pin(&mut base.0, &mut base.1, k, &[Label::Int(1)]);
+        }
+        ok = ok && self.pin(&mut base.0, &mut base.1, &format!("frozen:{hover}"), &[Label::Int(0)]);
+        ok = ok && self.pin(&mut base.0, &mut base.1, &format!("at:{hover}:{}", rule.wait), &[Label::Int(1)]);
+        for g in &rule.guards {
+            let vals: Labels = match self.domain(&g.key) {
+                Some(d) => {
+                    let value = |l: &Label| match *l {
+                        Label::Int(n) => n,
+                        Label::Above => d.high.unwrap() + 1,
+                        Label::Below => d.low.unwrap() - 1,
+                    };
+                    d.values.iter().filter(|l| g.holds(value(l))).copied().collect()
+                }
+                None => vec![Label::Int(self.table.start.get0(&g.key))].into_iter().filter(|l| matches!(l, Label::Int(n) if g.holds(*n))).collect(),
+            };
+            ok = ok && !vals.is_empty() && self.pin(&mut base.0, &mut base.1, &g.key, &vals);
+        }
+        let mut out = Vec::with_capacity(jobs.len() * 2);
+        for job in jobs {
+            let What::Sentence { a, .. } = job.what else { unreachable!("today's sentence jobs") };
+            if job.label.contains("[inv]") {
+                out.push(job);
+                continue;
+            }
+            for &n in &values {
+                let mut j = job.clone();
+                let n_label = Label::Int(n);
+                if !self.pin(&mut j.pins, &mut j.pre, &key32, &[n_label]) {
+                    continue;
+                }
+                if rule.plain.contains(&n) {
+                    out.push(j);
+                    continue;
+                }
+                if !ok {
+                    self.counts.inc("F1c: inputs whose hover or guards never hold (constants)");
+                    continue;
+                }
+                // a local input script: the job's rooms it can run in
+                let mut rooms: Labels = self
+                    .scope
+                    .rooms
+                    .iter()
+                    .filter(|&&r| rule.runs_in(self.game, n, self.game.resource(r)))
+                    .map(|&r| Label::Int(r as i64))
+                    .collect();
+                if a >= NUM_ACTORS {
+                    let home = self.game.object_room.get(&(a as i32)).copied();
+                    rooms.retain(|r| matches!(r, Label::Int(x) if self.game.resource(*x as i32) == home));
+                }
+                if rooms.is_empty() {
+                    self.counts.inc("F1c: inputs whose input script no room of theirs installs");
+                    continue;
+                }
+                if (n as i32) >= self.game.first_local && !self.pin(&mut j.pins, &mut j.pre, "room", &rooms) {
+                    continue;
+                }
+                if j.pre.get("room").is_some_and(|s| s.is_empty()) {
+                    self.counts.inc("F1c: inputs whose input script no room of theirs installs");
+                    continue;
+                }
+                let mut fine = true;
+                for (k, v) in &base.1 {
+                    fine = fine && self.pin(&mut j.pins, &mut j.pre, k, v);
+                }
+                for (k, v) in &base.0 {
+                    if !j.pre.contains_key(k) {
+                        j.pins.insert(k.clone(), v.clone());
+                    }
+                }
+                if !fine {
+                    continue;
+                }
+                j.pins.insert(SETTLED_PIN.to_string(), Val::Int(n));
+                j.label = match j.label.strip_suffix("~frozen") {
+                    Some(l) => format!("{l}[{n}]~frozen"),
+                    None => format!("{}[{n}]", j.label),
+                };
+                self.counts.inc("F1c: inputs that start at the input script");
+                out.push(j);
+            }
+        }
+        out
+    }
+
     /// `Builder.inputs`: every player input of the scope, in reader.py's order.
     pub fn inputs(&mut self) -> Vec<Job> {
         let mut out = Vec::new();
@@ -881,6 +1033,9 @@ impl<'g> Builder<'g> {
                     }
                 }
             }
+        }
+        if self.switches.input_settled {
+            out = self.settled_jobs(out);
         }
         let key32 = format!("var:{VAR_VERB_SCRIPT}");
         let vs: Vec<i64> = match self.domain(&key32) {
@@ -1163,6 +1318,15 @@ impl<'g> Builder<'g> {
 
     /// `Builder.run` for one input or event (the root call: its budget is made here).
     pub fn run_job(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
+        if self.args_log.is_some() {
+            if let Some(memo) = self.table.memo.clone() {
+                return self.run_job_memo(&memo, m, job);
+            }
+        }
+        self.run_job_real(m, job)
+    }
+
+    pub(crate) fn run_job_real(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
         self.counts.inc(format!("runs: {}", job.kind));
         let mut budget = (SPLIT_BUDGET, 0i64, job.pre.keys().cloned().collect::<BTreeSet<String>>());
         self.run(m, job, &job.pins, &job.pre, &mut budget)
@@ -1184,6 +1348,14 @@ impl<'g> Builder<'g> {
         self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
         let facts = self.rd.counts.get(FORKS_ON_READ) - facts0;
         let nonfacts = self.rd.counts.get(FORKS_ON_NONFACTS) - nonfacts0;
+        if let Some(l) = &mut self.memo_log {
+            l.touched.extend(run.touched.iter().cloned());
+            l.queries.extend(run.queries.iter().cloned());
+            for p in &run.paths {
+                l.touched.extend(p.pre.keys().cloned());
+                l.touched.extend(p.writes.keys().cloned());
+            }
+        }
         if run.limit == 0 {
             self.reach_out.extend(run.held);
         }
@@ -1356,6 +1528,9 @@ impl<'g> Builder<'g> {
             let cd: Vec<CutData> = kept.cut_data.iter().map(cut_text).collect();
             let (locs, mut sig, recursive) =
                 self.list_number(name, kept.unit, locs, kept.override_, &cd, kept.known, &kept.recursive, &kept.resistant, &kept.owned);
+            if let Some(l) = &mut self.memo_log {
+                l.sigs.push((sig, self.folded.contains(&sig)));
+            }
             if self.folded.contains(&sig) {
                 sig = 0;
             }
@@ -1756,6 +1931,12 @@ impl<'g> Builder<'g> {
                 self.reach_starts.push(self.scope.start.clone());
             }
         }
+        if self.switches.input_settled {
+            self.settled_rule();
+        }
+        if self.switches.pass2_reuse {
+            self.table.memo = Some(Arc::new(crate::memo::RunMemo::default()));
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -1769,10 +1950,16 @@ impl<'g> Builder<'g> {
             }
             self.widened.push(self.out_of_domain.clone());
             let added = self.extend_domains();
+            if let Some(memo) = &self.table.memo {
+                memo.start_reuse(self.widened.last().unwrap().keys().cloned());
+            }
             self.counts.set(format!("pass {}: domain values added for the next pass", n + 1), added);
             self.reset();
         }
         self.counts.set("records", self.n_records as i64);
+        if let Some(memo) = &self.table.memo {
+            memo.clear();
+        }
         if self.switches.due_first {
             crate::due::apply(self);
         }

@@ -36,6 +36,8 @@
 //!               a value not reached from the start does not run, and runs when the value arrives. Needs --split-limit.
 //!               Writes NAME.reached next to the packed file (taskcore --reached). Off by default.
 //! --reach-also FILE  a further start to read from (taskcore's --start-file format, key<TAB>value), with --reach
+//! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
+//!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
 //!               lower bound of its duration from the engine source, and the fold key holds the cost; the reading's
 //!               head (--golden) gives the parameters (`frame_costs`), which packed_reading.py copies into
@@ -452,6 +454,7 @@ fn main() {
     let split_limit = args.iter().any(|a| a == "--split-limit");
     let frame_costs = args.iter().any(|a| a == "--frame-costs");
     let reach = args.iter().any(|a| a == "--reach");
+    let pass2_reuse = args.iter().any(|a| a == "--pass2-reuse");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
@@ -509,6 +512,7 @@ fn main() {
     b.table.elsewhere = elsewhere;
     b.switches.split_limit = split_limit;
     b.switches.reach = reach;
+    b.switches.pass2_reuse = pass2_reuse;
     if reach {
         b.reach_starts.push(start.clone());
         if let Some(f) = arg(&args, "--reach-also") {
@@ -780,6 +784,17 @@ fn main() {
         "max_records_waiting": stats.max_buffered,
         "longest_jobs": stats.longest.iter().map(|(s, l, b)| json!([(s * 100.0).round() / 100.0, l, b])).collect::<Vec<_>>(),
     });
+    if let Some(m) = &b.table.memo {
+        let n = |a: &std::sync::atomic::AtomicU64| a.load(std::sync::atomic::Ordering::Relaxed);
+        r["pass2_reuse"] = json!({
+            "reused": n(&m.reused),
+            "ran_job_differs": n(&m.stale_job),
+            "ran_widened_fact": n(&m.stale_domain),
+            "ran_folded_list": n(&m.stale_list),
+            "ran_reached_value": n(&m.stale_reached),
+            "ran_not_in_pass_1": n(&m.none),
+        });
+    }
     r["sink_thread_busy_s"] = json!((tee.busy * 10.0).round() / 10.0);
     r["phases_s"] = json!(b.phase_secs.iter().map(|(k, v)| (k.to_string(), (v * 100.0).round() / 100.0)).collect::<BTreeMap<_, _>>());
     {
