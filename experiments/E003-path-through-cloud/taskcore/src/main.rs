@@ -45,6 +45,7 @@ struct Args {
     kept: Option<PathBuf>,
     model: bool,
     start_file: Option<PathBuf>,
+    reached: Option<PathBuf>,
     bans: Option<PathBuf>,
     ops: Option<PathBuf>,
     needed_check: bool,
@@ -70,6 +71,7 @@ fn parse() -> Result<Args, String> {
         kept: None,
         model: true,
         start_file: None,
+        reached: None,
         bans: None,
         ops: None,
         needed_check: false,
@@ -106,6 +108,7 @@ fn parse_opts(a: &mut Args, mut it: impl Iterator<Item = String>) -> Result<Vec<
             "--kept" => a.kept = Some(v.into()),
             "--names" => a.names = Some(v.into()),
             "--start-file" => a.start_file = Some(v.into()),
+            "--reached" => a.reached = Some(v.into()),
             "--bans" => a.bans = Some(v.into()),
             "--ops" => a.ops = Some(v.into()),
             "--goal" => a.goal = Some(v),
@@ -318,6 +321,15 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         None => 0,
     };
     st.s("start", t.strs.get(t.starts.get(start).ok_or("the file has no start")?.0));
+    // a reading made with the reader's switch --reach covers only what its start reaches: a start holding another
+    // value needs the reading extended, and no task comes out of this one (bans::reached_misses)
+    if let Some(path) = &a.reached {
+        let m = bans::reached_misses(&t, &t.starts[start].1, path)?;
+        if !m.is_empty() {
+            eprintln!("taskcore: the start holds {} values the reading did not reach: {:?}; extend the reading (reader-scope --reach-also)", m.len(), &m[..m.len().min(20)]);
+            std::process::exit(7);
+        }
+    }
     // a start value outside a domain the input's file uses: task.py raises OutOfDomain; so does taskcore, before the
     // fold and the reductions can hide the fact (sas::start_misses). With --start-check needed, only on those of
     // these facts that (e) needs, before or after the first fold (below)
@@ -503,6 +515,53 @@ fn run() -> Result<(), String> {
             write_out(&a, p, t0)
         }
         "serve" => serve::run(&a),
+        "dump" => {
+            // the reduced task as text, one JSON line per action and one per fact (the check of the reader's switch
+            // --reach, experiments/E004-fast-exact/reach_check.py): no state, no writer
+            let p = prepare(&a)?;
+            let t = &p.task;
+            let text = |f: u32, vals: &[u32]| -> String {
+                let d = t.facts.dom(f);
+                let v: Vec<String> = vals.iter().map(|&x| esc(t.strs.get(d[x as usize]))).collect();
+                format!("[{}]", v.join(","))
+            };
+            let f = std::fs::File::create(a.out.as_ref().ok_or("--out is needed")?).map_err(|e| e.to_string())?;
+            let mut o = std::io::BufWriter::new(f);
+            use std::io::Write as _;
+            for k in 0..t.facts.len() as u32 {
+                let all: Vec<u32> = (0..t.facts.size(k)).collect();
+                writeln!(o, "{{\"fact\":{},\"values\":{}}}", esc(t.key(k)), text(k, &all)).map_err(|e| e.to_string())?;
+            }
+            for i in 0..t.acts.len() {
+                let v = t.acts.view(i);
+                let m = t.acts.meta[i];
+                let sets = |it: &mut dyn Iterator<Item = (u32, &[u32])>| -> String {
+                    let s: Vec<String> = it.map(|(f, vs)| format!("[{},{}]", esc(t.key(f)), text(f, vs))).collect();
+                    format!("[{}]", s.join(","))
+                };
+                let effs: Vec<String> = v
+                    .effs()
+                    .map(|e| {
+                        let vals = if e.kind == K_BAD { "[]".to_string() } else { text(e.fact, e.vals) };
+                        format!("[{},{},{},{}]", esc(t.key(e.fact)), e.kind, vals, sets(&mut e.when()))
+                    })
+                    .collect();
+                writeln!(
+                    o,
+                    "{{\"label\":{},\"kind\":{},\"end\":{},\"cont\":{},\"cost\":{},\"rec\":{},\"pre\":{},\"eff\":[{}]}}",
+                    esc(t.strs.get(m.label)),
+                    esc(t.strs.get(m.kind)),
+                    esc(t.strs.get(m.end)),
+                    esc(t.strs.get(m.cont)),
+                    m.cost,
+                    m.rec,
+                    sets(&mut v.pre()),
+                    effs.join(",")
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        }
         "decode" => {
             let p = prepare(&a)?;
             let plan_text = std::fs::read_to_string(a.plan.as_ref().ok_or("--plan is needed")?).map_err(|e| e.to_string())?;

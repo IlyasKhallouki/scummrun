@@ -13,6 +13,7 @@ taskcore sas    --task kitchen.tc --start s17 --out task.sas [--stats stats.json
 taskcore decode (same options) --plan sas_plan --out steps.json
 taskcore validate (same options) --names plan.txt --out result.json   (a plan as input action names, run on the reduced task)
 taskcore info   --task kitchen.tc
+taskcore dump   (same options) --out F   (the reduced task as JSON lines: facts and values, actions)
 taskcore serve  --task kitchen.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
                 (then one `sas` request per line on stdin: replanning without reloading, below)
 ```
@@ -57,6 +58,10 @@ and the new binary on the kitchen and test_taskcore.py's property test).
   Its first line also lists the facts (e) needs on the banned task, before the fold (`reduce::needed`): the harness
   cuts each step's effects to them, as the python planner's pruned task cut them to relevance.py's (on the kitchen
   the same 244 facts as the pruned task's).
+- `--reached F` (`sas`, `serve`): `F` is the `NAME.reached` file of a reading made with the reader's switch `--reach`,
+  one line per fact, its key and reached values. A start holding a value outside them stops `sas` with exit code 7 and
+  no task, and answers a `serve` request with `error`, naming the values: that reading does not cover the start
+  (experiments/E004-fast-exact/reach.md, "A replan start").
 - `--start-check needed` (default `input`): the start check only on the facts (e) needs (below). It needs (e) on.
   Where the input check passes it changes nothing (the same file and operator table on the kitchen's replan
   starts, with and without bans); the stats count what the input check would have stopped on.

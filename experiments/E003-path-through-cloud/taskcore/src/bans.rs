@@ -37,6 +37,33 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// The index of value text `v` in fact `f`'s domain, NONE when the domain lacks it.
+/// `--reached F` (the reader's switch --reach writes it, `NAME.reached`): the start's values that are not among a fact's
+/// reached values, as `key=value`. One line per fact: `key<TAB>value<TAB>value...`. A fact the file does not name is
+/// not checked (its start is the file's start and nothing reads it). A value outside the domain is the start check's.
+pub fn reached_misses(t: &Task, start: &[u32], path: &Path) -> Result<Vec<String>, String> {
+    let text = read_lines(path)?;
+    let mut reached: std::collections::HashMap<&str, std::collections::HashSet<&str>> = std::collections::HashMap::new();
+    for line in text.lines() {
+        let mut parts = line.split('\t');
+        let key = parts.next().unwrap_or("");
+        reached.insert(key, parts.filter(|v| !v.is_empty()).collect());
+    }
+    let mut out = Vec::new();
+    for f in 0..t.facts.len() as u32 {
+        let x = start[f as usize];
+        if x == NONE {
+            continue;
+        }
+        if let Some(vals) = reached.get(t.key(f)) {
+            let v = t.strs.get(t.facts.dom(f)[x as usize]);
+            if !vals.contains(v) {
+                out.push(format!("{}={}", t.key(f), v));
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn value_index(t: &Task, f: u32, v: &str) -> u32 {
     match t.strs.find(v) {
         Some(s) => t.facts.dom(f).iter().position(|&x| x == s).map(|p| p as u32).unwrap_or(NONE),
