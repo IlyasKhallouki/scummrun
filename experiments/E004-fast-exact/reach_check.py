@@ -214,13 +214,16 @@ def main():
                 n = json.loads(st.read_text())["actions_after_reduce"]
                 out[f"taskcore_d_keeps_of_{name}"] = n
                 assert n == mine, f"{name}: taskcore's (d) keeps {n}, this copy {mine}"
-    # args:X with the single value 0 in the reading with the switch: no kept record names a list of X, so the fact is
-    # constant and a precondition or a write of it says nothing. The full reading's domain may hold lists only unkept
-    # records named. Both sides leave it out, and a record left with no effect is a no-op on either side.
+    # args:X with the single value 0 in either reading: no record names a list of X, so the fact is constant and a
+    # precondition or a write of it says nothing. Both sides leave it out, and a record left with no effect is a no-op.
     const = {k for k, d in zip(r.keys, r.doms) if k.startswith("args:") and [r.strs[v] for v in d] == ["0"]}
+    const |= {k for k, d in zip(f.keys, f.doms) if k.startswith("args:") and [f.strs[v] for v in d] == ["0"]}
+    # With the switch a job's and a record's set on args:X is always written; the full reading leaves it out where the
+    # lists known when the job was made are none (reach.md, "Lists"). So {0} on args:X, and a write of 0, are left out on
+    # both sides of the comparison.
     def norm(c):
-        pre = tuple(x for x in c[5] if not (x[0] in const and x[1] == ("0",)))
-        eff = tuple(e for e in c[6] if not (e[0] in const and e[2] == ("0",)))
+        pre = tuple(x for x in c[5] if not (x[0].startswith("args:") and x[1] == ("0",)))
+        eff = tuple(e for e in c[6] if not (e[0].startswith("args:") and e[2] == ("0",)))
         return c[:5] + (pre, eff)
     kf = Counter(n for n in (norm(f.canon(x)) for x, k in zip(f.acts, af) if k) if n[6])
     kr = Counter(n for n in (norm(r.canon(x)) for x, k in zip(r.acts, ar) if k) if n[6])
@@ -282,6 +285,7 @@ def main():
                     pairs.add((name, st_f.get("pos:" + name), f.strs[st[i]]))
     cls = Counter()
     other = []
+    same_label = {c[0] for c in only_reach}
     for c in only_full.elements():
         pre = dict(c[5])
         ar = [k for k in pre if k.startswith("args:") and pre[k] != ("0",)]
@@ -293,6 +297,8 @@ def main():
                 unnamed = True
         if unnamed:
             cls["lemma 2: a (pos, args) pair no kept record writes"] += 1
+        elif c[0] in same_label:
+            cls["a job read otherwise (a split in one reading only, a list folded in one only)"] += 1
         else:
             cls["other"] += 1
             other.append(c)

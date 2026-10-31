@@ -601,7 +601,7 @@ impl<'g> Builder<'g> {
             if values.is_empty() {
                 return false;
             }
-            if values != dom.values {
+            if values != dom.values || (key.starts_with("args:") && self.table.reach.is_some()) {
                 let have = pre.get(key).cloned().unwrap_or_else(|| values.clone());
                 pre.insert(key.to_string(), values.iter().copied().filter(|v| have.contains(v)).collect());
             }
@@ -1326,7 +1326,7 @@ impl<'g> Builder<'g> {
         let mut pre = Pre::new();
         for (k, s) in &p.pre {
             if let Some(dom) = self.table.domain(k) {
-                if *s != dom.values {
+                if *s != dom.values || (k.starts_with("args:") && self.table.reach.is_some()) {
                     pre.insert(k.clone(), s.clone());
                 }
             }

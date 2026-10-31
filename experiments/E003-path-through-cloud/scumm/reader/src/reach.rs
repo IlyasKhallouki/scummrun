@@ -253,7 +253,7 @@ impl Builder<'_> {
         let mut pre = Pre::new();
         for (k, s) in &p.pre {
             if let Some(dom) = self.table.domain(k) {
-                if *s != dom.values {
+                if *s != dom.values || k.starts_with("args:") {
                     pre.insert(k.clone(), s.clone());
                 }
             }
