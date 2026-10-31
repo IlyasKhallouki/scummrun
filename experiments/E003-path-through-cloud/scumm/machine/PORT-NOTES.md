@@ -877,6 +877,14 @@ non-fact, as with `actor_rooms` off (`getter_base`; `tests/value_sets.rs` `actor
   values, where there were none), and recall with possible gains one fact (S2#30). Logs:
   results/check-part1-row{4,5}-const_polls-input_after_turns-value_sets.log, results/check-part1-row4-const_polls-value_sets.log.
 
+**`input_script` (F1, from the size probe) and `sentence_queue` (F1b).** `input_script` (machine/inputs.rs): findObject
+and actorFromPos at the path's cell (`Path.cell`, which only the reader's input frame sets), and doSentence queuing
+outside settle for the frame's checkAndRunSentenceScript. The model check never sets a cell, and rows 3-5 queue in
+settle anyway, so the switch changes no check line (the row is in notes/log/2026-10-26-e003-f1b.md). `sentence_queue`
+is the reader's F1b switch: it reaches the reader's scope through `Switches` and no machine rule reads it. scumm-ir
+adds the reader's facts `mouse` and `queue`, `queue:verb`, `queue:a`, `queue:b` (`Fact::Mouse`, `Fact::Queue`), and the
+oracle has their families; no ground-truth state holds them.
+
 ## Notes for the next stage
 
 The machine is ported: all seven features, all nine golden runs at 0 differences. What a later stage can do here:
