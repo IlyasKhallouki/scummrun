@@ -59,3 +59,8 @@ run: stop goal at frame 3129, 0 replans, 401 frames, 28 inputs equal to the comm
   checkpoints
 
 K2_TBD
+
+== k = 2 with the switch (reader-scope --k 2 --elsewhere --live-locals --split-limit --goal state:316=1 --threads 6; 2026-10-31, the laptop alone, nice 10)
+not measured: stopped at 3517 s wall, 17733 CPU s, inside pass 1's event round 1 (4938 runs from 5319 events)
+pass 1 inputs: 4702 runs, 253933 records, 2143.1 s (off: 163981 records, 227.1 s); pass 1 event round 1 off: 4922 runs, 363.2 s
+RSS 2.8 GB seen, 1.1 GB packed so far; no records or plan

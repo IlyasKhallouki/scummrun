@@ -630,7 +630,9 @@ Measured (stuck, 2026-10-26; the laptop at load 10 to 20 from other jobs; result
   unsolvable); all reductions keep 24,059 (67,234 operators), and lama-first finds 6 steps: open the bar door, the
   sentence script's two waits, walk through the kitchen door, the cook's timer at 4 and 33. 2,164 CPU s and 1.8 GB
   on 5 threads, against 570 CPU s and 1.1 GB without.
-- K2_TBD
+- **k = 2** (`--elsewhere --live-locals`, 6 threads, the laptop alone): not measured. Pass 1's inputs took 2,143 s for
+  253,933 records (off: 227 s, 163,981 records). The reading was stopped at 3,517 s wall and 17,733 CPU s, inside pass
+  1's event round 1 (off: 363 s). Pass 2 takes about what pass 1 takes, so the two passes project past 8,000 s.
 
 ## Frame costs, as a switch
 
