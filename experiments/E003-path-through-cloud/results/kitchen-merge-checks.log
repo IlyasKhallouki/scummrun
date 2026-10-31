@@ -13,7 +13,7 @@ reader-port read kitchen --packed: sha1 279b7a24, main's
 reader-scope --k 2 --elsewhere --live-locals --threads 3: 519755 records, packed sha1 39200a67, the committed one;
   878.6 s wall, 2839.0 CPU s, peak 2806 MB (a try on 6 threads stopped at the 1.5 GB free guard, 4052 MB, 231 s)
 serve_check compare on that kitchen file, the 6 replans of the recorded seed-1 lama-first-costs run, caps left out:
-  main's taskcore sas (sha1 of the binary at wt-main-fr1), the new sas and one serve: task.sas, ops.jsonl, kept.json
+  main's taskcore sas (binary sha1 25738cbf), the new sas and one serve: task.sas, ops.jsonl, kept.json
   and stats the same on all 6; serve built 1, kept 5; CPU s per request: built 10.15, kept 4.13, new sas 9.52
 pytest -m 'not slow' test_replay_part1 test_replay test_replay_review test_replay_taskcore test_taskcore
   test_taskcore_serve test_frame_costs: 108 passed, 2 deselected in 143 s
