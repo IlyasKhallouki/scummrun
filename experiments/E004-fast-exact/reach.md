@@ -176,10 +176,11 @@ folds sets `args:X = 0` in `R`, since `RecordStream::finish` rewrites the writte
 (reduction 1). Otherwise the reading does not cover it, and this must not pass in silence.
 
 - **Detection.** The reader writes `NAME.reached` next to the packed file: one line per fact in the file, its key and
-  its reached values. `taskcore sas` and `taskcore serve` take `--reached F`. If the start holds a value outside the
-  file's reached values, taskcore stops with exit code 7, naming each fact and value. It writes no task. A start value
-  a task's domain lacks is taskcore's existing start check; this check is the one for a value the domain has and
-  the reading did not reach.
+  its reached values. `taskcore sas` and `taskcore serve` read that file on their own, or the one `--reached F` names,
+  so no caller can forget it. If the start holds a value outside the file's reached values, `sas` stops with exit code
+  7, naming each fact and value, and writes no task; a `serve` request gets `error` with the same text. A start value a
+  task's domain lacks is taskcore's existing start check; this check is the one for a value the domain has and the
+  reading did not reach. A reading without the switch removes an older `NAME.reached`.
 - **Extension.** The held branches stay in the Builder for the whole pass. A new start is one more seed: its values
   are committed as a round, they free what waits on them, and the rounds go on. By Theorem 1 the result is the closure
   from both starts. It is the same set of records as a reading seeded with both from the beginning, because a

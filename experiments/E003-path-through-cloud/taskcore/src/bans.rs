@@ -37,6 +37,17 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// The index of value text `v` in fact `f`'s domain, NONE when the domain lacks it.
+/// The file of reached values: `--reached F`, or `NAME.reached` next to the packed file, which the reader's switch --reach
+/// writes and a reading without it removes. So a reading with the switch is never used from a start it does not cover
+/// without taskcore saying so.
+pub fn reached_file(given: Option<&Path>, task: &Path) -> Option<std::path::PathBuf> {
+    if let Some(p) = given {
+        return Some(p.to_path_buf());
+    }
+    let p = task.with_extension("reached");
+    p.exists().then_some(p)
+}
+
 /// `--reached F` (the reader's switch --reach writes it, `NAME.reached`): the start's values that are not among a fact's
 /// reached values, as `key=value`. One line per fact: `key<TAB>value<TAB>value...`. A fact the file does not name is
 /// not checked (its start is the file's start and nothing reads it). A value outside the domain is the start check's.

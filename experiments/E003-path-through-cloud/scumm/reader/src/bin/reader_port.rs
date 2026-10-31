@@ -254,9 +254,12 @@ fn main() {
                 let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
                 let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
                 println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+                let path = PathBuf::from(packed_out.as_ref().unwrap()).with_extension("reached");
                 if let Some(reached) = &b.table.reach {
-                    let path = PathBuf::from(packed_out.as_ref().unwrap()).with_extension("reached");
                     std::fs::write(&path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").unwrap();
+                } else {
+                    // an older reading's, under this packed file's name
+                    std::fs::remove_file(&path).ok();
                 }
             }
             if let Some(d) = &b.due {

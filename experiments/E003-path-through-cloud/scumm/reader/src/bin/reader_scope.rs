@@ -706,10 +706,13 @@ fn main() {
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
     let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
     let (info, folded) = stream.finish(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+    let reached_path = packed.with_extension("reached");
     if let Some(reached) = &b.table.reach {
-        let path = packed.with_extension("reached");
-        std::fs::write(&path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").expect("the reached values");
-        eprintln!("[{name}] reached values: {}", path.display());
+        std::fs::write(&reached_path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").expect("the reached values");
+        eprintln!("[{name}] reached values: {}", reached_path.display());
+    } else {
+        // an older reading's, under this packed file's name
+        std::fs::remove_file(&reached_path).ok();
     }
     let fin_s = t_fin.elapsed().as_secs_f64();
     let packed_sha1 = {

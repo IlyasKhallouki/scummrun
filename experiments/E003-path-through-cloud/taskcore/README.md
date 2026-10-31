@@ -59,7 +59,8 @@ and the new binary on the kitchen and test_taskcore.py's property test).
   cuts each step's effects to them, as the python planner's pruned task cut them to relevance.py's (on the kitchen
   the same 244 facts as the pruned task's).
 - `--reached F` (`sas`, `serve`): `F` is the `NAME.reached` file of a reading made with the reader's switch `--reach`,
-  one line per fact, its key and reached values. A start holding a value outside them stops `sas` with exit code 7 and
+  one line per fact, its key and reached values; without the option, `NAME.reached` next to the packed file if there is
+  one. A start holding a value outside them stops `sas` with exit code 7 and
   no task, and answers a `serve` request with `error`, naming the values: that reading does not cover the start
   (experiments/E004-fast-exact/reach.md, "A replan start").
 - `--start-check needed` (default `input`): the start check only on the facts (e) needs (below). It needs (e) on.

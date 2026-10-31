@@ -293,13 +293,13 @@ impl Server {
             file_start = Some((format!("file:{}", path.display()), vals));
             named = Some(keys);
         }
-        if let Some(path) = &r.reached {
+        if let Some(path) = bans::reached_file(r.reached.as_deref(), &r.task) {
             let vals: &[u32] = match (&file_start, &r.start) {
                 (Some((_, v)), _) => v,
                 (None, Some(name)) => &self.t.starts[self.t.start_index(name).ok_or(format!("no start named {}", name))?].1,
                 _ => &self.t.starts[0].1,
             };
-            let m = bans::reached_misses(&self.t, vals, path)?;
+            let m = bans::reached_misses(&self.t, vals, &path)?;
             if !m.is_empty() {
                 return Err(format!("the start holds {} values the reading did not reach: {:?}; extend the reading", m.len(), &m[..m.len().min(20)]));
             }

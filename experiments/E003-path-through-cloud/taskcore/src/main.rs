@@ -323,8 +323,8 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
     st.s("start", t.strs.get(t.starts.get(start).ok_or("the file has no start")?.0));
     // a reading made with the reader's switch --reach covers only what its start reaches: a start holding another
     // value needs the reading extended, and no task comes out of this one (bans::reached_misses)
-    if let Some(path) = &a.reached {
-        let m = bans::reached_misses(&t, &t.starts[start].1, path)?;
+    if let Some(path) = bans::reached_file(a.reached.as_deref(), &a.task) {
+        let m = bans::reached_misses(&t, &t.starts[start].1, &path)?;
         if !m.is_empty() {
             eprintln!("taskcore: the start holds {} values the reading did not reach: {:?}; extend the reading (reader-scope --reach-also)", m.len(), &m[..m.len().min(20)]);
             std::process::exit(7);
