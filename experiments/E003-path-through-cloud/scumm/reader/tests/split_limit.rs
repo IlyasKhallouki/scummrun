@@ -161,10 +161,11 @@ fn reach(b: &mut Builder) -> BTreeSet<(String, Label)> {
     reach_from(b, &start)
 }
 
-/// `reach` from `start` (task_start's facts of it).
+/// `reach` from `start` (task_start's facts of it). The Builder's records are taken (memory).
 fn reach_from(b: &mut Builder, start: &Facts) -> BTreeSet<(String, Label)> {
-    let recs = b.records.clone();
+    let recs = std::mem::take(&mut b.records);
     let t = task::build_task(b, &recs, &[]);
+    drop(recs);
     let s = task::task_start(b, start, t.facts.iter().map(|f| &f.0));
     let mut have: Vec<BTreeSet<Label>> =
         t.facts.iter().map(|(k, d)| d.label(s.get(k).unwrap_or(0)).into_iter().collect()).collect();
@@ -217,12 +218,13 @@ fn room33_split_limit_lowered() {
     assert!(cut.counts.get(CUT) > 0);
     assert_eq!(split.counts.get(CUT), 0);
     assert!(split.counts.get(SPLIT) > cut.counts.get(SPLIT));
+    let n = (full.records.len(), cut.records.len(), split.records.len());
     let (r_full, r_cut, r_split) = (reach(&mut full), reach(&mut cut), reach(&mut split));
     eprintln!(
         "room 33: records {} / {} cut / {} split; reached pairs {} / {} / {}; splits {} (limit 32)",
-        full.records.len(),
-        cut.records.len(),
-        split.records.len(),
+        n.0,
+        n.1,
+        n.2,
         r_full.len(),
         r_cut.len(),
         r_split.len(),
@@ -234,8 +236,8 @@ fn room33_split_limit_lowered() {
 
 
 /// Rooms 33, 28 and 35 as reader-scope reads them from seed 1 with `--elsewhere --live-locals` (3 threads), with the
-/// switch on or off; the reach from the start.
-fn bar35(on: bool) -> (Builder<'static>, BTreeSet<(String, Label)>) {
+/// switch on or off: (records, paths cut, splits, the reach from the start).
+fn bar35(on: bool) -> (usize, i64, i64, BTreeSet<(String, Label)>) {
     let root = oracle::root();
     let start = scumm_reader::scaling::start_facts(&root, 1);
     let doms = scumm_reader::domains::build(game(), &scumm_reader::domains::meta_rooms(&root), &start, &scumm_reader::scaling::part1_goal(&root));
@@ -247,8 +249,9 @@ fn bar35(on: bool) -> (Builder<'static>, BTreeSet<(String, Label)>) {
     scumm_reader::par::with_pool(game(), &scope, 3, |pool| {
         b.read_all_into(pool, true, None, 2, None);
     });
+    let n = b.records.len();
     let r = reach_from(&mut b, &start);
-    (b, r)
+    (n, b.counts.get(CUT), b.counts.get(SPLIT), r)
 }
 
 #[test]
@@ -256,20 +259,15 @@ fn bar35(on: bool) -> (Builder<'static>, BTreeSet<(String, Label)>) {
 fn bar35_split_limit_reaches_the_kitchen() {
     let room28 = ("room".to_string(), Label::Int(28));
     let open = ("state:316".to_string(), Label::Int(1));
-    let (off, r_off) = bar35(false);
-    assert!(off.counts.get(CUT) > 0);
+    let (n_off, cut_off, _, r_off) = bar35(false);
+    assert!(cut_off > 0);
     assert!(!r_off.contains(&room28) && !r_off.contains(&open), "without the switch the cut paths hide the kitchen");
-    let (on, r_on) = bar35(true);
+    let (n_on, cut_on, splits, r_on) = bar35(true);
     eprintln!(
-        "rooms 33, 28, 35: records {} off / {} on; paths cut {} / {}; splits {}; reached pairs {} / {}",
-        off.records.len(),
-        on.records.len(),
-        off.counts.get(CUT),
-        on.counts.get(CUT),
-        on.counts.get(SPLIT),
+        "rooms 33, 28, 35: records {n_off} off / {n_on} on; paths cut {cut_off} / {cut_on}; splits {splits}; reached pairs {} / {}",
         r_off.len(),
         r_on.len()
     );
-    assert_eq!(on.counts.get(CUT), 0);
+    assert_eq!(cut_on, 0);
     assert!(r_on.contains(&room28) && r_on.contains(&open), "with the switch the walk through the door is read");
 }
