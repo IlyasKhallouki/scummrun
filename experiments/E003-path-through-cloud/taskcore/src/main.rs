@@ -5,6 +5,7 @@
 //!   taskcore sas    --task F.tc [--start NAME | --start-file F] [--bans F] [--fold strict|every|off]
 //!                   [--reduce all|none|a,b,..] [--product-limit N] [--encoding model|task] --out F.sas
 //!                   [--stats F.json] [--check-fold N] [--ops F.jsonl] [--start-check input|needed]
+//!                   [--cost-caps F]
 //!   taskcore decode (the same options) --plan sas_plan --out steps.json
 //!   taskcore validate (the same options) --names plan.txt --out result.json
 //!   taskcore info   --task F.tc
@@ -48,6 +49,7 @@ struct Args {
     ops: Option<PathBuf>,
     needed_check: bool,
     goal: Option<String>,
+    cost_caps: Option<PathBuf>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -72,6 +74,7 @@ fn parse() -> Result<Args, String> {
         ops: None,
         needed_check: false,
         goal: None,
+        cost_caps: None,
     };
     parse_opts(&mut a, it)?;
     check_args(&a)?;
@@ -106,6 +109,7 @@ fn parse_opts(a: &mut Args, mut it: impl Iterator<Item = String>) -> Result<Vec<
             "--bans" => a.bans = Some(v.into()),
             "--ops" => a.ops = Some(v.into()),
             "--goal" => a.goal = Some(v),
+            "--cost-caps" => a.cost_caps = Some(v.into()),
             "--start-check" => {
                 a.needed_check = match v.as_str() {
                     "input" => false,
@@ -277,6 +281,14 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         .f("seconds_load", t0.elapsed().as_secs_f64())
         .n("rss_after_load", peak_rss());
     let mut replaced = Vec::new();
+    // the harness's cost caps (bans.rs): first, so the bans' pieces, the fold and the reductions see the capped costs
+    if let Some(path) = &a.cost_caps {
+        let caps = bans::read_caps(path)?;
+        let lowered = bans::apply_caps(&mut t, &caps);
+        let mut j = J::new();
+        j.n("caps", caps.len()).n("actions_lowered", lowered);
+        st.raw("cost_caps", &j.done());
+    }
     // a start given as a file, and the bans (bans.rs): before the start check, so that it and everything after it
     // read the banned task as their input
     let mut named = None;

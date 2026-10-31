@@ -7,6 +7,13 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_kitchen.py log                               (results/replay-kitchen-taskcore.log from the json files)
        each with --planner taskcore|python (default taskcore) and --search lama-first|anytime (taskcore only)
        and --files (taskcore only: the task read from the reading's files, as replay_part1.py reads it)
+       replay_kitchen.py run all --reading-dir DIR --seed N [--search S] [--cost-caps]
+                                                           (a reading the Rust reader made, as files: below)
+       replay_kitchen.py costs FILE.json ...               (frame costs: each plan's predicted cost against the
+                                                            frames played, results/replay-kitchen-costs.log)
+       replay_kitchen.py plans --reading-dir DIR --search S [--plan-time N] [--variant-ban]
+                                                           (one plan from S1#7's ground-truth start, no engine:
+                                                            a line of results/kitchen-costs-plans.jsonl)
 
 **The planner.** taskcore (the default): the reading's records are exported once to a packed file
 (export_records.py) and every plan goes through taskcore from it (replay.py's module docstring); results
@@ -34,15 +41,34 @@ as the packed file (taskcore's own reductions do the rest, per start). "all" is 
 211's own event at its start point (the cook's timer), so the plan has to provoke the cook. The engine still runs that
 timer.
 
+**A reading the Rust reader made** (``--reading-dir DIR``: ``reader-port read kitchen --packed F --out G``, then
+``packed_reading.py from-golden G F --start-file S1#7-pre.json --out DIR``): the task is the reading's files, as
+with ``--files``, with no Python reader. Made with the reader's switch ``--frame-costs``, its actions cost their
+records' frames (scumm/reader/src/costs.rs), and the searches ``lama-first-costs`` and ``astar-lmcp`` (plan_fd.py)
+plan with them; ``lama-first`` plans with unit costs on the same file, and its plans' costs are still counted.
+``--cost-caps`` turns on the harness's caps (replay.py, "Frame costs"). ``--seed N`` boots the engine with seed N
+instead of run B's (the system's runs use seed 1; run B's own seed is not used): run B's inputs to S1#7's frame then
+give the S1#7 state up to what the random draws decide, which the start check lists. Results
+``replay-kitchen-rust-<costs->-<search>[-caps]-seed<N>-all.json``.
+
+With ``--reading-dir`` the variant "no211" bans the timer's label (every action of it) from the first plan on, as the
+pickle's "no211" leaves out its records.
+
+**Frame costs** (``costs``): per plan, its steps' costs (capped as planned) and their sum against the frames the
+engine spent from the plan's start to the next plan or the run's end; per played step, its cost against its frames
+(from the step's start to its end, retries included).
+
 **The budget**: ``--replan-limit`` (default 10) and ``--time-limit`` seconds (default 3 hours) for the kitchen, in
 place of Part I's 500 replans and 24 hours.
 """
 
 import argparse
+import functools
 import hashlib
 import json
 import os
 import pickle
+import re
 import shutil
 import sys
 import time
@@ -82,8 +108,12 @@ def sha(name: str) -> str:
     return hashlib.sha1((HERE / name).read_bytes()).hexdigest()[:12]
 
 
-def tag_of(planner: str = "python", search: str = "lama-first", files: bool = False) -> str:
-    """The results' tag: "" for the python planner, "taskcore", "taskcore-anytime" or "taskcore-files"."""
+def tag_of(planner: str = "python", search: str = "lama-first", files: bool = False, reading_dir=None,
+           seed: int | None = None, caps: bool = False, costs: bool = False) -> str:
+    """The results' tag: "" for the python planner, "taskcore", "taskcore-anytime" or "taskcore-files"; a reading the
+    Rust reader made: "rust-[costs-]<search>[-caps]-seed<N>"."""
+    if reading_dir is not None:
+        return f"rust-{'costs-' if costs else ''}{search}{'-caps' if caps else ''}-seed{seed}"
     if planner == "python":
         return ""
     return ("taskcore" if search == "lama-first" else f"taskcore-{search}") + ("-files" if files else "")
@@ -101,12 +131,12 @@ def run_dir_of(variant: str, tag: str = "") -> Path:
     return OUT / f"kitchen-{tag + '-' if tag else ''}{variant}"
 
 
-def cfg_of(out_dir: Path, inputs: Path) -> EngineConfig:
-    """Run B's settings (groundtruth.replay) with ``inputs`` as the raw input file."""
+def cfg_of(out_dir: Path, inputs: Path, seed: int | None = None) -> EngineConfig:
+    """Run B's settings (groundtruth.replay) with ``inputs`` as the raw input file; ``seed`` in place of run B's."""
     rel = releases.get("dos-cd")
     return EngineConfig(out_dir=out_dir, game_path=releases.game_dir(rel), release="dos-cd", timer_next="any",
-                        start_frame=46, max_ticks=10**7, seed=groundtruth.SEED, raw_inputs=inputs,
-                        skip_text=False, skip_cutscenes=False, game_settings={"talkspeed": "255"})
+                        start_frame=46, max_ticks=10**7, seed=groundtruth.SEED if seed is None else seed,
+                        raw_inputs=inputs, skip_text=False, skip_cutscenes=False, game_settings={"talkspeed": "255"})
 
 
 def prefix_events() -> list:
@@ -119,36 +149,62 @@ def say(msg: str) -> None:
 
 def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write: bool = True,
         out_dir: Path | None = None, plan_time: int = replay.PLAN_TIME, planner: str = "taskcore",
-        search: str = "lama-first", files: bool = False) -> dict:
+        search: str = "lama-first", files: bool = False, reading_dir: Path | None = None, seed: int | None = None,
+        cost_caps: bool = False, memory_limit: str = replay.PLAN_MEMORY) -> dict:
     """One plan in the engine and its check from boot; ``write``: the result file (a test passes False and its own
-    ``out_dir`` for the engines' files); ``files``: the task from the reading's files (module docstring)."""
+    ``out_dir`` for the engines' files); ``files``: the task from the reading's files; ``reading_dir``: a reading the
+    Rust reader made, as files; ``seed``: the engine's seed in place of run B's; ``cost_caps``: the harness's frame
+    cost caps (module docstring)."""
     t0 = time.monotonic()
-    if files and planner != "taskcore":
-        raise ValueError("--files plans through taskcore")
-    tag = tag_of(planner, search, files)
+    if (files or reading_dir is not None) and planner != "taskcore":
+        raise ValueError("--files and --reading-dir plan through taskcore")
+    # with --reading-dir, "no211" is a ban on the timer's label from the start (the reading's actions are as read)
+    rdoc = json.loads((Path(reading_dir) / "reading.json").read_text()) if reading_dir is not None else {}
+    frame_costs = rdoc.get("frame_costs")
+    tag = tag_of(planner, search, files, reading_dir, seed, cost_caps, frame_costs is not None)
+    cfg = functools.partial(cfg_of, seed=seed)
     row = next(r for r in groundtruth.load() if r["name"].startswith(MOVE + " "))
     start, frame = row["pre"], row["pre_frame"]
     goal = {f"owner:{MEAT}": {start["var:1"]}}
     out = {"variant": variant, "move": row["name"], "start_frame": frame,
            "goal": {k: sorted(v) for k, v in goal.items()},
            "sources": {n: sha(n) for n in SOURCES + (TASKCORE_SOURCES if planner == "taskcore" else ())
-                       + (("packed_reading.py",) if files else ())},
-           "files": files,
+                       + (("packed_reading.py",) if files or reading_dir is not None else ())},
+           "files": files or reading_dir is not None, "reading_dir": None if reading_dir is None else str(reading_dir),
+           "seed": groundtruth.SEED if seed is None else seed, "frame_costs": frame_costs, "cost_caps": cost_caps,
            "planner": planner, "search": search if planner == "taskcore" else "lama-first",
            "reading": str(reading), "replan_limit": replan_limit,
-           "time_limit": time_limit, "limits": {"input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT,
+           "time_limit": time_limit, "memory_limit": memory_limit, "limits": {"input": replay.INPUT_LIMIT, "wait": replay.WAIT_LIMIT,
                                                 "retries": replay.RETRIES, "retry_wait": replay.RETRY_WAIT,
                                                 "plan_time": plan_time}}
     rsrc = Path(str(reading) + ".sources")
     out["reading_sources"] = rsrc.read_text().strip() if rsrc.exists() else None
 
-    say(f"loading the reading {reading}")
-    b, recs, secs = pickle.loads(reading.read_bytes())
-    kept = [r for r in recs if not (variant == "no211" and r.label == TIMER_EVENT)]
-    out["records"] = {"all": len(recs), "kept": len(kept)}
     run_dir = out_dir or run_dir_of(variant, tag)
     packed = None
-    if files:
+    if reading_dir is not None:
+        say(f"loading the reading's files {reading_dir}")
+        t = time.monotonic()
+        rd = packed_reading.load_reading(Path(reading_dir) / "reading.json")
+        full = small = rd.task
+        b, packed = rd.b, rd.packed
+        recs = []
+        out["records"] = {"all": rdoc["n_records"], "kept": rdoc["n_records"]}
+        out["export"] = {"bytes": packed.stat().st_size, "seconds": 0.0,
+                         "sha1": hashlib.sha1(packed.read_bytes()).hexdigest()[:12]}
+        out["taskcore_binary"] = hashlib.sha1(plan_fd.TASKCORE.read_bytes()).hexdigest()[:12]
+        out["task"] = {"actions": len(full.actions), "facts": len(full.facts), "folded": rdoc["folded"],
+                       "seconds": time.monotonic() - t}
+        run_dir.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(run_dir / "plans", ignore_errors=True)
+    else:
+        say(f"loading the reading {reading}")
+        b, recs, secs = pickle.loads(reading.read_bytes())
+        kept = [r for r in recs if not (variant == "no211" and r.label == TIMER_EVENT)]
+        out["records"] = {"all": len(recs), "kept": len(kept)}
+    if reading_dir is not None:
+        pass  # the task is the reading's files, loaded above
+    elif files:
         say("writing the reading as files")
         t = time.monotonic()
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -192,14 +248,17 @@ def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write
     del recs
     say(f"booting to {MOVE} pre (frame {frame})")
     prefix = [e for e in prefix_events() if e["frame"] <= frame]
-    ctl, branch = replay.boot(cfg_of, prefix, frame, run_dir / "run")
+    ctl, branch = replay.boot(cfg, prefix, frame, run_dir / "run")
     try:
         d = diff(start, facts_of(branch.state()))
         out["start_check"] = {"facts": len(start), "differ": len(d), "differences": sorted(d.items())[:40]}
         say(f"start check: {len(d)} facts differ from the ground truth's {MOVE} pre")
         h = replay.Harness(b, full, small, branch, goal, replan_limit=replan_limit, time_limit=time_limit,
                            plan_time=plan_time, progress=say, planner=planner, packed=packed, search=search,
-                           workdir=run_dir / "plans")
+                           workdir=run_dir / "plans", cost_caps=cost_caps, memory_limit=memory_limit,
+                           cost_dmax=(frame_costs or {}).get("dmax"))
+        if reading_dir is not None and variant == "no211":
+            h.bans = [replay.Ban(TIMER_EVENT, ())]  # every action of the timer's label, as the pickle's no211 drops it
         res = h.run()
         checkpoints = h.checkpoints
     finally:
@@ -208,7 +267,7 @@ def run(variant: str, reading: Path, replan_limit: int, time_limit: float, write
     out["ban_task_sizes"] = [p.get("write_s") for p in res["plans"]]
     say(f"stop: {res['stop']}; verifying from boot ({len(checkpoints)} checkpoints)")
     t = time.monotonic()
-    ver = replay.verify(cfg_of, prefix + res["inputs"], checkpoints, sorted(goal), run_dir / "verify")
+    ver = replay.verify(cfg, prefix + res["inputs"], checkpoints, sorted(goal), run_dir / "verify")
     ver["seconds"] = time.monotonic() - t
     ver["goal"] = all(ver.get("final", {}).get(k) in v for k, v in goal.items())
     out["verify"] = ver
@@ -506,25 +565,125 @@ def write_log(tag: str = "") -> None:
     print("\n".join(lines))
 
 
+# --- frame costs: predicted against played -------------------------------------------------------------------------
+
+def plan_only(reading_dir: Path, search: str, plan_time: int, no211: bool, memory_limit: str) -> dict:
+    """One plan from run B's S1#7 pre facts (the reading's start) on a reading's files, with no engine: its steps,
+    costs, Fast Downward's plan cost and times (module docstring). ``no211``: the timer's label banned."""
+    rd = packed_reading.load_reading(Path(reading_dir) / "reading.json")
+    row = next(r for r in groundtruth.load() if r["name"].startswith(MOVE + " "))
+    start = replay.task_start(rd.b, row["pre"], rd.task)
+    bans = [replay.Ban(TIMER_EVENT, ())] if no211 else []
+    work = OUT / "kitchen-plans" / f"{search}{'-no211' if no211 else ''}"
+    res = plan_fd.plan_taskcore(rd.packed, rd.task.facts, rd.task.goal, rd.task.ban_pieces(bans), start, bans,
+                                time_limit=plan_time, memory_limit=memory_limit, search=search, workdir=work)
+    log = (work / "fd" / "fd.log").read_text() if (work / "fd" / "fd.log").exists() else res.log or ""
+    return {"reading": str(reading_dir), "search": search, "no211": no211, "plan_time": plan_time,
+            "memory_limit": memory_limit, "status": res.status, "plan_cost": res.plan_cost,
+            "costs_found": [int(c) for c in re.findall(r"Plan cost: (\d+)", log)],
+            "steps": [[a.name, a.cost] for a in res.paths], "taskcore_s": res.write_s, "search_s": res.seconds,
+            "operators": res.operators, "h0": [int(h) for h in re.findall(r"Initial heuristic value for \S+: (\d+)",
+                                                                       log)][:2],
+            "sources": {n: sha(n) for n in ("replay_kitchen.py", "plan_fd.py")}}
+
+
+def cost_rows(o: dict) -> tuple:
+    """Per plan: (plan, frame, steps, costs, predicted, played frames, how it ended); per played step: (plan, index,
+    name, outcome, cost, frames). A plan's played frames run from its start to the next plan or the run's end."""
+    r = o["run"]
+    plans, steps = [], []
+    ends = [p["frame"] for p in r["plans"][1:]] + [r["frame_end"]]
+    for p, end in zip(r["plans"], ends):
+        costs = p.get("costs") or []
+        played = [s for s in r["steps"] if s["plan"] == p["plan"]]
+        how = played[-1]["outcome"] if played else p.get("status")
+        plans.append((p["plan"], p["frame"], p.get("steps", []), costs, sum(costs), end - p["frame"], how,
+                      p.get("plan_cost")))
+        cost_of = dict(zip(p.get("steps", []), costs))  # by name: the harness may play waits first (reorders)
+        for st in played:
+            steps.append((st["plan"], st["index"], st["name"], st["outcome"], cost_of.get(st["name"]),
+                          st["end"] - st["start"]))
+    return plans, steps
+
+
+def costs_log(paths: list) -> list:
+    """The frame costs' check on the kitchen (module docstring, "Frame costs"), for the result files ``paths``."""
+    lines = ["E003: frame costs on the kitchen (reader switch --frame-costs, scumm/reader/src/costs.rs): each plan's "
+             "predicted cost in frames against the frames the engine spent playing it", ""]
+    for path in paths:
+        o = json.loads(Path(path).read_text())
+        r = o["run"]
+        fc = o.get("frame_costs") or {}
+        lines += [f"=== {Path(path).name}: search {o['search']}, cost caps {o.get('cost_caps')}, seed {o.get('seed')} ===",
+                  f"reading {o.get('reading_dir')}: {o['task']['actions']:,} actions; frame costs "
+                  f"{'dmax ' + str(fc.get('dmax')) + ', charinc ' + str(fc.get('charinc')) if fc else 'off (every action 1)'}",
+                  f"start: frame {o['start_frame']}, {o['start_check']['differ']} of {o['start_check']['facts']} facts "
+                  f"differ from run B's S1#7 pre: {o['start_check']['differences']}",
+                  f"result: stop {r['stop']!r}, goal {r['goal']}, {r['replans']} replans, {len(r['bans'])} bans, "
+                  f"{len(r['inputs'])} inputs; frames {r['frames']} (from {r['frame0']} to {r['frame_end']}), game "
+                  f"time {o['game_seconds']:.1f} s; verify from boot: {len(o['verify'].get('differ', []))} "
+                  f"differences at {o['verify'].get('checkpoints')} checkpoints, goal {o['verify'].get('goal')}"]
+        plans, steps = cost_rows(o)
+        for (n, frame, names, costs, pred, played, how, fd) in plans:
+            lines.append(f"  plan {n} at frame {frame}: {len(names)} steps, predicted {pred} frames (FD plan cost "
+                         f"{fd}), played {played} frames until {'the goal' if how == 'goal' else 'the next plan'}"
+                         f" ({how})")
+            lines.append("    " + ", ".join(f"{nm} {c}" for nm, c in zip(names, costs)))
+        by = {}
+        for (_, _, _, outcome, cost, frames) in steps:
+            k = by.setdefault(outcome, [0, 0, 0])
+            k[0], k[1], k[2] = k[0] + 1, k[1] + (cost or 0), k[2] + frames
+        lines.append("  by outcome (steps, their costs, their frames): " + "; ".join(
+            f"{k} {v[0]}, {v[1]}, {v[2]}" for k, v in sorted(by.items(), key=lambda kv: -kv[1][2])))
+        lines.append("  steps played (plan.index name: outcome; cost / frames, frames - cost):")
+        for (n, i, name, outcome, cost, frames) in steps:
+            gap = "" if cost is None else f", {frames - cost:+d}"
+            lines.append(f"    {n}.{i + 1} {name}: {outcome}; {cost} / {frames}{gap}")
+        lines.append("")
+    return lines
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["run", "trace", "noban", "log"])
-    ap.add_argument("variant", nargs="?", choices=["all", "no211"])
+    ap.add_argument("what", choices=["run", "trace", "noban", "log", "costs", "plans"])
+    ap.add_argument("variant", nargs="?")
+    ap.add_argument("files_json", nargs="*", help="costs: the result files")
+    ap.add_argument("--reading-dir", type=Path, help="a reading the Rust reader made, as files (module docstring)")
+    ap.add_argument("--seed", type=int, help="the engine's seed in place of run B's")
+    ap.add_argument("--cost-caps", action="store_true", help="the harness's frame cost caps (replay.py)")
+    ap.add_argument("--memory-limit", default=replay.PLAN_MEMORY, help="Fast Downward's search memory per plan")
+    ap.add_argument("--variant-ban", action="store_true", help="plans: the timer's label banned (no211)")
     ap.add_argument("--reading", type=Path, default=os.environ.get("READER_PICKLE"))
     ap.add_argument("--replan-limit", type=int, default=10)
     ap.add_argument("--time-limit", type=float, default=3 * 3600)
     ap.add_argument("--planner", choices=["taskcore", "python"], default="taskcore")
-    ap.add_argument("--search", choices=["lama-first", "anytime"], default="lama-first",
-                    help="taskcore's search: lama-first, or anytime LAMA for the plan time (--plan-time)")
+    ap.add_argument("--search", choices=["lama-first", "anytime", "lama-first-costs", "astar-lmcp"],
+                    default="lama-first", help="taskcore's search: lama-first, or anytime LAMA for the plan time "
+                    "(--plan-time); lama-first-costs and astar-lmcp plan with the file's costs (plan_fd.py)")
     ap.add_argument("--plan-time", type=int, default=replay.PLAN_TIME, help="seconds per plan (the anytime cap)")
     ap.add_argument("--files", action="store_true", help="the task from the reading's files (packed_reading.py)")
     a = ap.parse_args()
+    if a.what == "plans":
+        o = plan_only(a.reading_dir, a.search, a.plan_time, a.variant_ban, a.memory_limit)
+        with open(HERE / "results" / "kitchen-costs-plans.jsonl", "a") as f:
+            f.write(json.dumps(o) + "\n")
+        print(json.dumps({k: v for k, v in o.items() if k != "steps"}), *o["steps"], sep="\n")
+        return
+    if a.what == "costs":
+        paths = ([a.variant] if a.variant else []) + a.files_json
+        lines = costs_log(paths)
+        (HERE / "results" / "replay-kitchen-costs.log").write_text("\n".join(lines) + "\n")
+        print("\n".join(lines))
+        return
+    if a.variant not in (None, "all", "no211"):
+        raise SystemExit(f"variant {a.variant!r}: all or no211")
     tag = tag_of(a.planner, a.search, a.files)
     if a.what == "run":
-        if a.variant is None or a.reading is None:
-            raise SystemExit("run needs a variant and --reading (or READER_PICKLE)")
-        run(a.variant, Path(a.reading), a.replan_limit, a.time_limit, plan_time=a.plan_time, planner=a.planner,
-            search=a.search, files=a.files)
+        if a.variant is None or (a.reading is None and a.reading_dir is None):
+            raise SystemExit("run needs a variant and --reading (or READER_PICKLE) or --reading-dir")
+        run(a.variant, None if a.reading is None else Path(a.reading), a.replan_limit, a.time_limit,
+            plan_time=a.plan_time, planner=a.planner, search=a.search, files=a.files, reading_dir=a.reading_dir,
+            seed=a.seed, cost_caps=a.cost_caps, memory_limit=a.memory_limit)
     elif a.what == "noban":
         print(noban(a.variant, Path(a.reading), plan_time=a.plan_time, tag=tag))
     elif a.what == "trace":

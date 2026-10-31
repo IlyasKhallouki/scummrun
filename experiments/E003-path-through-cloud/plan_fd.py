@@ -36,7 +36,12 @@ The start check is on the facts reduction (e) needs (``--start-check needed``, t
 outside a domain stops the plan only on a fact that can matter to the goal, as the python planner's pruned task held
 only such facts; ``start_check="input"`` checks every fact the input's file names (task.py on build_task's task).
 Then lama-first (the same search string and limits as ``plan``) or, with ``search="anytime"``, anytime LAMA
-(``seq-sat-lama-2011``) for ``time_limit`` seconds, its last (best) plan. The plan reads back through the operator
+(``seq-sat-lama-2011``) for ``time_limit`` seconds, its last (best) plan. For a file with frame costs (the reader's
+switch ``--frame-costs``): ``search="lama-first-costs"``, lama-first's greedy search with costs (anytime LAMA's
+second iteration, cost plus one in both heuristics), or ``"astar-lmcp"``, A* with
+``landmark_cost_partitioning(lm_rhw())``, which is admissible, so its plan is optimal for the file's costs. The pick
+and goal operators cost 0 in every search (taskcore's model encoding). ``plan_cost`` is the plan's cost in the file as
+Fast Downward reports it. The plan reads back through the operator
 table, as ``parse_plan`` reads task.py's (picks folded into the steps that read them, goal operators left out), to
 the reduced actions and the input actions they stand for. A folded step stands for several paths; the step is the
 path whose precondition holds in the plan's predicted state at that step (``predict``: from the start, each step's
@@ -99,6 +104,18 @@ LAMA_FIRST = ("let(hlm,eval_modify_costs(landmark_sum(lm_factory=lm_reasonable_o
 # the same search, with the landmark factory's debug output on (module docstring)
 LAMA_FIRST_LANDMARKS = LAMA_FIRST.replace("lm_reasonable_orders_hps(lm_rhw())",
                                           "lm_reasonable_orders_hps(lm_rhw(),verbosity=debug)")
+# lama-first with the task's costs (frame costs, reader switch --frame-costs): the greedy search of anytime LAMA's
+# second iteration (driver/aliases.py:107-114: hff2 and hlm2 count each operator's cost plus one, the search keeps
+# the costs), with the landmark dump as above
+LAMA_FIRST_COSTS = ("let(hlm,eval_modify_costs(landmark_sum(lm_factory=lm_reasonable_orders_hps(lm_rhw(),"
+                    "verbosity=debug),pref=false),cost_type=plusone),let(hff,eval_modify_costs(ff(),cost_type=plusone),"
+                    "lazy_greedy([hff,hlm],preferred=[hff,hlm],reopen_closed=false)))")
+# A* with the admissible landmark heuristic (optimal cost partitioning over lm_rhw's landmarks): an optimal plan for
+# the file's costs
+ASTAR_LMCP = "astar(landmark_cost_partitioning(lm_rhw()))"
+# the searches plan_taskcore runs by name (anytime LAMA is an alias, below)
+SEARCHES = {"lama-first": LAMA_FIRST_LANDMARKS, "lama-first-costs": LAMA_FIRST_COSTS, "astar-lmcp": ASTAR_LMCP}
+_COST = re.compile(r"Plan cost: (\d+)")
 STATUS = {0: "plan", 11: "unsolvable", 12: "incomplete", 22: "memory", 23: "time", 34: "unsupported"}
 
 _NODE = re.compile(r'^\s*lm(\d+) \[label="(.*)"(.*)\];$')
@@ -248,6 +265,7 @@ class TaskcoreResult(Result):
     actions: list = field(default_factory=list)  # per step: its path (task.Action), effects on the file's facts only
     paths: list = field(default_factory=list)  # per step: its path as it is in the unreduced banned task
     write_s: float = 0.0  # taskcore sas: load, bans, start check, fold, reductions, the file and the operator table
+    plan_cost: int | None = None  # the plan's cost in the file, as Fast Downward reports it
     decode_s: float = 0.0  # the operator table read, the plan read back, the paths chosen
     operators: int = 0
     stats: dict = field(default_factory=dict)  # taskcore's
@@ -537,8 +555,9 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
     fd = work / "fd"
     for old in fd.glob("sas_plan*"):
         old.unlink()
-    if search == "lama-first":
-        code, log, text, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, workdir=str(fd))
+    if search in SEARCHES:
+        code, log, text, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, search=SEARCHES[search],
+                                          workdir=str(fd))
         status = STATUS.get(code, "error")
     elif search == "anytime":
         code, log, _, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, alias=ANYTIME, workdir=str(fd))
@@ -546,9 +565,11 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
         text = found[-1].read_text() if found else ""
         status = "plan" if found else STATUS.get(code, "error")
     else:
-        raise ValueError(f"search {search!r}: lama-first or anytime")
+        raise ValueError(f"search {search!r}: {', '.join(SEARCHES)} or anytime")
     res = TaskcoreResult(status, code, seconds=seconds, workdir=str(work), log=log, write_s=write_s,
                          operators=stats["sas"]["operators"], stats=stats, serve=reply)
+    costs = _COST.findall(log)
+    res.plan_cost = int(costs[-1]) if costs and status == "plan" else None  # the file's cost of the plan (FD's)
     res.landmarks, res.orderings = parse_landmarks(log)  # lama-first's dump (anytime LAMA's alias has none)
     if status == "plan":
         t1 = time.monotonic()

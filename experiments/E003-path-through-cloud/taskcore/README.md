@@ -9,7 +9,7 @@ taskcore sas    --task kitchen.tc --start s17 --out task.sas [--stats stats.json
                 [--fold strict|every|off] [--reduce all|none|a,b,...] [--product-limit 64]
                 [--encoding model|task] [--check-fold N] [--kept kept.json]
                 [--start-file start.txt] [--bans bans.txt] [--ops ops.jsonl]   (the replay harness's, below)
-                [--start-check input|needed]
+                [--start-check input|needed] [--cost-caps caps.txt]
 taskcore decode (same options) --plan sas_plan --out steps.json
 taskcore validate (same options) --names plan.txt --out result.json   (a plan as input action names, run on the reduced task)
 taskcore info   --task kitchen.tc
@@ -102,6 +102,18 @@ than its old ones), so a reduction's peak is the task's size, not twice it; the 
 server holds the loaded task and the kept task (smaller: (b) drops the effects nothing reads); a request adds (d)'s
 result. Its stats give this request's peak (the process's peak is reset before each request), and its reply the
 process's resident memory and CPU seconds.
+## Frame costs
+
+A packed file made with the reader's switch `--frame-costs` (scumm/reader/src/costs.rs) gives each action its
+record's cost in engine frames, at least 1; without it every action costs 1, as before. taskcore keeps the costs: the
+fold groups paths by cost, (f) keeps the cheaper of two actions, the model encoding writes metric 1 and the pick and
+goal operators cost 0. Every soundness note below assumes costs of at least 1, which frame costs keep.
+
+`--cost-caps F` (the replay harness's, replay.py "Frame costs"): one cap per line, `prefix<TAB>frames`. An action
+whose label is `prefix)` or starts with `prefix#` costs at most `frames` (`bans.rs`: `read_caps`, `apply_caps`),
+applied first, before the bans. The harness writes `event(NAME@W` for each slot the engine shows waiting at W at the
+plan's start, with the frames its dump shows are left. Without the option, and with an empty file, every output is
+as before, byte for byte (test_frame_costs.py). The stats count the caps and the actions they lowered (`cost_caps`).
 
 ## What the reductions keep, and the two encodings
 

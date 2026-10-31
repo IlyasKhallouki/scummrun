@@ -5,7 +5,7 @@
 //!
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
-//!                     [--elsewhere] [--live-locals] [--split-limit] [--golden FILE] [--max-files-gb G]
+//!                     [--elsewhere] [--live-locals] [--split-limit] [--golden FILE] [--max-files-gb G] [--frame-costs]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
@@ -32,6 +32,10 @@
 //!               split on its first fork on a read until no part passes the limit, and a run that passes it with no
 //!               fact left to split on, or a path the step limit ended, stops the reading. Off by default (reader.py's
 //!               rule: some runs past the limit are not split, and the paths the limit ended are dropped).
+//! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
+//!               lower bound of its duration from the engine source, and the fold key holds the cost; the reading's
+//!               head (--golden) gives the parameters (`frame_costs`), which packed_reading.py copies into
+//!               reading.json. Off by default: every action costs 1, as before.
 //! --golden FILE golden.py's reader file streamed as the records are made, with no records kept: the head, one
 //!               "record" line per record (as made, before `_read_once`'s rewrite of folded lists, which changes only
 //!               `args:` values), the builder's counters; gzip. What packed_reading.py from-golden reads with the
@@ -442,6 +446,7 @@ fn main() {
     let elsewhere = args.iter().any(|a| a == "--elsewhere");
     let live_locals = args.iter().any(|a| a == "--live-locals");
     let split_limit = args.iter().any(|a| a == "--split-limit");
+    let frame_costs = args.iter().any(|a| a == "--frame-costs");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
@@ -478,6 +483,7 @@ fn main() {
         "elsewhere": elsewhere,
         "live_locals": live_locals,
         "split_limit": split_limit,
+        "frame_costs": frame_costs,
         "cap_min": cap_s / 60.0,
         "load_at_start": loadavg(),
         "setup_s": 0.0,
@@ -502,6 +508,11 @@ fn main() {
         b.table.live_locals = Some(Arc::new(ll));
     }
     b.slot_locals = slots;
+    if frame_costs {
+        let fc = scumm_reader::costs::FrameCosts::of(&game, &scope);
+        base["frame_costs_params"] = serde_json::from_str(&fc.py().text()).unwrap_or(Value::Null);
+        b.frame_costs = Some(Arc::new(fc));
+    }
     let prog = Arc::new(Mutex::new(Prog { pass: 1, ..Default::default() }));
     {
         let prog = prog.clone();
@@ -570,7 +581,11 @@ fn main() {
     }
     let mut tee = Tee {
         busy: 0.0,
-        stream: Some(RecordStream::create(&packed).expect("the packed file")),
+        stream: Some({
+            let mut st = RecordStream::create(&packed).expect("the packed file");
+            st.costs = b.frame_costs.clone();
+            st
+        }),
         hash: hash.then(sha1_smol::Sha1::new),
         body: golden.as_ref().map(|g| {
             let p = g.with_extension("body.gz");
