@@ -7,7 +7,9 @@ usage: python test_taskcore_serve.py [N] [seed]    (N random tasks, default 200;
 For each random task (test_taskcore's, with labels as test_replay_taskcore gives them) and each configuration below,
 one server takes a sequence of requests, as a replay run gives them: new starts with no bans (the kept task is used),
 bans (built), the same bans from another start (kept), other bans and none again (built again), the file's own start
-by name, a start with a value outside a domain under both start checks, and another goal. Each request's files (the
+by name, a start with a value outside a domain under both start checks, another goal, and cost caps: new caps (built),
+the same caps from another start (kept), with bans, other caps, an empty file and no file (built, then kept), and a
+caps file with a bad line. Each request's files (the
 SAS file, the operator table, the kept list) must be ``taskcore sas``'s with the same options, byte for byte, and its
 stats the same but for times, memory and paths; or both stop, with the same message.
 """
@@ -24,6 +26,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
+import task as T  # noqa: E402
 import test_replay_taskcore as RT  # noqa: E402
 import test_taskcore as TC  # noqa: E402
 from export_records import write_bans, write_start  # noqa: E402
@@ -70,6 +73,19 @@ def rand_start(rng, task, outside_p=0.0) -> dict:
     return start
 
 
+def relabelled(task):
+    """Labels that cost caps can name (bans.rs ``apply_caps``: a label's prefix up to ")" or "#")."""
+    acts = [T.Action(a.name, pre=a.pre, effects=a.effects, cost=a.cost,
+                     what=RT.what(f"event({a.name})", a.what.kind, a.what.end, a.what.cont)) for a in task.actions]
+    return T.Task(task.facts, acts, task.goal)
+
+
+def rand_caps(rng, task) -> str:
+    """A caps file's text: some actions' labels, a cap of 1 to 3 (test_taskcore's costs are 1 to 3)."""
+    some = rng.sample(task.actions, min(len(task.actions), rng.randint(1, 5)))
+    return "".join(f"{a.what.label[:-1]}\t{rng.randint(1, 3)}\n" for a in some)
+
+
 def requests(rng, task, start, work: Path) -> list:
     """The request sequence of the module docstring: per request its options (paths in ``work``)."""
     def sf(i, st):
@@ -87,6 +103,19 @@ def requests(rng, task, start, work: Path) -> list:
     v = rng.choice(list(task.facts[k].values))
     out.append(sf(10, s1) + ["--goal", f"{k}={v}"])
     out.append(sf(11, s2))  # the server's goal again
+
+    def cf(i, text):
+        p = work / f"caps{i}.txt"
+        p.write_text(text)
+        return ["--cost-caps", str(p)]
+    c1, c2 = rand_caps(rng, task), rand_caps(rng, task)
+    out.append(sf(12, s1) + cf(12, c1))  # built
+    out.append(sf(13, s2) + cf(13, c1))  # the same caps in another file: kept
+    out.append(sf(14, s2) + bf(14, b1) + cf(14, c1))
+    out.append(sf(15, s1) + bf(15, b1) + cf(15, c2))
+    out.append(sf(16, s1) + cf(16, ""))  # empty: the file's costs again
+    out.append(sf(17, s2))  # no file: the same task, kept
+    out.append(sf(18, s2) + cf(18, "no tab here\n"))
     return out
 
 
@@ -145,7 +174,7 @@ def run_many(n: int, seed: int = 1):
     with tempfile.TemporaryDirectory(prefix="taskcore-serve-test-") as tmp:
         for _ in range(n):
             task, start = TC.rand_task(rng)
-            check_task(RT.labelled(task), start, Path(tmp), counts, fails, rng)
+            check_task(relabelled(RT.labelled(task)), start, Path(tmp), counts, fails, rng)
     return counts, fails
 
 
@@ -180,6 +209,35 @@ def test_the_harness_plans_alike_through_the_server(tmp_path):
             assert a.read_bytes() == b.read_bytes(), (n, f)
     plan_fd.close_servers()
     assert not plan_fd._SERVER
+
+
+def test_cost_caps_go_with_each_request(tmp_path):
+    """plan_taskcore with caps per plan: one server for all of them, the same plan and files as a taskcore process per
+    plan. The caps are not the server's options, or each plan would load the file again."""
+    import plan_fd
+    import test_frame_costs as FC
+    task = FC.timer_task()
+    FC.export(tmp_path, task)
+    caps = [("event(local:211@33\t10\n", ["event(local:211@33)#0"], 10), ("event(local:211@33\t100\n", None, 34),
+            ("", None, 34), ("event(local:211@33\t9\n", ["event(local:211@33)#0"], 9)]
+    servers = set()
+    for n, (text, steps, cost) in enumerate(caps):
+        f = tmp_path / f"caps{n}.txt"
+        f.write_text(text)
+        res = {}
+        for serve in (False, True):
+            res[serve] = plan_fd.plan_taskcore(tmp_path / "t.tc", task.facts, task.goal, [[a] for a in task.actions],
+                                               FC.START, workdir=tmp_path / f"p{n}-{serve}", search="astar-lmcp",
+                                               args=["--cost-caps", f], serve=serve)
+        assert res[True].plan_cost == res[False].plan_cost == cost
+        assert [s.name for s in res[True].steps] == [s.name for s in res[False].steps]
+        if steps:
+            assert [s.name for s in res[True].steps] == steps
+        for name in ("task.sas", "ops.jsonl"):
+            assert (tmp_path / f"p{n}-True" / name).read_bytes() == (tmp_path / f"p{n}-False" / name).read_bytes()
+        servers.add(id(plan_fd._SERVER[0]))
+    assert len(servers) == 1
+    plan_fd.close_servers()
 
 
 def test_a_server_error_stops_the_harness_with_its_reason(tmp_path):

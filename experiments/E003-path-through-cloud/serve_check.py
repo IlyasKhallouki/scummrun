@@ -6,7 +6,7 @@ usage: serve_check.py compare NAME PACKED OUT_DIR REQS.json --old MAIN_BIN [--ne
        serve_check.py log OUT_DIR/summary.json ...
 
 ``compare``: per request of REQS.json (``[{"start": a start file, "bans": a bans file or null, "check": "needed" or
-"input"}, ...]``, a replay run's replans), main's ``taskcore sas`` (before, ``--old``), the new binary's ``sas``, and
+"input", "caps": a cost caps file (optional)}, ...]``, a replay run's replans), main's ``taskcore sas`` (before, ``--old``), the new binary's ``sas``, and
 one ``taskcore serve`` process that takes every request in turn (after). Each writes the SAS file, the operator table,
 the kept list and the stats; the check is that they are the same bytes (the stats but for times, memory and paths),
 or that both stop with the same message. Per request: wall seconds, CPU seconds and peak memory of each (a ``sas``
@@ -49,6 +49,8 @@ def sas_cmd(binary, packed, req, out: Path, extra):
            req.get("check", "needed")] + list(extra)
     if req.get("bans"):
         cmd += ["--bans", req["bans"]]
+    if req.get("caps"):
+        cmd += ["--cost-caps", req["caps"]]
     return [str(c) for c in cmd]
 
 
