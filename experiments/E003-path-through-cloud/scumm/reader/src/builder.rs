@@ -1342,7 +1342,9 @@ impl<'g> Builder<'g> {
     ) -> Vec<Record> {
         let facts0 = self.rd.counts.get(FORKS_ON_READ);
         let nonfacts0 = self.rd.counts.get(FORKS_ON_NONFACTS);
+        let t_run = std::time::Instant::now();
         let run = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
+        crate::par::trace_run(&job.label, t_run.elapsed().as_secs_f64(), &run);
         self.last_pins = pins.clone();
         self.rd.update(&run.rd);
         self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
@@ -1470,7 +1472,9 @@ impl<'g> Builder<'g> {
             );
         }
         let key = first_fork.unwrap();
+        let n_dom = vals.len();
         let vals = if self.table.reach.is_some() { self.reach_parts(job, pre, &key, vals) } else { vals };
+        crate::par::trace_split(&job.label, budget.1 as usize, &key, n_dom, vals.len(), limit);
         budget.1 += 1;
         self.counts.inc("runs past the path limit split on their first fork on a read");
         self.counts.inc(format!("split_limit: runs split at depth {}", budget.1));

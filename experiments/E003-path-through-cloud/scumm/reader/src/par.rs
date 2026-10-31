@@ -392,6 +392,63 @@ enum Task {
     Job(usize, Arc<Snap>, Arc<Vec<Job>>),
 }
 
+/// READER_TRACE=1: to stderr, the splits of a job down to depth 8, each job's start, and each job of 1 s or more with its splits. For
+/// finding where a reading's time goes; it changes nothing the reading writes.
+fn trace_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("READER_TRACE").is_some())
+}
+
+static TRACE_T0: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+thread_local! {
+    /// this worker's current job: its splits, parts, deepest split
+    static TRACE: std::cell::Cell<(u64, u64, usize)> = const { std::cell::Cell::new((0, 0, 0)) };
+}
+
+pub(crate) fn trace_split(label: &str, depth: usize, key: &str, values: usize, kept: usize, cut: i64) {
+    if !trace_on() {
+        return;
+    }
+    let (n, parts, deep) = TRACE.get();
+    TRACE.set((n + 1, parts + kept as u64, deep.max(depth + 1)));
+    if depth < 8 {
+        eprintln!("split {label} depth {depth} on {key}: {kept} of {values} values, {cut} paths cut");
+    }
+}
+
+/// A machine run of 1 s or more: its paths, cut paths, held branches, and its largest counters and fork keys.
+pub(crate) fn trace_run(label: &str, secs: f64, run: &crate::builder::RunOut) {
+    if !trace_on() || secs < 1.0 {
+        return;
+    }
+    let top = |c: &crate::py::Counter| {
+        let mut v: Vec<(&String, &i64)> = c.0.iter().filter(|(_, n)| **n != 0).collect();
+        v.sort_by(|a, b| b.1.cmp(a.1));
+        v.iter().take(12).map(|(k, n)| format!("{k}={n}")).collect::<Vec<_>>().join("; ")
+    };
+    eprintln!(
+        "run {label}: {secs:.1} s, {} paths, {} cut, {} held, first fork {:?}\n  counts: {}\n  forks: {}\n  fork keys: {}",
+        run.paths.len(),
+        run.limit,
+        run.held.len(),
+        run.first_fork,
+        top(&run.rd.counts),
+        top(&run.rd.forks),
+        top(&run.rd.fork_keys)
+    );
+}
+
+fn trace_job(label: &str, secs: f64, records: usize) {
+    if !trace_on() {
+        return;
+    }
+    let (n, parts, deep) = TRACE.replace((0, 0, 0));
+    if secs >= 1.0 {
+        eprintln!("job {label}: {secs:.1} s, {records} records, {n} splits, {parts} parts, {deep} deep");
+    }
+}
+
 fn worker(game: &Game, scope: &Scope, sh: &Shared) {
     let mut rd = Reader::new(game);
     let mut wb: Option<Builder> = None;
@@ -451,8 +508,12 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                     sh.sync_ns.fetch_add(ts.elapsed().as_nanos() as u64, Ordering::Relaxed);
                 }
                 let t = Instant::now();
+                if trace_on() {
+                    eprintln!("start {} {:.1}", jobs[i].label, TRACE_T0.get_or_init(Instant::now).elapsed().as_secs_f64());
+                }
                 let mut m = WorkerMachine { rd: &mut rd, sh, snap: &snap, parts: Vec::new() };
                 let records = b.run_job(&mut m, &jobs[i]);
+                trace_job(&jobs[i].label, t.elapsed().as_secs_f64(), records.len());
                 let out = JobOut {
                     records,
                     deltas: b.take_deltas(),
