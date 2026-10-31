@@ -68,7 +68,7 @@ task and, for the bans and goal it was last asked for, the banned task as a view
 to (d), none of which reads the start (taskcore/src/serve.rs). Each plan then redoes only the start check, (d) from
 the new start and what follows. It writes the same files, byte for byte, and stops with the same errors, so the rest
 of ``plan_taskcore`` is unchanged. One server lives at a time: asking for another packed file (F10's reading made
-again) or other options closes the old one. ``write_s`` is then the request's time; ``serve`` the server's reply (its
+again) or other options closes the old one; ``--cost-caps`` in ``args`` goes with the request. ``write_s`` is then the request's time; ``serve`` the server's reply (its
 seconds, whether it built or kept, its memory).
 """
 
@@ -331,6 +331,14 @@ class TaskcoreServer:
 _SERVER: list = []  # the one live server (module docstring)
 
 
+def _split_cost_caps(args: list) -> tuple:
+    """(``args`` without ``--cost-caps F``, ``--cost-caps F`` if given.)"""
+    if "--cost-caps" not in args:
+        return args, []
+    i = args.index("--cost-caps")
+    return args[:i] + args[i + 2:], args[i:i + 2]
+
+
 def server_for(packed, args=(), binary=TASKCORE) -> TaskcoreServer:
     """The live server for (binary, packed, args), started if needed; any other one is closed first."""
     key = (str(binary), str(packed), tuple(str(a) for a in args))
@@ -536,8 +544,9 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
     t0 = time.monotonic()
     reply = {}
     if serve:
-        # the per-plan options to the server; the others (args) are the server's own
-        ok, reply = server_for(packed, args, binary).request(per + with_bans)
+        # the per-plan options to the server; the others (args) are the server's own. The cost caps change per plan.
+        own, caps = _split_cost_caps([str(a) for a in args])
+        ok, reply = server_for(packed, own, binary).request(per + with_bans + caps)
         p = subprocess.CompletedProcess(cmd, 0 if ok else 2, "", "" if ok else f"taskcore: {reply}\n")
         if not ok:
             reply = {}

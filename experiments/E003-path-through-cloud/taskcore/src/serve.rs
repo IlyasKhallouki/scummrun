@@ -4,7 +4,7 @@
 //!
 //! It loads the packed file once and writes `ready<TAB>{json}` on stdout (the load's numbers). Then it reads one
 //! request per line on stdin: `sas`'s per-replan options, tab-separated (`--start-file F` or `--start NAME`, `--bans
-//! F`, `--out F`, `--stats F`, `--ops F`, `--kept F`, `--start-check input|needed`, `--goal ..`), and writes the
+//! F`, `--out F`, `--stats F`, `--ops F`, `--kept F`, `--start-check input|needed`, `--goal ..`, `--cost-caps F`), and writes the
 //! files `taskcore sas` writes with the server's options and these, byte for byte, then one line: `ok<TAB>{json}`
 //! (this request's seconds and memory) or `error<TAB>message` (the message `sas` stops with). It exits at the end of
 //! stdin. The fold, the reductions, PRODUCT_LIMIT and the encoding are the server's; `--check-fold` is refused.
@@ -25,6 +25,13 @@
 //! (`reduce::red_d_from`: the kept task is read, not changed), the rest of the loop (`reduce::finish`), the second
 //! fold and loop, the writer. A request with other bans or another goal first builds them again from the loaded
 //! task (no file is read again).
+//!
+//! **Cost caps** (`--cost-caps`, a request's option, bans.rs). `sas` applies them to the loaded task, before the bans.
+//! So the bans, the fold and the reductions read the capped costs, and everything kept depends on them: a request whose
+//! caps differ from the last request's sets the loaded task's costs back to the file's, applies its caps and builds
+//! again from the loaded task, as for other bans. The caps read the engine's dump, so a replan where a paused slot's
+//! frames changed builds again; only the load is saved there. A request with no caps file and one with an empty file
+//! keep the same task.
 //!
 //! **Why the files are the same bytes.** The kept task is the one `sas` has when its loop reaches (d) in the first
 //! round: the same steps (`reduce::run` is `prefix`, (d), `finish`) on the same task (the fold reads the banned view
@@ -49,7 +56,8 @@ use std::io::{BufRead, Write};
 use std::time::Instant;
 
 /// The options a request may give: `sas`'s per-replan ones.
-const PER_REQUEST: [&str; 8] = ["--start-file", "--start", "--bans", "--out", "--stats", "--ops", "--kept", "--start-check"];
+const PER_REQUEST: [&str; 9] =
+    ["--start-file", "--start", "--bans", "--out", "--stats", "--ops", "--kept", "--start-check", "--cost-caps"];
 
 /// What the server keeps for one (bans, goal) (module docstring).
 struct Kept {
@@ -80,6 +88,9 @@ struct Server {
     seconds_load: f64,
     rss_after_load: u64,
     kept: Option<Kept>,
+    costs: Option<Vec<u32>>,   // the file's costs, once a request has given caps
+    caps: Vec<(String, u32)>,  // the caps the loaded task has now
+    caps_lowered: usize,
 }
 
 fn rss_now() -> u64 {
@@ -140,6 +151,18 @@ fn give_back(b: bans::Banned, k: &mut Kept) {
 }
 
 impl Server {
+    /// The loaded task with the file's costs and then `caps` (module docstring); what was kept read the old costs.
+    fn set_caps(&mut self, caps: Vec<(String, u32)>) {
+        self.kept = None;
+        let meta = &mut self.t.acts.meta;
+        match &self.costs {
+            Some(c) => meta.iter_mut().zip(c).for_each(|(m, &x)| m.cost = x),
+            None => self.costs = Some(meta.iter().map(|m| m.cost).collect()),
+        }
+        self.caps_lowered = bans::apply_caps(&mut self.t, &caps);
+        self.caps = caps;
+    }
+
     /// Build what is kept for (bans, goal) from the loaded task (module docstring).
     fn build(&mut self, key: (Option<String>, Option<String>), list: &[bans::Ban], goal: Vec<(u32, Vec<u32>)>) {
         let t0 = Instant::now();
@@ -249,6 +272,19 @@ impl Server {
             .n("add_effects_expanded", self.add_effects)
             .f("seconds_load", self.seconds_load)
             .n("rss_after_load", self.rss_after_load);
+        // the caps, first, as in `sas`
+        let caps = match &r.cost_caps {
+            Some(path) => bans::read_caps(path)?,
+            None => Vec::new(),
+        };
+        if caps != self.caps {
+            self.set_caps(caps);
+        }
+        if r.cost_caps.is_some() {
+            let mut j = J::new();
+            j.n("caps", self.caps.len()).n("actions_lowered", self.caps_lowered);
+            st.raw("cost_caps", &j.done());
+        }
         // the start file and the bans, read as `sas` reads them
         let mut file_start: Option<(String, Vec<u32>)> = None;
         let mut named = None;
@@ -433,6 +469,9 @@ pub fn run(a: &Args) -> Result<(), String> {
     if a.check_fold > 0 {
         return Err("serve: --check-fold is not kept across requests".into());
     }
+    if a.cost_caps.is_some() {
+        return Err("serve: --cost-caps is a request's option".into());
+    }
     let t0 = Instant::now();
     let loaded = packed::load(&a.task)?;
     let mut t = loaded.task;
@@ -451,6 +490,9 @@ pub fn run(a: &Args) -> Result<(), String> {
         seconds_load,
         rss_after_load,
         kept: None,
+        costs: None,
+        caps: Vec::new(),
+        caps_lowered: 0,
     };
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -482,6 +524,7 @@ pub fn run(a: &Args) -> Result<(), String> {
             r.kept = None;
             r.needed_check = false;
             r.goal = None;
+            r.cost_caps = None;
             let given = parse_opts(&mut r, line.split('\t').map(String::from))?;
             if let Some(k) = given.iter().find(|k| !PER_REQUEST.contains(&k.as_str()) && k.as_str() != "--goal") {
                 return Err(format!("serve: {} is the server's option, not a request's", k));

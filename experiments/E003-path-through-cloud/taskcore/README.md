@@ -102,6 +102,11 @@ than its old ones), so a reduction's peak is the task's size, not twice it; the 
 server holds the loaded task and the kept task (smaller: (b) drops the effects nothing reads); a request adds (d)'s
 result. Its stats give this request's peak (the process's peak is reset before each request), and its reply the
 process's resident memory and CPU seconds.
+
+**Cost caps.** `--cost-caps F` is a request's option. `sas` applies the caps to the loaded task, before the bans, so
+what the server keeps depends on them: a request whose caps differ from the last one's sets the loaded task's costs
+back to the file's, applies its caps and builds again from the loaded task. The load is still saved, not the fold or
+(a) to (c). The test (`../test_taskcore_serve.py`) covers caps too.
 ## Frame costs
 
 A packed file made with the reader's switch `--frame-costs` (scumm/reader/src/costs.rs) gives each action its
