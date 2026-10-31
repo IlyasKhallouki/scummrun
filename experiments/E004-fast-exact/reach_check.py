@@ -1,317 +1,142 @@
-"""The exactness check of the reader's switch --reach (reach.md): the actions of a reading with the switch against the
-actions step (d) keeps of the full reading, as canonical texts, and the fact values (d) reaches from each.
+"""The exactness check of the reader's switch --reach (reach.md): the task (d) alone makes from a full reading against
+the task (d) alone makes from a reading with the switch, as canonical texts, and the fact values reached in each.
 
-    python reach_check.py FULL.tc REACH.tc [--start start] [--reached REACH.reached] [--show N] [--json OUT]
+    python reach_check.py TASKCORE FULL.tc REACH.tc [--start start] [--reached REACH.reached] [--show N] [--json OUT]
 
-Reads taskcore's packed files directly. (d) here is reduce.rs `red_d_core`'s closure on the actions as packed.rs loads
-them, and taskcore's own count of what it keeps is the check on this copy (--taskcore BIN).
+It runs `taskcore dump --fold off --reduce d` on each file, so the sets and effects compared are those (d) leaves.
 """
 
 import argparse
 import json
-import struct
 import subprocess
 import sys
 import tempfile
 from collections import Counter
 from pathlib import Path
 
-MAGIC, END_MAGIC, NONE = 0x524F4354, 0x444E4554, 0xFFFFFFFF
 
-
-class Packed:
-    def __init__(self, path):
-        data = Path(path).read_bytes()
-        w = struct.unpack(f"<{len(data) // 4}I", data[: len(data) // 4 * 4])
-        assert w[0] == MAGIC and w[-1] == END_MAGIC, path
-        body, nact, o_str, o_facts, o_adds, o_goal, o_starts = w[-8:-1]
-        nstr = w[o_str]
-        lens = w[o_str + 1 : o_str + 1 + nstr]
-        p = (o_str + 1 + nstr) * 4
-        self.strs = []
-        for n in lens:
-            self.strs.append(data[p : p + n].decode())
-            p += n
-        q = o_facts
-        nf = w[q]
-        q += 1
-        self.keys, self.doms = [], []
-        for _ in range(nf):
-            self.keys.append(self.strs[w[q]])
-            n = w[q + 1]
-            self.doms.append(list(w[q + 2 : q + 2 + n]))
-            q += 2 + n
-        self.index = [{v: i for i, v in enumerate(d)} for d in self.doms]
-        q = o_adds
-        nadd = w[q]
-        q += 1
-        self.adds = {}
-        for _ in range(nadd):
-            fact, d, n = w[q], w[q + 1], w[q + 2]
-            q += 3
-            tbl = []
-            for _ in range(n):
-                m = w[q]
-                tbl.append(list(w[q + 1 : q + 1 + m]))
-                q += 1 + m
-            self.adds[(fact, d)] = tbl
-        q = o_goal
-        ng = w[q]
-        q += 1
-        self.goal = []
-        for _ in range(ng):
-            f, n = w[q], w[q + 1]
-            self.goal.append((f, list(w[q + 2 : q + 2 + n])))
-            q += 2 + n
-        q = o_starts
-        ns = w[q]
-        q += 1
-        self.starts = {}
-        for _ in range(ns):
-            self.starts[self.strs[w[q]]] = list(w[q + 1 : q + 1 + nf])
-            q += 1 + nf
-        self.acts = []
-        q = body
-        for _ in range(nact):
-            n = w[q]
-            b = w[q + 1 : q + 1 + n]
-            q += 1 + n
-            self.acts.append(self._action(b))
-
-    def _sets(self, b, c, n):
-        out = []
-        for _ in range(n):
-            f, m = b[c], b[c + 1]
-            out.append((f, tuple(b[c + 2 : c + 2 + m])))
-            c += 2 + m
-        return out, c
-
-    def _action(self, b):
-        rec, label, kind, end, cont, cost = b[:6]
-        pre, c = self._sets(b, 7, b[6])
-        neff = b[c]
-        c += 1
-        effs = []
-        for _ in range(neff):
-            op, fact = b[c], b[c + 1]
-            c += 2
-            if op == 0:
-                pay = (b[c],)
-                c += 1
-            elif op == 1:
-                n = b[c]
-                pay = tuple(b[c + 1 : c + 1 + n])
-                c += 1 + n
+def dump(taskcore, path, start, out, how=("--fold", "off", "--reduce", "d")):
+    subprocess.run([taskcore, "dump", "--task", path, "--start", start, *how, "--out", out, "--stats", out + ".stats"], check=True, stdout=subprocess.DEVNULL)
+    stats = json.loads(Path(out + ".stats").read_text())
+    facts, acts = {}, []
+    with open(out) as f:
+        for line in f:
+            x = json.loads(line)
+            if "fact" in x:
+                facts[x["fact"]] = set(x["values"])
             else:
-                pay = (b[c],)
-                c += 1
-            when, c = self._sets(b, c + 1, b[c])
-            effs.append((op, fact, pay, when))
-        return (rec, label, kind, end, cont, cost, pre, effs)
-
-    def text_sets(self, sets):
-        return tuple(sorted((self.keys[f], tuple(sorted(self.strs[v] for v in vs))) for f, vs in sets))
-
-    def canon(self, a):
-        rec, label, kind, end, cont, cost, pre, effs = a
-        es = []
-        for op, fact, pay, when in effs:
-            if op == 2:
-                p = ("add", struct.unpack("<i", struct.pack("<I", pay[0]))[0])
-            else:
-                p = tuple(sorted(self.strs[v] for v in pay))
-            es.append((self.keys[fact], op, p, self.text_sets(when)))
-        return (self.strs[label], self.strs[kind], self.strs[end], self.strs[cont], cost, self.text_sets(pre), tuple(sorted(es)))
-
-    def expanded(self, a):
-        """The action as packed.rs loads it: precondition sets and effects as (when sets, fact, values or None)."""
-        _, _, _, _, _, _, pre, effs = a
-        ix = self.index
-        cut = lambda f, vs: tuple(sorted(ix[f][v] for v in vs if v in ix[f]))
-        p = [(f, cut(f, vs)) for f, vs in pre]
-        out = []
-        for op, fact, pay, when in effs:
-            w = [(f, cut(f, vs)) for f, vs in when]
-            if op == 0 or op == 1:
-                if all(v in ix[fact] for v in pay):
-                    out.append((w, fact, tuple(ix[fact][v] for v in pay)))
-            else:
-                size = len(self.doms[fact])
-                own = None
-                for f, s in reversed(w):
-                    if f == fact and len(s) < size:
-                        own = s
-                        break
-                rest = [x for x in w if x[0] != fact]
-                tbl = self.adds[(fact, pay[0])]
-                for u in range(size):
-                    if own is not None and u not in own:
-                        continue
-                    nxt = sorted(ix[fact][v] for v in tbl[u] if v in ix[fact])
-                    if size == 1 and nxt == [u]:
-                        continue
-                    if nxt:
-                        out.append((rest + [(fact, (u,))], fact, tuple(nxt)))
-        return p, out
+                pre = tuple(sorted((k, tuple(sorted(v))) for k, v in x["pre"]))
+                eff = tuple(sorted((k, kind, tuple(sorted(v)), tuple(sorted((a, tuple(sorted(b))) for a, b in w))) for k, kind, v, w in x["eff"]))
+                acts.append((x["label"], x["kind"], x["end"], x["cont"], x["cost"], pre, eff))
+    return facts, acts, stats
 
 
-def closure(pk, start_name):
-    """(d): the reached (fact, value index) pairs, and the actions that apply."""
-    start = pk.starts[start_name]
-    reached = [set() for _ in pk.keys]
-    for f, v in enumerate(start):
-        if v != NONE and v in pk.index[f]:
-            reached[f].add(pk.index[f][v])
-    exp = [pk.expanded(a) for a in pk.acts]
-    applied = [False] * len(exp)
-    fired = [[False] * len(e[1]) for e in exp]
-    changed = True
-    while changed:
-        changed = False
-        for i, (pre, effs) in enumerate(exp):
-            if not applied[i]:
-                if all(any(x in reached[f] for x in s) for f, s in pre):
-                    applied[i] = True
-                else:
-                    continue
-            for j, (w, fact, vals) in enumerate(effs):
-                if fired[i][j]:
-                    continue
-                if all(any(x in reached[f] for x in s) for f, s in w):
-                    fired[i][j] = True
-                    for v in vals:
-                        if v not in reached[fact]:
-                            reached[fact].add(v)
-                            changed = True
-    return reached, applied
+def norm(c):
+    """With the switch a job's and a record's set on args:X is always written; the full reading leaves it out where the
+    lists known when the job was made are none (reach.md, "Lists"). So {0} on args:X, and a write of 0, are left out on
+    both sides, and a record left with no effect is a no-op."""
+    pre = tuple(x for x in c[5] if not (x[0].startswith("args:") and x[1] == ("0",)))
+    eff = tuple(e for e in c[6] if not (e[0].startswith("args:") and e[2] == ("0",)))
+    return c[:5] + (pre, eff)
 
 
-def texts(pk, reached):
-    return {pk.keys[f]: {pk.strs[pk.doms[f][x]] for x in r} for f, r in enumerate(reached)}
+def pairs_written(acts, start_pairs):
+    """Lemma 2: the (unit, pos, args) a kept record writes or keeps, and the start's."""
+    out = set(start_pairs)
+    for c in acts:
+        pre = dict(c[5])
+        sets = {e[0]: e[2][0] for e in c[6] if e[1] == 0 and not e[3] and len(e[2]) == 1}
+        for key in set(sets) | set(pre):
+            if not key.startswith("args:"):
+                continue
+            name = key[5:]
+            pk = "pos:" + name
+            if pk not in sets and key not in sets:
+                continue  # the record writes neither: it only reads the pair
+            ws = [sets[pk]] if pk in sets else list(pre.get(pk, ()))
+            ss = [sets[key]] if key in sets else list(pre.get(key, ()))
+            for w in ws:
+                for s in ss:
+                    out.add((name, w, s))
+    return out
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("taskcore")
     ap.add_argument("full")
     ap.add_argument("reach")
     ap.add_argument("--start", default="start")
     ap.add_argument("--reached")
     ap.add_argument("--show", type=int, default=5)
     ap.add_argument("--json")
-    ap.add_argument("--taskcore")
     a = ap.parse_args()
-    f, r = Packed(a.full), Packed(a.reach)
-    rf, af = closure(f, a.start)
-    rr, ar = closure(r, a.start)
-    out = {"full_actions": len(f.acts), "reach_actions": len(r.acts)}
-    out["d_keeps_of_full"] = sum(af)
-    out["d_keeps_of_reach"] = sum(ar)
-    if a.taskcore:
-        with tempfile.TemporaryDirectory() as d:
-            for name, path, mine in (("full", a.full, sum(af)), ("reach", a.reach, sum(ar))):
-                st = Path(d) / "s.json"
-                subprocess.run([a.taskcore, "sas", "--task", path, "--start", a.start, "--out", str(Path(d) / "t.sas"), "--fold", "off", "--reduce", "d", "--stats", str(st)], check=True, stdout=subprocess.DEVNULL)
-                n = json.loads(st.read_text())["actions_after_reduce"]
-                out[f"taskcore_d_keeps_of_{name}"] = n
-                assert n == mine, f"{name}: taskcore's (d) keeps {n}, this copy {mine}"
-    # args:X with the single value 0 in either reading: no record names a list of X, so the fact is constant and a
-    # precondition or a write of it says nothing. Both sides leave it out, and a record left with no effect is a no-op.
-    const = {k for k, d in zip(r.keys, r.doms) if k.startswith("args:") and [r.strs[v] for v in d] == ["0"]}
-    const |= {k for k, d in zip(f.keys, f.doms) if k.startswith("args:") and [f.strs[v] for v in d] == ["0"]}
-    # With the switch a job's and a record's set on args:X is always written; the full reading leaves it out where the
-    # lists known when the job was made are none (reach.md, "Lists"). So {0} on args:X, and a write of 0, are left out on
-    # both sides of the comparison.
-    def norm(c):
-        pre = tuple(x for x in c[5] if not (x[0].startswith("args:") and x[1] == ("0",)))
-        eff = tuple(e for e in c[6] if not (e[0].startswith("args:") and e[2] == ("0",)))
-        return c[:5] + (pre, eff)
-    kf = Counter(n for n in (norm(f.canon(x)) for x, k in zip(f.acts, af) if k) if n[6])
-    kr = Counter(n for n in (norm(r.canon(x)) for x, k in zip(r.acts, ar) if k) if n[6])
-    out["args_facts_constant_in_reach"] = len(const)
-    only_full = kf - kr
-    only_reach = kr - kf
+    with tempfile.TemporaryDirectory(prefix="reach-check-", dir=Path(a.reach).parent) as d:
+        ff, af, sf = dump(a.taskcore, a.full, a.start, d + "/f.jsonl")
+        rf, ar, sr = dump(a.taskcore, a.reach, a.start, d + "/r.jsonl")
+        # the task taskcore makes with every reduction, from each: the same up to names, or how it differs
+        tf, atf, _ = dump(a.taskcore, a.full, a.start, d + "/tf.jsonl", ())
+        tr, atr, _ = dump(a.taskcore, a.reach, a.start, d + "/tr.jsonl", ())
+    out = {"full_actions": sf["input_actions"], "reach_actions": sr["input_actions"], "d_keeps_of_full": len(af), "d_keeps_of_reach": len(ar)}
+    ctf, ctr = Counter(map(norm, atf)), Counter(map(norm, atr))
+    out["task"] = {
+        "actions_full": len(atf),
+        "actions_reach": len(atr),
+        "only_full": sum((ctf - ctr).values()),
+        "only_reach": sum((ctr - ctf).values()),
+        "labels_only_full": Counter(c[0].split("#")[0] for c in (ctf - ctr).elements()).most_common(12),
+        "labels_only_reach": Counter(c[0].split("#")[0] for c in (ctr - ctf).elements()).most_common(12),
+        "facts_differ": {k: (sorted(tf.get(k, set()) - tr.get(k, set())), sorted(tr.get(k, set()) - tf.get(k, set()))) for k in set(tf) | set(tr) if tf.get(k, set()) != tr.get(k, set())},
+    }
+    kf = Counter(n for n in map(norm, af) if n[6])
+    kr = Counter(n for n in map(norm, ar) if n[6])
+    only_full, only_reach = kf - kr, kr - kf
     out["kept_by_d_not_written"] = sum(only_full.values())
     out["written_not_kept_by_d"] = sum(only_reach.values())
-    tf, tr = texts(f, rf), texts(r, rr)
-    # a fact the reading with the switch has no record on is only its start value in the full file
-    st_f = {f.keys[i]: (f.strs[v] if v != NONE else None) for i, v in enumerate(f.starts[a.start])}
-    only_f = {}
-    facts_absent = 0
-    for k in tf:
-        d = tf[k] - tr.get(k, set())
-        if k not in tr:
-            facts_absent += 1
-            d -= {st_f[k]}
-        if d:
-            only_f[k] = sorted(d)
-    out["facts_only_in_full_file"] = facts_absent
-    only_r = {k: sorted(tr[k] - tf.get(k, set())) for k in tr if tr[k] - tf.get(k, set())}
-    out["values_reached_full"] = sum(len(v) for v in tf.values())
-    out["values_reached_reach"] = sum(len(v) for v in tr.values())
-    out["values_only_full"] = only_f
-    out["values_only_reach"] = only_r
+    # the values reached: every fact in both files (a fact only one file has is its start value there, or it is listed)
+    values_only_full = {k: sorted(v - rf.get(k, set())) for k, v in ff.items() if k in rf and v - rf[k]}
+    values_only_reach = {k: sorted(v - ff.get(k, set())) for k, v in rf.items() if k in ff and v - ff[k]}
+    out["values_full"] = sum(len(v) for v in ff.values())
+    out["values_reach"] = sum(len(v) for v in rf.values())
+    out["facts_only_in_full"] = {k: sorted(v) for k, v in ff.items() if k not in rf and len(v) > 1}
+    out["facts_only_in_reach"] = {k: sorted(v) for k, v in rf.items() if k not in ff and len(v) > 1}
+    out["n_facts_only_in_full_one_value"] = sum(1 for k, v in ff.items() if k not in rf and len(v) == 1)
+    out["values_only_full"] = values_only_full
+    out["values_only_reach"] = values_only_reach
     if a.reached:
-        file_vals = {}
+        fv = {}
         for line in Path(a.reached).read_text().splitlines():
             parts = line.split("\t")
-            file_vals[parts[0]] = set(x for x in parts[1:] if x)
-        # a list SIG_LIMIT folded is in the reader's values with its number, and 0 in the file
-        bad = {k: (sorted(file_vals.get(k, set()) - v), sorted(v - file_vals.get(k, set()))) for k, v in tr.items() if v - file_vals.get(k, set()) or (file_vals.get(k, set()) - v and not k.startswith("args:"))}
-        out["reached_file_differs_from_d"] = bad
-    # Lemma 2's class: the record needs (pos:X = w, args:X = s), and no kept record of the full reading writes that pair
-    pairs = set()
-    for x, k in zip(f.acts, af):
-        if not k:
-            continue
-        c = f.canon(x)
-        pre = dict(c[5])
-        sets = {}
-        for key, op, p, when in c[6]:
-            if op == 0:
-                sets[key] = p[0]
-        for key in set(sets) | set(pre):
-            if key.startswith("args:"):
-                name = key[5:]
-                w = sets.get("pos:" + name) or (pre.get("pos:" + name, ("",))[0] if len(pre.get("pos:" + name, ())) == 1 else None)
-                s_ = sets.get(key) or (pre[key][0] if len(pre.get(key, ())) == 1 else None)
-                if w is not None and s_ is not None:
-                    pairs.add((name, w, s_))
-    for k in ("start",):
-        st = f.starts[a.start]
-        for i, key in enumerate(f.keys):
-            if key.startswith("args:") and st[i] != NONE:
-                name = key[5:]
-                if "pos:" + name in f.keys:
-                    pairs.add((name, st_f.get("pos:" + name), f.strs[st[i]]))
-    cls = Counter()
-    other = []
+            fv[parts[0]] = {x for x in parts[1:] if x}
+        # a list SIG_LIMIT folded is still among the reader's values with its number; the file has it as 0
+        out["reader_values_differ_from_d"] = {k: (sorted(fv.get(k, set()) - v), sorted(v - fv.get(k, set()))) for k, v in rf.items() if k in fv and (v - fv[k] or (fv[k] - v and not k.startswith("args:")))}
+    pw = pairs_written(af, ())
     same_label = {c[0] for c in only_reach}
+    cls, other = Counter(), []
     for c in only_full.elements():
         pre = dict(c[5])
-        ar = [k for k in pre if k.startswith("args:") and pre[k] != ("0",)]
         unnamed = False
-        for k in ar:
-            name = k[5:]
-            pos = pre.get("pos:" + name, ())
-            if len(pos) == 1 and (name, pos[0], pre[k][0]) not in pairs:
-                unnamed = True
-        if unnamed:
-            cls["lemma 2: a (pos, args) pair no kept record writes"] += 1
-        elif c[0] in same_label:
-            cls["a job read otherwise (a split in one reading only, a list folded in one only)"] += 1
+        for k, s in pre.items():
+            if k.startswith("args:") and s != ("0",):
+                name = k[5:]
+                pos = pre.get("pos:" + name, ())
+                if len(pos) == 1 and all((name, pos[0], x) not in pw for x in s):
+                    unnamed = True
+        if c[0] in same_label:
+            cls["a job read otherwise (split or folded in one reading only)"] += 1
+        elif unnamed:
+            cls["an event with a known list no kept record names (lemma 2)"] += 1
         else:
             cls["other"] += 1
             other.append(c)
     out["kept_by_d_not_written_classes"] = dict(cls)
-    wf = Counter(c[0] for c in only_full.elements())
-    wr = Counter(c[0] for c in only_reach.elements())
-    out["only_full_by_label"] = wf.most_common(20)
-    out["only_reach_by_label"] = wr.most_common(20)
-    brief = {k: (v if not isinstance(v, dict) else {x: (y if len(str(y)) < 200 else f"{len(y)} items") for x, y in list(v.items())[:40]}) for k, v in out.items()}
+    out["only_full_labels"] = Counter(c[0].split("#")[0] for c in only_full.elements()).most_common(30)
+    out["only_reach_labels"] = Counter(c[0].split("#")[0] for c in only_reach.elements()).most_common(30)
+    brief = {k: (v if not isinstance(v, dict) else {x: (y if len(str(y)) < 160 else f"{len(y)} items") for x, y in list(v.items())[:30]}) for k, v in out.items()}
     print(json.dumps(brief, indent=1))
-    for name, bag in (("kept by (d), not written, not in lemma 2's class", other), ("written, not kept by (d)", only_reach)):
+    for name, bag in (("other", other), ("only reach", list(only_reach.elements())), ("only full", list(only_full.elements()))):
         for c in list(bag)[: a.show]:
-            print(name, ":", c)
+            print(name, ":", str(c)[:1500])
     if a.json:
         Path(a.json).write_text(json.dumps(out, indent=1))
 

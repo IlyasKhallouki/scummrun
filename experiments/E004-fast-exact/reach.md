@@ -120,7 +120,14 @@ gets). So an event `(X, w, s)` that no kept record names cannot apply in a state
 plan from that start.
 
 This makes `--reach` a slightly stronger reduction than `(d)`, and it is still exact for plans. The check counts these
-records in every scope. Any other record `(d)` keeps and `--reach` does not write is a failure of the reduction.
+records in every scope. Any other record `(d)` keeps and `--reach` does not write is a failure of the reduction, except
+for the case below.
+
+**A job read otherwise.** Under split_limit a run past `PATH_LIMIT` is run again as parts, each with the split fact
+pinned from the start. A path that does not read that fact then holds it in its precondition all the same, and merges
+differ. With `--reach` the run may stay under the limit and not split. Both readings are exact (split_limit's proof), but
+their records for that job differ: the unsplit job's records are the finer ones. The check lists them as a class of
+their own, by label.
 
 ## Domains
 
@@ -145,6 +152,18 @@ affects three things.
 `ELSEWHERE` needs nothing new. It is a value of `pos:` that a written record reaches. Since `positions` takes it out of
 every precondition set, it frees nothing. An event at a place outside the scope's points has `{1}` on a place `pos`'s
 domain lacks. It never meets `R`, and its job never runs. `(d)` drops its records too, because their set is empty.
+
+## Lists
+
+A job's precondition on `args:X` is left out today when the lists known at that moment are none, because the set would
+be the whole domain. Which lists are known then depends on what ran before. With `--reach` the set is always written, so
+a record does not depend on the order lists arrive in. In the full reading such a record has no set on `args:X`, and it
+also writes `args:X = 0`. With `--reach` it holds `args:X = {0}`, and that write goes, as for any write of the value a
+precondition already gives. The check compares both without this. A record that loses its only effect this way is a
+no-op.
+
+The record with the set is the tighter one: without it, an event with unknown locals applies at a state where the slot
+has a known list. Such a step has no plan of its own: what it can do with the real list is in the event of that list.
 
 SIG_LIMIT: the number of lists a wait point has seen depends on what ran. With fewer lists, `--reach` may fold fewer of
 them, and then its records name a list the full reading has folded into 0. The check counts these, and they are
@@ -173,10 +192,12 @@ folds sets `args:X = 0` in `R`, since `RecordStream::finish` rewrites the writte
 
 1. With the switch off, every golden is byte for byte today's.
 2. On each scope, from the full reading with split_limit and the same switches:
-   - Written records against the records `(d)` keeps (`taskcore --fold off --reduce d --kept`), as sets of canonical
-     records. Both directions are reported. A record `(d)` keeps that `--reach` does not write must be in Lemma 2's
-     class or the domain class above. Anything else is a bug.
+   - The actions `(d)` alone leaves of each file (`taskcore dump --fold off --reduce d`, `reach_check.py`), as sets of
+     canonical texts. Both directions are reported. An action `(d)` keeps that `--reach` does not write must be in
+     Lemma 2's class, a job read otherwise, or the domain class above. Anything else is a bug.
    - Reached fact values by `(d)`, from both packed files.
-   - On the kitchen and the bar door task, the optimal cost with A* and landmark cost partitioning, from both.
+   - The task taskcore makes from each with all its reductions, as canonical texts. Where they are equal up to names,
+     every optimal cost is equal without a search. On the kitchen, the optimal cost with A* and landmark cost
+     partitioning from both.
 3. A property test on a fake machine: any order of arrival gives the same records, and a held branch resumes.
 4. A start with a new value: taskcore stops, and the extended reading covers it.
