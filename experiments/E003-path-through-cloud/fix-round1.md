@@ -146,9 +146,9 @@ harness's own play leaves.
 the mouse to the object, frames until the click gate opens, a left click; with B the same again on B. A walk_to has no
 verb key. So the slots run at least one turn with the mouse on the object before the click.
 
-**The plain input script.** A script is plain when its own code holds a doSentence whose three operands are all
+**The plain input script.** A global script is plain when its own code holds a doSentence whose three operands are all
 variables, and no yield. Such a script makes the sentence from those variables and has no later part. Today's sentence
-record is what it does. In the game's text there is one, global 4 ([0407]); the 16 other values VAR_VERB_SCRIPT takes
+record is what it does. In the game's text there is one, global 4 ([0407]); the 15 other constants written to VAR_VERB_SCRIPT
 (14, 33, 66, 129, 149, 156, 158 and the rooms' locals) have no such doSentence (33 has doSentence(11, Local[2], 0)). No
 number is written in the code: inputs.rs reads this from the IR.
 
@@ -217,6 +217,12 @@ no record; the roles above. The kitchen task with the switch plans to owner:566 
 
 **Gate.** A count of room 33 and the kitchen with the switch on, before anything else: stop if the kitchen's reading time or
 its taskcore operators grow more than 3 times over the same switches without it.
+
+**Measured** (notes/log/2026-10-31-e003-f1c.md, results/f1c-gate.log). The gate fails on reading time: the kitchen's reading takes
+4.5 times the wall time and 5.4 times the CPU time, with 6.7 times the records (475,441 against 71,242). Its operators grow 2.53
+times (44,839 against 17,712). Room 33 is unchanged. Each sentence of the bar is 18 times today's: 6 from local 202's tests on the
+cook, the rule's own forks, times 3 from global 4's Bit[547] and Var[182]. The tests pass, and the kitchen plans to owner:566 = ego.
+The 185,069 click records of F1b are all in states rule 3 excludes.
 
 ## F2. Where in the frame an input is read (open choice)
 
