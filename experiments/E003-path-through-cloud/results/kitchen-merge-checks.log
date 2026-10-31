@@ -1,5 +1,6 @@
 E003, branch kitchen: origin/main (e926bd2) with stuck, noreload and costs merged, and taskcore serve taking --cost-caps
-per request. Checks on the laptop, 2026-10-31; nice 10, at most 6 threads, nothing else of ours running.
+per request. Checks on the laptop, 2026-10-31; nice 10, at most 6 threads for these checks; load up to 9 at one reading,
+so the times are not clean.
 
 == every switch off
 scumm/machine and scumm/ir: no diff from main, so the nine machine golden runs and check_rust_all were not rerun
