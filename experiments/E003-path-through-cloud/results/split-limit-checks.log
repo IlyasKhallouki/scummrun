@@ -1,0 +1,61 @@
+E003, branch stuck: origin/main (7c27006) with the reader switch split_limit (scumm/reader PORT-NOTES.md, "The path
+limit"). Checks on the laptop, 2026-10-26; nice 10, at most 6 threads, other jobs running (load 7 to 21). Seed 1's
+start (results/start-part1.jsonl) for every scope reading.
+
+== every switch off
+cargo test --release (scumm workspace): reader 20 unit, 21 oracle (room 33's goldens), 6 fix_round1, 5 split_limit
+  (1 ignored); ir 1 unit, 5 due, 3 facts, 3 oracle; machine 9 unit, 10 fix_round1, 5 value_sets: all pass. The
+  machine crate is unchanged; its golden.rs and check_rust.rs need ignored data this worktree does not link (the
+  movie file, results/check-part1-row0.jsonl) and fail on that before running.
+cargo test --release -p scumm-reader --test oracle -- --ignored --test-threads 1: 9 passed (kitchen_live_locals_on,
+  kitchen_reading_against_golden, kitchen_reading_elsewhere_on, kitchen_reading_rust_machine, kitchen_reading_threads,
+  kitchen_records_written_back, kitchen_runs_rust_machine, kitchen_streamed_threads_against_write_sas,
+  kitchen_task_against_write_sas) in 1729 s
+reader-scope --k 2 --elsewhere --live-locals --threads 5: 519755 records, packed sha1 39200a67 (the committed
+  results/reader-scope-k2-elsewhere-live-locals.json's); 3630 CPU s, peak 3740 MB
+reader-scope --rooms 33,28 --domain-goals none --goal state:316=1 --elsewhere --live-locals, with and without
+  --split-limit: 66030 records, records sha1 aa5aace17aaf, counters sha1 252285ca104a, packed sha1 3a35df0bc083 both
+  (no run passes the limit in the bar)
+
+== split_limit, the rule (tests/split_limit.rs)
+fake machine past the limit until 4 facts are pinned, 1 fork on facts and 10 on non-facts per run: on, every
+  combination of the 4 facts' values runs once, splits at 4 levels, 0 paths cut; off, not split (reader.py's
+  non-fact rule), 3 paths cut; a run with no fact left, and a path the step limit ended, stop the reading
+room 33, limit 32: records 878 uncut (limit 1024) / 806 cut / 900 split (18 splits); (fact, value) pairs reached
+  ignoring deletes 364 / 363 / 364; at limits 12, 16 and 24 a part passes the limit on non-fact forks alone and the
+  switch stops the reading
+
+== the kitchen (reader-port read kitchen --threads 2; taskcore sas --start s17, default reductions; lama-first)
+off: 72256 records, golden.py's (0 differences); 2 runs past the limit (sentence(8,574) and its ~frozen copy), 318
+  paths cut; 71729 actions; the delete relaxation applies 27912; taskcore 12029 actions, 17823 operators; 10 steps
+on: 72220 records; the 2 runs split once on var:102, 10 parts, 0 cut; only their records change (108 each into 90);
+  71693 actions; applies 27910, rooms reached 28 and 41 as off; taskcore 12027 actions, 17859 operators; the same
+  10 steps: event(local:211@33), walk_to(316), event(script:2@736), event(local:218@16), sentence(2,564),
+  fold:event(script:2@736), event(script:2@915), sentence(9,566), fold:event(script:2@736), event(script:2@915)
+B (due_first, value_sets, draw_clears, actor_rooms, --elsewhere, --live-locals; --task-out): 71278 records, due
+  writes 20790851 states 0 differences, taskcore 11977 actions, 17702 operators, 10 steps (fr1-main's)
+B + split_limit: 71242 records, 2 runs split, 0 cut, due writes 20789339 states 0 differences, taskcore 11975
+  actions, 17738 operators, the same 10 steps
+
+== rooms 33, 28 and 35 (reader-scope --rooms 33,28,35 --elsewhere --live-locals --split-limit --threads 6)
+270473 records, records sha1 39ac5a3c, packed sha1 28abab45, 269868 actions (208950 without the switch); 0 paths cut;
+  1840 CPU s, peak 2219 MB (without: 744 CPU s, 0.90 GB on 3 threads)
+
+== k = 1 with goal state:316 = 1 (reader-scope --k 1 --elsewhere --live-locals --goal state:316=1)
+off (packed 590c6acf, the goal patched): taskcore --reduce a,b,c,d: 168999 actions after the fold, (d) leaves out
+  152795, 16052 kept, the goal unreachable ignoring deletes; default reductions: 0 actions (unsolvable)
+on (--split-limit, 5 threads): 299617 records, records sha1 f4ddc2df, 298992 actions, 0 paths cut; 2164 CPU s,
+  peak 1783 MB (off: 570 CPU s, 1072 MB on 3 threads)
+  taskcore --reduce a,b,c,d: 230299 after the fold, (d) leaves out 198208, 31939 kept, the goal reachable
+  default reductions, --start-check needed: 24059 actions, 67234 operators; start check 0 facts
+  lama-first: 6 steps in 25.1 s: fold:sentence(2,428), event(script:2@736), fold:walk_to(428), event(script:2@736),
+  event(local:211@4), event(local:211@33)
+
+== the bar door run (replay_part1.py read-rust 33,28 --seed 1 --goal state:316=1 --elsewhere --live-locals
+   --split-limit; run 1 --slot-locals --reread --threads 3 --plan-memory 4G; FAST_MI_SCUMMVM_BIN at fr1-main's build)
+reading: 66030 records, 65516 actions, 5100 lists, lines sha1 693dc344213e (the committed run's)
+run: stop goal at frame 3129, 0 replans, 401 frames, 28 inputs equal to the committed run's
+  (results/replay-part1-bar-door-ll-seed1-locals.json), the same 3 steps; verify from boot 0 differences at 6
+  checkpoints
+
+K2_TBD
