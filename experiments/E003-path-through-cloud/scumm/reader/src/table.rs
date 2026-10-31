@@ -70,6 +70,9 @@ pub struct FactTable {
     /// fix round 1, F12 (switch value_sets, the Builder's): the machine half forks a fact read that only a
     /// comparison reads into the value sets it separates, and reads the mouse as ranges (machine.rs)
     pub value_sets: bool,
+    /// the switch split_limit (the Builder's): a run past the path limit is split until no part passes it
+    /// (`Builder::run_split`); the machine half then hands over no path of a run the limit cut (machine.rs)
+    pub split_limit: bool,
 }
 
 impl FactTable {
@@ -176,6 +179,7 @@ impl FactTable {
             live_locals: None,
             binary: Domain::binary(),
             value_sets: false,
+            split_limit: false,
         }
     }
 

@@ -14,9 +14,9 @@
 #            at the repository's pins when missing (ScummVM's tag with patches/*.patch applied once, on the fresh
 #            clone); then the builds: the Rust reader and taskcore, Fast Downward (./build.py release), ScummVM
 #            (scripts/build-scummvm.sh --no-reset). Ends with the free disk, memory and /dev/shm.
-#   read     reader-scope $SCOPE --elsewhere [--live-locals] on $THREADS threads: the packed file and golden.py's records
-#            streamed into $READ, then packed_reading.py from-golden on $THREADS processes: $READ/reading.json,
-#            reading.tc, reading.actions.jsonl. The reader's report and log go to $RES.
+#   read     reader-scope $SCOPE --elsewhere [--live-locals] [--split-limit] on $THREADS threads: the packed file and
+#            golden.py's records streamed into $READ, then packed_reading.py from-golden on $THREADS processes:
+#            $READ/reading.json, reading.tc, reading.actions.jsonl. The reader's report and log go to $RES.
 #   check    packed_reading.py check on the reading (optional: about 3.5 ms of CPU per action, so hours at Part I's
 #            scale).
 #   run      replay_part1.py run 1 on the reading: boot, the start check, the harness (taskcore and lama-first per
@@ -33,7 +33,9 @@
 # TIME_LIMIT=10800 (the run's seconds); PLAN_TIME=600 (plan.md step 4); PLAN_MEMORY=64G (Fast Downward per plan);
 # DEADLINE (UTC epoch seconds, optional: the harness's time limit ends there at the latest); LIVE_LOCALS=0 (1: the
 # reader's switch --live-locals, scumm/reader/PORT-NOTES.md "Live locals": events keyed only on the locals their unit
-# reads; reading.json and the run's record then say so).
+# reads; reading.json and the run's record then say so); SPLIT_LIMIT=0 (1: the reader's switch --split-limit,
+# scumm/reader/PORT-NOTES.md "The path limit": a run past the path limit is split until no part passes it, and the
+# reading stops on a run it cannot split).
 # Only seed 1: reader-scope reads results/start-part1.jsonl's seed 1, and a reading serves the seed it was read from.
 #
 # C2: this file names no game number. The reading and the results stay on the VM's private disk and RAM until
@@ -56,6 +58,7 @@ TIME_LIMIT="${TIME_LIMIT:-10800}"
 PLAN_TIME="${PLAN_TIME:-600}"
 PLAN_MEMORY="${PLAN_MEMORY:-64G}"
 LIVE_LOCALS="${LIVE_LOCALS:-0}"
+SPLIT_LIMIT="${SPLIT_LIMIT:-0}"
 PY="$ROOT/.venv/bin/python"
 SCUMMVM_TAG=v2026.3.0  # scripts/build-scummvm.sh's pin
 DOWNWARD_PIN=7ea2755269ff9398279b30f5c848e32ba6047c9c  # the submodule's commit (release 26.6.0)
@@ -107,6 +110,7 @@ read_scope() {
     mkdir -p "$READ" "$RES"
     local live=()
     [[ "$LIVE_LOCALS" == 1 ]] && live=(--live-locals)
+    [[ "$SPLIT_LIMIT" == 1 ]] && live+=(--split-limit)
     say "reader-scope $SCOPE --elsewhere ${live[*]}, $THREADS threads, into $READ"
     (cd "$HERE" && scumm/target/release/reader-scope $SCOPE --elsewhere "${live[@]}" --threads "$THREADS" --name "$NAME" \
         --out "$READ" --packed "$READ/reading.tc" --golden "$READ/reading.golden.jsonl.gz" --cap-min "$CAP_MIN" \

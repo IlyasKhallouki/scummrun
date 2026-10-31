@@ -5,7 +5,7 @@
 //!
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
-//!                     [--elsewhere] [--live-locals] [--golden FILE] [--max-files-gb G]
+//!                     [--elsewhere] [--live-locals] [--split-limit] [--golden FILE] [--max-files-gb G]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
@@ -28,6 +28,10 @@
 //!               (resistant, owned, and whether it is recursive). Off by default. The report counts the scope's units
 //!               by what is known of their reads (`live_locals_units`), and the reading's head (--golden) lists each
 //!               slot's read locals, which packed_reading.py copies into reading.json.
+//! --split-limit the reader switch split_limit (PORT-NOTES.md, "The path limit"): a run past the path limit is
+//!               split on its first fork on a read until no part passes the limit, and a run that passes it with no
+//!               fact left to split on, or a path the step limit ended, stops the reading. Off by default (reader.py's
+//!               rule: some runs past the limit are not split, and the paths the limit ended are dropped).
 //! --golden FILE golden.py's reader file streamed as the records are made, with no records kept: the head, one
 //!               "record" line per record (as made, before `_read_once`'s rewrite of folded lists, which changes only
 //!               `args:` values), the builder's counters; gzip. What packed_reading.py from-golden reads with the
@@ -437,6 +441,7 @@ fn main() {
     let keep = args.iter().any(|a| a == "--keep");
     let elsewhere = args.iter().any(|a| a == "--elsewhere");
     let live_locals = args.iter().any(|a| a == "--live-locals");
+    let split_limit = args.iter().any(|a| a == "--split-limit");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
@@ -472,6 +477,7 @@ fn main() {
         "threads": threads,
         "elsewhere": elsewhere,
         "live_locals": live_locals,
+        "split_limit": split_limit,
         "cap_min": cap_s / 60.0,
         "load_at_start": loadavg(),
         "setup_s": 0.0,
@@ -489,6 +495,7 @@ fn main() {
     let mut b = Builder::new(&game, scope.clone(), doms);
     b.keep_records = keep;
     b.table.elsewhere = elsewhere;
+    b.switches.split_limit = split_limit;
     if live_locals {
         let ll = scumm_reader::locals::LiveLocals::of(&game);
         base["live_locals_units"] = json!(ll.counts(&game, &scope));
