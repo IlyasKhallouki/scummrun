@@ -36,6 +36,8 @@
 //!               a value not reached from the start does not run, and runs when the value arrives. Needs --split-limit.
 //!               Writes NAME.reached next to the packed file (taskcore --reached). Off by default.
 //! --reach-also FILE  a further start to read from (taskcore's --start-file format, key<TAB>value), with --reach
+//! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
+//!               draw_clears and actor_rooms. Not due_first, which writes on the kept records after the reading. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
@@ -455,14 +457,16 @@ fn main() {
     let frame_costs = args.iter().any(|a| a == "--frame-costs");
     let reach = args.iter().any(|a| a == "--reach");
     let pass2_reuse = args.iter().any(|a| a == "--pass2-reuse");
+    let named = scumm_reader::builder::Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
+    assert!(!named.due_first, "--switches due_first: the records are streamed as made, and due_first writes on the kept records");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
     let dump = arg(&args, "--dump");
 
     let t_setup = Instant::now();
-    let doms = domains::build(&game, &domains::meta_rooms(&root), &start, &dom_goals);
-    let scope = Scope::of(&game, &rooms, &start);
+    let doms = domains::build_with(&game, &domains::meta_rooms(&root), &start, &dom_goals, named.scope());
+    let scope = Scope::of_with(&game, &rooms, &start, named.scope());
     let mut kinds: BTreeMap<&str, usize> = BTreeMap::new();
     for &u in &scope.units {
         let kind = match game.unit(u).key {
@@ -492,6 +496,7 @@ fn main() {
         "live_locals": live_locals,
         "split_limit": split_limit,
         "reach": reach,
+        "switches": named.names(),
         "frame_costs": frame_costs,
         "cap_min": cap_s / 60.0,
         "load_at_start": loadavg(),
@@ -510,9 +515,10 @@ fn main() {
     let mut b = Builder::new(&game, scope.clone(), doms);
     b.keep_records = keep;
     b.table.elsewhere = elsewhere;
-    b.switches.split_limit = split_limit;
-    b.switches.reach = reach;
-    b.switches.pass2_reuse = pass2_reuse;
+    b.switches = named;
+    b.switches.split_limit |= split_limit;
+    b.switches.reach |= reach;
+    b.switches.pass2_reuse |= pass2_reuse;
     if reach {
         b.reach_starts.push(start.clone());
         if let Some(f) = arg(&args, "--reach-also") {
