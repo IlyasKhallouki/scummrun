@@ -75,8 +75,9 @@ def main():
         ff, af, sf = dump(a.taskcore, a.full, a.start, d + "/f.jsonl")
         rf, ar, sr = dump(a.taskcore, a.reach, a.start, d + "/r.jsonl")
         # the task taskcore makes with every reduction, from each: the same up to names, or how it differs
-        tf, atf, _ = dump(a.taskcore, a.full, a.start, d + "/tf.jsonl", ())
-        tr, atr, _ = dump(a.taskcore, a.reach, a.start, d + "/tr.jsonl", ())
+        # (no fold: the fold before (d) sees the full reading's domains, and writes the same effect as more cases)
+        tf, atf, _ = dump(a.taskcore, a.full, a.start, d + "/tf.jsonl", ("--fold", "off"))
+        tr, atr, _ = dump(a.taskcore, a.reach, a.start, d + "/tr.jsonl", ("--fold", "off"))
     out = {"full_actions": sf["input_actions"], "reach_actions": sr["input_actions"], "d_keeps_of_full": len(af), "d_keeps_of_reach": len(ar)}
     ctf, ctr = Counter(map(norm, atf)), Counter(map(norm, atr))
     out["task"] = {
@@ -86,7 +87,9 @@ def main():
         "only_reach": sum((ctr - ctf).values()),
         "labels_only_full": Counter(c[0].split("#")[0] for c in (ctf - ctr).elements()).most_common(12),
         "labels_only_reach": Counter(c[0].split("#")[0] for c in (ctr - ctf).elements()).most_common(12),
-        "facts_differ": {k: (sorted(tf.get(k, set()) - tr.get(k, set())), sorted(tr.get(k, set()) - tf.get(k, set()))) for k in set(tf) | set(tr) if tf.get(k, set()) != tr.get(k, set())},
+        "facts_differ": {k: (sorted(tf[k] - tr[k]), sorted(tr[k] - tf[k])) for k in set(tf) & set(tr) if tf[k] != tr[k]},
+        "facts_only_full": sum(1 for k in tf if k not in tr),
+        "facts_only_reach": sum(1 for k in tr if k not in tf),
     }
     kf = Counter(n for n in map(norm, af) if n[6])
     kr = Counter(n for n in map(norm, ar) if n[6])

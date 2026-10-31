@@ -518,7 +518,7 @@ fn run() -> Result<(), String> {
         "dump" => {
             // the reduced task as text, one JSON line per action and one per fact (the check of the reader's switch
             // --reach, experiments/E004-fast-exact/reach_check.py): no state, no writer
-            let p = prepare(&a)?;
+            let mut p = prepare(&a)?;
             let t = &p.task;
             let text = |f: u32, vals: &[u32]| -> String {
                 let d = t.facts.dom(f);
@@ -559,6 +559,10 @@ fn run() -> Result<(), String> {
                     effs.join(",")
                 )
                 .map_err(|e| e.to_string())?;
+            }
+            drop(o);
+            if let Some(path) = &a.stats {
+                std::fs::write(path, p.stats.done() + "\n").map_err(|e| e.to_string())?;
             }
             Ok(())
         }
