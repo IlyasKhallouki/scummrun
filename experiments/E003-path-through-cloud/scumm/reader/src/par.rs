@@ -217,6 +217,10 @@ impl Machine for Pool<'_, '_> {
         self.main.run(cx, label, pins, pre, what)
     }
 
+    fn set_path_limit(&mut self, n: usize) {
+        self.main.set_path_limit(n)
+    }
+
     fn run_batch(&mut self, b: &mut Builder<'_>, jobs: &Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
         if self.threads == 0 {
             return false;
@@ -356,6 +360,10 @@ impl Machine for WorkerMachine<'_, '_> {
         self.rd.run(cx, label, pins, pre, what)
     }
 
+    fn set_path_limit(&mut self, n: usize) {
+        Machine::set_path_limit(self.rd, n)
+    }
+
     fn prefetch(&mut self, _cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
         // the first part is run here next; the others wait at the front of the queue for an idle worker
         if runs.len() < 2 {
@@ -437,6 +445,12 @@ pub(crate) fn trace_run(label: &str, secs: f64, run: &crate::builder::RunOut) {
         top(&run.rd.forks),
         top(&run.rd.fork_keys)
     );
+}
+
+pub(crate) fn trace_grow(label: &str, depth: usize, limit: usize, cut: i64) {
+    if trace_on() {
+        eprintln!("grow {label} depth {depth}: read again with the path limit at {limit} ({cut} paths cut)");
+    }
 }
 
 fn trace_job(label: &str, secs: f64, records: usize) {

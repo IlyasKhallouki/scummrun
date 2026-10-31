@@ -25,6 +25,8 @@ pub const VAR_EGO: i32 = 1;
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
 /// The Reader's counters the Builder reads to decide a split.
+/// The switch grow_limit: the largest path limit a run is read again with before the reading stops.
+pub const GROW_MAX: usize = 16_384;
 pub const FORKS_ON_READ: &str = "forks on read";
 pub const FORKS_ON_NONFACTS: &str = "forks on non-fact tests";
 
@@ -108,6 +110,10 @@ pub trait Machine {
     /// The runs a split is about to make, in its order (`Builder.run`'s parts): a machine may start them early
     /// (par.rs) and give each one's result to the `run` call for it. The default does nothing.
     fn prefetch(&mut self, _cx: &Ctx, _label: &str, _runs: &[(Pins, Pre)], _what: &What) {}
+
+    /// The switch grow_limit: the path limit of the runs that follow, 0 for the machine's own. The default does
+    /// nothing.
+    fn set_path_limit(&mut self, _n: usize) {}
 }
 
 /// What the Builder's counters and sets gained while one job ran (in a worker's Builder, par.rs), merged into the
@@ -217,6 +223,9 @@ pub struct Switches {
     /// Pass 2 reruns only what a widened value touches (memo.rs, experiments/E004-fast-exact/pass2-reuse.md); the output
     /// is byte for byte the same.
     pub pass2_reuse: bool,
+    /// A run past the path limit with no fact left to split on is read again whole with the limit 4 times larger,
+    /// up to GROW_MAX, before the reading stops (`Builder::run_split`). Needs split_limit.
+    pub grow_limit: bool,
 }
 
 impl Switches {
@@ -233,7 +242,8 @@ impl Switches {
                 "reach" => s.reach = true,
                 "pass2_reuse" => s.pass2_reuse = true,
                 "input_settled" => s.input_settled = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled)")),
+                "grow_limit" => s.grow_limit = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit)")),
             }
         }
         Ok(s)
@@ -263,6 +273,9 @@ impl Switches {
         }
         if self.input_settled {
             v.push("input_settled");
+        }
+        if self.grow_limit {
+            v.push("grow_limit");
         }
         v
     }
@@ -324,6 +337,8 @@ pub struct Builder<'g> {
     pub game: &'g Game,
     /// fix round 1's switches (all off: reader.py's reading)
     pub switches: Switches,
+    /// the switch grow_limit: the path limit of the run being read again whole, 0 for the machine's own
+    pub path_limit_now: usize,
     /// switch due_first's due facts, after the reading (due.rs)
     pub due: Option<crate::due::Due>,
     pub scope: Scope,
@@ -527,6 +542,7 @@ impl<'g> Builder<'g> {
         Builder {
             game,
             switches: Switches::default(),
+            path_limit_now: 0,
             due: None,
             scope,
             table,
@@ -1465,6 +1481,21 @@ impl<'g> Builder<'g> {
             }
             None => Labels::new(),
         };
+        if vals.len() < 2 && self.table.grow_limit && self.path_limit_now.max(crate::machine::PATH_LIMIT) < GROW_MAX {
+            // grow_limit: the run read whole with a larger limit. The limit only ends paths, so a run it cuts
+            // nothing of is the whole run, and its records cover every state the run can start in. The parts of a
+            // split under the larger limit run here, in order, so the reading does not depend on the workers.
+            let prev = self.path_limit_now;
+            let next = prev.max(crate::machine::PATH_LIMIT) * 4;
+            self.counts.inc(format!("grow_limit: runs read again with the path limit at {next}"));
+            crate::par::trace_grow(&job.label, budget.1 as usize, next, limit);
+            self.path_limit_now = next;
+            m.set_path_limit(next);
+            let out = self.run(m, job, pins, pre, budget);
+            self.path_limit_now = prev;
+            m.set_path_limit(prev);
+            return out;
+        }
         if vals.len() < 2 {
             panic!(
                 "split_limit: {} passed the path limit ({limit} paths cut) with no fact left to split on (first fork {first_fork:?}, {} splits deep); the reading stops",
@@ -1488,7 +1519,9 @@ impl<'g> Builder<'g> {
                 (p2, pre2)
             })
             .collect();
-        m.prefetch(&self.ctx(), &job.label, &parts, &job.what);
+        if self.path_limit_now == 0 {
+            m.prefetch(&self.ctx(), &job.label, &parts, &job.what);
+        }
         let mut out = Vec::new();
         for (p2, pre2) in &parts {
             out.extend(self.run(m, job, p2, pre2, budget));
@@ -1927,6 +1960,8 @@ impl<'g> Builder<'g> {
     ) -> usize {
         self.table.value_sets = self.switches.value_sets;
         self.table.split_limit = self.switches.split_limit;
+        self.table.grow_limit = self.switches.grow_limit;
+        assert!(!self.table.grow_limit || self.table.split_limit, "grow_limit needs split_limit");
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");

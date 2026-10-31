@@ -2253,6 +2253,10 @@ impl Reader<'_> {
 }
 
 impl RunMachine for Reader<'_> {
+    fn set_path_limit(&mut self, n: usize) {
+        self.m.path_limit = if n == 0 { PATH_LIMIT } else { n };
+    }
+
     /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`.
     fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         {
