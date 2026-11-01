@@ -1,0 +1,904 @@
+[part1] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 3 threads; load 10.15 16.21 17.04
+[part1] pass 1 inputs: 44 runs, 88 records, 0.2 s; 82 records in the pass, 2 s, RSS 221 MB
+[part1] pass 1 event round 1: 89 runs, 169 records, 0.3 s; 237 records in the pass, 2 s, RSS 255 MB
+[part1] pass 1 event round 2: 508 runs, 1708 records, 0.9 s; 1960 records in the pass, 3 s, RSS 267 MB
+[part1] pass 1 event round 3: 998 runs, 3568 records, 3.0 s; 5533 records in the pass, 6 s, RSS 284 MB
+run event(obj:451@21#7ba1220ae5cc): 3.6 s, 37 paths, 0 cut, 377 held, first fork Some("local:205")
+  counts: forks on non-fact tests=1534; non-fact tests forgotten where merged paths differ=733; paths from forks on read=716; forks on read=641; unfreezes of a slot frozen before the path (count taken as 1)=318; F12: fact reads forked per value: a jump's other test=312; F12: fact reads forked per value: an assignment=204; F12: forks on read into value sets=112; F12: fact reads a comparison alone reads, decided on their value set (no fork)=111; non-fact tests forgotten after an op that may change them=101; WaitFor ops that yield (their later part is an event)=36; inventory hook runs summarized (writes guessed): loadRoomWithEgo=36
+  forks: class=312; var=150; script=101; bit=76; local=1; room=1
+  fork keys: var:33=76; script:2=64; bit:453=36; bit:481=36; script:67=36; var:111=36; var:196=36; class:0:13=12; class:0:5=12; class:10:13=12; class:10:5=12; class:11:13=12
+job event(obj:451@21#7ba1220ae5cc): 4.0 s, 36 records, 0 splits, 0 parts, 0 deep
+run event(obj:450@77#186649efdf4a): 4.2 s, 37 paths, 0 cut, 267 held, first fork Some("local:204")
+  counts: forks on non-fact tests=1570; non-fact tests forgotten where merged paths differ=733; paths from forks on read=606; forks on read=531; unfreezes of a slot frozen before the path (count taken as 1)=318; F12: fact reads forked per value: a jump's other test=312; F12: fact reads forked per value: an assignment=168; non-fact tests forgotten after an op that may change them=101; F12: fact reads a comparison alone reads, decided on their value set (no fork)=40; F12: forks on read into value sets=38; inventory hook runs summarized (writes guessed): loadRoomWithEgo=36; non-fact tests decided by the same test earlier in the frame=24
+  forks: class=312; var=115; script=65; bit=37; local=1; room=1
+  fork keys: var:33=76; script:2=64; var:111=36; bit:453=33; class:0:13=12; class:0:5=12; class:10:13=12; class:10:5=12; class:11:13=12; class:11:5=12; class:12:13=12; class:12:5=12
+job event(obj:450@77#186649efdf4a): 4.6 s, 36 records, 0 splits, 0 parts, 0 deep
+run event(obj:450@77): 5.0 s, 54 paths, 0 cut, 404 held, first fork Some("local:204")
+  counts: forks on non-fact tests=2192; non-fact tests forgotten where merged paths differ=970; paths from forks on read=744; forks on read=659; F12: fact reads forked per value: a jump's other test=416; unfreezes of a slot frozen before the path (count taken as 1)=318; F12: fact reads forked per value: an assignment=172; non-fact tests forgotten after an op that may change them=134; F12: fact reads a comparison alone reads, decided on their value set (no fork)=60; F12: forks on read into value sets=56; inventory hook runs summarized (writes guessed): loadRoomWithEgo=52; non-fact tests decided by the same test earlier in the frame=32
+  forks: class=416; var=120; script=66; bit=54; room=2; local=1
+  fork keys: var:33=77; script:2=64; bit:453=46; var:111=37; class:0:13=20; class:10:13=20; class:11:13=20; class:12:13=20; class:1:13=20; class:2:13=20; class:3:13=20; class:4:13=20
+job event(obj:450@77): 5.7 s, 52 records, 0 splits, 0 parts, 0 deep
+run event(obj:451@21): 4.7 s, 54 paths, 0 cut, 564 held, first fork Some("local:205")
+  counts: forks on non-fact tests=2140; non-fact tests forgotten where merged paths differ=970; paths from forks on read=904; forks on read=819; F12: fact reads forked per value: a jump's other test=416; unfreezes of a slot frozen before the path (count taken as 1)=318; F12: fact reads forked per value: an assignment=224; F12: forks on read into value sets=164; F12: fact reads a comparison alone reads, decided on their value set (no fork)=162; non-fact tests forgotten after an op that may change them=134; WaitFor ops that yield (their later part is an event)=52; inventory hook runs summarized (writes guessed): loadRoomWithEgo=52
+  forks: class=416; var=170; script=118; bit=112; room=2; local=1
+  fork keys: var:33=77; script:2=64; bit:453=52; bit:481=52; script:67=52; var:196=52; var:111=37; class:0:13=20; class:10:13=20; class:11:13=20; class:12:13=20; class:1:13=20
+job event(obj:451@21): 5.3 s, 52 records, 0 splits, 0 parts, 0 deep
+shared dialog_line(120)[202@85]: not shared, it reads a dialog verb
+run dialog_line(120)[202@85]: 481.5 s, 273 paths, 0 cut, 2283 held, first fork Some("var:53")
+  counts: forks on non-fact tests=289983; non-fact tests forgotten where merged paths differ=116580; paths from forks on read=103323; forks on read=92611; F12: fact reads forked per value: a jump's other test=49140; F12: fact reads forked per value: an assignment=30870; non-fact tests forgotten after an op that may change them=18288; F12: forks on read into value sets=11340; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=22051; bit=10710; script=10710
+  fork keys: var:33=11340; script:2=10080; bit:19=5040; bit:453=5040; var:111=5040; var:38=5040; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890
+job dialog_line(120)[202@85]: 488.1 s, 270 records, 0 splits, 0 parts, 0 deep
+run dialog_line(122)[202@85]: 1068.8 s, 273 paths, 0 cut, 2283 held, first fork Some("var:53")
+  counts: forks on non-fact tests=289983; non-fact tests forgotten where merged paths differ=116580; paths from forks on read=103323; forks on read=92611; F12: fact reads forked per value: a jump's other test=49140; F12: fact reads forked per value: an assignment=30870; non-fact tests forgotten after an op that may change them=18288; F12: forks on read into value sets=11340; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=22051; bit=10710; script=10710
+  fork keys: var:33=11340; script:2=10080; bit:19=5040; bit:453=5040; var:111=5040; var:38=5040; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890
+run dialog_line(121)[202@85]: 1072.6 s, 273 paths, 0 cut, 2283 held, first fork Some("var:53")
+  counts: forks on non-fact tests=289983; non-fact tests forgotten where merged paths differ=116580; paths from forks on read=103323; forks on read=92611; F12: fact reads forked per value: a jump's other test=49140; F12: fact reads forked per value: an assignment=30870; non-fact tests forgotten after an op that may change them=18288; F12: forks on read into value sets=11340; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=22051; bit=10710; script=10710
+  fork keys: var:33=11340; script:2=10080; bit:19=5040; bit:453=5040; var:111=5040; var:38=5040; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890
+job dialog_line(122)[202@85]: 1076.6 s, 270 records, 0 splits, 0 parts, 0 deep
+job dialog_line(121)[202@85]: 1080.0 s, 270 records, 0 splits, 0 parts, 0 deep
+run dialog_line(123)[202@85]: 594.9 s, 273 paths, 0 cut, 2283 held, first fork Some("var:53")
+  counts: forks on non-fact tests=289983; non-fact tests forgotten where merged paths differ=116580; paths from forks on read=103323; forks on read=92611; F12: fact reads forked per value: a jump's other test=49140; F12: fact reads forked per value: an assignment=30870; non-fact tests forgotten after an op that may change them=18288; F12: forks on read into value sets=11340; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=22051; bit=10710; script=10710
+  fork keys: var:33=11340; script:2=10080; bit:19=5040; bit:453=5040; var:111=5040; var:38=5040; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890
+shared dialog_line(120)[201@33]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[201@35]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[201@28]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[202@33]: not shared, a kept list holds its verb argument
+job dialog_line(123)[202@85]: 601.5 s, 270 records, 0 splits, 0 parts, 0 deep
+run dialog_line(124)[202@85]: 515.5 s, 273 paths, 0 cut, 2283 held, first fork Some("var:53")
+  counts: forks on non-fact tests=289983; non-fact tests forgotten where merged paths differ=116580; paths from forks on read=103323; forks on read=92611; F12: fact reads forked per value: a jump's other test=49140; F12: fact reads forked per value: an assignment=30870; non-fact tests forgotten after an op that may change them=18288; F12: forks on read into value sets=11340; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=22051; bit=10710; script=10710
+  fork keys: var:33=11340; script:2=10080; bit:19=5040; bit:453=5040; var:111=5040; var:38=5040; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890
+job dialog_line(124)[202@85]: 518.9 s, 270 records, 0 splits, 0 parts, 0 deep
+[part1] pass 1 event round 4: 764 runs, 4116 records, 1605.9 s; 8437 records in the pass, 1612 s, RSS 1354 MB
+[part1] pass 1 event round 5: 2903 runs from 2903 events start; RSS 839 MB
+run dialog_line(122)[202@85]: 197.5 s, 153 paths, 0 cut, 1170 held, first fork Some("var:53")
+  counts: paths from forks on read=75603; forks on read=74971; forks on non-fact tests=64443; F12: fact reads forked per value: a jump's other test=49140; non-fact tests forgotten after an op that may change them=18288; F12: fact reads forked per value: an assignment=17010; non-fact tests forgotten where merged paths differ=15780; F12: forks on read into value sets=7560; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=18271; bit=6930; script=630
+  fork keys: var:33=11340; bit:19=3150; bit:453=3150; var:111=3150; var:38=3150; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890; class:12:13=1890
+run dialog_line(121)[202@85]: 198.5 s, 153 paths, 0 cut, 1170 held, first fork Some("var:53")
+  counts: paths from forks on read=75603; forks on read=74971; forks on non-fact tests=64443; F12: fact reads forked per value: a jump's other test=49140; non-fact tests forgotten after an op that may change them=18288; F12: fact reads forked per value: an assignment=17010; non-fact tests forgotten where merged paths differ=15780; F12: forks on read into value sets=7560; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=18271; bit=6930; script=630
+  fork keys: var:33=11340; bit:19=3150; bit:453=3150; var:111=3150; var:38=3150; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890; class:12:13=1890
+run dialog_line(123)[202@85]: 200.0 s, 153 paths, 0 cut, 1170 held, first fork Some("var:53")
+  counts: paths from forks on read=75603; forks on read=74971; forks on non-fact tests=64443; F12: fact reads forked per value: a jump's other test=49140; non-fact tests forgotten after an op that may change them=18288; F12: fact reads forked per value: an assignment=17010; non-fact tests forgotten where merged paths differ=15780; F12: forks on read into value sets=7560; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=18271; bit=6930; script=630
+  fork keys: var:33=11340; bit:19=3150; bit:453=3150; var:111=3150; var:38=3150; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890; class:12:13=1890
+job dialog_line(122)[202@85]: 200.2 s, 120 records, 0 splits, 0 parts, 0 deep
+job dialog_line(121)[202@85]: 201.1 s, 120 records, 0 splits, 0 parts, 0 deep
+job dialog_line(123)[202@85]: 202.4 s, 120 records, 0 splits, 0 parts, 0 deep
+run event(script:2@736#ee600d0f792f): 1.2 s, 52 paths, 0 cut, 117 held, first fork Some("bit:6")
+  counts: forks on non-fact tests=557; non-fact tests forgotten where merged paths differ=253; paths from forks on read=230; forks on read=182; non-fact tests forgotten after an op that may change them=97; F12: fact reads forked per value: a jump's other test=82; F12: fact reads forked per value: an assignment=78; inventory hook runs summarized (writes guessed): loadRoomWithEgo=44; non-fact tests decided by the same test earlier in the frame=30; F12: forks on read into value sets=13; F12: fact reads forked per value: an op=8; F12: fact reads a comparison alone reads, decided on their value set (no fork)=2
+  forks: class=81; var=70; local=16; bit=13; room=1; script=1
+  fork keys: var:111=45; var:33=24; local:202=16; bit:453=11; class:0:13=3; class:0:5=3; class:10:13=3; class:10:5=3; class:11:13=3; class:11:5=3; class:12:13=3; class:12:5=3
+job event(script:2@736#ee600d0f792f): 1.6 s, 52 records, 0 splits, 0 parts, 0 deep
+job event(script:2@736#83bc83b8d846): 1.1 s, 32 records, 0 splits, 0 parts, 0 deep
+run event(script:2@736#394efe1ace06): 1.0 s, 19 paths, 0 cut, 125 held, first fork Some("bit:6")
+  counts: forks on non-fact tests=908; non-fact tests forgotten where merged paths differ=436; paths from forks on read=370; forks on read=297; F12: fact reads forked per value: a jump's other test=182; F12: fact reads forked per value: an assignment=88; non-fact tests forgotten after an op that may change them=55; F12: forks on read into value sets=26; inventory hook runs summarized (writes guessed): loadRoomWithEgo=22; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=181; var=56; local=32; bit=25; script=2; room=1
+  fork keys: local:202=32; var:33=32; bit:453=22; class:654:32=22; var:111=22; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6; class:12:13=6
+job event(script:2@736#394efe1ace06): 1.1 s, 19 records, 0 splits, 0 parts, 0 deep
+run event(script:2@736#cf2d5744373): 2.8 s, 716 paths, 0 cut, 202 held, first fork Some("bit:6")
+  counts: forks on non-fact tests=1459; paths from forks on read=284; non-fact tests forgotten where merged paths differ=257; forks on read=236; F12: fact reads forked per value: a jump's other test=82; F12: fact reads forked per value: an assignment=77; F12: forks on read into value sets=68; inventory hook runs summarized (writes guessed): loadRoomWithEgo=48; non-fact tests forgotten after an op that may change them=27; F12: fact reads a comparison alone reads, decided on their value set (no fork)=24; F12: fact reads forked per value: an op=8; non-fact tests decided by the same test earlier in the frame=6
+  forks: var=91; class=81; bit=46; local=16; room=1; script=1
+  fork keys: var:111=44; var:33=24; bit:51=22; var:196=22; local:202=16; bit:453=11; bit:565=11; class:0:13=3; class:0:5=3; class:10:13=3; class:10:5=3; class:11:13=3
+job event(script:2@736#cf2d5744373): 3.2 s, 56 records, 0 splits, 0 parts, 0 deep
+run event(local:201@41#3ee981c87cc1): 1.3 s, 14 paths, 0 cut, 70 held, first fork Some("script:137")
+  counts: forks on non-fact tests=1407; non-fact tests forgotten where merged paths differ=686; paths from forks on read=440; forks on read=342; F12: fact reads forked per value: a jump's other test=184; F12: fact reads forked per value: an assignment=126; non-fact tests forgotten after an op that may change them=52; F12: forks on read into value sets=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=28; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=184; var=62; script=34; local=32; bit=30
+  fork keys: local:202=32; script:2=32; var:33=32; bit:453=28; class:654:32=28; var:111=28; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6
+job event(local:201@41#3ee981c87cc1): 1.4 s, 14 records, 0 splits, 0 parts, 0 deep
+run event(script:114@101#2f7464790a51): 2.7 s, 113 paths, 0 cut, 7029 held, first fork Some("script:73")
+  counts: paths from forks on read=756; forks on non-fact tests=753; forks on read=610; non-fact tests forgotten where merged paths differ=363; F12: fact reads forked per value: an assignment=253; F12: fact reads forked per value: a jump's other test=153; inventory hook runs summarized (writes guessed): actorFollowCamera=112; F12: fact reads forked per value: an engine step=111; F12: forks on read into value sets=57; non-fact tests forgotten after an op that may change them=49; F12: fact reads forked per value: an op=36; F12: fact reads a comparison alone reads, decided on their value set (no fork)=32
+  forks: var=370; class=153; script=44; bit=26; local=16; room=1
+  fork keys: var:27=111; var:111=75; var:38=75; var:33=52; var:290=50; bit:453=25; class:654:32=25; class:912:6=25; class:915:6=25; script:67=25; local:202=16; script:2=16
+job event(script:114@101#2f7464790a51): 3.7 s, 112 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#2f9b27d9072e): 12.8 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#2f9b27d9072e): 13.0 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#10d4c178245e): 12.9 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#10d4c178245e): 13.2 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#2d278b70b7aa): 12.6 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#2d278b70b7aa): 12.8 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#21af5b50622c): 12.9 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#21af5b50622c): 13.2 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#f10d4dbc333a): 13.2 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#f10d4dbc333a): 13.4 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#92c19cd8c562): 13.1 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#92c19cd8c562): 13.3 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422#213167c0c6ee): 13.6 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=673; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422#213167c0c6ee): 13.9 s, 13 records, 0 splits, 0 parts, 0 deep
+run event(local:201@41#bebfab29ef48): 1.3 s, 14 paths, 0 cut, 70 held, first fork Some("script:137")
+  counts: forks on non-fact tests=1407; non-fact tests forgotten where merged paths differ=686; paths from forks on read=440; forks on read=342; F12: fact reads forked per value: a jump's other test=184; F12: fact reads forked per value: an assignment=126; non-fact tests forgotten after an op that may change them=52; F12: forks on read into value sets=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=28; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=184; var=62; script=34; local=32; bit=30
+  fork keys: local:202=32; script:2=32; var:33=32; bit:453=28; class:654:32=28; var:111=28; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6
+job event(local:201@41#bebfab29ef48): 1.4 s, 14 records, 0 splits, 0 parts, 0 deep
+run event(local:201@41#685adf0bee01): 1.2 s, 14 paths, 0 cut, 70 held, first fork Some("script:137")
+  counts: forks on non-fact tests=1407; non-fact tests forgotten where merged paths differ=686; paths from forks on read=440; forks on read=342; F12: fact reads forked per value: a jump's other test=184; F12: fact reads forked per value: an assignment=126; non-fact tests forgotten after an op that may change them=52; F12: forks on read into value sets=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=28; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=184; var=62; script=34; local=32; bit=30
+  fork keys: local:202=32; script:2=32; var:33=32; bit:453=28; class:654:32=28; var:111=28; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6
+job event(local:201@41#685adf0bee01): 1.4 s, 14 records, 0 splits, 0 parts, 0 deep
+run event(local:201@41#1aec923df558): 1.2 s, 14 paths, 0 cut, 70 held, first fork Some("script:137")
+  counts: forks on non-fact tests=1407; non-fact tests forgotten where merged paths differ=686; paths from forks on read=440; forks on read=342; F12: fact reads forked per value: a jump's other test=184; F12: fact reads forked per value: an assignment=126; non-fact tests forgotten after an op that may change them=52; F12: forks on read into value sets=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=28; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=184; var=62; script=34; local=32; bit=30
+  fork keys: local:202=32; script:2=32; var:33=32; bit:453=28; class:654:32=28; var:111=28; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6
+job event(local:201@41#1aec923df558): 1.3 s, 14 records, 0 splits, 0 parts, 0 deep
+run event(local:201@41#ddca956d6a87): 1.4 s, 14 paths, 0 cut, 70 held, first fork Some("script:137")
+  counts: forks on non-fact tests=1407; non-fact tests forgotten where merged paths differ=686; paths from forks on read=440; forks on read=342; F12: fact reads forked per value: a jump's other test=184; F12: fact reads forked per value: an assignment=126; non-fact tests forgotten after an op that may change them=52; F12: forks on read into value sets=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=28; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=184; var=62; script=34; local=32; bit=30
+  fork keys: local:202=32; script:2=32; var:33=32; bit:453=28; class:654:32=28; var:111=28; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6
+job event(local:201@41#ddca956d6a87): 1.5 s, 14 records, 0 splits, 0 parts, 0 deep
+run event(local:201@41): 1.1 s, 14 paths, 0 cut, 70 held, first fork Some("script:137")
+  counts: forks on non-fact tests=1407; non-fact tests forgotten where merged paths differ=686; paths from forks on read=440; forks on read=342; F12: fact reads forked per value: a jump's other test=184; F12: fact reads forked per value: an assignment=126; non-fact tests forgotten after an op that may change them=52; F12: forks on read into value sets=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=28; non-fact tests decided by the same test earlier in the frame=12; F12: fact reads a comparison alone reads, decided on their value set (no fork)=4; inventory hook runs summarized (writes guessed): startScript=2
+  forks: class=184; var=62; script=34; local=32; bit=30
+  fork keys: local:202=32; script:2=32; var:33=32; bit:453=28; class:654:32=28; var:111=28; class:0:13=6; class:0:5=6; class:10:13=6; class:10:5=6; class:11:13=6; class:11:5=6
+job event(local:201@41): 1.2 s, 14 records, 0 splits, 0 parts, 0 deep
+run event(script:114@101): 2.6 s, 113 paths, 0 cut, 7029 held, first fork Some("script:73")
+  counts: paths from forks on read=756; forks on non-fact tests=753; forks on read=610; non-fact tests forgotten where merged paths differ=363; F12: fact reads forked per value: an assignment=253; F12: fact reads forked per value: a jump's other test=153; inventory hook runs summarized (writes guessed): actorFollowCamera=112; F12: fact reads forked per value: an engine step=111; F12: forks on read into value sets=57; non-fact tests forgotten after an op that may change them=49; F12: fact reads forked per value: an op=36; F12: fact reads a comparison alone reads, decided on their value set (no fork)=32
+  forks: var=370; class=153; script=44; bit=26; local=16; room=1
+  fork keys: var:27=111; var:111=75; var:38=75; var:33=52; var:290=50; bit:453=25; class:654:32=25; class:912:6=25; class:915:6=25; script:67=25; local:202=16; script:2=16
+job event(script:114@101): 3.4 s, 112 records, 0 splits, 0 parts, 0 deep
+run event(local:202@422): 11.0 s, 14 paths, 0 cut, 1029 held, first fork Some("script:137")
+  counts: forks on non-fact tests=10460; paths from forks on read=4074; non-fact tests forgotten where merged paths differ=3928; forks on read=3339; F12: fact reads forked per value: a jump's other test=1638; F12: fact reads forked per value: an assignment=1155; non-fact tests forgotten after an op that may change them=630; F12: forks on read into value sets=504; non-fact tests decided by the same test earlier in the frame=210; F12: fact reads a comparison alone reads, decided on their value set (no fork)=42; F12: fact reads forked per value: an op=42; inventory hook runs summarized (writes guessed): startScript=21
+  forks: class=1638; var=861; bit=483; script=357
+  fork keys: var:33=378; script:2=336; bit:19=231; bit:453=231; var:111=231; var:38=231; class:0:13=63; class:0:5=63; class:10:13=63; class:10:5=63; class:11:13=63; class:11:5=63
+job event(local:202@422): 11.3 s, 13 records, 0 splits, 0 parts, 0 deep
+run sentence(2,464)[inv]~frozen: 41.1 s, 85 paths, 0 cut, 485 held, first fork Some("room")
+  counts: forks on non-fact tests=21641; paths from forks on read=20659; forks on read=20428; F12: fact reads forked per value: a jump's other test=16396; non-fact tests forgotten after an op that may change them=6111; non-fact tests forgotten where merged paths differ=5340; F12: forks on read into value sets=2119; F12: fact reads forked per value: an assignment=1912; non-fact tests decided by the same test earlier in the frame=1711; F12: fact reads a comparison alone reads, decided on their value set (no fork)=423; freezes of a slot whose liveness is not known (frozen: where live)=309; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16385; bit=1917; var=1914; script=211; room=1
+  fork keys: var:111=859; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,464)[inv]~frozen: 41.6 s, 82 records, 0 splits, 0 parts, 0 deep
+run dialog_line(120)[202@85]: 177.4 s, 153 paths, 0 cut, 1170 held, first fork Some("var:53")
+  counts: paths from forks on read=75603; forks on read=74971; forks on non-fact tests=64443; F12: fact reads forked per value: a jump's other test=49140; non-fact tests forgotten after an op that may change them=18288; F12: fact reads forked per value: an assignment=17010; non-fact tests forgotten where merged paths differ=15780; F12: forks on read into value sets=7560; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=18271; bit=6930; script=630
+  fork keys: var:33=11340; bit:19=3150; bit:453=3150; var:111=3150; var:38=3150; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890; class:12:13=1890
+run dialog_line(124)[202@85]: 178.5 s, 153 paths, 0 cut, 1170 held, first fork Some("var:53")
+  counts: paths from forks on read=75603; forks on read=74971; forks on non-fact tests=64443; F12: fact reads forked per value: a jump's other test=49140; non-fact tests forgotten after an op that may change them=18288; F12: fact reads forked per value: an assignment=17010; non-fact tests forgotten where merged paths differ=15780; F12: forks on read into value sets=7560; non-fact tests decided by the same test earlier in the frame=5040; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1260; F12: fact reads forked per value: an op=1260; inventory hook runs summarized (writes guessed): startScript=630
+  forks: class=49140; var=18271; bit=6930; script=630
+  fork keys: var:33=11340; bit:19=3150; bit:453=3150; var:111=3150; var:38=3150; class:0:13=1890; class:0:5=1890; class:10:13=1890; class:10:5=1890; class:11:13=1890; class:11:5=1890; class:12:13=1890
+job dialog_line(120)[202@85]: 178.8 s, 120 records, 0 splits, 0 parts, 0 deep
+job dialog_line(124)[202@85]: 179.9 s, 120 records, 0 splits, 0 parts, 0 deep
+run sentence(3,464)[inv]~frozen: 42.3 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,464)[inv]~frozen: 42.8 s, 73 records, 0 splits, 0 parts, 0 deep
+run sentence(4,464)[inv]~frozen: 43.0 s, 75 paths, 0 cut, 476 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20628; forks on read=20397; F12: fact reads forked per value: a jump's other test=16385; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16380; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(5,464)[inv]~frozen: 43.0 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,464)[inv]~frozen: 43.7 s, 73 records, 0 splits, 0 parts, 0 deep
+job sentence(5,464)[inv]~frozen: 43.5 s, 73 records, 0 splits, 0 parts, 0 deep
+run sentence(2,464)[inv]: 46.9 s, 85 paths, 0 cut, 485 held, first fork Some("room")
+  counts: forks on non-fact tests=21641; paths from forks on read=20659; forks on read=20428; F12: fact reads forked per value: a jump's other test=16396; non-fact tests forgotten after an op that may change them=6111; non-fact tests forgotten where merged paths differ=5340; F12: forks on read into value sets=2119; F12: fact reads forked per value: an assignment=1912; non-fact tests decided by the same test earlier in the frame=1711; F12: fact reads a comparison alone reads, decided on their value set (no fork)=423; freezes of a slot whose liveness is not known (frozen: where live)=309; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16385; bit=1917; var=1914; script=211; room=1
+  fork keys: var:111=859; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,464)[inv]: 47.8 s, 82 records, 0 splits, 0 parts, 0 deep
+run sentence(4,464)[inv]: 47.7 s, 75 paths, 0 cut, 476 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20628; forks on read=20397; F12: fact reads forked per value: a jump's other test=16385; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16380; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,464)[inv]: 48.3 s, 73 records, 0 splits, 0 parts, 0 deep
+run sentence(3,464)[inv]: 48.7 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,464)[inv]: 49.5 s, 73 records, 0 splits, 0 parts, 0 deep
+run sentence(5,464)[inv]: 49.4 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,464)[inv]: 50.2 s, 73 records, 0 splits, 0 parts, 0 deep
+run sentence(2,488)[inv]~frozen: 51.0 s, 85 paths, 0 cut, 485 held, first fork Some("room")
+  counts: forks on non-fact tests=21641; paths from forks on read=20659; forks on read=20428; F12: fact reads forked per value: a jump's other test=16396; non-fact tests forgotten after an op that may change them=6111; non-fact tests forgotten where merged paths differ=5340; F12: forks on read into value sets=2119; F12: fact reads forked per value: an assignment=1912; non-fact tests decided by the same test earlier in the frame=1711; F12: fact reads a comparison alone reads, decided on their value set (no fork)=423; freezes of a slot whose liveness is not known (frozen: where live)=309; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16385; bit=1917; var=1914; script=211; room=1
+  fork keys: var:111=859; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(3,488)[inv]~frozen: 50.2 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,488)[inv]~frozen: 51.0 s, 73 records, 0 splits, 0 parts, 0 deep
+job sentence(2,488)[inv]~frozen: 51.9 s, 82 records, 0 splits, 0 parts, 0 deep
+run sentence(4,488)[inv]~frozen: 40.0 s, 75 paths, 0 cut, 476 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20628; forks on read=20397; F12: fact reads forked per value: a jump's other test=16385; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16380; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,488)[inv]~frozen: 40.8 s, 73 records, 0 splits, 0 parts, 0 deep
+run sentence(5,488)[inv]~frozen: 39.2 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(2,488)[inv]: 39.0 s, 85 paths, 0 cut, 485 held, first fork Some("room")
+  counts: forks on non-fact tests=21641; paths from forks on read=20659; forks on read=20428; F12: fact reads forked per value: a jump's other test=16396; non-fact tests forgotten after an op that may change them=6111; non-fact tests forgotten where merged paths differ=5340; F12: forks on read into value sets=2119; F12: fact reads forked per value: an assignment=1912; non-fact tests decided by the same test earlier in the frame=1711; F12: fact reads a comparison alone reads, decided on their value set (no fork)=423; freezes of a slot whose liveness is not known (frozen: where live)=309; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16385; bit=1917; var=1914; script=211; room=1
+  fork keys: var:111=859; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,488)[inv]~frozen: 39.9 s, 73 records, 0 splits, 0 parts, 0 deep
+job sentence(2,488)[inv]: 39.8 s, 82 records, 0 splits, 0 parts, 0 deep
+run sentence(3,488)[inv]: 39.0 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,488)[inv]: 39.5 s, 73 records, 0 splits, 0 parts, 0 deep
+shared dialog_line(120)[200@49]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[203@34]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[203@57]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[204@34]: not shared, it reads a dialog verb
+shared dialog_line(120)[204@57]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[203@35]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[203@38]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[209@35]: not shared, a kept list holds its verb argument
+shared dialog_line(120)[211@35]: not shared, it reads a dialog verb
+shared dialog_line(120)[200@28]: not shared, a kept list holds its verb argument
+run sentence(5,488)[inv]: 37.3 s, 75 paths, 0 cut, 481 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20633; forks on read=20402; F12: fact reads forked per value: a jump's other test=16390; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16385; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(4,488)[inv]: 38.1 s, 75 paths, 0 cut, 476 held, first fork Some("room")
+  counts: forks on non-fact tests=21524; paths from forks on read=20628; forks on read=20397; F12: fact reads forked per value: a jump's other test=16385; non-fact tests forgotten after an op that may change them=6108; non-fact tests forgotten where merged paths differ=5288; F12: forks on read into value sets=2115; F12: fact reads forked per value: an assignment=1896; non-fact tests decided by the same test earlier in the frame=1696; F12: fact reads a comparison alone reads, decided on their value set (no fork)=421; inventory hook runs summarized (writes guessed): startScript=210; WaitFor ops that yield (their later part is an event)=5
+  forks: class=16380; bit=1909; var=1896; script=211; room=1
+  fork keys: var:111=843; bit:19=840; bit:453=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,488)[inv]: 37.8 s, 73 records, 0 splits, 0 parts, 0 deep
+shared dialog_line(120)[211@28]: not shared, a kept list holds its verb argument
+job sentence(4,488)[inv]: 38.5 s, 73 records, 0 splits, 0 parts, 0 deep
+run dialog_line(120)[204@28]: 2.4 s, 0 paths, 3 cut, 3 held, first fork Some("var:53")
+  counts: forks on non-fact tests=1024; paths from forks on read=6; forks on read=4; F12: fact reads a comparison alone reads, decided on their value set (no fork)=3; F12: forks on read into value sets=3; WaitFor ops that yield (their later part is an event)=2; F12: fact reads forked per value: an engine step=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=4
+  fork keys: var:196=3; var:53=1
+split dialog_line(121)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+split dialog_line(122)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+split dialog_line(120)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+run dialog_line(120)[204@28]: 1.8 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+run dialog_line(122)[204@28]: 1.8 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+run dialog_line(121)[204@28]: 1.8 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(121)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+split dialog_line(120)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+split dialog_line(122)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+run dialog_line(121)[204@28]: 2.2 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+run dialog_line(120)[204@28]: 2.2 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+run dialog_line(122)[204@28]: 2.2 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(122)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+grow dialog_line(121)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(122)[204@28]: 5.1 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(122)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(122)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+run dialog_line(121)[204@28]: 5.7 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(121)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(121)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(122)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 6.3 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(121)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(122)[204@28]: 2.9 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+run dialog_line(120)[204@28]: 1.8 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+run dialog_line(121)[204@28]: 2.4 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(121)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+split dialog_line(120)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+split dialog_line(122)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+run dialog_line(121)[204@28]: 2.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+run dialog_line(122)[204@28]: 2.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(122)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+grow dialog_line(121)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 2.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(122)[204@28]: 5.2 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(122)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(122)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+run dialog_line(121)[204@28]: 5.6 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(121)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(121)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(122)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 6.2 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(121)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(122)[204@28]: 2.6 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(122)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+run dialog_line(121)[204@28]: 2.3 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+run dialog_line(120)[204@28]: 1.8 s, 0 paths, 1 cut, 1 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; F12: fact reads a comparison alone reads, decided on their value set (no fork)=1; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1; paths from forks on read=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(120)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+split dialog_line(121)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+run dialog_line(122)[204@28]: 2.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(122)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(121)[204@28]: 2.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(121)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 2.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(122)[204@28]: 4.6 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(122)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(122)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+run dialog_line(121)[204@28]: 5.3 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(121)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(121)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(122)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+job dialog_line(122)[204@28]: 31.9 s, 9 records, 4 splits, 6 parts, 2 deep
+run dialog_line(120)[204@28]: 5.7 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+split dialog_line(123)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+split dialog_line(123)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+grow dialog_line(123)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+havoc dialog_line(121)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+job dialog_line(121)[204@28]: 32.9 s, 9 records, 4 splits, 6 parts, 2 deep
+havoc dialog_line(123)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+havoc dialog_line(123)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+split dialog_line(124)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+split dialog_line(124)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+grow dialog_line(124)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+job dialog_line(120)[204@28]: 34.8 s, 9 records, 4 splits, 6 parts, 2 deep
+havoc dialog_line(124)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+shared dialog_line(120)[200@85]: not shared, a kept list holds its verb argument
+havoc dialog_line(124)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+shared dialog_line(120)[203@85]: not shared, a kept list holds its verb argument
+havoc dialog_line(124)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+split dialog_line(124)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+grow dialog_line(124)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+havoc dialog_line(124)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(124)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(123)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+split dialog_line(123)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+grow dialog_line(123)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+havoc dialog_line(123)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(123)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(124)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+split dialog_line(124)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+grow dialog_line(124)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+havoc dialog_line(124)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(124)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(123)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+split dialog_line(123)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+grow dialog_line(123)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+havoc dialog_line(123)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(123)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(124)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+job dialog_line(124)[204@28]: 1.4 s, 9 records, 4 splits, 6 parts, 2 deep
+havoc dialog_line(123)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+job dialog_line(123)[204@28]: 2.2 s, 9 records, 4 splits, 6 parts, 2 deep
+run sentence(3,909)~frozen: 43.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(2,909)~frozen: 44.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,909)~frozen: 44.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,909)~frozen: 44.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,909)~frozen: 44.8 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(4,909)~frozen: 45.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,910)~frozen: 42.2 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,910)~frozen: 42.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,909)~frozen: 43.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(4,909,910)~frozen: 44.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,909)~frozen: 44.3 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(4,909,910)~frozen: 44.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,910,909)~frozen: 42.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,910,909)~frozen: 43.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,910)~frozen: 44.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,910)~frozen: 45.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,910)~frozen: 44.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,910)~frozen: 45.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,910)~frozen: 43.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(2,911)~frozen: 43.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,910)~frozen: 44.2 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(2,911)~frozen: 43.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,911)~frozen: 43.4 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,911)~frozen: 44.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,911)~frozen: 49.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,911)~frozen: 49.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,911,909)~frozen: 49.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,911,909)~frozen: 49.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,911)~frozen: 48.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,911)~frozen: 49.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,912)~frozen: 44.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,912)~frozen: 44.6 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,912)~frozen: 44.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(4,912)~frozen: 44.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,912)~frozen: 44.5 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(3,912)~frozen: 45.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,912,909)~frozen: 43.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,912,909)~frozen: 44.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,912)~frozen: 43.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,912)~frozen: 44.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,913)~frozen: 45.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,913)~frozen: 45.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,913)~frozen: 46.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,913)~frozen: 47.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,913)~frozen: 46.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,913)~frozen: 46.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,913,909)~frozen: 46.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,913,909)~frozen: 46.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,914)~frozen: 35.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(5,913)~frozen: 36.4 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,914)~frozen: 35.9 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(5,913)~frozen: 36.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,914)~frozen: 35.8 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,914)~frozen: 36.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,914,909)~frozen: 36.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(4,914)~frozen: 37.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,914,909)~frozen: 37.5 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(4,914)~frozen: 37.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,914)~frozen: 37.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,914)~frozen: 38.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,915)~frozen: 36.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(3,915)~frozen: 36.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,915)~frozen: 36.5 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(3,915)~frozen: 36.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,915)~frozen: 35.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,915)~frozen: 36.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,915,909)~frozen: 35.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+run sentence(5,915)~frozen: 35.8 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,915,909)~frozen: 36.5 s, 50 records, 0 splits, 0 parts, 0 deep
+job sentence(5,915)~frozen: 36.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,916)~frozen: 36.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,916)~frozen: 36.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,916)~frozen: 36.2 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,916)~frozen: 36.6 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,916)~frozen: 36.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,916)~frozen: 37.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,916,909)~frozen: 36.2 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,916,909)~frozen: 36.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,916)~frozen: 36.4 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,916)~frozen: 37.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,917)~frozen: 36.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,917)~frozen: 37.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,917)~frozen: 37.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,917)~frozen: 37.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,917)~frozen: 35.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,917)~frozen: 35.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,917,909)~frozen: 35.8 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,917,909)~frozen: 36.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,917)~frozen: 36.2 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,917)~frozen: 36.6 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,909): 43.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,909): 44.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,909): 45.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,909): 45.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,909): 44.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,909): 45.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,909,910): 47.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,909,910): 47.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,909): 46.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,909): 46.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,910): 46.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,910): 47.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,910): 40.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,910): 40.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,910): 41.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,910): 42.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,910,909): 42.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,910,909): 42.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,910): 42.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,910): 43.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,911): 43.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,911): 43.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,911): 42.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,911): 43.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,911): 36.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,911): 37.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,911,909): 36.4 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,911,909): 37.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,911): 36.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,911): 37.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,912): 35.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,912): 36.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,912): 36.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,912): 37.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,912): 37.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,912): 37.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,912,909): 37.4 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,912,909): 37.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,912): 36.3 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,912): 36.8 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,913): 36.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,913): 37.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,913): 35.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,913): 36.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,913): 36.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,913): 37.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,913,909): 36.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,913,909): 37.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,913): 36.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,913): 37.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,914): 36.8 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,914): 37.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,914): 36.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,914): 37.0 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,914): 36.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,914): 36.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,914,909): 35.7 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,914,909): 36.1 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,914): 36.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,914): 36.6 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,915): 36.4 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,915): 36.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,915): 38.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,915): 38.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,915): 40.9 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,915): 41.9 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,915,909): 52.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,915,909): 53.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,915): 55.0 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,915): 55.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,916): 54.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,916): 55.4 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,916): 51.1 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,916): 51.6 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,916): 49.8 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,916): 50.5 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(4,916,909): 48.6 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(4,916,909): 49.2 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(5,916): 43.8 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(5,916): 44.3 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(2,917): 44.2 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(2,917): 44.7 s, 50 records, 0 splits, 0 parts, 0 deep
+run sentence(3,917): 46.5 s, 51 paths, 0 cut, 392 held, first fork Some("script:137")
+  counts: forks on non-fact tests=21481; paths from forks on read=20580; forks on read=20370; F12: fact reads forked per value: a jump's other test=16380; non-fact tests forgotten after an op that may change them=6096; non-fact tests forgotten where merged paths differ=5260; F12: forks on read into value sets=2100; F12: fact reads forked per value: an assignment=1890; non-fact tests decided by the same test earlier in the frame=1680; F12: fact reads a comparison alone reads, decided on their value set (no fork)=420; inventory hook runs summarized (writes guessed): startScript=210
+  forks: class=16380; bit=1890; var=1890; script=210
+  fork keys: bit:19=840; bit:453=840; var:111=840; var:38=840; class:0:13=630; class:0:5=630; class:10:13=630; class:10:5=630; class:11:13=630; class:11:5=630; class:12:13=630; class:12:5=630
+job sentence(3,917): 47.2 s, 50 records, 0 splits, 0 parts, 0 deep
+STOPPED: the reading passed 8000 CPU s; 23233 records in pass 1; report /home/ilyask/.cache/fast-mi-p1r/a3/part1.json

@@ -1,0 +1,133 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.2,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 169,
+      "s": 0.3,
+      "what": "pass 1: event round 1"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 508,
+      "longest_job_s": 0.0,
+      "records": 1708,
+      "s": 0.9,
+      "what": "pass 1: event round 2"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 998,
+      "longest_job_s": 0.0,
+      "records": 3568,
+      "s": 3.0,
+      "what": "pass 1: event round 3"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 764,
+      "longest_job_s": 0.0,
+      "records": 4116,
+      "s": 1605.9,
+      "what": "pass 1: event round 4"
+    }
+  ],
+  "cap_min": 300.0,
+  "cpu_use": 2.27,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "owner:901",
+    "owner:902",
+    "owner:903"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 318,
+    "reads some locals, known": 255
+  },
+  "load_at_end": "10.59 7.52 7.58",
+  "load_at_start": "10.15 16.21 17.04",
+  "n_rooms": 31,
+  "n_units": 573,
+  "name": "part1",
+  "objects": 384,
+  "packed_bytes_so_far": 34603008,
+  "pass": 1,
+  "peak_rss_mb": 3262,
+  "reach": true,
+  "read_cpu_s": 8001.4,
+  "read_wall_s": 3525.5,
+  "records_in_pass": 23233,
+  "rooms": [
+    10,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    41,
+    42,
+    43,
+    44,
+    48,
+    49,
+    51,
+    52,
+    53,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    64,
+    76,
+    83,
+    85,
+    96
+  ],
+  "rss_peak_seen": {
+    "at": "pass 1, event round 4 (764 jobs), 1085 s",
+    "mb": 3223
+  },
+  "runs_done_in_finished_batches": 2403,
+  "setup_s": 0.21,
+  "slot_facts": 12169,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "stopped: the reading passed 8000 CPU s",
+  "switches": [
+    "value_sets",
+    "draw_clears",
+    "actor_rooms",
+    "grow_limit",
+    "havoc_cut",
+    "shared_runs"
+  ],
+  "threads": 3,
+  "units": {
+    "entry": 31,
+    "exit": 31,
+    "global": 94,
+    "local": 215,
+    "obj": 202
+  }
+}
