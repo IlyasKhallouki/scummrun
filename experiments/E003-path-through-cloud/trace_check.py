@@ -148,6 +148,18 @@ def _truth_at(path: Path) -> None:
     groundtruth.load.__defaults__ = (path,)
 
 
+def _run_at(a) -> None:
+    """``--run DIR --movie FILE`` (both or neither; default run B's): groundtruth.py's run (results.jsonl and the
+    executor's movie.jsonl) and its explicit-key movie, for a run made otherwise from run B's route (runb_window.py)."""
+    import groundtruth
+    run, movie = getattr(a, "run_dir", None), getattr(a, "movie", None)
+    if (run is None) != (movie is None):
+        raise SystemExit("--run and --movie go together")
+    if run is not None:
+        groundtruth.RUN = Path(run).resolve()
+        groundtruth.MOVIE = Path(movie).resolve()
+
+
 def cmd_runb_truth(a) -> None:
     """groundtruth.py's ground truth of run B's Part I moves (the same moves, boundaries and dumps), with run B's
     recorded inputs played on ``--seed`` in place of run B's own seed."""
@@ -156,6 +168,7 @@ def cmd_runb_truth(a) -> None:
         raise SystemExit("the Any% seed is not used (plan.md)")
     a.out.mkdir(parents=True, exist_ok=True)
     paths.SCUMMVM_BIN = Path(a.bin)
+    _run_at(a)
     _truth_at(a.out / f"groundtruth-part1-seed{a.seed}.jsonl")
     groundtruth.SEED = a.seed
     groundtruth.ENGINE_DIR = a.out / "engine"
@@ -687,6 +700,7 @@ def cmd_runb_explain(a) -> dict:
     import check_rust
     import groundtruth
     t0 = time.monotonic()
+    _run_at(a)
     _truth_at(Path(a.truth).resolve())
     check_rust._ARGS.update(bin=Path(a.machine).resolve())
     for k, v in check_rust.RUST_SWITCHES.items():
@@ -1544,6 +1558,8 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--bin", required=True)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--run", dest="run_dir", type=Path, help="a run from run B's route (runb_window.py), not run B")
+    p.add_argument("--movie", type=Path, help="that run's explicit-key movie")
     p = sub.add_parser("runb-check")
     p.add_argument("--truth", type=Path, required=True)
     p.add_argument("--machine", type=Path, required=True)
@@ -1558,6 +1574,8 @@ def main() -> None:
     p.add_argument("--switches", default=FR1)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--results", action="store_true")
+    p.add_argument("--run", dest="run_dir", type=Path, help="a run from run B's route (runb_window.py), not run B")
+    p.add_argument("--movie", type=Path, help="that run's explicit-key movie")
     p = sub.add_parser("window-validate")
     p.add_argument("--run", type=Path, required=True, help="a window search run's result JSON")
     p.add_argument("--ghosts", action="store_true",
