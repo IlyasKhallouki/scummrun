@@ -2357,6 +2357,8 @@ impl RunMachine for Reader<'_> {
     /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`. The label names the run only; under --reach its
     /// guides come by the job's key (`Ctx::job_key`).
     fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+        // the rough reading (rough-reading.md): every run with the reading's step limit, else the machine's own
+        self.m.step_limit = if cx.table.step_limit == 0 { scumm_machine::machine::STEP_LIMIT } else { cx.table.step_limit };
         {
             let s = st_mut(&mut self.m);
             s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing());

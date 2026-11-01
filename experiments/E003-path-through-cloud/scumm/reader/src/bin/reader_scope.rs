@@ -6,6 +6,7 @@
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
 //!                     [--elsewhere] [--live-locals] [--split-limit] [--golden FILE] [--max-files-gb G] [--frame-costs]
+//!                     [--step-limit N]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
@@ -43,6 +44,9 @@
 //! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
 //!               draw_clears and actor_rooms, grow_limit, havoc_cut (havoc.rs), shared_runs (shared.rs). Not due_first,
 //!               which writes on the kept records after the reading. Off by default.
+//! --step-limit N  the rough reading (experiments/E004-fast-exact/rough-reading.md): every job read with the machine's
+//!               step limit N in place of its own (5,000); a path past N steps becomes a havoc record. Needs
+//!               --switches havoc_cut. The report counts the havoc records (`havoc_records`). Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
@@ -135,6 +139,8 @@ struct Tee {
     body: Option<(PathBuf, GoldenPool)>,
     golden_threads: usize,
     kinds: BTreeMap<String, usize>,
+    /// the pass's records that end "havoc" (the switch havoc_cut)
+    havoc: usize,
     prog: Arc<Mutex<Prog>>,
 }
 
@@ -167,6 +173,7 @@ impl RecordSink for Tee {
             self.body = Some((path.clone(), GoldenPool::new(&path, self.golden_threads)));
         }
         self.kinds.clear();
+        self.havoc = 0;
         let mut p = self.prog.lock().unwrap();
         p.records = 0;
         p.pass += 1;
@@ -185,6 +192,9 @@ impl Tee {
                 h.update(b"\n");
             }
             *self.kinds.entry(r.kind.clone()).or_default() += 1;
+            if r.end.as_deref() == Some("havoc") {
+                self.havoc += 1;
+            }
         }
         self.prog.lock().unwrap().records = first + recs.len();
     }
@@ -463,6 +473,7 @@ fn main() {
     let frame_costs = args.iter().any(|a| a == "--frame-costs");
     let reach = args.iter().any(|a| a == "--reach");
     let pass2_reuse = args.iter().any(|a| a == "--pass2-reuse");
+    let step_limit: u32 = arg(&args, "--step-limit").map_or(0, |n| n.parse().expect("--step-limit N"));
     let named = scumm_reader::builder::Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
     assert!(!named.due_first, "--switches due_first: the records are streamed as made, and due_first writes on the kept records");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
@@ -508,6 +519,9 @@ fn main() {
         "load_at_start": loadavg(),
         "setup_s": 0.0,
     });
+    if step_limit != 0 {
+        base["step_limit"] = json!(step_limit);
+    }
     base["setup_s"] = json!((t_setup.elapsed().as_secs_f64() * 100.0).round() / 100.0);
     eprintln!(
         "[{name}] {} rooms {:?}, {} units, {} slot facts; {threads} threads; load {}",
@@ -525,6 +539,9 @@ fn main() {
     b.switches.split_limit |= split_limit;
     b.switches.reach |= reach;
     b.switches.pass2_reuse |= pass2_reuse;
+    if step_limit != 0 {
+        b.switches.step_limit = step_limit;
+    }
     if reach {
         b.reach_starts.push(start.clone());
         // every --reach-also, in the order given: the closure does not depend on the order (reach.md)
@@ -628,6 +645,7 @@ fn main() {
         }),
         golden_threads,
         kinds: BTreeMap::new(),
+        havoc: 0,
         prog: prog.clone(),
     };
 
@@ -764,6 +782,9 @@ fn main() {
     r["status"] = json!("done");
     r["records"] = json!(b.n_records);
     r["records_by_kind"] = json!(tee.kinds);
+    if b.switches.havoc_cut {
+        r["havoc_records"] = json!(tee.havoc);
+    }
     let pass_counts: BTreeMap<String, i64> =
         b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);

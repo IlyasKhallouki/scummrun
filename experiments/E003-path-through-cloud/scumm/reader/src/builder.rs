@@ -238,6 +238,10 @@ pub struct Switches {
     /// h² over the pairs of the verb script and the room (pairs.rs, experiments/E004-fast-exact/reach-pairs.md): a job
     /// whose seed has a set on both runs only when a reached pair meets them. Needs --reach.
     pub reach_pairs: bool,
+    /// The rough reading (experiments/E004-fast-exact/rough-reading.md): every job is read with the machine's step
+    /// limit N in place of STEP_LIMIT, so a path past N steps ends there and havoc_cut makes it a havoc record. 0 (the
+    /// default): the machine's own limit. Needs havoc_cut. By name `step_limit=N`; reader-scope's `--step-limit N`.
+    pub step_limit: u32,
 }
 
 impl Switches {
@@ -258,7 +262,10 @@ impl Switches {
                 "havoc_cut" => s.havoc_cut = true,
                 "shared_runs" => s.shared_runs = true,
                 "reach_pairs" => s.reach_pairs = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs)")),
+                _ if n.starts_with("step_limit=") => {
+                    s.step_limit = n["step_limit=".len()..].parse().map_err(|_| format!("reader switch {n}: step_limit=N with N a number"))?
+                }
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, step_limit=N)")),
             }
         }
         Ok(s)
@@ -1997,6 +2004,8 @@ impl<'g> Builder<'g> {
         assert!(!self.table.grow_limit || self.table.split_limit, "grow_limit needs split_limit");
         self.table.havoc_cut = self.switches.havoc_cut;
         assert!(!self.table.havoc_cut || self.table.split_limit, "havoc_cut needs split_limit");
+        self.table.step_limit = self.switches.step_limit;
+        assert!(self.table.step_limit == 0 || self.table.havoc_cut, "step_limit needs havoc_cut");
         assert!(!self.switches.reach_pairs || self.switches.reach, "reach_pairs needs --reach");
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");

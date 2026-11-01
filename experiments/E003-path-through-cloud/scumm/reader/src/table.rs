@@ -78,6 +78,9 @@ pub struct FactTable {
     /// the switch havoc_cut (the Builder's, havoc.rs): the machine half hands over a path the step limit ended whole,
     /// with where it stood (machine.rs `path_out`)
     pub havoc_cut: bool,
+    /// the rough reading (the Builder's switch step_limit, experiments/E004-fast-exact/rough-reading.md): the machine
+    /// half reads every run with this step limit; 0, the machine's own (`STEP_LIMIT`)
+    pub step_limit: u32,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
@@ -196,6 +199,7 @@ impl FactTable {
             split_limit: false,
             grow_limit: false,
             havoc_cut: false,
+            step_limit: 0,
             reach: None,
             memo: None,
             shared: None,
