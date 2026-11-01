@@ -438,10 +438,13 @@ def reach_extender(rd, run_dir: Path, threads: int, starts: list):
     if not doc.get("reach"):
         raise SystemExit("--reach-extend needs a reading made with --reach")
     m = re.fullmatch(r"results/start-part1\.jsonl seed (\d+)", doc["start"]["name"])
-    if m is None:
-        raise SystemExit(f"--reach-extend needs a reading of results/start-part1.jsonl's starts, not "
-                         f"{doc['start']['name']}")
-    seed, rooms = int(m[1]), tuple(doc["scope"]["rooms"])
+    # a reading of another start's row (read-rust --start-rows): read again from the same file
+    m2 = None if m is not None else re.fullmatch(r"(/\S+\.jsonl) seed (\d+)", doc["start"]["name"])
+    if m is None and m2 is None:
+        raise SystemExit(f"--reach-extend needs a reading of results/start-part1.jsonl's starts or of a start-rows "
+                         f"file, not {doc['start']['name']}")
+    seed, rooms = int((m or m2)[1 if m else 2]), tuple(doc["scope"]["rooms"])
+    start_rows = Path(m2[1]) if m2 is not None else None
     goal = goal_text_of(doc["goal"])
     elsewhere = bool(doc.get("elsewhere")) or bool(getattr(rd.b, "elsewhere", None))
     starts += [Path(f) for f in doc.get("reach_also") or () if Path(f) not in starts]
@@ -455,7 +458,8 @@ def reach_extender(rd, run_dir: Path, threads: int, starts: list):
         starts.append(f)
         path = read_rust(rooms, seed, goal, f"reach-{n:02d}", d, threads, None, doc.get("domain_goals", "none"),
                          elsewhere=elsewhere, live_locals=doc.get("live_locals") is not None,
-                         split_limit=bool(doc.get("split_limit")), **reader_switches(doc, starts))
+                         split_limit=bool(doc.get("split_limit")), start_rows=start_rows,
+                         **reader_switches(doc, starts))
         return PR.load_reading(path)
     return extend
 

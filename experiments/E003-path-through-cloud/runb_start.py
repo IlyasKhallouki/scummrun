@@ -99,6 +99,7 @@ def main() -> None:
     u.add_argument("--cost-caps", action="store_true")
     u.add_argument("--unobserved-actor-rooms", action="store_true")
     u.add_argument("--approach-stones", action="store_true")
+    u.add_argument("--reach-extend", action="store_true")
     u.add_argument("--window-search", action="store_true")
     u.add_argument("--workers", type=int, default=7)
     a = ap.parse_args()
@@ -115,6 +116,7 @@ def main() -> None:
         P.cmd_run(a.seed, a.reading, False, a.replan_limit, a.time_limit, a.plan_time, results=a.results,
                   plan_memory=a.plan_memory, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
                   unobserved_actor_rooms=a.unobserved_actor_rooms, approach_stones=a.approach_stones,
+                  reach_extend=a.reach_extend,
                   window_search=a.window_search, workers=a.workers, starter=Starter(a.move, a.rows))
 
 
