@@ -105,7 +105,10 @@ Its events land on frames after g. It then runs one frame at a time until one of
 - **deviation**: a child that stops as spent, mismatch or limit after every needed record that precedes the input (≺)
   has matched and the input took effect: its record matched, or it took another of its paths (below) with a change a
   later step reads. Then a record the plan does not name changed what a later step needs: the plan's prediction ends
-  there, not the engine run. Its end point is its stop frame h, c = Q(h);
+  there, not the engine run. The child runs on to the first frame h at or after its stop where the engine takes a
+  click (input on, no cutscene, a room), where the replan starts; its end point is c = Q(h). *Why h and not the stop.*
+  From run B's start the earliest deviation by its stop frame was a cutscene that put ego back outside the bar, 591
+  frames before a click could land again (`results/window-kitchen.log`);
 - **another path** (a click's input): at the frame its last click lands and at the next one, the slots the input's
   record leaves at wait points (its `pos:` writes that no later tracked record writes: the final writes of section 2)
   do not all stand there, on any of its paths. The child then ran another record of the
@@ -286,8 +289,8 @@ Not claimed:
 
 After a success the chosen child's snapshot at its last input frame becomes the harness's engine, its input events join
 the run's inputs, and the records it matched before that frame are done. The rest stay pending for the next window. At
-a deviation the chosen child's branch at its stop frame becomes the engine, its inputs join the run's, the records it
-matched are done, the engine runs on to the first frame where it takes a click (input on, no cutscene, a room), and the
+a deviation the chosen child's branch at its end point (the first frame after its stop where the engine takes a click:
+input on, no cutscene, a room) becomes the engine, its inputs join the run's, the records it matched are done, and the
 harness replans from there. Before that frame only a key can land; a skip (Esc) inside that span is not tried, a stated
 loss. *Why.* From run B's start the first deviation stopped inside a cutscene, and the replan from that frame ran to
 the planner's 600 s limit (`results/window-kitchen.log`). At a mismatch-free success whose guessed write took another

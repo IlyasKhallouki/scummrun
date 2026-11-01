@@ -413,6 +413,11 @@ def is_deviation(m: Matcher, input_rec, before_input: set, took="n/a") -> bool:
     return took is not None if took != "n/a" else input_rec.i in m.matched
 
 
+def click_gate(st: dict) -> bool:
+    """The engine takes a click on the next frame: input on, no cutscene, a room (the Executor's gate)."""
+    return st.get("up", 0) > 0 and st.get("cs", 1) == 0 and bool(st.get("room", 0))
+
+
 def end_key(ch) -> tuple:
     """Section 5, Stop: the earliest end point, a success (or the goal) before a deviation at equal Q, then the earliest
     fork."""
@@ -535,6 +540,7 @@ class Child:
     unplanned: list = field(default_factory=list)
     choices: dict = field(default_factory=dict)  # Matcher.choices
     alt: str | None = None  # another path of the click that showed (section 3), the record's name
+    dev_stop: int | None = None  # a deviation's stop frame (its end point is the next click gate)
     took: str | None = "n/a"  # a click: "plan" (its record showed, Lemma 9), another path's name, or None
 
     def row(self) -> list:
@@ -742,6 +748,22 @@ class Search:
             if ch.outcome in ("spent", "mismatch", "limit") and ch.why != LEMMA9 and \
                     is_deviation(m, w["input"], w["before_input"], ch.took):
                 ch.outcome = "deviation"  # section 3: the input took effect, then the plan's prediction ended
+                ch.dev_stop = cb.frame
+                # its end point: the first frame the engine takes a click again, where the replan starts (section 7)
+                while not click_gate(cb.status) and cb.frame - ch.dev_stop < cfg.window_frames:
+                    with self._lock:
+                        best = w["best"]
+                    if best is not None and cb.status["qf"] >= best.q_end:
+                        ch.outcome = "pruned"
+                        break
+                    st = cb.run(frame=cb.frame + 1)
+                    if "end" in st:
+                        ch.outcome, ch.why = "ended", st["end"]
+                        break
+                if ch.outcome == "deviation" and cb.frame != ch.dev_stop:
+                    s = cb.state()
+                    obs = F.facts_of(s)
+                ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             if ch.outcome in ("success", "goal", "deviation"):
                 cps.append((cb.frame, dict(obs), RP.extra_of(s, cb.status)))
                 ch.checkpoints = cps
@@ -1087,8 +1109,7 @@ class Search:
                 b_, best.live = best.live, None
                 # section 7: on to the first frame where the engine takes a click (no input lands before it but a key)
                 f0, ran = b_.frame, 0
-                while not (b_.status.get("up", 0) > 0 and b_.status.get("cs", 1) == 0 and b_.status.get("room", 0)) \
-                        and ran < self.cfg.window_frames:
+                while not click_gate(b_.status) and ran < self.cfg.window_frames:
                     st_ = b_.run(frame=b_.frame + 1)
                     ran += 1
                     if "end" in st_:
@@ -1099,8 +1120,9 @@ class Search:
                 self._set_branch(b_)
                 self._predict(recs)
                 self._logs(n_plan, recs, members, res, "replan")
-                self.replan_cause = f"deviation at frame {best.end}: {str(best.why)[:300]}"
-                self.deviations.append({"plan": n_plan, "macro": k, "frame": best.end, "qf": best.q_end,
+                self.replan_cause = f"deviation at frame {best.dev_stop}: {str(best.why)[:300]}"
+                self.deviations.append({"plan": n_plan, "macro": k, "frame": best.dev_stop, "end": best.end,
+                                        "qf": best.q_end,
                                         "why": str(best.why)[:300], "replan_frame": b_.frame,
                                         "frames_to_the_click_gate": ran})
                 return "replan"
