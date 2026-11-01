@@ -114,6 +114,7 @@ process's resident memory and CPU seconds.
 what the server keeps depends on them: a request whose caps differ from the last one's sets the loaded task's costs
 back to the file's, applies its caps and builds again from the loaded task. The load is still saved, not the fold or
 (a) to (c). The test (`../test_taskcore_serve.py`) covers caps too.
+
 ## Frame costs
 
 A packed file made with the reader's switch `--frame-costs` (scumm/reader/src/costs.rs) gives each action its
@@ -222,7 +223,10 @@ o's effects; c_1, ..., c_m are the operators of O_A with R(c_j) non-empty, in fi
 - (P3) only pick operators write pick variables;
 - (P4) a pick variable is named only in conditions of effects of O_A;
 - (P5) for every pick variable k and every value u of k there is p(k,u): no precondition, the one effect k := u, cost 0;
-- (P6) every pick variable starts at 0.
+- (P6) every pick variable starts at 0;
+- (P7) for o in O_A, let K(o) be the pick variables of o's action's picked guesses (the operator table's `picked`,
+  task.py's `Op.picked`), and K(o) = ∅ for o in O_G: then R(o) ⊆ K(o), since the writer names pick variable k in a
+  condition only for a guess of o's own action written through k.
 
 The model encoding's goal resets copy an effect's conditions, so they can name a pick variable; they are effects of
 O_A, and R counts them. The writer checks (P1), (P3) and (P4) on every variant it writes with the switch on.
@@ -251,21 +255,30 @@ effects write P and lock, and lock is 0 again. At the end the goal holds on F (P
 cost 0, end_j costs cost(c_j), and the pick operators that were dropped cost 0. ∎
 
 **Theorem 2 (Π^W to Π).** Every plan of Π^W maps to a plan of Π with the same cost, whose operators from O_A and O_G
-are the plan's operators outside the windows, in order, with c_j for each end_j. Construction: drop begin_j and
-each q. Replace each end_j by p(k, s'(k)) for each k in R(c_j), where s' is the state of Π^W just before end_j
-(these operators exist by P5), then c_j. Invariant: the two states agree on F. An operator outside the windows
-applies in Π (its precondition there is the one in Π^W less lock = 0), and its effects name no pick variable. In a
-window F does not change (Lemma 2). After the picks inserted before c_j, the state of Π agrees with s' on F and on
-R(c_j), so c_j applies and its effects on F are those of end_j (Lemma 1). Π's goal is Π^W's less lock = 0.
-Costs: the inserted picks cost 0, c_j costs cost(end_j), begin and q cost 0. ∎
+are the plan's operators outside the windows, in order, with c_j for each end_j, and in which every pick variable of
+K(o) holds, just before each such o, the value it holds in Π^W just before o. Construction: drop begin_j and each q.
+Replace each operator o of the plan from O_A (each end_j, read as c_j, and each operator outside the windows) by
+p(k, s'(k)) for each k in K(o), in the order of the action's picked guesses, where s' is the state of Π^W just
+before o (these operators exist by P5), then o. By Lemma 2, s'(k) is the value the last q(j,k,·) of o's window gave
+k when o is end_j and k is in R(c_j), and 0 otherwise. Invariant: before each operator of Π^W's plan that is not a
+begin or a q, the two states agree on F. The inserted picks write only pick variables (P5), so F does not change,
+and after them Π's state agrees with s' on F and on K(o), which holds R(o) (P7). o's precondition names only F (P1);
+in Π^W it is Π's with lock = 0 added (outside a window) or, for end_j, c_j's with lock = j. So o applies in Π, and
+its effects on F are the same in both (Lemma 1). In a window F does not change (Lemma 2). A goal operator has
+K = ∅ and applies in Π by the same argument. Π's goal is Π^W's less lock = 0. Costs: the inserted picks cost 0, c_j
+costs cost(end_j), begin and q cost 0. ∎
 
 **Corollary.** Π and Π^W have the same optimal cost, and the maps send optimal plans to optimal plans with the same
 steps outside the picks, in the same order. In the model encoding Π's optimal cost is the task's (above), so Π^W's is
-too. Reading a plan of Π^W back (`decode`, the operator table): a pick variable that end_j reads has the value the
-last q(j,k,·) of its window gave it, else 0 (Lemma 2). These are the values Theorem 2's map sets, so the steps read
-back are those Π's reading gives for the mapped plan: the same actions, with the same precondition and guessed
-values. This is the sequential compilation of free choices (Nebel 2000), with each choice moved to just before the
-one operator that reads it.
+too. Reading a plan back (`decode`, the operator table) gives each step o its action, its precondition and guessed
+values, and for each k in K(o) the value k holds just before o. On Π^W that is s'(k): the window's last q(j,k,·),
+else 0 (decode sets every pick variable back to 0 after each step, Lemma 2). On the plan Theorem 2 maps it to, it is
+the value the inserted p(k, s'(k)) gave k, so s'(k) again. So decode reads the same steps from both: the same
+actions, with the same precondition, guessed and picked values. The test checks this map (`to_plain`). A weaker
+map that inserts picks only for R(c_j) before each c_j also gives a plan of Π with the same cost and the same facts,
+but there Π keeps a pick variable's value from an earlier window, and decode reads that value for a step whose
+action picks the variable without its operator reading it, where Π^W's decode reads 0. This is the sequential
+compilation of free choices (Nebel 2000), with each choice moved to just before the one operator that reads it.
 
 **Size.** One more variable with m + 1 values, and per consumer two operators and one pick operator per value of each
 variable it reads; the free pick operators go.
@@ -274,6 +287,7 @@ variable it reads; the free pick operators go.
 maps run on the files, and `decode` on both; `real` mode on a packed file. Measured on the bar door, k = 1 and the
 kitchen: `../results/pick-windows.log`.
 
+## The packed file (version 1)
 
 Little-endian u32 words. Strings are UTF-8. A value is written as the string `str(v)` of a domain value (ints,
 `above`, `below`), by its id in the string table.
