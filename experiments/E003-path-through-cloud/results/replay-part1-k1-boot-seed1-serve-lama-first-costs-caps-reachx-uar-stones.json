@@ -1,0 +1,2095 @@
+{
+ "seed": 1,
+ "reading": "/var/tmp/fast-mi/ksr-scratch/k1/reading/reading.json",
+ "name": "k1-boot",
+ "control": false,
+ "goal": {
+  "state:316": [
+   1
+  ]
+ },
+ "goal_is_part1_end": false,
+ "task": {
+  "actions": 234401,
+  "facts": 1252,
+  "records": 235579,
+  "folded": 1178,
+  "packed_sha1": "0603983aa4ad",
+  "packed_bytes": 190257136,
+  "lines_sha1": "079a02d104de",
+  "live_locals": true
+ },
+ "control_counts": null,
+ "limits": {
+  "replans": 30,
+  "seconds": 10800.0,
+  "plan_time": 600,
+  "plan_memory": "3G",
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60
+ },
+ "sources": {
+  "replay_part1.py": "0ea0b941bd18",
+  "replay.py": "a1a251d66f41",
+  "packed_reading.py": "d945f6fcb09d",
+  "export_records.py": "f0aa97ff0b22",
+  "plan_fd.py": "ae5dda514eb4",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ },
+ "taskcore_binary": "bf3409ec094e",
+ "taskcore_serve": true,
+ "search": "lama-first-costs",
+ "cost_caps": true,
+ "frame_costs": {
+  "charinc": 0,
+  "dmax": 6,
+  "rules": {
+   "WaitForActor, WaitForCamera, WaitForSentence: 1 frame": 433,
+   "WaitForMessage after a talk: the talk delay's frames + 1": 1472,
+   "WaitForMessage, message not known: 1 frame": 258,
+   "breakHere: 1 frame": 4625,
+   "delay N: floor(N / dmax) + 1 frames": 616,
+   "delayVariable, least value from the code before it": 31,
+   "delayVariable, value from the event's locals or 1 frame": 10
+  },
+  "switch": "--frame-costs",
+  "talk_delay": 60,
+  "wait_points": 7427
+ },
+ "reader": {
+  "switches": "value_sets,draw_clears,actor_rooms,input_settled",
+  "reach": true,
+  "split_limit": true,
+  "elsewhere": true,
+  "reach_also": null,
+  "live_locals": true
+ },
+ "unobserved_actor_rooms": true,
+ "approach_stones": true,
+ "reach_extend": {
+  "threads": 3,
+  "reader_scope": "/var/tmp/fast-mi/wt-ksr/experiments/E003-path-through-cloud/scumm/target/release/reader-scope",
+  "reader_scope_sha1": "ca2631e2987d"
+ },
+ "load_s": 13.12,
+ "start": {
+  "stop": {
+   "stop": "idle",
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "idle": "sentence",
+   "rng": 3182679328,
+   "up": 1,
+   "cs": 0,
+   "ego": [
+    346,
+    133
+   ]
+  },
+  "dump": {
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "ego": 1,
+   "ego_pos": [
+    346,
+    133
+   ],
+   "seed": 1,
+   "boot_param": 0
+  },
+  "trace": {
+   "boot": 1,
+   "cd_track": 4,
+   "control": 1,
+   "room": 5,
+   "segment_start": 1,
+   "stall": 4
+  },
+  "boot_s": 26.0,
+  "check": {
+   "boot checks": "ok",
+   "reading start": {
+    "name": "results/start-part1.jsonl seed 1",
+    "differ": 0,
+    "first": [],
+    "task facts differ": 0,
+    "task first": []
+   },
+   "start-part1": {
+    "differ": 0,
+    "frame": 2728,
+    "same frame": true
+   },
+   "taskcore": {
+    "input": {
+     "seconds": 195.3,
+     "status": "ok",
+     "serve": {
+      "kept": "built",
+      "seconds_build": 64.8334,
+      "seconds": 159.4273,
+      "cpu_seconds": 35.3813,
+      "peak_rss": 571629568,
+      "rss": 439922688
+     }
+    },
+    "needed": {
+     "seconds": 79.96,
+     "status": "ok",
+     "serve": {
+      "kept": "kept",
+      "seconds_build": 0.0,
+      "seconds": 79.9545,
+      "cpu_seconds": 23.5018,
+      "peak_rss": 581910528,
+      "rss": 440643584
+     }
+    }
+   },
+   "taskcore_s": 275.42
+  }
+ },
+ "run": {
+  "stop": "goal",
+  "goal": true,
+  "replans": 1,
+  "bans": [],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 2728,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "ace38899404bb647",
+    "cost_caps": {},
+    "costs": [
+     2,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1
+    ],
+    "plan_cost": 9,
+    "write_s": 152.94250447500963,
+    "status": "plan",
+    "seconds": 100.56432370201219,
+    "steps": [
+     "sentence(2,428)#44",
+     "event(script:2@736#d897055c2f2e)#163",
+     "walk_to(428)#245",
+     "event(script:2@736#da2874b63864)#1957",
+     "walk_to(316)[202]#2977",
+     "sentence(2,316)[202]#2808",
+     "event(local:203@58#5a49cf4aa671)#12618"
+    ],
+    "operators": 97547,
+    "actions": 24773,
+    "decode_s": 16.50294934900012,
+    "folds": [
+     "fold:sentence(2,428)#44+3",
+     null,
+     "fold:walk_to(428)#64+3",
+     null,
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 190,
+    "needed_facts": 541,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "built",
+     "seconds_build": 49.9359,
+     "seconds": 152.9418,
+     "cpu_seconds": 39.3988,
+     "peak_rss": 581038080,
+     "rss": 448425984
+    },
+    "landmarks": 17,
+    "landmark_orderings": 38,
+    "game_landmarks": 17
+   },
+   {
+    "plan": 1,
+    "frame": 3376,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 2
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "bd455cc40f4cadc8",
+    "cost_caps": {},
+    "costs": [
+     1,
+     1,
+     1,
+     2,
+     1
+    ],
+    "plan_cost": 6,
+    "write_s": 69.945536391926,
+    "status": "plan",
+    "seconds": 62.552986828028224,
+    "steps": [
+     "walk_to(428)#64",
+     "event(script:2@736#da2874b63864)#1957",
+     "walk_to(316)[202]#2977",
+     "sentence(2,316)[202]#2808",
+     "event(local:203@58#5a49cf4aa671)#12618"
+    ],
+    "operators": 97547,
+    "actions": 24773,
+    "decode_s": 11.47943967289757,
+    "folds": [
+     "fold:walk_to(428)#64+3",
+     null,
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 190,
+    "needed_facts": 541,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 69.9446,
+     "cpu_seconds": 26.6989,
+     "peak_rss": 589873152,
+     "rss": 452837376
+    },
+    "landmarks": 14,
+    "landmark_orderings": 24,
+    "game_landmarks": 14
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "sentence(2,428)#44",
+    "kind": "sentence",
+    "input": "click verb 2 on 428",
+    "start": 2728,
+    "issue": 2776,
+    "end": 3376,
+    "outcome": "mismatch",
+    "then": "replan",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2728,
+      "inputs": [
+       {
+        "frame": 2736,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2751,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2752,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2753,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2754,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2755,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2756,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2757,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2758,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2759,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2760,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2761,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2762,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2763,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2764,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2765,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2766,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2767,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2768,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2769,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2770,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2771,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2772,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2773,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2774,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2775,
+        "key": "o"
+       },
+       {
+        "frame": 2776,
+        "click": [
+         311,
+         107
+        ]
+       }
+      ],
+      "issue": 2776,
+      "first_settled": 2796,
+      "end": 3376,
+      "how": "limit",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "var:102",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "state:315",
+      "start": 0,
+      "changes": [
+       [
+        2796,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:428",
+      "start": 0,
+      "changes": [
+       [
+        2796,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        2775,
+        "above"
+       ],
+       [
+        2780,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:8 [0000]",
+      "Var[103] == Local[2]",
+      true,
+      "?(not a fact: var:103)",
+      false
+     ],
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      true,
+      "?(not a fact: var:104)",
+      false
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 2736,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2751,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2752,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2753,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2754,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2755,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2756,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2757,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2758,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2759,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2760,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2761,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2762,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2763,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2764,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2765,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2766,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2767,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2768,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2769,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2770,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2771,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2772,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2773,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2774,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2775,
+      "key": "o"
+     },
+     {
+      "frame": 2776,
+      "click": [
+       311,
+       107
+      ]
+     }
+    ],
+    "note": "waited 7 frames for the camera",
+    "seconds": 31.325513652991503
+   },
+   {
+    "plan": 1,
+    "index": 0,
+    "name": "walk_to(428)#64",
+    "kind": "walk_to",
+    "input": "click verb 11 on 428",
+    "start": 3376,
+    "issue": 3377,
+    "end": 3839,
+    "outcome": "goal",
+    "then": "goal",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 3376,
+      "inputs": [
+       {
+        "frame": 3377,
+        "click": [
+         163,
+         107
+        ]
+       }
+      ],
+      "issue": 3377,
+      "first_settled": 3378,
+      "end": 3379,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "script:2",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "var:102",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "pos:script:2",
+      "predicted": [
+       "736"
+      ],
+      "observed": -1,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "local:200",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:201",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:202",
+      "start": 1,
+      "changes": [
+       [
+        3378,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:206",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:207",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:208",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:210",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:211",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "pos:local:200",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        43
+       ]
+      ],
+      "count": 1,
+      "end": 43,
+      "net": true
+     },
+     {
+      "key": "pos:local:201",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        22
+       ]
+      ],
+      "count": 1,
+      "end": 22,
+      "net": true
+     },
+     {
+      "key": "pos:local:202",
+      "start": 1,
+      "changes": [
+       [
+        3378,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:206",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        49
+       ]
+      ],
+      "count": 1,
+      "end": 49,
+      "net": true
+     },
+     {
+      "key": "pos:local:207",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        15
+       ]
+      ],
+      "count": 1,
+      "end": 15,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        21
+       ]
+      ],
+      "count": 1,
+      "end": 21,
+      "net": true
+     },
+     {
+      "key": "pos:local:210",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        62
+       ]
+      ],
+      "count": 1,
+      "end": 62,
+      "net": true
+     },
+     {
+      "key": "pos:local:211",
+      "start": -1,
+      "changes": [
+       [
+        3378,
+        33
+       ]
+      ],
+      "count": 1,
+      "end": 33,
+      "net": true
+     },
+     {
+      "key": "room",
+      "start": 33,
+      "changes": [
+       [
+        3378,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ],
+       [
+        3379,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        3379,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:330",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:333",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:336",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:339",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:345",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:348",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:351",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:354",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:358",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        3378,
+        1
+       ],
+       [
+        3379,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:361",
+      "start": 0,
+      "changes": [
+       [
+        3379,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        3377,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     },
+     {
+      "key": "var:22",
+      "start": 33,
+      "changes": [
+       [
+        3378,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     },
+     {
+      "key": "var:32",
+      "start": 4,
+      "changes": [
+       [
+        3378,
+        202
+       ]
+      ],
+      "count": 1,
+      "end": 202,
+      "net": true
+     },
+     {
+      "key": "var:4",
+      "start": 33,
+      "changes": [
+       [
+        3378,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     },
+     {
+      "key": "var:70",
+      "start": 1,
+      "changes": [
+       [
+        3378,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "var:72",
+      "start": 33,
+      "changes": [
+       [
+        3378,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:8 [0000]",
+      "Var[103] == Local[2]",
+      true,
+      "?(not a fact: var:103)",
+      false
+     ],
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      true,
+      "?(not a fact: var:104)",
+      false
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 3377,
+      "click": [
+       163,
+       107
+      ]
+     }
+    ],
+    "note": "retry 1 after 60 frames (the record's path never started)",
+    "seconds": 16.150657022022642
+   }
+  ],
+  "frames": 1111,
+  "ticks": 6666,
+  "frame0": 2728,
+  "frame_end": 3839,
+  "seconds": 466.052271057968,
+  "inputs": [
+   {
+    "frame": 2736,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2751,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2752,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2753,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2754,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2755,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2756,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2757,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2758,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2759,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2760,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2761,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2762,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2763,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2764,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2765,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2766,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2767,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2768,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2769,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2770,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2771,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2772,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2773,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2774,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2775,
+    "key": "o"
+   },
+   {
+    "frame": 2776,
+    "click": [
+     311,
+     107
+    ]
+   },
+   {
+    "frame": 3377,
+    "click": [
+     163,
+     107
+    ]
+   }
+  ],
+  "extensions": []
+ },
+ "landmarks": {
+  "plan": 0,
+  "frame": 2728,
+  "nodes": [
+   {
+    "id": 0,
+    "facts": [
+     [
+      "state:316",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 1,
+    "facts": [
+     [
+      "room",
+      28
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 2,
+    "facts": [
+     [
+      "state:316",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 3,
+    "facts": [
+     [
+      "state:428",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 4,
+    "facts": [
+     [
+      "script:2",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 5,
+    "facts": [
+     [
+      "room",
+      33
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 6,
+    "facts": [
+     [
+      "pos:script:2",
+      736
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 7,
+    "facts": [
+     [
+      "frozen:script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 8,
+    "facts": [
+     [
+      "args:script:2",
+      239867291646052
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 9,
+    "facts": [
+     [
+      "state:428",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 10,
+    "facts": [
+     [
+      "args:script:2",
+      238143141588782
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 11,
+    "facts": [
+     [
+      "var:32",
+      4
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 12,
+    "facts": [
+     [
+      "script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 13,
+    "facts": [
+     [
+      "var:53",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 14,
+    "facts": [
+     [
+      "pos:script:2",
+      -1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 15,
+    "facts": [
+     [
+      "args:script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 16,
+    "facts": [
+     [
+      "verb:2",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   }
+  ],
+  "orderings": [
+   [
+    1,
+    0,
+    "gn"
+   ],
+   [
+    2,
+    0,
+    "gn"
+   ],
+   [
+    3,
+    0,
+    "n"
+   ],
+   [
+    3,
+    1,
+    "gn"
+   ],
+   [
+    4,
+    3,
+    "gn"
+   ],
+   [
+    4,
+    1,
+    "gn"
+   ],
+   [
+    5,
+    10,
+    "gn"
+   ],
+   [
+    5,
+    8,
+    "gn"
+   ],
+   [
+    5,
+    6,
+    "gn"
+   ],
+   [
+    5,
+    3,
+    "gn"
+   ],
+   [
+    5,
+    4,
+    "gn"
+   ],
+   [
+    5,
+    1,
+    "gn"
+   ],
+   [
+    6,
+    0,
+    "n"
+   ],
+   [
+    6,
+    3,
+    "gn"
+   ],
+   [
+    6,
+    1,
+    "gn"
+   ],
+   [
+    7,
+    6,
+    "gn"
+   ],
+   [
+    7,
+    3,
+    "gn"
+   ],
+   [
+    7,
+    4,
+    "gn"
+   ],
+   [
+    7,
+    1,
+    "gn"
+   ],
+   [
+    8,
+    0,
+    "n"
+   ],
+   [
+    8,
+    1,
+    "gn"
+   ],
+   [
+    9,
+    3,
+    "gn"
+   ],
+   [
+    10,
+    8,
+    "r"
+   ],
+   [
+    10,
+    1,
+    "n"
+   ],
+   [
+    10,
+    0,
+    "n"
+   ],
+   [
+    10,
+    3,
+    "gn"
+   ],
+   [
+    11,
+    10,
+    "gn"
+   ],
+   [
+    11,
+    8,
+    "gn"
+   ],
+   [
+    11,
+    6,
+    "gn"
+   ],
+   [
+    11,
+    4,
+    "gn"
+   ],
+   [
+    12,
+    6,
+    "gn"
+   ],
+   [
+    12,
+    4,
+    "gn"
+   ],
+   [
+    13,
+    6,
+    "gn"
+   ],
+   [
+    13,
+    4,
+    "gn"
+   ],
+   [
+    14,
+    6,
+    "n"
+   ],
+   [
+    15,
+    10,
+    "n"
+   ],
+   [
+    15,
+    8,
+    "n"
+   ],
+   [
+    16,
+    10,
+    "gn"
+   ]
+  ]
+ },
+ "summary": {
+  "steps": 2,
+  "executed": 2,
+  "played": 2,
+  "outcomes": {
+   "goal": 1,
+   "mismatch": 1
+  },
+  "writes_held": 0,
+  "writes_held_share": 0.0,
+  "matched": 0,
+  "matched_share": 0.0,
+  "not_matched": {
+   "goal": 1,
+   "mismatch": 1
+  },
+  "mismatches": 40,
+  "mismatches_per_executed": 20.0,
+  "mismatched_writes": 4,
+  "mismatched_writes_per_executed": 2.0,
+  "unplanned_changes": 36,
+  "unplanned_changes_per_executed": 18.0,
+  "unplanned_most": [
+   [
+    "state:315",
+    1
+   ],
+   [
+    "state:428",
+    1
+   ],
+   [
+    "local:200",
+    1
+   ],
+   [
+    "local:201",
+    1
+   ],
+   [
+    "local:202",
+    1
+   ],
+   [
+    "local:206",
+    1
+   ],
+   [
+    "local:207",
+    1
+   ],
+   [
+    "local:208",
+    1
+   ],
+   [
+    "local:210",
+    1
+   ],
+   [
+    "local:211",
+    1
+   ],
+   [
+    "pos:local:200",
+    1
+   ],
+   [
+    "pos:local:201",
+    1
+   ]
+  ],
+  "another_guess": 0,
+  "final_path": [],
+  "final_path_actions": 0,
+  "inputs": 28,
+  "time": {
+   "step_seconds": {
+    "n": 2,
+    "mean": 23.74,
+    "median": 23.74,
+    "max": 31.33,
+    "sum": 47.5
+   },
+   "step_frames": {
+    "n": 2,
+    "mean": 555.5,
+    "median": 555.5,
+    "max": 648,
+    "sum": 1111
+   },
+   "plan_seconds": {
+    "n": 2,
+    "mean": 206.99,
+    "median": 206.99,
+    "max": 270.01,
+    "sum": 414.0
+   },
+   "plan_write_s": {
+    "n": 2,
+    "mean": 111.44,
+    "median": 111.44,
+    "max": 152.94,
+    "sum": 222.9
+   },
+   "plan_search_s": {
+    "n": 2,
+    "mean": 81.56,
+    "median": 81.56,
+    "max": 100.56,
+    "sum": 163.1
+   },
+   "harness_s": 466.1,
+   "planning_s": 414.0,
+   "playing_s": 52.1
+  }
+ },
+ "verify": {
+  "checkpoints": 5,
+  "differ": [],
+  "inputs": 28,
+  "final": {
+   "state:316": 1
+  },
+  "same": true,
+  "goal": true,
+  "seconds": 12.7
+ },
+ "seconds": 793.4,
+ "game_seconds": 111.10363102970817
+}
