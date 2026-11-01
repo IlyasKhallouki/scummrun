@@ -1,0 +1,213 @@
+
+running 1 test
+run dialog_line(120)[204@28]: 6.4 s, 0 paths, 3 cut, 0 held, first fork Some("var:53")
+  counts: forks on non-fact tests=1021; paths from forks on read=9; F12: fact reads a comparison alone reads, decided on their value set (no fork)=6; forks on read=4; F12: forks on read into value sets=3; WaitFor ops that yield (their later part is an event)=2; F12: fact reads forked per value: an engine step=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=4
+  fork keys: var:196=3; var:53=1
+split dialog_line(120)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+run dialog_line(120)[204@28]: 5.0 s, 0 paths, 1 cut, 0 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1023; F12: fact reads a comparison alone reads, decided on their value set (no fork)=2; WaitFor ops that yield (their later part is an event)=2; paths from forks on read=2; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(120)[204@28] depth 1 on var:196: 5 of 5 values, 1 paths cut
+run dialog_line(120)[204@28]: 6.5 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 13.7 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 6.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 13.6 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+test part1_the_job_that_stopped_the_reading has been running for over 60 seconds
+run dialog_line(120)[204@28]: 5.4 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 13.1 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 6.0 s, 0 paths, 1 cut, 0 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1023; F12: fact reads a comparison alone reads, decided on their value set (no fork)=2; WaitFor ops that yield (their later part is an event)=2; paths from forks on read=2; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(120)[204@28] depth 1 on var:196: 5 of 5 values, 1 paths cut
+run dialog_line(120)[204@28]: 6.1 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 14.8 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 6.8 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 13.4 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 7.8 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 14.8 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 7.6 s, 0 paths, 1 cut, 0 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1023; F12: fact reads a comparison alone reads, decided on their value set (no fork)=2; WaitFor ops that yield (their later part is an event)=2; paths from forks on read=2; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(120)[204@28] depth 1 on var:196: 5 of 5 values, 1 paths cut
+run dialog_line(120)[204@28]: 7.3 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 15.6 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 7.3 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 12.6 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+run dialog_line(120)[204@28]: 5.2 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 9.1 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+havoc dialog_line(120)[204@28]: 6 units, 34 effects, 34 events; at {"$tuple":["local",28,204]}@Some(9); pending []
+havoc dialog_line(120)[204@28]: 6 units, 348 effects, 34 events; at {"$tuple":["local",28,204]}@Some(4); pending []
+havoc dialog_line(120)[204@28]: 3 units, 19 effects, 21 events; at {"$tuple":["local",28,204]}@Some(12); pending [Script(206)]
+dialog_line(120)[204@28]: 33 records, 27 havoc records, 217.3 s
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(9))], pending []; closure 6 units; 52 facts (52 with constants), 6 slots; record: 115 effects, 34 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+  cut at [(Local(28, 204), Some(4))], pending []; closure 6 units; 1045 facts (1045 with constants), 6 slots; record: 348 effects, 34 events
+  facts: state:0=c state:1=c state:10=c state:100=c state:1000=c state:1001=c state:1002=c state:1003=c state:1004=c state:1005=c state:1006=c state:1007=c state:1008=c state:1009=c state:101=c state:1010=c state:1011=c state:1012=c state:1013=c state:1014=c state:1015=c state:1016=c state:1017=c state:1018=c state:1019=c state:102=c state:1020=c state:1021=c state:1022=c state:1023=c state:1024=c state:1025=c state:1026=c state:1027=c state:1028=c state:1029=c state:103=c state:1030=c state:1031=c state:1032=c
+  cut at [(Local(28, 204), Some(12))], pending [Script(206)]; closure 3 units; 52 facts (52 with constants), 3 slots; record: 260 effects, 22 events
+  facts: state:315=c state:316=c state:317=c state:318=c state:319=c state:320=c state:321=c state:322=c state:323=c state:324=c state:325=c state:326=c state:327=c state:328=c state:329=c state:330=c state:331=c state:332=c state:333=c state:334=c state:335=c state:336=c state:337=c state:338=c state:339=c state:340=c state:341=c state:342=c state:343=c state:344=c state:345=c state:346=c state:347=c state:348=c state:349=c state:350=c state:351=c state:352=c state:353=c state:354=c
+run dialog_line(120)[204@28]: 5.2 s, 0 paths, 3 cut, 0 held, first fork Some("var:53")
+  counts: forks on non-fact tests=1021; paths from forks on read=9; F12: fact reads a comparison alone reads, decided on their value set (no fork)=6; forks on read=4; F12: forks on read into value sets=3; WaitFor ops that yield (their later part is an event)=2; F12: fact reads forked per value: an engine step=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=4
+  fork keys: var:196=3; var:53=1
+split dialog_line(120)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+run dialog_line(120)[204@28]: 5.0 s, 0 paths, 1 cut, 0 held, first fork Some("var:196")
+  counts: forks on non-fact tests=1023; F12: fact reads a comparison alone reads, decided on their value set (no fork)=2; WaitFor ops that yield (their later part is an event)=2; paths from forks on read=2; F12: forks on read into value sets=1; forks on read=1; non-fact tests forgotten where merged paths differ=1
+  forks: var=1
+  fork keys: var:196=1
+split dialog_line(120)[204@28] depth 1 on var:196: 5 of 5 values, 1 paths cut
+run dialog_line(120)[204@28]: 4.4 s, 0 paths, 1 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1024; WaitFor ops that yield (their later part is an event)=2; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+grow dialog_line(120)[204@28] depth 2: read again with the path limit at 4096 (1 paths cut)
+run dialog_line(120)[204@28]: 8.7 s, 3 paths, 0 cut, 0 held, first fork None
+  counts: forks on non-fact tests=1249; WaitFor ops that yield (their later part is an event)=1; non-fact tests forgotten where merged paths differ=1
+  forks: 
+  fork keys: 
+
+thread 'part1_the_job_that_stopped_the_reading' (1566523) panicked at reader/src/builder.rs:1411:17:
+split_limit: dialog_line(120)[204@28] has 3 paths the step limit ended; the reading stops
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test part1_the_job_that_stopped_the_reading ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 243.58s
+
