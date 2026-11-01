@@ -1,0 +1,63 @@
+E004 plan step A4: the window search's first runs, before each fix in window-search.md (branch window2). Seed 1, the kitchen's switches, 7 children.
+Each block: the run's own progress lines (frames, children, outcomes, the most common reasons). Runs stopped by hand are marked.
+
+== 1. the first end rule (the code of origin/window): the kitchen from boot, plan 0's second window
+[03:34:43] plan 0 window 1/8: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+[03:35:12]   window 1: stop: Q(g) + b reached the best success; 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}; best 2796 (Q 66916); 29.13 s
+[03:35:12] plan 0 window 2/8: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+[03:35:12]   window 2: a fact the macro step reads changed after its precondition held; 1 children {'spent': 1}; best None (Q None); 0.21 s
+[03:37:34] plan 1: plan, 26 steps, 130 s
+[03:37:34] plan 1 window 1/7: walk_to(428)#64 at frame 2777 (4 records needed, 4 tracked)
+
+== 2. the first matcher and mismatch rule, the end rule of Lemma 7: the second window ran on (stopped by hand)
+[03:51:51] plan 0 window 2/8: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+[03:52:02]     window 2: 100 children by frame 2875, {'spent': 19, 'mismatch': 75}; mismatches [("('pos:local:207', 15)", 75)]
+[03:53:10]     window 2: 800 children by frame 3575, {'spent': 19, 'mismatch': 777}; mismatches [("('pos:local:207', 15)", 778)]
+[03:54:34]     window 2: 1600 children by frame 4375, {'spent': 19, 'mismatch': 1576}; mismatches [("('pos:local:207', 15)", 1576)]
+
+== 3. causal-link checks (Lemma 8), no deviations yet: the second window's children all spent (stopped by hand)
+[04:05:50] plan 0 window 2/8: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+[04:05:57]     window 2: 100 children by frame 2875, {'spent': 95}; mismatches [("[('event(script:2@736#da2874b63864)#510', [('local:208', ['0'], 1)]), ('event(local:211@4#a2033c82531e)#518', [])]", 49), ("[('event(script:2@736#da2874b63864)#510', [('local:209', ['0'], 1)]), ('event(local:211@4#a2033c82531e)#518', [])]", 27), ("[('event(script:2@736#d897055c2f2e)#144', [('state:428', ['1'], 0)]), ('walk_to(428)#64', []), ('event(script:2@736#da2874b63864)#510', [('local:200', ['1'], 0)", 19)]
+[04:06:21]     window 2: 400 children by frame 3175, {'spent': 393}; mismatches [("[('event(script:2@736#da2874b63864)#510', [('local:208', ['0'], 1)]), ('event(local:211@4#a2033c82531e)#518', [])]", 203), ("[('event(script:2@736#da2874b63864)#510', [('local:209', ['0'], 1)]), ('event(local:211@4#a2033c82531e)#518', [])]", 171), ("[('event(script:2@736#d897055c2f2e)#144', [('state:428', ['1'], 0)]), ('walk_to(428)#64', []), ('event(script:2@736#da2874b63864)#510', [('local:200', ['1'], 0)", 19)]
+[04:07:05]     window 2: 800 children by frame 3575, {'spent': 794}; mismatches [("[('event(script:2@736#da2874b63864)#510', [('local:208', ['0'], 1)]), ('event(local:211@4#a2033c82531e)#518', [])]", 427), ("[('event(script:2@736#da2874b63864)#510', [('local:209', ['0'], 1)]), ('event(local:211@4#a2033c82531e)#518', [])]", 348), ("[('event(script:2@736#d897055c2f2e)#144', [('state:428', ['1'], 0)]), ('walk_to(428)#64', []), ('event(script:2@736#da2874b63864)#510', [('local:200', ['1'], 0)", 19)]
+
+== 4. deviations at their stop frame, no Lemma 9: run B's S1#7 pre, the first door window
+[04:13:16] plan 0 window 1/4: walk_to(316)[202]#107 at frame 235 (5 records needed, 5 tracked)
+[04:14:13]     window 1: 100 children by frame 334, {'duplicate': 35, 'spent': 58}; mismatches [("[('walk_to(316)[202]#107', [('pos:local:203', ['40'], -1)]), ('event(local:215@16#45fc7932b71b)#893', []), ('event(local:215@56#45fc7932b71b)#1628', []), ('even", 58)]
+[04:15:19]     window 1: 200 children by frame 434, {'duplicate': 35, 'spent': 158}; mismatches [("[('walk_to(316)[202]#107', [('pos:local:203', ['40'], -1)]), ('event(local:215@16#45fc7932b71b)#893', []), ('event(local:215@56#45fc7932b71b)#1628', []), ('even", 158)]
+[04:16:16]     window 1: 300 children by frame 534, {'duplicate': 35, 'spent': 258}; mismatches [("[('walk_to(316)[202]#107', [('pos:local:203', ['40'], -1)]), ('event(local:215@16#45fc7932b71b)#893', []), ('event(local:215@56#45fc7932b71b)#1628', []), ('even", 258)]
+[04:17:21]     window 1: 400 children by frame 634, {'duplicate': 35, 'spent': 353, 'deviation': 2, 'pruned': 3}; mismatches [("[('walk_to(316)[202]#107', [('pos:local:203', ['40'], -1)]), ('event(local:215@16#45fc7932b71b)#893', []), ('event(local:215@56#45fc7932b71b)#1628', []), ('even", 353)]
+[04:17:28]   window 1: stop: Q(g) + b reached the best deviation; 417 children {'deviation': 2, 'duplicate': 35, 'pruned': 27, 'spent': 353}; best 653 (Q 13240); 251.09 s
+[04:17:28] kitchen-s17-seed1-serve-lama-first-costs-caps-uar-stones-window-runb-S17: stop 'planner: taskcore: the start holds 1 values the reading did not reach: ["state:330=0"]; extend the reading'; verifying from boot (3 checkpoints)
+
+== 5. the replan from that deviation's stop frame, inside a cutscene
+[04:43:36]     window 1: 100 children by frame 334, {'duplicate': 35, 'spent': 59}; mismatches [('another path of the click, no change a later step reads', 59)]
+[04:43:43]     window 1: 200 children by frame 434, {'duplicate': 35, 'spent': 161}; mismatches [('another path of the click, no change a later step reads', 161)]
+[04:43:50]     window 1: 300 children by frame 534, {'duplicate': 35, 'spent': 261}; mismatches [('another path of the click, no change a later step reads', 261)]
+[04:43:59]     window 1: 400 children by frame 634, {'duplicate': 35, 'spent': 353, 'deviation': 2, 'pruned': 4}; mismatches [('another path of the click, no change a later step reads', 353)]
+[04:44:02]   window 1: stop: Q(g) + b reached the best deviation; 417 children {'deviation': 2, 'duplicate': 35, 'pruned': 27, 'spent': 353}; best 653 (Q 13240); 33.36 s
+[04:44:02] reach extension at frame 653: 1 values not reached, ['state:330=0']
+[04:45:27] reach extension 1: 39661 -> 39661 actions in 84.94 s (142.45 CPU s)
+[04:56:59] plan 2: time, 0 steps, 680 s
+[04:57:00] kitchen-s17-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-runb-S17: stop 'planner timeout (600 s)'; verifying from boot (3 checkpoints)
+
+== 6. deviations ranked by their stop frame: the chosen one ran 591 frames to the next click gate, in room 33 (stopped by hand)
+[04:59:04]     window 1: 100 children by frame 334, {'spent': 59, 'duplicate': 35}; mismatches [('another path of the click, no change a later step reads', 59)]
+[04:59:13]     window 1: 200 children by frame 434, {'spent': 160, 'duplicate': 35}; mismatches [('another path of the click, no change a later step reads', 160)]
+[04:59:21]     window 1: 300 children by frame 534, {'spent': 260, 'duplicate': 35}; mismatches [('another path of the click, no change a later step reads', 260)]
+[04:59:31]     window 1: 400 children by frame 634, {'spent': 353, 'duplicate': 35, 'deviation': 2, 'pruned': 5}; mismatches [('another path of the click, no change a later step reads', 353)]
+[04:59:35]   window 1: stop: Q(g) + b reached the best deviation; 417 children {'deviation': 2, 'duplicate': 35, 'pruned': 27, 'spent': 353}; best 653 (Q 13240); 43.69 s
+[05:01:43] plan 2: plan, 13 steps, 17 s
+[05:02:36]   window 1: stop: Q(g) + b reached the best deviation; 89 children {'deviation': 2, 'pruned': 87}; best 767 (Q 15520); 52.47 s
+[05:02:37] reach extension at frame 1358: 7 values not reached, ['room=33', 'pos:local:202=1', 'local:200=0', 'var:22=33', 'var:4=33']
+
+== 7. Lemma 9 at the click's frame only, and a match of writes that already held taken as the input's effect
+[04:36:57]   window 1: stop: Q(g) + b reached the best deviation; 47 children {'deviation': 1, 'duplicate': 6, 'pruned': 40}; best 2776 (Q 66436); 101.6 s
+[04:39:22] plan 1: plan, 27 steps, 119 s
+[04:39:23]   window 1: the input's precondition closed in the parent after its window opened; 1 children {'deviation': 1}; best 2778 (Q 66484); 0.11 s
+
+== 8. Lemma 9 on every slot write of the click's record: the walk through the open door (stopped by hand)
+[04:45:26] plan 0 window 2/8: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+[04:45:35]     window 2: 100 children by frame 2875, {'spent': 97}; mismatches [('another path of the click, no change a later step reads', 79), ("[('event(script:2@736#d897055c2f2e)#144', [('state:428', ['1'], 0)]), ('walk_to(428)#64', []), ('event(script:2@736#da2874b63864)#510', [('local:200', ['
+[04:46:35]     window 2: 1000 children by frame 3775, {'spent': 995}; mismatches [('another path of the click, no change a later step reads', 977), ("[('event(script:2@736#d897055c2f2e)#144', [('state:428', ['1'], 0)]), ('walk_to(428)#64', []), ('event(script:2@736#da2874b63864)#510', [('local:200',
+[04:50:39]     window 2: 3500 children by frame 6275, {'spent': 3496}; mismatches [('another path of the click, no change a later step reads', 3478), ("[('event(script:2@736#d897055c2f2e)#144', [('state:428', ['1'], 0)]), ('walk_to(428)#64', []), ('event(script:2@736#da2874b63864)#510', [('local:200

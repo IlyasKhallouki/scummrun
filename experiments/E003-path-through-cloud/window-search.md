@@ -64,8 +64,8 @@ monitors check during execution (Fritz and McIlraith 2007). □
 of a unit no plan step reads runs on, in the same frame or later, through events of the reading the plan leaves out
 (its events are may-steps). On the kitchen, the room entry's record predicts a local of the new room at its first wait
 point, and the engine shows that local one wait point further at the end of the entry frame, for every child: the first
-matcher never matched the record, and 1,557 of 1,576 children of that window ended as mismatches on that slot
-(`results/window-kitchen.log`). The own slot's write is kept as the evidence that the record ran: the slot yields there
+matcher never matched the record, and 1,576 of the first 1,600 children of that window ended as mismatches on that slot
+(`results/window-first-runs.log`). The own slot's write is kept as the evidence that the record ran: the slot yields there
 and runs at most once a frame (`runAllScripts`' `didexec`, `script.cpp:971-984`), unless a later tracked record of the
 same slot writes it, which the final writes then leave out.
 
@@ -108,7 +108,7 @@ Its events land on frames after g. It then runs one frame at a time until one of
   there, not the engine run. The child runs on to the first frame h at or after its stop where the engine takes a
   click (input on, no cutscene, a room), where the replan starts; its end point is c = Q(h). *Why h and not the stop.*
   From run B's start the earliest deviation by its stop frame was a cutscene that put ego back outside the bar, 591
-  frames before a click could land again (`results/window-kitchen.log`);
+  frames before a click could land again (`results/window-first-runs.log`);
 - **another path** (a click's input): at the frame its last click lands and at the next one, the slots the input's
   record leaves at wait points (its `pos:` writes that no later tracked record writes: the final writes of section 2)
   do not all stand there, on any of its paths. The child then ran another record of the
@@ -133,7 +133,7 @@ Its events land on frames after g. It then runs one frame at a time until one of
   *Why.* A door click whose path depends on where another actor stands (a non-fact the reader reads as a replay check)
   fails on most frames. Each failing child walked to the door and ran to the idle stop, 30 to 80 frames, before it
   counted as spent: the kitchen's first door window from run B's start took 417 children and 12,148 child frames
-  (`results/window-kitchen.log`).
+  (`results/window-first-runs.log`).
 - **pruned**: Q ≥ the best end point so far (a success, else a deviation) before it ends. It cannot end lower, since Q
   only grows;
 - **limit**: 3,600 frames after the last input;
@@ -243,8 +243,8 @@ would have saved with such a bound.
   matched, so no earlier than frame g' + n (Lemmas 2 and 3), and succeeds no earlier than Q(g') + b ≥ Q(g') + 4 · δ_lo · n.
   *Why deviations.* On the kitchen the room entry's record never matched in any child: in each, a slot of the new room
   that the plan leaves alone started one of two other local scripts (which one varied from child to child), and a later
-  step reads that script's state. 1,557 of 1,576 children in the first runs and every child after the door opened in
-  the next ones ended spent, and the window ran on to its end with no success (`results/window-kitchen.log`). The plan
+  step reads that script's state. In the first runs 1,576 of the first 1,600 children ended as mismatches, and in the
+  next ones every child after the door opened ended spent: the window ran on with no success (`results/window-first-runs.log`). The plan
   is wrong there, not the frame; the earliest child that shows it is the earliest state to replan from.
 - **End.** Let P be the tracked records that precede the input
   (r ≺ I_k, section 1). The parent is *ready* at frame g when every record of P has matched in the parent by g (the
@@ -267,7 +267,7 @@ would have saved with such a bound.
   *Why this rule replaced the first.* The first rule ended the window where any fact the macro step reads changed in
   the parent after the input's precondition had held. On the kitchen it ended the second window one frame after its
   start, with one child forked: the previous input's own predicted write (its sentence starting) changed a fact the
-  next input reads, before that sentence's later record had matched (`results/window-kitchen.log`). It would also end
+  next input reads, before that sentence's later record had matched (`results/window-first-runs.log`). It would also end
   a door's window at the first step of any other actor's slot whose events the macro step holds.
 - **Early successes.** A success forked at a frame where the input's precondition did not hold in the parent is kept,
   since it is an engine run, and logged as an A1 counterexample for B1.
@@ -293,7 +293,7 @@ a deviation the chosen child's branch at its end point (the first frame after it
 input on, no cutscene, a room) becomes the engine, its inputs join the run's, the records it matched are done, and the
 harness replans from there. Before that frame only a key can land; a skip (Esc) inside that span is not tried, a stated
 loss. *Why.* From run B's start the first deviation stopped inside a cutscene, and the replan from that frame ran to
-the planner's 600 s limit (`results/window-kitchen.log`). At a mismatch-free success whose guessed write took another
+the planner's 600 s limit (`results/window-first-runs.log`). At a mismatch-free success whose guessed write took another
 value than the plan's (the harness's rule), at an empty window, and when the plan is played out without the goal, the
 harness replans. Checkpoints for verify come only from frames
 before the next chosen input lands: the snapshot's frame, and a child's success frame when the next input lands after
