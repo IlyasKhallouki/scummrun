@@ -1574,6 +1574,7 @@ class Search:
                             any(frames_seen[rj["frame"]][0].get(kk) != v0.get(kk) for kk in linked):
                         ch.alt = ch.took = cands[n_][1]
                         ch.track_issue = track.copy()
+                        input_fail(rj["frame"])  # the plan's record failed: that is the deviation's cause (9.5)
                         return
                 if final or all(decided[n_] is not None for n_ in alt_c):
                     ch.took = None
@@ -1822,7 +1823,7 @@ class Search:
     def _not_run_fail(self, w: dict, ch: Child, track, f: int, kept) -> None:
         """A needed record whose own run did not happen before the child stopped (9.5)."""
         r = next((r for r in w["tracked"] if r.i in w["needed"] and r.i not in track.matched and
-                  r.i not in track.refuted), None)
+                  r.i not in track.refuted and r.kind == "event"), None)
         if r is None:
             return
         self._fail(w, ch, {"kind": "not run", "record": r.name, "frame": f, "why": "its run did not happen",
