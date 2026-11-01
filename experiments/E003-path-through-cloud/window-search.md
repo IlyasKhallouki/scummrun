@@ -437,7 +437,9 @@ A child keeps, for its first strict failure, the frame's runs, explain log, dump
 - the input's record not matched once decided: the first of (I1)-(I4) that failed, with the click's run of the
   `pos:` unit it names, or the unit with no run;
 - a mismatch (section 3): the run that left the slot where no pending record predicts;
-- a needed record whose run did not happen before the child stopped: where its unit's slot waits, and on what.
+- a needed record whose run did not happen before the child stopped: where its unit's slot waits, and on what;
+- a goal that holds with no goal record matched in a child: a goal record's failed own run, else the click's failed
+  record, else the goal record that never ran.
 
 At a deviation the chosen child's failure is explained; at an empty window, the failure most children share, on the
 first child that had it; at a guessed write the engine took otherwise, the run of that record and the key. A goal
