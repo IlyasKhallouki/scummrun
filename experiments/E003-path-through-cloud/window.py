@@ -1237,7 +1237,7 @@ class Search:
              "lemma9_stops": 0, "b_dev_qf": 4 * cfg.delta_lo * n, "explain_units": explain_units,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps]),
              "failures": collections.Counter(), "failure_of": {}, "k": k, "first_g": {}, "running": 0,
-             "lite_objects": lite_objects,
+             "lite_objects": lite_objects, "tracked_i": frozenset(r.i for r in tracked),
              # a tracked record that does not follow the input: its own run may come while the input code plays
              "early_recs": {r.i for r in tracked if not (has_input and first.i in r.preds) and r.i != first.i}}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None, "strict": True,
@@ -1648,11 +1648,12 @@ class Search:
                     ch.outcome, ch.why = "delta", st.get("v19")
                     w["delta_violation"] = [f, st.get("v19")]
                     break
-                if track.choices and ch.choice_fail is None:
-                    i = next(iter(track.choices))
+                tracked_i = w["tracked_i"]
+                if ch.choice_fail is None and any(i in tracked_i for i in track.choices):
+                    i = next(i for i in track.choices if i in tracked_i)
                     fr, path, seq = track.matched[i]
                     run_ = next((r for rs in Rk.values() for r in rs if r.seq == seq), None)
-                    ch.choice_fail = {"kind": "choice", "record": next(r.name for r in w["tracked"] if r.i == i),
+                    ch.choice_fail = {"kind": "choice", "record": sp.recs[i].name,
                                       "frame": fr, "why": f"effect {track.choices[i][0][0]}", "run": run_,
                                       "material": kept.freeze()}
                 if st.get("mv"):
@@ -1732,7 +1733,7 @@ class Search:
                 self._tick("match", t_)
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: (v[0], v[1]) for i, v in track.matched.items() if v[0] is not None}
-            ch.choices = dict(track.choices)
+            ch.choices = {i: c for i, c in track.choices.items() if i in w["tracked_i"]}
             took_effect = ch.took == "plan" or (ch.alt is not None and ch.took == ch.alt)  # 9.2, 9.3
             if ch.outcome in ("spent", "mismatch", "limit", "refuted") and \
                     all(i in track.matched for i in w["before_input"]) and took_effect:
