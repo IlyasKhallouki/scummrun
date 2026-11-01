@@ -1,12 +1,14 @@
 """Tests of E008's explorer (explore.py; plan.md "Entries", "Cells", "Selection", "Verify", "Parallelism and the
 machine", "Interfaces", "Stop rule").
 
-usage: uv run pytest experiments/E008-go-explore/test_explore.py              (unit tests, no engine)
+usage: uv run pytest experiments/E008-go-explore/test_explore.py              (unit and loop tests, no engine)
        E008_ENGINE=1 uv run pytest experiments/E008-go-explore/test_explore.py  (also the engine test)
 
 * unit: a synthetic archive (hand-made facts and a GUIDE fixture): cell keys, held atoms, representatives,
   favoured entries, each criterion of the order breaking a tie, n, exhaustion, busy cells, allowed rooms, movies and
   chain checkpoints, job.json, the readings index and its eviction, stagnation, the rollback of a cut ingest.
+* loop: ``explore.py run`` with fake_step.py and 2 workers: the fake goal, the stops, a run killed mid-way that
+  resumes to the archive an uninterrupted run gives, a job the guard killed run again.
 * engine (E008_ENGINE=1): init at the boot (frame 2728), two entries from E007's kitchen movie as a chain, verify
   (0 differences, owner:566 = 1) and report (488 frames, 11,712 qf from the root).
 
@@ -17,8 +19,10 @@ import gzip
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -356,6 +360,123 @@ def test_readings_registered_from_results(tmp_path):
     a.ingest(job_with(a, 0, [], reading={"path": str(rd / "reading.json"), "fresh": False,
                                          "scope": [28, 33, 35, 38]}))
     assert a.readings[0]["last_used"] == 1
+
+
+# --- loop ---------------------------------------------------------------------------------------------------------
+
+def loop_env(tmp: Path, **extra) -> dict:
+    env = dict(os.environ, E008_MEM_SECOND_GB="0", E008_FLOOR_GB="0", E008_EVICT_GB="0",
+               E008_HEAVY_LOCK=str(tmp / "heavy.lock"), E008_POLL_S="0.02", FAKE_GOAL_AFTER="6", FAKE_SLEEP_S="0.3")
+    env.pop("E008_STEP", None)
+    env.update({k: str(v) for k, v in extra.items()})
+    return env
+
+
+def run_cmd(arch: Path, workers: int = 2) -> list:
+    return [PY, "-u", str(HERE / "explore.py"), "run", str(arch), "--workers", str(workers), "--no-verify",
+            "--step-cmd", f"{PY} -u {HERE / 'fake_step.py'}"]
+
+
+def run_loop(arch: Path, env: dict, workers: int = 2) -> dict:
+    p = subprocess.run(run_cmd(arch, workers), env=env, capture_output=True, text=True, timeout=300)
+    assert p.returncode == 0, p.stderr[-3000:]
+    return json.loads((arch / "summary.json").read_text())
+
+
+def snapshot(arch: Path) -> dict:
+    """What a run's archive holds, its paths made relative and the driver's timings left out."""
+    def rel(text):  # the archive's dir and the guide's (each test archive has its own copy of the fixture)
+        return text.replace(str(arch), "ARCH").replace(str(arch.parent.resolve()), "DIR")
+    logs = [{k: x.get(k) for k in ("job", "entry", "cell", "key", "outcome", "new_entries", "new_r", "n", "tried",
+                                   "exhausted", "selectable")}
+            for x in map(json.loads, (arch / "log.jsonl").read_text().splitlines()) if x["outcome"] != "guard-killed"]
+    jobs = {d.name: rel((d / "job.json").read_text()) for d in sorted((arch / "jobs").iterdir())}
+    return {"entries": (arch / "entries.jsonl").read_text(), "cells": (arch / "cells.json").read_text(),
+            "readings": rel((arch / "readings.jsonl").read_text()), "logs": logs, "jobs": jobs,
+            "files": sorted(p.name for p in (arch / "entries").iterdir()),
+            "summary": {k: v for k, v in json.loads((arch / "summary.json").read_text()).items() if k != "time"}}
+
+
+def test_loop_reaches_the_fake_goal_with_two_workers(tmp_path):
+    a = make_archive(tmp_path)
+    s = run_loop(a.root, loop_env(tmp_path))
+    assert s["stop"] == "goal" and s["goal_entries"] and s["verify"] is None
+    logs = [json.loads(x) for x in (a.root / "log.jsonl").read_text().splitlines()]
+    assert len(logs) >= 6 and all(x["outcome"] == "ok" for x in logs)
+    assert [x["job"] for x in logs] == [f"j{k:05d}" for k in range(len(logs))]  # committed in start order
+    spans = [(x["started"], x["ended"]) for x in logs]
+    assert any(b0 < a1 for (a0, a1), (b0, b1) in zip(spans, spans[1:]))  # two jobs ran at once
+    assert all(x["key"] is not None and x["rusage"]["cpu_s"] >= 0 and x["guard"].startswith("GUARD: rc 0")
+               for x in logs)
+    b = X.Archive.open(a.root)
+    g = b.goal_entries()[0]
+    assert b.rows[g]["job"] == "j00005" and b.facts(g)["owner:566"] == 1
+    assert [x["path"] for x in b.readings if x["kind"] == "fresh"]  # the fake's readings, registered
+    assert any(x["reading"]["fresh"] is False for x in logs)  # and reused
+    rep = b.report()
+    assert rep["jobs"]["committed"] == len(logs) and rep["goal_chain"]["entry"] == g
+    again = run_loop(a.root, loop_env(tmp_path))  # a stopped archive stays stopped
+    assert again["stop"] == "goal" and len((a.root / "log.jsonl").read_text().splitlines()) == len(logs)
+
+
+@pytest.mark.parametrize("how", ["driver", "tree"])
+def test_loop_killed_mid_way_resumes_to_the_same_archive(tmp_path, how):
+    ref = make_archive(tmp_path / "ref")
+    run_loop(ref.root, loop_env(tmp_path))
+    a = make_archive(tmp_path / "cut")
+    env = loop_env(tmp_path)
+    p = subprocess.Popen(run_cmd(a.root), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    t = time.monotonic()
+    while len((a.root / "log.jsonl").read_text().splitlines()) < 2 and time.monotonic() - t < 60:
+        time.sleep(0.02)
+    time.sleep(0.1)
+    if how == "driver":  # the driver alone: its jobs go on and are waited for or committed on the resume
+        p.send_signal(signal.SIGKILL)
+    else:  # the driver and its jobs: those with no result.json are run again
+        X.kill_tree(p.pid)
+    p.wait()
+    assert not (a.root / "summary.json").exists()
+    run_loop(a.root, env)
+    assert snapshot(a.root) == snapshot(ref.root)
+
+
+def test_loop_a_job_the_guard_killed_is_run_again_and_not_counted(tmp_path):
+    ref = make_archive(tmp_path / "ref")
+    run_loop(ref.root, loop_env(tmp_path))
+    a = make_archive(tmp_path / "g")
+    run_loop(a.root, loop_env(tmp_path, FAKE_GUARD_ONCE=tmp_path / "killed-once"))
+    logs = [json.loads(x) for x in (a.root / "log.jsonl").read_text().splitlines()]
+    assert logs[0]["outcome"] == "guard-killed" and logs[0]["job"] == "j00000"
+    assert logs[1]["job"] == "j00000" and logs[1]["outcome"] == "ok"
+    assert (a.root / "jobs" / "j00000" / "log.1").exists()
+    assert snapshot(a.root) == snapshot(ref.root)
+
+
+def test_loop_stops(tmp_path):
+    a = make_archive(tmp_path / "fail")  # entry 2 (the first job's end) fails; the others go on making progress
+    s = run_loop(a.root, loop_env(tmp_path, FAKE_FAIL=2))
+    assert s["stop"] == "repeated failure" and s["detail"]["error"] == "fake failure" and s["detail"]["entry"] == 2
+    assert X.Archive.open(a.root).failures() == {(2, "fake failure"): 2}
+    a = make_archive(tmp_path / "fail-root")  # on the root alone, one sweep of the start's frontier comes first
+    s = run_loop(a.root, loop_env(tmp_path, FAKE_FAIL=0))
+    assert s["stop"] == "stagnation" and s["jobs"] == 1
+    a = make_archive(tmp_path / "differ")
+    s = run_loop(a.root, loop_env(tmp_path, FAKE_DIFFER=0))
+    assert s["stop"] == "return differs" and s["jobs"] == 1 and len(X.Archive.open(a.root).rows) == 1
+    a = make_archive(tmp_path / "exhausted", guide=dict(GUIDE, atoms=[["owner:566", 1, 0]], keys={"owner:566": 0}))
+    s = run_loop(a.root, loop_env(tmp_path))
+    assert s["stop"] == "exhausted" and s["jobs"] == 1
+    a = make_archive(tmp_path / "floor")
+    s = run_loop(a.root, loop_env(tmp_path, E008_FLOOR_GB=1e9))
+    assert s["stop"] == "disk floor" and s["jobs"] == 0 and not list((a.root / "jobs").iterdir())
+
+
+def test_loop_stagnation(tmp_path):
+    """Each job reaches a new cell (state:316 = 2, 4, ...: a guide key, no atom of R) and no new atom: one sweep of
+    the start's frontier (the root's cell) and the run stops."""
+    a = make_archive(tmp_path)
+    s = run_loop(a.root, loop_env(tmp_path, FAKE_NO_PROGRESS="state:316"))
+    assert s["stop"] == "stagnation" and s["jobs"] == 1 and len(X.Archive.open(a.root).cells()) == 2
 
 
 # --- engine -------------------------------------------------------------------------------------------------------
