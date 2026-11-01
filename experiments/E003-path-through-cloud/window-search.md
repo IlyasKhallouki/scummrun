@@ -479,3 +479,14 @@ after the command, grouped by frame (R_k). When the window ends at frame f, the 
 □ *Test.* On the kitchen from boot's route at frame 3000, seven children from one `fork_each` and seven forked one
 frame at a time: full dumps (locals, exact) equal at the fork and 30 frames after the same click on each
 (`results/fork-each-check.log`).
+
+**The lite dump (sub-switch `lite`, strict only, off by default).** After its click a child reads its view each frame
+from the bridge's `state` with `objects`: the dump's vars, bits, verbs, slots (locals included), cutscene stack and
+actors as `state` gives them, with the owners, states and classes of the window's objects only, and no room objects or
+inventory. *Lemma D.* For every key of the window's view (FastView) and for `args:` (ArgsView), the lite dump gives the
+values the full dump gives: facts_of reads each key from those fields, and the window's objects are every object whose
+owner, state or class the view reads, and those whose script's locals it reads. replay.eval_check (M3) reads vars,
+actors and the room, which the lite dump has. □ The checkpoints and a child's unplanned facts read every fact, so at an
+end point the child takes a full dump. A cause's values on an object outside the window read as "not in the dump".
+*Test.* On the kitchen from boot's route, every frame from 2728 to 3219: the lite dump for the reading's 46 objects
+against the full dump (`results/lite-check.log`).
