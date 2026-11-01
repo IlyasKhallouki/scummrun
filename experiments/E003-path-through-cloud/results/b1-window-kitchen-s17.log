@@ -1,0 +1,39 @@
+B1 strict matcher on replay-part1-kitchen-s17-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-runb-S17.json (reading reading), frames 235-710: 2981 slot runs, 2848 resumed at a wait point at depth 0
+verdicts: {'unplaced': 899, 'ambiguous': 747, 'unexplained': 574, 'explained': 495, 'stutter': 133}
+matcher: 475 calls, 4632.6 us per call, 772.6 us per run
+wait check: 492 explained runs with a known arrival, 0 waited less than their record's frame cost
+unexplained runs by unit and wait point (the condition that failed most often), each group's first run explained: the opcode, the engine's values, the class:
+  463: local:200@43: pre var:70; first at 236: the records' precondition fails; [0000] jump if; var:70 = 0 (fact); semantics
+  57: local:210@62: end pos:local:210; first at 283: the wait did not block; [0000] WaitForCamera; var 2 = 480 (position); split
+  29: local:217@18: effect frozen:local:216; first at 636: left the path to the predicted write; [0007] jump if; var 0 = 95 (position); split
+  11: local:207@23: end pos:local:207; first at 313: the wait did not block; [0005] WaitForCamera; var 2 = 480 (position); split
+  7: local:204@18: end pos:local:204; first at 699: left the records' path; [0017] jump unless; var 0 = 51 (position); split
+  3: local:208@41: effect local:208; first at 301: the predicted write is not in the run; -; ; None
+  1: local:217@18: effect local:216; first at 690: left the path to the predicted write; [0007] jump if; var 0 = 388 (position); split
+  1: local:206@49: effect args:local:206; first at 698: the predicted write is not in the run; -; ; None
+  1: script:2@915: effect var:133; first at 710: the predicted write is not in the run; -; ; None
+  1: script:23@409: pre frozen:script:23; first at 710: the records' precondition fails; [0199] jump goto; frozen:script:23 = 1 (fact); semantics
+runs at a wait point the reading has no event record at (unit@W: runs, the first one checked):
+  463: local:201@22: invisible to the task: no task fact written, the slot back at its wait point
+  435: script:159@5: invisible to the task: no task fact written, the slot back at its wait point
+  1: local:201@35: invisible to the task: no task fact written, the slot back at its wait point
+matcher on the plan's units only (3 units): 475 calls, 3.0 us per call
+the plan's steps the run counted as matched: 16; strictly matched (their own run, M1-M4): 5; inputs 2 of 5; events whose run did not happen there: 5
+the plan's executed steps, strictly:
+  plan 0 walk_to(316)[202]#107 (matched): not matched {'frame': 636, 'pre_fails': [], 'effect': 'args:local:203', 'pos': [('pos:script:2', 'no run')]}
+  plan 0 event(local:215@16#45fc7932b71b)#893 (matched): its run did not happen {'frames': [636, 637], 'next_run': 640}
+  plan 0 event(local:215@56#45fc7932b71b)#1628 (matched): its run did not happen {'frames': [636, 637], 'next_run': 645}
+  plan 0 event(local:215@64#45fc7932b71b)#7340 (matched): its run did not happen {'frames': [636, 637], 'next_run': 647}
+  plan 0 event(local:215@69#45fc7932b71b)#10562 (matched): not matched {'frame': 665, 'verdict': 'ambiguous', 'pre_fails': [('args:local:215', '[0]'), ('state:316', '1')], 'end': None, 'effect_fails': [('args:local:216', 'frozenset({258285697547262})')]}
+  plan 0 walk_to(316)[202]#5511 (matched): not matched {'frame': 666, 'pre_fails': [], 'effect': 'local:216', 'pos': [('pos:local:216', 86), ('pos:local:217', 18), ('pos:script:2', 'no run')]}
+  plan 0 event(script:2@736#d40e45ecaad6)#7311 (matched): its run did not happen {'frames': [666, 667], 'next_run': 691}
+  plan 0 event(local:218@16#965f4bbc7b57)#7380 (not reached): its run did not happen {'frames': [688, 689], 'next_run': 693}
+  plan 1 walk_to(316)[202]#5511 (matched): not matched {'frame': 690, 'pre_fails': [], 'effect': None, 'pos': [('pos:local:216', 86), ('pos:local:217', 18)]}
+  plan 1 event(script:2@736#d40e45ecaad6)#7311 (matched): matched {'frame': 692, 'verdict': 'explained'}
+  plan 1 event(local:218@16#965f4bbc7b57)#7380 (matched): matched {'frame': 698, 'verdict': 'explained'}
+  plan 1 sentence(2,564)#10643 (matched): matched {'frame': 700, 'pre_fails': [], 'effect': None, 'pos': []}
+  plan 1 event(script:2@736#85f24aad8241)#15514 (matched): not matched {'frame': 705, 'verdict': 'explained', 'pre_fails': [('args:script:2', '[212310049339719]')], 'end': [915, 759], 'effect_fails': []}
+  plan 1 event(script:2@759#85f24aad8241)#21248 (matched): its run did not happen {'frames': [700, 701], 'next_run': None}
+  plan 1 sentence(9,566)#10916 (goal): matched {'frame': 702, 'pre_fails': [], 'effect': None, 'pos': []}
+  plan 1 event(script:2@736#c1184912b947)#15571 (matched): matched {'frame': 705, 'verdict': 'explained'}
+  plan 1 event(script:2@915#fa5666eff670)#21282 (matched): not matched {'frame': 710, 'verdict': 'unexplained', 'pre_fails': [], 'end': None, 'effect_fails': [('var:133', 'None')]}
