@@ -1,0 +1,29 @@
+E004 plan step A4, window search sections 1-7 with the sub-switch cache (9.7): window2's s17 run again (branch trace). ScummVM build sha1 6249a8e7d911 (the bridge at a77a9af; its new commands not asked).
+file replay-part1-kitchen-s17-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-runb-S17.json
+stop 'goal'; goal reached True; goal from the plan's goal records True
+verify from boot (fresh engine, no fork): 10 checkpoints, 0 differences, 62 inputs, goal at the end True, error None
+game time from the run's start (frame 235, qf 4880) to its stop (frame 710, qf 14380): 475 frames, 9500 qf, 39.58 s
+plans 2, replans 1
+  replan after plan 0 at frame 689: deviation at frame 689: [('event(local:218@16#965f4bbc7b57)#7380', [('local:204', ['1'], 0), ('local:206', ['0'], 1), ('local:207', ['0'], 1), ('local:210', ['0'], 1)])]
+windows 5; children 450; child frames 1841; outcomes {'deviation': 5, 'duplicate': 35, 'pruned': 51, 'spent': 353, 'success': 4, 'interface': 1, 'goal': 1}
+search CPU: engines 13.7 s {'child': 13.2, 'snapshot': 0.47, 'the last engine': 0.05}, Python 27.99 s, total 41.7 s
+Python CPU by part {}
+memory {'forks_pss_kb': 74457, 'python_rss_kb': 246736, 'live_forks': 16, 'min_available_kb': 6412916}
+steps: inputs 5 {'matched': 4, 'goal': 1}; events 12 {'matched': 11, 'not reached': 1}
+  window 0.1 walk_to(316)[202]#107: frames 235-652 (stop: Q(g) + b reached the best success); 417 children {'deviation': 4, 'duplicate': 35, 'pruned': 23, 'spent': 353, 'success': 2}, 1476 child frames, 78.06 s wall, 23.65 Python s; best success fork 635 inputs 636-636 end 665 (qf 13480); failures []
+  window 0.2 walk_to(316)[202]#5511: frames 636-688 (stop: Q(g) + b reached the best deviation); 23 children {'deviation': 1, 'pruned': 22}, 304 child frames, 9.62 s wall, 3.59 Python s; best deviation fork 665 inputs 666-666 end 689 (qf 13960); failures []
+  window 1.1 walk_to(316)[202]#5511: frames 689-696 (stop: Q(g) + b reached the best success); 7 children {'pruned': 6, 'success': 1}, 42 child frames, 0.83 s wall, 0.5 Python s; best success fork 689 inputs 690-690 end 698 (qf 14140); failures []
+  window 1.2 sentence(2,564)#10643: frames 690-697 (stop: Q(g) + b reached the best success); 2 children {'interface': 1, 'success': 1}, 9 child frames, 0.67 s wall, 0.12 Python s; best success fork 691 inputs 699-700 end 700 (qf 14180); failures []
+  window 1.3 sentence(9,566)#10916: frames 700-701 (the input's precondition closed in the parent after its window opened); 1 children {'goal': 1}, 10 child frames, 0.46 s wall, 0.12 Python s; best goal fork 700 inputs 701-702 end 710 (qf 14380); failures []
+windows with an input 5; search CPU per such window 8.3 s; x 250 = 0.58 CPU h
+
+against window2's run (cache off): the same inputs True (7 and 7), stop frame 710 and 710, qf 9500 and 9500, stop 'goal' and 'goal'
+per window: input, children (cache, window2), chosen fork (cache, window2), child frames (cache, window2), Python CPU s (cache, window2)
+  walk_to(316)[202]#107: 417, 417; fork 635, 635; 1476, 1475; 23.65, 36.02
+  walk_to(316)[202]#5511: 23, 23; fork 665, 665; 304, 301; 3.59, 4.27
+  walk_to(316)[202]#5511: 7, 8; fork 689, 689; 42, 44; 0.5, 0.8
+  sentence(2,564)#10643: 2, 3; fork 691, 691; 9, 9; 0.12, 0.24
+  sentence(9,566)#10916: 1, 1; fork 700, 700; 10, 10; 0.12, 0.16
+engine CPU s 13.7 against 23.5; Python CPU s 27.99 against 41.49; total 41.7 against 65.0
+the run's progress log:
+ugrep: warning: /home/ilyask/.cache/fast-mi/w3/logs/kitchen-s17.log: No such file or directory
