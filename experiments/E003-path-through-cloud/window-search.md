@@ -62,7 +62,13 @@ ego check, the Executor's play or the dialog line's verb click, with the steppin
 Its events land on frames after g. It then runs one frame at a time until one of these holds:
 
 - **success**: every record the window needs has matched, at frame h; c = Q(h);
-- **goal**: the goal holds at frame h; a success with c = Q(h), and the run ends there;
+- **goal**: the goal holds at frame h and every tracked record of the plan that writes a goal value (a *goal record*:
+  a predicted write of a goal value that changes the fact) has matched; a success with c = Q(h), and the run ends
+  there;
+- **goal, not from the plan**: the goal holds and a goal record has not matched, or none is tracked. The engine reached
+  the goal by a path the plan did not predict, or by waiting. It is not a success; it is logged with its frame and Q as a
+  baseline for B1. Where it happens in the idling parent, the run stops there with that reason: the goal came from
+  waiting, and the frame is a timeout baseline, not a plan;
 - **mismatch**: a slot of a unit with a pending record stands at a wait point (`pos:U`) it did not hold at the fork and
   that no pending record starts at or predicts, or the room becomes one no pending record predicts. A record outside
   the plan ran. The child is kept for B1;
@@ -185,6 +191,11 @@ a mismatch-free success whose guessed write took another value than the plan's (
 and when the plan is played out without the goal, the harness replans. Checkpoints for verify come only from frames
 before the next chosen input lands: the snapshot's frame, and a child's success frame when the next input lands after
 it. Verify then plays every chosen input from boot in a fresh engine with no fork.
+
+The run's success is a stop on a goal from the plan's records (section 3), not a goal that merely holds. Its report
+counts the records that matched their predictions (their final writes, in order), and, apart from that, the input steps
+after which no tracked fact changed without a predicted write (plan.md's strict match, counted once per macro step on
+its input).
 
 RETRIES, RETRY_WAIT, waits-first, the camera's precondition wait and the second click try are not used. Bans are not
 made: a window's children name no tested value a ban could cut.
