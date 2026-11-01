@@ -270,6 +270,10 @@ one operator that reads it.
 **Size.** One more variable with m + 1 values, and per consumer two operators and one pick operator per value of each
 variable it reads; the free pick operators go.
 
+**Tests.** `../test_pick_windows.py`: on random tasks, Fast Downward's optimum off and on against the task's own, both
+maps run on the files, and `decode` on both; `real` mode on a packed file. Measured on the bar door, k = 1 and the
+kitchen: `../results/pick-windows.log`.
+
 
 Little-endian u32 words. Strings are UTF-8. A value is written as the string `str(v)` of a domain value (ints,
 `above`, `below`), by its id in the string table.
