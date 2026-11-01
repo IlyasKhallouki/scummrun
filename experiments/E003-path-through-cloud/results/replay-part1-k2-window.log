@@ -1,0 +1,38 @@
+E003 step 5 on Part I: the runner (replay_part1.py) on the reading 'k2-w2'
+
+(replay-part1-k2-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json; sources {'replay_part1.py': 'f39e9f2c683d', 'replay.py': '8b5cff383621', 'packed_reading.py': 'd945f6fcb09d', 'export_records.py': 'f0aa97ff0b22', 'plan_fd.py': 'ae5dda514eb4', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'start.py': '573ac0069ff6', 'window.py': '6d157334e602'})
+=== seed 1 ===
+reading /var/tmp/fast-mi/window2-scratch/k2/reading/reading.json: 450,967 actions, 1,826 facts, packed file 380,136,780 bytes (sha1 db3d4605cfd7); goal {'state:316': [1]} (not the Part I end); read with --live-locals
+start: idle stop at frame 2728 (sentence), room 33, boot 3.2 s; checks ok; against the reading's start (results/start-part1.jsonl seed 1): 0 facts differ, 0 of them the task's; taskcore start check: input ok, needed ok
+result: stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched"; goal reached True; verify from boot: 0 differences at 6 checkpoints (28 inputs, 4.8 s), the goal at its end True
+replans 2; bans 0; plans 3; frames 401 (game time 40.1 s); player inputs 28
+steps: 6 in the log, 2 executed (2 played); outcomes {'not reached': 3, 'window empty': 3}
+matched (plan.md: the predicted writes and no other tracked fact changed): 0 of 2 executed (0.0); predicted writes held: 0 (0.0); not matched: {'window empty': 2}
+mismatches: 2 (1.0 per executed action): 0 predicted writes not seen (0.0), 2 tracked facts changed with no prediction (1.0; most often [['state:358', 1], ['var:182', 1]]); 0 steps with another guessed value than the plan's
+final path: 0 actions []
+Part I goals passed through: not scored yet (score_part1.py)
+time: run 390.1 s: load 2.88 s, boot 3.2 s, start check 88.79 s, harness 290.3 s (planning 225.2 s, playing 65.2 s), verify 4.8 s
+  per step (played): seconds {'n': 2, 'mean': 20.7, 'median': 20.7, 'max': 40.79, 'sum': 41.4}; frames {'n': 2, 'mean': 35.5, 'median': 35.5, 'max': 68, 'sum': 71}
+  per plan: all {'n': 3, 'mean': 75.06, 'median': 86.07, 'max': 105.38, 'sum': 225.2}; taskcore {'n': 3, 'mean': 40.02, 'median': 37.47, 'max': 55.93, 'sum': 120.1}; lama-first {'n': 3, 'mean': 29.97, 'median': 42.27, 'max': 42.61, 'sum': 89.9}
+landmarks (plan 0, frame 2728): 15 nodes, 15 on game facts, 29 orderings; the game facts: state:316=1 (goal); room=28; state:316=0 (start); state:428=1; script:2=1; room=33 (start); pos:script:2=736; frozen:script:2=0 (start); args:script:2=239867291646052; state:428=0 (start); script:2=0 (start); var:32=4 (start); var:53=1 (start); pos:script:2=-1 (start); args:script:2=0 (start)
+search lama-first-costs; cost caps True; frame costs dmax 15, charinc 0
+reader: {'switches': 'value_sets,draw_clears,actor_rooms,input_settled', 'reach': True, 'split_limit': True, 'elsewhere': True, 'reach_also': None, 'live_locals': True}
+window search {'workers': 7, 'delta_lo': 1, 'window_frames': 3600, 'child_limit': 3600, 'mem_floor_kb': 3145728}: run clock 9624 quarter-frames (40.1 s) from frame 2728 (qf 65284) to 3129 (qf 74908)
+  3 windows, 403 children, 3487 child frames, outcomes {'deviation': 2, 'duplicate': 6, 'pruned': 65, 'goal, not from the plan': 1, 'spent': 329}; early successes 0; bound violations 0; engine CPU s {'child': 38.07, 'snapshot': 0.0, 'the last engine': 4.28}; Python CPU s 59.8
+  replan after plan 0 at frame 2796: deviation at frame 2796: [('sentence(2,428)#44', [('var:102', ['1'], 0)]), ('event(script:2@736#d897055c2f2e)#163', [])]
+  replan after plan 1 at frame 2799: deviation at frame 2799: [('walk_to(428)#64', [('var:102', ['1'], 0)]), ('event(script:2@736#da2874b63864)#1957', [])]
+  window 0.1 sentence(2,428)#44: frames 2728-2796 (stop: Q(g) + b reached the best deviation); 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}, 2820 child frames, 40.79 s; b 2 frames (8 qf, chain 1); best fork 2728, inputs 2736-2776, done 2796 (qf 66916, 1632 after the window's start), early False, walk 20
+  window 1.1 walk_to(428)#64: frames 2796-2801 (stop: Q(g) + b reached the best deviation); 5 children {'deviation': 1, 'pruned': 4}, 8 child frames, 0.62 s; b 2 frames (8 qf, chain 1); best fork 2796, inputs 2797-2797, done 2799 (qf 66988, 72 after the window's start), early False, walk None
+  window 2.1 walk_to(315)[202]#2733: frames 2799-3129 (goal in the parent, not from the plan); 330 children {'goal, not from the plan': 1, 'spent': 329}, 659 child frames, 21.69 s; b 2 frames (8 qf, chain 1); no success
+  plan 0 at frame 2728: plan, 6 steps, taskcore 55.93 s, lama-first-costs 42.61 s, 143,417 operators, 0 bans, landmarks 15, predicted 7 frames (FD plan cost 7): ['sentence(2,428)#44', 'event(script:2@736#d897055c2f2e)#163', 'walk_to(428)#245', 'event(script:2@736#da2874b63864)#1957', 'walk_to(315)[202]#2735', 'event(local:217@18#d2acdc8c2415)#10761']
+  plan 1 at frame 2796: plan, 4 steps, taskcore 37.47 s, lama-first-costs 42.27 s, 143,417 operators, 0 bans, landmarks 14, predicted 4 frames (FD plan cost 4): ['walk_to(428)#64', 'event(script:2@736#da2874b63864)#1957', 'walk_to(315)[202]#2736', 'event(local:217@18#d2acdc8c2415)#10761']
+    start: {'live slots with unknown locals (args 0)': 2}
+  plan 2 at frame 2799: plan, 2 steps, taskcore 26.64 s, lama-first-costs 5.04 s, 32,118 operators, 0 bans, landmarks 3, predicted 2 frames (FD plan cost 2): ['walk_to(315)[202]#2733', 'event(local:217@18#d2acdc8c2415)#10761']
+    start: {'live slots with unknown locals (args 0)': 8}
+  reach extensions: 0, wall 0.0 s, CPU 0.0 s
+  0.1 sentence(2,428)#44 [sentence] click verb 2 on 428: frames 2728/2796, 40.8 s; window empty -> replan; 1 tries; inputs [(2736, [319, 130]), (2751, [319, 130]), (2752, [319, 130]), (2753, [319, 130]), (2754, [319, 130]), (2755, [319, 130]), (2756, [319, 130]), (2757, [319, 130]), (2758, [319, 130]), (2759, [319, 130]), (2760, [319, 130]), (2761, [319, 130]), (2762, [319, 130]), (2763, [319, 130]), (2764, [319, 130]), (2765, [319, 130]), (2766, [319, 130]), (2767, [319, 130]), (2768, [319, 130]), (2769, [319, 130]), (2770, [319, 130]), (2771, [319, 130]), (2772, [319, 130]), (2773, [319, 130]), (2774, [319, 130]), (2775, 'o'), (2776, [311, 107])]; window 0: stop: Q(g) + b reached the best deviation; outcomes {'deviation': 1, 'duplicate': 6, 'pruned': 61}
+  0.2 event(script:2@736#d897055c2f2e)#163 [event] wait: frames 2796/2796, 0.0 s; not reached -> replan; 0 tries; window 0: stop: Q(g) + b reached the best deviation; outcomes {'deviation': 1, 'duplicate': 6, 'pruned': 61}
+  1.1 walk_to(428)#64 [walk_to] click verb 11 on 428: frames 2796/2799, 0.6 s; window empty -> replan; 1 tries; inputs [(2797, [163, 107])]; changed with no prediction [('state:358', 0, 1), ('var:182', 0, 'above')]; window 0: stop: Q(g) + b reached the best deviation; outcomes {'deviation': 1, 'pruned': 4}
+  1.2 event(script:2@736#da2874b63864)#1957 [event] wait: frames 2801/2801, 0.0 s; not reached -> replan; 0 tries; window 0: stop: Q(g) + b reached the best deviation; outcomes {'deviation': 1, 'pruned': 4}
+  2.1 walk_to(315)[202]#2733 [walk_to] click verb 11 on 315: frames 2799/None, 21.7 s; window empty -> stop; 0 tries; window 0: goal in the parent, not from the plan; outcomes {'goal, not from the plan': 1, 'spent': 329}
+  2.2 event(local:217@18#d2acdc8c2415)#10761 [event] wait: frames 3129/3129, 0.0 s; not reached -> stop; 0 tries; window 0: goal in the parent, not from the plan; outcomes {'goal, not from the plan': 1, 'spent': 329}
