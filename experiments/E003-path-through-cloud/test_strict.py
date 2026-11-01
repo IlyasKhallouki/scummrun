@@ -346,6 +346,26 @@ def test_an_input_check_is_decided_where_the_engine_tests_it_not_on_the_forks_du
         f"check {check[0]}"
 
 
+def test_an_effect_outside_its_domain_is_reported_and_the_record_still_matches(monkeypatch):
+    sr = FakeReading({7: (7, "local:3", 5, {}, {"pos:local:3": ("set", 9), "var:133": ("set", 0)}, [])})
+    r = mrec(0, "event", "e#7", "local:3", 5, writes={"pos:local:3", "var:133"})
+    t = S.Track(plan_of(sr, [r], {"e#7": 7}), {})
+    ru = run(11, "local:3", 5, 9)
+    after = {"pos:local:3": 9, "var:133": None}
+    vs = t.verdicts([ru], {"pos:local:3": 5, "var:133": 0}, after, None)
+    monkeypatch.setattr(S.F, "facts_of", lambda d: d["facts"])
+    t.apply(10, ru, vs[0][1], after, {"facts": {"var:133": 566}})
+    assert 0 in t.matched and t.outside[0] == [("var:133", 566)]
+    assert t.copy().outside == t.outside
+    # an input record's
+    sr2 = FakeReading({3: (3, None, None, {}, {"pos:script:4": ("set", NOWHERE), "var:133": ("set", 0)}, [])})
+    plan = plan_of(sr2, [mrec(0, "input", "c#3")], {"c#3": 3})
+    got = S.input_match(sr2, plan, 3, ["script:4"], {"pos:script:4": 1, "var:133": 0}, None, {},
+                        {"script:4": run(20, "script:4", 0, -1, depth=1)}, {"pos:script:4": NOWHERE, "var:133": None},
+                        [], None, {"facts": {"var:133": 566}})
+    assert got["ok"] and got["outside"] == [("var:133", 566)]
+
+
 def test_a_read_of_a_variable_the_reading_does_not_hold_is_split():
     """trace-validation.md section 5: split when the value tested is not a fact of the reading. The k = 2 deviation:
     the sentence script wrote var 102 = 0 at [002B], a constant; the test that sent it there, [0000], read var 103,

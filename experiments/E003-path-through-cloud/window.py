@@ -685,6 +685,7 @@ class Child:
     fail: dict | None = None
     choice_fail: dict | None = None
     d0: dict | None = None  # the parent's state dump at the fork
+    outside: list = field(default_factory=list)  # the click record's effects outside their domain (9.2, M4)
 
     def row(self) -> list:
         return [self.g, self.first, self.issue, self.outcome, self.end, self.q_end, self.frames,
@@ -1412,7 +1413,7 @@ class Search:
                 obs = F.facts_of(s)
                 now = sview(obs, s)
                 for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump, pkept.ex):
-                    ptrack.apply(g + 1, run_, v_, now)
+                    ptrack.apply(g + 1, run_, v_, now, s)
                 pkept.frame(g + 1, R_, s, now)
                 prev_view, prev_dump = now, s
         finally:
@@ -1466,6 +1467,11 @@ class Search:
                            "unplanned": len(best.unplanned)}
         rec["parent_matched"] = {by.get(i, str(i)): f for i, (f, _, _) in ptrack.matched.items()}
         rec["parent_refuted"] = {by.get(i, str(i)): [f, why] for i, (f, why, _) in ptrack.refuted.items()}
+        rec["outside_domain"] = self._outside(ptrack, best, first if has_input else None, by)
+        for o_ in rec["outside_domain"]:
+            h.progress(f"  window {k + 1}: outside the domain: {o_['record']} ({o_['branch']}) {o_['key']} = "
+                       f"{o_['engine']}, domain {o_['domain']}; M4 does not check it (trace-validation.md section 3), "
+                       f"so the record still matches")
         self.py_cpu += time.process_time() - cpu0
         self.windows.append(rec)
         if h.workdir is not None:
@@ -1474,6 +1480,26 @@ class Search:
         parent.explain_off()
         return {"rec": rec, "best": best, "track": ptrack, "cause": cause,
                 "parent_matched": {i: (v[0], v[1]) for i, v in ptrack.matched.items() if v[0] is not None}}
+
+    def _outside(self, ptrack, best, first, by: dict) -> list:
+        """Section 9.2, M4: the matched records' effects whose engine value lies outside the fact's domain, in the parent
+        and the chosen child. M4 leaves them unchecked (trace-validation.md section 3, "Facts outside the view"), so
+        each record still matches under that rule; a value outside the domain is reported where it shows."""
+        out, seen = [], set()
+        items = [("parent", i, kk, v) for i, l in ptrack.outside.items() for kk, v in l]
+        if best is not None and best.track is not None:
+            items += [("chosen child", i, kk, v) for i, l in best.track.outside.items() for kk, v in l]
+            if first is not None:
+                items += [("chosen child", first.i, kk, v) for kk, v in best.outside]
+        for who, i, kk, v in items:
+            if (i, kk) in seen:
+                continue
+            seen.add((i, kk))
+            dom = self.h.doms.get(kk)
+            out.append({"record": by.get(i, str(i)), "branch": who, "key": kk, "engine": v,
+                        "domain": [str(x) for x in dom.values][:8] if dom is not None else None,
+                        "still_matches": True})
+        return out
 
     def _goal_writer_fail(self, pkept, g: int, before: dict | None, now: dict) -> dict | None:
         """The run of frame g that wrote a goal fact the plan's goal records did not (9.5), from the parent's kept
@@ -1581,7 +1607,7 @@ class Search:
             held: list = []  # event runs after the click's first run while its record is undecided (9.2)
 
             def apply_run(f_, r, v, view):
-                for r_, how in track.apply(f_, r, v, view):
+                for r_, how in track.apply(f_, r, v, view, frames_seen.get(f_, (None, None))[1]):
                     if how == "matched":
                         idx_ = sp.idx[r_.i][track.matched[r_.i][1]]
                         matched_writes.append((r.seq, {kk: e[1] for kk, e in sr.rec(idx_)[4].items()
@@ -1609,7 +1635,8 @@ class Search:
                     cu = S.cite_unit(chk[0])
                     r_ = chk_own.get(cu[0]) if cu is not None else None
                     return S.decide_on_log(self.code, kept.ex, [r_], chk) if r_ is not None else S.NO_LOG
-                decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later, on_log)
+                decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later, on_log,
+                                            frames_seen.get(f, (None, None))[1])
                 decided[n_]["frame"], decided[n_]["view"] = f, va
 
             def settle(final: bool = False) -> None:
@@ -1624,6 +1651,7 @@ class Search:
                     track.matched[first.i] = (s_issue, cands[ok][1], res_["last_seq"])
                     track.unit_seq[first.i] = {u: r_.seq for u, r_ in own[ok].items()}
                     track.first_seq[first.i] = res_["first_seq"]
+                    ch.outside = list(res_.get("outside") or [])
                     ch.took = "plan" if res_["took"] else "plan, no change"
                     ch.track_issue = track.copy()
                     return
@@ -2173,4 +2201,6 @@ class Search:
                 "memory_kb": dict(self.mem), "deviations": list(self.deviations),
                 "config": dataclasses.asdict(self.cfg),
                 "causes": list(self.causes), "python_cpu_by_part_s": {k: round(v, 2) for k, v in self.prof.items()},
-                "empty_windows": [[list(k), n] for k, n in self.empty_keys.items()]}
+                "empty_windows": [[list(k), n] for k, n in self.empty_keys.items()],
+                "outside_domain": [dict(o, plan=w.get("plan"), macro=w.get("macro")) for w in ws
+                                   for o in w.get("outside_domain", ())]}

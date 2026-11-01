@@ -11,7 +11,7 @@ What it gives window.py (section numbers of window-search.md):
 * ``Track``: one branch's strict matches: each event record of the plan matched or refuted on its own run (9.2).
 * ``input_match``: (I1)-(I4) and "took effect" for an input record at s + 1 (9.2, Lemma 9′); (I4) and M3 on the
   engine's own opcodes where the explain log has the test (``decide_on_log``, 9.2's "the frame where the engine
-  tests it").
+  tests it"), and the effects whose engine value lies outside their domain, reported (``outside``).
 * ``Failure`` and ``explain``: what a child keeps of its first failure, and B1's explanation of it (9.5):
   trace_check.explain_unexplained (Lemmas X and B, the two classes), and Lemma X toward an input record's own end.
 
@@ -232,11 +232,14 @@ class Track:
         self.choices: dict = {}  # MRec.i -> [(key, observed)]: a guessed write the engine took otherwise
         self.unit_seq: dict = {}  # an input's MRec.i -> {unit: the seq of the click's run of it}
         self.first_seq: dict = {}  # an input's MRec.i -> the seq of the click's first run
+        # MRec.i -> [(key, the engine's value)]: an effect of the matched record whose engine value lies outside its
+        # domain, which M4 does not check (trace-validation.md section 3: reported where it shows)
+        self.outside: dict = {}
 
     def copy(self) -> "Track":
         t = Track(self.plan, self.matched)
         t.refuted, t.choices, t.unit_seq = dict(self.refuted), dict(self.choices), dict(self.unit_seq)
-        t.first_seq = dict(self.first_seq)
+        t.first_seq, t.outside = dict(self.first_seq), dict(self.outside)
         return t
 
     def armed(self, r) -> int | None:
@@ -267,9 +270,10 @@ class Track:
         vs = m.match(mine, before, after_in, open_keys_of(runs, before, after))
         return [(v.run, v) for v in vs]
 
-    def apply(self, k: int, run: TE.Run, v, after: dict) -> list:
+    def apply(self, k: int, run: TE.Run, v, after: dict, dump: dict | None = None) -> list:
         """Definition S for one run: the plan's event record whose own run it is, matched or refuted. Returns [(MRec,
-        "matched"|"refuted")]."""
+        "matched"|"refuted")]. ``dump``: the state dump at D_k, for the engine's value of an effect outside its
+        domain."""
         out = []
         for r in self.plan.events:
             if r.i in self.matched or r.i in self.refuted or r.unit != run.unit or r.wait != run.code0:
@@ -291,6 +295,9 @@ class Track:
                       and after.get(kk) != x.chosen]
                 if ch:
                     self.choices[r.i] = ch
+                od = outside_of(self.plan.sr.rec(idx[path])[4], after, dump)
+                if od:
+                    self.outside[r.i] = od
                 out.append((r, "matched"))
             else:
                 if path is not None:
@@ -302,6 +309,17 @@ class Track:
                 out.append((r, "refuted"))
             break  # a run is the own run of one record at most (the records of a unit form a chain)
         return out
+
+
+def outside_of(eff: dict, view: dict, dump: dict | None) -> list:
+    """The effects of a record (B1's tuple's effects) whose engine value lies outside the fact's domain (None in the
+    view): [(key, the engine's value)]. M4 does not check them (trace-validation.md section 3, "Facts outside the
+    view"), so the record's match does not depend on them; they are reported where they show."""
+    keys = [kk for kk, e in eff.items() if e[0] in ("set", "guess") and kk in view and view[kk] is None]
+    if not keys:
+        return []
+    obs = F.facts_of(dump) if dump is not None else {}
+    return [(kk, obs.get(kk)) for kk in keys]
 
 
 class _MatcherView:
@@ -329,16 +347,17 @@ class _MatcherView:
 # --- an input record at s + 1 ------------------------------------------------------------------------------------------
 
 def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: dict | None, applied: dict,
-                own: dict, vk: dict, later: list, decide=None) -> dict:
+                own: dict, vk: dict, later: list, decide=None, dk: dict | None = None) -> dict:
     """9.2's (I1)-(I4) and "took effect" for the reading's action ``idx``, an input record whose ``pos:`` writes name
     ``units``: v0 the view before its first click (V_{f_1−1}), d0 the dump there, ``applied`` the set writes of the
     event records matched before its first run, ``own`` its runs (unit -> the unit's first run at depth 1 or more from
     the click's frame on), vk the view at the frame it is decided, ``later`` the runs of that frame after its last run.
     ``decide``: (I4) on the frame where the engine tests a check, check -> True, False, None or NO_LOG
     (``decide_on_log`` on the click's run of the check's unit); a check it gives NO_LOG for, or every check without
-    it, is decided on d0.
-    Returns {"ok", "took", "why", "run", "engine", "want", "first_seq", "last_seq"}: why the first condition that
-    failed, run the click's run of the unit it names."""
+    it, is decided on d0. ``dk``: the dump at the frame it is decided, for the engine's values outside a domain.
+    Returns {"ok", "took", "why", "run", "engine", "want", "first_seq", "last_seq", "outside"}: why the first
+    condition that failed, run the click's run of the unit it names, outside the effects M4 left unchecked because
+    the engine's value lies outside the domain."""
     _, _, _, pre, eff, checks = sr.rec(idx)
     state = {**v0, **applied} if applied else v0
     bad = next((k for k, vs in pre.items() if not TE._holds(state.get(k), vs)), None)
@@ -382,7 +401,7 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
         if got is False:
             return {"ok": False, "took": False, "why": f"check {c[0]}", "run": None, "engine": None}
     return {"ok": True, "took": changed, "why": None, "run": None, "first_seq": min(seqs, default=-1),
-            "last_seq": max(seqs, default=-1)}
+            "last_seq": max(seqs, default=-1), "outside": outside_of(eff, vk, dk)}
 
 
 def _show(v):
@@ -665,4 +684,4 @@ def unit_where(unit: str) -> list:
 
 
 __all__ = ["Reading", "ArgsView", "Plan", "Track", "input_match", "Kept", "explain", "short", "runs_of", "by_frame",
-           "unit_where", "M", "cite_unit", "decide_on_log", "NO_LOG"]
+           "unit_where", "M", "cite_unit", "decide_on_log", "NO_LOG", "outside_of"]
