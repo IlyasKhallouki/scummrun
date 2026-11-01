@@ -1,0 +1,7 @@
+game loaded in 0.12 s
+kitchen: 72256 records, reading 56.35 s, 55.7 CPU s, peak RSS 712 MB
+kitchen reading against golden.py's: 72258 compared, 0 differences
+golden/kitchen.tc: 71729 actions (527 folded), 44792868 bytes
+total 61.10 s, peak RSS 731876 kB
+reader-port exit 0
+279b7a24dc91a76a94aa75a1c23b7a750e335152  golden/kitchen.tc
