@@ -1,0 +1,49 @@
+{
+ "full_actions": 83718,
+ "reach_actions": 683,
+ "d_keeps_of_full": 690,
+ "d_keeps_of_reach": 683,
+ "task": {
+  "actions_full": 0,
+  "actions_reach": 0,
+  "only_full": 0,
+  "only_reach": 0,
+  "labels_only_full": [],
+  "labels_only_reach": [],
+  "facts_differ": {},
+  "facts_only_full": 274,
+  "facts_only_reach": 0
+ },
+ "kept_by_d_not_written": 0,
+ "written_not_kept_by_d": 0,
+ "values_full": 692,
+ "values_reach": 418,
+ "facts_only_in_full": {},
+ "facts_only_in_reach": {},
+ "n_facts_only_in_full_one_value": 274,
+ "values_only_full": {},
+ "values_only_reach": {},
+ "reader_values_differ_from_d": {
+  "state:316": [
+   [],
+   [
+    "1"
+   ]
+  ]
+ },
+ "guesses_cut": 0,
+ "d_named_keeps_of_full": 690,
+ "named_only_full": 0,
+ "named_only_reach": 0,
+ "named_only_full_labels": [],
+ "named_only_reach_labels": [],
+ "named_values_only_full": {},
+ "named_values_only_reach": {
+  "state:316": [
+   "1"
+  ]
+ },
+ "kept_by_d_not_written_classes": {},
+ "only_full_labels": [],
+ "only_reach_labels": []
+}

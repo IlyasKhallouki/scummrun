@@ -1,0 +1,28 @@
+actions 75942; var:32 reached ['14', '149', '201', '202', '4', '66']; room reached 8 values
+pairs reached 38 of 48
+(var:32 = 202, room = 85): not reached
+(var:32 = 204, room = 28): not reached
+actions h1 keeps with no reached (var:32, room) pair: 486
+  21 dialog_line(120)[202@85]
+  21 dialog_line(121)[202@85]
+  21 dialog_line(122)[202@85]
+  21 dialog_line(123)[202@85]
+  21 dialog_line(124)[202@85]
+  21 dialog_line(125)[202@85]
+  21 dialog_line(126)[202@85]
+  21 dialog_line(128)[202@85]
+  21 dialog_line(127)[202@85]
+  6 dialog_line(120)[14@85]
+  6 dialog_line(121)[14@85]
+  6 dialog_line(122)[14@85]
+  6 dialog_line(123)[14@85]
+  6 dialog_line(124)[14@85]
+  6 dialog_line(125)[14@85]
+  room = 28: var:32 in ['4', '14', '66', '149', '201', '202']
+  room = 29: var:32 in ['4', '14', '66', '149', '201', '202']
+  room = 33: var:32 in ['4', '14', '66', '149', '201', '202']
+  room = 34: var:32 in ['4', '14', '66', '149', '201', '202']
+  room = 35: var:32 in ['4', '14', '66', '149', '201', '202']
+  room = 38: var:32 in ['4', '14', '66', '149', '201', '202']
+  room = 41: var:32 in ['4']
+  room = 85: var:32 in ['201']

@@ -1,0 +1,317 @@
+{
+  "batches": [
+    {
+      "job_s": 10.1,
+      "jobs": 1546,
+      "longest_job_s": 0.3,
+      "records": 22757,
+      "s": 3.5,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 6.0,
+      "jobs": 822,
+      "longest_job_s": 0.2,
+      "records": 4251,
+      "s": 2.0,
+      "what": "pass 1: event round 1"
+    },
+    {
+      "job_s": 3.3,
+      "jobs": 607,
+      "longest_job_s": 0.7,
+      "records": 3827,
+      "s": 1.2,
+      "what": "pass 1: event round 2"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 42,
+      "longest_job_s": 0.0,
+      "records": 152,
+      "s": 0.0,
+      "what": "pass 1: event round 3"
+    },
+    {
+      "job_s": 9.6,
+      "jobs": 118,
+      "longest_job_s": 0.5,
+      "records": 9783,
+      "s": 3.3,
+      "what": "pass 1: event round 4"
+    },
+    {
+      "job_s": 3.5,
+      "jobs": 63,
+      "longest_job_s": 0.4,
+      "records": 1636,
+      "s": 1.2,
+      "what": "pass 1: event round 5"
+    },
+    {
+      "job_s": 15.5,
+      "jobs": 4979,
+      "longest_job_s": 0.5,
+      "records": 20854,
+      "s": 7.2,
+      "what": "pass 1: later rounds (1023)"
+    },
+    {
+      "job_s": 10.2,
+      "jobs": 1666,
+      "longest_job_s": 0.1,
+      "records": 25277,
+      "s": 3.5,
+      "what": "pass 2: inputs"
+    },
+    {
+      "job_s": 4.4,
+      "jobs": 843,
+      "longest_job_s": 0.1,
+      "records": 4499,
+      "s": 1.5,
+      "what": "pass 2: event round 1"
+    },
+    {
+      "job_s": 3.6,
+      "jobs": 607,
+      "longest_job_s": 0.5,
+      "records": 3829,
+      "s": 1.3,
+      "what": "pass 2: event round 2"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 42,
+      "longest_job_s": 0.0,
+      "records": 152,
+      "s": 0.0,
+      "what": "pass 2: event round 3"
+    },
+    {
+      "job_s": 8.6,
+      "jobs": 118,
+      "longest_job_s": 0.5,
+      "records": 9783,
+      "s": 3.0,
+      "what": "pass 2: event round 4"
+    },
+    {
+      "job_s": 2.5,
+      "jobs": 63,
+      "longest_job_s": 0.3,
+      "records": 1636,
+      "s": 0.9,
+      "what": "pass 2: event round 5"
+    },
+    {
+      "job_s": 12.5,
+      "jobs": 4979,
+      "longest_job_s": 0.3,
+      "records": 20854,
+      "s": 5.3,
+      "what": "pass 2: later rounds (1023)"
+    }
+  ],
+  "cpu_use": 2.88,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "state:316"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 33,
+    "reads some locals, known": 51
+  },
+  "load_at_end": "10.10 6.95 7.10",
+  "load_at_start": "9.11 6.38 6.93",
+  "n_rooms": 2,
+  "n_units": 84,
+  "name": "baroff",
+  "objects": 57,
+  "out_of_domain_keys": 0,
+  "outside_points": {},
+  "packed": {
+    "actions": 65516,
+    "args_values_zeroed": 4,
+    "bytes": 42067092,
+    "facts": 664,
+    "file": "/var/tmp/fast-mi/reach-scratch/bar/baroff.tc",
+    "finish_s": 0.21,
+    "folded": 514,
+    "sha1": "3a35df0bc083b834db567cf9fef0481fc6c7f57c",
+    "strings": 15048
+  },
+  "peak_rss_mb": 253,
+  "phases_s": {
+    "emit": 0.81,
+    "end of pass": 0.0,
+    "events": 1.82,
+    "events: event_pins": 1.73,
+    "events: replans": 0.01,
+    "inputs()": 0.04,
+    "runs": 33.84
+  },
+  "pool": {
+    "batches": 2058,
+    "job_s": 90.2,
+    "jobs": 16495,
+    "longest_jobs": [
+      [
+        0.67,
+        "esc(local:220@5216)",
+        2
+      ],
+      [
+        0.53,
+        "esc(local:220@5516#df39e61ce709)",
+        4
+      ],
+      [
+        0.5,
+        "esc(local:220@5379)",
+        2
+      ],
+      [
+        0.48,
+        "esc(local:220@5516#5b0e4b31be68)",
+        19
+      ],
+      [
+        0.46,
+        "esc(local:220@993)",
+        1033
+      ],
+      [
+        0.45,
+        "esc(local:220@5379)",
+        1031
+      ],
+      [
+        0.44,
+        "esc(local:220@5516)",
+        1031
+      ],
+      [
+        0.43,
+        "esc(local:220@5216)",
+        1031
+      ],
+      [
+        0.42,
+        "esc(local:220@5216#df39e61ce709)",
+        4
+      ],
+      [
+        0.38,
+        "esc(local:220@5516#56a7ecc31925)",
+        19
+      ],
+      [
+        0.38,
+        "event(local:220@5483)",
+        2
+      ],
+      [
+        0.37,
+        "esc(local:220@5516#10da9722e437)",
+        1033
+      ],
+      [
+        0.37,
+        "esc(local:220@5516#f80af5444b8a)",
+        19
+      ],
+      [
+        0.36,
+        "esc(local:220@5379#5b0e4b31be68)",
+        19
+      ],
+      [
+        0.36,
+        "event(local:220@6630#8a9e2250af84)",
+        5
+      ],
+      [
+        0.36,
+        "esc(local:220@5379#8a9e2250af84)",
+        4
+      ],
+      [
+        0.35,
+        "esc(local:220@5216#df39e61ce709)",
+        1033
+      ],
+      [
+        0.34,
+        "esc(local:220@5216#56a7ecc31925)",
+        19
+      ],
+      [
+        0.34,
+        "esc(local:220@5516#df39e61ce709)",
+        1033
+      ],
+      [
+        0.34,
+        "event(local:220@5637#df39e61ce709)",
+        4
+      ]
+    ],
+    "max_records_waiting": 3457,
+    "merge_and_stream_s": 1.47,
+    "merge_counters_s": 0.38,
+    "snapshots_s": 0.16,
+    "split_parts_queued": 0,
+    "split_parts_run_elsewhere": 0,
+    "stream_records_s": 0.97,
+    "workers_sync_s": 0.64
+  },
+  "reach": false,
+  "read_cpu_s": 103.0,
+  "read_peak_rss_mb": 253,
+  "read_wall_s": 35.8,
+  "reader_counts": {
+    "event rounds": 1028,
+    "pass 1: domain values added for the next pass": 24,
+    "pass 1: records": 63260,
+    "pass 2: records": 66030,
+    "records": 66030
+  },
+  "records": 66030,
+  "records_by_kind": {
+    "dialog_line": 549,
+    "event": 28071,
+    "sentence": 23036,
+    "skip_cutscene": 12682,
+    "walk_to": 1692
+  },
+  "rooms": [
+    33,
+    28
+  ],
+  "rss_peak_seen": {
+    "at": "pass 2, event round 19 (76 jobs), 31 s",
+    "mb": 242
+  },
+  "setup_s": 0.09,
+  "sink_thread_busy_s": 11.9,
+  "slot_events": [],
+  "slot_facts": 2718,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "done",
+  "threads": 3,
+  "total_s": 36.7,
+  "units": {
+    "entry": 2,
+    "exit": 2,
+    "global": 32,
+    "local": 25,
+    "obj": 23
+  }
+}

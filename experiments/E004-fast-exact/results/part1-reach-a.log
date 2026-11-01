@@ -1,0 +1,50 @@
+[part1] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 3 threads; load 4.16 10.50 12.35
+[part1] pass 1 inputs: 44 runs, 88 records, 0.0 s; 86 records in the pass, 0 s, RSS 186 MB
+[part1] pass 1 event round 1: 89 runs, 125 records, 0.1 s; 180 records in the pass, 0 s, RSS 232 MB
+[part1] pass 1 event round 2: 898 runs, 2444 records, 0.4 s; 2657 records in the pass, 1 s, RSS 248 MB
+[part1] pass 1 event round 3: 998 runs, 2366 records, 0.5 s; 5021 records in the pass, 1 s, RSS 290 MB
+[part1] pass 1 event round 4: 1560 runs from 1560 events start; RSS 292 MB
+job dialog_line(120)[202@85]: 357.3 s, 270 records, 0 splits, 0 parts, 0 deep
+job dialog_line(121)[202@85]: 358.8 s, 270 records, 0 splits, 0 parts, 0 deep
+job dialog_line(122)[202@85]: 360.1 s, 270 records, 0 splits, 0 parts, 0 deep
+job dialog_line(123)[202@85]: 341.1 s, 270 records, 0 splits, 0 parts, 0 deep
+job dialog_line(124)[202@85]: 342.6 s, 270 records, 0 splits, 0 parts, 0 deep
+[part1] pass 1 event round 4: 1560 runs, 5620 records, 705.6 s; 10643 records in the pass, 707 s, RSS 740 MB
+[part1] pass 1 event round 5: 1725 runs from 1725 events start; RSS 701 MB
+job dialog_line(120)[202@85]: 178.7 s, 120 records, 0 splits, 0 parts, 0 deep
+job dialog_line(122)[202@85]: 180.2 s, 120 records, 0 splits, 0 parts, 0 deep
+job dialog_line(121)[202@85]: 180.5 s, 120 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#2f9b27d9072e): 15.4 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#10d4c178245e): 13.6 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#2d278b70b7aa): 15.1 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#21af5b50622c): 12.9 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#f10d4dbc333a): 14.0 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#92c19cd8c562): 9.5 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422#213167c0c6ee): 11.7 s, 13 records, 0 splits, 0 parts, 0 deep
+job event(local:202@422): 10.6 s, 13 records, 0 splits, 0 parts, 0 deep
+split dialog_line(120)[204@28] depth 0 on var:53: 3 of 3 values, 3 paths cut
+split dialog_line(120)[204@28] depth 1 on var:196: 1 of 5 values, 1 paths cut
+
+thread 'reader-2' (466868) panicked at reader/src/builder.rs:1467:13:
+split_limit: dialog_line(120)[204@28] passed the path limit (1 paths cut) with no fact left to split on (first fork None, 2 splits deep); the reading stops
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (466839) panicked at reader/src/par.rs:260:25:
+a worker failed: split_limit: dialog_line(120)[204@28] passed the path limit (1 paths cut) with no fact left to split on (first fork None, 2 splits deep); the reading stops
+
+thread 'main' (466839) panicked at reader/src/par.rs:555:37:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+job dialog_line(124)[202@85]: 182.7 s, 120 records, 0 splits, 0 parts, 0 deep
+
+thread 'reader-1' (466867) panicked at reader/src/par.rs:496:41:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'reader-1' (466867) panicked at reader/src/par.rs:509:37:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+job dialog_line(123)[202@85]: 185.1 s, 120 records, 0 splits, 0 parts, 0 deep
+
+thread 'reader-0' (466866) panicked at reader/src/par.rs:496:41:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'reader-0' (466866) panicked at reader/src/par.rs:509:37:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }

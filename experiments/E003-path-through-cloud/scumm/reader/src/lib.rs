@@ -11,21 +11,29 @@
 //! * [`replay::Replay`]: a [`builder::Machine`] that plays back the machine runs reader_port_oracle.py captured
 //!   from the Python reading (the oracle for the Builder's half until the Rust machine lands).
 
+pub mod args;
 pub mod builder;
+pub mod costs;
 pub mod domain;
 pub mod domains;
 pub mod due;
 pub mod facts;
+pub mod havoc;
+pub mod inputs;
 pub mod locals;
 pub mod machine;
+pub mod memo;
 pub mod oracle;
 pub mod packed;
+pub mod pairs;
 pub mod par;
 pub mod py;
+pub mod reach;
 pub mod record;
 pub mod replay;
 pub mod scaling;
 pub mod scope;
+pub mod shared;
 pub mod table;
 pub mod task;
 

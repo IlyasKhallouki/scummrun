@@ -521,6 +521,35 @@ pub fn start_misses(t: &Task, start: &[u32], limit: u128) -> Result<Vec<String>,
     Ok((0..nf).filter(|&f| none[f] && used[f]).map(|f| t.key(f as u32).to_string()).collect())
 }
 
+/// `start_misses` on the actions of any source (the banned task as a view, serve.rs), with `t`'s facts, strings and
+/// number of input actions and the goal `goal`: the same facts and the same first error, since `start_misses` expands
+/// only the actions that name a fact out of its domain, each on its own, in order; those are copied into a task of
+/// their own here.
+pub fn start_misses_src<S: Src + ?Sized>(
+    src: &S,
+    t: &Task,
+    goal: &[(u32, Vec<u32>)],
+    start: &[u32],
+    limit: u128,
+) -> Result<Vec<String>, String> {
+    let nf = t.facts.len();
+    let none: Vec<bool> = (0..nf).map(|f| start[f] == NONE).collect();
+    if !none.iter().any(|&b| b) {
+        return Ok(Vec::new());
+    }
+    let mut acts = Actions::default();
+    for ai in 0..src.n() {
+        let v = src.view(ai);
+        let names = v.pre().any(|(f, _)| none[f as usize])
+            || v.effs().any(|e| none[e.fact as usize] || e.when().any(|(f, _)| none[f as usize]));
+        if names {
+            acts.copy_src(src, ai);
+        }
+    }
+    let sub = Task { strs: t.strs.clone(), facts: t.facts.clone(), goal: goal.to_vec(), starts: Vec::new(), acts, n_orig: t.n_orig };
+    start_misses(&sub, start, limit)
+}
+
 /// What pass 1 learns: the head's variables and the counts.
 pub struct Plan {
     pub vars: Vec<u32>,  // variable ids in file order

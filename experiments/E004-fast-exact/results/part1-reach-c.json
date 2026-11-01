@@ -1,0 +1,130 @@
+{
+ "batches": [
+  {
+   "job_s": 0.0,
+   "jobs": 44,
+   "longest_job_s": 0.0,
+   "records": 88,
+   "s": 0.1,
+   "what": "pass 1: inputs"
+  },
+  {
+   "job_s": 0.0,
+   "jobs": 89,
+   "longest_job_s": 0.0,
+   "records": 125,
+   "s": 0.2,
+   "what": "pass 1: event round 1"
+  },
+  {
+   "job_s": 0.0,
+   "jobs": 898,
+   "longest_job_s": 0.0,
+   "records": 2444,
+   "s": 0.7,
+   "what": "pass 1: event round 2"
+  },
+  {
+   "job_s": 0.0,
+   "jobs": 998,
+   "longest_job_s": 0.0,
+   "records": 2366,
+   "s": 1.1,
+   "what": "pass 1: event round 3"
+  },
+  {
+   "job_s": 0.0,
+   "jobs": 1560,
+   "longest_job_s": 0.0,
+   "records": 5620,
+   "s": 1413.0,
+   "what": "pass 1: event round 4"
+  }
+ ],
+ "cpu_use": 1.68,
+ "domain_goals": "part1",
+ "elsewhere": true,
+ "frame_costs": false,
+ "goal": [
+  "owner:901",
+  "owner:902",
+  "owner:903"
+ ],
+ "k": null,
+ "live_locals": true,
+ "live_locals_units": {
+  "reads no local": 318,
+  "reads some locals, known": 255
+ },
+ "load_at_end": "13.56 14.31 14.57",
+ "load_at_start": "14.54 13.69 11.47",
+ "n_rooms": 31,
+ "n_units": 573,
+ "name": "part1",
+ "objects": 384,
+ "packed_bytes_so_far": 8388608,
+ "pass": 1,
+ "peak_rss_mb": 3269,
+ "reach": true,
+ "read_cpu_s": 2455.5,
+ "read_wall_s": 1463.4,
+ "records_in_pass": 10643,
+ "rooms": [
+  10,
+  28,
+  29,
+  30,
+  31,
+  33,
+  34,
+  35,
+  36,
+  37,
+  38,
+  41,
+  42,
+  43,
+  44,
+  48,
+  49,
+  51,
+  52,
+  53,
+  57,
+  58,
+  59,
+  60,
+  61,
+  62,
+  64,
+  76,
+  83,
+  85,
+  96
+ ],
+ "rss_peak_seen": {
+  "at": "pass 1, event round 4 (1560 jobs), 810 s",
+  "mb": 3219
+ },
+ "runs_done_in_finished_batches": 3589,
+ "setup_s": 0.18,
+ "slot_facts": 12169,
+ "slot_locals": 0,
+ "split_limit": true,
+ "start": "results/start-part1.jsonl seed 1",
+ "status": "stopped: MemAvailable fell under 3.0 GB",
+ "switches": [
+  "value_sets",
+  "draw_clears",
+  "actor_rooms",
+  "grow_limit"
+ ],
+ "threads": 3,
+ "units": {
+  "entry": 31,
+  "exit": 31,
+  "global": 94,
+  "local": 215,
+  "obj": 202
+ }
+}

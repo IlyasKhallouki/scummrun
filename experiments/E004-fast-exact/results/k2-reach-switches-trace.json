@@ -1,0 +1,334 @@
+{
+ "batches": [
+  {
+   "job_s": 0.1,
+   "jobs": 44,
+   "longest_job_s": 0.0,
+   "records": 88,
+   "s": 0.1,
+   "what": "pass 1: inputs"
+  },
+  {
+   "job_s": 0.6,
+   "jobs": 89,
+   "longest_job_s": 0.4,
+   "records": 169,
+   "s": 0.6,
+   "what": "pass 1: event round 1"
+  },
+  {
+   "job_s": 0.7,
+   "jobs": 508,
+   "longest_job_s": 0.0,
+   "records": 1705,
+   "s": 0.7,
+   "what": "pass 1: event round 2"
+  },
+  {
+   "job_s": 2.8,
+   "jobs": 998,
+   "longest_job_s": 0.1,
+   "records": 3567,
+   "s": 2.9,
+   "what": "pass 1: event round 3"
+  },
+  {
+   "job_s": 6.5,
+   "jobs": 764,
+   "longest_job_s": 1.3,
+   "records": 2842,
+   "s": 6.5,
+   "what": "pass 1: event round 4"
+  },
+  {
+   "job_s": 5.2,
+   "jobs": 881,
+   "longest_job_s": 1.8,
+   "records": 3008,
+   "s": 5.2,
+   "what": "pass 1: event round 5"
+  },
+  {
+   "job_s": 79.1,
+   "jobs": 17914,
+   "longest_job_s": 2.6,
+   "records": 63680,
+   "s": 80.9,
+   "what": "pass 1: later rounds (1022)"
+  },
+  {
+   "job_s": 0.0,
+   "jobs": 44,
+   "longest_job_s": 0.0,
+   "records": 88,
+   "s": 0.1,
+   "what": "pass 2: inputs"
+  },
+  {
+   "job_s": 0.1,
+   "jobs": 89,
+   "longest_job_s": 0.0,
+   "records": 169,
+   "s": 0.1,
+   "what": "pass 2: event round 1"
+  },
+  {
+   "job_s": 0.8,
+   "jobs": 508,
+   "longest_job_s": 0.0,
+   "records": 1705,
+   "s": 0.9,
+   "what": "pass 2: event round 2"
+  },
+  {
+   "job_s": 2.7,
+   "jobs": 998,
+   "longest_job_s": 0.1,
+   "records": 3567,
+   "s": 2.8,
+   "what": "pass 2: event round 3"
+  },
+  {
+   "job_s": 5.2,
+   "jobs": 764,
+   "longest_job_s": 0.9,
+   "records": 2842,
+   "s": 5.3,
+   "what": "pass 2: event round 4"
+  },
+  {
+   "job_s": 8.2,
+   "jobs": 881,
+   "longest_job_s": 3.0,
+   "records": 3024,
+   "s": 8.3,
+   "what": "pass 2: event round 5"
+  },
+  {
+   "job_s": 83.3,
+   "jobs": 17950,
+   "longest_job_s": 2.0,
+   "records": 65103,
+   "s": 85.2,
+   "what": "pass 2: later rounds (1022)"
+  }
+ ],
+ "cpu_use": 1.1,
+ "domain_goals": "part1",
+ "elsewhere": true,
+ "frame_costs": false,
+ "goal": [
+  "state:316"
+ ],
+ "k": 2,
+ "live_locals": true,
+ "live_locals_units": {
+  "reads no local": 143,
+  "reads some locals, known": 140
+ },
+ "load_at_end": "8.34 9.03 10.46",
+ "load_at_start": "8.11 9.41 10.90",
+ "n_rooms": 10,
+ "n_units": 283,
+ "name": "k2t",
+ "objects": 146,
+ "out_of_domain_keys": 0,
+ "outside_points": {},
+ "packed": {
+  "actions": 75942,
+  "args_values_zeroed": 22,
+  "bytes": 79726148,
+  "facts": 1738,
+  "file": "p1/k2/k2t.tc",
+  "finish_s": 0.63,
+  "folded": 556,
+  "sha1": "97ca22e0ad24e1ac30cdfa5592d1966e472b62b5",
+  "strings": 33380
+ },
+ "peak_rss_mb": 338,
+ "phases_s": {
+  "emit": 2.03,
+  "end of pass": 0.0,
+  "events": 4.83,
+  "events: event_pins": 4.55,
+  "events: replans": 0.04,
+  "runs": 199.52
+ },
+ "pool": {
+  "batches": 2056,
+  "job_s": 195.6,
+  "jobs": 42432,
+  "longest_jobs": [
+   [
+    2.96,
+    "event(script:2@736#b73c40199d58)",
+    1033
+   ],
+   [
+    2.6,
+    "event(script:2@736#b73c40199d58)",
+    7
+   ],
+   [
+    1.98,
+    "event(script:2@736#b73c40199d58)",
+    1035
+   ],
+   [
+    1.82,
+    "event(script:2@736#b73c40199d58)",
+    5
+   ],
+   [
+    1.32,
+    "event(obj:450@77#186649efdf4a)",
+    4
+   ],
+   [
+    1.17,
+    "event(obj:451@21#7ba1220ae5cc)",
+    4
+   ],
+   [
+    0.88,
+    "event(obj:451@21#7ba1220ae5cc)",
+    1032
+   ],
+   [
+    0.82,
+    "event(obj:450@77#186649efdf4a)",
+    1032
+   ],
+   [
+    0.82,
+    "event(obj:451@21)",
+    4
+   ],
+   [
+    0.68,
+    "event(obj:450@77)",
+    4
+   ],
+   [
+    0.6,
+    "event(obj:451@21)",
+    1032
+   ],
+   [
+    0.6,
+    "event(obj:450@77)",
+    1032
+   ],
+   [
+    0.43,
+    "event(script:2@736#5dde5b8d581)",
+    1
+   ],
+   [
+    0.4,
+    "esc(local:220@5516#56a7ecc31925)",
+    24
+   ],
+   [
+    0.38,
+    "event(local:218@136)",
+    14
+   ],
+   [
+    0.37,
+    "event(script:2@736#c92deaccd60d)",
+    6
+   ],
+   [
+    0.34,
+    "esc(local:220@5216#e4447e70c5b)",
+    1037
+   ],
+   [
+    0.34,
+    "event(script:2@736#84cff8c9fb99)",
+    1034
+   ],
+   [
+    0.33,
+    "esc(local:220@5516#f80af5444b8a)",
+    1052
+   ],
+   [
+    0.32,
+    "esc(local:220@5216#20a0de6b2f05)",
+    1052
+   ]
+  ],
+  "max_records_waiting": 440,
+  "merge_and_stream_s": 26.0,
+  "merge_counters_s": 1.62,
+  "snapshots_s": 0.55,
+  "split_parts_queued": 36,
+  "split_parts_run_elsewhere": 0,
+  "stream_records_s": 24.07,
+  "workers_sync_s": 0.75
+ },
+ "reach": true,
+ "read_cpu_s": 227.7,
+ "read_peak_rss_mb": 338,
+ "read_wall_s": 206.5,
+ "reader_counts": {
+  "event rounds": 1027,
+  "pass 1: domain values added for the next pass": 34,
+  "pass 1: records": 75059,
+  "pass 2: records": 76498,
+  "reach: branches and jobs still held at the end": 59775,
+  "reach: most branches held at once": 59775,
+  "reach: records of a rerun already written": 1711,
+  "reach: reruns": 1577,
+  "reach: values reached (facts written or seeded)": 14894,
+  "records": 76498
+ },
+ "records": 76498,
+ "records_by_kind": {
+  "dialog_line": 1971,
+  "event": 50308,
+  "sentence": 10520,
+  "skip_cutscene": 12799,
+  "walk_to": 900
+ },
+ "rooms": [
+  28,
+  29,
+  33,
+  34,
+  35,
+  38,
+  41,
+  83,
+  85,
+  96
+ ],
+ "rss_peak_seen": {
+  "at": "pass 2, event round 24 (224 jobs), 183 s",
+  "mb": 331
+ },
+ "setup_s": 0.1,
+ "sink_thread_busy_s": 12.4,
+ "slot_events": [],
+ "slot_facts": 6846,
+ "slot_locals": 0,
+ "split_limit": true,
+ "start": "results/start-part1.jsonl seed 1",
+ "status": "done",
+ "switches": [
+  "value_sets",
+  "draw_clears",
+  "actor_rooms"
+ ],
+ "threads": 1,
+ "total_s": 208.1,
+ "units": {
+  "entry": 10,
+  "exit": 10,
+  "global": 82,
+  "local": 91,
+  "obj": 90
+ }
+}

@@ -1,0 +1,119 @@
+{
+ "full_actions": 71058,
+ "reach_actions": 27617,
+ "d_keeps_of_full": 27633,
+ "d_keeps_of_reach": 27617,
+ "task": {
+  "actions_full": 25932,
+  "actions_reach": 25928,
+  "only_full": 21,
+  "only_reach": 17,
+  "labels_only_full": [
+   [
+    "event(script:2@759",
+    11
+   ],
+   [
+    "sentence(8,574)",
+    4
+   ],
+   [
+    "sentence(8,574)~frozen",
+    4
+   ],
+   [
+    "event(local:206@49)",
+    1
+   ],
+   [
+    "event(local:211@4)",
+    1
+   ]
+  ],
+  "labels_only_reach": [
+   [
+    "event(local:211@33",
+    8
+   ],
+   [
+    "sentence(8,574)",
+    4
+   ],
+   [
+    "sentence(8,574)~frozen",
+    4
+   ],
+   [
+    "event(local:207@23",
+    1
+   ]
+  ],
+  "facts_differ": {},
+  "facts_only_full": 88,
+  "facts_only_reach": 0
+ },
+ "kept_by_d_not_written": 17,
+ "written_not_kept_by_d": 8,
+ "values_full": 5906,
+ "values_reach": 5818,
+ "facts_only_in_full": {},
+ "facts_only_in_reach": {},
+ "n_facts_only_in_full_one_value": 88,
+ "values_only_full": {},
+ "values_only_reach": {},
+ "reader_values_differ_from_d": {},
+ "guesses_cut": 0,
+ "d_named_keeps_of_full": 27622,
+ "named_only_full": 6,
+ "named_only_reach": 8,
+ "named_only_full_labels": [
+  [
+   "sentence(8,574)",
+   3
+  ],
+  [
+   "sentence(8,574)~frozen",
+   3
+  ]
+ ],
+ "named_only_reach_labels": [
+  [
+   "sentence(8,574)",
+   4
+  ],
+  [
+   "sentence(8,574)~frozen",
+   4
+  ]
+ ],
+ "named_values_only_full": {},
+ "named_values_only_reach": {},
+ "kept_by_d_not_written_classes": {
+  "a job read otherwise (split or folded in one reading only)": 6,
+  "an event with a known list no kept record names (lemma 2)": 11
+ },
+ "only_full_labels": [
+  [
+   "event(script:2@759",
+   11
+  ],
+  [
+   "sentence(8,574)",
+   3
+  ],
+  [
+   "sentence(8,574)~frozen",
+   3
+  ]
+ ],
+ "only_reach_labels": [
+  [
+   "sentence(8,574)",
+   4
+  ],
+  [
+   "sentence(8,574)~frozen",
+   4
+  ]
+ ]
+}

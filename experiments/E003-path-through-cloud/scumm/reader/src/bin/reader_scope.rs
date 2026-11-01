@@ -5,14 +5,16 @@
 //!
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
-//!                     [--elsewhere] [--live-locals] [--golden FILE] [--max-files-gb G]
+//!                     [--elsewhere] [--live-locals] [--split-limit] [--golden FILE] [--max-files-gb G] [--frame-costs]
+//!                     [--step-limit N]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
 //! --out DIR     the report, DIR/NAME.json (and the packed file DIR/NAME.tc unless --packed)
 //! --cap-min M   stop the reading after M minutes (default 60); --max-rss-gb G (default 8) and --min-free-gb G
 //!               (MemAvailable, default 3) stop it too, and --max-files-gb G (the packed file and --golden's body
-//!               together, default no limit); the report then says where it stopped (exit code 3)
+//!               together, default no limit), and --max-cpu-s N (the reading's CPU seconds, all threads, default no
+//!               limit); the report then says where it stopped (exit code 3)
 //! --max-waiting N  records done and waiting for an earlier job past which workers start no new job but that
 //!               one (default 100,000: memory stays bounded when one job runs long)
 //! --hash        sha1 of the records' lines (golden.py's "record" lines, as made, before `_read_once`'s rewrite of
@@ -28,6 +30,29 @@
 //!               (resistant, owned, and whether it is recursive). Off by default. The report counts the scope's units
 //!               by what is known of their reads (`live_locals_units`), and the reading's head (--golden) lists each
 //!               slot's read locals, which packed_reading.py copies into reading.json.
+//! --split-limit the reader switch split_limit (PORT-NOTES.md, "The path limit"): a run past the path limit is
+//!               split on its first fork on a read until no part passes the limit, and a run that passes it with no
+//!               fact left to split on, or a path the step limit ended, stops the reading. Off by default (reader.py's
+//!               rule: some runs past the limit are not split, and the paths the limit ended are dropped).
+//! --reach       forward reachability (reach.rs, experiments/E004-fast-exact/reach.md): a job or a fork's branch that needs
+//!               a value not reached from the start does not run, and runs when the value arrives. Needs --split-limit.
+//!               Writes NAME.reached next to the packed file (taskcore --reached). Off by default.
+//! --reach-also FILE  a further start to read from (taskcore's --start-file format, key<TAB>value), with --reach;
+//!               given more than once, a start per file. Only int values are read, and `pos:`/`escpos:` come from the
+//!               file's `at:`/`esc:` facts (task.rs `task_start`), so a start from the engine is given as its facts.py
+//!               map (the replay harness's reach extension, replay_part1.py `--reach-extend`)
+//! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
+//!               draw_clears and actor_rooms, grow_limit, havoc_cut (havoc.rs), shared_runs (shared.rs). Not due_first,
+//!               which writes on the kept records after the reading. Off by default.
+//! --step-limit N  the rough reading (experiments/E004-fast-exact/rough-reading.md): every job read with the machine's
+//!               step limit N in place of its own (5,000); a path past N steps becomes a havoc record. Needs
+//!               --switches havoc_cut. The report counts the havoc records (`havoc_records`). Off by default.
+//! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
+//!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
+//! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
+//!               lower bound of its duration from the engine source, and the fold key holds the cost; the reading's
+//!               head (--golden) gives the parameters (`frame_costs`), which packed_reading.py copies into
+//!               reading.json. Off by default: every action costs 1, as before.
 //! --golden FILE golden.py's reader file streamed as the records are made, with no records kept: the head, one
 //!               "record" line per record (as made, before `_read_once`'s rewrite of folded lists, which changes only
 //!               `args:` values), the builder's counters; gzip. What packed_reading.py from-golden reads with the
@@ -114,6 +139,8 @@ struct Tee {
     body: Option<(PathBuf, GoldenPool)>,
     golden_threads: usize,
     kinds: BTreeMap<String, usize>,
+    /// the pass's records that end "havoc" (the switch havoc_cut)
+    havoc: usize,
     prog: Arc<Mutex<Prog>>,
 }
 
@@ -146,6 +173,7 @@ impl RecordSink for Tee {
             self.body = Some((path.clone(), GoldenPool::new(&path, self.golden_threads)));
         }
         self.kinds.clear();
+        self.havoc = 0;
         let mut p = self.prog.lock().unwrap();
         p.records = 0;
         p.pass += 1;
@@ -164,6 +192,9 @@ impl Tee {
                 h.update(b"\n");
             }
             *self.kinds.entry(r.kind.clone()).or_default() += 1;
+            if r.end.as_deref() == Some("havoc") {
+                self.havoc += 1;
+            }
         }
         self.prog.lock().unwrap().records = first + recs.len();
     }
@@ -433,18 +464,26 @@ fn main() {
     let max_rss_kb = (arg(&args, "--max-rss-gb").map_or(8.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let max_files_b = arg(&args, "--max-files-gb").map(|g| (g.parse::<f64>().unwrap() * 1073741824.0) as u64);
+    let max_cpu_s: Option<f64> = arg(&args, "--max-cpu-s").map(|c| c.parse().unwrap());
     let hash = args.iter().any(|a| a == "--hash");
     let keep = args.iter().any(|a| a == "--keep");
     let elsewhere = args.iter().any(|a| a == "--elsewhere");
     let live_locals = args.iter().any(|a| a == "--live-locals");
+    let split_limit = args.iter().any(|a| a == "--split-limit");
+    let frame_costs = args.iter().any(|a| a == "--frame-costs");
+    let reach = args.iter().any(|a| a == "--reach");
+    let pass2_reuse = args.iter().any(|a| a == "--pass2-reuse");
+    let step_limit: u32 = arg(&args, "--step-limit").map_or(0, |n| n.parse().expect("--step-limit N"));
+    let named = scumm_reader::builder::Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
+    assert!(!named.due_first, "--switches due_first: the records are streamed as made, and due_first writes on the kept records");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
     let report_path = out.join(format!("{name}.json"));
     let sample_n: usize = arg(&args, "--sample").map_or(0, |n| n.parse().unwrap());
     let dump = arg(&args, "--dump");
 
     let t_setup = Instant::now();
-    let doms = domains::build(&game, &domains::meta_rooms(&root), &start, &dom_goals);
-    let scope = Scope::of(&game, &rooms, &start);
+    let doms = domains::build_with(&game, &domains::meta_rooms(&root), &start, &dom_goals, named.scope());
+    let scope = Scope::of_with(&game, &rooms, &start, named.scope());
     let mut kinds: BTreeMap<&str, usize> = BTreeMap::new();
     for &u in &scope.units {
         let kind = match game.unit(u).key {
@@ -472,10 +511,17 @@ fn main() {
         "threads": threads,
         "elsewhere": elsewhere,
         "live_locals": live_locals,
+        "split_limit": split_limit,
+        "reach": reach,
+        "switches": named.names(),
+        "frame_costs": frame_costs,
         "cap_min": cap_s / 60.0,
         "load_at_start": loadavg(),
         "setup_s": 0.0,
     });
+    if step_limit != 0 {
+        base["step_limit"] = json!(step_limit);
+    }
     base["setup_s"] = json!((t_setup.elapsed().as_secs_f64() * 100.0).round() / 100.0);
     eprintln!(
         "[{name}] {} rooms {:?}, {} units, {} slot facts; {threads} threads; load {}",
@@ -489,12 +535,35 @@ fn main() {
     let mut b = Builder::new(&game, scope.clone(), doms);
     b.keep_records = keep;
     b.table.elsewhere = elsewhere;
+    b.switches = named;
+    b.switches.split_limit |= split_limit;
+    b.switches.reach |= reach;
+    b.switches.pass2_reuse |= pass2_reuse;
+    if step_limit != 0 {
+        b.switches.step_limit = step_limit;
+    }
+    if reach {
+        b.reach_starts.push(start.clone());
+        // every --reach-also, in the order given: the closure does not depend on the order (reach.md)
+        let also: Vec<&String> = args.windows(2).filter(|w| w[0] == "--reach-also").map(|w| &w[1]).collect();
+        for f in &also {
+            b.reach_starts.push(scumm_reader::reach::start_file(f));
+        }
+        if !also.is_empty() {
+            base["reach_also"] = json!(also);
+        }
+    }
     if live_locals {
         let ll = scumm_reader::locals::LiveLocals::of(&game);
         base["live_locals_units"] = json!(ll.counts(&game, &scope));
         b.table.live_locals = Some(Arc::new(ll));
     }
     b.slot_locals = slots;
+    if frame_costs {
+        let fc = scumm_reader::costs::FrameCosts::of(&game, &scope);
+        base["frame_costs_params"] = serde_json::from_str(&fc.py().text()).unwrap_or(Value::Null);
+        b.frame_costs = Some(Arc::new(fc));
+    }
     let prog = Arc::new(Mutex::new(Prog { pass: 1, ..Default::default() }));
     {
         let prog = prog.clone();
@@ -563,7 +632,11 @@ fn main() {
     }
     let mut tee = Tee {
         busy: 0.0,
-        stream: Some(RecordStream::create(&packed).expect("the packed file")),
+        stream: Some({
+            let mut st = RecordStream::create(&packed).expect("the packed file");
+            st.costs = b.frame_costs.clone();
+            st
+        }),
         hash: hash.then(sha1_smol::Sha1::new),
         body: golden.as_ref().map(|g| {
             let p = g.with_extension("body.gz");
@@ -572,6 +645,7 @@ fn main() {
         }),
         golden_threads,
         kinds: BTreeMap::new(),
+        havoc: 0,
         prog: prog.clone(),
     };
 
@@ -598,6 +672,8 @@ fn main() {
             }
             let why = if wall > cap_s {
                 Some(format!("the reading passed {:.0} minutes", cap_s / 60.0))
+            } else if max_cpu_s.is_some_and(|m| cpu_secs() - cpu0 > m) {
+                Some(format!("the reading passed {:.0} CPU s", max_cpu_s.unwrap()))
             } else if rss > max_rss_kb {
                 Some(format!("the process's RSS passed {:.1} GB", max_rss_kb as f64 / 1048576.0))
             } else if free < min_free_kb {
@@ -665,7 +741,16 @@ fn main() {
     let keys = stream.fact_keys();
     let goal_labels: Vec<(String, Vec<Label>)> = goal.iter().map(|(k, v)| (k.clone(), v.iter().map(|&x| Label::Int(x)).collect())).collect();
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+    let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
     let (info, folded) = stream.finish(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+    let reached_path = packed.with_extension("reached");
+    if let Some(reached) = &b.table.reach {
+        std::fs::write(&reached_path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").expect("the reached values");
+        eprintln!("[{name}] reached values: {}", reached_path.display());
+    } else {
+        // an older reading's, under this packed file's name
+        std::fs::remove_file(&reached_path).ok();
+    }
     let fin_s = t_fin.elapsed().as_secs_f64();
     let packed_sha1 = {
         let mut h = sha1_smol::Sha1::new();
@@ -697,8 +782,11 @@ fn main() {
     r["status"] = json!("done");
     r["records"] = json!(b.n_records);
     r["records_by_kind"] = json!(tee.kinds);
+    if b.switches.havoc_cut {
+        r["havoc_records"] = json!(tee.havoc);
+    }
     let pass_counts: BTreeMap<String, i64> =
-        b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
+        b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
     r["outside_points"] = json!(b
@@ -739,6 +827,26 @@ fn main() {
         "max_records_waiting": stats.max_buffered,
         "longest_jobs": stats.longest.iter().map(|(s, l, b)| json!([(s * 100.0).round() / 100.0, l, b])).collect::<Vec<_>>(),
     });
+    if let Some(m) = &b.table.memo {
+        let n = |a: &std::sync::atomic::AtomicU64| a.load(std::sync::atomic::Ordering::Relaxed);
+        r["pass2_reuse"] = json!({
+            "reused": n(&m.reused),
+            "ran_job_differs": n(&m.stale_job),
+            "ran_widened_fact": n(&m.stale_domain),
+            "ran_folded_list": n(&m.stale_list),
+            "ran_reached_value": n(&m.stale_reached),
+            "ran_not_in_pass_1": n(&m.none),
+        });
+    }
+    if let Some(sh) = &b.table.shared {
+        let n = |a: &std::sync::atomic::AtomicU64| a.load(std::sync::atomic::Ordering::Relaxed);
+        r["shared_runs"] = json!({
+            "made": n(&sh.made),
+            "taken": n(&sh.taken),
+            "not_kept": n(&sh.not_kept),
+            "waited_s": (n(&sh.waited_ns) as f64 / 1e7).round() / 100.0,
+        });
+    }
     r["sink_thread_busy_s"] = json!((tee.busy * 10.0).round() / 10.0);
     r["phases_s"] = json!(b.phase_secs.iter().map(|(k, v)| (k.to_string(), (v * 100.0).round() / 100.0)).collect::<BTreeMap<_, _>>());
     {

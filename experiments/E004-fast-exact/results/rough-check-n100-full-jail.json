@@ -1,0 +1,250 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 178,
+      "s": 0.0,
+      "what": "pass 1: event round 1"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 141,
+      "longest_job_s": 0.0,
+      "records": 272,
+      "s": 0.0,
+      "what": "pass 1: event round 2"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 88,
+      "longest_job_s": 0.0,
+      "records": 176,
+      "s": 0.0,
+      "what": "pass 1: event round 3"
+    }
+  ],
+  "cap_min": 20.0,
+  "counters_sha1": "29196f94d1b8edb279496136b9d8e42f872a5864",
+  "cpu_use": 3.37,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "state:316"
+  ],
+  "havoc_records": 0,
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 22,
+    "reads some locals, known": 32
+  },
+  "load_at_end": "12.23 11.73 7.13",
+  "load_at_start": "12.23 11.73 7.13",
+  "n_rooms": 2,
+  "n_units": 54,
+  "name": "jail",
+  "objects": 27,
+  "out_of_domain_keys": 0,
+  "outside_points": {},
+  "packed": {
+    "actions": 683,
+    "args_values_zeroed": 0,
+    "bytes": 185928,
+    "facts": 194,
+    "file": "/home/ilyask/fast-mi/rough-out/check100/full/jail.tc",
+    "finish_s": 0.0,
+    "folded": 31,
+    "sha1": "aa3365bafc05946cf182ee33030102590c9b47a3",
+    "strings": 926
+  },
+  "peak_rss_mb": 150,
+  "phases_s": {
+    "emit": 0.0,
+    "end of pass": 0.0,
+    "events": 0.0,
+    "events: event_pins": 0.0,
+    "events: replans": 0.0,
+    "runs": 0.09
+  },
+  "pool": {
+    "batches": 4,
+    "job_s": 0.3,
+    "jobs": 362,
+    "longest_jobs": [
+      [
+        0.04,
+        "event(script:23@409)",
+        1
+      ],
+      [
+        0.02,
+        "esc(obj:429@235#acd44700b627)",
+        2
+      ],
+      [
+        0.02,
+        "event(script:2@915)",
+        2
+      ],
+      [
+        0.02,
+        "event(script:2@736)",
+        1
+      ],
+      [
+        0.0,
+        "sentence(4,426)",
+        0
+      ],
+      [
+        0.0,
+        "sentence(4,426)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "sentence(4,428)~frozen",
+        3
+      ],
+      [
+        0.0,
+        "sentence(3,426)",
+        0
+      ],
+      [
+        0.0,
+        "sentence(4,426,427)",
+        0
+      ],
+      [
+        0.0,
+        "sentence(5,426)",
+        0
+      ],
+      [
+        0.0,
+        "sentence(2,426)",
+        0
+      ],
+      [
+        0.0,
+        "event(script:2@736#d897055c2f2e)",
+        1
+      ],
+      [
+        0.0,
+        "sentence(4,429)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "sentence(4,427)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "sentence(4,428)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "event(obj:429@327)",
+        2
+      ],
+      [
+        0.0,
+        "sentence(4,426)~frozen",
+        3
+      ],
+      [
+        0.0,
+        "sentence(4,427)",
+        2
+      ],
+      [
+        0.0,
+        "sentence(4,426)",
+        3
+      ],
+      [
+        0.0,
+        "esc(obj:429@235)",
+        2
+      ]
+    ],
+    "max_records_waiting": 233,
+    "merge_and_stream_s": 0.01,
+    "merge_counters_s": 0.0,
+    "snapshots_s": 0.0,
+    "split_parts_queued": 0,
+    "split_parts_run_elsewhere": 0,
+    "stream_records_s": 0.01,
+    "workers_sync_s": 0.01
+  },
+  "reach": true,
+  "read_cpu_s": 0.4,
+  "read_peak_rss_mb": 150,
+  "read_wall_s": 0.1,
+  "reader_counts": {
+    "event rounds": 3,
+    "pass 1: records": 714,
+    "reach: branches and jobs still held at the end": 822,
+    "reach: most branches held at once": 822,
+    "reach: records of a rerun already written": 179,
+    "reach: reruns": 180,
+    "reach: values reached (facts written or seeded)": 3940,
+    "records": 714
+  },
+  "records": 714,
+  "records_by_kind": {
+    "event": 184,
+    "sentence": 480,
+    "skip_cutscene": 2,
+    "walk_to": 48
+  },
+  "records_sha1": "2515b4f6d2d55dd8056b943378bf065721c37b0d",
+  "rooms": [
+    31,
+    33
+  ],
+  "rss_peak_seen": {
+    "at": "",
+    "mb": 0
+  },
+  "setup_s": 0.06,
+  "sink_thread_busy_s": 0.0,
+  "slot_events": [],
+  "slot_facts": 2093,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "done",
+  "switches": [
+    "value_sets",
+    "draw_clears",
+    "actor_rooms",
+    "grow_limit",
+    "havoc_cut",
+    "havoc_starts"
+  ],
+  "threads": 5,
+  "total_s": 0.3,
+  "units": {
+    "entry": 2,
+    "exit": 2,
+    "global": 24,
+    "local": 14,
+    "obj": 12
+  }
+}

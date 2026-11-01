@@ -59,6 +59,9 @@ pub const VAR_SENTENCE_SCRIPT: i32 = 33;
 pub const VAR_INVENTORY_SCRIPT: i32 = 34;
 pub const VAR_CUTSCENE_START_SCRIPT: i32 = 35;
 pub const VAR_CUTSCENE_END_SCRIPT: i32 = 36;
+/// actorFollowCamera's note for the inventory hook run it does not make (the reader's havoc_cut reads it as that hook)
+pub const SECOND_INVENTORY_HOOK: &str =
+    "a second inventory hook run when the followed actor changed (camera.cpp:207-208) is not run: camera._follows is not a fact";
 pub const VAR_WALKTO_OBJ: i32 = 38;
 pub const VAR_CURSORSTATE: i32 = 52;
 pub const VAR_USERPUT: i32 = 53;
@@ -2056,8 +2059,7 @@ impl<'g> Machine<'g> {
                     let tail = [
                         Step::ScrollNote,
                         Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, int0)] },
-                        Step::Note(rc("a second inventory hook run when the followed actor changed (camera.cpp:207-208) \
-                                       is not run: camera._follows is not a fact")),
+                        Step::Note(rc(SECOND_INVENTORY_HOOK)),
                     ];
                     let change = |m: &mut Self, q: &mut Path| {
                         let r = match aroom {

@@ -53,6 +53,7 @@ impl Replay {
                 forks: Counter::from_py(rd.get("forks")),
                 fork_keys: Counter::from_py(rd.get("fork_keys")),
             },
+            ..Default::default()
         };
         (out, at)
     }

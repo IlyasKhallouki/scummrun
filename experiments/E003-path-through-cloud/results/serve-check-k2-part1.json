@@ -1,0 +1,120 @@
+{
+ "name": "k2-part1",
+ "packed": "/var/tmp/fast-mi/partI-scratch/k2-on.tc",
+ "args": [],
+ "server_ready_s": 178.63,
+ "hello": {
+  "task": "/var/tmp/fast-mi/partI-scratch/k2-on.tc",
+  "input_actions": 531174,
+  "facts": 2252,
+  "seconds_load": 178.6207,
+  "cpu_seconds": 61.6246,
+  "rss": 1276973056,
+  "peak_rss": 1279664128
+ },
+ "server_max_rss_mb": 2379.8,
+ "rows": [
+  {
+   "i": 0,
+   "req": {
+    "start": "/var/tmp/fast-mi/noreload-scratch/k2-starts/start-0.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 88.305,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 80.6827,
+     "seconds": 88.3038,
+     "cpu_seconds": 60.1936,
+     "peak_rss": 2498039808,
+     "rss": 1842253824
+    },
+    "error": null
+   },
+   "old": {
+    "seconds": 194.874,
+    "cpu_seconds": 108.207,
+    "max_rss_mb": 2373.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "bd9f4322da269f33"
+  },
+  {
+   "i": 1,
+   "req": {
+    "start": "/var/tmp/fast-mi/noreload-scratch/k2-starts/start-1.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 2.455,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 2.4535,
+     "cpu_seconds": 1.9739,
+     "peak_rss": 1473642496,
+     "rss": 1473642496
+    },
+    "error": null
+   },
+   "old": {
+    "seconds": 272.38,
+    "cpu_seconds": 115.675,
+    "max_rss_mb": 2379.6,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "bd9f4322da269f33"
+  },
+  {
+   "i": 2,
+   "req": {
+    "start": "/var/tmp/fast-mi/noreload-scratch/k2-starts/start-0.txt",
+    "bans": "/var/tmp/fast-mi/noreload-scratch/ban-A.txt",
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 77.299,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 69.6175,
+     "seconds": 77.2976,
+     "cpu_seconds": 56.875,
+     "peak_rss": 2495369216,
+     "rss": 1844404224
+    },
+    "error": null
+   },
+   "old": {
+    "seconds": 177.019,
+    "cpu_seconds": 115.492,
+    "max_rss_mb": 2418.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "bd9f4322da269f33"
+  }
+ ]
+}

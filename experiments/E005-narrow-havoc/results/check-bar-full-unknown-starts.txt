@@ -1,0 +1,6 @@
+"unknown-target writes left out and listed on the record (no candidate list): runInputScript":6490
+"unknown-target writes left out and listed on the record (no candidate list): startObject":7
+"unknown-target writes left out and listed on the record (no candidate list): startScript":176
+"unknown-target writes left out and listed on the record (with a candidate list): VerbOps":155
+"unknown-target writes left out and listed on the record (with a candidate list): drawObject":5142
+"unknown-target writes left out and listed on the record (with a candidate list): startObject":177

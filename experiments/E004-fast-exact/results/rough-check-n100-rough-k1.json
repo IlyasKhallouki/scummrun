@@ -1,0 +1,81 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 169,
+      "s": 0.2,
+      "what": "pass 1: event round 1"
+    }
+  ],
+  "cap_min": 20.0,
+  "cpu_use": 4.93,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "state:316"
+  ],
+  "k": 1,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 60,
+    "reads some locals, known": 80
+  },
+  "load_at_end": "13.72 12.19 7.50",
+  "load_at_start": "12.93 11.93 7.29",
+  "n_rooms": 4,
+  "n_units": 140,
+  "name": "k1",
+  "objects": 86,
+  "packed_bytes_so_far": 2097152,
+  "pass": 1,
+  "peak_rss_mb": 8282,
+  "reach": true,
+  "read_cpu_s": 118.3,
+  "read_wall_s": 24.0,
+  "records_in_pass": 2095,
+  "rooms": [
+    28,
+    33,
+    35,
+    38
+  ],
+  "rss_peak_seen": {
+    "at": "pass 1, event round 2 (4906 jobs), 24 s",
+    "mb": 8282
+  },
+  "runs_done_in_finished_batches": 133,
+  "setup_s": 0.06,
+  "slot_facts": 4024,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "stopped: the process's RSS passed 8.0 GB",
+  "step_limit": 100,
+  "switches": [
+    "value_sets",
+    "draw_clears",
+    "actor_rooms",
+    "grow_limit",
+    "havoc_cut",
+    "havoc_starts"
+  ],
+  "threads": 5,
+  "units": {
+    "entry": 4,
+    "exit": 4,
+    "global": 42,
+    "local": 48,
+    "obj": 42
+  }
+}

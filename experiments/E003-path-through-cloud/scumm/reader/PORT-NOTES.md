@@ -573,6 +573,164 @@ replan. The control's one replan (frame 6376) starts with 1 live slot at args 0 
 from its dumped locals and flags, and then 0 slots are at args 0 (local 202 and global 23 match a built list). Both
 verify from boot with 0 differences (results/replay-part1-bar-door-ll.log).
 
+## The path limit: split until no part passes it, as a switch
+
+**The finding** (Part I attempt 2 on the VM, results/vm-part1-2-*.json, and a diagnosis on the laptop). The machine
+ends a path where a fork would pass PATH_LIMIT (1,024 paths): neither side runs, the path ends "limit"
+(scumm-machine `machine.rs`, `drive`). reader.py's `Builder.run` then splits such a run on its first fork on a read,
+but not when the run forked more on non-facts than on facts, and not past SPLIT_DEPTH (2) levels or SPLIT_BUDGET (4)
+parts; DROP_ENDS drops the paths that end "limit". So every state of a run that only a cut path covered has no
+record. In the bar with room 35 (rooms 33, 28 and 35, seed 1, `--elsewhere --live-locals`), room 35 makes the classes
+of the kitchen door and var:196 facts, and the event that walks through the door (`event(script:2@736...)`, the
+sentence script's wait after the walk) makes 1,024 paths in pass 2 and cuts 532 (506 forks on read, 1,353 on
+non-facts: not split). The start's case (classes 15 and 16 of the door at 0) is among the cut ones: no record writes
+room 28 from the start, and the delete relaxation reaches rooms 33 and 35 only, against 33, 28 and 38 with room 38
+in place of 35. At k = 1, 30,065 paths are cut and 101 runs are refused by the non-fact rule; in the Part I scope
+every walk through a door of room 33 is cut, and from the start the relaxation reaches rooms 33 and 38 only.
+
+**The rule** (`Builder::run_split`, switch `split_limit`; reader-scope `--split-limit`, reader-port
+`--switches split_limit`). A run past the path limit is run again once per value of its first fork on a read (the
+values its precondition leaves), that fact pinned; a part that passes the limit is split again, with no cap on depth
+or parts and whatever its forks on non-facts. A part that passes the limit with no fact left to split on stops the
+reading (a panic naming the job), and so does a path the step limit ended (STEP_LIMIT, 5,000 steps; with no path
+cut by the path limit, every "limit" end is the step limit's, so the machine needs no change). Why it is exact: in
+any state the engine runs one path of the job; the parts' preconditions divide the job's states by the pinned fact's
+values, so they do not overlap and together cover them, and each part runs the same code with that fact known. So
+the parts' records cover every state the job can start in. Each record of a part carries the pinned value in its
+precondition, also when its path never read that fact.
+
+What it changes besides: with the switch the machine half hands over no path of a run the limit cut
+(`Reader::run`), since the Builder splits it and reads none of them; the counters gain "split_limit: runs split at
+depth N" and "split_limit: parts run"; "paths ended by the path limit" stays 0.
+
+**With the switch off** the reading is reader.py's: the Builder and the machine half take the old branches, and the
+goldens are unchanged (below).
+
+Measured (stuck, 2026-10-26; the laptop at load 10 to 20 from other jobs; results/split-limit-checks.log):
+
+- **Off, unchanged.** The reader's fast tests (20 unit, 21 oracle with room 33's goldens, 6 fix_round1) and the
+  kitchen's nine oracle tests (`--ignored`: the reading against golden.py's, over the captured runs and with the Rust
+  machine half, on threads, the SAS files against write_sas) pass. k = 2 with `--elsewhere --live-locals` gives the
+  committed packed file (sha1 39200a67). The machine crate is unchanged.
+- **Room 33 with the limit at 32** (tests/split_limit.rs): the cut reading has 806 records and reaches 363 (fact,
+  value) pairs ignoring deletes; the split one 900 records, 18 splits, and 364 pairs, the uncut reading's (878
+  records). At 24 and below a part passes the limit on non-fact forks alone and the reading stops.
+- **The kitchen** (s17): 2 runs passed the limit (318 paths cut), both `sentence(8,574)`; with the switch each is
+  split once into 5 parts (on var:102), 0 cut. 72,220 records against 72,256, and only those two runs' records
+  change, 108 of each into 90: with var:102 pinned, the paths the full run kept apart on a non-fact test
+  (`Var[103] == Local[2]`) merge, and the part writes var:102 as a guess of both values. The delete relaxation
+  applies 27,910 actions against 27,912 and reaches the same rooms; taskcore keeps 12,027 actions (12,029), and
+  lama-first gives the same 10 steps. With due_first, value_sets, draw_clears, actor_rooms, `--elsewhere` and `--live-locals` too: 71,242
+  records against 71,278, 11,975 actions against 11,977, the same 10 steps.
+- **Rooms 33, 28 and 35 from seed 1** (`--elsewhere --live-locals`): 269,868 actions (208,950 without the switch),
+  packed sha1 28abab45; 921 splits in the last pass, 8 levels deep; 0 paths cut. Room 28 and state:316 = 1
+  are reached ignoring deletes. 1,840 CPU s and 2.2 GB on 6 threads, against 744 CPU s and 0.9 GB without.
+- **k = 1** (`--elsewhere --live-locals`, goal state:316 = 1): 299,617 records (237,465 without), 973 splits, 0 cut.
+  taskcore's (d) no longer proves the goal unreachable: reductions a-d keep 31,939 actions (16,052 without, and
+  unsolvable); all reductions keep 24,059 (67,234 operators), and lama-first finds 6 steps: open the bar door, the
+  sentence script's two waits, walk through the kitchen door, the cook's timer at 4 and 33. 2,164 CPU s and 1.8 GB
+  on 5 threads, against 570 CPU s and 1.1 GB without.
+- **k = 2** (`--elsewhere --live-locals`, 6 threads, the laptop alone): not measured. Pass 1's inputs took 2,143 s for
+  253,933 records (off: 227 s, 163,981 records). The reading was stopped at 3,517 s wall and 17,733 CPU s, inside pass
+  1's event round 1 (off: 363 s). Pass 2 takes about what pass 1 takes, so the two passes project past 8,000 s.
+
+## Forward reachability: the switch `reach`
+
+`reach` (reader-scope `--reach`, reader-port `--switches reach`), off by default, needs `split_limit`. The proof is in
+`experiments/E004-fast-exact/reach.md`. With it off, none of `reach.rs` runs, `read_once` takes its old path and
+`on_fork` makes its groups as before.
+
+- `reach.rs`: `Reached`, the values reached with the round each arrived in, shared with the workers and written only
+  between batches. `ReachState`, what waits on what, on the reading's thread.
+- `read_once_reach` replaces the rounds of `read_once`. A batch reads one round's values, so the reading is the same for
+  any number of threads. The inputs run first and the start's events after them, as in `read_once`.
+- `machine.rs` `on_fork` asks `reach_groups` which groups to follow. A group that meets no reached value is sent back as
+  a `Held` in `RunOut.held`, with its guide. If no group is left the path ends "no value", which the Builder drops as it
+  drops any such path. Paths of different preconditions never merge (`join`'s signature holds the whole of `pre`), so
+  this changes nothing else in the run.
+- `Builder::run`: `reach_path` holds a path whose precondition as a record does not meet (two sets on one unit), before
+  a record is made of it. `reach_record` then decides on the action's precondition, and in a rerun drops what the round
+  before already met. `run_split` makes parts only for the values reached.
+- The precondition on `args:X` is always written under the switch (`pin`, `record`).
+- `NAME.reached` next to the packed file, which taskcore reads on its own. `Builder::reach_extend` goes on from a new start.
+
+`pass2_reuse` (reader-scope `--pass2-reuse`, reader-port `--switches pass2_reuse`), off by default, needs worker threads.
+The proof is in `experiments/E004-fast-exact/pass2-reuse.md`. `memo.rs` keeps each run of pass 1 with what it depended on
+(`RunLog`). `Builder::run_job` takes a run of pass 2 from there when all of it agrees. `machine.rs` logs through `info`.
+The output is byte for byte the same; the peak memory holds pass 1's records.
+
+## A run past the limit with no fact to split on: the switch `grow_limit`
+
+`grow_limit` (reader-scope `--switches grow_limit`, reader-port `--switches grow_limit`), off by default, needs
+`split_limit`. Under `split_limit` a part that passes the path limit with no fact left to split on stops the reading.
+With `grow_limit` the run is read again whole with the limit 4 times larger (`Machine::set_path_limit`), up to
+GROW_MAX (16,384), and the reading stops only past that. Why it is exact: the limit only ends paths, so a run it cuts
+nothing of is the whole run, and its records cover every state it can start in, as an uncut run's do. Parts of a split
+under the larger limit run on the worker that split, in order (no prefetch), so the reading does not depend on the
+number of threads. The counter "grow_limit: runs read again with the path limit at N" counts them.
+`tests/grow_limit.rs`: a run of 5,000 paths is read whole at 16,384; off, or past GROW_MAX, the reading stops.
+
+Under `reach`, a fork reached again on another path of the same run holds the same branch again. `reach_groups`
+keeps each held branch once per run, where it was first held (`held_seen`). The waits were already a set
+(`add_wait`), in the order first held, so the output is unchanged: the bar's packed sha1s with and without fix round
+1's switches are the same (00960d7d, 1da422ac).
+
+reader-scope `--switches S,...` takes reader switches by name as reader-port does (value_sets, draw_clears,
+actor_rooms, grow_limit; not due_first). `READER_TRACE=1` writes to stderr each job's start, each split down to depth
+8, each run of 1 s or more with its paths, cut paths, held branches and largest counters, and each job of 1 s or more.
+
+## A path the step limit ended: the switch `havoc_cut`
+
+`havoc_cut` (reader-scope and reader-port `--switches havoc_cut`), off by default, needs `split_limit`. The rule and its
+proof are in `experiments/E004-fast-exact/havoc-cut.md`. Under it the machine half hands over a path the step limit
+ended whole, with `PathOut.cut`: the frames on its stack and the engine steps its calls have not run (`machine.rs`
+`cut_of`). `Builder::run` makes each such path one havoc record (`havoc.rs`) in place of stopping the reading: the
+path's own record, then for each fact the code it can still run may write (`havoc::closure`, `scope_writes_code` and
+`havoc::sites`) one of the constants written or no change, as cases on the current value, else a guess over the
+domain; for each slot of that code any wait point or none, the list 0, and an event with unknown locals at each wait
+point; end "havoc". `READER_TRACE` prints each one (`havoc LABEL: N units, N effects, N events; at ...; pending
+...`). Off, no line changes; on, a reading with no step-limit path writes the same files (`tests/havoc_cut.rs`, the
+five check scopes).
+
+## Clicks that differ only in their verb: the switch `shared_runs`
+
+`shared_runs` (`--switches shared_runs`), off by default. Claim and proof: `experiments/E004-fast-exact/shared-runs.md`.
+`machine::Reader::run` keys a click's run by its pins, precondition and guides with the verb taken out; within a batch
+the first run is made, checked (no read of `Local[1]` before a write, `shared::arg_written`; no read or write of
+another dialog verb; no kept list with the argument) and kept, and later jobs with the key take it renamed
+(`shared::rename`). A key whose run was not kept runs at once in later batches. The output is byte for byte the same
+(`tests/shared_runs.rs`, the five check scopes); reader-scope's report gives `shared_runs` counts.
+
+## Frame costs, as a switch
+
+**The finding.** Every action cost 1 (build_task's `cost: 1`), so the planner minimized records, not game time. The
+step 5 kitchen run took 13,141 frames (1,095 s) for a 7-step plan.
+
+**The switch**: `--frame-costs` (`reader-port read`, `reader-scope`), off by default; `Builder.frame_costs` and
+`RecordStream.costs` (`costs.rs`). Each record gets a cost in engine frames that is a lower bound of its own duration,
+from the engine source and the scripts (the rule and its source lines are in `costs.rs`' module docstring):
+
+- an input: one frame per key or click the harness plays (a sentence 2, or 3 with B; a walk, a dialog line, an Esc 1);
+- an event: the frames from its slot's yield to its turn: breakHere 1; delay N `floor(N / dmax) + 1`; delayVariable
+  the same with the event's value, or the least value of the last assignment on the straight code before it;
+  WaitForMessage after a talk on text slot 0 on the straight code before it `sum over parts of max(1, ceil((60 + n *
+  VAR_CHARINC) / dmax)) + 1`; any other wait 1;
+- `dmax` = VAR_TIMER_NEXT (at most 15) where no unit of the scope writes it, else 15; VAR_CHARINC likewise, else each
+  message part counts 1 frame.
+
+Every cost is at least 1, so taskcore's soundness notes (costs of at least 1) still hold. The cost goes into build_task's
+fold key (`task::fold_key_cost`, `fold_hash_cost`, `fold_parts_cost`): two records that differ only in cost stay two
+actions. The packed format already had a cost word. The reading's head gets the parameters (`frame_costs`), which
+`packed_reading.py from-golden` copies into reading.json; the records are unchanged.
+
+**With the switch off** every output is as before: the kitchen reading's packed file is byte for byte main's
+(`reader-port read kitchen --packed`, sha1 279b7a24, the same with the binary built from main), and the reading equals
+golden.py's (72,258 lines, 0 differences). **With it on** the records still equal golden.py's (the head's
+`frame_costs` key left out of the comparison), and the kitchen gives the same 71,729 actions (527 folded): no two of
+its records differ in cost alone. `tests/frame_costs.rs` checks the kitchen's clock (dmax 5, VAR_CHARINC 0 at S1#7)
+and its wait points, and costs every golden record (each at least 1; the cook's timer, room 28's local 211 at
+[0021], at least 361 frames).
+
 ## Python behaviours kept on purpose, and the differences
 
 1. **The scope-1 finding, kept with the switch off.** `Builder.positions` turns a write of
@@ -734,12 +892,31 @@ for the kitchen's. `room33_slot_locals` is the thirteenth fast test.
   --reread`, which runs reader-scope and `reading_from_golden`). On rooms 33 and 28 from seed 1, reader-scope's reading
   equals the Python reader's action for action (66,106 records, 65,592 actions) in 30 s on 3 threads (Python: 2,434 s).
 
+## F1c (switch input_settled)
+
+Off by default; with it off no job, run or path changes (`Builder::settled_jobs`, `FactTable.settled`, the machine half's
+`f1c_*` steps are not reached, and a join hashes as before). The rule, with its engine lines, is fix-round1.md's F1c.
+scumm-machine and scumm-ir have no change: the click's steps are the reader's hooks on the machine (`eng`, `op`, `getter`).
+
+- `inputs.rs` reads the plain input script, the hover and the variables' roles from the IR (`settled_rule`). No number.
+- `settled_jobs` splits each sentence and walk on var:32: a plain value is today's job with var:32 pinned; another value n
+  is a job labelled `[n]` with the hover's and the guards' pins, and the pin `SETTLED_PIN` (no fact has that name, so it stays
+  in the Builder; a split keeps it). The record's source stays `What::Sentence`, so the harness plays it as it plays today's.
+- `Reader::run_full` runs such a job as steps: `f1c_click` for A (and B), `f1c_end`. A path's `settled_target` and `queued`
+  are in its join's signature.
+- A waiting slot's constants sit in its list of locals from `SETTLED_LOCAL` (1000) up: `f1c_carry` adds them, the list's
+  number covers them, `LiveLocals::keep` keeps them and `eng_resume_at` writes them on the later turn's path.
+
 ## Files
 
 - `src/`: the modules above; `src/bin/reader_port.rs` (`reader-port static | records NAME | replay NAME |
   runs NAME | dump-runs NAME --runs N,... | read NAME [--switches S] [--live-locals] [--elsewhere] | task --out DIR |
   stream --out FILE | bench-task --out DIR | bench | due-engine FRAMES`).
-- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens.
+- `tests/oracle.rs`: the comparisons as tests; `tests/fix_round1.rs`: fix round 1's switches against their goldens;
+  `tests/split_limit.rs`: the switch split_limit (a fake machine for the rule; room 33 with the limit lowered; rooms 33,
+  28 and 35 from seed 1, ignored).
+  `tests/frame_costs.rs`: the switch `--frame-costs` (`src/costs.rs`) on the kitchen.
+  `tests/input_settled.rs`: the switch input_settled on single jobs (fix-round1.md, F1c).
 - `../../reader_port_oracle.py`: the Python oracles (new file; no existing .py file changed).
 - `../../reader_run_dump.py`: chosen runs made again in Python and written whole (new file).
 - `../machine/src/machine/hooks.rs`: the hook points (Machine changes, above).

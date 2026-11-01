@@ -25,6 +25,8 @@ pub const VAR_EGO: i32 = 1;
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
 /// The Reader's counters the Builder reads to decide a split.
+/// The switch grow_limit: the largest path limit a run is read again with before the reading stops.
+pub const GROW_MAX: usize = 16_384;
 pub const FORKS_ON_READ: &str = "forks on read";
 pub const FORKS_ON_NONFACTS: &str = "forks on non-fact tests";
 
@@ -85,6 +87,11 @@ pub struct RunOut {
     pub first_fork: Option<String>,
     /// the Reader's counters' increments during the run (keys added with 0 included)
     pub rd: RdCounts,
+    /// the switch --reach: the branches this run held back (reach.rs)
+    pub held: Vec<crate::reach::Held>,
+    /// the switch pass2_reuse, in pass 1: the facts the machine half consulted, and its questions (memo.rs)
+    pub touched: Vec<String>,
+    pub queries: Vec<crate::memo::Query>,
 }
 
 /// What the machine-dependent half provides: one run of an input or event (reader.py `Reader.run_sentence_sym`,
@@ -103,6 +110,10 @@ pub trait Machine {
     /// The runs a split is about to make, in its order (`Builder.run`'s parts): a machine may start them early
     /// (par.rs) and give each one's result to the `run` call for it. The default does nothing.
     fn prefetch(&mut self, _cx: &Ctx, _label: &str, _runs: &[(Pins, Pre)], _what: &What) {}
+
+    /// The switch grow_limit: the path limit of the runs that follow, 0 for the machine's own. The default does
+    /// nothing.
+    fn set_path_limit(&mut self, _n: usize) {}
 }
 
 /// What the Builder's counters and sets gained while one job ran (in a worker's Builder, par.rs), merged into the
@@ -123,6 +134,8 @@ pub struct Deltas {
     pub sig_ids: BTreeMap<i64, BTreeSet<String>>,
     /// the `args:` values `record` added to the table (`table.args_vals`), in order
     pub args: Vec<(String, i64)>,
+    /// the switch --reach: the branches the job held back
+    pub held: Vec<crate::reach::Held>,
 }
 
 /// One job's records and what it added to the Builder (par.rs).
@@ -153,6 +166,9 @@ pub struct Ctx<'a> {
     pub game: &'a Game,
     pub scope: &'a Scope,
     pub table: &'a FactTable,
+    /// the switch --reach: the identity of the job being run (reach.rs `job_key`), by which its guides are found;
+    /// None: no guides
+    pub job_key: Option<&'a str>,
 }
 
 /// The next round's events as the records of a batch give them, in their order, each once: a later event with the
@@ -160,13 +176,13 @@ pub struct Ctx<'a> {
 /// (its replan copy is the earlier one's, `_limit` gives it the same key, and `events_done` then skips it), so it is
 /// not kept (at Part I's scale the inputs' records name millions of events, a few tens of thousands of them distinct).
 #[derive(Default)]
-struct NextEvents {
-    events: Vec<Event>,
+pub(crate) struct NextEvents {
+    pub(crate) events: Vec<Event>,
     seen: FxHashSet<(String, UnitKey, i64, i64, bool)>,
 }
 
 impl NextEvents {
-    fn add(&mut self, recs: &[Record]) {
+    pub(crate) fn add(&mut self, recs: &[Record]) {
         for r in recs {
             for e in &r.next_events {
                 if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
@@ -196,6 +212,48 @@ pub struct Switches {
     pub draw_clears: bool,
     /// F9: scumm-machine's actor_rooms; the scope's writes and the table's domains of it (Scope::of_with, table.rs)
     pub actor_rooms: bool,
+    /// A run past the path limit is split on its first fork on a read, again and again, until no part passes the
+    /// limit; a run that passes it with no fact left to split on, or a path the step limit ended, stops the reading
+    /// (`Builder::run_split`). Off: reader.py's rule, which leaves a run unsplit when it forked more on non-facts,
+    /// past SPLIT_DEPTH levels or SPLIT_BUDGET parts, and drops the paths the limit ended.
+    pub split_limit: bool,
+    /// Forward reachability (reach.rs, experiments/E004-fast-exact/reach.md): a job or a fork's branch that needs a
+    /// value not reached from the start does not run, and runs when the value arrives. Needs split_limit.
+    pub reach: bool,
+    /// F1c (fix-round1.md): a sentence or a walk with a room's input script that is not plain starts at that script,
+    /// from the sentence variables as constants (inputs.rs; machine.rs `f1c_click`; `Builder::settled_jobs`)
+    pub input_settled: bool,
+    /// Pass 2 reruns only what a widened value touches (memo.rs, experiments/E004-fast-exact/pass2-reuse.md); the output
+    /// is byte for byte the same.
+    pub pass2_reuse: bool,
+    /// A run past the path limit with no fact left to split on is read again whole with the limit 4 times larger,
+    /// up to GROW_MAX, before the reading stops (`Builder::run_split`). Needs split_limit.
+    pub grow_limit: bool,
+    /// A path the step limit ended becomes a havoc record (havoc.rs, experiments/E004-fast-exact/havoc-cut.md) in
+    /// place of stopping the reading. Needs split_limit.
+    pub havoc_cut: bool,
+    /// Jobs that differ only in an input argument their run never read share one run (machine.rs `SharedRuns`,
+    /// experiments/E004-fast-exact/shared-runs.md); the output is byte for byte the same.
+    pub shared_runs: bool,
+    /// h² over the pairs of the verb script and the room (pairs.rs, experiments/E004-fast-exact/reach-pairs.md): a job
+    /// whose seed has a set on both runs only when a reached pair meets them. Needs --reach.
+    pub reach_pairs: bool,
+    /// The rough reading (experiments/E004-fast-exact/rough-reading.md): every job is read with the machine's step
+    /// limit N in place of STEP_LIMIT, so a path past N steps ends there and havoc_cut makes it a havoc record. 0 (the
+    /// default): the machine's own limit. Needs havoc_cut. By name `step_limit=N`; reader-scope's `--step-limit N`.
+    pub step_limit: u32,
+    /// havoc_cut's closure names, for a start whose operand does not fold, the units the engine can run for it: an
+    /// object's verb entry, a variable's values (havoc.rs `closure`, experiments/E004-fast-exact/havoc-cut.md, "The
+    /// switch havoc_starts"), in place of every unit. Needs havoc_cut.
+    pub havoc_starts: bool,
+    /// havoc_cut's closure names, for a room change, the exit code of the rooms it can leave and the entry code of the
+    /// rooms it can load (havoc.rs `closure`, experiments/E005-narrow-havoc/havoc-rooms.md), in place of every scope
+    /// room. Needs havoc_cut.
+    pub havoc_rooms: bool,
+    /// havoc_cut's closure names, for a start by a local or an indexed variable, the scripts of the values a static
+    /// analysis of the game's code gives it (args.rs, experiments/E005-narrow-havoc/havoc-args.md), in place of every
+    /// unit. Needs havoc_cut.
+    pub havoc_args: bool,
 }
 
 impl Switches {
@@ -208,7 +266,21 @@ impl Switches {
                 "value_sets" => s.value_sets = true,
                 "draw_clears" => s.draw_clears = true,
                 "actor_rooms" => s.actor_rooms = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms)")),
+                "split_limit" => s.split_limit = true,
+                "reach" => s.reach = true,
+                "pass2_reuse" => s.pass2_reuse = true,
+                "input_settled" => s.input_settled = true,
+                "grow_limit" => s.grow_limit = true,
+                "havoc_cut" => s.havoc_cut = true,
+                "shared_runs" => s.shared_runs = true,
+                "reach_pairs" => s.reach_pairs = true,
+                "havoc_starts" => s.havoc_starts = true,
+                "havoc_rooms" => s.havoc_rooms = true,
+                "havoc_args" => s.havoc_args = true,
+                _ if n.starts_with("step_limit=") => {
+                    s.step_limit = n["step_limit=".len()..].parse().map_err(|_| format!("reader switch {n}: step_limit=N with N a number"))?
+                }
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, havoc_rooms, havoc_args, step_limit=N)")),
             }
         }
         Ok(s)
@@ -226,6 +298,39 @@ impl Switches {
         }
         if self.actor_rooms {
             v.push("actor_rooms");
+        }
+        if self.split_limit {
+            v.push("split_limit");
+        }
+        if self.reach {
+            v.push("reach");
+        }
+        if self.pass2_reuse {
+            v.push("pass2_reuse");
+        }
+        if self.input_settled {
+            v.push("input_settled");
+        }
+        if self.grow_limit {
+            v.push("grow_limit");
+        }
+        if self.havoc_cut {
+            v.push("havoc_cut");
+        }
+        if self.shared_runs {
+            v.push("shared_runs");
+        }
+        if self.reach_pairs {
+            v.push("reach_pairs");
+        }
+        if self.havoc_starts {
+            v.push("havoc_starts");
+        }
+        if self.havoc_rooms {
+            v.push("havoc_rooms");
+        }
+        if self.havoc_args {
+            v.push("havoc_args");
         }
         v
     }
@@ -287,6 +392,8 @@ pub struct Builder<'g> {
     pub game: &'g Game,
     /// fix round 1's switches (all off: reader.py's reading)
     pub switches: Switches,
+    /// the switch grow_limit: the path limit of the run being read again whole, 0 for the machine's own
+    pub path_limit_now: usize,
     /// switch due_first's due facts, after the reading (due.rs)
     pub due: Option<crate::due::Due>,
     pub scope: Scope,
@@ -321,6 +428,8 @@ pub struct Builder<'g> {
     fact_info: FxHashMap<String, std::rc::Rc<(Kind, Option<Domain>)>>,
     /// false: the records go to the sink and are not kept (`records` stays empty, so memory does not grow with
     /// the record count); the reading is the same, `n_records` counts them
+    /// the switch `--frame-costs` (costs.rs): each record's cost in engine frames; None: every record costs 1
+    pub frame_costs: Option<std::sync::Arc<crate::costs::FrameCosts>>,
     pub keep_records: bool,
     /// the pass's records so far (`len(self.records)`)
     pub n_records: usize,
@@ -349,6 +458,16 @@ pub struct Builder<'g> {
     pub slot_locals: Vec<SlotLocals>,
     /// F10: the events `dumped_events` made in the last pass (not the Esc ones), with their lists' numbers
     pub slot_events: Vec<Event>,
+    /// the switch --reach: the starts the reached values are seeded from
+    pub reach_starts: Vec<crate::facts::Facts>,
+    /// the switch --reach: the rounds' state (reach.rs)
+    pub(crate) reach_state: Option<Box<crate::reach::ReachState>>,
+    /// the switch --reach: the branches the job being run held back
+    pub(crate) reach_out: Vec<crate::reach::Held>,
+    /// the switch --reach: the job being run, as reach.rs keys it (`job_key`)
+    pub(crate) cur_job_key: Option<Arc<str>>,
+    /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs)
+    pub(crate) memo_log: Option<crate::memo::RunLog>,
 }
 
 /// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
@@ -425,7 +544,25 @@ impl<'g> Builder<'g> {
             rd: std::mem::take(&mut self.rd),
             sig_ids: std::mem::take(&mut self.sig_ids),
             args: self.args_log.as_mut().map(std::mem::take).unwrap_or_default(),
+            held: std::mem::take(&mut self.reach_out),
         }
+    }
+
+    /// What `take_deltas` took, back on the counters (a worker's Builder, whose counters are empty between jobs).
+    pub(crate) fn set_deltas(&mut self, d: Deltas) {
+        self.counts = d.counts;
+        self.ends = d.ends;
+        self.drops = d.drops;
+        self.nonfact_checks = d.nonfact_checks;
+        self.guesses = d.guesses;
+        self.unknown_writes = d.unknown_writes;
+        self.unknown_sites = d.unknown_sites;
+        self.out_of_domain = d.out_of_domain;
+        self.outside_points = d.outside_points;
+        self.rd = d.rd;
+        self.sig_ids = d.sig_ids;
+        self.args_log = Some(d.args);
+        self.reach_out = d.held;
     }
 
     /// A job run elsewhere (par.rs), merged as if it had run here: its counters added in their order, its sets
@@ -454,6 +591,7 @@ impl<'g> Builder<'g> {
         for (k, s) in d.args {
             self.table.args_vals.entry(k).or_default().insert(s);
         }
+        self.reach_out.extend(d.held);
         self.last_pins = last_pins;
     }
 
@@ -461,6 +599,7 @@ impl<'g> Builder<'g> {
         Builder {
             game,
             switches: Switches::default(),
+            path_limit_now: 0,
             due: None,
             scope,
             table,
@@ -499,11 +638,17 @@ impl<'g> Builder<'g> {
             widened: Vec::new(),
             slot_locals: Vec::new(),
             slot_events: Vec::new(),
+            frame_costs: None,
+            reach_starts: Vec::new(),
+            reach_state: None,
+            reach_out: Vec::new(),
+            cur_job_key: None,
+            memo_log: None,
         }
     }
 
     pub fn ctx(&self) -> Ctx<'_> {
-        Ctx { game: self.game, scope: &self.scope, table: &self.table }
+        Ctx { game: self.game, scope: &self.scope, table: &self.table, job_key: self.cur_job_key.as_deref() }
     }
 
     pub fn kind(&self, key: &str) -> Kind {
@@ -567,7 +712,7 @@ impl<'g> Builder<'g> {
             if values.is_empty() {
                 return false;
             }
-            if values != dom.values {
+            if values != dom.values || (key.starts_with("args:") && self.table.reach.is_some()) {
                 let have = pre.get(key).cloned().unwrap_or_else(|| values.clone());
                 pre.insert(key.to_string(), values.iter().copied().filter(|v| have.contains(v)).collect());
             }
@@ -761,6 +906,121 @@ impl<'g> Builder<'g> {
         vals.into_iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect()
     }
 
+    /// F1c: the switch's reading of the scripts (inputs.rs), once.
+    pub fn settled_rule(&mut self) -> Option<std::sync::Arc<crate::inputs::SettledRule>> {
+        if self.table.settled.is_none() {
+            let rule = crate::inputs::settled_rule(self.game, &self.scope.units, &self.table.start);
+            self.table.settled = rule.map(std::sync::Arc::new);
+        }
+        self.table.settled.clone()
+    }
+
+    /// F1c rule 2 and 3 (fix-round1.md): each sentence or walk on room objects and actors, per value of VAR_VERB_SCRIPT:
+    /// a plain value keeps today's job with var:32 pinned; any other value n gets a job labelled [n] that needs the
+    /// hover live, not frozen and at its wait, and its guards, and carries `SETTLED_PIN`. An input with an object in the
+    /// inventory stays as it is.
+    fn settled_jobs(&mut self, jobs: Vec<Job>) -> Vec<Job> {
+        use crate::inputs::SETTLED_PIN;
+        let Some(rule) = self.settled_rule() else {
+            self.counts.inc("F1c: no plain input script or no hover (the switch changes nothing)");
+            return jobs;
+        };
+        let key32 = format!("var:{VAR_VERB_SCRIPT}");
+        let values: Vec<i64> = match self.domain(&key32) {
+            Some(d) if self.kind(&key32) != Kind::Const => d.values.iter().filter_map(|v| v.int()).filter(|&v| v != 0).collect(),
+            _ => vec![self.table.start.get0(&key32)],
+        };
+        let hover_key = self.game.lifecycle_key(rule.hover).map(|k| k.to_string());
+        let hover = slot_name(hover_key.as_deref().unwrap_or(""));
+        let mut base = (Pins::new(), Pre::new());
+        let mut ok = true;
+        if let Some(k) = &hover_key {
+            ok = self.pin(&mut base.0, &mut base.1, k, &[Label::Int(1)]);
+        }
+        ok = ok && self.pin(&mut base.0, &mut base.1, &format!("frozen:{hover}"), &[Label::Int(0)]);
+        ok = ok && self.pin(&mut base.0, &mut base.1, &format!("at:{hover}:{}", rule.wait), &[Label::Int(1)]);
+        for g in &rule.guards {
+            let vals: Labels = match self.domain(&g.key) {
+                Some(d) => {
+                    let value = |l: &Label| match *l {
+                        Label::Int(n) => n,
+                        Label::Above => d.high.unwrap() + 1,
+                        Label::Below => d.low.unwrap() - 1,
+                    };
+                    d.values.iter().filter(|l| g.holds(value(l))).copied().collect()
+                }
+                None => vec![Label::Int(self.table.start.get0(&g.key))].into_iter().filter(|l| matches!(l, Label::Int(n) if g.holds(*n))).collect(),
+            };
+            ok = ok && !vals.is_empty() && self.pin(&mut base.0, &mut base.1, &g.key, &vals);
+        }
+        let mut out = Vec::with_capacity(jobs.len() * 2);
+        for job in jobs {
+            let What::Sentence { a, .. } = job.what else { unreachable!("today's sentence jobs") };
+            if job.label.contains("[inv]") {
+                out.push(job);
+                continue;
+            }
+            for &n in &values {
+                let mut j = job.clone();
+                let n_label = Label::Int(n);
+                if !self.pin(&mut j.pins, &mut j.pre, &key32, &[n_label]) {
+                    continue;
+                }
+                if rule.plain.contains(&n) {
+                    out.push(j);
+                    continue;
+                }
+                if !ok {
+                    self.counts.inc("F1c: inputs whose hover or guards never hold (constants)");
+                    continue;
+                }
+                // a local input script: the job's rooms it can run in
+                let mut rooms: Labels = self
+                    .scope
+                    .rooms
+                    .iter()
+                    .filter(|&&r| rule.runs_in(self.game, n, self.game.resource(r)))
+                    .map(|&r| Label::Int(r as i64))
+                    .collect();
+                if a >= NUM_ACTORS {
+                    let home = self.game.object_room.get(&(a as i32)).copied();
+                    rooms.retain(|r| matches!(r, Label::Int(x) if self.game.resource(*x as i32) == home));
+                }
+                if rooms.is_empty() {
+                    self.counts.inc("F1c: inputs whose input script no room of theirs installs");
+                    continue;
+                }
+                if (n as i32) >= self.game.first_local && !self.pin(&mut j.pins, &mut j.pre, "room", &rooms) {
+                    continue;
+                }
+                if j.pre.get("room").is_some_and(|s| s.is_empty()) {
+                    self.counts.inc("F1c: inputs whose input script no room of theirs installs");
+                    continue;
+                }
+                let mut fine = true;
+                for (k, v) in &base.1 {
+                    fine = fine && self.pin(&mut j.pins, &mut j.pre, k, v);
+                }
+                for (k, v) in &base.0 {
+                    if !j.pre.contains_key(k) {
+                        j.pins.insert(k.clone(), v.clone());
+                    }
+                }
+                if !fine {
+                    continue;
+                }
+                j.pins.insert(SETTLED_PIN.to_string(), Val::Int(n));
+                j.label = match j.label.strip_suffix("~frozen") {
+                    Some(l) => format!("{l}[{n}]~frozen"),
+                    None => format!("{}[{n}]", j.label),
+                };
+                self.counts.inc("F1c: inputs that start at the input script");
+                out.push(j);
+            }
+        }
+        out
+    }
+
     /// `Builder.inputs`: every player input of the scope, in reader.py's order.
     pub fn inputs(&mut self) -> Vec<Job> {
         let mut out = Vec::new();
@@ -847,6 +1107,9 @@ impl<'g> Builder<'g> {
                     }
                 }
             }
+        }
+        if self.switches.input_settled {
+            out = self.settled_jobs(out);
         }
         let key32 = format!("var:{VAR_VERB_SCRIPT}");
         let vs: Vec<i64> = match self.domain(&key32) {
@@ -1129,6 +1392,18 @@ impl<'g> Builder<'g> {
 
     /// `Builder.run` for one input or event (the root call: its budget is made here).
     pub fn run_job(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
+        // the switch --reach: a job's guides are found by the whole job (reach.rs `job_key`), not by its label, which
+        // rooms share
+        self.cur_job_key = self.table.reach.is_some().then(|| Arc::from(crate::reach::job_key(job)));
+        if self.args_log.is_some() {
+            if let Some(memo) = self.table.memo.clone() {
+                return self.run_job_memo(&memo, m, job);
+            }
+        }
+        self.run_job_real(m, job)
+    }
+
+    pub(crate) fn run_job_real(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
         self.counts.inc(format!("runs: {}", job.kind));
         let mut budget = (SPLIT_BUDGET, 0i64, job.pre.keys().cloned().collect::<BTreeSet<String>>());
         self.run(m, job, &job.pins, &job.pre, &mut budget)
@@ -1144,13 +1419,36 @@ impl<'g> Builder<'g> {
     ) -> Vec<Record> {
         let facts0 = self.rd.counts.get(FORKS_ON_READ);
         let nonfacts0 = self.rd.counts.get(FORKS_ON_NONFACTS);
+        let t_run = std::time::Instant::now();
         let run = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
+        crate::par::trace_run(&job.label, t_run.elapsed().as_secs_f64(), &run);
         self.last_pins = pins.clone();
         self.rd.update(&run.rd);
         self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
         let facts = self.rd.counts.get(FORKS_ON_READ) - facts0;
         let nonfacts = self.rd.counts.get(FORKS_ON_NONFACTS) - nonfacts0;
-        if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
+        if let Some(l) = &mut self.memo_log {
+            l.touched.extend(run.touched.iter().cloned());
+            l.queries.extend(run.queries.iter().cloned());
+            for p in &run.paths {
+                l.touched.extend(p.pre.keys().cloned());
+                l.touched.extend(p.writes.keys().cloned());
+            }
+        }
+        if run.limit == 0 {
+            self.reach_out.extend(run.held);
+        }
+        if self.table.split_limit {
+            if run.limit != 0 {
+                return self.run_split(m, job, pins, pre, budget, run.first_fork.clone(), run.limit);
+            }
+            // scumm-machine's step limit ends a path "limit" too; in a run the path limit cut nothing (limit 0)
+            // every such end is the step limit's, and no split lifts it
+            let n = run.paths.iter().filter(|p| p.end.as_deref() == Some("limit")).count();
+            if n != 0 && !self.table.havoc_cut {
+                panic!("split_limit: {} has {n} paths the step limit ended; the reading stops", job.label);
+            }
+        } else if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
             self.counts.inc("runs past the path limit not split (more forks on non-facts than on facts)");
         } else if run.limit != 0 && run.first_fork.is_some() {
             let key = run.first_fork.clone().unwrap();
@@ -1186,13 +1484,19 @@ impl<'g> Builder<'g> {
         let mut out = Vec::new();
         for p in &run.paths {
             self.ends.add(Py::Tuple(vec![Py::str(&job.kind), end_py(&p.end)]), 1);
-            if p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym {
+            // the switch havoc_cut: a path the step limit ended (machine.rs hands it over with where it stood)
+            let havoc = self.table.havoc_cut && p.cut.is_some();
+            if !havoc && (p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym) {
                 let base = job.label.split('#').next().unwrap().split('@').next().unwrap();
                 let lab = format!("{base}{}", if job.label.contains('@') { ")" } else { "" });
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
                 continue;
             }
-            let Some(mut rec) = self.record(&job.kind, &job.label, p, &job.what) else {
+            if self.table.reach.is_some() && !self.reach_path(job, p) {
+                continue;
+            }
+            let rec = if havoc { Some(self.havoc_record(&job.kind, &job.label, p, &job.what)) } else { self.record(&job.kind, &job.label, p, &job.what) };
+            let Some(mut rec) = rec else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
                 continue;
             };
@@ -1205,8 +1509,88 @@ impl<'g> Builder<'g> {
                 _ => BTreeSet::new(),
             };
             rec.engine_pre = rec.pre.keys().filter(|k| budget.2.contains(*k) || own.contains(*k)).cloned().collect();
+            if self.table.reach.is_some() && !self.reach_record(job, p, &rec) {
+                continue;
+            }
             out.push(rec);
         }
+        out
+    }
+
+    /// The switch split_limit: a run past the path limit is run again once per value of its first fork on a read
+    /// (the values its precondition leaves), that fact pinned to the value, and each part that passes the limit is
+    /// split again, with no cap on depth or parts and whatever its forks on non-facts. In any state the engine runs
+    /// one path of the run, and the parts' preconditions divide the run's states by the pinned fact's values: they
+    /// do not overlap and together cover them. So the parts' records cover every state the run can start in, and
+    /// no path the limit ended is dropped. A part that passes the limit with no fact left to split on stops the
+    /// reading (a panic naming the job).
+    #[allow(clippy::too_many_arguments)]
+    fn run_split(
+        &mut self,
+        m: &mut dyn Machine,
+        job: &Job,
+        pins: &Pins,
+        pre: &Pre,
+        budget: &mut (i64, i64, BTreeSet<String>),
+        first_fork: Option<String>,
+        limit: i64,
+    ) -> Vec<Record> {
+        let vals: Labels = match &first_fork {
+            Some(key) => {
+                let dom = self.domain(key).unwrap_or_else(|| panic!("split_limit: {}'s first fork {key} has no domain", job.label));
+                match pre.get(key) {
+                    Some(s) => dom.values.iter().copied().filter(|v| s.contains(v)).collect(),
+                    None => dom.values.clone(),
+                }
+            }
+            None => Labels::new(),
+        };
+        if vals.len() < 2 && self.table.grow_limit && self.path_limit_now.max(crate::machine::PATH_LIMIT) < GROW_MAX {
+            // grow_limit: the run read whole with a larger limit. The limit only ends paths, so a run it cuts
+            // nothing of is the whole run, and its records cover every state the run can start in. The parts of a
+            // split under the larger limit run here, in order, so the reading does not depend on the workers.
+            let prev = self.path_limit_now;
+            let next = prev.max(crate::machine::PATH_LIMIT) * 4;
+            self.counts.inc(format!("grow_limit: runs read again with the path limit at {next}"));
+            crate::par::trace_grow(&job.label, budget.1 as usize, next, limit);
+            self.path_limit_now = next;
+            m.set_path_limit(next);
+            let out = self.run(m, job, pins, pre, budget);
+            self.path_limit_now = prev;
+            m.set_path_limit(prev);
+            return out;
+        }
+        if vals.len() < 2 {
+            panic!(
+                "split_limit: {} passed the path limit ({limit} paths cut) with no fact left to split on (first fork {first_fork:?}, {} splits deep); the reading stops",
+                job.label, budget.1
+            );
+        }
+        let key = first_fork.unwrap();
+        let n_dom = vals.len();
+        let vals = if self.table.reach.is_some() { self.reach_parts(job, pre, &key, vals) } else { vals };
+        crate::par::trace_split(&job.label, budget.1 as usize, &key, n_dom, vals.len(), limit);
+        budget.1 += 1;
+        self.counts.inc("runs past the path limit split on their first fork on a read");
+        self.counts.inc(format!("split_limit: runs split at depth {}", budget.1));
+        self.counts.add("split_limit: parts run", vals.len() as i64);
+        let parts: Vec<(Pins, Pre)> = vals
+            .iter()
+            .map(|&v| {
+                let (mut p2, mut pre2) = (pins.clone(), pre.clone());
+                pre2.insert(key.clone(), vec![v]);
+                p2.insert(key.clone(), self.table.value(&key, v));
+                (p2, pre2)
+            })
+            .collect();
+        if self.path_limit_now == 0 {
+            m.prefetch(&self.ctx(), &job.label, &parts, &job.what);
+        }
+        let mut out = Vec::new();
+        for (p2, pre2) in &parts {
+            out.extend(self.run(m, job, p2, pre2, budget));
+        }
+        budget.1 -= 1;
         out
     }
 
@@ -1215,7 +1599,7 @@ impl<'g> Builder<'g> {
         let mut pre = Pre::new();
         for (k, s) in &p.pre {
             if let Some(dom) = self.table.domain(k) {
-                if *s != dom.values {
+                if *s != dom.values || (k.starts_with("args:") && self.table.reach.is_some()) {
                     pre.insert(k.clone(), s.clone());
                 }
             }
@@ -1245,6 +1629,9 @@ impl<'g> Builder<'g> {
             let cd: Vec<CutData> = kept.cut_data.iter().map(cut_text).collect();
             let (locs, mut sig, recursive) =
                 self.list_number(name, kept.unit, locs, kept.override_, &cd, kept.known, &kept.recursive, &kept.resistant, &kept.owned);
+            if let Some(l) = &mut self.memo_log {
+                l.sigs.push((sig, self.folded.contains(&sig)));
+            }
             if self.folded.contains(&sig) {
                 sig = 0;
             }
@@ -1636,6 +2023,37 @@ impl<'g> Builder<'g> {
         mut sink: Option<&mut dyn RecordSink>,
     ) -> usize {
         self.table.value_sets = self.switches.value_sets;
+        self.table.split_limit = self.switches.split_limit;
+        self.table.grow_limit = self.switches.grow_limit;
+        assert!(!self.table.grow_limit || self.table.split_limit, "grow_limit needs split_limit");
+        self.table.havoc_cut = self.switches.havoc_cut;
+        assert!(!self.table.havoc_cut || self.table.split_limit, "havoc_cut needs split_limit");
+        self.table.step_limit = self.switches.step_limit;
+        assert!(self.table.step_limit == 0 || self.table.havoc_cut, "step_limit needs havoc_cut");
+        self.table.havoc_starts = self.switches.havoc_starts;
+        assert!(!self.table.havoc_starts || self.table.havoc_cut, "havoc_starts needs havoc_cut");
+        self.table.havoc_rooms = self.switches.havoc_rooms;
+        assert!(!self.table.havoc_rooms || self.table.havoc_cut, "havoc_rooms needs havoc_cut");
+        assert!(!self.switches.havoc_args || self.table.havoc_cut, "havoc_args needs havoc_cut");
+        self.havoc_args_analysis();
+        assert!(!self.switches.reach_pairs || self.switches.reach, "reach_pairs needs --reach");
+        if self.switches.reach {
+            assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
+            assert!(!self.switches.due_first, "--reach reads no due: facts");
+            self.table.reach = Some(Arc::new(crate::reach::Reached::default()));
+            if self.reach_starts.is_empty() {
+                self.reach_starts.push(self.scope.start.clone());
+            }
+        }
+        if self.switches.input_settled {
+            self.settled_rule();
+        }
+        if self.switches.pass2_reuse {
+            self.table.memo = Some(Arc::new(crate::memo::RunMemo::default()));
+        }
+        if self.switches.shared_runs && self.table.shared.is_none() {
+            self.table.shared = Some(Arc::new(crate::shared::SharedRuns::default()));
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -1649,10 +2067,18 @@ impl<'g> Builder<'g> {
             }
             self.widened.push(self.out_of_domain.clone());
             let added = self.extend_domains();
+            if let Some(memo) = &self.table.memo {
+                memo.start_reuse(self.widened.last().unwrap().keys().cloned());
+            }
             self.counts.set(format!("pass {}: domain values added for the next pass", n + 1), added);
             self.reset();
+            // havoc_args reads the variables by their domains, which the next pass widened
+            self.havoc_args_analysis();
         }
         self.counts.set("records", self.n_records as i64);
+        if let Some(memo) = &self.table.memo {
+            memo.clear();
+        }
         if self.switches.due_first {
             crate::due::apply(self);
         }
@@ -1686,6 +2112,22 @@ impl<'g> Builder<'g> {
         self.fact_info.clear();
         self.n_records = 0;
         self.args_set.clear();
+    }
+
+    /// The switch havoc_args: the analysis of the game's code (args.rs) with this pass's domains, and its counts; with
+    /// the switch off, none.
+    pub fn havoc_args_analysis(&mut self) {
+        if !self.switches.havoc_args {
+            self.table.havoc_args = None;
+            return;
+        }
+        let t = std::time::Instant::now();
+        let a = crate::args::HavocArgs::of(self.game, &self.scope, &self.table);
+        self.counts.set("havoc_args: units no launch reaches", a.unreached as i64);
+        self.counts.set("havoc_args: starts whose values are not known (they may start any unit)", a.wild.len() as i64);
+        self.counts.set("havoc_args: rounds of the analysis", a.rounds as i64);
+        self.counts.set("havoc_args: analysis ms", t.elapsed().as_millis() as i64);
+        self.table.havoc_args = Some(Arc::new(a));
     }
 
     /// `Builder.extend_domains`: add the written values a domain lacked; returns how many.
@@ -1725,6 +2167,11 @@ impl<'g> Builder<'g> {
         self.records.clear();
         self.n_records = 0;
         self.args_set.clear();
+        if self.table.reach.is_some() {
+            self.read_once_reach(m, start_events, skip, sink);
+            self.end_of_pass();
+            return;
+        }
         let t0 = std::time::Instant::now();
         let jobs = self.inputs();
         *self.phase_secs.entry("inputs()").or_default() += t0.elapsed().as_secs_f64();
@@ -1751,46 +2198,7 @@ impl<'g> Builder<'g> {
         let mut rounds = 0;
         while !todo.is_empty() {
             rounds += 1;
-            let te = std::time::Instant::now();
-            let mut jobs = Vec::new();
-            let mut added: FxHashSet<(String, UnitKey, i64, bool)> =
-                todo.iter().filter(|e| e.sig == 0).map(|e| (e.name.clone(), e.unit, e.w, e.abort)).collect();
-            let n0 = todo.len();
-            for i in 0..n0 {
-                let ev = &todo[i];
-                let k = (ev.name.clone(), ev.unit, ev.w, ev.abort);
-                if ev.sig != 0 && !added.contains(&k) && !self.events_done.contains(&(ev.name.clone(), ev.unit, ev.w, 0, ev.abort)) {
-                    added.insert(k);
-                    let copy = ev.unknown_locals(true);
-                    todo.push(copy);
-                    self.counts.inc("events with unknown locals (args 0) added for replans");
-                }
-            }
-            *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
-            let mut tp = 0.0;
-            for ev in &todo {
-                let ev = self.limit(ev);
-                let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
-                if self.events_done.contains(&k) {
-                    continue;
-                }
-                self.events_done.insert(k);
-                if skip.is_some_and(|f| f(&ev)) {
-                    self.counts.inc("events left out by the caller");
-                    continue;
-                }
-                let tq = std::time::Instant::now();
-                let (ok, pins, pre) = self.event_pins(&ev);
-                tp += tq.elapsed().as_secs_f64();
-                if !ok {
-                    self.counts.inc("events whose conditions never hold (constants)");
-                    continue;
-                }
-                let kind = if ev.abort { "skip_cutscene" } else { "event" };
-                jobs.push(Job { kind: kind.into(), label: ev.label(), pins, pre, what: What::Event(ev), checks: vec![] });
-            }
-            *self.phase_secs.entry("events").or_default() += te.elapsed().as_secs_f64();
-            *self.phase_secs.entry("events: event_pins").or_default() += tp;
+            let jobs = self.event_jobs(&mut todo, skip);
             let t0 = std::time::Instant::now();
             let n0 = self.n_records;
             let n_jobs = jobs.len();
@@ -1810,6 +2218,60 @@ impl<'g> Builder<'g> {
             self.tell(&what, n_jobs, n, t0.elapsed().as_secs_f64());
         }
         self.counts.set("event rounds", rounds);
+        self.end_of_pass();
+    }
+
+    /// The jobs of one round's events: each event's copy with unknown locals, its list past SIG_LIMIT folded, those
+    /// not yet run, and their pins. `todo` gains the copies.
+    pub(crate) fn event_jobs(&mut self, todo: &mut Vec<Event>, skip: Option<&dyn Fn(&Event) -> bool>) -> Vec<Job> {
+        let te = std::time::Instant::now();
+        let mut jobs = Vec::new();
+        let mut added: FxHashSet<(String, UnitKey, i64, bool)> =
+            todo.iter().filter(|e| e.sig == 0).map(|e| (e.name.clone(), e.unit, e.w, e.abort)).collect();
+        let n0 = todo.len();
+        for i in 0..n0 {
+            let ev = &todo[i];
+            let k = (ev.name.clone(), ev.unit, ev.w, ev.abort);
+            if ev.sig != 0 && !added.contains(&k) && !self.events_done.contains(&(ev.name.clone(), ev.unit, ev.w, 0, ev.abort)) {
+                added.insert(k);
+                let copy = ev.unknown_locals(true);
+                todo.push(copy);
+                self.counts.inc("events with unknown locals (args 0) added for replans");
+            }
+        }
+        *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
+        let mut tp = 0.0;
+        for ev0 in todo.iter() {
+            let ev = self.limit(ev0);
+            if ev.sig == 0 && ev0.sig != 0 {
+                self.reach_folded(&ev.name);
+            }
+            let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
+            if self.events_done.contains(&k) {
+                continue;
+            }
+            self.events_done.insert(k);
+            if skip.is_some_and(|f| f(&ev)) {
+                self.counts.inc("events left out by the caller");
+                continue;
+            }
+            let tq = std::time::Instant::now();
+            let (ok, pins, pre) = self.event_pins(&ev);
+            tp += tq.elapsed().as_secs_f64();
+            if !ok {
+                self.counts.inc("events whose conditions never hold (constants)");
+                continue;
+            }
+            let kind = if ev.abort { "skip_cutscene" } else { "event" };
+            jobs.push(Job { kind: kind.into(), label: ev.label(), pins, pre, what: What::Event(ev), checks: vec![] });
+        }
+        *self.phase_secs.entry("events").or_default() += te.elapsed().as_secs_f64();
+        *self.phase_secs.entry("events: event_pins").or_default() += tp;
+        jobs
+    }
+
+    /// `_read_once`'s last loop: the folded lists' numbers rewritten, the `args:` values, the collisions.
+    fn end_of_pass(&mut self) {
         let tw = std::time::Instant::now();
         let folded = self.folded.clone();
         for r in &mut self.records {
@@ -1845,7 +2307,7 @@ impl<'g> Builder<'g> {
     }
 
     /// One job's records, as made: to the sink, then kept (or, with `keep_records` off, only counted).
-    fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
+    pub(crate) fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
         if recs.is_empty() {
             return;
         }
@@ -1873,7 +2335,7 @@ impl<'g> Builder<'g> {
     }
 
     /// The progress callback (reader.py `Builder.progress`): what ran, its jobs, its records, its seconds.
-    fn tell(&mut self, what: &str, jobs: usize, records: usize, secs: f64) {
+    pub(crate) fn tell(&mut self, what: &str, jobs: usize, records: usize, secs: f64) {
         if let Some(p) = &mut self.progress {
             p(what, jobs, records, secs);
         }
@@ -1924,6 +2386,10 @@ impl<'g> Builder<'g> {
 
     /// `run_jobs_each` on jobs a machine can share with its threads.
     pub fn run_jobs_shared(&mut self, m: &mut dyn Machine, jobs: Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, Vec<Record>)) {
+        if let Some(sh) = &self.table.shared {
+            // the switch shared_runs: a run is shared within its batch only
+            sh.next_batch();
+        }
         for job in jobs.iter() {
             if let What::Event(e) = &job.what {
                 if e.sig != 0 {
@@ -1983,6 +2449,10 @@ impl<'g> Builder<'g> {
         put("universe", Py::strs(&self.scope.universe));
         put("scope_counts", self.scope.counts.py());
         put("n_records", Py::Int(if self.keep_records { self.records.len() } else { self.n_records } as i64));
+        if let Some(fc) = &self.frame_costs {
+            // the switch --frame-costs: its parameters (costs.rs); absent with the switch off
+            put("frame_costs", fc.py());
+        }
         if let Some(ll) = &self.table.live_locals {
             // the switch --live-locals: every unit's read locals (None: all), keyed by its slot's name in the engine's
             // state (`local:N@R`, `entry@R`, `exit@R` for room R's code); absent with the switch off

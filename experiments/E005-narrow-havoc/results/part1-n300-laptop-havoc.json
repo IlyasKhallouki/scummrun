@@ -1,0 +1,38 @@
+{
+ "havoc_records": 696,
+ "naming_every_unit": 0,
+ "closure_units": {
+  "min": 564,
+  "median": 564,
+  "p90": 564,
+  "max": 565
+ },
+ "effects": {
+  "median": 2098,
+  "max": 2130
+ },
+ "events": {
+  "median": 13589,
+  "max": 13948,
+  "sum": 9461534
+ },
+ "room_changes": {
+  "none": 0,
+  "every_scope_room": 0,
+  "named_rooms": 696,
+  "rooms_named_median": 30.0,
+  "rooms_named_max": 30
+ },
+ "starts_named_by_havoc_args": 2017,
+ "records_with_a_start_not_resolved": 0,
+ "every_unit_reasons": {},
+ "every_room_reasons": {},
+ "jobs": {
+  "sentence(3,464)[inv]~frozen": 231,
+  "sentence(2,464)[inv]~frozen": 231,
+  "sentence(4,464)[inv]~frozen": 223,
+  "event(script:2@736": 11
+ },
+ "lines_not_parsed": 0,
+ "closures_with_at_least_500_units": 696
+}

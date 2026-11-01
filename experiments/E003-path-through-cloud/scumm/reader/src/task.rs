@@ -99,7 +99,13 @@ impl<'t> FactsBuild<'t> {
 
 /// build_task's fold key of a record: (label, precondition, effects), in a canonical text (sets sorted).
 pub fn fold_key(r: &Record) -> String {
-    fold_text(r, None)
+    fold_text(r, None, None)
+}
+
+/// The fold key with the record's cost under the switch `--frame-costs` (costs.rs; None: off, `fold_key`'s): records
+/// that differ only in cost stay two actions.
+pub fn fold_key_cost(r: &Record, cost: Option<u32>) -> String {
+    fold_text(r, None, cost)
 }
 
 /// A set's values as the fold key writes them: texts, sorted.
@@ -141,9 +147,13 @@ fn push_set_text(s: &mut String, v: &[Label]) {
 
 /// The fold key; with `slots`, the parts `_read_once`'s rewrite of folded lists can change (an `args:` key's
 /// precondition, an `args:` key's set) are written as a mark and pushed to `slots` in key order.
-fn fold_text(r: &Record, mut slots: Option<&mut ArgSlots>) -> String {
+fn fold_text(r: &Record, mut slots: Option<&mut ArgSlots>, cost: Option<u32>) -> String {
     let mut s = String::with_capacity(256);
     s.push_str(&r.label);
+    if let Some(c) = cost {
+        s.push('\u{4}');
+        s.push_str(&c.to_string());
+    }
     s.push('\u{1}');
     for (k, v) in &r.pre {
         s.push_str(k);
@@ -188,6 +198,11 @@ pub fn fold_hash(r: &Record) -> [u8; 16] {
     hash16(fold_key(r).as_bytes())
 }
 
+/// `fold_hash` with the record's cost under the switch `--frame-costs` (None: `fold_hash`'s).
+pub fn fold_hash_cost(r: &Record, cost: Option<u32>) -> [u8; 16] {
+    hash16(fold_key_cost(r, cost).as_bytes())
+}
+
 /// The `args:` values of a record's fold key that `_read_once` rewrites when SIG_LIMIT folds their list into 0
 /// after the record was made: the precondition sets of `args:` keys and the values the record sets them to.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -207,8 +222,13 @@ pub struct FoldParts {
 }
 
 pub fn fold_parts(r: &Record) -> FoldParts {
+    fold_parts_cost(r, None)
+}
+
+/// `fold_parts` with the record's cost under the switch `--frame-costs` (None: `fold_parts`'s).
+pub fn fold_parts_cost(r: &Record, cost: Option<u32>) -> FoldParts {
     let mut sl = ArgSlots::default();
-    let base = hash16(fold_text(r, Some(&mut sl)).as_bytes());
+    let base = hash16(fold_text(r, Some(&mut sl), cost).as_bytes());
     let empty = sl.pre.is_empty() && sl.eff.is_empty();
     FoldParts { base, slots: (!empty).then(|| Box::new(sl)) }
 }
@@ -287,8 +307,11 @@ pub fn build_task(b: &mut Builder, records: &[Record], goal: &[(String, Labels)]
     let mut folded = 0;
     let mut actions = Vec::new();
     let mut counts = Counter::default();
+    let costs = b.frame_costs.clone();
     for (i, r) in records.iter().enumerate() {
-        if !seen.insert(fold_key(r)) {
+        // the switch --frame-costs: the record's frames (costs.rs), in its fold key too; off, 1
+        let cost = costs.as_ref().map(|fc| fc.cost(r));
+        if !seen.insert(fold_key_cost(r, cost)) {
             folded += 1;
             continue;
         }
@@ -302,7 +325,7 @@ pub fn build_task(b: &mut Builder, records: &[Record], goal: &[(String, Labels)]
         for k in r.pre.keys() {
             fb.setdefault(k);
         }
-        actions.push(Action { name: format!("{}#{i}", r.label), pre, effects, what: i, cost: 1 });
+        actions.push(Action { name: format!("{}#{i}", r.label), pre, effects, what: i, cost: cost.map_or(1, i64::from) });
     }
     let args: Vec<String> = fb.facts.iter().filter(|(k, _)| k.starts_with("args:")).map(|(k, _)| k.clone()).collect();
     for k in args {

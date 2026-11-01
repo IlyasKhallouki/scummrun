@@ -55,6 +55,10 @@ const SAVED: i32 = i32::MIN;
 /// `("resume_at", ev)`)
 const INPUT_STEP: &str = "\u{1}reader: _eng_input";
 const RESUME_STEP: &str = "\u{1}reader: _eng_resume_at";
+/// F1c's steps (switch input_settled): the click on A, the click on B, the click's end
+const F1C_CLICK_A: &str = "\u{1}reader: F1c click A";
+const F1C_CLICK_B: &str = "\u{1}reader: F1c click B";
+const F1C_END: &str = "\u{1}reader: F1c end";
 const VERB_CLICK_AREA: i32 = 1; // model.py, verbs.h:35
 const LEFT_CLICK: i32 = 1; // model.py, verbs.cpp:666
 const VAR_VERB_SCRIPT: i32 = 32;
@@ -127,7 +131,7 @@ fn slot_of(name: &str) -> Slot {
     }
 }
 
-fn pkey_of(s: &str) -> PKey {
+pub(crate) fn pkey_of(s: &str) -> PKey {
     if let Some(name) = s.strip_prefix("args:") {
         return PKey::Args(slot_of(name));
     }
@@ -251,6 +255,12 @@ pub struct SymX {
     fz: Rc<BTreeMap<Slot, (i32, Option<Val>)>>,
     nf: Rc<BTreeMap<Ident, Vec<Test>>>,
     resume_wait: Option<(UnitId, i32)>,
+    /// F1c: the object or actor the mouse is on while a click's scripts run (0: no click)
+    settled_target: i32,
+    /// F1c: the sentence the click's scripts queued
+    queued: Option<(i32, i32, i32)>,
+    /// F1c: a slot this path leaves waiting carries the constants its code reads (rule 8)
+    carry: bool,
 }
 
 impl PathExt for SymX {
@@ -297,6 +307,34 @@ struct St {
     view: Option<Rc<BTreeMap<PKey, Labels>>>,
     /// F12: the instruction the step being run runs (None: an engine step)
     cur: Option<X>,
+    /// the switch --reach: the reached values, this rerun's guides, the branches this run held back (reach.rs)
+    reach: Option<std::sync::Arc<crate::reach::Reached>>,
+    guides: Option<std::sync::Arc<Vec<crate::reach::Guide>>>,
+    held: Vec<crate::reach::Held>,
+    /// the held branches of this run so far: a fork reached again on another path holds the same branch, which is
+    /// kept once, where it was first held (the waits are a set: `add_wait`, reach.rs)
+    held_seen: FxHashSet<crate::reach::Held>,
+    /// the switch pass2_reuse, in pass 1: log what the run consults (memo.rs)
+    track: bool,
+    touched: FxHashSet<Fact>,
+    queries: Vec<crate::memo::Query>,
+    /// F1c: the run's input, where it starts at the input script
+    settled: Option<Rc<SettledRun>>,
+    /// the switch shared_runs (shared.rs): the scope's dialog verbs, the run's reads of them but the click's own
+    /// (`click_read` while `eng_input` reads it), and whether the click read its verb
+    watch_verbs: Vec<i32>,
+    verb_reads: u64,
+    click_read: bool,
+    clicked: bool,
+}
+
+/// F1c: one input's run from input script `n` (machine.rs `f1c_click`).
+struct SettledRun {
+    rule: std::sync::Arc<crate::inputs::SettledRule>,
+    n: i32,
+    verb: i32,
+    a: i32,
+    b: i32,
 }
 
 fn st<'a>(m: &'a Machine<'_>) -> &'a St {
@@ -413,6 +451,9 @@ fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Val> {
 
 fn info(m: &mut Machine<'_>, k: Fact) -> Rc<Info> {
     let s = st_mut(m);
+    if s.track {
+        s.touched.insert(k);
+    }
     if let Some(i) = s.info.get(&k) {
         return i.clone();
     }
@@ -792,6 +833,7 @@ impl Hooks for ReaderHooks {
     }
 
     fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+        watch_verb(m, k);
         let v = read_fact(m, p, k, o);
         match k {
             Fact::ActorRoom(a) => actor_room_value(m, a, v),
@@ -806,6 +848,7 @@ impl Hooks for ReaderHooks {
 
     /// `SymOracle.get`.
     fn oget(&self, m: &mut Machine<'_>, _o: &FactOracle, k: Fact) -> Val {
+        watch_verb(m, k);
         if let Some(&v) = st(m).pins.get(&k) {
             return v;
         }
@@ -905,6 +948,9 @@ impl Hooks for ReaderHooks {
 
     /// `Reader.getter`: a MEMO_GETTERS getter whose arguments are known names them.
     fn getter(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
+        if let Some(v) = f1c_at_mouse(m, p, name, args, x) {
+            return v;
+        }
         let v = m.getter_base(p, o, name, args, x);
         let g = m.game;
         let nm = g.syms.str(name);
@@ -1036,6 +1082,7 @@ impl Hooks for ReaderHooks {
             known::SAVE_VERBS => save_verbs(m, p, o, x, st, args),
             known::RESTORE_VERBS => restore_verbs(m, p, o, x, st, args),
             known::VERB_OPS => lazily(m, |m| m.op_base(p, o, x, st)),
+            known::DO_SENTENCE if sx(p).settled_target != 0 => f1c_do_sentence(m, p, o, x, st),
             _ => m.op_base(p, o, x, st),
         }
     }
@@ -1082,6 +1129,15 @@ impl Hooks for ReaderHooks {
                     enc_val(&mut b, *v);
                 }
             }
+        }
+        // F1c: only a path of a click run has these, so a reading with the switch off hashes as before
+        if x.settled_target != 0 || x.queued.is_some() || x.carry {
+            b.extend_from_slice(&x.settled_target.to_le_bytes());
+            let (v, a, q) = x.queued.unwrap_or((-1, -1, -1));
+            for n in [v, a, q] {
+                b.extend_from_slice(&n.to_le_bytes());
+            }
+            b.push(x.carry as u8);
         }
         let mut h = FxHasher::default();
         h.write(&b);
@@ -1162,6 +1218,9 @@ impl Hooks for ReaderHooks {
         match step {
             Step::Note(s) if &**s == INPUT_STEP => eng_input(m, p, ci, o),
             Step::Note(s) if &**s == RESUME_STEP => eng_resume_at(m, p, ci, o),
+            Step::Note(s) if &**s == F1C_CLICK_A => f1c_click(m, p, false),
+            Step::Note(s) if &**s == F1C_CLICK_B => f1c_click(m, p, true),
+            Step::Note(s) if &**s == F1C_END => f1c_end(m, p),
             Step::Scene { room, .. } => {
                 // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
                 let res = match *room {
@@ -1380,6 +1439,7 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
         Some(sets) => sets,
         None => vals.iter().map(|&v| vec![v]).collect(),
     };
+    let groups = if st(m).reach.is_some() { reach_groups(m, p, key, &i.key, groups) } else { groups };
     let fam = family(key);
     let s = st_mut(m);
     if s.first_fork.is_none() {
@@ -1396,6 +1456,12 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
         m.h_halt(p, "no value", (*i.key).into());
         return Vec::new();
     }
+    if groups.is_empty() {
+        // the switch --reach: every branch of this fork is held back or ran before
+        *p = snap;
+        m.h_halt(p, "no value", (*i.key).into());
+        return Vec::new();
+    }
     let mut forks = Vec::with_capacity(groups.len());
     for g in groups.iter().skip(1) {
         let mut q = snap.clone();
@@ -1406,6 +1472,43 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
     Rc::make_mut(&mut sx_mut(&mut first).pre).insert(PKey::F(key), groups[0].clone());
     *p = first;
     forks
+}
+
+/// The switch --reach at a fork: the groups to follow. A group no guide of this rerun agrees with ran before, or belongs
+/// to another rerun; a group that meets no reached value is held back (reach.rs).
+fn reach_groups(m: &mut Machine<'_>, p: &Path, key: Fact, text: &str, groups: Vec<Labels>) -> Vec<Labels> {
+    use crate::reach::{agrees, make_guide, Held};
+    let pk = PKey::F(key);
+    let pre = sx(p).pre.clone();
+    let s = st(m);
+    let (reach, guides, seed) = (s.reach.clone().unwrap(), s.guides.clone(), s.seed.clone());
+    let table = s.table.as_ref().unwrap();
+    let mut keep = Vec::with_capacity(groups.len());
+    let mut held = Vec::new();
+    let mut queries = Vec::new();
+    for g in groups {
+        if !agrees(guides.as_deref(), &pre, pk, &g) {
+            continue;
+        }
+        let answer = reach.meets(table, text, &g);
+        if s.track {
+            queries.push(crate::memo::Query { key: text.to_string(), set: g.clone(), before: false, answer });
+        }
+        if answer {
+            keep.push(g);
+        } else {
+            held.push(Held { guide: make_guide(&pre, &seed, Some((pk, &g))), key: text.to_string(), set: g });
+        }
+    }
+    let s = st_mut(m);
+    for h in held {
+        if !s.held_seen.contains(&h) {
+            s.held_seen.insert(h.clone());
+            s.held.push(h);
+        }
+    }
+    s.queries.extend(queries);
+    keep
 }
 
 /// reader.py `_make_step`: the op with its counter kept as a step until something reads it.
@@ -1498,12 +1601,28 @@ fn restore_verbs(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: St
     Vec::new()
 }
 
+/// The switch shared_runs: a read of one of the scope's dialog verbs (shared.rs, condition 2).
+fn watch_verb(m: &mut Machine<'_>, k: Fact) {
+    if let Fact::Verb(v) = k {
+        let s = st_mut(m);
+        if !s.click_read && s.watch_verbs.binary_search(&v).is_ok() {
+            s.verb_reads += 1;
+        }
+    }
+}
+
 /// model.py `_eng_input` (its switch input_after_turns off): the click on a verb runs the input script.
 fn eng_input(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> Vec<Path> {
     let verb = st(m).verb;
     for k in [Fact::Var(VAR_VERB_SCRIPT), Fact::Var(VAR_USERPUT), Fact::Verb(verb)] {
         // the drift's reads (`Path.input_drift`, which the reader does not read): a fact may fork here
+        // (the switch shared_runs: the click's own read of its verb is not counted, `watch_verb`)
+        let own = k == Fact::Verb(verb);
+        st_mut(m).click_read = own;
         m.read(p, k, o);
+        let s = st_mut(m);
+        s.click_read = false;
+        s.clicked |= own;
     }
     let (_, cite) = call_at(p, ci);
     let n = m.oget(o, Fact::Var(VAR_VERB_SCRIPT));
@@ -1560,7 +1679,15 @@ fn eng_resume_at(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -
     if g.ins(uid)[idx as usize].yields == Some(Yield::Wait) {
         sx_mut(p).resume_wait = Some((uid, ev.w as i32));
     }
-    let locals: Vec<(i32, Val)> = ev.locals.iter().map(|(n, v)| (*n as i32, mval(m, v))).collect();
+    // F1c rule 8: the constants the slot's list carries go on the path, and on with it
+    let settled = ev.locals.iter().filter(|e| e.0 >= crate::inputs::SETTLED_LOCAL);
+    for (n, v) in settled {
+        let v = mval(m, v);
+        m.h_write(p, Fact::Var((*n - crate::inputs::SETTLED_LOCAL) as i32), v);
+        sx_mut(p).carry = true;
+    }
+    let locals: Vec<(i32, Val)> =
+        ev.locals.iter().filter(|e| e.0 < crate::inputs::SETTLED_LOCAL).map(|(n, v)| (*n as i32, mval(m, v))).collect();
     let owned = match &ev.owned {
         Py::Bool(b) => Owned::Bool(*b),
         other => Owned::Unk(mval(m, &RVal::from_py(other))),
@@ -1577,6 +1704,175 @@ fn eng_resume_at(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -
         count(m, "events resuming a slot with its own open cutscenes (cutscene data carried)");
     }
     Vec::new()
+}
+
+// --- fix round 1, F1c: a sentence from the input script (fix-round1.md, F1c; inputs.rs) -----------------------------
+
+/// F1c: a mouse value as F12 has it: a range with value_sets, else a plain unknown of the same name.
+fn f1c_mouse_val(m: &mut Machine<'_>, what: &str, lo: i32, hi: i32) -> Val {
+    if m.switches.value_sets {
+        m.vals().mk_range(Reason::Input, what, lo, hi)
+    } else {
+        m.vals().mk(Reason::Input, format!("{what} in [{lo}..{hi}]"))
+    }
+}
+
+/// F1c rule 4: VAR_VIRT_MOUSE_X/Y are the range of the object's box, over each place F5 can move it to. On an actor, or
+/// an object with no box, they stay as they are: not known.
+fn f1c_mouse(m: &mut Machine<'_>, p: &mut Path, target: i32) {
+    use crate::inputs::{VAR_VIRT_MOUSE_X, VAR_VIRT_MOUSE_Y};
+    let g = m.game;
+    let Some(bx) = g.object_box.get(&target).copied().filter(|b| b.w > 0 && b.h > 0) else { return };
+    let places = match g.movable.get(&target).filter(|_| m.switches.draw_clears) {
+        Some(v) => v.clone(),
+        None => vec![(bx.x, bx.y)],
+    };
+    let (x0, x1) = (places.iter().map(|c| c.0).min().unwrap(), places.iter().map(|c| c.0).max().unwrap() + bx.w - 1);
+    let (y0, y1) = (places.iter().map(|c| c.1).min().unwrap(), places.iter().map(|c| c.1).max().unwrap() + bx.h - 1);
+    let vx = f1c_mouse_val(m, &format!("VAR_VIRT_MOUSE_X: object {target}"), x0, x1);
+    let vy = f1c_mouse_val(m, &format!("VAR_VIRT_MOUSE_Y: object {target}"), y0, y1);
+    m.h_write(p, Fact::Var(VAR_VIRT_MOUSE_X), vx);
+    m.h_write(p, Fact::Var(VAR_VIRT_MOUSE_Y), vy);
+}
+
+/// F1c rules 4 to 6: a click of the input: the sentence variables as the hover leaves them, then the input script.
+fn f1c_click(m: &mut Machine<'_>, p: &mut Path, second: bool) -> Vec<Path> {
+    let run = st(m).settled.clone().expect("a click step outside a click run");
+    let r = &run.rule;
+    let target = if second {
+        let no_prep = p.writes.get(&Fact::Var(r.p)) == Some(&Val::Int(0));
+        if sx(p).queued.is_some() || no_prep {
+            count(m, "F1c: two-object inputs whose first click queues a sentence or leaves no preposition (dropped)");
+            m.h_halt(p, "unmodelled", "F1c: the first click does not wait for a second object".into());
+            return Vec::new();
+        }
+        m.h_write(p, Fact::Var(r.b), Val::Int(run.b));
+        m.h_write(p, Fact::Var(r.last), Val::Int(run.b));
+        run.b
+    } else {
+        for (k, v) in [(r.v, run.verb), (r.a, run.a), (r.b, 0), (r.p, 0), (r.last, run.a)] {
+            m.h_write(p, Fact::Var(k), Val::Int(v));
+        }
+        run.a
+    };
+    f1c_mouse(m, p, target);
+    sx_mut(p).settled_target = target;
+    let args = vec![
+        (0, Val::Int(crate::inputs::SCENE_CLICK_AREA)),
+        (1, Val::Int(0)),
+        (2, Val::Int(crate::inputs::LEFT_BUTTON)),
+    ];
+    let step = Step::Script { n: run.n, resistant: Some(false), recursive: Some(false), args };
+    let cid = m.h_cid();
+    p.stack.push(Entry::Call(Call {
+        head: "runInputScript".into(),
+        cite: "script.cpp:1478-1511".into(),
+        steps: vec![step].into(),
+        caller: None,
+        active: false,
+        i: 0,
+        cid,
+    }));
+    Vec::new()
+}
+
+/// F1c rule 4: findObject and actorFromPos at the mouse while a click's scripts run: the input's object, or actor.
+fn f1c_at_mouse(m: &mut Machine<'_>, p: &mut Path, name: Sym, args: Span, x: Option<X>) -> Option<Val> {
+    if name != known::FIND_OBJECT && name != known::ACTOR_FROM_POS {
+        return None;
+    }
+    let target = sx(p).settled_target;
+    if target == 0 || !crate::inputs::is_mouse_args(m.game, m.game.ast.kids(args)) {
+        return None;
+    }
+    let is_actor = (target as i64) < scope::NUM_ACTORS;
+    if name == known::FIND_OBJECT {
+        return Some(Val::Int(if is_actor { 0 } else { target }));
+    }
+    if is_actor {
+        return Some(Val::Int(target));
+    }
+    let cite = match x {
+        Some(x) => m.cite(x),
+        None => "actor.cpp:2115-2147".into(),
+    };
+    let cond: S = format!("no actor under the click on object {target}").into();
+    let why: S = format!("?({}: actorFromPos at the mouse)", Reason::Position.as_str()).into();
+    let a = Assumption { cite, cond, side: Side::Bool(true), why };
+    if !p.assumptions.iter().any(|b| *b == a) {
+        p.assumptions.push(a);
+    }
+    Some(Val::Int(0))
+}
+
+/// F1c rule 7: doSentence on a click's path: STOP is the machine's own op and empties what is held; a push is held on the
+/// path, and the click's scripts go on.
+fn f1c_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
+    let Stmt::Op { args, flags, .. } = st else { unreachable!() };
+    let g = m.game;
+    if g.ast.flags(flags).contains(&known::STOP) {
+        sx_mut(p).queued = None;
+        return m.op_base(p, o, x, st);
+    }
+    let cite = m.cite(x);
+    if sx(p).queued.is_some() {
+        count(m, "F1c: a second sentence on one click (dropped)");
+        m.h_halt(p, "unmodelled", format!("{cite}: a second doSentence on one click").into());
+        return Vec::new();
+    }
+    let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
+    let vals: Vec<Val> = kids.iter().map(|&a| m.val(p, o, a, Some(x))).collect();
+    if let [Val::Int(v), Val::Int(a), Val::Int(b)] = vals[..] {
+        sx_mut(p).queued = Some((v, a, b));
+        m.h_note(p, cite, "doSentence", "sentence queued (F1c): it runs where the click's run ends");
+    } else {
+        let strs: Vec<String> = vals.iter().map(|&v| m.vals_ref().show(v).to_string()).collect();
+        let w = format!("sentence [{}]", strs.join(", "));
+        count(m, "F1c: sentences with a value not known (listed, not run)");
+        p.unknown_writes.push(("doSentence".into(), cite, w.into()));
+    }
+    Vec::new()
+}
+
+/// F1c rule 7: where the click's run ends, a sentence held runs as today's record runs it (the job's pins hold the
+/// sentence script idle, or live and frozen); a v5 sentence whose B is A and not 0 is dropped (script.cpp:1202-1204).
+/// None held: the record ends, and what it leaves waiting carries the constants (rule 8).
+fn f1c_end(m: &mut Machine<'_>, p: &mut Path) -> Vec<Path> {
+    let x = sx_mut(p);
+    let q = x.queued.take();
+    x.settled_target = 0;
+    let Some((verb, a, b)) = q else {
+        x.carry = true;
+        return Vec::new();
+    };
+    if b != 0 && a == b {
+        return Vec::new();
+    }
+    let cid = m.h_cid();
+    let step = Step::Sentence { verb, a, b: (b != 0).then_some(b) };
+    p.stack.push(Entry::Call(Call {
+        head: "checkAndRunSentenceScript".into(),
+        cite: "script.cpp:1244-1246".into(),
+        steps: vec![step].into(),
+        caller: None,
+        active: false,
+        i: 0,
+        cid,
+    }));
+    Vec::new()
+}
+
+/// F1c rule 8: a slot the path leaves waiting carries the five variables its own code reads, where the path knows them.
+fn f1c_carry(rule: &crate::inputs::SettledRule, out: &mut PathOut) {
+    for k in out.kept.values_mut() {
+        let Some(vars) = rule.reads.get(&k.unit) else { continue };
+        for &n in vars {
+            if let Some(RVal::Int(v)) = out.writes.get(&format!("var:{n}")) {
+                k.locals.push((crate::inputs::SETTLED_LOCAL + n as i64, RVal::Int(*v)));
+            }
+        }
+        k.locals.sort_by_key(|e| e.0);
+    }
 }
 
 fn opt_bool(p: &Py) -> Option<bool> {
@@ -1746,10 +2042,12 @@ fn tri_py(t: &(S, S, S)) -> Py {
 }
 
 /// `Builder.run`'s and `Builder.record`'s reads of a path (reader_port_oracle.py's `_path_dict`).
-fn path_out(game: &Game, run: &Run, p: &Path) -> PathOut {
+fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&SettledRun>) -> PathOut {
     let end = p.end.map(|e| e.to_string());
     let sym = p.ext.is_some();
-    if !sym || end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) {
+    // the switch havoc_cut: a path the step limit ended is handed over whole, with where it stood (havoc.rs)
+    let cut = (havoc && sym && end.as_deref() == Some("limit")).then(|| cut_of(game, p, settled));
+    if !sym || (cut.is_none() && end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e))) {
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
@@ -1801,6 +2099,75 @@ fn path_out(game: &Game, run: &Run, p: &Path) -> PathOut {
         unknown_writes: p.unknown_writes.iter().map(tri_py).collect(),
         assumptions,
         notes,
+        cut,
+    }
+}
+
+/// The switch havoc_cut: the frames on a cut path's stack with the instruction each runs next, and the engine steps
+/// its calls have not run yet (`Call.i` is the next step's index). `settled` is the F1c click the run makes, if any.
+fn cut_of(game: &Game, p: &Path, settled: Option<&SettledRun>) -> crate::record::Cut {
+    let mut cut = crate::record::Cut::default();
+    for e in &p.stack {
+        match e {
+            Entry::Frame(f) => {
+                if f.unit != scumm_machine::path::NONE_UNIT {
+                    cut.frames.push((game.unit(f.unit).key, f.pc));
+                }
+            }
+            Entry::Call(c) => {
+                for st in c.steps.iter().skip(c.i as usize) {
+                    cut.steps.extend(pending_step(st, settled));
+                }
+            }
+        }
+    }
+    cut
+}
+
+/// One engine step a call has still to run, as the code it runs (havoc-cut.md, "The write set"). A step the model notes
+/// and does not run counts as the engine runs it: a scroll note as the scroll hook, actorFollowCamera's second
+/// inventory hook as that hook, any other note as every unit. The reader's own steps count as what they do.
+fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::CutStep> {
+    use crate::record::{CutStep, RoomStep};
+    let other = |st: &Step| vec![CutStep::Other(format!("{st:?}").chars().take(40).collect())];
+    let var = |n: i32| CutStep::Write(format!("var:{n}"));
+    match st {
+        Step::CutIndex(_) => vec![],
+        Step::Script { n, .. } => vec![CutStep::Script(*n)],
+        Step::Object { obj, .. } => vec![CutStep::Object(*obj)],
+        Step::Hook { var, .. } => vec![CutStep::Hook(*var)],
+        Step::Write(k, _) => vec![CutStep::Write(key_str(*k))],
+        // startScene's steps, with the room a step loads (havoc_rooms reads it; havoc-rooms.md)
+        Step::Scene { room: r, .. } | Step::SceneBegin(r) | Step::SceneLoad(r) | Step::Room1(r) => {
+            vec![CutStep::Room(RoomStep::Load(match r {
+                Val::Int(n) => Some(*n),
+                _ => None,
+            }))]
+        }
+        Step::RoomCode { entry } => vec![CutStep::Room(RoomStep::Code(*entry))],
+        Step::SceneKill | Step::SceneEgo(_) => vec![CutStep::Room(RoomStep::Other)],
+        // checkAndRunSentenceScript runs VAR_SENTENCE_SCRIPT's script (script.cpp:1244-1246)
+        Step::Sentence { .. } => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
+        Step::ScrollNote => vec![CutStep::Hook(scumm_machine::machine::VAR_SCROLL_SCRIPT)],
+        Step::Note(s) if &**s == scumm_machine::machine::SECOND_INVENTORY_HOOK => vec![CutStep::Hook(VAR_INVENTORY_SCRIPT)],
+        // a click on a verb: the input script (`eng_input`)
+        Step::Note(s) if &**s == INPUT_STEP => vec![CutStep::Hook(VAR_VERB_SCRIPT)],
+        // F1c's clicks: the sentence variables and the mouse (`f1c_click`, `f1c_mouse`), then the input script again
+        Step::Note(s) if &**s == F1C_CLICK_A || &**s == F1C_CLICK_B => match settled {
+            Some(run) => {
+                let r = &run.rule;
+                let vars: Vec<i32> = if &**s == F1C_CLICK_A { vec![r.v, r.a, r.b, r.p, r.last] } else { vec![r.b, r.last] };
+                let mut out: Vec<CutStep> = vars.into_iter().map(var).collect();
+                out.push(var(crate::inputs::VAR_VIRT_MOUSE_X));
+                out.push(var(crate::inputs::VAR_VIRT_MOUSE_Y));
+                out.push(CutStep::Script(run.n));
+                out
+            }
+            None => other(st),
+        },
+        // F1c's end: the sentence its click queued (`f1c_end`)
+        Step::Note(s) if &**s == F1C_END => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
+        _ => other(st),
     }
 }
 
@@ -1902,9 +2269,29 @@ impl Reader<'_> {
             s.pending = None;
             s.view = None;
             s.event = None;
+            s.settled = None;
         }
         let o = &self.o;
+        let settled_n = match (&cx.table.settled, pins.get(crate::inputs::SETTLED_PIN)) {
+            (Some(_), Some(RVal::Int(n))) => Some(*n as i32),
+            _ => None,
+        };
         let run = match what {
+            What::Sentence { verb, a, b } if settled_n.is_some() => {
+                // F1c: the click (with B, both clicks) from the input script, then what it queued
+                let n = settled_n.unwrap();
+                let b = b.unwrap_or(0) as i32;
+                st_mut(m).settled = Some(Rc::new(SettledRun { rule: cx.table.settled.clone().unwrap(), n, verb: *verb as i32, a: *a as i32, b }));
+                let mut steps = vec![Step::Note(F1C_CLICK_A.into())];
+                if b != 0 {
+                    steps.push(Step::Note(F1C_CLICK_B.into()));
+                }
+                steps.push(Step::Note(F1C_END.into()));
+                let cid = m.h_cid();
+                let call = Call { head: "click".into(), cite: "scumm.cpp:3175-3255".into(), steps: steps.into(), caller: None, active: false, i: 0, cid };
+                let first = first_path(m, call);
+                m.h_drive(o, first, format!("input script {n}"), None)
+            }
             What::Sentence { verb, a, b } => m.run_sentence(o, *verb as i32, *a as i32, b.map(|b| b as i32)),
             What::Verb(v) => {
                 st_mut(m).verb = *v as i32;
@@ -1946,7 +2333,7 @@ impl Reader<'_> {
     pub fn path_dump(&self, run: &Run, p: &Path) -> Py {
         let game = self.m.game;
         let tri_list = |l: &scumm_machine::plist::PList<(S, S, S)>| Py::List(l.iter().map(tri_py).collect());
-        let o = path_out(game, run, &Path { notes: Default::default(), end: None, ..p.clone() });
+        let o = path_out(game, run, &Path { notes: Default::default(), end: None, ..p.clone() }, false, None);
         let mut f = vec![
             ("end", p.end.map_or(Py::None, Py::str)),
             ("end_at", p.end_at.as_ref().map_or(Py::None, |s| Py::str(&**s))),
@@ -1969,12 +2356,151 @@ impl Reader<'_> {
 }
 
 impl RunMachine for Reader<'_> {
-    /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`.
-    fn run(&mut self, cx: &Ctx, _label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+    fn set_path_limit(&mut self, n: usize) {
+        self.m.path_limit = if n == 0 { PATH_LIMIT } else { n };
+    }
+
+    /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`. The label names the run only; under --reach its
+    /// guides come by the job's key (`Ctx::job_key`).
+    fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+        // the rough reading (rough-reading.md): every run with the reading's step limit, else the machine's own
+        self.m.step_limit = if cx.table.step_limit == 0 { scumm_machine::machine::STEP_LIMIT } else { cx.table.step_limit };
+        {
+            let s = st_mut(&mut self.m);
+            s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing());
+            s.touched.clear();
+            s.queries.clear();
+        }
+        if let Some(r) = &cx.table.reach {
+            let s = st_mut(&mut self.m);
+            s.guides = cx.job_key.and_then(|k| r.guides_of(k));
+            s.reach = Some(r.clone());
+            s.held.clear();
+            s.held_seen.clear();
+        }
+        // the switch shared_runs (shared.rs): a click that differs from another job's only in its verb takes its run
+        let mut mine: Option<(std::sync::Arc<crate::shared::SharedRuns>, (String, String), i64, UnitKey, std::sync::Arc<Vec<bool>>)> = None;
+        if let (Some(sh), What::Verb(v)) = (&cx.table.shared, what) {
+            if let Some((key, unit, def)) = self.share_key(cx, pins, pre, *v, sh) {
+                match sh.look(&key.0, &key.1) {
+                    crate::shared::Look::Hit(out, v0) => return crate::shared::rename(out, v0, *v),
+                    crate::shared::Look::Mine => mine = Some((sh.clone(), key, *v, unit, def)),
+                    crate::shared::Look::Alone => {}
+                }
+            }
+            let s = st_mut(&mut self.m);
+            s.watch_verbs = cx.scope.dialog_verbs.iter().map(|&x| x as i32).collect();
+            s.watch_verbs.sort_unstable();
+            s.verb_reads = 0;
+            s.click_read = false;
+            s.clicked = false;
+        }
+        let out = self.run_out(cx, pins, pre, what);
+        if let Some((sh, key, v, unit, def)) = mine {
+            let ok = self.shareable(&out, unit, &def);
+            if let Err(why) = ok {
+                crate::par::trace_shared(label, why);
+            }
+            sh.fill(&key.0, &key.1, ok.is_ok().then(|| (out.clone(), v)));
+        }
+        out
+    }
+}
+
+impl Reader<'_> {
+    /// The switch shared_runs: the key of a click's run with its verb taken out, and the input script's unit; None
+    /// when the run is not one the switch shares (its verb not pinned to 1, its input script not known, or the script
+    /// names its verb argument).
+    #[allow(clippy::type_complexity)]
+    fn share_key(&self, cx: &Ctx, pins: &Pins, pre: &Pre, v: i64, sh: &crate::shared::SharedRuns) -> Option<((String, String), UnitKey, std::sync::Arc<Vec<bool>>)> {
+        let game = self.m.game;
+        let vk = format!("verb:{v}");
+        if pins.get(&vk) != Some(&RVal::Int(1)) || pre.get(&vk).map(|s| s.as_slice()) != Some(&[Label::Int(1)][..]) {
+            return None;
+        }
+        let Some(RVal::Int(n)) = pins.get(&format!("var:{VAR_VERB_SCRIPT}")) else { return None };
+        let n = *n as i32;
+        let unit = if n >= game.first_local {
+            let Some(RVal::Int(room)) = pins.get("room") else { return None };
+            UnitKey::Local(game.resource(*room as i32)?, n)
+        } else {
+            UnitKey::Global(n)
+        };
+        let uid = game.id(unit)?;
+        let def = sh.arg_written(game, uid)?;
+        let mut p2 = pins.clone();
+        p2.remove(&vk);
+        let mut q2 = pre.clone();
+        q2.remove(&vk);
+        let fv = PKey::F(Fact::Verb(v as i32));
+        let guides: Option<Vec<crate::reach::Guide>> = st(&self.m).guides.as_ref().map(|gs| {
+            gs.iter()
+                .map(|g| g.iter().map(|(k, l)| (if *k == fv { PKey::F(Fact::Verb(i32::MIN)) } else { *k }, l.clone())).collect())
+                .collect()
+        });
+        let _ = cx;
+        let coarse = format!("{}|{n}|{unit:?}|{p2:?}|{q2:?}", self.m.path_limit);
+        Some(((format!("{coarse}|{guides:?}"), coarse), unit, def))
+    }
+
+    /// The switch shared_runs, conditions 2-4 on the run made (shared.rs): no read of another dialog verb, no write
+    /// of one, and a kept list of the input script holds `Local[1]` only where the script has written it.
+    fn shareable(&self, out: &RunOut, unit: UnitKey, def: &[bool]) -> Result<(), &'static str> {
+        let game = self.m.game;
+        let Some(uid) = game.id(unit) else { return Err("no unit") };
+        let s = st(&self.m);
+        if !s.clicked {
+            return Err("no click read");
+        }
+        if s.verb_reads != 0 {
+            return Err("it reads a dialog verb");
+        }
+        let watched = |k: &str| {
+            k.strip_prefix("verb:").and_then(|n| n.parse::<i32>().ok()).is_some_and(|n| s.watch_verbs.binary_search(&n).is_ok())
+        };
+        if out.paths.iter().any(|p| p.writes.keys().any(|k| watched(k))) {
+            return Err("it writes a dialog verb");
+        }
+        let kept_arg = out.paths.iter().any(|p| {
+            p.kept.values().any(|k| {
+                k.unit == unit
+                    && k.locals.iter().any(|(i, _)| *i == crate::shared::ARG as i64)
+                    && !game.at(uid, k.w as i32).is_some_and(|i| def.get(i as usize) == Some(&true))
+            })
+        });
+        if kept_arg {
+            return Err("a kept list holds its verb argument");
+        }
+        Ok(())
+    }
+
+    /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`, made.
+    fn run_out(&mut self, cx: &Ctx, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
-        let paths = run.paths.iter().map(|p| path_out(game, &run, p)).collect();
-        RunOut { paths, limit: run.limit as i64, value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(), first_fork, rd }
+        let settled = st(&self.m).settled.clone();
+        // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths
+        let paths = if cx.table.split_limit && run.limit != 0 {
+            Vec::new()
+        } else {
+            run.paths
+                .iter()
+                .map(|p| {
+                    let mut out = path_out(game, &run, p, cx.table.havoc_cut, settled.as_deref());
+                    if let Some(rule) = &cx.table.settled {
+                        if out.sym && sx(p).carry && !out.kept.is_empty() {
+                            f1c_carry(rule, &mut out);
+                        }
+                    }
+                    out
+                })
+                .collect()
+        };
+        let s = st_mut(&mut self.m);
+        let held = std::mem::take(&mut s.held);
+        let touched = s.touched.drain().map(key_str).collect();
+        let queries = std::mem::take(&mut s.queries);
+        RunOut { paths, limit: run.limit as i64, value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(), first_fork, rd, held, touched, queries }
     }
 }
 
@@ -2002,4 +2528,81 @@ pub fn dump_capture_run(rd: &mut Reader, cx: &Ctx, i: usize, c: &Py) -> Py {
         ("rd", Py::dict(vec![("counts", nz(&rdc.counts)), ("forks", nz(&rdc.forks)), ("fork_keys", nz(&rdc.fork_keys))])),
         ("paths", Py::List(run.paths.iter().map(|p| rd.path_dump(&run, p)).collect())),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::record::CutStep;
+
+    /// A path whose stack holds one call with these steps, `done` of them run.
+    fn path(steps: Vec<Step>, done: u32) -> Path {
+        Path::new(vec![Entry::Call(Call { head: "t".into(), cite: "t".into(), steps: steps.into(), caller: None, active: false, i: done, cid: 1 })])
+    }
+
+    fn settled() -> SettledRun {
+        let rule = crate::inputs::SettledRule {
+            plain: Default::default(),
+            v: 9,
+            a: 10,
+            b: 11,
+            p: 12,
+            last: 13,
+            hover: UnitKey::Global(3),
+            wait: 0,
+            guards: vec![],
+            reads: Default::default(),
+            installed: Default::default(),
+            anywhere: Default::default(),
+        };
+        SettledRun { rule: std::sync::Arc::new(rule), n: 204, verb: 7, a: 320, b: 0 }
+    }
+
+    /// The independent check's hole (2): a cut inside the first click's input script still has F1c's second click
+    /// (its two sentence variables, the mouse, the input script again) and the queued sentence to run.
+    #[test]
+    fn a_cut_in_the_first_click_keeps_the_second_click_and_the_sentence() {
+        let game = crate::oracle::load_game();
+        let p = path(vec![Step::Note(F1C_CLICK_A.into()), Step::Note(F1C_CLICK_B.into()), Step::Note(F1C_END.into())], 1);
+        let run = settled();
+        let cut = cut_of(&game, &p, Some(&run));
+        let w = |n: i32| CutStep::Write(format!("var:{n}"));
+        let want = vec![
+            w(11),
+            w(13),
+            w(crate::inputs::VAR_VIRT_MOUSE_X),
+            w(crate::inputs::VAR_VIRT_MOUSE_Y),
+            CutStep::Script(204),
+            CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT),
+        ];
+        assert_eq!(cut.steps, want);
+        // without the click's run the second click names every unit
+        let cut = cut_of(&game, &p, None);
+        assert!(matches!(cut.steps[0], CutStep::Other(_)), "{:?}", cut.steps);
+    }
+
+    /// Hole (3): a pending scroll note is the scroll hook, which the engine may run; actorFollowCamera's second
+    /// inventory hook is that hook; any other note reads every unit.
+    #[test]
+    fn notes_the_model_does_not_run_count_as_the_engine_runs_them() {
+        let game = crate::oracle::load_game();
+        let p = path(
+            vec![
+                Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![] },
+                Step::ScrollNote,
+                Step::Note(scumm_machine::machine::SECOND_INVENTORY_HOOK.into()),
+                Step::Note("some other note".into()),
+                Step::CutIndex(None),
+            ],
+            1,
+        );
+        let cut = cut_of(&game, &p, None);
+        assert_eq!(cut.steps.len(), 3, "{:?}", cut.steps);
+        assert_eq!(cut.steps[0], CutStep::Hook(scumm_machine::machine::VAR_SCROLL_SCRIPT));
+        assert_eq!(cut.steps[1], CutStep::Hook(VAR_INVENTORY_SCRIPT));
+        assert!(matches!(cut.steps[2], CutStep::Other(_)));
+        // a pending sentence runs the sentence script
+        let p = path(vec![Step::Sentence { verb: 7, a: 320, b: None }], 0);
+        assert_eq!(cut_of(&game, &p, None).steps, vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)]);
+    }
 }

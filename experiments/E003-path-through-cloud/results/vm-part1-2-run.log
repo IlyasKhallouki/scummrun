@@ -1,0 +1,6 @@
+[14:26:59] part1-seed1: booting to the first idle stop
+[14:27:02] part1-seed1: idle stop at frame 2728; the start check
+[14:34:03] planning through taskcore (plan 0, frame 2728, 0 bans)
+[14:41:21] plan 0: unsolvable, 0 steps, 0 s
+[14:41:21] part1-seed1: stop 'no plan (the planner proved none)'; verifying from boot (1 checkpoints)
+[14:41:24] wrote /home/ilyask/fast-mi/out/partI-live3/results/replay-part1-part1-seed1.json

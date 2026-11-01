@@ -1,0 +1,2 @@
+lock taken 18:00:05, memory cap 5501324 kB
+rc 137 100 s

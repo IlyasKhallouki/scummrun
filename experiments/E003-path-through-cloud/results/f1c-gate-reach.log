@@ -1,0 +1,95 @@
+E003, F1c's gate again with --reach on both sides. Branch ksr from reach 18d6e5b, with reader-port read --no-keep (919961b).
+Laptop, 2026-10-31/11-01; nice 10, 3 threads per reading; load 8 to 17 from other jobs (a reader-scope of Part I, builds, a
+browser), so wall and CPU times move with the hour. Seed 1, the kitchen's start s17 and goal owner:566 = ego.
+Base switches: value_sets,draw_clears,actor_rooms,split_limit,reach with --elsewhere --live-locals.
+reader-port read kitchen --threads 3 --switches S --elsewhere --live-locals --packed F; taskcore sas --start s17 for operators
+(F.reached next to F); lama-first on taskcore's SAS file.
+
+== the gate, first pair (load about 9.5)
+| reading | records | actions | wall s | CPU s | peak MB | operators s17 | lama-first |
+| kitchen, reach | 27739 | 27617 | 9.20 | 22.6 | 535 | 17672 | plan, 10 steps, 2.0 s |
+| kitchen, reach, input_settled | 40765 | 39661 | 14.23 | 38.7 | 655 | 43323 | plan, 10 steps, 7.9 s |
+| ratio | 1.47 | 1.44 | 1.55 | 1.71 | 1.22 | 2.45 | |
+THE GATE (3 times) PASSES on records, CPU and operators in every pair, and on wall in 5 of 7 pairs and the median (below).
+Packed files: sha1 94ae07f7 (reach), 4f19fb05 (reach, input_settled); the same on every run.
+
+== all pairs, the same two readings one after the other (load: the 1-minute load average at each start)
+| pair | load | reach wall s | reach CPU s | input_settled wall s | input_settled CPU s | wall ratio | CPU ratio |
+| 1 | about 9.5 | 9.20 | 22.6 | 14.23 | 38.7 | 1.55 | 1.71 |
+| 2 | 9.1, 9.0 | 14.39 | 33.9 | 118.03 | 81.3 | 8.20 | 2.40 |
+| 3 | 16.4, 14.9 | 54.91 | 52.1 | 59.94 | 82.0 | 1.09 | 1.57 |
+| 4 | 13.8, 13.5 | 46.14 | 51.8 | 55.59 | 80.1 | 1.20 | 1.55 |
+| nk, --no-keep | 7.8, 11.9 | 36.61 | 54.8 | 115.96 | 100.3 | 3.17 | 1.83 |
+| 6 | 9.9, 10.2 | 36.76 | 60.5 | 65.45 | 95.8 | 1.78 | 1.58 |
+| 7 | 11.8, 11.8 | 44.56 | 61.5 | 57.10 | 95.6 | 1.28 | 1.55 |
+median of the 7: wall 1.55, CPU 1.58. In pairs 2 and nk the input_settled reading had under one core on average (CPU s over wall s
+0.69 and 0.86; 2.72 in pair 1). Pair 5 was stopped by the memory guard (MemAvailable under 3 GB from other jobs) and is not counted.
+--no-keep: peak 258 MB and 252 MB, the same packed files and .reached files.
+
+== against F1c's gate without --reach (results/f1c-gate.log)
+| reading | records | actions | CPU s | peak MB | operators s17 |
+| kitchen, base | 71242 | 71058 | 80.8 | 748 | 17712 |
+| kitchen, input_settled | 475441 | 442665 | 435.7 | 4176 | 44839 |
+| kitchen, reach | 27739 | 27617 | 22.6 | 535 | 17672 |
+| kitchen, reach, input_settled | 40765 | 39661 | 38.7 | 655 | 43323 |
+This branch's input_settled reading without --reach (--no-keep): 475441 records, 442665 actions, sha1 7115b5ab, the same file as F1c's
+gate; 430.25 s wall, 676.5 CPU s at load 14, peak 311 MB.
+
+== actions by kind (taskcore dump --fold off --reduce none)
+| kind | reach | reach, input_settled |
+| sentence | 3580 | 14504 |
+| walk_to | 264 | 1208 |
+| event | 17159 | 17293 |
+| skip_cutscene | 6488 | 6488 |
+| dialog_line | 126 | 168 |
+sentence and walk_to with input_settled: 10548 var:32 = 202, 1320 var:32 = 14, 3274 var:32 = 4 (the plain value), 570 inventory (as today).
+3274 + 570 = 3844, the reach reading's sentences and walks.
+Without --reach (F1c's gate, records): 400116 var:32 = 202, 3900 var:32 = 14, 25488 plain, 4384 inventory.
+
+== global 4's Bit[547] under --reach
+NAME.reached: bit:547 0 in both readings. s17 holds bit:547 = 0. No action of either file writes bit:547, none has bit:547 = {1} in
+its precondition (10531 actions of the input_settled file have bit:547 = {0}), and none reads var:182 (reached 0 and above).
+So the fork at global 4's [0000] runs only its bit:547 = 0 side; the other side, with var:182's fork under it, is held and never freed.
+The writes that make bit: a fact (an indexed Bit write whose index does not fold) are the machine's unknown-target writes: left out of
+the record's effects and listed on it (machine.rs `put`, builder.rs), with or without --reach.
+actorroom:6 is reached at -1, 0 and 28; 72 is not (F1c's gate had 28, 72, 0 and not known).
+sentence(7,320): 6 actions and 6 frozen with reach; with input_settled also [202] 30 and 30 frozen, [14] 3 and 3 frozen (78).
+The 30 of [202]: actorroom:6 = -1 12, = 28 12, = 0 6; all bit:547 = {0}.
+
+== the plan with input_settled, s17 to owner:566 = ego (lama-first, 43323 operators)
+event(local:211@33), fold:walk_to(316)[202] (the fold of actorroom:6 = -1 and = 28, each with bit:547 = {0}, var:32 = {202}, the hover
+at its wait; the record starts the sentence script, script:2 = 1, waiting at 736), event(script:2@736), event(local:218@16),
+sentence(2,564), event(script:2@736), event(script:2@915), sentence(9,566), event(script:2@736), event(script:2@915)
+Without input_settled the same steps with walk_to(316). Not played.
+
+== exactness: --reach with input_settled against the full reading with the same switches
+reach_check.py (experiments/E004-fast-exact/results/reach-kitchen-input-settled-check.json), start s17:
+| | count |
+| full file's actions | 442665 |
+| (d) keeps of full | 39677 |
+| --reach writes | 39661 |
+| (d) keeps, not written | 17: 11 event naming (lemma 2, event(script:2@759...)), 6 a job read otherwise (sentence(8,574), its frozen copy) |
+| written, (d) does not keep | 8: sentence(8,574) and its frozen copy, a job read otherwise |
+| fact values reached by (d) | the same on every fact both files have (5865 values); 87 facts only in the full file, each with one value |
+| the reader's .reached against (d) on its file | the same |
+| guesses cut | 0 |
+The same classes and counts as without input_settled (reach-kitchen-check.json: 17 and 8).
+Taskcore's task with all reductions: 13905 actions, 43323 operators from --reach; 13907 actions, 44839 operators from the full file;
+173 variables and 5189 values on both.
+
+== the optimal cost from s17, on taskcore's SAS files of both (FD's search memory limit 2 GB, 1800 s, nice 10, the memory guard on)
+| task | operators | A* landmark cost partitioning (lm_rhw) | greedy ff, bound 8 |
+| --reach, input_settled | 43323 | h0 6; f = 6 not closed in 1800 s, peak 1427 MB; no plan | cost 7, 7 steps, 0.5 s search |
+| full, input_settled | 44839 | h0 6; f = 6 not closed in 1800 s, peak 1430 MB; no plan | cost 7, 7 steps, 0.5 s search |
+| --reach, without input_settled | 17672 | h0 7, plan cost 7, 8 expanded | |
+The cost-7 plans, both: event(local:211@33), fold:walk_to(316)[202], event(script:2@736), event(local:218@16), sentence(9,566),
+event(script:2@736) (a fold of 2 in the full file's), event(script:2@915).
+So the optimal cost is 6 or 7 on both; A* did not decide which. A greedy search with bound 7 (a plan of cost 6) on the --reach task
+found none in 600 s. That is no proof.
+Other admissible searches tried on the --reach task: landmark cost partitioning over lm_merged(lm_rhw, lm_zg): the same 28 landmarks,
+h0 6; lm_zg alone: no h0 in 60 s; lm_exhaust, lmcut and the three stubborn-set prunings: conditional effects not supported. The FD
+build has no LP solver, so no optimal cost partitioning.
+
+== every switch off
+reader-port read kitchen --packed: 72256 records, 71729 actions, sha1 279b7a24 (main's); the reading against golden.py's: 72258
+compared, 0 differences. The only code change on ksr is reader-port's --no-keep (off by default).

@@ -1,0 +1,30 @@
+closure units: count
+      1 0
+      3 1
+     25 3
+     50 6
+every-unit reasons:
+     79 []
+jobs (label without list):
+      9 dialog_line(128)[204@28]
+      9 dialog_line(126)[204@28]
+      9 dialog_line(125)[204@28]
+      9 dialog_line(124)[204@28]
+      9 dialog_line(123)[204@28]
+      9 dialog_line(122)[204@28]
+      9 dialog_line(121)[204@28]
+      9 dialog_line(120)[204@28]
+      7 event(local
+slowest jobs:
+970.9 event(script:114@101):
+941.0 event(script:114@101#2f7464790a51):
+621.8 event(script:114@101#2f7464790a51):
+345.6 event(script:114@101):
+200.4 dialog_line(126)[202@85]:
+186.7 dialog_line(123)[202@85]:
+186.4 dialog_line(120)[202@85]:
+165.3 dialog_line(121)[202@85]:
+155.4 dialog_line(122)[202@85]:
+150.1 dialog_line(124)[202@85]:
+149.7 dialog_line(125)[202@85]:
+149.5 dialog_line(128)[202@85]:

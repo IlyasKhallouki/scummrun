@@ -4,6 +4,7 @@ usage: from plan_fd import plan, plan_taskcore
        result = plan(sas, start, time_limit=600)    # sas: task.SasTask; start: a facts.py map
        result.status, result.steps, result.landmarks, result.orderings
        result = plan_taskcore(packed, facts, goal, pieces, start, bans, workdir=DIR)   # through taskcore (below)
+       result = plan_taskcore(..., serve=True)   # the same, through one long-lived taskcore per packed file (below)
 
 **The planner.** Fast Downward (``third_party/downward``, release 26.6.0, built with ``./build.py release``),
 its search component on our file: the driver runs search only when the one input file looks like translator
@@ -35,7 +36,12 @@ The start check is on the facts reduction (e) needs (``--start-check needed``, t
 outside a domain stops the plan only on a fact that can matter to the goal, as the python planner's pruned task held
 only such facts; ``start_check="input"`` checks every fact the input's file names (task.py on build_task's task).
 Then lama-first (the same search string and limits as ``plan``) or, with ``search="anytime"``, anytime LAMA
-(``seq-sat-lama-2011``) for ``time_limit`` seconds, its last (best) plan. The plan reads back through the operator
+(``seq-sat-lama-2011``) for ``time_limit`` seconds, its last (best) plan. For a file with frame costs (the reader's
+switch ``--frame-costs``): ``search="lama-first-costs"``, lama-first's greedy search with costs (anytime LAMA's
+second iteration, cost plus one in both heuristics), or ``"astar-lmcp"``, A* with
+``landmark_cost_partitioning(lm_rhw())``, which is admissible, so its plan is optimal for the file's costs. The pick
+and goal operators cost 0 in every search (taskcore's model encoding). ``plan_cost`` is the plan's cost in the file as
+Fast Downward reports it. The plan reads back through the operator
 table, as ``parse_plan`` reads task.py's (picks folded into the steps that read them, goal operators left out), to
 the reduced actions and the input actions they stand for. A folded step stands for several paths; the step is the
 path whose precondition holds in the plan's predicted state at that step (``predict``: from the start, each step's
@@ -55,8 +61,18 @@ effects cut to the facts (e) needs (the operator table's ``needed``): the python
 effects on the facts relevance.py needs, and on the kitchen (e) alone gives that task exactly
 (results/taskcore-kitchen.log). A start outside a domain on a needed fact: taskcore stops as task.py raises
 OutOfDomain; status "out of domain". Any other taskcore error raises ``TaskcoreError``.
+
+**Without reloading** (``serve=True``, off by default): instead of one ``taskcore sas`` process per plan, the request
+goes to one ``taskcore serve`` process per packed file (``TaskcoreServer``, ``server_for``), which keeps the loaded
+task and, for the bans and goal it was last asked for, the banned task as a view, the fold and the reduction loop up
+to (d), none of which reads the start (taskcore/src/serve.rs). Each plan then redoes only the start check, (d) from
+the new start and what follows. It writes the same files, byte for byte, and stops with the same errors, so the rest
+of ``plan_taskcore`` is unchanged. One server lives at a time: asking for another packed file (F10's reading made
+again) or other options closes the old one; ``--cost-caps`` in ``args`` goes with the request. ``write_s`` is then the request's time; ``serve`` the server's reply (its
+seconds, whether it built or kept, its memory).
 """
 
+import atexit
 import dataclasses
 import json
 import os
@@ -88,6 +104,18 @@ LAMA_FIRST = ("let(hlm,eval_modify_costs(landmark_sum(lm_factory=lm_reasonable_o
 # the same search, with the landmark factory's debug output on (module docstring)
 LAMA_FIRST_LANDMARKS = LAMA_FIRST.replace("lm_reasonable_orders_hps(lm_rhw())",
                                           "lm_reasonable_orders_hps(lm_rhw(),verbosity=debug)")
+# lama-first with the task's costs (frame costs, reader switch --frame-costs): the greedy search of anytime LAMA's
+# second iteration (driver/aliases.py:107-114: hff2 and hlm2 count each operator's cost plus one, the search keeps
+# the costs), with the landmark dump as above
+LAMA_FIRST_COSTS = ("let(hlm,eval_modify_costs(landmark_sum(lm_factory=lm_reasonable_orders_hps(lm_rhw(),"
+                    "verbosity=debug),pref=false),cost_type=plusone),let(hff,eval_modify_costs(ff(),cost_type=plusone),"
+                    "lazy_greedy([hff,hlm],preferred=[hff,hlm],reopen_closed=false)))")
+# A* with the admissible landmark heuristic (optimal cost partitioning over lm_rhw's landmarks): an optimal plan for
+# the file's costs
+ASTAR_LMCP = "astar(landmark_cost_partitioning(lm_rhw()))"
+# the searches plan_taskcore runs by name (anytime LAMA is an alias, below)
+SEARCHES = {"lama-first": LAMA_FIRST_LANDMARKS, "lama-first-costs": LAMA_FIRST_COSTS, "astar-lmcp": ASTAR_LMCP}
+_COST = re.compile(r"Plan cost: (\d+)")
 STATUS = {0: "plan", 11: "unsolvable", 12: "incomplete", 22: "memory", 23: "time", 34: "unsupported"}
 
 _NODE = re.compile(r'^\s*lm(\d+) \[label="(.*)"(.*)\];$')
@@ -237,6 +265,7 @@ class TaskcoreResult(Result):
     actions: list = field(default_factory=list)  # per step: its path (task.Action), effects on the file's facts only
     paths: list = field(default_factory=list)  # per step: its path as it is in the unreduced banned task
     write_s: float = 0.0  # taskcore sas: load, bans, start check, fold, reductions, the file and the operator table
+    plan_cost: int | None = None  # the plan's cost in the file, as Fast Downward reports it
     decode_s: float = 0.0  # the operator table read, the plan read back, the paths chosen
     operators: int = 0
     stats: dict = field(default_factory=dict)  # taskcore's
@@ -248,6 +277,84 @@ class TaskcoreResult(Result):
     predicted_goal: bool | None = None  # the goal holds in the predicted state after the last step
     choices: dict = field(default_factory=dict)  # step index -> its paths (effects cut as ``actions``), left to the
     # engine (module docstring); that step's entry in ``actions`` and ``paths`` is ``either`` of them
+    serve: dict = field(default_factory=dict)  # with serve=True: the server's reply (taskcore/src/serve.rs)
+
+
+class TaskcoreServer:
+    """One ``taskcore serve`` process on ``packed`` with the options ``args`` (module docstring): ``request(argv)``
+    sends one ``sas`` request (its per-plan options) and returns (ok, the reply's json or the error message)."""
+
+    def __init__(self, packed, args=(), binary=TASKCORE):
+        self.key = (str(binary), str(packed), tuple(str(a) for a in args))
+        cmd = [str(binary), "serve", "--task", str(packed)] + list(self.key[2])
+        self.p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True)
+        t0 = time.monotonic()
+        line = self.p.stdout.readline()
+        if not line.startswith("ready\t"):
+            err = self.p.stderr.read() if self.p.poll() is not None or not line else ""
+            self.close()
+            raise TaskcoreError((err or line).strip() or "taskcore serve did not start", " ".join(cmd))
+        self.hello = json.loads(line.split("\t", 1)[1])
+        self.hello["seconds"] = round(time.monotonic() - t0, 3)
+        self.cmd = " ".join(cmd)
+
+    def request(self, argv) -> tuple:
+        parts = [str(a) for a in argv]
+        if any("\t" in a or "\n" in a for a in parts):
+            raise TaskcoreError(f"a request argument with a tab or a newline: {parts!r}", self.cmd)
+        try:
+            self.p.stdin.write("\t".join(parts) + "\n")
+            self.p.stdin.flush()
+            line = self.p.stdout.readline()
+        except (BrokenPipeError, OSError):
+            line = ""
+        if not line:
+            err = self.p.stderr.read() if self.p.poll() is not None else ""
+            raise TaskcoreError(f"taskcore serve stopped (exit {self.p.poll()}): {err.strip()[-2000:]}", self.cmd)
+        kind, rest = line.rstrip("\n").split("\t", 1)
+        return kind == "ok", (json.loads(rest) if kind == "ok" else rest)
+
+    def close(self) -> None:
+        if self.p.poll() is None:
+            try:
+                self.p.stdin.close()
+            except OSError:
+                pass
+            try:
+                self.p.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                self.p.kill()
+                self.p.wait()
+
+
+_SERVER: list = []  # the one live server (module docstring)
+
+
+def _split_cost_caps(args: list) -> tuple:
+    """(``args`` without ``--cost-caps F``, ``--cost-caps F`` if given.)"""
+    if "--cost-caps" not in args:
+        return args, []
+    i = args.index("--cost-caps")
+    return args[:i] + args[i + 2:], args[i:i + 2]
+
+
+def server_for(packed, args=(), binary=TASKCORE) -> TaskcoreServer:
+    """The live server for (binary, packed, args), started if needed; any other one is closed first."""
+    key = (str(binary), str(packed), tuple(str(a) for a in args))
+    if _SERVER and _SERVER[0].key == key and _SERVER[0].p.poll() is None:
+        return _SERVER[0]
+    close_servers()
+    _SERVER.append(TaskcoreServer(packed, args, binary))
+    return _SERVER[0]
+
+
+def close_servers() -> None:
+    while _SERVER:
+        _SERVER.pop().close()
+
+
+atexit.register(close_servers)
 
 
 def _conds(w) -> tuple:
@@ -416,25 +523,35 @@ def predict(facts: dict, pieces: list, steps: list, start: dict, held=None, choi
 
 def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, bans=(), *, time_limit: int = 600,
                   memory_limit: str = "32G", search: str = "lama-first", workdir, binary=TASKCORE, args=(),
-                  start_check: str = "needed", keep: bool = False, engine_choice: bool = True) -> TaskcoreResult:
+                  start_check: str = "needed", keep: bool = False, engine_choice: bool = True,
+                  serve: bool = False) -> TaskcoreResult:
     """A plan through taskcore (module docstring). ``facts``: the packed file's facts (key -> Domain), ``goal`` its
     goal, ``pieces`` per input action its paths under ``bans`` (replay.ban_pieces), ``start`` a facts.py map (with
     the task's pos:/escpos:/args: keys), ``bans`` replay.Ban or (label, ((key, value), ...)). ``args``: further
     taskcore options (the default: fold strict, reductions (a)-(f), the model encoding). ``start_check``: taskcore's
     ``--start-check`` (needed: on the facts (e) needs; input: on every fact the input's file names). ``keep``: keep
     the SAS file and the operator table in ``workdir``. ``engine_choice``: a step whose paths differ only on facts
-    the file does not hold is left to the engine (``choices``) instead of raising PathChoice."""
+    the file does not hold is left to the engine (``choices``) instead of raising PathChoice. ``serve``: through the
+    long-lived server (module docstring) instead of a taskcore process of its own."""
     from export_records import write_bans, write_start
     work = Path(workdir)
     work.mkdir(parents=True, exist_ok=True)
     sas_file, ops_file, stats_file = work / "task.sas", work / "ops.jsonl", work / "stats.json"
-    cmd = [str(binary), "sas", "--task", str(packed), "--start-file", str(write_start(work / "start.txt", facts, start)),
-           "--out", str(sas_file), "--stats", str(stats_file), "--ops", str(ops_file), "--start-check",
-           start_check] + [str(a) for a in args]
-    if bans:
-        cmd += ["--bans", str(write_bans(work / "bans.txt", bans))]
+    per = ["--start-file", str(write_start(work / "start.txt", facts, start)), "--out", str(sas_file), "--stats",
+           str(stats_file), "--ops", str(ops_file), "--start-check", start_check]
+    with_bans = ["--bans", str(write_bans(work / "bans.txt", bans))] if bans else []
+    cmd = [str(binary), "sas", "--task", str(packed)] + per + [str(a) for a in args] + with_bans
     t0 = time.monotonic()
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    reply = {}
+    if serve:
+        # the per-plan options to the server; the others (args) are the server's own. The cost caps change per plan.
+        own, caps = _split_cost_caps([str(a) for a in args])
+        ok, reply = server_for(packed, own, binary).request(per + with_bans + caps)
+        p = subprocess.CompletedProcess(cmd, 0 if ok else 2, "", "" if ok else f"taskcore: {reply}\n")
+        if not ok:
+            reply = {}
+    else:
+        p = subprocess.run(cmd, capture_output=True, text=True)
     write_s = time.monotonic() - t0
     if p.returncode != 0:
         m = re.search(r"(\d+) facts out of their domains: \[(.*)\]", p.stderr)
@@ -447,8 +564,9 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
     fd = work / "fd"
     for old in fd.glob("sas_plan*"):
         old.unlink()
-    if search == "lama-first":
-        code, log, text, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, workdir=str(fd))
+    if search in SEARCHES:
+        code, log, text, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, search=SEARCHES[search],
+                                          workdir=str(fd))
         status = STATUS.get(code, "error")
     elif search == "anytime":
         code, log, _, seconds, _ = run(sas_file.read_text(), time_limit, memory_limit, alias=ANYTIME, workdir=str(fd))
@@ -456,9 +574,11 @@ def plan_taskcore(packed, facts: dict, goal: dict, pieces: list, start: dict, ba
         text = found[-1].read_text() if found else ""
         status = "plan" if found else STATUS.get(code, "error")
     else:
-        raise ValueError(f"search {search!r}: lama-first or anytime")
+        raise ValueError(f"search {search!r}: {', '.join(SEARCHES)} or anytime")
     res = TaskcoreResult(status, code, seconds=seconds, workdir=str(work), log=log, write_s=write_s,
-                         operators=stats["sas"]["operators"], stats=stats)
+                         operators=stats["sas"]["operators"], stats=stats, serve=reply)
+    costs = _COST.findall(log)
+    res.plan_cost = int(costs[-1]) if costs and status == "plan" else None  # the file's cost of the plan (FD's)
     res.landmarks, res.orderings = parse_landmarks(log)  # lama-first's dump (anytime LAMA's alias has none)
     if status == "plan":
         t1 = time.monotonic()

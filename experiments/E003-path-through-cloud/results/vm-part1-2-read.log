@@ -1,0 +1,217 @@
+[13:46:45] reader-scope --part1 --elsewhere --live-locals, 32 threads, into /dev/shm/partI
+[part1] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 32 threads; load 0.11 2.96 10.25
+[part1] pass 1 inputs: 34124 runs from 0 events start; RSS 191 MB
+[part1] pass 1 inputs: 34124 runs, 1544657 records, 217.4 s; 1536901 records in the pass, 217 s, RSS 3053 MB
+[part1] pass 1 event round 1: 10096 runs from 17151 events start; RSS 3232 MB
+[part1] pass 1 event round 1: 10096 runs, 970155 records, 324.9 s; 2510302 records in the pass, 543 s, RSS 4194 MB
+[part1] pass 1 event round 2: 4488 runs from 8152 events start; RSS 4164 MB
+[part1] pass 1 event round 2: 4488 runs, 130046 records, 19.0 s; 2632987 records in the pass, 562 s, RSS 4270 MB
+[part1] pass 1 event round 3: 3520 runs from 3746 events start; RSS 4166 MB
+[part1] pass 1 event round 3: 3520 runs, 121945 records, 27.4 s; 2762694 records in the pass, 590 s, RSS 3989 MB
+[part1] pass 1 event round 4: 3889 runs from 4385 events start; RSS 3878 MB
+[part1] pass 1 event round 4: 3889 runs, 181352 records, 27.6 s; 2938174 records in the pass, 618 s, RSS 4212 MB
+[part1] pass 1 event round 5: 6911 runs from 7897 events start; RSS 4392 MB
+[part1] pass 1 event round 5: 6911 runs, 117717 records, 21.6 s; 3065872 records in the pass, 640 s, RSS 3514 MB
+[part1] pass 1 event round 6: 5133 runs from 7993 events start; RSS 3895 MB
+[part1] pass 1 event round 6: 5133 runs, 58318 records, 14.3 s; 3120552 records in the pass, 655 s, RSS 4269 MB
+[part1] pass 1 event round 7: 3733 runs from 5966 events start; RSS 3906 MB
+[part1] pass 1 event round 7: 3733 runs, 61927 records, 17.9 s; 3182928 records in the pass, 673 s, RSS 3873 MB
+[part1] pass 1 event round 8: 2473 runs from 5154 events start; RSS 3666 MB
+[part1] pass 1 event round 8: 2473 runs, 32772 records, 8.2 s; 3217885 records in the pass, 682 s, RSS 3655 MB
+[part1] pass 1 event round 9: 1984 runs from 2619 events start; RSS 3658 MB
+[part1] pass 1 event round 9: 1984 runs, 18580 records, 11.1 s; 3235984 records in the pass, 693 s, RSS 3858 MB
+[part1] pass 1 event round 10: 1716 runs from 2365 events start; RSS 3704 MB
+[part1] pass 1 event round 10: 1716 runs, 9288 records, 4.2 s; 3246757 records in the pass, 698 s, RSS 3748 MB
+[part1] pass 1 event round 11: 1446 runs from 1707 events start; RSS 3748 MB
+[part1] pass 1 event round 11: 1446 runs, 12805 records, 10.6 s; 3259173 records in the pass, 708 s, RSS 4654 MB
+[part1] pass 1 event round 12: 1648 runs from 1765 events start; RSS 4682 MB
+[part1] pass 1 event round 12: 1648 runs, 7704 records, 2.0 s; 3266285 records in the pass, 710 s, RSS 4479 MB
+[part1] pass 1 event round 13: 1278 runs from 1584 events start; RSS 4480 MB
+[part1] pass 1 event round 13: 1278 runs, 8759 records, 5.4 s; 3276025 records in the pass, 716 s, RSS 3970 MB
+[part1] pass 1 event round 14: 1311 runs from 1533 events start; RSS 3979 MB
+[part1] pass 1 event round 14: 1311 runs, 8539 records, 2.1 s; 3284564 records in the pass, 718 s, RSS 3929 MB
+[part1] pass 1 event round 15: 1310 runs from 1566 events start; RSS 3919 MB
+[part1] pass 1 event round 15: 1310 runs, 3531 records, 8.6 s; 3288095 records in the pass, 727 s, RSS 4731 MB
+[part1] pass 1 event round 16: 1147 runs from 1325 events start; RSS 3955 MB
+[part1] pass 1 event round 16: 1147 runs, 4840 records, 2.1 s; 3292131 records in the pass, 729 s, RSS 4010 MB
+[part1] pass 1 event round 17: 1397 runs from 1635 events start; RSS 3913 MB
+[part1] pass 1 event round 17: 1397 runs, 11442 records, 12.2 s; 3302681 records in the pass, 741 s, RSS 4259 MB
+[part1] pass 1 event round 18: 1554 runs from 1924 events start; RSS 4265 MB
+[part1] pass 1 event round 18: 1554 runs, 11998 records, 30.8 s; 3315890 records in the pass, 772 s, RSS 4484 MB
+[part1] pass 1 event round 19: 1502 runs from 1942 events start; RSS 4449 MB
+[part1] pass 1 event round 19: 1502 runs, 36724 records, 2.8 s; 3353099 records in the pass, 775 s, RSS 3689 MB
+[part1] pass 1 event round 20: 1283 runs from 1515 events start; RSS 3661 MB
+[part1] pass 1 event round 20: 1283 runs, 7382 records, 21.2 s; 3360349 records in the pass, 797 s, RSS 4350 MB
+[part1] pass 1 event round 21: 1086 runs from 1270 events start; RSS 4350 MB
+[part1] pass 1 event round 21: 1086 runs, 3728 records, 21.5 s; 3364209 records in the pass, 818 s, RSS 4524 MB
+[part1] pass 1 event round 22: 1157 runs from 1267 events start; RSS 4267 MB
+[part1] pass 1 event round 22: 1157 runs, 3745 records, 13.1 s; 3367954 records in the pass, 832 s, RSS 4756 MB
+[part1] pass 1 event round 23: 1066 runs from 1271 events start; RSS 4424 MB
+[part1] pass 1 event round 23: 1066 runs, 6551 records, 29.1 s; 3374152 records in the pass, 861 s, RSS 4251 MB
+[part1] pass 1 event round 24: 873 runs, 2822 records, 8.0 s; 3377327 records in the pass, 869 s, RSS 5924 MB
+[part1] pass 1 event round 25: 838 runs, 1149 records, 22.7 s; 3378151 records in the pass, 892 s, RSS 5297 MB
+[part1] pass 1 event round 26: 701 runs, 3198 records, 20.5 s; 3380849 records in the pass, 912 s, RSS 4798 MB
+[part1] pass 1 event round 27: 604 runs, 1189 records, 0.4 s; 3382863 records in the pass, 913 s, RSS 4297 MB
+[part1] pass 1 event round 28: 641 runs, 4621 records, 12.5 s; 3387088 records in the pass, 925 s, RSS 6676 MB
+[part1] pass 1 event round 29: 551 runs, 2407 records, 4.0 s; 3389439 records in the pass, 929 s, RSS 3828 MB
+[part1] pass 1 event round 30: 586 runs, 1835 records, 1.3 s; 3391177 records in the pass, 931 s, RSS 3628 MB
+[part1] pass 1 event round 31: 424 runs, 3052 records, 1.6 s; 3394778 records in the pass, 933 s, RSS 4395 MB
+[part1] pass 1 event round 32: 320 runs, 1122 records, 0.2 s; 3395709 records in the pass, 933 s, RSS 4324 MB
+[part1] pass 1 event round 33: 314 runs, 445 records, 0.0 s; 3396345 records in the pass, 933 s, RSS 4327 MB
+[part1] pass 1 event round 34: 272 runs, 350 records, 1.3 s; 3396686 records in the pass, 934 s, RSS 3872 MB
+[part1] pass 1 event round 35: 266 runs, 281 records, 1.7 s; 3396976 records in the pass, 936 s, RSS 4681 MB
+[part1] pass 1 event round 36: 244 runs, 322 records, 0.0 s; 3397298 records in the pass, 936 s, RSS 4702 MB
+[part1] pass 1 event round 37: 247 runs, 367 records, 1.3 s; 3397665 records in the pass, 937 s, RSS 3639 MB
+[part1] pass 1 event round 38: 211 runs, 256 records, 0.0 s; 3397921 records in the pass, 937 s, RSS 3643 MB
+[part1] pass 1 event round 39: 208 runs, 240 records, 0.0 s; 3398161 records in the pass, 937 s, RSS 3645 MB
+[part1] pass 1 event round 40: 207 runs, 253 records, 0.0 s; 3398414 records in the pass, 937 s, RSS 3588 MB
+[part1] pass 1 event round 41: 207 runs, 234 records, 0.0 s; 3398648 records in the pass, 937 s, RSS 3591 MB
+[part1] pass 1 event round 42: 206 runs, 246 records, 0.0 s; 3398894 records in the pass, 938 s, RSS 3595 MB
+[part1] pass 1 event round 49: 238 runs, 321 records, 0.0 s; 3401560 records in the pass, 940 s, RSS 3725 MB
+[part1] pass 1 event round 100: 79 runs, 121 records, 0.0 s; 3412519 records in the pass, 943 s, RSS 3517 MB
+[part1] pass 1 event round 200: 22 runs, 46 records, 0.0 s; 3419685 records in the pass, 944 s, RSS 3460 MB
+[part1] pass 1 event round 300: 22 runs, 46 records, 0.0 s; 3423685 records in the pass, 945 s, RSS 3474 MB
+[part1] pass 1 event round 400: 20 runs, 44 records, 0.0 s; 3427490 records in the pass, 946 s, RSS 3475 MB
+[part1] pass 1 event round 500: 20 runs, 44 records, 0.0 s; 3431290 records in the pass, 947 s, RSS 3478 MB
+[part1] pass 1 event round 600: 16 runs, 36 records, 0.0 s; 3434326 records in the pass, 947 s, RSS 3479 MB
+[part1] pass 1 event round 700: 16 runs, 36 records, 0.0 s; 3437326 records in the pass, 948 s, RSS 3485 MB
+[part1] pass 1 event round 800: 16 runs, 36 records, 0.0 s; 3440326 records in the pass, 949 s, RSS 3492 MB
+[part1] pass 1 event round 900: 16 runs, 36 records, 0.0 s; 3443326 records in the pass, 950 s, RSS 3518 MB
+[part1] pass 1 event round 1000: 16 runs, 36 records, 0.0 s; 3446326 records in the pass, 951 s, RSS 3524 MB
+[part1] pass 1 event round 1100: 4 runs, 4 records, 0.0 s; 3447382 records in the pass, 952 s, RSS 3547 MB
+[part1] pass 1 event round 1200: 4 runs, 4 records, 0.0 s; 3447832 records in the pass, 952 s, RSS 3543 MB
+[part1] pass 1 event round 1300: 4 runs, 4 records, 0.0 s; 3448282 records in the pass, 953 s, RSS 3537 MB
+[part1] pass 1 event round 1400: 4 runs, 4 records, 0.0 s; 3448732 records in the pass, 953 s, RSS 3540 MB
+[part1] pass 1 event round 1500: 4 runs, 4 records, 0.0 s; 3449182 records in the pass, 954 s, RSS 3538 MB
+[part1] pass 1 event round 1600: 4 runs, 4 records, 0.0 s; 3449632 records in the pass, 954 s, RSS 3539 MB
+[part1] pass 1 event round 1700: 4 runs, 4 records, 0.0 s; 3450082 records in the pass, 955 s, RSS 3539 MB
+[part1] pass 1 event round 1800: 4 runs, 4 records, 0.0 s; 3450532 records in the pass, 955 s, RSS 3540 MB
+[part1] pass 1 event round 1900: 4 runs, 4 records, 0.0 s; 3450982 records in the pass, 956 s, RSS 3543 MB
+[part1] pass 1 event round 2000: 2 runs, 2 records, 0.0 s; 3451391 records in the pass, 957 s, RSS 3543 MB
+[part1] pass 1 event round 2100: 2 runs, 2 records, 0.0 s; 3451591 records in the pass, 957 s, RSS 3549 MB
+[part1] pass 1 event round 2200: 2 runs, 2 records, 0.0 s; 3451791 records in the pass, 957 s, RSS 3543 MB
+[part1] pass 1 event round 2300: 2 runs, 2 records, 0.0 s; 3451991 records in the pass, 958 s, RSS 3544 MB
+[part1] pass 1 event round 2400: 2 runs, 2 records, 0.0 s; 3452191 records in the pass, 958 s, RSS 3542 MB
+[part1] pass 1 event round 2500: 2 runs, 2 records, 0.0 s; 3452391 records in the pass, 959 s, RSS 3544 MB
+[part1] pass 1 event round 2600: 2 runs, 2 records, 0.0 s; 3452591 records in the pass, 959 s, RSS 3543 MB
+[part1] pass 1 event round 2700: 2 runs, 2 records, 0.0 s; 3452791 records in the pass, 960 s, RSS 3544 MB
+[part1] pass 1 event round 2800: 2 runs, 2 records, 0.0 s; 3452991 records in the pass, 960 s, RSS 3542 MB
+[part1] pass 1 event round 2900: 2 runs, 2 records, 0.0 s; 3453191 records in the pass, 961 s, RSS 3544 MB
+[part1] pass 1 event round 3000: 2 runs, 2 records, 0.0 s; 3453391 records in the pass, 962 s, RSS 3543 MB
+[part1] pass 1 inputs: 34668 runs from 0 events start; RSS 3608 MB
+[part1] pass 2 inputs: 34668 runs, 2114631 records, 182.7 s; 2106143 records in the pass, 1145 s, RSS 3606 MB
+[part1] pass 2 event round 1: 9930 runs from 17031 events start; RSS 3675 MB
+[part1] pass 2 event round 1: 9930 runs, 963294 records, 324.8 s; 3073740 records in the pass, 1470 s, RSS 4346 MB
+[part1] pass 2 event round 2: 3900 runs from 7514 events start; RSS 4389 MB
+[part1] pass 2 event round 2: 3900 runs, 106901 records, 22.4 s; 3171532 records in the pass, 1492 s, RSS 4294 MB
+[part1] pass 2 event round 3: 2615 runs from 2845 events start; RSS 4200 MB
+[part1] pass 2 event round 3: 2615 runs, 111192 records, 29.0 s; 3291687 records in the pass, 1522 s, RSS 4031 MB
+[part1] pass 2 event round 4: 2710 runs from 3245 events start; RSS 3925 MB
+[part1] pass 2 event round 4: 2710 runs, 157122 records, 28.8 s; 3444226 records in the pass, 1551 s, RSS 4321 MB
+[part1] pass 2 event round 5: 2855 runs from 3806 events start; RSS 4246 MB
+[part1] pass 2 event round 5: 2855 runs, 91336 records, 18.9 s; 3543448 records in the pass, 1570 s, RSS 3897 MB
+[part1] pass 2 event round 6: 2411 runs from 3198 events start; RSS 3846 MB
+[part1] pass 2 event round 6: 2411 runs, 39720 records, 11.3 s; 3580543 records in the pass, 1582 s, RSS 4292 MB
+[part1] pass 2 event round 7: 2421 runs from 3092 events start; RSS 3927 MB
+[part1] pass 2 event round 7: 2421 runs, 45675 records, 16.8 s; 3626415 records in the pass, 1599 s, RSS 3959 MB
+[part1] pass 2 event round 8: 1880 runs from 2998 events start; RSS 3721 MB
+[part1] pass 2 event round 8: 1880 runs, 34738 records, 8.5 s; 3663787 records in the pass, 1607 s, RSS 3816 MB
+[part1] pass 2 event round 9: 1884 runs from 3049 events start; RSS 3714 MB
+[part1] pass 2 event round 9: 1884 runs, 23067 records, 10.8 s; 3685751 records in the pass, 1618 s, RSS 4023 MB
+[part1] pass 2 event round 10: 1742 runs from 2699 events start; RSS 4026 MB
+[part1] pass 2 event round 10: 1742 runs, 11469 records, 2.1 s; 3699145 records in the pass, 1621 s, RSS 3996 MB
+[part1] pass 2 event round 11: 1584 runs from 2152 events start; RSS 3983 MB
+[part1] pass 2 event round 11: 1584 runs, 9356 records, 8.7 s; 3708501 records in the pass, 1629 s, RSS 6032 MB
+[part1] pass 2 event round 12: 1581 runs from 1994 events start; RSS 5737 MB
+[part1] pass 2 event round 12: 1581 runs, 6916 records, 1.9 s; 3714527 records in the pass, 1632 s, RSS 4938 MB
+[part1] pass 2 event round 13: 1174 runs from 1502 events start; RSS 4940 MB
+[part1] pass 2 event round 13: 1174 runs, 8166 records, 4.7 s; 3723583 records in the pass, 1636 s, RSS 3820 MB
+[part1] pass 2 event round 14: 1218 runs from 1432 events start; RSS 3823 MB
+[part1] pass 2 event round 14: 1218 runs, 8661 records, 2.1 s; 3732244 records in the pass, 1638 s, RSS 4071 MB
+[part1] pass 2 event round 15: 1232 runs from 1392 events start; RSS 3896 MB
+[part1] pass 2 event round 15: 1232 runs, 3850 records, 8.3 s; 3736094 records in the pass, 1647 s, RSS 4917 MB
+[part1] pass 2 event round 16: 1083 runs from 1245 events start; RSS 4503 MB
+[part1] pass 2 event round 16: 1083 runs, 4778 records, 2.1 s; 3740067 records in the pass, 1649 s, RSS 3857 MB
+[part1] pass 2 event round 17: 1347 runs from 1572 events start; RSS 3667 MB
+[part1] pass 2 event round 17: 1347 runs, 11036 records, 12.0 s; 3749774 records in the pass, 1661 s, RSS 4822 MB
+[part1] pass 2 event round 18: 1518 runs from 1874 events start; RSS 4632 MB
+[part1] pass 2 event round 18: 1518 runs, 13258 records, 27.7 s; 3764204 records in the pass, 1689 s, RSS 4632 MB
+[part1] pass 2 event round 19: 1490 runs from 1906 events start; RSS 4391 MB
+[part1] pass 2 event round 19: 1490 runs, 37036 records, 3.2 s; 3802155 records in the pass, 1692 s, RSS 3907 MB
+[part1] pass 2 event round 20: 1271 runs from 1503 events start; RSS 3862 MB
+[part1] pass 2 event round 20: 1271 runs, 7453 records, 21.2 s; 3809522 records in the pass, 1714 s, RSS 4453 MB
+[part1] pass 2 event round 21: 1087 runs from 1258 events start; RSS 4453 MB
+[part1] pass 2 event round 21: 1087 runs, 3729 records, 21.1 s; 3813384 records in the pass, 1735 s, RSS 4754 MB
+[part1] pass 2 event round 22: 1158 runs from 1268 events start; RSS 4260 MB
+[part1] pass 2 event round 22: 1158 runs, 3746 records, 12.1 s; 3817130 records in the pass, 1747 s, RSS 7024 MB
+[part1] pass 2 event round 23: 1067 runs from 1272 events start; RSS 6580 MB
+[part1] pass 2 event round 23: 1067 runs, 6552 records, 29.2 s; 3823058 records in the pass, 1777 s, RSS 4813 MB
+[part1] pass 2 event round 24: 875 runs, 2826 records, 8.3 s; 3826508 records in the pass, 1785 s, RSS 5627 MB
+[part1] pass 2 event round 25: 841 runs, 1152 records, 23.6 s; 3827335 records in the pass, 1809 s, RSS 5165 MB
+[part1] pass 2 event round 26: 704 runs, 3203 records, 21.0 s; 3829945 records in the pass, 1830 s, RSS 4893 MB
+[part1] pass 2 event round 27: 608 runs, 1194 records, 0.4 s; 3832057 records in the pass, 1830 s, RSS 4385 MB
+[part1] pass 2 event round 28: 644 runs, 4711 records, 13.2 s; 3836556 records in the pass, 1843 s, RSS 4588 MB
+[part1] pass 2 event round 29: 555 runs, 3013 records, 3.5 s; 3839324 records in the pass, 1847 s, RSS 4139 MB
+[part1] pass 2 event round 30: 589 runs, 1838 records, 1.4 s; 3841069 records in the pass, 1849 s, RSS 3786 MB
+[part1] pass 2 event round 31: 427 runs, 3058 records, 1.7 s; 3844677 records in the pass, 1850 s, RSS 4533 MB
+[part1] pass 2 event round 32: 323 runs, 1125 records, 0.2 s; 3845609 records in the pass, 1850 s, RSS 4584 MB
+[part1] pass 2 event round 33: 317 runs, 450 records, 0.0 s; 3846252 records in the pass, 1851 s, RSS 4444 MB
+[part1] pass 2 event round 34: 276 runs, 357 records, 1.3 s; 3846609 records in the pass, 1852 s, RSS 4075 MB
+[part1] pass 2 event round 35: 271 runs, 294 records, 1.8 s; 3846903 records in the pass, 1854 s, RSS 4850 MB
+[part1] pass 2 event round 36: 249 runs, 327 records, 0.0 s; 3847230 records in the pass, 1854 s, RSS 4727 MB
+[part1] pass 2 event round 37: 250 runs, 377 records, 1.3 s; 3847607 records in the pass, 1855 s, RSS 3767 MB
+[part1] pass 2 event round 38: 213 runs, 260 records, 0.0 s; 3847867 records in the pass, 1855 s, RSS 3770 MB
+[part1] pass 2 event round 39: 211 runs, 243 records, 0.0 s; 3848110 records in the pass, 1855 s, RSS 3773 MB
+[part1] pass 2 event round 40: 211 runs, 257 records, 0.0 s; 3848367 records in the pass, 1855 s, RSS 3777 MB
+[part1] pass 2 event round 41: 211 runs, 239 records, 0.0 s; 3848606 records in the pass, 1855 s, RSS 3778 MB
+[part1] pass 2 event round 42: 209 runs, 251 records, 0.0 s; 3848857 records in the pass, 1855 s, RSS 3779 MB
+[part1] pass 2 event round 47: 200 runs, 283 records, 0.0 s; 3850656 records in the pass, 1858 s, RSS 3880 MB
+[part1] pass 2 event round 49: 242 runs, 325 records, 0.0 s; 3851516 records in the pass, 1858 s, RSS 3892 MB
+[part1] pass 2 event round 50: 200 runs, 702 records, 0.6 s; 3851833 records in the pass, 1858 s, RSS 3826 MB
+[part1] pass 2 event round 58: 130 runs, 4308 records, 2.2 s; 3857623 records in the pass, 1861 s, RSS 4191 MB
+[part1] pass 2 event round 100: 79 runs, 121 records, 0.0 s; 3863653 records in the pass, 1863 s, RSS 3617 MB
+[part1] pass 2 event round 200: 22 runs, 46 records, 0.0 s; 3870875 records in the pass, 1864 s, RSS 3585 MB
+[part1] pass 2 event round 300: 22 runs, 46 records, 0.0 s; 3874875 records in the pass, 1864 s, RSS 3592 MB
+[part1] pass 2 event round 400: 20 runs, 44 records, 0.0 s; 3878680 records in the pass, 1865 s, RSS 3594 MB
+[part1] pass 2 event round 500: 20 runs, 44 records, 0.0 s; 3882480 records in the pass, 1866 s, RSS 3614 MB
+[part1] pass 2 event round 600: 16 runs, 36 records, 0.0 s; 3885516 records in the pass, 1867 s, RSS 3625 MB
+[part1] pass 2 event round 700: 16 runs, 36 records, 0.0 s; 3888516 records in the pass, 1868 s, RSS 3638 MB
+[part1] pass 2 event round 800: 16 runs, 36 records, 0.0 s; 3891516 records in the pass, 1868 s, RSS 3639 MB
+[part1] pass 2 event round 900: 16 runs, 36 records, 0.0 s; 3894516 records in the pass, 1869 s, RSS 3656 MB
+[part1] pass 2 event round 1000: 16 runs, 36 records, 0.0 s; 3897516 records in the pass, 1870 s, RSS 3659 MB
+[part1] pass 2 event round 1100: 4 runs, 4 records, 0.0 s; 3898572 records in the pass, 1871 s, RSS 3661 MB
+[part1] pass 2 event round 1200: 4 runs, 4 records, 0.0 s; 3899022 records in the pass, 1871 s, RSS 3660 MB
+[part1] pass 2 event round 1300: 4 runs, 4 records, 0.0 s; 3899472 records in the pass, 1872 s, RSS 3659 MB
+[part1] pass 2 event round 1400: 4 runs, 4 records, 0.0 s; 3899922 records in the pass, 1872 s, RSS 3660 MB
+[part1] pass 2 event round 1500: 4 runs, 4 records, 0.0 s; 3900372 records in the pass, 1872 s, RSS 3659 MB
+[part1] pass 2 event round 1600: 4 runs, 4 records, 0.0 s; 3900822 records in the pass, 1873 s, RSS 3660 MB
+[part1] pass 2 event round 1700: 4 runs, 4 records, 0.0 s; 3901272 records in the pass, 1873 s, RSS 3661 MB
+[part1] pass 2 event round 1800: 4 runs, 4 records, 0.0 s; 3901722 records in the pass, 1874 s, RSS 3662 MB
+[part1] pass 2 event round 1900: 4 runs, 4 records, 0.0 s; 3902172 records in the pass, 1874 s, RSS 3662 MB
+[part1] pass 2 event round 2000: 2 runs, 2 records, 0.0 s; 3902581 records in the pass, 1875 s, RSS 3665 MB
+[part1] pass 2 event round 2100: 2 runs, 2 records, 0.0 s; 3902781 records in the pass, 1875 s, RSS 3665 MB
+[part1] pass 2 event round 2200: 2 runs, 2 records, 0.0 s; 3902981 records in the pass, 1876 s, RSS 3664 MB
+[part1] pass 2 event round 2300: 2 runs, 2 records, 0.0 s; 3903181 records in the pass, 1876 s, RSS 3662 MB
+[part1] pass 2 event round 2400: 2 runs, 2 records, 0.0 s; 3903381 records in the pass, 1877 s, RSS 3663 MB
+[part1] pass 2 event round 2500: 2 runs, 2 records, 0.0 s; 3903581 records in the pass, 1877 s, RSS 3660 MB
+[part1] pass 2 event round 2600: 2 runs, 2 records, 0.0 s; 3903781 records in the pass, 1877 s, RSS 3660 MB
+[part1] pass 2 event round 2700: 2 runs, 2 records, 0.0 s; 3903981 records in the pass, 1878 s, RSS 3660 MB
+[part1] pass 2 event round 2800: 2 runs, 2 records, 0.0 s; 3904181 records in the pass, 1878 s, RSS 3659 MB
+[part1] pass 2 event round 2900: 2 runs, 2 records, 0.0 s; 3904381 records in the pass, 1879 s, RSS 3660 MB
+[part1] pass 2 event round 3000: 2 runs, 2 records, 0.0 s; 3904581 records in the pass, 1879 s, RSS 3660 MB
+[part1] read: 3904728 records, 1879.7 s wall, 44776.4 CPU s, peak RSS 70176 MB
+[part1] golden file /dev/shm/partI/reading.golden.jsonl.gz in 1.3 s
+[part1] done: 3904728 records, read 1879.7 s wall 44776.4 CPU s (23.82 CPUs), peak RSS 70176 MB; packed 11931582988 bytes, 3884656 actions (20072 folded); report /dev/shm/partI/part1.json
+[14:18:57] packed_reading.py from-golden
+{
+ "actions": 3884656,
+ "records": 3904728,
+ "facts": 4433,
+ "bounds": 25,
+ "json": "/dev/shm/partI/reading.json",
+ "packed": "/dev/shm/partI/reading.tc",
+ "lines": "/dev/shm/partI/reading.actions.jsonl"
+}
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        29G  7.1G   21G  26% /
+tmpfs           126G   21G  106G  16% /dev/shm

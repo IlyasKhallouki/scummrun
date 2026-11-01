@@ -1,0 +1,122 @@
+{
+ "name": "bar",
+ "packed": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/reading.tc",
+ "args": [],
+ "server_ready_s": 3.21,
+ "hello": {
+  "task": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/fix-round1/c/bar-door-rust/reading.tc",
+  "input_actions": 65592,
+  "facts": 664,
+  "seconds_load": 3.2069,
+  "cpu_seconds": 0.9086,
+  "rss": 55971840,
+  "peak_rss": 57565184
+ },
+ "server_max_rss_mb": 104.7,
+ "rows": [
+  {
+   "i": 0,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-part1/bar-door-rust-seed1/plans/plan-000/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 20.633,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 9.6867,
+     "seconds": 20.632,
+     "cpu_seconds": 10.123,
+     "peak_rss": 110194688,
+     "rss": 110194688
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 24.706,
+    "cpu_seconds": 10.874,
+    "max_rss_mb": 110.2,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 22.565,
+    "cpu_seconds": 13.171,
+    "max_rss_mb": 111.2,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "95bf439e68f9dcb8"
+  },
+  {
+   "i": 1,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-part1/bar-door-rust-seed1/plans/plan-000/start.txt",
+    "bans": null,
+    "check": "input"
+   },
+   "serve": {
+    "seconds": 7.801,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 7.7892,
+     "cpu_seconds": 4.3018,
+     "peak_rss": 110219264,
+     "rss": 110219264
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 25.227,
+    "cpu_seconds": 10.876,
+    "max_rss_mb": 109.7,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 25.841,
+    "cpu_seconds": 13.41,
+    "max_rss_mb": 109.5,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "95bf439e68f9dcb8"
+  }
+ ]
+}

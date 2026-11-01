@@ -1,0 +1,50 @@
+{
+ "full_actions": 65516,
+ "reach_actions": 26185,
+ "d_keeps_of_full": 26203,
+ "d_keeps_of_reach": 26185,
+ "task": {
+  "actions_full": 16255,
+  "actions_reach": 16244,
+  "only_full": 11,
+  "only_reach": 0,
+  "labels_only_full": [
+   [
+    "event(script:2@759",
+    11
+   ]
+  ],
+  "labels_only_reach": [],
+  "facts_differ": {},
+  "facts_only_full": 69,
+  "facts_only_reach": 0
+ },
+ "kept_by_d_not_written": 11,
+ "written_not_kept_by_d": 0,
+ "values_full": 5601,
+ "values_reach": 5532,
+ "facts_only_in_full": {},
+ "facts_only_in_reach": {},
+ "n_facts_only_in_full_one_value": 69,
+ "values_only_full": {},
+ "values_only_reach": {},
+ "reader_values_differ_from_d": {},
+ "guesses_cut": 0,
+ "d_named_keeps_of_full": 26192,
+ "named_only_full": 0,
+ "named_only_reach": 0,
+ "named_only_full_labels": [],
+ "named_only_reach_labels": [],
+ "named_values_only_full": {},
+ "named_values_only_reach": {},
+ "kept_by_d_not_written_classes": {
+  "an event with a known list no kept record names (lemma 2)": 11
+ },
+ "only_full_labels": [
+  [
+   "event(script:2@759",
+   11
+  ]
+ ],
+ "only_reach_labels": []
+}

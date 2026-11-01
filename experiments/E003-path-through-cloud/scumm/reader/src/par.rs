@@ -54,6 +54,8 @@ enum PartState {
 /// One part of a split, which an idle worker may run before the job's own worker gets to it.
 struct Part {
     snap: Arc<Snap>,
+    /// the job's key (--reach: `Ctx::job_key`)
+    job_key: Option<Arc<str>>,
     label: String,
     pins: Pins,
     pre: Pre,
@@ -217,6 +219,10 @@ impl Machine for Pool<'_, '_> {
         self.main.run(cx, label, pins, pre, what)
     }
 
+    fn set_path_limit(&mut self, n: usize) {
+        self.main.set_path_limit(n)
+    }
+
     fn run_batch(&mut self, b: &mut Builder<'_>, jobs: &Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
         if self.threads == 0 {
             return false;
@@ -356,7 +362,11 @@ impl Machine for WorkerMachine<'_, '_> {
         self.rd.run(cx, label, pins, pre, what)
     }
 
-    fn prefetch(&mut self, _cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
+    fn set_path_limit(&mut self, n: usize) {
+        Machine::set_path_limit(self.rd, n)
+    }
+
+    fn prefetch(&mut self, cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
         // the first part is run here next; the others wait at the front of the queue for an idle worker
         if runs.len() < 2 {
             return;
@@ -366,6 +376,7 @@ impl Machine for WorkerMachine<'_, '_> {
             .map(|(pins, pre)| {
                 Arc::new(Part {
                     snap: self.snap.clone(),
+                    job_key: cx.job_key.map(Arc::from),
                     label: label.to_string(),
                     pins: pins.clone(),
                     pre: pre.clone(),
@@ -390,6 +401,86 @@ impl Machine for WorkerMachine<'_, '_> {
 enum Task {
     Part(Arc<Part>),
     Job(usize, Arc<Snap>, Arc<Vec<Job>>),
+}
+
+/// READER_TRACE=1: to stderr, the splits of a job down to depth 8, each job's start, and each job of 1 s or more with its splits. For
+/// finding where a reading's time goes; it changes nothing the reading writes.
+fn trace_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("READER_TRACE").is_some())
+}
+
+static TRACE_T0: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+thread_local! {
+    /// this worker's current job: its splits, parts, deepest split
+    static TRACE: std::cell::Cell<(u64, u64, usize)> = const { std::cell::Cell::new((0, 0, 0)) };
+}
+
+pub(crate) fn trace_split(label: &str, depth: usize, key: &str, values: usize, kept: usize, cut: i64) {
+    if !trace_on() {
+        return;
+    }
+    let (n, parts, deep) = TRACE.get();
+    TRACE.set((n + 1, parts + kept as u64, deep.max(depth + 1)));
+    if depth < 8 {
+        eprintln!("split {label} depth {depth} on {key}: {kept} of {values} values, {cut} paths cut");
+    }
+}
+
+/// A machine run of 1 s or more: its paths, cut paths, held branches, and its largest counters and fork keys.
+pub(crate) fn trace_run(label: &str, secs: f64, run: &crate::builder::RunOut) {
+    if !trace_on() || secs < 1.0 {
+        return;
+    }
+    let top = |c: &crate::py::Counter| {
+        let mut v: Vec<(&String, &i64)> = c.0.iter().filter(|(_, n)| **n != 0).collect();
+        v.sort_by(|a, b| b.1.cmp(a.1));
+        v.iter().take(12).map(|(k, n)| format!("{k}={n}")).collect::<Vec<_>>().join("; ")
+    };
+    eprintln!(
+        "run {label}: {secs:.1} s, {} paths, {} cut, {} held, first fork {:?}\n  counts: {}\n  forks: {}\n  fork keys: {}",
+        run.paths.len(),
+        run.limit,
+        run.held.len(),
+        run.first_fork,
+        top(&run.rd.counts),
+        top(&run.rd.forks),
+        top(&run.rd.fork_keys)
+    );
+}
+
+/// The switch havoc_cut: a path the step limit ended made a havoc record: the units its closure reads, its effects
+/// and events, and where it stood.
+pub(crate) fn trace_havoc(label: &str, units: usize, effects: usize, events: usize, cut: &crate::record::Cut, why: &[String], extra: &str) {
+    if trace_on() {
+        let at: Vec<String> = cut.frames.iter().map(|(k, pc)| format!("{}@{pc:?}", crate::facts::unit_text(*k))).collect();
+        let why: Vec<&String> = why.iter().take(4).collect();
+        eprintln!("havoc {label}: {units} units, {effects} effects, {events} events; at {}; pending {:?}; every unit: {why:?}{extra}", at.join(" > "), cut.steps);
+    }
+}
+
+/// The switch shared_runs: a click's run that others with the same key cannot take, and why.
+pub(crate) fn trace_shared(label: &str, why: &str) {
+    if trace_on() {
+        eprintln!("shared {label}: not shared, {why}");
+    }
+}
+
+pub(crate) fn trace_grow(label: &str, depth: usize, limit: usize, cut: i64) {
+    if trace_on() {
+        eprintln!("grow {label} depth {depth}: read again with the path limit at {limit} ({cut} paths cut)");
+    }
+}
+
+fn trace_job(label: &str, secs: f64, records: usize) {
+    if !trace_on() {
+        return;
+    }
+    let (n, parts, deep) = TRACE.replace((0, 0, 0));
+    if secs >= 1.0 {
+        eprintln!("job {label}: {secs:.1} s, {records} records, {n} splits, {parts} parts, {deep} deep");
+    }
 }
 
 fn worker(game: &Game, scope: &Scope, sh: &Shared) {
@@ -426,7 +517,7 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
         let r = panic::catch_unwind(AssertUnwindSafe(|| match task {
             Task::Part(p) => {
                 if p.claim() {
-                    let cx = Ctx { game, scope, table: &p.snap.base };
+                    let cx = Ctx { game, scope, table: &p.snap.base, job_key: p.job_key.as_deref() };
                     match panic::catch_unwind(AssertUnwindSafe(|| rd.run(&cx, &p.label, &p.pins, &p.pre, &p.what))) {
                         Ok(out) => p.finish(out),
                         Err(e) => {
@@ -451,8 +542,12 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                     sh.sync_ns.fetch_add(ts.elapsed().as_nanos() as u64, Ordering::Relaxed);
                 }
                 let t = Instant::now();
+                if trace_on() {
+                    eprintln!("start {} {:.1}", jobs[i].label, TRACE_T0.get_or_init(Instant::now).elapsed().as_secs_f64());
+                }
                 let mut m = WorkerMachine { rd: &mut rd, sh, snap: &snap, parts: Vec::new() };
                 let records = b.run_job(&mut m, &jobs[i]);
+                trace_job(&jobs[i].label, t.elapsed().as_secs_f64(), records.len());
                 let out = JobOut {
                     records,
                     deltas: b.take_deltas(),

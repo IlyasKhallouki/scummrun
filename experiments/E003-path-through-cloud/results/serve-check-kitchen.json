@@ -1,0 +1,538 @@
+{
+ "name": "kitchen",
+ "packed": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/kitchen.tc",
+ "args": [],
+ "server_ready_s": 2.25,
+ "hello": {
+  "task": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/kitchen.tc",
+  "input_actions": 71729,
+  "facts": 716,
+  "seconds_load": 2.2484,
+  "cpu_seconds": 0.8694,
+  "rss": 60059648,
+  "peak_rss": 61358080
+ },
+ "server_max_rss_mb": 109.6,
+ "rows": [
+  {
+   "i": 0,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-000/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 20.462,
+    "reply": {
+     "kept": "built",
+     "seconds_build": 7.3311,
+     "seconds": 20.4613,
+     "cpu_seconds": 11.452,
+     "peak_rss": 121614336,
+     "rss": 114302976
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 23.972,
+    "cpu_seconds": 12.031,
+    "max_rss_mb": 116.1,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 25.297,
+    "cpu_seconds": 15.0,
+    "max_rss_mb": 116.7,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "646c5e0bc948ffa8"
+  },
+  {
+   "i": 1,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-001/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 9.321,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 9.3172,
+     "cpu_seconds": 5.3692,
+     "peak_rss": 121933824,
+     "rss": 121933824
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 14.97,
+    "cpu_seconds": 11.965,
+    "max_rss_mb": 115.9,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 22.237,
+    "cpu_seconds": 14.168,
+    "max_rss_mb": 119.6,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "19090a90c31deaa9"
+  },
+  {
+   "i": 2,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-002/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 10.501,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 10.5002,
+     "cpu_seconds": 5.6728,
+     "peak_rss": 121896960,
+     "rss": 121896960
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 24.001,
+    "cpu_seconds": 12.033,
+    "max_rss_mb": 118.4,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 19.704,
+    "cpu_seconds": 14.099,
+    "max_rss_mb": 118.5,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "646c5e0bc948ffa8"
+  },
+  {
+   "i": 3,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-003/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 12.363,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 12.3521,
+     "cpu_seconds": 5.4051,
+     "peak_rss": 121896960,
+     "rss": 121896960
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 22.884,
+    "cpu_seconds": 12.007,
+    "max_rss_mb": 117.7,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 18.96,
+    "cpu_seconds": 14.279,
+    "max_rss_mb": 117.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "9c18360bc28c0622"
+  },
+  {
+   "i": 4,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-004/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 7.224,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 7.2231,
+     "cpu_seconds": 5.2853,
+     "peak_rss": 121896960,
+     "rss": 121896960
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 16.734,
+    "cpu_seconds": 12.03,
+    "max_rss_mb": 116.2,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 20.733,
+    "cpu_seconds": 14.903,
+    "max_rss_mb": 115.9,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "9c18360bc28c0622"
+  },
+  {
+   "i": 5,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-005/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 5.951,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 5.95,
+     "cpu_seconds": 5.1956,
+     "peak_rss": 114556928,
+     "rss": 114393088
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 13.648,
+    "cpu_seconds": 11.43,
+    "max_rss_mb": 118.9,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 15.239,
+    "cpu_seconds": 13.07,
+    "max_rss_mb": 118.8,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "b9f6ca9b4ea5f53a"
+  },
+  {
+   "i": 6,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-006/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 7.682,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 7.6806,
+     "cpu_seconds": 5.5222,
+     "peak_rss": 114556928,
+     "rss": 114442240
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 15.523,
+    "cpu_seconds": 11.929,
+    "max_rss_mb": 117.4,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 16.373,
+    "cpu_seconds": 13.956,
+    "max_rss_mb": 119.2,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "3ffeecd3b64d798a"
+  },
+  {
+   "i": 7,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-007/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 5.502,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 5.5011,
+     "cpu_seconds": 5.0348,
+     "peak_rss": 114556928,
+     "rss": 114442240
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 11.447,
+    "cpu_seconds": 10.716,
+    "max_rss_mb": 116.9,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 20.392,
+    "cpu_seconds": 13.888,
+    "max_rss_mb": 117.0,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "84bd2287bfc4ed4f"
+  },
+  {
+   "i": 8,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-008/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 9.878,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 9.8776,
+     "cpu_seconds": 5.6365,
+     "peak_rss": 114556928,
+     "rss": 114442240
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 22.016,
+    "cpu_seconds": 12.525,
+    "max_rss_mb": 116.4,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 28.847,
+    "cpu_seconds": 15.202,
+    "max_rss_mb": 115.7,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "b9f6ca9b4ea5f53a"
+  },
+  {
+   "i": 9,
+   "req": {
+    "start": "/var/tmp/fast-mi/out/E003-replay/kitchen-taskcore-all/plans/plan-009/start.txt",
+    "bans": null,
+    "check": "needed"
+   },
+   "serve": {
+    "seconds": 9.813,
+    "reply": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 9.8109,
+     "cpu_seconds": 5.5303,
+     "peak_rss": 114556928,
+     "rss": 114442240
+    },
+    "error": null
+   },
+   "new": {
+    "seconds": 16.853,
+    "cpu_seconds": 12.031,
+    "max_rss_mb": 115.8,
+    "error": null
+   },
+   "new_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old": {
+    "seconds": 19.963,
+    "cpu_seconds": 14.544,
+    "max_rss_mb": 116.6,
+    "error": null
+   },
+   "old_vs_serve": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "old_vs_new": {
+    "task.sas": true,
+    "ops.jsonl": true,
+    "kept.json": true,
+    "stats": true
+   },
+   "errors_same": true,
+   "sas_sha": "88bec6008e30d086"
+  }
+ ]
+}

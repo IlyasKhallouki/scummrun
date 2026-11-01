@@ -1,0 +1,28 @@
+{
+ "actions_a": 27617,
+ "actions_b": 27575,
+ "b_not_in_a": 0,
+ "a_not_in_b": 42,
+ "a_not_in_b_of_labels_b_lacks": 42,
+ "labels_b_lacks": 14,
+ "families": {
+  "dialog_line(120)[14@41]": 3,
+  "dialog_line(120)[202@41]": 3,
+  "dialog_line(121)[14@41]": 3,
+  "dialog_line(121)[202@41]": 3,
+  "dialog_line(122)[14@41]": 3,
+  "dialog_line(122)[202@41]": 3,
+  "dialog_line(123)[14@41]": 3,
+  "dialog_line(123)[202@41]": 3,
+  "dialog_line(126)[14@41]": 3,
+  "dialog_line(126)[202@41]": 3,
+  "dialog_line(127)[14@41]": 3,
+  "dialog_line(127)[202@41]": 3,
+  "dialog_line(128)[14@41]": 3,
+  "dialog_line(128)[202@41]": 3
+ },
+ "d_values_differ": [],
+ "n_d_values_differ": 0,
+ "reader_reached_differ": [],
+ "n_reader_reached_differ": 0
+}

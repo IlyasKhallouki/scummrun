@@ -1,0 +1,1268 @@
+{
+ "seed": 1,
+ "reading": "/home/ilyask/.cache/claude-tmp/claude-1000/-home-ilyask-projects-fast-mi/fddeb01d-e1c6-4709-aec7-b9adf056eb93/scratchpad/partI-runner/bar-door/control.json",
+ "name": "bar-door",
+ "control": true,
+ "goal": {
+  "state:316": [
+   1
+  ]
+ },
+ "goal_is_part1_end": false,
+ "task": {
+  "actions": 65592,
+  "facts": 664,
+  "records": 66106,
+  "folded": 514,
+  "packed_sha1": "87e3b570ea9d",
+  "packed_bytes": 39942204,
+  "lines_sha1": "6776538038ce",
+  "live_locals": false
+ },
+ "control_counts": {
+  "actions": 65592,
+  "sets kept": 365572,
+  "sets dropped": 177908,
+  "actions with a set dropped": 54136,
+  "checks dropped": 90754,
+  "stepped facts made engine conditions": 1920,
+  "bytes": 39942204,
+  "dropped_by_fact": {
+   "bit": 73703,
+   "class": 3688,
+   "cutscene": 3,
+   "local": 69,
+   "owner": 1342,
+   "room": 2807,
+   "script": 418,
+   "state": 249,
+   "var": 95629
+  },
+  "dropped_by_kind": {
+   "dialog_line": 702,
+   "event": 68566,
+   "sentence": 43712,
+   "skip_cutscene": 62016,
+   "walk_to": 2912
+  }
+ },
+ "limits": {
+  "replans": 500,
+  "seconds": 86400,
+  "plan_time": 600,
+  "plan_memory": "6G",
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60
+ },
+ "sources": {
+  "replay_part1.py": "780b00f4957d",
+  "replay.py": "192ec4d47522",
+  "packed_reading.py": "d0fa7ad41869",
+  "export_records.py": "f0aa97ff0b22",
+  "plan_fd.py": "7d24d0129db3",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ },
+ "taskcore_binary": "14882d1e67c5",
+ "taskcore_serve": true,
+ "load_s": 1.57,
+ "start": {
+  "stop": {
+   "stop": "idle",
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "idle": "sentence",
+   "rng": 3182679328,
+   "up": 1,
+   "cs": 0,
+   "ego": [
+    346,
+    133
+   ]
+  },
+  "dump": {
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "ego": 1,
+   "ego_pos": [
+    346,
+    133
+   ],
+   "seed": 1,
+   "boot_param": 0
+  },
+  "trace": {
+   "boot": 1,
+   "cd_track": 4,
+   "control": 1,
+   "room": 5,
+   "segment_start": 1,
+   "stall": 4
+  },
+  "boot_s": 9.4,
+  "check": {
+   "boot checks": "ok",
+   "reading start": {
+    "name": "results/start-part1.jsonl seed 1",
+    "differ": 0,
+    "first": [],
+    "task facts differ": 0,
+    "task first": []
+   },
+   "start-part1": {
+    "differ": 0,
+    "frame": 2728,
+    "same frame": true
+   },
+   "taskcore": {
+    "input": {
+     "seconds": 13.2,
+     "status": "ok",
+     "serve": {
+      "kept": "built",
+      "seconds_build": 4.4126,
+      "seconds": 11.9058,
+      "cpu_seconds": 3.9761,
+      "peak_rss": 104308736,
+      "rss": 86749184
+     }
+    },
+    "needed": {
+     "seconds": 8.34,
+     "status": "ok",
+     "serve": {
+      "kept": "kept",
+      "seconds_build": 0.0,
+      "seconds": 8.3388,
+      "cpu_seconds": 2.8304,
+      "peak_rss": 101187584,
+      "rss": 83701760
+     }
+    }
+   },
+   "taskcore_s": 21.58
+  }
+ },
+ "run": {
+  "stop": "no plan (the planner proved none)",
+  "goal": false,
+  "replans": 1,
+  "bans": [
+   {
+    "label": "event(script:2@736#796edf56058c)",
+    "values": [
+     [
+      "room",
+      33
+     ]
+    ]
+   }
+  ],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 2728,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first",
+    "input_key": "233f28c27d1c8159",
+    "write_s": 10.4501088889956,
+    "status": "plan",
+    "seconds": 14.885085894988151,
+    "steps": [
+     "walk_to(428)#11964",
+     "event(script:2@736#796edf56058c)#29554",
+     "event(local:211@4#ec2e4e2ceed4)#31163",
+     "event(local:211@33#d8feea141239)#33775"
+    ],
+    "operators": 134993,
+    "actions": 8958,
+    "decode_s": 10.548183651990257,
+    "folds": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 76,
+    "needed_facts": 138,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "kept",
+     "seconds_build": 0.0,
+     "seconds": 10.4491,
+     "cpu_seconds": 5.701,
+     "peak_rss": 105697280,
+     "rss": 95424512
+    },
+    "landmarks": 2,
+    "landmark_orderings": 1,
+    "game_landmarks": 2
+   },
+   {
+    "plan": 1,
+    "frame": 6376,
+    "bans": 1,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 3
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first",
+    "input_key": "64eac928da8c2f2c",
+    "write_s": 2.929671308986144,
+    "status": "unsolvable",
+    "seconds": 0.44729916998767294,
+    "steps": [],
+    "operators": 0,
+    "actions": 0,
+    "decode_s": 0.0,
+    "folds": [],
+    "predicted_goal": null,
+    "file_facts": 0,
+    "needed_facts": 0,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "built",
+     "seconds_build": 1.1487,
+     "seconds": 2.9283,
+     "cpu_seconds": 2.1229,
+     "peak_rss": 119488512,
+     "rss": 93851648
+    },
+    "landmarks": 2,
+    "landmark_orderings": 1,
+    "game_landmarks": 2
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "walk_to(428)#11964",
+    "kind": "walk_to",
+    "input": "click verb 11 on 428",
+    "start": 2728,
+    "issue": 2775,
+    "end": 2776,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2728,
+      "inputs": [
+       {
+        "frame": 2736,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2751,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2752,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2753,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2754,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2755,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2756,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2757,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2758,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2759,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2760,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2761,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2762,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2763,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2764,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2765,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2766,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2767,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2768,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2769,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2770,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2771,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2772,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2773,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2774,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2775,
+        "click": [
+         315,
+         107
+        ]
+       }
+      ],
+      "issue": 2775,
+      "end": 2776,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        2774,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [
+     {
+      "frame": 2736,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2751,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2752,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2753,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2754,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2755,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2756,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2757,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2758,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2759,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2760,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2761,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2762,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2763,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2764,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2765,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2766,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2767,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2768,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2769,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2770,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2771,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2772,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2773,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2774,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2775,
+      "click": [
+       315,
+       107
+      ]
+     }
+    ],
+    "note": "waited 7 frames for the camera",
+    "seconds": 2.9094613250053953
+   },
+   {
+    "plan": 0,
+    "index": 1,
+    "name": "event(script:2@736#796edf56058c)#29554",
+    "kind": "event",
+    "input": "wait",
+    "start": 2776,
+    "issue": null,
+    "end": 6376,
+    "outcome": "mismatch",
+    "then": "ban",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2776,
+      "first_settled": 2796,
+      "end": 6376,
+      "how": "limit",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "local:200",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:202",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "write"
+     },
+     {
+      "key": "local:206",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:207",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:210",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:211",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "room",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "state:324",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:330",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:333",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:336",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:339",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:342",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:345",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:348",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:351",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:354",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:357",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "state:359",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "var:22",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "var:32",
+      "predicted": [
+       "202"
+      ],
+      "observed": 4,
+      "kind": "write"
+     },
+     {
+      "key": "var:4",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "var:72",
+      "predicted": [
+       "28"
+      ],
+      "observed": 33,
+      "kind": "write"
+     },
+     {
+      "key": "pos:entry",
+      "predicted": [
+       "141"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:200",
+      "predicted": [
+       "43"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:202",
+      "predicted": [
+       "-1"
+      ],
+      "observed": 1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:206",
+      "predicted": [
+       "49"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:207",
+      "predicted": [
+       "5"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:210",
+      "predicted": [
+       "0"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:211",
+      "predicted": [
+       "4"
+      ],
+      "observed": -1,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        2779,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "ban event(script:2@736#796edf56058c) at {'room': 33}",
+    "seconds": 87.60739230999025
+   }
+  ],
+  "frames": 3648,
+  "ticks": 21888,
+  "frame0": 2728,
+  "frame_end": 6376,
+  "seconds": 130.9930056000012,
+  "inputs": [
+   {
+    "frame": 2736,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2751,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2752,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2753,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2754,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2755,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2756,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2757,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2758,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2759,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2760,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2761,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2762,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2763,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2764,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2765,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2766,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2767,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2768,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2769,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2770,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2771,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2772,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2773,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2774,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2775,
+    "click": [
+     315,
+     107
+    ]
+   }
+  ]
+ },
+ "landmarks": {
+  "plan": 0,
+  "frame": 2728,
+  "nodes": [
+   {
+    "id": 0,
+    "facts": [
+     [
+      "state:316",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 1,
+    "facts": [
+     [
+      "state:316",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   }
+  ],
+  "orderings": [
+   [
+    1,
+    0,
+    "gn"
+   ]
+  ]
+ },
+ "summary": {
+  "steps": 2,
+  "executed": 2,
+  "played": 2,
+  "outcomes": {
+   "matched": 1,
+   "mismatch": 1
+  },
+  "writes_held": 1,
+  "writes_held_share": 0.5,
+  "matched": 0,
+  "matched_share": 0.0,
+  "not_matched": {
+   "mismatch": 1,
+   "writes held, tracked facts changed": 1
+  },
+  "mismatches": 32,
+  "mismatches_per_executed": 16.0,
+  "mismatched_writes": 30,
+  "mismatched_writes_per_executed": 15.0,
+  "unplanned_changes": 2,
+  "unplanned_changes_per_executed": 1.0,
+  "unplanned_most": [
+   [
+    "var:182",
+    2
+   ]
+  ],
+  "another_guess": 0,
+  "final_path": [
+   "walk_to(428)#11964"
+  ],
+  "final_path_actions": 1,
+  "inputs": 26,
+  "time": {
+   "step_seconds": {
+    "n": 2,
+    "mean": 45.26,
+    "median": 45.26,
+    "max": 87.61,
+    "sum": 90.5
+   },
+   "step_frames": {
+    "n": 2,
+    "mean": 1824,
+    "median": 1824.0,
+    "max": 3600,
+    "sum": 3648
+   },
+   "plan_seconds": {
+    "n": 2,
+    "mean": 19.63,
+    "median": 19.63,
+    "max": 35.88,
+    "sum": 39.3
+   },
+   "plan_write_s": {
+    "n": 2,
+    "mean": 6.69,
+    "median": 6.69,
+    "max": 10.45,
+    "sum": 13.4
+   },
+   "plan_search_s": {
+    "n": 2,
+    "mean": 7.67,
+    "median": 7.67,
+    "max": 14.89,
+    "sum": 15.3
+   },
+   "harness_s": 131.0,
+   "planning_s": 39.3,
+   "playing_s": 91.7
+  }
+ },
+ "verify": {
+  "checkpoints": 4,
+  "differ": [],
+  "inputs": 26,
+  "final": {
+   "state:316": 0
+  },
+  "same": true,
+  "goal": false,
+  "seconds": 19.6
+ },
+ "seconds": 183.2,
+ "game_seconds": 364.81192258899677
+}

@@ -70,6 +70,35 @@ pub struct FactTable {
     /// fix round 1, F12 (switch value_sets, the Builder's): the machine half forks a fact read that only a
     /// comparison reads into the value sets it separates, and reads the mouse as ranges (machine.rs)
     pub value_sets: bool,
+    /// the switch split_limit (the Builder's): a run past the path limit is split until no part passes it
+    /// (`Builder::run_split`); the machine half then hands over no path of a run the limit cut (machine.rs)
+    pub split_limit: bool,
+    /// the switch grow_limit (the Builder's, `Builder::run_split`)
+    pub grow_limit: bool,
+    /// the switch havoc_cut (the Builder's, havoc.rs): the machine half hands over a path the step limit ended whole,
+    /// with where it stood (machine.rs `path_out`)
+    pub havoc_cut: bool,
+    /// the rough reading (the Builder's switch step_limit, experiments/E004-fast-exact/rough-reading.md): the machine
+    /// half reads every run with this step limit; 0, the machine's own (`STEP_LIMIT`)
+    pub step_limit: u32,
+    /// the switch havoc_starts (the Builder's, havoc.rs `closure`): a start the closure cannot fold names the units the
+    /// engine can run for it, not every unit
+    pub havoc_starts: bool,
+    /// the switch havoc_rooms (the Builder's, havoc.rs `closure`, experiments/E005-narrow-havoc/havoc-rooms.md): a room
+    /// change in a havoc closure names the rooms it leaves and loads, not every scope room
+    pub havoc_rooms: bool,
+    /// the switch havoc_args (the Builder's, args.rs, experiments/E005-narrow-havoc/havoc-args.md): the analysis a
+    /// computed start's values in a havoc closure come from; None off
+    pub havoc_args: Option<std::sync::Arc<crate::args::HavocArgs>>,
+    /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
+    pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
+    /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
+    pub memo: Option<std::sync::Arc<crate::memo::RunMemo>>,
+    /// the switch shared_runs: the batch's runs of clicks that differ only in their verb (shared.rs); None off
+    pub shared: Option<std::sync::Arc<crate::shared::SharedRuns>>,
+    /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
+    /// (inputs.rs); None with the switch off
+    pub settled: Option<std::sync::Arc<crate::inputs::SettledRule>>,
 }
 
 impl FactTable {
@@ -176,6 +205,17 @@ impl FactTable {
             live_locals: None,
             binary: Domain::binary(),
             value_sets: false,
+            split_limit: false,
+            grow_limit: false,
+            havoc_cut: false,
+            step_limit: 0,
+            havoc_starts: false,
+            havoc_rooms: false,
+            havoc_args: None,
+            reach: None,
+            memo: None,
+            shared: None,
+            settled: None,
         }
     }
 

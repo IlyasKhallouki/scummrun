@@ -1,0 +1,12 @@
+kitchen: 27739 records, reading 13.13 s, 31.8 CPU s, peak RSS 526 MB
+kitchen with value_sets,draw_clears,actor_rooms,split_limit,reach: 27741 of 27741 lines differ from golden.py's (switches on; not a check)
+/var/tmp/fast-mi/reach-scratch/kitchen/on.tc: 27617 actions (122 folded), 18720004 bytes
+total 16.67 s, peak RSS 539256 kB
+kitchen: 71242 records, reading 26.15 s, 68.3 CPU s, peak RSS 754 MB
+kitchen with value_sets,draw_clears,actor_rooms,split_limit: 67618 of 71244 lines differ from golden.py's (switches on; not a check)
+/var/tmp/fast-mi/reach-scratch/kitchen/off.tc: 71058 actions (184 folded), 43502056 bytes
+total 36.38 s, peak RSS 771644 kB
+[t=1.858478s, 70508 KB] Plan length: 7 step(s).
+[t=1.858478s, 70508 KB] Plan cost: 7
+[t=2.131032s, 73720 KB] Plan length: 7 step(s).
+[t=2.131032s, 73720 KB] Plan cost: 7

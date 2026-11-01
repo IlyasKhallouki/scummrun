@@ -21,6 +21,13 @@
 //! lacks but the start file names (write_start writes every fact of the caller's task) is an error. Each piece
 //! keeps the action's name, label and members, so a plan reads back to the input actions.
 //!
+//! **Cost caps** (`--cost-caps`, the replay harness's frame costs: replay.py `cost_caps`). One cap per line:
+//! `prefix<TAB>frames`. An action whose label is `prefix)` or starts with `prefix#` costs at most `frames` (at least
+//! 1). The harness writes `event(NAME@W` for each slot the engine's dump shows waiting at W at the plan's start, with
+//! the frames the dump shows it still needs: an event of that slot at W costs no more, a lower bound both for the
+//! slot's first turn and for any later one. Applied first, before the bans; the file's other actions keep their
+//! costs.
+//!
 //! One difference that cannot reach the file: task.py's precondition sets may hold values their domain lacks (they
 //! are cut to the domain when the file is written); here they were cut on reading. A piece whose set would hold
 //! only such values is dropped here and written by task.py as an action no value meets, which it drops too.
@@ -30,6 +37,44 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// The index of value text `v` in fact `f`'s domain, NONE when the domain lacks it.
+/// The file of reached values: `--reached F`, or `NAME.reached` next to the packed file, which the reader's switch --reach
+/// writes and a reading without it removes. So a reading with the switch is never used from a start it does not cover
+/// without taskcore saying so.
+pub fn reached_file(given: Option<&Path>, task: &Path) -> Option<std::path::PathBuf> {
+    if let Some(p) = given {
+        return Some(p.to_path_buf());
+    }
+    let p = task.with_extension("reached");
+    p.exists().then_some(p)
+}
+
+/// `--reached F` (the reader's switch --reach writes it, `NAME.reached`): the start's values that are not among a fact's
+/// reached values, as `key=value`. One line per fact: `key<TAB>value<TAB>value...`. A fact the file does not name is
+/// not checked (its start is the file's start and nothing reads it). A value outside the domain is the start check's.
+pub fn reached_misses(t: &Task, start: &[u32], path: &Path) -> Result<Vec<String>, String> {
+    let text = read_lines(path)?;
+    let mut reached: std::collections::HashMap<&str, std::collections::HashSet<&str>> = std::collections::HashMap::new();
+    for line in text.lines() {
+        let mut parts = line.split('\t');
+        let key = parts.next().unwrap_or("");
+        reached.insert(key, parts.filter(|v| !v.is_empty()).collect());
+    }
+    let mut out = Vec::new();
+    for f in 0..t.facts.len() as u32 {
+        let x = start[f as usize];
+        if x == NONE {
+            continue;
+        }
+        if let Some(vals) = reached.get(t.key(f)) {
+            let v = t.strs.get(t.facts.dom(f)[x as usize]);
+            if !vals.contains(v) {
+                out.push(format!("{}={}", t.key(f), v));
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn value_index(t: &Task, f: u32, v: &str) -> u32 {
     match t.strs.find(v) {
         Some(s) => t.facts.dom(f).iter().position(|&x| x == s).map(|p| p as u32).unwrap_or(NONE),
@@ -132,12 +177,80 @@ fn cut(t: &Task, a: &OAct, point: &[(u32, u32)]) -> Option<Vec<OAct>> {
 
 /// The task with every ban applied to every action of its label (module docstring). `named`: the start file's keys.
 pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut BanCounts) -> Result<Task, String> {
+    let b = banned(&t, bans, named, c)?;
+    let mut acts = Actions::default();
+    for i in 0..b.n() {
+        acts.copy_src(&b, i);
+    }
+    drop(b);
+    Ok(Task { acts, ..t })
+}
+
+/// The error `apply` stops with for these bans and the start file's keys `named`, if any (its first: a ban that names a
+/// fact the packed file lacks and the start file names); serve.rs checks it per request, as the keys are the
+/// request's.
+pub fn named_error(t: &Task, bans: &[Ban], named: Option<&HashSet<String>>) -> Option<String> {
+    let keys: HashSet<&str> = (0..t.facts.len() as u32).map(|f| t.key(f)).collect();
+    for ban in bans {
+        if ban.point.iter().all(|(k, _)| keys.contains(k.as_str())) {
+            continue;
+        }
+        if let Some((k, _)) = ban.point.iter().find(|(k, _)| !keys.contains(k.as_str()) && named.map_or(false, |n| n.contains(k))) {
+            return Some(format!("a ban on {} names fact {}, which the start file names and the packed file lacks: \
+                                the file's facts are not the task's", ban.label, k));
+        }
+    }
+    None
+}
+
+/// The banned task as a view over the input's actions (`apply` without the copy, for serve.rs): the actions of a
+/// banned label replaced by their pieces, in place; every other action is the input's own.
+pub struct Banned<'a> {
+    pub input: &'a Actions,
+    pub pieces: Actions,
+    /// per action of the banned task: the input's action `i` (`i`), or piece `p` (`p | PIECE`)
+    pub order: Vec<u32>,
+}
+
+const PIECE: u32 = 1 << 31;
+
+impl<'a> Banned<'a> {
+    fn at(&self, i: usize) -> (&Actions, usize) {
+        let o = self.order[i];
+        if o & PIECE != 0 {
+            (&self.pieces, (o & !PIECE) as usize)
+        } else {
+            (self.input, o as usize)
+        }
+    }
+}
+
+impl<'a> Src for Banned<'a> {
+    fn n(&self) -> usize {
+        self.order.len()
+    }
+    fn view(&self, i: usize) -> View<'_> {
+        let (a, j) = self.at(i);
+        a.view(j)
+    }
+    fn meta(&self, i: usize) -> Meta {
+        let (a, j) = self.at(i);
+        a.meta[j]
+    }
+    fn members(&self, i: usize) -> &[u32] {
+        let (a, j) = self.at(i);
+        a.members(j)
+    }
+}
+
+/// The bans of the module docstring on `t`, as a view (`Banned`); the counts in `c`.
+pub fn banned<'a>(t: &'a Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut BanCounts) -> Result<Banned<'a>, String> {
     let key_of: HashMap<&str, u32> = (0..t.facts.len() as u32).map(|f| (t.key(f), f)).collect();
     let mut by: FxMap<u32, Vec<Vec<(u32, u32)>>> = FxMap::default();
     for ban in bans {
         c.bans += 1;
         let point: Option<Vec<(u32, u32)>> =
-            ban.point.iter().map(|(k, v)| key_of.get(k.as_str()).map(|&f| (f, value_index(&t, f, v)))).collect();
+            ban.point.iter().map(|(k, v)| key_of.get(k.as_str()).map(|&f| (f, value_index(t, f, v)))).collect();
         let Some(point) = point else {
             if let Some((k, _)) = ban.point.iter().find(|(k, _)| !key_of.contains_key(k.as_str()) && named.map_or(false, |n| n.contains(k))) {
                 return Err(format!("a ban on {} names fact {}, which the start file names and the packed file lacks: \
@@ -150,10 +263,14 @@ pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut Ban
             by.entry(label).or_default().push(point);
         }
     }
-    let mut acts = Actions::default();
+    if t.acts.len() as u64 >= PIECE as u64 {
+        return Err(format!("{} actions: more than the banned view holds", t.acts.len()));
+    }
+    let mut pieces_out = Actions::default();
+    let mut order = Vec::with_capacity(t.acts.len());
     for i in 0..t.acts.len() {
         let Some(points) = by.get(&t.acts.meta[i].label) else {
-            acts.copy_from(&t.acts, i);
+            order.push(i as u32);
             continue;
         };
         let mut pieces = vec![t.acts.get(i)];
@@ -161,7 +278,7 @@ pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut Ban
         for point in points {
             let mut next = Vec::with_capacity(pieces.len());
             for q in pieces {
-                match cut(&t, &q, point) {
+                match cut(t, &q, point) {
                     Some(ps) => {
                         hit = true;
                         next.extend(ps);
@@ -176,9 +293,59 @@ pub fn apply(t: Task, bans: &[Ban], named: Option<&HashSet<String>>, c: &mut Ban
             c.pieces += pieces.len() as u64;
         }
         for p in &pieces {
-            acts.push(t.acts.meta[i], t.acts.members(i), p);
+            if pieces_out.len() as u64 >= PIECE as u64 {
+                return Err("too many pieces for the banned view".into());
+            }
+            order.push(pieces_out.len() as u32 | PIECE);
+            pieces_out.push(t.acts.meta[i], t.acts.members(i), p);
         }
     }
-    c.actions_after = acts.len() as u64;
-    Ok(Task { acts, ..t })
+    c.actions_after = order.len() as u64;
+    Ok(Banned { input: &t.acts, pieces: pieces_out, order })
+}
+
+/// The cost caps in a caps file (module docstring): (label prefix, frames).
+pub fn read_caps(path: &Path) -> Result<Vec<(String, u32)>, String> {
+    let text = read_lines(path)?;
+    let mut out = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        if line.is_empty() {
+            continue;
+        }
+        let (p, c) = line.split_once('\t').ok_or(format!("{}:{}: no tab", path.display(), n + 1))?;
+        let c: u32 = c.trim().parse().map_err(|e| format!("{}:{}: {}", path.display(), n + 1, e))?;
+        out.push((p.to_string(), c.max(1)));
+    }
+    Ok(out)
+}
+
+/// Each action whose label a cap names costs at most the cap (module docstring); returns the actions whose cost went
+/// down.
+pub fn apply_caps(t: &mut Task, caps: &[(String, u32)]) -> usize {
+    if caps.is_empty() {
+        return 0;
+    }
+    let mut by: HashMap<&str, u32> = HashMap::new();
+    for (p, c) in caps {
+        let e = by.entry(p.as_str()).or_insert(*c);
+        *e = (*e).min(*c);
+    }
+    let mut lowered = 0;
+    for m in t.acts.meta.iter_mut() {
+        let label = t.strs.get(m.label);
+        let prefix = match label.find('#') {
+            Some(i) => &label[..i],
+            None => match label.strip_suffix(')') {
+                Some(p) => p,
+                None => continue,
+            },
+        };
+        if let Some(&c) = by.get(prefix) {
+            if c < m.cost {
+                m.cost = c;
+                lowered += 1;
+            }
+        }
+    }
+    lowered
 }

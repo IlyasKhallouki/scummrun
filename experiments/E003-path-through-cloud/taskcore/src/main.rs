@@ -5,9 +5,13 @@
 //!   taskcore sas    --task F.tc [--start NAME | --start-file F] [--bans F] [--fold strict|every|off]
 //!                   [--reduce all|none|a,b,..] [--product-limit N] [--encoding model|task] --out F.sas
 //!                   [--stats F.json] [--check-fold N] [--ops F.jsonl] [--start-check input|needed]
+//!                   [--cost-caps F]
 //!   taskcore decode (the same options) --plan sas_plan --out steps.json
 //!   taskcore validate (the same options) --names plan.txt --out result.json
 //!   taskcore info   --task F.tc
+//!   taskcore serve  --task F.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
+//!                   (then one `sas` request per line on stdin: serve.rs)
+//!   --goal K=V[|V..][,K=V..]: the goal instead of the file's (sas, decode, validate, serve)
 
 mod bans;
 mod fold;
@@ -15,6 +19,7 @@ mod model;
 mod packed;
 mod reduce;
 mod sas;
+mod serve;
 
 use fold::FoldMode;
 use model::*;
@@ -24,6 +29,7 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 use std::time::Instant;
 
+#[derive(Clone)]
 struct Args {
     names: Option<PathBuf>,
     cmd: String,
@@ -39,14 +45,17 @@ struct Args {
     kept: Option<PathBuf>,
     model: bool,
     start_file: Option<PathBuf>,
+    reached: Option<PathBuf>,
     bans: Option<PathBuf>,
     ops: Option<PathBuf>,
     needed_check: bool,
+    goal: Option<String>,
+    cost_caps: Option<PathBuf>,
 }
 
 fn parse() -> Result<Args, String> {
     let mut it = std::env::args().skip(1);
-    let cmd = it.next().ok_or("usage: taskcore sas|decode|info --task F.tc ...")?;
+    let cmd = it.next().ok_or("usage: taskcore sas|decode|info|serve --task F.tc ...")?;
     let mut a = Args {
         names: None,
         cmd,
@@ -62,10 +71,21 @@ fn parse() -> Result<Args, String> {
         kept: None,
         model: true,
         start_file: None,
+        reached: None,
         bans: None,
         ops: None,
         needed_check: false,
+        goal: None,
+        cost_caps: None,
     };
+    parse_opts(&mut a, it)?;
+    check_args(&a)?;
+    Ok(a)
+}
+
+/// The options in `it` into `a`; the option names given, in order.
+fn parse_opts(a: &mut Args, mut it: impl Iterator<Item = String>) -> Result<Vec<String>, String> {
+    let mut given = Vec::new();
     while let Some(k) = it.next() {
         let v = it.next().ok_or(format!("{} needs a value", k))?;
         match k.as_str() {
@@ -88,8 +108,11 @@ fn parse() -> Result<Args, String> {
             "--kept" => a.kept = Some(v.into()),
             "--names" => a.names = Some(v.into()),
             "--start-file" => a.start_file = Some(v.into()),
+            "--reached" => a.reached = Some(v.into()),
             "--bans" => a.bans = Some(v.into()),
             "--ops" => a.ops = Some(v.into()),
+            "--goal" => a.goal = Some(v),
+            "--cost-caps" => a.cost_caps = Some(v.into()),
             "--start-check" => {
                 a.needed_check = match v.as_str() {
                     "input" => false,
@@ -106,14 +129,45 @@ fn parse() -> Result<Args, String> {
             }
             _ => return Err(format!("unknown option {}", k)),
         }
+        given.push(k);
     }
+    Ok(given)
+}
+
+fn check_args(a: &Args) -> Result<(), String> {
     if a.start.is_some() && a.start_file.is_some() {
         return Err("--start and --start-file: give one".into());
     }
     if a.needed_check && !a.reduce.e {
         return Err("--start-check needed needs reduction (e)".into());
     }
-    Ok(a)
+    Ok(())
+}
+
+/// `--goal K=V[|V..][,K=V..]`: per fact its values, by their text, in the order given (each set sorted, as the
+/// file's are).
+fn parse_goal(t: &Task, spec: &str) -> Result<Vec<(u32, Vec<u32>)>, String> {
+    let mut goal: Vec<(u32, Vec<u32>)> = Vec::new();
+    for part in spec.split(',').filter(|p| !p.is_empty()) {
+        let (k, vs) = part.split_once('=').ok_or(format!("--goal {}: KEY=VALUE", part))?;
+        let f = (0..t.facts.len() as u32).find(|&f| t.key(f) == k).ok_or(format!("--goal: no fact {}", k))?;
+        let mut vals = Vec::new();
+        for v in vs.split('|') {
+            let x = t
+                .strs
+                .find(v)
+                .and_then(|s| t.facts.dom(f).iter().position(|&y| y == s))
+                .ok_or(format!("--goal: {} has no value {}", k, v))?;
+            vals.push(x as u32);
+        }
+        vals.sort_unstable();
+        vals.dedup();
+        if goal.iter().any(|(g, _)| *g == f) {
+            return Err(format!("--goal: {} given twice", k));
+        }
+        goal.push((f, vals));
+    }
+    Ok(goal)
 }
 
 /// A tiny JSON writer for the stats.
@@ -216,6 +270,9 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
     let t0 = Instant::now();
     let loaded = packed::load(&a.task)?;
     let mut t = loaded.task;
+    if let Some(g) = &a.goal {
+        t.goal = parse_goal(&t, g)?;
+    }
     let names: Vec<String> = if a.names.is_some() { (0..t.acts.len()).map(|i| t.name(i)).collect() } else { Vec::new() };
     let mut st = J::new();
     st.s("task", &a.task.display().to_string())
@@ -227,6 +284,14 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         .f("seconds_load", t0.elapsed().as_secs_f64())
         .n("rss_after_load", peak_rss());
     let mut replaced = Vec::new();
+    // the harness's cost caps (bans.rs): first, so the bans' pieces, the fold and the reductions see the capped costs
+    if let Some(path) = &a.cost_caps {
+        let caps = bans::read_caps(path)?;
+        let lowered = bans::apply_caps(&mut t, &caps);
+        let mut j = J::new();
+        j.n("caps", caps.len()).n("actions_lowered", lowered);
+        st.raw("cost_caps", &j.done());
+    }
     // a start given as a file, and the bans (bans.rs): before the start check, so that it and everything after it
     // read the banned task as their input
     let mut named = None;
@@ -256,6 +321,15 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
         None => 0,
     };
     st.s("start", t.strs.get(t.starts.get(start).ok_or("the file has no start")?.0));
+    // a reading made with the reader's switch --reach covers only what its start reaches: a start holding another
+    // value needs the reading extended, and no task comes out of this one (bans::reached_misses)
+    if let Some(path) = bans::reached_file(a.reached.as_deref(), &a.task) {
+        let m = bans::reached_misses(&t, &t.starts[start].1, &path)?;
+        if !m.is_empty() {
+            eprintln!("taskcore: the start holds {} values the reading did not reach: {:?}; extend the reading (reader-scope --reach-also)", m.len(), &m[..m.len().min(20)]);
+            std::process::exit(7);
+        }
+    }
     // a start value outside a domain the input's file uses: task.py raises OutOfDomain; so does taskcore, before the
     // fold and the reductions can hide the fact (sas::start_misses). With --start-check needed, only on those of
     // these facts that (e) needs, before or after the first fold (below)
@@ -367,6 +441,56 @@ fn prepare(a: &Args) -> Result<Prepared, String> {
     Ok(Prepared { names, task: t, start, stats: st, replaced, needed })
 }
 
+/// The `sas` command's outputs from a prepared task: the SAS file, the operator table, the stats and the kept list.
+fn write_out(a: &Args, mut p: Prepared, t0: Instant) -> Result<(), String> {
+    let out = a.out.clone().ok_or("--out is needed")?;
+    let t1 = Instant::now();
+    let mut x = sas::Expander::new(&p.task, a.limit);
+    x.model = a.model;
+    let plan = sas::pass1(&mut x)?;
+    let s1 = t1.elapsed().as_secs_f64();
+    let t2 = Instant::now();
+    let f = std::fs::File::create(&out).map_err(|e| format!("{}: {}", out.display(), e))?;
+    let bytes = sas::pass2(&mut x, &plan, &p.task.starts[p.start].1, BufWriter::with_capacity(4 << 20, f))?;
+    let s2 = t2.elapsed().as_secs_f64();
+    if let Some(path) = &a.ops {
+        let t3 = Instant::now();
+        let f = std::fs::File::create(path).map_err(|e| format!("{}: {}", path.display(), e))?;
+        sas::write_ops(&mut x, &plan, &p.needed, BufWriter::with_capacity(1 << 20, f))?;
+        p.stats.f("seconds_ops", t3.elapsed().as_secs_f64());
+    }
+    let mut c = plan.counts.clone();
+    c.bytes = bytes;
+    p.stats
+        .f("seconds_pass1", s1)
+        .f("seconds_pass2", s2)
+        .f("seconds_total", t0.elapsed().as_secs_f64())
+        .raw("sas", &sas_json(&c))
+        .n("peak_rss", peak_rss());
+    if let Some(path) = &a.kept {
+        // the input actions each reduced action stands for, and the ones (f) replaced: (dropped, by)
+        let mut o = String::from("{\"actions\": [");
+        for i in 0..p.task.acts.len() {
+            if i > 0 {
+                o.push_str(", ");
+            }
+            let m: Vec<String> = p.task.acts.members(i).iter().map(|x| x.to_string()).collect();
+            let _ = write!(o, "[{}]", m.join(", "));
+        }
+        o.push_str("], \"replaced\": [");
+        let r: Vec<String> = p.replaced.iter().map(|(x, y)| format!("[{}, {}]", x, y)).collect();
+        o.push_str(&r.join(", "));
+        o.push_str("]}\n");
+        std::fs::write(path, o).map_err(|e| e.to_string())?;
+    }
+    let js = p.stats.done();
+    match &a.stats {
+        Some(path) => std::fs::write(path, js + "\n").map_err(|e| e.to_string())?,
+        None => println!("{}", js),
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let a = parse()?;
     let t0 = Instant::now();
@@ -387,51 +511,60 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         "sas" => {
+            let p = prepare(&a)?;
+            write_out(&a, p, t0)
+        }
+        "serve" => serve::run(&a),
+        "dump" => {
+            // the reduced task as text, one JSON line per action and one per fact (the check of the reader's switch
+            // --reach, experiments/E004-fast-exact/reach_check.py): no state, no writer
             let mut p = prepare(&a)?;
-            let out = a.out.clone().ok_or("--out is needed")?;
-            let t1 = Instant::now();
-            let mut x = sas::Expander::new(&p.task, a.limit);
-            x.model = a.model;
-            let plan = sas::pass1(&mut x)?;
-            let s1 = t1.elapsed().as_secs_f64();
-            let t2 = Instant::now();
-            let f = std::fs::File::create(&out).map_err(|e| format!("{}: {}", out.display(), e))?;
-            let bytes = sas::pass2(&mut x, &plan, &p.task.starts[p.start].1, BufWriter::with_capacity(4 << 20, f))?;
-            let s2 = t2.elapsed().as_secs_f64();
-            if let Some(path) = &a.ops {
-                let t3 = Instant::now();
-                let f = std::fs::File::create(path).map_err(|e| format!("{}: {}", path.display(), e))?;
-                sas::write_ops(&mut x, &plan, &p.needed, BufWriter::with_capacity(1 << 20, f))?;
-                p.stats.f("seconds_ops", t3.elapsed().as_secs_f64());
+            let t = &p.task;
+            let text = |f: u32, vals: &[u32]| -> String {
+                let d = t.facts.dom(f);
+                let v: Vec<String> = vals.iter().map(|&x| esc(t.strs.get(d[x as usize]))).collect();
+                format!("[{}]", v.join(","))
+            };
+            let f = std::fs::File::create(a.out.as_ref().ok_or("--out is needed")?).map_err(|e| e.to_string())?;
+            let mut o = std::io::BufWriter::new(f);
+            use std::io::Write as _;
+            for k in 0..t.facts.len() as u32 {
+                let all: Vec<u32> = (0..t.facts.size(k)).collect();
+                let st = t.starts[p.start].1[k as usize];
+                let st = if st == NONE { "null".to_string() } else { esc(t.strs.get(t.facts.dom(k)[st as usize])) };
+                writeln!(o, "{{\"fact\":{},\"values\":{},\"start\":{}}}", esc(t.key(k)), text(k, &all), st).map_err(|e| e.to_string())?;
             }
-            let mut c = plan.counts.clone();
-            c.bytes = bytes;
-            p.stats
-                .f("seconds_pass1", s1)
-                .f("seconds_pass2", s2)
-                .f("seconds_total", t0.elapsed().as_secs_f64())
-                .raw("sas", &sas_json(&c))
-                .n("peak_rss", peak_rss());
-            if let Some(path) = &a.kept {
-                // the input actions each reduced action stands for, and the ones (f) replaced: (dropped, by)
-                let mut o = String::from("{\"actions\": [");
-                for i in 0..p.task.acts.len() {
-                    if i > 0 {
-                        o.push_str(", ");
-                    }
-                    let m: Vec<String> = p.task.acts.members(i).iter().map(|x| x.to_string()).collect();
-                    let _ = write!(o, "[{}]", m.join(", "));
-                }
-                o.push_str("], \"replaced\": [");
-                let r: Vec<String> = p.replaced.iter().map(|(x, y)| format!("[{}, {}]", x, y)).collect();
-                o.push_str(&r.join(", "));
-                o.push_str("]}\n");
-                std::fs::write(path, o).map_err(|e| e.to_string())?;
+            for i in 0..t.acts.len() {
+                let v = t.acts.view(i);
+                let m = t.acts.meta[i];
+                let sets = |it: &mut dyn Iterator<Item = (u32, &[u32])>| -> String {
+                    let s: Vec<String> = it.map(|(f, vs)| format!("[{},{}]", esc(t.key(f)), text(f, vs))).collect();
+                    format!("[{}]", s.join(","))
+                };
+                let effs: Vec<String> = v
+                    .effs()
+                    .map(|e| {
+                        let vals = if e.kind == K_BAD { "[]".to_string() } else { text(e.fact, e.vals) };
+                        format!("[{},{},{},{}]", esc(t.key(e.fact)), e.kind, vals, sets(&mut e.when()))
+                    })
+                    .collect();
+                writeln!(
+                    o,
+                    "{{\"label\":{},\"kind\":{},\"end\":{},\"cont\":{},\"cost\":{},\"rec\":{},\"pre\":{},\"eff\":[{}]}}",
+                    esc(t.strs.get(m.label)),
+                    esc(t.strs.get(m.kind)),
+                    esc(t.strs.get(m.end)),
+                    esc(t.strs.get(m.cont)),
+                    m.cost,
+                    m.rec,
+                    sets(&mut v.pre()),
+                    effs.join(",")
+                )
+                .map_err(|e| e.to_string())?;
             }
-            let js = p.stats.done();
-            match &a.stats {
-                Some(path) => std::fs::write(path, js + "\n").map_err(|e| e.to_string())?,
-                None => println!("{}", js),
+            drop(o);
+            if let Some(path) = &a.stats {
+                std::fs::write(path, p.stats.done() + "\n").map_err(|e| e.to_string())?;
             }
             Ok(())
         }

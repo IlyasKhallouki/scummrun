@@ -1,0 +1,96 @@
+[k2t] 10 rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96], 283 units, 6846 slot facts; 1 threads; load 8.11 9.41 10.90
+[k2t] pass 1 inputs: 44 runs, 88 records, 0.1 s; 86 records in the pass, 0 s, RSS 62 MB
+[k2t] pass 1 event round 1: 89 runs, 169 records, 0.6 s; 256 records in the pass, 1 s, RSS 79 MB
+[k2t] pass 1 event round 2: 508 runs, 1705 records, 0.7 s; 1962 records in the pass, 2 s, RSS 86 MB
+[k2t] pass 1 event round 3: 998 runs, 3567 records, 2.9 s; 5529 records in the pass, 5 s, RSS 90 MB
+job event(obj:450@77#186649efdf4a): 1.3 s, 36 records, 0 splits, 0 parts, 0 deep
+job event(obj:451@21#7ba1220ae5cc): 1.2 s, 36 records, 0 splits, 0 parts, 0 deep
+[k2t] pass 1 event round 4: 764 runs, 2842 records, 6.5 s; 8371 records in the pass, 11 s, RSS 126 MB
+split event(script:2@736#b73c40199d58) depth 0 on bit:6: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 1 on class:452:16: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 2 on class:452:15: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 3 on class:452:14: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 4 on room: 2 of 37 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 5 on var:32: 6 of 6 values, 373 paths cut
+job event(script:2@736#b73c40199d58): 1.8 s, 188 records, 6 splits, 12 parts, 6 deep
+[k2t] pass 1 event round 5: 881 runs, 3008 records, 5.2 s; 11379 records in the pass, 16 s, RSS 142 MB
+[k2t] pass 1 event round 6: 1147 runs from 1147 events start; RSS 153 MB
+[k2t] pass 1 event round 6: 1147 runs, 4042 records, 6.5 s; 15421 records in the pass, 23 s, RSS 207 MB
+[k2t] pass 1 event round 7: 1115 runs from 1115 events start; RSS 216 MB
+split event(script:2@736#b73c40199d58) depth 0 on bit:6: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 1 on class:452:16: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 2 on class:452:15: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 3 on class:452:14: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 4 on room: 8 of 37 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 5 on var:32: 6 of 6 values, 158 paths cut
+job event(script:2@736#b73c40199d58): 2.6 s, 98 records, 6 splits, 18 parts, 6 deep
+[k2t] pass 1 event round 7: 1115 runs, 4397 records, 7.6 s; 19817 records in the pass, 31 s, RSS 182 MB
+[k2t] pass 1 event round 8: 696 runs, 2278 records, 3.3 s; 22072 records in the pass, 34 s, RSS 200 MB
+[k2t] pass 1 event round 9: 636 runs, 12168 records, 11.0 s; 34140 records in the pass, 45 s, RSS 265 MB
+[k2t] pass 1 event round 10: 557 runs, 2273 records, 3.7 s; 36537 records in the pass, 49 s, RSS 218 MB
+[k2t] pass 1 event round 11: 689 runs, 2571 records, 3.1 s; 39108 records in the pass, 52 s, RSS 233 MB
+[k2t] pass 1 event round 12: 566 runs, 2274 records, 4.3 s; 41379 records in the pass, 57 s, RSS 232 MB
+[k2t] pass 1 event round 13: 467 runs, 1722 records, 2.7 s; 43104 records in the pass, 60 s, RSS 241 MB
+[k2t] pass 1 event round 14: 378 runs, 1208 records, 4.1 s; 44286 records in the pass, 64 s, RSS 259 MB
+[k2t] pass 1 event round 15: 326 runs, 897 records, 1.6 s; 45209 records in the pass, 65 s, RSS 256 MB
+[k2t] pass 1 event round 16: 292 runs, 731 records, 3.4 s; 45932 records in the pass, 69 s, RSS 261 MB
+[k2t] pass 1 event round 17: 249 runs, 653 records, 1.0 s; 46593 records in the pass, 70 s, RSS 259 MB
+[k2t] pass 1 event round 24: 224 runs, 8610 records, 7.3 s; 56562 records in the pass, 79 s, RSS 315 MB
+[k2t] pass 1 event round 100: 47 runs, 69 records, 0.0 s; 65980 records in the pass, 88 s, RSS 279 MB
+[k2t] pass 1 event round 200: 7 runs, 13 records, 0.0 s; 69183 records in the pass, 91 s, RSS 286 MB
+[k2t] pass 1 event round 300: 7 runs, 13 records, 0.0 s; 70481 records in the pass, 93 s, RSS 291 MB
+[k2t] pass 1 event round 400: 6 runs, 12 records, 0.0 s; 71677 records in the pass, 94 s, RSS 293 MB
+[k2t] pass 1 event round 500: 6 runs, 12 records, 0.0 s; 72881 records in the pass, 96 s, RSS 298 MB
+[k2t] pass 1 event round 600: 2 runs, 4 records, 0.0 s; 73349 records in the pass, 97 s, RSS 301 MB
+[k2t] pass 1 event round 700: 2 runs, 4 records, 0.0 s; 73749 records in the pass, 98 s, RSS 305 MB
+[k2t] pass 1 event round 800: 2 runs, 4 records, 0.0 s; 74149 records in the pass, 99 s, RSS 306 MB
+[k2t] pass 1 event round 900: 2 runs, 4 records, 0.0 s; 74549 records in the pass, 99 s, RSS 310 MB
+[k2t] pass 1 event round 1000: 2 runs, 4 records, 0.0 s; 74949 records in the pass, 100 s, RSS 311 MB
+[k2t] pass 2 inputs: 44 runs, 88 records, 0.1 s; 86 records in the pass, 101 s, RSS 315 MB
+[k2t] pass 2 event round 1: 89 runs, 169 records, 0.1 s; 256 records in the pass, 101 s, RSS 316 MB
+[k2t] pass 2 event round 2: 508 runs, 1705 records, 0.9 s; 1962 records in the pass, 102 s, RSS 131 MB
+[k2t] pass 2 event round 3: 998 runs, 3567 records, 2.8 s; 5529 records in the pass, 105 s, RSS 127 MB
+[k2t] pass 2 event round 4: 764 runs, 2842 records, 5.3 s; 8371 records in the pass, 110 s, RSS 150 MB
+split event(script:2@736#b73c40199d58) depth 0 on bit:6: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 1 on class:452:16: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 2 on class:452:15: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 3 on class:452:14: 1 of 2 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 4 on room: 2 of 37 values, 374 paths cut
+split event(script:2@736#b73c40199d58) depth 5 on var:32: 6 of 6 values, 373 paths cut
+job event(script:2@736#b73c40199d58): 3.0 s, 188 records, 6 splits, 12 parts, 6 deep
+[k2t] pass 2 event round 5: 881 runs, 3024 records, 8.3 s; 11395 records in the pass, 118 s, RSS 154 MB
+[k2t] pass 2 event round 6: 1147 runs from 1147 events start; RSS 172 MB
+[k2t] pass 2 event round 6: 1147 runs, 4064 records, 8.8 s; 15459 records in the pass, 127 s, RSS 216 MB
+[k2t] pass 2 event round 7: 1115 runs from 1115 events start; RSS 240 MB
+split event(script:2@736#b73c40199d58) depth 0 on bit:6: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 1 on class:452:16: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 2 on class:452:15: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 3 on class:452:14: 1 of 2 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 4 on room: 8 of 37 values, 188 paths cut
+split event(script:2@736#b73c40199d58) depth 5 on var:32: 6 of 6 values, 158 paths cut
+job event(script:2@736#b73c40199d58): 2.0 s, 98 records, 6 splits, 18 parts, 6 deep
+[k2t] pass 2 event round 7: 1115 runs, 4431 records, 9.2 s; 19890 records in the pass, 136 s, RSS 188 MB
+[k2t] pass 2 event round 8: 696 runs, 2300 records, 4.1 s; 22166 records in the pass, 141 s, RSS 206 MB
+[k2t] pass 2 event round 9: 663 runs, 12349 records, 12.2 s; 34414 records in the pass, 153 s, RSS 278 MB
+[k2t] pass 2 event round 10: 566 runs, 2313 records, 3.0 s; 36852 records in the pass, 156 s, RSS 242 MB
+[k2t] pass 2 event round 11: 689 runs, 2582 records, 2.7 s; 39429 records in the pass, 159 s, RSS 248 MB
+[k2t] pass 2 event round 12: 566 runs, 2274 records, 3.2 s; 41705 records in the pass, 162 s, RSS 253 MB
+[k2t] pass 2 event round 13: 467 runs, 1771 records, 2.7 s; 43479 records in the pass, 165 s, RSS 252 MB
+[k2t] pass 2 event round 14: 378 runs, 1208 records, 3.7 s; 44661 records in the pass, 169 s, RSS 271 MB
+[k2t] pass 2 event round 15: 326 runs, 1065 records, 1.4 s; 45752 records in the pass, 170 s, RSS 270 MB
+[k2t] pass 2 event round 16: 292 runs, 731 records, 2.8 s; 46475 records in the pass, 173 s, RSS 277 MB
+[k2t] pass 2 event round 17: 249 runs, 1325 records, 1.1 s; 47784 records in the pass, 174 s, RSS 277 MB
+[k2t] pass 2 event round 24: 224 runs, 8610 records, 7.4 s; 58001 records in the pass, 183 s, RSS 331 MB
+[k2t] pass 2 event round 100: 47 runs, 69 records, 0.1 s; 67415 records in the pass, 195 s, RSS 293 MB
+[k2t] pass 2 event round 200: 7 runs, 13 records, 0.0 s; 70622 records in the pass, 198 s, RSS 300 MB
+[k2t] pass 2 event round 300: 7 runs, 13 records, 0.0 s; 71922 records in the pass, 199 s, RSS 304 MB
+[k2t] pass 2 event round 400: 6 runs, 12 records, 0.0 s; 73124 records in the pass, 201 s, RSS 307 MB
+[k2t] pass 2 event round 500: 6 runs, 12 records, 0.0 s; 74324 records in the pass, 203 s, RSS 313 MB
+[k2t] pass 2 event round 600: 2 runs, 4 records, 0.0 s; 74788 records in the pass, 203 s, RSS 314 MB
+[k2t] pass 2 event round 700: 2 runs, 4 records, 0.0 s; 75188 records in the pass, 204 s, RSS 318 MB
+[k2t] pass 2 event round 800: 2 runs, 4 records, 0.0 s; 75588 records in the pass, 205 s, RSS 323 MB
+[k2t] pass 2 event round 900: 2 runs, 4 records, 0.0 s; 75986 records in the pass, 205 s, RSS 323 MB
+[k2t] pass 2 event round 1000: 2 runs, 4 records, 0.0 s; 76388 records in the pass, 206 s, RSS 328 MB
+[k2t] read: 76498 records, 206.5 s wall, 227.7 CPU s, peak RSS 338 MB
+[k2t] reached values: p1/k2/k2t.reached
+[k2t] done: 76498 records, read 206.5 s wall 227.7 CPU s (1.10 CPUs), peak RSS 338 MB; packed 79726148 bytes, 75942 actions (556 folded); report p1/k2/k2t.json

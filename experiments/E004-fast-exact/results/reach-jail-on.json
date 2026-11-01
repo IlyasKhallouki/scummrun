@@ -1,0 +1,238 @@
+{
+  "batches": [
+    {
+      "job_s": 0.1,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 0: event round 1"
+    },
+    {
+      "job_s": 0.3,
+      "jobs": 89,
+      "longest_job_s": 0.1,
+      "records": 154,
+      "s": 0.1,
+      "what": "pass 0: event round 2"
+    },
+    {
+      "job_s": 0.2,
+      "jobs": 141,
+      "longest_job_s": 0.0,
+      "records": 272,
+      "s": 0.1,
+      "what": "pass 0: event round 3"
+    },
+    {
+      "job_s": 0.1,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 216,
+      "s": 0.0,
+      "what": "pass 0: event round 4"
+    }
+  ],
+  "cpu_use": 1.74,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "state:316"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 22,
+    "reads some locals, known": 32
+  },
+  "load_at_end": "7.02 8.90 8.72",
+  "load_at_start": "6.76 8.88 8.71",
+  "n_rooms": 2,
+  "n_units": 54,
+  "name": "jail-on",
+  "objects": 27,
+  "out_of_domain_keys": 0,
+  "outside_points": {},
+  "packed": {
+    "actions": 683,
+    "args_values_zeroed": 0,
+    "bytes": 185572,
+    "facts": 192,
+    "file": "/var/tmp/fast-mi/reach-scratch/jail/jail-on.tc",
+    "finish_s": 0.0,
+    "folded": 47,
+    "sha1": "3aed04a5677877fb257a74187a297872cec888d4",
+    "strings": 924
+  },
+  "peak_rss_mb": 136,
+  "phases_s": {
+    "emit": 0.02,
+    "end of pass": 0.0,
+    "events": 0.0,
+    "events: event_pins": 0.0,
+    "events: replans": 0.0,
+    "runs": 0.27
+  },
+  "pool": {
+    "batches": 4,
+    "job_s": 0.7,
+    "jobs": 363,
+    "longest_jobs": [
+      [
+        0.13,
+        "event(script:23@409)",
+        1
+      ],
+      [
+        0.04,
+        "event(script:2@736#5cd3c5844fef)",
+        1
+      ],
+      [
+        0.04,
+        "event(script:2@736)",
+        1
+      ],
+      [
+        0.03,
+        "event(script:23@409)",
+        3
+      ],
+      [
+        0.02,
+        "sentence(4,426)",
+        0
+      ],
+      [
+        0.01,
+        "sentence(2,426)",
+        1
+      ],
+      [
+        0.01,
+        "event(script:2@736#d897055c2f2e)",
+        1
+      ],
+      [
+        0.01,
+        "sentence(3,426)",
+        0
+      ],
+      [
+        0.01,
+        "sentence(2,426)",
+        2
+      ],
+      [
+        0.01,
+        "sentence(7,428)~frozen",
+        2
+      ],
+      [
+        0.01,
+        "event(script:2@915)",
+        2
+      ],
+      [
+        0.01,
+        "sentence(4,427)~frozen",
+        2
+      ],
+      [
+        0.01,
+        "sentence(4,427)~frozen",
+        3
+      ],
+      [
+        0.01,
+        "sentence(4,429)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "sentence(4,428)",
+        1
+      ],
+      [
+        0.0,
+        "sentence(4,426)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "sentence(2,426)",
+        0
+      ],
+      [
+        0.0,
+        "sentence(4,428)~frozen",
+        2
+      ],
+      [
+        0.0,
+        "event(obj:429@327)",
+        2
+      ],
+      [
+        0.0,
+        "event(script:2@475#bdbf6099272c)",
+        1
+      ]
+    ],
+    "max_records_waiting": 153,
+    "merge_and_stream_s": 0.04,
+    "merge_counters_s": 0.01,
+    "snapshots_s": 0.0,
+    "split_parts_queued": 0,
+    "split_parts_run_elsewhere": 0,
+    "stream_records_s": 0.04,
+    "workers_sync_s": 0.0
+  },
+  "reach": true,
+  "read_cpu_s": 0.5,
+  "read_peak_rss_mb": 136,
+  "read_wall_s": 0.3,
+  "reader_counts": {
+    "event rounds": 4,
+    "pass 1: records": 730,
+    "reach: branches and jobs still held at the end": 822,
+    "reach: most branches held at once": 822,
+    "reach: records of a rerun already written": 179,
+    "reach: reruns": 181,
+    "reach: values reached (facts written or seeded)": 3928,
+    "records": 730
+  },
+  "records": 730,
+  "records_by_kind": {
+    "event": 200,
+    "sentence": 480,
+    "skip_cutscene": 2,
+    "walk_to": 48
+  },
+  "rooms": [
+    31,
+    33
+  ],
+  "rss_peak_seen": {
+    "at": "",
+    "mb": 0
+  },
+  "setup_s": 0.1,
+  "sink_thread_busy_s": 0.0,
+  "slot_events": [],
+  "slot_facts": 2093,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "done",
+  "threads": 3,
+  "total_s": 0.6,
+  "units": {
+    "entry": 2,
+    "exit": 2,
+    "global": 24,
+    "local": 14,
+    "obj": 12
+  }
+}

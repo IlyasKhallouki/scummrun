@@ -595,6 +595,46 @@ pub struct PathOut {
     pub unknown_writes: Vec<Py>,
     pub assumptions: Vec<Assumption>,
     pub notes: Vec<Py>,
+    /// the switch havoc_cut: where a path the step limit ended stood (None for every other path, and off)
+    pub cut: Option<Cut>,
+}
+
+/// The switch havoc_cut (havoc.rs): a path the step limit ended, where it stood. `frames` are the frames on its stack,
+/// bottom first, each with the instruction it runs next; `steps` the engine steps its calls have not run yet.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Cut {
+    pub frames: Vec<(UnitKey, Option<u32>)>,
+    pub steps: Vec<CutStep>,
+}
+
+/// An engine step a cut path has not run yet, as the havoc record's closure reads it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum CutStep {
+    /// runScript(N)
+    Script(i32),
+    /// runObjectScript(O)
+    Object(i32),
+    /// runScript(VAR(var))
+    Hook(i32),
+    /// a write of the engine's own, to this fact
+    Write(String),
+    /// a step of startScene
+    Room(RoomStep),
+    /// a step the closure does not follow: it reads every unit of the scope
+    Other(String),
+}
+
+/// A pending step of startScene, as the switch havoc_rooms reads it (experiments/E005-narrow-havoc/havoc-rooms.md);
+/// with the switch off every one is a room change to any scope room.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum RoomStep {
+    /// a step that holds the room the change loads (`Scene`, `SceneBegin`, `SceneLoad`, `Room1`): the room's number,
+    /// None when it is not known
+    Load(Option<i32>),
+    /// the current room's code: its entry code (true) or its exit code (false)
+    Code(bool),
+    /// any other step of the change (`SceneKill`, `SceneEgo`)
+    Other,
 }
 
 impl PathOut {
@@ -613,6 +653,7 @@ impl PathOut {
             unknown_writes: p.get("unknown_writes").items().to_vec(),
             assumptions: p.get("assumptions").items().iter().map(Assumption::from_py).collect(),
             notes: p.get("notes").items().to_vec(),
+            cut: None,
         }
     }
 }

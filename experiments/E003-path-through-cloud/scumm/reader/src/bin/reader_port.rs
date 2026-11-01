@@ -4,13 +4,18 @@
 //! reader-port records NAME            golden records parsed and written back
 //! reader-port replay NAME [--out F]   the reading by the Rust Builder over the captured runs, against golden.py's
 //! reader-port read NAME [--threads N] [--switches S,...] [--live-locals] [--elsewhere] [--out F] [--golden F]
-//!                  [--packed F] [--task-out DIR]
+//!                  [--packed F] [--task-out DIR] [--frame-costs] [--no-keep]
 //!                                     the reading with the Rust machine half (fix round 1's switches on), against
 //!                                     golden.py's (switches off) or --golden's; --live-locals and --elsewhere read
 //!                                     with those switches (PORT-NOTES.md, "Live locals", "ELSEWHERE"; the comparison
 //!                                     then shows the renumbered lists), --packed writes its packed file as made (the
 //!                                     kitchen's goal and start s17; room 33's start as "start"; not with due_first,
-//!                                     whose writes go on the kept records after the reading: use --task-out)
+//!                                     whose writes go on the kept records after the reading: use --task-out);
+//!                                     --frame-costs gives each action its cost in engine frames (costs.rs) in the
+//!                                     packed file and --task-out's files; the records are the same, the reading's
+//!                                     head gets the costs' parameters (the comparison leaves that key out);
+//!                                     --no-keep (with --packed) keeps no records in memory, as reader-scope
+//!                                     without --keep: the packed file is the same, and there is no comparison
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
@@ -155,7 +160,13 @@ fn main() {
             let cpu0 = scumm_reader::cpu_secs();
             let live = args.iter().any(|a| a == "--live-locals");
             let elsewhere = args.iter().any(|a| a == "--elsewhere");
+            let frame_costs = args.iter().any(|a| a == "--frame-costs");
             let packed_out = arg(&args, "--packed");
+            let no_keep = args.iter().any(|a| a == "--no-keep");
+            assert!(
+                !no_keep || (packed_out.is_some() && ["--out", "--golden", "--task-out"].iter().all(|f| arg(&args, f).is_none())),
+                "--no-keep needs --packed, and --out, --golden and --task-out read the kept records"
+            );
             assert!(
                 !(sw.due_first && packed_out.is_some()),
                 "--packed streams the records as made, and due_first writes due: on the kept records after the reading; use --task-out"
@@ -164,15 +175,33 @@ fn main() {
             // builder counters, which the reading (golden.py's file) must not have
             let mut packing: Option<packed::RecordStream> = None;
             let (mut b, secs) = match arg(&args, "--threads") {
-                _ if live || elsewhere || packed_out.is_some() => {
+                _ if live || elsewhere || frame_costs || sw.reach || packed_out.is_some() => {
                     // a switch on, or the packed file written as made: on `--threads` workers (default 0)
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
                     let mut b = oracle::builder_with(&game, &st, name, sw);
                     b.table.elsewhere = elsewhere;
+                    b.keep_records = !no_keep;
+                    if sw.reach {
+                        // the start the packed file gets: the kitchen's s17, another scope's own
+                        b.reach_starts.push(if name == "kitchen" {
+                            oracle::kitchen_task(&st).s17
+                        } else {
+                            Facts::from_py(st.named("builder", name).get("start_items"))
+                        });
+                    }
                     if live {
                         b.table.live_locals = Some(std::sync::Arc::new(scumm_reader::locals::LiveLocals::of(&game)));
                     }
+                    if frame_costs {
+                        // the switch --frame-costs (costs.rs): the scope's frame clock and every unit's wait points
+                        let fc = scumm_reader::costs::FrameCosts::of(&game, &b.scope);
+                        println!("frame costs: dmax {}, charinc {:?}; wait points {:?}", fc.dmax, fc.charinc, fc.rules.0);
+                        b.frame_costs = Some(std::sync::Arc::new(fc));
+                    }
                     let mut stream = packed_out.as_ref().map(|p| packed::RecordStream::create(&PathBuf::from(p)).unwrap());
+                    if let Some(st) = stream.as_mut() {
+                        st.costs = b.frame_costs.clone();
+                    }
                     let scope = b.scope.clone();
                     let t = Instant::now();
                     scumm_reader::par::with_pool(&game, &scope, threads, |pool| {
@@ -195,7 +224,7 @@ fn main() {
             };
             println!(
                 "{name}: {} records, reading {secs:.2} s, {:.1} CPU s, peak RSS {} MB",
-                b.records.len(),
+                if no_keep { b.n_records } else { b.records.len() },
                 scumm_reader::cpu_secs() - cpu0,
                 peak_rss_kb().unwrap_or(0) / 1024
             );
@@ -209,7 +238,11 @@ fn main() {
                 }
                 gz.finish().unwrap();
             }
-            if sw == Switches::default() {
+            // --frame-costs adds its parameters to the reading's head only: compared without them
+            let costs_kept = b.frame_costs.take();
+            if no_keep {
+                println!("{name}: no records kept (--no-keep), no comparison");
+            } else if sw == Switches::default() {
                 ok &= report(&format!("{name} reading against golden.py's"), oracle::compare_reading(&b, &golden, 5));
             } else if let Some(g) = arg(&args, "--golden") {
                 // a switch's own golden (fix round 1): the reading with the same switches, written by --out
@@ -218,6 +251,7 @@ fn main() {
                 let (diffs, n) = oracle::compare_reading(&b, &golden, usize::MAX);
                 println!("{name} with {}: {} of {n} lines differ from golden.py's (switches on; not a check)", sw.names().join(","), diffs.len());
             }
+            b.frame_costs = costs_kept;
             if let Some(stream) = packing {
                 let (goal, start_name, start) = if name == "kitchen" {
                     let kt = oracle::kitchen_task(&st);
@@ -227,8 +261,16 @@ fn main() {
                 };
                 let keys = stream.fact_keys();
                 let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
+                let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
                 let (info, folded) = stream.finish(&mut b, &goal, &[(start_name.to_string(), s0)]).unwrap();
                 println!("{}: {} actions ({folded} folded), {} bytes", packed_out.as_ref().unwrap(), info.actions, info.bytes);
+                let path = PathBuf::from(packed_out.as_ref().unwrap()).with_extension("reached");
+                if let Some(reached) = &b.table.reach {
+                    std::fs::write(&path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").unwrap();
+                } else {
+                    // an older reading's, under this packed file's name
+                    std::fs::remove_file(&path).ok();
+                }
             }
             if let Some(d) = &b.due {
                 for (k, v) in &d.counts.0 {

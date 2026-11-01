@@ -16,6 +16,7 @@ section answers the critique point by point.
 | | item | order |
 |---|---|---|
 | F1 | an input is one record, and it starts at the input script | after F2, F5, F9, F12 |
+| F1c | a sentence or walk starts at the room's input script, from the settled sentence variables | after F2, F5, F9, F12; instead of F1 and F1b |
 | F2 | where in the frame an input is read (open choice), and the planner rule | before F1 |
 | F3 | an input's engine conditions are read in its frame (S3#45) | verified on F1, F2, F7 |
 | F4 | '.' is the talk-stop key (PI decision on C1) | any time |
@@ -117,6 +118,117 @@ record). Replay: the kitchen door clicks stop failing.
 
 **Cost.** Tables: cells, verb rectangles, room widths, mouse loops. Facts: `mouse` and the input variables. Records:
 measured first.
+
+## F1c. The input script from the settled sentence variables (switch input_settled)
+
+**Why.** F1b (branch f1b, notes/log/2026-10-26-e003-f1b.md) offered a click on every cell and ran it with the hover
+and the sentence variables as free facts. The kitchen's reading took 6.8 times today's wall time, with 7.4 times the
+records and no plan. Its test "the bar door from s17, hover and cursor pinned as at s17" already gave local 203's three
+paths at small size. F1c keeps today's inputs and starts their records at the input script, from the state the
+harness's own play leaves.
+
+**Engine.**
+- A frame (scumm.cpp): processInput reads the mouse (3177), updateScummVars copies it (3198, 3385-3388), every live
+  slot takes its turn (runAllScripts, 3231; script.cpp:968-987), checkExecVerbs takes the click (3232),
+  checkAndRunSentenceScript runs a queued sentence (3255).
+- checkExecVerbs drops a click while _userPut <= 0 (verbs.cpp:590). A click off every verb gives
+  runInputScript(kSceneClickArea, 0, code), code 1 for the left button (verbs.cpp:666, 681-688).
+- runInputScript runs VAR_VERB_SCRIPT's script with [area, value, code] (script.cpp:1478-1511), at once, to its first
+  yield or end (runScript, 38-106; runScriptNested, 344-389). A number from _numGlobalScripts on is the room's local
+  (70-86). VAR_VERB_SCRIPT 0 runs nothing (script.cpp:1510).
+- A slot takes its turn when live and not frozen (script.cpp:979).
+- o5_doSentence: STOP empties the queue and stops the sentence script (script_v5.cpp:1004-1008); any other verb pushes,
+  and the script goes on (script.cpp:1145-1172). checkAndRunSentenceScript pops the top at the frame's end, unless a
+  live, unfrozen slot of the sentence script holds it (script.cpp:1186-1191), and drops one whose B is A and not 0
+  (1202-1204).
+
+**The harness's play.** Executor.play for a sentence: the verb's key (the same input as its left click, verbs.cpp:608-615),
+the mouse to the object, frames until the click gate opens, a left click; with B the same again on B. A walk_to has no
+verb key. So the slots run at least one turn with the mouse on the object before the click.
+
+**The plain input script.** A global script is plain when its own code holds a doSentence whose three operands are all
+variables, and no yield. Such a script makes the sentence from those variables and has no later part. Today's sentence
+record is what it does. In the game's text there is one, global 4 ([0407]); the 15 other constants written to VAR_VERB_SCRIPT
+(14, 33, 66, 129, 149, 156, 158 and the rooms' locals) have no such doSentence (33 has doSentence(11, Local[2], 0)). No
+number is written in the code: inputs.rs reads this from the IR.
+
+**The roles.** All read from the plain script and the hover, in inputs.rs:
+- `v`, `a`, `b`: the three variables of the plain script's doSentence. MI1: Var[107], [108], [109].
+- The hover: a global unit whose code has a loop with a wait, holding Local[L] = findObject(VAR_VIRT_MOUSE_X,
+  VAR_VIRT_MOUSE_Y), and Var[a] = Local[L]. MI1: global 23, with one wait (at:script:23:409, after breakHere [0198]).
+- `last`: the variable of the hover's "object under the mouse has changed" test, Local[L] != Var[last], which the next
+  line sets to Local[L]. MI1: Var[181] ([00F9], [0100]).
+- `p`: the bare variable the hover tests where its true side writes Var[b] and its false side Var[a]. MI1: Var[110]
+  ([0105]-[0126]).
+- The guards: the tests on a variable and a constant before the hover's findObject whose false side jumps past it. MI1:
+  VAR_CURSORSTATE > 0 ([0000]). The other tests before it (Bit[563], the mouse in the inventory, [0007]-[006C]) rejoin
+  at findObject.
+
+**Rule.**
+1. Inputs stay today's: sentence(verb, A, B), walk_to(A), dialog_line. No new label kind. A dialog line runs as today.
+2. Every sentence and walk_to whose A and B are room objects or actors splits on VAR_VERB_SCRIPT: per plain value,
+   today's job with var:32 pinned to it and nothing else changed; per other value n of var:32's domain but 0, a job
+   whose label ends [n]. A local n needs a room of the job where a unit of that room, or a global, installs it (a
+   constant write to var:32); others are left out as states that never hold, and counted. An input with an object in
+   the inventory stays as today, with no pin on var:32. That click is a verb click, area 1, on a slot.
+3. The states n's job needs, on top of today's pins:
+   - input on: VAR_USERPUT > 0 (verbs.cpp:590; today's pin);
+   - the hover live, not frozen, at its wait: script:H = 1, frozen:H = 0, at:H:W = 1 (script.cpp:979);
+   - the guards: var:52 > 0 in MI1.
+   A hover at another place or frozen, or the cursor off, writes none of the variables below, so these are the states in
+   which they hold. Not required: Bit[563] and the hover's class tests on the object ([009E]-[00F9]). The first decides
+   nothing for a mouse on a room object, y < 152. The second is listed in "What it leaves".
+4. The record starts at n, with these writes on the path, so they are constants and no fact, fork or precondition:
+   Var[v] = verb (the walk verb for a walk_to), Var[a] = A, Var[b] = 0, Var[p] = 0, Var[last] = A. VAR_VIRT_MOUSE_X/Y
+   are the range of A's box (every place of A's boxes where F5 can move it; F12's ranges, a plain unknown without
+   value_sets). No other sentence variable is written; a read of one is a non-fact, with a replay check where it decides.
+   findObject(VAR_VIRT_MOUSE_X, VAR_VIRT_MOUSE_Y) is A, or 0 on an actor. actorFromPos on them is the actor, or 0 on an
+   object, with a replay check that no actor is under the click.
+5. It runs n with [kSceneClickArea, 0, 1], forking only on what n and what it chains to test.
+6. With B: the same frame's run is A's click. If it leaves Var[p] 0 or queues a sentence, the two clicks are not this
+   input: the path is dropped. Else Var[b] = B, Var[last] = B, the mouse is B's box, and n runs again.
+7. A doSentence(V, A', B') on a path of the click is held on the path, not as a fact: what the click's scripts push is
+   what runs. STOP empties it. Where the click's run ends, a sentence held runs as today's record runs it: the same
+   `Step::Sentence`, with the job's same pins on the sentence script, idle or live and frozen (B' = A' != 0 is dropped).
+   Where none is held, the record ends. A second push on one click is not modelled: dropped and counted.
+8. A slot the click leaves waiting, with no sentence on the path, carries the constants its own code reads (the values at
+   the path's end) as part of its list of locals (index 1000 + variable), so `args:<unit>` tells them apart, and its
+   later turn starts with them written on its path. So local 203's `startObject(316, Var[107])` ([004A]) knows the verb.
+   With live-locals these entries are kept. A later yield carries them on. This assumes no input between the click and
+   that turn writes them.
+
+**The limit of the vocabulary.** Inputs in states rule 3 excludes are not offered. That is not a proof that no route
+needs them: clicks with the cursor off, or the hover not at its wait, are real inputs that do something in some state.
+They stay out, as they are today. Floor clicks and the verb key's own run of n stay out too. F1b's records in those states
+are counted in the note.
+
+**What it leaves.**
+- The hover's class tests: with Var[107] = 10, or 4 with Var[110] set, the hover writes 0 where the object lacks the class
+  ([009E]-[00F9]). The record takes the input's A and B anyway, as today's does; the engine then gives no sentence.
+- A box wholly under earlier boxes of the room's list: findObject would give the earlier object. Today's record takes A
+  too. No cells are read here (F1's `cells.rs` is not needed; the mouse is A's box).
+- The verb key's run of n and the inventory's clicks.
+- A later turn's constants, by rule 8, for code the slot calls but does not hold: read as non-facts.
+
+**Tests** (`scumm/reader/tests/input_settled.rs`). The bar door clicks with the cook at x > 310, at x <= 310 and away,
+local 203's three paths, and the door's record holding local 203's tests on the cook; the verb reaching local 203's later
+turn; room 57's local 201 inside, outside and across [000B]-[0012]; room 85's local 201 on 914 and elsewhere; key 23 gives
+no record; the roles above. The kitchen task with the switch plans to owner:566 = ego.
+
+**Gate.** A count of room 33 and the kitchen with the switch on, before anything else: stop if the kitchen's reading time or
+its taskcore operators grow more than 3 times over the same switches without it.
+
+**Measured** (notes/log/2026-10-31-e003-f1c.md, results/f1c-gate.log). The gate fails on reading time: the kitchen's reading takes
+4.5 times the wall time and 5.4 times the CPU time, with 6.7 times the records (475,441 against 71,242). Its operators grow 2.53
+times (44,839 against 17,712). Room 33 is unchanged. Each sentence of the bar is 18 times today's: 6 from local 202's tests on the
+cook, the rule's own forks, times 3 from global 4's Bit[547] and Var[182]. The tests pass, and the kitchen plans to owner:566 = ego.
+The 185,069 click records of F1b are all in states rule 3 excludes.
+
+**Measured with --reach on both sides** (notes/log/2026-11-01-e003-f1c-reach.md, results/f1c-gate-reach.log). The gate passes: over
+seven pairs the reading takes a median 1.58 times the CPU time and 1.55 times the wall time, with 1.47 times the records (40,765
+against 27,739), and the operators grow 2.45 times (43,323 against 17,672). Bit[547] is reached only at its start value, so global
+4's first test runs one side. The kitchen plans to owner:566 = ego by `walk_to(316)[202]`. --reach keeps the fact values (d) keeps
+of the full reading with the switch; the optimal cost is 6 or 7 on both, and A* with landmark cost partitioning did not settle it.
 
 ## F2. Where in the frame an input is read (open choice)
 

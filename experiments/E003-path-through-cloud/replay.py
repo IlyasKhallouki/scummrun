@@ -92,7 +92,10 @@ What the harness does, per plan step (plan.md step 5, with D5):
   ``write_sas`` on ``task`` with the bans (``task``: the pruned task) and ``plan_fd.plan``; a ``write_sas`` error
   (task.py raises ValueError) stops the run with its reason. Each plan's entry keeps the time to write the task
   (``write_s``), the planner's (``seconds``), the operators, the steps and the landmarks lama-first dumped
-  (``landmarks``: how many, and the game facts of the first plan's, ``Harness.landmarks``).
+  (``landmarks``: how many, and the game facts of the first plan's, ``Harness.landmarks``). With
+  ``taskcore_serve`` (off by default) the taskcore planner keeps one taskcore process per packed file and replans
+  without loading the reading again (plan_fd ``serve``): the same files, so the same plans; each plan's entry also
+  keeps the server's reply (``serve``).
 * **A step that is several paths** (taskcore only): a folded step whose paths the plan cannot tell apart, because they
   differ only on facts the reduced file does not hold and whose predicted value is unknown (``plan_fd.predict`` with
   ``choices``), is chosen in the engine when it is played: the path whose precondition holds in the engine's state,
@@ -102,6 +105,35 @@ What the harness does, per plan step (plan.md step 5, with D5):
   writes the engine shows (``_watch`` with one ``exps`` per path; the one with the most writes held when none holds
   all), judged as a single step from there. Several with different inputs (not met so far: a fold is of one label)
   stop the run ("path choice"): a replan would give the same plan from the same frame.
+* **Frame costs** (``cost_caps``, off by default; a reading made with the reader's switch ``--frame-costs``, whose
+  actions cost their records' frames, scumm/reader/src/costs.rs). An event's cost counts its slot's whole wait from
+  the yield. A slot already waiting at the plan's start has spent part of it, so at each plan the harness caps the
+  cost of every event of a live slot at its wait point with what the engine's dump shows is left
+  (``cost_caps_of``): a paused slot with delay D jiffies runs ``floor(D / dmax) + 1`` frames on at the earliest
+  (script.cpp:1513-1542, scumm.cpp:3129-3132; ``dmax`` the reading's), any other live slot 1 frame. The cap holds for
+  any later turn of the slot at that point too (it only lowers a lower bound). taskcore applies the caps
+  (``--cost-caps``). Each plan's entry keeps its steps' costs (``costs``, capped) and Fast Downward's plan cost
+  (``plan_cost``).
+* **The actors' rooms** (``unobserved_actor_rooms``, off by default; a reading made with the reader's switch
+  actor_rooms, F9, whose ``actorroom:N`` facts are an actor's room). The bridge's state dump lists only the current
+  room's visible actors, with no room (patches/0001-scumm-add-speedrun-bridge.patch, the actor dump), so the harness
+  cannot see these facts; without the switch they read as 0. With it they are unobserved, as ``args:`` and
+  ``saved:`` are: not matched, not waited for, their values the plan's (``predict``). Each plan's start gives them the
+  plan's predicted value at a replan, and at the first plan, or where the plan's value is unknown, not known
+  (``ACTOR_ROOM_NOT_KNOWN``), as the reader's start rule gives an actor's room the start does not hold
+  (scumm/reader/src/task.rs ``task_start``).
+* **A reading with ``--reach`` and a replan start it does not cover** (``reach_extend``, off by default). A reading
+  made with the reader's switch ``--reach`` holds only what its start reaches (experiments/E004-fast-exact/reach.md),
+  and taskcore checks every start against the reached values the reader wrote next to the packed file: a replan start
+  holding a value outside them stops ``taskcore sas`` (exit 7) or gets ``error`` from ``taskcore serve``, naming the
+  values (``reach_misses`` reads them back). Without the switch that is a taskcore error and stops the run, as before.
+  With it, the harness hands the start (the engine's facts.py map with the start's ``args:`` numbers) to
+  ``reach_extend(start, harness)``, the caller's: a reading of the same scope from the first start and every start
+  extended so far (reader-scope ``--reach-also``), by reach.md's Theorem 1 the closure from all of them, so it holds
+  every record the old one held. The harness takes that reading as F10's reread does (``_swap``), makes the start
+  again and plans. Each extension is kept (``extensions``: the plan, the frame, the values, the wall and CPU seconds,
+  the actions before and after). A start the extended reading still does not cover, or a further extension that adds
+  no value, stops the run ("reach extension").
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
   one), a planner timeout, the planner's memory limit (``memory_limit``: Fast Downward's search memory, this
   laptop's budget), the replan limit, the time limit, a start outside the task's domains (task.OutOfDomain: the task
@@ -155,6 +187,10 @@ RETRY_REASONS = frozenset({"position", "timer", "random draw", "actor state", "m
 TIME_CHECKS = frozenset({"position", "actor state"})  # failing checks waited for before the input (actor moving)
 UNOBSERVED = ("args:", "saved:")  # facts the state dump does not hold (a slot's locals, the saved verbs)
 PREDICTED = ("pos:", "escpos:") + UNOBSERVED  # the plan's values kept for the replan (``Harness.pred``)
+# the reader's switch actor_rooms (F9): an actor's room as a fact; one the start does not give is not known
+# (scumm/reader/src/table.rs NOT_KNOWN, task.rs task_start). The state dump lists only the current room's visible
+# actors, with no room (``Harness`` ``unobserved_actor_rooms``)
+ACTOR_ROOM, ACTOR_ROOM_NOT_KNOWN = "actorroom:", -1
 SLOT_PREFIXES = ("script:", "local:", "objscript:", "pos:", "escpos:", "frozen:", "cutscene")  # the input taken
 EXECUTOR_EGO = 1  # the actor the Executor's approach and stepping stone take as ego (executor.py:1008, 1011, 1099)
 HISTORY_CAP = 12  # changes kept per fact and step in the log
@@ -319,22 +355,22 @@ def elsewhere(b, obs: dict, out: dict) -> dict:
     return out
 
 
-def view(b, doms: dict, obs: dict) -> dict:
+def view(b, doms: dict, obs: dict, unobserved: tuple = UNOBSERVED) -> dict:
     """The engine's facts (a facts.py map) as the task's values: every key of ``doms`` (key -> Domain) but the
     unobserved ones, slot positions as ``pos:``/``escpos:`` (reader.task_start), each value labelled by its domain
     (None: the domain does not hold it)."""
     st = task_start(b, obs, types.SimpleNamespace(facts=doms))
     out = {}
     for k, dom in doms.items():
-        if k.startswith(UNOBSERVED) or dom is None:
+        if k.startswith(unobserved) or dom is None:
             continue
         out[k] = dom.label(st.get(k, 0))
     return out
 
 
-def holds(conds: dict, state: dict) -> list:
+def holds(conds: dict, state: dict, unobserved: tuple = UNOBSERVED) -> list:
     """The keys of ``conds`` ({key: set of values}) that ``state`` does not meet (unobserved keys skipped)."""
-    return [k for k, s in conds.items() if not k.startswith(UNOBSERVED) and state.get(k) not in s]
+    return [k for k, s in conds.items() if not k.startswith(unobserved) and state.get(k) not in s]
 
 
 def extra_of(state: dict, status: dict) -> dict:
@@ -490,7 +526,7 @@ class Expect:
     changes: bool = True  # the value before the step is not among ``values``
 
 
-def expectations(rec, before: dict, doms: dict, guessed=()) -> dict:
+def expectations(rec, before: dict, doms: dict, guessed=(), unobserved: tuple = UNOBSERVED) -> dict:
     """The record's predicted writes as Expects, from the state ``before`` the step (the task's values): a set, a
     step (``add``: the value before plus the step; several values make it a guess), a guess (with the value the plan
     chose, plan_fd Step.guessed, where its condition holds before), a conditional write and a copy (on the source's
@@ -498,7 +534,7 @@ def expectations(rec, before: dict, doms: dict, guessed=()) -> dict:
     chosen = {k: v for k, v, when in guessed if all(before.get(c) in vs for c, vs in when)}  # guesses that fire
     out = {}
     for k, e in rec.effects.items():
-        if k.startswith(UNOBSERVED):
+        if k.startswith(unobserved):
             continue
         b0 = before.get(k)
         if e[0] == "set":
@@ -632,13 +668,13 @@ def apply_bans(task: T.Task, bans: list) -> T.Task:
 
 # --- the replan's prediction --------------------------------------------------------------------------------------------
 
-def predict(pred: dict, rec, before: dict) -> dict:
+def predict(pred: dict, rec, before: dict, predicted: tuple = PREDICTED) -> dict:
     """The plan's prediction ``pred`` (slot positions and the unobserved facts) after ``rec`` was played from the
     state ``before``: its set writes, its conditional writes whose condition holds; a write of any other kind makes
     the value unknown (dropped)."""
     out = dict(pred)
     for k, e in rec.effects.items():
-        if not k.startswith(PREDICTED):
+        if not k.startswith(predicted):
             continue
         if e[0] == "set":
             out[k] = e[1]
@@ -658,7 +694,7 @@ def after(state: dict, exps: dict) -> dict:
 
 
 def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict, ahead: list, hist: History,
-           choices=None):
+           choices=None, unobserved: tuple = UNOBSERVED):
     """The engine ran on: the facts this step's mismatches name were re-written, within its window, by the plan's
     next steps (``ahead``, the event steps after it up to its next input), to the values those steps predict. Each
     step of that run has its precondition in the plan's state after the steps before it, and holds on some frame no
@@ -680,13 +716,13 @@ def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict,
     for st in ahead:
         a = task.actions[st.action]
         if choices and st.action in choices:
-            ok = [p for p in choices[st.action] if not holds(p.pre, state)]
+            ok = [p for p in choices[st.action] if not holds(p.pre, state, unobserved)]
             if len(ok) != 1:
                 return None
             a = picked[st.action] = ok[0]
-        if holds(a.pre, state):
+        if holds(a.pre, state, unobserved):
             return None
-        x = expectations(a.what, state, doms, st.guessed)
+        x = expectations(a.what, state, doms, st.guessed, unobserved)
         need = [x[k] for k in pending if k in x]
         ch = [e for e in x.values() if e.changes]
         hit = next((n for n in range(pos, len(frames)) if (holds_at(n, need) if need else holds_at(n, ch, False))),
@@ -711,6 +747,29 @@ def ran_on(task: T.Task, doms: dict, exps: dict, mismatches: list, before: dict,
 
 NUM_SCRIPT_LOCAL = 25  # script.h:76
 WIO_INVENTORY = 0  # scumm.h:213: an object's slot started from the inventory, which a room change leaves alive
+
+
+def cost_caps_of(state: dict, dmax: int) -> dict:
+    """The frame-cost caps at a plan's start (module docstring, "Frame costs"): {"event(NAME@W": frames} for every live
+    slot of the engine's state dump at its wait point W: ``floor(delay / dmax) + 1`` for a paused slot (status 1,
+    ssPaused), 1 for any other. Two slots of one name and point: the lesser."""
+    out: dict = {}
+    for sl in state["slots"]:
+        name = F.unit_of(sl["where"], sl["number"])
+        if name is None or sl["code"] < 0:
+            continue
+        cap = sl["delay"] // max(1, dmax) + 1 if sl["status"] == 1 and sl["delay"] > 0 else 1
+        key = f"event({name}@{sl['code']}"
+        out[key] = min(cap, out.get(key, cap))
+    return out
+
+
+def capped_cost(name: str, cost: int, caps: dict) -> int:
+    """An action's cost under the caps (taskcore bans.rs ``apply_caps``: a label ``P)`` or ``P#...``)."""
+    label = name.rsplit("#", 1)[0] if "#" in name else name
+    head = label.split("#", 1)[0]
+    prefix = head[:-1] if head.endswith(")") else head
+    return min(cost, caps[prefix]) if prefix in caps else cost
 
 
 def dumped_slots(state: dict) -> dict | None:
@@ -930,6 +989,34 @@ def _is_input(e: dict) -> bool:
 
 # --- the harness ------------------------------------------------------------------------------------------------------
 
+_REACH_MISS = re.compile(r"the start holds (\d+) values the reading did not reach: \[(.*?)\]")
+
+
+def reach_misses(message: str) -> tuple | None:
+    """(how many, the first of them as "key=value") of the values a start holds that a ``--reach`` reading did not
+    reach, from taskcore's message (main.rs and serve.rs, bans::reached_misses: at most 20 named), or None when the
+    message is another error."""
+    m = _REACH_MISS.search(message)
+    if m is None:
+        return None
+    return int(m[1]), [json.loads(f'"{x}"') for x in re.findall(r'"((?:[^"\\]|\\.)*)"', m[2])]
+
+
+def reach_start(start: dict) -> dict:
+    """The start as reader-scope ``--reach-also`` reads it (reach.rs ``start_file``, task.rs ``task_start``): every
+    int value, the engine's ``at:``/``esc:`` facts with them, so the reader makes ``pos:``/``escpos:`` (and ELSEWHERE)
+    from them as the harness did; ``args:`` as the start has it."""
+    return {k: v for k, v in sorted(start.items()) if isinstance(v, int) and not isinstance(v, bool)
+            and "\t" not in k and "\n" not in k}
+
+
+def _cpu_s() -> float:
+    """This process's CPU seconds and those of its children that have ended (the reader a reach extension runs)."""
+    import resource
+    a, b = resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN)
+    return a.ru_utime + a.ru_stime + b.ru_utime + b.ru_stime
+
+
 class Stop(Exception):
     pass
 
@@ -969,12 +1056,18 @@ class Harness:
                  replan_limit: int = 500, time_limit: float = 24 * 3600, plan_time: int = PLAN_TIME,
                  progress=None, planner: str = "taskcore", packed=None, search: str = "lama-first", workdir=None,
                  taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None,
-                 slot_locals: bool = False, lists: dict | None = None, reread=None):
+                 slot_locals: bool = False, lists: dict | None = None, reread=None, taskcore_serve: bool = False,
+                 cost_caps: bool = False, cost_dmax: int | None = None, reach_extend=None,
+                 reach_extend_limit: int = 3, unobserved_actor_rooms: bool = False):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         if reread is not None and planner != "taskcore":
             raise ValueError("reading slots again (F10) replaces the packed task: the taskcore planner only")
         self.b, self.base = b, task
+        # the actors' rooms as unobserved facts (module docstring), off by default
+        self.unobserved_actor_rooms = unobserved_actor_rooms
+        extra = (ACTOR_ROOM,) if unobserved_actor_rooms else ()
+        self.unobserved, self.predicted = UNOBSERVED + extra, PREDICTED + extra
         # F10 (module docstring): the slots' dumped locals at a replan; ``lists`` the reading's built lists;
         # ``reread(unmatched slots, harness)`` a reading with those slots' events (an object with task, packed, b,
         # lists and doc, as packed_reading.Reading), or None
@@ -983,6 +1076,20 @@ class Harness:
         self.rereads: list = []  # per reading made again: the plan, the frame, the slots, the seconds, the actions
         self.slot_detail = None  # the last F10 replan's live slots (``_replan_locals``), for the plan's entry
         self.planner, self.packed, self.search, self.taskcore_args = planner, packed, search, tuple(taskcore_args)
+        # the taskcore planner without reloading (plan_fd ``serve``, off by default): one long-lived taskcore per
+        # packed file keeps what does not depend on the start; the files and so the plans are the same
+        self.taskcore_serve = taskcore_serve
+        if taskcore_serve and planner != "taskcore":
+            raise ValueError("taskcore_serve is the taskcore planner's")
+        # frame costs (module docstring): the caps at each plan from the engine's dump, and the reading's dmax
+        if cost_caps and (planner != "taskcore" or not cost_dmax):
+            raise ValueError("cost caps: the taskcore planner and the reading's dmax (reading.json frame_costs)")
+        self.cost_caps, self.cost_dmax = cost_caps, cost_dmax
+        # a --reach reading extended at a replan start it does not cover (module docstring), or None (off)
+        if reach_extend is not None and planner != "taskcore":
+            raise ValueError("the reach extension replaces the packed task: the taskcore planner only")
+        self.reach_extend, self.reach_extend_limit = reach_extend, reach_extend_limit
+        self.extensions: list = []  # per extension: the plan, the frame, the values, the seconds, the actions
         self.memory_limit = memory_limit
         self.on_plan = on_plan  # called with the harness after each plan (the caller's snapshot of ``result``)
         self.workdir = Path(workdir) if workdir is not None else None
@@ -1019,11 +1126,33 @@ class Harness:
 
     # --- observing ------------------------------------------------------------------------------------------------
 
+    def _holds(self, conds: dict, state: dict) -> list:
+        return holds(conds, state, self.unobserved)
+
+    def _view(self, b, doms: dict, obs: dict) -> dict:
+        return view(b, doms, obs, self.unobserved)
+
+    def _expectations(self, rec, before: dict, doms: dict, guessed=()) -> dict:
+        return expectations(rec, before, doms, guessed, self.unobserved)
+
+    def _predict(self, pred: dict, rec, before: dict) -> dict:
+        return predict(pred, rec, before, self.predicted)
+
+    def _actor_rooms_start(self, start: dict, first: bool) -> dict:
+        """With ``unobserved_actor_rooms``: each ``actorroom:`` fact of the task at its value in the plan's prediction
+        at a replan, else not known, as the reader starts it (module docstring)."""
+        out = dict(start)
+        for k in self.base.facts:
+            if k.startswith(ACTOR_ROOM):
+                v = None if first else self.pred.get(k)
+                out[k] = v if isinstance(v, int) and not isinstance(v, bool) else ACTOR_ROOM_NOT_KNOWN
+        return out
+
     def observe(self) -> None:
         s = self.branch.state()
         self.state = s
         self.obs = F.facts_of(s)
-        self.now = view(self.b, self.doms, self.obs)
+        self.now = self._view(self.b, self.doms, self.obs)
 
     def belief(self) -> dict:
         """The engine's values with the plan's values of the facts the dump does not hold."""
@@ -1036,7 +1165,7 @@ class Harness:
         self.observe()
 
     def goal_holds(self) -> bool:
-        return not holds(self.goal, self.now)
+        return not self._holds(self.goal, self.now)
 
     def settled(self) -> bool:
         st = self.branch.status
@@ -1050,7 +1179,7 @@ class Harness:
 
     def _set_pred(self, pred: dict) -> None:
         self.pred = pred
-        self.kept = {k: v for k, v in pred.items() if k.startswith(UNOBSERVED)}
+        self.kept = {k: v for k, v in pred.items() if k.startswith(self.unobserved)}
 
     # --- planning -------------------------------------------------------------------------------------------------
 
@@ -1156,7 +1285,7 @@ class Harness:
         self.base, self.packed, self.b, self.lists = new.task, new.packed, new.b, new.lists
         self.pieces = self.pieces_bans = None
         self.doms = dict(new.task.facts)
-        self.now = view(self.b, self.doms, self.obs)
+        self.now = self._view(self.b, self.doms, self.obs)
 
     def _same_input(self, entry: dict, start: dict) -> bool:
         """The planner's input (the start, the bans) at this frame is the previous plan's, on the same frame: the
@@ -1192,7 +1321,7 @@ class Harness:
             return []
         # the plan's slot positions and unobserved facts at its start
         self._set_pred({k: self.task.facts[k].label(start.get(k, 0)) for k in self.task.facts
-                        if k.startswith(PREDICTED)})
+                        if k.startswith(self.predicted)})
         return list(res.steps)
 
     def _plan_taskcore(self, first: bool) -> list:
@@ -1209,6 +1338,8 @@ class Harness:
             start, counts = self._replan_locals(self.base)
         else:
             start, counts = replan_start(self.b, self.obs, prediction(self.now, self.pred), self.base)
+        if self.unobserved_actor_rooms:
+            start = self._actor_rooms_start(start, first)
         n = len(self.plans)
         entry = {"plan": n, "frame": self.branch.frame, "bans": len(self.bans), "start_counts": dict(counts),
                  "reorders": [], "planner": "taskcore", "search": self.search}
@@ -1220,23 +1351,37 @@ class Harness:
         if self.workdir is None:
             self.workdir = Path(tempfile.mkdtemp(prefix="replay-taskcore-"))
         self.progress(f"planning through taskcore (plan {n}, frame {self.branch.frame}, {len(self.bans)} bans)")
+        args, caps = list(self.taskcore_args), {}
+        if self.cost_caps:
+            caps = cost_caps_of(self.state, self.cost_dmax)
+            cdir = self.workdir / f"plan-{n:03d}"
+            cdir.mkdir(parents=True, exist_ok=True)
+            (cdir / "caps.txt").write_text("".join(f"{k}\t{v}\n" for k, v in sorted(caps.items())))
+            args += ["--cost-caps", str(cdir / "caps.txt")]
+            entry["cost_caps"] = {k: v for k, v in sorted(caps.items()) if v > 1}
         try:
             res = plan_fd.plan_taskcore(self.packed, self.base.facts, self.goal, self.pieces, start, self.bans,
                                         time_limit=self.plan_time, memory_limit=self.memory_limit,
                                         search=self.search, workdir=self.workdir / f"plan-{n:03d}",
-                                        args=self.taskcore_args, keep=self.keep_files)
+                                        args=args, keep=self.keep_files, serve=self.taskcore_serve)
         except (plan_fd.PathChoice, plan_fd.TaskcoreError) as e:
+            miss = reach_misses(str(e)) if isinstance(e, plan_fd.TaskcoreError) else None
+            if miss is not None and self.reach_extend is not None:
+                return self._extend(first, entry, start, miss)
             entry.update(status="path choice" if isinstance(e, plan_fd.PathChoice) else "taskcore error",
                          error=str(e), steps=[])
             self.stop_reason = f"planner: {e}"
             return []
         sc = res.stats.get("start_check", {})
+        entry.update(costs=[capped_cost(a.name, a.cost, caps) for a in res.paths], plan_cost=res.plan_cost)
         entry.update(write_s=res.write_s, status=res.status, seconds=res.seconds, steps=[s.name for s in res.steps],
                      operators=res.operators, actions=res.stats.get("actions"), decode_s=res.decode_s,
                      folds=res.folds, predicted_goal=res.predicted_goal, file_facts=len(res.file_facts),
                      needed_facts=len(res.needed_facts),
                      input_check_misses=sc.get("facts_the_input_check_stops_on"),
                      choices={str(i): [p.name for p in ps] for i, ps in res.choices.items()})
+        if self.taskcore_serve:
+            entry["serve"] = res.serve
         self._landmarks(entry, res)
         if res.status == "out of domain":
             entry.update(misses=res.misses, steps=[])
@@ -1245,6 +1390,33 @@ class Harness:
         self.task = T.Task(self.base.facts, list(res.actions), self.base.goal)
         self.choices = dict(res.choices)
         return self._planned(entry, res, start)
+
+    def _extend(self, first: bool, entry: dict, start: dict, miss: tuple) -> list:
+        """A replan start the ``--reach`` reading does not cover (module docstring): the reading extended from it, taken
+        as the task, and the plan made again. The entry of the refused try is kept, with status "reach extension"."""
+        n, values = miss
+        entry.update(status="reach extension", reach_misses=n, reach_values=values, steps=[])
+        entry.pop("input_key", None)  # the try after the extension is no replan of this one (``_same_input``)
+        tries = [x for x in self.extensions if x["frame"] == entry["frame"] and x["replans"] == self.replans]
+        last = tries[-1] if tries else None
+        if len(tries) >= self.reach_extend_limit or (last is not None and set(values) <= set(last["values"])):
+            self.stop_reason = (f"reach extension: the start at frame {self.branch.frame} holds {n} values the "
+                                f"extended reading did not reach either: {values[:5]}")
+            return []
+        self.progress(f"reach extension at frame {self.branch.frame}: {n} values not reached, {values[:5]}")
+        actions_before = len(self.base.actions)
+        cpu0, wall0 = _cpu_s(), time.monotonic()
+        new = self.reach_extend(reach_start(start), self)
+        rec = {"plan": entry["plan"], "frame": self.branch.frame, "replan": not first, "replans": self.replans,
+               "n_values": n,
+               "values": values, "seconds": round(time.monotonic() - wall0, 2), "cpu_s": round(_cpu_s() - cpu0, 2),
+               "actions_before": actions_before, "actions": len(new.task.actions),
+               "reading": str(getattr(new, "path", ""))}
+        self.extensions.append(rec)
+        self._swap(new)
+        self.progress(f"reach extension {len(self.extensions)}: {actions_before} -> {rec['actions']} actions in "
+                      f"{rec['seconds']} s ({rec['cpu_s']} CPU s)")
+        return self._plan_taskcore(first)
 
     # --- one step -------------------------------------------------------------------------------------------------
 
@@ -1413,13 +1585,13 @@ class Harness:
                 rec = a.what
             while True:
                 # the precondition (or, for an event, its effects already there)
-                bad = holds(a.pre, self.belief())
+                bad = self._holds(a.pre, self.belief())
                 if bad:
                     if is_event and self._already(rec, step):
-                        self._set_pred(predict(self.pred, rec, self.prev_before or self.belief()))
+                        self._set_pred(self._predict(self.pred, rec, self.prev_before or self.belief()))
                         log.outcome, log.then, log.end = "already happened", "next", self.branch.frame
                         return "next"
-                    ok = self._wait_for(lambda: not holds(a.pre, self.belief()), INPUT_LIMIT)
+                    ok = self._wait_for(lambda: not self._holds(a.pre, self.belief()), INPUT_LIMIT)
                     if self.goal_holds():
                         log.outcome, log.then, log.end = "goal", "goal", self.branch.frame
                         return "goal"
@@ -1427,7 +1599,7 @@ class Harness:
                         b = self.belief()
                         log.outcome, log.then, log.end = "precondition", "replan", self.branch.frame
                         log.mismatches = [dataclasses.asdict(Mismatch(k, _txt(a.pre[k]), b.get(k), "precondition"))
-                                          for k in holds(a.pre, b)]
+                                          for k in self._holds(a.pre, b)]
                         return "replan"
                 if not is_event and rec.checks:
                     self._wait_checks(rec, log)
@@ -1437,7 +1609,7 @@ class Harness:
                 hist = History(self.now, self.branch.frame)
                 self.prev_before = before
                 cands = alts or [a]
-                alt_exps = [expectations(p.what, before, self.doms, step.guessed) for p in cands]
+                alt_exps = [self._expectations(p.what, before, self.doms, step.guessed) for p in cands]
                 evals = None
                 if is_event:
                     ok, start = True, self.branch.frame
@@ -1446,7 +1618,7 @@ class Harness:
                     start = t["issue"]
                     pre = self.watched.before_input
                     if pre is not None:
-                        hist.note(pre[0], view(self.b, self.doms, F.facts_of(pre[1])))
+                        hist.note(pre[0], self._view(self.b, self.doms, F.facts_of(pre[1])))
                 if ok:
                     how, seen, started, taken, which = self._watch(alt_exps, start, limit, t, hist, not is_event)
                 else:
@@ -1471,7 +1643,7 @@ class Harness:
                         self._take_path(step, a, alts, log)
                     guesses = match(exps, seen)
                     log.mismatches = [dataclasses.asdict(m) for m in guesses]
-                    self._set_pred(predict(self.pred, rec, before))
+                    self._set_pred(self._predict(self.pred, rec, before))
                     log.then = "replan" if guesses else "next"
                     return log.then
                 mism = match(exps, seen)
@@ -1504,16 +1676,16 @@ class Harness:
                     return "replan"
                 if alts:
                     self._take_path(step, a, alts, log)
-                chain = ran_on(self.task, self.doms, exps, mism, before, ahead, hist, self.choices)
+                chain = ran_on(self.task, self.doms, exps, mism, before, ahead, hist, self.choices, self.unobserved)
                 if chain:
                     log.outcome, log.then = "matched, the engine ran on", "next"
                     log.add(f"the facts that differ were re-written within the window by the plan's next steps "
                             f"{[st.name for st, _ in chain]}, which are done too")
-                    pred, state, keys = predict(self.pred, rec, before), after(before, exps), set(exps)
+                    pred, state, keys = self._predict(self.pred, rec, before), after(before, exps), set(exps)
                     for st, _ in chain:
                         r2 = self.task.actions[st.action].what
-                        x2 = expectations(r2, state, self.doms, st.guessed)
-                        pred, state = predict(pred, r2, state), after(state, x2)
+                        x2 = self._expectations(r2, state, self.doms, st.guessed)
+                        pred, state = self._predict(pred, r2, state), after(state, x2)
                         keys |= set(x2)
                     log.unplanned = hist.unplanned(keys)  # the chain's writes are predicted too
                     self._set_pred(pred)
@@ -1559,8 +1731,8 @@ class Harness:
 
         def held():
             b = self.belief()
-            return [p for p in cands if not holds(p.pre, b)
-                    and all(b[k] in vs for k, vs in p.pre.items() if k.startswith(UNOBSERVED) and k in b)]
+            return [p for p in cands if not self._holds(p.pre, b)
+                    and all(b[k] in vs for k, vs in p.pre.items() if k.startswith(self.unobserved) and k in b)]
         if not held():
             self._wait_for(lambda: bool(held()), INPUT_LIMIT)
         ok = held()
@@ -1582,7 +1754,7 @@ class Harness:
                                     f"the engine's state")
             else:
                 log.then = "replan"
-                keys = sorted({k for p in cands for k in holds(p.pre, b)})
+                keys = sorted({k for p in cands for k in self._holds(p.pre, b)})
                 log.mismatches = [dataclasses.asdict(Mismatch(k, _txt(set().union(*(p.pre.get(k, ()) for p in cands))),
                                                               b.get(k), "precondition")) for k in keys[:12]]
             return None
@@ -1599,7 +1771,7 @@ class Harness:
         """An event whose effects hold at its turn (it ran during the previous step): every write that changes a
         value, judged from the state at the previous step's start."""
         before = self.prev_before or self.belief()
-        exps = expectations(rec, before, self.doms, step.guessed)
+        exps = self._expectations(rec, before, self.doms, step.guessed)
         changed = [x for x in exps.values() if x.changes]
         return bool(changed) and all(self.now.get(x.key) in x.values for x in changed)
 
@@ -1688,13 +1860,14 @@ class Harness:
         """The record of the run so far (module docstring), from what the harness holds: no engine call."""
         st = self.branch.status
         return {
-            "stop": self.stop_reason, "goal": not holds(self.goal, self.now), "replans": self.replans,
+            "stop": self.stop_reason, "goal": not self._holds(self.goal, self.now), "replans": self.replans,
             "bans": [dataclasses.asdict(b) for b in self.bans], "plans": self.plans,
             "steps": [dataclasses.asdict(s) for s in self.steps],
             "frames": st.get("frame", 0) - (self.frame0 or 0), "ticks": (st.get("tick") or 0) - (self.tick0 or 0),
             "frame0": self.frame0, "frame_end": st.get("frame"),
             "seconds": time.monotonic() - self.t0 if self.t0 is not None else 0.0, "inputs": self.inputs(),
             **({"rereads": self.rereads} if self.slot_locals else {}),
+            **({"extensions": self.extensions} if self.reach_extend is not None else {}),
         }
 
     def inputs(self) -> list:

@@ -311,7 +311,7 @@ impl LiveLocals {
     pub fn keep(&self, u: UnitKey, locals: Vec<(i64, Val)>) -> (Vec<(i64, Val)>, bool) {
         let Some(reads) = self.get(u) else { return (locals, false) };
         let n = locals.len();
-        let kept: Vec<(i64, Val)> = locals.into_iter().filter(|(i, _)| i32::try_from(*i).is_ok_and(|i| reads.contains(&i))).collect();
+        let kept: Vec<(i64, Val)> = locals.into_iter().filter(|(i, _)| *i >= crate::inputs::SETTLED_LOCAL || i32::try_from(*i).is_ok_and(|i| reads.contains(&i))).collect();
         let dropped = kept.len() != n;
         (kept, dropped)
     }
