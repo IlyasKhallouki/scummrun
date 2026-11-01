@@ -59,7 +59,10 @@ Each path `p` that the step limit ended becomes one record `H(p)`, its havoc rec
   of room code in the scope (the change kills them). For each slot of `S(p)`:
   - its place may become any of its wait points or none, and its list of locals may become 0 (unknown) or stay;
   - it may be frozen or unfrozen, and its Esc point may change or go;
-  - its event at each of its wait points, with unknown locals, is named, so the plan can go on from any of them.
+  - its event at each of its wait points, with unknown locals, is named, so the plan can go on from any of them. An
+    object's event also has its owned flag unknown (whether the object is out of the room, which a room change reads,
+    script.cpp:1083-1106): its owner is an unknown value, as a path holds an owner it cannot work out, so the run
+    covers both.
 
   With a reachable `freezeScripts`, the frozen flag of every slot may change. With a reachable `cutscene`,
   `endCutscene`, `beginOverride` or `endOverride`, every Esc point may change.
