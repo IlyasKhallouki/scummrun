@@ -68,6 +68,9 @@ class WindowConfig:
     # section 9.7: a child's state dump and hit tests kept until its engine runs again, the first seeded with the
     # parent's dump at the fork; off by default
     cache: bool = False
+    # section 9.7 (strict only): the parent forks a child at each of its next N frames with one bridge command (the
+    # bridge's run "fork_each"); 0, the default: one fork and one frame per command, as before
+    fork_each: int = 0
 
 
 def delta_lo_of(frame_costs: dict | None) -> int:
@@ -738,6 +741,26 @@ class Search:
         c.quit = quit_noting
         return c
 
+    def fork_ahead(self, b, n: int) -> tuple:
+        """Controller.fork_each under the fork lock: ``b`` runs n frames with a child at each decision point (section
+        9.7). Returns b's stop status and the children in frame order, each quit noting its CPU as ``fork``'s."""
+        ctl = getattr(self._fork, "__self__", None)
+        with self._lock:
+            st, kids = ctl.fork_each(b, n)
+            for c in kids:
+                self.live.add(c.pid)
+        self.forks["child, ahead"] += len(kids)
+        cpu, live = self.cpu, self.live
+        for c in kids:
+            quit_, pid = c.quit, c.pid
+
+            def quit_noting(quit_=quit_, pid=pid):
+                cpu["child"] += cpu_of(pid)
+                live.discard(pid)
+                quit_()
+            c.quit = quit_noting
+        return st, kids
+
     def sample_memory(self) -> None:
         """The search's memory now: the forked processes' Pss (each one's own pages, its share of the pages it shares
         with the parent), this process's RSS, and MemAvailable; the peaks are kept (``summary``)."""
@@ -1232,10 +1255,11 @@ class Search:
         end_rule, prev, end_reason, gate_shut = EndRule(), {}, None, 0
         w0 = parent.frame
         parent_fail, pgv = None, None
+        obs_branch, ahead, ahead_cur, rows_ahead = parent, [], None, {}  # section 9.7, fork_each
         try:
             while True:
-                st = parent.status
-                g = parent.frame
+                st = obs_branch.status
+                g = obs_branch.frame
                 if cfg.delta_lo > 1 and max(1, st.get("v19", 0)) < cfg.delta_lo:
                     w["delta_violation"] = [g, st.get("v19")]
                     end_reason = "delta"
@@ -1283,7 +1307,7 @@ class Search:
                     end_reason = f"{cfg.window_frames} frames"
                     break
                 if has_input:
-                    if self._gate(inp, st, s, parent):
+                    if self._gate(inp, st, s, obs_branch):
                         while w["running"] >= cfg.workers:
                             time.sleep(0.002)
                         while mem_available_kb() < cfg.mem_floor_kb:
@@ -1291,7 +1315,10 @@ class Search:
                                 raise RP.Stop(f"memory: MemAvailable {mem_available_kb() // 1024} MB, under "
                                               f"{cfg.mem_floor_kb // 1024} MB")
                             time.sleep(0.05)
-                        cb = self.fork(parent, "child")
+                        if ahead_cur is not None and ahead_cur.frame == g:  # section 9.7: the child forked there
+                            cb, ahead_cur = ahead_cur, None
+                        else:
+                            cb = self.fork(parent, "child")
                         ch = Child(g, st["qf"], not pre_now, frozenset(ptrack.matched), dict(now), None)
                         ch.track, ch.d0 = ptrack.copy(), s
                         children.append(ch)
@@ -1304,25 +1331,57 @@ class Search:
                                        f"failures {w['failures'].most_common(2)}")
                     else:
                         gate_shut += 1
-                st = parent.run(frame=g + 1)
-                if "end" in st:
-                    end_reason = f"engine ended: {st['end']}"
-                    break
-                rows = parent.runs()["runs"]
-                ents = parent.explain_log()["explain"]
-                s = parent.state()
+                if ahead_cur is not None:  # a child forked ahead whose frame took no child: it is not needed
+                    ahead_cur.quit()
+                    ahead_cur = None
+                if cfg.fork_each and has_input:
+                    # section 9.7: the parent's next frames come as children forked there by one command; each is
+                    # the parent at its frame (A0), so the window reads that frame from it
+                    if not ahead:
+                        try:
+                            st_, kids = self.fork_ahead(parent, cfg.fork_each)
+                        except ControlError as e:
+                            end_reason = f"engine ended: {e}"
+                            break
+                        rows_ahead = S.by_frame(S.runs_of(parent.runs()["runs"]))
+                        pkept.add_entries(parent.explain_log()["explain"])
+                        ahead.extend(kids)
+                    ahead_cur = ahead.pop(0)
+                    ahead_cur.runs()  # its buffers hold the parent's frames before its fork
+                    ahead_cur.explain_log()
+                    obs_branch = ahead_cur
+                    st = ahead_cur.status
+                    s = ahead_cur.state()
+                    R_ = rows_ahead.get(g + 1, [])
+                else:
+                    st = parent.run(frame=g + 1)
+                    if "end" in st:
+                        end_reason = f"engine ended: {st['end']}"
+                        break
+                    rows = parent.runs()["runs"]
+                    pkept.add_entries(parent.explain_log()["explain"])
+                    obs_branch = parent
+                    s = parent.state()
+                    R_ = S.by_frame(S.runs_of(rows)).get(g + 1, [])
                 obs = F.facts_of(s)
                 now = sview(obs, s)
-                R_ = S.by_frame(S.runs_of(rows)).get(g + 1, [])
                 for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump):
                     ptrack.apply(g + 1, run_, v_, now)
-                pkept.add_entries(ents)
                 pkept.frame(g + 1, R_, s, now)
                 prev_view, prev_dump = now, s
         finally:
             for x in futures:
                 x.result()
             pool.shutdown(wait=True)
+            for c in ahead:
+                c.quit()
+        if obs_branch is not parent:  # section 9.7: the window's end is the child forked at that frame
+            if ahead_cur is None:
+                raise RP.Stop("fork_each: the window's last frame has no branch left")
+            ahead_cur.runs()
+            ahead_cur.explain_log()
+            self._set_branch(ahead_cur)
+            parent = ahead_cur
         best = w["best"]
         if best is not None and best.first in w["first_g"]:  # the earliest fork of the same run (Lemma 5)
             best.g = min(best.g, w["first_g"][best.first])
