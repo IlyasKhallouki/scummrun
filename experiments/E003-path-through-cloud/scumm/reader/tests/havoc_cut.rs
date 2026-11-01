@@ -207,3 +207,150 @@ fn part1_the_job_that_stopped_the_reading() {
     let msg = r.err().and_then(|e| e.downcast_ref::<String>().cloned()).unwrap_or_default();
     assert!(msg.contains("paths the step limit ended; the reading stops"), "{msg}");
 }
+
+// --- the independent check's holes (1) and (4) to (6), on Part I's scope ------------------------------------------
+
+use scumm_ir::{known, Expr, RefKind, Stmt, UnitId};
+use scumm_reader::table::Kind;
+use std::collections::BTreeSet;
+
+/// A cut at a unit's start: its first instruction, or each verb entry of an object.
+fn cut_at(u: UnitId) -> Cut {
+    let unit = game().unit(u);
+    let frames = match unit.key {
+        UnitKey::Obj(_) => unit.entries.iter().map(|e| (unit.key, Some(e.1))).collect(),
+        k => vec![(k, Some(0))],
+    };
+    Cut { frames, steps: vec![] }
+}
+
+/// The room resource room code runs in.
+fn res_of(u: UnitId) -> Option<i32> {
+    match game().unit(u).key {
+        UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) => Some(r),
+        _ => None,
+    }
+}
+
+/// The ops of a unit's own code.
+fn ops(u: UnitId) -> impl Iterator<Item = (scumm_ir::Sym, Vec<scumm_ir::ExprId>, scumm_ir::Span)> {
+    let g = game();
+    g.ins(u).iter().filter_map(move |x| match x.st {
+        Some(Stmt::Op { name, args, subops, .. }) => Some((name, g.ast.kids(args).to_vec(), subops)),
+        _ => None,
+    })
+}
+
+fn is_fact(b: &Builder, k: &str) -> bool {
+    (b.table.doms.doms.contains_key(k) || b.table.extra.contains_key(k)) && b.kind(k) == Kind::Fact
+}
+
+/// Hole (1): with F5, a drawObject with setXY moves its object, so the havoc record may change `objpos:O`, whether or
+/// not the code can change the room.
+#[test]
+fn part1_a_draw_with_set_xy_moves_its_object() {
+    let b = part1(true);
+    let g = game();
+    let (mut units, mut sites) = (0, 0);
+    for &u in &b.scope.units {
+        let mut moved = BTreeSet::new();
+        for (name, args, subops) in ops(u) {
+            let xy = g.ast.subs(subops).iter().any(|s| s.name == known::SET_XY && g.ast.constant(g.ast.kids(s.args)[0]) != Some(255));
+            if name != known::DRAW_OBJECT || !xy {
+                continue;
+            }
+            if let Some(o) = g.ast.constant(args[0]) {
+                let k = format!("objpos:{o}");
+                if g.movable.contains_key(&o) && is_fact(&b, &k) {
+                    moved.insert(k);
+                }
+            }
+        }
+        if moved.is_empty() {
+            continue;
+        }
+        units += 1;
+        let hw = havoc::writes(g, &b.scope, &b.table, &cut_at(u), res_of(u));
+        for k in &moved {
+            sites += 1;
+            assert!(hw.facts.contains_key(k), "{:?}: a drawObject with setXY moves {k}", g.unit(u).key);
+        }
+    }
+    eprintln!("{units} units, {sites} objects moved by setXY");
+    assert!(sites > 0);
+}
+
+/// Hole (4): setOwnerOf(O, 0) stops O's scripts (clearOwnerOf, object.cpp:131-133, 176-180), so O's slots are in the
+/// closure's stops. Each cut is at the setOwnerOf itself. In Part I the inventory hook it runs reaches code that names
+/// every unit, so the hook is taken away here (VAR_INVENTORY_SCRIPT's domain {0}): the stop must not hang on it.
+#[test]
+fn part1_set_owner_of_to_0_stops_the_objects_scripts() {
+    let mut b = part1(true);
+    b.table.extra.insert("var:34".into(), scumm_reader::Domain::of([0], None, None));
+    let g = game();
+    let (mut n, mut all) = (0, 0);
+    for &u in &b.scope.units {
+        let k = g.unit(u).key;
+        for (i, x) in g.ins(u).iter().enumerate() {
+            let Some(Stmt::Op { name: known::SET_OWNER_OF, args, .. }) = x.st else { continue };
+            let args = g.ast.kids(args);
+            if args.len() < 2 || g.ast.constant(args[1]) != Some(0) {
+                continue;
+            }
+            let Some(o) = g.ast.constant(args[0]) else { continue };
+            let Some(ou) = g.id(UnitKey::Obj(o)) else { continue };
+            all += 1;
+            let cut = Cut { frames: vec![(k, Some(i as u32))], steps: vec![] };
+            let c = havoc::closure(g, &b.scope, &b.table, &cut, res_of(u));
+            if c.stops_all || c.starts.contains_key(&ou) {
+                continue;
+            }
+            n += 1;
+            assert!(c.stops.contains(&UnitKey::Obj(o)), "{k:?}: setOwnerOf({o}, 0) stops object {o}'s scripts");
+            let hw = havoc::writes(g, &b.scope, &b.table, &cut, res_of(u));
+            assert!(hw.slots.contains(&format!("obj:{o}")));
+        }
+    }
+    eprintln!("{n} of {all} setOwnerOf(O, 0) sites with a closure that stops not every slot and runs no code of O");
+    assert!(n > 0);
+}
+
+/// Hole (5): an indexed write whose index does not fold lands on the base plus each value of the index variable's
+/// domain, or on any variable; not on a window of 16 after the base.
+#[test]
+fn part1_an_index_that_does_not_fold_is_not_a_window() {
+    let b = part1(true);
+    let g = game();
+    let all_vars: Vec<String> = b.table.doms.doms.keys().filter(|k| k.starts_with("var:") && is_fact(&b, k)).cloned().collect();
+    let (mut sites, mut outside) = (0, 0);
+    for &u in &b.scope.units {
+        let mut caps = 0;
+        for x in g.ins(u) {
+            let Some(Stmt::Assign(a)) = x.st else { continue };
+            let Expr::Index { kind: RefKind::Var, base, offset } = g.ast.expr(a.lhs) else { continue };
+            if scumm_reader::domains::fold(&g.ast, offset, None, None, &mut caps).is_some() {
+                continue;
+            }
+            let expect: Vec<String> = match g.ast.expr(offset) {
+                Expr::Var(k) if is_fact(&b, &format!("var:{k}")) => match b.domain(&format!("var:{k}")).unwrap().values.iter().map(|l| l.int()).collect::<Option<Vec<i64>>>() {
+                    Some(vs) => vs.into_iter().map(|v| format!("var:{}", base as i64 + v)).filter(|k| is_fact(&b, k)).collect(),
+                    None => all_vars.clone(),
+                },
+                Expr::Var(_) => continue,
+                _ => all_vars.clone(),
+            };
+            sites += 1;
+            let hw = havoc::writes(g, &b.scope, &b.table, &cut_at(u), res_of(u));
+            for k in &expect {
+                let n: i32 = k[4..].parse().unwrap();
+                if n >= base && n < base + 16 {
+                    continue;
+                }
+                outside += 1;
+                assert!(hw.facts.contains_key(k), "{:?}: Var[{base} + {:?}] can write {k}", g.unit(u).key, g.ast.expr(offset));
+            }
+        }
+    }
+    eprintln!("{sites} indexed writes whose index does not fold, {outside} targets outside the 16 after the base");
+    assert!(outside > 0);
+}

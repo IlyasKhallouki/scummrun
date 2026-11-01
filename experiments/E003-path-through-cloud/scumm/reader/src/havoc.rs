@@ -24,8 +24,9 @@ const VAR_INVENTORY_SCRIPT: i32 = 34;
 const VAR_CUTSCENE_START_SCRIPT: i32 = 35;
 const VAR_CUTSCENE_END_SCRIPT: i32 = 36;
 
-/// The fact kinds whose every writing construct [`sites`] reads, as `scope_writes` does.
-const MODELED: [&str; 7] = ["var:", "bit:", "state:", "owner:", "class:", "verb:", "saved:"];
+/// The fact kinds whose every writing construct [`sites`] reads, as `scope_writes` does (`objpos:`: F5's drawObject
+/// with setXY, and a room load, which is the engine's own write).
+const MODELED: [&str; 8] = ["var:", "bit:", "state:", "owner:", "class:", "verb:", "saved:", "objpos:"];
 
 /// The code a cut path can still run (havoc-cut.md, "The write set").
 #[derive(Debug, Default)]
@@ -181,6 +182,21 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                             }
                             known::SET_OWNER_OF | known::PICKUP_OBJECT => {
                                 c.hooks.insert(VAR_INVENTORY_SCRIPT);
+                                // setOwnerOf(O, 0): clearOwnerOf stops O's scripts (object.cpp:131-133, 176-180)
+                                let owner0 = name == known::SET_OWNER_OF
+                                    && a.get(1).is_none_or(|&e| fold(ast, e, None, None, &mut caps).is_none_or(|v| v.contains(&0)));
+                                if owner0 {
+                                    match a.first().and_then(|&e| fold(ast, e, None, None, &mut caps)) {
+                                        Some(os) => c.stops.extend(os.into_iter().map(|o| UnitKey::Obj(o as i32))),
+                                        None => {
+                                            for &v in &scope.units {
+                                                if let k @ UnitKey::Obj(_) = game.unit(v).key {
+                                                    c.stops.insert(k);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             known::DO_SENTENCE => {
                                 c.hooks.insert(VAR_SENTENCE_SCRIPT);
@@ -272,13 +288,12 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
     c
 }
 
-/// Where a write site can land: one fact, every fact with a prefix, a window of 16 variables after a base (an index
-/// that does not fold), or a class of every object.
+/// Where a write site can land: one fact, every fact with a prefix (an index whose values are not known), or a class
+/// of every object.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Target {
     Exact(String),
     Prefix(String),
-    Window(i32),
     Class(i64),
 }
 
@@ -287,7 +302,6 @@ impl Target {
         match self {
             Target::Exact(k) => k == key,
             Target::Prefix(p) => key.starts_with(p.as_str()),
-            Target::Window(b) => key.strip_prefix("var:").and_then(|n| n.parse::<i32>().ok()).is_some_and(|n| *b <= n && n < b + 16),
             Target::Class(c) => key.starts_with("class:") && key.rsplit(':').next().and_then(|x| x.parse::<i64>().ok()) == Some(*c),
         }
     }
@@ -301,24 +315,40 @@ type Site = (Target, Option<BTreeSet<i64>>);
 /// drawObject draws and clears only objects of the room it runs in (o5_drawObject returns when getObjectIndex finds
 /// no local object, script_v5.cpp:1101-1130): the room of room code, else `room`, the path's, while the closure
 /// cannot change the room; else every scope room.
-fn sites(game: &Game, scope: &Scope, c: &Closure, room: Option<i32>) -> Vec<Site> {
+fn sites(game: &Game, scope: &Scope, table: &FactTable, c: &Closure, room: Option<i32>) -> Vec<Site> {
     let ast = &game.ast;
     let settings = domains::settings_env();
     let mut caps = 0i64;
     let mut out: Vec<Site> = Vec::new();
     let consts = |e: ExprId, caps: &mut i64| fold(ast, e, None, None, caps).map(|v| v.into_iter().collect::<BTreeSet<i64>>());
-    fn lhs(ast: &scumm_ir::Ast, e: ExprId, caps: &mut i64) -> Vec<Target> {
+    // an index that does not fold: the values of its variable (its domain of plain values, or its one value where the
+    // scope never writes it); None: not known, so every variable or bit
+    let index_values = |e: ExprId| -> Option<Vec<i64>> {
+        let Expr::Var(n) = ast.expr(e) else { return None };
+        let key = format!("var:{n}");
+        match table.kind(&key, scope) {
+            Kind::Fact => {
+                let d = table.domain(&key)?;
+                d.values.iter().map(|l| l.int()).collect()
+            }
+            Kind::Const => Some(vec![domains::SETTINGS.iter().find(|s| s.0 == n).map_or_else(|| table.start.get0(&key), |s| s.1)]),
+            Kind::NonFact => None,
+        }
+    };
+    let lhs = |e: ExprId, caps: &mut i64| -> Vec<Target> {
         match ast.expr(e) {
             Expr::Var(n) => vec![Target::Exact(format!("var:{n}"))],
             Expr::Bit(n) => vec![Target::Exact(format!("bit:{n}"))],
             Expr::Index { kind: k @ (RefKind::Var | RefKind::Bit), base, offset } => match fold(ast, offset, None, None, caps) {
                 Some(s) => s.into_iter().map(|v| Target::Exact(format!("{}:{}", k.as_str(), base as i64 + v))).collect(),
-                None if k == RefKind::Var => vec![Target::Window(base)],
-                None => vec![Target::Prefix("bit:".into())],
+                None => match index_values(offset) {
+                    Some(vs) => vs.into_iter().map(|v| Target::Exact(format!("{}:{}", k.as_str(), base as i64 + v))).collect(),
+                    None => vec![Target::Prefix(format!("{}:", k.as_str()))],
+                },
             },
             _ => vec![],
         }
-    }
+    };
     for (&u, starts) in &c.starts {
         let starts: Vec<u32> = starts.iter().copied().collect();
         let room_of_unit = game.unit(u).room;
@@ -328,7 +358,7 @@ fn sites(game: &Game, scope: &Scope, c: &Closure, room: Option<i32>) -> Vec<Site
             let Some(st) = ins[i as usize].st else { continue };
             for y in stmt_nodes(ast, &st) {
                 if let Expr::Embed(a) = ast.expr(y) {
-                    for t in lhs(ast, a.lhs, &mut caps) {
+                    for t in lhs(a.lhs, &mut caps) {
                         out.push((t, None));
                     }
                 }
@@ -336,11 +366,11 @@ fn sites(game: &Game, scope: &Scope, c: &Closure, room: Option<i32>) -> Vec<Site
             match st {
                 Stmt::Assign(a) => {
                     let v = if a.op == AssignOp::Set { consts(a.rhs, &mut caps) } else { None };
-                    for t in lhs(ast, a.lhs, &mut caps) {
+                    for t in lhs(a.lhs, &mut caps) {
                         out.push((t, v.clone()));
                     }
                 }
-                Stmt::Op { name, args, .. } => {
+                Stmt::Op { name, args, subops, .. } => {
                     let a = ast.kids(args);
                     let objs = |e: ExprId, caps: &mut i64| fold(ast, e, None, None, caps);
                     if name == known::SET_VAR_RANGE {
@@ -354,7 +384,7 @@ fn sites(game: &Game, scope: &Scope, c: &Closure, room: Option<i32>) -> Vec<Site
                             }
                             Expr::Local(_) => {}
                             _ => {
-                                for t in lhs(ast, a[0], &mut caps) {
+                                for t in lhs(a[0], &mut caps) {
                                     out.push((t, None));
                                 }
                                 // an index that folds names its first variable; the next ones follow it
@@ -408,6 +438,22 @@ fn sites(game: &Game, scope: &Scope, c: &Closure, room: Option<i32>) -> Vec<Site
                             _ => scope.rooms.clone(),
                         };
                         let in_rooms = |o: &i32| game.object_room.get(o).is_some_and(|r| draw_rooms.contains(r));
+                        // F5: a setXY moves the drawn object (script_v5.cpp:1108-1114); x 255 moves nothing
+                        let moves = name == known::DRAW_OBJECT
+                            && scope.switches.draw_clears
+                            && ast.subs(subops).iter().any(|sub| {
+                                sub.name == known::SET_XY
+                                    && ast.kids(sub.args).first().is_none_or(|&e| fold(ast, e, None, None, &mut caps).is_none_or(|v| v.iter().any(|&x| x != 255)))
+                            });
+                        if moves {
+                            let drawn: Vec<i32> = match &os {
+                                Some(os) => os.iter().map(|&o| o as i32).collect(),
+                                None => game.object_room.keys().copied().filter(|o| in_rooms(o)).collect(),
+                            };
+                            for o in drawn.into_iter().filter(|o| game.movable.contains_key(o)) {
+                                out.push((Target::Exact(format!("objpos:{o}")), None));
+                            }
+                        }
                         match &os {
                             Some(os) => {
                                 for o in os {
@@ -507,7 +553,7 @@ pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: Op
     let mut exact: FxHashMap<String, Vec<Option<BTreeSet<i64>>>> = FxHashMap::default();
     let mut wide: Vec<Site> = Vec::new();
     let room_no = room.and_then(|r| scope.rooms.iter().copied().find(|&x| game.resource(x) == Some(r)));
-    for (t, v) in sites(game, scope, &c, room_no) {
+    for (t, v) in sites(game, scope, table, &c, room_no) {
         match t {
             Target::Exact(k) => exact.entry(k).or_default().push(v),
             t => wide.push((t, v)),
