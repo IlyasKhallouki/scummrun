@@ -15,6 +15,7 @@ none. The run's file ends in ``-runb-<move>``.
 """
 
 import argparse
+import dataclasses
 import json
 import sys
 import time
@@ -51,15 +52,16 @@ class Starter:
         self.prefix = [e for e in replay_kitchen.prefix_events() if e["frame"] <= self.frame]
 
     @staticmethod
-    def config(seed: int, out_dir: Path, inputs: Path):
-        return replay_kitchen.cfg_of(out_dir, inputs, seed=seed)
+    def config(seed: int, out_dir: Path, inputs: Path, dump_locals: bool = False):
+        cfg = replay_kitchen.cfg_of(out_dir, inputs, seed=seed)
+        return dataclasses.replace(cfg, dump_locals=True) if dump_locals else cfg
 
-    def boot(self, seed: int, out_dir: Path) -> tuple:
+    def boot(self, seed: int, out_dir: Path, dump_locals: bool = False) -> tuple:
         if seed == RB.ANY_SEED:
             raise SystemExit("the Any% seed is not used (plan.md)")
         t = time.monotonic()
         out_dir.mkdir(parents=True, exist_ok=True)
-        ctl, b = replay.boot(lambda o, i: self.config(seed, o, i), self.prefix, self.frame, out_dir)
+        ctl, b = replay.boot(lambda o, i: self.config(seed, o, i, dump_locals), self.prefix, self.frame, out_dir)
         st, s = b.status, b.state()
         row = {"seed": seed, "frame": self.frame, "move": self.move,
                "stop": {k: st.get(k) for k in ("stop", "frame", "tick", "room", "idle", "rng", "up", "cs", "ego",
@@ -102,6 +104,7 @@ def main() -> None:
     u.add_argument("--reach-extend", action="store_true")
     u.add_argument("--window-search", action="store_true")
     u.add_argument("--workers", type=int, default=7)
+    u.add_argument("--window-strict", action="store_true")
     a = ap.parse_args()
     if a.cmd == "row":
         st = Starter(a.move, a.out)
@@ -117,7 +120,8 @@ def main() -> None:
                   plan_memory=a.plan_memory, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
                   unobserved_actor_rooms=a.unobserved_actor_rooms, approach_stones=a.approach_stones,
                   reach_extend=a.reach_extend,
-                  window_search=a.window_search, workers=a.workers, starter=Starter(a.move, a.rows))
+                  window_search=a.window_search, workers=a.workers, starter=Starter(a.move, a.rows),
+                  window_strict=a.window_strict)
 
 
 if __name__ == "__main__":

@@ -726,7 +726,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None, slot_locals: bool = False,
             reread: bool = False, threads: int = 3, serve: bool = False, search: str = "lama-first",
             cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
-            approach_stones: bool = False, window_search: bool = False, workers: int = 7, starter=None) -> dict:
+            approach_stones: bool = False, window_search: bool = False, workers: int = 7, starter=None,
+            window_strict: bool = False) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -746,7 +747,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         ("-serve" if serve else "") + (f"-{search}" if search != "lama-first" else "") + \
         ("-caps" if cost_caps else "") + ("-reachx" if reach_extend else "") + \
         ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "") + \
-        ("-window" if window_search else "") + (f"-{starter.name}" if starter is not None else "")
+        ("-window" if window_search else "") + ("-strict" if window_strict else "") + \
+        (f"-{starter.name}" if starter is not None else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
@@ -776,9 +778,15 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     wcfg = None
     if window_search:
         import window as WS
-        wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs))
+        wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=window_strict)
         out["window_search"] = dict(vars(wcfg))
         out["sources"]["window.py"] = sha(HERE / "window.py")
+        if window_strict:  # window-search.md section 9: B1's matcher and explainer
+            for n_ in ("strict.py", "trace_explain.py", "trace_check.py"):
+                out["sources"][n_] = sha(HERE / n_)
+            out["window_strict"] = {"scummvm": str(paths.SCUMMVM_BIN), "scummvm_sha1": sha(paths.SCUMMVM_BIN)}
+    elif window_strict:
+        raise SystemExit("--window-strict is a sub-switch of --window-search")
     if reach_extend:
         out["reach_extend"] = {"threads": threads, "reader_scope": str(READER_SCOPE),
                                "reader_scope_sha1": sha(READER_SCOPE)}
@@ -790,10 +798,11 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     out["load_s"] = round(time.monotonic() - t0, 2)
     if starter is None:
         say(f"{tag}: booting to the first idle stop")
-        ctl, branch, row = boot(seed, run_dir / "run", dump_locals=slot_locals)
+        ctl, branch, row = boot(seed, run_dir / "run", dump_locals=slot_locals or window_strict)
     else:  # another start (``starter``: an instrument's boot, its config for verify and its inputs before the start)
         say(f"{tag}: booting to {starter.name}")
-        ctl, branch, row = starter.boot(seed, run_dir / "run")
+        ctl, branch, row = starter.boot(seed, run_dir / "run", dump_locals=window_strict) if window_strict else \
+            starter.boot(seed, run_dir / "run")
         out["starter"] = starter.describe()
     h = None
     try:
@@ -1103,6 +1112,8 @@ def main() -> None:
     r.add_argument("--window-search", action="store_true",
                    help="plan step A4: each input tried on every frame of its window on forked children (window.py)")
     r.add_argument("--workers", type=int, default=7, help="the window search's children at a time")
+    r.add_argument("--window-strict", action="store_true",
+                   help="the window search's sub-switch strict: B1's matcher (window-search.md section 9)")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -1126,7 +1137,8 @@ def main() -> None:
                 results=a.results, plan_memory=a.plan_memory, deadline=a.deadline, slot_locals=a.slot_locals,
                 reread=a.reread, threads=a.threads, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
                 reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms,
-                approach_stones=a.approach_stones, window_search=a.window_search, workers=a.workers)
+                approach_stones=a.approach_stones, window_search=a.window_search, workers=a.workers,
+                window_strict=a.window_strict)
     else:
         cmd_log(a.name, a.results)
 
