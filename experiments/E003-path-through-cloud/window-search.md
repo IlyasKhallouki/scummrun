@@ -330,6 +330,8 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
   are the runs between D_{k−1} and D_k (trace-validation.md section 1). The parent turns `segment` on at the window's
   start and reads R_k after each frame. A child inherits it with an empty buffer (the parent reads its runs before it
   forks) and reads its runs after each frame it observes.
+- The records are the harness's current reading's: a reach extension or F10's reread replaces the reading, and the
+  strict search reads the new one's records and the click's other records from then on.
 - V_k is the window's view at D_k (FastView), plus `args:U` for each unit U whose `args:` a tracked record reads or
   writes: the set of the reading's built lists at U's wait point that U's dumped locals match, {0} when none does
   (B1's view, trace_check.py `Reading.view`). The engine runs with SPEEDRUN_DUMP_LOCALS, which observes only
