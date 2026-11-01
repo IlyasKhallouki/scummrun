@@ -1,13 +1,15 @@
 """E008: the explorer (plan.md "Entries", "Cells", "Selection", "Verify", "Parallelism and the machine",
-"Interfaces"): the archive of engine states, its cells and their order, the readings cache, the verify from boot
-and the report.
+"Interfaces", "Stop rule"): the archive of engine states, its cells and their order, the job loop with b workers, the
+readings cache, the verify from boot and the report.
 
 usage (from this folder, with ../../.venv/bin/python):
   explore.py init ARCHIVE --stage NAME --goal K=V[,K=V] | part1 --guide GUIDE.json --allowed k2 | files | R,R,...
+  explore.py run ARCHIVE --workers B [--step-cmd CMD] [--no-verify]
   explore.py verify ARCHIVE [--entry ID]
   explore.py report ARCHIVE
 
-It does not import guide.py: it reads GUIDE.json by its format.
+It imports neither guide.py nor step.py: it reads GUIDE.json by its format and runs the step as a process
+(``python -u step.py run JOB_DIR``; the command before ``run JOB_DIR`` is env E008_STEP or ``--step-cmd``).
 
 **The archive** (plan.md "Interfaces"), ARCHIVE/: ``stage.json``; ``entries.jsonl`` (light rows) and
 ``entries/ID.json.gz`` (events and checkpoints); ``cells.json``; ``readings.jsonl``; ``jobs/JOB/`` (``job.json``,
@@ -30,6 +32,22 @@ of its segment, so a chain's #r needs no entry file.
   and whose room is allowed: the least (#g, not favoured, n, -#r, tick, id) first. n of the job's cell is set to 0
   when the job's entries add a new cell or a new representative of any cell, else it goes up by 1. ``tried`` and
   ``exhausted`` are kept per representative id.
+* **Jobs, in start order.** The driver keeps up to b jobs running and commits their results in the order it started
+  them: a job that ends early waits for the ones before it. So the archive after a run depends on the results only,
+  not on which job ended first (ids are given in ingest order), and a run killed mid-way resumes to the same archive.
+  A job is ``guard.sh JOB_DIR/log python -u step.py run JOB_DIR``, under ``flock /var/tmp/fast-mi/heavy.lock`` when
+  its scope has 5 rooms or more; a second concurrent job starts only when MemAvailable is at least E008_MEM_SECOND_GB
+  (7). Readings are evicted least recently used first while the free space of E008_DISK_PATH (/home) is under
+  E008_EVICT_GB (10); no job starts under E008_FLOOR_GB (8). These are the machine's watchdogs (plan.md).
+* **Resume.** A job dir without a committed log line is the driver's unfinished work: if its process still runs it is
+  waited for, if it left a result.json that result is committed, else it is run again in place. A job the guard
+  killed is not counted as tried and is run again; a second kill of the same job stops the run (the plan's rule for a
+  job that fails twice on the same entry with the same error). An ingest cut short is rolled back on open.
+* **Stops** (plan.md "Stop rule"): the first goal entry (stop starting, wait for the running jobs, then verify and
+  write summary.json); an exhausted archive (nothing selectable and nothing running); stagnation (after the last job
+  that added a pair no earlier entry held, as many committed jobs as there were selectable cells right after it, none
+  adding one); the same entry failing twice with the same error; a return that differs (stops at once, the running
+  jobs are killed and are run again on a later resume).
 * **Verify** plays the goal entry's movie from boot in a fresh engine (``replay.verify`` with
   ``replay_part1.config(1, ...)``, every checkpoint of the chain), then boots the movie to the goal frame
   (``replay.boot``) to read the run clock: frames, qf and seconds (qf / the release's timer_hz, as cmd_run) from the
@@ -45,6 +63,10 @@ import json
 import os
 import re
 import resource
+import shlex
+import shutil
+import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -217,6 +239,63 @@ def machine() -> dict:
             "guard": os.environ.get("E008_GUARD") or str(Path.home() / ".cache/fast-mi-e007/guard.sh"),
             "heavy_lock": os.environ.get("E008_HEAVY_LOCK") or "/var/tmp/fast-mi/heavy.lock",
             "poll_s": _env_float("E008_POLL_S", 1.0)}
+
+
+def mem_available_gb() -> float:
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        if line.startswith("MemAvailable:"):
+            return int(line.split()[1]) / (1 << 20)
+    return 0.0
+
+
+def disk_free_fn(path: str):
+    return lambda: shutil.disk_usage(path).free
+
+
+def _proc_stat(pid: int) -> list | None:
+    try:
+        s = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return None
+    return s[s.rfind(")") + 2:].split()  # fields from the 3rd (state) on
+
+
+def proc_start(pid: int) -> int | None:
+    st = _proc_stat(pid)
+    return int(st[19]) if st else None  # field 22, starttime
+
+
+def proc_alive(pid: int, start: int | None) -> bool:
+    st = _proc_stat(pid)
+    return st is not None and st[0] != "Z" and (start is None or int(st[19]) == start)
+
+
+def proc_tree(pid: int) -> list:
+    kids: dict = {}
+    for p in os.listdir("/proc"):
+        if p.isdigit():
+            st = _proc_stat(int(p))
+            if st:
+                kids.setdefault(int(st[1]), []).append(int(p))
+    out, todo = [], [pid]
+    while todo:
+        p = todo.pop()
+        out.append(p)
+        todo += kids.get(p, [])
+    return out
+
+
+def kill_tree(pid: int, grace_s: float = 5.0) -> None:
+    tree = proc_tree(pid)
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for p in reversed(tree):
+            try:
+                os.kill(p, sig)
+            except OSError:
+                pass
+        t = time.monotonic()
+        while time.monotonic() - t < grace_s and any(proc_alive(p, None) for p in tree):
+            time.sleep(0.05)
 
 
 def plan_env() -> dict:
@@ -825,6 +904,264 @@ def _evict_dir(d: Path, keep: list) -> None:
             pass
 
 
+# --- the driver -------------------------------------------------------------------------------------------------------
+
+class Job:
+    """One step process (module docstring, "Jobs"), started by this driver or found running on a resume."""
+
+    def __init__(self, a: Archive, name: str):
+        self.a, self.name = a, name
+        self.dir = a.root / "jobs" / name
+        self.doc = read_json(self.dir / "job.json")
+        self.entry, self.scope = self.doc["entry"]["id"], self.doc["scope"]
+        self.cell = a.rows[self.entry]["cell"]
+        self.proc = None
+        self.pid = self.pid_start = None
+        self.done = False
+        self.rc = None
+        self.rusage = None
+        self.started = self.ended = None
+        self.state = None  # None while running; then "finished" or "guard-killed"
+
+    def in_use(self) -> set:
+        return {r["path"] for r in self.doc["readings"]} | {str(Path(self.doc["reading_dir"]) / "reading.json")}
+
+    def command(self, step_cmd: list, m: dict) -> list:
+        cmd = [m["guard"], str(self.dir / "log")] + step_cmd + ["run", str(self.dir)]
+        if len(self.scope) >= HEAVY_ROOMS:
+            cmd = ["flock", m["heavy_lock"]] + cmd
+        return cmd
+
+    def clear(self) -> None:
+        """Before a run (again): what an earlier, unfinished run of the job left, except its logs."""
+        for f in ("result.json", "pid.json"):
+            (self.dir / f).unlink(missing_ok=True)
+        for d in ("new", "run"):
+            shutil.rmtree(self.dir / d, ignore_errors=True)
+        rd = Path(self.doc["reading_dir"])
+        if rd.exists() and self.a.root.resolve() in rd.resolve().parents:
+            shutil.rmtree(rd, ignore_errors=True)
+        if (self.dir / "log").exists():
+            k = 1
+            while (self.dir / f"log.{k}").exists():
+                k += 1
+            os.replace(self.dir / "log", self.dir / f"log.{k}")
+
+    def start(self, step_cmd: list, m: dict) -> None:
+        self.clear()
+        self.started = time.time()
+        with open(self.dir / "spawn.log", "a") as out:
+            self.proc = subprocess.Popen(self.command(step_cmd, m), cwd=HERE, stdin=subprocess.DEVNULL, stdout=out,
+                                         stderr=out, start_new_session=True)
+        self.pid, self.pid_start = self.proc.pid, proc_start(self.proc.pid)
+        write_json(self.dir / "pid.json", {"pid": self.pid, "start": self.pid_start, "started": self.started})
+        self.done, self.state, self.ended = False, None, None
+
+    def attach(self) -> bool:
+        """On a resume: the job's process from an earlier driver, if it still runs."""
+        p = self.dir / "pid.json"
+        if not p.exists():
+            return False
+        d = read_json(p)
+        if not proc_alive(d["pid"], d.get("start")):
+            return False
+        self.pid, self.pid_start, self.started = d["pid"], d.get("start"), d.get("started")
+        return True
+
+    def poll(self) -> bool:
+        if self.done:
+            return True
+        if self.proc is not None:
+            pid, status, ru = os.wait4(self.proc.pid, os.WNOHANG)
+            if pid == 0:
+                return False
+            self.rc = os.waitstatus_to_exitcode(status)
+            self.proc.returncode = self.rc
+            self.rusage = {"cpu_s": round(ru.ru_utime + ru.ru_stime, 1), "maxrss_mb": round(ru.ru_maxrss / 1024, 1)}
+        elif self.pid is not None and proc_alive(self.pid, self.pid_start):
+            return False
+        self.done, self.ended = True, time.time()
+        return True
+
+    def kill(self) -> None:
+        if self.pid is not None and not self.done:
+            kill_tree(self.pid)
+            self.poll()
+
+    def result_ok(self) -> bool:
+        try:
+            r = read_json(self.dir / "result.json")
+        except (OSError, json.JSONDecodeError):
+            return False
+        return r.get("job") == self.name
+
+    def guard_killed(self) -> bool:
+        p = self.dir / "log"
+        return p.exists() and any(line.startswith("GUARD: MemAvailable") and "killing group" in line
+                                  for line in p.read_text(errors="replace").splitlines())
+
+    def classify(self) -> str:
+        """After the process ended: "finished" (a result.json, the step's or one that says it left none) or
+        "guard-killed"."""
+        if self.result_ok():
+            return "finished"
+        if self.guard_killed():
+            return "guard-killed"
+        tail = ""
+        if (self.dir / "log").exists():
+            tail = " | ".join((self.dir / "log").read_text(errors="replace").splitlines()[-3:])
+        write_json(self.dir / "result.json", {
+            "job": self.name, "entry": self.entry, "ok": False,
+            "error": f"the step ended (exit {self.rc}) with no result.json", "log_tail": tail, "return": None,
+            "reading": None, "targets": None, "probes": [], "attempt": None, "readings_made": [], "new": [],
+            "tried": [], "exhausted": False})
+        return "finished"
+
+    def extra(self) -> dict:
+        ended = time.time()
+        guard = None
+        if (self.dir / "log").exists():
+            guard = next((line for line in reversed((self.dir / "log").read_text(errors="replace").splitlines())
+                          if line.startswith("GUARD: rc")), None)
+        return {"started": self.started, "ended": self.ended or ended,
+                "driver_wall_s": round(ended - self.started, 1) if self.started else None,
+                "rc": self.rc, "rusage": self.rusage, "guard": guard}
+
+
+def run(root: Path, workers: int, step_cmd: list | None = None, do_verify: bool = True) -> dict:
+    """The job loop (module docstring): until a stop rule fires. Returns summary.json's contents."""
+    a = Archive.open(root)
+    if (a.root / "summary.json").exists():
+        s = read_json(a.root / "summary.json")
+        say(f"{a.root}: stopped already ({s.get('stop')}); summary.json")
+        return s
+    m = machine()
+    step_cmd = step_cmd or shlex.split(os.environ.get("E008_STEP") or "") or \
+        [sys.executable, "-u", str(HERE / "step.py")]
+    a.stage["workers"] = workers
+    a.stage["env"] = plan_env()
+    write_json(a.root / "stage.json", a.stage)
+    free = disk_free_fn(m["disk_path"])
+    for name in a.job_names():  # a dir the driver made but did not finish writing: its selection is made again
+        if not (a.root / "jobs" / name / "job.json").exists():
+            shutil.rmtree(a.root / "jobs" / name)
+    running: list = []
+    restart: list = []
+    kills = _count(x["job"] for x in a.logs if x.get("outcome") == "guard-killed")
+    for name in a.unfinished_jobs():  # a resume (module docstring)
+        j = Job(a, name)
+        a.busy[name] = (j.entry, j.cell)
+        running.append(j)
+        if j.attach():
+            say(f"{name}: still running (pid {j.pid}); waiting for it")
+        elif j.result_ok():
+            j.done, j.state = True, "finished"
+        else:
+            restart.append(j)
+    stop, detail, stopping = None, None, False
+
+    def can_start() -> bool:
+        if free() < m["floor_gb"] * GIB:
+            return False
+        active = [j for j in running if not j.done and j not in restart]
+        return not active or mem_available_gb() >= m["mem_second_gb"]
+
+    while True:
+        for j in running:
+            if j not in restart and j.poll() and j.state is None:
+                j.state = j.classify()
+                if j.state == "guard-killed":
+                    kills[j.name] = kills.get(j.name, 0) + 1
+                    a.log_event({"job": j.name, "entry": j.entry, "outcome": "guard-killed", **j.extra()})
+                    say(f"{j.name}: the guard killed it ({kills[j.name]}); not counted as tried")
+                    if kills[j.name] >= 2:
+                        stop, detail, stopping = "repeated failure", {"job": j.name, "entry": j.entry,
+                                                                      "error": "the guard killed the job twice"}, True
+                    else:
+                        restart.append(j)
+        committed = False
+        if running and running[0].done and running[0].state == "finished":  # one commit, then its fill
+            committed = True
+            j = running.pop(0)
+            line = a.ingest(j.dir, j.extra())
+            a.busy.pop(j.name, None)
+            say(f"{j.name}: entry {j.entry} {line['outcome']}; {len(line['new_entries'])} entries, "
+                f"{line['new_cells']} new cells, {len(line['new_r'])} new atoms; archive {len(a.rows)} entries, "
+                f"{len(a.cellmap)} cells")
+            if line["outcome"] == "return differs":
+                stop, detail = "return differs", {"job": j.name, "entry": j.entry, "return": line["return"]}
+                for k in running:
+                    k.kill()
+                    a.busy.pop(k.name, None)
+                running, restart = [], []
+            elif not stopping and line["outcome"] == "error" and a.failures().get((j.entry, line["error"]), 0) >= 2:
+                stop, detail, stopping = "repeated failure", {"job": j.name, "entry": j.entry,
+                                                              "error": line["error"]}, True
+        if stop == "return differs":
+            break
+        if not stopping and a.goal_entries():
+            stop, detail, stopping = "goal", {"entry": a.goal_entries()[0]}, True
+        if restart and not stopping:
+            for j in list(restart):
+                if can_start():
+                    restart.remove(j)
+                    say(f"{j.name}: run again")
+                    j.start(step_cmd, m)
+        elif stopping:
+            for j in restart:
+                running.remove(j)
+                a.busy.pop(j.name, None)
+            restart = []
+        floor = False
+        if not stopping and not a.stagnant():
+            if free() < m["evict_gb"] * GIB:
+                gone = a.evict(free, set().union(*(j.in_use() for j in running)))
+                if gone:
+                    say(f"evicted {len(gone)} readings")
+            while len(running) < workers:
+                if free() < m["floor_gb"] * GIB:
+                    floor = True
+                    break
+                if not can_start():
+                    break
+                ids = a.select(1)
+                if not ids:
+                    break
+                d = a.prepare_job(ids[0])
+                j = Job(a, d.name)
+                a.busy[j.name] = (j.entry, j.cell)
+                j.start(step_cmd, m)
+                running.append(j)
+                say(f"{j.name}: entry {j.entry} (room {a.rows[j.entry]['room']}), scope {j.scope}, key "
+                    f"{read_json(d / 'select.json')['key']}")
+        if not running:
+            if stop is None:
+                if not a.select(1):
+                    stop = "exhausted"
+                elif a.stagnant():
+                    stop = "stagnation"
+                elif floor:
+                    stop, detail = "disk floor", {"free_gb": round(free() / GIB, 1), "floor_gb": m["floor_gb"]}
+                else:
+                    stop = "no job could start"
+            break
+        if not committed:
+            time.sleep(m["poll_s"])
+    summary = {"stop": stop, "detail": detail, "jobs": len(a.committed_jobs()), "entries": len(a.rows),
+               "cells": len(a.cellmap), "goal_entries": a.goal_entries(), "time": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    if stop == "goal":
+        if do_verify:
+            say(f"goal entry {detail['entry']}: verifying its movie from boot")
+            v = a.verify(detail["entry"])
+            summary["verify"] = {k: v.get(k) for k in ("entry", "same", "goal", "frames", "qf", "seconds",
+                                                       "inputs", "segments")}
+        else:
+            summary["verify"] = None
+    write_json(a.root / "summary.json", summary)
+    say(f"stop: {stop} {detail or ''}")
+    return summary
+
+
 # --- the commands -----------------------------------------------------------------------------------------------------
 
 def boot_root(out_dir: Path) -> tuple:
@@ -889,6 +1226,12 @@ def main(argv=None) -> None:
     p.add_argument("--guide", required=True)
     p.add_argument("--allowed", required=True)
     p.add_argument("--workers", type=int, default=2)
+    p = sub.add_parser("run")
+    p.add_argument("archive")
+    p.add_argument("--workers", type=int, default=2)
+    p.add_argument("--step-cmd", default=None, help="the step command before 'run JOB_DIR' (default env E008_STEP, "
+                                                    "else python -u step.py)")
+    p.add_argument("--no-verify", action="store_true", help="a goal stop without the verify (the tests' fake step)")
     p = sub.add_parser("verify")
     p.add_argument("archive")
     p.add_argument("--entry", type=int, default=None)
@@ -897,6 +1240,9 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
     if args.cmd == "init":
         cmd_init(args)
+    elif args.cmd == "run":
+        run(Path(args.archive), args.workers, shlex.split(args.step_cmd) if args.step_cmd else None,
+            not args.no_verify)
     elif args.cmd == "verify":
         v = Archive.open(Path(args.archive)).verify(args.entry)
         print(json.dumps({k: v.get(k) for k in ("entry", "same", "goal", "frames", "qf", "seconds", "inputs",
