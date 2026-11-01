@@ -352,7 +352,9 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
   that is not a stutter (trace-validation.md section 3: one opcode, a WaitFor op, c1 = c0), after the record that left
   U at W matched, or after the window's start when no tracked record of U before r is pending. r *matches strictly*
   at that run's frame k when M1-M4 hold for r on it (Definition M: V_{k−1}, V_k, R_k and the open keys of
-  trace-validation.md section 3) and every tracked record r follows (≺) has matched before. Otherwise r is *refuted*.
+  trace-validation.md section 3) and every tracked record r follows (≺) has matched before. M4 follows that section's
+  rule for facts outside the view: an effect on a fact whose engine value lies outside its domain is not checked (B1's
+  StrictMatcher code checked it, so B1's strict counts are low on that point). Otherwise r is *refuted*.
   **Lemma S1 (one run per event record).** A refuted record never matches. *Proof.* Any two of the plan's records of U
   write `pos:U`, so they interfere and ≺ orders them in plan order. In the model, U's slot waits at W from the record
   that left it there until r runs. The engine's first run of U from W after that is therefore the step the plan says is
