@@ -198,3 +198,25 @@ def test_fast_view_is_view():
     for _ in range(300):
         obs = {k: rng.choice((0, 1)) if k != "var:3" else rng.choice((0, 1, 2, 7)) for k in keys if rng.random() < .7}
         assert fv(obs) == RP.view(b, facts, obs), obs
+
+
+def test_a_deviation_needs_the_input_and_its_predecessors():
+    r0 = rec(0, "event", unit="script:2", wait=736, writes={"state:1"}, exps={"state:1": x("state:1", 1)})
+    r1 = rec(1, "input", writes={"pos:script:2"}, exps={"pos:script:2": x("pos:script:2", 736)})
+    r2 = rec(2, "event", unit="script:2", wait=736, writes={"room"}, exps={"room": x("room", 28)})
+    for r in (r0, r1, r2):
+        r.preds = frozenset()
+    r1.preds, r2.preds = frozenset({0}), frozenset({0, 1})
+    m = W.Matcher([r0, r1, r2], {0, 1, 2}, r1)
+    m.input_issued = True
+    m.note(4, {"state:1": 0, "pos:script:2": 736, "room": 33})
+    assert not W.is_deviation(m, r1, {0})  # the door's record has not matched: a failure, not a deviation
+    m.note(5, {"state:1": 1, "pos:script:2": 736, "room": 33})
+    assert W.is_deviation(m, r1, {0})
+
+
+def test_the_earliest_end_point_wins_a_success_at_equal_q():
+    def c(q, outcome, g):
+        return types.SimpleNamespace(q_end=q, outcome=outcome, g=g)
+    assert W.end_key(c(100, "deviation", 1)) < W.end_key(c(120, "success", 0))
+    assert W.end_key(c(100, "success", 5)) < W.end_key(c(100, "deviation", 1))

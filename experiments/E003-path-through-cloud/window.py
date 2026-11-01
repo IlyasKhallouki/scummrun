@@ -404,6 +404,17 @@ class Matcher:
                 (r.kind == "input" or (r.unit is not None and now.get(f"pos:{r.unit}") == R.NOWHERE))]
 
 
+def is_deviation(m: Matcher, input_rec, before_input: set) -> bool:
+    """Section 3, deviation: the input's record and every needed record preceding the input have matched."""
+    return input_rec is not None and input_rec.i in m.matched and all(i in m.matched for i in before_input)
+
+
+def end_key(ch) -> tuple:
+    """Section 5, Stop: the earliest end point, a success (or the goal) before a deviation at equal Q, then the earliest
+    fork."""
+    return ch.q_end, ch.outcome == "deviation", ch.g
+
+
 class EndRule:
     """Section 5, End (Lemma 7): the model's window for the input opens at the first frame where the parent is ready
     (every tracked record preceding the input has matched in it) and the input's precondition holds; the window ends
@@ -501,6 +512,7 @@ class Search:
         self.unplanned_goals: list = []  # children and parents where the goal held with no goal record matched
         self.live: set = set()  # the pids of the forked processes alive
         self.mem: dict = {}  # sample_memory's peaks
+        self.deviations: list = []  # the windows that ended in a deviation (section 3), each a replan
 
     # --- processes ---
 
@@ -639,20 +651,23 @@ class Search:
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: v for i, v in m.matched.items() if v[0] is not None}
             ch.choices = dict(m.choices)
-            if ch.outcome in ("success", "goal"):
+            if ch.outcome in ("spent", "mismatch", "limit") and is_deviation(m, w["input"], w["before_input"]):
+                ch.outcome = "deviation"  # section 3: the input took effect, then the plan's prediction ended
+            if ch.outcome in ("success", "goal", "deviation"):
                 cps.append((cb.frame, dict(obs), RP.extra_of(s, cb.status)))
                 ch.checkpoints = cps
                 full = w["full_fv"](obs)
                 ch.unplanned = [{"key": x.key, "start": RP._str(ch.full_at_fork.get(x.key)), "changes": [],
                                  "count": 1, "end": RP._str(x.observed), "net": True}
                                 for x in RP.unplanned(ch.full_at_fork, full, w["predicted_keys"])][:40]
-                if ch.q_end < ch.q0 + w["b_qf"]:
+                floor = w["b_qf"] if ch.outcome != "deviation" else w["b_dev_qf"]
+                if ch.q_end < ch.q0 + floor:
                     with self._lock:
-                        w["bound_violations"].append([ch.g, ch.q0, ch.q_end, w["b_qf"]])
+                        w["bound_violations"].append([ch.g, ch.q0, ch.q_end, floor, ch.outcome])
                 old = None
                 with self._lock:
                     best = w["best"]
-                    if best is None or ch.q_end < best.q_end or (ch.q_end == best.q_end and ch.g < best.g):
+                    if best is None or end_key(ch) < end_key(best):
                         w["best"], old = ch, best
                         ch.snapshot, ch.live, snap, cb = snap, cb, None, None
                 for b_ in ((old.snapshot, old.live) if old is not None else ()):
@@ -714,7 +729,8 @@ class Search:
         w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name, "tracked": tracked, "needed": needed, "input": first if has_input else None,
              "doms": doms, "full_doms": full_doms, "fv": FastView(h.b, doms, h.unobserved),
              "full_fv": FastView(h.b, full_doms, h.unobserved), "best": None, "firsts": set(), "b_qf": b_qf,
-             "bound_violations": [], "delta_violation": None, "issued": issued,
+             "bound_violations": [], "delta_violation": None, "issued": issued, "before_input": before_input,
+             "b_dev_qf": 4 * cfg.delta_lo * n,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps])}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None,
                "records": [recs[j].name for j in members], "needed": [r.name for r in tracked if r.i in needed],
@@ -758,8 +774,10 @@ class Search:
                     prev = now
                     with self._lock:
                         best = w["best"]
-                    if best is not None and st["qf"] + b_qf >= best.q_end:
-                        end_reason = "stop: Q(g) + b reached the best success"
+                    if best is not None and st["qf"] + (b_qf if best.outcome != "deviation" else w["b_dev_qf"]) \
+                            >= best.q_end:
+                        end_reason = "stop: Q(g) + b reached the best " + \
+                            ("deviation" if best.outcome == "deviation" else "success")
                         break
                 if g - w0 >= cfg.window_frames:
                     end_reason = f"{cfg.window_frames} frames"
@@ -956,6 +974,23 @@ class Search:
             h.ex.movie.extend(best.events)
             self.flush()
             self._mark(recs, res["parent_matched"], best.g)
+            if best.outcome == "deviation":
+                # section 7: the deviating child's branch at its stop is the engine; the plan is made again from there
+                self._mark(recs, best.matched, None)
+                if best.snapshot is not None:
+                    best.snapshot.quit()
+                best.snapshot = None
+                h.checkpoints.append(best.checkpoints[0])
+                if best.checkpoints[-1][0] != best.checkpoints[0][0]:
+                    h.checkpoints.append(best.checkpoints[-1])  # its stop: the next input comes after the replan
+                b_, best.live = best.live, None
+                self._set_branch(b_)
+                self._predict(recs)
+                self._logs(n_plan, recs, members, res, "replan")
+                self.replan_cause = f"deviation at frame {best.end}: {str(best.why)[:300]}"
+                self.deviations.append({"plan": n_plan, "macro": k, "frame": best.end, "qf": best.q_end,
+                                        "why": str(best.why)[:300]})
+                return "replan"
             if best.outcome == "goal":
                 self._mark(recs, best.matched, None)
                 b_, other = best.live, best.snapshot
@@ -971,7 +1006,7 @@ class Search:
                 h.checkpoints.append(best.checkpoints[-1])  # the goal's frame: no input after it
             self._set_branch(b_)
             self._predict(recs)
-            choices = {recs_name(recs, i): c for i, c in best.choices.items()}
+            choices = {recs[i].name: c for i, c in best.choices.items()}
             self._logs(n_plan, recs, members, res, "goal" if best.outcome == "goal" else
                        ("replan" if choices else "next"))
             if best.outcome == "goal":
@@ -993,5 +1028,5 @@ class Search:
                 "early_successes": sum(w["early_successes"] for w in ws),
                 "bound_violations": sum(len(w["bound_violations"]) for w in ws),
                 "goal_from_the_plan": self.goal_credited, "unplanned_goals": self.unplanned_goals,
-                "memory_kb": dict(self.mem),
+                "memory_kb": dict(self.mem), "deviations": list(self.deviations),
                 "config": dataclasses.asdict(self.cfg)}
