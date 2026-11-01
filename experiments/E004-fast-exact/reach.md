@@ -129,6 +129,23 @@ differ. With `--reach` the run may stay under the limit and not split. Both read
 their records for that job differ: the unsplit job's records are the finer ones. The check lists them as a class of
 their own, by label.
 
+## An event with unknown locals runs with no locals
+
+An event whose number is 0 stands for a list the reader does not know: the copy each wait point gets for replans, a
+list folded past SIG_LIMIT, and a slot a path left waiting with only some of its locals known (`Kept.known` false).
+Its job's precondition holds `args:X = {0}`, and every state with `args:X = 0` meets it, whatever the slot's locals
+are. A run that starts with some locals known assumes them, so its records hold only where the slot has those
+locals. Two events of one wait point with number 0 can carry different partial locals, and the job of their key
+(`events_done`: name, unit, place, number, abort) is the one that arrives first. With `--reach` the order of arrival
+is not the full reading's, so the job can run with other locals.
+
+The rule: with `--reach`, an event with number 0 runs with no locals (`Event::unknown_locals`), whichever event of the
+key arrives first. Its run reads each local as unknown, which covers every list a state with `args:X = 0` can hold, so
+its records hold wherever its precondition does. The job no longer depends on the order of arrival, and Theorem 1's
+argument goes through for it. Against the full reading, whose job keeps the first arrival's partial locals, such a job
+is a job read otherwise: the full reading's records for it are narrower than its precondition allows. With `--reach`
+off nothing changes.
+
 ## Domains
 
 A pass reads with fixed domains. A value written outside its domain widens the domain for the next pass, and the
@@ -202,7 +219,17 @@ with what `--reach` writes.
 - **Extension.** The held branches stay in the Builder for the whole pass. A new start is one more seed: its values
   are committed as a round, they free what waits on them, and the rounds go on. By Theorem 1 the result is the closure
   from both starts. It is the same set of records as a reading seeded with both from the beginning, because a
-  closure does not depend on its order. `Builder::reach_extend` does this in process. `reader-scope --reach-also FILE`
+  closure does not depend on its order.
+- **A start's slots.** A start seeds two things: its values, and its events. The first start's events are the slots
+  it has live at a place, each with unknown locals (`start_events`); Theorem 1's closure starts from them as from the
+  inputs. A later start seeds the same: its values, and an event with unknown locals for each slot it has live at a
+  place of the scope's points that no earlier start had. Without its events, a slot the later start holds at a new
+  place has its value `pos:X = W` reached and no job for `(X, W)`, so the reading from both starts lacks that event's
+  records. A start in taskcore's `--start-file` format gives `pos:X` and `escpos:X` directly and no `at:` or `esc:`
+  facts. For a unit whose `at:`/`esc:` facts the start does not name, its `pos:`/`escpos:` value is the start's own
+  (`task_start` would make it NOWHERE). With both, the reading seeded with several starts and a reading extended start
+  by start are the same closure: each start's values and events go in as seeds, and the order of seeds changes
+  nothing. A reading with one start is unchanged. `Builder::reach_extend` does this in process. `reader-scope --reach-also FILE`
   makes the reading from both starts on the command line, with a start file in the format of
   `taskcore --start-file`.
 - **Why it stays correct.** `R` only grows, so what was written stays right, and the task only gains actions.
