@@ -23,7 +23,11 @@ What the harness does, per plan step (plan.md step 5, with D5):
   object is on screen or the camera stops (``Harness._wait_camera``): the Executor's approach walks toward a point
   computed from the camera's position, which lies behind ego while the camera catches up with it. The approach
   takes actor ``EXECUTOR_EGO`` as ego (executor.py:1008, 1011, 1045, 1099); where VAR_EGO holds another actor the
-  click is an interface failure (``_check_ego``).
+  click is an interface failure (``_check_ego``). When floor clicks get ego no further and the object is still off
+  screen, the Executor's stepping stone (a walk to an object on screen whose walk point is nearer the object, kept if
+  the object then comes on screen in the same room) is tried on forks only with ``stone_fork`` (a Controller.fork;
+  off by default, and then it is an interface failure as before). Each trial plays on a fork of its own with no
+  further fork, and only the stone kept is played, so the run's inputs stay those of one engine.
 * **The precondition.** Before its input, a step waits (no input) until its precondition holds in the engine's
   state, up to ``INPUT_LIMIT`` frames; the input then goes on the first frame the engine takes it (the Executor's
   click gate), not after the game settles (D5). A precondition that never holds is a mismatch of the plan's
@@ -1058,7 +1062,7 @@ class Harness:
                  taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None,
                  slot_locals: bool = False, lists: dict | None = None, reread=None, taskcore_serve: bool = False,
                  cost_caps: bool = False, cost_dmax: int | None = None, reach_extend=None,
-                 reach_extend_limit: int = 3, unobserved_actor_rooms: bool = False):
+                 reach_extend_limit: int = 3, unobserved_actor_rooms: bool = False, stone_fork=None):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         if reread is not None and planner != "taskcore":
@@ -1102,6 +1106,8 @@ class Harness:
         self.branch = branch
         self.watched = _Watched(branch)
         self.ex = Executor(self.watched, release, fork=None)
+        # the Executor's stepping stones on forks (module docstring, "The camera"), off by default
+        self.ex.stone_fork = stone_fork
         self.replan_limit, self.time_limit, self.plan_time = replan_limit, time_limit, plan_time
         self.progress = progress or (lambda msg: None)
         self.bans: list = []

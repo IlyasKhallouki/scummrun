@@ -17,7 +17,7 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_part1.py run SEED --reading DIR/reading.json [--control] [--replan-limit 500] [--time-limit 86400]
                        [--plan-time 600] [--plan-memory 6G] [--results DIR] [--deadline EPOCH]
                        [--slot-locals [--reread]] [--serve] [--search S] [--cost-caps] [--reach-extend]
-                       [--unobserved-actor-rooms]
+                       [--unobserved-actor-rooms] [--approach-stones]
        replay_part1.py log NAME [--results DIR]           (the log of NAME's runs and start checks, from the json)
        score_part1.py RESULT.json ...                     (after the run: the key's Part I goals, from boot)
 
@@ -127,6 +127,10 @@ run's file then ends in ``-reachx``. Without the flag such a start stops the run
 **The actors' rooms** (``--unobserved-actor-rooms``, off by default; a reading with the reader switch actor_rooms):
 the harness treats the ``actorroom:`` facts as unobserved, with the plan's values, and not known at the first plan
 (replay.py, "The actors' rooms"); the start check gives them the same. The run's file then ends in ``-uar``.
+
+**Stepping stones** (``--approach-stones``, off by default): the Executor's stepping stones are tried on forks of the
+run's engine (replay.py, "The camera"), for an object off screen that floor clicks do not bring on screen. The run's
+file then ends in ``-stones``.
 
 **Without reloading** (``--serve``, off by default): taskcore runs as one long-lived process per packed file
 (plan_fd ``serve``, taskcore/src/serve.rs), which keeps the loaded reading and what does not depend on the start, for
@@ -697,7 +701,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             test_seeds: bool = False, out_root: Path = OUT, results: Path = RESULTS,
             plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None, slot_locals: bool = False,
             reread: bool = False, threads: int = 3, serve: bool = False, search: str = "lama-first",
-            cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False) -> dict:
+            cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
+            approach_stones: bool = False) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -716,7 +721,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     tag = f"{name}-seed{seed}" + ("-control" if control else "") + ("-locals" if slot_locals else "") + \
         ("-serve" if serve else "") + (f"-{search}" if search != "lama-first" else "") + \
         ("-caps" if cost_caps else "") + ("-reachx" if reach_extend else "") + \
-        ("-uar" if unobserved_actor_rooms else "")
+        ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
@@ -741,6 +746,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         out["reader"]["live_locals"] = rd.doc.get("live_locals") is not None
     if unobserved_actor_rooms:
         out["unobserved_actor_rooms"] = True
+    if approach_stones:
+        out["approach_stones"] = True
     if reach_extend:
         out["reach_extend"] = {"threads": threads, "reader_scope": str(READER_SCOPE),
                                "reader_scope_sha1": sha(READER_SCOPE)}
@@ -780,7 +787,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
                            taskcore_serve=serve, search=search, cost_caps=cost_caps,
                            cost_dmax=(frame_costs or {}).get("dmax"),
                            reach_extend=reach_extender(rd, run_dir, threads, starts) if reach_extend else None,
-                           unobserved_actor_rooms=unobserved_actor_rooms)
+                           unobserved_actor_rooms=unobserved_actor_rooms,
+                           stone_fork=ctl.fork if approach_stones else None)
         res = h.run()
         checkpoints = h.checkpoints
     finally:
@@ -1017,6 +1025,8 @@ def main() -> None:
                    help="extend a --reach reading at a replan start it does not cover (reader-scope --reach-also)")
     r.add_argument("--unobserved-actor-rooms", action="store_true",
                    help="the actors' rooms (reader switch actor_rooms) unobserved, with the plan's values (replay.py)")
+    r.add_argument("--approach-stones", action="store_true",
+                   help="the Executor's stepping stones on forks, for an object floor clicks do not bring on screen")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -1039,7 +1049,8 @@ def main() -> None:
         cmd_run(a.seed, a.reading, a.control, a.replan_limit, a.time_limit, a.plan_time, a.test_seeds,
                 results=a.results, plan_memory=a.plan_memory, deadline=a.deadline, slot_locals=a.slot_locals,
                 reread=a.reread, threads=a.threads, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
-                reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms)
+                reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms,
+                approach_stones=a.approach_stones)
     else:
         cmd_log(a.name, a.results)
 
