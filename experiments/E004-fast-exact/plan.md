@@ -152,3 +152,58 @@ The check is the bar door task.
    the Part I projection.
 3. **Reduction 2.** Check that the outputs are byte for byte the same on five scopes, record the CPU each one
    saves, and update the projection.
+
+## Results
+
+Written after the runs, from the lab notes: notes/log/2026-10-31-e004-reach.md, 2026-11-01-e004-p1r.md,
+2026-11-01-e004-rough.md and 2026-11-01-e005.md, and for reduction 1 notes/log/2026-10-26-e003-noreload.md. Laptop,
+nice 10, 3 threads, seed 1, unless a line says otherwise.
+
+**What each reduction measured.**
+
+- **Reduction 1, replan on the kept task** (`taskcore serve`). The planner input is the same bytes on every recorded
+  replan. A replan costs 0.4 to 2.0 CPU s on k = 2, against 105 to 164 before, and 5.0 to 5.7 on the kitchen, against
+  13 to 15.
+- **Reduction 2, pass 2 reuse** (`pass2_reuse`). The packed file, records and counters are the same on the bar, k = 1,
+  k = 2 and the jail. With `--reach` it saves 15 to 27% of the reading CPU (k = 2: 266.1 to 220.2 CPU s), and costs
+  3.5 to 5 times the peak memory (k = 2: 552 MB to 2,751 MB), since pass 1's records are held.
+- **Reduction 3, forward reachability** (`--reach`). Reading CPU falls 2.2 times on the kitchen (68.3 to 31.8 s), 11.5
+  times on k = 1 (1,583.8 to 138.3 s) and 880 times on the jail (439.7 to 0.5 s, its room is not reached). k = 2 takes
+  234.7 CPU s with it; without it the reading was stopped unfinished after 2,707 CPU s. Records fall 61% on the
+  kitchen and 83% on k = 1, against the 85-95% predicted. Against (d), the bar and the jail match once two named
+  classes are applied; the kitchen differs by 6 records against 8, and k = 1 by 276 against 342, from runs split
+  differently. The kitchen's optimal cost is 7 from both readings.
+- **Reduction 4, exact loops.** Not built.
+- **havoc_cut** (a path the step limit ends becomes a havoc record). The check scopes give the same files, since no
+  path there reaches the step limit. On Part I it lets the job that stopped the reading (room 28's local 204, a loop
+  on var:164 that has no bound) pass, as 9 havoc records per job.
+- **shared_runs** (jobs that differ only in an argument they never read share one run). The output is the same. It
+  saves 2.3% of the reading CPU on k = 1 and on k = 2, under the 5% keep rule, so it stays off. It does not apply to
+  the `[202@85]` dialog jobs that fill Part I's round 4, because their runs read a dialog verb.
+- **The rough reading** (`--step-limit N`, every job read to N steps). On the bar at N = 100 it reaches every value
+  the full reading reaches, and 4,344 more; its plan has 6 steps, as the exact one, and the last is a havoc step. On
+  Part I no N finished. At N = 100 and 300, havoc records that name every unit (576) fill the reading, and it held 49
+  to 56 GB within minutes on the VM. At N = 500 and 1,000 almost no path is cut, so it costs what the full reading
+  costs: at N = 1,000 it was in pass 1's round 8 after 22,554 CPU s.
+- **E005, havoc_args and havoc_rooms.** Both computed starts resolve (global 73 names 58 and 200, global 23 names
+  none), but every Part I havoc record at N = 300 still names 564 of 573 units. That reading reached 113 GB on the VM
+  in 250 s, and 5.5 GB in 100 s on the laptop.
+
+**Part I, the exact reading.** With `--reach`, havoc_cut, shared_runs and fix round 1's switches, the reading was
+stopped in pass 1's round 5, after 8,001 CPU s, with 23,233 records and a peak of 3.26 GB. In round 4, five dialog
+jobs, `dialog_line(120..124)[202@85]`, took 3,765 of the round's 3,785 job seconds.
+
+**The stop rule fired.** Part I's reading did not finish, on the laptop or on the VM, with any reduction or switch. So
+there is no Part I task, no plan and nothing played, and the success threshold was not met.
+
+**The stage that binds** is the reading's pass 1.
+
+- In the exact reading, a few jobs that fork on facts and merge slowly take the time: the `[202@85]` dialog family
+  (room 85's local 202, then global 114's `loadRoom(49)`), the sentence jobs that reach the same room change (4,061
+  job seconds of round 5), and `event(script:114@101)` (1,498 s at N = 1,000). Their paths are under 1,000 steps, so
+  the time comes from forks and merges, not path length.
+- In the rough reading, the havoc record's size binds. A computed `startObject` in globals 9 and 23 names all 202
+  objects' verb entries, and `actorFollowCamera(VAR_EGO)` with the ego's room unknown names every scope room. So each
+  record names 564 of 573 units and 13,589 events.
+
+Not measured on Part I: taskcore, the planner and play, because no reading finished.
