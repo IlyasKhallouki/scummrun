@@ -353,7 +353,7 @@ The human's intro Esc, and with it the logo speed glitch, is a separate, run-lon
 **Scripts.**
 
 - Bar entry from the Dock closes 316 and starts the cook's timer, local-211 (local-205 `[0040]`/`[0044]`). The cook is in room 0, the kitchen.
-- Open 316 while 211 is running starts local-214 instead of opening (obj-0316 `[0018]`/`[0021]`). local-214 prints the cook's "You can't come back here!" with `print(255)` at a fixed position (`[000F]`), then starts local-212 (`[004B]`).
+- Open 316 while 211 is running starts local-214 instead of opening (obj-0316 `[0018]`/`[0021]`). local-214 prints the cook's warning with `print(255)` at a fixed position (`[000F]`), one message of two parts joined by `wait()`, then starts local-212 (`[004B]`).
 - local-212 waits 600 jiffies (`[0000]` to `[0020]`), then starts local-216. local-216 stops 211 and 212 and opens the door pair 316/570 (`[0017]`/`[0019]`/`[001B]`).
 - The walk-in is a Walk to 316, which checks only that the door is open (obj-0316 `[003F]` to `[004B]`; local-218 `[0017]`).
 - No script checks where ego stood when the Open was given.

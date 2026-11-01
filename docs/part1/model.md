@@ -711,7 +711,7 @@ The scripts branch on a visit flag in four dialogues. In each, every modelled in
   - `walk-to-kitchen-door-provoking-cook`: the same Open from the left half;
   - then `walk-into-kitchen-after-provoking-cook`.
 - **Script.** Open 316 while `local-211` runs starts `local-214` instead of opening (`room-028-bar/obj-0316-door.txt [0018]` to `[0021]`).
-  - `local-214` is a short cutscene: the door opens (`[0005]`, 316 alone), `delay(30)`, "Hey! You can't come back here!", the door closes (`[003B]`).
+  - `local-214` is a short cutscene: the door opens (`[0005]`, 316 alone), `delay(30)`, the cook's warning (one message, two parts joined by `wait()`), the door closes (`[003B]`).
   - It then starts `local-212` (`[004B]`), which waits 600 jiffies and starts `local-216` (`local-212.txt [0020]`): the cook comes out and opens 316 and 570 (`local-216.txt [001B]`).
   - `local-211` keeps running, so a provoke can only make the cook come out earlier.
 - **Guards:**

@@ -240,7 +240,7 @@ Summary for the model:
 
 | Sentence (room 28) | Precondition | Effect | Evidence |
 |---|---|---|---|
-| `Open (2)` 316 "door" while 211 runs (cook in the kitchen) | - | **Blocked.** Local 214 runs as a cutscene: door opens, "You can't come back here!", door closes, then **local 212 starts**, which brings the cook out after 600 jiffies | `data/scripts/room-028-bar/obj-0316-door.txt [0018]` to `[0021]`; `data/scripts/room-028-bar/local-214.txt [0005]` to `[004B]` |
+| `Open (2)` 316 "door" while 211 runs (cook in the kitchen) | - | **Blocked.** Local 214 runs as a cutscene: door opens, the cook's warning (one message, two parts joined by `wait()`), door closes, then **local 212 starts**, which brings the cook out after 600 jiffies | `data/scripts/room-028-bar/obj-0316-door.txt [0018]` to `[0021]`; `data/scripts/room-028-bar/local-214.txt [0005]` to `[004B]` |
 | `Open (2)` 316 while 211 is not running | - | Script 25 opens 316 and the paired 570. Neither door has class 6 (locked) or 11 (unpaired) (raw DOBJ: 316, 570 have classes {15}) | `[0027]`; `data/scripts/global/script-025.txt [0016]` to `[0036]` |
 | **`Walk to (11)` 316** | **state(316) == 1**, i.e. the cook is out. With click semantics, also: cook X ≤ 310 or cook not in room 28 (B2) | Local 218 runs as a cutscene: walk to (660,120), then `loadRoomWithEgo(570,41)` | `[003F]` to `[004B]`; `data/scripts/room-028-bar/local-218.txt [0000]` to `[0017]` |
 | Any click on 316 while the cook is in the bar at X > 310 (click semantics only) | - | "Don't go into the kitchen!". If cook X < 520, 216 restarts and he picks a new target. Otherwise he goes back into the kitchen and 211 restarts | `data/scripts/room-028-bar/local-215.txt [0010]` to `[0083]` |

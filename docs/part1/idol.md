@@ -242,7 +242,7 @@ cook timing is in `money.md`. All `local-*` files in this section are in
 **Door 316** (`obj-0316-door.txt`).
 
 - **Open** (`[0018]`): if 211 is running (cook in the kitchen), start
-  `local-214`, "Hey! You can't come back here!". Otherwise
+  `local-214`, the cook's warning (one message, two parts joined by `wait()`). Otherwise
   `startScript(25,[316,570])`.
 - **Walk to** (`[003F]`): if state == 1, start `local-218`, which walks in and
   loads room 41.

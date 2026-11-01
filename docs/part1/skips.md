@@ -441,7 +441,7 @@ Excluded alternatives (Task 8.1b may re-admit those excluded only on action coun
 Task 8.1b added split actions to `model.md` §4.1 and §4.2 while this note was being written. Their cutscenes are:
 
 - **`provoke-cook`, `walk-to-kitchen-door-provoking-cook`.** `room-028-bar/local-214.txt [0000]` to `[004E]` is **NO-OVERRIDE**.
-  - It shows "Hey! You can't come back here!" (`print(255)` + `WaitForMessage` `[000F]`/`[0039]`), and only then starts `local-212` at `[004B]`. `local-212` waits 600 jiffies (`[0000]`, `[0004]`) before it brings the cook out.
+  - It shows the cook's warning, one message of two parts joined by `wait()` (`print(255)` + `WaitForMessage` `[000F]`/`[0039]`), and only then starts `local-212` at `[004B]`. `local-212` waits 600 jiffies (`[0000]`, `[0004]`) before it brings the cook out.
   - A `.` on that line starts the 600-jiffy timer sooner, which moves the cook's door window earlier. That is a timing change only, and the `until` guard of `walk-into-kitchen-after-provoking-cook` absorbs it.
 - **`walk-into-kitchen-after-provoking-cook`.** As A4: `local-218`, **NO-OVERRIDE**.
 - **`walk-out-of-bar-from-{left,right}[-meanwhile]`.** The `-meanwhile` variants are A7's global 120, **STATE-DIFF**. The others run no cutscene: `obj-0315-door.txt [0090]` goes straight to `loadRoomWithEgo`.
