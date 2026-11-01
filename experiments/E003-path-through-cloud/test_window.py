@@ -220,3 +220,26 @@ def test_the_earliest_end_point_wins_a_success_at_equal_q():
         return types.SimpleNamespace(q_end=q, outcome=outcome, g=g)
     assert W.end_key(c(100, "deviation", 1)) < W.end_key(c(120, "success", 0))
     assert W.end_key(c(100, "success", 5)) < W.end_key(c(100, "deviation", 1))
+
+
+def test_a_click_shows_in_its_own_frame():
+    paths = [{"pos:local:203": x("pos:local:203", 40)}, {"pos:local:203": x("pos:local:203", 58)}]
+    assert W.path_shows(paths, {"pos:local:203": 58})
+    assert not W.path_shows(paths, {"pos:local:203": -1})
+    assert W.path_shows([{}], {})  # a record that leaves no slot: nothing to tell
+
+
+def test_another_path_needs_a_change_a_later_step_reads():
+    noop = ("walk(1)#1", {"pos:local:203": x("pos:local:203", -1)}, {"local:203": x("local:203", 0)})
+    enters = ("walk(1)#2", {"pos:script:2": x("pos:script:2", 736)}, {"script:2": x("script:2", 1)})
+    fork = {"pos:local:203": -1, "local:203": 0, "pos:script:2": -1, "script:2": 0}
+    now = dict(fork)
+    assert W.other_path([noop, enters], now, fork) is None  # nothing shows: the no-op changes nothing
+    now.update({"pos:script:2": 736, "script:2": 1})
+    assert W.other_path([noop, enters], now, fork) == "walk(1)#2"
+
+
+def test_later_reads_are_causal_links():
+    recs = [rec(0, "input", writes={"a", "b", "c"}), rec(1, "event", reads={"a"}, writes={"b"}),
+            rec(2, "input", reads={"b", "c"})]
+    assert W.later_reads(recs, 0, ["a", "b", "c", "d"]) == {"a", "c"}

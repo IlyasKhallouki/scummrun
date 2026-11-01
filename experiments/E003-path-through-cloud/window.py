@@ -404,15 +404,63 @@ class Matcher:
                 (r.kind == "input" or (r.unit is not None and now.get(f"pos:{r.unit}") == R.NOWHERE))]
 
 
-def is_deviation(m: Matcher, input_rec, before_input: set) -> bool:
-    """Section 3, deviation: the input's record and every needed record preceding the input have matched."""
-    return input_rec is not None and input_rec.i in m.matched and all(i in m.matched for i in before_input)
+def is_deviation(m: Matcher, input_rec, before_input: set, alt=None) -> bool:
+    """Section 3, deviation: every needed record preceding the input has matched, and the input took effect (its
+    record matched, or ``alt``, another of its paths with a change a later step reads, showed)."""
+    return input_rec is not None and (input_rec.i in m.matched or alt is not None) and \
+        all(i in m.matched for i in before_input)
 
 
 def end_key(ch) -> tuple:
     """Section 5, Stop: the earliest end point, a success (or the goal) before a deviation at equal Q, then the earliest
     fork."""
     return ch.q_end, ch.outcome == "deviation", ch.g
+
+
+_SOURCE = re.compile(rb'^\{"i": (\d+), "rec": -?\d+, "label": "(?:[^"\\\\]|\\\\.)*", "source": (\[[^\]]*\])')
+
+
+def source_index(lines_path) -> dict:
+    """The reading's actions by their input (the action lines' ``source``: kind, verb, objects), from one pass over the
+    lines file."""
+    out = collections.defaultdict(list)
+    with open(lines_path, "rb") as fh:
+        for ln in fh:
+            m = _SOURCE.match(ln)
+            if m is not None:
+                out[tuple(json.loads(m[2]))].append(int(m[1]))
+    return out
+
+
+def later_reads(recs: list, i: int, keys) -> set:
+    """Of ``keys``, those a step after recs[i] reads before any later step writes them (Lemma 8's links)."""
+    out = set()
+    for k in keys:
+        for q in recs[i + 1:]:
+            if k in q.reads:
+                out.add(k)
+                break
+            if k in q.writes:
+                break
+    return out
+
+
+def path_shows(pos_exps: list, now: dict) -> bool:
+    """Lemma 9: on some path, every slot the record leaves at a wait point stands there."""
+    return any(all(now.get(k) in x.values for k, x in pe.items()) for pe in pos_exps)
+
+
+def other_path(alts: list, now: dict, at_fork: dict):
+    """Section 3, another path: the first other record of the click that shows (its ``pos:`` writes hold and one of
+    its writes differs from the fork's value) and changes a fact a later step reads; None if none does."""
+    for name, pos, linked in alts:
+        if not all(now.get(k) in x.values for k, x in pos.items()):
+            continue
+        shown = any(now.get(k) != at_fork.get(k) for k in list(pos) + list(linked))
+        change = [k for k, x in linked.items() if now.get(k) in x.values and now.get(k) != at_fork.get(k)]
+        if shown and change:
+            return name
+    return None
 
 
 class EndRule:
@@ -483,6 +531,7 @@ class Child:
     arrival: int | None = None  # the first frame after the last input where ego stopped walking
     unplanned: list = field(default_factory=list)
     choices: dict = field(default_factory=dict)  # Matcher.choices
+    alt: str | None = None  # another path of the click that showed (section 3), the record's name
 
     def row(self) -> list:
         return [self.g, self.first, self.issue, self.outcome, self.end, self.q_end, self.frames,
@@ -513,6 +562,7 @@ class Search:
         self.live: set = set()  # the pids of the forked processes alive
         self.mem: dict = {}  # sample_memory's peaks
         self.deviations: list = []  # the windows that ended in a deviation (section 3), each a replan
+        self._by_source = None  # the reading's actions by their input (``source_index``), made at the first click
 
     # --- processes ---
 
@@ -545,6 +595,28 @@ class Search:
         m["python_rss_kb"] = max(m.get("python_rss_kb", 0), own)
         m["live_forks"] = max(m.get("live_forks", 0), len(self.live))
         m["min_available_kb"] = min(m.get("min_available_kb", 1 << 40), mem_available_kb())
+
+    def _alternatives(self, recs: list, first: MRec) -> list:
+        """The click's other records in the reading (section 3): (name, their ``pos:`` writes, their writes a later step
+        reads), predicted from the plan's state before the click."""
+        h = self.h
+        lines = getattr(getattr(h.base, "lines", None), "path", None)
+        if lines is None:
+            return []
+        if self._by_source is None:
+            self._by_source = source_index(lines)
+        own = {p.name for p in first.paths}
+        out = []
+        for i in self._by_source.get(tuple(first.paths[0].what.source), ()):
+            a = h.base.actions[i]
+            if a.name in own:
+                continue
+            e = h._expectations(a.what, first.before, h.doms, ())
+            e = {k: x for k, x in e.items() if not k.startswith(h.unobserved) and k in h.doms}
+            linked = later_reads(recs, first.i, [k for k in e if not k.startswith("pos:")])
+            out.append((a.name, {k: x for k, x in e.items() if k.startswith("pos:")},
+                        {k: e[k] for k in linked}))
+        return out
 
     def stone_fork(self, b):
         return self.fork(b, "stone trial")
@@ -619,6 +691,13 @@ class Search:
                     ch.outcome = "pruned"
                     break
                 m.note(f, now)
+                if f == ch.issue and w["click_paths"] is not None and not path_shows(w["click_paths"], now):
+                    # Lemma 9: the record's slots do not stand where it leaves them: another path of the click ran
+                    ch.alt = other_path(w["alts"], now, ch.full_at_fork)
+                    if ch.alt is None:
+                        ch.outcome, ch.why = "spent", "another path of the click, no change a later step reads"
+                        w["lemma9_stops"] += 1
+                        break
                 if st.get("mv"):
                     moved = True
                 elif moved and ch.arrival is None:
@@ -628,7 +707,7 @@ class Search:
                     # the goal holds, but no record of the plan that writes it has matched: not from the plan
                     ch.outcome, ch.why = "goal, not from the plan", sorted(w["goal_writers"])
                     break
-                if goal or m.complete():
+                if (goal or m.complete()) and ch.alt is None:
                     ch.outcome = "goal" if goal else "success"
                     break
                 mm = m.mismatch(now, ch.at_fork)
@@ -651,7 +730,7 @@ class Search:
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: v for i, v in m.matched.items() if v[0] is not None}
             ch.choices = dict(m.choices)
-            if ch.outcome in ("spent", "mismatch", "limit") and is_deviation(m, w["input"], w["before_input"]):
+            if ch.outcome in ("spent", "mismatch", "limit") and is_deviation(m, w["input"], w["before_input"], ch.alt):
                 ch.outcome = "deviation"  # section 3: the input took effect, then the plan's prediction ended
             if ch.outcome in ("success", "goal", "deviation"):
                 cps.append((cb.frame, dict(obs), RP.extra_of(s, cb.status)))
@@ -713,6 +792,7 @@ class Search:
             {f"pos:{r.unit}" for r in tracked if r.unit}
         doms = {kk: h.doms[kk] for kk in keys if kk in h.doms and not kk.startswith(h.unobserved)}
         full_doms = {kk: d for kk, d in h.doms.items() if not kk.startswith(h.unobserved)}
+        doms_all = full_doms
         observed_reads = sorted(kk for kk in reads if kk in doms)
         # section 5, End: the tracked records that precede the input (P) and the facts the input reads
         before_input = {r.i for r in tracked if has_input and r.i in first.preds}
@@ -726,10 +806,16 @@ class Search:
         pm = Matcher(tracked, needed, None, issued=issued)
         pm.plan_pending = [r for r in recs if not r.done]
         goal_writers = {r.i for r in tracked if r.i in self.goal_writers}
+        click_paths, alts = None, []
+        if has_input and inp.kind == "click":  # Lemma 9 and the click's other paths (section 3)
+            click_paths = [{kk: x for kk, x in e.items() if kk.startswith("pos:") and kk in doms_all}
+                           for e in first.exps]
+            alts = self._alternatives(recs, first)
         w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name, "tracked": tracked, "needed": needed, "input": first if has_input else None,
              "doms": doms, "full_doms": full_doms, "fv": FastView(h.b, doms, h.unobserved),
              "full_fv": FastView(h.b, full_doms, h.unobserved), "best": None, "firsts": set(), "b_qf": b_qf,
              "bound_violations": [], "delta_violation": None, "issued": issued, "before_input": before_input,
+             "click_paths": click_paths, "alts": alts, "lemma9_stops": 0,
              "b_dev_qf": 4 * cfg.delta_lo * n,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps])}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None,
@@ -818,6 +904,8 @@ class Search:
                    gate_shut=gate_shut, outcomes=dict(sorted(counts.items())),
                    child_frames=sum(c.frames for c in children),
                    early_successes=sum(1 for c in children if c.early and c.outcome in ("success", "goal")),
+                   lemma9_stops=w["lemma9_stops"], other_paths=collections.Counter(c.alt for c in children if c.alt),
+                   alternatives=len(alts),
                    bound_violations=w["bound_violations"], delta_violation=w["delta_violation"],
                    mismatch_keys=collections.Counter(str(c.why[0]) for c in children if c.outcome == "mismatch"
                                                      and isinstance(c.why, tuple)).most_common(8),
