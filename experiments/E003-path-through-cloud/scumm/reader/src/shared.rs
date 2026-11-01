@@ -22,12 +22,15 @@ pub struct SharedRuns {
     batch: AtomicU64,
     runs: Mutex<FxHashMap<String, (u64, State)>>,
     cv: Condvar,
+    /// the keys, without their guides, whose run read its verb in an earlier batch: a job with one runs at once
+    /// rather than wait for another's run (a choice of when to run; what is written is the same)
+    refused: Mutex<rustc_hash::FxHashSet<String>>,
     /// each input script's instructions where `Local[1]` is written on every path ([`arg_written`])
     units: Mutex<FxHashMap<UnitId, Option<Arc<Vec<bool>>>>>,
     /// runs made and kept, taken by another job, made and not kept (they read their verb)
     pub made: AtomicU64,
     pub taken: AtomicU64,
-    pub refused: AtomicU64,
+    pub not_kept: AtomicU64,
     /// nanoseconds workers waited for a run another worker was making
     pub waited_ns: AtomicU64,
 }
@@ -49,7 +52,10 @@ impl SharedRuns {
         self.runs.lock().unwrap().clear();
     }
 
-    pub fn look(&self, key: &str) -> Look {
+    pub fn look(&self, key: &str, coarse: &str) -> Look {
+        if self.refused.lock().unwrap().contains(coarse) {
+            return Look::Alone;
+        }
         let b = self.batch.load(Ordering::SeqCst);
         let t0 = std::time::Instant::now();
         let mut m = self.runs.lock().unwrap();
@@ -73,12 +79,13 @@ impl SharedRuns {
     }
 
     /// The run with `key` is made: `out` is it with its verb, or None when it read the verb.
-    pub fn fill(&self, key: &str, out: Option<(RunOut, i64)>) {
+    pub fn fill(&self, key: &str, coarse: &str, out: Option<(RunOut, i64)>) {
         let b = self.batch.load(Ordering::SeqCst);
         if out.is_some() {
             self.made.fetch_add(1, Ordering::Relaxed);
         } else {
-            self.refused.fetch_add(1, Ordering::Relaxed);
+            self.not_kept.fetch_add(1, Ordering::Relaxed);
+            self.refused.lock().unwrap().insert(coarse.to_string());
         }
         self.runs.lock().unwrap().insert(key.to_string(), (b, State::Done(out)));
         self.cv.notify_all();

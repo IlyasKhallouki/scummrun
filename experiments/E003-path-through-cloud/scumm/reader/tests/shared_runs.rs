@@ -67,29 +67,33 @@ fn read(rooms: Vec<i32>, at: &str, on: bool, only: usize) -> (Vec<Vec<String>>, 
     }
     let counts = format!("{}\n{}", b.counters_py().text(), b.counts.py().text());
     let n = |a: &std::sync::atomic::AtomicU64| a.load(std::sync::atomic::Ordering::Relaxed);
-    (out, counts, sh.map(|s| (n(&s.made), n(&s.taken), n(&s.refused))))
+    (out, counts, sh.map(|s| (n(&s.made), n(&s.taken), n(&s.not_kept))))
 }
 
-fn same(rooms: Vec<i32>, at: &str, only: usize) {
+fn same(rooms: Vec<i32>, at: &str, only: usize, shared: bool) {
     let (off, coff, _) = read(rooms.clone(), at, false, only);
     let (on, con, st) = read(rooms, at, true, only);
     let (made, taken, refused) = st.unwrap();
-    eprintln!("{at}: {} jobs, made {made}, taken {taken}, read their verb {refused}", off.len());
+    eprintln!("{at}: {} jobs, made {made}, taken {taken}, not kept {refused}", off.len());
     assert_eq!(off.len(), on.len());
     for (i, (a, b)) in off.iter().zip(&on).enumerate() {
         assert_eq!(a, b, "job {i}'s records");
     }
     assert_eq!(coff, con, "the counters");
-    assert!(taken >= 1, "at least one job took another's run");
+    if shared {
+        assert!(taken >= 1, "at least one job took another's run");
+    }
 }
 
 #[test]
 fn k2_dialog_jobs_of_202_at_85() {
-    same(k2_rooms(), "[202@85]", 5);
+    same(k2_rooms(), "[202@85]", 5, true);
 }
 
+/// In Part I's scope the run reads the dialog verbs (the room change it makes reaches code that does), so no job
+/// takes another's run; the records are the same either way.
 #[test]
 #[ignore]
 fn part1_dialog_jobs_of_202_at_85() {
-    same(part1_rooms(), "[202@85]", 5);
+    same(part1_rooms(), "[202@85]", 5, false);
 }

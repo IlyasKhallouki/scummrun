@@ -822,7 +822,7 @@ fn main() {
         r["shared_runs"] = json!({
             "made": n(&sh.made),
             "taken": n(&sh.taken),
-            "read_their_verb": n(&sh.refused),
+            "not_kept": n(&sh.not_kept),
             "waited_s": (n(&sh.waited_ns) as f64 / 1e7).round() / 100.0,
         });
     }

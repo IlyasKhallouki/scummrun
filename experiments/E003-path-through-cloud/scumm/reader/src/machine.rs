@@ -2346,10 +2346,10 @@ impl RunMachine for Reader<'_> {
             s.held_seen.clear();
         }
         // the switch shared_runs (shared.rs): a click that differs from another job's only in its verb takes its run
-        let mut mine: Option<(std::sync::Arc<crate::shared::SharedRuns>, String, i64, UnitKey, std::sync::Arc<Vec<bool>>)> = None;
+        let mut mine: Option<(std::sync::Arc<crate::shared::SharedRuns>, (String, String), i64, UnitKey, std::sync::Arc<Vec<bool>>)> = None;
         if let (Some(sh), What::Verb(v)) = (&cx.table.shared, what) {
             if let Some((key, unit, def)) = self.share_key(cx, pins, pre, *v, sh) {
-                match sh.look(&key) {
+                match sh.look(&key.0, &key.1) {
                     crate::shared::Look::Hit(out, v0) => return crate::shared::rename(out, v0, *v),
                     crate::shared::Look::Mine => mine = Some((sh.clone(), key, *v, unit, def)),
                     crate::shared::Look::Alone => {}
@@ -2368,7 +2368,7 @@ impl RunMachine for Reader<'_> {
             if let Err(why) = ok {
                 crate::par::trace_shared(label, why);
             }
-            sh.fill(&key, ok.is_ok().then(|| (out.clone(), v)));
+            sh.fill(&key.0, &key.1, ok.is_ok().then(|| (out.clone(), v)));
         }
         out
     }
@@ -2379,7 +2379,7 @@ impl Reader<'_> {
     /// when the run is not one the switch shares (its verb not pinned to 1, its input script not known, or the script
     /// names its verb argument).
     #[allow(clippy::type_complexity)]
-    fn share_key(&self, cx: &Ctx, pins: &Pins, pre: &Pre, v: i64, sh: &crate::shared::SharedRuns) -> Option<(String, UnitKey, std::sync::Arc<Vec<bool>>)> {
+    fn share_key(&self, cx: &Ctx, pins: &Pins, pre: &Pre, v: i64, sh: &crate::shared::SharedRuns) -> Option<((String, String), UnitKey, std::sync::Arc<Vec<bool>>)> {
         let game = self.m.game;
         let vk = format!("verb:{v}");
         if pins.get(&vk) != Some(&RVal::Int(1)) || pre.get(&vk).map(|s| s.as_slice()) != Some(&[Label::Int(1)][..]) {
@@ -2406,7 +2406,8 @@ impl Reader<'_> {
                 .collect()
         });
         let _ = cx;
-        Some((format!("{}|{n}|{unit:?}|{p2:?}|{q2:?}|{guides:?}", self.m.path_limit), unit, def))
+        let coarse = format!("{}|{n}|{unit:?}|{p2:?}|{q2:?}", self.m.path_limit);
+        Some(((format!("{coarse}|{guides:?}"), coarse), unit, def))
     }
 
     /// The switch shared_runs, conditions 2-4 on the run made (shared.rs): no read of another dialog verb, no write
