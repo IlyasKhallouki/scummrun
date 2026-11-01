@@ -242,7 +242,7 @@ Against the prediction:
 | k = 2, refinements | 1 (var 103) at about 2796; at most 2 | 1 (var 103) at 2796 |
 | k = 2, the reread | D_103 of 77 to 100; records and actions within ±10%; operators within ±15%; 120 to 400 s wall, 300 to 700 CPU s, peak 3.5 to 5.5 GB; var:103 = 428 | 77; +0.01%; operators +35% (outside); 215 s wall, 507 CPU s; peak 3.9 GB in the run the 3 GB rule stopped, 1.2 GB streamed; 428 |
 | k = 2, after it | the click's part 1 matches, #510 refuted on M4 (local:201), a deviation at 2798 with no class; the goal in the idling engine at about 3129, local 209 | so (#219 in the refined reading); 3129 |
-| k = 2, numbers | idling; about 401 frames (9,624 qf, 40.1 s); 2 ± 1 replans; window search 40 to 150 CPU s; Python under 1 GB, the planner under 1.5 GB | idling; 401 (9,624, 40.10 s); 2; 45.4 s; Python 1,167 MB (outside: the harness held both readings), the planner 1,124 MB |
+| k = 2, numbers | idling; about 401 frames (9,624 qf, 40.1 s); 2 ± 1 replans; window search 40 to 150 CPU s; Python under 1 GB, the planner under 1.5 GB | idling; 401 (9,624, 40.10 s); 2; 45.4 s; Python 1,167 MB (outside; the first reading stays open in cmd_run next to the refined one), the planner 1,124 MB |
 | kitchen, switch on | no refinement; the goal from the plan's records at 3216, 488 frames, 11,712 qf, 2 replans | so |
 | verify from boot | 0 differences | 0 on both |
 
