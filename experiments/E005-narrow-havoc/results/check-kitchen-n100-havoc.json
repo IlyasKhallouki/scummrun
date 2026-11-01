@@ -1,0 +1,46 @@
+{
+ "havoc_records": 19926,
+ "naming_every_unit": 0,
+ "closure_units": {
+  "min": 0,
+  "median": 96,
+  "p90": 98,
+  "max": 127
+ },
+ "effects": {
+  "median": 875,
+  "max": 1000
+ },
+ "events": {
+  "median": 2185,
+  "max": 2202,
+  "sum": 22937931
+ },
+ "room_changes": {
+  "none": 9875,
+  "every_scope_room": 8207,
+  "named_rooms": 1844,
+  "rooms_named_median": 2.0,
+  "rooms_named_max": 2
+ },
+ "starts_named_by_havoc_args": 12613,
+ "records_with_a_start_not_resolved": 0,
+ "every_unit_reasons": {},
+ "every_room_reasons": {
+  "[\"actorFollowCamera at {\\\"$tuple\\\":[\\\"global\\\",19]}[22]: actor 1, its room at the cut not known\"]": 7769,
+  "[\"actorFollowCamera at {\\\"$tuple\\\":[\\\"global\\\",114]}[18]: actor 1, its room at the cut not known\"]": 438
+ },
+ "jobs": {
+  "event(script:4@366)": 4020,
+  "event(script:9@89)": 2158,
+  "event(script:9@231)": 2158,
+  "event(script:9@175)": 1826,
+  "event(script:9@208)": 1826,
+  "event(local:202@11)": 1475,
+  "event(local:202@52)": 1407,
+  "event(local:220@2300": 318,
+  "esc(local:220@993": 291,
+  "event(local:203@2)": 232
+ },
+ "lines_not_parsed": 0
+}

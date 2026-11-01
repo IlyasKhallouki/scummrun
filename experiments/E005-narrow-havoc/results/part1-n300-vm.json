@@ -1,0 +1,137 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.0,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 169,
+      "s": 0.1,
+      "what": "pass 1: event round 1"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 508,
+      "longest_job_s": 0.0,
+      "records": 1708,
+      "s": 0.1,
+      "what": "pass 1: event round 2"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 998,
+      "longest_job_s": 0.0,
+      "records": 3568,
+      "s": 0.2,
+      "what": "pass 1: event round 3"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 704,
+      "longest_job_s": 0.0,
+      "records": 2571,
+      "s": 1.4,
+      "what": "pass 1: event round 4"
+    }
+  ],
+  "cap_min": 100000.0,
+  "cpu_use": 15.87,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "owner:901",
+    "owner:902",
+    "owner:903"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 318,
+    "reads some locals, known": 255
+  },
+  "load_at_end": "16.80 9.70 4.08",
+  "load_at_start": "1.21 0.55 0.21",
+  "n_rooms": 31,
+  "n_units": 573,
+  "name": "part1",
+  "objects": 384,
+  "packed_bytes_so_far": 12582912,
+  "pass": 1,
+  "peak_rss_mb": 113435,
+  "reach": true,
+  "read_cpu_s": 3967.7,
+  "read_wall_s": 250.1,
+  "records_in_pass": 9741,
+  "rooms": [
+    10,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    41,
+    42,
+    43,
+    44,
+    48,
+    49,
+    51,
+    52,
+    53,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    64,
+    76,
+    83,
+    85,
+    96
+  ],
+  "rss_peak_seen": {
+    "at": "pass 1, event round 5 (2711 jobs), 250 s",
+    "mb": 113435
+  },
+  "runs_done_in_finished_batches": 2343,
+  "setup_s": 0.06,
+  "slot_facts": 12169,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "stopped: MemAvailable fell under 8.0 GB",
+  "step_limit": 300,
+  "switches": [
+    "value_sets",
+    "draw_clears",
+    "actor_rooms",
+    "grow_limit",
+    "havoc_cut",
+    "reach_pairs",
+    "havoc_starts",
+    "havoc_rooms",
+    "havoc_args"
+  ],
+  "threads": 16,
+  "units": {
+    "entry": 31,
+    "exit": 31,
+    "global": 94,
+    "local": 215,
+    "obj": 202
+  }
+}

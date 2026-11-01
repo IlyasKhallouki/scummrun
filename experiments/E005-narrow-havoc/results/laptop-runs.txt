@@ -1,0 +1,11 @@
+kitchen-full: lock taken 17:40:05 rc 0 20 s  | last rss: 10 259496 9078144 2.03 2398 | havoc lines: 0
+kitchen-n100: lock taken 17:40:25 stopped: MemAvailable 2174112 kB under 3145728 kB at 280 s rc 143 281 s  | last rss: 280 5549220 2174112 5.20 50689 | havoc lines: 19926
+kitchen-n100b: lock taken 17:55:13, memory cap 5986576 kB stopped: MemAvailable 3109336 kB under 3145728 kB at 291 s rc 143 291 s  | last rss: 291 5565848 3109336 5.23 53571 | havoc lines: 19926
+kitchen-n150: lock taken 18:02:38, memory cap 5340160 kB rc 137 15 s  | last rss: 10 3521628 5396040 5.75 2747 | havoc lines: 22
+kitchen-n200: lock taken 17:54:06 rc 137 20 s  | last rss: 10 5368376 4005916 3.09 2897 | havoc lines: 13
+kitchen-n250: lock taken 18:02:18, memory cap 5739320 kB rc 0 20 s  | last rss: 15 217108 8452948 5.46 3488 | havoc lines: 0
+kitchen-n300: lock taken 17:53:46 rc 0 20 s  | last rss: 10 282348 9010992 3.14 2388 | havoc lines: 0
+bar-full: lock taken 17:45:06 rc 0 20 s  | last rss: 10 244172 8928636 5.10 3076 | havoc lines: 0
+bar-n100: lock taken 17:45:26 rc 0 500 s  | last rss: 490 738340 8490588 3.07 91008 | havoc lines: 23835
+part1-n300: lock taken 18:00:05, memory cap 5501324 kB rc 137 100 s  | last rss: 95 5238124 3911808 6.48 28227 | havoc lines: 696
+part1-n100: lock taken 18:20:15, memory cap 5362196 kB stopped: MemAvailable 3116460 kB under 3145728 kB at 51 s rc 3 51 s  | last rss: 51  3116460 7.39 17418 | havoc lines: 740
