@@ -404,11 +404,13 @@ class Matcher:
                 (r.kind == "input" or (r.unit is not None and now.get(f"pos:{r.unit}") == R.NOWHERE))]
 
 
-def is_deviation(m: Matcher, input_rec, before_input: set, alt=None) -> bool:
-    """Section 3, deviation: every needed record preceding the input has matched, and the input took effect (its
-    record matched, or ``alt``, another of its paths with a change a later step reads, showed)."""
-    return input_rec is not None and (input_rec.i in m.matched or alt is not None) and \
-        all(i in m.matched for i in before_input)
+def is_deviation(m: Matcher, input_rec, before_input: set, took="n/a") -> bool:
+    """Section 3, deviation: every needed record preceding the input has matched, and the input took effect:
+    ``took`` is "plan" (a click whose record showed, Lemma 9), another of its paths with a change a later step reads
+    (that record's name), or None; for an input that is no click, its record matched."""
+    if input_rec is None or not all(i in m.matched for i in before_input):
+        return False
+    return took is not None if took != "n/a" else input_rec.i in m.matched
 
 
 def end_key(ch) -> tuple:
@@ -417,6 +419,7 @@ def end_key(ch) -> tuple:
     return ch.q_end, ch.outcome == "deviation", ch.g
 
 
+LEMMA9 = "another path of the click, no change a later step reads"
 _SOURCE = re.compile(rb'^\{"i": (\d+), "rec": -?\d+, "label": "(?:[^"\\\\]|\\\\.)*", "source": (\[[^\]]*\])')
 
 
@@ -532,6 +535,7 @@ class Child:
     unplanned: list = field(default_factory=list)
     choices: dict = field(default_factory=dict)  # Matcher.choices
     alt: str | None = None  # another path of the click that showed (section 3), the record's name
+    took: str | None = "n/a"  # a click: "plan" (its record showed, Lemma 9), another path's name, or None
 
     def row(self) -> list:
         return [self.g, self.first, self.issue, self.outcome, self.end, self.q_end, self.frames,
@@ -691,13 +695,18 @@ class Search:
                     ch.outcome = "pruned"
                     break
                 m.note(f, now)
-                if f == ch.issue and w["click_paths"] is not None and not path_shows(w["click_paths"], now):
-                    # Lemma 9: the record's slots do not stand where it leaves them: another path of the click ran
-                    ch.alt = other_path(w["alts"], now, ch.full_at_fork)
-                    if ch.alt is None:
-                        ch.outcome, ch.why = "spent", "another path of the click, no change a later step reads"
-                        w["lemma9_stops"] += 1
-                        break
+                if w["click_paths"] is not None and f in (ch.issue, ch.issue + 1) and ch.took in ("n/a", None):
+                    # Lemma 9: the click's record shows in its frame or the next one (the verb script may queue the
+                    # sentence there), or another of its paths does, or it did nothing a later step reads
+                    if path_shows(w["click_paths"], now):
+                        ch.took = "plan"
+                    else:
+                        ch.alt = other_path(w["alts"], now, ch.full_at_fork)
+                        ch.took = ch.alt
+                        if ch.took is None and f == ch.issue + 1:
+                            ch.outcome, ch.why = "spent", LEMMA9
+                            w["lemma9_stops"] += 1
+                            break
                 if st.get("mv"):
                     moved = True
                 elif moved and ch.arrival is None:
@@ -707,7 +716,7 @@ class Search:
                     # the goal holds, but no record of the plan that writes it has matched: not from the plan
                     ch.outcome, ch.why = "goal, not from the plan", sorted(w["goal_writers"])
                     break
-                if (goal or m.complete()) and ch.alt is None:
+                if (goal or m.complete()) and ch.took in ("n/a", "plan"):
                     ch.outcome = "goal" if goal else "success"
                     break
                 mm = m.mismatch(now, ch.at_fork)
@@ -730,7 +739,8 @@ class Search:
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: v for i, v in m.matched.items() if v[0] is not None}
             ch.choices = dict(m.choices)
-            if ch.outcome in ("spent", "mismatch", "limit") and is_deviation(m, w["input"], w["before_input"], ch.alt):
+            if ch.outcome in ("spent", "mismatch", "limit") and ch.why != LEMMA9 and \
+                    is_deviation(m, w["input"], w["before_input"], ch.took):
                 ch.outcome = "deviation"  # section 3: the input took effect, then the plan's prediction ended
             if ch.outcome in ("success", "goal", "deviation"):
                 cps.append((cb.frame, dict(obs), RP.extra_of(s, cb.status)))

@@ -243,3 +243,14 @@ def test_later_reads_are_causal_links():
     recs = [rec(0, "input", writes={"a", "b", "c"}), rec(1, "event", reads={"a"}, writes={"b"}),
             rec(2, "input", reads={"b", "c"})]
     assert W.later_reads(recs, 0, ["a", "b", "c", "d"]) == {"a", "c"}
+
+
+def test_a_click_deviates_only_when_it_took_effect():
+    r0 = rec(0, "input", writes={"var:1"}, exps={"var:1": x("var:1", 0)})
+    r0.preds = frozenset()
+    m = W.Matcher([r0], {0}, r0)
+    m.input_issued = True
+    m.note(5, {"var:1": 0})  # its checked write already held: a match that shows nothing
+    assert W.is_deviation(m, r0, set())  # an input that is no click: its record's match
+    assert not W.is_deviation(m, r0, set(), took=None)  # a click whose record did not show (Lemma 9)
+    assert W.is_deviation(m, r0, set(), took="walk(1)#2")

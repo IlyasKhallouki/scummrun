@@ -106,8 +106,8 @@ Its events land on frames after g. It then runs one frame at a time until one of
   has matched and the input took effect: its record matched, or it took another of its paths (below) with a change a
   later step reads. Then a record the plan does not name changed what a later step needs: the plan's prediction ends
   there, not the engine run. Its end point is its stop frame h, c = Q(h);
-- **another path** (a click's input): at the frame its last click lands, the slots the input's record leaves at wait
-  points (its `pos:` writes) do not all stand there, on any of its paths. The child then ran another record of the
+- **another path** (a click's input): at the frame its last click lands and at the next one, the slots the input's
+  record leaves at wait points (its `pos:` writes) do not all stand there, on any of its paths. The child then ran another record of the
   reading for the same click (same verb and objects): if one of them shows (its `pos:` writes hold, and one of its
   writes differs from the fork's value) and writes a fact a later step reads to a new value, the child goes on, as a
   deviation candidate; otherwise it is spent at once.
@@ -115,8 +115,11 @@ Its events land on frames after g. It then runs one frame at a time until one of
   (`processInput`), then runs the scripts (`runAllScripts`), then the click: `checkExecVerbs` runs the room's or the
   verb's input script nested until its first wait point, and `checkAndRunSentenceScript` the sentence script likewise
   (`scumm.cpp`, the order in `time.md` §0). The record of a click is that run (the reader's F1b), so at the end of the
-  frame the click lands in, each slot the record leaves at a wait point stands there; a slot that has yielded runs no
-  more in that frame. *Premise:* no script that runs after it in the same frame stops or moves that slot. Under it, a
+  frame it runs in, each slot the record leaves at a wait point stands there; a slot that has yielded runs no more in
+  that frame. *Premises:* the record runs in the frame the click lands in or the next one (a verb script may queue the
+  sentence one frame later: on the kitchen the door's sentence showed at the next frame, a walk to the kitchen door in
+  the click's own), and no script that runs after it in that frame stops or moves that slot. A record that showed is
+  the input taking effect; a match of the record's other writes that already held does not count as that. Under it, a
   child whose record's slots do not stand there at that frame did not run the record's path, and cannot match it
   later. A wrong premise loses children (a success the search would miss), never a route: what the search keeps are
   engine runs. The count of children stopped this way is reported.
