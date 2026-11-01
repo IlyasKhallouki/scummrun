@@ -333,11 +333,11 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
 - `explain` (Lemma O) is armed in the parent for every unit, and in a child for the units of the window's needed
   records and of the input's `pos:` writes, from the frame after the fork. The logs are read with the runs. They are
   kept only to explain a failure (9.5).
-- A child observes every frame from its fork when a tracked record of an earlier macro step is pending at the fork
-  (its run may come while the input code plays: the input code then runs one frame at a time); else from the frame
-  its last click lands, as before. *Why this is enough.* Only a pending record of an earlier macro step can run before
-  the input: every other record the window tracks follows the input (≺) or is done. The view before the input that
-  the input's record reads is the fork's (its first event lands on the frame after the fork, section 5).
+- A child observes every frame from its fork when a tracked record that does not follow the input (≺) is pending at
+  the fork (its run may come while the input code plays: the input code then runs one frame at a time); else from the
+  frame its last click lands, as before. *Why this is enough.* A record that follows the input cannot match before the
+  input's record has, so only the others can have their own run before the input. The view before the input that the
+  input's record reads is the fork's (its first event lands on the frame after the fork, section 5).
 - Running one frame at a time or several at once gives the same run: a stop at a decision point waits no
   quarter-frame and writes no game state; the bridge reads commands only while the engine is stopped. Verify from boot
   already relies on this: it reaches the window's checkpoints, taken one frame at a time, in larger steps.
@@ -447,3 +447,11 @@ start (frame 2798) instead of its fork (3076), the state dump at 3149, the frame
 places, among them the camera (440 against 480), the random state, four object states and vars 0, 2, 20 and 100. The
 room's camera script pans on ego's x (local 201 at [0000], `getActorX(VAR_EGO)`), so the camera at the click frame
 depends on when ego walked. The approach stays in each child (approach_check.py, `results/approach-check.log`).
+
+**The cache (sub-switch `cache`, off by default).** A child's input code asks the engine for its state dump and for
+hit tests (`at`) several times at one stop. *Lemma C.* Between two runs of a branch its game state does not change:
+the bridge reads commands only while the engine is stopped, a scheduled input lands on a later frame, and `segment`
+and `explain` observe only (Lemma O). So a second dump or hit test at the same stop gives the first's answer, and the
+child keeps them until its next run. Its first dump is the parent's at the fork: a forked child is the parent at that
+stop (A0). □ The search's runs, and so its result, are the same with the cache on or off; only the number of dumps
+and hit tests the engine makes changes, and the run reports both counts.
