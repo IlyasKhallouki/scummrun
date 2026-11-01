@@ -1,4 +1,4 @@
-E004 plan step A4, window search sections 1-7 with the sub-switches cache and fork_each 7 (9.7): window2's k=2 run again (branch trace). ScummVM build sha1 6249a8e7d911 (the bridge at a77a9af). The 1-minute load from other jobs was 8 to 15.
+E004 plan step A4, window search sections 1-7 with the sub-switches cache and fork_each 7 (9.7): window2's k=2 run again (branch trace). ScummVM build sha1 6249a8e7d911 (the bridge at a77a9af). The load from other jobs was not recorded for these runs.
 file replay-part1-k2-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-ahead7.json
 stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched"; goal reached True; goal from the plan's goal records False
 verify from boot (fresh engine, no fork): 6 checkpoints, 0 differences, 28 inputs, goal at the end True, error None
