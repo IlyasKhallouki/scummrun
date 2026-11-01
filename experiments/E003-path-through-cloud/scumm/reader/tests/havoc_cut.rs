@@ -435,3 +435,92 @@ fn an_objects_draw_clears_the_players_room() {
     }
     assert!(n > 0);
 }
+
+// --- the switch havoc_starts (havoc-cut.md, "The switch havoc_starts") ---------------------------------------------
+
+/// Every start of Part I's scope whose operand does not fold: (unit, instruction, the start's name, object, script).
+fn unfolded_starts(b: &Builder) -> Vec<(UnitId, u32, scumm_ir::Sym, Option<scumm_ir::ExprId>, scumm_ir::ExprId)> {
+    let g = game();
+    let mut out = Vec::new();
+    for &u in &b.scope.units {
+        for (i, x) in g.ins(u).iter().enumerate() {
+            let Some(Stmt::Start { name, script, obj, .. }) = x.st else { continue };
+            let operand = if name == known::START_OBJECT { obj.unwrap() } else { script };
+            if g.ast.constant(operand).is_none() {
+                out.push((u, i as u32, name, obj, script));
+            }
+        }
+    }
+    out
+}
+
+/// Off, a cut at a start of an object by a local names every unit; with havoc_starts, the closure holds each object
+/// unit of the scope at the start's verb entry (else its 0xFF entry), and that start is no reason to name every unit.
+#[test]
+fn part1_havoc_starts_an_object_not_folded_names_the_objects_verb_entries() {
+    let g = game();
+    let mut b = part1(true);
+    let mut n = 0;
+    for (u, i, name, _, script) in unfolded_starts(&b) {
+        if name != known::START_OBJECT {
+            continue;
+        }
+        let k = g.unit(u).key;
+        let cut = Cut { frames: vec![(k, Some(i))], steps: vec![] };
+        let reason = format!("startObject not folded at {}[{i}]", scumm_reader::facts::unit_text(k));
+        b.table.havoc_starts = false;
+        let off = havoc::closure(g, &b.scope, &b.table, &cut, None);
+        if !off.why.contains(&reason) {
+            continue; // not live from the cut under the settings
+        }
+        assert!(off.every_unit, "off: {k:?}[{i}] names every unit");
+        b.table.havoc_starts = true;
+        let on = havoc::closure(g, &b.scope, &b.table, &cut, None);
+        assert!(!on.why.contains(&reason), "{:?}", on.why);
+        let verb = g.ast.constant(script);
+        let mut objects = 0;
+        for &v in &b.scope.units {
+            let UnitKey::Obj(o) = g.unit(v).key else { continue };
+            let want: Vec<u32> = match verb {
+                Some(verb) => g.entry(o, verb).into_iter().collect(),
+                None => g.unit(v).entries.iter().map(|e| e.1).collect(),
+            };
+            for e in &want {
+                assert!(on.starts.get(&v).is_some_and(|s| s.contains(e)), "object {o}'s entry {e} for verb {verb:?} in the closure of {k:?}[{i}]");
+            }
+            objects += !want.is_empty() as usize;
+        }
+        eprintln!("{k:?}[{i}] verb {verb:?}: {objects} objects; on: {} units, every unit {} ({:?})", on.starts.len(), on.every_unit, on.why.first());
+        n += 1;
+    }
+    assert!(n > 0, "Part I's scope has a start of an object that does not fold");
+}
+
+/// With havoc_starts, a start of a script by a variable that is a fact names the scripts of the variable's values.
+#[test]
+fn part1_havoc_starts_a_script_by_a_variable_names_its_values() {
+    let g = game();
+    let mut b = part1(true);
+    b.table.havoc_starts = true;
+    let mut n = 0;
+    for (u, i, name, _, script) in unfolded_starts(&b) {
+        let Expr::Var(var) = g.ast.expr(script) else { continue };
+        if name == known::START_OBJECT || b.kind(&format!("var:{var}")) != Kind::Fact {
+            continue;
+        }
+        let Some(vals) = b.domain(&format!("var:{var}")).and_then(|d| d.values.iter().map(|l| l.int()).collect::<Option<Vec<i64>>>()) else { continue };
+        let k = g.unit(u).key;
+        let cut = Cut { frames: vec![(k, Some(i))], steps: vec![] };
+        let on = havoc::closure(g, &b.scope, &b.table, &cut, None);
+        for v in vals.iter().filter(|&&v| v > 0 && (v as i32) < g.first_local) {
+            if let Some(gu) = g.id(UnitKey::Global(*v as i32)) {
+                assert!(on.starts.contains_key(&gu), "global {v} of var:{var}'s domain in the closure of {k:?}[{i}]");
+            }
+        }
+        let reason = format!("start not folded at {}[{i}]", scumm_reader::facts::unit_text(k));
+        assert!(!on.why.contains(&reason), "{:?}", on.why);
+        eprintln!("{k:?}[{i}] by var:{var} {vals:?}: {} units", on.starts.len());
+        n += 1;
+    }
+    assert!(n > 0, "Part I's scope has a start of a script by a variable that is a fact");
+}

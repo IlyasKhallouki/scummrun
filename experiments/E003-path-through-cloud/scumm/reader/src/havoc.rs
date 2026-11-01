@@ -69,6 +69,36 @@ fn entries(game: &Game, u: UnitId) -> Vec<u32> {
     }
 }
 
+/// The switch havoc_starts (havoc-cut.md): the instructions object `o`'s code runs for each verb of `verbs` (its entry
+/// for the verb, else its 0xFF entry, `Game::entry`), or every entry when the verbs are not known.
+fn verb_entries(game: &Game, u: UnitId, verbs: &Option<Vec<i64>>) -> Vec<u32> {
+    match (game.unit(u).key, verbs) {
+        (UnitKey::Obj(o), Some(vs)) => {
+            let mut out: Vec<u32> = vs.iter().filter_map(|&v| game.entry(o, v as i32)).collect();
+            out.sort_unstable();
+            out.dedup();
+            out
+        }
+        _ => entries(game, u),
+    }
+}
+
+/// The values of an operand that is a variable, by the domain convention (havoc-cut.md, "Values"): a fact's domain
+/// when every value of it is plain, a variable no code of the scope writes its setting or its start value; None
+/// otherwise (a local, an index, a non-fact).
+fn var_values(game: &Game, scope: &Scope, table: &FactTable, e: ExprId) -> Option<Vec<i64>> {
+    let Expr::Var(n) = game.ast.expr(e) else { return None };
+    let key = format!("var:{n}");
+    match table.kind(&key, scope) {
+        Kind::Fact => {
+            let d = table.domain(&key)?;
+            d.values.iter().map(|l| l.int()).collect()
+        }
+        Kind::Const => Some(vec![domains::SETTINGS.iter().find(|s| s.0 == n).map_or_else(|| table.start.get0(&key), |s| s.1)]),
+        Kind::NonFact => None,
+    }
+}
+
 /// The room resource a unit's code runs in, when it is room code.
 fn unit_res(k: UnitKey) -> Option<i32> {
     match k {
@@ -146,12 +176,29 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                 let Some(st) = ins[i as usize].st else { continue };
                 match st {
                     Stmt::Start { name, script, obj, .. } => {
+                        // the switch havoc_starts: an operand that is a variable names its values
+                        let value_of = |e: ExprId, caps: &mut i64| {
+                            fold(ast, e, None, None, caps).or_else(|| if table.havoc_starts { var_values(game, scope, table, e) } else { None })
+                        };
                         if name == known::START_OBJECT {
-                            match obj.and_then(|o| fold(ast, o, None, None, &mut caps)) {
+                            // havoc_starts: the verb's entry, else the 0xFF one (`Game::entry`); off, every entry
+                            let verbs = if table.havoc_starts { fold(ast, script, None, None, &mut caps) } else { None };
+                            match obj.and_then(|o| value_of(o, &mut caps)) {
                                 Some(os) => {
                                     for o in os {
                                         if let Some(v) = game.id(UnitKey::Obj(o as i32)) {
-                                            todo.push((v, entries(game, v)));
+                                            todo.push((v, verb_entries(game, v, &verbs)));
+                                        }
+                                    }
+                                }
+                                None if table.havoc_starts => {
+                                    // any object of the scope, at the verb's entry
+                                    for &v in &scope.units {
+                                        if let UnitKey::Obj(_) = game.unit(v).key {
+                                            let es = verb_entries(game, v, &verbs);
+                                            if !es.is_empty() {
+                                                todo.push((v, es));
+                                            }
                                         }
                                     }
                                 }
@@ -161,7 +208,7 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                                 }
                             }
                         } else {
-                            match fold(ast, script, None, None, &mut caps) {
+                            match value_of(script, &mut caps) {
                                 Some(ns) => {
                                     for n in ns {
                                         add_script(n as i32, res, &mut todo, &mut locals);
