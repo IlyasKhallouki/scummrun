@@ -1940,7 +1940,8 @@ class Search:
                     log.issue, log.end = best.issue, best.end
                     log.unplanned = list(best.unplanned)
                 log.outcome = ("goal" if best is not None and best.outcome == "goal" else
-                               "matched" if r.done or (best is not None and r.i in best.matched) else "window empty")
+                               "matched" if r.done or (best is not None and r.i in best.matched) else
+                               "deviation" if best is not None and best.outcome == "deviation" else "window empty")
             else:
                 f = r.done_frame if r.done else (best.matched.get(r.i, (None,))[0] if best is not None else None)
                 log.start = log.end = f if f is not None else rec["end"]
