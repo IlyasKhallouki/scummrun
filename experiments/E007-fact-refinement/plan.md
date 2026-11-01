@@ -190,6 +190,67 @@ records and actions before and after, D_N's values, the out-of-domain check, and
 - A record of A with a check on v that no record of A2 refines must be infeasible: no value of D_v passes its checks on
   v together (A read v twice as two unrelated unknowns). The engine runs no such path, so step 2 holds for it.
 
-## Results
+## Results (2026-11-01, written after the runs)
 
-Written after the runs.
+Code on branch e007: the reader switch at e1881af, a refined fact's value sets at 86a21cd, read-rust's `--fact-vars` at
+d74b070, lemma_check.py at 88e3411, the loop at 48e3e53 and a58d1f7, streamed rereads at 8564d2c. Files:
+`results/off-checks.log`, `results/lemma-kitchen.log`, `results/stream-check.log`, `results/refine-k2.log`,
+`results/refine-kitchen.log`. Lab note: `notes/log/2026-11-01-e007.md`.
+
+Off checks: `reader-port read kitchen --packed` writes 279b7a24; read-rust without `--fact-vars` gives the kitchen
+41c31b6d and k = 2 f5ec2354, with the actions, lists and reached files byte for byte e006's; the kitchen from the boot
+with `--refine-facts` off is E006's run field by field, except which of two twin children (Lemma 5: the same run) window
+0 kept, which depends on the workers' order.
+
+Lemma check (kitchen, var 103): the first reading forked var 103 per value and grew from 41,877 to 107,395 records; with
+the amendment's value sets, 41,895 records (+0.04%) and 40,911 actions. D_103 has 27 values, no value of var 103 is
+written outside it in the last pass. No record of A2 fails to refine a record of A (2,620 refine a record of A that
+merged two paths, and lack the checks of the other path). Of the 13,082 records of A with a check on var 103, 10,604 are
+refined by records of A2 and 2,478 are infeasible (their checks on var 103 contradict each other for every value).
+
+| test | stop | goal | frames (qf, s) from 2728 | plans, replans | refinements | children | window search CPU s | reader CPU s | peak memory |
+|---|---|---|---|---|---|---|---|---|---|
+| k = 2 | goal, not from the plan, at 3129 | reached while the engine idled | 401 (9,624, 40.10) | 3, 2 | 1: var 103, at 2796 | 403 | 45.4 (engines 13.8, Python 31.6) | 507.4 (the reread, 215 s wall) | Python 1,167 MB, forks 70 MB, taskcore 1,124 MB, reader 1,217 MB |
+| kitchen | the goal at 3216 | from the plan's records | 488 (11,712, 48.80) | 3, 2 | none (2 turns) | 501 | 263.8 (135.5, 128.2) | 0 | Python 291 MB, forks 78 MB, taskcore 89 MB |
+
+Each verified from boot in a fresh engine with no fork: 6 and 9 checkpoints, 0 differences; the goal holds at the end
+of both.
+
+- k = 2: plan 0's open-door sentence deviated at 2796 on the cause E006 named (var 103 = 428, not a fact of the reading;
+  local 2 = 0; class split). The loop added var 103 on its own: the scope read again from the boot's start and the
+  engine's state at 2796, var 103's domain 77 values (seeds 0 and 428), none written outside it in the last pass;
+  451,987 to 452,038 records, 450,967 to 451,018 actions; plan 1's task 193,967 operators where plan 0's had 143,417
+  (+35%). The replan's start took var:103 = 428 from the dump. walk_to(428)'s window then took 4 children: the click's
+  record matched its part 1 (var 102 = 0) and every child deviated at 2798 on the event #219 refuted by M4 (local:201),
+  with no class: no variable to add. Plan 2 (walk_to(315)[202] and an event of local 217): the goal held in the idling
+  parent at 3129, written by local 209's drawObject at [0033], a unit the plan does not name (class split on its locals
+  0 and 1 = 339): no variable to add. The loop made 3 turns, 1 refinement.
+- The first k = 2 run (a58d1f7) made the same turn and was stopped by the 3 GB rule while its reread held 3.9 GB of
+  kept records (other jobs held about 17 GB). The reader then streamed its golden lines in the refiner's rereads
+  (`read-rust --stream`, `stream-check.log`): the same files on the kitchen and on k = 2 (f5ec2354), its peak 3,947 MB
+  down to 833 MB. The run above is the second.
+- Kitchen: as E006; its two turns added nothing (the refuted event at 2798 with no class, and the cook's x, a
+  position, at 3204). One later child of the last window ended as a goal at 3218 before the prune reached it (E006's
+  was pruned at 3217); the result is the same.
+
+Against the prediction:
+
+| | predicted | measured |
+|---|---|---|
+| off checks | 279b7a24; 41c31b6d, f5ec2354; the kitchen's log as E006's | so (window 0's twin, Lemma 5) |
+| lemma check | 0 unrefined; D_103 of 25 to 40 values; none outside; records within ±10% | 0 unrefined; 27 values; none outside; +156% per value, then +0.04% with the amendment |
+| k = 2, refinements | 1 (var 103) at about 2796; at most 2 | 1 (var 103) at 2796 |
+| k = 2, the reread | D_103 of 77 to 100; records and actions within ±10%; operators within ±15%; 120 to 400 s wall, 300 to 700 CPU s, peak 3.5 to 5.5 GB; var:103 = 428 | 77; +0.01%; operators +35% (outside); 215 s wall, 507 CPU s; peak 3.9 GB in the run the 3 GB rule stopped, 1.2 GB streamed; 428 |
+| k = 2, after it | the click's part 1 matches, #510 refuted on M4 (local:201), a deviation at 2798 with no class; the goal in the idling engine at about 3129, local 209 | so (#219 in the refined reading); 3129 |
+| k = 2, numbers | idling; about 401 frames (9,624 qf, 40.1 s); 2 ± 1 replans; window search 40 to 150 CPU s; Python under 1 GB, the planner under 1.5 GB | idling; 401 (9,624, 40.10 s); 2; 45.4 s; Python 1,167 MB (outside: the harness held both readings), the planner 1,124 MB |
+| kitchen, switch on | no refinement; the goal from the plan's records at 3216, 488 frames, 11,712 qf, 2 replans | so |
+| verify from boot | 0 differences | 0 on both |
+
+By the threshold, yes: k = 2 from the boot reaches state:316 = 1 while the engine idles, verified from boot, with the
+one refinement made by the harness from the cause it read, and the kitchen with the switch still reaches its goal from
+the plan's records. No stop rule of this plan fired; the machine's 3 GB rule stopped the first k = 2 run.
+
+Next blocker, for the goal from the plan's records rather than the engine idling: the goal's writer, local 209's
+drawObject at [0033], a unit the plan does not name, class split on that script's locals; before it, the event #219
+refuted on M4 at 2798 (local:201, started by a run no plan step names), with no class. Neither is a variable the
+reading holds no fact of, so the loop has nothing to add there.
