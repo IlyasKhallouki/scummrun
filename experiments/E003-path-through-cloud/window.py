@@ -1483,8 +1483,9 @@ class Search:
                 decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later)
                 decided[n_]["frame"] = f
 
-            def settle() -> None:
-                """The click's outcome once its candidates are decided (Lemma 9′)."""
+            def settle(final: bool = False) -> None:
+                """The click's outcome once its candidates are decided (Lemma 9′); ``final`` at the idle stop or the
+                child's limit, where a candidate whose runs have not come fails."""
                 if ch.took != "n/a":
                     return
                 plan_c = [n_ for n_, c in enumerate(cands) if c[0] == "plan"]
@@ -1495,7 +1496,7 @@ class Search:
                     ch.took = "plan" if res_["took"] else "plan, no change"
                     ch.track_issue = track.copy()
                     return
-                if any(decided[n_] is None for n_ in plan_c):
+                if not final and any(decided[n_] is None for n_ in plan_c):
                     return
                 alt_c = [n_ for n_, c in enumerate(cands) if c[0] == "alt"]
                 for n_ in alt_c:
@@ -1505,7 +1506,7 @@ class Search:
                         ch.alt = ch.took = cands[n_][1]
                         ch.track_issue = track.copy()
                         return
-                if all(decided[n_] is not None for n_ in alt_c):
+                if final or all(decided[n_] is not None for n_ in alt_c):
                     ch.took = None
 
             def frame_step(f) -> None:
@@ -1617,6 +1618,8 @@ class Search:
                     break
                 if f > s_issue + 1 and "idle" in st:
                     if ch.took == "n/a":  # Lemma 9′: at the idle stop nothing is left to start the click's runs
+                        settle(final=True)
+                    if ch.took is None:
                         ch.outcome, ch.why = "spent", "Lemma 9′: no run by the idle stop"
                         with self._lock:
                             w["lemma9_stops"] += 1
@@ -1630,6 +1633,8 @@ class Search:
                 if f - s_issue >= cfg.child_limit:
                     ch.outcome, ch.why = "limit", m.unmet(now)
                     if ch.took == "n/a":
+                        settle(final=True)
+                    if ch.took is None:
                         input_fail(f)
                     else:
                         self._not_run_fail(w, ch, track, f, kept)
@@ -1657,8 +1662,9 @@ class Search:
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: (v[0], v[1]) for i, v in track.matched.items() if v[0] is not None}
             ch.choices = dict(track.choices)
+            took_effect = ch.took == "plan" or (ch.alt is not None and ch.took == ch.alt)  # 9.2, 9.3
             if ch.outcome in ("spent", "mismatch", "limit", "refuted") and \
-                    all(i in track.matched for i in w["before_input"]) and ch.took not in (None, "plan, no change"):
+                    all(i in track.matched for i in w["before_input"]) and took_effect:
                 ch.outcome = "deviation"
                 ch.dev_stop = cb.frame
                 while cb.frame - ch.dev_stop < cfg.window_frames:
