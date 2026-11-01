@@ -24,6 +24,7 @@ pub mod machine;
 pub mod memo;
 pub mod oracle;
 pub mod packed;
+pub mod pairs;
 pub mod par;
 pub mod py;
 pub mod reach;

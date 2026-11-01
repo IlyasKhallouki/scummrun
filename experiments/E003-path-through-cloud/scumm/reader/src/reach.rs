@@ -11,7 +11,7 @@ use crate::memo::{Query, RunLog};
 use crate::py::Counter;
 use crate::record::{Event, PathOut, Pre, Record};
 use crate::table::{pos_key, FactTable, NOWHERE};
-use crate::task::{record_action, task_start};
+use crate::task::{record_action, task_start, TEffect};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
@@ -69,7 +69,7 @@ fn place_of(key: &str) -> Option<(String, i64)> {
 }
 
 /// The fact a wait on `key` wakes on.
-fn watch_key(key: &str) -> String {
+pub(crate) fn watch_key(key: &str) -> String {
     match place_of(key) {
         Some((p, _)) => p,
         None => key.to_string(),
@@ -218,6 +218,23 @@ pub fn start_file(path: &str) -> Facts {
     }))
 }
 
+/// A written value as (d) takes it (`Builder::reach_value`).
+pub(crate) fn value_of(table: &FactTable, key: &str, l: Label) -> Option<Label> {
+    if key.starts_with("args:") {
+        return Some(l);
+    }
+    let d = table.domain(key)?;
+    d.label_of(l).filter(|x| d.contains(*x))
+}
+
+/// A start's pair of the verb script and the room (pairs.rs), from its seed values; None when it lacks either.
+fn pair_of(vals: &[(String, Label)]) -> Option<crate::pairs::Pair> {
+    let a = crate::pairs::fact_a();
+    let x = vals.iter().find(|(k, _)| *k == a)?.1;
+    let y = vals.iter().find(|(k, _)| k == crate::pairs::FACT_B)?.1;
+    Some((x, y))
+}
+
 /// A job's whole run (guide None) or a branch of it, waiting for a set to meet the reached values.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Wait {
@@ -249,6 +266,12 @@ pub struct ReachState {
     todo: Vec<Event>,
     pub rounds: i64,
     pub max_waits: usize,
+    /// the switch reach_pairs (pairs.rs): the reached pairs of the verb script and the room, and the jobs held on one
+    /// (job number -> its seed's sets on the two facts); None with the switch off, or after a start without a value of
+    /// either fact (every pair is then taken as reachable)
+    pub(crate) pairs: Option<crate::pairs::Pairs>,
+    pair_waits: BTreeMap<u32, (Labels, Labels)>,
+    pairs_held: usize,
 }
 
 impl ReachState {
@@ -403,17 +426,11 @@ impl Builder<'_> {
     /// A written value as (d) takes it: `packed.rs` writes a value past a domain's bounds as the collapsed value, and
     /// taskcore's load gives a value the domain lacks no index (K_BAD, which reaches nothing).
     fn reach_value(&self, key: &str, l: Label) -> Option<Label> {
-        if key.starts_with("args:") {
-            return Some(l);
-        }
-        let d = self.table.domain(key)?;
-        d.label_of(l).filter(|x| d.contains(*x))
+        value_of(&self.table, key, l)
     }
 
     /// (d)'s effects of a written record (`packed.rs` of taskcore: `add` as one effect per current value).
-    fn reach_apply(&mut self, reach: &Reached, r: &Record) {
-        let mut c = Counter::default();
-        let (_, effects) = record_action(&self.table, r, &mut c);
+    fn reach_apply(&mut self, reach: &Reached, effects: Vec<TEffect>) {
         for e in effects {
             if let Some(d) = e.add {
                 let dom = self.table.domain(&e.key).expect("a step's fact has a domain").into_owned();
@@ -458,14 +475,34 @@ impl Builder<'_> {
             }
         }
         for r in recs {
-            self.reach_apply(reach, r);
+            let mut c = Counter::default();
+            let (pre, effects) = record_action(&self.table, r, &mut c);
+            if let Some(p) = self.reach_state.as_mut().unwrap().pairs.as_mut() {
+                let table = &self.table;
+                p.add_action(&pre, &effects, &|k, l| value_of(table, k, l), &watch_key);
+            }
+            self.reach_apply(reach, effects);
         }
     }
 
-    /// A job that does not meet the reached values waits on the first set that fails; true: it can run.
+    /// A job that does not meet the reached values waits on the first set that fails; with the switch reach_pairs, a
+    /// job whose seed has sets on both facts of the pairs waits until a reached pair meets them; true: it can run.
     fn reach_job_ready(&mut self, reach: &Reached, job: &Job) -> bool {
         match reach.first_unmet(&self.table, job.pre.iter(), None) {
-            None => true,
+            None => {
+                let st = self.reach_state.as_mut().unwrap();
+                let Some(p) = &st.pairs else { return true };
+                let (Some(sa), Some(sb)) = (job.pre.get(&p.a), job.pre.get(&p.b)) else { return true };
+                if p.meets(sa, sb) {
+                    return true;
+                }
+                let (sa, sb) = (sa.clone(), sb.clone());
+                let id = st.id_of(job);
+                if st.pair_waits.insert(id, (sa, sb)).is_none() {
+                    st.pairs_held += 1;
+                }
+                false
+            }
             Some((key, set)) => {
                 let st = self.reach_state.as_mut().unwrap();
                 let id = st.id_of(job);
@@ -519,6 +556,7 @@ impl Builder<'_> {
         let st = self.reach_state.as_mut().unwrap();
         let mut keys: Vec<String> = new_keys.into_iter().collect();
         keys.sort();
+        let new_list = if st.pairs.is_some() { keys.clone() } else { Vec::new() };
         for k in keys {
             let Some(list) = st.waits.remove(&k) else { continue };
             let mut kept = Vec::new();
@@ -538,6 +576,17 @@ impl Builder<'_> {
             }
         }
         st.max_waits = st.max_waits.max(st.wait_set.len());
+        // the switch reach_pairs: the round's actions and new values into the pairs, then the jobs a new pair frees
+        if let Some(p) = st.pairs.as_mut() {
+            let n = p.commit(&new_list, &|k, s| reach.meets(table, k, s));
+            if n > 0 {
+                let freed: Vec<u32> = st.pair_waits.iter().filter(|(_, (sa, sb))| p.meets(sa, sb)).map(|(id, _)| *id).collect();
+                for id in freed {
+                    st.pair_waits.remove(&id);
+                    st.ready_jobs.push(id);
+                }
+            }
+        }
     }
 
     /// A list SIG_LIMIT folded: `RecordStream::finish` rewrites the numbers already written to 0, so `args:<unit>` = 0
@@ -632,8 +681,27 @@ impl Builder<'_> {
         // the start's values (and the dumped slots' lists, as the harness's start file has them) are in at round 0
         let starts = self.reach_starts.clone();
         let mut seeds = Vec::new();
+        let mut start_pairs: Vec<Option<crate::pairs::Pair>> = Vec::new();
         for (n, s) in starts.iter().enumerate() {
-            seeds.extend(self.reach_seed_values(s).into_iter().map(|(k, l)| (n, k, l)));
+            let vals = self.reach_seed_values(s);
+            start_pairs.push(pair_of(&vals));
+            seeds.extend(vals.into_iter().map(|(k, l)| (n, k, l)));
+        }
+        if self.switches.reach_pairs {
+            let a = crate::pairs::fact_a();
+            let b = crate::pairs::FACT_B;
+            let doms = (self.table.domain(&a).map(|d| d.into_owned()), self.table.domain(b).map(|d| d.into_owned()));
+            match doms {
+                (Some(da), Some(db)) if start_pairs.iter().all(|p| p.is_some()) => {
+                    let mut p = crate::pairs::Pairs::new(a, b.to_string(), da, db);
+                    for sp in start_pairs.iter().flatten() {
+                        p.seed(*sp);
+                    }
+                    p.commit(&[], &|_, _| false);
+                    self.reach_state.as_mut().unwrap().pairs = Some(p);
+                }
+                _ => self.counts.inc("reach: pairs off (a fact of the pairs has no domain, or a start no value of it)"),
+            }
         }
         let mut events: Vec<Event> = if start_events { self.start_events() } else { vec![] };
         if start_events && !self.slot_locals.is_empty() {
@@ -672,6 +740,14 @@ impl Builder<'_> {
         self.counts.set("event rounds", rounds - 1);
         self.counts.set("reach: most branches held at once", waits as i64);
         self.counts.set("reach: branches and jobs still held at the end", left as i64);
+        if let Some(st) = self.reach_state.as_ref().filter(|st| st.pairs.is_some()) {
+            let p = st.pairs.as_ref().unwrap();
+            let (n, acts, held, left) = (p.len() as i64, p.n_actions() as i64, st.pairs_held as i64, st.pair_waits.len() as i64);
+            self.counts.set("reach: pairs of the verb script and the room reached", n);
+            self.counts.set("reach: pairs' actions (written, with an effect on either fact)", acts);
+            self.counts.set("reach: jobs held on a pair not reached", held);
+            self.counts.set("reach: jobs still held on a pair at the end", left);
+        }
         let vals: i64 = reach.inner.read().unwrap().vals.values().map(|m| m.len() as i64).sum();
         self.counts.set("reach: values reached (facts written or seeded)", vals);
     }
@@ -681,7 +757,20 @@ impl Builder<'_> {
     pub fn reach_extend(&mut self, m: &mut dyn Machine, start: &Facts, skip: Option<&dyn Fn(&Event) -> bool>, mut sink: Option<&mut dyn RecordSink>) {
         let reach = self.reach_arc();
         let vals = self.reach_seed_values(start);
-        self.reach_state.as_mut().expect("a pass read with the switch --reach").fresh.extend(vals);
+        let sp = pair_of(&vals);
+        let st = self.reach_state.as_mut().expect("a pass read with the switch --reach");
+        if st.pairs.is_some() {
+            match sp {
+                Some(sp) => st.pairs.as_mut().unwrap().seed(sp),
+                None => {
+                    // a start without a value of a fact of the pairs: every pair is taken as reachable
+                    st.pairs = None;
+                    let held: Vec<u32> = std::mem::take(&mut st.pair_waits).into_keys().collect();
+                    st.ready_jobs.extend(held);
+                }
+            }
+        }
+        st.fresh.extend(vals);
         self.reach_commit(&reach);
         let jobs = self.reach_batch(&reach, skip);
         self.reach_rounds(m, jobs, skip, &mut sink);

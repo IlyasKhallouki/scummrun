@@ -235,6 +235,9 @@ pub struct Switches {
     /// Jobs that differ only in an input argument their run never read share one run (machine.rs `SharedRuns`,
     /// experiments/E004-fast-exact/shared-runs.md); the output is byte for byte the same.
     pub shared_runs: bool,
+    /// h² over the pairs of the verb script and the room (pairs.rs, experiments/E004-fast-exact/reach-pairs.md): a job
+    /// whose seed has a set on both runs only when a reached pair meets them. Needs --reach.
+    pub reach_pairs: bool,
 }
 
 impl Switches {
@@ -254,7 +257,8 @@ impl Switches {
                 "grow_limit" => s.grow_limit = true,
                 "havoc_cut" => s.havoc_cut = true,
                 "shared_runs" => s.shared_runs = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs)")),
+                "reach_pairs" => s.reach_pairs = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs)")),
             }
         }
         Ok(s)
@@ -293,6 +297,9 @@ impl Switches {
         }
         if self.shared_runs {
             v.push("shared_runs");
+        }
+        if self.reach_pairs {
+            v.push("reach_pairs");
         }
         v
     }
@@ -1990,6 +1997,7 @@ impl<'g> Builder<'g> {
         assert!(!self.table.grow_limit || self.table.split_limit, "grow_limit needs split_limit");
         self.table.havoc_cut = self.switches.havoc_cut;
         assert!(!self.table.havoc_cut || self.table.split_limit, "havoc_cut needs split_limit");
+        assert!(!self.switches.reach_pairs || self.switches.reach, "reach_pairs needs --reach");
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");
