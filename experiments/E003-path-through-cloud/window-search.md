@@ -440,8 +440,9 @@ At a deviation the chosen child's failure is explained; at an empty window, the 
 first child that had it; at a guessed write the engine took otherwise, the run of that record and the key. A goal
 that holds with no goal record matched is explained by the run that wrote the goal's fact (the parent's explain log
 has every run). The explanation is B1's, on the kept log: trace_check.explain_unexplained (Lemma X, the first opcode
-off the records' path; Lemma B, the backward slice; the two classes), and for an input's `pos:` end the same Lemma X
-toward the record's own end. It is logged with the replan and the window: the record, the frame, the unit, the code
+off the records' path; Lemma B, the backward slice; the two classes), for an input's `pos:` end the same Lemma X
+toward the record's own end, and for a unit the click's record starts and its runs never did, Lemma X on the click's run
+of a unit whose code starts it, toward those start sites. It is logged with the replan and the window: the record, the frame, the unit, the code
 offset, the opcode, the engine's values and the class.
 
 A run stops, instead of replanning, when a window is empty for the second time on the same input record with the same
