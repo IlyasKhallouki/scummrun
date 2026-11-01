@@ -21,6 +21,9 @@ from (results/replay-kitchen-taskcore-files-all.json's frame0). The span is the 
    compared with F, status and dump. At every frame P also forks once, as the window search's parent does (plan A4).
    That fork becomes a load child if one is needed, and quits at once otherwise.
 5. At the end, P's trace.jsonl is compared with F's. Children write no trace.
+6. *The control.* One more child of P at the fork frame waits through the walk. Then its RNG state's low bit is
+   flipped (``set_rng``) and it steps through the span against F with no load. This shows what the comparison sees of
+   a one-word change.
 
 A comparison is of the JSON texts, key order included. The span's events come from F's stops and trace: room changes,
 CD track starts and frames with a cutscene open. Fork times are measured around Controller.fork. Child frames per
@@ -223,6 +226,7 @@ def cmd_run(a) -> dict:
     pool: queue.Queue = queue.Queue()
     for _ in range(a.load):
         pool.put(fork())
+    K = fork()  # the control: started after the walk, with its RNG state changed
     note("P", n0, ref.check(n0, None, P.state()), counts)
     wanted = threading.Semaphore(0)  # load slots waiting for a child
     stop = threading.Event()
@@ -301,6 +305,8 @@ def cmd_run(a) -> dict:
     while not pool.empty():
         pool.get().quit()
     C.quit()
+    doc["control"] = control(K, ref, n0, end, a.keep)
+    K.quit()
     ctl.close()
     trace_p = (out / "parent" / "trace.jsonl").read_bytes()
     doc["walk"] = {"seconds": round(walk_s, 1), "stopped": stopped, "frame_ms": quantiles(walk_ms),
@@ -313,6 +319,38 @@ def cmd_run(a) -> dict:
     doc["loadavg"] = quantiles(loads)
     doc["mem_available_mb"] = quantiles([m / 1024 for m in mems])
     return doc
+
+
+def control(K, ref: Reference, n0: int, end: int, keep: int) -> dict:
+    """The control: a child of P at the fork frame whose RNG state is changed by one bit (set_rng), then stepped one
+    frame at a time through the span against F, with no load. It shows what the comparison sees of a one-word change:
+    the frames where the status differs, where the dump without its exact object differs, and where the exact object
+    alone does."""
+    rng = K.status["rng"]
+    K.set_rng(rng ^ 1 or 2)
+    first = {"status": None, "dump": None, "exact": None}
+    frames = {"status": 0, "dump": 0, "exact": 0}
+    where = []
+    n = 0
+    for f in range(n0 + 1, end + 1):
+        st = K.run(frame=f)
+        if "end" in st:
+            where.append({"frame": f, "where": f"ended: {st['end'].get('reason')}"})
+            break
+        n += 1
+        s = K.state()
+        _, _, z_st, z_sd = ref.frames[f]
+        r_st, r_sd = json.loads(zlib.decompress(z_st)), json.loads(zlib.decompress(z_sd))
+        for kind, a, b in (("status", r_st, st), ("dump", strip_exact(r_sd), strip_exact(s)),
+                           ("exact", r_sd.get("exact"), s.get("exact"))):
+            if a != b:
+                frames[kind] += 1
+                if first[kind] is None:
+                    first[kind] = f
+                    if len(where) < keep:
+                        where.append({"frame": f, "where": f"{kind} " + first_diff(a, b)})
+    return {"rng_from": rng, "rng_to": rng ^ 1 or 2, "frames": n, "first_differs": first,
+            "frames_differ": frames, "first_differences": where}
 
 
 def run_log(doc: dict) -> list:
@@ -338,6 +376,14 @@ def run_log(doc: dict) -> list:
     ]
     for d in w["differences"]:
         lines.append(f"  differs: {d['who']} at frame {d['frame']}: {d['where']}")
+    k = doc.get("control")
+    if k:
+        lines.append(f"control: a child of P at frame {doc['fork_frame']} with its RNG state's low bit flipped, "
+                     f"{k['frames']} frames against F with no load. First frame that differs: status "
+                     f"{k['first_differs']['status']}, dump without its exact object {k['first_differs']['dump']}, "
+                     f"exact object {k['first_differs']['exact']}. Frames that differ: {k['frames_differ']}")
+        for d in k["first_differences"]:
+            lines.append(f"  control differs at frame {d['frame']}: {d['where']}")
     return lines
 
 
