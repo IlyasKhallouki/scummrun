@@ -625,6 +625,14 @@ impl Scope {
 /// out here when it is a constant or a variable the scope does not write (its start value); any other reaches every
 /// actor. The FactTable works the operands out again with the reading's domains (`table::actor_room_domains`).
 pub fn fix1_writes(game: &Game, units: &[UnitId], rooms: &[i32], start: &Facts, sw: Switches, out: &mut Writes) {
+    // the variables written are those of `out` (its var: keys do not change below)
+    let written = out.clone();
+    fix1_writes_with(game, units, rooms, start, sw, &|k| written.has(k), out)
+}
+
+/// `fix1_writes`, an actor operand's variable counted as written where `written` says so (havoc.rs: the scope's and
+/// the closure's writes).
+pub fn fix1_writes_with(game: &Game, units: &[UnitId], rooms: &[i32], start: &Facts, sw: Switches, written: &dyn Fn(&str) -> bool, out: &mut Writes) {
     if sw.draw_clears {
         for &r in rooms {
             for &o in game.room_objects.get(&r).map(|v| v.as_slice()).unwrap_or(&[]) {
@@ -648,7 +656,7 @@ pub fn fix1_writes(game: &Game, units: &[UnitId], rooms: &[i32], start: &Facts, 
     if sw.actor_rooms {
         let var = |n: i32| -> Option<BTreeSet<i64>> {
             let k = format!("var:{n}");
-            (!out.has(&k)).then(|| [start.get0(&k)].into_iter().collect())
+            (!written(&k)).then(|| [start.get0(&k)].into_iter().collect())
         };
         let mut actors: BTreeSet<i64> = BTreeSet::new();
         for (who, _) in actor_room_writes(game, units, &var) {

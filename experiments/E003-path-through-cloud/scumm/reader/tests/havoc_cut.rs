@@ -354,3 +354,84 @@ fn part1_an_index_that_does_not_fold_is_not_a_window() {
     eprintln!("{sites} indexed writes whose index does not fold, {outside} targets outside the 16 after the base");
     assert!(outside > 0);
 }
+
+/// Hole (6), F9: an actor operand that is a variable the scope writes can be any actor at the cut, not only its start
+/// value: the closure's fix round 1 writes name every actor's room. Each cut is at the write.
+#[test]
+fn part1_an_actor_variable_the_scope_writes_is_any_actor() {
+    let b = part1(true);
+    let g = game();
+    let mut n = 0;
+    for &u in &b.scope.units {
+        let k = g.unit(u).key;
+        for (i, x) in g.ins(u).iter().enumerate() {
+            let Some(Stmt::Op { name, args, .. }) = x.st else { continue };
+            let args = g.ast.kids(args);
+            let var = match name {
+                known::PUT_ACTOR_IN_ROOM => match g.ast.expr(args[0]) {
+                    Expr::Var(v) => v,
+                    _ => continue,
+                },
+                known::LOAD_ROOM_WITH_EGO => scumm_reader::domains::VAR_EGO,
+                _ => continue,
+            };
+            if !b.scope.writes.has(&format!("var:{var}")) {
+                continue;
+            }
+            n += 1;
+            let cut = Cut { frames: vec![(k, Some(i as u32))], steps: vec![] };
+            let c = havoc::closure(g, &b.scope, &b.table, &cut, res_of(u));
+            let units = c.units();
+            let starts: rustc_hash::FxHashMap<UnitId, Vec<u32>> = c.starts.iter().map(|(&u, s)| (u, s.iter().copied().collect())).collect();
+            let w = scumm_reader::scope::scope_writes_code(g, &units, Some(&starts));
+            let fix = havoc::fix_writes(g, &b.scope, &c, &w);
+            for a in 0..scumm_reader::scope::NUM_ACTORS {
+                assert!(fix.exact.contains(&format!("actorroom:{a}")), "{k:?}: actor Var[{var}], which the scope writes, can be actor {a}");
+            }
+        }
+    }
+    eprintln!("{n} actor operands the scope writes");
+    assert!(n > 0);
+}
+
+/// A scope of `rooms` read as Part I's is.
+fn builder_for(rooms: &[i32]) -> Builder<'static> {
+    let g = game();
+    let root = scumm_ir::default_root();
+    let start = scumm_reader::scaling::start_facts(&root, 1);
+    let goal = scumm_reader::scaling::part1_goal(&root);
+    let sw = Switches::parse("value_sets,draw_clears,actor_rooms,split_limit,grow_limit,havoc_cut").unwrap();
+    let doms = scumm_reader::domains::build_with(g, &scumm_reader::domains::meta_rooms(&root), &start, &goal, sw.scope());
+    let scope = scumm_reader::Scope::of_with(g, rooms, &start, sw.scope());
+    let mut b = Builder::new(g, scope, doms);
+    b.switches = sw;
+    b.table.havoc_cut = true;
+    b
+}
+
+/// Hole (6): an object's code runs in the player's room (an inventory object's in any room), so its drawObject clears
+/// objects of that room, not of the object's home room. Each object with a drawObject in its code, cut at the
+/// drawObject, standing in another room of a scope of the two.
+#[test]
+fn an_objects_draw_clears_the_players_room() {
+    let g = game();
+    let mut n = 0;
+    for u in g.ids() {
+        let UnitKey::Obj(o) = g.unit(u).key else { continue };
+        let Some(&home) = g.object_room.get(&o) else { continue };
+        let Some(i) = g.ins(u).iter().position(|x| matches!(x.st, Some(Stmt::Op { name: known::DRAW_OBJECT, .. }))) else { continue };
+        let Some(&r2) = g.room_objects.iter().filter(|(&r, v)| r != home && r < 0x80 && v.len() > 2).map(|(r, _)| r).min() else { continue };
+        let b = builder_for(&[home, r2]);
+        let cut = Cut { frames: vec![(UnitKey::Obj(o), Some(i as u32))], steps: vec![] };
+        let c = havoc::closure(g, &b.scope, &b.table, &cut, Some(r2));
+        if c.room_change {
+            continue;
+        }
+        n += 1;
+        let hw = havoc::writes(g, &b.scope, &b.table, &cut, Some(r2));
+        let missing: Vec<i32> = g.object_room.iter().filter(|(y, &r)| r == r2 && is_fact(&b, &format!("state:{y}")) && !hw.facts.contains_key(&format!("state:{y}"))).map(|(y, _)| *y).collect();
+        eprintln!("object {o} (room {home}) standing in room {r2}: {} of its objects' states not written", missing.len());
+        assert!(missing.is_empty(), "object {o}'s code in room {r2}: its drawObject can clear the state of {missing:?}");
+    }
+    assert!(n > 0);
+}

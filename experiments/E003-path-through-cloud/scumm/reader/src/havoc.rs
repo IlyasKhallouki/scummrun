@@ -351,8 +351,9 @@ fn sites(game: &Game, scope: &Scope, table: &FactTable, c: &Closure, room: Optio
     };
     for (&u, starts) in &c.starts {
         let starts: Vec<u32> = starts.iter().copied().collect();
-        let room_of_unit = game.unit(u).room;
-        let global = matches!(game.unit(u).key, UnitKey::Global(_));
+        // the room room code runs in; an object's code and a global script's run in the player's room (an inventory
+        // object's in any room)
+        let room_of_unit = unit_res(game.unit(u).key).and(game.unit(u).room);
         let ins = game.ins(u);
         for i in domains::live(game, u, &settings, Some(&starts), &mut caps) {
             let Some(st) = ins[i as usize].st else { continue };
@@ -431,7 +432,7 @@ fn sites(game: &Game, scope: &Scope, table: &FactTable, c: &Closure, room: Optio
                             (&["state"], one())
                         };
                         // drawObject: the objects of the room it runs in
-                        let draw_rooms: Vec<i32> = match (if global { None } else { room_of_unit }, room) {
+                        let draw_rooms: Vec<i32> = match (room_of_unit, room) {
                             _ if name != known::DRAW_OBJECT => vec![],
                             (Some(r), _) => vec![r],
                             (None, Some(r)) if !c.room_change => vec![r],
@@ -504,6 +505,17 @@ fn sites(game: &Game, scope: &Scope, table: &FactTable, c: &Closure, room: Optio
     out
 }
 
+/// The fix round 1 writes of the closure's code (havoc-cut.md, "In detail"): F5's objpos: of the scope's rooms'
+/// movable objects comes from loading a room, so only with a room change; F9's actor operands: a variable keeps its
+/// start value only where no code of the scope writes it (the path may have written it before the cut).
+pub fn fix_writes(game: &Game, scope: &Scope, c: &Closure, w: &Writes) -> Writes {
+    let mut fix = Writes::default();
+    let fix_rooms: Vec<i32> = if c.room_change { scope.rooms.clone() } else { vec![] };
+    let written = |k: &str| scope.writes.has(k) || w.has(k);
+    scope::fix1_writes_with(game, &c.units(), &fix_rooms, &scope.start, scope.switches, &written, &mut fix);
+    fix
+}
+
 /// What a havoc record writes, before it is put on the path's own record: facts with their values (None: any value of
 /// the domain), the slots it may start, stop or reach, and the units whose events it names.
 #[derive(Debug, Default)]
@@ -524,10 +536,7 @@ pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: Op
     let units = c.units();
     let starts: FxHashMap<UnitId, Vec<u32>> = c.starts.iter().map(|(&u, s)| (u, s.iter().copied().collect())).collect();
     let w: Writes = scope::scope_writes_code(game, &units, Some(&starts));
-    let mut fix = Writes::default();
-    // F5's objpos: of the scope's rooms' movable objects comes from loading a room: only with a room change
-    let fix_rooms: Vec<i32> = if c.room_change { scope.rooms.clone() } else { vec![] };
-    scope::fix1_writes(game, &units, &fix_rooms, &scope.start, scope.switches, &mut fix);
+    let fix = fix_writes(game, scope, &c, &w);
     let mut engine: BTreeSet<String> = c.engine_writes.clone();
     let v = |n: i32| format!("var:{n}");
     engine.insert(v(scope::VAR_RESULT));
