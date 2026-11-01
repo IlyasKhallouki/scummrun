@@ -411,7 +411,6 @@ def taskcore_start_check(rd, start_facts: dict, work: Path, serve: bool = False)
         if p.returncode == 0:
             row["status"] = "ok"
         else:
-            import re
             m = re.search(r"(\d+) facts out of their domains: \[(.*)\]", p.stderr)
             row["status"] = "out of domain" if m else "error"
             row["error"] = p.stderr.strip()[-400:] if not m else None
