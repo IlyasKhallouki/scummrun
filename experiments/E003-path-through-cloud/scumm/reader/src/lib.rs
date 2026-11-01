@@ -17,6 +17,7 @@ pub mod domain;
 pub mod domains;
 pub mod due;
 pub mod facts;
+pub mod ghost;
 pub mod havoc;
 pub mod inputs;
 pub mod locals;

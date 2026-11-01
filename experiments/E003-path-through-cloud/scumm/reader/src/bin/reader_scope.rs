@@ -42,7 +42,8 @@
 //!               map (the replay harness's reach extension, replay_part1.py `--reach-extend`)
 //! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
 //!               draw_clears and actor_rooms, grow_limit, havoc_cut (havoc.rs), shared_runs (shared.rs), noop_records
-//!               (E004 b1-refine.md, Lemma N). Not due_first,
+//!               (E004 b1-refine.md, Lemma N), ghost_slots (ghost.rs, Lemma G: the verdicts in the report and the
+//!               reading's head). Not due_first,
 //!               which writes on the kept records after the reading. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
@@ -869,6 +870,10 @@ fn main() {
             x
         })
         .collect::<Vec<_>>());
+    if let Some(g) = &b.ghost_slots {
+        // the switch ghost_slots (ghost.rs, E004 b1-refine.md Lemma G): the verdict per unit a recursive start names
+        r["ghost_slots"] = json!(g);
+    }
     r["peak_rss_mb"] = json!(peak_rss_kb().unwrap_or(0) / 1024);
     r["total_s"] = json!((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0);
     r["load_at_end"] = json!(loadavg());

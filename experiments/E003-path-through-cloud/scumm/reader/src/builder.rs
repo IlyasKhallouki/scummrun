@@ -239,6 +239,10 @@ pub struct Switches {
     /// is kept as a record with no effect (a self-loop of the task) in place of being dropped, so trace validation
     /// has the record of the engine's run.
     pub noop_records: bool,
+    /// B1 refine, Lemma G (experiments/E004-fast-exact/b1-refine.md, section 2): for each unit a recursive start can
+    /// name, whether its older instances are invisible to the task (ghost.rs); the verdicts go into the reading's head
+    /// and the report, and the records do not change.
+    pub ghost_slots: bool,
 }
 
 impl Switches {
@@ -259,7 +263,8 @@ impl Switches {
                 "havoc_cut" => s.havoc_cut = true,
                 "shared_runs" => s.shared_runs = true,
                 "noop_records" => s.noop_records = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, noop_records)")),
+                "ghost_slots" => s.ghost_slots = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, noop_records, ghost_slots)")),
             }
         }
         Ok(s)
@@ -301,6 +306,9 @@ impl Switches {
         }
         if self.noop_records {
             v.push("noop_records");
+        }
+        if self.ghost_slots {
+            v.push("ghost_slots");
         }
         v
     }
@@ -400,6 +408,8 @@ pub struct Builder<'g> {
     /// the record count); the reading is the same, `n_records` counts them
     /// the switch `--frame-costs` (costs.rs): each record's cost in engine frames; None: every record costs 1
     pub frame_costs: Option<std::sync::Arc<crate::costs::FrameCosts>>,
+    /// the switch ghost_slots (ghost.rs): the verdict per unit a recursive start can name; None with it off
+    pub ghost_slots: Option<BTreeMap<String, String>>,
     pub keep_records: bool,
     /// the pass's records so far (`len(self.records)`)
     pub n_records: usize,
@@ -609,6 +619,7 @@ impl<'g> Builder<'g> {
             slot_locals: Vec::new(),
             slot_events: Vec::new(),
             frame_costs: None,
+            ghost_slots: None,
             reach_starts: Vec::new(),
             reach_state: None,
             reach_out: Vec::new(),
@@ -2023,6 +2034,9 @@ impl<'g> Builder<'g> {
         if self.switches.input_settled {
             self.settled_rule();
         }
+        if self.switches.ghost_slots && self.ghost_slots.is_none() {
+            self.ghost_slots = Some(crate::ghost::verdicts(self.game, &self.scope, &self.table));
+        }
         if self.switches.pass2_reuse {
             self.table.memo = Some(Arc::new(crate::memo::RunMemo::default()));
         }
@@ -2409,6 +2423,10 @@ impl<'g> Builder<'g> {
         if let Some(fc) = &self.frame_costs {
             // the switch --frame-costs: its parameters (costs.rs); absent with the switch off
             put("frame_costs", fc.py());
+        }
+        if let Some(g) = &self.ghost_slots {
+            // the switch ghost_slots (ghost.rs): absent with the switch off
+            put("ghost_slots", Py::Dict(g.iter().map(|(k, v)| (k.clone(), Py::str(v))).collect()));
         }
         if let Some(ll) = &self.table.live_locals {
             // the switch --live-locals: every unit's read locals (None: all), keyed by its slot's name in the engine's
