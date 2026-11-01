@@ -1,0 +1,20 @@
+B1 on run B's recorded inputs on seed 1: row 5 of the model check with fix round 1's switches, the 51 counted moves of the first 56 rows (the inputs leave run B's moves at ('S1#52', "the engine's sentence by done is not the scored action's")); certain predictions right 134 of 160
+misses: 28 = 2 rejected moves (2 outside V: inputs V does not hold) + 26 refuted certain predictions
+with an automatic cause (an opcode and the engine's value): 26 of 28 (92.9%); of the misses inside V: 26 of 26 (100.0%)
+by class: split 20, semantics 6
+by kind: still waiting: its loop's test 11, still waiting 9, ran the write, another value at done 2, left the path 2, the engine queued another sentence 1, started again 1
+causes by count (unit, code offset, opcode, class; the engine values of the first; the misses):
+  11: local:207 [03A3] jump unless (split): var 194 = 0 (fact); time = 1 (time); S1#19 at:local:207:931, S1#19 at:local:207:978, S1#19 at:local:208:79, S1#19 local:208, S1#19 var:19, S1#19 var:32, S1#19 verb:120, S1#19 verb:121, S1#19 verb:122, S1#19 verb:123, S1#19 verb:124
+  4: local:207 [1119] breakHere (split): frames to its next run = 1 (time); S1#23 local:207, S1#23 var:101, S1#23 var:17, S1#23 var:32
+  3: local:207 [0ACE] WaitForMessage (split): var 3 = 255 (time); S1#20 at:local:207:3007, S1#20 var:229, S1#20 var:230
+  1: local:207 [0013] delay (split): delay = 120 (time); S1#12 local:207
+  1: local:211 [001D] delay (split): delay = 20 (time); S1#10 local:211
+  1: obj:685 [0168] loadRoomWithEgo (semantics): room = 215 (fact); entry restarted = 1392 (fact); S1#26 at:entry:2605
+  1: script:19 [0005] CursorSoftOn (semantics): var 52 = 0 (fact); S1#2 var:52
+  1: script:19 [0007] UserputSoftOn (semantics): var 53 = 0 (fact); S1#2 var:53
+  1: script:4 [0407] doSentence (semantics): var 107 = 11 (fact); var 108 = 323 (fact); var 109 = 0 (fact); S1#7 var:103
+  1: script:4 [03C0] jump if (semantics): local 6 = 0 (fact); S1#22 var:103
+  1: script:4 [03C5] jump if (semantics): var 108 = 0 (fact); S1#17 var:103
+  rejected: S2#2: outside V (a click on a floor point)
+  rejected: S2#3: outside V (a click on a floor point)
+engine: {'forks': 109, 'frames': 489, 'explain_entries': 4417, 'explain_runs': 124}; 5.5 s
