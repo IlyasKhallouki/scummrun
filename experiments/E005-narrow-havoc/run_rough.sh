@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # E005's readings on the laptop (plan.md, "Machine"): nice 10, 3 threads, each under /var/tmp/fast-mi/heavy.lock, and
 # stopped when MemAvailable falls under 3 GB. Each run is detached: OUT/TAG/ holds the report, the packed file, the
-# trace without its job-start lines, RSS every 10 s and the exit code (steps.txt).
+# trace without its job-start lines, RSS every 5 s and the exit code (steps.txt). A cgroup holds each run to the
+# memory available when it starts less the 3 GB floor, so a fast rise stops the run and no other process.
 #
 #   run_rough.sh part1 N TAG       Part I (reader-scope --part1, goal results/end-part1.json), rough at N
 #   run_rough.sh bar N TAG         rooms 33 and 28, goal state:316=1 (E004's check scope)
@@ -37,9 +38,13 @@ detached() {
     setsid nohup flock "$LOCK" bash -c '
         dir="$1"; min="$2"; shift 2
         cd "'"$E003"'"
-        echo "lock taken $(date +%H:%M:%S)" >> "$dir/steps.txt"
+        # the memory a run may take: what is available now less the 3 GB floor, held by a cgroup so a fast rise
+        # stops this run and no other process
+        cap=$(( $(awk "/MemAvailable/{print \$2}" /proc/meminfo) - min ))
+        echo "lock taken $(date +%H:%M:%S), memory cap ${cap} kB" >> "$dir/steps.txt"
         SECONDS=0
-        READER_TRACE=1 nice -n 10 "$@" > "$dir/stdout.log" 2> >(grep --line-buffered -v "^start " > "$dir/trace.log") &
+        READER_TRACE=1 systemd-run --user --scope -q -p MemoryMax=${cap}K -p MemorySwapMax=0 nice -n 10 "$@" \
+            > "$dir/stdout.log" 2> >(grep --line-buffered -v "^start " > "$dir/trace.log") &
         pid=$!
         while kill -0 $pid 2>/dev/null; do
             avail=$(awk "/MemAvailable/{print \$2}" /proc/meminfo)
@@ -49,7 +54,7 @@ detached() {
                 kill -TERM $pid 2>/dev/null || true
                 break
             fi
-            sleep 10
+            sleep 5
         done
         wait $pid; rc=$?
         echo "rc $rc $SECONDS s" >> "$dir/steps.txt"
