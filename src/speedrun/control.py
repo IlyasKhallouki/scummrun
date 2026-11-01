@@ -114,6 +114,37 @@ class Branch:
         self._send({"cmd": "holds", "until": until})
         return self._recv()["holds"]
 
+    def segment(self, on: bool = True) -> None:
+        """Record every slot run from the next one on, or stop (the bridge's ``segment``; trace-validation.md,
+        experiments/E003-path-through-cloud). Off by default; it observes only."""
+        self._send({"cmd": "segment", "on": on})
+        self._recv()
+
+    def runs(self) -> dict:
+        """The slot runs recorded since the last call, oldest last to end first: ``{"runs": [[frame, after, seq,
+        depth, slot, where, number, room, code0, code1, status, frozen, delay, ops], ...], "dropped", "violations",
+        "frame"}``; the bridge's buffer is cleared."""
+        self._send({"cmd": "runs"})
+        return self._recv()
+
+    def explain(self, first: int, last: int, units: list | None = None) -> None:
+        """Log the opcodes, reads and writes of the runs of ``units`` ([[where, number], ...]; None: every run) in
+        frames ``first`` to ``last`` (the bridge's ``explain``). Off by default; it observes only."""
+        cmd: dict = {"cmd": "explain", "from": first, "to": last}
+        if units is not None:
+            cmd["units"] = [list(u) for u in units]
+        self._send(cmd)
+        self._recv()
+
+    def explain_off(self) -> None:
+        self._send({"cmd": "explain", "off": True})
+        self._recv()
+
+    def explain_log(self) -> dict:
+        """The explain entries since the last call: ``{"explain": [entry, ...], "dropped", "violations"}``; cleared."""
+        self._send({"cmd": "explain_log"})
+        return self._recv()
+
     def quit(self) -> None:
         lag = getattr(self, "lag", None)  # the executor's lag snapshot of this branch (Executor._set_lag)
         if lag is not None:

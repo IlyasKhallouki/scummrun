@@ -1,0 +1,24 @@
+B1 strict matcher on replay-part1-k2-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json (reading reading), frames 2728-3129: 2408 slot runs, 2209 resumed at a wait point at depth 0
+verdicts: {'unplaced': 732, 'unexplained': 475, 'ambiguous': 636, 'stutter': 21, 'explained': 345}
+matcher: 401 calls, 5554.2 us per call, 1008.3 us per run
+wait check: 344 explained runs with a known arrival, 0 waited less than their record's frame cost
+unexplained runs by unit and wait point (the condition that failed most often), each group's first run explained: the opcode, the engine's values, the class:
+  331: local:200@43: pre var:70; first at 2799: the records' precondition fails; [0000] jump if; var:70 = 0 (fact); semantics
+  69: local:202@1: end pos:local:202; first at 2729: left the records' path; [0006] jump unless; var 0 = 9 (position); split
+  52: local:210@62: end pos:local:210; first at 2802: the wait did not block; [0000] WaitForCamera; var 2 = 160 (position); split
+  10: local:207@23: end pos:local:207; first at 2829: the wait did not block; [0005] WaitForCamera; var 2 = 160 (position); split
+  5: local:208@41: effect local:208; first at 2808: the predicted write is not in the run; -; ; None
+  4: local:208@21: pre args:local:208; first at 2803: two instances of the unit; [0015] None; live slots of local:208 = 2 (fact); semantics
+  4: local:208@41: pre pos:local:208; first at 2803: two instances of the unit; [0029] None; live slots of local:208 = 2 (fact); semantics
+runs at a wait point the reading has no event record at (unit@W: runs, the first one checked):
+  401: script:159@5: invisible to the task: no task fact written, the slot back at its wait point
+  331: local:201@22: invisible to the task: no task fact written, the slot back at its wait point
+matcher on the plan's units only (2 units): 401 calls, 3.4 us per call
+the plan's steps the run counted as matched: 0; strictly matched (their own run, M1-M4): 0; inputs 0 of 0; events whose run did not happen there: 0
+the plan's executed steps, strictly:
+  plan 0 sentence(2,428)#44 (window empty): not matched {'frame': 2776, 'pre_fails': [], 'effect': 'var:102', 'pos': []}
+  plan 0 event(script:2@736#d897055c2f2e)#163 (not reached): matched {'frame': 2796, 'verdict': 'explained'}
+  plan 1 walk_to(428)#64 (window empty): not matched {'frame': 2797, 'pre_fails': [], 'effect': 'script:2', 'pos': [('pos:script:2', -1)]}
+  plan 1 event(script:2@736#da2874b63864)#1957 (not reached): its run did not happen {'frames': [2801, 2802], 'next_run': None}
+  plan 2 walk_to(315)[202]#2733 (window empty): not issued {}
+  plan 2 event(local:217@18#d2acdc8c2415)#10761 (not reached): its run did not happen {'frames': [3129, 3130], 'next_run': None}

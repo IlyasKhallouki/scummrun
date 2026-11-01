@@ -1,0 +1,79 @@
+E003, the kitchen from boot with --reach. Branch ksr. Seed 1. Laptop, nice 10, 3 threads per reading; other jobs kept the
+1-minute load between 8 and 21. ScummVM /var/tmp/fast-mi/svm-fr1-main. Harness: replay_part1.py run 1 --serve --search
+lama-first-costs --cost-caps --reach-extend --unobserved-actor-rooms [--approach-stones], replan limit 30, plan memory 3G.
+Per-run files: replay-part1-kitchen-boot.log, replay-part1-k1-boot.log and their json files.
+
+== readings (replay_part1.py read-rust; --elsewhere --live-locals --split-limit --reach --frame-costs,
+   --switches value_sets,draw_clears,actor_rooms,input_settled; from results/start-part1.jsonl seed 1)
+| scope | rooms | goal | records | actions | lists | read wall s | read CPU s | peak MB (--keep) | files s | packed bytes | sha1 |
+| kitchen | 33,28,41 | owner:566 = 1 | 41877 | 40773 | 4754 | 69.5 | 106.9 | 582 | 53.8 | 27434460 | 47583c5433ae |
+| k = 1 | 28,33,35,38 | state:316 = 1 | 235579 | 234401 | 8775 | 543.1 | 407.5 | 2154 | 589.0 | 190257136 | 0603983aa4ad |
+frame costs dmax 6 on both (talkspeed as plan.md's boot sets it).
+k = 1 with --reach and without input_settled (notes/log/2026-10-31-e004-reach.md): 51726 records, 138.3 CPU s, 367 MB.
+
+== the first start and the actors' rooms
+Without --unobserved-actor-rooms the first start is refused: taskcore through serve answers "the start holds 2 values the
+reading did not reach: actorroom:1=0, actorroom:3=0" (sas: exit 7). The harness wrote 0 for every actorroom: fact (the
+state dump has no actor room); the reader starts them not known (-1). reading.reached: actorroom:1 -1 28 41; actorroom:3
+-1 28; actorroom:6 -1 0 28; actorroom:7 -1 0 41. With the actor rooms at -1: sas exit 0, 44605 operators.
+The same first try also showed a fault in the start check through serve (a local import of re), fixed in 915a4cc.
+
+== the kitchen runs (start: the idle stop at frame 2728, room 33; goal owner:566 = 1)
+| run | stop | goal | verify from boot | frames | plans | replans | bans | reach extensions | inputs | run wall s |
+| without stepping stones | replan limit | no | 0 differences, 66 checkpoints | 1057 | 31 | 30 | 0 | 0 | 209 | 1533.9 |
+| with --approach-stones | goal | yes | 0 differences, 14 checkpoints, goal at the end | 2216 | 3 | 2 | 0 | 0 | 39 | 432.5 |
+Without stones: steps 1-2 matched, step 3 precondition, then walk_to(316)[202] 30 times "interface failure": the door is off
+screen after ego enters the bar; floor clicks stop at screen x 303 (x 307-319 at the door's walk y are other objects) and the
+camera does not pan there; with no fork no stepping stone is tried. A probe on the same state: the stepping stone (a walk to
+an object on screen whose walk point is nearer the door) brings the door on screen at frame 3533, xstart 288.
+
+== frames to owner:566 = ego
+| run | start | frames |
+| this run, --approach-stones | frame 2728, room 33 | 2216 |
+| run B's inputs on seed 1 (runb_reference.py) | room 33 at frame 51 | 523 (goal at frame 574) |
+| run B's inputs on seed 1 | S1#7 pre, frame 235 | 339 |
+| costs branch, lama-first, unit cost (replay-kitchen-taskcore.log) | S1#7 pre, frame 235 | 13141 |
+| costs branch, lama-first-costs and caps (replay-kitchen-costs.log) | S1#7 pre, frame 235 | 10101 |
+Run B's inputs on seed 1 reach the goal at the ground truth's frame (S1#10 done, 574); room 28 at 203, room 41 at 462.
+
+== where the 2216 frames go (this run, from the steps' tries)
+| what | frames |
+| walking and clicking up to each input (door 428: 48; door 316 approach with the stone: 74; five other inputs: 6) | 128 |
+| events and writes that held after an input (matched, goal) | 30 |
+| waits at the input limit (600) for writes the plan predicted that did not come: walk_to(316)[202] tries 1 and 4 | 1200 |
+| wait for walk_to(428)'s precondition (room 33) after ego was already in room 28, with its retry wait | 660 |
+| retry waits on walk_to(316)[202] (60, 60, 72) | 192 |
+| door clicks that did nothing (tries 2 and 3 of walk_to(316)[202], and walk_to(428)'s, 2 frames each) | 6 |
+| dialogue | 0 |
+Room 28 came at frame 2798, one frame after the click on door 428. Room 41 came at frame 4338, six frames after the fourth
+click on door 316; the harness then waited to the limit, to frame 4932.
+
+== door clicks
+door 316, walk_to(316)[202]#1038: 4 clicks (one after the approach and the stone, three retries); 2 did nothing ("the
+record's path never started"), 2 started; the fourth took ego into room 41. door 428: walk_to(428)#64, 1 click, judged not
+started, while room 28 came one frame later. Without stepping stones: no click on door 316 was sent in 30 tries.
+
+== plans and replans (this run; taskcore through serve; FD search single-threaded)
+| plan | frame | steps | operators | taskcore wall s | taskcore CPU s | serve | search wall s | predicted frames (FD cost) | played frames | ended |
+| 0 | 2728 | 27 | 44605 | 9.46 | 9.09 | built | 168.7 | 343 | 731 | precondition |
+| 1 | 3459 | 14 | 43323 | 33.52 | 12.14 | built | 43.8 | 27 | 1473 | mismatch |
+| 2 | 4932 | 3 | 43323 | 28.87 | 11.79 | built | 36.8 | 7 | 12 | goal |
+The two replans: 62.4 s taskcore wall, 23.9 s taskcore CPU, 80.6 s search wall. Every request was built again (the cost caps
+change at each replan). Start check through serve: 8.55 and 5.49 s. Harness 397.1 s: planning 336.7 s, playing 60.4 s.
+Without stones, 30 replans: taskcore 501.0 s wall in all, search 844.3 s wall in all, median 13.5 and 21.5 s.
+First plan: predicted 343 frames, the run took 2216.
+
+== --reach-extend
+0 extensions in either kitchen run (34 plans) and in the pilot (2 plans): every start after the first was inside the
+reached values of the first reading.
+
+== the k = 1 pilot (rooms 28,33,35,38, goal state:316 = 1, the same switches and --approach-stones)
+| stop | goal | verify from boot | frames | plans | replans | bans | reach extensions | inputs | run wall s |
+| goal | yes | 0 differences, 5 checkpoints, goal at the end | 1111 (2728 to 3839) | 2 | 1 | 0 | 0 | 28 | 793.4 |
+| plan | frame | steps | operators | taskcore wall s | taskcore CPU s | serve | search wall s | predicted frames | played frames | ended |
+| 0 | 2728 | 7 | 97547 | 152.9 | 39.4 | built | 100.6 | 9 | 648 | mismatch |
+| 1 | 3376 | 5 | 97547 | 69.9 | 26.7 | kept | 62.6 | 6 | 463 | goal |
+Start check through serve: 195.3 s (build 64.8 s) and 80.0 s, 35.4 and 23.5 CPU s; taskcore peak RSS 590 MB.
+Frames: 48 walking and clicking to door 428, 600 waiting at the limit for var:102 = 1 (predicted, not seen), 3 for the click on
+428 (room 28 at frame 3378), then 460 frames of the retry and waits until state:316 = 1 held at frame 3839, before the plan's
+own steps on door 316 were reached. Door clicks: 1 (door 428), judged not started.

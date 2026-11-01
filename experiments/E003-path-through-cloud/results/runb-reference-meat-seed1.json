@@ -1,0 +1,24 @@
+{
+ "seed": 1,
+ "goal": "owner:566=var:1",
+ "from": 46,
+ "to": 900,
+ "first_frame": 574,
+ "first_frame_in_room": {
+  "0": 46,
+  "38": 48,
+  "96": 50,
+  "33": 51,
+  "28": 203,
+  "41": 462
+ },
+ "inputs": 107,
+ "ground_truth": {
+  "move": "S1#10",
+  "pre_frame": 561,
+  "done_frame": 574,
+  "held_at_pre": false
+ },
+ "stopped": null,
+ "seconds": 10.9
+}

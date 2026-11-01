@@ -1,0 +1,14 @@
+A0: fork exactness under load. Build /var/tmp/fast-mi/svm-window/build/scummvm/scummvm (sha1 87066f13be73), seed 1, run B's inputs from boot; fork at frame 235, 3000 frames to frame 3235; dumps with SPEEDRUN_DUMP_LOCALS and SPEEDRUN_DUMP_EXACT; 7 load children; 8 CPUs
+span: 22 room changes (first at frame 462), 357 frames with a cutscene open, 13 CD track starts (12 playing, first at frame 579)
+reference F: 74.2 s; per-frame run command {'n': 3000, 'median': 1.887, 'p90': 6.202, 'min': 0.6, 'max': 70.002} ms
+walk: 703.1 s; per frame (C and P run) {'n': 3000, 'median': 30.977, 'p90': 90.005, 'min': 1.012, 'max': 289.345} ms; stopped early: None
+C and P against F: 6002 frame comparisons (status and dump), 0 differ
+load children against F: 1506 children, 6402 chunks, 6402 comparisons, 0 differ
+P's trace.jsonl equals F's: True ({'F': '3c4fdad27400', 'P': '3c4fdad27400'})
+fork ms: {'n': 3967, 'median': 25.934, 'p90': 73.826, 'min': 3.418, 'max': 315.714}
+child frames per second (load children, run commands only): {'n': 5312, 'median': 145.846, 'p90': 358.924, 'min': 29.572, 'max': 1316.763}
+load average (1 min) during the walk: {'n': 60, 'median': 29.56, 'p90': 32.91, 'min': 20.52, 'max': 34.36}; MemAvailable MB: {'n': 60, 'median': 6040.369, 'p90': 7026.996, 'min': 4113.801, 'max': 8112.035}
+control: a child of P at frame 235 with its RNG state's low bit flipped, 3000 frames against F with no load. First frame that differs: status 236, dump without its exact object 236, exact object 236. Frames that differ: {'status': 3000, 'dump': 3000, 'exact': 3000}
+  control differs at frame 236: status .rng: 2189388206 != 577465519
+  control differs at frame 236: dump .vars[100]: 31 != 191
+  control differs at frame 236: exact .rng: 2189388206 != 577465519
