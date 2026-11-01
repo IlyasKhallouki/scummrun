@@ -287,7 +287,10 @@ Not claimed:
 After a success the chosen child's snapshot at its last input frame becomes the harness's engine, its input events join
 the run's inputs, and the records it matched before that frame are done. The rest stay pending for the next window. At
 a deviation the chosen child's branch at its stop frame becomes the engine, its inputs join the run's, the records it
-matched are done, and the harness replans from that state. At a mismatch-free success whose guessed write took another
+matched are done, the engine runs on to the first frame where it takes a click (input on, no cutscene, a room), and the
+harness replans from there. Before that frame only a key can land; a skip (Esc) inside that span is not tried, a stated
+loss. *Why.* From run B's start the first deviation stopped inside a cutscene, and the replan from that frame ran to
+the planner's 600 s limit (`results/window-kitchen.log`). At a mismatch-free success whose guessed write took another
 value than the plan's (the harness's rule), at an empty window, and when the plan is played out without the goal, the
 harness replans. Checkpoints for verify come only from frames
 before the next chosen input lands: the snapshot's frame, and a child's success frame when the next input lands after

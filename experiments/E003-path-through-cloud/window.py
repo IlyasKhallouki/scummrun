@@ -1085,12 +1085,24 @@ class Search:
                 if best.checkpoints[-1][0] != best.checkpoints[0][0]:
                     h.checkpoints.append(best.checkpoints[-1])  # its stop: the next input comes after the replan
                 b_, best.live = best.live, None
+                # section 7: on to the first frame where the engine takes a click (no input lands before it but a key)
+                f0, ran = b_.frame, 0
+                while not (b_.status.get("up", 0) > 0 and b_.status.get("cs", 1) == 0 and b_.status.get("room", 0)) \
+                        and ran < self.cfg.window_frames:
+                    st_ = b_.run(frame=b_.frame + 1)
+                    ran += 1
+                    if "end" in st_:
+                        raise RP.Stop(f"engine ended: {st_['end']}")
+                if ran:
+                    s_ = b_.state()
+                    h.checkpoints.append((b_.frame, F.facts_of(s_), RP.extra_of(s_, b_.status)))
                 self._set_branch(b_)
                 self._predict(recs)
                 self._logs(n_plan, recs, members, res, "replan")
                 self.replan_cause = f"deviation at frame {best.end}: {str(best.why)[:300]}"
                 self.deviations.append({"plan": n_plan, "macro": k, "frame": best.end, "qf": best.q_end,
-                                        "why": str(best.why)[:300]})
+                                        "why": str(best.why)[:300], "replan_frame": b_.frame,
+                                        "frames_to_the_click_gate": ran})
                 return "replan"
             if best.outcome == "goal":
                 self._mark(recs, best.matched, None)
