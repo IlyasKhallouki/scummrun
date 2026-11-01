@@ -270,3 +270,25 @@ def test_a_record_is_armed_by_the_clicks_run_of_its_unit():
     assert t.armed(e1) == 21
     t.apply(31, run(40, "script:2", 736, -1), types.SimpleNamespace(status="explained", record=8, why=[]), {})
     assert 1 in t.matched
+
+
+def test_a_read_of_a_variable_the_reading_does_not_hold_is_split():
+    """trace-validation.md section 5: split when the value tested is not a fact of the reading. The k = 2 deviation:
+    the sentence script wrote var 102 = 0 at [002B], a constant; the test that sent it there, [0000], read var 103,
+    which the reading holds no fact of."""
+    import model as M
+    code = TE.Code(M.Game.load())
+    key = ("global", 2)
+    ex = TE.Explained([("b", 1, 30, 1, 0, 2, 2, 28, 0), ("o", 1, 0, 0xC8), ("r", 1, 103, 428),
+                       ("r", 1, TE.LOCAL_BIT | 2, 0), ("o", 1, 0x2B, 0x1A), ("w", 1, 102, 0),
+                       ("e", 1, -1, 0, 0, 0)])
+    steps = TE.steps_of(code, key, list(ex.runs.values()))
+    vals, m = TE.write_values(code, key, steps, 1, "var:102", None)
+    assert m == 0 and steps[m].op.code == 0
+    assert any(v.what == "var 103" for v in vals)
+    code.facts = frozenset({"var:102", "room"})
+    vals, _ = TE.write_values(code, key, steps, 1, "var:102", None)
+    assert next(v for v in vals if v.what == "var 103").kind == "not a fact of the reading"
+    assert TE.cause_class(vals) == "split"
+    code.facts = frozenset({"var:102", "var:103", "room"})
+    assert TE.kind_of_var(code, 103) == "fact"

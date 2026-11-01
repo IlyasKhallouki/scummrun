@@ -172,6 +172,9 @@ class Code:
         self.game = game
         self._reach: dict = {}
         self.nonfacts = M.non_fact_vars(game)
+        # the reading's facts (its domains' keys), when a reading is given: a variable or bit outside them is not a
+        # fact of the reading (section 5, the two classes); None: every variable the game's scripts write knownly is
+        self.facts: frozenset | None = None
 
     def key(self, where: int, number: int, room: int) -> tuple | None:
         if where == WIO_GLOBAL:
@@ -488,12 +491,42 @@ def trace_back(code: Code, key, steps: list, n: int, vid: int, val, dump) -> Val
 
 def kind_of_var(code: Code, vid: int) -> str:
     if vid & BIT_BIT:
-        return "fact"
+        return reading_kind(code, f"bit:{vid & 0x7FFF}")
     if vid & LOCAL_BIT:
         return "unknown"
     if vid in F.CLOCKS:
         return "clock"
-    return code.nonfacts.get(vid, "fact")
+    k = code.nonfacts.get(vid)
+    return k if k is not None else reading_kind(code, f"var:{vid}")
+
+
+def reading_kind(code: Code, key: str) -> str:
+    """Section 5's split names "a value that is not a fact of the reading": a variable or bit the reading holds no
+    fact of is not one, whatever the game's other scripts do with it (``code.facts``, when a reading is given)."""
+    return "fact" if code.facts is None or key in code.facts else "not a fact of the reading"
+
+
+def write_values(code: Code, key, steps: list, n: int, fact: str, dump: dict | None) -> tuple:
+    """Lemma B on the write at steps[n] of ``fact``; when its value reads nothing, on the test that sent the run to it
+    (``test_before_write``). Returns (values, the index in ``steps`` of that test or None)."""
+    vals = slice_test(code, key, steps, n, dump)
+    if vals:
+        return vals, None
+    m = test_before_write(code, key, steps, n, fact)
+    if m is None:
+        return [], None
+    return slice_test(code, key, steps, m, dump), m
+
+
+def test_before_write(code: Code, key, steps: list, n: int, fact: str) -> int | None:
+    """For a write at steps[n] whose value reads nothing (a constant): Lemma X toward the unit's other write sites of
+    ``fact``, within the run up to the write: the conditional jump that sent the run to this write while its other side
+    could reach another write of the fact. Its test is what the value came from (Lemma B on it)."""
+    i = steps[n].i
+    targets = frozenset(code.write_sites(key, fact)) - {i}
+    if not targets:
+        return None
+    return first_off(code, key, steps[:n + 1], targets, cross_yields=False)
 
 
 def kind_of_leaf(code: Code, leaf) -> str:

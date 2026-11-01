@@ -200,6 +200,16 @@ getters. Its value in the engine is:
 A test whose fact the engine had at a value the model did not expect is neither: the cause lies in the run that wrote
 it, and the explanation follows that write.
 
+*Which values are facts of the reading* (written after the strict window runs, branch walk). A variable or a bit is a
+fact of the reading only when the reading's domains hold it; one the game's other scripts write knownly but this
+reading holds no fact of (outside its scope, or dropped as not a fact) is not one, so a test that read it is split. The
+first version took every variable that some script writes knownly as a fact, and called the k = 2 run's door sentence
+semantics, where the sentence script reaches its write of a constant at [002B] only through the tests at [0000] and
+[0007], on vars 103 and 104, which the reading does not hold. *A write of a constant* reads
+nothing, so its slice is empty; its class is that of the test that sent the run to that write rather than to another
+write of the fact (Lemma X within the run toward the unit's other write sites of the fact, then Lemma B on that test).
+The first version called every such write semantics.
+
 ### What the first runs on run B called for
 
 Written after the first runs, each with the case that showed it:

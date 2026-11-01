@@ -433,10 +433,11 @@ class Explainer:
                 if not hit:
                     continue
                 x = self.code.unit(key).ins[s.i] if s.i is not None else None
-                vals = TE.slice_test(self.code, key, steps, n, dump) if x is not None else []
+                vals, m = TE.write_values(self.code, key, steps, n, fact, dump) if x is not None else ([], None)
                 return {"kind": "wrote another value", "frame": k, "bisection": stats, "unit": M.unit_name(key),
                         "room": lg.room, "offset": s.op.code, "opcode": ir.head(x.st) if x else None,
                         "values": [v.as_dict() for v in vals], "class": TE.cause_class(vals) if vals else "semantics",
+                        "test_offset": steps[m].op.code if m is not None else None,
                         "cause": True, "model_ran_unit": key in self.model_units}
         return {"kind": "wrote another value", "frame": k, "bisection": stats, "cause": None,
                 "why": "no logged run of that frame writes it"}
@@ -516,10 +517,11 @@ class Explainer:
                         if own is not None:
                             return own | {"wrote": [s.op.code, got]}
                 dump = dumps.get(s.run.frame - 1) or self.dump_at(s.run.frame - 1)
-                vals = TE.slice_test(code, key, steps, hit, dump)
+                vals, m = TE.write_values(code, key, steps, hit, fact, dump)
                 return {"kind": "wrote another value", "unit": name, "room": s.run.room, "frame": s.run.frame,
                         "offset": s.op.code, "opcode": ir.head(x.st), "written": got,
                         "values": [v.as_dict() for v in vals], "class": TE.cause_class(vals) if vals else "semantics",
+                        "test_offset": steps[m].op.code if m is not None else None,
                         "cause": True, "depth": depth, "model_ran_unit": key in self.model_units}
             if fact is not None and not fact.startswith(TE.SLOT_KEYS) and not via_writevar(s.i):
                 # an op that writes the fact itself (no writeVar: the log has no value): it ran, and the fact
@@ -1100,11 +1102,12 @@ def explain_unexplained(code: TE.Code, eng: WindowEngine, k: int, run: TE.Run, w
         vid = int(fk[4:]) if fk.startswith("var:") else None
         n = next((m for m, st in enumerate(steps) if vid is not None and any(v == vid for v, _ in st.op.writes)), None)
         if n is not None:
-            vals = TE.slice_test(code, key, steps, n, dump)
+            vals, m = TE.write_values(code, key, steps, n, fk, dump)
             x = code.unit(key).ins[steps[n].i]
             return {"cause": True, "kind": "wrote another value", "unit": run.unit, "frame": k,
                     "offset": steps[n].op.code, "opcode": ir.head(x.st), "written": got,
-                    "values": [v.as_dict() for v in vals], "class": TE.cause_class(vals)}
+                    "values": [v.as_dict() for v in vals], "class": TE.cause_class(vals) if vals else "semantics",
+                    "test_offset": steps[m].op.code if m is not None else None}
         # the write the records predict did not run: Lemma X toward its sites in this run
         targets = slot_write_sites(code, key, fk)
         n = TE.first_off(code, key, steps, targets, cross_yields=False) if targets else None
@@ -1161,6 +1164,7 @@ def cmd_window_validate(a) -> dict:
             cands.setdefault(key, []).append(rd.rec(i))
     matcher = TE.StrictMatcher([r for rs in cands.values() for r in rs], TE.NOWHERE, decide)
     code = TE.Code(M.Game.load())
+    code.facts = frozenset(rd.doms)  # section 5: a value is a fact only if the reading holds it
     verdicts = []
     last_at = {}  # (where, number) -> frame where its slot last stopped at code1
     waits = C.Counter()
