@@ -1239,10 +1239,10 @@ index 00000000..0a89310f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..e2f182b8
+index 00000000..bd5ea2be
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,573 @@
+@@ -0,0 +1,577 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1776,6 +1776,10 @@ index 00000000..e2f182b8
 +	bool _stopOnMenu = false;                    // run "menu": a dialogue menu takes a click
 +	SpeedrunConditions _stopUntil;
 +	Common::Array<SpeedrunConditions> _stopUntilAny; // run "until_any": any group holds
++	// run "fork_each": N: a child at each of the next N decision points, the run stops after the N-th (plan step A4's
++	// kill 2, experiments/E003-path-through-cloud/window-search.md section 9.7); off unless a run asks for it
++	uint _forkEachLeft = 0;
++	Common::Array<int64> _forkEachForks;  // (frame, child pid) pairs of the current fork_each run
 +	JsonlWriter _frameFile;         // $SPEEDRUN_OUT/frames.jsonl: one line per decision point
 +	const char *_errorCode = "engine_error"; // code for the next error() record
 +	bool _finished = false;
@@ -2171,10 +2175,10 @@ index 00000000..49d670d5
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
 new file mode 100644
-index 00000000..93b5f346
+index 00000000..56e2ff9d
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_control.cpp
-@@ -0,0 +1,417 @@
+@@ -0,0 +1,465 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -2219,6 +2223,8 @@ index 00000000..93b5f346
 +//     {"cmd": "run", "until": [C3], "max_frame": N}   ... or until the conditions hold
 +//     {"cmd": "run", "control": true, "max_frame": N} ... or until a click would count
 +//     {"cmd": "fork"}                            fork; the child connects on its own
++//     {"cmd": "run", "fork_each": N}             a child at each of the next N decision points (each connects
++//                                                and stops there); the stop "fork_each" lists [frame, pid] pairs
 +//     {"cmd": "state"}                           C7 state dump
 +//     {"cmd": "holds", "until": [C3...]}         {"holds": bool} now, no frame run
 +//     run also takes "idle": true (stop when the bridge's idle rule holds), "menu": true
@@ -2330,6 +2336,12 @@ index 00000000..93b5f346
 +	}
 +	s.add("cam", (int)e.camera._cur.x).add("xstart", (int)e._virtscr[kMainVirtScreen].xstart)
 +	 .add("room_w", (int)e._roomWidth);
++	if (!_forkEachForks.empty()) {
++		JsonArray forks;
++		for (uint i = 0; i + 1 < _forkEachForks.size(); i += 2)
++			forks.addRaw(JsonArray().add(_forkEachForks[i]).add(_forkEachForks[i + 1]).str());
++		s.addRaw("forks", forks.str());
++	}
 +	return s.str();
 +}
 +
@@ -2344,6 +2356,34 @@ index 00000000..93b5f346
 +void SpeedrunBridge::controlAtDecisionPoint() {
 +	if (_controlFd < 0 || _finished)
 +		return;
++	if (_forkEachLeft > 0) {
++		// "fork_each": a child at this decision point, made as the "fork" command makes one; it stops here and
++		// waits for commands. The parent runs on, and stops after the last child.
++		_vm->closeRoom();
++		const pid_t pid = fork();
++		if (pid == 0) {
++			_branchChild = true;
++			close(_controlFd);
++			_controlFd = -1;
++			_trace.close();
++			if (_frameLog)
++				_frameFile.close();
++			_frameLog = false;
++			_forkEachLeft = 0;
++			_forkEachForks.clear();
++			if (!controlConnect())
++				_exit(4);
++			controlLoop("forked");
++			return;
++		}
++		_forkEachForks.push_back((int64)_frames);
++		_forkEachForks.push_back(pid > 0 ? (int64)pid : -1);
++		if (--_forkEachLeft > 0)
++			return;
++		controlLoop("fork_each");
++		_forkEachForks.clear();
++		return;
++	}
 +	const char *reason = nullptr;
 +	if (_stopFrame && _frames >= _stopFrame)
 +		reason = "frame";
@@ -2410,6 +2450,13 @@ index 00000000..93b5f346
 +				_stopOnIdle = obj->getVal("idle")->isBool() && obj->getVal("idle")->asBool();
 +			if (obj->contains("menu"))
 +				_stopOnMenu = obj->getVal("menu")->isBool() && obj->getVal("menu")->asBool();
++			if (obj->contains("fork_each")) {
++				const Common::JSONValue *v = obj->getVal("fork_each");
++				if (!v->isIntegerNumber() || v->asIntegerNumber() < 1 || v->asIntegerNumber() > 64)
++					error = "fork_each needs a number of frames in 1..64";
++				else
++					_forkEachLeft = (uint)v->asIntegerNumber();
++			}
 +			if (error.empty() && obj->contains("until_any")) {
 +				const Common::JSONValue *groups = obj->getVal("until_any");
 +				if (!groups->isArray()) {
@@ -2426,8 +2473,13 @@ index 00000000..93b5f346
 +				}
 +			}
 +			if (error.empty() && !_stopFrame && !_stopMaxFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu &&
-+			    _stopUntil.empty() && _stopUntilAny.empty())
-+				error = "run needs frame, max_frame, control, idle, until or until_any";
++			    _stopUntil.empty() && _stopUntilAny.empty() && !_forkEachLeft)
++				error = "run needs frame, max_frame, control, idle, until, until_any or fork_each";
++			if (error.empty() && _forkEachLeft && (_stopFrame || _stopMaxFrame || _stopOnControl || _stopOnIdle ||
++			                                       _stopOnMenu || !_stopUntil.empty() || !_stopUntilAny.empty()))
++				error = "fork_each takes no other stop";
++			if (!error.empty())
++				_forkEachLeft = 0;
 +			if (error.empty() && _stopFrame && _stopFrame <= _frames)
 +				error = Common::String::format("frame %llu is not after the current frame %llu",
 +				                               (unsigned long long)_stopFrame, (unsigned long long)_frames);
