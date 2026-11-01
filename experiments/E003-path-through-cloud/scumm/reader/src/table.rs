@@ -82,6 +82,10 @@ pub struct FactTable {
     /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
     /// (inputs.rs); None with the switch off
     pub settled: Option<std::sync::Arc<crate::inputs::SettledRule>>,
+    /// the variables the switch `--fact-vars` made facts (`add_fact_vars`); empty with the switch off. A comparison
+    /// of one with a local the path knows splits its values as a comparison with a constant does (machine.rs
+    /// `compare_sets`)
+    pub refined: BTreeSet<i32>,
 }
 
 impl FactTable {
@@ -193,6 +197,7 @@ impl FactTable {
             reach: None,
             memo: None,
             settled: None,
+            refined: BTreeSet::new(),
         }
     }
 
@@ -350,6 +355,7 @@ impl FactTable {
                 "already a fact"
             } else {
                 self.extra.insert(key, Domain::of(seeds.iter().copied(), None, None));
+                self.refined.insert(n);
                 "added"
             };
             out.push(FactVar { n, what, seeds: seeds.into_iter().collect() });

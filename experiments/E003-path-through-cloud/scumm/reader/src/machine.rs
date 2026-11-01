@@ -361,8 +361,11 @@ fn fork(k: Fact) -> ! {
 
 /// F12: a read of fact `k`, whose values left are `cands`, that only a comparison with a constant (or a zero test)
 /// of the step's jump reads: the value sets the comparison separates. None where the step uses the value otherwise
-/// (a copy, an object or script number, an index, arithmetic: one path per value).
-fn compare_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Vec<Labels>> {
+/// (a copy, an object or script number, an index, arithmetic: one path per value). For a variable the switch
+/// `--fact-vars` made a fact (`FactTable::refined`, experiments/E007-fact-refinement/plan.md), a comparison with a
+/// local whose value the path knows (an argument bound at the slot's start, as a sentence's objects) separates the
+/// same way: on this path that local is that constant, so the test splits the values as a comparison with it would.
+fn compare_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> Option<Vec<Labels>> {
     let x = st(m).cur?;
     let g = m.game;
     let Some(Stmt::Jump { cond: Some(c), .. }) = g.ins(x.u)[x.i as usize].st else { return None };
@@ -393,10 +396,37 @@ fn compare_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Vec<Lab
             CmpOp::Ge => y >= z,
         }
     };
+    let refined = match k {
+        Fact::Var(n) => st(m).table.as_ref().is_some_and(|t| t.refined.contains(&n)),
+        _ => false,
+    };
+    // the path's value of a local, when it knows one (`Machine::local`'s rule: an unwritten local of a slot whose
+    // arguments are known is 0)
+    let known = |e: ExprId| -> Option<i64> {
+        let Expr::Local(n) = ast.expr(e) else { return None };
+        let f = p.frame()?;
+        match f.local(n) {
+            Some(Val::Int(v)) => Some(v as i64),
+            Some(_) => None,
+            None => f.args_known.then_some(0),
+        }
+    };
+    let mut by_local = false;
     let test: Box<dyn Fn(i64) -> bool> = match ast.expr(c) {
         Expr::Cmp { op, a, b } => match (reads(a), ast.constant(b), reads(b), ast.constant(a)) {
             (true, Some(c), _, _) => Box::new(move |v| cmp(op, v, c as i64)),
             (_, _, true, Some(c)) => Box::new(move |v| cmp(op, c as i64, v)),
+            _ if refined => match (reads(a), known(b), reads(b), known(a)) {
+                (true, Some(c), _, _) => {
+                    by_local = true;
+                    Box::new(move |v| cmp(op, v, c))
+                }
+                (_, _, true, Some(c)) => {
+                    by_local = true;
+                    Box::new(move |v| cmp(op, c, v))
+                }
+                _ => return None,
+            },
             _ => return None,
         },
         Expr::Not(a) if reads(a) => Box::new(|v| v == 0),
@@ -411,16 +441,19 @@ fn compare_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Vec<Lab
         Label::Below => d.low.unwrap() - 1,
     };
     let (yes, no): (Labels, Labels) = cands.iter().partition(|&&l| test(val(l)));
+    if by_local {
+        count(m, "E007: a refined fact read by a comparison with a known local, split into its value sets");
+    }
     Some([yes, no].into_iter().filter(|s| !s.is_empty()).collect())
 }
 
 /// F12 at a fork on read: a comparison alone reads the fact. One value set left: its value set, no fork (the test
 /// decides on it); more: a fork into them.
-fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Val> {
+fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> Option<Val> {
     if !st(m).table.as_ref().unwrap().value_sets {
         return None;
     }
-    let Some(sets) = compare_sets(m, k, cands) else {
+    let Some(sets) = compare_sets(m, k, cands, p) else {
         let at = match st(m).cur.and_then(|x| m.game.ins(x.u)[x.i as usize].st) {
             None => "an engine step",
             Some(Stmt::Jump { .. }) => "a jump's other test",
@@ -696,7 +729,7 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val 
             return lazy_of(m, &i, Some(&s));
         }
         let s = s.clone();
-        if let Some(v) = read_by_sets(m, k, &s) {
+        if let Some(v) = read_by_sets(m, k, &s, p) {
             return v;
         }
         fork(k);
@@ -727,7 +760,7 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val 
                 return lazy_of(m, &i, None);
             }
             let all = d.values.clone();
-            if let Some(v) = read_by_sets(m, k, &all) {
+            if let Some(v) = read_by_sets(m, k, &all, p) {
                 return v;
             }
             fork(k)
