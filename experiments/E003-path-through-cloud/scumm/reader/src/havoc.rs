@@ -857,8 +857,16 @@ impl Builder<'_> {
                 Some(f) => self.game.resistant(f, res),
                 None => Some(false),
             };
+            // an object's slot: whether its object is out of the room is unknown, an owner the path cannot work out
+            // (havoc-cut.md, "Slots"), as the machine holds such an owner (`Owned::Unk`)
             let owned = match k {
-                UnitKey::Obj(_) => Py::None,
+                UnitKey::Obj(o) => crate::record::Val::Unk(crate::record::Unknown {
+                    class: crate::record::UClass::Unknown,
+                    reason: scumm_ir::Reason::Work.as_str().to_string(),
+                    what: format!("owner:{o} after a havoc record"),
+                    values: None,
+                })
+                .py(),
                 _ => Py::Bool(false),
             };
             let mut ws: Vec<(i64, bool)> = scope::stop_points(self.game, u)

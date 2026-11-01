@@ -524,3 +524,41 @@ fn part1_havoc_starts_a_script_by_a_variable_names_its_values() {
     }
     assert!(n > 0, "Part I's scope has a start of a script by a variable that is a fact");
 }
+
+// --- an object's event a havoc record names (havoc-cut.md, "Slots") ------------------------------------------------
+
+/// A havoc record whose closure holds an object with a wait point names that object's event, and the event runs: its
+/// owned flag is an unknown owner, which the run reads as the machine reads an owner it cannot work out.
+#[test]
+fn an_objects_event_from_a_havoc_record_runs() {
+    let g = game();
+    let sw = Switches { split_limit: true, havoc_cut: true, ..Default::default() };
+    let mut b = oracle::builder_with(g, static_oracle(), "room33", sw);
+    b.table.split_limit = true;
+    b.table.havoc_cut = true;
+    let mut n = 0;
+    for &u in &b.scope.units.clone() {
+        let k = g.unit(u).key;
+        let UnitKey::Obj(_) = k else { continue };
+        let entry = g.unit(u).entries.first().map(|e| e.1).unwrap_or(0);
+        let cut = Cut { frames: vec![(k, Some(entry))], steps: vec![] };
+        let hw = havoc::writes(g, &b.scope, &b.table, &cut, None);
+        if !hw.event_units.contains(&k) {
+            continue;
+        }
+        let key = b.table.doms.doms.keys().find(|x| x.starts_with("var:") && b.kind(x) == Kind::Fact).unwrap().clone();
+        let v = b.domain(&key).unwrap().values.iter().find_map(|l| l.int()).unwrap();
+        let mut fake = Fake { cut, cuts: 1, write: (key, Val::Int(v)) };
+        let recs = b.run_job(&mut fake, &job());
+        let Some(ev) = havocs(&recs).iter().flat_map(|r| r.next_events.iter()).find(|e| e.unit == k).cloned() else { continue };
+        let mut m = scumm_reader::machine::Reader::new(g);
+        let ev_job = Job { kind: "event".into(), label: ev.label(), pins: Pins::new(), pre: Pre::new(), what: What::Event(ev.clone()), checks: vec![] };
+        let out = b.run_job(&mut m, &ev_job);
+        eprintln!("{} from a havoc record: {} records", ev.label(), out.len());
+        n += 1;
+        if n >= 3 {
+            break;
+        }
+    }
+    assert!(n > 0, "room 33's scope has an object with a wait point");
+}
