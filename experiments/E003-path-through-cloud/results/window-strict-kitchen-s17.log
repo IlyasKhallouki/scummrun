@@ -1,0 +1,40 @@
+E004 plan step A4, second version: the strict window search on the kitchen from run B's S1#7 pre on seed 1 (branch trace).
+Run: runb_start.py run --seed 1 --move S1#7 --serve --search lama-first-costs --cost-caps --unobserved-actor-rooms --approach-stones --reach-extend --window-search --window-strict --window-cache --window-fork-each 7 --window-lite, replan limit 30, plan memory 3G; reading kitchen-s17-w3 (window2's S1#7 reading). ScummVM build sha1 6249a8e7d911 (the bridge at a77a9af). Code at 5d74d54.
+Against: run B's inputs on seed 1 from S1#7 pre (235) to the goal 339 frames, 6,780 qf, 28.3 s; window2's run from the same start 475 frames, 9,500 qf, 39.6 s.
+
+file replay-part1-kitchen-s17-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-runb-S17.json
+stop 'goal'; goal reached True; goal from the plan's goal records True
+verify from boot (fresh engine, no fork): 5 checkpoints, 0 differences, 58 inputs, goal at the end True, error None
+game time from the run's start (frame 235, qf 4880) to its stop (frame 713, qf 14440): 478 frames, 9560 qf, 39.83 s
+plans 3, replans 1
+  replan after plan 0 at frame 700: deviation at frame 700: [('walk_to(316)[202]#107', [('pos:local:203', ['40'], -1)]), ('event(local:215@16#45fc7932b71b)#893', []), ('event(local:215@56#45fc7932b71b)#1628', []), ('event(local:215@64#45fc7932b71b)#7340', [])]; cause: input walk_to(316)[202]#107 at 662: no run pos:local:215: the click's run left the path to the start of local:215; local:203 [001E] jump if; var 0 = 298 (position); class split
+  cause (deviation, plan 0 window 0): input walk_to(316)[202]#107 at 662: no run pos:local:215: the click's run left the path to the start of local:215; local:203 30 jump if; var 0 = 298; class split
+windows 2; children 472; child frames 13693; outcomes {'deviation': 1, 'duplicate': 35, 'mismatch': 12, 'pruned': 45, 'spent': 378, 'goal': 1}
+search CPU: engines 38.1 s {'child': 38.1, 'snapshot': 0.0, 'the last engine': 0.02}, Python 70.76 s, total 108.9 s
+Python CPU by part {'setup': 0.12, 'play': 3.48, 'observe': 39.51, 'child total': 61.75, 'cache: state, kept': 2841, 'cache: state, asked': 1507, 'cache: at, asked': 2385, 'cache: at, kept': 7050, 'match': 4.9}
+memory {'forks_pss_kb': 92105, 'python_rss_kb': 263456, 'live_forks': 21, 'min_available_kb': 3667020}
+steps: inputs 2 {'window empty': 1, 'goal': 1}; events 6 {'not reached': 4, 'matched': 2}
+  window 0.1 walk_to(316)[202]#107: frames 235-699 (stop: Q(g) + b reached the best deviation); 464 children {'deviation': 1, 'duplicate': 35, 'mismatch': 12, 'pruned': 38, 'spent': 378}, 13617 child frames, 95.42 s wall, 70.1 Python s; best deviation fork 660 inputs 661-661 end 700 (qf 14180); failures [[['input', 'walk_to(316)[202]#107', 'no run pos:local:215'], 355], [['input', 'walk_to(316)[202]#107', 'effect args:local:203'], 24]]
+  window 2.1 sentence(9,566)#1264: frames 700-708 (stop: Q(g) + b reached the best success); 8 children {'goal': 1, 'pruned': 7}, 76 child frames, 0.73 s wall, 0.66 Python s; best goal fork 700 inputs 701-702 end 713 (qf 14440); failures []
+windows with an input 2; search CPU per such window 54.4 s; x 250 = 3.78 CPU h
+
+the run's progress log:
+kitchen-s17-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-runb-S17: booting to runb-S17
+kitchen-s17-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-runb-S17: start at frame 235; the start check
+planning through taskcore (plan 0, frame 235, 0 bans)
+plan 0: plan, 14 steps, 17 s
+plan 0 window 1/4: walk_to(316)[202]#107 at frame 235 (5 records needed, 5 tracked)
+  window 1: cause: input walk_to(316)[202]#107 at 662: no run pos:local:215: the click's run left the path to the start of local:215; local:203 [001E] jump if; var 0 = 298 (position); class split
+  window 1: stop: Q(g) + b reached the best deviation; 464 children {'deviation': 1, 'duplicate': 35, 'mismatch': 12, 'pruned': 38, 'spent': 378}; best 700 (Q 14180); 95.42 s
+planning through taskcore (plan 1, frame 700, 0 bans)
+reach extension at frame 700: 1 values not reached, ['state:330=0']
+read reach-01: 40765 records in 43.5 s (3 threads, peak 573 MB), files in 15.0 s: 39661 actions, 4707 lists
+reach extension 1: 39661 -> 39661 actions in 58.71 s (114.67 CPU s)
+planning through taskcore (plan 2, frame 700, 0 bans)
+plan 2: plan, 3 steps, 7 s
+plan 2 window 1/1: sentence(9,566)#1264 at frame 700 (3 records needed, 3 tracked)
+  window 1: stop: Q(g) + b reached the best success; 8 children {'goal': 1, 'pruned': 7}; best 713 (Q 14440); 0.73 s
+kitchen-s17-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-runb-S17: stop 'goal'; verifying from boot (5 checkpoints)
+wrote /home/ilyask/.cache/fast-mi/w3/results/replay-part1-kitchen-s17-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-runb-S17.json
+exit 0
+GUARD: rc 0 wall 260.031 s low 0 min MemAvailable 3599828 kB
