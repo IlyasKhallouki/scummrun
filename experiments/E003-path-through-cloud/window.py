@@ -1179,6 +1179,7 @@ class Search:
             raise RP.Stop("the strict window search needs the reading's lines file (a packed reading)")
         unobserved = ("saved:",) + ((RP.ACTOR_ROOM,) if h.unobserved_actor_rooms else ())
         self.sr = S.Reading(h.base, h.doms, lines, h.lists, unobserved)
+        self.code.facts = frozenset(h.doms)  # trace-validation.md section 5: a fact only if the reading holds it
         self._strict_by_source = None
 
     def _tick(self, part: str, t0: float) -> float:
