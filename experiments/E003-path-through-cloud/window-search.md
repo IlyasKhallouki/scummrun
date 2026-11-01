@@ -52,7 +52,12 @@ shows only the later value.
 
 A record *matches* at the first frame, at or after the last input frame of the child, where all its final writes hold
 and every tracked record that precedes it has matched at that frame or before. Records are examined in plan order, so a
-record and its predecessor can match on the same frame. Unobserved facts (`args:`, `saved:`, and `actorroom:` with the
+record and its predecessor can match on the same frame. An input's record matches only in a branch where the input
+was given: in the child that plays it, and in every branch of a later window (the parent and its children), since
+those all descend from the snapshot taken at that input's last frame. (The first code matched an input's record only
+in its own child. An input whose final writes hold only after its last frame then stayed pending, and every later
+window needs it, since the next input interferes with it: no later window could succeed. `test_window.py`,
+`test_an_earlier_input_matches_once_issued`.) Unobserved facts (`args:`, `saved:`, and `actorroom:` with the
 switch for the actors' rooms) are not matched, as in the harness.
 
 ## 3. A child and its outcome
@@ -164,9 +169,29 @@ would have saved with such a bound.
   frame are the same run (the Executor's choices depend only on the state it reads); the second is dropped.
 - **Stop.** With best success c*, the search forks no more once Q(g) + b ≥ c*. Any fork at g' ≥ g succeeds at
   Q ≥ Q(g') + b ≥ Q(g) + b ≥ c*, so it cannot do better (Lemmas 2-4). Children already running finish or are pruned.
-- **End.** The window ends where a fact the macro step reads (observed facts only) changes in the idling parent after
-  the input's precondition has held in the parent, or 3,600 frames after the start. An empty window is a model flaw for
-  B1, not a retry: the harness replans from the parent at the window's end.
+- **End.** Let P be the tracked records that precede the input
+  (r ≺ I_k, section 1). The parent is *ready* at frame g when every record of P has matched in the parent by g (the
+  matcher, section 2, run on the idling parent). The model's window for I_k is open at g when the parent is ready and
+  some path of I_k's precondition holds on the parent's view, with the plan's values of the unobserved facts. The
+  window ends at the first frame where the model's window was open before and no path's precondition holds, or
+  3,600 frames after the start. An empty window is a model flaw for B1, not a retry: the harness replans from the
+  parent at the window's end.
+  **Lemma 7 (the end never fires on the plan's own writes).** Before the parent is ready, every change the plan
+  predicts on the way to I_k is a write of a record of P, and the rule does not look. After it is ready, P has matched,
+  so a fact I_k reads that changes and closes its precondition is a change the plan does not place before I_k: either
+  a record the plan orders after I_k (I_k ≺ r, so in every order that respects ≺ the input comes first) or no record
+  of the plan. In both cases the model's own window for I_k has closed, which is the relative deadline the end
+  stands for. *Proof.* The parent after the window's start is the chosen child of the previous window run on with no
+  input (A0, Lemma 5), so the records that child matched match in the parent on the same frames. A write the plan
+  predicts before I_k on a fact I_k reads belongs to a record r with r ⊳ I_k, hence r ∈ P or r is done. □
+  The end is a cut on work, not part of the guarantee (section 6 covers the frames forked before it). A fact read by
+  the macro step's events but not by I_k does not end the window: the children run such an event or show the
+  mismatch.
+  *Why this rule replaced the first.* The first rule ended the window where any fact the macro step reads changed in
+  the parent after the input's precondition had held. On the kitchen it ended the second window one frame after its
+  start, with one child forked: the previous input's own predicted write (its sentence starting) changed a fact the
+  next input reads, before that sentence's later record had matched (`results/window-kitchen.log`). It would also end
+  a door's window at the first step of any other actor's slot whose events the macro step holds.
 - **Early successes.** A success forked at a frame where the input's precondition did not hold in the parent is kept,
   since it is an engine run, and logged as an A1 counterexample for B1.
 
