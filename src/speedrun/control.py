@@ -210,6 +210,24 @@ class Controller:
         child.wait_first_stop()  # its "forked" status
         return child
 
+    def fork_each(self, branch: Branch, n: int) -> tuple[dict, list[Branch]]:
+        """A child at each of ``branch``'s next ``n`` decision points (the bridge's ``run`` with ``fork_each``, a build
+        that has it): returns ``branch``'s stop status at the last of them and the children in frame order, each
+        stopped at its frame as a ``fork`` child is."""
+        branch._send({"cmd": "run", "fork_each": n})
+        children = []
+        for _ in range(n):
+            child = self._accept()
+            child.wait_first_stop()  # its "forked" status
+            children.append(child)
+        st = branch._await_stop()
+        if "end" in st:
+            for c in children:
+                c.quit()
+            raise ControlError(f"fork_each: the run ended: {st}")
+        children.sort(key=lambda c: c.frame)
+        return st, children
+
     def close(self) -> None:
         if self.root is not None:
             self.root.quit()
