@@ -30,6 +30,8 @@ Each block: the run's own progress lines (frames, children, outcomes, the most c
 [04:17:28]   window 1: stop: Q(g) + b reached the best deviation; 417 children {'deviation': 2, 'duplicate': 35, 'pruned': 27, 'spent': 353}; best 653 (Q 13240); 251.09 s
 [04:17:28] kitchen-s17-seed1-serve-lama-first-costs-caps-uar-stones-window-runb-S17: stop 'planner: taskcore: the start holds 1 values the reading did not reach: ["state:330=0"]; extend the reading'; verifying from boot (3 checkpoints)
 
+   the window's record: 417 children, 12148 child frames, wall 251.09 s, Python 155.74 s; end point deviation at frame 653
+
 == 5. the replan from that deviation's stop frame, inside a cutscene
 [04:43:36]     window 1: 100 children by frame 334, {'duplicate': 35, 'spent': 59}; mismatches [('another path of the click, no change a later step reads', 59)]
 [04:43:43]     window 1: 200 children by frame 434, {'duplicate': 35, 'spent': 161}; mismatches [('another path of the click, no change a later step reads', 161)]

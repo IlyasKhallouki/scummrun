@@ -125,7 +125,7 @@ Its events land on frames after g. It then runs one frame at a time until one of
   the click's own), each such wait blocks for the rest of that frame, and no script that runs after it in that frame
   stops or moves that slot. A wait that the plan's next record of the same slot resumes from is left out: it may not
   block (a walk to a door ego already stands at passes the sentence script's wait for ego in the same frame, and the
-  first version of this check stopped every child of that window). A record that showed is
+  first version of this check stopped 3,478 of the first 3,500 children of that window). A record that showed is
   the input taking effect; a match of the record's other writes that already held does not count as that. Under it, a
   child whose record's slots do not stand there at that frame did not run the record's path, and cannot match it
   later. A wrong premise loses children (a success the search would miss), never a route: what the search keeps are
