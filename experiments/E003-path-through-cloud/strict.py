@@ -342,7 +342,7 @@ class Kept:
 
     def freeze(self, extra_views: dict | None = None, extra_dumps: dict | None = None) -> dict:
         return {"runs": {k: list(v) for k, v in self.runs.items()}, "entries": list(self.entries),
-                "dumps": dict(self.dumps, **(extra_dumps or {})), "views": dict(self.views, **(extra_views or {}))}
+                "dumps": {**self.dumps, **(extra_dumps or {})}, "views": {**self.views, **(extra_views or {})}}
 
 
 class _Eng:
@@ -423,13 +423,26 @@ def input_end_cause(code: TE.Code, eng: _Eng, run: TE.Run, want: int, dump: dict
     if n is not None:
         x = code.unit(key).ins[steps[n].i]
         if x.yields == "wait":
-            vals = TE.wait_values(x, 0, dump)
+            vals = wait_values_read(x, steps[n], dump)
             return base | {"cause": True, "kind": "the wait did not block", "offset": steps[n].op.code,
                            "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals], "class": "split"}
         vals = TE.slice_test(code, key, steps, n, dump)
         return base | {"cause": True, "kind": "left the record's path", "offset": steps[n].op.code,
                        "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals], "class": TE.cause_class(vals)}
     return base | {"cause": None, "kind": "no branch off the record's path found", "steps": len(steps)}
+
+
+def wait_values_read(x, step, dump: dict | None) -> list:
+    """TE.wait_values, with a WaitForActor's actor read from the op's own logged reads when the IR names it through
+    a variable or a local (Lemma B: the value readVar returned while the op ran)."""
+    if isinstance(x.st, ir.Op) and x.st.name == "WaitForActor" and step is not None:
+        args = []
+        for a in x.st.args:
+            vid = TE.var_id(a)
+            got = next((v for var, v in step.op.reads if var == vid), None) if vid is not None else None
+            args.append(ir.Const(got) if got is not None else a)
+        return [TE.getter_value(ir.Getter("getActorMoving", tuple(args)), dump)]
+    return TE.wait_values(x, 0, dump)
 
 
 def not_run_cause(code: TE.Code, eng: _Eng, fail: dict) -> dict:
