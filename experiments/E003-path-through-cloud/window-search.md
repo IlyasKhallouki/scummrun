@@ -102,7 +102,12 @@ Its events land on frames after g. It then runs one frame at a time until one of
 - **spent**: an idle stop of the bridge (`Branch.run(idle=True)`'s rule: input on, no cutscene, no sentence, input or
   object script, no message wait, ego standing) more than one frame after the last input, while the input's record is
   unmatched or a needed record belongs to a unit with no live slot. Nothing that could still run the record is alive;
-- **pruned**: Q ≥ the best success so far before it succeeds. It cannot finish lower, since Q only grows;
+- **deviation**: a child that stops as spent, mismatch or limit after its input's record and every needed record that
+  precedes the input (≺) have matched. The input took effect as the plan predicts, and then a record the plan does not
+  name changed what a later step needs: the plan's prediction ends there, not the engine run. Its end point is its stop
+  frame h, c = Q(h);
+- **pruned**: Q ≥ the best end point so far (a success, else a deviation) before it ends. It cannot end lower, since Q
+  only grows;
 - **limit**: 3,600 frames after the last input;
 - **interface**: the Executor raised (no control, the object not clickable).
 
@@ -205,6 +210,14 @@ would have saved with such a bound.
   frame are the same run (the Executor's choices depend only on the state it reads); the second is dropped.
 - **Stop.** With best success c*, the search forks no more once Q(g) + b ≥ c*. Any fork at g' ≥ g succeeds at
   Q ≥ Q(g') + b ≥ Q(g) + b ≥ c*, so it cannot do better (Lemmas 2-4). Children already running finish or are pruned.
+  The search keeps the earliest end point, success or deviation (a success at equal Q). With a deviation c_d the
+  earliest, it forks no more once Q(g) + 4 · δ_lo · n ≥ c_d: a fork at g' ≥ g deviates after its input's record
+  matched, so no earlier than frame g' + n (Lemmas 2 and 3), and succeeds no earlier than Q(g') + b ≥ Q(g') + 4 · δ_lo · n.
+  *Why deviations.* On the kitchen the room entry's record never matched in any child: in each, a slot of the new room
+  that the plan leaves alone started one of two other local scripts (which one varied from child to child), and a later
+  step reads that script's state. 1,557 of 1,576 children in the first runs and every child after the door opened in
+  the next ones ended spent, and the window ran on to its end with no success (`results/window-kitchen.log`). The plan
+  is wrong there, not the frame; the earliest child that shows it is the earliest state to replan from.
 - **End.** Let P be the tracked records that precede the input
   (r ≺ I_k, section 1). The parent is *ready* at frame g when every record of P has matched in the parent by g (the
   matcher, section 2, run on the idling parent). The model's window for I_k is open at g when the parent is ready and
@@ -234,9 +247,9 @@ would have saved with such a bound.
 ## 6. The guarantee
 
 For one macro step, let g_s be the frame the search stopped forking (the stop, the end, or the goal). Every fork frame
-g in [start, g_s) is tried, directly or through the child it equals (Lemma 5). The search returns the success with the
-least Q over them, ties to the earliest fork. Given A0, A1, A2 and the scope's δ_lo, no fork at a later frame of the
-window succeeds with a lower Q (section 5, Stop).
+g in [start, g_s) is tried, directly or through the child it equals (Lemma 5). The search returns the end point
+(success or deviation) with the least Q over them, a success at equal Q, ties to the earliest fork. Given A0, A1, A2
+and the scope's δ_lo, no fork at a later frame of the window succeeds or deviates with a lower Q (section 5, Stop).
 
 Not claimed:
 
@@ -248,8 +261,10 @@ Not claimed:
 
 After a success the chosen child's snapshot at its last input frame becomes the harness's engine, its input events join
 the run's inputs, and the records it matched before that frame are done. The rest stay pending for the next window. At
-a mismatch-free success whose guessed write took another value than the plan's (the harness's rule), at an empty window,
-and when the plan is played out without the goal, the harness replans. Checkpoints for verify come only from frames
+a deviation the chosen child's branch at its stop frame becomes the engine, its inputs join the run's, the records it
+matched are done, and the harness replans from that state. At a mismatch-free success whose guessed write took another
+value than the plan's (the harness's rule), at an empty window, and when the plan is played out without the goal, the
+harness replans. Checkpoints for verify come only from frames
 before the next chosen input lands: the snapshot's frame, and a child's success frame when the next input lands after
 it. Verify then plays every chosen input from boot in a fresh engine with no fork.
 
