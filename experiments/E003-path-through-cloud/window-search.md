@@ -395,7 +395,8 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
   click (same verb and objects) is decided, matches strictly and took effect, and one of its writes that changed is a
   fact a later step reads, the child goes on as a deviation candidate; once neither I nor any J can still match, it is
   spent. At the bridge's idle stop (input on, no cutscene, no sentence queued, no input or object script running, ego
-  standing) a unit whose run has not come gets none from this click: I fails on "no run".
+  standing) a unit whose run has not come gets none from this click: I fails on "no run". A goal that holds while I,
+  a goal record, is not decided yet is called neither the plan's nor another's until I is decided.
   *Proof that this loses no success and no deviation.* The click starts its work only through `runScriptNested`, and
   the child gives no other input after it; so a unit's first such run from frame s on is the click's. The first one is
   I's, and so no later run of U is: if I does not match once decided it never does. Every needed record that follows I
