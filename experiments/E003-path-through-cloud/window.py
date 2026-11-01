@@ -1206,7 +1206,7 @@ class Search:
              "issued": issued, "before_input": before_input, "alts": alts, "in_units": in_units,
              "lemma9_stops": 0, "b_dev_qf": 4 * cfg.delta_lo * n, "explain_units": explain_units,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps]),
-             "failures": collections.Counter(), "failure_of": {}, "k": k, "first_g": {},
+             "failures": collections.Counter(), "failure_of": {}, "k": k, "first_g": {}, "running": 0,
              # a tracked record that does not follow the input: its own run may come while the input code plays
              "early_recs": {r.i for r in tracked if not (has_input and first.i in r.preds) and r.i != first.i}}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None, "strict": True,
@@ -1284,7 +1284,7 @@ class Search:
                     break
                 if has_input:
                     if self._gate(inp, st, s, parent):
-                        while sum(1 for x in futures if not x.done()) >= cfg.workers:
+                        while w["running"] >= cfg.workers:
                             time.sleep(0.002)
                         while mem_available_kb() < cfg.mem_floor_kb:
                             if not any(not x.done() for x in futures):
@@ -1292,9 +1292,11 @@ class Search:
                                               f"{cfg.mem_floor_kb // 1024} MB")
                             time.sleep(0.05)
                         cb = self.fork(parent, "child")
-                        ch = Child(g, st["qf"], not pre_now, frozenset(ptrack.matched), dict(now), w["full_fv"](obs))
+                        ch = Child(g, st["qf"], not pre_now, frozenset(ptrack.matched), dict(now), None)
                         ch.track, ch.d0 = ptrack.copy(), s
                         children.append(ch)
+                        with self._lock:
+                            w["running"] += 1
                         futures.append(pool.submit(self._child_strict, w, cb, ch))
                         if len(children) % 100 == 0:
                             done_ = collections.Counter(c.outcome for c in children if c.outcome)
@@ -1688,6 +1690,8 @@ class Search:
             if ch.outcome in ("success", "goal", "deviation"):
                 ch.checkpoints = [(s_issue, F.facts_of(d_issue), RP.extra_of(d_issue, st_issue)),
                                   (cb.frame, dict(obs), RP.extra_of(s, cb.status))]
+                if ch.full_at_fork is None:  # the parent's full view at the fork, from its dump there
+                    ch.full_at_fork = w["full_fv"](F.facts_of(ch.d0))
                 full = w["full_fv"](obs)
                 ch.unplanned = [{"key": x.key, "start": RP._str(ch.full_at_fork.get(x.key)), "changes": [],
                                  "count": 1, "end": RP._str(x.observed), "net": True}
@@ -1713,6 +1717,8 @@ class Search:
             return ch
         finally:
             self._tick("child total", t_start)
+            with self._lock:
+                w["running"] -= 1
             if isinstance(cb, _Cached):
                 with self._lock:
                     self.prof.update({f"cache: {k}": v for k, v in cb.hits.items()})
