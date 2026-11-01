@@ -76,3 +76,20 @@ reach_check.py (experiments/E004-fast-exact/results/reach-kitchen-input-settled-
 The same classes and counts as without input_settled (reach-kitchen-check.json: 17 and 8).
 Taskcore's task with all reductions: 13905 actions, 43323 operators from --reach; 13907 actions, 44839 operators from the full file;
 173 variables and 5189 values on both.
+
+== the optimal cost from s17, on taskcore's SAS files of both (FD's search memory limit 2 GB, 1800 s, nice 10, the memory guard on)
+| task | operators | A* landmark cost partitioning (lm_rhw) | greedy ff, bound 8 |
+| --reach, input_settled | 43323 | h0 6; f = 6 not closed in 1800 s, peak 1427 MB; no plan | cost 7, 7 steps, 0.5 s search |
+| full, input_settled | 44839 | h0 6; f = 6 not closed in 1800 s, peak 1430 MB; no plan | cost 7, 7 steps, 0.5 s search |
+| --reach, without input_settled | 17672 | h0 7, plan cost 7, 8 expanded | |
+The cost-7 plans, both: event(local:211@33), fold:walk_to(316)[202], event(script:2@736), event(local:218@16), sentence(9,566),
+event(script:2@736) (a fold of 2 in the full file's), event(script:2@915).
+So the optimal cost is 6 or 7 on both; A* did not decide which. A greedy search with bound 7 (a plan of cost 6) on the --reach task
+found none in 600 s. That is no proof.
+Other admissible searches tried on the --reach task: landmark cost partitioning over lm_merged(lm_rhw, lm_zg): the same 28 landmarks,
+h0 6; lm_zg alone: no h0 in 60 s; lm_exhaust, lmcut and the three stubborn-set prunings: conditional effects not supported. The FD
+build has no LP solver, so no optimal cost partitioning.
+
+== every switch off
+reader-port read kitchen --packed: 72256 records, 71729 actions, sha1 279b7a24 (main's); the reading against golden.py's: 72258
+compared, 0 differences. The only code change on ksr is reader-port's --no-keep (off by default).
