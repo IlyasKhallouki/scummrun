@@ -9,7 +9,8 @@ one server takes a sequence of requests, as a replay run gives them: new starts 
 bans (built), the same bans from another start (kept), other bans and none again (built again), the file's own start
 by name, a start with a value outside a domain under both start checks, another goal, and cost caps: new caps (built),
 the same caps from another start (kept), with bans, other caps, an empty file and no file (built, then kept), and a
-caps file with a bad line. Each request's files (the
+caps file with a bad line; then pick windows as a request's option, on and off (taskcore/README.md, "Pick windows";
+with task.py's encoding both stop). Each request's files (the
 SAS file, the operator table, the kept list) must be ``taskcore sas``'s with the same options, byte for byte, and its
 stats the same but for times, memory and paths; or both stop, with the same message.
 """
@@ -39,6 +40,7 @@ CONFIGS = [
     ("reduce none", ["--reduce", "none"]),
     ("fold off", ["--fold", "off"]),
     ("PRODUCT_LIMIT 1, task encoding", ["--product-limit", "1", "--encoding", "task"]),
+    ("PRODUCT_LIMIT 1, pick windows", ["--product-limit", "1", "--pick-windows", "on"]),
 ]
 VOLATILE = ("seconds", "rss", "peak_rss")  # key prefixes: times and memory
 PATHS = ("task", "start")  # keys: paths
@@ -116,6 +118,9 @@ def requests(rng, task, start, work: Path) -> list:
     out.append(sf(16, s1) + cf(16, ""))  # empty: the file's costs again
     out.append(sf(17, s2))  # no file: the same task, kept
     out.append(sf(18, s2) + cf(18, "no tab here\n"))
+    out.append(sf(19, s1) + ["--pick-windows", "on"])
+    out.append(sf(20, s1) + bf(20, b1) + ["--pick-windows", "on"])
+    out.append(sf(21, s2) + ["--pick-windows", "off"])
     return out
 
 

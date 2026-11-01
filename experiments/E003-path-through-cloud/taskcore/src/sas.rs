@@ -30,6 +30,12 @@
 //!
 //! The operators, their order and their numbers are the same in both encodings (a reset is one more effect of an
 //! operator that already writes), so a plan reads back the same way.
+//!
+//! Pick windows (`windows`, README "Pick windows", off by default): in the model encoding, the free pick operators
+//! go, and each operator that reads a pick variable is written as a window: `begin` (its precondition, `lock` 0 -> j),
+//! one pick operator per value of each pick variable it reads (`lock` = j), then the operator itself, which also sets
+//! those pick variables back to 0 and `lock` to 0. Every other operator needs `lock` = 0, and so does the goal. The
+//! variable `lock` (id 2 nf + 1) comes last in the file. With the switch off nothing of this is written.
 
 use crate::model::*;
 use std::io::Write;
@@ -56,6 +62,9 @@ pub struct SasCounts {
     pub noop_effects: u64,
     pub goal_resets: u64,
     pub bytes: u64,
+    pub window_mode: bool,    // pick windows on (stats only then)
+    pub windows: u64,         // the consumers: variants that read a pick variable
+    pub window_pick_ops: u64, // the pick operators of the windows
 }
 
 pub struct Variant<'b> {
@@ -96,6 +105,8 @@ pub struct Expander<'t> {
     pub check: bool,
     pub model: bool,         // the model encoding (module docstring); false: task.py's
     goal_set: Vec<Vec<u32>>, // per fact its goal set when the goal is a set of values, else empty
+    pub windows: bool,       // pick windows (module docstring); needs `model`
+    pub n_windows: u64,      // the windows of the file (pass1 sets it); `lock` has n_windows + 1 values
 }
 
 fn advance(idx: &mut [usize], len: impl Fn(usize) -> usize) -> bool {
@@ -163,6 +174,8 @@ impl<'t> Expander<'t> {
             check: true,
             model: false,
             goal_set,
+            windows: false,
+            n_windows: 0,
         }
     }
 
@@ -428,16 +441,20 @@ impl<'t> Expander<'t> {
             self.t.key(var).to_string()
         } else if var < 2 * self.nf {
             format!("pick:{}", self.t.key(var - self.nf))
-        } else {
+        } else if var == 2 * self.nf {
             "goal".to_string()
+        } else {
+            "lock".to_string()
         }
     }
 
     pub fn var_size(&self, var: u32) -> u32 {
         if var < 2 * self.nf {
             self.t.facts.size(var % self.nf.max(1))
-        } else {
+        } else if var == 2 * self.nf {
             2
+        } else {
+            1 + self.n_windows as u32
         }
     }
 
@@ -449,6 +466,39 @@ impl<'t> Expander<'t> {
             val.to_string()
         }
     }
+}
+
+/// The pick variables a variant reads, R(o) of README "Pick windows": the pick variables named in the conditions of
+/// its effects, as task facts (pick variable nf + k is k), in key order (`rank`).
+pub fn window_reads(nf: u32, rank: &[u32], v: &Variant) -> Vec<u32> {
+    let mut r: Vec<u32> = Vec::new();
+    for &(s, _) in v.ranges {
+        let e = &v.effs[s..];
+        for j in 0..e[2] as usize {
+            let c = e[3 + 2 * j];
+            if c >= nf && c < 2 * nf && !r.contains(&(c - nf)) {
+                r.push(c - nf);
+            }
+        }
+    }
+    r.sort_by_key(|&k| rank[k as usize]);
+    r
+}
+
+/// The properties of the file README "Pick windows" rests on, checked on each variant written with the switch on:
+/// (P1) its precondition names task facts only; (P3) it writes no pick variable, so its effects name pick variables
+/// only in their conditions (P4).
+fn window_check(nf: u32, name: &dyn Fn() -> String, v: &Variant) -> Result<(), String> {
+    if let Some(&(f, _)) = v.chosen.iter().find(|&&(f, _)| f >= nf) {
+        return Err(format!("{}: a precondition on variable {} (pick windows need preconditions on facts only)", name(), f));
+    }
+    for &(s, _) in v.ranges {
+        let k = v.effs[s];
+        if k >= nf && k < 2 * nf {
+            return Err(format!("{}: writes a pick variable (pick windows need only pick operators to write them)", name()));
+        }
+    }
+    Ok(())
 }
 
 fn check_effects(effbuf: &[u32], kept: &[(usize, usize)]) -> Result<(), String> {
@@ -580,7 +630,12 @@ pub fn goal_parts(t: &Task) -> Result<(Vec<(u32, u32)>, Vec<(u32, Vec<u32>)>), S
 pub fn pass1(x: &mut Expander) -> Result<Plan, String> {
     let nf = x.nf;
     let t = x.t;
-    let mut used = vec![false; 2 * nf as usize + 1];
+    let windows = x.windows;
+    let rank = if windows { x.rank.clone() } else { Vec::new() };
+    let mut n_windows = 0u64;
+    let mut window_picks = 0u64;
+    let mut window_ops = 0u64;
+    let mut used = vec![false; 2 * nf as usize + 2];
     for (f, _) in &t.goal {
         used[*f as usize] = true;
     }
@@ -613,15 +668,30 @@ pub fn pass1(x: &mut Expander) -> Result<Plan, String> {
             if v.cost != 1 && v.cost != 0 {
                 metric = true;
             }
+            if windows {
+                window_check(nf, &|| t.name(ai), v)?;
+                let r = window_reads(nf, &rank, v);
+                if !r.is_empty() {
+                    // begin, the picks, and the variant itself as the end: its resets and its lock effect
+                    let np: u64 = r.iter().map(|&k| t.facts.size(k) as u64).sum();
+                    n_windows += 1;
+                    window_picks += np;
+                    window_ops += 1 + np;
+                    effects += 1 + np + r.len() as u64 + 1;
+                }
+            }
             Ok(())
         })?;
     }
     let action_ops = n_ops;
+    n_ops += window_ops;
     let mut pick_ops = 0;
-    for f in 0..nf {
-        if x.picks[f as usize] {
-            used[(nf + f) as usize] = true;
-            pick_ops += t.facts.size(f) as u64;
+    if !windows {
+        for f in 0..nf {
+            if x.picks[f as usize] {
+                used[(nf + f) as usize] = true;
+                pick_ops += t.facts.size(f) as u64;
+            }
         }
     }
     n_ops += pick_ops;
@@ -633,16 +703,20 @@ pub fn pass1(x: &mut Expander) -> Result<Plan, String> {
         effects += goal_ops;
     }
     n_ops += goal_ops;
-    if x.model && pick_ops + goal_ops > 0 {
+    if x.model && pick_ops + goal_ops + n_windows > 0 {
         metric = true; // the model encoding (module docstring)
     }
+    x.n_windows = n_windows;
     let mut vars: Vec<u32> = (0..2 * nf).filter(|&v| used[v as usize]).collect();
     let keys: Vec<String> = (0..2 * nf).map(|v| if used[v as usize] { x.var_key(v) } else { String::new() }).collect();
     vars.sort_by(|&a, &b| keys[a as usize].cmp(&keys[b as usize]));
     if !goal_sets.is_empty() {
         vars.push(2 * nf);
     }
-    let mut index = vec![NONE; 2 * nf as usize + 1];
+    if n_windows > 0 {
+        vars.push(2 * nf + 1);
+    }
+    let mut index = vec![NONE; 2 * nf as usize + 2];
     for (i, &v) in vars.iter().enumerate() {
         index[v as usize] = i as u32;
     }
@@ -658,6 +732,9 @@ pub fn pass1(x: &mut Expander) -> Result<Plan, String> {
     c.values = vars.iter().map(|&v| x.var_size(v) as u64).sum();
     c.pick_vars = vars.iter().filter(|&&v| v >= nf && v < 2 * nf).count() as u64;
     c.goal_resets = resets;
+    c.window_mode = windows;
+    c.windows = n_windows;
+    c.window_pick_ops = window_picks;
     Ok(Plan { vars, index, metric, n_ops, goal_single, goal_sets, counts: c })
 }
 
@@ -751,8 +828,10 @@ pub fn pass2<W: Write>(x: &mut Expander, plan: &Plan, start: &[u32], w: W) -> Re
         o.line_n(*s as u64).map_err(io)?;
     }
     o.line("end_state").map_err(io)?;
+    // pick windows (module docstring): `lock`, when the file has a window
+    let lock = if x.n_windows > 0 { Some(plan.index[2 * nf as usize + 1] as u64) } else { None };
     o.line("begin_goal").map_err(io)?;
-    o.line_n(plan.goal_single.len() as u64 + (!plan.goal_sets.is_empty()) as u64).map_err(io)?;
+    o.line_n(plan.goal_single.len() as u64 + (!plan.goal_sets.is_empty()) as u64 + lock.is_some() as u64).map_err(io)?;
     for &(f, val) in &plan.goal_single {
         o.n(plan.index[f as usize] as u64).map_err(io)?;
         o.s(" ").map_err(io)?;
@@ -762,24 +841,82 @@ pub fn pass2<W: Write>(x: &mut Expander, plan: &Plan, start: &[u32], w: W) -> Re
         o.n(plan.index[2 * nf as usize] as u64).map_err(io)?;
         o.line(" 1").map_err(io)?;
     }
+    if let Some(l) = lock {
+        o.n(l).map_err(io)?;
+        o.line(" 0").map_err(io)?;
+    }
     o.line("end_goal").map_err(io)?;
     o.line_n(plan.n_ops).map_err(io)?;
     let mut n = 0u64;
     let index = &plan.index;
     let mut ioerr: Option<std::io::Error> = None;
+    let windows = x.windows;
+    let rank = if windows { x.rank.clone() } else { Vec::new() };
+    let mut j = 0u64; // the window's number, 1 to n_windows
     for ai in 0..t.acts.len() {
         x.expand(ai, &mut |v: &Variant| {
+            let reads = if windows { window_reads(nf, &rank, v) } else { Vec::new() };
             let r = (|| -> std::io::Result<()> {
+                if !reads.is_empty() {
+                    // begin_j: the variant's precondition, lock 0 -> j
+                    j += 1;
+                    let l = lock.unwrap();
+                    o.line("begin_operator")?;
+                    o.s("a")?;
+                    o.line_n(n)?;
+                    n += 1;
+                    o.line_n(v.chosen.len() as u64)?;
+                    for &(f, val) in v.chosen {
+                        o.n(index[f as usize] as u64)?;
+                        o.s(" ")?;
+                        o.line_n(val as u64)?;
+                    }
+                    o.line("1")?;
+                    o.s("0 ")?;
+                    o.n(l)?;
+                    o.s(" 0 ")?;
+                    o.line_n(j)?;
+                    o.line("0")?;
+                    o.line("end_operator")?;
+                    // the window's picks: lock = j, one per value of each pick variable the variant reads
+                    for &k in &reads {
+                        for u in 0..t.facts.size(k) {
+                            o.line("begin_operator")?;
+                            o.s("a")?;
+                            o.line_n(n)?;
+                            n += 1;
+                            o.line("1")?;
+                            o.n(l)?;
+                            o.s(" ")?;
+                            o.line_n(j)?;
+                            o.line("1")?;
+                            o.s("0 ")?;
+                            o.n(index[(nf + k) as usize] as u64)?;
+                            o.s(" -1 ")?;
+                            o.line_n(u as u64)?;
+                            o.line("0")?;
+                            o.line("end_operator")?;
+                        }
+                    }
+                }
                 o.line("begin_operator")?;
                 o.s("a")?;
                 o.line_n(n)?;
-                o.line_n(v.chosen.len() as u64)?;
+                // outside a window an operator needs lock = 0 (lock is the file's last variable, so the list stays
+                // in variable order)
+                let plain_lock = if reads.is_empty() { lock } else { None };
+                o.line_n(v.chosen.len() as u64 + plain_lock.is_some() as u64)?;
                 for &(f, val) in v.chosen {
                     o.n(index[f as usize] as u64)?;
                     o.s(" ")?;
                     o.line_n(val as u64)?;
                 }
-                o.line_n(v.ranges.len() as u64)?;
+                if let Some(l) = plain_lock {
+                    o.n(l)?;
+                    o.line(" 0")?;
+                }
+                let extra = if reads.is_empty() { 0 } else { reads.len() as u64 + 1 };
+                o.line_n(v.ranges.len() as u64 + extra)?;
                 for &(s, _) in v.ranges {
                     let e = &v.effs[s..];
                     let nc = e[2] as usize;
@@ -795,6 +932,19 @@ pub fn pass2<W: Write>(x: &mut Expander, plan: &Plan, start: &[u32], w: W) -> Re
                     o.s(" -1 ")?;
                     o.line_n(e[1] as u64)?;
                 }
+                if !reads.is_empty() {
+                    // end_j: the pick variables it read back to 0, lock j -> 0
+                    for &k in &reads {
+                        o.s("0 ")?;
+                        o.n(index[(nf + k) as usize] as u64)?;
+                        o.line(" -1 0")?;
+                    }
+                    o.s("0 ")?;
+                    o.n(lock.unwrap())?;
+                    o.s(" ")?;
+                    o.n(j)?;
+                    o.line(" 0")?;
+                }
                 o.line_n(v.cost as u64)?;
                 o.line("end_operator")
             })();
@@ -807,7 +957,7 @@ pub fn pass2<W: Write>(x: &mut Expander, plan: &Plan, start: &[u32], w: W) -> Re
         })
         .map_err(|e| if let Some(ie) = ioerr.take() { ie.to_string() } else { e })?;
     }
-    let mut pick_facts: Vec<u32> = (0..nf).filter(|&f| x.picks[f as usize]).collect();
+    let mut pick_facts: Vec<u32> = if windows { Vec::new() } else { (0..nf).filter(|&f| x.picks[f as usize]).collect() };
     pick_facts.sort_by(|&a, &b| t.key(a).cmp(t.key(b)));
     for f in pick_facts {
         for u in 0..t.facts.size(f) {
@@ -833,12 +983,16 @@ pub fn pass2<W: Write>(x: &mut Expander, plan: &Plan, start: &[u32], w: W) -> Re
             o.line("begin_operator").map_err(io)?;
             o.s("a").map_err(io)?;
             o.line_n(n).map_err(io)?;
-            o.line_n(plan.goal_sets.len() as u64).map_err(io)?;
+            o.line_n(plan.goal_sets.len() as u64 + lock.is_some() as u64).map_err(io)?;
             for &j in &order {
                 let (f, vals) = &plan.goal_sets[j];
                 o.n(index[*f as usize] as u64).map_err(io)?;
                 o.s(" ").map_err(io)?;
                 o.line_n(vals[gidx[j]] as u64).map_err(io)?;
+            }
+            if let Some(l) = lock {
+                o.n(l).map_err(io)?;
+                o.line(" 0").map_err(io)?;
             }
             o.line("1").map_err(io)?;
             o.s("0 ").map_err(io)?;
@@ -870,16 +1024,33 @@ pub struct Step {
     pub picked: Vec<(u32, Vec<u32>, u32)>, // (key, values, the pick variable's value)
 }
 
-/// The plan's operators (their numbers, in plan order) read back to actions.
+/// The plan's operators (their numbers, in plan order) read back to actions. With pick windows (module docstring) a
+/// window's begin is left out like a goal operator, its picks are read as pick operators, and after each step every
+/// pick variable is 0 again (README "Pick windows", Lemma 2).
 pub fn decode(x: &mut Expander, plan_ops: &[u64]) -> Result<Vec<Step>, String> {
     let t = x.t;
     let nf = x.nf;
+    let windows = x.windows;
+    let rank = if windows { x.rank.clone() } else { Vec::new() };
     let want: std::collections::HashSet<u64> = plan_ops.iter().copied().collect();
     let mut found: std::collections::HashMap<u64, (usize, Vec<(u32, u32)>, Vec<(u32, u32)>, Picked)> = Default::default();
+    let mut pick_ops: std::collections::HashMap<u64, (u32, u32)> = Default::default();
     let mut n = 0u64;
     for ai in 0..t.acts.len() {
         let mut here: Vec<(u64, Vec<(u32, u32)>, Vec<(u32, u32)>)> = Vec::new();
         let picked = x.expand(ai, &mut |v: &Variant| {
+            if windows {
+                let reads = window_reads(nf, &rank, v);
+                if !reads.is_empty() {
+                    n += 1; // begin
+                    for &k in &reads {
+                        for u in 0..t.facts.size(k) {
+                            pick_ops.insert(n, (k, u));
+                            n += 1;
+                        }
+                    }
+                }
+            }
             if want.contains(&n) {
                 here.push((n, v.chosen.to_vec(), v.guessed.to_vec()));
             }
@@ -891,9 +1062,8 @@ pub fn decode(x: &mut Expander, plan_ops: &[u64]) -> Result<Vec<Step>, String> {
         }
     }
     // pick operators, then goal operators
-    let mut pick_facts: Vec<u32> = (0..nf).filter(|&f| x.picks[f as usize]).collect();
+    let mut pick_facts: Vec<u32> = if windows { Vec::new() } else { (0..nf).filter(|&f| x.picks[f as usize]).collect() };
     pick_facts.sort_by(|&a, &b| t.key(a).cmp(t.key(b)));
-    let mut pick_ops: std::collections::HashMap<u64, (u32, u32)> = Default::default();
     for f in pick_facts {
         for u in 0..t.facts.size(f) {
             pick_ops.insert(n, (f, u));
@@ -908,7 +1078,7 @@ pub fn decode(x: &mut Expander, plan_ops: &[u64]) -> Result<Vec<Step>, String> {
             continue;
         }
         let Some((ai, chosen, guessed, picked)) = found.get(&op) else {
-            continue; // a goal operator
+            continue; // a goal operator, or a window's begin
         };
         let mut g = guessed.clone();
         let mut p = Vec::new();
@@ -918,6 +1088,9 @@ pub fn decode(x: &mut Expander, plan_ops: &[u64]) -> Result<Vec<Step>, String> {
             p.push((*key, vals.clone(), u));
         }
         steps.push(Step { op, action: *ai, chosen: chosen.clone(), guessed: g, picked: p });
+        if windows {
+            picks.clear();
+        }
     }
     Ok(steps)
 }
@@ -951,6 +1124,11 @@ fn json_str(s: &str) -> String {
 ///   with their conditions (task.py's `Op.picked`);
 /// * per pick operator `{"op": n, "pick": [key, value]}`, per goal operator `{"op": n, "goal": true}`.
 ///
+/// With pick windows (module docstring) there are no free pick operators. A window j is, in order, `{"op": n,
+/// "begin": true, "window": j}`, its picks `{"op": n, "pick": [key, value], "window": j}`, and the operator's own row
+/// with `"window": j` last. A pick's value holds for that window's operator only; elsewhere every pick variable is
+/// at its first value (README "Pick windows", Lemma 2).
+///
 /// Values are the domain's value texts. Operators are numbered as in the file (pass 2's order).
 pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, needed: &[String], mut w: W) -> Result<(), String> {
     let io = |e: std::io::Error| e.to_string();
@@ -965,9 +1143,30 @@ pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, needed: &[String], mut
         .map_err(io)?;
     let mut n = 0u64;
     let mut ioerr: Option<std::io::Error> = None;
+    let windows = x.windows;
+    let rank = if windows { x.rank.clone() } else { Vec::new() };
+    let mut j = 0u64;
     for ai in 0..t.acts.len() {
         let picked = x
             .expand(ai, &mut |v: &Variant| {
+                let reads = if windows { window_reads(nf, &rank, v) } else { Vec::new() };
+                let mut tail = String::new();
+                if !reads.is_empty() {
+                    j += 1;
+                    tail = format!(", \"window\": {}", j);
+                    let mut rows = format!("{{\"op\": {}, \"begin\": true, \"window\": {}}}\n", n, j);
+                    n += 1;
+                    for &k in &reads {
+                        for u in 0..t.facts.size(k) {
+                            rows.push_str(&format!("{{\"op\": {}, \"pick\": [{}, {}], \"window\": {}}}\n", n, key(k), val(k, u), j));
+                            n += 1;
+                        }
+                    }
+                    if let Err(e) = w.write_all(rows.as_bytes()) {
+                        ioerr = Some(e);
+                        return Err("write".into());
+                    }
+                }
                 let ch: Vec<String> = v.chosen.iter().map(|&(f, u)| format!("[{}, {}]", key(f), val(f, u))).collect();
                 let gu: Vec<String> = v
                     .guessed
@@ -979,7 +1178,7 @@ pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, needed: &[String], mut
                         format!("[{}, {}, [{}]]", key(f), val(f, u), c.join(", "))
                     })
                     .collect();
-                if let Err(e) = writeln!(w, "{{\"op\": {}, \"action\": {}, \"chosen\": [{}], \"guessed\": [{}]}}", n, ai, ch.join(", "), gu.join(", ")) {
+                if let Err(e) = writeln!(w, "{{\"op\": {}, \"action\": {}, \"chosen\": [{}], \"guessed\": [{}]{}}}", n, ai, ch.join(", "), gu.join(", "), tail) {
                     ioerr = Some(e);
                     return Err("write".into());
                 }
@@ -999,7 +1198,7 @@ pub fn write_ops<W: Write>(x: &mut Expander, plan: &Plan, needed: &[String], mut
         writeln!(w, "{{\"action\": {}, \"name\": {}, \"members\": [{}], \"picked\": [{}]}}", ai, json_str(&t.name(ai)), mem.join(", "), pk.join(", "))
             .map_err(io)?;
     }
-    let mut pick_facts: Vec<u32> = (0..nf).filter(|&f| x.picks[f as usize]).collect();
+    let mut pick_facts: Vec<u32> = if windows { Vec::new() } else { (0..nf).filter(|&f| x.picks[f as usize]).collect() };
     pick_facts.sort_by(|&a, &b| t.key(a).cmp(t.key(b)));
     for f in pick_facts {
         for u in 0..t.facts.size(f) {
