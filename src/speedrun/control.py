@@ -104,6 +104,12 @@ class Branch:
         self._send({"cmd": "state"})
         return self._recv()["state"]
 
+    def state_lite(self, objects) -> dict:
+        """The state dump's fields facts.py's facts_of reads, with the owners, states and classes of ``objects`` only and
+        no room objects or inventory (the bridge's ``state`` with ``objects``, a build that has it)."""
+        self._send({"cmd": "state", "objects": sorted(int(o) for o in objects)})
+        return self._recv()["state"]
+
     def set_rng(self, state: int) -> None:
         """Search only: put the RNG in ``state`` (the trace records it, so the run is not valid)."""
         self._send({"cmd": "set_rng", "state": state})
