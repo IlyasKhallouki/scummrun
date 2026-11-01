@@ -113,3 +113,48 @@ pass is a run of the task under α even where Lemma G's static conditions fail; 
 
 **Test.** Off: the five check scopes' sha1s and the kitchen's 279b7a24 (the records do not change with it on either).
 On: the verdicts on the window runs' readings; B1's window validation before and after.
+
+## 3. The input script on run B's moves (no switch: B4's work)
+
+**What the engine shows.** Three refuted predictions of run B's check (row 5) have their first opcode off the path in
+the plain input script, the global that ends in doSentence(verb, A, B) of three variables. Row 5 runs a sentence by
+starting the sentence script with (verb, A, B); the engine's click runs the input script first, and that script
+decides whether a sentence is queued and which. Found again in the engine:
+
+- a click whose point is over another object than the scored action's, with the default verb: the input script
+  queues a walk to that other object. On this seed the click is another input of V than the scored one; the model is
+  not at fault there, the sample is (the move is out of sync);
+- a click whose point is over no object: the script walks ego to the mouse point. That is a floor click, outside V;
+- a verb that takes a preposition with one object (its first click on an inventory icon): the script starts the
+  preposition script, which sets the preposition variable, and then queues no sentence while the second object is
+  missing (its local "a sentence is complete" stays 0). Row 5 runs the sentence anyway. This one is a semantics
+  error of the input rule.
+
+**Does input_settled cover it?** No. F1c (`inputs.rs`) starts an input at the room's input script only when that
+script is not plain; a plain input script keeps today's job, the sentence run directly ("today's sentence record is
+what it does"), and an input with an inventory object stays as it is. The third case is an inventory input under a
+plain input script, so the switch reads it as row 5 does. A reading from that move's start with input_settled on has
+no record of the input at all (its object is not one of the room's).
+
+**What a fix needs.** The plain rule is not a proof: the plain script has paths that queue no sentence, or another
+sentence, depending on the verb's preposition, the hovered object's default verb and owner, and a settings bit. A
+sound rule runs the plain script too, from the sentence variables and the click's area (scene or inventory) as
+constants, as F1c does for the other input scripts, and keeps its records apart from the sentence's (F1b's records,
+D10). That is plan step B4, which B1 now asks for; it is not built here.
+
+## 4. Two run B causes that are the done frame (class split, for the window search)
+
+Both were classed semantics by B1's first explanation. Found again in the engine, each is the done frame against the
+model's settled end, which is class split:
+
+- **Cursor and userput soft-on.** The model's last writer of the cursor and userput variables was taken to be the
+  cutscene-end script's soft-on ops. In the engine those ran, and in the done frame a room change ran the new room's
+  first local script, which turns the cursor and userput off, then waits. One frame later that script resumes and
+  turns them on. The model's settled end has them on, which the engine reaches one frame after the done frame.
+- **A room change into a pseudo-room of the same resource.** The model predicted the entry code no longer waiting at
+  its first breakHere. In the engine, the done frame is the room change: the entry code starts again and waits at
+  that breakHere, and it ends one frame later. The model's settled end is that later state.
+
+So neither opcode's abstract semantics is wrong; the time the slot still waits at done is the value to split on, as for
+B1's other 20 split causes. They go to the window search's list, with the others: WaitForCamera that does not block,
+polling loops on positions, delays, and the done frame before the write.
