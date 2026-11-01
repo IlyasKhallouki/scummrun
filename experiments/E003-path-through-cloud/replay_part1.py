@@ -727,7 +727,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             reread: bool = False, threads: int = 3, serve: bool = False, search: str = "lama-first",
             cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
             approach_stones: bool = False, window_search: bool = False, workers: int = 7, starter=None,
-            window_strict: bool = False, window_cache: bool = False, window_fork_each: int = 0) -> dict:
+            window_strict: bool = False, window_cache: bool = False, window_fork_each: int = 0,
+            window_lite: bool = False) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -748,7 +749,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         ("-caps" if cost_caps else "") + ("-reachx" if reach_extend else "") + \
         ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "") + \
         ("-window" if window_search else "") + ("-strict" if window_strict else "") + ("-cache" if window_cache else "") + \
-        (f"-ahead{window_fork_each}" if window_fork_each else "") + \
+        (f"-ahead{window_fork_each}" if window_fork_each else "") + ("-lite" if window_lite else "") + \
         (f"-{starter.name}" if starter is not None else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -779,10 +780,10 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     wcfg = None
     if window_search:
         import window as WS
-        if window_fork_each and not window_strict:
-            raise SystemExit("--window-fork-each is a sub-switch of --window-strict")
+        if (window_fork_each or window_lite) and not window_strict:
+            raise SystemExit("--window-fork-each and --window-lite are sub-switches of --window-strict")
         wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=window_strict,
-                               cache=window_cache, fork_each=window_fork_each)
+                               cache=window_cache, fork_each=window_fork_each, lite=window_lite)
         out["window_search"] = dict(vars(wcfg))
         out["sources"]["window.py"] = sha(HERE / "window.py")
         if window_strict:  # window-search.md section 9: B1's matcher and explainer
@@ -1120,6 +1121,8 @@ def main() -> None:
                    help="the window search's sub-switch strict: B1's matcher (window-search.md section 9)")
     r.add_argument("--window-fork-each", type=int, default=0,
                    help="the strict window search's sub-switch fork_each: N frames forked ahead per command (9.7)")
+    r.add_argument("--window-lite", action="store_true",
+                   help="the strict window search's sub-switch lite: a child's views from the bridge's lite dump (9.7)")
     r.add_argument("--window-cache", action="store_true",
                    help="the window search's sub-switch cache: a child's dump kept until it runs (section 9.7)")
     lg = sub.add_parser("log")
@@ -1146,7 +1149,8 @@ def main() -> None:
                 reread=a.reread, threads=a.threads, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
                 reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms,
                 approach_stones=a.approach_stones, window_search=a.window_search, workers=a.workers,
-                window_strict=a.window_strict, window_cache=a.window_cache, window_fork_each=a.window_fork_each)
+                window_strict=a.window_strict, window_cache=a.window_cache, window_fork_each=a.window_fork_each,
+                window_lite=a.window_lite)
     else:
         cmd_log(a.name, a.results)
 
