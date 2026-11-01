@@ -252,53 +252,55 @@ class _MatcherView:
 # --- an input record at s + 1 ------------------------------------------------------------------------------------------
 
 def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: dict | None, applied: dict,
-                runs_s: list, runs_s1: list, v1: dict) -> dict:
-    """9.2's (I1)-(I4) for the reading's action ``idx``, an input record whose ``pos:`` writes name ``units``: v0 the
-    view before its first click (V_{f_1−1}), d0 the dump there, ``applied`` the set writes of the event records matched
-    before its first run, runs_s and runs_s1 R_s and R_{s+1}, v1 V_{s+1}. Returns {"ok", "took", "why", "run"}: why the
-    first condition that failed, run the slot run of the unit it names."""
+                own: dict, vk: dict, later: list) -> dict:
+    """9.2's (I1)-(I4) and "took effect" for the reading's action ``idx``, an input record whose ``pos:`` writes name
+    ``units``: v0 the view before its first click (V_{f_1−1}), d0 the dump there, ``applied`` the set writes of the
+    event records matched before its first run, ``own`` its runs (unit -> the unit's first run at depth 1 or more from
+    the click's frame on), vk the view at the frame it is decided, ``later`` the runs of that frame after its last run.
+    Returns {"ok", "took", "why", "run", "engine", "want", "first_seq", "last_seq"}: why the first condition that
+    failed, run the click's run of the unit it names."""
     _, _, _, pre, eff, checks = sr.rec(idx)
-    state = dict(v0, **applied) if applied else v0
+    state = {**v0, **applied} if applied else v0
     bad = next((k for k, vs in pre.items() if not TE._holds(state.get(k), vs)), None)
     if bad is not None:
         return {"ok": False, "took": False, "why": f"pre {bad}", "run": None, "engine": _show(state.get(bad))}
-    both = sorted(runs_s + runs_s1, key=lambda r: r.seq)
     changed = False
-    last_of = {}
-    for r in both:
-        last_of[r.unit] = r
     for k, e in eff.items():
         if not k.startswith("pos:") or e[0] != "set":
             continue
-        u = k[4:]
-        r = last_of.get(u)
+        r = own.get(k[4:])
         if r is None:
-            return {"ok": False, "took": False, "why": f"no run {k}", "run": None, "engine": None}
+            if e[1] == R.NOWHERE:  # a slot the click stops, or leaves dead: the view says
+                if vk.get(k) != R.NOWHERE:
+                    return {"ok": False, "took": False, "why": f"end {k}", "run": None, "engine": vk.get(k),
+                            "want": e[1]}
+                changed = changed or v0.get(k) != R.NOWHERE
+                continue
+            return {"ok": False, "took": False, "why": f"no run {k}", "run": None, "engine": None, "want": e[1]}
         end = r.code1 if r.code1 >= 0 else R.NOWHERE
-        if end != e[1] and not (end == R.NOWHERE and e[1] == R.NOWHERE):
+        if end != e[1]:
             return {"ok": False, "took": False, "why": f"end {k}", "run": r, "engine": end, "want": e[1]}
         if v0.get(k) != end:
             changed = True
-    mine = [r for r in both if r.unit in units]
-    last_seq = max((r.seq for r in mine), default=-1)
-    later = [r for r in runs_s1 if r.seq > last_seq]
+    seqs = [r.seq for r in own.values()]
+    mine = sorted(own.values(), key=lambda r: r.seq)
     for k, e in eff.items():
-        if k.startswith("pos:") or e[0] not in ("set", "guess") or k not in v1:
+        if k.startswith("pos:") or e[0] not in ("set", "guess") or k not in vk:
             continue
-        if not TE.StrictMatcher._value_ok(e, v1[k]):
+        if not TE.StrictMatcher._value_ok(e, vk[k]):
             if any(k in plan.matcher.keys.get((r.unit, r.code0, r.code1 if r.code1 >= 0 else R.NOWHERE), ()) or
                    k in plan.matcher.keys.get((r.unit, r.code0, None), ()) for r in later):
                 continue
             return {"ok": False, "took": False, "why": f"effect {k}", "run": mine[-1] if mine else None,
-                    "engine": _show(v1[k])}
+                    "engine": _show(vk[k])}
         if not TE.StrictMatcher._value_ok(e, v0.get(k)):
             changed = True
     if d0 is not None:
         for c in checks:
             if RP.eval_check(c, sr.task.actions[idx].what, d0) is False:
                 return {"ok": False, "took": False, "why": f"check {c[0]}", "run": None, "engine": None}
-    return {"ok": True, "took": changed, "why": None, "run": None, "last_seq": last_seq,
-            "first_seq": min((r.seq for r in mine), default=-1)}
+    return {"ok": True, "took": changed, "why": None, "run": None, "first_seq": min(seqs, default=-1),
+            "last_seq": max(seqs, default=-1)}
 
 
 def _show(v):

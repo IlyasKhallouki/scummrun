@@ -119,21 +119,23 @@ def test_the_input_needs_its_own_runs_and_a_change():
     r = mrec(0, "input", "click#3")
     plan = plan_of(sr, [r], {"click#3": 3})
     v0 = {"room": 28, "pos:script:4": NOWHERE, "pos:script:2": NOWHERE, "var:5": 0}
-    rs = [run(20, "script:4", 0, -1, frame=30)]
-    rs1 = [run(21, "script:2", 0, 736, frame=30, after=1)]
+    own = {"script:4": run(20, "script:4", 0, -1, frame=30, depth=1),
+           "script:2": run(21, "script:2", 0, 736, frame=30, after=1, depth=1)}
     v1 = dict(v0, **{"pos:script:2": 736, "var:5": 1})
-    got = S.input_match(sr, plan, 3, ["script:4", "script:2"], v0, None, {}, rs, rs1, v1)
+    got = S.input_match(sr, plan, 3, ["script:4", "script:2"], v0, None, {}, own, v1, [])
     assert got["ok"] and got["took"] and got["last_seq"] == 21
-    # the sentence script's run passed its wait (one run, one record): not matched, the end named
-    bad = S.input_match(sr, plan, 3, ["script:4", "script:2"], v0, None, {}, rs,
-                        [run(21, "script:2", 0, -1, frame=30, after=1)], v1)
+    # the sentence script's start passed its wait (one run, one record): not matched, the end named
+    bad = S.input_match(sr, plan, 3, ["script:4", "script:2"], v0, None, {},
+                        dict(own, **{"script:2": run(21, "script:2", 0, -1, frame=30, after=1, depth=1)}), v1, [])
     assert not bad["ok"] and bad["why"] == "end pos:script:2" and bad["engine"] == NOWHERE
-    # no run of a unit the record names
-    assert S.input_match(sr, plan, 3, ["script:4", "script:2"], v0, None, {}, rs, [], v1)["why"] == \
-        "no run pos:script:2"
+    # no start of a unit the record leaves at a wait point
+    assert S.input_match(sr, plan, 3, ["script:4", "script:2"], v0, None, {}, {"script:4": own["script:4"]}, v1,
+                         [])["why"] == "no run pos:script:2"
     # the precondition on the view before, after the writes of the records matched before the click's runs
-    assert S.input_match(sr, plan, 3, [], dict(v0, room=33), None, {}, rs, rs1, v1)["why"] == "pre room"
-    assert S.input_match(sr, plan, 3, [], dict(v0, room=33), None, {"room": 28}, rs, rs1, v1)["ok"]
+    assert S.input_match(sr, plan, 3, [], dict(v0, room=33), None, {}, own, v1, [])["why"] == "pre room"
+    assert S.input_match(sr, plan, 3, [], dict(v0, room=33), None, {"room": 28}, own, v1, [])["ok"]
+    # an effect a later run of the frame writes is not checked (M4)
+    assert S.input_match(sr, plan, 3, [], v0, None, {}, own, dict(v1, **{"var:5": 7}), [])["why"] == "effect var:5"
 
 
 def test_a_match_on_writes_that_held_did_not_take_effect():
@@ -141,8 +143,11 @@ def test_a_match_on_writes_that_held_did_not_take_effect():
     sr = FakeReading({3: (3, None, None, {}, {"pos:script:4": ("set", NOWHERE)}, [])})
     plan = plan_of(sr, [mrec(0, "input", "c#3")], {"c#3": 3})
     v0 = {"pos:script:4": NOWHERE}
-    got = S.input_match(sr, plan, 3, ["script:4"], v0, None, {}, [run(20, "script:4", 0, -1)], [], v0)
+    got = S.input_match(sr, plan, 3, ["script:4"], v0, None, {}, {"script:4": run(20, "script:4", 0, -1, depth=1)},
+                        v0, [])
     assert got["ok"] and not got["took"]
+    # a slot the record leaves dead with no run of it: the view decides
+    assert S.input_match(sr, plan, 3, ["script:4"], v0, None, {}, {}, v0, [])["ok"]
 
 
 def test_open_keys_and_frames():

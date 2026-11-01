@@ -589,6 +589,19 @@ class _Cached:
         return got
 
 
+class _FirstWatched(RP._Watched):
+    """replay._Watched that also keeps the frame and the state dump before the first input event it schedules."""
+
+    def __init__(self, b):
+        super().__init__(b)
+        self.first_before = None
+
+    def inputs(self, events: list) -> None:
+        if self.first_before is None and any(RP._is_input(e) for e in events):
+            self.first_before = (self._b.frame, self._b.state())
+        super().inputs(events)
+
+
 class _Stepper:
     """A child's branch while the input code plays, one frame at a time (section 9.1): after each frame ``on_frame``
     reads its runs, explain log and view. A run to a frame, or to a condition with a frame limit, is played as single
@@ -1400,6 +1413,7 @@ class Search:
                 self._tick("observe", t_)
             branch = _Stepper(cb, on_frame) if observe_play else cb
             ctx = _Ctx(branch, self.release, self.stone_fork if self.stones else None)
+            ctx.watched = ctx.ex.b = _FirstWatched(branch)  # the view before the first input event (I1)
             tt = self._tick("setup", tt)
             try:
                 self._play(ctx, w["inp"], w["name"])
@@ -1420,12 +1434,10 @@ class Search:
                     return ch
                 w["first_g"][ch.first] = ch.g
             if cb.frame != ch.issue:
-                st = cb.run(frame=ch.issue)
+                st = branch.run(frame=ch.issue)
                 if "end" in st:
                     ch.outcome, ch.why = "ended", st["end"]
                     return ch
-                if observe_play:
-                    on_frame()
             s_issue = ch.issue
             if s_issue not in frames_seen:
                 on_frame()
@@ -1433,6 +1445,7 @@ class Search:
                 rows_all.extend(cb.runs()["runs"])
                 kept.add_entries(cb.explain_log()["explain"])
             st_issue = dict(cb.status)
+            d_issue = frames_seen[s_issue][1]
             snap = self.fork(cb, "snapshot")  # the next window's parent (section 7), its buffers empty
             st = cb.run(frame=s_issue + 1)
             if "end" in st:
@@ -1444,79 +1457,121 @@ class Search:
             frames_seen.setdefault(ch.g, (ch.at_fork, ch.d0))
             for f in sorted(Rk):
                 kept.frame(f, Rk[f], frames_seen.get(f, (None, None))[1], frames_seen.get(f, (None, None))[0])
-            # 9.2's input record at s + 1: first the runs before the click's own (I1), then the click, then the rest
-            in_runs = [r for f in (s_issue, s_issue + 1) for r in Rk.get(f, ())
-                       if any(r.unit in us for us in w["in_units"].values())]
-            sigma0 = min((r.seq for r in in_runs), default=None)
-            verd = {}
-            for f in sorted(Rk):
-                if f <= ch.g or f > s_issue + 1:
-                    continue
-                vb, va = frames_seen.get(f - 1, (None, None)), frames_seen.get(f, (None, None))
-                if vb[0] is None or va[0] is None:
-                    continue
-                verd[f] = track.verdicts(Rk[f], vb[0], va[0], vb[1])
-            applied = {}
-            for f in sorted(verd):
-                for run_, v_ in verd[f]:
-                    if sigma0 is None or run_.seq < sigma0:
-                        for r_, how in track.apply(f, run_, v_, frames_seen[f][0]):
-                            if how == "matched":
-                                idx = sp.idx[r_.i][track.matched[r_.i][1]]
-                                applied.update({kk: e[1] for kk, e in sr.rec(idx)[4].items() if e[0] == "set"})
             v0, d0 = ch.at_fork, ch.d0
-            v1 = frames_seen[s_issue + 1][0]
-            R_s, R_s1 = Rk.get(s_issue, []), Rk.get(s_issue + 1, [])
-            res = None
-            for nn, idx in enumerate(sp.idx[first.i]):
-                if idx is None:
-                    continue
-                res = S.input_match(sr, sp, idx, w["in_units"][nn], v0, d0, applied, R_s, R_s1, v1)
-                if res["ok"]:
-                    track.matched[first.i] = (s_issue, nn, res["last_seq"])
-                    ch.took = "plan" if res["took"] else "plan, no change"
-                    break
-            if ch.took not in ("plan", "plan, no change"):
-                for name, idx, us, linked in w["alts"]:
-                    rj = S.input_match(sr, sp, idx, us, v0, d0, applied, R_s, R_s1, v1)
-                    if rj["ok"] and rj["took"] and any(v1.get(kk) != v0.get(kk) for kk in linked):
-                        ch.alt = ch.took = name
-                        break
-                else:
-                    ch.took = None
-            for f in (s_issue, s_issue + 1):
-                for run_, v_ in verd.get(f, []):
-                    if sigma0 is not None and run_.seq >= sigma0:
-                        track.apply(f, run_, v_, frames_seen[f][0])
-                if f == s_issue:
+            fb = ctx.watched.first_before
+            if fb is not None and fb[0] != ch.g:  # the input code waited before its first event: V_{f_1−1}
+                v0, d0 = w["sview"](F.facts_of(fb[1]), fb[1]), fb[1]
+                frames_seen.setdefault(fb[0], (v0, d0))
+            # 9.2: the click's record and its other records, each decided once its runs have come
+            cands = [("plan", nn, idx, w["in_units"][nn], None) for nn, idx in enumerate(sp.idx[first.i])
+                     if idx is not None] + [("alt", name, idx, us, linked) for name, idx, us, linked in w["alts"]]
+            needs = [[kk[4:] for kk, e in sr.rec(c[2])[4].items() if kk.startswith("pos:") and e[0] == "set"
+                      and isinstance(e[1], int) and e[1] >= 0] for c in cands]
+            own = [{} for _ in cands]
+            decided: list = [None] * len(cands)
+            matched_writes: list = []  # (seq of the run, its record's set writes), the event records matched here
+
+            def decide(n_, f, va, runs_f):
+                c = cands[n_]
+                seqs = [r.seq for r in own[n_].values()]
+                lo, hi = (min(seqs), max(seqs)) if seqs else (None, None)
+                applied = {}
+                for sq, wr in matched_writes:
+                    if lo is None or sq < lo:
+                        applied.update(wr)
+                later = [r for r in runs_f if hi is not None and r.seq > hi]
+                decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later)
+                decided[n_]["frame"] = f
+
+            def settle() -> None:
+                """The click's outcome once its candidates are decided (Lemma 9′)."""
+                if ch.took != "n/a":
+                    return
+                plan_c = [n_ for n_, c in enumerate(cands) if c[0] == "plan"]
+                ok = next((n_ for n_ in plan_c if decided[n_] is not None and decided[n_]["ok"]), None)
+                if ok is not None:
+                    res_ = decided[ok]
+                    track.matched[first.i] = (s_issue, cands[ok][1], res_["last_seq"])
+                    ch.took = "plan" if res_["took"] else "plan, no change"
                     ch.track_issue = track.copy()
-            if ch.track_issue is None:
-                ch.track_issue = track.copy()
+                    return
+                if any(decided[n_] is None for n_ in plan_c):
+                    return
+                alt_c = [n_ for n_, c in enumerate(cands) if c[0] == "alt"]
+                for n_ in alt_c:
+                    rj, linked = decided[n_], cands[n_][4]
+                    if rj is not None and rj["ok"] and rj["took"] and \
+                            any(frames_seen[rj["frame"]][0].get(kk) != v0.get(kk) for kk in linked):
+                        ch.alt = ch.took = cands[n_][1]
+                        ch.track_issue = track.copy()
+                        return
+                if all(decided[n_] is not None for n_ in alt_c):
+                    ch.took = None
+
+            def frame_step(f) -> None:
+                """R_f in run order: the click's runs collected, a candidate decided once its runs have come (before
+                the event runs after them), the event runs matched (Definition S)."""
+                vb, va = frames_seen.get(f - 1, (None, None)), frames_seen.get(f, (None, None))
+                runs_f = Rk.get(f, [])
+                vs = dict((r.seq, v) for r, v in track.verdicts(runs_f, vb[0], va[0], vb[1])) \
+                    if vb[0] is not None and va[0] is not None else {}
+                for r in runs_f:
+                    if r.depth >= 1 and r.frame >= s_issue and ch.took == "n/a":
+                        for n_, c in enumerate(cands):
+                            if r.unit in c[3] and r.unit not in own[n_]:
+                                own[n_][r.unit] = r
+                    if r.seq in vs:
+                        if ch.took == "n/a" and va[0] is not None:
+                            for n_ in range(len(cands)):
+                                if decided[n_] is None and own[n_] and all(u in own[n_] for u in needs[n_]) and \
+                                        max(x.seq for x in own[n_].values()) < r.seq:
+                                    decide(n_, f, va[0], runs_f)
+                            settle()
+                        for r_, how in track.apply(f, r, vs[r.seq], va[0]):
+                            if how == "matched":
+                                idx_ = sp.idx[r_.i][track.matched[r_.i][1]]
+                                matched_writes.append((r.seq, {kk: e[1] for kk, e in sr.rec(idx_)[4].items()
+                                                               if e[0] == "set"}))
+                if ch.took == "n/a" and f >= s_issue + 1 and va[0] is not None:
+                    for n_ in range(len(cands)):
+                        if decided[n_] is None and all(u in own[n_] for u in needs[n_]):
+                            decide(n_, f, va[0], runs_f)
+                    settle()
+
+            def input_fail(f, why_default="no run") -> None:
+                first_c = next((n_ for n_, c in enumerate(cands) if c[0] == "plan"), None)
+                res_ = decided[first_c] if first_c is not None else None
+                if res_ is None and first_c is not None:
+                    miss = [u for u in needs[first_c] if u not in own[first_c]]
+                    res_ = {"why": f"no run pos:{miss[0]}" if miss else why_default, "run": None, "engine": None}
+                if res_ is None:
+                    return
+                self._fail(w, ch, {"kind": "input", "record": first.name, "frame": res_.get("frame", f),
+                                   "why": res_["why"], "run": res_.get("run"), "want": res_.get("want"),
+                                   "engine": res_.get("engine"),
+                                   "asks": sr.rec(sp.idx[first.i][0])[3].get(res_["why"].split(" ", 1)[-1])
+                                   if sp.idx[first.i][0] is not None else None,
+                                   "material": kept.freeze({ch.g: v0}, {ch.g: d0})})
+
+            for f in sorted(Rk):
+                if ch.g < f <= s_issue + 1:
+                    frame_step(f)
             tt = self._tick("match", tt)
-            if ch.took is None:
-                ch.outcome, ch.why = "spent", f"Lemma 9′: {res['why'] if res else 'no path'}"
-                with self._lock:
-                    w["lemma9_stops"] += 1
-                if res is not None:
-                    self._fail(w, ch, {"kind": "input", "record": first.name, "frame": s_issue + 1,
-                                       "why": res["why"], "run": res.get("run"), "want": res.get("want"),
-                                       "engine": res.get("engine"),
-                                       "asks": sr.rec(sp.idx[first.i][0])[3].get(res["why"].split(" ", 1)[-1]),
-                                       "material": kept.freeze({ch.g: v0, s_issue + 1: v1},
-                                                               {ch.g: d0})})
-                ch.end, ch.q_end = cb.frame, cb.status.get("qf")
-                ch.frames = cb.frame - ch.g
-                return ch
             moved = False
-            s, now = frames_seen[s_issue + 1][1], v1
+            s, now = frames_seen[s_issue + 1][1], frames_seen[s_issue + 1][0]
             obs = F.facts_of(s)
             m = Matcher(w["tracked"], w["needed"], first, ch.done, issued=w["issued"])
             m.plan_pending = w["plan_pending"]
-            prev_view, prev_dump = v1, s
             while True:
                 st = cb.status
                 f = cb.frame
                 ch.frames = f - ch.g
+                if ch.took is None:  # Lemma 9′: neither the click's record nor another of its records can match
+                    ch.outcome, ch.why = "spent", "Lemma 9′"
+                    with self._lock:
+                        w["lemma9_stops"] += 1
+                    input_fail(f)
+                    break
                 if cfg.delta_lo > 1 and max(1, st.get("v19", 0)) < cfg.delta_lo:
                     ch.outcome, ch.why = "delta", st.get("v19")
                     w["delta_violation"] = [f, st.get("v19")]
@@ -1561,6 +1616,12 @@ class Search:
                     ch.outcome = "pruned"
                     break
                 if f > s_issue + 1 and "idle" in st:
+                    if ch.took == "n/a":  # Lemma 9′: at the idle stop nothing is left to start the click's runs
+                        ch.outcome, ch.why = "spent", "Lemma 9′: no run by the idle stop"
+                        with self._lock:
+                            w["lemma9_stops"] += 1
+                        input_fail(f)
+                        break
                     dead = m.dead_needed(now)
                     if dead:
                         ch.outcome, ch.why = "spent", m.unmet(now)
@@ -1568,7 +1629,10 @@ class Search:
                         break
                 if f - s_issue >= cfg.child_limit:
                     ch.outcome, ch.why = "limit", m.unmet(now)
-                    self._not_run_fail(w, ch, track, f, kept)
+                    if ch.took == "n/a":
+                        input_fail(f)
+                    else:
+                        self._not_run_fail(w, ch, track, f, kept)
                     break
                 st = cb.run(frame=f + 1)
                 if "end" in st:
@@ -1581,12 +1645,14 @@ class Search:
                 obs = F.facts_of(s)
                 now = w["sview"](obs, s)
                 t_ = self._tick("observe", t_)
-                R_ = S.by_frame(S.runs_of(rows)).get(f + 1, [])
-                Rk[f + 1] = R_
-                for run_, v_ in track.verdicts(R_, prev_view, now, prev_dump):
-                    track.apply(f + 1, run_, v_, now)
-                kept.frame(f + 1, R_, s, now)
-                prev_view, prev_dump = now, s
+                Rk[f + 1] = S.by_frame(S.runs_of(rows)).get(f + 1, [])
+                frames_seen[f + 1] = (now, s)
+                for old in [x for x in frames_seen if x < f - 1 and x != ch.g]:
+                    del frames_seen[old]
+                for old in [x for x in Rk if x < f - 2]:
+                    del Rk[old]
+                kept.frame(f + 1, Rk[f + 1], s, now)
+                frame_step(f + 1)
                 self._tick("match", t_)
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: (v[0], v[1]) for i, v in track.matched.items() if v[0] is not None}
@@ -1614,7 +1680,6 @@ class Search:
                     obs = F.facts_of(s)
                 ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             if ch.outcome in ("success", "goal", "deviation"):
-                d_issue = frames_seen[s_issue][1]
                 ch.checkpoints = [(s_issue, F.facts_of(d_issue), RP.extra_of(d_issue, st_issue)),
                                   (cb.frame, dict(obs), RP.extra_of(s, cb.status))]
                 full = w["full_fv"](obs)
