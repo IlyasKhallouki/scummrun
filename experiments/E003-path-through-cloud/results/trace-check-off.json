@@ -1,0 +1,25 @@
+{
+ "old": "/var/tmp/fast-mi/svm-window/build/scummvm/scummvm",
+ "old_sha1": "87066f13be73",
+ "new": "/home/ilyask/.cache/fast-mi/svm-trace/build/scummvm/scummvm",
+ "new_sha1": "00adbbc2d286",
+ "first_frame": 1,
+ "frames": 3234,
+ "to_frame": 3235,
+ "status_differ": 0,
+ "off_differ": 0,
+ "on_differ": 0,
+ "trace_sha1": {
+  "old": "3c4fdad27400",
+  "new-off": "3c4fdad27400",
+  "new-on": "3c4fdad27400"
+ },
+ "traces_equal": true,
+ "runs": 15230,
+ "log_entries": 271939,
+ "runs_dropped": 0,
+ "log_dropped": 0,
+ "violations": 0,
+ "differences": [],
+ "seconds": 42.3
+}
