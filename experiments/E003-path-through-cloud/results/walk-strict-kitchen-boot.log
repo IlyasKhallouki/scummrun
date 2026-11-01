@@ -1,0 +1,115 @@
+E004 branch walk: the strict window search with window-search.md 9.8's fixes, the kitchen from the harness's boot, the reading without wait_both (kitchen-w3, the trace branch's), run.sh; seed 1; --serve --search lama-first-costs --cost-caps --reach-extend --unobserved-actor-rooms --approach-stones --window-search --window-strict --window-cache --window-fork-each 7 --window-lite --workers 3, replan limit 30, plan memory 3G; the ScummVM build of svm-w3b (bridge a77a9af).
+
+file replay-part1-kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split'; goal reached False; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 5 checkpoints, 0 differences, 27 inputs, goal at the end False, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 9976, qf 239236): 7248 frames, 173952 qf, 724.82 s
+plans 2, replans 1
+  replan after plan 0 at frame 6376: window empty: 3600 frames; children {'refuted': 1, 'spent': 3599}; cause: input walk_to(428)#64 at 2798: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  cause (window empty, plan 0 window 1): input walk_to(428)#64 at 2798: end pos:script:2: the wait did not block; script:2 736 WaitForActor; getActorMoving(1) = 0; class split
+  cause (window empty, plan 1 window 0): input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 736 WaitForActor; getActorMoving(1) = 0; class split
+windows 3; children 7266; child frames 24527; outcomes {'duplicate': 6, 'pruned': 59, 'success': 1, 'refuted': 1, 'spent': 7199}
+search CPU: engines 95.9 s {'child': 85.65, 'snapshot': 10.23, 'the last engine': 0.0}, Python 166.44 s, total 262.3 s
+Python CPU by part {'setup': 0.93, 'play': 9.39, 'observe': 80.84, 'match': 6.7, 'child total': 119.83, 'cache: state, kept': 48660, 'cache: state, asked': 17200, 'cache: at, asked': 39185, 'cache: at, kept': 108325}
+memory {'forks_pss_kb': 73284, 'python_rss_kb': 305256, 'live_forks': 14, 'min_available_kb': 8436004}
+steps: inputs 3 {'matched': 1, 'window empty': 2}; events 5 {'matched': 1, 'not reached': 4}
+  window 0.1 sentence(2,428)#44: frames 2728-2794 (stop: Q(g) + b reached the best success); 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}, 2774 child frames, 7.52 s wall, 6.66 Python s; best success fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures []
+  window 0.2 walk_to(428)#64: frames 2776-6376 (3600 frames); 3600 children {'refuted': 1, 'spent': 3599}, 10953 child frames, 89.17 s wall, 79.71 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'end pos:script:2'], 3581], [['input', 'walk_to(428)#64', 'pre script:2'], 18]]
+  window 1.1 walk_to(428)#64: frames 6376-9976 (3600 frames); 3600 children {'spent': 3600}, 10800 child frames, 90.3 s wall, 80.08 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'end pos:script:2'], 3600]]
+windows with an input 3; search CPU per such window 87.4 s; x 250 = 6.07 CPU h
+effects outside their domain (M4 does not check them; the record still matches under trace-validation.md section 3): 0
+run seconds 291.8; reach extensions 0
+  plan 0 at frame 2728: plan, 27 steps, write 3.5233646819833666, search None, plan_cost 343
+  plan 1 at frame 6376: plan, 25 steps, write 3.0187424819450825, search None, plan_cost 340
+
+the run's progress log:
+kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: booting to the first idle stop
+kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: plan, 27 steps, 37 s
+plan 0 window 1/8: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+  window 1: stop: Q(g) + b reached the best success; 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}; best 2796 (Q 66916); 7.52 s
+plan 0 window 2/8: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+    window 2: 100 children by frame 2875, {'refuted': 1, 'spent': 97}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 79), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 200 children by frame 2975, {'refuted': 1, 'spent': 197}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 179), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 300 children by frame 3075, {'refuted': 1, 'spent': 296}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 278), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 400 children by frame 3175, {'refuted': 1, 'spent': 396}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 378), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 500 children by frame 3275, {'refuted': 1, 'spent': 496}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 478), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 600 children by frame 3375, {'refuted': 1, 'spent': 596}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 578), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 700 children by frame 3475, {'refuted': 1, 'spent': 696}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 678), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 800 children by frame 3575, {'refuted': 1, 'spent': 797}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 779), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 900 children by frame 3675, {'refuted': 1, 'spent': 896}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 878), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1000 children by frame 3775, {'refuted': 1, 'spent': 996}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 978), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1100 children by frame 3875, {'refuted': 1, 'spent': 1096}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1078), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1200 children by frame 3975, {'refuted': 1, 'spent': 1196}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1178), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1300 children by frame 4075, {'refuted': 1, 'spent': 1297}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1279), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1400 children by frame 4175, {'refuted': 1, 'spent': 1396}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1378), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1500 children by frame 4275, {'refuted': 1, 'spent': 1497}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1479), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1600 children by frame 4375, {'refuted': 1, 'spent': 1596}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1578), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1700 children by frame 4475, {'refuted': 1, 'spent': 1696}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1678), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1800 children by frame 4575, {'refuted': 1, 'spent': 1796}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1778), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 1900 children by frame 4675, {'refuted': 1, 'spent': 1896}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1878), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2000 children by frame 4775, {'refuted': 1, 'spent': 1996}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1978), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2100 children by frame 4875, {'refuted': 1, 'spent': 2096}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2078), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2200 children by frame 4975, {'refuted': 1, 'spent': 2197}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2179), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2300 children by frame 5075, {'refuted': 1, 'spent': 2296}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2278), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2400 children by frame 5175, {'refuted': 1, 'spent': 2396}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2378), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2500 children by frame 5275, {'refuted': 1, 'spent': 2496}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2478), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2600 children by frame 5375, {'refuted': 1, 'spent': 2596}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2578), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2700 children by frame 5475, {'refuted': 1, 'spent': 2696}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2678), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2800 children by frame 5575, {'refuted': 1, 'spent': 2796}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2778), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 2900 children by frame 5675, {'refuted': 1, 'spent': 2897}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2879), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3000 children by frame 5775, {'refuted': 1, 'spent': 2997}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2979), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3100 children by frame 5875, {'refuted': 1, 'spent': 3096}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3078), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3200 children by frame 5975, {'refuted': 1, 'spent': 3196}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3178), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3300 children by frame 6075, {'refuted': 1, 'spent': 3296}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3278), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3400 children by frame 6175, {'refuted': 1, 'spent': 3396}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3378), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3500 children by frame 6275, {'refuted': 1, 'spent': 3496}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3478), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+    window 2: 3600 children by frame 6375, {'refuted': 1, 'spent': 3597}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3579), (('input', 'walk_to(428)#64', 'pre script:2'), 18)]
+  window 2: cause: input walk_to(428)#64 at 2798: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  window 2: 3600 frames; 3600 children {'refuted': 1, 'spent': 3599}; best None (Q None); 89.17 s
+planning through taskcore (plan 1, frame 6376, 0 bans)
+plan 1: plan, 25 steps, 37 s
+plan 1 window 1/7: walk_to(428)#64 at frame 6376 (3 records needed, 3 tracked)
+    window 1: 100 children by frame 6475, {'spent': 97}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 97)]
+    window 1: 200 children by frame 6575, {'spent': 197}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 197)]
+    window 1: 300 children by frame 6675, {'spent': 297}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 297)]
+    window 1: 400 children by frame 6775, {'spent': 397}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 397)]
+    window 1: 500 children by frame 6875, {'spent': 497}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 497)]
+    window 1: 600 children by frame 6975, {'spent': 597}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 597)]
+    window 1: 700 children by frame 7075, {'spent': 697}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 697)]
+    window 1: 800 children by frame 7175, {'spent': 797}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 797)]
+    window 1: 900 children by frame 7275, {'spent': 897}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 897)]
+    window 1: 1000 children by frame 7375, {'spent': 997}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 997)]
+    window 1: 1100 children by frame 7475, {'spent': 1097}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1097)]
+    window 1: 1200 children by frame 7575, {'spent': 1197}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1197)]
+    window 1: 1300 children by frame 7675, {'spent': 1297}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1297)]
+    window 1: 1400 children by frame 7775, {'spent': 1397}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1397)]
+    window 1: 1500 children by frame 7875, {'spent': 1497}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1497)]
+    window 1: 1600 children by frame 7975, {'spent': 1597}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1597)]
+    window 1: 1700 children by frame 8075, {'spent': 1697}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1697)]
+    window 1: 1800 children by frame 8175, {'spent': 1797}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1797)]
+    window 1: 1900 children by frame 8275, {'spent': 1897}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1897)]
+    window 1: 2000 children by frame 8375, {'spent': 1997}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 1997)]
+    window 1: 2100 children by frame 8475, {'spent': 2097}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2097)]
+    window 1: 2200 children by frame 8575, {'spent': 2197}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2197)]
+    window 1: 2300 children by frame 8675, {'spent': 2297}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2297)]
+    window 1: 2400 children by frame 8775, {'spent': 2397}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2397)]
+    window 1: 2500 children by frame 8875, {'spent': 2497}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2497)]
+    window 1: 2600 children by frame 8975, {'spent': 2597}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2597)]
+    window 1: 2700 children by frame 9075, {'spent': 2697}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2697)]
+    window 1: 2800 children by frame 9175, {'spent': 2797}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2797)]
+    window 1: 2900 children by frame 9275, {'spent': 2897}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2897)]
+    window 1: 3000 children by frame 9375, {'spent': 2997}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 2997)]
+    window 1: 3100 children by frame 9475, {'spent': 3097}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3097)]
+    window 1: 3200 children by frame 9575, {'spent': 3197}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3197)]
+    window 1: 3300 children by frame 9675, {'spent': 3297}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3297)]
+    window 1: 3400 children by frame 9775, {'spent': 3397}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3397)]
+    window 1: 3500 children by frame 9875, {'spent': 3497}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3497)]
+    window 1: 3600 children by frame 9975, {'spent': 3597}; failures [(('input', 'walk_to(428)#64', 'end pos:script:2'), 3597)]
+  window 1: cause: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  window 1: 3600 frames; 3600 children {'spent': 3600}; best None (Q None); 90.3 s
+kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split'; verifying from boot (5 checkpoints)
+wrote /home/ilyask/.cache/fast-mi-walk/results/replay-part1-kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+exit 0
+GUARD: rc 0 wall 293.2 s low 0 min MemAvailable 8405112 kB
