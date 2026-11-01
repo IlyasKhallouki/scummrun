@@ -1479,7 +1479,7 @@ impl<'g> Builder<'g> {
             let rec = if havoc {
                 Some(self.havoc_record(&job.kind, &job.label, p, &job.what))
             } else {
-                self.record_inner(&job.kind, &job.label, p, &job.what, self.switches.noop_records)
+                self.record_inner(&job.kind, &job.label, p, &job.what, self.table.noop_records)
             };
             let Some(mut rec) = rec else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
@@ -2023,6 +2023,7 @@ impl<'g> Builder<'g> {
         assert!(!self.table.grow_limit || self.table.split_limit, "grow_limit needs split_limit");
         self.table.havoc_cut = self.switches.havoc_cut;
         assert!(!self.table.havoc_cut || self.table.split_limit, "havoc_cut needs split_limit");
+        self.table.noop_records = self.switches.noop_records;
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");

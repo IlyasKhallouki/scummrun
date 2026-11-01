@@ -78,6 +78,9 @@ pub struct FactTable {
     /// the switch havoc_cut (the Builder's, havoc.rs): the machine half hands over a path the step limit ended whole,
     /// with where it stood (machine.rs `path_out`)
     pub havoc_cut: bool,
+    /// the switch noop_records (the Builder's, E004 b1-refine.md Lemma N): a path whose record has no effect is kept
+    /// as a record with no effect; here so the workers' Builders (par.rs) see it
+    pub noop_records: bool,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
@@ -196,6 +199,7 @@ impl FactTable {
             split_limit: false,
             grow_limit: false,
             havoc_cut: false,
+            noop_records: false,
             reach: None,
             memo: None,
             shared: None,
