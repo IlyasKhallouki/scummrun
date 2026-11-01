@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn string_chars() {
-        assert_eq!(chars("Hey!"), 4);
+        assert_eq!(chars("abc!"), 4);
         assert_eq!(chars("M\\x88l\\x82e"), 5);
         assert_eq!(chars(""), 0);
     }
