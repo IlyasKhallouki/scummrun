@@ -27,6 +27,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
+sys.path.insert(1, str(HERE.parent / "E004-fast-exact"))
 
 import facts as F  # noqa: E402
 import fork_exact as FX  # noqa: E402
@@ -856,6 +857,7 @@ class WindowEngine:
         self.root.run(frame=self.f0)
         assert self.root.status["frame"] == self.f0, self.root.status
         self.stats = {"forks": 0, "explain_entries": 0}
+        self.qf = {}  # frame -> the bridge's run clock at that frame's stop (durations.md's game-time check)
 
     def trace(self) -> tuple:
         t0 = time.monotonic()
@@ -863,11 +865,13 @@ class WindowEngine:
         b = self.c.fork(self.root)
         self.stats["forks"] += 1
         dumps[self.f0] = b.state()
+        self.qf[self.f0] = self.root.status.get("qf")
         b.segment(True)
         for f in range(self.f0 + 1, self.f1 + 1):
             st = b.run(frame=f)
             if "end" in st:
                 break
+            self.qf[f] = st.get("qf")
             runs.add(b.runs()["runs"])
             dumps[f] = b.state()
         b.quit()
@@ -1123,7 +1127,7 @@ def cmd_window_validate(a) -> dict:
     against the reading's event records; the plan's steps, each with the run that strictly matches it or why none
     does; the wait check (section 6)."""
     import collections as C
-    doc = json.loads(Path(a.run).read_text())
+    doc = runb_doc(a.runb[0], a.runb[1], a.reading) if a.runb else json.loads(Path(a.run).read_text())
     t0 = time.monotonic()
     rd = Reading(Path(a.reading or doc["reading"]))
     import replay as RP0
@@ -1297,7 +1301,12 @@ def cmd_window_validate(a) -> dict:
                       "inputs_strict": sum(1 for x in executed if not x["step"].startswith("event(")
                                            and x["strict"] == "matched"),
                       "events_without_their_run": sum(1 for x in executed if x["strict"] == "its run did not happen")}
-    out = {"run": Path(a.run).name, "reading": Path(a.reading or doc["reading"]).parent.name, "frames": [f0, f1],
+    game_time = None
+    if a.bounds:
+        import durations as DU
+        game_time = game_time_waits(runs, eng.qf, dumps, DU.read(a.bounds), f0, f1, verdicts, rd, doc)
+    out = {"run": Path(a.run).name if a.run else f"run B {a.runb[0]}-{a.runb[1]}",
+           "reading": Path(a.reading or doc["reading"]).parent.name, "frames": [f0, f1],
            "runs_total": len(runs.runs), "runs_matched_scope": len(verdicts), "verdicts": dict(counts),
            "unexplained_by_point": [[u, w, why, n] for (u, w, why), n in fails.most_common(25)],
            "causes": causes,
@@ -1312,7 +1321,140 @@ def cmd_window_validate(a) -> dict:
                        "per_call_us": round(per_call * 1e6, 1),
                        "per_run_us": round(matcher.seconds / max(1, len(verdicts)) * 1e6, 1)},
            "engine_seconds": trace_s, "engine": eng.stats, "reading_load_s": round(load_s, 1)}
+    if game_time is not None:
+        out["game_time_waits"] = game_time
     return out
+
+
+def runb_doc(lo: int, hi: int, reading) -> dict:
+    """A window run's doc for run B's recorded inputs on seed 1 from frame ``lo`` to ``hi``: the engine plays run B's
+    inputs up to ``hi`` (run_engine_cfg's starter) and the trace covers lo..hi; no plan steps."""
+    assert reading, "--runb needs --reading"
+    return {"seed": 1, "reading": str(reading), "starter": {"frame": hi, "instrument": "run B's recorded inputs"},
+            "run": {"frame0": lo, "frame_end": hi, "inputs": [], "steps": []}, "start": {}}
+
+
+def game_time_waits(runs, qf: dict, dumps: dict, b: dict, f0: int, f1: int, verdicts: list, rd, doc: dict) -> dict:
+    """durations.md's test on one traced run, in game time (the bridge's clock ``qf`` at each frame's stop):
+
+    - D1: every frame's clock step is at least 4 · δ_lo;
+    - a wait: a run at depth 0 that resumes at the wait point where its slot's previous run left it (a blocked
+      WaitFor op that runs again, one op and the same point, is no new entry and is skipped). Its wait, the clock
+      from that run's frame to this one's, must be at least the least bound of the wait point's actions (``point``),
+      counted per rule; an explained run (one record, section 3) also against its own record's bound;
+    - D8: a slot's first run after the start, at the point where the start's dump has it, against the start's cap;
+    - D5: no two keys or clicks other than '.' land on one frame of the run's inputs.
+    A local unit's bound is its room's (the run's room)."""
+    import collections as C
+    dl4 = b["head"]["qf_frame"]
+    room_key = lambda unit, room: str(room) if unit.startswith(("local:", "entry", "exit")) else "-"  # noqa: E731
+    res = {"head": b["head"], "frames": {"checked": 0, "below": 0, "least_qf": None},
+           "rules": {}, "below": [], "records": {"checked": 0, "below": 0, "least_slack": None},
+           "caps": {"checked": 0, "below": 0, "least_slack": None}, "no_point": 0, "inputs": {}}
+
+    def rule_row(r):
+        return res["rules"].setdefault(r, {"waits": 0, "below": 0, "least_slack": None, "least_wait_qf": None,
+                                           "samples": []})
+
+    def least(d, k, v):
+        d[k] = v if d[k] is None else min(d[k], v)
+
+    for k in range(f0 + 1, f1 + 1):
+        if qf.get(k) is not None and qf.get(k - 1) is not None:
+            res["frames"]["checked"] += 1
+            step = qf[k] - qf[k - 1]
+            least(res["frames"], "least_qf", step)
+            if step < dl4:
+                res["frames"]["below"] += 1
+    explained = {v.run.seq: v for _, v in verdicts if v.status == "explained"}
+    at_start = {(sl["where"], sl["number"]): sl["code"] for sl in dumps[f0]["slots"] if sl["code"] >= 0}
+    last = {}
+    for r in sorted(runs.runs, key=lambda x: x.seq):
+        key = (r.where, r.number, r.room)
+        unit = r.unit
+        stutter = r.ops == 1 and r.code0 == r.code1
+        if r.depth == 0 and r.code0 >= 0 and unit and qf.get(r.frame) is not None:
+            j = last.get(key)
+            p = b["points"].get((unit, room_key(unit, r.room), r.code0))
+            if j is not None and j[1] == r.code0 and not stutter:
+                waited = qf[r.frame] - qf[j[0]]
+                if p is None:
+                    res["no_point"] += 1
+                else:
+                    row = rule_row(p[1])
+                    row["waits"] += 1
+                    if len(row["samples"]) < 5:
+                        row["samples"].append([unit, r.room, r.code0, r.frame, waited, p[0]])
+                    least(row, "least_slack", waited - p[0])
+                    least(row, "least_wait_qf", waited)
+                    if waited < p[0]:
+                        row["below"] += 1
+                        res["below"].append({"frame": r.frame, "unit": unit, "room": r.room, "w": r.code0,
+                                             "entry_frame": j[0], "waited_qf": waited, "bound_qf": p[0], "rule": p[1]})
+                v = explained.get(r.seq)
+                if v is not None:
+                    a = rd.task.actions[v.record]
+                    bb = b["actions"].get((a.name.rsplit("#", 1)[0], a.cost))
+                    if bb is not None:
+                        lb = bb[5].get(str(r.room), bb[3]) if bb[5] else bb[3]
+                        res["records"]["checked"] += 1
+                        least(res["records"], "least_slack", waited - lb)
+                        if waited < lb:
+                            res["records"]["below"] += 1
+                            res["below"].append({"frame": r.frame, "unit": unit, "w": r.code0, "record": a.name,
+                                                 "waited_qf": waited, "bound_qf": lb, "rule": bb[4]})
+            elif j is None and at_start.get((r.where, r.number)) == r.code0:
+                cap = b["caps"].get((unit, r.code0))
+                if cap is not None:
+                    if p is not None and "recursive" in p[1]:
+                        lb = 0
+                    elif cap[1] == "paused":
+                        lb = cap[0]
+                    else:
+                        lb = min(cap[0], p[0]) if p is not None else cap[0]
+                    waited = qf[r.frame] - qf[f0]
+                    res["caps"]["checked"] += 1
+                    least(res["caps"], "least_slack", waited - lb)
+                    if waited < lb:
+                        res["caps"]["below"] += 1
+                        res["below"].append({"frame": r.frame, "unit": unit, "w": r.code0, "from_start_qf": waited,
+                                             "cap_qf": lb, "kind": cap[1]})
+        if not stutter:
+            last[key] = (r.frame, r.code1)
+    per = C.Counter()
+    for e in doc["run"].get("inputs") or []:
+        if not (e.get("key") == "."):
+            per[e["frame"]] += 1
+    if doc.get("starter") and not doc["run"].get("inputs"):
+        import replay_kitchen
+        for e in replay_kitchen.prefix_events():
+            if f0 < e["frame"] <= f1 and e.get("key") != ".":
+                per[e["frame"]] += 1
+    res["inputs"] = {"keys_and_clicks": sum(per.values()), "frames_with_two_or_more": sum(1 for n in per.values() if n > 1)}
+    res["below_count"] = len(res["below"])
+    res["below"] = res["below"][:30]
+    return res
+
+
+def game_time_log(g: dict) -> list:
+    h = g["head"]
+    lines = [f"game-time wait check (durations.md): delta_lo {h['delta_lo']} ({h['qf_frame']} qf a frame), dmax {h['dmax']}, "
+             f"talk-stop key on {bool(h['talkstop'])}",
+             f"  D1 frames: {g['frames']['checked']} checked, {g['frames']['below']} below {h['qf_frame']} qf, least step "
+             f"{g['frames']['least_qf']} qf",
+             f"  D5 inputs: {g['inputs']['keys_and_clicks']} keys and clicks other than '.', frames with two or more: "
+             f"{g['inputs']['frames_with_two_or_more']}",
+             f"  D8 caps: {g['caps']['checked']} first runs of slots waiting at the start, {g['caps']['below']} below, "
+             f"least slack {g['caps']['least_slack']} qf",
+             f"  explained runs against their record's bound: {g['records']['checked']}, {g['records']['below']} below, "
+             f"least slack {g['records']['least_slack']} qf",
+             f"  waits at a point with no action of the reading: {g['no_point']}",
+             "  waits per rule (the wait point's least bound): waits, below, least slack qf, least wait qf"]
+    for r, row in sorted(g["rules"].items(), key=lambda x: -x[1]["waits"]):
+        lines.append(f"    {row['waits']:6d} {row['below']:4d} {str(row['least_slack']):>7} {str(row['least_wait_qf']):>7}  {r}")
+    for x in g["below"]:
+        lines.append(f"  below: {x}")
+    return lines
 
 
 def window_log(d: dict) -> list:
@@ -1499,7 +1641,10 @@ def main() -> None:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--results", action="store_true")
     p = sub.add_parser("window-validate")
-    p.add_argument("--run", type=Path, required=True, help="a window search run's result JSON")
+    p.add_argument("--run", type=Path, help="a window search run's result JSON")
+    p.add_argument("--runb", type=int, nargs=2, metavar=("FROM", "TO"),
+                   help="run B's recorded inputs on seed 1 from frame FROM to TO instead (needs --reading)")
+    p.add_argument("--bounds", type=Path, help="durations.py's bounds file: also the game-time wait check")
     p.add_argument("--reading", type=Path, help="its reading.json (default: the one the run names)")
     p.add_argument("--bin", required=True)
     p.add_argument("--out", type=Path, required=True)
@@ -1527,9 +1672,11 @@ def main() -> None:
         rows = cmd_causes_tsv(a)
         print(f"{len(rows) - 1} rows")
     elif a.cmd == "window-validate":
+        assert a.run or a.runb, "--run or --runb"
         doc = cmd_window_validate(a)
         (a.out / f"window-{a.tag}.json").write_text(json.dumps(doc, indent=1, default=_plain) + "\n")
-        write(f"b1-window-{a.tag}", doc, window_log(doc), a.results)
+        lines = window_log(doc) + (game_time_log(doc["game_time_waits"]) if "game_time_waits" in doc else [])
+        write(f"b1-window-{a.tag}", doc, lines, a.results)
     elif a.cmd == "runb-explain":
         doc = cmd_runb_explain(a)
         (a.out / "runb-causes.json").write_text(json.dumps(doc, indent=1, default=str) + "\n")
