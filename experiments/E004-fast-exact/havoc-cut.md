@@ -27,18 +27,36 @@ Each path `p` that the step limit ended becomes one record `H(p)`, its havoc rec
     start value and every constant the scope's code writes there; a hook with no domain, an engine step the closure
     does not follow, or `systemOps` names every unit of the scope;
   - when a reachable instruction can change the room (`loadRoom`, `loadRoomWithEgo`, `actorFollowCamera`), the entry
-    and exit code of every scope room, and the room hooks.
+    and exit code of every scope room, and the room hooks;
+  - the engine steps still pending in each call on the stack, each as the code it runs: a script or object start,
+    a hook by its variable, a room change, the sentence script for a sentence. Steps the model notes and does not run
+    count as the engine runs them: the scroll hook for a pending scroll note (the camera position is not a fact, so
+    the engine may run it), and any other note as every unit. The reader's own click steps count as what they do: F1c's
+    second click writes its sentence variables and the mouse, then runs the input script again, and F1c's end runs the
+    queued sentence through the sentence script. A pending step the closure does not follow names every unit.
 
   `T(p)` is every fact of the table that some instruction of `C(p)` can write: the targets `scope_writes` finds in
   that code, the fix round 1 writes of the switches that are on, and the engine's own writes for the instructions
   present (the room variables for a room change, `cutscene` and `VAR_OVERRIDE` for cutscenes and overrides,
-  `VAR_TALK_ACTOR` and `VAR_KEYPRESS` for talk and print).
+  `VAR_TALK_ACTOR` and `VAR_KEYPRESS` for talk and print). In detail:
+  - An indexed write whose index does not fold: when the index is a variable whose domain holds plain values only,
+    the base plus each of them (the domain convention of "Values"); otherwise every variable, or every bit.
+  - `drawObject` draws and clears only objects of the room it runs in (script_v5.cpp:1101-1130). Room code runs in its
+    own room. An object's code and a global script's run in the room the player is in: an inventory object's code runs
+    in any room. So for them it is the path's room while the closure cannot change the room, and every scope room
+    otherwise.
+  - With F5 (`draw_clears`), a `drawObject` with `setXY` moves its object (script_v5.cpp:1108-1114): `objpos:O` for
+    each movable object it can draw. A room change puts the loaded room's objects back (room.cpp:195).
+  - With F9 (`actor_rooms`), an actor operand that is a variable counts as its start value only when no code of the
+    scope writes it, since the path may have written it before the cut; otherwise it is every actor.
 - **Values.** For each fact `f` of `T(p)`: when every write site of `C(p)` that can hit `f` writes a constant, the
   effect is "one of those constants, or no change", written as cases on `f`'s current value. Otherwise it is any
   value of `f`'s domain. A value is picked by the task's existing pick variables, as a random draw is.
 - **Slots.** `S(p)` is the slots of the units of `C(p)` (they can start, wait or end), the slots a reachable
-  `stopScript` or `stopObjectScript` names (every slot of the scope when the number does not fold), and with a room
-  change every slot of room code in the scope (the change kills them). For each slot of `S(p)`:
+  `stopScript` or `stopObjectScript` names (every slot of the scope when the number does not fold), the slots of the
+  object of a reachable `setOwnerOf` whose owner can be 0 (`clearOwnerOf` stops the object's scripts,
+  object.cpp:131-133, 176-180; every object's slots when the object does not fold), and with a room change every slot
+  of room code in the scope (the change kills them). For each slot of `S(p)`:
   - its place may become any of its wait points or none, and its list of locals may become 0 (unknown) or stay;
   - it may be frozen or unfrozen, and its Esc point may change or go;
   - its event at each of its wait points, with unknown locals, is named, so the plan can go on from any of them.
@@ -57,8 +75,9 @@ or yielded and the engine's pending steps are done.
 1. Every instruction `e` runs is in `C(p)`. It is reachable from a frame's current instruction, or it belongs to a unit
    started on the way, or to a hook or room code that a reachable instruction runs. The closure follows each of these.
 2. Every fact `e` writes is in `T(p)`. `scope_writes` reads the same instructions and gives each target: a constant
-   target exactly, an index that does not fold as its window or prefix. The engine's own writes are added for the
-   instructions that make them.
+   target exactly; an index that does not fold as the base plus each value of the index variable's domain, which
+   rests on the convention of item 3, or as every variable or bit. The engine's own writes are added for the
+   instructions that make them, and so are the writes of the steps the calls on the stack have still to run.
 3. Every value is allowed. A fact outside `T(p)` keeps the value `p` left it, which is `H(p)`'s own effect, or no
    effect. A fact in `T(p)` ends with one of the constants its sites write, or keeps its value, when all its sites
    write constants. Otherwise it ends with some value of its domain. That is the convention every guess of the reader
