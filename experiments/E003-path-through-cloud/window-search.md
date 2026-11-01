@@ -103,8 +103,8 @@ Its events land on frames after g. It then runs one frame at a time until one of
   object script, no message wait, ego standing) more than one frame after the last input, while the input's record is
   unmatched or a needed record belongs to a unit with no live slot. Nothing that could still run the record is alive;
 - **deviation**: a child that stops as spent, mismatch or limit after every needed record that precedes the input (≺)
-  has matched and the input took effect: its record matched, or it took another of its paths (below) with a change a
-  later step reads. Then a record the plan does not name changed what a later step needs: the plan's prediction ends
+  has matched and the input took effect: for a click, its record showed (Lemma 9, below) or another of its paths showed
+  with a change a later step reads; for any other input, its record matched. Then a record the plan does not name changed what a later step needs: the plan's prediction ends
   there, not the engine run. The child runs on to the first frame h at or after its stop where the engine takes a
   click (input on, no cutscene, a room), where the replan starts; its end point is c = Q(h). *Why h and not the stop.*
   From run B's start the earliest deviation by its stop frame was a cutscene that put ego back outside the bar, 591
@@ -239,11 +239,11 @@ would have saved with such a bound.
 - **Stop.** With best success c*, the search forks no more once Q(g) + b ≥ c*. Any fork at g' ≥ g succeeds at
   Q ≥ Q(g') + b ≥ Q(g) + b ≥ c*, so it cannot do better (Lemmas 2-4). Children already running finish or are pruned.
   The search keeps the earliest end point, success or deviation (a success at equal Q). With a deviation c_d the
-  earliest, it forks no more once Q(g) + 4 · δ_lo · n ≥ c_d: a fork at g' ≥ g deviates after its input's record
-  matched, so no earlier than frame g' + n (Lemmas 2 and 3), and succeeds no earlier than Q(g') + b ≥ Q(g') + 4 · δ_lo · n.
+  earliest, it forks no more once Q(g) + 4 · δ_lo · n ≥ c_d: a fork at g' ≥ g deviates after its input took effect,
+  so no earlier than frame g' + n (Lemmas 2 and 3), and succeeds no earlier than Q(g') + b ≥ Q(g') + 4 · δ_lo · n.
   *Why deviations.* On the kitchen the room entry's record never matched in any child: in each, a slot of the new room
-  that the plan leaves alone started one of two other local scripts (which one varied from child to child), and a later
-  step reads that script's state. In the first runs 1,576 of the first 1,600 children ended as mismatches, and in the
+  that the plan leaves alone started one of several other local scripts (which one varied from child to child), and a
+  later step reads that script's state. In the first runs 1,576 of the first 1,600 children ended as mismatches, and in the
   next ones every child after the door opened ended spent: the window ran on with no success (`results/window-first-runs.log`). The plan
   is wrong there, not the frame; the earliest child that shows it is the earliest state to replan from.
 - **End.** Let P be the tracked records that precede the input
