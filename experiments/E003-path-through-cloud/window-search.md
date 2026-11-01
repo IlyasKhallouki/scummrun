@@ -312,7 +312,7 @@ made: a window's children name no tested value a ban could cut.
 
 The switch `window_search` (replay_part1.py `--window-search`) is off by default. Off, the harness's code path is
 unchanged. Its sub-switches are off by default too: `strict` (section 9, `--window-strict`), `cache` (9.7,
-`--window-cache`), and, under `strict`, `fork_each` (`--window-fork-each N`) and `lite` (`--window-lite`). With all of
+`--window-cache`), `fork_each` (9.7, `--window-fork-each N`), and, under `strict`, `lite` (`--window-lite`). With all of
 them off the search is sections 1-7. The bridge's `run` with `fork_each` and `state` with `objects` run only when a
 command asks for them; with neither asked and the other controls off, the bridge's status, dumps and trace equal the
 shared build's (trace_check.py check-off, `results/check-off-fork-each.log`).
@@ -478,7 +478,7 @@ child keeps them until its next run. Its first dump is the parent's at the fork:
 stop (A0). □ The search's runs, and so its result, are the same with the cache on or off; only the number of dumps
 and hit tests the engine makes changes, and the run reports both counts.
 
-**Forks ahead (sub-switch `fork_each` = N, strict only, off by default; plan step A4's kill (2)).** The parent runs N
+**Forks ahead (sub-switch `fork_each` = N, off by default; plan step A4's kill (2)).** The parent runs N
 frames with one command, and the bridge forks a child at each of their decision points (`run` with `fork_each`).
 *Lemma F.* Each such child is the child the `fork` command makes at that decision point: the bridge makes it with the
 same steps (it closes the room file, forks, the child closes the parent's files, connects and reports "forked") at the
