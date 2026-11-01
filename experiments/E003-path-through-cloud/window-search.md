@@ -311,7 +311,11 @@ made: a window's children name no tested value a ban could cut.
 ## 8. Off
 
 The switch `window_search` (replay_part1.py `--window-search`) is off by default. Off, the harness's code path is
-unchanged. Its sub-switch `strict` (section 9, `--window-strict`) is off by default too; off, the search is sections 1-7.
+unchanged. Its sub-switches are off by default too: `strict` (section 9, `--window-strict`), `cache` (9.7,
+`--window-cache`), and, under `strict`, `fork_each` (`--window-fork-each N`) and `lite` (`--window-lite`). With all of
+them off the search is sections 1-7. The bridge's `run` with `fork_each` and `state` with `objects` run only when a
+command asks for them; with neither asked and the other controls off, the bridge's status, dumps and trace equal the
+shared build's (trace_check.py check-off, `results/check-off-fork-each.log`).
 
 ## 9. The strict window search (sub-switch `strict`)
 
