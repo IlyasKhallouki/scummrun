@@ -1550,7 +1550,7 @@ class Search:
                         applied.update(wr)
                 later = [r for r in runs_f if hi is not None and r.seq > hi]
                 decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later)
-                decided[n_]["frame"] = f
+                decided[n_]["frame"], decided[n_]["view"] = f, va
 
             def settle(final: bool = False) -> None:
                 """The click's outcome once its candidates are decided (Lemma 9′); ``final`` at the idle stop or the
@@ -1571,7 +1571,7 @@ class Search:
                 for n_ in alt_c:
                     rj, linked = decided[n_], cands[n_][4]
                     if rj is not None and rj["ok"] and rj["took"] and \
-                            any(frames_seen[rj["frame"]][0].get(kk) != v0.get(kk) for kk in linked):
+                            any(rj["view"].get(kk) != v0.get(kk) for kk in linked):
                         ch.alt = ch.took = cands[n_][1]
                         ch.track_issue = track.copy()
                         input_fail(rj["frame"])  # the plan's record failed: that is the deviation's cause (9.5)
