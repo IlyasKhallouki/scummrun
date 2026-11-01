@@ -105,3 +105,33 @@ def test_input_clicks():
     assert W.input_clicks(types.SimpleNamespace(kind="sentence", source=("sentence", 4, 10, 11))) == 2
     assert W.input_clicks(types.SimpleNamespace(kind="sentence", source=("sentence", 4, 10, None))) == 1
     assert W.input_clicks(types.SimpleNamespace(kind="dialog_line", source=("line", 120))) == 1
+
+
+def test_an_earlier_input_matches_once_issued():
+    # the previous macro step's input (r0) matches after its issue frame: a later window's branches may match it
+    r0 = rec(0, "input", writes={"var:1"}, exps={"var:1": x("var:1", 1)})
+    r1 = rec(1, "input", writes={"var:2"}, exps={"var:2": x("var:2", 1)})
+    for r in (r0, r1):
+        r.preds = frozenset()
+    r1.preds = frozenset({0})
+    without = W.Matcher([r0, r1], {0, 1}, r1)
+    without.input_issued = True
+    without.note(5, {"var:1": 1, "var:2": 1})
+    assert not without.complete()  # r0 can never match: the window could never succeed
+    m = W.Matcher([r0, r1], {0, 1}, r1, issued={0})
+    m.input_issued = True
+    m.note(5, {"var:1": 1, "var:2": 1})
+    assert m.matched == {0: (5, 0), 1: (5, 0)} and m.complete()
+    parent = W.Matcher([r0, r1], {0, 1}, None, issued={0})  # the idling parent: r0, never r1
+    parent.note(5, {"var:1": 1, "var:2": 1})
+    assert parent.matched == {0: (5, 0)}
+
+
+def test_the_end_rule_waits_for_the_inputs_predecessors():
+    e = W.EndRule()
+    assert not e.closed(ready=False, pre_now=True)  # the precondition holds, a predecessor is still to match
+    assert not e.closed(ready=False, pre_now=False)  # its own predicted write closes it: not the end
+    assert not e.open
+    assert not e.closed(ready=True, pre_now=True) and e.open  # the model's window opens
+    assert not e.closed(ready=True, pre_now=True)
+    assert e.closed(ready=True, pre_now=False)  # and closes: the end

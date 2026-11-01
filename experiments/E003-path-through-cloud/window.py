@@ -23,12 +23,14 @@ C1 and C2: it gives only the harness's player inputs and names no game's number.
 
 import collections
 import dataclasses
+import json
 import os
 import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import facts as F
 import reader as R
@@ -71,6 +73,25 @@ def mem_available_kb() -> int:
     except OSError:
         pass
     return 1 << 40
+
+
+def _proc_kb(path: str, field_: str) -> int:
+    try:
+        with open(path) as fh:
+            for ln in fh:
+                if ln.startswith(field_):
+                    return int(ln.split()[1])
+    except OSError:
+        pass
+    return 0
+
+
+def pss_kb(pid: int) -> int:
+    return _proc_kb(f"/proc/{pid}/smaps_rollup", "Pss:")
+
+
+def rss_kb(pid: int) -> int:
+    return _proc_kb(f"/proc/{pid}/status", "VmRSS:")
 
 
 def cpu_of(pid: int) -> float:
@@ -229,8 +250,9 @@ class Matcher:
     final writes hold and the tracked records it follows have matched; ``needed`` are the ones success needs. The input's
     record matches only in the child that played it, once ``input_issued``."""
 
-    def __init__(self, tracked: list, needed: set, input_rec: MRec | None, done=()):
+    def __init__(self, tracked: list, needed: set, input_rec: MRec | None, done=(), issued=()):
         self.tracked, self.needed, self.input = tracked, set(needed), input_rec
+        self.issued = set(issued)  # inputs issued before the fork (earlier macro steps): their records may match
         self.matched: dict = {i: (None, 0) for i in done}  # i -> (frame, path); None: matched in the parent before
         idx = {r.i for r in tracked}
         self.final = {}
@@ -246,7 +268,7 @@ class Matcher:
         for r in self.tracked:
             if r.i in self.matched:
                 continue
-            if r.kind == "input" and not (self.input_issued and r is self.input):
+            if r.kind == "input" and r.i not in self.issued and not (self.input_issued and r is self.input):
                 continue
             if any(p not in self.matched for p in self.preds[r.i]):
                 continue
@@ -291,6 +313,21 @@ class Matcher:
         input's own record or an event whose unit has no live slot (``pos:U`` at NOWHERE)."""
         return [r.name for r in self.pending() if r.i in self.needed and
                 (r.kind == "input" or (r.unit is not None and now.get(f"pos:{r.unit}") == R.NOWHERE))]
+
+
+class EndRule:
+    """Section 5, End (Lemma 7): the model's window for the input opens at the first frame where the parent is ready
+    (every tracked record preceding the input has matched in it) and the input's precondition holds; the window ends
+    at the first later frame where the precondition holds on no path."""
+
+    def __init__(self):
+        self.open = False
+
+    def closed(self, ready: bool, pre_now: bool) -> bool:
+        if self.open:
+            return not pre_now
+        self.open = ready and pre_now
+        return False
 
 
 # --- one child ---------------------------------------------------------------------------------------------------------
@@ -373,6 +410,8 @@ class Search:
         self.goal_writers: set = set()  # the plan's records that write a goal value (``play_plan``)
         self.goal_credited = False  # the goal came from the plan's records (the run's success)
         self.unplanned_goals: list = []  # children and parents where the goal held with no goal record matched
+        self.live: set = set()  # the pids of the forked processes alive
+        self.mem: dict = {}  # sample_memory's peaks
 
     # --- processes ---
 
@@ -381,14 +420,30 @@ class Search:
         notes its CPU first."""
         with self._lock:
             c = self._fork(b)
+            self.live.add(c.pid)
+            n = sum(self.forks.values())
         self.forks[role] += 1
-        quit_, pid, cpu = c.quit, c.pid, self.cpu
+        if n % 25 == 0:
+            self.sample_memory()
+        quit_, pid, cpu, live = c.quit, c.pid, self.cpu, self.live
 
         def quit_noting():
             cpu[role] += cpu_of(pid)
+            live.discard(pid)
             quit_()
         c.quit = quit_noting
         return c
+
+    def sample_memory(self) -> None:
+        """The search's memory now: the forked processes' Pss (each one's own pages, its share of the pages it shares
+        with the parent), this process's RSS, and MemAvailable; the peaks are kept (``summary``)."""
+        pss = sum(pss_kb(p) for p in list(self.live))
+        own = rss_kb(os.getpid())
+        m = self.mem
+        m["forks_pss_kb"] = max(m.get("forks_pss_kb", 0), pss)
+        m["python_rss_kb"] = max(m.get("python_rss_kb", 0), own)
+        m["live_forks"] = max(m.get("live_forks", 0), len(self.live))
+        m["min_available_kb"] = min(m.get("min_available_kb", 1 << 40), mem_available_kb())
 
     def stone_fork(self, b):
         return self.fork(b, "stone trial")
@@ -444,7 +499,7 @@ class Search:
                     return ch
             snap = self.fork(cb, "snapshot")
             s, obs, now = self._observe(cb, w["doms"])
-            m = Matcher(w["tracked"], w["needed"], w["input"], ch.done)
+            m = Matcher(w["tracked"], w["needed"], w["input"], ch.done, issued=w["issued"])
             m.input_issued = True
             m.plan_pending = w["plan_pending"]
             cps = [(cb.frame, dict(obs), RP.extra_of(s, cb.status))]
@@ -555,25 +610,30 @@ class Search:
         doms = {kk: h.doms[kk] for kk in keys if kk in h.doms and not kk.startswith(h.unobserved)}
         full_doms = {kk: d for kk, d in h.doms.items() if not kk.startswith(h.unobserved)}
         observed_reads = sorted(kk for kk in reads if kk in doms)
+        # section 5, End: the tracked records that precede the input (P) and the facts the input reads
+        before_input = {r.i for r in tracked if has_input and r.i in first.preds}
+        input_reads = sorted(kk for kk in (first.reads if has_input else ()) if kk in doms)
+        # the inputs of earlier macro steps were issued before this window's start: their records may match
+        issued = {r.i for r in tracked if r.kind == "input" and r.macro < k}
         n = input_clicks(first.paths[0].what) if has_input else 0
         chain, chain_names = chain_frames(recs, members) if has_input else (0, [])
         b_frames = n + chain
         b_qf = 4 * cfg.delta_lo * b_frames
-        pm = Matcher(tracked, needed, None)
+        pm = Matcher(tracked, needed, None, issued=issued)
         pm.plan_pending = [r for r in recs if not r.done]
         goal_writers = {r.i for r in tracked if r.i in self.goal_writers}
         w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name, "tracked": tracked, "needed": needed, "input": first if has_input else None,
              "doms": doms, "full_doms": full_doms, "best": None, "firsts": set(), "b_qf": b_qf,
-             "bound_violations": [], "delta_violation": None,
+             "bound_violations": [], "delta_violation": None, "issued": issued,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps])}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None,
                "records": [recs[j].name for j in members], "needed": [r.name for r in tracked if r.i in needed],
                "tracked": [r.name for r in tracked], "start": parent.frame, "start_qf": parent.status.get("qf"),
                "b_frames": b_frames, "b_qf": b_qf, "n_clicks": n, "chain": chain_names, "delta_lo": cfg.delta_lo,
-               "observed_reads": len(observed_reads)}
+               "observed_reads": len(observed_reads), "before_input": len(before_input), "open": None}
         pool = ThreadPoolExecutor(max_workers=cfg.workers)
         futures, children = [], []
-        pre_held, prev, end_reason, gate_shut = False, None, None, 0
+        end_rule, prev, end_reason, gate_shut = EndRule(), {}, None, 0
         w0 = parent.frame
         try:
             while True:
@@ -596,12 +656,16 @@ class Search:
                 else:
                     belief = dict(now, **h.kept)
                     pre_now = any(not h._holds(a.pre, belief) for a in first.paths)
-                    cur = tuple(now.get(kk) for kk in observed_reads)
-                    if pre_held and cur != prev:
-                        end_reason = "a fact the macro step reads changed after its precondition held"
+                    ready = all(i in pm.matched for i in before_input)
+                    if end_rule.closed(ready, pre_now):
+                        # section 5, End (Lemma 7): the model's window for the input closed in the ready parent
+                        end_reason = "the input's precondition closed in the parent after its window opened"
+                        rec["end_change"] = [[kk, prev.get(kk), now.get(kk)] for kk in input_reads
+                                             if prev.get(kk) != now.get(kk)][:8]
                         break
-                    pre_held = pre_held or pre_now
-                    prev = cur
+                    if rec["open"] is None and end_rule.open:
+                        rec["open"] = g
+                    prev = now
                     with self._lock:
                         best = w["best"]
                     if best is not None and st["qf"] + b_qf >= best.q_end:
@@ -624,6 +688,11 @@ class Search:
                                    dict(now), RP.view(h.b, full_doms, obs, h.unobserved))
                         children.append(ch)
                         futures.append(pool.submit(self._child, w, cb, ch))
+                        if len(children) % 100 == 0:
+                            done_ = collections.Counter(c.outcome for c in children if c.outcome)
+                            mk = collections.Counter(str(c.why) for c in children if c.outcome == "mismatch")
+                            h.progress(f"    window {k + 1}: {len(children)} children by frame {g}, {dict(done_)}"
+                                       + (f"; mismatches {mk.most_common(3)}" if mk else ""))
                     else:
                         gate_shut += 1
                 st = parent.run(frame=g + 1)
@@ -656,6 +725,9 @@ class Search:
         rec["parent_matched"] = {by.get(i, str(i)): f for i, (f, _) in pm.matched.items() if f is not None}
         self.py_cpu += time.process_time() - cpu0
         self.windows.append(rec)
+        if h.workdir is not None:  # a long run keeps its windows as it goes
+            with open(Path(h.workdir).parent / "windows.jsonl", "a") as fh:
+                fh.write(json.dumps(rec, default=str) + "\n")
         return {"rec": rec, "best": best, "parent_matched": {i: v for i, v in pm.matched.items() if v[0] is not None}}
 
     # --- one plan ---
@@ -829,4 +901,5 @@ class Search:
                 "early_successes": sum(w["early_successes"] for w in ws),
                 "bound_violations": sum(len(w["bound_violations"]) for w in ws),
                 "goal_from_the_plan": self.goal_credited, "unplanned_goals": self.unplanned_goals,
+                "memory_kb": dict(self.mem),
                 "config": dataclasses.asdict(self.cfg)}
