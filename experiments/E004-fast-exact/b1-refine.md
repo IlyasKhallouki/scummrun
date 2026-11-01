@@ -77,7 +77,9 @@ recursive flag (a constant number, or any script unit when the number does not f
   "The write set") of U from its first instruction has an empty fact set, touches no slot but U's, changes no room,
   and has no `freezeScripts`, cutscene or override op;
 - (b) no instruction of the scope reads U's liveness: no `isScriptRunning` whose argument folds to a set holding U's
-  number, or does not fold.
+  number, or does not fold. An argument folds when it is a constant expression, or a variable whose domain in the
+  table is a finite set of numbers (a variable's value stays in its domain: the domain is its start value closed
+  under the scope's writes, and the reader widens it when a write falls outside).
 
 It writes the verdict per unit (invisible, or the condition that failed) into the reading's head and report. The
 records do not change. A reading with the switch states which units it follows by α; the trace validation then
@@ -101,10 +103,13 @@ So under (a) and (b) the reading's records, with α, cover every engine run: the
 before, and a ghost's runs are stutters of the task. Where (a) or (b) fails, the verdict says so and the reading makes
 no claim on that unit's ghosts (an open item for B2's recursive starts).
 
-**The matcher's part** (`trace_check.py window-validate`, used only with a reading that has the verdicts): the newest
-instance of U is the slot of U's latest run from its first instruction in the segmentation; a dumped slot of U that is
-another slot is left out of the view (α), and a run on such a slot is a *ghost* run, not matched. The first ghost run
-of each unit is explained (its logged writes), and a write of a fact of the task there is a cause.
+**The matcher's part** (`trace_check.py window-validate --ghosts`, off by default, with a reading that has the
+verdicts): for each unit the verdicts name, the newest instance is the slot of the unit's latest run from its first
+instruction in the segmentation; a dumped slot of the unit that is another slot is left out of the view (α), and a
+run on such a slot is a *ghost* run, not matched against records. On a trace, α is checked run by run, whatever the
+verdict: every ghost run is explained (its logged opcodes and writes), and one that writes a fact of the task, or
+runs an op that writes an object, a verb, a script's life or the room, is a cause. So a trace whose ghost runs all
+pass is a run of the task under α even where Lemma G's static conditions fail; where they hold, every trace is.
 
 **Test.** Off: the five check scopes' sha1s and the kitchen's 279b7a24 (the records do not change with it on either).
 On: the verdicts on the window runs' readings; B1's window validation before and after.
