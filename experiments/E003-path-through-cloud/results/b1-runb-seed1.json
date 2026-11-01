@@ -1,0 +1,1089 @@
+{
+ "truth": "groundtruth-part1-seed1.jsonl",
+ "seed": 1,
+ "synced_rows": 56,
+ "first_departure": [
+  "S1#52",
+  "the engine's sentence by done is not the scored action's"
+ ],
+ "counted_in_sync": 51,
+ "certain_right": 134,
+ "certain_wrong": 26,
+ "rejected": [
+  {
+   "move": "S2#2",
+   "why_not": "no action kind",
+   "input": "a click on a floor point",
+   "kind": "outside V",
+   "cause": null
+  },
+  {
+   "move": "S2#3",
+   "why_not": "no action kind",
+   "input": "a click on a floor point",
+   "kind": "outside V",
+   "cause": null
+  }
+ ],
+ "causes": [
+  {
+   "move": "S1#2",
+   "fact": "var:52",
+   "predicted": 1,
+   "engine": 0,
+   "pre": 0,
+   "pre_frame": 48,
+   "done_frame": 50,
+   "kind": "ran the write, another value at done",
+   "unit": "script:19",
+   "room": 38,
+   "frame": 49,
+   "offset": 5,
+   "opcode": "CursorSoftOn",
+   "values": [
+    {
+     "what": "var 52",
+     "value": 0,
+     "source": "the engine's value at done after this op ran",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "cause": true,
+   "depth": 0,
+   "model_ran_unit": true,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 5,
+   "alternatives": [
+    {
+     "unit": "script:23",
+     "kind": "still waiting: its loop's test",
+     "offset": 400,
+     "opcode": "jump if",
+     "class": "split",
+     "direct": true
+    },
+    {
+     "unit": "script:23",
+     "kind": "still waiting: its loop's test",
+     "offset": 400,
+     "opcode": "jump if",
+     "class": "split",
+     "direct": true
+    },
+    {
+     "unit": "local:200",
+     "kind": "ran the write, another value at done",
+     "offset": 2,
+     "opcode": "CursorHide",
+     "class": "semantics",
+     "direct": true
+    }
+   ],
+   "seconds": 0.18
+  },
+  {
+   "move": "S1#2",
+   "fact": "var:53",
+   "predicted": 1,
+   "engine": 0,
+   "pre": 0,
+   "pre_frame": 48,
+   "done_frame": 50,
+   "kind": "ran the write, another value at done",
+   "unit": "script:19",
+   "room": 38,
+   "frame": 49,
+   "offset": 7,
+   "opcode": "UserputSoftOn",
+   "values": [
+    {
+     "what": "var 53",
+     "value": 0,
+     "source": "the engine's value at done after this op ran",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "cause": true,
+   "depth": 0,
+   "model_ran_unit": true,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 5,
+   "alternatives": [
+    {
+     "unit": "script:23",
+     "kind": "still waiting: its loop's test",
+     "offset": 400,
+     "opcode": "jump if",
+     "class": "split",
+     "direct": true
+    },
+    {
+     "unit": "script:23",
+     "kind": "still waiting: its loop's test",
+     "offset": 400,
+     "opcode": "jump if",
+     "class": "split",
+     "direct": true
+    },
+    {
+     "unit": "local:200",
+     "kind": "ran the write, another value at done",
+     "offset": 0,
+     "opcode": "UserputOff",
+     "class": "semantics",
+     "direct": true
+    }
+   ],
+   "seconds": 0.09
+  },
+  {
+   "move": "S1#7",
+   "fact": "var:103",
+   "predicted": 316,
+   "engine": 323,
+   "pre": 323,
+   "pre_frame": 235,
+   "done_frame": 286,
+   "kind": "the engine queued another sentence",
+   "unit": "script:4",
+   "room": 28,
+   "frame": 236,
+   "offset": 1031,
+   "opcode": "doSentence",
+   "values": [
+    {
+     "what": "var 107",
+     "value": 11,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "var 108",
+     "value": 323,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "var 109",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "cause": true,
+   "model_ran_unit": false,
+   "wrote": [
+    48,
+    323
+   ],
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.16
+  },
+  {
+   "move": "S1#10",
+   "fact": "local:211",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 561,
+   "done_frame": 574,
+   "kind": "still waiting",
+   "unit": "local:211",
+   "frame": 567,
+   "offset": 29,
+   "opcode": "delay",
+   "values": [
+    {
+     "what": "delay",
+     "value": 20,
+     "source": "the slot's delay at its last run (jiffies)",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#12",
+   "fact": "local:207",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 579,
+   "done_frame": 614,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 592,
+   "offset": 19,
+   "opcode": "delay",
+   "values": [
+    {
+     "what": "delay",
+     "value": 120,
+     "source": "the slot's delay at its last run (jiffies)",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "seconds": 0.06
+  },
+  {
+   "move": "S1#17",
+   "fact": "var:103",
+   "predicted": 621,
+   "engine": 912,
+   "pre": 912,
+   "pre_frame": 897,
+   "done_frame": 943,
+   "kind": "left the path",
+   "unit": "script:4",
+   "room": 52,
+   "frame": 898,
+   "offset": 965,
+   "opcode": "jump if",
+   "values": [
+    {
+     "what": "var 108",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "cause": true,
+   "depth": 1,
+   "model_ran_unit": false,
+   "start_direct": true,
+   "started": "script:2",
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.08
+  },
+  {
+   "move": "S1#19",
+   "fact": "at:local:207:931",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "seconds": 0.01
+  },
+  {
+   "move": "S1#19",
+   "fact": "at:local:207:978",
+   "predicted": 1,
+   "engine": 0,
+   "pre": 0,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "seconds": 0.01
+  },
+  {
+   "move": "S1#19",
+   "fact": "at:local:208:79",
+   "predicted": 1,
+   "engine": 0,
+   "pre": 0,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 1,
+   "start_direct": true,
+   "started": "local:208",
+   "seconds": 0.01
+  },
+  {
+   "move": "S1#19",
+   "fact": "local:208",
+   "predicted": 1,
+   "engine": 0,
+   "pre": 0,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 1,
+   "start_direct": true,
+   "started": "local:208",
+   "seconds": 0.01
+  },
+  {
+   "move": "S1#19",
+   "fact": "var:19",
+   "predicted": 1,
+   "engine": 5,
+   "pre": 5,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 1,
+   "start_direct": true,
+   "started": "local:208",
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#19",
+   "fact": "var:32",
+   "predicted": 14,
+   "engine": 209,
+   "pre": 209,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#19",
+   "fact": "verb:120",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 3,
+   "alternatives": [
+    {
+     "unit": "local:209",
+     "kind": "ran the write, another value at done",
+     "offset": 29,
+     "opcode": "VerbOps",
+     "class": "semantics",
+     "direct": true
+    },
+    {
+     "unit": "local:207",
+     "kind": "still waiting: its loop's test",
+     "offset": 931,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": true
+    }
+   ],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#19",
+   "fact": "verb:121",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 3,
+   "alternatives": [
+    {
+     "unit": "local:209",
+     "kind": "ran the write, another value at done",
+     "offset": 29,
+     "opcode": "VerbOps",
+     "class": "semantics",
+     "direct": true
+    },
+    {
+     "unit": "local:207",
+     "kind": "still waiting: its loop's test",
+     "offset": 931,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": true
+    }
+   ],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#19",
+   "fact": "verb:122",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 3,
+   "alternatives": [
+    {
+     "unit": "local:209",
+     "kind": "ran the write, another value at done",
+     "offset": 29,
+     "opcode": "VerbOps",
+     "class": "semantics",
+     "direct": true
+    },
+    {
+     "unit": "local:207",
+     "kind": "still waiting: its loop's test",
+     "offset": 931,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": true
+    }
+   ],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#19",
+   "fact": "verb:123",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 3,
+   "alternatives": [
+    {
+     "unit": "local:209",
+     "kind": "ran the write, another value at done",
+     "offset": 29,
+     "opcode": "VerbOps",
+     "class": "semantics",
+     "direct": true
+    },
+    {
+     "unit": "local:207",
+     "kind": "still waiting: its loop's test",
+     "offset": 931,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": true
+    }
+   ],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#19",
+   "fact": "verb:124",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1019,
+   "done_frame": 1020,
+   "kind": "still waiting: its loop's test",
+   "unit": "local:207",
+   "frame": 1020,
+   "offset": 931,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 194",
+     "value": 0,
+     "source": "",
+     "kind": "fact"
+    },
+    {
+     "what": "time",
+     "value": 1,
+     "source": "frames in the move",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 3,
+   "alternatives": [
+    {
+     "unit": "local:209",
+     "kind": "ran the write, another value at done",
+     "offset": 29,
+     "opcode": "VerbOps",
+     "class": "semantics",
+     "direct": true
+    },
+    {
+     "unit": "local:207",
+     "kind": "still waiting: its loop's test",
+     "offset": 931,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": true
+    }
+   ],
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#20",
+   "fact": "at:local:207:3007",
+   "predicted": 1,
+   "engine": 0,
+   "pre": 0,
+   "pre_frame": 1046,
+   "done_frame": 1054,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1054,
+   "offset": 2766,
+   "opcode": "WaitForMessage",
+   "values": [
+    {
+     "what": "var 3",
+     "value": 255,
+     "source": "VAR_HAVE_MSG at the decision point before: a message still shows",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#20",
+   "fact": "var:229",
+   "predicted": 161,
+   "engine": 169,
+   "pre": 169,
+   "pre_frame": 1046,
+   "done_frame": 1054,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1054,
+   "offset": 2766,
+   "opcode": "WaitForMessage",
+   "values": [
+    {
+     "what": "var 3",
+     "value": 255,
+     "source": "VAR_HAVE_MSG at the decision point before: a message still shows",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.05
+  },
+  {
+   "move": "S1#20",
+   "fact": "var:230",
+   "predicted": 51,
+   "engine": 52,
+   "pre": 52,
+   "pre_frame": 1046,
+   "done_frame": 1054,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1054,
+   "offset": 2766,
+   "opcode": "WaitForMessage",
+   "values": [
+    {
+     "what": "var 3",
+     "value": 255,
+     "source": "VAR_HAVE_MSG at the decision point before: a message still shows",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.04
+  },
+  {
+   "move": "S1#22",
+   "fact": "var:103",
+   "predicted": 568,
+   "engine": 621,
+   "pre": 621,
+   "pre_frame": 1063,
+   "done_frame": 1086,
+   "kind": "left the path",
+   "unit": "script:4",
+   "room": 51,
+   "frame": 1064,
+   "offset": 960,
+   "opcode": "jump if",
+   "values": [
+    {
+     "what": "local 6",
+     "value": 0,
+     "source": "set before these runs; its writers in the unit: 1",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "cause": true,
+   "depth": 3,
+   "model_ran_unit": false,
+   "start_direct": true,
+   "started": "script:2",
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 1,
+   "alternatives": [],
+   "seconds": 0.07
+  },
+  {
+   "move": "S1#23",
+   "fact": "local:207",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1228,
+   "done_frame": 1233,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1233,
+   "offset": 4377,
+   "opcode": "breakHere",
+   "values": [
+    {
+     "what": "frames to its next run",
+     "value": 1,
+     "source": "a breakHere yields one frame",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "seconds": 0.03
+  },
+  {
+   "move": "S1#23",
+   "fact": "var:101",
+   "predicted": 51,
+   "engine": 52,
+   "pre": 52,
+   "pre_frame": 1228,
+   "done_frame": 1233,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1233,
+   "offset": 4377,
+   "opcode": "breakHere",
+   "values": [
+    {
+     "what": "frames to its next run",
+     "value": 1,
+     "source": "a breakHere yields one frame",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 3,
+   "start_direct": true,
+   "started": "script:7",
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 2,
+   "alternatives": [
+    {
+     "unit": "script:9",
+     "kind": "left the path",
+     "offset": 237,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": false
+    }
+   ],
+   "seconds": 0.13
+  },
+  {
+   "move": "S1#23",
+   "fact": "var:17",
+   "predicted": 160,
+   "engine": 224,
+   "pre": 224,
+   "pre_frame": 1228,
+   "done_frame": 1233,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1233,
+   "offset": 4377,
+   "opcode": "breakHere",
+   "values": [
+    {
+     "what": "frames to its next run",
+     "value": 1,
+     "source": "a breakHere yields one frame",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 3,
+   "start_direct": true,
+   "started": "local:207",
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 4,
+   "alternatives": [
+    {
+     "unit": "local:207",
+     "kind": "still waiting",
+     "offset": 4377,
+     "opcode": "breakHere",
+     "class": "split",
+     "direct": true
+    },
+    {
+     "unit": "local:207",
+     "kind": "still waiting",
+     "offset": 4377,
+     "opcode": "breakHere",
+     "class": "split",
+     "direct": true
+    },
+    {
+     "unit": "script:9",
+     "kind": "left the path",
+     "offset": 237,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": false
+    }
+   ],
+   "seconds": 0.18
+  },
+  {
+   "move": "S1#23",
+   "fact": "var:32",
+   "predicted": 4,
+   "engine": 14,
+   "pre": 14,
+   "pre_frame": 1228,
+   "done_frame": 1233,
+   "kind": "still waiting",
+   "unit": "local:207",
+   "frame": 1233,
+   "offset": 4377,
+   "opcode": "breakHere",
+   "values": [
+    {
+     "what": "frames to its next run",
+     "value": 1,
+     "source": "a breakHere yields one frame",
+     "kind": "time"
+    }
+   ],
+   "class": "split",
+   "cause": true,
+   "depth": 0,
+   "direct": true,
+   "model_last_writer": true,
+   "candidates": 4,
+   "alternatives": [
+    {
+     "unit": "script:14",
+     "kind": "left the path",
+     "offset": 266,
+     "opcode": "jump if",
+     "class": "semantics",
+     "direct": true
+    },
+    {
+     "unit": "exit",
+     "kind": "no starter ran",
+     "offset": null,
+     "opcode": null,
+     "class": null,
+     "direct": true
+    },
+    {
+     "unit": "script:9",
+     "kind": "left the path",
+     "offset": 237,
+     "opcode": "jump unless",
+     "class": "split",
+     "direct": false
+    }
+   ],
+   "seconds": 0.13
+  },
+  {
+   "move": "S1#26",
+   "fact": "at:entry:2605",
+   "predicted": 0,
+   "engine": 1,
+   "pre": 1,
+   "pre_frame": 1365,
+   "done_frame": 1392,
+   "kind": "started again",
+   "unit": "obj:685",
+   "room": 58,
+   "frame": 1392,
+   "offset": 360,
+   "opcode": "loadRoomWithEgo",
+   "values": [
+    {
+     "what": "room",
+     "value": 215,
+     "source": "the room at done",
+     "kind": "fact"
+    },
+    {
+     "what": "entry restarted",
+     "value": 1392,
+     "source": "its new run's frame",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "cause": true,
+   "model_ran_unit": true,
+   "depth": 0,
+   "seconds": 0.05
+  }
+ ],
+ "engine": {
+  "forks": 109,
+  "frames": 489,
+  "explain_entries": 4417,
+  "explain_runs": 124
+ },
+ "seconds": 5.5
+}

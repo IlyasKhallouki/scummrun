@@ -124,6 +124,11 @@ class EngineConfig:
     # SPEEDRUN_DUMP_LOCALS (fix round 1, F10): the state dump also lists each live slot's locals and each cutscene
     # level's data. Observation only; off, the dump is as before.
     dump_locals: bool = False
+    # SPEEDRUN_DUMP_EXACT (plan step A0, experiments/E003-path-through-cloud/fork-exact.md): the state dump also has
+    # an "exact" object: the RNG, the bridge clock, the input cursor, the audio pump, the CD timers and status, the
+    # running sounds and queues, the camera, and a digest of the screens and the palette. Observation only; off, the
+    # dump is as before.
+    dump_exact: bool = False
     # Extra `key=value` pairs for the game's ini section (e.g. music_driver); they
     # override the pinned defaults, so a measurement must record them.
     game_settings: dict[str, str] = field(default_factory=dict)
@@ -274,6 +279,8 @@ def build_env(cfg: EngineConfig, base_env: Mapping[str, str] | None = None) -> d
         env["SPEEDRUN_FRAME_LOG"] = "1"
     if cfg.dump_locals:
         env["SPEEDRUN_DUMP_LOCALS"] = "1"
+    if cfg.dump_exact:
+        env["SPEEDRUN_DUMP_EXACT"] = "1"
 
     # Keep ScummVM's unconditional data/cache dirs out of $HOME (see module doc).
     env["XDG_DATA_HOME"] = str(_xdg_data_dir(cfg))

@@ -1,0 +1,588 @@
+{
+ "run": "replay-part1-kitchen-s17-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-runb-S17.json",
+ "reading": "reading",
+ "frames": [
+  235,
+  710
+ ],
+ "runs_total": 2981,
+ "runs_matched_scope": 2848,
+ "verdicts": {
+  "unplaced": 899,
+  "ambiguous": 747,
+  "unexplained": 574,
+  "explained": 495,
+  "stutter": 133
+ },
+ "unexplained_by_point": [
+  [
+   "local:200",
+   43,
+   "pre var:70",
+   463
+  ],
+  [
+   "local:210",
+   62,
+   "end pos:local:210",
+   57
+  ],
+  [
+   "local:217",
+   18,
+   "effect frozen:local:216",
+   29
+  ],
+  [
+   "local:207",
+   23,
+   "end pos:local:207",
+   11
+  ],
+  [
+   "local:204",
+   18,
+   "end pos:local:204",
+   7
+  ],
+  [
+   "local:208",
+   41,
+   "effect local:208",
+   3
+  ],
+  [
+   "local:217",
+   18,
+   "effect local:216",
+   1
+  ],
+  [
+   "local:206",
+   49,
+   "effect args:local:206",
+   1
+  ],
+  [
+   "script:2",
+   915,
+   "effect var:133",
+   1
+  ],
+  [
+   "script:23",
+   409,
+   "pre frozen:script:23",
+   1
+  ]
+ ],
+ "causes": [
+  {
+   "unit": "local:200",
+   "w": 43,
+   "why": "pre var:70",
+   "runs": 463,
+   "first_frame": 236,
+   "cause": true,
+   "kind": "the records' precondition fails",
+   "frame": 236,
+   "offset": 0,
+   "opcode": "jump if",
+   "values": [
+    {
+     "what": "var:70",
+     "value": 0,
+     "source": "the view at the decision point before; the records ask ['1']",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics"
+  },
+  {
+   "unit": "local:210",
+   "w": 62,
+   "why": "end pos:local:210",
+   "runs": 57,
+   "first_frame": 283,
+   "frame": 283,
+   "engine_end": 62,
+   "record_ends": [
+    0
+   ],
+   "cause": true,
+   "kind": "the wait did not block",
+   "offset": 0,
+   "opcode": "WaitForCamera",
+   "values": [
+    {
+     "what": "var 2",
+     "value": 480,
+     "source": "VAR_CAMERA_POS_X at the decision point before; the camera's target is not in the dump",
+     "kind": "position"
+    }
+   ],
+   "class": "split"
+  },
+  {
+   "unit": "local:217",
+   "w": 18,
+   "why": "effect frozen:local:216",
+   "runs": 29,
+   "first_frame": 636,
+   "cause": true,
+   "kind": "left the path to the predicted write",
+   "frame": 636,
+   "offset": 7,
+   "opcode": "jump if",
+   "values": [
+    {
+     "what": "var 0",
+     "value": 95,
+     "source": "getDist at [0000] wrote 95; the dump: None",
+     "kind": "position"
+    }
+   ],
+   "class": "split",
+   "fact": "frozen:local:216"
+  },
+  {
+   "unit": "local:207",
+   "w": 23,
+   "why": "end pos:local:207",
+   "runs": 11,
+   "first_frame": 313,
+   "frame": 313,
+   "engine_end": 15,
+   "record_ends": [
+    -1,
+    5
+   ],
+   "cause": true,
+   "kind": "the wait did not block",
+   "offset": 5,
+   "opcode": "WaitForCamera",
+   "values": [
+    {
+     "what": "var 2",
+     "value": 480,
+     "source": "VAR_CAMERA_POS_X at the decision point before; the camera's target is not in the dump",
+     "kind": "position"
+    }
+   ],
+   "class": "split"
+  },
+  {
+   "unit": "local:204",
+   "w": 18,
+   "why": "end pos:local:204",
+   "runs": 7,
+   "first_frame": 699,
+   "frame": 699,
+   "engine_end": 18,
+   "record_ends": [
+    -1
+   ],
+   "cause": true,
+   "kind": "left the records' path",
+   "offset": 23,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 0",
+     "value": 51,
+     "source": "getActorX at [0012] wrote 51; the dump: None",
+     "kind": "position"
+    }
+   ],
+   "class": "split"
+  },
+  {
+   "unit": "local:208",
+   "w": 41,
+   "why": "effect local:208",
+   "runs": 3,
+   "first_frame": 301,
+   "cause": null,
+   "kind": "the predicted write is not in the run",
+   "frame": 301,
+   "engine": 1,
+   "sites": 1
+  },
+  {
+   "unit": "local:217",
+   "w": 18,
+   "why": "effect local:216",
+   "runs": 1,
+   "first_frame": 690,
+   "cause": true,
+   "kind": "left the path to the predicted write",
+   "frame": 690,
+   "offset": 7,
+   "opcode": "jump if",
+   "values": [
+    {
+     "what": "var 0",
+     "value": 388,
+     "source": "getDist at [0000] wrote 388; the dump: None",
+     "kind": "position"
+    }
+   ],
+   "class": "split",
+   "fact": "local:216"
+  },
+  {
+   "unit": "local:206",
+   "w": 49,
+   "why": "effect args:local:206",
+   "runs": 1,
+   "first_frame": 698,
+   "cause": null,
+   "kind": "the predicted write is not in the run",
+   "frame": 698,
+   "engine": [
+    0
+   ],
+   "sites": 0
+  },
+  {
+   "unit": "script:2",
+   "w": 915,
+   "why": "effect var:133",
+   "runs": 1,
+   "first_frame": 710,
+   "cause": null,
+   "kind": "the predicted write is not in the run",
+   "frame": 710,
+   "engine": null,
+   "sites": 0
+  },
+  {
+   "unit": "script:23",
+   "w": 409,
+   "why": "pre frozen:script:23",
+   "runs": 1,
+   "first_frame": 710,
+   "cause": true,
+   "kind": "the records' precondition fails",
+   "frame": 710,
+   "offset": 409,
+   "opcode": "jump goto",
+   "values": [
+    {
+     "what": "frozen:script:23",
+     "value": 1,
+     "source": "the view at the decision point before; the records ask ['0']",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics",
+   "note": "no opcode of the run reads it"
+  }
+ ],
+ "unplaced_by_point": [
+  [
+   "local:201",
+   22,
+   463
+  ],
+  [
+   "script:159",
+   5,
+   435
+  ],
+  [
+   "local:201",
+   35,
+   1
+  ]
+ ],
+ "unplaced_checked": [
+  {
+   "unit": "local:201",
+   "w": 22,
+   "runs": 463,
+   "first_frame": 236,
+   "verdict": "invisible to the task: no task fact written, the slot back at its wait point",
+   "ops": 5
+  },
+  {
+   "unit": "script:159",
+   "w": 5,
+   "runs": 435,
+   "first_frame": 236,
+   "verdict": "invisible to the task: no task fact written, the slot back at its wait point",
+   "ops": 3
+  },
+  {
+   "unit": "local:201",
+   "w": 35,
+   "runs": 1,
+   "first_frame": 705,
+   "verdict": "invisible to the task: no task fact written, the slot back at its wait point",
+   "ops": 7
+  }
+ ],
+ "matcher_plan_units": {
+  "units": [
+   "local:215",
+   "local:218",
+   "script:2"
+  ],
+  "calls": 475,
+  "per_call_us": 3.0
+ },
+ "open_key_matches": 1,
+ "steps": [
+  {
+   "step": "walk_to(316)[202]#107",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 636,
+   "pre_fails": [],
+   "effect": "args:local:203",
+   "pos": [
+    [
+     "pos:script:2",
+     "no run"
+    ]
+   ]
+  },
+  {
+   "step": "event(local:215@16#45fc7932b71b)#893",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "its run did not happen",
+   "frames": [
+    636,
+    637
+   ],
+   "next_run": 640
+  },
+  {
+   "step": "event(local:215@56#45fc7932b71b)#1628",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "its run did not happen",
+   "frames": [
+    636,
+    637
+   ],
+   "next_run": 645
+  },
+  {
+   "step": "event(local:215@64#45fc7932b71b)#7340",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "its run did not happen",
+   "frames": [
+    636,
+    637
+   ],
+   "next_run": 647
+  },
+  {
+   "step": "event(local:215@69#45fc7932b71b)#10562",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 665,
+   "verdict": "ambiguous",
+   "pre_fails": [
+    [
+     "args:local:215",
+     "[0]"
+    ],
+    [
+     "state:316",
+     "1"
+    ]
+   ],
+   "end": null,
+   "effect_fails": [
+    [
+     "args:local:216",
+     "frozenset({258285697547262})"
+    ]
+   ]
+  },
+  {
+   "step": "walk_to(316)[202]#5511",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 666,
+   "pre_fails": [],
+   "effect": "local:216",
+   "pos": [
+    [
+     "pos:local:216",
+     86
+    ],
+    [
+     "pos:local:217",
+     18
+    ],
+    [
+     "pos:script:2",
+     "no run"
+    ]
+   ]
+  },
+  {
+   "step": "event(script:2@736#d40e45ecaad6)#7311",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "its run did not happen",
+   "frames": [
+    666,
+    667
+   ],
+   "next_run": 691
+  },
+  {
+   "step": "event(local:218@16#965f4bbc7b57)#7380",
+   "plan": 0,
+   "outcome": "not reached",
+   "strict": "its run did not happen",
+   "frames": [
+    688,
+    689
+   ],
+   "next_run": 693
+  },
+  {
+   "step": "walk_to(316)[202]#5511",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 690,
+   "pre_fails": [],
+   "effect": null,
+   "pos": [
+    [
+     "pos:local:216",
+     86
+    ],
+    [
+     "pos:local:217",
+     18
+    ]
+   ]
+  },
+  {
+   "step": "event(script:2@736#d40e45ecaad6)#7311",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "matched",
+   "frame": 692,
+   "verdict": "explained"
+  },
+  {
+   "step": "event(local:218@16#965f4bbc7b57)#7380",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "matched",
+   "frame": 698,
+   "verdict": "explained"
+  },
+  {
+   "step": "sentence(2,564)#10643",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "matched",
+   "frame": 700,
+   "pre_fails": [],
+   "effect": null,
+   "pos": []
+  },
+  {
+   "step": "event(script:2@736#85f24aad8241)#15514",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 705,
+   "verdict": "explained",
+   "pre_fails": [
+    [
+     "args:script:2",
+     "[212310049339719]"
+    ]
+   ],
+   "end": [
+    915,
+    759
+   ],
+   "effect_fails": []
+  },
+  {
+   "step": "event(script:2@759#85f24aad8241)#21248",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "its run did not happen",
+   "frames": [
+    700,
+    701
+   ],
+   "next_run": null
+  },
+  {
+   "step": "sentence(9,566)#10916",
+   "plan": 1,
+   "outcome": "goal",
+   "strict": "matched",
+   "frame": 702,
+   "pre_fails": [],
+   "effect": null,
+   "pos": []
+  },
+  {
+   "step": "event(script:2@736#c1184912b947)#15571",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "matched",
+   "frame": 705,
+   "verdict": "explained"
+  },
+  {
+   "step": "event(script:2@915#fa5666eff670)#21282",
+   "plan": 1,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 710,
+   "verdict": "unexplained",
+   "pre_fails": [],
+   "end": null,
+   "effect_fails": [
+    [
+     "var:133",
+     "None"
+    ]
+   ]
+  }
+ ],
+ "steps_summary": {
+  "loose_matched": 16,
+  "strict_matched": 5,
+  "inputs_loose": 5,
+  "inputs_strict": 2,
+  "events_without_their_run": 5
+ },
+ "wait_check": {
+  "checked": 492,
+  "below_bound": [],
+  "below_count": 0
+ },
+ "matcher": {
+  "calls": 475,
+  "seconds": 2.2,
+  "per_call_us": 4632.6,
+  "per_run_us": 772.6
+ },
+ "engine_seconds": 1.9,
+ "engine": {
+  "forks": 14,
+  "explain_entries": 215
+ },
+ "reading_load_s": 8.2
+}

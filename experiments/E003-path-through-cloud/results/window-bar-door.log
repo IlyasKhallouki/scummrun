@@ -1,0 +1,26 @@
+E004 plan step A4, the window search: the bar door from boot on seed 1, goal state:316 = 1 (the harness's first idle stop, room 33; branch window2).
+Laptop, nice 10, 7 children at a time; 1-minute load 6 to 9. ScummVM /var/tmp/fast-mi/svm-window.
+Reading: rooms 28, 33, goal state:316 = 1, the kitchen's read-rust switches (packed sha1 009e656ccfa7; 38,874 records, 37,776 actions), named bar-door-w2 here.
+Run: replay_part1.py run 1 --serve --search lama-first-costs --cost-caps --reach-extend --unobserved-actor-rooms --approach-stones --window-search, replan limit 30, plan memory 3G.
+The k = 1 pilot on the same goal (kitchen-boot-reach.log): state:316 = 1 held at frame 3839 from the game itself, 1,111 frames from 2728.
+
+file replay-part1-bar-door-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json
+stop "goal, not from the plan: it held in the idling engine at frame 3138 with none of the plan's goal records matched"; goal reached True; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 5 checkpoints, 0 differences, 28 inputs, goal at the end True
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 3138, qf 75124): 410 frames, 9840 qf, 41.00 s
+  from the harness boot's first frame in room 33 (frame 2638, qf 63124): 500 frames, 12000 qf, 50.00 s
+plans 2, replans 1, reach extensions 0
+  replan after plan 0 at frame 2798: deviation at frame 2798: [('event(script:2@736#da2874b63864)#510', [('local:201', ['0'], 1), ('local:208', ['0'], 1)])]
+  deviation: plan 0 window 2, stop frame 2798 (qf 66964), replan at frame 2798 (0 frames to the click gate); [('event(script:2@736#da2874b63864)#510', [('local:201', ['0'], 1), ('local:208', ['0'], 1)])]
+  plan 0 at frame 2728: plan, 7 steps, taskcore 6.6 CPU s, search 8.9 s wall
+  plan 1 at frame 2798: plan, 2 steps, taskcore 5.9 CPU s, search 4.9 s wall
+windows 3; children 431; child frames 3632; outcomes {'duplicate': 6, 'pruned': 64, 'success': 1, 'deviation': 1, 'spent': 358, 'goal, not from the plan': 1}
+search CPU: engines 44.3 s ({'child': 39.55, 'snapshot': 0.28, 'the last engine': 4.5}), Python 53.3 s, total 97.6 s; forks {'child': 431, 'snapshot': 425}
+search memory peaks: forks' Pss 64 MB with 14 live, the harness's RSS 137 MB, MemAvailable at least 6463 MB
+early successes 0; bound violations 0; goals not from the plan 2
+windows (plan.window input: start, first frame the model's window opened, end and why; children and outcomes; frames from the window's start to the chosen end point; b):
+  0.1 sentence(2,428)#44: frames 2728-2794 (open 2728; stop: Q(g) + b reached the best success); 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}, 2734 child frames, Lemma 9 stops 0, other paths {}; wall 34.08 s, Python 32.04 s; b 2 frames; chosen: success, fork 2730, inputs 2736-2776, end 2796: 68 frames and 1632 qf from the window's start, walk 20
+  0.2 walk_to(428)#64: frames 2776-2801 (open 2796; stop: Q(g) + b reached the best deviation); 25 children {'deviation': 1, 'pruned': 5, 'spent': 19}, 219 child frames, Lemma 9 stops 0, other paths {}; wall 2.93 s, Python 2.64 s; b 2 frames; chosen: deviation, fork 2795, inputs 2796-2796, end 2798: 22 frames and 528 qf from the window's start, walk None
+  1.1 walk_to(315)[202]#846: frames 2798-3138 (open 2798; goal in the parent, not from the plan); 340 children {'goal, not from the plan': 1, 'spent': 339}, 679 child frames, Lemma 9 stops 339, other paths {}; wall 20.3 s, Python 18.63 s; b 2 frames; no end point
+steps in the record 6, executed 3; predicted writes held 3; matched (writes held, no tracked fact changed without a prediction) 2; outcomes {'matched': 3, 'not reached': 2, 'window empty': 1}; mismatches 2
+run wall 105.9 s

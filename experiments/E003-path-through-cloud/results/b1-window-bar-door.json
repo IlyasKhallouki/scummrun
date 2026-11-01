@@ -1,0 +1,345 @@
+{
+ "run": "replay-part1-bar-door-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json",
+ "reading": "reading",
+ "frames": [
+  2728,
+  3138
+ ],
+ "runs_total": 2492,
+ "runs_matched_scope": 2289,
+ "verdicts": {
+  "unplaced": 751,
+  "unexplained": 494,
+  "ambiguous": 664,
+  "stutter": 21,
+  "explained": 359
+ },
+ "unexplained_by_point": [
+  [
+   "local:200",
+   43,
+   "pre var:70",
+   341
+  ],
+  [
+   "local:202",
+   1,
+   "end pos:local:202",
+   68
+  ],
+  [
+   "local:210",
+   62,
+   "end pos:local:210",
+   57
+  ],
+  [
+   "local:207",
+   23,
+   "end pos:local:207",
+   10
+  ],
+  [
+   "local:208",
+   41,
+   "effect local:208",
+   8
+  ],
+  [
+   "local:208",
+   41,
+   "pre pos:local:208",
+   5
+  ],
+  [
+   "local:208",
+   21,
+   "pre args:local:208",
+   5
+  ]
+ ],
+ "causes": [
+  {
+   "unit": "local:200",
+   "w": 43,
+   "why": "pre var:70",
+   "runs": 341,
+   "first_frame": 2798,
+   "cause": true,
+   "kind": "the records' precondition fails",
+   "frame": 2798,
+   "offset": 0,
+   "opcode": "jump if",
+   "values": [
+    {
+     "what": "var:70",
+     "value": 0,
+     "source": "the view at the decision point before; the records ask ['1']",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics"
+  },
+  {
+   "unit": "local:202",
+   "w": 1,
+   "why": "end pos:local:202",
+   "runs": 68,
+   "first_frame": 2729,
+   "frame": 2729,
+   "engine_end": 1,
+   "record_ends": [
+    21
+   ],
+   "cause": true,
+   "kind": "left the records' path",
+   "offset": 6,
+   "opcode": "jump unless",
+   "values": [
+    {
+     "what": "var 0",
+     "value": 9,
+     "source": "getActorWalkBox at [0001] wrote 9; the dump: None",
+     "kind": "position"
+    }
+   ],
+   "class": "split"
+  },
+  {
+   "unit": "local:210",
+   "w": 62,
+   "why": "end pos:local:210",
+   "runs": 57,
+   "first_frame": 2803,
+   "frame": 2803,
+   "engine_end": 62,
+   "record_ends": [
+    0
+   ],
+   "cause": true,
+   "kind": "the wait did not block",
+   "offset": 0,
+   "opcode": "WaitForCamera",
+   "values": [
+    {
+     "what": "var 2",
+     "value": 160,
+     "source": "VAR_CAMERA_POS_X at the decision point before; the camera's target is not in the dump",
+     "kind": "position"
+    }
+   ],
+   "class": "split"
+  },
+  {
+   "unit": "local:207",
+   "w": 23,
+   "why": "end pos:local:207",
+   "runs": 10,
+   "first_frame": 2828,
+   "frame": 2828,
+   "engine_end": 15,
+   "record_ends": [
+    -1,
+    5
+   ],
+   "cause": true,
+   "kind": "the wait did not block",
+   "offset": 5,
+   "opcode": "WaitForCamera",
+   "values": [
+    {
+     "what": "var 2",
+     "value": 160,
+     "source": "VAR_CAMERA_POS_X at the decision point before; the camera's target is not in the dump",
+     "kind": "position"
+    }
+   ],
+   "class": "split"
+  },
+  {
+   "unit": "local:208",
+   "w": 41,
+   "why": "effect local:208",
+   "runs": 8,
+   "first_frame": 2809,
+   "cause": null,
+   "kind": "the predicted write is not in the run",
+   "frame": 2809,
+   "engine": 1,
+   "sites": 1
+  },
+  {
+   "unit": "local:208",
+   "w": 41,
+   "why": "pre pos:local:208",
+   "runs": 5,
+   "first_frame": 2873,
+   "cause": true,
+   "kind": "two instances of the unit",
+   "frame": 2873,
+   "offset": 41,
+   "opcode": null,
+   "values": [
+    {
+     "what": "live slots of local:208",
+     "value": 2,
+     "source": "the dump: a recursive start's second instance; the reading keeps one slot per unit",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics"
+  },
+  {
+   "unit": "local:208",
+   "w": 21,
+   "why": "pre args:local:208",
+   "runs": 5,
+   "first_frame": 2873,
+   "cause": true,
+   "kind": "two instances of the unit",
+   "frame": 2873,
+   "offset": 21,
+   "opcode": null,
+   "values": [
+    {
+     "what": "live slots of local:208",
+     "value": 2,
+     "source": "the dump: a recursive start's second instance; the reading keeps one slot per unit",
+     "kind": "fact"
+    }
+   ],
+   "class": "semantics"
+  }
+ ],
+ "unplaced_by_point": [
+  [
+   "script:159",
+   5,
+   410
+  ],
+  [
+   "local:201",
+   22,
+   341
+  ]
+ ],
+ "unplaced_checked": [
+  {
+   "unit": "script:159",
+   "w": 5,
+   "runs": 410,
+   "first_frame": 2729,
+   "verdict": "invisible to the task: no task fact written, the slot back at its wait point",
+   "ops": 3
+  },
+  {
+   "unit": "local:201",
+   "w": 22,
+   "runs": 341,
+   "first_frame": 2798,
+   "verdict": "invisible to the task: no task fact written, the slot back at its wait point",
+   "ops": 6
+  }
+ ],
+ "matcher_plan_units": {
+  "units": [
+   "local:217",
+   "script:2"
+  ],
+  "calls": 410,
+  "per_call_us": 1.1
+ },
+ "open_key_matches": 1,
+ "steps": [
+  {
+   "step": "sentence(2,428)#44",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "matched",
+   "frame": 2776,
+   "pre_fails": [],
+   "effect": null,
+   "pos": []
+  },
+  {
+   "step": "event(script:2@736#d897055c2f2e)#144",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "matched",
+   "frame": 2796,
+   "verdict": "explained"
+  },
+  {
+   "step": "walk_to(428)#64",
+   "plan": 0,
+   "outcome": "matched",
+   "strict": "not matched",
+   "frame": 2796,
+   "pre_fails": [
+    [
+     "script:2",
+     "1"
+    ]
+   ],
+   "effect": "script:2",
+   "pos": [
+    [
+     "pos:script:2",
+     -1
+    ]
+   ]
+  },
+  {
+   "step": "event(script:2@736#da2874b63864)#510",
+   "plan": 0,
+   "outcome": "not reached",
+   "strict": "its run did not happen",
+   "frames": [
+    2801,
+    2802
+   ],
+   "next_run": null
+  },
+  {
+   "step": "walk_to(315)[202]#846",
+   "plan": 1,
+   "outcome": "window empty",
+   "strict": "not issued"
+  },
+  {
+   "step": "event(local:217@18#d2acdc8c2415)#9633",
+   "plan": 1,
+   "outcome": "not reached",
+   "strict": "its run did not happen",
+   "frames": [
+    3138,
+    3139
+   ],
+   "next_run": null
+  }
+ ],
+ "steps_summary": {
+  "loose_matched": 3,
+  "strict_matched": 2,
+  "inputs_loose": 2,
+  "inputs_strict": 1,
+  "events_without_their_run": 0
+ },
+ "wait_check": {
+  "checked": 358,
+  "below_bound": [],
+  "below_count": 0
+ },
+ "matcher": {
+  "calls": 410,
+  "seconds": 1.936,
+  "per_call_us": 4722.7,
+  "per_run_us": 845.9
+ },
+ "engine_seconds": 1.7,
+ "engine": {
+  "forks": 10,
+  "explain_entries": 125
+ },
+ "reading_load_s": 8.3
+}

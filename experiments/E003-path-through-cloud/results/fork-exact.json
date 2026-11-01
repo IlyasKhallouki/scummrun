@@ -1,0 +1,111 @@
+{
+ "bin": "/var/tmp/fast-mi/svm-window/build/scummvm/scummvm",
+ "bin_sha1": "87066f13be73",
+ "seed": 1,
+ "fork_frame": 235,
+ "frames": 3000,
+ "end_frame": 3235,
+ "load_children": 7,
+ "chunk": 100,
+ "cpus": 8,
+ "reference": {
+  "seconds": 74.2,
+  "step_ms": {
+   "n": 3000,
+   "median": 1.887,
+   "p90": 6.202,
+   "min": 0.6,
+   "max": 70.002
+  },
+  "room_changes": 22,
+  "first_room_change": 462,
+  "cutscene_frames": 357,
+  "cd_track_starts": 13,
+  "cd_tracks_playing": 12,
+  "first_cd_track_start": 579
+ },
+ "control": {
+  "rng_from": 359576455,
+  "rng_to": 359576454,
+  "frames": 3000,
+  "first_differs": {
+   "status": 236,
+   "dump": 236,
+   "exact": 236
+  },
+  "frames_differ": {
+   "status": 3000,
+   "dump": 3000,
+   "exact": 3000
+  },
+  "first_differences": [
+   {
+    "frame": 236,
+    "where": "status .rng: 2189388206 != 577465519"
+   },
+   {
+    "frame": 236,
+    "where": "dump .vars[100]: 31 != 191"
+   },
+   {
+    "frame": 236,
+    "where": "exact .rng: 2189388206 != 577465519"
+   }
+  ]
+ },
+ "walk": {
+  "seconds": 703.1,
+  "stopped": null,
+  "frame_ms": {
+   "n": 3000,
+   "median": 30.977,
+   "p90": 90.005,
+   "min": 1.012,
+   "max": 289.345
+  },
+  "C_and_P": {
+   "compared": 6002,
+   "differ": 0
+  },
+  "load": {
+   "compared": 6402,
+   "differ": 0,
+   "children": 1506,
+   "chunks": 6402
+  },
+  "differences": [],
+  "trace_sha1": {
+   "F": "3c4fdad27400",
+   "P": "3c4fdad27400"
+  },
+  "traces_equal": true
+ },
+ "fork_ms": {
+  "n": 3967,
+  "median": 25.934,
+  "p90": 73.826,
+  "min": 3.418,
+  "max": 315.714
+ },
+ "child_fps": {
+  "n": 5312,
+  "median": 145.846,
+  "p90": 358.924,
+  "min": 29.572,
+  "max": 1316.763
+ },
+ "loadavg": {
+  "n": 60,
+  "median": 29.56,
+  "p90": 32.91,
+  "min": 20.52,
+  "max": 34.36
+ },
+ "mem_available_mb": {
+  "n": 60,
+  "median": 6040.369,
+  "p90": 7026.996,
+  "min": 4113.801,
+  "max": 8112.035
+ }
+}

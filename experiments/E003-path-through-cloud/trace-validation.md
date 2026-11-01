@@ -1,0 +1,253 @@
+# Trace validation with the engine's explanation (plan step B1)
+
+The model claims to over-approximate the engine on V (assumption A1). B1 tests that claim on every run the system makes:
+each piece of script work the engine does is matched against the reading's records, and where the engine leaves a
+record, the engine itself says where and on which value. This note states what each part guarantees, for any SCUMM v5
+game under the bridge. It was written before the code (`trace_check.py`, the bridge's `segment` and `explain`
+commands).
+
+## Setting
+
+- E, K, P, C and F are as in `fork-exact.md`: the patched engine under a pinned configuration, a parent branch stopped at
+  a decision point, its forked child, and a fresh engine with the same inputs. A0 holds (measured there).
+- A *decision point* is the bridge's stop in a frame (`SpeedrunBridge::onDecisionPoint`, scummLoop right before
+  `checkAndRunSentenceScript`). D_k is the decision point of frame k. The engine's facts at D_k are `facts_of` of the
+  state dump there, and the reading's view of them is `replay.view` (`window.FastView`).
+- The reading's records (reader.py `Record`): an *event* record event(U@W) is one path of unit U's slot from wait point
+  W; an *input* record is one path of an input (a sentence, a walk, a dialog line, Esc). A record has a precondition
+  pre(r) (key → set of values), checks (conditions on non-facts with the side the path took: cite, condition, side), its
+  effects (key → a set value, a guess among values, or a step), its end (how the path stopped) and a frame cost (the
+  task's action cost, a lower bound in frames, `costs.rs`).
+
+## 1. The engine's segmentation
+
+**Slot run.** One call of `ScummEngine::executeScript` (script.cpp:494-519). Its slot s is `_currentScript` at the
+call; its unit is the slot's (where, number) and, for a local script or the room's entry and exit code, the room
+resource `_roomResource`; c0 is the code offset it starts from (`scriptCode(s, offs)`: the `[XXXX]` offset of the
+decompiled scripts, the W of the `at:` facts); c1 the slot's code offset when the call returns, if the slot is still
+live; its status at the return (dead, running, paused by a delay; frozen when the freeze count is above 0); the number of
+opcodes it executed itself; its depth (`vm.numNestedScripts` at the call); its frame k and whether it ran after D_k.
+
+**Lemma S (segmentation).** Every opcode the engine executes is executed by exactly one slot run, the innermost call of
+`executeScript` on the stack, and every opcode of a run belongs to the run's slot.
+
+*Proof.* Opcodes are fetched and dispatched only in `executeScript`'s loop (`executeOpcode` has no other caller). The
+loop runs while `_currentScript != 0xFF`. `_currentScript` is given a slot index in three places only: in
+`runScriptNested` just before its `executeScript` call (script.cpp:369), in `runAllScripts` just before its call
+(:980), and in `runScriptNested` after an inner run returns (:384), where it gets back the slot that was running when
+the inner call was made, that is the slot of the run whose opcode made it, and only if that slot still holds the same
+script, is live and is not frozen. Every other assignment sets 0xFF (script.cpp, script_v5.cpp, room.cpp, actor.cpp,
+scumm.cpp), which ends the loop at its next test. So within one call, every opcode fetched is of the call's slot, and
+the opcodes of an inner call are the inner run's. ∎
+
+The bridge checks the premise as it runs: each opcode it logs is of the run's own slot, and it counts violations.
+
+**The runs between two decision points** are the runs of frame k after D_k and of frame k+1 before D_{k+1}. The facts at
+D_k and D_{k+1} are their pre and post states.
+
+## 2. The bridge's controls (off by default)
+
+- `{"cmd": "segment", "on": true}`: from the next frame on, the bridge records every slot run (section 1).
+  `{"cmd": "runs"}` returns them and clears the buffer. Off (the default, and `"on": false`), nothing is recorded.
+- `{"cmd": "explain", "from": F0, "to": F1, "units": [[where, number], ...]}`: in frames F0 to F1, the runs whose slot
+  holds one of these units (none given: every run) log what the engine's own debug channels would print at the same
+  call sites: each opcode with its code offset (DEBUG_OPCODES, script.cpp:508), each `readVar` with the variable and the
+  value it returns (DEBUG_VARS, :571, with the value added), each `writeVar` with the variable and the value (:714).
+  `{"cmd": "explain_log"}` returns the log and clears it. Both buffers are bounded; what does not fit is counted.
+
+The engine gains three hooks in script.cpp: the start and the end of `executeScript`, each opcode before
+`executeOpcode`, and the value `readVar` returns (`readVar` calls its old body, now `readVarBody`, and passes the value
+on). With the bridge off (`SPEEDRUN_OUT` unset) each hook is a null-pointer test. With the bridge on and both controls
+off, each is a test of one bridge member.
+
+**Lemma O (the controls observe only).** With `segment` or `explain` on, the engine's game state at every decision
+point is the same as with both off.
+
+*Proof.* The hooks read engine members and call `const` member functions of the bridge (`scriptCode`, `scriptStart`,
+which read the engine's tables and raw resource pointers without touching the LRU counters, as the state dump does).
+They write only the bridge's own buffers and counters, which game logic never reads. `readVar`'s value is returned
+unchanged, and its body runs exactly once either way. The commands run only while the engine is stopped. ∎
+
+*Test* (`trace_check.py check-off`): three engines from boot in lockstep, one frame at a time, the same inputs: the
+shared build, the new build with the controls off, and the new build with `segment` on from boot and `explain` on for
+every run of a span of frames. At every frame the stop status and the full state dump (with `SPEEDRUN_DUMP_LOCALS` and
+`SPEEDRUN_DUMP_EXACT`) must be equal, and at the end the three `trace.jsonl` files.
+
+## 3. The strict matcher
+
+For the runs between D_{k-1} and D_k, with V_{k-1} and V_k the views there:
+
+**Definition M.** A run ρ of unit U with c0 = W matches the event record r = event(U@W) when
+
+- (M1) r's unit is U and its wait point is W;
+- (M2) pre(r) holds on V_{k-1} after the effects of the records matched to the earlier runs between the same decision
+  points, in run order;
+- (M3) every check of r that the engine can decide holds: the side the record took is the side the engine took. The
+  engine's side is read from the state at D_{k-1} (`replay.eval_check`, which already decides most checks), or, with
+  `explain`, from the run's own opcodes: the instruction after the check's cite tells which way the branch went. A
+  check neither can decide is counted as open, never as held;
+- (M4) r's effects match: its slot's write `pos:U` is c1 (or NOWHERE when the slot is dead), and every other effect
+  key holds its value in V_k, unless a later run between the same decision points writes that key.
+
+ρ is *explained* when exactly one record of U at W matches. It is *ambiguous* when more than one does, and
+*unexplained* when none does. A record whose writes already held and whose run did not happen matches nothing: a match
+needs its run (M1). An input record matches the runs between the decision point before its input's frame and the one
+after it on the units its `pos:` effects name, with M2 on the view before and M4 on the view after.
+
+**Lemma M (what a match says).** If every run of a trace is explained, then on the facts the view holds, the trace is a
+run of the task: each run is a step of the record it matched, applied in run order. An unexplained run is a
+counterexample to A1 on those facts, or a run the matcher's grain cannot place (a run that the reading folds into
+another record's path, such as a nested run inside a record). It says nothing on non-facts other than the checks it
+decides, and nothing on runs that were not made (Cirstea et al. 2024: partial traces can be accepted wrongly).
+
+*Proof.* M1 ties each record to one run; M2 and M4 are the record's precondition and effects evaluated in the order the
+engine ran them, so the sequence of matched records is applicable from V_{k-1} and ends in V_k on every key it writes
+that no later run writes. ∎
+
+**Cost.** The matcher indexes the records by (U, W, the wait point their slot write sets) and, within that, by the
+locals list their precondition asks of their own slot. Per run it looks up the candidates and evaluates their
+preconditions and effects on the view's keys: no fork, no frame. Its cost per call is measured on the window runs, on
+every unit of the scope and on the plan's units only (what a window search's child asks), and reported with the
+results.
+
+### What the window runs called for
+
+Written after the first strict runs on the window search's kitchen run, each with the case that showed it:
+
+- **Stutter.** A run that executes one opcode, a WaitFor op, and stops at that op's own offset has blocked: o5_wait
+  only reads the engine and re-runs itself next frame (script_v5.cpp:3272-3310). It changes nothing, so it is no step
+  of the task; it is counted as *stutter*, not matched. The reading keeps no record for it (a record that changes
+  nothing adds nothing).
+- **The locals.** ``args:U`` is the built list a slot's dumped locals match (replay.replan_start_locals). Lists with
+  unknown locals overlap, so the view holds the set of every list the locals match, and a precondition on ``args:U``
+  holds when one of them is the record's. A run that two records match through two such lists is counted as
+  *ambiguous*: the reading's abstraction of the locals is a relation there, not a function.
+- **Open keys.** The sentence script and what it runs nested (a room change) run after a decision point and are not
+  matched as event runs. For the runs of the next frame, the facts that changed between the two decision points, and
+  the slot facts of the units that ran, are open in M2: the views do not give their value at those runs' start. The
+  matches that relied on an open key are counted.
+- **Facts outside the view.** An effect on a fact the view does not hold (unobserved, or a value outside its domain) is
+  not checked by M4; a value outside the domain is reported where it shows.
+- **Runs the reading has no record for.** A run at a wait point the reading has no event record at is *unplaced*. One
+  run per such point is explained: if it writes no fact of the task (no logged write of a task variable or bit, no op
+  that writes an object, a verb, a script's life or the room) and its slot stops where it started, the task cannot see
+  it. Otherwise its write is a cause.
+- **One run, one record.** An event record is one run, so Lemma X looks for the first opcode off a record's path within
+  that run only (no yield crossed). A WaitFor op where the record's path stops (it blocked there in the reading) and the
+  engine's run went on is the first opcode off the path, with the wait's condition as the engine's value.
+- **The plan's steps.** Each executed step of a window run is checked on its own run: an event on the first run of its
+  unit at its wait point from the step's start (after any stutter), an input on the views before its first click and
+  after its frame. Its record must hold there (every failing precondition key and effect is listed).
+
+## 4. Locate
+
+**Lemma L (bisection over forks).** Let P be a predicate on the engine's facts at a decision point, with P(D_lo) true
+and P(D_hi) false. From a branch at lo, bisection forks a child, runs it to mid = ⌊(lo + hi) / 2⌋ and evaluates P
+there; if P holds, the child becomes the branch at lo = mid, else the child is dropped and hi = mid. After
+⌈log2(hi − lo)⌉ forks it returns k with P(D_{k−1}) true and P(D_k) false. If P is monotone on [lo, hi] (true up to
+some frame, false after), k is the first frame where P fails.
+
+*Proof.* The invariant P(D_lo) ∧ ¬P(D_hi) holds at every step, and hi − lo halves. A child is the run with the same
+inputs (A0), so P evaluated in it is P of that run. ∎
+
+The predicates used: (a) a fact f stays at its value before the move or at the prediction's value; (b) the unit U whose
+record predicts f is live at a wait point from which a write of f is reachable in U's code (section 5), or has not yet
+started. (b) is monotone while U is not started again: an unreachable write stays unreachable.
+
+## 5. Explain
+
+In a child at D_{k−1}, `explain` is armed for frame k and the unit U the located frame names, the child runs one frame,
+and the log is read. Then:
+
+**The record's path.** A record's path through U from W is an instruction sequence of U's IR (ir.py: `next` and
+`target`) that takes each of the record's checks on its side and stops at the record's end: its `pos:U` write W1 (the
+instruction after a breakHere or delay, or a WaitFor opcode) or the slot's end. A write site of a fact f is an
+instruction whose IR statement writes f (an assignment to a variable or a bit, setState, setOwnerOf, setClass,
+pickupObject, a start or a stop of a script, a yield at W for `at:U:W`).
+
+**Lemma X (the first opcode off the path).** Walk the run's logged opcodes in order alongside U's IR. The first
+conditional jump J the engine executed whose taken side cannot reach the record's end (or, for a predicted write, any
+write site of f with that value) without passing another yield, while its other side can, is the first opcode where
+the engine left every path of the record. If no such J exists and the slot is live at a wait point from which the end
+is reachable, the engine has not left the path: it has not got there yet (a wait the prediction ran past).
+
+*Proof.* Reachability is over-approximated by the IR's control flow, which contains every way the opcodes can go
+(ir.py's `next` and `target`, checked against the bytes). Before J, the end was reachable from every executed
+instruction; after J it is not, so no continuation of this run follows the record's path. ∎
+
+**Lemma B (the backward slice).** J's condition is an IR expression over constants, variables, bits, locals and
+getters. Its value in the engine is:
+
+- for a variable or a bit: the value `readVar` returned for it while J executed (the explain log);
+- for a local: the same value; it was last written by the slot itself, by an instruction of U that assigns that
+  local, or by the arguments at the slot's start (in v5 a local is written only through `writeVar` on the running slot,
+  script.cpp:846, or by `initializeLocals` at the start, script.cpp:155-164). The slice follows the log back to that
+  write and, when its value came from a getter, names the getter;
+- for a getter the opcode evaluates itself (an actor's x or y, a box, an object's state or class, a distance): the
+  value from the state dump at D_{k−1} (actors' x, y, elevation and moving state; objects' states and classes),
+  since DEBUG_VARS does not show it. When the getter's value was written into a local or a variable inside the run,
+  the log's `writeVar` gives the engine's value at that instant, and the two are reported side by side.
+
+**The two classes of cause.**
+
+- *split* (CEGAR, Clarke et al. 2003): the value the engine tested is not a fact of the reading (a position, an actor's
+  state, a random draw, a clock, a local the reading does not know), or is the time a slot still had to wait. The
+  record lumps together engine states that this test tells apart, and the job must split on that value.
+- *semantics*: the value the engine tested is a fact, and its value at D_{k−1} is one the record's precondition allows
+  or the prediction gives. The model computed that opcode, or an earlier one whose result the test reads, differently
+  from the engine: one fix in the reader.
+
+A test whose fact the engine had at a value the model did not expect is neither: the cause lies in the run that wrote
+it, and the explanation follows that write.
+
+### What the first runs on run B called for
+
+Written after the first runs, each with the case that showed it:
+
+- **The writer.** A refuted prediction f = v names no unit. The candidates are the units with a write site of f: first
+  the model's last writer (the last unit in a feasible path's turns with a write site whose target is a constant: the
+  value at the end is the last write's), then the units both the model and the engine ran, then the rest; sites
+  through an index, or with an object that is not a constant, come after those that name f. The others' results are
+  kept as alternatives. (A loop over an indexed write was taken for the writer of a cursor variable.)
+- **Ops that write without writeVar.** o5_cursorCommand writes VAR_CURSORSTATE and VAR_USERPUT directly
+  (script_v5.cpp:935-938), and a room change writes the room's variables in startScene (room.cpp:76-205). Their write
+  sites are the ops; the log shows no value, so the engine's value is the fact at done.
+- **The sentence queue.** checkAndRunSentenceScript starts the sentence script with the queued (verb, A, B) as its
+  locals 0-2 (script.cpp:1240-1246). When the sentence script writes f from those locals with another value than
+  predicted, the slice goes on to the doSentence the engine ran last before that start, and its arguments' values.
+  When the slot that writes is the earlier sentence's instance, the cause is where that slot waited.
+- **A new instance.** A slot fact the engine's slot left as predicted and then holds again at done comes from a new
+  instance; the run that encloses its first run (the segmentation's depth) started it, with the opcode that ran it.
+- **Not there yet.** Lemma X's second outcome (the write still reachable from where the slot waits at done) is a cause
+  of class split: the job must split on the time the slot still waits (a delay's jiffies, the one frame after a
+  breakHere, a WaitFor op's condition) against the frame the next input comes. Its opcode is the polling loop's test
+  when the slot waits in one, else the yield.
+- **Run B on another seed.** Run B's recorded inputs played on seed 1 stop doing what they did in run B at some move.
+  Only the moves before it are checked: the first move whose room at done (or at the next move's start) is not run
+  B's, whose dialog line is not shown, whose sentence by done is not the scored action's where it was in run B's own
+  ground truth, or that the model does not accept for another reason than a missing action kind.
+
+## 6. The wait check
+
+**Lemma W (frame costs).** For an event record r = event(U@W) matched to a run in frame k, let j be the frame of the run
+that left U's slot at W (the runs' own frames: a run after a decision point belongs to its frame). The engine waited
+k − j frames. A2 (every cost a lower bound) requires k − j ≥ cost(r). The
+check runs on every matched event of every validated run; a wait below its bound is a counterexample to the rule that
+priced r.
+
+## 7. What is checked
+
+- run B's recorded inputs on seed 1, the moves of the model check (check.py, row 5 with fix round 1's switches): every
+  move the model rejects and every certain prediction the engine refutes gets a located frame, an explained opcode and
+  the engine's value, or is reported without one, with the reason;
+- the window search's runs (kitchen from boot and from run B's S1#7 pre, the bar door, k = 2) and their replans,
+  replayed from boot with `segment` on: every run between the decision points the plan's steps cover, strictly
+  matched;
+- B1's gate: at least 90% of run B's rejected moves and refuted predictions get an automatic cause. Fewer than half: the
+  grain is wrong.
+
+## 8. Off
+
+Every new control is off by default; the bridge with both off writes the same trace, status and dumps as before
+(section 2's test). `trace_check.py` is an instrument: nothing the system runs imports it. It changes no reader, task
+or planner output.

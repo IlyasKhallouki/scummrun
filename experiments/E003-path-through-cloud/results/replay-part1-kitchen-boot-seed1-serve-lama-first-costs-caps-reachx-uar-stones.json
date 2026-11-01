@@ -1,0 +1,4538 @@
+{
+ "seed": 1,
+ "reading": "/var/tmp/fast-mi/ksr-scratch/kb/reading/reading.json",
+ "name": "kitchen-boot",
+ "control": false,
+ "goal": {
+  "owner:566": [
+   1
+  ]
+ },
+ "goal_is_part1_end": false,
+ "task": {
+  "actions": 40773,
+  "facts": 656,
+  "records": 41877,
+  "folded": 1104,
+  "packed_sha1": "47583c5433ae",
+  "packed_bytes": 27434460,
+  "lines_sha1": "8abae2486f19",
+  "live_locals": true
+ },
+ "control_counts": null,
+ "limits": {
+  "replans": 30,
+  "seconds": 10800.0,
+  "plan_time": 600,
+  "plan_memory": "3G",
+  "input": 600,
+  "wait": 3600,
+  "retries": 3,
+  "retry_wait": 60
+ },
+ "sources": {
+  "replay_part1.py": "0ea0b941bd18",
+  "replay.py": "a1a251d66f41",
+  "packed_reading.py": "d945f6fcb09d",
+  "export_records.py": "f0aa97ff0b22",
+  "plan_fd.py": "ae5dda514eb4",
+  "reader.py": "94d495853f07",
+  "model.py": "cc630446bdbe",
+  "task.py": "c356a6df633a",
+  "domains.py": "19932b58530a",
+  "facts.py": "c06fc3489018",
+  "start.py": "573ac0069ff6"
+ },
+ "taskcore_binary": "bf3409ec094e",
+ "taskcore_serve": true,
+ "search": "lama-first-costs",
+ "cost_caps": true,
+ "frame_costs": {
+  "charinc": 0,
+  "dmax": 6,
+  "rules": {
+   "WaitForActor, WaitForCamera, WaitForSentence: 1 frame": 433,
+   "WaitForMessage after a talk: the talk delay's frames + 1": 1472,
+   "WaitForMessage, message not known: 1 frame": 258,
+   "breakHere: 1 frame": 4625,
+   "delay N: floor(N / dmax) + 1 frames": 616,
+   "delayVariable, least value from the code before it": 31,
+   "delayVariable, value from the event's locals or 1 frame": 10
+  },
+  "switch": "--frame-costs",
+  "talk_delay": 60,
+  "wait_points": 7427
+ },
+ "reader": {
+  "switches": "value_sets,draw_clears,actor_rooms,input_settled",
+  "reach": true,
+  "split_limit": true,
+  "elsewhere": true,
+  "reach_also": null,
+  "live_locals": true
+ },
+ "unobserved_actor_rooms": true,
+ "approach_stones": true,
+ "reach_extend": {
+  "threads": 3,
+  "reader_scope": "/var/tmp/fast-mi/wt-ksr/experiments/E003-path-through-cloud/scumm/target/release/reader-scope",
+  "reader_scope_sha1": "ca2631e2987d"
+ },
+ "load_s": 1.01,
+ "start": {
+  "stop": {
+   "stop": "idle",
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "idle": "sentence",
+   "rng": 3182679328,
+   "up": 1,
+   "cs": 0,
+   "ego": [
+    346,
+    133
+   ]
+  },
+  "dump": {
+   "frame": 2728,
+   "tick": 16321,
+   "room": 33,
+   "ego": 1,
+   "ego_pos": [
+    346,
+    133
+   ],
+   "seed": 1,
+   "boot_param": 0
+  },
+  "trace": {
+   "boot": 1,
+   "cd_track": 4,
+   "control": 1,
+   "room": 5,
+   "segment_start": 1,
+   "stall": 4
+  },
+  "boot_s": 3.6,
+  "check": {
+   "boot checks": "ok",
+   "reading start": {
+    "name": "results/start-part1.jsonl seed 1",
+    "differ": 0,
+    "first": [],
+    "task facts differ": 0,
+    "task first": []
+   },
+   "start-part1": {
+    "differ": 0,
+    "frame": 2728,
+    "same frame": true
+   },
+   "taskcore": {
+    "input": {
+     "seconds": 8.55,
+     "status": "ok",
+     "serve": {
+      "kept": "built",
+      "seconds_build": 2.1666,
+      "seconds": 7.9696,
+      "cpu_seconds": 7.6556,
+      "peak_rss": 85401600,
+      "rss": 66940928
+     }
+    },
+    "needed": {
+     "seconds": 5.49,
+     "status": "ok",
+     "serve": {
+      "kept": "kept",
+      "seconds_build": 0.0,
+      "seconds": 5.4892,
+      "cpu_seconds": 5.4206,
+      "peak_rss": 85925888,
+      "rss": 67043328
+     }
+    }
+   },
+   "taskcore_s": 14.05
+  }
+ },
+ "run": {
+  "stop": "goal",
+  "goal": true,
+  "replans": 2,
+  "bans": [],
+  "plans": [
+   {
+    "plan": 0,
+    "frame": 2728,
+    "bans": 0,
+    "start_counts": {},
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "9a2b1736a26b9d04",
+    "cost_caps": {},
+    "costs": [
+     2,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     1,
+     301,
+     1,
+     1,
+     1,
+     11,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     4
+    ],
+    "plan_cost": 343,
+    "write_s": 9.46409245103132,
+    "status": "plan",
+    "seconds": 168.73069895000663,
+    "steps": [
+     "sentence(2,428)#44",
+     "event(script:2@736#d897055c2f2e)#144",
+     "walk_to(428)#64",
+     "event(script:2@736#da2874b63864)#510",
+     "walk_to(316)[202]#1037",
+     "sentence(10,339)[202]#3609",
+     "event(script:2@736#19304638b7a4)#9910",
+     "event(local:211@4#a2033c82531e)#518",
+     "event(local:211@33#2ccd890c8af5)#9617",
+     "event(local:216@33#9fcd1ec1c6b2)#10059",
+     "event(local:216@59#9fcd1ec1c6b2)#15428",
+     "event(local:222@222#fb24d615b04e)#10163",
+     "event(local:222@243#fb24d615b04e)#15451",
+     "event(local:216@86#eae8d340bbfe)#9629",
+     "event(local:216@92#eae8d340bbfe)#10065",
+     "event(local:216@105#eae8d340bbfe)#15439",
+     "event(local:222@480#fb24d615b04e)#15541",
+     "esc(local:222@613#fb24d615b04e)#18390",
+     "event(local:222@973#fb24d615b04e)#19393",
+     "esc(local:222@1082#fb24d615b04e)#25680",
+     "event(local:222@1345#fb24d615b04e)#19397",
+     "walk_to(316)[202]#10846",
+     "event(script:2@736#d40e45ecaad6)#15408",
+     "event(local:218@16#965f4bbc7b57)#15491",
+     "sentence(9,566)#15899",
+     "event(script:2@736#c1184912b947)#18658",
+     "event(script:2@915#fa5666eff670)#23924"
+    ],
+    "operators": 44605,
+    "actions": 14323,
+    "decode_s": 5.036591711919755,
+    "folds": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     "fold:sentence(10,339)[202]#3609+2",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     "fold:event(local:216@105#eae8d340bbfe)#15438+1",
+     null,
+     null,
+     null,
+     null,
+     null,
+     "fold:walk_to(316)[202]#1040+1",
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 148,
+    "needed_facts": 190,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "built",
+     "seconds_build": 1.7434,
+     "seconds": 9.4636,
+     "cpu_seconds": 9.0933,
+     "peak_rss": 87334912,
+     "rss": 58773504
+    },
+    "landmarks": 34,
+    "landmark_orderings": 138,
+    "game_landmarks": 34
+   },
+   {
+    "plan": 1,
+    "frame": 3459,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 8
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "669908e37a9ebcdd",
+    "cost_caps": {
+     "event(local:207@23": 10,
+     "event(local:210@62": 6,
+     "event(local:211@33": 260
+    },
+    "costs": [
+     1,
+     4,
+     5,
+     2,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     1,
+     2,
+     1,
+     4
+    ],
+    "plan_cost": 27,
+    "write_s": 33.51953888591379,
+    "status": "plan",
+    "seconds": 43.818910305039026,
+    "steps": [
+     "walk_to(316)[202]#1038",
+     "event(local:215@16#45fc7932b71b)#9668",
+     "event(local:215@56#45fc7932b71b)#10087",
+     "event(local:215@64#45fc7932b71b)#15447",
+     "event(local:215@69#45fc7932b71b)#15526",
+     "walk_to(316)[202]#10846",
+     "event(script:2@736#d40e45ecaad6)#15408",
+     "event(local:218@16#965f4bbc7b57)#15491",
+     "sentence(2,564)#15626",
+     "event(script:2@736#85f24aad8241)#18600",
+     "event(script:2@759#85f24aad8241)#23888",
+     "sentence(9,566)#15899",
+     "event(script:2@736#c1184912b947)#18658",
+     "event(script:2@915#fa5666eff670)#23924"
+    ],
+    "operators": 43323,
+    "actions": 13905,
+    "decode_s": 4.469317445065826,
+    "folds": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     "fold:walk_to(316)[202]#1040+1",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 142,
+    "needed_facts": 190,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "built",
+     "seconds_build": 3.7819,
+     "seconds": 33.5157,
+     "cpu_seconds": 12.1375,
+     "peak_rss": 85536768,
+     "rss": 75501568
+    },
+    "landmarks": 28,
+    "landmark_orderings": 77,
+    "game_landmarks": 28
+   },
+   {
+    "plan": 2,
+    "frame": 4932,
+    "bans": 0,
+    "start_counts": {
+     "live slots with unknown locals (args 0)": 4
+    },
+    "reorders": [],
+    "planner": "taskcore",
+    "search": "lama-first-costs",
+    "input_key": "04615f3ac01136f5",
+    "cost_caps": {
+     "event(local:201@35": 8
+    },
+    "costs": [
+     2,
+     1,
+     4
+    ],
+    "plan_cost": 7,
+    "write_s": 28.869277650956064,
+    "status": "plan",
+    "seconds": 36.758325797040015,
+    "steps": [
+     "sentence(9,566)#15899",
+     "event(script:2@736#c1184912b947)#18658",
+     "event(script:2@915#fa5666eff670)#23924"
+    ],
+    "operators": 43323,
+    "actions": 13905,
+    "decode_s": 6.070680984063074,
+    "folds": [
+     null,
+     null,
+     null
+    ],
+    "predicted_goal": true,
+    "file_facts": 142,
+    "needed_facts": 190,
+    "input_check_misses": 0,
+    "choices": {},
+    "serve": {
+     "kept": "built",
+     "seconds_build": 7.7866,
+     "seconds": 28.8667,
+     "cpu_seconds": 11.79,
+     "peak_rss": 93831168,
+     "rss": 58404864
+    },
+    "landmarks": 16,
+    "landmark_orderings": 36,
+    "game_landmarks": 16
+   }
+  ],
+  "steps": [
+   {
+    "plan": 0,
+    "index": 0,
+    "name": "sentence(2,428)#44",
+    "kind": "sentence",
+    "input": "click verb 2 on 428",
+    "start": 2728,
+    "issue": 2776,
+    "end": 2777,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2728,
+      "inputs": [
+       {
+        "frame": 2736,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2751,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2752,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2753,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2754,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2755,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2756,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2757,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2758,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2759,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2760,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2761,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2762,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2763,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2764,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2765,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2766,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2767,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2768,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2769,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2770,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2771,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2772,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2773,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2774,
+        "click": [
+         319,
+         130
+        ]
+       },
+       {
+        "frame": 2775,
+        "key": "o"
+       },
+       {
+        "frame": 2776,
+        "click": [
+         311,
+         107
+        ]
+       }
+      ],
+      "issue": 2776,
+      "end": 2777,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        2775,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 2736,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2751,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2752,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2753,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2754,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2755,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2756,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2757,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2758,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2759,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2760,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2761,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2762,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2763,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2764,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2765,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2766,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2767,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2768,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2769,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2770,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2771,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2772,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2773,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2774,
+      "click": [
+       319,
+       130
+      ]
+     },
+     {
+      "frame": 2775,
+      "key": "o"
+     },
+     {
+      "frame": 2776,
+      "click": [
+       311,
+       107
+      ]
+     }
+    ],
+    "note": "waited 7 frames for the camera",
+    "seconds": 1.852742252056487
+   },
+   {
+    "plan": 0,
+    "index": 1,
+    "name": "event(script:2@736#d897055c2f2e)#144",
+    "kind": "event",
+    "input": "wait",
+    "start": 2777,
+    "issue": null,
+    "end": 2796,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2777,
+      "first_settled": 2796,
+      "end": 2796,
+      "how": "held",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        2780,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 0.5606471180217341
+   },
+   {
+    "plan": 0,
+    "index": 2,
+    "name": "walk_to(428)#64",
+    "kind": "walk_to",
+    "input": "click verb 11 on 428",
+    "start": 2796,
+    "issue": 2797,
+    "end": 3459,
+    "outcome": "precondition",
+    "then": "replan",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 2796,
+      "inputs": [
+       {
+        "frame": 2797,
+        "click": [
+         163,
+         107
+        ]
+       }
+      ],
+      "issue": 2797,
+      "first_settled": 2798,
+      "end": 2799,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "room",
+      "predicted": [
+       "33"
+      ],
+      "observed": 28,
+      "kind": "precondition"
+     },
+     {
+      "key": "var:32",
+      "predicted": [
+       "4"
+      ],
+      "observed": 202,
+      "kind": "precondition"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "local:200",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:201",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:202",
+      "start": 1,
+      "changes": [
+       [
+        2798,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:206",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:207",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:208",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:210",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:211",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "pos:local:200",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        43
+       ]
+      ],
+      "count": 1,
+      "end": 43,
+      "net": true
+     },
+     {
+      "key": "pos:local:201",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        22
+       ]
+      ],
+      "count": 1,
+      "end": 22,
+      "net": true
+     },
+     {
+      "key": "pos:local:202",
+      "start": 1,
+      "changes": [
+       [
+        2798,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:206",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        49
+       ]
+      ],
+      "count": 1,
+      "end": 49,
+      "net": true
+     },
+     {
+      "key": "pos:local:207",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        15
+       ]
+      ],
+      "count": 1,
+      "end": 15,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        21
+       ]
+      ],
+      "count": 1,
+      "end": 21,
+      "net": true
+     },
+     {
+      "key": "pos:local:210",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        62
+       ]
+      ],
+      "count": 1,
+      "end": 62,
+      "net": true
+     },
+     {
+      "key": "pos:local:211",
+      "start": -1,
+      "changes": [
+       [
+        2798,
+        33
+       ]
+      ],
+      "count": 1,
+      "end": 33,
+      "net": true
+     },
+     {
+      "key": "room",
+      "start": 33,
+      "changes": [
+       [
+        2798,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ],
+       [
+        2799,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        2799,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:333",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:336",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:339",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:342",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:345",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:348",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:351",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:354",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:358",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:360",
+      "start": 0,
+      "changes": [
+       [
+        2798,
+        1
+       ],
+       [
+        2799,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:361",
+      "start": 0,
+      "changes": [
+       [
+        2799,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        2797,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     },
+     {
+      "key": "var:22",
+      "start": 33,
+      "changes": [
+       [
+        2798,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     },
+     {
+      "key": "var:32",
+      "start": 4,
+      "changes": [
+       [
+        2798,
+        202
+       ]
+      ],
+      "count": 1,
+      "end": 202,
+      "net": true
+     },
+     {
+      "key": "var:4",
+      "start": 33,
+      "changes": [
+       [
+        2798,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     },
+     {
+      "key": "var:70",
+      "start": 1,
+      "changes": [
+       [
+        2798,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "var:72",
+      "start": 33,
+      "changes": [
+       [
+        2798,
+        28
+       ]
+      ],
+      "count": 1,
+      "end": 28,
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 2797,
+      "click": [
+       163,
+       107
+      ]
+     }
+    ],
+    "note": "retry 1 after 60 frames (the record's path never started)",
+    "seconds": 20.530823568929918
+   },
+   {
+    "plan": 1,
+    "index": 0,
+    "name": "walk_to(316)[202]#1038",
+    "kind": "walk_to",
+    "input": "click verb 11 on 316",
+    "start": 3459,
+    "issue": 4332,
+    "end": 4932,
+    "outcome": "mismatch",
+    "then": "replan",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 3459,
+      "inputs": [
+       {
+        "frame": 3461,
+        "click": [
+         303,
+         129
+        ]
+       },
+       {
+        "frame": 3490,
+        "click": [
+         303,
+         129
+        ]
+       },
+       {
+        "frame": 3491,
+        "click": [
+         303,
+         129
+        ]
+       },
+       {
+        "frame": 3492,
+        "click": [
+         303,
+         129
+        ]
+       },
+       {
+        "frame": 3493,
+        "click": [
+         311,
+         87
+        ]
+       },
+       {
+        "frame": 3533,
+        "click": [
+         315,
+         103
+        ]
+       }
+      ],
+      "issue": 3533,
+      "first_settled": 3565,
+      "end": 4133,
+      "how": "limit",
+      "started": true,
+      "taken": true
+     },
+     {
+      "try": 2,
+      "kind": "retry",
+      "start": 4193,
+      "inputs": [
+       {
+        "frame": 4194,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 4194,
+      "first_settled": 4195,
+      "end": 4196,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     },
+     {
+      "try": 3,
+      "kind": "retry",
+      "start": 4256,
+      "inputs": [
+       {
+        "frame": 4257,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 4257,
+      "first_settled": 4258,
+      "end": 4259,
+      "how": "spent",
+      "started": false,
+      "taken": true
+     },
+     {
+      "try": 4,
+      "kind": "retry",
+      "start": 4331,
+      "inputs": [
+       {
+        "frame": 4332,
+        "click": [
+         287,
+         103
+        ]
+       }
+      ],
+      "issue": 4332,
+      "first_settled": 4339,
+      "end": 4932,
+      "how": "limit",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "frozen:local:200",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:201",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:203",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:206",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:207",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:210",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:216",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:obj:316",
+      "predicted": [
+       "0"
+      ],
+      "observed": 1,
+      "kind": "write"
+     },
+     {
+      "key": "local:203",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "local:215",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:203",
+      "predicted": [
+       "40"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:local:215",
+      "predicted": [
+       "16"
+      ],
+      "observed": -1,
+      "kind": "write"
+     },
+     {
+      "key": "pos:script:2",
+      "predicted": [
+       "-1"
+      ],
+      "observed": 937,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "class:568:32",
+      "start": 0,
+      "changes": [
+       [
+        4338,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "frozen:script:2",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "local:204",
+      "start": 0,
+      "changes": [
+       [
+        4338,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "local:206",
+      "start": 1,
+      "changes": [
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:207",
+      "start": 1,
+      "changes": [
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:208",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "local:210",
+      "start": 1,
+      "changes": [
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:216",
+      "start": 1,
+      "changes": [
+       [
+        4332,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "local:218",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "objscript:316",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "pos:local:200",
+      "start": 43,
+      "changes": [
+       [
+        4338,
+        10
+       ]
+      ],
+      "count": 1,
+      "end": 10,
+      "net": true
+     },
+     {
+      "key": "pos:local:201",
+      "start": 22,
+      "changes": [
+       [
+        4338,
+        35
+       ]
+      ],
+      "count": 1,
+      "end": 35,
+      "net": true
+     },
+     {
+      "key": "pos:local:204",
+      "start": -1,
+      "changes": [
+       [
+        4338,
+        18
+       ]
+      ],
+      "count": 1,
+      "end": 18,
+      "net": true
+     },
+     {
+      "key": "pos:local:206",
+      "start": 49,
+      "changes": [
+       [
+        4338,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:207",
+      "start": 23,
+      "changes": [
+       [
+        4337,
+        15
+       ],
+       [
+        4338,
+        -1
+       ]
+      ],
+      "count": 2,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:208",
+      "start": -1,
+      "changes": [
+       [
+        4333,
+        21
+       ],
+       [
+        4336,
+        41
+       ],
+       [
+        4338,
+        -1
+       ]
+      ],
+      "count": 3,
+      "end": -1,
+      "net": false
+     },
+     {
+      "key": "pos:local:210",
+      "start": 62,
+      "changes": [
+       [
+        4338,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:216",
+      "start": 92,
+      "changes": [
+       [
+        4332,
+        -1
+       ]
+      ],
+      "count": 1,
+      "end": -1,
+      "net": true
+     },
+     {
+      "key": "pos:local:218",
+      "start": -1,
+      "changes": [
+       [
+        4333,
+        16
+       ],
+       [
+        4338,
+        -1
+       ]
+      ],
+      "count": 2,
+      "end": -1,
+      "net": false
+     },
+     {
+      "key": "pos:obj:316",
+      "start": -1,
+      "changes": [
+       [
+        4333,
+        78
+       ],
+       [
+        4338,
+        -1
+       ]
+      ],
+      "count": 2,
+      "end": -1,
+      "net": false
+     },
+     {
+      "key": "room",
+      "start": 28,
+      "changes": [
+       [
+        4338,
+        41
+       ]
+      ],
+      "count": 1,
+      "end": 41,
+      "net": true
+     },
+     {
+      "key": "script:2",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:324",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4334,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:325",
+      "start": 0,
+      "changes": [
+       [
+        4334,
+        1
+       ],
+       [
+        4335,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:326",
+      "start": 0,
+      "changes": [
+       [
+        4335,
+        1
+       ],
+       [
+        4336,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:327",
+      "start": 0,
+      "changes": [
+       [
+        4336,
+        1
+       ],
+       [
+        4337,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:328",
+      "start": 1,
+      "changes": [
+       [
+        4332,
+        0
+       ],
+       [
+        4337,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 3,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:329",
+      "start": 0,
+      "changes": [
+       [
+        4332,
+        1
+       ],
+       [
+        4333,
+        0
+       ],
+       [
+        4338,
+        1
+       ]
+      ],
+      "count": 3,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:342",
+      "start": 1,
+      "changes": [
+       [
+        4334,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:357",
+      "start": 1,
+      "changes": [
+       [
+        4337,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:358",
+      "start": 0,
+      "changes": [
+       [
+        4337,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:359",
+      "start": 0,
+      "changes": [
+       [
+        4333,
+        1
+       ],
+       [
+        4334,
+        0
+       ],
+       [
+        4336,
+        1
+       ],
+       [
+        4337,
+        0
+       ]
+      ],
+      "count": 4,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:360",
+      "start": 1,
+      "changes": [
+       [
+        4332,
+        0
+       ],
+       [
+        4334,
+        1
+       ],
+       [
+        4335,
+        0
+       ],
+       [
+        4337,
+        1
+       ],
+       [
+        4338,
+        0
+       ]
+      ],
+      "count": 5,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:361",
+      "start": 0,
+      "changes": [
+       [
+        4332,
+        1
+       ],
+       [
+        4333,
+        0
+       ],
+       [
+        4335,
+        1
+       ],
+       [
+        4336,
+        0
+       ],
+       [
+        4338,
+        1
+       ]
+      ],
+      "count": 5,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:571",
+      "start": 0,
+      "changes": [
+       [
+        4338,
+        1
+       ],
+       [
+        4339,
+        0
+       ],
+       [
+        4341,
+        1
+       ],
+       [
+        4342,
+        0
+       ],
+       [
+        4344,
+        1
+       ],
+       [
+        4345,
+        0
+       ],
+       [
+        4347,
+        1
+       ],
+       [
+        4348,
+        0
+       ],
+       [
+        4350,
+        1
+       ],
+       [
+        4351,
+        0
+       ],
+       [
+        4353,
+        1
+       ],
+       [
+        4354,
+        0
+       ]
+      ],
+      "count": 397,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:572",
+      "start": 0,
+      "changes": [
+       [
+        4339,
+        1
+       ],
+       [
+        4340,
+        0
+       ],
+       [
+        4342,
+        1
+       ],
+       [
+        4343,
+        0
+       ],
+       [
+        4345,
+        1
+       ],
+       [
+        4346,
+        0
+       ],
+       [
+        4348,
+        1
+       ],
+       [
+        4349,
+        0
+       ],
+       [
+        4351,
+        1
+       ],
+       [
+        4352,
+        0
+       ],
+       [
+        4354,
+        1
+       ],
+       [
+        4355,
+        0
+       ]
+      ],
+      "count": 396,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        4340,
+        1
+       ],
+       [
+        4341,
+        0
+       ],
+       [
+        4343,
+        1
+       ],
+       [
+        4344,
+        0
+       ],
+       [
+        4346,
+        1
+       ],
+       [
+        4347,
+        0
+       ],
+       [
+        4349,
+        1
+       ],
+       [
+        4350,
+        0
+       ],
+       [
+        4352,
+        1
+       ],
+       [
+        4353,
+        0
+       ],
+       [
+        4355,
+        1
+       ],
+       [
+        4356,
+        0
+       ]
+      ],
+      "count": 396,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        4339,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "var:22",
+      "start": 28,
+      "changes": [
+       [
+        4338,
+        41
+       ]
+      ],
+      "count": 1,
+      "end": 41,
+      "net": true
+     },
+     {
+      "key": "var:32",
+      "start": 202,
+      "changes": [
+       [
+        4338,
+        4
+       ]
+      ],
+      "count": 1,
+      "end": 4,
+      "net": true
+     },
+     {
+      "key": "var:4",
+      "start": 28,
+      "changes": [
+       [
+        4338,
+        41
+       ]
+      ],
+      "count": 1,
+      "end": 41,
+      "net": true
+     },
+     {
+      "key": "var:70",
+      "start": 0,
+      "changes": [
+       [
+        4338,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "var:72",
+      "start": 28,
+      "changes": [
+       [
+        4338,
+        41
+       ]
+      ],
+      "count": 1,
+      "end": 41,
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "room-028-bar/local-203.txt:13 [0012]",
+      "VAR_RESULT == 28",
+      true,
+      "?(actor state: getActorRoom(6))",
+      true
+     ],
+     [
+      "room-028-bar/local-203.txt:15 [001E]",
+      "VAR_RESULT > 310",
+      true,
+      "?(position: getActorX(6))",
+      false
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 3461,
+      "click": [
+       303,
+       129
+      ]
+     },
+     {
+      "frame": 3490,
+      "click": [
+       303,
+       129
+      ]
+     },
+     {
+      "frame": 3491,
+      "click": [
+       303,
+       129
+      ]
+     },
+     {
+      "frame": 3492,
+      "click": [
+       303,
+       129
+      ]
+     },
+     {
+      "frame": 3493,
+      "click": [
+       311,
+       87
+      ]
+     },
+     {
+      "frame": 3533,
+      "click": [
+       315,
+       103
+      ]
+     },
+     {
+      "frame": 4194,
+      "click": [
+       287,
+       103
+      ]
+     },
+     {
+      "frame": 4257,
+      "click": [
+       287,
+       103
+      ]
+     },
+     {
+      "frame": 4332,
+      "click": [
+       287,
+       103
+      ]
+     }
+    ],
+    "note": "waited 1 frames for the camera; retry 1 after 60 frames; retry 2 after 60 frames (the record's path never started); retry 3 after 60 frames (the record's path never started); waited 12 frames for the record's position checks",
+    "seconds": 34.72960978804622
+   },
+   {
+    "plan": 2,
+    "index": 0,
+    "name": "sentence(9,566)#15899",
+    "kind": "sentence",
+    "input": "click verb 9 on 566",
+    "start": 4932,
+    "issue": 4934,
+    "end": 4935,
+    "outcome": "matched",
+    "then": "next",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 4932,
+      "inputs": [
+       {
+        "frame": 4933,
+        "key": "p"
+       },
+       {
+        "frame": 4934,
+        "click": [
+         79,
+         99
+        ]
+       }
+      ],
+      "issue": 4934,
+      "end": 4935,
+      "how": "held",
+      "started": true,
+      "taken": true
+     }
+    ],
+    "mismatches": [],
+    "unplanned": [
+     {
+      "key": "state:571",
+      "start": 1,
+      "changes": [
+       [
+        4933,
+        0
+       ],
+       [
+        4935,
+        1
+       ]
+      ],
+      "count": 2,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:572",
+      "start": 0,
+      "changes": [
+       [
+        4933,
+        1
+       ],
+       [
+        4934,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        4934,
+        1
+       ],
+       [
+        4935,
+        0
+       ]
+      ],
+      "count": 2,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:182",
+      "start": 0,
+      "changes": [
+       [
+        4934,
+        "above"
+       ]
+      ],
+      "count": 1,
+      "end": "above",
+      "net": true
+     }
+    ],
+    "checks": [
+     [
+      "global/script-002.txt:9 [0007]",
+      "Var[104] == Local[1]",
+      false,
+      "?(not a fact: var:104)",
+      true
+     ]
+    ],
+    "inputs": [
+     {
+      "frame": 4933,
+      "key": "p"
+     },
+     {
+      "frame": 4934,
+      "click": [
+       79,
+       99
+      ]
+     }
+    ],
+    "note": "",
+    "seconds": 0.159360792953521
+   },
+   {
+    "plan": 2,
+    "index": 1,
+    "name": "event(script:2@736#c1184912b947)#18658",
+    "kind": "event",
+    "input": "wait",
+    "start": 4935,
+    "issue": null,
+    "end": 4944,
+    "outcome": "goal",
+    "then": "goal",
+    "tries": [
+     {
+      "try": 1,
+      "kind": "first",
+      "start": 4935,
+      "first_settled": 4944,
+      "end": 4944,
+      "how": "goal",
+      "started": true,
+      "taken": false
+     }
+    ],
+    "mismatches": [
+     {
+      "key": "frozen:local:200",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     },
+     {
+      "key": "frozen:local:201",
+      "predicted": [
+       "1"
+      ],
+      "observed": 0,
+      "kind": "write"
+     }
+    ],
+    "unplanned": [
+     {
+      "key": "class:566:32",
+      "start": 0,
+      "changes": [
+       [
+        4944,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "owner:566",
+      "start": 15,
+      "changes": [
+       [
+        4944,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "script:2",
+      "start": 1,
+      "changes": [
+       [
+        4944,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "state:566",
+      "start": 0,
+      "changes": [
+       [
+        4944,
+        1
+       ]
+      ],
+      "count": 1,
+      "end": 1,
+      "net": true
+     },
+     {
+      "key": "state:571",
+      "start": 1,
+      "changes": [
+       [
+        4936,
+        0
+       ],
+       [
+        4938,
+        1
+       ],
+       [
+        4939,
+        0
+       ],
+       [
+        4941,
+        1
+       ],
+       [
+        4942,
+        0
+       ],
+       [
+        4944,
+        1
+       ]
+      ],
+      "count": 6,
+      "end": 1,
+      "net": false
+     },
+     {
+      "key": "state:572",
+      "start": 0,
+      "changes": [
+       [
+        4936,
+        1
+       ],
+       [
+        4937,
+        0
+       ],
+       [
+        4939,
+        1
+       ],
+       [
+        4940,
+        0
+       ],
+       [
+        4942,
+        1
+       ],
+       [
+        4943,
+        0
+       ]
+      ],
+      "count": 6,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "state:573",
+      "start": 0,
+      "changes": [
+       [
+        4937,
+        1
+       ],
+       [
+        4938,
+        0
+       ],
+       [
+        4940,
+        1
+       ],
+       [
+        4941,
+        0
+       ],
+       [
+        4943,
+        1
+       ],
+       [
+        4944,
+        0
+       ]
+      ],
+      "count": 6,
+      "end": 0,
+      "net": false
+     },
+     {
+      "key": "var:133",
+      "start": 0,
+      "changes": [
+       [
+        4944,
+        null
+       ]
+      ],
+      "count": 1,
+      "end": null,
+      "net": true
+     },
+     {
+      "key": "var:182",
+      "start": "above",
+      "changes": [
+       [
+        4944,
+        0
+       ]
+      ],
+      "count": 1,
+      "end": 0,
+      "net": true
+     },
+     {
+      "key": "var:376",
+      "start": 1036,
+      "changes": [
+       [
+        4944,
+        996
+       ]
+      ],
+      "count": 1,
+      "end": 996,
+      "net": true
+     }
+    ],
+    "checks": [],
+    "inputs": [],
+    "note": "",
+    "seconds": 0.466127026011236
+   }
+  ],
+  "frames": 2216,
+  "ticks": 13296,
+  "frame0": 2728,
+  "frame_end": 4944,
+  "seconds": 397.14192257099785,
+  "inputs": [
+   {
+    "frame": 2736,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2751,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2752,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2753,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2754,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2755,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2756,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2757,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2758,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2759,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2760,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2761,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2762,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2763,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2764,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2765,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2766,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2767,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2768,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2769,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2770,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2771,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2772,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2773,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2774,
+    "click": [
+     319,
+     130
+    ]
+   },
+   {
+    "frame": 2775,
+    "key": "o"
+   },
+   {
+    "frame": 2776,
+    "click": [
+     311,
+     107
+    ]
+   },
+   {
+    "frame": 2797,
+    "click": [
+     163,
+     107
+    ]
+   },
+   {
+    "frame": 3461,
+    "click": [
+     303,
+     129
+    ]
+   },
+   {
+    "frame": 3490,
+    "click": [
+     303,
+     129
+    ]
+   },
+   {
+    "frame": 3491,
+    "click": [
+     303,
+     129
+    ]
+   },
+   {
+    "frame": 3492,
+    "click": [
+     303,
+     129
+    ]
+   },
+   {
+    "frame": 3493,
+    "click": [
+     311,
+     87
+    ]
+   },
+   {
+    "frame": 3533,
+    "click": [
+     315,
+     103
+    ]
+   },
+   {
+    "frame": 4194,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 4257,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 4332,
+    "click": [
+     287,
+     103
+    ]
+   },
+   {
+    "frame": 4933,
+    "key": "p"
+   },
+   {
+    "frame": 4934,
+    "click": [
+     79,
+     99
+    ]
+   }
+  ],
+  "extensions": []
+ },
+ "landmarks": {
+  "plan": 0,
+  "frame": 2728,
+  "nodes": [
+   {
+    "id": 0,
+    "facts": [
+     [
+      "owner:566",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": true,
+    "aux": false
+   },
+   {
+    "id": 1,
+    "facts": [
+     [
+      "args:script:2",
+      275249001133680
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 2,
+    "facts": [
+     [
+      "frozen:script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 3,
+    "facts": [
+     [
+      "room",
+      41
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 4,
+    "facts": [
+     [
+      "owner:566",
+      15
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 5,
+    "facts": [
+     [
+      "pos:script:2",
+      915
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 6,
+    "facts": [
+     [
+      "script:2",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 7,
+    "facts": [
+     [
+      "args:script:2",
+      212310049339719
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 8,
+    "facts": [
+     [
+      "pos:script:2",
+      736
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 9,
+    "facts": [
+     [
+      "args:script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 10,
+    "facts": [
+     [
+      "state:564",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 11,
+    "facts": [
+     [
+      "room",
+      28
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 12,
+    "facts": [
+     [
+      "owner:568",
+      15
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 13,
+    "facts": [
+     [
+      "local:218",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 14,
+    "facts": [
+     [
+      "frozen:local:218",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 15,
+    "facts": [
+     [
+      "bit:424",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 16,
+    "facts": [
+     [
+      "pos:local:218",
+      16
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 17,
+    "facts": [
+     [
+      "room",
+      33
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 18,
+    "facts": [
+     [
+      "pos:script:2",
+      -1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 19,
+    "facts": [
+     [
+      "script:2",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 20,
+    "facts": [
+     [
+      "var:32",
+      4
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 21,
+    "facts": [
+     [
+      "var:53",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 22,
+    "facts": [
+     [
+      "class:566:32",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 23,
+    "facts": [
+     [
+      "verb:9",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 24,
+    "facts": [
+     [
+      "state:428",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 25,
+    "facts": [
+     [
+      "args:script:2",
+      239867291646052
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 26,
+    "facts": [
+     [
+      "local:218",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 27,
+    "facts": [
+     [
+      "state:316",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 28,
+    "facts": [
+     [
+      "args:script:2",
+      233157767768790
+     ],
+     [
+      "args:local:203",
+      127842467589518
+     ]
+    ],
+    "disjunctive": true,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 29,
+    "facts": [
+     [
+      "pos:local:218",
+      -1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 30,
+    "facts": [
+     [
+      "state:428",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 31,
+    "facts": [
+     [
+      "args:script:2",
+      238143141588782
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": false,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 32,
+    "facts": [
+     [
+      "state:316",
+      0
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   },
+   {
+    "id": 33,
+    "facts": [
+     [
+      "verb:2",
+      1
+     ]
+    ],
+    "disjunctive": false,
+    "conjunctive": false,
+    "initial": true,
+    "goal": false,
+    "aux": false
+   }
+  ],
+  "orderings": [
+   [
+    1,
+    0,
+    "gn"
+   ],
+   [
+    2,
+    24,
+    "gn"
+   ],
+   [
+    2,
+    11,
+    "gn"
+   ],
+   [
+    2,
+    8,
+    "gn"
+   ],
+   [
+    2,
+    6,
+    "gn"
+   ],
+   [
+    2,
+    5,
+    "gn"
+   ],
+   [
+    2,
+    1,
+    "gn"
+   ],
+   [
+    2,
+    0,
+    "gn"
+   ],
+   [
+    3,
+    8,
+    "r"
+   ],
+   [
+    3,
+    5,
+    "r"
+   ],
+   [
+    3,
+    1,
+    "n"
+   ],
+   [
+    3,
+    6,
+    "r"
+   ],
+   [
+    3,
+    7,
+    "gn"
+   ],
+   [
+    3,
+    0,
+    "gn"
+   ],
+   [
+    4,
+    7,
+    "gn"
+   ],
+   [
+    4,
+    1,
+    "gn"
+   ],
+   [
+    4,
+    0,
+    "gn"
+   ],
+   [
+    5,
+    0,
+    "gn"
+   ],
+   [
+    6,
+    3,
+    "n"
+   ],
+   [
+    6,
+    16,
+    "n"
+   ],
+   [
+    6,
+    24,
+    "gn"
+   ],
+   [
+    6,
+    11,
+    "gn"
+   ],
+   [
+    6,
+    5,
+    "gn"
+   ],
+   [
+    6,
+    1,
+    "gn"
+   ],
+   [
+    6,
+    13,
+    "n"
+   ],
+   [
+    6,
+    0,
+    "gn"
+   ],
+   [
+    7,
+    0,
+    "n"
+   ],
+   [
+    7,
+    1,
+    "gn"
+   ],
+   [
+    8,
+    5,
+    "n"
+   ],
+   [
+    8,
+    3,
+    "n"
+   ],
+   [
+    8,
+    0,
+    "n"
+   ],
+   [
+    8,
+    13,
+    "n"
+   ],
+   [
+    8,
+    16,
+    "n"
+   ],
+   [
+    8,
+    24,
+    "gn"
+   ],
+   [
+    8,
+    11,
+    "gn"
+   ],
+   [
+    8,
+    27,
+    "n"
+   ],
+   [
+    8,
+    1,
+    "gn"
+   ],
+   [
+    9,
+    31,
+    "n"
+   ],
+   [
+    9,
+    25,
+    "n"
+   ],
+   [
+    9,
+    7,
+    "n"
+   ],
+   [
+    9,
+    1,
+    "n"
+   ],
+   [
+    10,
+    3,
+    "gn"
+   ],
+   [
+    11,
+    8,
+    "r"
+   ],
+   [
+    11,
+    5,
+    "r"
+   ],
+   [
+    11,
+    6,
+    "r"
+   ],
+   [
+    11,
+    7,
+    "n"
+   ],
+   [
+    11,
+    28,
+    "gn"
+   ],
+   [
+    11,
+    1,
+    "n"
+   ],
+   [
+    11,
+    27,
+    "gn"
+   ],
+   [
+    11,
+    16,
+    "gn"
+   ],
+   [
+    11,
+    0,
+    "n"
+   ],
+   [
+    11,
+    13,
+    "gn"
+   ],
+   [
+    11,
+    20,
+    "r"
+   ],
+   [
+    11,
+    3,
+    "gn"
+   ],
+   [
+    12,
+    3,
+    "gn"
+   ],
+   [
+    13,
+    7,
+    "n"
+   ],
+   [
+    13,
+    0,
+    "n"
+   ],
+   [
+    13,
+    1,
+    "n"
+   ],
+   [
+    13,
+    3,
+    "gn"
+   ],
+   [
+    14,
+    3,
+    "gn"
+   ],
+   [
+    15,
+    3,
+    "gn"
+   ],
+   [
+    16,
+    7,
+    "n"
+   ],
+   [
+    16,
+    0,
+    "n"
+   ],
+   [
+    16,
+    1,
+    "n"
+   ],
+   [
+    16,
+    3,
+    "gn"
+   ],
+   [
+    17,
+    31,
+    "gn"
+   ],
+   [
+    17,
+    24,
+    "gn"
+   ],
+   [
+    17,
+    11,
+    "gn"
+   ],
+   [
+    17,
+    8,
+    "gn"
+   ],
+   [
+    17,
+    25,
+    "gn"
+   ],
+   [
+    17,
+    6,
+    "gn"
+   ],
+   [
+    17,
+    3,
+    "n"
+   ],
+   [
+    18,
+    8,
+    "n"
+   ],
+   [
+    18,
+    5,
+    "n"
+   ],
+   [
+    19,
+    8,
+    "gn"
+   ],
+   [
+    19,
+    6,
+    "gn"
+   ],
+   [
+    20,
+    31,
+    "gn"
+   ],
+   [
+    20,
+    8,
+    "gn"
+   ],
+   [
+    20,
+    25,
+    "gn"
+   ],
+   [
+    20,
+    7,
+    "gn"
+   ],
+   [
+    20,
+    6,
+    "gn"
+   ],
+   [
+    21,
+    8,
+    "gn"
+   ],
+   [
+    21,
+    6,
+    "gn"
+   ],
+   [
+    22,
+    7,
+    "gn"
+   ],
+   [
+    23,
+    7,
+    "gn"
+   ],
+   [
+    24,
+    1,
+    "n"
+   ],
+   [
+    24,
+    27,
+    "n"
+   ],
+   [
+    24,
+    7,
+    "n"
+   ],
+   [
+    24,
+    3,
+    "n"
+   ],
+   [
+    24,
+    0,
+    "n"
+   ],
+   [
+    24,
+    13,
+    "n"
+   ],
+   [
+    24,
+    16,
+    "n"
+   ],
+   [
+    24,
+    11,
+    "gn"
+   ],
+   [
+    25,
+    5,
+    "r"
+   ],
+   [
+    25,
+    1,
+    "n"
+   ],
+   [
+    25,
+    27,
+    "n"
+   ],
+   [
+    25,
+    7,
+    "n"
+   ],
+   [
+    25,
+    3,
+    "n"
+   ],
+   [
+    25,
+    0,
+    "n"
+   ],
+   [
+    25,
+    13,
+    "n"
+   ],
+   [
+    25,
+    16,
+    "n"
+   ],
+   [
+    25,
+    11,
+    "gn"
+   ],
+   [
+    26,
+    16,
+    "r"
+   ],
+   [
+    26,
+    8,
+    "r"
+   ],
+   [
+    26,
+    6,
+    "r"
+   ],
+   [
+    26,
+    5,
+    "r"
+   ],
+   [
+    26,
+    13,
+    "gn"
+   ],
+   [
+    27,
+    7,
+    "n"
+   ],
+   [
+    27,
+    1,
+    "n"
+   ],
+   [
+    27,
+    3,
+    "n"
+   ],
+   [
+    27,
+    16,
+    "gn"
+   ],
+   [
+    27,
+    0,
+    "n"
+   ],
+   [
+    27,
+    13,
+    "gn"
+   ],
+   [
+    28,
+    7,
+    "n"
+   ],
+   [
+    28,
+    1,
+    "n"
+   ],
+   [
+    28,
+    3,
+    "n"
+   ],
+   [
+    28,
+    16,
+    "gn"
+   ],
+   [
+    28,
+    0,
+    "n"
+   ],
+   [
+    28,
+    13,
+    "gn"
+   ],
+   [
+    29,
+    13,
+    "r"
+   ],
+   [
+    29,
+    8,
+    "r"
+   ],
+   [
+    29,
+    6,
+    "r"
+   ],
+   [
+    29,
+    5,
+    "r"
+   ],
+   [
+    29,
+    16,
+    "gn"
+   ],
+   [
+    30,
+    24,
+    "gn"
+   ],
+   [
+    31,
+    5,
+    "r"
+   ],
+   [
+    31,
+    11,
+    "n"
+   ],
+   [
+    31,
+    1,
+    "n"
+   ],
+   [
+    31,
+    27,
+    "n"
+   ],
+   [
+    31,
+    25,
+    "r"
+   ],
+   [
+    31,
+    7,
+    "n"
+   ],
+   [
+    31,
+    3,
+    "n"
+   ],
+   [
+    31,
+    0,
+    "n"
+   ],
+   [
+    31,
+    13,
+    "n"
+   ],
+   [
+    31,
+    16,
+    "n"
+   ],
+   [
+    31,
+    24,
+    "gn"
+   ],
+   [
+    32,
+    27,
+    "gn"
+   ],
+   [
+    33,
+    31,
+    "gn"
+   ]
+  ]
+ },
+ "summary": {
+  "steps": 6,
+  "executed": 6,
+  "played": 6,
+  "outcomes": {
+   "goal": 1,
+   "matched": 3,
+   "mismatch": 1,
+   "precondition": 1
+  },
+  "writes_held": 3,
+  "writes_held_share": 0.5,
+  "matched": 0,
+  "matched_share": 0.0,
+  "not_matched": {
+   "goal": 1,
+   "mismatch": 1,
+   "precondition": 1,
+   "writes held, tracked facts changed": 3
+  },
+  "mismatches": 87,
+  "mismatches_per_executed": 14.5,
+  "mismatched_writes": 15,
+  "mismatched_writes_per_executed": 2.5,
+  "unplanned_changes": 72,
+  "unplanned_changes_per_executed": 12.0,
+  "unplanned_most": [
+   [
+    "var:182",
+    6
+   ],
+   [
+    "local:206",
+    2
+   ],
+   [
+    "local:207",
+    2
+   ],
+   [
+    "local:210",
+    2
+   ],
+   [
+    "pos:local:200",
+    2
+   ],
+   [
+    "pos:local:201",
+    2
+   ],
+   [
+    "pos:local:206",
+    2
+   ],
+   [
+    "pos:local:207",
+    2
+   ],
+   [
+    "pos:local:210",
+    2
+   ],
+   [
+    "room",
+    2
+   ],
+   [
+    "state:342",
+    2
+   ],
+   [
+    "state:358",
+    2
+   ]
+  ],
+  "another_guess": 0,
+  "final_path": [
+   "sentence(2,428)#44",
+   "event(script:2@736#d897055c2f2e)#144",
+   "sentence(9,566)#15899"
+  ],
+  "final_path_actions": 3,
+  "inputs": 39,
+  "time": {
+   "step_seconds": {
+    "n": 6,
+    "mean": 9.72,
+    "median": 1.21,
+    "max": 34.73,
+    "sum": 58.3
+   },
+   "step_frames": {
+    "n": 6,
+    "mean": 369.33,
+    "median": 34.0,
+    "max": 1473,
+    "sum": 2216
+   },
+   "plan_seconds": {
+    "n": 3,
+    "mean": 112.25,
+    "median": 81.81,
+    "max": 183.23,
+    "sum": 336.7
+   },
+   "plan_write_s": {
+    "n": 3,
+    "mean": 23.95,
+    "median": 28.87,
+    "max": 33.52,
+    "sum": 71.9
+   },
+   "plan_search_s": {
+    "n": 3,
+    "mean": 83.1,
+    "median": 43.82,
+    "max": 168.73,
+    "sum": 249.3
+   },
+   "harness_s": 397.1,
+   "planning_s": 336.7,
+   "playing_s": 60.4
+  }
+ },
+ "verify": {
+  "checkpoints": 14,
+  "differ": [],
+  "inputs": 39,
+  "final": {
+   "owner:566": 1
+  },
+  "same": true,
+  "goal": true,
+  "seconds": 16.6
+ },
+ "seconds": 432.5,
+ "game_seconds": 221.60724244989495
+}
