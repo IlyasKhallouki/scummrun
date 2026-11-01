@@ -1239,10 +1239,10 @@ index 00000000..0a89310f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..bd5ea2be
+index 00000000..d43d4757
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,577 @@
+@@ -0,0 +1,581 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1555,6 +1555,10 @@ index 00000000..bd5ea2be
 +	/** Ego's inventory in display order (findInventory() is 1-based). */
 +	Common::Array<int> egoInventory() const;
 +	Common::String stateJson() const;
++	// The state dump's fields that facts_of reads, with owners, states and classes for the objects ``objects`` only
++	// and no room objects or inventory (the "state" command with "objects": window-search.md section 9.7); off unless
++	// a state command asks for it
++	Common::String stateLiteJson(const Common::Array<int> &objects) const;
 +	/** The state dump's "exact" object (SPEEDRUN_DUMP_EXACT): reads only. */
 +	Common::String exactJson() const;
 +	Common::String objectsJson();
@@ -2175,10 +2179,10 @@ index 00000000..49d670d5
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
 new file mode 100644
-index 00000000..56e2ff9d
+index 00000000..6fcf1a35
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_control.cpp
-@@ -0,0 +1,465 @@
+@@ -0,0 +1,476 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -2226,6 +2230,8 @@ index 00000000..56e2ff9d
 +//     {"cmd": "run", "fork_each": N}             a child at each of the next N decision points (each connects
 +//                                                and stops there); the stop "fork_each" lists [frame, pid] pairs
 +//     {"cmd": "state"}                           C7 state dump
++//     {"cmd": "state", "objects": [ids]}         the dump's fields facts_of reads, objects' owners, states and
++//                                                classes for these ids only, no room objects or inventory
 +//     {"cmd": "holds", "until": [C3...]}         {"holds": bool} now, no frame run
 +//     run also takes "idle": true (stop when the bridge's idle rule holds), "menu": true
 +//     (stop when a dialogue menu takes a click) and
@@ -2577,7 +2583,16 @@ index 00000000..56e2ff9d
 +			else
 +				controlSend(Common::String::format("{\"holds\":%s}", allHold(conds) ? "true" : "false"));
 +		} else if (cmd == "state") {
-+			controlSend("{\"state\":" + stateJson() + "}");
++			if (obj->contains("objects") && obj->getVal("objects")->isArray()) {
++				// window-search.md section 9.7: the dump's fields facts_of reads, for these objects only
++				Common::Array<int> objects;
++				for (const Common::JSONValue *v : obj->getVal("objects")->asArray())
++					if (v->isIntegerNumber())
++						objects.push_back((int)v->asIntegerNumber());
++				controlSend("{\"state\":" + stateLiteJson(objects) + "}");
++			} else {
++				controlSend("{\"state\":" + stateJson() + "}");
++			}
 +		} else if (cmd == "segment") {
 +			// trace-validation.md: record every slot run from now on, or stop.
 +			_segment = obj->contains("on") && obj->getVal("on")->isBool() && obj->getVal("on")->asBool();
@@ -4641,10 +4656,10 @@ index 00000000..7263e24f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..ac2499ef
+index 00000000..8f0f384c
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,855 @@
+@@ -0,0 +1,989 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -5278,6 +5293,140 @@ index 00000000..ac2499ef
 +	// the fields above (exactJson()).
 +	if (_dumpExact)
 +		s.addRaw("exact", exactJson());
++	return s.str();
++}
++
++
++Common::String SpeedrunBridge::stateLiteJson(const Common::Array<int> &objects) const {
++	ScummEngine &e = *_vm;
++	const int ego = e._scummVars[e.VAR_EGO];
++	const Actor *egoActor = (ego > 0 && ego < e._numActors) ? e._actors[ego] : nullptr;
++
++	JsonObject s;
++	s.add("tick", _ticks).add("frame", _frames).add("room", (int)e._currentRoom).add("ego", ego);
++	if (egoActor)
++		s.addRaw("ego_pos", pointJson(egoActor->getRealPos().x, egoActor->getRealPos().y));
++	else
++		s.addNull("ego_pos");
++	if (ConfMan.hasKey("random_seed"))
++		s.add("seed", ConfMan.getInt("random_seed"));
++	else
++		s.addNull("seed");
++	s.add("boot_param", e._bootParam);
++
++	JsonArray vars;
++	for (int i = 0; i < e._numVariables; i++)
++		vars.add(e._scummVars[i]);
++	s.addRaw("vars", vars.str());
++
++	JsonArray bits;
++	for (int n = 0; n < e._numBitVariables; n++) {
++		if (e._bitVars[n >> 3] & (1 << (n & 7)))
++			bits.add(n);
++	}
++	s.addRaw("bits_set", bits.str());
++
++	JsonObject owners, states, classes;
++	for (uint k = 0; k < objects.size(); k++) {
++		const int obj = objects[k];
++		if (obj < 1 || obj >= e._numGlobalObjects)
++			continue;
++		const Common::String key = Common::String::format("%d", obj);
++		owners.add(key.c_str(), (int)e._objectOwnerTable[obj]);
++		states.add(key.c_str(), (int)e._objectStateTable[obj]);
++		if (e._classData[obj])
++			classes.addRaw(key.c_str(), classesJson(e._classData[obj]));
++	}
++	s.addRaw("owners", owners.str()).addRaw("states", states.str()).addRaw("classes", classes.str());
++
++	JsonArray verbs;
++	for (int slot = 1; slot < e._numVerbs; slot++) {
++		if (verbVisible(slot))
++			verbs.addRaw(verbJson(slot, true));
++	}
++	s.addRaw("verbs", verbs.str());
++
++	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
++	// PC offset, frozen count and cutscene override count. "code" is the PC
++	// from the script's first opcode (scriptCode()), or -1. With
++	// SPEEDRUN_DUMP_LOCALS also "locals": the slot's NUM_SCRIPT_LOCAL locals
++	// (vm.localvar, script.h:136: initializeLocals sets them from the call's
++	// args, script.cpp:155-164; the scripts read and write them through
++	// readVar and writeVar, script.cpp:706, 846), and the slot's two flags
++	// (script.h:91; runScript and runObjectScript set them, script.cpp:98-99,
++	// 145-146): "resistant", freezeResistant (freezeScripts skips the slot,
++	// script.cpp:919, 928), and "recursive" (chainScript passes it on,
++	// script_v5.cpp:850). Whether a room change kills the slot is its "where".
++	JsonArray slots;
++	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
++		const ScriptSlot &ss = e.vm.slot[i];
++		if (ss.status == ssDead)
++			continue;
++		JsonObject o;
++		o.add("slot", i).add("number", (int)ss.number).add("where", (int)ss.where).add("status", (int)ss.status)
++		 .add("offs", (uint64)ss.offs).add("code", scriptCode(i, ss.offs)).add("frozen", (int)ss.freezeCount)
++		 .add("delay", (int)ss.delay).add("cutscene_override", (int)ss.cutsceneOverride);
++		if (_dumpLocals) {
++			JsonArray locals;
++			for (int n = 0; n < NUM_SCRIPT_LOCAL; n++)
++				locals.add((int)e.vm.localvar[i][n]);
++			o.addRaw("locals", locals.str());
++			o.add("resistant", ss.freezeResistant).add("recursive", ss.recursive);
++		}
++		slots.addRaw(o.str());
++	}
++	s.addRaw("slots", slots.str());
++
++	// The cutscene stack (script.cpp:1632-1737). beginCutscene() pushes a
++	// level and clears its override, endCutscene() pops it. beginOverride()
++	// arms the current level's override: cutScenePtr[level] is the offs of
++	// the jump after it, in slot cutSceneScript[level]; endOverride() clears
++	// it. Esc calls abortCutscene() while VAR_CUTSCENEEXIT_KEY is non-zero
++	// (input.cpp:966, 1423-1424), which resumes the top level's override, if
++	// armed, at that jump with VAR_OVERRIDE = 1.
++	// Level 0 is the stack's bottom: an override can be armed there with no
++	// cutscene open. The script that began a level is not kept, so a level
++	// names a script only through its override.
++	JsonObject cutscene;
++	const int depth = e.vm.cutSceneStackPointer;
++	cutscene.add("depth", depth);
++	JsonArray levels;
++	for (int level = 0; level <= depth && level < kMaxCutsceneNum; level++) {
++		const uint32 ptr = e.vm.cutScenePtr[level];
++		const int slot = e.vm.cutSceneScript[level];
++		JsonObject l;
++		l.add("level", level);
++		// With SPEEDRUN_DUMP_LOCALS: the level's cutSceneData, the beginCutscene
++		// argument that endCutscene hands to the end hook (script.cpp:1640, 1658).
++		if (_dumpLocals)
++			l.add("data", (int)e.vm.cutSceneData[level]);
++		if (!ptr || slot >= NUM_SCRIPT_SLOT) {
++			l.addNull("override");
++		} else {
++			const ScriptSlot &ss = e.vm.slot[slot];
++			JsonObject o;
++			o.add("slot", slot).add("number", (int)ss.number).add("where", (int)ss.where)
++			 .add("status", (int)ss.status).add("ptr", (uint64)ptr).add("code", scriptCode(slot, ptr))
++			 .add("stale", overrideStale(level));
++			l.addRaw("override", o.str());
++		}
++		levels.addRaw(l.str());
++	}
++	cutscene.addRaw("levels", levels.str());
++	s.addRaw("cutscene", cutscene.str());
++
++	// Actors in the current room: what a click on a person (Give fish to troll) aims at.
++	JsonArray actors;
++	for (int i = 1; i < e._numActors; i++) {
++		const Actor *a = e._actors[i];
++		if (!a || !a->isInCurrentRoom() || !a->_visible)
++			continue;
++		JsonObject o;
++		o.add("id", i).add("x", (int)a->getRealPos().x).add("y", (int)a->getRealPos().y)
++		 .add("elevation", (int)a->getElevation()).add("moving", (int)a->_moving);
++		actors.addRaw(o.str());
++	}
++	s.addRaw("actors", actors.str());
 +	return s.str();
 +}
 +
