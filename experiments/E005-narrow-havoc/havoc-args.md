@@ -25,6 +25,11 @@ A static analysis of the game's code, made once per reading (and again when pass
      unknown;
    - a jump's condition that compares `Local[k]` with a constant, or tests its truth, narrows `Local[k]` on each edge:
      the fallthrough holds the condition, the jump its negation;
+   - the same condition on a variable narrows that variable, and an assignment to a variable gives it its value, until
+     the next instruction that is neither an assignment nor a jump: any other instruction may run other code (a start,
+     a hook, a room change) or yield, and the engine changes its own variables only between frames (scumm.cpp
+     `updateScummVars`). The mouse's screen position, VAR_MOUSE_X and VAR_MOUSE_Y, is the screen's range, as F12 reads
+     it (scumm-machine `mouse_range`: the engine clips the mouse to the screen, input.cpp:414-434);
    - an indexed write to a local, an instruction the IR did not parse, or an indexed write to a variable whose index
      may leave `[0, 0x4000 - b)` (the index could reach the local range, `writeVar`'s `0x4000` bit) makes every local
      unknown;
@@ -67,9 +72,10 @@ step 5 gives:
 - **Between the start and `i`.** Only the slot's own instructions write its locals (`writeVar` with the `0x4000` bit
   writes `vm.localvar[_currentScript]`). Step 1 follows every path of the unit's control flow, applies every write
   the IR shows to a local, makes the locals unknown where a write's target is not known, and narrows only by a
-  condition that held on that edge. A yield does not change locals. So each path's value at `i` is in the
-  analysis's set (abstract interpretation over sets and ranges; widening and narrowing from a fixpoint keep it an
-  over-approximation).
+  condition that held on that edge. A yield does not change locals. A narrowed variable is kept only across
+  assignments and jumps, where no other script runs and no frame passes, so it still holds where it is read. So each
+  path's value at `i` is in the analysis's set (abstract interpretation over sets and ranges; widening and narrowing
+  from a fixpoint keep it an over-approximation).
 - **The number.** A local operand is that value. `Var[b + X]` reads variable `b + x` for `X`'s value `x`, and that
   variable's value is in its domain by the convention every guess of the reader rests on.
 
