@@ -1,0 +1,40 @@
+E004 plan step A4, second version: the strict window search on the kitchen from the harness's boot on seed 1 (branch trace), with every cost switch, code at 5d74d54.
+Run: replay_part1.py run 1 --serve --search lama-first-costs --cost-caps --reach-extend --unobserved-actor-rooms --approach-stones --window-search --window-strict --window-cache --window-fork-each 7 --window-lite, replan limit 30, plan memory 3G; reading kitchen-w3. ScummVM build sha1 6249a8e7d911 (the bridge at a77a9af).
+
+file replay-part1-kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split'; goal reached False; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 5 checkpoints, 0 differences, 27 inputs, goal at the end False, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 9976, qf 239236): 7248 frames, 173952 qf, 724.82 s
+plans 2, replans 1
+  replan after plan 0 at frame 6376: window empty: 3600 frames; children {'refuted': 1, 'spent': 3599}; cause: input walk_to(428)#64 at 2797: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  cause (window empty, plan 0 window 1): input walk_to(428)#64 at 2797: end pos:script:2: the wait did not block; script:2 736 WaitForActor; getActorMoving(1) = 0; class split
+  cause (window empty, plan 1 window 0): input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 736 WaitForActor; getActorMoving(1) = 0; class split
+windows 3; children 7266; child frames 24527; outcomes {'duplicate': 6, 'pruned': 59, 'success': 1, 'refuted': 1, 'spent': 7199}
+search CPU: engines 177.6 s {'child': 160.16, 'snapshot': 17.4, 'the last engine': 0.0}, Python 268.41 s, total 446.0 s
+Python CPU by part {'setup': 1.47, 'play': 20.41, 'child total': 198.27, 'cache: state, kept': 48660, 'cache: state, asked': 17200, 'cache: at, asked': 39185, 'cache: at, kept': 108325, 'observe': 125.75, 'match': 11.18}
+memory {'forks_pss_kb': 105402, 'python_rss_kb': 300712, 'live_forks': 18, 'min_available_kb': 5884312}
+steps: inputs 3 {'matched': 1, 'window empty': 2}; events 5 {'matched': 1, 'not reached': 4}
+  window 0.1 sentence(2,428)#44: frames 2728-2794 (stop: Q(g) + b reached the best success); 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}, 2774 child frames, 15.65 s wall, 14.51 Python s; best success fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures []
+  window 0.2 walk_to(428)#64: frames 2776-6376 (3600 frames); 3600 children {'refuted': 1, 'spent': 3599}, 10953 child frames, 140.16 s wall, 130.63 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'end pos:script:2'], 3581], [['input', 'walk_to(428)#64', 'pre script:2'], 18]]
+  window 1.1 walk_to(428)#64: frames 6376-9976 (3600 frames); 3600 children {'spent': 3600}, 10800 child frames, 135.91 s wall, 123.27 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'end pos:script:2'], 3600]]
+windows with an input 3; search CPU per such window 148.7 s; x 250 = 10.32 CPU h
+
+the run's progress log:
+kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: booting to the first idle stop
+kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: plan, 27 steps, 56 s
+plan 0 window 1/8: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+  window 1: stop: Q(g) + b reached the best success; 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}; best 2796 (Q 66916); 15.65 s
+plan 0 window 2/8: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+  window 2: cause: input walk_to(428)#64 at 2797: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  window 2: 3600 frames; 3600 children {'refuted': 1, 'spent': 3599}; best None (Q None); 140.16 s
+planning through taskcore (plan 1, frame 6376, 0 bans)
+plan 1: plan, 25 steps, 51 s
+plan 1 window 1/7: walk_to(428)#64 at frame 6376 (3 records needed, 3 tracked)
+  window 1: cause: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  window 1: 3600 frames; 3600 children {'spent': 3600}; best None (Q None); 135.91 s
+kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split'; verifying from boot (5 checkpoints)
+wrote /home/ilyask/.cache/fast-mi/w3/results/replay-part1-kitchen-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+exit 0
+GUARD: rc 0 wall 453.026 s low 0 min MemAvailable 5278492 kB
