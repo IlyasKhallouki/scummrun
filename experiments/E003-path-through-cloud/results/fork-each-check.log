@@ -1,0 +1,9 @@
+fork_each_check: replay-part1-kitchen-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json, seed 1, from frame 3000: 7 children of one fork_each (the parent stopped 'fork_each' at 3007, 7 forks listed) against 7 forked one frame at a time; full dumps (locals, exact) compared
+frame 3001 (reference 3001): top-level keys that differ at the fork [], 30 frames after the same click []
+frame 3002 (reference 3002): top-level keys that differ at the fork [], 30 frames after the same click []
+frame 3003 (reference 3003): top-level keys that differ at the fork [], 30 frames after the same click []
+frame 3004 (reference 3004): top-level keys that differ at the fork [], 30 frames after the same click []
+frame 3005 (reference 3005): top-level keys that differ at the fork [], 30 frames after the same click []
+frame 3006 (reference 3006): top-level keys that differ at the fork [], 30 frames after the same click []
+frame 3007 (reference 3007): top-level keys that differ at the fork [], 30 frames after the same click []
+pairs with a difference: 0; wall: fork_each 66.3 ms, one frame and one fork at a time 145.9 ms
