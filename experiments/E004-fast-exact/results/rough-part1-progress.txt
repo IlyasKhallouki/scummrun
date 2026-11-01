@@ -80,3 +80,23 @@
 [bar] read: 94833 records, 1514.8 s wall, 2299.0 CPU s, peak RSS 13454 MB
 [bar] reached values: /home/ilyask/fast-mi/rough-out/bar100/bar.reached
 [bar] done: 94833 records, read 1514.8 s wall 2299.0 CPU s (1.52 CPUs), peak RSS 13454 MB; packed 159208320 bytes, 74131 actions (20702 folded); report /home/ilyask/fast-mi/rough-out/bar100/bar.json
+== n1000b
+[part1] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 5 threads; load 5.43 5.53 6.76
+[part1] pass 1 inputs: 44 runs, 88 records, 0.0 s; 38 records in the pass, 0 s, RSS 258 MB
+[part1] pass 1 event round 1: 89 runs, 169 records, 0.1 s; 159 records in the pass, 0 s, RSS 315 MB
+[part1] pass 1 event round 2: 508 runs, 1708 records, 0.1 s; 1960 records in the pass, 1 s, RSS 357 MB
+[part1] pass 1 event round 3: 998 runs, 3568 records, 0.3 s; 5523 records in the pass, 1 s, RSS 413 MB
+[part1] pass 1 event round 4: 764 runs, 4116 records, 216.6 s; 8149 records in the pass, 217 s, RSS 1404 MB
+[part1] pass 1 event round 5: 2903 runs, 16125 records, 741.8 s; 25177 records in the pass, 959 s, RSS 1237 MB
+[part1] pass 1 event round 6: 4314 runs, 18311 records, 1892.6 s; 43518 records in the pass, 2852 s, RSS 1686 MB
+[part1] pass 1 event round 7: 3732 runs, 24691 records, 892.3 s; 67662 records in the pass, 3745 s, RSS 2309 MB
+== n1000p
+[part1] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 5 threads; load 13.08 15.09 13.31
+[part1] pass 1 inputs: 44 runs, 88 records, 0.0 s; 76 records in the pass, 0 s, RSS 262 MB
+[part1] pass 1 event round 1: 89 runs, 169 records, 0.1 s; 186 records in the pass, 1 s, RSS 328 MB
+[part1] pass 1 event round 2: 508 runs, 1708 records, 0.2 s; 1960 records in the pass, 1 s, RSS 358 MB
+[part1] pass 1 event round 3: 998 runs, 3568 records, 0.5 s; 5530 records in the pass, 1 s, RSS 438 MB
+[part1] pass 1 event round 4: 704 runs, 2571 records, 2.6 s; 7129 records in the pass, 4 s, RSS 497 MB
+[part1] pass 1 event round 5: 2711 runs, 14501 records, 526.1 s; 22459 records in the pass, 530 s, RSS 1217 MB
+[part1] pass 1 event round 6: 3783 runs, 15793 records, 1643.3 s; 37576 records in the pass, 2174 s, RSS 1194 MB
+[part1] pass 1 event round 7: 4378 runs, 28688 records, 1208.1 s; 65971 records in the pass, 3382 s, RSS 1969 MB
