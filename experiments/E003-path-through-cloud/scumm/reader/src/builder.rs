@@ -246,6 +246,14 @@ pub struct Switches {
     /// object's verb entry, a variable's values (havoc.rs `closure`, experiments/E004-fast-exact/havoc-cut.md, "The
     /// switch havoc_starts"), in place of every unit. Needs havoc_cut.
     pub havoc_starts: bool,
+    /// havoc_cut's closure names, for a room change, the exit code of the rooms it can leave and the entry code of the
+    /// rooms it can load (havoc.rs `closure`, experiments/E005-narrow-havoc/havoc-rooms.md), in place of every scope
+    /// room. Needs havoc_cut.
+    pub havoc_rooms: bool,
+    /// havoc_cut's closure names, for a start by a local or an indexed variable, the scripts of the values a static
+    /// analysis of the game's code gives it (args.rs, experiments/E005-narrow-havoc/havoc-args.md), in place of every
+    /// unit. Needs havoc_cut.
+    pub havoc_args: bool,
 }
 
 impl Switches {
@@ -267,10 +275,12 @@ impl Switches {
                 "shared_runs" => s.shared_runs = true,
                 "reach_pairs" => s.reach_pairs = true,
                 "havoc_starts" => s.havoc_starts = true,
+                "havoc_rooms" => s.havoc_rooms = true,
+                "havoc_args" => s.havoc_args = true,
                 _ if n.starts_with("step_limit=") => {
                     s.step_limit = n["step_limit=".len()..].parse().map_err(|_| format!("reader switch {n}: step_limit=N with N a number"))?
                 }
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, step_limit=N)")),
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, reach_pairs, havoc_starts, havoc_rooms, havoc_args, step_limit=N)")),
             }
         }
         Ok(s)
@@ -315,6 +325,12 @@ impl Switches {
         }
         if self.havoc_starts {
             v.push("havoc_starts");
+        }
+        if self.havoc_rooms {
+            v.push("havoc_rooms");
+        }
+        if self.havoc_args {
+            v.push("havoc_args");
         }
         v
     }
@@ -2016,6 +2032,10 @@ impl<'g> Builder<'g> {
         assert!(self.table.step_limit == 0 || self.table.havoc_cut, "step_limit needs havoc_cut");
         self.table.havoc_starts = self.switches.havoc_starts;
         assert!(!self.table.havoc_starts || self.table.havoc_cut, "havoc_starts needs havoc_cut");
+        self.table.havoc_rooms = self.switches.havoc_rooms;
+        assert!(!self.table.havoc_rooms || self.table.havoc_cut, "havoc_rooms needs havoc_cut");
+        assert!(!self.switches.havoc_args || self.table.havoc_cut, "havoc_args needs havoc_cut");
+        self.havoc_args_analysis();
         assert!(!self.switches.reach_pairs || self.switches.reach, "reach_pairs needs --reach");
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
@@ -2052,6 +2072,8 @@ impl<'g> Builder<'g> {
             }
             self.counts.set(format!("pass {}: domain values added for the next pass", n + 1), added);
             self.reset();
+            // havoc_args reads the variables by their domains, which the next pass widened
+            self.havoc_args_analysis();
         }
         self.counts.set("records", self.n_records as i64);
         if let Some(memo) = &self.table.memo {
@@ -2090,6 +2112,22 @@ impl<'g> Builder<'g> {
         self.fact_info.clear();
         self.n_records = 0;
         self.args_set.clear();
+    }
+
+    /// The switch havoc_args: the analysis of the game's code (args.rs) with this pass's domains, and its counts; with
+    /// the switch off, none.
+    pub fn havoc_args_analysis(&mut self) {
+        if !self.switches.havoc_args {
+            self.table.havoc_args = None;
+            return;
+        }
+        let t = std::time::Instant::now();
+        let a = crate::args::HavocArgs::of(self.game, &self.scope, &self.table);
+        self.counts.set("havoc_args: units no launch reaches", a.unreached as i64);
+        self.counts.set("havoc_args: starts whose values are not known (they may start any unit)", a.wild.len() as i64);
+        self.counts.set("havoc_args: rounds of the analysis", a.rounds as i64);
+        self.counts.set("havoc_args: analysis ms", t.elapsed().as_millis() as i64);
+        self.table.havoc_args = Some(Arc::new(a));
     }
 
     /// `Builder.extend_domains`: add the written values a domain lacked; returns how many.

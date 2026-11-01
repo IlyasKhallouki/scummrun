@@ -84,6 +84,12 @@ pub struct FactTable {
     /// the switch havoc_starts (the Builder's, havoc.rs `closure`): a start the closure cannot fold names the units the
     /// engine can run for it, not every unit
     pub havoc_starts: bool,
+    /// the switch havoc_rooms (the Builder's, havoc.rs `closure`, experiments/E005-narrow-havoc/havoc-rooms.md): a room
+    /// change in a havoc closure names the rooms it leaves and loads, not every scope room
+    pub havoc_rooms: bool,
+    /// the switch havoc_args (the Builder's, args.rs, experiments/E005-narrow-havoc/havoc-args.md): the analysis a
+    /// computed start's values in a havoc closure come from; None off
+    pub havoc_args: Option<std::sync::Arc<crate::args::HavocArgs>>,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
@@ -204,6 +210,8 @@ impl FactTable {
             havoc_cut: false,
             step_limit: 0,
             havoc_starts: false,
+            havoc_rooms: false,
+            havoc_args: None,
             reach: None,
             memo: None,
             shared: None,

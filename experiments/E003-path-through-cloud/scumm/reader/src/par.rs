@@ -452,11 +452,11 @@ pub(crate) fn trace_run(label: &str, secs: f64, run: &crate::builder::RunOut) {
 
 /// The switch havoc_cut: a path the step limit ended made a havoc record: the units its closure reads, its effects
 /// and events, and where it stood.
-pub(crate) fn trace_havoc(label: &str, units: usize, effects: usize, events: usize, cut: &crate::record::Cut, why: &[String]) {
+pub(crate) fn trace_havoc(label: &str, units: usize, effects: usize, events: usize, cut: &crate::record::Cut, why: &[String], extra: &str) {
     if trace_on() {
         let at: Vec<String> = cut.frames.iter().map(|(k, pc)| format!("{}@{pc:?}", crate::facts::unit_text(*k))).collect();
         let why: Vec<&String> = why.iter().take(4).collect();
-        eprintln!("havoc {label}: {units} units, {effects} effects, {events} events; at {}; pending {:?}; every unit: {why:?}", at.join(" > "), cut.steps);
+        eprintln!("havoc {label}: {units} units, {effects} effects, {events} events; at {}; pending {:?}; every unit: {why:?}{extra}", at.join(" > "), cut.steps);
     }
 }
 

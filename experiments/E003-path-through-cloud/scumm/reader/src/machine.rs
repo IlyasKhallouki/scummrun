@@ -2128,7 +2128,7 @@ fn cut_of(game: &Game, p: &Path, settled: Option<&SettledRun>) -> crate::record:
 /// and does not run counts as the engine runs it: a scroll note as the scroll hook, actorFollowCamera's second
 /// inventory hook as that hook, any other note as every unit. The reader's own steps count as what they do.
 fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::CutStep> {
-    use crate::record::CutStep;
+    use crate::record::{CutStep, RoomStep};
     let other = |st: &Step| vec![CutStep::Other(format!("{st:?}").chars().take(40).collect())];
     let var = |n: i32| CutStep::Write(format!("var:{n}"));
     match st {
@@ -2137,9 +2137,15 @@ fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::C
         Step::Object { obj, .. } => vec![CutStep::Object(*obj)],
         Step::Hook { var, .. } => vec![CutStep::Hook(*var)],
         Step::Write(k, _) => vec![CutStep::Write(key_str(*k))],
-        Step::Scene { .. } | Step::SceneBegin(_) | Step::RoomCode { .. } | Step::SceneKill | Step::SceneLoad(_) | Step::SceneEgo(_) | Step::Room1(_) => {
-            vec![CutStep::Room]
+        // startScene's steps, with the room a step loads (havoc_rooms reads it; havoc-rooms.md)
+        Step::Scene { room: r, .. } | Step::SceneBegin(r) | Step::SceneLoad(r) | Step::Room1(r) => {
+            vec![CutStep::Room(RoomStep::Load(match r {
+                Val::Int(n) => Some(*n),
+                _ => None,
+            }))]
         }
+        Step::RoomCode { entry } => vec![CutStep::Room(RoomStep::Code(*entry))],
+        Step::SceneKill | Step::SceneEgo(_) => vec![CutStep::Room(RoomStep::Other)],
         // checkAndRunSentenceScript runs VAR_SENTENCE_SCRIPT's script (script.cpp:1244-1246)
         Step::Sentence { .. } => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
         Step::ScrollNote => vec![CutStep::Hook(scumm_machine::machine::VAR_SCROLL_SCRIPT)],

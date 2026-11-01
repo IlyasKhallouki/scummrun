@@ -619,9 +619,22 @@ pub enum CutStep {
     /// a write of the engine's own, to this fact
     Write(String),
     /// a step of startScene
-    Room,
+    Room(RoomStep),
     /// a step the closure does not follow: it reads every unit of the scope
     Other(String),
+}
+
+/// A pending step of startScene, as the switch havoc_rooms reads it (experiments/E005-narrow-havoc/havoc-rooms.md);
+/// with the switch off every one is a room change to any scope room.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum RoomStep {
+    /// a step that holds the room the change loads (`Scene`, `SceneBegin`, `SceneLoad`, `Room1`): the room's number,
+    /// None when it is not known
+    Load(Option<i32>),
+    /// the current room's code: its entry code (true) or its exit code (false)
+    Code(bool),
+    /// any other step of the change (`SceneKill`, `SceneEgo`)
+    Other,
 }
 
 impl PathOut {
