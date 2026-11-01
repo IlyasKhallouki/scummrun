@@ -1672,6 +1672,10 @@ class Search:
                         fr, why_, run_ = track.refuted[gi]
                         self._fail(w, ch, {"kind": "refuted", "record": sp.recs[gi].name, "frame": fr, "why": why_,
                                            "run": run_, "material": kept.freeze()})
+                    elif any(d is not None and not d["ok"] for n_, d in enumerate(decided) if cands[n_][0] == "plan"):
+                        input_fail(f)  # the click's record failed: that is why the goal came another way
+                    else:
+                        self._not_run_fail(w, ch, track, f, kept)
                     break
                 if (goal and credited) or all(i in track.matched for i in w["needed"]):
                     ch.outcome = "goal" if goal else "success"
