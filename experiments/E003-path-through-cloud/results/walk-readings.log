@@ -1,0 +1,25 @@
+E004 wait_both (experiments/E004-fast-exact/wait-both.md): the readings with the switch off and on, seed 1, reader-scope with the
+kitchen's switches (--elsewhere --live-locals --split-limit --reach --frame-costs, --switches value_sets,draw_clears,actor_rooms,
+input_settled[,wait_both]), 3 threads, nice 10, the reader built at branch walk. Kitchen and bar: read-rust's command (--keep --lines);
+k = 1 and k = 2: streamed (no --keep). CPU s and peak RSS from reader-scope's report; load at start in the last column.
+
+| scope | switch | records | actions | packed bytes | read CPU s | read wall s | peak RSS MB | records by kind | load |
+|---|---|---|---|---|---|---|---|---|---|
+| kitchen, rooms 33,28,41, owner:566=1 | off | 41877 | 40773 | 27434460 | 42.9 | 15.2 | 610 | {'dialog_line': 252, 'event': 17647, 'sentence': 16208, 'skip_cutscene': 6490, 'walk_to': 1280} | 3.62 3.17 3.20 |
+| kitchen, rooms 33,28,41, owner:566=1 | on | 294608 | 281977 | 564836680 | 752.3 | 278.7 | 4578 | {'dialog_line': 432, 'event': 72614, 'sentence': 198052, 'skip_cutscene': 17674, 'walk_to': 5836} | 1.81 3.18 3.64 |
+| kitchen, rooms 33,28,41, owner:566=1 | on / off | 7.04 | 6.92 | 20.6 | 17.5 | 18.3 | 7.50 | | |
+| bar, rooms 33,28, state:316=1 | off | 38874 | 37776 | 26009896 | 42.2 | 15.5 | 587 | {'dialog_line': 168, 'event': 16906, 'sentence': 14174, 'skip_cutscene': 6490, 'walk_to': 1136} | 3.48 3.17 3.20 |
+| bar, rooms 33,28, state:316=1 | on | 286914 | 274289 | 556540296 | 756.3 | 284.0 | 4518 | {'dialog_line': 270, 'event': 71694, 'sentence': 192844, 'skip_cutscene': 17674, 'walk_to': 4432} | 1.38 2.24 3.05 |
+| bar, rooms 33,28, state:316=1 | on / off | 7.38 | 7.26 | 21.4 | 17.9 | 18.3 | 7.70 | | |
+| k = 1, rooms 28,33,35,38, state:316=1 | off | 235579 | 234401 | 190257136 | 189.3 | 58.6 | 495 | {'dialog_line': 594, 'event': 36568, 'sentence': 171058, 'skip_cutscene': 8889, 'walk_to': 18470} | 3.42 3.17 3.20 |
+| k = 1, rooms 28,33,35,38, state:316=1 | on | 643386 | 629725 | 985879488 | 2142.5 | 686.4 | 2927 | {'dialog_line': 729, 'event': 135554, 'sentence': 451406, 'skip_cutscene': 24603, 'walk_to': 31094} | 4.11 3.45 3.30 |
+| k = 1, rooms 28,33,35,38, state:316=1 | on / off | 2.73 | 2.69 | 5.2 | 11.3 | 11.7 | 5.91 | | |
+| k = 2, rooms 28,29,33,34,35,38,41,83,85,96, state:316=1 | off | 451987 | 450967 | 380136780 | 253.5 | 76.0 | 831 | {'dialog_line': 1971, 'event': 51493, 'sentence': 347550, 'skip_cutscene': 12799, 'walk_to': 38174} | 1.14 1.70 3.32 |
+| k = 2, rooms 28,29,33,34,35,38,41,83,85,96, state:316=1 | on | 915552 | 906845 | 1115591940 | 1536.4 | 495.0 | 2304 | {'dialog_line': 2241, 'event': 193532, 'sentence': 622756, 'skip_cutscene': 35749, 'walk_to': 61274} | 1.35 1.86 3.18 |
+| k = 2, rooms 28,29,33,34,35,38,41,83,85,96, state:316=1 | on / off | 2.03 | 2.01 | 2.9 | 6.1 | 6.5 | 2.77 | | |
+
+Where the kitchen's growth is (reading.actions.jsonl of the reading on): verbs 8 and 10 on object 322 (four labels each:
+with the suffix [202] or not, ~frozen or not): 134,648 of the 198,052 sentences. The checks "<WaitFor op> blocks" on
+the side false most often carried: the sentence script's [02E0] 151,057, the room's dialog script's [0018] (WaitForCamera)
+145,411 and [025F] (WaitForMessage) 145,114, the cook's script's [0056] (WaitForActor(6)) 92,556. walk_to(428): 130
+actions on (18 off), 110 of them pass [02E0] in the same run.
