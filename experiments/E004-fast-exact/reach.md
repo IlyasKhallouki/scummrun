@@ -139,9 +139,11 @@ locals. Two events of one wait point with number 0 can carry different partial l
 (`events_done`: name, unit, place, number, abort) is the one that arrives first. With `--reach` the order of arrival
 is not the full reading's, so the job can run with other locals.
 
-The rule: with `--reach`, an event with number 0 runs with no locals (`Event::unknown_locals`), whichever event of the
-key arrives first. Its run reads each local as unknown, which covers every list a state with `args:X = 0` can hold, so
-its records hold wherever its precondition does. The job no longer depends on the order of arrival, and Theorem 1's
+The rule: with `--reach`, an event with number 0 runs with no locals, no cutscene data, and the two flags a path can
+set unknown: whether the slot was started recursively, and for an object's slot whether its object is out of the room
+(`Event::unknown_locals`, as the copy each wait point gets for replans), whichever event of the key arrives first. Its
+run reads each local and each such flag as unknown, which covers every list a state with `args:X = 0` can hold, so its
+records hold wherever its precondition does. The job no longer depends on the order of arrival, and Theorem 1's
 argument goes through for it. Against the full reading, whose job keeps the first arrival's partial locals, such a job
 is a job read otherwise: the full reading's records for it are narrower than its precondition allows. With `--reach`
 off nothing changes.
