@@ -249,5 +249,6 @@ priced r.
 ## 8. Off
 
 Every new control is off by default; the bridge with both off writes the same trace, status and dumps as before
-(section 2's test). `trace_check.py` is an instrument: nothing the system runs imports it. It changes no reader, task
+(section 2's test). `trace_check.py` is an instrument; the window search's sub-switch `strict` (window-search.md
+section 9.5) calls its `explain_unexplained` on a child's kept log to give each replan its cause. It changes no reader, task
 or planner output.

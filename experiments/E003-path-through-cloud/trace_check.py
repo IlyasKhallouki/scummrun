@@ -3,7 +3,8 @@
 usage (from this folder, with ../../.venv/bin/python, under nice):
        trace_check.py check-off --new BIN [--old BIN] [--frames N] [--results]
 
-An instrument: nothing the system runs imports it. It names no game number; the moves, frames and units it reports come
+An instrument; the window search's sub-switch strict (strict.py) calls its explain_unexplained for each replan's
+cause. It names no game number; the moves, frames and units it reports come
 from the runs it reads.
 
 **check-off** (trace-validation.md, Lemma O): three engines play run B's recorded inputs on seed 1 from boot in
