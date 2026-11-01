@@ -491,6 +491,17 @@ def attempt_record(target: tuple, res: dict, seconds: float) -> dict:
             "inputs": len(res.get("inputs") or ()), "checkpoints": len(cps), "error": res.get("error")}
 
 
+def attempt_costs(res: dict, att_cpu: float) -> dict:
+    """An attempt's CPU by part (module docstring, "CPU per part"): ``read`` the readers of its reach extensions and
+    refinements, ``play`` the window search's engines and Python, ``plan`` the rest of ``att_cpu`` (getrusage over
+    the attempt)."""
+    ws = res.get("window_summary") or {}
+    py = ws.get("python_cpu_s") or 0.0
+    reads = sum(x.get("cpu_s") or 0.0 for x in list(res.get("extensions") or []) + list(res.get("refinements") or []))
+    return {"read": reads, "play": sum((ws.get("engine_cpu_s") or {}).values()) + py,
+            "plan": max(0.0, att_cpu - py - reads)}
+
+
 def target_holds(target: tuple, goal: dict, facts: dict) -> bool:
     k, v, tier, _ = target
     if tier == 0:
@@ -560,12 +571,8 @@ def run_job(job_dir) -> dict:
             made = made_reading(h, rd)
             if made is not None:
                 out["readings_made"].append(made)
-            ws = res.get("window_summary") or {}
-            play = sum((ws.get("engine_cpu_s") or {}).values()) + (ws.get("python_cpu_s") or 0.0)
-            reads = sum(x.get("cpu_s") or 0.0 for x in (res.get("extensions") or ()) + (res.get("refinements") or ()))
-            cpu["read"] += reads
-            cpu["play"] += play
-            cpu["plan"] += max(0.0, att_cpu - (ws.get("python_cpu_s") or 0.0) - reads)
+            for part, x in attempt_costs(res, att_cpu).items():
+                cpu[part] += x
             out["probes"].append({"target": [tg[0], tg[1]], "tier": tg[2], "depth": tg[3], "status": status_,
                                   "stop": res.get("stop"), "seconds": round(secs, 1), "attempt": f"a{n_att - 1:02d}",
                                   "reading": str(rd.path)})
