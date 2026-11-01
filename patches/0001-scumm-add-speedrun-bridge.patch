@@ -240,10 +240,26 @@ index bfb33823..fb0ed0f3 100644
  }
  
 diff --git a/engines/scumm/sound.h b/engines/scumm/sound.h
-index 2b9b1e66..9e4a9ee5 100644
+index 2b9b1e66..f92ff394 100644
 --- a/engines/scumm/sound.h
 +++ b/engines/scumm/sound.h
-@@ -113,6 +113,7 @@ public:
+@@ -47,6 +47,7 @@ class SeekableAudioStream;
+ namespace Scumm {
+ 
+ class ScummEngine;
++class SpeedrunBridge;
+ 
+ struct MP3OffsetTable;
+ 
+@@ -57,6 +58,7 @@ enum {
+ // TODO: Consider splitting Sound into even more subclasses.
+ // E.g. for v1-v4, v5, v6+, ...
+ class Sound : public Common::Serializable {
++	friend class SpeedrunBridge; // the state dump's "exact" object reads the CD timers and the queues
+ public:
+ 	enum SoundMode {
+ 		kVOCMode,
+@@ -113,6 +115,7 @@ public:
  	byte _digiSndMode;
  	uint _lastSound;
  	uint32 _speechTimerMod;
@@ -251,7 +267,7 @@ index 2b9b1e66..9e4a9ee5 100644
  
  	MidiDriverFlags _musicType;
  
-@@ -144,6 +145,8 @@ public:
+@@ -144,6 +147,8 @@ public:
  	void resetSpeechTimer();
  	void startSpeechTimer();
  	void stopSpeechTimer();
@@ -339,10 +355,10 @@ index 6c161ccd..e62dc05f 100644
  	void playCDTrack(int track, int numLoops, int startFrame, int duration);
 diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
 new file mode 100644
-index 00000000..69447187
+index 00000000..a7e6ca61
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.cpp
-@@ -0,0 +1,798 @@
+@@ -0,0 +1,799 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -516,6 +532,7 @@ index 00000000..69447187
 +		{"SPEEDRUN_FRAME_LOG", &SpeedrunBridge::_frameLog},
 +		// Observation only: the state dump gains fields, nothing else changes.
 +		{"SPEEDRUN_DUMP_LOCALS", &SpeedrunBridge::_dumpLocals},
++		{"SPEEDRUN_DUMP_EXACT", &SpeedrunBridge::_dumpExact},
 +	};
 +	for (const auto &var : kBoolVars) {
 +		const char *value = envValue(var.name);
@@ -1143,10 +1160,10 @@ index 00000000..69447187
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..ff09fe43
+index 00000000..db3d4d5e
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,521 @@
+@@ -0,0 +1,524 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1442,6 +1459,8 @@ index 00000000..ff09fe43
 +	/** Ego's inventory in display order (findInventory() is 1-based). */
 +	Common::Array<int> egoInventory() const;
 +	Common::String stateJson() const;
++	/** The state dump's "exact" object (SPEEDRUN_DUMP_EXACT): reads only. */
++	Common::String exactJson() const;
 +	Common::String objectsJson();
 +	/** Write $SPEEDRUN_OUT/@p name whole (atomically); engine_error if that fails. */
 +	bool writeFile(const char *name, const Common::String &contents);
@@ -1558,6 +1577,7 @@ index 00000000..ff09fe43
 +	Common::Array<int32> _skipSpare; // the last skips event's "spare" (textSpared())
 +	bool _stepStates = false;       // SPEEDRUN_STEP_STATES
 +	bool _dumpLocals = false;       // SPEEDRUN_DUMP_LOCALS: slot locals and flags, cutscene data in the state dump
++	bool _dumpExact = false;        // SPEEDRUN_DUMP_EXACT: the state dump's "exact" object (RNG, clocks, sound, screens)
 +	Common::Array<SpeedrunInterrupt> _interrupts; // SPEEDRUN_INTERRUPTS
 +	Common::Array<SpeedrunInput> _inputs; // SPEEDRUN_INPUTS
 +	uint _inputIndex = 0;           // next event to deliver
@@ -4201,10 +4221,10 @@ index 00000000..7263e24f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..27e72a34
+index 00000000..ac2499ef
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,757 @@
+@@ -0,0 +1,855 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -4232,11 +4252,14 @@ index 00000000..27e72a34
 +#include "common/config-manager.h"
 +#include "common/endian.h"
 +#include "common/file.h"
++#include "common/system.h"
++#include "backends/audiocd/audiocd.h"
 +
 +#include "scumm/actor.h"
 +#include "scumm/object.h"
 +#include "scumm/resource.h"
 +#include "scumm/scumm.h"
++#include "scumm/sound.h"
 +#include "scumm/verbs.h"
 +#include "scumm/speedrun/speedrun_bridge.h"
 +
@@ -4831,7 +4854,102 @@ index 00000000..27e72a34
 +		actors.addRaw(o.str());
 +	}
 +	s.addRaw("actors", actors.str());
++	// With SPEEDRUN_DUMP_EXACT: what the fork-exactness check compares beyond
++	// the fields above (exactJson()).
++	if (_dumpExact)
++		s.addRaw("exact", exactJson());
 +	return s.str();
++}
++
++namespace {
++
++// 64-bit FNV-1a over raw bytes.
++void fnv64(uint64 &h, const byte *p, uint32 n) {
++	for (uint32 i = 0; i < n; i++) {
++		h ^= p[i];
++		h *= 1099511628211ULL; // FNV-1a 64 prime
++	}
++}
++
++} // End of anonymous namespace
++
++Common::String SpeedrunBridge::exactJson() const {
++	// Reads only: members (the bridge is a friend of ScummEngine and Sound),
++	// const calls, and the screens' and the palette's memory. The calls into
++	// the mixer and iMuse take and release their mutexes, nothing else.
++	const ScummEngine &e = *_vm;
++	JsonObject x;
++	// The RNG state (common/random.cpp, xorshift32; not in the save stream).
++	x.add("rng", (uint64)e._rnd.getSeed());
++	// The bridge clock (onWait's quarter-frames) and the segment start.
++	x.add("qf", _quarterFrames).add("qf0", _qf0).add("tick0", _tick0).add("seg", _segmentStarted);
++	// The raw input schedule's cursor and this frame's mouse and buttons
++	// (processInput() derives the last three from the first ones).
++	x.add("input", (uint)_inputIndex)
++	 .addRaw("raw_mouse", JsonArray().add((int)_rawMouseX).add((int)_rawMouseY).str())
++	 .addRaw("mouse", JsonArray().add((int)e._mouse.x).add((int)e._mouse.y).str())
++	 .addRaw("vmouse", JsonArray().add((int)e._virtualMouse.x).add((int)e._virtualMouse.y).str())
++	 .addRaw("buttons", JsonArray().add((int)e._leftBtnPressed).add((int)e._rightBtnPressed)
++	                               .add((int)e._mouseAndKeyboardStat).str());
++	// The audio pump (pumpAudio()): what the mixer, and with it the music
++	// driver's timer, has been fed.
++	x.add("audio_pumped", _audioPumped).add("audio_pending", _audioPending)
++	 .add("audio_owed", Common::String::format("%.17g", _audioOwed));
++	const Sound *snd = e._sound;
++	if (snd) {
++		if (snd->_soundCD) {
++			// The CD music timer that feeds VAR_MUSIC_TIMER (advanceCDTimer()),
++			// its quarter-frame phase, and the CD's play state.
++			const SoundCD *cd = snd->_soundCD;
++			const AudioCDManager::Status st = g_system->getAudioCDManager()->getStatus();
++			JsonObject c;
++			c.add("timer", (uint64)cd->_cdMusicTimer).add("timer_mod", (uint64)cd->_cdMusicTimerMod)
++			 .add("music_timer", cd->getMusicTimer()).add("sound", (int)cd->_currentCDSound).add("poll", snd->pollCD())
++			 .addRaw("status", JsonArray().add((int)st.playing).add(st.track).add(st.start).add(st.duration)
++			                              .add(st.numLoops).add(st.volume).add(st.balance).str());
++			x.addRaw("cd", c.str());
++		}
++		x.add("speech_timer", (uint64)snd->_speechTimerMod);
++		// Every sound the scripts' isSoundRunning would call running, with its status.
++		JsonArray running;
++		for (int n = 1; n < e._numSounds; n++) {
++			const int status = snd->isSoundRunning(n);
++			if (status)
++				running.addRaw(JsonArray().add(n).add(status).str());
++		}
++		x.addRaw("sounds", running.str());
++		JsonArray queue;
++		for (int i = 0; i < snd->_soundQueuePos && i < (int)ARRAYSIZE(snd->_soundQueue); i++)
++			queue.addRaw(JsonArray().add((int)snd->_soundQueue[i].sound).add((int)snd->_soundQueue[i].offset).str());
++		x.addRaw("sound_queue", queue.str());
++		JsonArray midi;
++		for (int i = 0; i < snd->_midiQueuePos && i < (int)ARRAYSIZE(snd->_midiQueue); i++)
++			midi.add((int)snd->_midiQueue[i]);
++		x.addRaw("midi_queue", midi.str());
++	}
++	const CameraData &cam = e.camera;
++	x.addRaw("camera", JsonArray().add((int)cam._cur.x).add((int)cam._cur.y).add((int)cam._dest.x).add((int)cam._dest.y)
++	                              .add((int)cam._accel.x).add((int)cam._accel.y).add((int)cam._last.x).add((int)cam._last.y)
++	                              .add(cam._leftTrigger).add(cam._rightTrigger).add((int)cam._follows).add((int)cam._mode)
++	                              .add((int)cam._movingToActor).str());
++	// The four virtual screens (front and back buffers, size and scroll) and
++	// the palette: what is drawn, costume frames included.
++	uint64 h = 14695981039346656037ULL; // FNV-1a 64 offset basis
++	for (int i = 0; i < 4; i++) {
++		const VirtScreen &vs = e._virtscr[i];
++		const int32 header[5] = {vs.w, vs.h, vs.pitch, vs.xstart, vs.topline};
++		fnv64(h, (const byte *)header, sizeof(header));
++		const uint32 size = (vs.h > 0 && vs.pitch > 0) ? (uint32)vs.pitch * (uint32)vs.h : 0;
++		const byte *front = vs.getPixels(-(int)vs.xstart, 0); // the buffer's start
++		const byte *back = vs.getBackPixels(-(int)vs.xstart, 0);
++		if (front && size)
++			fnv64(h, front, size);
++		if (back && size)
++			fnv64(h, back, size);
++	}
++	fnv64(h, e._currentPalette, sizeof(e._currentPalette));
++	x.add("screens", Common::String::format("%016llx", (unsigned long long)h));
++	return x.str();
 +}
 +
 +#pragma mark - Object dump (C6)
