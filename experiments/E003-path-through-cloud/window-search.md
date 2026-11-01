@@ -349,10 +349,12 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
 ### 9.2 Definition S: a record's own run
 
 - **Event.** For an event record r = event(U@W), r's own run in a branch is the first run of U at depth 0 with c0 = W
-  that is not a stutter (trace-validation.md section 3: one opcode, a WaitFor op, c1 = c0), after the record that left
-  U at W matched, or after the window's start when no tracked record of U before r is pending. r *matches strictly*
-  at that run's frame k when M1-M4 hold for r on it (Definition M: V_{k−1}, V_k, R_k and the open keys of
-  trace-validation.md section 3) and every tracked record r follows (≺) has matched before. M4 follows that section's
+  that is not a stutter (trace-validation.md section 3: one opcode, a WaitFor op, c1 = c0), after the run of U by the
+  record that left U at W (for a click, the click's run of U), or after the window's start when no tracked record of U
+  before r is pending. r *matches strictly* at that run's frame k when M1-M4 hold for r on it (Definition M: V_{k−1},
+  V_k, R_k and the open keys of trace-validation.md section 3) and every tracked record r follows (≺) has matched and
+  had begun before that run (an event's run, a click's first run). While a click's record is not decided, the event
+  runs after its first run wait for the decision and are then taken in run order. M4 follows that section's
   rule for facts outside the view: an effect on a fact whose engine value lies outside its domain is not checked (B1's
   StrictMatcher code checked it, so B1's strict counts are low on that point). Otherwise r is *refuted*.
   **Lemma S1 (one run per event record).** A refuted record never matches. *Proof.* Any two of the plan's records of U
