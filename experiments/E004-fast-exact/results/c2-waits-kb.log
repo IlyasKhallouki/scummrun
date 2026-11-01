@@ -1,0 +1,62 @@
+B1 strict matcher on replay-part1-kitchen-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json (reading reading), frames 2728-3219: 3153 slot runs, 2850 resumed at a wait point at depth 0
+verdicts: {'unplaced': 868, 'unexplained': 607, 'ambiguous': 772, 'stutter': 153, 'explained': 450}
+matcher: 491 calls, 22233.9 us per call, 3830.5 us per run
+wait check: 449 explained runs with a known arrival, 0 waited less than their record's frame cost
+unexplained runs by unit and wait point (the condition that failed most often), each group's first run explained: the opcode, the engine's values, the class:
+  411: local:200@43: pre var:70; first at 2798: the records' precondition fails; [0000] jump if; var:70 = 0 (fact); semantics
+  68: local:202@1: end pos:local:202; first at 2729: left the records' path; [0006] jump unless; var 0 = 9 (position); split
+  60: local:210@62: end pos:local:210; first at 2803: the wait did not block; [0000] WaitForCamera; var 2 = 160 (position); split
+  25: local:217@18: effect frozen:local:216; first at 3150: left the path to the predicted write; [0007] jump if; var 0 = 275 (position); split
+  10: local:207@23: end pos:local:207; first at 2828: the wait did not block; [0005] WaitForCamera; var 2 = 160 (position); split
+  9: local:208@41: effect local:208; first at 2809: the predicted write is not in the run; -; ; None
+  7: local:204@18: end pos:local:204; first at 3209: left the records' path; [0017] jump unless; var 0 = 51 (position); split
+  6: local:208@41: pre pos:local:208; first at 2873: two instances of the unit; [0029] None; live slots of local:208 = 2 (fact); semantics
+  6: local:208@21: pre args:local:208; first at 2873: two instances of the unit; [0015] None; live slots of local:208 = 2 (fact); semantics
+  1: script:2@702: pre room; first at 3111: the records' precondition fails; [02BE] jump goto; room = 28 (fact); semantics
+  1: local:217@18: effect local:216; first at 3200: left the path to the predicted write; [0007] jump if; var 0 = 306 (position); split
+  1: local:206@49: effect args:local:206; first at 3208: the predicted write is not in the run; -; ; None
+  1: script:2@915: pre room; first at 3219: the records' precondition fails; [0393] animateCostume; room = 41 (fact); semantics
+  1: script:23@409: pre frozen:script:23; first at 3219: the records' precondition fails; [0199] jump goto; frozen:script:23 = 1 (fact); semantics
+runs at a wait point the reading has no event record at (unit@W: runs, the first one checked):
+  456: script:159@5: invisible to the task: no task fact written, the slot back at its wait point
+  411: local:201@22: invisible to the task: no task fact written, the slot back at its wait point
+  1: local:201@35: invisible to the task: no task fact written, the slot back at its wait point
+matcher on the plan's units only (4 units): 491 calls, 20.2 us per call
+the plan's steps the run counted as matched: 19; strictly matched (their own run, M1-M4): 7; inputs 3 of 7; events whose run did not happen there: 5
+the plan's executed steps, strictly:
+  plan 0 sentence(2,428)#44 (matched): matched {'frame': 2776, 'pre_fails': [], 'effect': None, 'pos': []}
+  plan 0 event(script:2@736#d897055c2f2e)#144 (matched): matched {'frame': 2796, 'verdict': 'explained'}
+  plan 0 walk_to(428)#64 (matched): not matched {'frame': 2796, 'pre_fails': [('script:2', '1')], 'effect': 'script:2', 'pos': [('pos:script:2', -1)]}
+  plan 0 event(script:2@736#da2874b63864)#510 (not reached): its run did not happen {'frames': [2800, 2801], 'next_run': 3201}
+  plan 0 event(local:211@4#a2033c82531e)#518 (not reached): its run did not happen {'frames': [2800, 2801], 'next_run': None}
+  plan 1 walk_to(316)[202]#1038 (matched): not matched {'frame': 3150, 'pre_fails': [], 'effect': 'args:local:203', 'pos': [('pos:script:2', 'no run')]}
+  plan 1 event(local:215@16#45fc7932b71b)#9668 (matched): its run did not happen {'frames': [3150, 3151], 'next_run': 3154}
+  plan 1 event(local:215@56#45fc7932b71b)#10087 (matched): its run did not happen {'frames': [3150, 3151], 'next_run': 3159}
+  plan 1 event(local:215@64#45fc7932b71b)#15447 (matched): its run did not happen {'frames': [3150, 3151], 'next_run': 3161}
+  plan 1 event(local:215@69#45fc7932b71b)#15526 (matched): not matched {'frame': 3175, 'verdict': 'ambiguous', 'pre_fails': [('args:local:215', '[0]'), ('state:316', '1')], 'end': None, 'effect_fails': [('args:local:216', 'frozenset({258285697547262})')]}
+  plan 1 walk_to(316)[202]#10846 (matched): not matched {'frame': 3176, 'pre_fails': [], 'effect': 'local:216', 'pos': [('pos:local:216', 86), ('pos:local:217', 18), ('pos:script:2', 'no run')]}
+  plan 1 event(script:2@736#d40e45ecaad6)#15408 (matched): its run did not happen {'frames': [3176, 3177], 'next_run': 3201}
+  plan 1 event(local:218@16#965f4bbc7b57)#15491 (not reached): its run did not happen {'frames': [3198, 3199], 'next_run': 3203}
+  plan 2 walk_to(316)[202]#10846 (matched): not matched {'frame': 3200, 'pre_fails': [], 'effect': None, 'pos': [('pos:local:216', 86), ('pos:local:217', 18)]}
+  plan 2 event(script:2@736#d40e45ecaad6)#15408 (matched): matched {'frame': 3202, 'verdict': 'explained'}
+  plan 2 event(local:218@16#965f4bbc7b57)#15491 (matched): matched {'frame': 3208, 'verdict': 'explained'}
+  plan 2 sentence(2,564)#15626 (matched): matched {'frame': 3210, 'pre_fails': [], 'effect': None, 'pos': []}
+  plan 2 event(script:2@736#85f24aad8241)#18600 (matched): not matched {'frame': 3215, 'verdict': 'explained', 'pre_fails': [('args:script:2', '[212310049339719]')], 'end': [915, 759], 'effect_fails': []}
+  plan 2 event(script:2@759#85f24aad8241)#23888 (matched): its run did not happen {'frames': [3210, 3211], 'next_run': None}
+  plan 2 sentence(9,566)#15899 (goal): matched {'frame': 3212, 'pre_fails': [], 'effect': None, 'pos': []}
+  plan 2 event(script:2@736#c1184912b947)#18658 (matched): matched {'frame': 3215, 'verdict': 'explained'}
+  plan 2 event(script:2@915#fa5666eff670)#23924 (matched): not matched {'frame': 3219, 'verdict': 'unexplained', 'pre_fails': [], 'end': None, 'effect_fails': [('var:133', 'None')]}
+game-time wait check (durations.md): delta_lo 6 (24 qf a frame), dmax 6, talk-stop key on True
+  D1 frames: 491 checked, 0 below 24 qf, least step 24 qf
+  D5 inputs: 40 keys and clicks other than '.', frames with two or more: 0
+  D8 caps: 4 first runs of slots waiting at the start, 0 below, least slack 0 qf
+  explained runs against their record's bound: 448, 0 below, least slack 0 qf
+  waits at a point with no action of the reading: 866
+  waits per rule (the wait point's least bound): waits, below, least slack qf, least wait qf
+      1426    0       0      24  breakHere
+       284    0      24      24  recursive unit (D7)
+        89    0       0      48  delay (D4)
+         3    0      24      48  walk wait
+         2    0     888     912  WaitForCamera
+         1    0     312     336  talk wait
+         1    0     120     144  WaitForActor

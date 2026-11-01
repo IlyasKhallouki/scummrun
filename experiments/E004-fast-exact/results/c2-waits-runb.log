@@ -1,0 +1,49 @@
+B1 strict matcher on run B 235-574 (reading reading), frames 235-574: 2315 slot runs, 1951 resumed at a wait point at depth 0
+verdicts: {'unplaced': 536, 'ambiguous': 403, 'unexplained': 417, 'explained': 410, 'stutter': 185}
+matcher: 339 calls, 6162.7 us per call, 1070.8 us per run
+wait check: 408 explained runs with a known arrival, 0 waited less than their record's frame cost
+unexplained runs by unit and wait point (the condition that failed most often), each group's first run explained: the opcode, the engine's values, the class:
+  227: local:200@43: pre var:70; first at 236: the records' precondition fails; [0000] jump if; var:70 = 0 (fact); semantics
+  62: local:203@1: end pos:local:203; first at 486: left the records' path; [0008] jump unless; var 0 = 122 (position); split
+  35: local:217@18: pre actorroom:6; first at 422: the records' precondition fails; [0012] jump goto; actorroom:6 = 0 (fact); semantics
+  26: local:210@62: end pos:local:210; first at 284: the wait did not block; [0000] WaitForCamera; var 2 = 480 (position); split
+  17: local:204@18: end pos:local:204; first at 463: left the records' path; [0017] jump unless; var 0 = 51 (position); split
+  16: local:206@88: end pos:local:206; first at 524: no record's precondition holds; -; ; None
+  4: script:2@702: pre script:2; first at 237: the records' precondition fails; [02BE] jump goto; script:2 = 0 (fact); semantics
+  4: local:207@23: end pos:local:207; first at 315: the wait did not block; [0005] WaitForCamera; var 2 = 480 (position); split
+  4: local:206@65: end pos:local:206; first at 510: no record's precondition holds; -; ; None
+  3: local:208@41: pre pos:local:208; first at 297: two instances of the unit; [0029] None; live slots of local:208 = 2 (fact); semantics
+  3: local:208@21: pre args:local:208; first at 297: two instances of the unit; [0015] None; live slots of local:208 = 2 (fact); semantics
+  3: script:23@409: pre var:52; first at 485: the records' precondition fails; [0000] jump if; var:52 = 0 (fact); semantics
+  3: script:23@409: pre frozen:script:23; first at 536: the records' precondition fails; [0199] jump goto; frozen:script:23 = 1 (fact); semantics
+  2: script:2@915: effect var:133; first at 561: the predicted write is not in the run; -; ; None
+  1: local:203@58: pre args:local:203; first at 286: args: the flags differ; -; ; None
+  1: local:214@57: pre state:316; first at 296: the records' precondition fails; [0039] WaitForMessage; state:316 = 1 (fact); semantics
+  1: local:212@8: pre actorroom:6; first at 419: the records' precondition fails; [0008] assign = isScriptRunning; actorroom:6 = 0 (fact); semantics
+  1: local:206@49: effect args:local:206; first at 462: the predicted write is not in the run; -; ; None
+  1: local:218@16: pre bit:424; first at 462: the records' precondition fails; [0010] WaitForActor; bit:424 = 0 (fact); semantics
+  1: local:204@18: effect actorroom:7; first at 485: the predicted write is not in the run; -; ; None
+  1: script:2@915: pre class:568:6; first at 536: the records' precondition fails; [0393] animateCostume; class:568:6 = 0 (fact); semantics
+  1: local:208@121: pre frozen:local:208; first at 536: the records' precondition fails; [0079] assign ++; frozen:local:208 = 1 (fact); semantics
+runs at a wait point the reading has no event record at (unit@W: runs, the first one checked):
+  227: local:201@22: invisible to the task: no task fact written, the slot back at its wait point
+  296: script:159@5: invisible to the task: no task fact written, the slot back at its wait point
+  13: local:201@35: invisible to the task: no task fact written, the slot back at its wait point
+matcher on the plan's units only (0 units): 339 calls, 4.9 us per call
+the plan's steps the run counted as matched: 0; strictly matched (their own run, M1-M4): 0; inputs 0 of 0; events whose run did not happen there: 0
+the plan's executed steps, strictly:
+game-time wait check (durations.md): delta_lo 5 (20 qf a frame), dmax 5, talk-stop key on True
+  D1 frames: 339 checked, 0 below 20 qf, least step 20 qf
+  D5 inputs: 50 keys and clicks other than '.', frames with two or more: 0
+  D8 caps: 2 first runs of slots waiting at the start, 0 below, least slack 0 qf
+  explained runs against their record's bound: 407, 0 below, least slack 0 qf
+  waits at a point with no action of the reading: 536
+  waits per rule (the wait point's least bound): waits, below, least slack qf, least wait qf
+      1048    0       0      20  breakHere
+       108    0      20      20  recursive unit (D7)
+        45    0       0     100  delay (D4)
+         5    0       0      20  WaitForActor
+         4    0     100     120  walk wait
+         2    0     720     740  WaitForCamera
+         1    0      40      60  talk wait
+         1    0     240     240  no yield ends at W (a start not yet run)

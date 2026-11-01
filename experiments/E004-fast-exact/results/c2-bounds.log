@@ -1,0 +1,75 @@
+E004 plan step C2: durations.py bounds on the readings of the committed runs (branch timed).
+wait tables: wait-table --reading R/reading.json (reader at 1bacea0); caps: S1#7 from the window run's plan 0 (replay.py cost_caps_of), the boot starts by --start-pos
+
+== s17: /var/tmp/fast-mi/window2-scratch/s17/reading (packed sha1 0e86dbb4500b)
+scope	28,33,41	110
+const	var:19	5	0
+const	var:57	46	0
+const	var:37	0	0
+const	var:1	1	0
+recursive	script:17	-	global/script-017.txt:110 [027D]
+recursive	script:25	-	room-033-dock/local-200.txt:13 [0015]
+recursive	script:26	-	room-033-dock/local-200.txt:19 [002A]
+recursive	local:208	28	room-028-bar/local-210.txt:15 [0028]
+recursive	local:209	28	room-028-bar/local-210.txt:13 [001F]
+bounds-s17.tsv: 7526 (label, cost) pairs, 313 wait points, 3 caps; delta_lo 5, dmax 5, talk-stop key on True
+    4178  recursive unit (D7)
+    1540  input (input)
+     453  breakHere
+     437  talk wait
+     408  WaitForActor
+     318  delay (D4)
+     112  WaitForCamera
+      67  walk wait
+      13  no yield ends at W (a start not yet run)
+cap	local:207	23	100	paused
+cap	local:210	62	40	paused
+cap	local:211	33	7780	paused
+
+== kb: /var/tmp/fast-mi/window2-scratch/kb/reading (packed sha1 47583c5433ae)
+scope	28,33,41	110
+const	var:19	6	0
+const	var:57	46	0
+const	var:37	0	0
+const	var:1	1	0
+recursive	script:17	-	global/script-017.txt:110 [027D]
+recursive	script:25	-	room-033-dock/local-200.txt:13 [0015]
+recursive	script:26	-	room-033-dock/local-200.txt:19 [002A]
+recursive	local:208	28	room-028-bar/local-210.txt:15 [0028]
+recursive	local:209	28	room-028-bar/local-210.txt:13 [001F]
+bounds-kb.tsv: 7816 (label, cost) pairs, 321 wait points, 2 caps; delta_lo 6, dmax 6, talk-stop key on True
+    4178  recursive unit (D7)
+    1731  input (input)
+     482  WaitForActor
+     465  breakHere
+     443  talk wait
+     318  delay (D4)
+     112  WaitForCamera
+      73  walk wait
+      14  no yield ends at W (a start not yet run)
+cap	local:202	1	24	other
+cap	script:23	409	24	other
+
+== bar: /var/tmp/fast-mi/window2-scratch/bar/reading (packed sha1 009e656ccfa7)
+scope	28,33	84
+const	var:19	6	0
+const	var:57	46	0
+const	var:37	0	0
+const	var:1	1	0
+recursive	script:17	-	global/script-017.txt:110 [027D]
+recursive	script:25	-	room-033-dock/local-200.txt:13 [0015]
+recursive	script:26	-	room-033-dock/local-200.txt:19 [002A]
+recursive	local:208	28	room-028-bar/local-210.txt:15 [0028]
+recursive	local:209	28	room-028-bar/local-210.txt:13 [001F]
+bounds-bar.tsv: 6962 (label, cost) pairs, 203 wait points, 2 caps; delta_lo 6, dmax 6, talk-stop key on True
+    4100  recursive unit (D7)
+    1282  input (input)
+     433  talk wait
+     366  breakHere
+     322  WaitForActor
+     286  delay (D4)
+     112  WaitForCamera
+      49  walk wait
+      12  no yield ends at W (a start not yet run)
+cap	local:202	1	24	other
+cap	script:23	409	24	other
