@@ -376,7 +376,10 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
   - (I2) for each `pos:U` = w of I, I's run of U ends at w; for w = NOWHERE and no run, U has no live slot on V_k;
   - (I3) each other set or guessed write of I holds on V_k, unless a run of R_k after I's last run is at a point whose
     records write that key (M4);
-  - (I4) each check of I that the dump at D_{f_1−1} decides (`replay.eval_check`) takes I's side (M3).
+  - (I4) each check of I that the engine decides takes I's side (M3), on the frame where the engine tests it: the
+    click's first run at depth 1 or more of the check's unit, from frame s on, read in its explain log (the next
+    opcode after a conditional jump, or whether the run stopped at a WaitFor op); a check whose unit has no such run
+    in the log yet is decided on the dump at D_{f_1−1} (`replay.eval_check`), as first written (9.8).
 
   (I1)-(I3) are B1's check of an input step (trace_check.py window-validate), with M2's order of runs and the click's
   own runs: B1's check took the last run of each unit in R_s ∪ R_{s+1}. On the kitchen from run B's S1#7 the click on
@@ -504,3 +507,32 @@ actors and the room, which the lite dump has. □ The checkpoints and a child's 
 end point the child takes a full dump. A cause's values on an object outside the window read as "not in the dump".
 *Test.* On the kitchen from boot's route, every frame from 2728 to 3219: the lite dump for the reading's 46 objects
 against the full dump (`results/lite-check.log`).
+
+### 9.8 What the strict runs from the boot called for
+
+Written before the code of branch walk, each with the case that showed it.
+
+- **(I4) on the frame where the engine tests a check.** The first version decided an input record's checks on the dump
+  at the fork, D_{f_1−1}. At fork 659 of the kitchen from run B's S1#7 that dump had the cook at x = 314; the door
+  script tested his x in frame 660 and read 306, after the frame's walk; the child was rejected on a check the engine
+  had taken the record's way, and it had reached the kitchen 1 frame earlier than the chosen one. A test of a position
+  or an actor's state reads the engine at that opcode, which no decision point's dump shows when the actors moved in
+  between. *Rule.* The children arm `explain` for the units the click's records' checks cite too, and a check is decided
+  on the click's own run of its unit (Lemma S: that run executed the opcode; the opcode after a conditional jump is
+  its taken side, o5 jumping when the condition is false; a WaitFor op either ended the run there or the run went
+  on). The same reading decides an event record's check on its own run (M3's second way, trace-validation.md
+  section 3) when the branch's log holds that run. Where the log holds no run of the check's unit, the dump decides,
+  as before. A logged run that did not execute the cite leaves the check open: the engine did not test it there.
+  *Why this is the engine's side.* Lemma S places every opcode in exactly one run, and the explain log records each
+  executed opcode with its offset in order (Lemma O); the next logged opcode of the same run is where control went.
+- **An effect outside its domain is reported.** M4 does not check an effect whose engine value lies outside the
+  fact's domain (trace-validation.md section 3, "Facts outside the view"), and that section says such a value is
+  reported where it shows. The first version left it out silently (var 133 = 566 against the domain {0} at the S1#7
+  goal). Each window now lists, for the parent and the chosen child, every matched record's effect whose engine value
+  lies outside its domain: the record, the fact, the engine's value and the domain. Under the documented rule the
+  record still matches (the effect is not checked); the run's output says so.
+- **Labels.** A window whose chosen child is a deviation logs the input's step as "deviation", not "window empty".
+- **The classes (trace-validation.md section 5).** A cause whose test read a variable the reading holds no fact of is
+  split, as the section's rule says; and a write of a constant (no read) is classed by the test that sent the run to
+  that write.
+
