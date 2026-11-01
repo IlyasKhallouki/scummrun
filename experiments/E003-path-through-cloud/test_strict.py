@@ -272,6 +272,80 @@ def test_a_record_is_armed_by_the_clicks_run_of_its_unit():
     assert 1 in t.matched
 
 
+# --- (I4), M4's report and the classes (window-search.md 9.2; trace-validation.md sections 3 and 5) ---------------
+
+def test_a_cite_names_its_unit_and_offset():
+    assert S.cite_unit("global/script-002.txt:170 [02E0]") == ("script:2", 0x2E0)
+    assert S.cite_unit("room-028-bar/local-203.txt:12 [001E]") == ("local:203", 0x1E)
+    assert S.cite_unit("room-028-bar/obj-0316-door.txt:5 [0010]") == ("obj:316", 0x10)
+    assert S.cite_unit("room-033-kitchen/entry.txt:3 [0007]") == ("entry", 7)
+    assert S.cite_unit("local:207's delay is over") is None
+
+
+class FakeCode:
+    """TE.Code's interface over one unit: a conditional jump at [0000] (fall-through [0005], target [0009]), a wait at
+    [0005], an op at [0009]."""
+
+    def __init__(self):
+        import ir
+        jump = types.SimpleNamespace(st=ir.Jump(ir.Var(1), 9, "if"), next=1, target=2, yields=None, offset=0)
+        wait = types.SimpleNamespace(st=ir.Op("WaitForActor", (ir.Const(1),)), next=2, target=None, yields="wait",
+                                     offset=5)
+        op = types.SimpleNamespace(st=None, next=3, target=None, yields=None, offset=9)
+        self.u = types.SimpleNamespace(ins=[jump, wait, op], at={0: 0, 5: 1, 9: 2})
+
+    def key(self, where, number, room):
+        return ("local", room, number)
+
+    def unit(self, key):
+        return self.u
+
+    def index(self, key, code):
+        return self.u.at.get(code)
+
+
+def logged(seq, codes, code1, frame=30, after=0):
+    ex = TE.Explained([("b", seq, frame, after, 0, 3, 203, 28, codes[0])] + [("o", seq, c, 0) for c in codes] +
+                      [("e", seq, code1, 2, 0, 0)])
+    return ex, run(seq, "local:203", codes[0], code1, frame=frame, after=after, depth=1)
+
+
+def test_a_check_is_decided_on_the_engines_own_opcodes():
+    code = FakeCode()
+    cite = "room-028-bar/local-203.txt:1 [0000]"
+    ex, r = logged(5, [0, 5, 9], -1)  # the condition held (fall-through), the wait passed
+    assert S.decide_on_log(code, ex, [r], (cite, "Var[1]", True, "?(position)")) is True
+    assert S.decide_on_log(code, ex, [r], (cite, "Var[1]", False, "?(position)")) is False
+    wait = ("room-028-bar/local-203.txt:2 [0005]", "WaitForActor(1); blocks", False, "?(actor state)")
+    assert S.decide_on_log(code, ex, [r], wait) is True  # it went on: the record's side "does not block"
+    ex2, r2 = logged(6, [0, 5], 5)  # it blocked at the wait
+    assert S.decide_on_log(code, ex2, [r2], wait) is False
+    ex3, r3 = logged(7, [0, 9], -1)  # the jump was taken: the condition was false
+    assert S.decide_on_log(code, ex3, [r3], (cite, "Var[1]", True, "?(position)")) is False
+    # a run the log does not hold, or no run of the unit: the dump decides, as before
+    assert S.decide_on_log(code, TE.Explained(), [r], (cite, "Var[1]", True, "")) is S.NO_LOG
+    assert S.decide_on_log(code, ex, [], (cite, "Var[1]", True, "")) is S.NO_LOG
+    # a logged run of the unit that did not reach the cite: the engine did not test it there
+    assert S.decide_on_log(code, ex3, [r3], wait) is None
+
+
+def test_an_input_check_is_decided_where_the_engine_tests_it_not_on_the_forks_dump():
+    """The check's (I4) case: the fork's dump has the actor at x = 314, the door script read 306 a frame later."""
+    check = ("room-028-bar/local-203.txt:1 [001E]", "VAR_RESULT > 310", False, "?(position: getActorX(6))")
+    sr = FakeReading({3: (3, None, None, {}, {"pos:local:203": ("set", NOWHERE)}, [check])})
+    sr.task.actions = {3: types.SimpleNamespace(what=types.SimpleNamespace(kind="walk_to", source=("event",)))}
+    plan = plan_of(sr, [mrec(0, "input", "c#3")], {"c#3": 3})
+    v0 = {"pos:local:203": 5}
+    d0 = {"vars": [0] * 300, "actors": [{"id": 6, "x": 314, "y": 100}], "room": 28}
+    own = {"local:203": run(20, "local:203", 0, -1, depth=1)}
+    vk = {"pos:local:203": NOWHERE}
+    assert S.input_match(sr, plan, 3, ["local:203"], v0, d0, {}, own, vk, [])["why"] == f"check {check[0]}"
+    assert S.input_match(sr, plan, 3, ["local:203"], v0, d0, {}, own, vk, [], lambda c: True)["ok"]
+    assert not S.input_match(sr, plan, 3, ["local:203"], v0, d0, {}, own, vk, [], lambda c: False)["ok"]
+    assert S.input_match(sr, plan, 3, ["local:203"], v0, d0, {}, own, vk, [], lambda c: S.NO_LOG)["why"] == \
+        f"check {check[0]}"
+
+
 def test_a_read_of_a_variable_the_reading_does_not_hold_is_split():
     """trace-validation.md section 5: split when the value tested is not a fact of the reading. The k = 2 deviation:
     the sentence script wrote var 102 = 0 at [002B], a constant; the test that sent it there, [0000], read var 103,

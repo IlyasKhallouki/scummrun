@@ -9,7 +9,9 @@ What it gives window.py (section numbers of window-search.md):
 * ``Plan``: one plan's B1 StrictMatcher over the reading's event records of the plan's units, and which record left
   each event's slot at its wait point (Definition S, Lemma S1).
 * ``Track``: one branch's strict matches: each event record of the plan matched or refuted on its own run (9.2).
-* ``input_match``: (I1)-(I4) and "took effect" for an input record at s + 1 (9.2, Lemma 9′).
+* ``input_match``: (I1)-(I4) and "took effect" for an input record at s + 1 (9.2, Lemma 9′); (I4) and M3 on the
+  engine's own opcodes where the explain log has the test (``decide_on_log``, 9.2's "the frame where the engine
+  tests it").
 * ``Failure`` and ``explain``: what a child keeps of its first failure, and B1's explanation of it (9.5):
   trace_check.explain_unexplained (Lemmas X and B, the two classes), and Lemma X toward an input record's own end.
 
@@ -30,6 +32,66 @@ import trace_explain as TE
 
 _SOURCE = re.compile(rb'^\{"i": (\d+), "rec": -?\d+, "label": "(?:[^"\\\\]|\\\\.)*", "source": (\[[^\]]*\])')
 KEEP_FRAMES = 3  # frames of explain entries and runs a branch keeps (an input's record spans R_s and R_{s+1})
+_CITE = re.compile(r"^(?:global/script-(\d+)|[^/]+/(?:local-(\d+)|(entry)|(exit)|obj-(\d+)[^/]*))\.txt:\d+ "
+                   r"\[([0-9A-F]+)\]$")
+
+
+def cite_unit(cite: str) -> tuple | None:
+    """A check's cite (reader.Record.checks: "global/script-002.txt:170 [02E0]") as (unit name, code offset)."""
+    m = _CITE.match(cite)
+    if m is None:
+        return None
+    g, loc, ent, ext, obj, off = m.groups()
+    unit = (f"script:{int(g)}" if g else f"local:{int(loc)}" if loc else "entry" if ent else "exit" if ext
+            else f"obj:{int(obj)}")
+    return unit, int(off, 16)
+
+
+NO_LOG = object()  # decide_on_log: no logged run of the check's unit to read
+
+
+def decide_on_log(code: TE.Code, ex: TE.Explained, runs: list, check):
+    """M3 on the engine's own opcodes (trace-validation.md section 3; window-search.md 9.2, (I4)): the first of
+    ``runs`` (segment runs, in run order) of the check's unit that the explain log ``ex`` holds and that executed the
+    check's cite tells the side the engine took there, in the frame it took it. A conditional jump: the next opcode of
+    the same run is the fall-through (the condition held: o5 jumps when it is false) or the target. A WaitFor op with
+    the check "blocks": the run ended at the op (it blocked) or went on. True or False: the engine took the record's
+    side or not; None: a logged run of the unit did not execute the cite, or the log does not tell; NO_LOG: no run of
+    the unit in ``runs`` is in the log."""
+    cu = cite_unit(check[0])
+    side = check[2]
+    if cu is None or side not in (True, False):
+        return NO_LOG
+    unit, off = cu
+    logged = False
+    for r in runs:
+        if r.unit != unit:
+            continue
+        lg = ex.runs.get(r.seq)
+        if lg is None:
+            continue
+        logged = True
+        key = code.key(lg.where, lg.number, lg.room)
+        if key is None:
+            return None
+        steps = TE.steps_of(code, key, [lg])
+        for n, st in enumerate(steps):
+            if st.op.code != off or st.i is None:
+                continue
+            x = code.unit(key).ins[st.i]
+            if isinstance(x.st, ir.Jump) and x.st.cond is not None:
+                sides = TE.taken(code, key, steps, n)
+                if sides is None or x.next == x.target:
+                    return None
+                return (sides[0] == x.next) == side
+            if x.yields == "wait" and check[1].endswith(" blocks"):
+                nxt = steps[n + 1] if n + 1 < len(steps) else None
+                if nxt is not None:
+                    return side is False  # the run went on past the wait: it did not block
+                return (side is True) if lg.code1 == off else None
+            return None
+        return None  # the engine's run of the unit did not reach the cite
+    return None if logged else NO_LOG
 
 
 # --- the reading as B1 reads it -----------------------------------------------------------------------------------
@@ -188,15 +250,17 @@ class Track:
             return None
         return self.unit_seq.get(prev, {}).get(r.unit, m[2])
 
-    def verdicts(self, runs: list, before: dict, after: dict, dump_before: dict | None) -> list:
+    def verdicts(self, runs: list, before: dict, after: dict, dump_before: dict | None,
+                 ex: TE.Explained | None = None) -> list:
         """B1's verdicts on R_k's runs of the plan's units at depth 0 from a wait point, stutters left out: [(Run,
-        Verdict)] in run order."""
+        Verdict)] in run order. ``ex``: the branch's explain log, from which M3 reads a check on the run's own opcodes
+        (``decide_on_log``); a check whose unit's run it does not hold is decided on the dump before, as before."""
         plan = self.plan
         mine = [r for r in runs if r.depth == 0 and r.code0 >= 0 and r.unit in plan.unit_set
                 and not is_stutter(plan.code, r)]
         if not mine:
             return []
-        m = _MatcherView(plan.matcher, dump_before)
+        m = _MatcherView(plan.matcher, dump_before, plan.code, ex)
         # trace-validation.md section 3, facts outside the view: a value outside its domain (None in the view) is not
         # checked by M4
         after_in = {k: v for k, v in after.items() if v is not None}
@@ -241,14 +305,18 @@ class Track:
 
 
 class _MatcherView:
-    """The plan's StrictMatcher with this branch's check decisions (M3 on the dump before the runs); the index is
-    shared, the counters are the branch's."""
+    """The plan's StrictMatcher with this branch's check decisions (M3 on the run's own opcodes where the explain log
+    has them, else on the dump before the runs); the index is shared, the counters are the branch's."""
 
-    def __init__(self, m: TE.StrictMatcher, dump_before):
+    def __init__(self, m: TE.StrictMatcher, dump_before, code: TE.Code | None = None, ex: TE.Explained | None = None):
         self.__dict__.update(m.__dict__)
         self.calls, self.seconds, self.open_used = 0, 0.0, 0
 
         def decide(check, run):
+            if ex is not None and code is not None:
+                got = decide_on_log(code, ex, [run], check)
+                if got is not NO_LOG:
+                    return got
             if dump_before is None:
                 return None
             return RP.eval_check(check, types.SimpleNamespace(kind="event", source=("event",)), dump_before)
@@ -261,11 +329,14 @@ class _MatcherView:
 # --- an input record at s + 1 ------------------------------------------------------------------------------------------
 
 def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: dict | None, applied: dict,
-                own: dict, vk: dict, later: list) -> dict:
+                own: dict, vk: dict, later: list, decide=None) -> dict:
     """9.2's (I1)-(I4) and "took effect" for the reading's action ``idx``, an input record whose ``pos:`` writes name
     ``units``: v0 the view before its first click (V_{f_1−1}), d0 the dump there, ``applied`` the set writes of the
     event records matched before its first run, ``own`` its runs (unit -> the unit's first run at depth 1 or more from
     the click's frame on), vk the view at the frame it is decided, ``later`` the runs of that frame after its last run.
+    ``decide``: (I4) on the frame where the engine tests a check, check -> True, False, None or NO_LOG
+    (``decide_on_log`` on the click's run of the check's unit); a check it gives NO_LOG for, or every check without
+    it, is decided on d0.
     Returns {"ok", "took", "why", "run", "engine", "want", "first_seq", "last_seq"}: why the first condition that
     failed, run the click's run of the unit it names."""
     _, _, _, pre, eff, checks = sr.rec(idx)
@@ -304,10 +375,12 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
                     "engine": _show(vk[k])}
         if not TE.StrictMatcher._value_ok(e, v0.get(k)):
             changed = True
-    if d0 is not None:
-        for c in checks:
-            if RP.eval_check(c, sr.task.actions[idx].what, d0) is False:
-                return {"ok": False, "took": False, "why": f"check {c[0]}", "run": None, "engine": None}
+    for c in checks:
+        got = decide(c) if decide is not None else NO_LOG
+        if got is NO_LOG:
+            got = RP.eval_check(c, sr.task.actions[idx].what, d0) if d0 is not None else None
+        if got is False:
+            return {"ok": False, "took": False, "why": f"check {c[0]}", "run": None, "engine": None}
     return {"ok": True, "took": changed, "why": None, "run": None, "first_seq": min(seqs, default=-1),
             "last_seq": max(seqs, default=-1)}
 
@@ -329,12 +402,15 @@ class Kept:
         self.seq_frame: dict = {}
         self.dumps: dict = {}
         self.views: dict = {}
+        self.ex = TE.Explained()  # the same entries by run (M3 on a run's opcodes), the kept frames' and ``pinned``
+        self.pinned: set = set()  # seqs of runs kept past KEEP_FRAMES (a click's runs, until it is decided)
 
     def add_entries(self, entries: list) -> None:
         for e in entries:
             if e[0] == "b":
                 self.seq_frame[e[1]] = e[2]
         self.entries.extend(entries)
+        self.ex.add(entries)
 
     def frame(self, k: int, runs: list, dump: dict | None, view: dict | None) -> None:
         self.runs[k] = runs
@@ -346,6 +422,8 @@ class Kept:
         for d in (self.runs, self.dumps, self.views):
             for f in [f for f in d if f < lo]:
                 del d[f]
+        for sq in [sq for sq, r in self.ex.runs.items() if r.frame < lo - 1 and sq not in self.pinned]:
+            del self.ex.runs[sq]
         if len(self.entries) > 4096:
             keep_seq = {s for s, f in self.seq_frame.items() if f >= lo - 1}
             self.entries = [e for e in self.entries if e[1] in keep_seq]
@@ -587,4 +665,4 @@ def unit_where(unit: str) -> list:
 
 
 __all__ = ["Reading", "ArgsView", "Plan", "Track", "input_match", "Kept", "explain", "short", "runs_of", "by_frame",
-           "unit_where", "M"]
+           "unit_where", "M", "cite_unit", "decide_on_log", "NO_LOG"]

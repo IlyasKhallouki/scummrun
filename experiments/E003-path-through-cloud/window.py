@@ -1250,6 +1250,15 @@ class Search:
                 units |= set(in_units[nn])
         for _, _, us, _ in alts:
             units |= set(us)
+        # (I4) on the engine's own opcodes: the units the click's records' checks cite
+        chk_units = set()
+        if has_input:
+            for idx in [i for i in sp.idx[first.i] if i is not None] + [a_[1] for a_ in alts]:
+                for c_ in self.sr.rec(idx)[5]:
+                    cu = S.cite_unit(c_[0])
+                    if cu is not None:
+                        chk_units.add(cu[0])
+        units |= chk_units
         explain_units = [wn for u in sorted(units) for wn in S.unit_where(u)]
         # section 9.7, lite: the objects whose owner, state or class the window's view reads, and those whose script
         # units' locals it reads (their owner tells an inventory slot)
@@ -1263,6 +1272,7 @@ class Search:
              "best": None, "firsts": set(), "b_qf": b_qf, "bound_violations": [], "delta_violation": None,
              "issued": issued, "before_input": before_input, "alts": alts, "in_units": in_units,
              "lemma9_stops": 0, "b_dev_qf": 4 * cfg.delta_lo * n, "explain_units": explain_units,
+             "chk_units": frozenset(chk_units),
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps]),
              "failures": collections.Counter(), "failure_of": {}, "k": k, "first_g": {}, "running": 0,
              "lite_objects": lite_objects, "tracked_i": frozenset(r.i for r in tracked),
@@ -1401,7 +1411,7 @@ class Search:
                     R_ = S.by_frame(S.runs_of(rows)).get(g + 1, [])
                 obs = F.facts_of(s)
                 now = sview(obs, s)
-                for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump):
+                for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump, pkept.ex):
                     ptrack.apply(g + 1, run_, v_, now)
                 pkept.frame(g + 1, R_, s, now)
                 prev_view, prev_dump = now, s
@@ -1565,6 +1575,7 @@ class Search:
             needs = [[kk[4:] for kk, e in sr.rec(c[2])[4].items() if kk.startswith("pos:") and e[0] == "set"
                       and isinstance(e[1], int) and e[1] >= 0] for c in cands]
             own = [{} for _ in cands]
+            chk_own: dict = {}  # (I4) unit -> the click's first run of it at depth 1 or more from s on
             decided: list = [None] * len(cands)
             matched_writes: list = []  # (seq of the run, its record's set writes), the event records matched here
             held: list = []  # event runs after the click's first run while its record is undecided (9.2)
@@ -1593,7 +1604,12 @@ class Search:
                     if lo is None or sq < lo:
                         applied.update(wr)
                 later = [r for r in runs_f if hi is not None and r.seq > hi]
-                decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later)
+
+                def on_log(chk):  # (I4): the check on the click's own run of its unit, in the frame it ran
+                    cu = S.cite_unit(chk[0])
+                    r_ = chk_own.get(cu[0]) if cu is not None else None
+                    return S.decide_on_log(self.code, kept.ex, [r_], chk) if r_ is not None else S.NO_LOG
+                decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later, on_log)
                 decided[n_]["frame"], decided[n_]["view"] = f, va
 
             def settle(final: bool = False) -> None:
@@ -1630,13 +1646,16 @@ class Search:
                 the event runs after them), the event runs matched (Definition S)."""
                 vb, va = frames_seen.get(f - 1, (None, None)), frames_seen.get(f, (None, None))
                 runs_f = Rk.get(f, [])
-                vs = dict((r.seq, v) for r, v in track.verdicts(runs_f, vb[0], va[0], vb[1])) \
+                vs = dict((r.seq, v) for r, v in track.verdicts(runs_f, vb[0], va[0], vb[1], kept.ex)) \
                     if vb[0] is not None and va[0] is not None else {}
                 for r in runs_f:
                     if r.depth >= 1 and r.frame >= s_issue and ch.took == "n/a":
                         for n_, c in enumerate(cands):
                             if r.unit in c[3] and r.unit not in own[n_]:
                                 own[n_][r.unit] = r
+                        if r.unit in w["chk_units"] and r.unit not in chk_own:
+                            chk_own[r.unit] = r
+                            kept.pinned.add(r.seq)
                     if r.seq in vs:
                         if ch.took == "n/a" and va[0] is not None:
                             for n_ in range(len(cands)):
