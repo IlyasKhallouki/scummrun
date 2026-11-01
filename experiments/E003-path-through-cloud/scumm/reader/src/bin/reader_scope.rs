@@ -35,7 +35,10 @@
 //! --reach       forward reachability (reach.rs, experiments/E004-fast-exact/reach.md): a job or a fork's branch that needs
 //!               a value not reached from the start does not run, and runs when the value arrives. Needs --split-limit.
 //!               Writes NAME.reached next to the packed file (taskcore --reached). Off by default.
-//! --reach-also FILE  a further start to read from (taskcore's --start-file format, key<TAB>value), with --reach
+//! --reach-also FILE  a further start to read from (taskcore's --start-file format, key<TAB>value), with --reach;
+//!               given more than once, a start per file. Only int values are read, and `pos:`/`escpos:` come from the
+//!               file's `at:`/`esc:` facts (task.rs `task_start`), so a start from the engine is given as its facts.py
+//!               map (the replay harness's reach extension, replay_part1.py `--reach-extend`)
 //! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
 //!               draw_clears and actor_rooms. Not due_first, which writes on the kept records after the reading. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
@@ -521,8 +524,13 @@ fn main() {
     b.switches.pass2_reuse |= pass2_reuse;
     if reach {
         b.reach_starts.push(start.clone());
-        if let Some(f) = arg(&args, "--reach-also") {
-            b.reach_starts.push(scumm_reader::reach::start_file(&f));
+        // every --reach-also, in the order given: the closure does not depend on the order (reach.md)
+        let also: Vec<&String> = args.windows(2).filter(|w| w[0] == "--reach-also").map(|w| &w[1]).collect();
+        for f in &also {
+            b.reach_starts.push(scumm_reader::reach::start_file(f));
+        }
+        if !also.is_empty() {
+            base["reach_also"] = json!(also);
         }
     }
     if live_locals {

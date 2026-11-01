@@ -4,7 +4,7 @@
 //! reader-port records NAME            golden records parsed and written back
 //! reader-port replay NAME [--out F]   the reading by the Rust Builder over the captured runs, against golden.py's
 //! reader-port read NAME [--threads N] [--switches S,...] [--live-locals] [--elsewhere] [--out F] [--golden F]
-//!                  [--packed F] [--task-out DIR] [--frame-costs]
+//!                  [--packed F] [--task-out DIR] [--frame-costs] [--no-keep]
 //!                                     the reading with the Rust machine half (fix round 1's switches on), against
 //!                                     golden.py's (switches off) or --golden's; --live-locals and --elsewhere read
 //!                                     with those switches (PORT-NOTES.md, "Live locals", "ELSEWHERE"; the comparison
@@ -13,7 +13,9 @@
 //!                                     whose writes go on the kept records after the reading: use --task-out);
 //!                                     --frame-costs gives each action its cost in engine frames (costs.rs) in the
 //!                                     packed file and --task-out's files; the records are the same, the reading's
-//!                                     head gets the costs' parameters (the comparison leaves that key out)
+//!                                     head gets the costs' parameters (the comparison leaves that key out);
+//!                                     --no-keep (with --packed) keeps no records in memory, as reader-scope
+//!                                     without --keep: the packed file is the same, and there is no comparison
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
@@ -160,6 +162,11 @@ fn main() {
             let elsewhere = args.iter().any(|a| a == "--elsewhere");
             let frame_costs = args.iter().any(|a| a == "--frame-costs");
             let packed_out = arg(&args, "--packed");
+            let no_keep = args.iter().any(|a| a == "--no-keep");
+            assert!(
+                !no_keep || (packed_out.is_some() && ["--out", "--golden", "--task-out"].iter().all(|f| arg(&args, f).is_none())),
+                "--no-keep needs --packed, and --out, --golden and --task-out read the kept records"
+            );
             assert!(
                 !(sw.due_first && packed_out.is_some()),
                 "--packed streams the records as made, and due_first writes due: on the kept records after the reading; use --task-out"
@@ -173,6 +180,7 @@ fn main() {
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
                     let mut b = oracle::builder_with(&game, &st, name, sw);
                     b.table.elsewhere = elsewhere;
+                    b.keep_records = !no_keep;
                     if sw.reach {
                         // the start the packed file gets: the kitchen's s17, another scope's own
                         b.reach_starts.push(if name == "kitchen" {
@@ -216,7 +224,7 @@ fn main() {
             };
             println!(
                 "{name}: {} records, reading {secs:.2} s, {:.1} CPU s, peak RSS {} MB",
-                b.records.len(),
+                if no_keep { b.n_records } else { b.records.len() },
                 scumm_reader::cpu_secs() - cpu0,
                 peak_rss_kb().unwrap_or(0) / 1024
             );
@@ -232,7 +240,9 @@ fn main() {
             }
             // --frame-costs adds its parameters to the reading's head only: compared without them
             let costs_kept = b.frame_costs.take();
-            if sw == Switches::default() {
+            if no_keep {
+                println!("{name}: no records kept (--no-keep), no comparison");
+            } else if sw == Switches::default() {
                 ok &= report(&format!("{name} reading against golden.py's"), oracle::compare_reading(&b, &golden, 5));
             } else if let Some(g) = arg(&args, "--golden") {
                 // a switch's own golden (fix round 1): the reading with the same switches, written by --out

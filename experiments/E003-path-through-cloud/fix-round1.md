@@ -224,6 +224,12 @@ times (44,839 against 17,712). Room 33 is unchanged. Each sentence of the bar is
 cook, the rule's own forks, times 3 from global 4's Bit[547] and Var[182]. The tests pass, and the kitchen plans to owner:566 = ego.
 The 185,069 click records of F1b are all in states rule 3 excludes.
 
+**Measured with --reach on both sides** (notes/log/2026-11-01-e003-f1c-reach.md, results/f1c-gate-reach.log). The gate passes: over
+seven pairs the reading takes a median 1.58 times the CPU time and 1.55 times the wall time, with 1.47 times the records (40,765
+against 27,739), and the operators grow 2.45 times (43,323 against 17,672). Bit[547] is reached only at its start value, so global
+4's first test runs one side. The kitchen plans to owner:566 = ego by `walk_to(316)[202]`. --reach keeps the fact values (d) keeps
+of the full reading with the switch; the optimal cost is 6 or 7 on both, and A* with landmark cost partitioning did not settle it.
+
 ## F2. Where in the frame an input is read (open choice)
 
 **Engine.** processInput acts on two keys itself: Esc's abortCutscene, which tests the armed override before the
