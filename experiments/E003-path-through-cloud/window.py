@@ -1619,6 +1619,7 @@ class Search:
                 self._fail(w, ch, {"kind": "input", "record": first.name, "frame": res_.get("frame", f),
                                    "why": res_["why"], "run": res_.get("run"), "want": res_.get("want"),
                                    "engine": res_.get("engine"),
+                                   "own": list(own[first_c].values()) if first_c is not None else [],
                                    "asks": sr.rec(sp.idx[first.i][0])[3].get(res_["why"].split(" ", 1)[-1])
                                    if sp.idx[first.i][0] is not None else None,
                                    "material": kept.freeze({ch.g: v0}, {ch.g: d0})})

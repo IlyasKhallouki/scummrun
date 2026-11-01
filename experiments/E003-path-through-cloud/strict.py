@@ -384,6 +384,9 @@ def explain(code: TE.Code, sr: Reading, fail: dict) -> dict:
                 if kk - 1 not in views or kk not in views:
                     return base | {"cause": None, "kind": "the frames are not kept"}
                 return base | TC.explain_unexplained(code, eng, kk, run, why, sr, views, dumps)
+            if why.startswith("no run pos:"):
+                return base | no_start_cause(code, eng, fail.get("own") or [], why.split("pos:", 1)[1],
+                                             fail["material"]["dumps"])
             if why.startswith("pre"):
                 fk = why.split(" ", 1)[1]
                 vals = [TE.Value(fk, fail.get("engine"), "the view before the click; the record asks "
@@ -445,6 +448,34 @@ def wait_values_read(x, step, dump: dict | None) -> list:
             args.append(ir.Const(got) if got is not None else a)
         return [TE.getter_value(ir.Getter("getActorMoving", tuple(args)), dump)]
     return TE.wait_values(x, 0, dump)
+
+
+def no_start_cause(code: TE.Code, eng: _Eng, own: list, unit: str, dumps: dict) -> dict:
+    """A click whose record starts ``unit`` and whose runs never did (9.5): Lemma X on the click's run of a unit
+    whose code starts it, toward those start sites, and Lemma B on the branch the run took there."""
+    for r in sorted(own, key=lambda x: x.seq):
+        key = code.key(r.where, r.number, r.room)
+        target = code.key_of_name(unit, r.room)
+        if key is None or target is None:
+            continue
+        sites = frozenset(code.start_sites(key, target)) | frozenset(code.start_sites(key, target, direct=False))
+        if not sites:
+            continue
+        lg = _logged(eng, r)
+        if lg is None:
+            continue
+        steps = TE.steps_of(code, key, [lg])
+        n = TE.first_off(code, key, steps, sites, cross_yields=False)
+        d = dumps.get(r.frame - 1 if not r.after else r.frame)
+        if n is None:
+            return {"cause": None, "kind": f"the click's run of {r.unit} kept a path to the start of {unit}",
+                    "unit": r.unit}
+        x = code.unit(key).ins[steps[n].i]
+        vals = wait_values_read(x, steps[n], d) if x.yields == "wait" else TE.slice_test(code, key, steps, n, d)
+        return {"cause": True, "kind": f"the click's run left the path to the start of {unit}", "unit": r.unit,
+                "offset": steps[n].op.code, "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals],
+                "class": "split" if x.yields == "wait" else TE.cause_class(vals)}
+    return {"cause": None, "kind": f"no run of the click's units starts {unit}", "unit": None}
 
 
 def not_run_cause(code: TE.Code, eng: _Eng, fail: dict) -> dict:
