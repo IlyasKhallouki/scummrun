@@ -354,21 +354,29 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
   that left it there until r runs. The engine's first run of U from W after that is therefore the step the plan says is
   r's. A later run from W needs U to come back to W, which is a step the plan does not name. □
 - **Input.** Let an input record I land its clicks on frames f_1 ≤ … ≤ f_n = s, with f_1 − 1 the fork's frame, and let
-  U_I be the units its `pos:` writes name. I *matches strictly* at s + 1 when:
-  - (I1) pre(I) holds on V_{f_1−1}, after the set writes of the tracked event records that matched strictly at frames
-    f_1 … s + 1 on runs before I's first run (`runAllScripts` runs before `checkExecVerbs` in a frame, so a slot run in
-    R_{f_1} comes before the click's work);
-  - (I2) for each `pos:U` = w of I, U has a run in R_s ∪ R_{s+1}, and the last of them ends at w (the slot dead for
-    NOWHERE);
-  - (I3) each other set or guessed write of I holds on V_{s+1}, unless a later run in R_{s+1} is at a point whose
+  U_I be the units its `pos:` writes name. *The click's runs.* A slot run at depth 0 is a slot `runAllScripts` resumes;
+  a run at depth 1 or more came through `runScriptNested`, which starts a script: `runInputScript` from
+  `checkExecVerbs`, `checkAndRunSentenceScript` for the sentence on top of the queue, a `startScript` inside them
+  (script.cpp; the segment's depth is `vm.numNestedScripts` when the run begins, trace-validation.md section 1). I's run
+  of U ∈ U_I is the first run of U at depth 1 or more in a frame from s on. I is *decided* at the first frame k ≥ s + 1
+  where each U with a write `pos:U` = w ≥ 0 has had its run; it *matches strictly* at k when:
+  - (I1) pre(I) holds on V_{f_1−1}, after the set writes of the tracked event records that matched strictly before
+    I's first run (`runAllScripts` runs before `checkExecVerbs` in a frame, so a slot run in R_s comes before the
+    click's work);
+  - (I2) for each `pos:U` = w of I, I's run of U ends at w; for w = NOWHERE and no run, U has no live slot on V_k;
+  - (I3) each other set or guessed write of I holds on V_k, unless a run of R_k after I's last run is at a point whose
     records write that key (M4);
   - (I4) each check of I that the dump at D_{f_1−1} decides (`replay.eval_check`) takes I's side (M3).
 
-  (I1)-(I3) are B1's check of an input step (trace_check.py window-validate), with M2's order of runs; (I4) is M3.
-  *I took effect* when it matches strictly and one of its writes changed: a `pos:U` whose last run left U elsewhere
-  than V_{f_1−1} has it, or another write whose value on V_{f_1−1} is not among its predicted values. A match on writes
-  that all held before is no evidence that the click ran its path (the check's item 3: walk_to(316)#10846 passed
-  Lemma 9 on `pos:script:4` = NOWHERE, which held before the click).
+  (I1)-(I3) are B1's check of an input step (trace_check.py window-validate), with M2's order of runs and the click's
+  own runs: B1's check took the last run of each unit in R_s ∪ R_{s+1}. On the kitchen from run B's S1#7 the click on
+  the door comes while the stepping stone's sentence still waits for ego: the sentence script's runs there are that
+  sentence's blocked wait at the same point, and the click's sentence starts once it ends. The last run then passes or
+  fails for the other sentence. (I4) is M3.
+  *I took effect* when it matches strictly and one of its writes changed: a `pos:U` whose run left U elsewhere than
+  V_{f_1−1} has it, or another write whose value on V_{f_1−1} is not among its predicted values. A match on writes that
+  all held before is no evidence that the click ran its path (the check's item 3: walk_to(316)#10846 passed Lemma 9 on
+  `pos:script:4` = NOWHERE, which held before the click).
 - **Success.** A child succeeds at h when every record the window needs has matched strictly by h, in the child or, by
   the fork, in the parent. A goal stop needs the goal records matched strictly. Writes that held before the fork never
   complete a macro step, since each needed record needs its own run (the check's item 6: window 2.2 succeeded on its
@@ -378,16 +386,20 @@ This section states what changes, for any SCUMM v5 game under the bridge. It was
 
 ### 9.3 The child, strictly
 
-- **The click is decided at s + 1 (Lemma 9′).** After frame s + 1 the child has R_s, R_{s+1} and V_{s+1}. If I matches
-  strictly, the child goes on. Else, if another record J of the same click (same verb and objects) matches strictly and
-  took effect, and one of its writes that changed is a fact a later step reads, the child goes on as a deviation
-  candidate. Else it is spent.
-  *Proof that this loses no success and no deviation.* I's runs are the runs the click starts in R_s ∪ R_{s+1}, so if
-  I does not match at s + 1 it never does. Every needed record that follows I then cannot match, and the window needs
-  I: no success. With neither I nor another record of the click taking effect, the child is no deviation (section 3).
-  No premise is needed (section 3's Lemma 9 had three). The first version tried the click's other records at frame s,
-  before the plan's own record had its second frame, and a record that showed one frame late could then never succeed
-  (the check's item 6); here the plan's record is decided first, on both frames. □
+- **The click is decided when its runs have come (Lemma 9′).** From frame s + 1 on, at each frame the child collects
+  the click's runs. Once I is decided: if it matches strictly, the child goes on; else, if another record J of the same
+  click (same verb and objects) is decided, matches strictly and took effect, and one of its writes that changed is a
+  fact a later step reads, the child goes on as a deviation candidate; once neither I nor any J can still match, it is
+  spent. At the bridge's idle stop (input on, no cutscene, no sentence queued, no input or object script running, ego
+  standing) a unit whose run has not come gets none from this click: I fails on "no run".
+  *Proof that this loses no success and no deviation.* The click starts its work only through `runScriptNested`, and
+  the child gives no other input after it; so a unit's first such run from frame s on is the click's. The first one is
+  I's, and so no later run of U is: if I does not match once decided it never does. Every needed record that follows I
+  then cannot match, and the window needs I: no success. With neither I nor another record of the click taking effect,
+  the child is no deviation (section 3). Until I is decided, no record that follows it can match, so going on loses
+  nothing. At the idle stop nothing queued or running is left to start U for this click. □ The first version tried the
+  click's other records at frame s, before the plan's own record had its second frame (the check's item 6: a record
+  that showed one frame late could never succeed); here the plan's record is decided first.
 - **Refuted.** A child stops as *refuted* when a needed record is refuted (Lemma S1: no success). For the deviation
   rule it counts as a mismatch. A needed record refuted in the parent ends the window: no child forked after can
   succeed.
@@ -415,8 +427,8 @@ the plan's own write.
 A child keeps, for its first strict failure, the frame's runs, explain log, dumps and views. The failure is one of:
 
 - a needed event record refuted: its own run, and the first condition of Definition M that failed for it;
-- the input's record not matched at s + 1: the first of (I1)-(I4) that failed, with the run of the `pos:` unit it
-  names;
+- the input's record not matched once decided: the first of (I1)-(I4) that failed, with the click's run of the
+  `pos:` unit it names, or the unit with no run;
 - a mismatch (section 3): the run that left the slot where no pending record predicts;
 - a needed record whose run did not happen before the child stopped: where its unit's slot waits, and on what.
 
