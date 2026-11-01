@@ -56,3 +56,55 @@ same single value, and keys outside the table are not task facts; the end is the
 **Test.** Off: the kitchen's packed sha1 279b7a24 and the five check scopes' sha1s. On: B1's window validation, with
 the unexplained runs of the group before and after; the five check scopes' records, CPU and peak; the reached values
 the same.
+
+## 2. A second instance of a recursively started unit (`ghost_slots`)
+
+**What the engine shows.** A unit's loop starts another unit U with the recursive flag, so `runScript` skips
+`stopScript` (script.cpp:65-66) and U gets a second slot while its first instance still runs. The reading keeps one
+place, one list of locals and one live flag per unit name. Its start record writes the new instance's start over U's
+slot facts, and the older instance's later runs then fail the records' precondition on U's place or list, and its end
+fails the record's effect "U not live", since the newer instance is.
+
+The reading already follows the newest instance: a recursive start writes U's slot facts with the new start, and a
+start without the flag stops every instance first (script.cpp `stopScript` kills every slot of the number). So the
+reading's abstraction is α: U's slot facts are those of U's most recently started instance (live or ended). The older
+instances are ghosts, which α does not see. That is sound only if nothing the task holds can tell a ghost is there.
+
+**The rule.** With `ghost_slots` on, the reader decides for each unit U that some code of the scope starts with the
+recursive flag (a constant number, or any script unit when the number does not fold) whether U's ghosts are invisible:
+
+- (a) the code a ghost can run writes no fact of the table but U's own slot facts: the havoc closure (havoc-cut.md,
+  "The write set") of U from its first instruction has an empty fact set, touches no slot but U's, changes no room,
+  and has no `freezeScripts`, cutscene or override op;
+- (b) no instruction of the scope reads U's liveness: no `isScriptRunning` whose argument folds to a set holding U's
+  number, or does not fold.
+
+It writes the verdict per unit (invisible, or the condition that failed) into the reading's head and report. The
+records do not change. A reading with the switch states which units it follows by α; the trace validation then
+applies α to the engine (below).
+
+**Lemma G.** Let U satisfy (a) and (b), and let α map an engine state to the task's facts with U's slot facts taken
+from U's most recently started instance only. Then every engine run of a ghost of U leaves α unchanged, and every
+other engine run changes α as it did before.
+
+*Proof.* A ghost runs U's code from a point that U's code reaches from its first instruction, so every instruction it
+runs, and every unit or hook it starts, is in U's closure from its first instruction (havoc-cut.md's closure is over
+the control flow, the starts and the hooks, so it contains every continuation). By (a) none of them writes a fact of
+the table other than U's slot facts, and α reads U's slot facts from the newest instance, which the ghost's run does
+not touch: its own slot is another slot (`getScriptSlot` gives each start a free slot, script.cpp:73-76). So α is the
+same before and after the run. A run of any other code reads U only through U's liveness, and by (b) no instruction of
+the scope reads it, so its path, and with it its writes, do not depend on whether a ghost lives. `stopScript(U)` and a
+room change end every instance, ghosts included, and α's U ends with them; `freezeScripts` freezes a ghost as it does
+the newest instance, which delays only the ghost's runs, and those change nothing α holds. ∎
+
+So under (a) and (b) the reading's records, with α, cover every engine run: the newest instance's runs are matched as
+before, and a ghost's runs are stutters of the task. Where (a) or (b) fails, the verdict says so and the reading makes
+no claim on that unit's ghosts (an open item for B2's recursive starts).
+
+**The matcher's part** (`trace_check.py window-validate`, used only with a reading that has the verdicts): the newest
+instance of U is the slot of U's latest run from its first instruction in the segmentation; a dumped slot of U that is
+another slot is left out of the view (α), and a run on such a slot is a *ghost* run, not matched. The first ghost run
+of each unit is explained (its logged writes), and a write of a fact of the task there is a cause.
+
+**Test.** Off: the five check scopes' sha1s and the kitchen's 279b7a24 (the records do not change with it on either).
+On: the verdicts on the window runs' readings; B1's window validation before and after.
