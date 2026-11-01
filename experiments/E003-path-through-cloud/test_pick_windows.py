@@ -89,23 +89,47 @@ class Sas:
             assert nxt() == "end_operator"
             self.ops.append((name, prev, effs, cost))
 
-    def run(self, plan: list):
+    def applies(self, n: int, s) -> bool:
+        _, prev, effs, _ = self.ops[n]
+        return all(s[v] == d for v, d in prev) and all(pre == -1 or s[v] == pre for _, v, pre, _ in effs)
+
+    def step(self, n: int, s) -> list:
+        t = list(s)
+        for conds, v, _, post in self.ops[n][2]:
+            if all(s[cv] == cd for cv, cd in conds):
+                t[v] = post
+        return t
+
+    def run(self, plan: list, end=False):
         """Run the operators ``plan`` (numbers) from the start: (cost, goal reached), or (None, why) where one does not
-        apply. Conditions read the state before the operator, as Fast Downward's."""
+        apply. Conditions read the state before the operator, as Fast Downward's. With ``end``, the last state too."""
         s = list(self.init)
         cost = 0
         for i, n in enumerate(plan):
-            name, prev, effs, c = self.ops[n]
-            assert name == f"a{n}", name
-            if any(s[v] != d for v, d in prev) or any(pre != -1 and s[v] != pre for _, v, pre, _ in effs):
-                return None, f"step {i} (a{n}) does not apply"
-            t = list(s)
-            for conds, v, _, post in effs:
-                if all(s[cv] == cd for cv, cd in conds):
-                    t[v] = post
-            s = t
-            cost += c if self.metric else 1
-        return cost, all(s[v] == d for v, d in self.goal)
+            assert self.ops[n][0] == f"a{n}", self.ops[n][0]
+            if not self.applies(n, s):
+                return (None, f"step {i} (a{n}) does not apply") + ((None,) if end else ())
+            s = self.step(n, s)
+            cost += self.ops[n][3] if self.metric else 1
+        return (cost, all(s[v] == d for v, d in self.goal)) + ((s,) if end else ())
+
+    def facts(self, s) -> dict:
+        """A state on the task's facts and ``goal`` (F): every variable but the pick variables and ``lock``."""
+        return {k: v for k, v in zip(self.names, s) if not k.startswith("pick:") and k != "lock"}
+
+    def walk(self, rng, length: int, prefer) -> list:
+        """A random operator sequence from the start, ``length`` long or until none applies; an applicable operator
+        that ``prefer`` names is taken half of the time."""
+        s, out = list(self.init), []
+        for _ in range(length):
+            ok = [n for n in range(len(self.ops)) if self.applies(n, s)]
+            if not ok:
+                break
+            good = [n for n in ok if prefer(n)]
+            n = rng.choice(good if good and rng.random() < 0.5 else ok)
+            out.append(n)
+            s = self.step(n, s)
+        return out
 
 
 class Ops:
@@ -248,6 +272,9 @@ def check_maps(work, task_args, args, plain, win, plain_plan, win_plan, counts, 
             fails.append((name, "theorem 1: the mapped plan", cost, c2, g2))
         else:
             counts["theorem 1: the mapped plan runs on Π^W, the same cost"] += 1
+            nw = sum(1 for n in mapped if W.op[n].get("begin"))
+            counts["theorem 1: windows in those plans"] += nw
+            counts["theorem 1: plans through a window"] += nw > 0
     if win_plan is not None:
         cost, goal = sw.run(win_plan)
         mapped = to_plain(win_plan, P, W)
@@ -258,12 +285,87 @@ def check_maps(work, task_args, args, plain, win, plain_plan, win_plan, counts, 
             fails.append((name, "theorem 2: the mapped plan", cost, c2, g2))
         else:
             counts["theorem 2: the mapped plan runs on Π, the same cost"] += 1
+            nw = sum(1 for n in win_plan if W.op[n].get("begin"))
+            counts["theorem 2: windows in those plans"] += nw
+            counts["theorem 2: plans through a window"] += nw > 0
             a = decode(work, task_args, args + ON, win_plan, "w")
             b = decode(work, task_args, args, mapped, "p")
             if a != b:
                 fails.append((name, "decode: other steps", a[:3], b[:3]))
             else:
                 counts["decode: the same steps"] += 1
+
+
+def to_consumers(sp: Sas, P: Ops, consumer: set, rng, n: int, cap: int = 20000) -> list:
+    """Up to ``n`` operator sequences of Π that end in a consumer: a breadth-first search over Π's other operators
+    (picks left out) from the start, up to ``cap`` states; at each state where consumers apply, one of them, after
+    random picks of every pick variable of its action."""
+    from collections import deque
+    plain_ops = [m for m in range(len(sp.ops)) if "pick" not in P.op.get(m, {})]
+    seen = {tuple(sp.init): None}
+    q, out, used = deque([(tuple(sp.init), [])]), [], set()
+    while q and len(out) < n and len(seen) < cap:
+        s, path = q.popleft()
+        for m in plain_ops:
+            if not sp.applies(m, s):
+                continue
+            if m in consumer and m not in used:
+                used.add(m)
+                picks = []
+                for k, _, _ in P.acts[P.op[m]["action"]]["picked"]:
+                    vals = [v for (j, kk, v) in P.pick if j is None and kk == k]
+                    picks.append(P.pick[(None, k, rng.choice(vals))])
+                out.append(path + picks + [m])
+                if len(out) >= n:
+                    break
+                continue
+            t = tuple(sp.step(m, s))
+            if t not in seen:
+                seen[t] = None
+                q.append((t, path + [m]))
+    return out
+
+
+def check_walks(plain, win, rng, n: int, length: int, counts, fails, name) -> None:
+    """The two maps on random operator sequences rather than plans: each walk on one file, mapped to the other, runs
+    there and ends in a state with the same facts (F). Consumers on Π, and windows on Π^W, are preferred."""
+    P, W = Ops(plain[1]), Ops(win[1])
+    sp, sw = Sas(plain[0]), Sas(win[0])
+    consumer = {p_op for p_op, w_op in zip(P.action_rows, W.action_rows) if "window" in W.op[w_op]}
+    in_window = lambda m: W.op[m].get("begin") or W.op[m].get("window") is not None  # noqa: E731
+    for i, walk in enumerate(to_consumers(sp, P, consumer, rng, n)):
+        mapped = to_windows(walk, P, W)
+        a, b = sp.run(walk, end=True), sw.run(mapped, end=True)
+        if a[0] is None or b[0] is None or a[0] != b[0] or sp.facts(a[2]) != sw.facts(b[2]):
+            fails.append((name, "theorem 1 on a sequence to a consumer", i, a[:2], b[:2]))
+            continue
+        counts["sequences of Π to a consumer: mapped, the same facts and cost"] += 1
+        back = to_plain(mapped, P, W)
+        c = sp.run(back, end=True)
+        if c[0] != a[0] or sp.facts(c[2]) != sp.facts(a[2]):
+            fails.append((name, "theorem 2 on the window of a sequence to a consumer", i, a[:2], c[:2]))
+        else:
+            counts["the same, mapped back by theorem 2: the same facts and cost"] += 1
+    for i in range(n):
+        walk = sp.walk(rng, length, lambda m: m in consumer or "pick" in P.op.get(m, {}))
+        mapped = to_windows(walk, P, W)
+        a, b = sp.run(walk, end=True), sw.run(mapped, end=True)
+        if a[0] is None or b[0] is None or a[0] != b[0] or sp.facts(a[2]) != sw.facts(b[2]):
+            fails.append((name, "theorem 1 on a walk", i, a[:2], b[:2]))
+        else:
+            counts["walks on Π: mapped, the same facts and cost"] += 1
+            counts["walks on Π: consumers"] += sum(1 for m in walk if m in consumer)
+        walk = sw.walk(rng, length, in_window)
+        while walk and (W.op[walk[-1]].get("begin") or "pick" in W.op[walk[-1]]):
+            walk.pop()  # end outside a window (a window changes no fact of F: Lemma 2)
+        mapped = to_plain(walk, P, W)
+        a, b = sw.run(walk, end=True), sp.run(mapped, end=True)
+        if a[0] is None or b[0] is None or a[0] != b[0] or sw.facts(a[2]) != sp.facts(b[2]):
+            fails.append((name, "theorem 2 on a walk", i, a[:2], b[:2]))
+        else:
+            counts["walks on Π^W: mapped, the same facts and cost"] += 1
+            counts["walks on Π^W: windows closed"] += sum(1 for m in walk if W.op[m].get("window") is not None
+                                                          and "action" in W.op[m])
 
 
 def check_one(task, start, work: Path, counts: collections.Counter, fails: list) -> None:
@@ -326,6 +428,8 @@ def real(argv) -> int:
     ap.add_argument("--plain-plan", type=Path)
     ap.add_argument("--window-plan", type=Path)
     ap.add_argument("--work", type=Path)
+    ap.add_argument("--walks", type=int, default=0, help="random operator sequences each way (check_walks)")
+    ap.add_argument("--length", type=int, default=40)
     ap.add_argument("--args", nargs=argparse.REMAINDER, default=[])
     a = ap.parse_args(argv)
     task_args = ["--task", a.tc] + (["--start-file", a.start] if os.path.exists(a.start) else ["--start", a.start])
@@ -344,6 +448,8 @@ def real(argv) -> int:
         pp = read_plan(a.plain_plan) if a.plain_plan else None
         wp = read_plan(a.window_plan) if a.window_plan else None
         check_maps(work, task_args, a.args, plain, win, pp, wp, counts, fails, "real")
+        if a.walks:
+            check_walks(plain, win, random.Random(1), a.walks, a.length, counts, fails, "real")
     for k, v in sorted(counts.items()):
         print(f"{v:6d}  {k}")
     print(f"failures: {len(fails)}")
@@ -358,6 +464,7 @@ def test_random_tasks():
     assert counts["PRODUCT_LIMIT 1: tasks with a window"] > 0
     assert counts["theorem 2: the mapped plan runs on Π, the same cost"] > 0
     assert counts["decode: the same steps"] > 0 and counts["no window, no pick: the same bytes"] > 0
+    assert counts["theorem 1: plans through a window"] > 0 and counts["theorem 2: plans through a window"] > 0
 
 
 def test_task_encoding_refused(tmp_path):
