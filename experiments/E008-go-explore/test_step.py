@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -219,6 +220,14 @@ def test_first_plan_status_skips_the_reach_extensions_try():
     assert step.first_plan_status([]) is None
 
 
+def test_attempt_costs_split_an_attempts_cpu():
+    res = {"extensions": [], "refinements": [{"plan": 0, "added": []}, {"plan": 1, "cpu_s": 4.0}],
+           "window_summary": {"engine_cpu_s": {"child": 100.0, "stone trial": 20.0}, "python_cpu_s": 30.0}}
+    assert step.attempt_costs(res, 50.0) == {"read": 4.0, "play": 150.0, "plan": 16.0}
+    assert step.attempt_costs({"extensions": [{"cpu_s": 2.0}]}, 1.0) == {"read": 2.0, "play": 0.0, "plan": 0.0}
+    assert step.attempt_costs({}, 3.0) == {"read": 0.0, "play": 0.0, "plan": 3.0}
+
+
 def test_exit_codes():
     assert step.exit_code({"ok": True}) == 0
     assert step.exit_code({"ok": False, "return": {"same": False}}) == 3
@@ -251,6 +260,118 @@ def test_cached_readings_newest_first_and_same_scope(tmp_path):
     (tmp_path / "r3" / "reading.json").write_text(json.dumps({"scope": {"rooms": [28, 33, 41]}, "packed": "x.tc"}))
     job = {"scope": [33, 28, 41], "readings": [{"path": str(p)} for p in paths + [tmp_path / "r3" / "reading.json"]]}
     assert step.cached_readings(job) == [paths[2], paths[0]]
+
+
+# --- run_job's bookkeeping, with the engine, the reader and the harness stubbed ------------------------------------------
+
+class _Root:
+    pid = os.getpid()
+    frame = 2728
+    status = STATUS
+
+    def state(self):
+        return STATE
+
+
+class _Ctl:
+    closed = False
+
+    def close(self):
+        _Ctl.closed = True
+
+
+class _Rd:
+    def __init__(self, d: Path, fresh: bool):
+        d.mkdir(parents=True, exist_ok=True)
+        self.path, self.packed = d / "reading.json", d / "reading.tc"
+        self.packed.write_text("")
+        self.packed.with_suffix(".reached").write_text(REACHED)
+        self.doc = {"scope": {"rooms": [28, 33, 41]}, "n_records": 9, "n_actions": 8, "read_s": 1.0,
+                    "start": {"name": f"{d}/start.jsonl seed 1"},
+                    "reader_scope": {"read_wall_s": 1.0, "read_cpu_s": 2.0, "peak_rss_mb": 50} if fresh else {}}
+
+    def close(self):
+        pass
+
+
+def stub_job(tmp_path, monkeypatch, plays: list, cached: bool = False):
+    """run_job on a stubbed return, reading and harness: ``plays`` the first plan's status per attempt in order."""
+    (tmp_path / "GUIDE.json").write_text(json.dumps(GUIDE))
+    job = {"job": "j7", "seed": 1, "stage": "t", "goal": GOAL, "guide": str(tmp_path / "GUIDE.json"),
+           "entry": {"id": 5, "root": False, "frame": 2728, "events": [], "checkpoint": [2728, {}, {}]},
+           "scope": [28, 33, 41], "tried": [["room", 41]], "held": [["state:316", 1]], "readings": [],
+           "reading_dir": str(tmp_path / "readings" / "r-j7")}
+    jd = tmp_path / "job"
+    jd.mkdir()
+    (jd / "job.json").write_text(json.dumps(job))
+    calls = {"fresh": 0, "attempts": []}
+    monkeypatch.setattr(step, "boot_entry", lambda e, d: (_Ctl(), _Root(), {"same": True, "differ": {},
+                                                                              "boot_s": 0.1, "frame": 2728}))
+
+    def fresh(job_, state, status, threads):
+        calls["fresh"] += 1
+        return _Rd(Path(job_["reading_dir"]), True), 3.0, 0.2
+    monkeypatch.setattr(step, "read_fresh", fresh)
+    monkeypatch.setattr(step, "choose_reading", lambda j, f: (_Rd(tmp_path / "cached", False), "reused", [])
+                        if cached else (None, "no cached reading", []))
+
+    def att(rd, ctl, root, tg, goal, adir, threads, workers):
+        status = plays[len(calls["attempts"])]
+        calls["attempts"].append((tg, str(rd.path)))
+        if status != "plan":
+            res = {"plans": [{"status": status}], "stop": "no plan", "inputs": []}
+            return res, types.SimpleNamespace(packed=rd.packed, checkpoints=[], inputs=lambda: []), 1.0, 0.5
+        made = adir / "refine-01"
+        made.mkdir(parents=True)
+        (made / "reading.json").write_text(json.dumps({"scope": {"rooms": [28, 33, 41]}}))
+        ins = [{"frame": 2736, "click": [1, 2]}, {"frame": 2800, "click": [3, 4]}]
+        cps = [cp(2728, 1), cp(2736, 2), cp(2798, 3), cp(2805, 4, **{"owner:566": 1})]
+        res = {"plans": [{"status": "reach extension"}, {"status": "plan"}], "stop": "goal", "goal_from_the_plan": True,
+               "frames": 77, "frame0": 2728, "frame_end": 2805, "qf0": 1, "qf_end": 9, "replans": 1, "inputs": ins,
+               "refinements": [{"plan": 0, "frame": 2798, "added": [103], "cpu_s": 5.0}], "extensions": [],
+               "window_summary": {"engine_cpu_s": {"child": 7.0}, "python_cpu_s": 2.0}}
+        h = types.SimpleNamespace(packed=made / "reading.tc", checkpoints=cps, inputs=lambda: ins)
+        return res, h, 9.0, 20.0
+    monkeypatch.setattr(step, "attempt", att)
+    return step.run_job(jd), calls, jd
+
+
+def test_run_job_probes_then_plays_the_first_target_with_a_plan(tmp_path, monkeypatch):
+    r, calls, jd = stub_job(tmp_path, monkeypatch, ["unsolvable", "plan"])
+    assert r["ok"], r["error"]
+    assert set(r) == PLAN_RESULT_KEYS and json.loads((jd / "result.json").read_text())["ok"]
+    assert [c[0][:2] for c in calls["attempts"]] == [("owner:566", 1), ("class:426:32", 1)]  # room 41 was tried
+    assert [p["status"] for p in r["probes"]] == ["unsolvable", "plan"]
+    assert r["tried"] == [["owner:566", 1], ["class:426:32", 1]] and r["exhausted"] is False
+    assert r["reading"]["fresh"] and r["reading"]["why"] == "no cached reading" and r["reading"]["read_cpu_s"] == 2.0
+    a = r["attempt"]
+    assert a["target"] == ["class:426:32", 1] and a["stop"] == "goal" and a["reached"] is False  # class not set
+    assert [(n["frame"], n["how"]) for n in r["new"]] == [(2736, "checkpoint"), (2798, "checkpoint"), (2805, "end")]
+    e = step.read_entry(jd / r["new"][-1]["file"])
+    assert e["parent"] == 5 and e["id"] is None and len(e["events"]) == 2 and set(e) == PLAN_ENTRY_KEYS
+    assert r["readings_made"] == [{"path": str(jd / "run" / "a01" / "refine-01" / "reading.json"),
+                                   "scope": [28, 33, 41], "kind": "refine"}]
+    assert r["cpu_s"]["play"] == 9.0 and r["cpu_s"]["read"] >= 5.0
+    assert r["cpu_s"]["total"] == pytest.approx(sum(r["cpu_s"][k] for k in ("return", "read", "plan", "play")), abs=0.2)
+    assert (jd / "log").read_text() and _Ctl.closed
+
+
+def test_run_job_reads_fresh_once_when_a_cached_reading_is_out_of_domain(tmp_path, monkeypatch):
+    r, calls, jd = stub_job(tmp_path, monkeypatch, ["out of domain", "plan"], cached=True)
+    assert r["ok"], r["error"]
+    assert calls["fresh"] == 1
+    assert [c[0][:2] for c in calls["attempts"]] == [("owner:566", 1), ("owner:566", 1)]
+    assert calls["attempts"][1][1].endswith("r-j7/reading.json")
+    assert r["reading"]["fresh"] and r["reading"]["why"] == "out of domain"
+    assert r["reading"]["replaced"]["why"] == "reused"
+    assert r["tried"] == [["owner:566", 1]]
+    assert r["attempt"]["reached"] is True
+
+
+def test_run_job_with_no_target_with_a_plan_is_exhausted(tmp_path, monkeypatch):
+    r, calls, jd = stub_job(tmp_path, monkeypatch, ["unsolvable"] * 20)
+    assert r["ok"] and r["exhausted"] and r["attempt"] is None and r["new"] == []
+    assert len(r["tried"]) == len(calls["attempts"]) == r["targets"]["n"]
 
 
 # --- in the engine (E008_ENGINE=1) --------------------------------------------------------------------------------------
