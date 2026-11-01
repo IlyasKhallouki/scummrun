@@ -2042,11 +2042,11 @@ fn tri_py(t: &(S, S, S)) -> Py {
 }
 
 /// `Builder.run`'s and `Builder.record`'s reads of a path (reader_port_oracle.py's `_path_dict`).
-fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool) -> PathOut {
+fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&SettledRun>) -> PathOut {
     let end = p.end.map(|e| e.to_string());
     let sym = p.ext.is_some();
     // the switch havoc_cut: a path the step limit ended is handed over whole, with where it stood (havoc.rs)
-    let cut = (havoc && sym && end.as_deref() == Some("limit")).then(|| cut_of(game, p));
+    let cut = (havoc && sym && end.as_deref() == Some("limit")).then(|| cut_of(game, p, settled));
     if !sym || (cut.is_none() && end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e))) {
         return PathOut { end, sym, ..Default::default() };
     }
@@ -2104,9 +2104,8 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool) -> PathOut {
 }
 
 /// The switch havoc_cut: the frames on a cut path's stack with the instruction each runs next, and the engine steps
-/// its calls have not run yet (`Call.i` is the next step's index).
-fn cut_of(game: &Game, p: &Path) -> crate::record::Cut {
-    use crate::record::CutStep;
+/// its calls have not run yet (`Call.i` is the next step's index). `settled` is the F1c click the run makes, if any.
+fn cut_of(game: &Game, p: &Path, settled: Option<&SettledRun>) -> crate::record::Cut {
     let mut cut = crate::record::Cut::default();
     for e in &p.stack {
         match e {
@@ -2117,27 +2116,53 @@ fn cut_of(game: &Game, p: &Path) -> crate::record::Cut {
             }
             Entry::Call(c) => {
                 for st in c.steps.iter().skip(c.i as usize) {
-                    let s = match st {
-                        Step::Note(_) | Step::ScrollNote | Step::CutIndex(_) => continue,
-                        Step::Script { n, .. } => CutStep::Script(*n),
-                        Step::Object { obj, .. } => CutStep::Object(*obj),
-                        Step::Hook { var, .. } => CutStep::Hook(*var),
-                        Step::Write(k, _) => CutStep::Write(key_str(*k)),
-                        Step::Scene { .. }
-                        | Step::SceneBegin(_)
-                        | Step::RoomCode { .. }
-                        | Step::SceneKill
-                        | Step::SceneLoad(_)
-                        | Step::SceneEgo(_)
-                        | Step::Room1(_) => CutStep::Room,
-                        other => CutStep::Other(format!("{other:?}").chars().take(40).collect()),
-                    };
-                    cut.steps.push(s);
+                    cut.steps.extend(pending_step(st, settled));
                 }
             }
         }
     }
     cut
+}
+
+/// One engine step a call has still to run, as the code it runs (havoc-cut.md, "The write set"). A step the model notes
+/// and does not run counts as the engine runs it: a scroll note as the scroll hook, actorFollowCamera's second
+/// inventory hook as that hook, any other note as every unit. The reader's own steps count as what they do.
+fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::CutStep> {
+    use crate::record::CutStep;
+    let other = |st: &Step| vec![CutStep::Other(format!("{st:?}").chars().take(40).collect())];
+    let var = |n: i32| CutStep::Write(format!("var:{n}"));
+    match st {
+        Step::CutIndex(_) => vec![],
+        Step::Script { n, .. } => vec![CutStep::Script(*n)],
+        Step::Object { obj, .. } => vec![CutStep::Object(*obj)],
+        Step::Hook { var, .. } => vec![CutStep::Hook(*var)],
+        Step::Write(k, _) => vec![CutStep::Write(key_str(*k))],
+        Step::Scene { .. } | Step::SceneBegin(_) | Step::RoomCode { .. } | Step::SceneKill | Step::SceneLoad(_) | Step::SceneEgo(_) | Step::Room1(_) => {
+            vec![CutStep::Room]
+        }
+        // checkAndRunSentenceScript runs VAR_SENTENCE_SCRIPT's script (script.cpp:1244-1246)
+        Step::Sentence { .. } => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
+        Step::ScrollNote => vec![CutStep::Hook(scumm_machine::machine::VAR_SCROLL_SCRIPT)],
+        Step::Note(s) if &**s == scumm_machine::machine::SECOND_INVENTORY_HOOK => vec![CutStep::Hook(VAR_INVENTORY_SCRIPT)],
+        // a click on a verb: the input script (`eng_input`)
+        Step::Note(s) if &**s == INPUT_STEP => vec![CutStep::Hook(VAR_VERB_SCRIPT)],
+        // F1c's clicks: the sentence variables and the mouse (`f1c_click`, `f1c_mouse`), then the input script again
+        Step::Note(s) if &**s == F1C_CLICK_A || &**s == F1C_CLICK_B => match settled {
+            Some(run) => {
+                let r = &run.rule;
+                let vars: Vec<i32> = if &**s == F1C_CLICK_A { vec![r.v, r.a, r.b, r.p, r.last] } else { vec![r.b, r.last] };
+                let mut out: Vec<CutStep> = vars.into_iter().map(var).collect();
+                out.push(var(crate::inputs::VAR_VIRT_MOUSE_X));
+                out.push(var(crate::inputs::VAR_VIRT_MOUSE_Y));
+                out.push(CutStep::Script(run.n));
+                out
+            }
+            None => other(st),
+        },
+        // F1c's end: the sentence its click queued (`f1c_end`)
+        Step::Note(s) if &**s == F1C_END => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
+        _ => other(st),
+    }
 }
 
 // --- the Reader -----------------------------------------------------------------------------------------------------
@@ -2302,7 +2327,7 @@ impl Reader<'_> {
     pub fn path_dump(&self, run: &Run, p: &Path) -> Py {
         let game = self.m.game;
         let tri_list = |l: &scumm_machine::plist::PList<(S, S, S)>| Py::List(l.iter().map(tri_py).collect());
-        let o = path_out(game, run, &Path { notes: Default::default(), end: None, ..p.clone() }, false);
+        let o = path_out(game, run, &Path { notes: Default::default(), end: None, ..p.clone() }, false, None);
         let mut f = vec![
             ("end", p.end.map_or(Py::None, Py::str)),
             ("end_at", p.end_at.as_ref().map_or(Py::None, |s| Py::str(&**s))),
@@ -2445,6 +2470,7 @@ impl Reader<'_> {
     fn run_out(&mut self, cx: &Ctx, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
+        let settled = st(&self.m).settled.clone();
         // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths
         let paths = if cx.table.split_limit && run.limit != 0 {
             Vec::new()
@@ -2452,7 +2478,7 @@ impl Reader<'_> {
             run.paths
                 .iter()
                 .map(|p| {
-                    let mut out = path_out(game, &run, p, cx.table.havoc_cut);
+                    let mut out = path_out(game, &run, p, cx.table.havoc_cut, settled.as_deref());
                     if let Some(rule) = &cx.table.settled {
                         if out.sym && sx(p).carry && !out.kept.is_empty() {
                             f1c_carry(rule, &mut out);
@@ -2494,4 +2520,81 @@ pub fn dump_capture_run(rd: &mut Reader, cx: &Ctx, i: usize, c: &Py) -> Py {
         ("rd", Py::dict(vec![("counts", nz(&rdc.counts)), ("forks", nz(&rdc.forks)), ("fork_keys", nz(&rdc.fork_keys))])),
         ("paths", Py::List(run.paths.iter().map(|p| rd.path_dump(&run, p)).collect())),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::record::CutStep;
+
+    /// A path whose stack holds one call with these steps, `done` of them run.
+    fn path(steps: Vec<Step>, done: u32) -> Path {
+        Path::new(vec![Entry::Call(Call { head: "t".into(), cite: "t".into(), steps: steps.into(), caller: None, active: false, i: done, cid: 1 })])
+    }
+
+    fn settled() -> SettledRun {
+        let rule = crate::inputs::SettledRule {
+            plain: Default::default(),
+            v: 9,
+            a: 10,
+            b: 11,
+            p: 12,
+            last: 13,
+            hover: UnitKey::Global(3),
+            wait: 0,
+            guards: vec![],
+            reads: Default::default(),
+            installed: Default::default(),
+            anywhere: Default::default(),
+        };
+        SettledRun { rule: std::sync::Arc::new(rule), n: 204, verb: 7, a: 320, b: 0 }
+    }
+
+    /// The independent check's hole (2): a cut inside the first click's input script still has F1c's second click
+    /// (its two sentence variables, the mouse, the input script again) and the queued sentence to run.
+    #[test]
+    fn a_cut_in_the_first_click_keeps_the_second_click_and_the_sentence() {
+        let game = crate::oracle::load_game();
+        let p = path(vec![Step::Note(F1C_CLICK_A.into()), Step::Note(F1C_CLICK_B.into()), Step::Note(F1C_END.into())], 1);
+        let run = settled();
+        let cut = cut_of(&game, &p, Some(&run));
+        let w = |n: i32| CutStep::Write(format!("var:{n}"));
+        let want = vec![
+            w(11),
+            w(13),
+            w(crate::inputs::VAR_VIRT_MOUSE_X),
+            w(crate::inputs::VAR_VIRT_MOUSE_Y),
+            CutStep::Script(204),
+            CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT),
+        ];
+        assert_eq!(cut.steps, want);
+        // without the click's run the second click names every unit
+        let cut = cut_of(&game, &p, None);
+        assert!(matches!(cut.steps[0], CutStep::Other(_)), "{:?}", cut.steps);
+    }
+
+    /// Hole (3): a pending scroll note is the scroll hook, which the engine may run; actorFollowCamera's second
+    /// inventory hook is that hook; any other note reads every unit.
+    #[test]
+    fn notes_the_model_does_not_run_count_as_the_engine_runs_them() {
+        let game = crate::oracle::load_game();
+        let p = path(
+            vec![
+                Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![] },
+                Step::ScrollNote,
+                Step::Note(scumm_machine::machine::SECOND_INVENTORY_HOOK.into()),
+                Step::Note("some other note".into()),
+                Step::CutIndex(None),
+            ],
+            1,
+        );
+        let cut = cut_of(&game, &p, None);
+        assert_eq!(cut.steps.len(), 3, "{:?}", cut.steps);
+        assert_eq!(cut.steps[0], CutStep::Hook(scumm_machine::machine::VAR_SCROLL_SCRIPT));
+        assert_eq!(cut.steps[1], CutStep::Hook(VAR_INVENTORY_SCRIPT));
+        assert!(matches!(cut.steps[2], CutStep::Other(_)));
+        // a pending sentence runs the sentence script
+        let p = path(vec![Step::Sentence { verb: 7, a: 320, b: None }], 0);
+        assert_eq!(cut_of(&game, &p, None).steps, vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)]);
+    }
 }
