@@ -141,3 +141,83 @@ cut point. MI1 numbers appear only in the tests and the notes.
 ## Results
 
 Written after the runs. Nothing above this line changes.
+
+Runs of 2026-11-01. Every reading ran the reader at 00a7832; the laptop's through run_rough.sh, the VM's through
+E004's vm_rough.sh. Numbers and summaries: `results/`; the traces stay in ~/.cache/fast-mi-e005.
+
+**Off is unchanged.** Every switch off, the kitchen's packed file keeps sha1 279b7a24, with 0 differences from
+golden.py's reading. The reader's tests pass: 101 in 13 suites (23 ignored), the new ones included.
+
+**B, from the files.** The analysis of Part I's table takes 0.5 s and 9 rounds, and leaves no computed start of the
+game unknown.
+
+- Global 73's start names {58, 200}, as predicted.
+- Global 23's start: Local[0] is 1 to 12 there, `Var[397..408]` hold 0, and it names no unit, as predicted. The
+  bound needed one more thing than the plan said: on the inventory branch Local[0] is `Var[133 + Local[2]]`, with
+  Local[2] computed from the mouse, so the variables' narrowing by `VAR_MOUSE_X > 160` and `VAR_MOUSE_Y > 152` and the
+  mouse's screen range were added to havoc-args.md before any run (51250a2).
+- Globals 2 and 47's starts name {0, 10, 96, 202} and {0, 200, 208}. In the runs, no start was left unresolved.
+
+**A.** Predicted: at most 4 rooms in the median. Measured:
+
+- Part I at N = 300: every one of the 20,331 havoc records can change the room, and each names 30 of the 31 rooms.
+- Part I at N = 100: 722 of 740 fall back to every scope room, because `actorFollowCamera(VAR_EGO)` meets an ego whose
+  room at the cut is not known (global 114, object 905, global 19; `actorroom:` is a non-fact in Part I's table).
+- The bar at N = 100: 9,239 of 23,835 fall back for the same reason; 3,704 name 2 rooms.
+
+**Part I.** Seed 1, goal results/end-part1.json, run D's switches with havoc_cut, havoc_starts, reach_pairs,
+havoc_rooms and havoc_args.
+
+| N | where | end | wall s | CPU s | peak RSS | where it stood | records | havoc records | naming every unit | units per record (median) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 300 | laptop, 3 threads | cgroup cap 5.5 GB | 100 | 282 | 5.2 GB | pass 1 | | 696 | 0 | 564 |
+| 300 | VM, 16 threads | MemAvailable under 8 GB | 250 | 3,968 | 113 GB | pass 1, round 5 | 9,741 | 20,331 | 0 | 564 |
+| 100 | laptop, 3 threads | MemAvailable under 3 GB | 50 | 174 | 4.9 GB | pass 1, round 2 (24,365 runs) | 1,874 | 740 | 0 | 572 |
+
+- A havoc record at N = 300 names 564 or 565 of the scope's 573 units, with 2,098 effects and 13,589 events (E004:
+  576 units, 2,141 effects, 14,072 events).
+- The cuts stand where E004's did: room 85's local 202 > global 114 > global 73 (> global 17), in the sentence jobs on
+  two inventory objects, 500 havoc records per job.
+- No reading finished, so there is no task, no plan and no comparison with the key. No further N: at 500 and 1,000
+  E004 found almost no cut, and the full reading's cost.
+
+**Soundness.**
+
+- The bar at N = 100: done in 494 s, 916 CPU s, 6.0 GB, 87,168 records, 12,092 havoc records (E004: 2,299 CPU s,
+  13.5 GB, 94,833 and 16,661). On all 574 facts compared it reaches every value the full reading reaches, and 3,662
+  more.
+- The kitchen: at N = 100 it stopped at the 3 GB floor after 290 s and 5.6 GB, with 19,926 havoc records (0 naming
+  every unit, 96 units in the median). At N = 150 and 200 it rose past 5 GB in under 20 s; the N = 200 run met the
+  kernel's OOM killer, before run_rough.sh had its cgroup cap (aa00639). At N = 250 and 300 no path passes the limit,
+  so the reading is the full one. The kitchen's check could not be made on this laptop.
+
+**The exact reader.** It never names every unit for a start: a start whose number it does not know is left out and
+listed. On the bar's full reading that is 176 `startScript` and 184 `startObject` records. No Part I reading finished,
+so there is no Part I count.
+
+**The stop rule fired.** No havoc record names every unit by its reasons any more, but every Part I record names 564
+of 573 units, and the N = 300 reading needs more memory than the laptop has and more than the VM's 125 GB. The VM ran
+once: 0.20 h, $0.12; the ledger stands at $16.26 of $30.
+
+**The stage that binds** is the havoc record's size, and A and B do not reach it:
+
+- With both starts resolved, the closure still reaches nearly all code through the computed `startObject` in globals
+  9 and 23. havoc_starts names every object's entry for the verb, so all 202 objects of the scope, and their code
+  changes the room to constant rooms all over the scope. In a diagnostic build where such a start names no object
+  (unsound, a measurement only, not committed), the same cut (local 202 > global 114 > global 73) names 65 units and
+  1,160 facts, not 564 and 2,181.
+- Second, `actorFollowCamera(VAR_EGO)` with the ego's room not known at the cut sends A back to every scope room.
+
+**Predicted against measured.**
+
+- B, global 73: {58, 200}; measured {58, 200}.
+- B, global 23: no unit; measured no unit. It needed the mouse's guards, which the plan did not name.
+- A: at most 4 rooms in the median; measured 30 of 31 at N = 300, every scope room for 98% of records at N = 100.
+- N = 300: 0 records naming every unit, done on the laptop under 6 GB, 4,000 CPU s and 20,000 havoc records;
+  measured 0 by reason, 564 of 573 units by size, not done on the laptop (5.5 GB in 100 s) or on the VM (113 GB in
+  250 s, 3,968 CPU s, 20,331 havoc records).
+- N = 100: 0 naming every unit and room 58's records still blowing up; measured 0 naming every unit, but it stopped in
+  round 2 before room 58's entry code, on the records of round 1 (572 units each).
+- Soundness: the bar and the kitchen contain their full readings, the bar under 4 GB; measured the bar contains its
+  full reading at 6.0 GB, and the kitchen could not be read at N = 100 on this laptop.
+- Plan: at most 15 steps with a havoc step; measured no reading, so no plan.
