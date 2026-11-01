@@ -114,33 +114,32 @@ pass is a run of the task under α even where Lemma G's static conditions fail; 
 **Test.** Off: the five check scopes' sha1s and the kitchen's 279b7a24 (the records do not change with it on either).
 On: the verdicts on the window runs' readings; B1's window validation before and after.
 
-## 3. The input script on run B's moves (no switch: B4's work)
+## 3. The input script on run B's moves (no switch)
 
 **What the engine shows.** Three refuted predictions of run B's check (row 5) have their first opcode off the path in
 the plain input script, the global that ends in doSentence(verb, A, B) of three variables. Row 5 runs a sentence by
 starting the sentence script with (verb, A, B); the engine's click runs the input script first, and that script
-decides whether a sentence is queued and which. Found again in the engine:
+decides whether a sentence is queued and which. Found again in the engine, frame by frame with the explain log, each
+is run B's recorded input doing another thing on this seed than in run B:
 
 - a click whose point is over another object than the scored action's, with the default verb: the input script
-  queues a walk to that other object. On this seed the click is another input of V than the scored one; the model is
-  not at fault there, the sample is (the move is out of sync);
+  queues a walk to that other object. That is another input of V than the scored one;
 - a click whose point is over no object: the script walks ego to the mouse point. That is a floor click, outside V;
-- a verb that takes a preposition with one object (its first click on an inventory icon): the script starts the
-  preposition script, which sets the preposition variable, and then queues no sentence while the second object is
-  missing (its local "a sentence is complete" stays 0). Row 5 runs the sentence anyway. This one is a semantics
-  error of the input rule.
+- a verb key, then a click on an inventory slot: the verb key's run of the input script selects the verb and queues
+  nothing (its local "a sentence is complete" stays 0, the first opcode off the path B1 found); the click that follows
+  runs no input script at all, the hovered inventory object is not the scored action's, and a cutscene starts two
+  frames later. The move's input did not take effect.
 
-**Does input_settled cover it?** No. F1c (`inputs.rs`) starts an input at the room's input script only when that
-script is not plain; a plain input script keeps today's job, the sentence run directly ("today's sentence record is
-what it does"), and an input with an inventory object stays as it is. The third case is an inventory input under a
-plain input script, so the switch reads it as row 5 does. A reading from that move's start with input_settled on has
-no record of the input at all (its object is not one of the room's).
+So none of the three is an opcode with wrong abstract semantics: the inputs are not the scored action's on this
+seed. The sync filter of B1's run B check (trace-validation.md, "Run B on another seed") lets them through because
+the same evidence (no new sentence by done, or another one) also holds in run B's own ground truth for these moves.
+The window-search replay of run B's moves (section 5) issues each move's own input instead.
 
-**What a fix needs.** The plain rule is not a proof: the plain script has paths that queue no sentence, or another
-sentence, depending on the verb's preposition, the hovered object's default verb and owner, and a settings bit. A
-sound rule runs the plain script too, from the sentence variables and the click's area (scene or inventory) as
-constants, as F1c does for the other input scripts, and keeps its records apart from the sentence's (F1b's records,
-D10). That is plan step B4, which B1 now asks for; it is not built here.
+**Does input_settled cover it?** It would not change these: F1c (`inputs.rs`) starts an input at the room's input
+script only when that script is not plain; a plain input script keeps today's job, the sentence run directly, and an
+input with an inventory object stays as it is. The plain rule itself is not a proof (the plain script has paths that
+queue no sentence, or another one, by the verb's preposition, the hovered object's default verb and owner, and a
+settings bit), which is plan step B4's work; no miss of this sample needs it.
 
 ## 4. Two run B causes that are the done frame (class split, for the window search)
 
