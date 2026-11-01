@@ -25,6 +25,7 @@ LOCAL_BIT, BIT_BIT = 0x4000, 0x8000  # readVar's local and bit variables (script
 RUN_FIELDS = ("frame", "after", "seq", "depth", "slot", "where", "number", "room", "code0", "code1", "status", "frozen",
               "delay", "ops")
 SS_DEAD, SS_PAUSED, SS_RUNNING = 0, 1, 2  # script.h:81-83
+NOWHERE = -1  # reader.NOWHERE: the pos: value of a unit with no live slot
 SLOT_KEYS = ("at:", "frozen:", "local:", "script:", "objscript:", "esc:")
 # Variables opcodes write besides their own operands (check.py IN_OPCODES and LEFT_IN): a room change's startScene
 # (VAR_ROOM, VAR_CAMERA_MIN_X and _MAX_X, VAR_ROOM_RESOURCE, VAR_ROOM_FLAG, VAR_NEW_ROOM; room.cpp:76-205), and
@@ -377,21 +378,27 @@ def taken(code: Code, key, steps: list, n: int) -> tuple | None:
     return None
 
 
-def first_off(code: Code, key, steps: list, targets: frozenset) -> int | None:
+def first_off(code: Code, key, steps: list, targets: frozenset, cross_yields: bool = True) -> int | None:
     """Lemma X: the index in ``steps`` of the first conditional jump whose taken side cannot reach ``targets`` while
-    its other side can."""
+    its other side can. ``cross_yields``: the path may go on in the slot's later runs (a prediction over many
+    frames); off for one record, which is one run."""
     u = code.unit(key)
     for n, s in enumerate(steps):
         if s.i is None:
             continue
         x = u.ins[s.i]
+        if x.yields == "wait" and s.i in targets:
+            nxt = steps[n + 1] if n + 1 < len(steps) and steps[n + 1].run is s.run else None
+            if nxt is not None:
+                return n  # the path stops at this WaitFor op (it blocks there); the engine's did not block
+            continue
         if not (isinstance(x.st, ir.Jump) and x.st.cond is not None):
             continue
         sides = taken(code, key, steps, n)
         if sides is None:
             continue
         went, other = sides
-        if not code.reachable(key, went, targets) and code.reachable(key, other, targets):
+        if not code.reachable(key, went, targets, cross_yields) and code.reachable(key, other, targets, cross_yields):
             return n
     return None
 
@@ -529,6 +536,10 @@ def wait_values(x, slot_delay: int, dump: dict | None) -> list:
         return [Value("frames to its next run", 1, "a breakHere yields one frame", "time")]
     if name == "WaitForActor":
         return [getter_value(ir.Getter("getActorMoving", x.st.args), dump)]
+    if name == "WaitForCamera":
+        cam = dump["vars"][2] if dump is not None else None  # VAR_CAMERA_POS_X (vars.cpp:39)
+        return [Value("var 2", cam, "VAR_CAMERA_POS_X at the decision point before; the camera's target is not "
+                                    "in the dump", "position")]
     if name == "WaitForMessage":
         have = dump["vars"][3] if dump is not None else None  # VAR_HAVE_MSG (vars.cpp:40)
         return [Value("var 3", have, "VAR_HAVE_MSG at the decision point before: a message still shows", "time")]
@@ -579,80 +590,151 @@ class Verdict:
     why: list = field(default_factory=list)  # per candidate: the first condition that failed
 
 
+def _holds(got, vs) -> bool:
+    """A precondition's set holds on a view value; a set value (``args:``: every built list the dumped locals match)
+    holds when one of its values is in the set."""
+    if isinstance(got, frozenset):
+        return bool(got & vs)
+    return got in vs
+
+
 class StrictMatcher:
     """Definition M over a set of event records. ``records``: (index, unit name, wait point, pre, effects, checks)
-    with pre {key: set of values}, effects {key: ("set", v) | ("guess", values) | ...}. The view's keys are the
-    reading's (``replay.view``): ``pos:U`` is U's wait point (NOWHERE when not live)."""
+    with pre {key: set of values}, effects {key: ("set", v) | ("guess", values) | (kind,)}, in the task's values. The
+    views' keys are the reading's (``replay.view``): ``pos:U`` is U's wait point (NOWHERE when not live). Records are
+    indexed by (unit, wait point, the wait point their ``pos:`` effect sets), so a run looks only at the records that
+    can end where it ended (M1 and M4's slot write first)."""
 
     def __init__(self, records, nowhere, decide_check=None):
-        self.by_point = collections.defaultdict(list)
+        self.index = collections.defaultdict(list)
+        self.points = set()
         for rec in records:
-            self.by_point[(rec[1], rec[2])].append(rec)
+            idx, unit, w, pre, eff, checks = rec
+            pos = eff.get(f"pos:{unit}")
+            end = pos[1] if pos is not None and pos[0] == "set" else None
+            others = tuple((k, e) for k, e in eff.items() if not k.startswith("pos:") and e[0] in ("set", "guess"))
+            self.index[(unit, w, end)].append((idx, tuple(pre.items()), others, tuple(checks), pos))
+            self.points.add((unit, w))
+        # per index entry, every key its records write: what a later run between the same decision points may write
+        self.keys = {k: frozenset(kk for rec in v for kk, _ in rec[2]) for k, v in self.index.items()}
+        # per index entry, its records by the locals list their precondition asks of their own slot (args:U), so a
+        # run looks only at the records of the lists its dumped locals match
+        self.by_args = {}
+        for (unit, w, end), recs in self.index.items():
+            sub, rest = collections.defaultdict(list), []
+            for rec in recs:
+                want = next((vs for k, vs in rec[1] if k == f"args:{unit}"), None)
+                if want is None:
+                    rest.append(rec)
+                else:
+                    for sig in want:
+                        sub[sig].append(rec)
+            self.by_args[(unit, w, end)] = (dict(sub), rest)
         self.nowhere = nowhere
         self.decide_check = decide_check  # (check, run) -> True, False or None (open)
         self.calls = 0
         self.seconds = 0.0
+        self.open_used = 0
 
     @staticmethod
     def _value_ok(eff, got) -> bool:
+        if isinstance(got, frozenset):  # args: every list the dumped locals match
+            return (eff[1] in got) if eff[0] == "set" else (bool(got & eff[1]) if eff[0] == "guess" else True)
         if eff[0] == "set":
             return got == eff[1]
         if eff[0] == "guess":
             return got in eff[1]
         return True  # a step or a copy: its value depends on the state, not checked here
 
-    def match(self, runs: list, before: dict, after: dict) -> list:
+    def match(self, runs: list, before: dict, after: dict, open_keys=frozenset()) -> list:
         """One verdict per run between two decision points, in run order (``runs``: Run, oldest first); ``before`` and
-        ``after`` the views at the two decision points."""
+        ``after`` the views at the two decision points. ``open_keys``: facts whose value at the runs' start the views do
+        not give (work between the decision points that no run here is matched to, such as the sentence script after
+        the earlier decision point): M2 does not check them, and a match that needed one is counted."""
         t = time.perf_counter()
         self.calls += 1
-        state = dict(before)
-        later_writes = collections.Counter()
-        cands_of = []
-        for r in runs:
-            cands = self.by_point.get((r.unit, r.code0), [])
-            cands_of.append(cands)
-        for cands in cands_of:
-            for rec in cands:
-                for k in rec[4]:
-                    later_writes[k] += 1
+        state = before
+        copied = False
         out = []
-        for r, cands in zip(runs, cands_of):
-            for rec in cands:
-                for k in rec[4]:
-                    later_writes[k] -= 1
-            if not cands:
+        empty = ()
+        entries = []
+        for r in runs:
+            end = r.code1 if r.code1 >= 0 else self.nowhere
+            a, b = (r.unit, r.code0, end), (r.unit, r.code0, None)
+            entries.append((a, b))
+        # a key a later run between the same decision points may write: M4 does not check it on an earlier run (asked
+        # only of a key whose check fails)
+        keys = self.keys
+
+        def later_writes(n, k):
+            for a2, b2 in entries[n + 1:]:
+                if k in keys.get(a2, ()) or k in keys.get(b2, ()):
+                    return True
+            return False
+        for n, r in enumerate(runs):
+            a, b = entries[n]
+            if (r.unit, r.code0) not in self.points:
                 out.append(Verdict(r, "unplaced"))
                 continue
+            if a not in self.index and b not in self.index:
+                out.append(Verdict(r, "unexplained", None, [(None, f"end pos:{r.unit}")]))
+                continue
+            ak = f"args:{r.unit}"
+            sigs = None if ak in open_keys else state.get(ak)
+            groups = []
+            for e in (a, b):
+                if e not in self.index:
+                    continue
+                if sigs is None:
+                    groups.append(self.index[e])
+                    continue
+                sub, rest = self.by_args[e]
+                seen = set()
+                pick = list(rest)
+                for sig in (sigs if isinstance(sigs, frozenset) else (sigs,)):
+                    for rec in sub.get(sig, empty):
+                        if rec[0] not in seen:
+                            seen.add(rec[0])
+                            pick.append(rec)
+                groups.append(pick)
             ok, why = [], []
-            end = r.code1 if r.code1 >= 0 else self.nowhere
-            for rec in cands:
-                idx, unit, w, pre, eff, checks = rec
-                bad = next((k for k, vs in pre.items() if state.get(k) not in vs), None)
-                if bad is not None:
-                    why.append((idx, f"pre {bad}"))
-                    continue
-                pos = eff.get(f"pos:{unit}")
-                if pos is not None and not self._value_ok(pos, end):
-                    why.append((idx, f"end pos:{unit}"))
-                    continue
-                miss = next((k for k, e in eff.items() if not k.startswith("pos:") and later_writes[k] == 0
-                             and not self._value_ok(e, after.get(k))), None)
-                if miss is not None:
-                    why.append((idx, f"effect {miss}"))
-                    continue
-                if self.decide_check is not None:
-                    failed = next((c for c in checks if self.decide_check(c, r) is False), None)
-                    if failed is not None:
-                        why.append((idx, f"check {failed[0]}"))
+            if not any(groups):
+                why.append((None, f"pre {ak}"))
+            for group in groups:
+                for idx, pre, others, checks, pos in group:
+                    bad = next((k for k, vs in pre if not _holds(state.get(k), vs) and k not in open_keys), None)
+                    if bad is not None:
+                        why.append((idx, f"pre {bad}"))
                         continue
-                ok.append(rec)
+                    if pos is not None and pos[0] == "guess":
+                        e = r.code1 if r.code1 >= 0 else self.nowhere
+                        if e not in pos[1]:
+                            why.append((idx, f"end pos:{r.unit}"))
+                            continue
+                    miss = next((k for k, e in others if k in after and not self._value_ok(e, after[k]) and
+                                 not later_writes(n, k)), None)
+                    if miss is not None:
+                        why.append((idx, f"effect {miss}"))
+                        continue
+                    if self.decide_check is not None and checks:
+                        failed = next((c for c in checks if self.decide_check(c, r) is False), None)
+                        if failed is not None:
+                            why.append((idx, f"check {failed[0]}"))
+                            continue
+                    ok.append((idx, others))
             if len(ok) == 1:
+                if open_keys:
+                    self.open_used += 1
                 out.append(Verdict(r, "explained", ok[0][0], why))
-                for k, e in ok[0][4].items():
-                    if e[0] == "set":
-                        state[k] = e[1]
             else:
                 out.append(Verdict(r, "ambiguous" if ok else "unexplained", [o[0] for o in ok] or None, why))
+            if ok:
+                # every matching record's set writes that agree go on to the next run's state
+                sets = [dict((k, e[1]) for k, e in o[1] if e[0] == "set") for o in ok]
+                common = {k: v for k, v in sets[0].items() if all(s.get(k) == v for s in sets[1:])}
+                if common:
+                    if not copied:
+                        state, copied = dict(state), True
+                    state.update(common)
         self.seconds += time.perf_counter() - t
         return out

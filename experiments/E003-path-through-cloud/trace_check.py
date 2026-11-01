@@ -16,6 +16,7 @@ It also counts the runs and log entries the third engine gave, the buffers' over
 """
 
 import argparse
+import collections
 import dataclasses
 import hashlib
 import json
@@ -740,6 +741,616 @@ def cmd_runb_explain(a) -> dict:
     return doc
 
 
+# --- the window search's runs, strictly matched (section 3) ----------------------------------------------------------
+
+class Reading:
+    """A reading's records as the strict matcher reads them: event records by (unit, wait point), every action by
+    its name, the domains and the view."""
+
+    def __init__(self, path: Path):
+        import packed_reading as PR
+        import replay as RP
+        self.RP = RP
+        self.rd = PR.load_reading(path)
+        self.task = self.rd.task
+        self.doms = self.task.facts
+        self.by_name, self.events = {}, collections.defaultdict(list)
+        # the dump holds every slot's locals (dump_locals), so args: is observed; the saved verbs are not
+        self.unobserved = ("saved:",)
+        lines = self.rd.lines
+        with open(lines, "rb") as fh:
+            for ln in fh:
+                d = json.loads(ln)
+                i, src = d["i"], d["source"]
+                if src[0] == "event" and not src[4]:
+                    self.events[(src[1], src[2])].append(i)
+        for i in range(len(self.task.actions)):
+            self.by_name[self.task.actions[i].name] = i
+        self._recs = {}
+
+    def rec(self, i: int) -> tuple:
+        """(index, unit, wait point, precondition, effects, checks) of action i, for StrictMatcher."""
+        if i not in self._recs:
+            a = self.task.actions[i]
+            w = a.what
+            src = w.source
+            unit, wp = (src[1], src[2]) if src[0] == "event" else (None, None)
+            eff = {}
+            for k, e in w.effects.items():
+                if k.startswith(self.unobserved):
+                    continue
+                # the packed reading's effects hold the task's values already (labels such as "above")
+                if e[0] == "set":
+                    eff[k] = ("set", e[1])
+                elif e[0] == "guess":
+                    eff[k] = ("guess", frozenset(e[1]))
+                else:
+                    eff[k] = (e[0],)
+            pre = {k: vs for k, vs in a.pre.items() if not k.startswith(self.unobserved)}
+            self._recs[i] = (i, unit, wp, pre, eff, list(w.checks))
+        return self._recs[i]
+
+    def view(self, facts: dict, dump: dict) -> dict:
+        """The reading's view of the engine at a decision point, with each live slot's ``args:`` (the built list
+        its dumped locals match, replay.replan_start_locals; 0 when none does)."""
+        out = self.RP.view(self.rd.b, self.doms, facts)
+        ds = self.RP.dumped_slots(dump)
+        if ds is not None and self.rd.lists is not None:
+            start, _, _ = self.RP.replan_start_locals(self.rd.b, facts, {}, self.task, ds["slots"], self.rd.lists)
+            for k, v in start.items():
+                if k.startswith("args:"):
+                    name, pos = k[5:], start.get(f"pos:{k[5:]}")
+                    slot = ds["slots"].get(name)
+                    if slot is None or pos is None or pos < 0:
+                        out[k] = frozenset({v})
+                        continue
+                    live = self.RP.live_match(self.rd.b, slot)
+                    sigs = frozenset(l["sig"] for l in self.rd.lists.get((name, pos), [])
+                                     if self.RP.list_matches(l, slot, live))
+                    out[k] = sigs or frozenset({0})
+        return out
+
+
+def record_fails(rec: tuple, run: TE.Run, views: dict, k: int) -> dict:
+    """Every condition of one record that the engine's run between D_{k-1} and D_k fails: the precondition's keys
+    with the engine's values, its slot's end, its other effects."""
+    before, after = views[k - 1], views.get(k, {})
+    pre = [(kk, str(before.get(kk) if not isinstance(before.get(kk), frozenset) else sorted(before.get(kk))[:3]))
+           for kk, vs in rec[3].items() if not TE._holds(before.get(kk), vs)]
+    pos = rec[4].get(f"pos:{rec[1]}")
+    end = run.code1 if run.code1 >= 0 else TE.NOWHERE
+    end_bad = pos is not None and not TE.StrictMatcher._value_ok(pos, end)
+    eff = [(kk, str(after.get(kk))) for kk, e in rec[4].items()
+           if not kk.startswith("pos:") and e[0] in ("set", "guess") and kk in after and
+           not TE.StrictMatcher._value_ok(e, after[kk])]
+    return {"pre_fails": pre[:6], "end": [end, pos[1] if pos else None] if end_bad else None, "effect_fails": eff[:6]}
+
+
+def run_engine_cfg(doc: dict, out: Path, events: list):
+    """The engine configuration the run's verify used: the harness boot's (replay_part1.config) or, for a start from
+    run B's inputs, run B's settings (replay_kitchen.cfg_of) with run B's inputs up to the start before the run's."""
+    import replay
+    import replay_kitchen
+    import replay_part1
+    starter = doc.get("starter") or doc["start"].get("starter")
+    out.mkdir(parents=True, exist_ok=True)
+    if starter:
+        prefix = [e for e in replay_kitchen.prefix_events() if e["frame"] <= starter["frame"]]
+        cfg = replay_kitchen.cfg_of(out, replay.write_events(out / "movie.jsonl", prefix + events), seed=doc["seed"])
+    else:
+        cfg = replay_part1.config(doc["seed"], out, replay.write_events(out / "movie.jsonl", events))
+    return dataclasses.replace(cfg, dump_locals=True)
+
+
+class WindowEngine:
+    """The run's chosen inputs from boot in a fresh engine, stopped at the run's start; children of it trace the run
+    (every slot run and the state dump at every decision point) and explain one frame."""
+
+    def __init__(self, doc: dict, binary: Path, out: Path):
+        paths.SCUMMVM_BIN = binary
+        r = doc["run"]
+        self.f0, self.f1 = r["frame0"], r["frame_end"]
+        self.c = Controller(run_engine_cfg(doc, out, r["inputs"]), timeout_s=600)
+        self.c.start()
+        self.root = self.c.root
+        self.root.run(frame=self.f0)
+        assert self.root.status["frame"] == self.f0, self.root.status
+        self.stats = {"forks": 0, "explain_entries": 0}
+
+    def trace(self) -> tuple:
+        t0 = time.monotonic()
+        runs, dumps = TE.Runs(), {}
+        b = self.c.fork(self.root)
+        self.stats["forks"] += 1
+        dumps[self.f0] = b.state()
+        b.segment(True)
+        for f in range(self.f0 + 1, self.f1 + 1):
+            st = b.run(frame=f)
+            if "end" in st:
+                break
+            runs.add(b.runs()["runs"])
+            dumps[f] = b.state()
+        b.quit()
+        return runs, dumps, round(time.monotonic() - t0, 1)
+
+    def explain(self, k: int, units) -> TE.Explained:
+        ch = self.c.fork(self.root)
+        self.stats["forks"] += 1
+        ch.segment(True)
+        if k - 1 > ch.status["frame"]:
+            ch.run(frame=k - 1)
+        ch.explain(k, k, units)
+        ch.run(frame=k)
+        lg = ch.explain_log()
+        ch.quit()
+        self.stats["explain_entries"] += len(lg["explain"])
+        return TE.Explained(lg["explain"])
+
+    def close(self) -> None:
+        self.c.close()
+
+
+def unplaced_check(code: TE.Code, eng: "WindowEngine", k: int, run: TE.Run, rd) -> dict:
+    """A run at a wait point the reading has no event record at: whether it changed a fact of the task (a logged write
+    of a task variable or bit, an op that writes an object's state, owner or class, a verb, or starts or stops a
+    script), or left its slot elsewhere. If not, the task cannot see it: no record is needed."""
+    key = code.key(run.where, run.number, run.room)
+    if key is None:
+        return {"verdict": "unit not in the IR"}
+    ex = eng.explain(k, [[run.where, run.number]])
+    lg = next((r for r in ex.runs.values() if r.frame == run.frame and r.code0 == run.code0 and
+               r.where == run.where and r.number == run.number), None)
+    if lg is None:
+        return {"verdict": "the run is not in the explain log"}
+    u = code.unit(key)
+    for op in lg.ops:
+        i = u.at.get(op.code)
+        for var, val in op.writes:
+            fk = f"bit:{var & 0x7FFF}" if var & TE.BIT_BIT else (None if var & TE.LOCAL_BIT else f"var:{var}")
+            if fk is not None and fk in rd.doms:
+                return {"verdict": "writes a task fact", "offset": op.code, "opcode": ir.head(u.ins[i].st) if i is not
+                        None else None, "fact": fk, "value": val, "class": "semantics", "cause": True}
+        st = u.ins[i].st if i is not None else None
+        if isinstance(st, ir.Start) or (isinstance(st, ir.Op) and st.name in (
+                "setState", "setOwnerOf", "setClass", "pickupObject", "drawObject", "VerbOps", "stopScript",
+                "freezeScripts", "loadRoom", "loadRoomWithEgo")):
+            return {"verdict": "runs an op that writes a task fact", "offset": op.code, "opcode": ir.head(st),
+                    "class": "semantics", "cause": True}
+    if run.code1 != run.code0:
+        return {"verdict": "left its slot at another wait point", "end": run.code1, "class": "semantics",
+                "cause": True}
+    return {"verdict": "invisible to the task: no task fact written, the slot back at its wait point",
+            "ops": len(lg.ops)}
+
+
+def slot_write_sites(code: TE.Code, key, fact: str) -> frozenset:
+    """The instructions of ``key`` that can write ``fact``: write_sites, and for a slot's facts the ops that start,
+    stop, freeze or unfreeze scripts."""
+    out = set(code.write_sites(key, fact)) if fact.split(":")[0] in ("var", "bit", "state", "owner", "class", "verb",
+                                                                       "room", "cutscene") else set()
+    kind = fact.split(":")[0]
+    own = M.unit_name(key) == fact.split(":", 1)[1]
+    if kind in ("local", "script", "objscript") and own:
+        out |= code.end_sites(key)
+    for i, x in enumerate(code.unit(key).ins):
+        st = x.st
+        # a freeze count changes on freezeScripts and unfreezeScripts, and a start sets it to 0 (script.cpp:100, 147)
+        if kind == "frozen" and (isinstance(st, ir.Start) or (isinstance(st, ir.Op) and
+                                                              ("reeze" in st.name or "utscene" in st.name))):
+            out.add(i)
+        elif kind in ("local", "script", "objscript") and (isinstance(st, ir.Start) or
+                                                           (isinstance(st, ir.Op) and st.name.startswith("stop"))):
+            out.add(i)
+    return frozenset(out)
+
+
+def C_counter(xs):
+    import collections as C
+    return C.Counter(x for x in xs if x is not None)
+
+
+def args_cause(code: TE.Code, key, steps: list, run: TE.Run, fk: str, rd, before: dict, dump: dict, k: int) -> dict:
+    """An ``args:`` precondition that fails: the slot's dumped locals against the lists the records ask for (the
+    reading's lists at that wait point with those numbers); the first local that differs, the opcode of the run that
+    reads it, and the engine's value."""
+    name = fk[5:]
+    sigs = {v for i in rd.events.get((run.unit, run.code0), []) for v in rd.rec(i)[3].get(fk, ())}
+    lists = [l for l in (rd.rd.lists or {}).get((name, run.code0), []) if l["sig"] in sigs]
+    slot = next((sl for sl in dump["slots"] if F.unit_of(sl["where"], sl["number"]) == name), None)
+    got = before.get(fk)
+    if slot is None or "locals" not in slot:
+        return {"cause": None, "kind": "the slot's locals are not in the dump", "unit": run.unit, "frame": k}
+    diffs = collections.Counter()
+    for l in lists:
+        for n, x in enumerate(slot["locals"]):
+            v = l["locals"].get(n, 0)
+            if isinstance(v, dict):
+                if v.get("values") is not None and x not in v["values"]:
+                    diffs[n] += 1
+            elif v != x:
+                diffs[n] += 1
+        if l["override"] != slot["cutscene_override"]:
+            diffs["override"] += 1
+    same_unit = [sl for sl in dump["slots"] if F.unit_of(sl["where"], sl["number"]) == name]
+    if len(same_unit) > 1:
+        vals = [TE.Value(f"live slots of {name}", len(same_unit), "the dump: a recursive start's second instance; "
+                         "the reading keeps one slot per unit", "fact")]
+        return {"cause": True, "kind": "two instances of the unit", "unit": run.unit, "frame": k, "offset": run.code0,
+                "opcode": None, "values": [v.as_dict() for v in vals], "class": "semantics"}
+    want = {"recursive": True if slot.get("recursive") else None, "resistant": bool(slot.get("resistant")),
+            "owned": slot["where"] == F.WIO_INVENTORY}
+    if not diffs and lists and "resistant" in slot and \
+            all(json.dumps(l.get("flags"), sort_keys=True) != json.dumps(want, sort_keys=True) for l in lists):
+        lf = collections.Counter(json.dumps(l.get("flags"), sort_keys=True) for l in lists)
+        vals = [TE.Value("slot flags", json.dumps(want, sort_keys=True),
+                         f"the dump's (freezeResistant, recursive, owned); the records' lists hold "
+                         f"{[x for x, _ in lf.most_common(3)]}", "fact")]
+        return {"cause": True, "kind": "the slot's flags are not the lists'", "unit": run.unit, "frame": k,
+                "offset": run.code0, "opcode": None, "values": [v.as_dict() for v in vals], "class": "semantics"}
+    if not diffs:
+        why = "no list at that wait point has the records' numbers" if not lists else "the flags differ"
+        return {"cause": None, "kind": f"args: {why}", "unit": run.unit, "frame": k, "engine_args": got}
+    loc = diffs.most_common(1)[0][0]
+    if loc == "override":
+        vals = [TE.Value("cutscene override count", slot["cutscene_override"], "the dump", "fact")]
+        return {"cause": True, "kind": "the slot's locals match no list the records ask for", "unit": run.unit,
+                "frame": k, "offset": run.code0, "opcode": None, "values": [v.as_dict() for v in vals],
+                "class": "semantics"}
+    vid = TE.LOCAL_BIT | loc
+    n = next((m for m, st in enumerate(steps) if any(v == vid for v, _ in st.op.reads)), None)
+    wanted = sorted({str(l["locals"].get(loc, 0)) if not isinstance(l["locals"].get(loc, 0), dict) else "unknown"
+                     for l in lists})
+    vals = [TE.Value(f"local {loc}", slot["locals"][loc], f"the dumped slot's local; the records' lists hold "
+                     f"{wanted[:6]}", "unknown")]
+    x = code.unit(key).ins[steps[n].i] if n is not None and steps[n].i is not None else None
+    return {"cause": True, "kind": "the slot's locals match no list the records ask for", "unit": run.unit,
+            "frame": k, "offset": steps[n].op.code if n is not None else run.code0,
+            "opcode": ir.head(x.st) if x else None, "values": [v.as_dict() for v in vals], "class": "split",
+            "note": None if n is not None else "no opcode of the run reads that local"}
+
+
+def explain_unexplained(code: TE.Code, eng: WindowEngine, k: int, run: TE.Run, why: str, rd, views: dict,
+                        dumps: dict) -> dict:
+    """Section 5 for one run the strict matcher left unexplained: in a child at D_{k-1}, the run's own opcodes, then
+    the opcode behind the condition that failed and the engine's values there."""
+    key = code.key(run.where, run.number, run.room)
+    if key is None:
+        return {"cause": None, "kind": "unit not in the IR"}
+    ex = eng.explain(k, [[run.where, run.number]])
+    lg = next((r for r in ex.runs.values() if r.frame == run.frame and r.after == run.after and
+               r.code0 == run.code0 and r.where == run.where and r.number == run.number), None)
+    if lg is None:
+        return {"cause": None, "kind": "the run is not in the explain log"}
+    steps = TE.steps_of(code, key, [lg])
+    dump = dumps.get(k - 1)
+    kind, _, fk = why.partition(" ")
+    before = views[k - 1]
+    if kind == "pre" and fk.startswith(("args:", "pos:")):
+        same_unit = [sl for sl in dump["slots"] if F.unit_of(sl["where"], sl["number"]) == fk.split(":", 1)[1]]
+        if len(same_unit) > 1:
+            vals = [TE.Value(f"live slots of {run.unit}", len(same_unit), "the dump: a recursive start's second "
+                             "instance; the reading keeps one slot per unit", "fact")]
+            return {"cause": True, "kind": "two instances of the unit", "unit": run.unit, "frame": k,
+                    "offset": run.code0, "opcode": None, "values": [v.as_dict() for v in vals], "class": "semantics"}
+    if kind == "pre" and fk.startswith("args:"):
+        return args_cause(code, key, steps, run, fk, rd, before, dump, k)
+    if kind == "pre":
+        got = before.get(fk)
+        want = sorted({str(v) for i in rd.events.get((run.unit, run.code0), []) for v in rd.rec(i)[3].get(fk, ())})
+        vid = None
+        if fk.startswith("var:"):
+            vid = int(fk[4:])
+        elif fk.startswith("bit:"):
+            vid = TE.BIT_BIT | int(fk[4:])
+        n = next((m for m, st in enumerate(steps) if vid is not None and any(v == vid for v, _ in st.op.reads)), None)
+        vals = [TE.Value(fk, got, f"the view at the decision point before; the records ask {want[:6]}",
+                         "unknown" if fk.startswith("args:") else "fact")]
+        if n is not None:
+            x = code.unit(key).ins[steps[n].i]
+            return {"cause": True, "kind": "the records' precondition fails", "unit": run.unit, "frame": k,
+                    "offset": steps[n].op.code, "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals],
+                    "class": TE.cause_class(vals)}
+        x = code.unit(key).ins[steps[0].i] if steps and steps[0].i is not None else None
+        return {"cause": True, "kind": "the records' precondition fails", "unit": run.unit, "frame": k,
+                "offset": run.code0, "opcode": ir.head(x.st) if x else None, "values": [v.as_dict() for v in vals],
+                "class": TE.cause_class(vals), "note": "no opcode of the run reads it"}
+    if kind == "end":
+        ends = set()
+        for i in rd.events.get((run.unit, run.code0), []):
+            rec = rd.rec(i)
+            if all(TE._holds(before.get(kk), vs) for kk, vs in rec[3].items()):
+                pos = rec[4].get(f"pos:{run.unit}")
+                ends.add(pos[1] if pos and pos[0] == "set" else run.code0)
+        targets = set()
+        for e in ends:
+            targets |= code.end_sites(key) if e == TE.NOWHERE else code.yield_sites(key, e)
+        targets = frozenset(targets)
+        n = TE.first_off(code, key, steps, targets, cross_yields=False)
+        base = {"unit": run.unit, "frame": k, "engine_end": run.code1, "record_ends": sorted(ends)}
+        if n is not None:
+            x = code.unit(key).ins[steps[n].i]
+            if x.yields == "wait":  # the records' paths block at this WaitFor op; the engine's passed it
+                vals = TE.wait_values(x, 0, dump)
+                return base | {"cause": True, "kind": "the wait did not block", "offset": steps[n].op.code,
+                               "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals], "class": "split"}
+            vals = TE.slice_test(code, key, steps, n, dump)
+            return base | {"cause": True, "kind": "left the records' path", "offset": steps[n].op.code,
+                           "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals],
+                           "class": TE.cause_class(vals)}
+        last = steps[-1] if steps else None
+        if last is not None and last.i is not None and code.unit(key).ins[last.i].yields == "wait" and \
+                run.code1 == last.op.code and code.reachable(key, code.unit(key).ins[last.i].next, targets, False):
+            # the run blocked at a WaitFor op the records' paths pass (their check took "does not block")
+            x = code.unit(key).ins[last.i]
+            vals = TE.wait_values(x, 0, dumps.get(k))
+            return base | {"cause": True, "kind": "the wait blocked", "offset": last.op.code,
+                           "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals], "class": "split"}
+        if not ends:
+            bad = C_counter(next((kk for kk, vs in rd.rec(i)[3].items() if not TE._holds(before.get(kk), vs)), None)
+                            for i in rd.events.get((run.unit, run.code0), []))
+            fk2 = bad.most_common(1)[0][0] if bad else None
+            return base | {"cause": None, "kind": "no record's precondition holds", "most_failing": fk2,
+                           "engine": before.get(fk2) if fk2 else None}
+        return base | {"cause": None, "kind": "no branch off the records' path found",
+                       "steps": len(steps)}
+    if kind == "effect":
+        after = views.get(k, {})
+        got = after.get(fk)
+        vid = int(fk[4:]) if fk.startswith("var:") else None
+        n = next((m for m, st in enumerate(steps) if vid is not None and any(v == vid for v, _ in st.op.writes)), None)
+        if n is not None:
+            vals = TE.slice_test(code, key, steps, n, dump)
+            x = code.unit(key).ins[steps[n].i]
+            return {"cause": True, "kind": "wrote another value", "unit": run.unit, "frame": k,
+                    "offset": steps[n].op.code, "opcode": ir.head(x.st), "written": got,
+                    "values": [v.as_dict() for v in vals], "class": TE.cause_class(vals)}
+        # the write the records predict did not run: Lemma X toward its sites in this run
+        targets = slot_write_sites(code, key, fk)
+        n = TE.first_off(code, key, steps, targets, cross_yields=False) if targets else None
+        if n is not None:
+            x = code.unit(key).ins[steps[n].i]
+            vals = TE.wait_values(x, 0, dump) if x.yields == "wait" else TE.slice_test(code, key, steps, n, dump)
+            return {"cause": True, "kind": "left the path to the predicted write", "unit": run.unit, "frame": k,
+                    "offset": steps[n].op.code, "opcode": ir.head(x.st), "values": [v.as_dict() for v in vals],
+                    "class": "split" if x.yields == "wait" else TE.cause_class(vals), "fact": fk}
+        return {"cause": None, "kind": "the predicted write is not in the run", "unit": run.unit, "frame": k,
+                "engine": got, "sites": len(targets)}
+    return {"cause": None, "kind": f"no rule for {why}"}
+
+
+def cmd_window_validate(a) -> dict:
+    """Section 3 on one window search run: the strict matcher over every slot run from the run's start to its end,
+    against the reading's event records; the plan's steps, each with the run that strictly matches it or why none
+    does; the wait check (section 6)."""
+    import collections as C
+    doc = json.loads(Path(a.run).read_text())
+    t0 = time.monotonic()
+    rd = Reading(Path(a.reading or doc["reading"]))
+    import replay as RP0
+    if doc.get("unobserved_actor_rooms"):
+        rd.unobserved = rd.unobserved + (RP0.ACTOR_ROOM,)
+    load_s = time.monotonic() - t0
+    eng = WindowEngine(doc, Path(a.bin), a.out / "engine")
+    runs, dumps, trace_s = eng.trace()
+    f0, f1 = eng.f0, eng.f1
+    import replay as RP
+    unobserved = RP.UNOBSERVED + ((RP.ACTOR_ROOM,) if doc.get("unobserved_actor_rooms") else ())
+    views = {f: rd.view(F.facts_of(d), d) for f, d in dumps.items()}
+    if unobserved != RP.UNOBSERVED:
+        for v in views.values():
+            for k in [k for k in v if k.startswith(RP.ACTOR_ROOM)]:
+                del v[k]
+
+    memo = {}
+
+    def decide(check, run):
+        f = run.frame - 1 if not run.after else run.frame
+        key = (check[0], check[1], check[2], f)
+        if key in memo:
+            return memo[key]
+        d = dumps.get(f)
+        if d is None:
+            return None
+        memo[key] = got = RP.eval_check(check, type("R", (), {"kind": "event", "source": ("event",)})(), d)
+        return got
+
+    cands = {}
+    for key, idxs in rd.events.items():
+        for i in idxs:
+            cands.setdefault(key, []).append(rd.rec(i))
+    matcher = TE.StrictMatcher([r for rs in cands.values() for r in rs], TE.NOWHERE, decide)
+    code = TE.Code(M.Game.load())
+    verdicts = []
+    last_at = {}  # (where, number) -> frame where its slot last stopped at code1
+    waits = C.Counter()
+    below = []
+    for k in range(f0 + 1, f1 + 1):
+        between = [r for r in runs.between(k) if r.depth == 0 and r.code0 >= 0]
+        if k - 1 not in views or k not in views:
+            continue
+        # work after the earlier decision point (the sentence script, a room change it makes) is no matched run
+        # here: the facts it moved are open at the runs' start (trace-validation.md section 3, the open keys)
+        after_dp = [r for r in runs.between(k) if r.frame == k - 1 and r.after]
+        open_keys = frozenset()
+        if after_dp:
+            v0, v1 = views[k - 1], views[k]
+            moved = {kk for kk in v0.keys() | v1.keys() if v0.get(kk) != v1.get(kk)}
+            units = {r.unit for r in after_dp} | {r.unit for r in runs.between(k)}
+            open_keys = frozenset(moved | {f"{p}:{u}" for u in units for p in ("pos", "args", "local", "script",
+                                                                               "frozen", "objscript")})
+        vs = matcher.match(between, views[k - 1], views[k], open_keys)
+        for v in vs:
+            r = v.run
+            if v.status == "unexplained" and r.code1 == r.code0 and r.ops == 1:
+                key = code.key(r.where, r.number, r.room)
+                i = code.index(key, r.code0) if key is not None else None
+                if i is not None and code.unit(key).ins[i].yields == "wait":
+                    v.status = "stutter"  # a blocked WaitFor op that ran again: o5_wait only reads, no step
+            verdicts.append((k, v))
+            r = v.run
+            if v.status == "explained":
+                # Lemma W: the frames from the run that left the slot at this wait point to this run (the runs'
+                # own frames: a run after a decision point belongs to its frame)
+                cost = rd.task.actions[v.record].cost
+                j = last_at.get((r.where, r.number, r.room))
+                if j is not None and j[1] == r.code0:
+                    waits["checked"] += 1
+                    if r.frame - j[0] < cost:
+                        below.append({"frame": r.frame, "unit": r.unit, "w": r.code0, "waited": r.frame - j[0],
+                                      "bound": cost, "record": rd.task.actions[v.record].name})
+        for r in runs.between(k):
+            if r.code1 >= 0:
+                last_at[(r.where, r.number, r.room)] = (r.frame, r.code1)
+    counts = C.Counter(v.status for _, v in verdicts)
+    unplaced = C.Counter((v.run.unit, v.run.code0) for _, v in verdicts if v.status == "unplaced")
+    # what failed, per (unit, wait point), for the unexplained ones; each group's first run explained (section 5)
+    fails = C.Counter()
+    first_of = {}
+    for k, v in verdicts:
+        if v.status == "unexplained":
+            first = C.Counter(w for _, w in v.why)
+            g = (v.run.unit, v.run.code0, first.most_common(1)[0][0] if first else "none")
+            fails[g] += 1
+            first_of.setdefault(g, (k, v.run))
+    causes, invisible = [], []
+    first_unplaced = {}
+    for k, v in verdicts:
+        if v.status == "unplaced":
+            first_unplaced.setdefault((v.run.unit, v.run.code0), (k, v.run))
+    try:
+        for g, n in fails.most_common():
+            k, run = first_of[g]
+            c = explain_unexplained(code, eng, k, run, g[2], rd, views, dumps)
+            causes.append({"unit": g[0], "w": g[1], "why": g[2], "runs": n, "first_frame": k} | c)
+        for (u, w), (k, run) in first_unplaced.items():
+            invisible.append({"unit": u, "w": w, "runs": unplaced[(u, w)], "first_frame": k} |
+                             unplaced_check(code, eng, k, run, rd))
+    finally:
+        eng.close()
+    # the matcher's cost when a window search's child asks it only about the units of the plan's steps
+    plan_units = {rd.rec(rd.by_name[st["name"]])[1] for st in doc["run"]["steps"] if st["name"] in rd.by_name} - {None}
+    m2 = TE.StrictMatcher([r for rs in cands.values() for r in rs if r[1] in plan_units], TE.NOWHERE, decide)
+    for k in range(f0 + 1, f1 + 1):
+        if k - 1 in views and k in views:
+            m2.match([r for r in runs.between(k) if r.depth == 0 and r.code0 >= 0 and r.unit in plan_units],
+                     views[k - 1], views[k])
+    # the plan's executed event steps: the run that strictly matches each one's record, or why none does
+    steps_out = []
+    for st in doc["run"]["steps"]:
+        name = st["name"]
+        i = rd.by_name.get(name)
+        if i is None:
+            steps_out.append({"step": name, "plan": st["plan"], "outcome": st["outcome"], "strict": "not in the reading"})
+            continue
+        rec = rd.rec(i)
+        lo, hi = (st.get("start") or f0), (st.get("end") or f1)
+        if rec[1] is not None:
+            mine = [(k, v) for k, v in verdicts if v.run.unit == rec[1] and v.run.code0 == rec[2] and lo <= k <= hi + 1]
+            if mine and all(v.status == "stutter" for _, v in mine):
+                # a blocked WaitFor op re-ran there: the record's own run is the first one after it that is not
+                mine = [next(((k, v) for k, v in verdicts if v.run.unit == rec[1] and v.run.code0 == rec[2]
+                              and k > hi + 1 and v.status != "stutter"), mine[0])]
+            hit = next(((k, v) for k, v in mine if v.status == "explained" and v.record == i), None)
+            if hit is None:
+                hit = next(((k, v) for k, v in mine if v.status == "ambiguous" and i in (v.record or ())), None)
+            if hit:
+                res = {"strict": "matched", "frame": hit[0], "verdict": hit[1].status}
+            elif mine:
+                k, v = mine[0]
+                res = {"strict": "not matched", "frame": k, "verdict": v.status} | record_fails(rec, v.run, views, k)
+            else:
+                later = next((k for k, v in verdicts if v.run.unit == rec[1] and v.run.code0 == rec[2] and k > hi + 1),
+                             None)
+                res = {"strict": "its run did not happen", "frames": [lo, hi + 1], "next_run": later}
+        else:
+            # an input: its record's precondition before its click frame, its effects after it
+            iss = st.get("issue")
+            first_in = min((e["frame"] for e in st.get("inputs") or []), default=iss)
+            if iss is None or iss not in views or first_in - 1 not in views:
+                res = {"strict": "not issued"}
+            else:
+                pre_all = [(kk, str(views[first_in - 1].get(kk))) for kk, vv in rec[3].items()
+                           if not TE._holds(views[first_in - 1].get(kk), vv)]
+                pre_bad = pre_all[0][0] if pre_all else None
+                post = views.get(min(iss + 1, f1), views[iss])
+                eff_bad = next((kk for kk, e in rec[4].items() if e[0] in ("set", "guess") and kk in post and not
+                                TE.StrictMatcher._value_ok(e, post[kk]) and not kk.startswith("pos:")), None)
+                pos_bad = []
+                for kk, e in rec[4].items():
+                    if kk.startswith("pos:") and e[0] == "set":
+                        unit = kk[4:]
+                        rr = [r for f in (iss, iss + 1) for r in runs.between(f) if r.unit == unit]
+                        end = rr[-1].code1 if rr else None
+                        if end is None:
+                            pos_bad.append((kk, "no run"))
+                        elif end != e[1] and not (end < 0 and e[1] == TE.NOWHERE):
+                            pos_bad.append((kk, end))
+                ok = pre_bad is None and eff_bad is None and not pos_bad
+                res = {"strict": "matched" if ok else "not matched", "frame": iss, "pre_fails": pre_all[:6],
+                       "effect": eff_bad, "pos": pos_bad[:3]}
+        steps_out.append({"step": name, "plan": st["plan"], "outcome": st["outcome"]} | res)
+    per_call = matcher.seconds / max(1, matcher.calls)
+    executed = [x for x in steps_out if x["outcome"] in ("matched", "goal")]
+    strict_summary = {"loose_matched": len(executed),
+                      "strict_matched": sum(1 for x in executed if x["strict"] == "matched"),
+                      "inputs_loose": sum(1 for x in executed if not x["step"].startswith("event(")),
+                      "inputs_strict": sum(1 for x in executed if not x["step"].startswith("event(")
+                                           and x["strict"] == "matched"),
+                      "events_without_their_run": sum(1 for x in executed if x["strict"] == "its run did not happen")}
+    out = {"run": Path(a.run).name, "reading": Path(a.reading or doc["reading"]).parent.name, "frames": [f0, f1],
+           "runs_total": len(runs.runs), "runs_matched_scope": len(verdicts), "verdicts": dict(counts),
+           "unexplained_by_point": [[u, w, why, n] for (u, w, why), n in fails.most_common(25)],
+           "causes": causes,
+           "unplaced_by_point": [[u, w, n] for (u, w), n in unplaced.most_common(25)],
+           "unplaced_checked": invisible,
+           "matcher_plan_units": {"units": sorted(plan_units), "calls": m2.calls,
+                                  "per_call_us": round(m2.seconds / max(1, m2.calls) * 1e6, 1)},
+           "open_key_matches": matcher.open_used,
+           "steps": steps_out, "steps_summary": strict_summary, "wait_check": {"checked": waits["checked"], "below_bound": below[:20],
+                                               "below_count": len(below)},
+           "matcher": {"calls": matcher.calls, "seconds": round(matcher.seconds, 3),
+                       "per_call_us": round(per_call * 1e6, 1),
+                       "per_run_us": round(matcher.seconds / max(1, len(verdicts)) * 1e6, 1)},
+           "engine_seconds": trace_s, "engine": eng.stats, "reading_load_s": round(load_s, 1)}
+    return out
+
+
+def window_log(d: dict) -> list:
+    lines = [f"B1 strict matcher on {d['run']} (reading {d['reading']}), frames {d['frames'][0]}-{d['frames'][1]}: "
+             f"{d['runs_total']} slot runs, {d['runs_matched_scope']} resumed at a wait point at depth 0",
+             f"verdicts: {d['verdicts']}",
+             f"matcher: {d['matcher']['calls']} calls, {d['matcher']['per_call_us']} us per call, "
+             f"{d['matcher']['per_run_us']} us per run",
+             f"wait check: {d['wait_check']['checked']} explained runs with a known arrival, "
+             f"{d['wait_check']['below_count']} waited less than their record's frame cost"]
+    for b in d["wait_check"]["below_bound"]:
+        lines.append(f"  below: frame {b['frame']} {b['unit']}@{b['w']} waited {b['waited']}, bound {b['bound']}")
+    lines.append("unexplained runs by unit and wait point (the condition that failed most often), each group's first "
+                 "run explained: the opcode, the engine's values, the class:")
+    for c in d["causes"]:
+        vals = "; ".join(f"{v['what']} = {v['value']} ({v['kind']})" for v in c.get("values", []))
+        where = f"[{c['offset']:04X}] {c.get('opcode')}" if isinstance(c.get("offset"), int) else "-"
+        lines.append(f"  {c['runs']}: {c['unit']}@{c['w']}: {c['why']}; first at {c['first_frame']}: {c.get('kind')}; "
+                     f"{where}; {vals}; {c.get('class')}")
+    lines.append("runs at a wait point the reading has no event record at (unit@W: runs, the first one checked):")
+    for c in d["unplaced_checked"]:
+        lines.append(f"  {c['runs']}: {c['unit']}@{c['w']}: {c['verdict']}"
+                     + (f" ([{c['offset']:04X}] {c.get('opcode')} {c.get('fact', '')} {c.get('value', '')})"
+                        if isinstance(c.get("offset"), int) else ""))
+    mp = d["matcher_plan_units"]
+    lines.append(f"matcher on the plan's units only ({len(mp['units'])} units): {mp['calls']} calls, "
+                 f"{mp['per_call_us']} us per call")
+    ss = d["steps_summary"]
+    lines.append(f"the plan's steps the run counted as matched: {ss['loose_matched']}; strictly matched (their own run, "
+                 f"M1-M4): {ss['strict_matched']}; inputs {ss['inputs_strict']} of {ss['inputs_loose']}; events whose "
+                 f"run did not happen there: {ss['events_without_their_run']}")
+    lines.append("the plan's executed steps, strictly:")
+    for s in d["steps"]:
+        extra = {k: v for k, v in s.items() if k not in ("step", "plan", "outcome", "strict")}
+        lines.append(f"  plan {s['plan']} {s['step']} ({s['outcome']}): {s['strict']} {extra}")
+    return lines
+
+
 def cause_key(c: dict) -> tuple:
     return c.get("unit"), c.get("offset"), c.get("opcode"), c.get("class")
 
@@ -779,10 +1390,44 @@ def causes_log(doc: dict, title: str) -> list:
     return lines
 
 
+def cmd_causes_tsv(a) -> list:
+    """The cause list as one table: per run B miss and per group of unexplained window runs, the unit, the code offset,
+    the opcode, the class, the kind and the engine's values; numbers, units and offsets only."""
+    rows = [["source", "item", "count", "unit", "offset", "opcode", "class", "kind", "engine values"]]
+
+    def vals(c):
+        return "; ".join(f"{v['what']}={v['value']}({v['kind']})" for v in c.get("values", []))
+
+    def off(c):
+        return f"{c['offset']:04X}" if isinstance(c.get("offset"), int) else ""
+    rb = json.loads((RESULTS / "b1-runb-seed1.json").read_text())
+    for c in rb["causes"]:
+        rows.append(["run B seed 1", f"{c['move']} {c['fact']}", "1", c.get("unit") or "", off(c), c.get("opcode") or "",
+                     c.get("class") or "", c.get("kind") or "", vals(c)])
+    for r in rb["rejected"]:
+        rows.append(["run B seed 1", f"{r['move']} rejected", "1", "", "", "", "outside V" if r["kind"] == "outside V"
+                     else "", r["input"], ""])
+    for f in sorted(RESULTS.glob("b1-window-*.json")):
+        d = json.loads(f.read_text())
+        tag = f.stem.replace("b1-window-", "window ")
+        for c in d["causes"]:
+            rows.append([tag, f"{c['unit']}@{c['w']} {c['why']}", str(c["runs"]), c.get("unit") or "", off(c),
+                         c.get("opcode") or "", c.get("class") or "", c.get("kind") or "", vals(c)])
+        for c in d.get("unplaced_checked", []):
+            rows.append([tag, f"{c['unit']}@{c['w']} no record", str(c["runs"]), c["unit"], off(c), c.get("opcode") or "",
+                         c.get("class") or "invisible", c["verdict"], ""])
+    (RESULTS / "b1-causes.tsv").write_text("".join("\t".join(map(str, r)) + "\n" for r in rows))
+    return rows
+
+
+def _plain(o):
+    return sorted(o, key=str) if isinstance(o, (set, frozenset)) else str(o)
+
+
 def write(stem: str, doc: dict, lines: list, results: bool) -> None:
     if results:
         RESULTS.mkdir(exist_ok=True)
-        (RESULTS / f"{stem}.json").write_text(json.dumps(doc, indent=1) + "\n")
+        (RESULTS / f"{stem}.json").write_text(json.dumps(doc, indent=1, default=_plain) + "\n")
         (RESULTS / f"{stem}.log").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
@@ -815,8 +1460,23 @@ def main() -> None:
     p.add_argument("--switches", default=FR1)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--results", action="store_true")
+    p = sub.add_parser("window-validate")
+    p.add_argument("--run", type=Path, required=True, help="a window search run's result JSON")
+    p.add_argument("--reading", type=Path, help="its reading.json (default: the one the run names)")
+    p.add_argument("--bin", required=True)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--tag", required=True)
+    p.add_argument("--results", action="store_true")
+    sub.add_parser("causes-tsv")
     a = ap.parse_args()
-    if a.cmd == "runb-explain":
+    if a.cmd == "causes-tsv":
+        rows = cmd_causes_tsv(a)
+        print(f"{len(rows) - 1} rows")
+    elif a.cmd == "window-validate":
+        doc = cmd_window_validate(a)
+        (a.out / f"window-{a.tag}.json").write_text(json.dumps(doc, indent=1, default=_plain) + "\n")
+        write(f"b1-window-{a.tag}", doc, window_log(doc), a.results)
+    elif a.cmd == "runb-explain":
         doc = cmd_runb_explain(a)
         (a.out / "runb-causes.json").write_text(json.dumps(doc, indent=1, default=str) + "\n")
         lines = causes_log(doc, f"B1 on run B's recorded inputs on seed 1: row 5 of the model check with fix round 1's "
