@@ -1,0 +1,21 @@
+E004 branch walk: the strict window search from the harness's boot on the reading with wait_both (bar-walk: the bar's read-rust switches and wait_both), seed 1; run.sh: --serve --search lama-first-costs --cost-caps --reach-extend --unobserved-actor-rooms --approach-stones --window-search --window-strict --window-cache --window-fork-each 7 --window-lite --workers 3, replan limit 30, plan memory 3G; the ScummVM build of svm-w3b; run under the heavy lock with nothing else of this branch running.
+
+file replay-part1-bar-walk-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+stop 'planner memory limit (3G)'; goal reached False; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 1 checkpoints, 0 differences, 0 inputs, goal at the end False, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 2728, qf 65284): 0 frames, 0 qf, 0.00 s
+plans 1, replans 0
+windows 0; children 0; child frames 0; outcomes {}
+
+plan 0's task (taskcore stats.json):
+  input actions 274289, after fold and reductions 155637, effects 9087699; SAS: operators 1690737, effects 99705270, conditional effects 39658070, max variants 90, 1534355851 bytes; taskcore 100.7985 s, RSS after the reductions 1639 MB
+
+the run's progress log:
+bar-walk-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: booting to the first idle stop
+bar-walk-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: memory, 0 steps, 83 s
+bar-walk-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite: stop 'planner memory limit (3G)'; verifying from boot (1 checkpoints)
+wrote /home/ilyask/.cache/fast-mi-walk/results/replay-part1-bar-walk-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+exit 0
+GUARD: rc 0 wall 333.3 s low 0 min MemAvailable 3246704 kB
