@@ -4,7 +4,8 @@
 //!
 //! It loads the packed file once and writes `ready<TAB>{json}` on stdout (the load's numbers). Then it reads one
 //! request per line on stdin: `sas`'s per-replan options, tab-separated (`--start-file F` or `--start NAME`, `--bans
-//! F`, `--out F`, `--stats F`, `--ops F`, `--kept F`, `--start-check input|needed`, `--goal ..`, `--cost-caps F`), and writes the
+//! F`, `--out F`, `--stats F`, `--ops F`, `--kept F`, `--start-check input|needed`, `--goal ..`, `--cost-caps F`,
+//! `--pick-windows on|off`: the server's setting unless the request gives one; only the writer reads it), and writes the
 //! files `taskcore sas` writes with the server's options and these, byte for byte, then one line: `ok<TAB>{json}`
 //! (this request's seconds and memory) or `error<TAB>message` (the message `sas` stops with). It exits at the end of
 //! stdin. The fold, the reductions, PRODUCT_LIMIT and the encoding are the server's; `--check-fold` is refused.
@@ -56,8 +57,18 @@ use std::io::{BufRead, Write};
 use std::time::Instant;
 
 /// The options a request may give: `sas`'s per-replan ones.
-const PER_REQUEST: [&str; 9] =
-    ["--start-file", "--start", "--bans", "--out", "--stats", "--ops", "--kept", "--start-check", "--cost-caps"];
+const PER_REQUEST: [&str; 10] = [
+    "--start-file",
+    "--start",
+    "--bans",
+    "--out",
+    "--stats",
+    "--ops",
+    "--kept",
+    "--start-check",
+    "--cost-caps",
+    "--pick-windows",
+];
 
 /// What the server keeps for one (bans, goal) (module docstring).
 struct Kept {

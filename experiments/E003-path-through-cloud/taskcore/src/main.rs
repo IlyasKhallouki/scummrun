@@ -5,13 +5,15 @@
 //!   taskcore sas    --task F.tc [--start NAME | --start-file F] [--bans F] [--fold strict|every|off]
 //!                   [--reduce all|none|a,b,..] [--product-limit N] [--encoding model|task] --out F.sas
 //!                   [--stats F.json] [--check-fold N] [--ops F.jsonl] [--start-check input|needed]
-//!                   [--cost-caps F]
+//!                   [--cost-caps F] [--pick-windows on|off]
 //!   taskcore decode (the same options) --plan sas_plan --out steps.json
 //!   taskcore validate (the same options) --names plan.txt --out result.json
 //!   taskcore info   --task F.tc
 //!   taskcore serve  --task F.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
 //!                   (then one `sas` request per line on stdin: serve.rs)
 //!   --goal K=V[|V..][,K=V..]: the goal instead of the file's (sas, decode, validate, serve)
+//!   --pick-windows on: each guess through a pick variable chosen in a window just before the operator that reads it
+//!                      (sas, decode, serve; README "Pick windows"; off by default)
 
 mod bans;
 mod fold;
@@ -51,6 +53,7 @@ struct Args {
     needed_check: bool,
     goal: Option<String>,
     cost_caps: Option<PathBuf>,
+    pick_windows: bool,
 }
 
 fn parse() -> Result<Args, String> {
@@ -77,6 +80,7 @@ fn parse() -> Result<Args, String> {
         needed_check: false,
         goal: None,
         cost_caps: None,
+        pick_windows: false,
     };
     parse_opts(&mut a, it)?;
     check_args(&a)?;
@@ -127,6 +131,13 @@ fn parse_opts(a: &mut Args, mut it: impl Iterator<Item = String>) -> Result<Vec<
                     _ => return Err(format!("--encoding {}: model or task", v)),
                 }
             }
+            "--pick-windows" => {
+                a.pick_windows = match v.as_str() {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err(format!("--pick-windows {}: on or off", v)),
+                }
+            }
             _ => return Err(format!("unknown option {}", k)),
         }
         given.push(k);
@@ -140,6 +151,10 @@ fn check_args(a: &Args) -> Result<(), String> {
     }
     if a.needed_check && !a.reduce.e {
         return Err("--start-check needed needs reduction (e)".into());
+    }
+    if a.pick_windows && !a.model {
+        // with task.py's metric 0 Fast Downward would count each begin and pick of a window as 1
+        return Err("--pick-windows on needs --encoding model".into());
     }
     Ok(())
 }
@@ -254,6 +269,9 @@ fn sas_json(c: &sas::SasCounts) -> String {
         .n("noop_effects", c.noop_effects)
         .n("goal_resets", c.goal_resets)
         .n("bytes", c.bytes);
+    if c.window_mode {
+        j.n("pick_windows", c.windows).n("window_pick_operators", c.window_pick_ops);
+    }
     j.done()
 }
 
@@ -447,6 +465,7 @@ fn write_out(a: &Args, mut p: Prepared, t0: Instant) -> Result<(), String> {
     let t1 = Instant::now();
     let mut x = sas::Expander::new(&p.task, a.limit);
     x.model = a.model;
+    x.windows = a.pick_windows;
     let plan = sas::pass1(&mut x)?;
     let s1 = t1.elapsed().as_secs_f64();
     let t2 = Instant::now();
@@ -583,9 +602,11 @@ fn run() -> Result<(), String> {
             let t = &p.task;
             let mut x = sas::Expander::new(t, a.limit);
             x.model = a.model;
+            x.windows = a.pick_windows;
             let plan = sas::pass1(&mut x)?;
             let mut x = sas::Expander::new(t, a.limit);
             x.model = a.model;
+            x.windows = a.pick_windows;
             let steps = sas::decode(&mut x, &ops)?;
             let key = |f: u32| esc(t.key(f));
             let val = |f: u32, v: u32| esc(t.strs.get(t.facts.dom(f)[v as usize]));
