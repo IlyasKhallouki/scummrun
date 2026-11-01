@@ -47,6 +47,8 @@ pub struct Closure {
     pub engine_writes: BTreeSet<String>,
     /// the hook variables a reachable instruction runs
     pub hooks: BTreeSet<i32>,
+    /// why the closure names every unit, each where it comes from (READER_TRACE's havoc lines; changes nothing)
+    pub why: Vec<String>,
 }
 
 impl Closure {
@@ -120,7 +122,10 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                 c.engine_writes.insert(k.clone());
             }
             CutStep::Room => c.room_change = true,
-            CutStep::Other(_) => c.every_unit = true,
+            CutStep::Other(o) => {
+                c.every_unit = true;
+                c.why.push(format!("pending {o}"));
+            }
         }
     }
     let mut room_added = false;
@@ -150,7 +155,10 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                                         }
                                     }
                                 }
-                                None => c.every_unit = true,
+                                None => {
+                                    c.every_unit = true;
+                                    c.why.push(format!("startObject not folded at {}[{i}]", crate::facts::unit_text(key)));
+                                }
                             }
                         } else {
                             match fold(ast, script, None, None, &mut caps) {
@@ -159,7 +167,10 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                                         add_script(n as i32, res, &mut todo, &mut locals);
                                     }
                                 }
-                                None => c.every_unit = true,
+                                None => {
+                                    c.every_unit = true;
+                                    c.why.push(format!("start not folded at {}[{i}]", crate::facts::unit_text(key)));
+                                }
                             }
                         }
                     }
@@ -201,7 +212,10 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                             known::DO_SENTENCE => {
                                 c.hooks.insert(VAR_SENTENCE_SCRIPT);
                             }
-                            known::SYSTEM_OPS => c.every_unit = true,
+                            known::SYSTEM_OPS => {
+                                c.every_unit = true;
+                                c.why.push(format!("systemOps at {}[{i}]", crate::facts::unit_text(key)));
+                            }
                             known::STOP_SCRIPT | known::STOP_OBJECT_SCRIPT => {
                                 match a.first().and_then(|&e| fold(ast, e, None, None, &mut caps)) {
                                     Some(ns) => {
@@ -277,7 +291,10 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: O
                         add_script(v as i32, room, &mut todo, &mut locals);
                     }
                 }
-                None => c.every_unit = true,
+                None => {
+                    c.every_unit = true;
+                    c.why.push(format!("hook var:{h} has no domain"));
+                }
             }
             more = true;
         }
@@ -528,6 +545,8 @@ pub struct HavocWrites {
     pub frozen_all: bool,
     pub esc_all: bool,
     pub closure_units: usize,
+    /// why the closure names every unit (Closure::why)
+    pub why: Vec<String>,
 }
 
 /// The facts and slots of the havoc record of a path cut at `cut` (havoc-cut.md, "The write set", "Values", "Slots").
@@ -568,7 +587,7 @@ pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: Op
             t => wide.push((t, v)),
         }
     }
-    let mut out = HavocWrites { closure_units: units.len(), ..Default::default() };
+    let mut out = HavocWrites { closure_units: units.len(), why: c.why.clone(), ..Default::default() };
     let skip = |k: &str| {
         ["pos:", "escpos:", "args:", "at:", "esc:", "frozen:", "script:", "local:", "objscript:"].iter().any(|p| k.starts_with(p))
     };
@@ -831,7 +850,7 @@ impl Builder<'_> {
         self.counts.inc(format!("havoc_cut: paths the step limit ended, made havoc records: {kind}"));
         self.counts.add("havoc_cut: havoc effects", n_eff as i64);
         self.counts.add("havoc_cut: havoc events (unknown locals)", n_ev as i64);
-        crate::par::trace_havoc(label, hw.closure_units, n_eff, n_ev, &cut);
+        crate::par::trace_havoc(label, hw.closure_units, n_eff, n_ev, &cut, &hw.why);
         rec
     }
 }
