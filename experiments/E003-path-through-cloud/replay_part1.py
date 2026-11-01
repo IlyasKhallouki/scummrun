@@ -8,6 +8,7 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_part1.py export-pickle PICKLE --goal ... --name NAME --start-name TEXT --out DIR   (a pickled reading)
        replay_part1.py read-rust ROOMS --seed N --goal FACT=V[,FACT=V] --name NAME --out DIR [--threads 3]
                        [--elsewhere] [--live-locals] [--split-limit] [--switches S,...] [--reach] [--frame-costs]
+                       [--start-rows FILE]
                        (a reading from the Rust reader, scumm/target/release/reader-scope, with golden.read_scope's
                        domains (no goal), made into the three files and the lists by packed_reading.reading_from_golden;
                        the switches are reader-scope's, off by default)
@@ -139,6 +140,11 @@ Lemma 2's floor on a frame's quarter-frames comes from the reading's frame costs
 file then ends in ``-window``, and its record has the windows, the replans' causes, the run clock in quarter-frames
 (``game_qf``) and the search's CPU.
 
+**Another start** (``read-rust --start-rows FILE``, and ``cmd_run``'s ``starter``; off by default): the reading's
+start is the row of the seed in FILE (start-part1.jsonl's format) in place of results/start-part1.jsonl, and a run
+boots through the starter (an instrument's: its boot, its engine config for verify and the inputs it gives before the
+start, which verify plays first). runb_start.py is such an instrument. Without them the commands are as before.
+
 **Without reloading** (``--serve``, off by default): taskcore runs as one long-lived process per packed file
 (plan_fd ``serve``, taskcore/src/serve.rs), which keeps the loaded reading and what does not depend on the start, for
 the start check (its two modes are two requests) and every plan of the run. The files it writes, and so the plans,
@@ -223,10 +229,10 @@ def goal_of(text: str, domain) -> dict:
     return out
 
 
-def start_row(seed: int) -> dict | None:
-    if not START_ROWS.exists():
+def start_row(seed: int, rows: Path = START_ROWS) -> dict | None:
+    if not rows.exists():
         return None
-    return next((r for r in map(json.loads, START_ROWS.read_text().splitlines()) if r["seed"] == seed), None)
+    return next((r for r in map(json.loads, rows.read_text().splitlines()) if r["seed"] == seed), None)
 
 
 # --- the readings ----------------------------------------------------------------------------------------------------
@@ -285,7 +291,7 @@ def goal_text_of(goal: dict) -> str:
 def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, threads: int = 3,
               slot_locals: list | None = None, domain_goals: str = "none", elsewhere: bool = False,
               live_locals: bool = False, split_limit: bool = False, switches: str = "", reach: bool = False,
-              frame_costs: bool = False, reach_also: list | None = None) -> Path:
+              frame_costs: bool = False, reach_also: list | None = None, start_rows: Path | None = None) -> Path:
     """A reading from the Rust reader (module docstring): reader-scope on ``rooms`` from results/start-part1.jsonl's
     seed ``seed`` (``domain_goals`` "none": golden.read_scope's domains), its records kept and written in golden.py's
     format, then packed_reading.reading_from_golden: the three files and the lists. ``slot_locals`` (F10): slots
@@ -294,12 +300,14 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
     ``"elsewhere": true``, and has ``live_locals``); ``split_limit``: reader-scope's switch ``--split-limit``
     (reading.json then says ``"split_limit": true``); ``switches``, ``reach``, ``frame_costs``: reader-scope's
     ``--switches``, ``--reach``, ``--frame-costs`` (module docstring, "The reader's other switches"); ``reach_also``:
-    further start files (reader-scope ``--reach-also``, with ``reach``). Returns reading.json."""
+    further start files (reader-scope ``--reach-also``, with ``reach``); ``start_rows``: the start's row from that
+    file (start-part1.jsonl's format) in place of results/start-part1.jsonl (reader-scope ``--start-rows``; off by
+    default). Returns reading.json."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    row = start_row(seed)
+    row = start_row(seed) if start_rows is None else start_row(seed, Path(start_rows))
     if row is None:
-        raise SystemExit(f"no start for seed {seed} in {START_ROWS}")
+        raise SystemExit(f"no start for seed {seed} in {start_rows or START_ROWS}")
     cmd = ["nice", "-n", "10", str(READER_SCOPE), "--rooms", ",".join(map(str, rooms)), "--start-seed", str(seed),
            "--domain-goals", domain_goals, "--goal", goal_text, "--name", name, "--threads", str(threads),
            "--out", str(out), "--packed", str(out / f"{name}.rust.tc"), "--keep", "--lines",
@@ -320,6 +328,8 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
         cmd += ["--reach-also", str(f)]
     if frame_costs:
         cmd.append("--frame-costs")
+    if start_rows is not None:
+        cmd += ["--start-rows", str(start_rows)]
     if slot_locals:
         sl = out / "slot-locals.jsonl"
         sl.write_text("".join(json.dumps(x) + "\n" for x in slot_locals))
@@ -333,7 +343,8 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
     rep = json.loads((out / f"{name}.json").read_text())
     t = time.monotonic()
     info = PR.reading_from_golden(out / f"{name}.golden.jsonl.gz", out / f"{name}.rust.tc", out, row["facts"],
-                                  f"results/start-part1.jsonl seed {seed}", name="reading",
+                                  f"results/start-part1.jsonl seed {seed}" if start_rows is None else
+                                  f"{start_rows} seed {seed}", name="reading",
                                   info={"name": name, "rooms": list(rooms), "domain_goals": domain_goals,
                                         "reader": "rust", "read_s": round(read_s, 1),
                                         "reader_scope": {k: rep.get(k) for k in ("records", "read_wall_s",
@@ -565,7 +576,8 @@ def boot(seed: int, out_dir: Path, dump_locals: bool = False) -> tuple:
     return ctl, b, row
 
 
-def start_check(row: dict, rd, work: Path, serve: bool = False, unobserved_actor_rooms: bool = False) -> dict:
+def start_check(row: dict, rd, work: Path, serve: bool = False, unobserved_actor_rooms: bool = False,
+                rows: Path = START_ROWS) -> dict:
     """The start against the reading's start (every fact, and the facts the packed file holds: a reading serves the
     start its domains were built from, module docstring), results/start-part1.jsonl's row, and taskcore's check."""
     f = row["facts"]
@@ -574,7 +586,7 @@ def start_check(row: dict, rd, work: Path, serve: bool = False, unobserved_actor
     task_d = sorted((k, v) for k, v in d.items() if k in rd.task.facts)
     out["reading start"] = {"name": rd.doc["start"]["name"], "differ": len(d), "first": sorted(d.items())[:20],
                             "task facts differ": len(task_d), "task first": task_d[:20]}
-    known = start_row(row["seed"])
+    known = start_row(row["seed"], rows)
     if known is not None:
         d2 = diff(known["facts"], f)
         out["start-part1"] = {"differ": len(d2), "frame": known["stop"]["frame"],
@@ -709,7 +721,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None, slot_locals: bool = False,
             reread: bool = False, threads: int = 3, serve: bool = False, search: str = "lama-first",
             cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
-            approach_stones: bool = False, window_search: bool = False, workers: int = 7) -> dict:
+            approach_stones: bool = False, window_search: bool = False, workers: int = 7, starter=None) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -729,7 +741,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         ("-serve" if serve else "") + (f"-{search}" if search != "lama-first" else "") + \
         ("-caps" if cost_caps else "") + ("-reachx" if reach_extend else "") + \
         ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "") + \
-        ("-window" if window_search else "")
+        ("-window" if window_search else "") + (f"-{starter.name}" if starter is not None else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
@@ -771,13 +783,19 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
                               "reader_scope": str(READER_SCOPE) if reread else None,
                               "reader_scope_sha1": sha(READER_SCOPE) if reread else None}
     out["load_s"] = round(time.monotonic() - t0, 2)
-    say(f"{tag}: booting to the first idle stop")
-    ctl, branch, row = boot(seed, run_dir / "run", dump_locals=slot_locals)
+    if starter is None:
+        say(f"{tag}: booting to the first idle stop")
+        ctl, branch, row = boot(seed, run_dir / "run", dump_locals=slot_locals)
+    else:  # another start (``starter``: an instrument's boot, its config for verify and its inputs before the start)
+        say(f"{tag}: booting to {starter.name}")
+        ctl, branch, row = starter.boot(seed, run_dir / "run")
+        out["starter"] = starter.describe()
     h = None
     try:
         out["start"] = {"stop": row["stop"], "dump": row["dump"], "trace": row["trace"], "boot_s": row["boot_s"]}
-        say(f"{tag}: idle stop at frame {row['stop']['frame']}; the start check")
-        chk = out["start"]["check"] = start_check(row, rd, run_dir / "start-check", serve, unobserved_actor_rooms)
+        say(f"{tag}: start at frame {row['stop']['frame']}; the start check")
+        chk = out["start"]["check"] = start_check(row, rd, run_dir / "start-check", serve, unobserved_actor_rooms,
+                                                  START_ROWS if starter is None else starter.rows)
         if row["checks"]:
             raise RuntimeError(f"seed {seed}: the start fails start.py's checks: {row['checks']}")
         if chk["reading start"]["task facts differ"]:
@@ -814,8 +832,12 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     say(f"{tag}: stop {res['stop']!r}; verifying from boot ({len(checkpoints)} checkpoints)")
     t = time.monotonic()
     try:
-        ver = replay.verify(lambda o, i: config(seed, o, i), res["inputs"], checkpoints, sorted(goal),
-                            run_dir / "verify")
+        if starter is None:
+            ver = replay.verify(lambda o, i: config(seed, o, i), res["inputs"], checkpoints, sorted(goal),
+                                run_dir / "verify")
+        else:  # the inputs before the start, then the run's, from boot
+            ver = replay.verify(lambda o, i: starter.config(seed, o, i), starter.prefix + res["inputs"], checkpoints,
+                                sorted(goal), run_dir / "verify")
         ver["goal"] = all(ver.get("final", {}).get(k) in v for k, v in goal.items())
     except Exception as e:  # noqa: BLE001 (the run's record is written either way)
         ver = {"error": f"{type(e).__name__}: {e}", "goal": False, "differ": [], "inputs": None, "checkpoints": None}
@@ -1040,6 +1062,7 @@ def main() -> None:
     rr.add_argument("--switches", default="", help="reader-scope's --switches (reader switches by name)")
     rr.add_argument("--reach", action="store_true", help="reader-scope's switch --reach (needs --split-limit)")
     rr.add_argument("--frame-costs", action="store_true", help="reader-scope's switch --frame-costs")
+    rr.add_argument("--start-rows", type=Path, help="the start's row from this file, not results/start-part1.jsonl")
     c = sub.add_parser("control")
     c.add_argument("reading", type=Path)
     s = sub.add_parser("start")
@@ -1087,7 +1110,7 @@ def main() -> None:
     elif a.cmd == "read-rust":
         print(read_rust(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out, a.threads,
                         elsewhere=a.elsewhere, live_locals=a.live_locals, split_limit=a.split_limit,
-                        switches=a.switches, reach=a.reach, frame_costs=a.frame_costs))
+                        switches=a.switches, reach=a.reach, frame_costs=a.frame_costs, start_rows=a.start_rows))
     elif a.cmd == "control":
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
