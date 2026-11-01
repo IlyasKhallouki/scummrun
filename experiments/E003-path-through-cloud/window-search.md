@@ -467,3 +467,15 @@ and `explain` observe only (Lemma O). So a second dump or hit test at the same s
 child keeps them until its next run. Its first dump is the parent's at the fork: a forked child is the parent at that
 stop (A0). □ The search's runs, and so its result, are the same with the cache on or off; only the number of dumps
 and hit tests the engine makes changes, and the run reports both counts.
+
+**Forks ahead (sub-switch `fork_each` = N, strict only, off by default; plan step A4's kill (2)).** The parent runs N
+frames with one command, and the bridge forks a child at each of their decision points (`run` with `fork_each`).
+*Lemma F.* Each such child is the child the `fork` command makes at that decision point: the bridge makes it with the
+same steps (it closes the room file, forks, the child closes the parent's files, connects and reports "forked") at the
+same place in the frame, and the parent goes on as it would one frame at a time (9.1). So the child at frame f stands
+for the parent at f (A0): the window reads frame f's view from it and, where the gate is open, uses it as the child
+forked at f; one the window does not use is quit. The parent's runs and explain log for the N frames come in one read
+after the command, grouped by frame (R_k). When the window ends at frame f, the child at f is the engine from there.
+□ *Test.* On the kitchen from boot's route at frame 3000, seven children from one `fork_each` and seven forked one
+frame at a time: full dumps (locals, exact) equal at the fork and 30 frames after the same click on each
+(`results/fork-each-check.log`).
