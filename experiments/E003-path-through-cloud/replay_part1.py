@@ -780,8 +780,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     wcfg = None
     if window_search:
         import window as WS
-        if (window_fork_each or window_lite) and not window_strict:
-            raise SystemExit("--window-fork-each and --window-lite are sub-switches of --window-strict")
+        if window_lite and not window_strict:
+            raise SystemExit("--window-lite is a sub-switch of --window-strict")
         wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=window_strict,
                                cache=window_cache, fork_each=window_fork_each, lite=window_lite)
         out["window_search"] = dict(vars(wcfg))
@@ -1120,7 +1120,7 @@ def main() -> None:
     r.add_argument("--window-strict", action="store_true",
                    help="the window search's sub-switch strict: B1's matcher (window-search.md section 9)")
     r.add_argument("--window-fork-each", type=int, default=0,
-                   help="the strict window search's sub-switch fork_each: N frames forked ahead per command (9.7)")
+                   help="the window search's sub-switch fork_each: N frames forked ahead per command (9.7)")
     r.add_argument("--window-lite", action="store_true",
                    help="the strict window search's sub-switch lite: a child's views from the bridge's lite dump (9.7)")
     r.add_argument("--window-cache", action="store_true",

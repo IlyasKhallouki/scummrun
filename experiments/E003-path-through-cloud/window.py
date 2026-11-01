@@ -68,8 +68,8 @@ class WindowConfig:
     # section 9.7: a child's state dump and hit tests kept until its engine runs again, the first seeded with the
     # parent's dump at the fork; off by default
     cache: bool = False
-    # section 9.7 (strict only): the parent forks a child at each of its next N frames with one bridge command (the
-    # bridge's run "fork_each"); 0, the default: one fork and one frame per command, as before
+    # section 9.7: the parent forks a child at each of its next N frames with one bridge command (the bridge's run
+    # "fork_each"); 0, the default: one fork and one frame per command, as before
     fork_each: int = 0
     # section 9.7 (strict only): a child's views after its click from the bridge's dump of the fields facts_of reads,
     # for the window's objects only; off by default
@@ -1033,11 +1033,12 @@ class Search:
         futures, children = [], []
         end_rule, prev, end_reason, gate_shut = EndRule(), {}, None, 0
         w0 = parent.frame
+        obs_branch, ahead, ahead_cur = parent, [], None  # section 9.7, fork_each (off: the parent itself)
         try:
             while True:
-                st = parent.status
-                g = parent.frame
-                s, obs, now = self._observe(parent, w["fv"])
+                st = obs_branch.status
+                g = obs_branch.frame
+                s, obs, now = self._observe(obs_branch, w["fv"])
                 if cfg.delta_lo > 1 and max(1, st.get("v19", 0)) < cfg.delta_lo:
                     w["delta_violation"] = [g, st.get("v19")]
                     end_reason = "delta"
@@ -1075,7 +1076,7 @@ class Search:
                     end_reason = f"{cfg.window_frames} frames"
                     break
                 if has_input:
-                    if self._gate(inp, st, s, parent):
+                    if self._gate(inp, st, s, obs_branch):
                         while sum(1 for x in futures if not x.done()) >= cfg.workers:
                             time.sleep(0.002)
                         while mem_available_kb() < cfg.mem_floor_kb:
@@ -1083,7 +1084,10 @@ class Search:
                                 raise RP.Stop(f"memory: MemAvailable {mem_available_kb() // 1024} MB, under "
                                               f"{cfg.mem_floor_kb // 1024} MB")
                             time.sleep(0.05)
-                        cb = self.fork(parent, "child")
+                        if ahead_cur is not None and ahead_cur.frame == g:  # section 9.7: the child forked there
+                            cb, ahead_cur = ahead_cur, None
+                        else:
+                            cb = self.fork(parent, "child")
                         ch = Child(g, st["qf"], not pre_now, frozenset(i for i, v in pm.matched.items()),
                                    dict(now), w["full_fv"](obs))
                         if cfg.cache:
@@ -1098,6 +1102,20 @@ class Search:
                                        + (f"; mismatches {mk.most_common(3)}" if mk else ""))
                     else:
                         gate_shut += 1
+                if ahead_cur is not None:  # a child forked ahead whose frame took no child: it is not needed
+                    ahead_cur.quit()
+                    ahead_cur = None
+                if cfg.fork_each and has_input:  # section 9.7: the parent's next frames as children forked there
+                    if not ahead:
+                        try:
+                            _, kids = self.fork_ahead(parent, cfg.fork_each)
+                        except ControlError as e:
+                            end_reason = f"engine ended: {e}"
+                            break
+                        ahead.extend(kids)
+                    ahead_cur = ahead.pop(0)
+                    obs_branch = ahead_cur
+                    continue
                 st = parent.run(frame=g + 1)
                 if "end" in st:
                     end_reason = f"engine ended: {st['end']}"
@@ -1106,6 +1124,13 @@ class Search:
             for x in futures:
                 x.result()
             pool.shutdown(wait=True)
+            for c in ahead:
+                c.quit()
+        if obs_branch is not parent:  # section 9.7: the window's end is the child forked at that frame
+            if ahead_cur is None:
+                raise RP.Stop("fork_each: the window's last frame has no branch left")
+            self._set_branch(ahead_cur)
+            parent = ahead_cur
         best = w["best"]
         counts = collections.Counter(c.outcome for c in children)
         rec.update(end=parent.frame, end_qf=parent.status.get("qf"), end_reason=end_reason, forks=len(children),
