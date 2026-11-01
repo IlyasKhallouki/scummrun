@@ -113,7 +113,6 @@
       "what": "pass 2: later rounds (1022)"
     }
   ],
-  "cap_min": 60.0,
   "counters_sha1": "1de7b9dab3ef58ea45930b025ed41cf235ebc906",
   "cpu_use": 2.86,
   "domain_goals": "part1",

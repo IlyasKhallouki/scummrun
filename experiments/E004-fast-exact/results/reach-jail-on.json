@@ -33,7 +33,6 @@
       "what": "pass 0: event round 4"
     }
   ],
-  "cap_min": 120.0,
   "cpu_use": 1.74,
   "domain_goals": "part1",
   "elsewhere": true,

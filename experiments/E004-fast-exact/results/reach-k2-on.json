@@ -89,7 +89,6 @@
       "what": "pass 0: later rounds (2046)"
     }
   ],
-  "cap_min": 120.0,
   "cpu_use": 2.76,
   "domain_goals": "part1",
   "elsewhere": true,
