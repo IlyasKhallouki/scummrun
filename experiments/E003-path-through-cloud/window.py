@@ -61,6 +61,10 @@ class WindowConfig:
     window_frames: int = WINDOW_FRAMES
     child_limit: int = CHILD_LIMIT
     mem_floor_kb: int = MEM_FLOOR_KB
+    # window-search.md section 9: B1's strict matcher, the click decided at s + 1, ties, Lemma 7′ and the causes
+    # (strict.py); off by default, and off the search is sections 1-7
+    strict: bool = False
+    repeat_stop: int = 2  # section 9.5 (strict only): the run stops at this many empty windows of one input and cause
 
 
 def delta_lo_of(frame_costs: dict | None) -> int:
@@ -418,6 +422,28 @@ def is_deviation(m: Matcher, input_rec, before_input: set, took="n/a") -> bool:
     return took is not None if took != "n/a" else input_rec.i in m.matched
 
 
+def _plain(o):
+    """A cause or a record as JSON values (runs and values as dicts, sets as sorted lists)."""
+    if isinstance(o, dict):
+        return {str(k): _plain(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_plain(x) for x in o]
+    if isinstance(o, (set, frozenset)):
+        return sorted((_plain(x) for x in o), key=str)
+    if dataclasses.is_dataclass(o) and not isinstance(o, type):
+        return _plain(dataclasses.asdict(o))
+    return o
+
+
+def strict_stop(best_q: int, best_deviation: bool, qf: int, b_qf: int, b_dev_qf: int) -> bool:
+    """Section 9.3, the parent's stop at a tie: no fork at Q(g) = ``qf`` or later can end before the best (``best_q``):
+    with a success the best, Q(g) + b ≥ c* (a later fork loses a tie to the earlier); with a deviation, a later success
+    at Q = c_d still wins, so Q(g) + b > c_d and Q(g) + 4·δ_lo·n ≥ c_d."""
+    if not best_deviation:
+        return qf + b_qf >= best_q
+    return qf + b_qf > best_q and qf + b_dev_qf >= best_q
+
+
 def click_gate(st: dict) -> bool:
     """The engine takes a click on the next frame: input on, no cutscene, a room (the Executor's gate)."""
     return st.get("up", 0) > 0 and st.get("cs", 1) == 0 and bool(st.get("room", 0))
@@ -521,6 +547,51 @@ class _Ctx:
         self.observe()
 
 
+class _Stepper:
+    """A child's branch while the input code plays, one frame at a time (section 9.1): after each frame ``on_frame``
+    reads its runs, explain log and view. A run to a frame, or to a condition with a frame limit, is played as single
+    frames with the same stop rule on each (the bridge's ``until`` or ``control`` with ``max_frame`` one frame on)."""
+
+    def __init__(self, b, on_frame):
+        self._b, self._on = b, on_frame
+
+    def __getattr__(self, name):
+        return getattr(self._b, name)
+
+    def run(self, *, frame=None, until=None, control=False, max_frame=None, idle=False, until_any=None,
+            menu=False) -> dict:
+        b = self._b
+        if idle or until_any or menu or (frame is None and max_frame is None):
+            f0 = b.frame
+            st = b.run(frame=frame, until=until, control=control, max_frame=max_frame, idle=idle,
+                       until_any=until_any, menu=menu)
+            if "end" not in st and b.frame != f0:
+                self._on()
+            return st
+        if frame is not None and not until and not control:
+            if frame <= b.frame:
+                f0 = b.frame
+                st = b.run(frame=frame)
+                if "end" not in st and b.frame != f0:
+                    self._on()
+                return st
+            st = b.status
+            while b.frame < frame:
+                st = b.run(frame=b.frame + 1)
+                if "end" in st:
+                    return st
+                self._on()
+            return st
+        end = max_frame if max_frame is not None else frame
+        while True:
+            st = b.run(until=until, control=control, max_frame=b.frame + 1)
+            if "end" in st:
+                return st
+            self._on()
+            if st.get("stop") in ("until", "control") or b.frame >= end:
+                return st
+
+
 @dataclass
 class Child:
     g: int  # the fork frame
@@ -547,6 +618,12 @@ class Child:
     alt: str | None = None  # another path of the click that showed (section 3), the record's name
     dev_stop: int | None = None  # a deviation's stop frame (its end point is the next click gate)
     took: str | None = "n/a"  # a click: "plan" (its record showed, Lemma 9), another path's name, or None
+    # the strict search (section 9): the branch's strict matches, at the snapshot's frame, its first failure
+    track: object = None
+    track_issue: object = None
+    fail: dict | None = None
+    choice_fail: dict | None = None
+    d0: dict | None = None  # the parent's state dump at the fork
 
     def row(self) -> list:
         return [self.g, self.first, self.issue, self.outcome, self.end, self.q_end, self.frames,
@@ -578,6 +655,12 @@ class Search:
         self.mem: dict = {}  # sample_memory's peaks
         self.deviations: list = []  # the windows that ended in a deviation (section 3), each a replan
         self._by_source = None  # the reading's actions by their input (``source_index``), made at the first click
+        # the strict search (section 9): the reading as B1 reads it, the IR, this plan's strict parts and its strict
+        # matches carried from window to window, the causes, the Python CPU by part
+        self.sr = self.code = self.splan = self.strack = None
+        self.causes: list = []
+        self.empty_keys: collections.Counter = collections.Counter()
+        self.prof: collections.Counter = collections.Counter()
 
     # --- processes ---
 
@@ -967,6 +1050,573 @@ class Search:
                 fh.write(json.dumps(rec, default=str) + "\n")
         return {"rec": rec, "best": best, "parent_matched": {i: v for i, v in pm.matched.items() if v[0] is not None}}
 
+    # --- the strict search (window-search.md section 9) ---
+
+    def _strict_setup(self) -> None:
+        """The reading as B1 reads it and the IR, once per run (strict.py)."""
+        if self.sr is not None:
+            return
+        import model as M_
+        import strict as S
+        import trace_explain as TE
+        h = self.h
+        lines = getattr(getattr(h.base, "lines", None), "path", None)
+        if lines is None:
+            raise RP.Stop("the strict window search needs the reading's lines file (a packed reading)")
+        unobserved = ("saved:",) + ((RP.ACTOR_ROOM,) if h.unobserved_actor_rooms else ())
+        self.sr = S.Reading(h.base, h.doms, lines, h.lists, unobserved)
+        self.code = TE.Code(M_.Game.load())
+
+    def _tick(self, part: str, t0: float) -> float:
+        t = time.thread_time()
+        with self._lock:
+            self.prof[part] += t - t0
+        return t
+
+    def _strict_alternatives(self, first: MRec, recs: list) -> list:
+        """The click's other records (section 3, 9.3): (name, action index, the units their ``pos:`` writes name, their
+        writes a later step reads)."""
+        h = self.h
+        if self._by_source is None:
+            self._by_source = source_index(h.base.lines.path)
+        own = {p.name for p in first.paths}
+        out = []
+        for i in self._by_source.get(tuple(first.paths[0].what.source), ()):
+            a = h.base.actions[i]
+            if a.name in own:
+                continue
+            eff = self.sr.rec(i)[4]
+            linked = later_reads(recs, first.i, [k for k in eff if not k.startswith("pos:")])
+            out.append((a.name, i, [k[4:] for k in eff if k.startswith("pos:")], linked))
+        return out
+
+    def window_strict(self, recs: list, members: list, tracked: list, needed: set, parent, plan_no: int,
+                      k: int) -> dict:
+        """``window`` with section 9: the parent matched strictly on its own runs (Lemma 7′ for the end), the children
+        by ``_child_strict``, the ties of 9.3, the cause of an empty window or a deviation (9.5). Returns as
+        ``window``, with "track" (the parent's strict matches at the end) and "cause"."""
+        import strict as S
+        h, cfg, sp = self.h, self.cfg, self.splan
+        t0, cpu0 = time.monotonic(), time.process_time()
+        first = recs[members[0]]
+        has_input = first.kind == "input"
+        inp = RP.step_input(first.paths[0].what) if has_input else None
+        alts = self._strict_alternatives(first, recs) if has_input and inp.kind == "click" else []
+        reads = set().union(*[recs[j].reads for j in members])
+        extra = set()
+        for _, i, _, _ in alts:
+            r_ = self.sr.rec(i)
+            extra |= set(r_[3]) | set(r_[4])
+        keys = set().union(*[r.writes | r.reads for r in tracked]) | reads | set(h.goal) | {"room"} | \
+            {f"pos:{r.unit}" for r in tracked if r.unit} | extra
+        args_units = sorted({kk[5:] for kk in keys if kk.startswith("args:")})
+        keys |= {f"pos:{u}" for u in args_units}
+        doms = {kk: h.doms[kk] for kk in keys if kk in h.doms and not kk.startswith(h.unobserved)}
+        full_doms = {kk: d for kk, d in h.doms.items() if not kk.startswith(h.unobserved)}
+        fv, av = FastView(h.b, doms, h.unobserved), S.ArgsView(h.b, h.lists, args_units)
+
+        def sview(obs, s):
+            v = fv(obs)
+            v.update(av(s, v))
+            return v
+        observed_reads = sorted(kk for kk in reads if kk in doms)
+        before_input = {r.i for r in tracked if has_input and r.i in first.preds}
+        input_reads = sorted(kk for kk in (first.reads if has_input else ()) if kk in doms)
+        issued = {r.i for r in tracked if r.kind == "input" and r.macro < k}
+        n = input_clicks(first.paths[0].what) if has_input else 0
+        chain, chain_names = chain_frames(recs, members) if has_input else (0, [])
+        b_frames = n + chain
+        b_qf = 4 * cfg.delta_lo * b_frames
+        goal_writers = {r.i for r in tracked if r.i in self.goal_writers}
+        # the units the children's explain is armed for: the tracked records' and the input's pos: writes'
+        units = {r.unit for r in tracked if r.unit}
+        in_units = {}
+        if has_input:
+            for nn, idx in enumerate(sp.idx[first.i]):
+                in_units[nn] = [kk[4:] for kk in self.sr.rec(idx)[4] if kk.startswith("pos:")] if idx is not None else []
+                units |= set(in_units[nn])
+        for _, _, us, _ in alts:
+            units |= set(us)
+        explain_units = [wn for u in sorted(units) for wn in S.unit_where(u)]
+        pm = Matcher(tracked, needed, None, issued=issued)  # the mismatch rule's predicted positions (section 3)
+        pm.plan_pending = [r for r in recs if not r.done]
+        w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name,
+             "tracked": tracked, "needed": needed, "input": first if has_input else None, "doms": doms,
+             "full_doms": full_doms, "fv": fv, "sview": sview, "full_fv": FastView(h.b, full_doms, h.unobserved),
+             "best": None, "firsts": set(), "b_qf": b_qf, "bound_violations": [], "delta_violation": None,
+             "issued": issued, "before_input": before_input, "alts": alts, "in_units": in_units,
+             "lemma9_stops": 0, "b_dev_qf": 4 * cfg.delta_lo * n, "explain_units": explain_units,
+             "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps]),
+             "failures": collections.Counter(), "failure_of": {}, "k": k,
+             # a tracked record that does not follow the input: its own run may come while the input code plays
+             "early_recs": {r.i for r in tracked if not (has_input and first.i in r.preds) and r.i != first.i}}
+        rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None, "strict": True,
+               "records": [recs[j].name for j in members], "needed": [r.name for r in tracked if r.i in needed],
+               "tracked": [r.name for r in tracked], "start": parent.frame, "start_qf": parent.status.get("qf"),
+               "b_frames": b_frames, "b_qf": b_qf, "n_clicks": n, "chain": chain_names, "delta_lo": cfg.delta_lo,
+               "observed_reads": len(observed_reads), "before_input": len(before_input), "open": None,
+               "alternatives": len(alts), "args_units": len(args_units)}
+        # the parent: segment on, explain on every unit, its strict matches from the plan's so far
+        parent.segment(True)
+        parent.runs()
+        parent.explain(parent.frame + 1, parent.frame + cfg.window_frames + cfg.child_limit + 2, None)
+        parent.explain_log()
+        ptrack = self.strack.copy()
+        pkept = S.Kept()
+        s = parent.state()
+        obs = F.facts_of(s)
+        now = sview(obs, s)
+        prev_view, prev_dump = now, s
+        pkept.frame(parent.frame, [], s, now)
+        pool = ThreadPoolExecutor(max_workers=cfg.workers)
+        futures, children = [], []
+        end_rule, prev, end_reason, gate_shut = EndRule(), {}, None, 0
+        w0 = parent.frame
+        parent_fail, pgv = None, None
+        try:
+            while True:
+                st = parent.status
+                g = parent.frame
+                if cfg.delta_lo > 1 and max(1, st.get("v19", 0)) < cfg.delta_lo:
+                    w["delta_violation"] = [g, st.get("v19")]
+                    end_reason = "delta"
+                    break
+                ref = [i for i in needed if i in ptrack.refuted]
+                if ref:
+                    i = ref[0]
+                    f_, why_, run_ = ptrack.refuted[i]
+                    parent_fail = {"kind": "refuted", "record": recs[i].name, "frame": f_, "why": why_, "run": run_,
+                                   "material": pkept.freeze()}
+                    end_reason = "a needed record refuted in the parent"
+                    break
+                if not h._holds(h.goal, now):
+                    credited = bool(goal_writers) and all(i in ptrack.matched for i in goal_writers)
+                    end_reason = "goal in the parent" + ("" if credited else ", not from the plan")
+                    if not credited:
+                        parent_fail = self._goal_writer_fail(pkept, g, pgv, now)
+                    break
+                pgv = now
+                if not has_input:
+                    if all(i in ptrack.matched for i in needed):
+                        end_reason = "matched in the parent"
+                        break
+                else:
+                    belief = dict(now, **{kk: v for kk, v in h.kept.items() if not kk.startswith("args:")})
+                    pre_now = any(not h._holds(a.pre, belief) for a in first.paths)
+                    ready = all(i in ptrack.matched for i in before_input)  # Lemma 7′
+                    if end_rule.closed(ready, pre_now):
+                        end_reason = "the input's precondition closed in the parent after its window opened"
+                        rec["end_change"] = [[kk, prev.get(kk), now.get(kk)] for kk in input_reads
+                                             if prev.get(kk) != now.get(kk)][:8]
+                        break
+                    if rec["open"] is None and end_rule.open:
+                        rec["open"] = g
+                    prev = now
+                    with self._lock:
+                        best = w["best"]
+                    # section 9.3: the parent's stop at a tie
+                    if best is not None and strict_stop(best.q_end, best.outcome == "deviation", st["qf"], b_qf,
+                                                        w["b_dev_qf"]):
+                        end_reason = "stop: Q(g) + b reached the best " + \
+                            ("deviation" if best.outcome == "deviation" else "success")
+                        break
+                if g - w0 >= cfg.window_frames:
+                    end_reason = f"{cfg.window_frames} frames"
+                    break
+                if has_input:
+                    if self._gate(inp, st, s, parent):
+                        while sum(1 for x in futures if not x.done()) >= cfg.workers:
+                            time.sleep(0.002)
+                        while mem_available_kb() < cfg.mem_floor_kb:
+                            if not any(not x.done() for x in futures):
+                                raise RP.Stop(f"memory: MemAvailable {mem_available_kb() // 1024} MB, under "
+                                              f"{cfg.mem_floor_kb // 1024} MB")
+                            time.sleep(0.05)
+                        cb = self.fork(parent, "child")
+                        ch = Child(g, st["qf"], not pre_now, frozenset(ptrack.matched), dict(now), w["full_fv"](obs))
+                        ch.track, ch.d0 = ptrack.copy(), s
+                        children.append(ch)
+                        futures.append(pool.submit(self._child_strict, w, cb, ch))
+                        if len(children) % 100 == 0:
+                            done_ = collections.Counter(c.outcome for c in children if c.outcome)
+                            h.progress(f"    window {k + 1}: {len(children)} children by frame {g}, {dict(done_)}; "
+                                       f"failures {w['failures'].most_common(2)}")
+                    else:
+                        gate_shut += 1
+                st = parent.run(frame=g + 1)
+                if "end" in st:
+                    end_reason = f"engine ended: {st['end']}"
+                    break
+                rows = parent.runs()["runs"]
+                ents = parent.explain_log()["explain"]
+                s = parent.state()
+                obs = F.facts_of(s)
+                now = sview(obs, s)
+                R_ = S.by_frame(S.runs_of(rows)).get(g + 1, [])
+                for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump):
+                    ptrack.apply(g + 1, run_, v_, now)
+                pkept.add_entries(ents)
+                pkept.frame(g + 1, R_, s, now)
+                prev_view, prev_dump = now, s
+        finally:
+            for x in futures:
+                x.result()
+            pool.shutdown(wait=True)
+        best = w["best"]
+        counts = collections.Counter(c.outcome for c in children)
+        # section 9.5: the cause, on the kept failure of the chosen deviation or of the failure most children share
+        cause, fail = None, None
+        if best is not None and best.outcome == "deviation":
+            fail = best.fail
+        elif best is None:
+            fail = parent_fail
+            if fail is None and w["failures"]:
+                sig = w["failures"].most_common(1)[0][0]
+                fail = w["failure_of"][sig]
+        if fail is not None:
+            cause = S.explain(self.code, self.sr, fail)
+        rec.update(end=parent.frame, end_qf=parent.status.get("qf"), end_reason=end_reason, forks=len(children),
+                   gate_shut=gate_shut, outcomes=dict(sorted(counts.items())),
+                   child_frames=sum(c.frames for c in children),
+                   early_successes=sum(1 for c in children if c.early and c.outcome in ("success", "goal")),
+                   lemma9_stops=w["lemma9_stops"], other_paths=collections.Counter(c.alt for c in children if c.alt),
+                   bound_violations=w["bound_violations"], delta_violation=w["delta_violation"],
+                   failures=[[list(sig), nn] for sig, nn in w["failures"].most_common(8)],
+                   mismatch_keys=collections.Counter(str(c.why[0]) for c in children if c.outcome == "mismatch"
+                                                     and isinstance(c.why, tuple)).most_common(8),
+                   children=[c.row() for c in children[:CHILD_ROWS]],
+                   wall_s=round(time.monotonic() - t0, 2), python_cpu_s=round(time.process_time() - cpu0, 2),
+                   cause=_plain(cause))
+        by = {r.i: r.name for r in recs}
+        if best is not None:
+            rec["best"] = {"g": best.g, "first": best.first, "issue": best.issue, "end": best.end, "q0": best.q0,
+                           "q_end": best.q_end, "outcome": best.outcome, "early": best.early, "took": best.took,
+                           "frames_issue_to_end": best.end - best.issue, "arrival": best.arrival,
+                           "walk_frames": (best.arrival - best.issue) if best.arrival else None,
+                           "matched": {by.get(i, str(i)): f for i, (f, _, _) in best.track.matched.items()
+                                       if i not in ptrack.matched or ptrack.matched[i][0] is None},
+                           "unplanned": len(best.unplanned)}
+        rec["parent_matched"] = {by.get(i, str(i)): f for i, (f, _, _) in ptrack.matched.items()}
+        rec["parent_refuted"] = {by.get(i, str(i)): [f, why] for i, (f, why, _) in ptrack.refuted.items()}
+        self.py_cpu += time.process_time() - cpu0
+        self.windows.append(rec)
+        if h.workdir is not None:
+            with open(Path(h.workdir).parent / "windows.jsonl", "a") as fh:
+                fh.write(json.dumps(rec, default=str) + "\n")
+        parent.explain_off()
+        return {"rec": rec, "best": best, "track": ptrack, "cause": cause,
+                "parent_matched": {i: (v[0], v[1]) for i, v in ptrack.matched.items() if v[0] is not None}}
+
+    def _goal_writer_fail(self, pkept, g: int, before: dict | None, now: dict) -> dict | None:
+        """The run of frame g that wrote a goal fact the plan's goal records did not (9.5), from the parent's kept
+        runs and its explain log of every unit."""
+        import strict as S
+        facts = [kk for kk in self.h.goal if before is None or before.get(kk) != now.get(kk)]
+        mat = pkept.freeze()
+        eng = S._Eng(mat["entries"])
+        for run in mat["runs"].get(g, []):
+            key = self.code.key(run.where, run.number, run.room)
+            lg = S._logged(eng, run)
+            if key is None or lg is None:
+                continue
+            idxs = {self.code.index(key, op.code) for op in lg.ops}
+            for fact in facts:
+                if idxs & self.code.write_sites(key, fact):
+                    return {"kind": "goal writer", "record": None, "frame": g, "why": f"wrote {fact}", "run": run,
+                            "fact": fact, "material": mat}
+        return None
+
+    def _child_strict(self, w: dict, cb, ch: Child) -> Child:
+        """Section 3 with section 9 for one child forked at ``ch.g``."""
+        import strict as S
+        h, cfg, sp, sr = self.h, self.cfg, self.splan, self.sr
+        snap = None
+        t_start = tt = time.thread_time()
+        kept = S.Kept()
+        frames_seen: dict = {}  # frame -> (view, dump), the frames this child observed
+        track = ch.track
+        first = w["input"]
+        try:
+            cb.explain(ch.g + 1, ch.g + cfg.child_limit + cfg.window_frames + 2, w["explain_units"])
+            observe_play = any(i not in track.matched and i not in track.refuted for i in w["early_recs"])
+            rows_all: list = []
+
+            def on_frame():
+                t_ = time.thread_time()
+                rows_all.extend(cb.runs()["runs"])
+                kept.add_entries(cb.explain_log()["explain"])
+                s_ = cb.state()
+                frames_seen[cb.frame] = (w["sview"](F.facts_of(s_), s_), s_)
+                self._tick("observe", t_)
+            branch = _Stepper(cb, on_frame) if observe_play else cb
+            ctx = _Ctx(branch, self.release, self.stone_fork if self.stones else None)
+            tt = self._tick("setup", tt)
+            try:
+                self._play(ctx, w["inp"], w["name"])
+            except RouteError as e:
+                ch.outcome, ch.why = "interface", str(e)
+                return ch
+            tt = self._tick("play", tt)
+            ins = [e for e in ctx.ex.movie if RP._is_input(e)]
+            ch.events = list(ctx.ex.movie)
+            if not ins:
+                ch.outcome, ch.why = "interface", "no input event"
+                return ch
+            ch.first, ch.issue = min(e["frame"] for e in ins), max(e["frame"] for e in ins)
+            with self._lock:
+                if ch.first in w["firsts"]:
+                    ch.outcome = "duplicate"
+                    return ch
+                w["firsts"].add(ch.first)
+            if cb.frame != ch.issue:
+                st = cb.run(frame=ch.issue)
+                if "end" in st:
+                    ch.outcome, ch.why = "ended", st["end"]
+                    return ch
+                if observe_play:
+                    on_frame()
+            s_issue = ch.issue
+            if s_issue not in frames_seen:
+                on_frame()
+            else:
+                rows_all.extend(cb.runs()["runs"])
+                kept.add_entries(cb.explain_log()["explain"])
+            st_issue = dict(cb.status)
+            snap = self.fork(cb, "snapshot")  # the next window's parent (section 7), its buffers empty
+            st = cb.run(frame=s_issue + 1)
+            if "end" in st:
+                ch.outcome, ch.why = "ended", st["end"]
+                return ch
+            on_frame()
+            tt = time.thread_time()
+            Rk = S.by_frame(S.runs_of(rows_all))
+            frames_seen.setdefault(ch.g, (ch.at_fork, ch.d0))
+            for f in sorted(Rk):
+                kept.frame(f, Rk[f], frames_seen.get(f, (None, None))[1], frames_seen.get(f, (None, None))[0])
+            # 9.2's input record at s + 1: first the runs before the click's own (I1), then the click, then the rest
+            in_runs = [r for f in (s_issue, s_issue + 1) for r in Rk.get(f, ())
+                       if any(r.unit in us for us in w["in_units"].values())]
+            sigma0 = min((r.seq for r in in_runs), default=None)
+            verd = {}
+            for f in sorted(Rk):
+                if f <= ch.g or f > s_issue + 1:
+                    continue
+                vb, va = frames_seen.get(f - 1, (None, None)), frames_seen.get(f, (None, None))
+                if vb[0] is None or va[0] is None:
+                    continue
+                verd[f] = track.verdicts(Rk[f], vb[0], va[0], vb[1])
+            applied = {}
+            for f in sorted(verd):
+                for run_, v_ in verd[f]:
+                    if sigma0 is None or run_.seq < sigma0:
+                        for r_, how in track.apply(f, run_, v_, frames_seen[f][0]):
+                            if how == "matched":
+                                idx = sp.idx[r_.i][track.matched[r_.i][1]]
+                                applied.update({kk: e[1] for kk, e in sr.rec(idx)[4].items() if e[0] == "set"})
+            v0, d0 = ch.at_fork, ch.d0
+            v1 = frames_seen[s_issue + 1][0]
+            R_s, R_s1 = Rk.get(s_issue, []), Rk.get(s_issue + 1, [])
+            res = None
+            for nn, idx in enumerate(sp.idx[first.i]):
+                if idx is None:
+                    continue
+                res = S.input_match(sr, sp, idx, w["in_units"][nn], v0, d0, applied, R_s, R_s1, v1)
+                if res["ok"]:
+                    track.matched[first.i] = (s_issue, nn, res["last_seq"])
+                    ch.took = "plan" if res["took"] else "plan, no change"
+                    break
+            if ch.took not in ("plan", "plan, no change"):
+                for name, idx, us, linked in w["alts"]:
+                    rj = S.input_match(sr, sp, idx, us, v0, d0, applied, R_s, R_s1, v1)
+                    if rj["ok"] and rj["took"] and any(v1.get(kk) != v0.get(kk) for kk in linked):
+                        ch.alt = ch.took = name
+                        break
+                else:
+                    ch.took = None
+            for f in (s_issue, s_issue + 1):
+                for run_, v_ in verd.get(f, []):
+                    if sigma0 is not None and run_.seq >= sigma0:
+                        track.apply(f, run_, v_, frames_seen[f][0])
+                if f == s_issue:
+                    ch.track_issue = track.copy()
+            if ch.track_issue is None:
+                ch.track_issue = track.copy()
+            tt = self._tick("match", tt)
+            if ch.took is None:
+                ch.outcome, ch.why = "spent", f"Lemma 9′: {res['why'] if res else 'no path'}"
+                with self._lock:
+                    w["lemma9_stops"] += 1
+                if res is not None:
+                    self._fail(w, ch, {"kind": "input", "record": first.name, "frame": s_issue + 1,
+                                       "why": res["why"], "run": res.get("run"), "want": res.get("want"),
+                                       "engine": res.get("engine"),
+                                       "asks": sr.rec(sp.idx[first.i][0])[3].get(res["why"].split(" ", 1)[-1]),
+                                       "material": kept.freeze({ch.g: v0, s_issue + 1: v1},
+                                                               {ch.g: d0})})
+                ch.end, ch.q_end = cb.frame, cb.status.get("qf")
+                ch.frames = cb.frame - ch.g
+                return ch
+            moved = False
+            s, now = frames_seen[s_issue + 1][1], v1
+            obs = F.facts_of(s)
+            m = Matcher(w["tracked"], w["needed"], first, ch.done, issued=w["issued"])
+            m.plan_pending = w["plan_pending"]
+            prev_view, prev_dump = v1, s
+            while True:
+                st = cb.status
+                f = cb.frame
+                ch.frames = f - ch.g
+                if cfg.delta_lo > 1 and max(1, st.get("v19", 0)) < cfg.delta_lo:
+                    ch.outcome, ch.why = "delta", st.get("v19")
+                    w["delta_violation"] = [f, st.get("v19")]
+                    break
+                if track.choices and ch.choice_fail is None:
+                    i = next(iter(track.choices))
+                    fr, path, seq = track.matched[i]
+                    run_ = next((r for rs in Rk.values() for r in rs if r.seq == seq), None)
+                    ch.choice_fail = {"kind": "choice", "record": next(r.name for r in w["tracked"] if r.i == i),
+                                      "frame": fr, "why": f"effect {track.choices[i][0][0]}", "run": run_,
+                                      "material": kept.freeze()}
+                if st.get("mv"):
+                    moved = True
+                elif moved and ch.arrival is None:
+                    ch.arrival = f
+                goal = not h._holds(h.goal, now)
+                if goal and not (w["goal_writers"] and all(i in track.matched for i in w["goal_writers"])):
+                    ch.outcome, ch.why = "goal, not from the plan", sorted(w["goal_writers"])
+                    break
+                if goal or all(i in track.matched for i in w["needed"]):
+                    ch.outcome = "goal" if goal else "success"
+                    break
+                ref = [i for i in w["needed"] if i in track.refuted]
+                if ref:
+                    fr, why_, run_ = track.refuted[ref[0]]
+                    ch.outcome, ch.why = "refuted", (next(r.name for r in w["tracked"] if r.i == ref[0]), why_)
+                    self._fail(w, ch, {"kind": "refuted", "record": ch.why[0], "frame": fr, "why": why_,
+                                       "run": run_, "material": kept.freeze()})
+                    break
+                m.matched = {i: (v[0], v[1]) for i, v in track.matched.items()}
+                mm = m.mismatch(now, ch.at_fork)
+                if mm is not None:
+                    ch.outcome, ch.why = "mismatch", mm
+                    unit = mm[0][4:] if str(mm[0]).startswith("pos:") else None
+                    run_ = next((r for r in reversed(Rk.get(f, [])) if r.unit == unit), None) if unit else None
+                    self._fail(w, ch, {"kind": "mismatch", "record": None, "frame": f, "why": f"end {mm[0]}",
+                                       "run": run_, "material": kept.freeze()})
+                    break
+                with self._lock:
+                    best = w["best"]
+                if best is not None and st["qf"] >= best.q_end:  # section 9.3: after the frame's end tests
+                    ch.outcome = "pruned"
+                    break
+                if f > s_issue + 1 and "idle" in st:
+                    dead = m.dead_needed(now)
+                    if dead:
+                        ch.outcome, ch.why = "spent", m.unmet(now)
+                        self._not_run_fail(w, ch, track, f, kept)
+                        break
+                if f - s_issue >= cfg.child_limit:
+                    ch.outcome, ch.why = "limit", m.unmet(now)
+                    self._not_run_fail(w, ch, track, f, kept)
+                    break
+                st = cb.run(frame=f + 1)
+                if "end" in st:
+                    ch.outcome, ch.why = "ended", st["end"]
+                    break
+                t_ = time.thread_time()
+                rows = cb.runs()["runs"]
+                kept.add_entries(cb.explain_log()["explain"])
+                s = cb.state()
+                obs = F.facts_of(s)
+                now = w["sview"](obs, s)
+                t_ = self._tick("observe", t_)
+                R_ = S.by_frame(S.runs_of(rows)).get(f + 1, [])
+                Rk[f + 1] = R_
+                for run_, v_ in track.verdicts(R_, prev_view, now, prev_dump):
+                    track.apply(f + 1, run_, v_, now)
+                kept.frame(f + 1, R_, s, now)
+                prev_view, prev_dump = now, s
+                self._tick("match", t_)
+            ch.end, ch.q_end = cb.frame, cb.status.get("qf")
+            ch.matched = {i: (v[0], v[1]) for i, v in track.matched.items() if v[0] is not None}
+            ch.choices = dict(track.choices)
+            if ch.outcome in ("spent", "mismatch", "limit", "refuted") and \
+                    all(i in track.matched for i in w["before_input"]) and ch.took not in (None, "plan, no change"):
+                ch.outcome = "deviation"
+                ch.dev_stop = cb.frame
+                while cb.frame - ch.dev_stop < cfg.window_frames:
+                    if click_gate(cb.status):  # section 9.3: the gate first, then the prune
+                        break
+                    with self._lock:
+                        best = w["best"]
+                    if best is not None and cb.status["qf"] >= best.q_end:
+                        ch.outcome = "pruned"
+                        break
+                    st = cb.run(frame=cb.frame + 1)
+                    if "end" in st:
+                        ch.outcome, ch.why = "ended", st["end"]
+                        break
+                if ch.outcome == "deviation" and cb.frame != ch.dev_stop:
+                    cb.runs()
+                    cb.explain_log()
+                    s = cb.state()
+                    obs = F.facts_of(s)
+                ch.end, ch.q_end = cb.frame, cb.status.get("qf")
+            if ch.outcome in ("success", "goal", "deviation"):
+                d_issue = frames_seen[s_issue][1]
+                ch.checkpoints = [(s_issue, F.facts_of(d_issue), RP.extra_of(d_issue, st_issue)),
+                                  (cb.frame, dict(obs), RP.extra_of(s, cb.status))]
+                full = w["full_fv"](obs)
+                ch.unplanned = [{"key": x.key, "start": RP._str(ch.full_at_fork.get(x.key)), "changes": [],
+                                 "count": 1, "end": RP._str(x.observed), "net": True}
+                                for x in RP.unplanned(ch.full_at_fork, full, w["predicted_keys"])][:40]
+                floor = w["b_qf"] if ch.outcome != "deviation" else w["b_dev_qf"]
+                if ch.q_end < ch.q0 + floor:
+                    with self._lock:
+                        w["bound_violations"].append([ch.g, ch.q0, ch.q_end, floor, ch.outcome])
+                old = None
+                with self._lock:
+                    best = w["best"]
+                    if best is None or end_key(ch) < end_key(best):
+                        w["best"], old = ch, best
+                        ch.snapshot, ch.live, snap, cb = snap, cb, None, None
+                for b_ in ((old.snapshot, old.live) if old is not None else ()):
+                    if b_ is not None:
+                        b_.quit()
+                if old is not None:
+                    old.snapshot = old.live = None
+            return ch
+        except (ControlError, OSError, RP.Stop) as e:
+            ch.outcome, ch.why = "error", f"{type(e).__name__}: {e}"
+            return ch
+        finally:
+            self._tick("child total", t_start)
+            for b_ in (snap, cb):
+                if b_ is not None:
+                    try:
+                        b_.quit()
+                    except OSError:
+                        pass
+
+    def _fail(self, w: dict, ch: Child, fail: dict) -> None:
+        """A child's first failure (9.5), counted by its signature; the first child with a signature keeps it."""
+        if ch.fail is not None:
+            return
+        ch.fail = fail
+        sig = (fail["kind"], fail.get("record"), str(fail.get("why")))
+        with self._lock:
+            w["failures"][sig] += 1
+            w["failure_of"].setdefault(sig, fail)
+
+    def _not_run_fail(self, w: dict, ch: Child, track, f: int, kept) -> None:
+        """A needed record whose own run did not happen before the child stopped (9.5)."""
+        r = next((r for r in w["tracked"] if r.i in w["needed"] and r.i not in track.matched and
+                  r.i not in track.refuted), None)
+        if r is None:
+            return
+        self._fail(w, ch, {"kind": "not run", "record": r.name, "frame": f, "why": "its run did not happen",
+                           "unit": r.unit, "run": None, "material": kept.freeze()})
+
     # --- one plan ---
 
     def _set_branch(self, b) -> None:
@@ -1051,6 +1701,12 @@ class Search:
         self.pred0 = dict(h.pred)
         h.plans[-1]["macro_steps"] = [[recs[j].name for j in m] for m in macros]
         h.plans[-1]["goal_writers"] = [recs[i].name for i in sorted(self.goal_writers)]
+        strict = self.cfg.strict
+        if strict:  # section 9: this plan's strict parts; nothing of it has matched yet
+            import strict as S
+            self._strict_setup()
+            self.splan = S.Plan(self.sr, recs, self.code, {})
+            self.strack = S.Track(self.splan, {})
         for k, members in enumerate(macros):
             if time.monotonic() - h.t0 > h.time_limit:
                 h.stop_reason = "time limit"
@@ -1063,8 +1719,11 @@ class Search:
                     {r.i for r in tracked if r.macro < k and any(r.i in recs[j].preds for j in members)}
             h.progress(f"plan {n_plan} window {k + 1}/{len(macros)}: {recs[members[0]].name} at frame {h.branch.frame} "
                        f"({len(needed)} records needed, {len(tracked)} tracked)")
-            res = self.window(recs, members, tracked, needed, h.branch, n_plan, k)
+            res = (self.window_strict if strict else self.window)(recs, members, tracked, needed, h.branch, n_plan, k)
             wr, best = res["rec"], res["best"]
+            cause = res.get("cause")
+            if strict and cause is not None:
+                h.progress(f"  window {k + 1}: cause: {S.short(cause)}")
             ugs = [c for c in wr["children"] if c[3] == "goal, not from the plan"]
             if ugs:
                 self.unplanned_goals.append({"plan": n_plan, "macro": k, "children": len(ugs), "first": ugs[0]})
@@ -1072,7 +1731,11 @@ class Search:
                        f"best {wr.get('best', {}).get('end')} (Q {wr.get('best', {}).get('q_end')}); "
                        f"{wr['wall_s']} s")
             if best is None:
-                self._mark(recs, res["parent_matched"], None)
+                if strict:
+                    self.strack = res["track"]
+                    self._strict_mark(recs, self.strack)
+                else:
+                    self._mark(recs, res["parent_matched"], None)
                 self.flush()
                 h.observe()
                 h.checkpoint()
@@ -1086,6 +1749,9 @@ class Search:
                                                  "qf": h.branch.status.get("qf")})
                     h.stop_reason = (f"goal, not from the plan: it held in the idling engine at frame "
                                      f"{h.branch.frame} with none of the plan's goal records matched")
+                    if strict:
+                        self._note_cause(n_plan, k, "goal, not from the plan", cause)
+                        h.stop_reason += f"; cause: {S.short(cause)}"
                     self._logs(n_plan, recs, members, res, "stop")
                     return "stop"
                 if wr.get("delta_violation"):
@@ -1096,15 +1762,31 @@ class Search:
                     self._logs(n_plan, recs, members, res, "next")
                     continue
                 self.replan_cause = f"window empty: {wr['end_reason']}; children {wr['outcomes']}"
+                if strict:  # section 9.5: the cause, and the stop at the same empty window again
+                    self._note_cause(n_plan, k, "window empty", cause)
+                    self.replan_cause += f"; cause: {S.short(cause)}"
+                    key = (recs[members[0]].name, (cause or {}).get("kind"), (cause or {}).get("unit"),
+                           (cause or {}).get("offset"), (cause or {}).get("why"))
+                    self.empty_keys[key] += 1
+                    if self.empty_keys[key] >= self.cfg.repeat_stop:
+                        h.stop_reason = (f"the same empty window {self.empty_keys[key]} times on "
+                                         f"{recs[members[0]].name}: {S.short(cause)}")
+                        self._logs(n_plan, recs, members, res, "stop")
+                        return "stop"
                 self._logs(n_plan, recs, members, res, "replan")
                 return "replan"
             # a success: the chosen child's snapshot (at the goal, its live branch) is the engine from here
             h.ex.movie.extend(best.events)
             self.flush()
-            self._mark(recs, res["parent_matched"], best.g)
+            if strict:  # section 9: the chosen child's strict matches, at its snapshot (all of them at its end)
+                self.strack = (best.track if best.outcome in ("goal", "deviation") else best.track_issue).copy()
+                self._strict_mark(recs, self.strack)
+            else:
+                self._mark(recs, res["parent_matched"], best.g)
             if best.outcome == "deviation":
                 # section 7: the deviating child's branch at its stop is the engine; the plan is made again from there
-                self._mark(recs, best.matched, None)
+                if not strict:
+                    self._mark(recs, best.matched, None)
                 if best.snapshot is not None:
                     best.snapshot.quit()
                 best.snapshot = None
@@ -1126,16 +1808,21 @@ class Search:
                 self._predict(recs)
                 self._logs(n_plan, recs, members, res, "replan")
                 self.replan_cause = f"deviation at frame {best.dev_stop}: {str(best.why)[:300]}"
+                if strict:
+                    self._note_cause(n_plan, k, "deviation", cause)
+                    self.replan_cause += f"; cause: {S.short(cause)}"
                 self.deviations.append({"plan": n_plan, "macro": k, "frame": best.dev_stop, "end": best.end,
                                         "qf": best.q_end,
                                         "why": str(best.why)[:300], "replan_frame": b_.frame,
                                         "frames_to_the_click_gate": ran})
                 return "replan"
             if best.outcome == "goal":
-                self._mark(recs, best.matched, None)
+                if not strict:
+                    self._mark(recs, best.matched, None)
                 b_, other = best.live, best.snapshot
             else:
-                self._mark(recs, best.matched, best.issue)
+                if not strict:
+                    self._mark(recs, best.matched, best.issue)
                 b_, other = best.snapshot, best.live
                 self.pending_cp = (best.checkpoints[-1], len(h.ex.movie))
             if other is not None:
@@ -1154,9 +1841,26 @@ class Search:
                 return "goal"
             if choices:  # the harness's rule: a guessed write the engine took otherwise is a replan
                 self.replan_cause = f"a guessed write took another value than the plan's: {choices}"
+                if strict and best.choice_fail is not None:
+                    c_ = S.explain(self.code, self.sr, best.choice_fail)
+                    self._note_cause(n_plan, k, "a guessed write", c_)
+                    self.replan_cause += f"; cause: {S.short(c_)}"
                 return "replan"
         self.replan_cause = "the plan played out without the goal"
+        if strict:
+            self._note_cause(n_plan, len(macros), "the plan played out without the goal",
+                             {"cause": None, "kind": "every window succeeded and the goal does not hold"})
         return "replan"
+
+    def _strict_mark(self, recs: list, track) -> None:
+        """Section 9: the records a branch matched strictly are done (their frame and path)."""
+        for i, (f, path, _seq) in track.matched.items():
+            r = recs[i]
+            if not r.done:
+                r.done, r.done_frame, r.path = True, f, path
+
+    def _note_cause(self, n_plan: int, k: int, what: str, cause) -> None:
+        self.causes.append({"plan": n_plan, "macro": k, "what": what, "cause": _plain(cause)})
 
     def summary(self) -> dict:
         ws = self.windows
@@ -1169,4 +1873,6 @@ class Search:
                 "bound_violations": sum(len(w["bound_violations"]) for w in ws),
                 "goal_from_the_plan": self.goal_credited, "unplanned_goals": self.unplanned_goals,
                 "memory_kb": dict(self.mem), "deviations": list(self.deviations),
-                "config": dataclasses.asdict(self.cfg)}
+                "config": dataclasses.asdict(self.cfg),
+                "causes": list(self.causes), "python_cpu_by_part_s": {k: round(v, 2) for k, v in self.prof.items()},
+                "empty_windows": [[list(k), n] for k, n in self.empty_keys.items()]}
