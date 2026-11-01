@@ -168,20 +168,25 @@ class Track:
         self.matched = dict(done)
         self.refuted: dict = {}
         self.choices: dict = {}  # MRec.i -> [(key, observed)]: a guessed write the engine took otherwise
+        self.unit_seq: dict = {}  # an input's MRec.i -> {unit: the seq of the click's run of it}
+        self.first_seq: dict = {}  # an input's MRec.i -> the seq of the click's first run
 
     def copy(self) -> "Track":
         t = Track(self.plan, self.matched)
-        t.refuted, t.choices = dict(self.refuted), dict(self.choices)
+        t.refuted, t.choices, t.unit_seq = dict(self.refuted), dict(self.choices), dict(self.unit_seq)
+        t.first_seq = dict(self.first_seq)
         return t
 
     def armed(self, r) -> int | None:
-        """The seq after which a run of r's unit from its wait point is r's own (Definition S), None while the record
-        that leaves r's slot there has not matched."""
+        """The seq after which a run of r's unit from its wait point is r's own (Definition S): the run of r's unit by
+        the record that left it there (for an input, its run of that unit); None while that record has not matched."""
         prev = self.plan.prev_writer.get(r.i)
         if prev is None:
             return -1
         m = self.matched.get(prev)
-        return m[2] if m is not None else None
+        if m is None:
+            return None
+        return self.unit_seq.get(prev, {}).get(r.unit, m[2])
 
     def verdicts(self, runs: list, before: dict, after: dict, dump_before: dict | None) -> list:
         """B1's verdicts on R_k's runs of the plan's units at depth 0 from a wait point, stutters left out: [(Run,
@@ -212,8 +217,9 @@ class Track:
             ok = {ok} if isinstance(ok, int) else set(ok)
             idx = self.plan.idx[r.i]
             path = next((n for n, i in enumerate(idx) if i in ok), None)
+            # a record it follows must have begun before this run: an event's run, a click's first run
             late = [p for p in r.preds if p in self.plan.idx and
-                    (p not in self.matched or self.matched[p][2] >= run.seq)]
+                    (p not in self.matched or self.first_seq.get(p, self.matched[p][2]) >= run.seq)]
             if path is not None and not late:
                 self.matched[r.i] = (k, path, run.seq)
                 ch = [(kk, after.get(kk)) for kk, x in r.exps[path].items()

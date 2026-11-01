@@ -254,3 +254,19 @@ def test_a_value_outside_its_domain_is_not_checked_by_m4():
     vs = t.verdicts([ru], {"pos:local:3": 5, "var:133": 4}, {"pos:local:3": 9, "var:133": None}, None)
     t.apply(10, ru, vs[0][1], {})
     assert 0 in t.matched
+
+
+def test_a_record_is_armed_by_the_clicks_run_of_its_unit():
+    """An event record that follows a click resumes the unit the click's own run of it left there; a later run of the
+    click (another unit) does not move that point."""
+    sr = FakeReading({3: (3, None, None, {}, {"pos:script:2": ("set", 736)}, []),
+                      8: (8, "script:2", 736, {}, {"pos:script:2": ("set", NOWHERE)}, [])})
+    i0 = mrec(0, "input", "click#3", writes={"pos:script:2"})
+    e1 = mrec(1, "event", "e#8", "script:2", 736, reads={"pos:script:2"}, writes={"pos:script:2"}, preds={0})
+    t = S.Track(plan_of(sr, [i0, e1], {"click#3": 3, "e#8": 8}), {})
+    t.matched[0] = (30, 0, 50)  # the click's last run: seq 50 (another unit)
+    t.unit_seq[0] = {"script:2": 21}  # its run of the sentence script: seq 21
+    t.first_seq[0] = 20
+    assert t.armed(e1) == 21
+    t.apply(31, run(40, "script:2", 736, -1), types.SimpleNamespace(status="explained", record=8, why=[]), {})
+    assert 1 in t.matched

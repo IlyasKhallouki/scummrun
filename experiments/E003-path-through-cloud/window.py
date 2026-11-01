@@ -1564,6 +1564,22 @@ class Search:
             own = [{} for _ in cands]
             decided: list = [None] * len(cands)
             matched_writes: list = []  # (seq of the run, its record's set writes), the event records matched here
+            held: list = []  # event runs after the click's first run while its record is undecided (9.2)
+
+            def apply_run(f_, r, v, view):
+                for r_, how in track.apply(f_, r, v, view):
+                    if how == "matched":
+                        idx_ = sp.idx[r_.i][track.matched[r_.i][1]]
+                        matched_writes.append((r.seq, {kk: e[1] for kk, e in sr.rec(idx_)[4].items()
+                                                       if e[0] == "set"}))
+
+            def flush():
+                # the event runs after the click's first run, held while its record was undecided: in run order
+                if ch.took != "n/a" and held:
+                    for item in held:
+                        if ch.took is not None:
+                            apply_run(*item)
+                    held.clear()
 
             def decide(n_, f, va, runs_f):
                 c = cands[n_]
@@ -1587,6 +1603,8 @@ class Search:
                 if ok is not None:
                     res_ = decided[ok]
                     track.matched[first.i] = (s_issue, cands[ok][1], res_["last_seq"])
+                    track.unit_seq[first.i] = {u: r_.seq for u, r_ in own[ok].items()}
+                    track.first_seq[first.i] = res_["first_seq"]
                     ch.took = "plan" if res_["took"] else "plan, no change"
                     ch.track_issue = track.copy()
                     return
@@ -1623,16 +1641,18 @@ class Search:
                                         max(x.seq for x in own[n_].values()) < r.seq:
                                     decide(n_, f, va[0], runs_f)
                             settle()
-                        for r_, how in track.apply(f, r, vs[r.seq], va[0]):
-                            if how == "matched":
-                                idx_ = sp.idx[r_.i][track.matched[r_.i][1]]
-                                matched_writes.append((r.seq, {kk: e[1] for kk, e in sr.rec(idx_)[4].items()
-                                                               if e[0] == "set"}))
+                            flush()
+                        first_own = min((x.seq for o in own for x in o.values()), default=None)
+                        if ch.took == "n/a" and first_own is not None and r.seq > first_own:
+                            held.append((f, r, vs[r.seq], va[0]))  # whose own run it is waits for the click (9.2)
+                        else:
+                            apply_run(f, r, vs[r.seq], va[0])
                 if ch.took == "n/a" and f >= s_issue + 1 and va[0] is not None:
                     for n_ in range(len(cands)):
                         if decided[n_] is None and all(u in own[n_] for u in needs[n_]):
                             decide(n_, f, va[0], runs_f)
                     settle()
+                flush()
 
             def input_fail(f, why_default="no run") -> None:
                 first_c = next((n_ for n_, c in enumerate(cands) if c[0] == "plan"), None)
@@ -1731,6 +1751,7 @@ class Search:
                 if f > s_issue + 1 and "idle" in st:
                     if ch.took == "n/a":  # Lemma 9′: at the idle stop nothing is left to start the click's runs
                         settle(final=True)
+                        flush()
                     if ch.took is None:
                         ch.outcome, ch.why = "spent", "Lemma 9′: no run by the idle stop"
                         with self._lock:
@@ -1746,6 +1767,7 @@ class Search:
                     ch.outcome, ch.why = "limit", m.unmet(now)
                     if ch.took == "n/a":
                         settle(final=True)
+                        flush()
                     if ch.took is None:
                         input_fail(f)
                     else:
