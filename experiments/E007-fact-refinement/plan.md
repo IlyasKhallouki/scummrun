@@ -175,6 +175,21 @@ records and actions before and after, D_N's values, the out-of-domain check, and
   memory 3G; the reader's 60-minute and 8 GB watchdog); a run that hits one reports it as its stop. They are not
   decisions of this experiment.
 
+## Amendment (2026-11-01, before the runs, after the lemma check's first reading)
+
+- The first reading of the kitchen with `--fact-vars 103` forked every read of var 103 per value: the sentence script
+  compares it with its local 2 (the sentence's second object), not with a constant, so F12's value sets did not apply.
+  The records grew from 41,877 to 107,395 (2.56 times); k = 2, with about 80 values, would grow far more. Step 1 of
+  Lemma R already says "per value set that the comparison reading it separates": the reader now applies F12's rule to
+  a variable `--fact-vars` made a fact when the other operand is a local whose value the path knows (an argument bound
+  at the slot's start), which on that path is a constant (machine.rs `compare_sets`, `FactTable::refined`). It touches
+  only the listed variables, so every reading without the switch is unchanged. The predictions above stand as written.
+- The check compares records, not actions: the packed file folds equal records, so it reads the golden files. A record
+  of A that merged two paths with the same effects (a test taken either way) keeps one path's checks; a record of A2
+  that refines it lacks those checks on the other path. Such records are counted apart ("refines a merged record").
+- A record of A with a check on v that no record of A2 refines must be infeasible: no value of D_v passes its checks on
+  v together (A read v twice as two unrelated unknowns). The engine runs no such path, so step 2 holds for it.
+
 ## Results
 
 Written after the runs.
