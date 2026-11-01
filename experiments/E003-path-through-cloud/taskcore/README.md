@@ -10,6 +10,7 @@ taskcore sas    --task kitchen.tc --start s17 --out task.sas [--stats stats.json
                 [--encoding model|task] [--check-fold N] [--kept kept.json]
                 [--start-file start.txt] [--bans bans.txt] [--ops ops.jsonl]   (the replay harness's, below)
                 [--start-check input|needed] [--cost-caps caps.txt]
+                [--pick-windows on|off]   (off by default: "Pick windows", below)
 taskcore decode (same options) --plan sas_plan --out steps.json
 taskcore validate (same options) --names plan.txt --out result.json   (a plan as input action names, run on the reduced task)
 taskcore info   --task kitchen.tc
@@ -191,7 +192,84 @@ value (counted in `reduce_counts`), and the fold leaves a sub-group unfolded whe
 whole domain (`subgroups_writing_a_fact_twice_left_unfolded`). build_task writes one effect per fact, so neither
 happens on its tasks; the random tests make such actions (test_taskcore.py's `bad` actions).
 
-## The packed file (version 1)
+## Pick windows (`--pick-windows on`)
+
+A switch of the writer (`sas`, `decode`, and `serve`, as the server's option or a request's), off by default. With it
+off every output is as before, byte for byte. It needs the model encoding.
+
+**Why.** A guess written through a pick variable (PRODUCT_LIMIT, above) makes a pick operator per pick variable and
+value: no precondition, cost 0, and nothing sets the variable back. From every state the planner can reach every
+assignment of the pick variables at cost 0, with the same f. A* with an admissible heuristic expands that plateau
+before it closes an f-layer: on the bar door's task, 62 pick operators over 27 pick variables (25 with 2 values, 2
+with 6) give 2^25 · 6^2 = 1.2 · 10^9 copies of every state.
+
+**The rewrite.** Π is the file written with the switch off. Its variables are F (the task's facts and `goal`) and P
+(the pick variables); its operators are O_A (the actions' variants), O_P (one pick operator p(k,u) per pick variable k
+and value u) and O_G (the goal operators). For o in O_A, R(o) is the set of pick variables named in the conditions of
+o's effects; c_1, ..., c_m are the operators of O_A with R(c_j) non-empty, in file order. Π^W has one more variable,
+`lock`, with values 0 to m, 0 at the start and in the goal. It has no O_P, and:
+
+- every other operator of O_A, and every goal operator, gets the precondition lock = 0;
+- c_j becomes three kinds of operators: begin_j (c_j's precondition, lock 0 → j, cost 0); q(j,k,u) for each k in
+  R(c_j) and each value u of k (precondition lock = j, effect k := u, cost 0); end_j (c_j's precondition, c_j's
+  effects, k := 0 for each k in R(c_j), lock j → 0, cost(c_j)).
+
+**What the proof uses of Π.** These hold for every task taskcore writes, from the writer's rules
+(`sas.rs` `Expander::expand`), whatever the game:
+
+- (P1) every precondition names only F;
+- (P2) the goal names only F;
+- (P3) only pick operators write pick variables;
+- (P4) a pick variable is named only in conditions of effects of O_A;
+- (P5) for every pick variable k and every value u of k there is p(k,u): no precondition, the one effect k := u, cost 0;
+- (P6) every pick variable starts at 0.
+
+The model encoding's goal resets copy an effect's conditions, so they can name a pick variable; they are effects of
+O_A, and R counts them. The writer checks (P1), (P3) and (P4) on every variant it writes with the switch on.
+
+**Lemma 1.** Let o be in O_A or O_G, and let s and s' agree on F and on R(o). Then o applies in both or in neither,
+and o(s) and o(s') agree on F. Proof: o's precondition names only F (P1). Whether an effect fires depends on its
+conditions, which name F and R(o) only (P4 and the definition of R; R(o) is empty for a goal operator). What it
+writes is fixed by the operator. ∎
+
+**Lemma 2.** In every operator sequence of Π^W that applies from the start: where lock = 0, every pick variable is 0;
+from begin_j to the next operator that changes lock, only operators q(j,·,·) apply, F does not change, and that next
+operator is end_j. Proof: at the start lock = 0 and the pick variables are 0 (P6). An operator that is not begin, q
+or end writes neither lock nor P (P3). With lock = j only q(j,·,·) and end_j apply, since every other operator
+needs lock = 0 or lock = j' ≠ j. q(j,k,u) writes only k, a member of R(c_j). end_j sets every member of R(c_j) back to
+0 and lock to 0, and the other pick variables stayed 0 in the window. ∎
+
+**Theorem 1 (Π to Π^W).** Every plan of Π maps to a plan of Π^W with the same cost, whose operators outside the
+windows are the plan's operators from O_A and O_G, in the same order, with each c_j read as its window. Construction:
+drop the plan's pick operators. Replace each c_j by begin_j, then q(j,k,s(k)) for each k in R(c_j), where s is the
+state of Π just before c_j, then end_j. Invariant before each step: the two states agree on F, and in Π^W lock = 0,
+so every pick variable is 0 there (Lemma 2). A pick operator of Π changes no fact of F (P3). Any other operator o
+that is not a consumer applies in Π^W (P1, and lock = 0), and its effects name no pick variable, so the states agree
+on F after it. For c_j: begin_j applies, since its precondition is c_j's and lock = 0. After the picks, the state of
+Π^W agrees with s on F and on R(c_j), so end_j applies and its effects on F are those of c_j in s (Lemma 1); its other
+effects write P and lock, and lock is 0 again. At the end the goal holds on F (P2) and lock = 0. Costs: begin and q
+cost 0, end_j costs cost(c_j), and the pick operators that were dropped cost 0. ∎
+
+**Theorem 2 (Π^W to Π).** Every plan of Π^W maps to a plan of Π with the same cost, whose operators from O_A and O_G
+are the plan's operators outside the windows, in order, with c_j for each end_j. Construction: drop begin_j and
+each q. Replace each end_j by p(k, s'(k)) for each k in R(c_j), where s' is the state of Π^W just before end_j
+(these operators exist by P5), then c_j. Invariant: the two states agree on F. An operator outside the windows
+applies in Π (its precondition there is the one in Π^W less lock = 0), and its effects name no pick variable. In a
+window F does not change (Lemma 2). After the picks inserted before c_j, the state of Π agrees with s' on F and on
+R(c_j), so c_j applies and its effects on F are those of end_j (Lemma 1). Π's goal is Π^W's less lock = 0.
+Costs: the inserted picks cost 0, c_j costs cost(end_j), begin and q cost 0. ∎
+
+**Corollary.** Π and Π^W have the same optimal cost, and the maps send optimal plans to optimal plans with the same
+steps outside the picks, in the same order. In the model encoding Π's optimal cost is the task's (above), so Π^W's is
+too. Reading a plan of Π^W back (`decode`, the operator table): a pick variable that end_j reads has the value the
+last q(j,k,·) of its window gave it, else 0 (Lemma 2). These are the values Theorem 2's map sets, so the steps read
+back are those Π's reading gives for the mapped plan: the same actions, with the same precondition and guessed
+values. This is the sequential compilation of free choices (Nebel 2000), with each choice moved to just before the
+one operator that reads it.
+
+**Size.** One more variable with m + 1 values, and per consumer two operators and one pick operator per value of each
+variable it reads; the free pick operators go.
+
 
 Little-endian u32 words. Strings are UTF-8. A value is written as the string `str(v)` of a domain value (ints,
 `above`, `below`), by its id in the string table.
