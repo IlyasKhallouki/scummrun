@@ -679,11 +679,14 @@ class StrictMatcher:
             return got in eff[1]
         return True  # a step or a copy: its value depends on the state, not checked here
 
-    def match(self, runs: list, before: dict, after: dict, open_keys=frozenset()) -> list:
+    def match(self, runs: list, before: dict, after: dict, open_keys=frozenset(), same_unit: bool = False) -> list:
         """One verdict per run between two decision points, in run order (``runs``: Run, oldest first); ``before`` and
         ``after`` the views at the two decision points. ``open_keys``: facts whose value at the runs' start the views do
         not give (work between the decision points that no run here is matched to, such as the sentence script after
-        the earlier decision point): M2 does not check them, and a match that needed one is counted."""
+        the earlier decision point): M2 does not check them, and a match that needed one is counted. ``same_unit``
+        (window-search.md 9.9, the parts of a run that passed a wait): a later run of the same unit moves its slot, so
+        M4 does not check the unit's ``args:`` on an earlier one, and a matched run's end goes on to the next run's
+        state as its unit's ``pos:`` (the next part starts there); off, as before."""
         t = time.perf_counter()
         self.calls += 1
         state = before
@@ -702,6 +705,8 @@ class StrictMatcher:
         def later_writes(n, k):
             for a2, b2 in entries[n + 1:]:
                 if k in keys.get(a2, ()) or k in keys.get(b2, ()):
+                    return True
+                if same_unit and a2[0] == entries[n][0][0] and k == f"args:{a2[0]}":
                     return True
             return False
         for n, r in enumerate(runs):
@@ -765,6 +770,8 @@ class StrictMatcher:
                 # every matching record's set writes that agree go on to the next run's state
                 sets = [dict((k, e[1]) for k, e in o[1] if e[0] == "set") for o in ok]
                 common = {k: v for k, v in sets[0].items() if all(s.get(k) == v for s in sets[1:])}
+                if same_unit:
+                    common[f"pos:{r.unit}"] = r.code1 if r.code1 >= 0 else self.nowhere
                 if common:
                     if not copied:
                         state, copied = dict(state), True

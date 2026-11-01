@@ -14,6 +14,10 @@ What it gives window.py (section numbers of window-search.md):
   tests it"), and the effects whose engine value lies outside their domain, reported (``outside``).
 * ``Failure`` and ``explain``: what a child keeps of its first failure, and B1's explanation of it (9.5):
   trace_check.explain_unexplained (Lemmas X and B, the two classes), and Lemma X toward an input record's own end.
+* ``parts_of``, ``Parter``, ``part_verdicts`` (sub-switch ``split_wait``, 9.9; experiments/E006-passed-wait/plan.md,
+  Lemma P): a run that passed a WaitFor op read as parts, each the own run of one record: the click's record on part 1
+  (``input_match``'s ``parts``), the plan's next event of the unit on each later part; an event's own run at depth 0
+  the same (``Track.verdicts``' ``parts``). Off (``parts`` None), every result is as before.
 
 It names no game number. Every unit, offset and value it reports comes from the engine's runs and logs and the IR.
 """
@@ -254,20 +258,24 @@ class Track:
         return self.unit_seq.get(prev, {}).get(r.unit, m[2])
 
     def verdicts(self, runs: list, before: dict, after: dict, dump_before: dict | None,
-                 ex: TE.Explained | None = None) -> list:
+                 ex: TE.Explained | None = None, parts=None) -> list:
         """B1's verdicts on R_k's runs of the plan's units at depth 0 from a wait point, stutters left out: [(Run,
         Verdict)] in run order. ``ex``: the branch's explain log, from which M3 reads a check on the run's own opcodes
-        (``decide_on_log``); a check whose unit's run it does not hold is decided on the dump before, as before."""
+        (``decide_on_log``); a check whose unit's run it does not hold is decided on the dump before, as before.
+        ``parts`` (sub-switch ``split_wait``, a ``Parter``): a run that passed a WaitFor op is matched as its parts
+        (Lemma P), each with its own verdict; off (None), as before."""
         plan = self.plan
-        mine = [r for r in runs if r.depth == 0 and r.code0 >= 0 and r.unit in plan.unit_set
-                and not is_stutter(plan.code, r)]
+        mine = plan_runs(plan, runs, parts)
         if not mine:
             return []
         m = _MatcherView(plan.matcher, dump_before, plan.code, ex)
         # trace-validation.md section 3, facts outside the view: a value outside its domain (None in the view) is not
         # checked by M4
         after_in = {k: v for k, v in after.items() if v is not None}
-        vs = m.match(mine, before, after_in, open_keys_of(runs, before, after))
+        if parts is None:
+            vs = m.match(mine, before, after_in, open_keys_of(runs, before, after))
+        else:
+            vs = m.match(mine, before, after_in, open_keys_of(runs, before, after), same_unit=True)
         return [(v.run, v) for v in vs]
 
     def apply(self, k: int, run: TE.Run, v, after: dict, dump: dict | None = None) -> list:
@@ -311,6 +319,16 @@ class Track:
         return out
 
 
+def plan_runs(plan: Plan, runs: list, parts=None) -> list:
+    """The runs B1's matcher takes in R_k: the plan's units' runs at depth 0 from a wait point, stutters left out; with
+    ``parts`` (9.9), a run that passed a WaitFor op as its parts."""
+    mine = [r for r in runs if r.depth == 0 and r.code0 >= 0 and r.unit in plan.unit_set
+            and not is_stutter(plan.code, r)]
+    if parts is not None:
+        mine = [p for r in mine for p in (parts(r) or [r])]
+    return mine
+
+
 def outside_of(eff: dict, view: dict, dump: dict | None) -> list:
     """The effects of a record (B1's tuple's effects) whose engine value lies outside the fact's domain (None in the
     view): [(key, the engine's value)]. M4 does not check them (trace-validation.md section 3, "Facts outside the
@@ -347,7 +365,7 @@ class _MatcherView:
 # --- an input record at s + 1 ------------------------------------------------------------------------------------------
 
 def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: dict | None, applied: dict,
-                own: dict, vk: dict, later: list, decide=None, dk: dict | None = None) -> dict:
+                own: dict, vk: dict, later: list, decide=None, dk: dict | None = None, parts=None) -> dict:
     """9.2's (I1)-(I4) and "took effect" for the reading's action ``idx``, an input record whose ``pos:`` writes name
     ``units``: v0 the view before its first click (V_{f_1−1}), d0 the dump there, ``applied`` the set writes of the
     event records matched before its first run, ``own`` its runs (unit -> the unit's first run at depth 1 or more from
@@ -355,19 +373,28 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
     ``decide``: (I4) on the frame where the engine tests a check, check -> True, False, None or NO_LOG
     (``decide_on_log`` on the click's run of the check's unit); a check it gives NO_LOG for, or every check without
     it, is decided on d0. ``dk``: the dump at the frame it is decided, for the engine's values outside a domain.
-    Returns {"ok", "took", "why", "run", "engine", "want", "first_seq", "last_seq", "outside"}: why the first
-    condition that failed, run the click's run of the unit it names, outside the effects M4 left unchecked because
-    the engine's value lies outside the domain."""
+    ``parts`` (sub-switch ``split_wait``, 9.9, a ``Parter``): a click's run of U that passed a WaitFor op is its parts
+    (Lemma P); the record is matched on part 1, the later parts are later runs between the same decision points ((I3):
+    their records' keys and U's ``args:``), and ``decide`` reads U's checks on part 1 (the caller's ``decide`` gets the
+    part through ``parts``). Returns {"ok", "took", "why", "run", "engine", "want", "first_seq", "last_seq",
+    "outside", "split"}: why the first condition that failed, run the click's run of the unit it names, outside the
+    effects M4 left unchecked because the engine's value lies outside the domain, split {U: the run's parts} for the
+    units whose run passed a wait (with ``parts``)."""
     _, _, _, pre, eff, checks = sr.rec(idx)
     state = {**v0, **applied} if applied else v0
     bad = next((k for k, vs in pre.items() if not TE._holds(state.get(k), vs)), None)
     if bad is not None:
         return {"ok": False, "took": False, "why": f"pre {bad}", "run": None, "engine": _show(state.get(bad))}
     changed = False
+    split: dict = {}
     for k, e in eff.items():
         if not k.startswith("pos:") or e[0] != "set":
             continue
-        r = own.get(k[4:])
+        r = whole = own.get(k[4:])
+        ps = parts(r) if parts is not None and r is not None else None
+        if ps:  # 9.9: the record is the run's part 1; the later parts are the plan's next events' own runs
+            split[k[4:]] = ps
+            r = ps[0]
         if r is None:
             if e[1] == R.NOWHERE:  # a slot the click stops, or leaves dead: the view says
                 if vk.get(k) != R.NOWHERE:
@@ -377,12 +404,14 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
                 continue
             return {"ok": False, "took": False, "why": f"no run {k}", "run": None, "engine": None, "want": e[1]}
         end = r.code1 if r.code1 >= 0 else R.NOWHERE
-        if end != e[1]:
-            return {"ok": False, "took": False, "why": f"end {k}", "run": r, "engine": end, "want": e[1]}
+        if end != e[1]:  # (the cause is read on the click's whole run: Lemma X toward the record's end)
+            return {"ok": False, "took": False, "why": f"end {k}", "run": whole, "engine": end, "want": e[1]}
         if v0.get(k) != end:
             changed = True
     seqs = [r.seq for r in own.values()]
     mine = sorted(own.values(), key=lambda r: r.seq)
+    if split:  # 9.9, (I3): the later parts are later runs between the same decision points
+        later = [p for ps in split.values() for p in ps[1:]] + list(later)
     for k, e in eff.items():
         if k.startswith("pos:") or e[0] not in ("set", "guess") or vk.get(k) is None:
             continue  # (a value outside its domain is not checked: trace-validation.md section 3)
@@ -390,6 +419,8 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
             if any(k in plan.matcher.keys.get((r.unit, r.code0, r.code1 if r.code1 >= 0 else R.NOWHERE), ()) or
                    k in plan.matcher.keys.get((r.unit, r.code0, None), ()) for r in later):
                 continue
+            if k.startswith("args:") and k[5:] in split:
+                continue  # U's slot moved on in a later part: its locals there are the later part's
             return {"ok": False, "took": False, "why": f"effect {k}", "run": mine[-1] if mine else None,
                     "engine": _show(vk[k])}
         if not TE.StrictMatcher._value_ok(e, v0.get(k)):
@@ -400,14 +431,106 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
             got = RP.eval_check(c, sr.task.actions[idx].what, d0) if d0 is not None else None
         if got is False:
             return {"ok": False, "took": False, "why": f"check {c[0]}", "run": None, "engine": None}
-    return {"ok": True, "took": changed, "why": None, "run": None, "first_seq": min(seqs, default=-1),
-            "last_seq": max(seqs, default=-1), "outside": outside_of(eff, vk, dk)}
+    out = {"ok": True, "took": changed, "why": None, "run": None, "first_seq": min(seqs, default=-1),
+           "last_seq": max(seqs, default=-1), "outside": outside_of(eff, vk, dk)}
+    if split:
+        out["split"] = split
+    return out
 
 
 def _show(v):
     if isinstance(v, frozenset):
         return sorted(v)[:4]
     return v
+
+
+# --- a run that passed a wait (9.9; experiments/E006-passed-wait/plan.md, Lemma P) ------------------------------------
+
+PART_STEP = 0.001  # part j of a split run has the run's seq + j * PART_STEP: after the run began, before the next run
+
+
+def parts_of(code: TE.Code, lg: TE.Logged, resumed: bool) -> list | None:
+    """Lemma P: the logged run ``lg`` cut before each WaitFor op it executed and went on past (another opcode of the run
+    follows it), except the op it resumed at (``resumed``: a slot runAllScripts resumed, whose first opcode is at its
+    wait point c0): its parts as Logged runs, part j (from 1) with seq lg.seq + j * PART_STEP; part 1 starts where the
+    run started, part j ≥ 2 at its WaitFor op; each part but the last ends at the next part's op with the slot running
+    there. None when the run passed no such op or its unit is not in the IR."""
+    key = code.key(lg.where, lg.number, lg.room)
+    if key is None:
+        return None
+    u = code.unit(key)
+    first = next((n for n, op in enumerate(lg.ops) if op.code >= 0), None)
+    cuts = []
+    for n, op in enumerate(lg.ops):
+        if op.code < 0 or n + 1 >= len(lg.ops):
+            continue  # the run's last opcode: a WaitFor there blocked
+        if resumed and n == first and op.code == lg.code0:
+            continue  # the wait the run resumed at: the event's record starts at it
+        i = code.index(key, op.code)
+        if i is not None and u.ins[i].yields == "wait":
+            cuts.append(n)
+    if not cuts or len(cuts) + 1 >= 1 / PART_STEP:
+        return None
+    bounds = [0] + cuts + [len(lg.ops)]
+    out = []
+    for j in range(len(bounds) - 1):
+        a, b = bounds[j], bounds[j + 1]
+        last = j == len(bounds) - 2
+        out.append(TE.Logged(lg.seq + (j + 1) * PART_STEP, lg.frame, lg.after, lg.slot, lg.where, lg.number, lg.room,
+                             lg.code0 if j == 0 else lg.ops[a].code, list(lg.ops[a:b]),
+                             lg.code1 if last else lg.ops[b].code, lg.status if last else TE.SS_RUNNING,
+                             lg.frozen, lg.delay if last else 0))
+    return out
+
+
+def part_entries(lg: TE.Logged) -> list:
+    """A part as explain-log entries (the bridge's format, TE.Explained.add), so that the kept log holds it by its
+    seq: M3 on its own opcodes (``decide_on_log``) and a cause read on it (9.5)."""
+    out = [("b", lg.seq, lg.frame, lg.after, lg.slot, lg.where, lg.number, lg.room, lg.code0)]
+    for op in lg.ops:
+        out.append(("o", lg.seq, op.code, op.opcode))
+        out.extend(("r", lg.seq, v, x) for v, x in op.reads)
+        out.extend(("w", lg.seq, v, x) for v, x in op.writes)
+    out.append(("e", lg.seq, lg.code1, lg.status, lg.frozen, lg.delay))
+    return out
+
+
+class Parter:
+    """One branch's ``parts`` (9.9): run -> its parts as Runs when its log in ``kept`` shows it passed a WaitFor op
+    (``parts_of``), else None. A split run's parts go into the kept log as runs of their own (``part_entries``)."""
+
+    def __init__(self, code: TE.Code, kept: "Kept"):
+        self.code, self.kept = code, kept
+        self.cache: collections.OrderedDict = collections.OrderedDict()
+        self.splits = 0  # runs read as parts
+
+    def __call__(self, r: TE.Run) -> list | None:
+        if r.seq in self.cache:
+            return self.cache[r.seq]
+        lg = self.kept.ex.runs.get(r.seq)
+        ps = parts_of(self.code, lg, r.depth == 0) if lg is not None and lg.seq == r.seq else None
+        out = None
+        if ps:
+            self.kept.add_entries([e for p in ps for e in part_entries(p)])
+            out = [TE.Run(r.frame, r.after, p.seq, r.depth, r.slot, r.where, r.number, r.room, p.code0, p.code1,
+                          p.status, p.frozen, p.delay, len(p.ops)) for p in ps]
+            self.splits += 1
+        self.cache[r.seq] = out
+        while len(self.cache) > 4096:
+            self.cache.popitem(last=False)
+        return out
+
+
+def part_verdicts(plan: Plan, parts: list, state: dict, after: dict, later: list, dump_before: dict | None,
+                  ex, open_keys: frozenset) -> list:
+    """9.9: B1's verdicts on a click's run's later parts (``parts``, in order), each the own run of an event record:
+    M2 on ``state`` (the view before the click's run with the set writes of the records matched before these parts,
+    the click's record's included), M3 on each part's own opcodes (``ex``), M4 on ``after`` unless a later part or a
+    run of ``later`` (the plan's runs after the click's run in the same R_k, ``plan_runs``) writes the key."""
+    m = _MatcherView(plan.matcher, dump_before, plan.code, ex)
+    after_in = {k: v for k, v in after.items() if v is not None}
+    vs = m.match(list(parts) + list(later), state, after_in, open_keys, same_unit=True)
+    return [(v.run, v) for v in vs[:len(parts)]]
 
 
 # --- a failure and its cause (9.5) -----------------------------------------------------------------------------------
@@ -514,6 +637,10 @@ def explain(code: TE.Code, sr: Reading, fail: dict) -> dict:
 
 
 def _logged(eng: _Eng, run: TE.Run):
+    if isinstance(run.seq, float):  # a part of a run that passed a wait (9.9): its own entries, by its seq
+        lg = eng.ex.runs.get(run.seq)
+        if lg is not None:
+            return lg
     return next((r for r in eng.ex.runs.values() if r.frame == run.frame and r.after == run.after and
                  r.code0 == run.code0 and r.where == run.where and r.number == run.number), None)
 
@@ -684,4 +811,5 @@ def unit_where(unit: str) -> list:
 
 
 __all__ = ["Reading", "ArgsView", "Plan", "Track", "input_match", "Kept", "explain", "short", "runs_of", "by_frame",
-           "unit_where", "M", "cite_unit", "decide_on_log", "NO_LOG", "outside_of"]
+           "unit_where", "M", "cite_unit", "decide_on_log", "NO_LOG", "outside_of", "parts_of", "part_entries", "Parter",
+           "part_verdicts", "plan_runs", "PART_STEP"]

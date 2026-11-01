@@ -386,3 +386,120 @@ def test_a_read_of_a_variable_the_reading_does_not_hold_is_split():
     assert TE.cause_class(vals) == "split"
     code.facts = frozenset({"var:102", "var:103", "room"})
     assert TE.kind_of_var(code, 103) == "fact"
+
+
+# --- a run that passed a wait (window-search.md 9.9; experiments/E006-passed-wait/plan.md, Lemma P) ----------------
+
+def part_log(seq, codes, code1, frame=30, after=1, depth=1, room=28):
+    entries = [("b", seq, frame, after, 0, 3, 203, room, codes[0])] + [("o", seq, c, 0) for c in codes] + \
+        [("e", seq, code1, 2 if code1 >= 0 else 0, 0, 0)]
+    return entries, run(seq, "local:203", codes[0], code1, frame=frame, after=after, depth=depth)
+
+
+def test_a_run_that_passed_a_wait_is_cut_before_the_wait():
+    code = FakeCode()  # [0000] jump, [0005] a WaitFor op, [0009] an op
+    ex = TE.Explained(part_log(5, [0, 5, 9], -1)[0])
+    ps = S.parts_of(code, ex.runs[5], resumed=False)
+    assert [(p.code0, p.code1, [o.code for o in p.ops]) for p in ps] == [(0, 5, [0]), (5, -1, [5, 9])]
+    assert [p.seq for p in ps] == [5 + S.PART_STEP, 5 + 2 * S.PART_STEP]
+    assert ps[0].status == TE.SS_RUNNING and ps[1].status == 0
+    # a run that blocked at the wait (its last opcode) is one part: no cut
+    assert S.parts_of(code, TE.Explained(part_log(6, [0, 5], 5)[0]).runs[6], resumed=False) is None
+    # a slot resumed at the wait: the event's record starts at it, no cut there
+    assert S.parts_of(code, TE.Explained(part_log(7, [5, 9], -1)[0]).runs[7], resumed=True) is None
+    # a run started at the wait (not resumed): the record ends at it
+    ps = S.parts_of(code, TE.Explained(part_log(8, [5, 9], -1)[0]).runs[8], resumed=False)
+    assert [(p.code0, p.code1, len(p.ops)) for p in ps] == [(5, 5, 0), (5, -1, 2)]
+    # the parts go into the kept log as runs of their own
+    ex2 = TE.Explained([e for p in S.parts_of(code, ex.runs[5], False) for e in S.part_entries(p)])
+    assert sorted(ex2.runs) == [5 + S.PART_STEP, 5 + 2 * S.PART_STEP]
+    assert [o.code for o in ex2.runs[5 + 2 * S.PART_STEP].ops] == [5, 9]
+
+
+def split_case():
+    """The kitchen's walk_to(428) case on FakeCode's unit: the click's record ends at the wait [0005]; the plan's next
+    event of the unit resumes there, passes the wait and ends the slot; the engine's run did both in one run."""
+    wait = ("room-028-bar/local-203.txt:2 [0005]", "WaitForActor(1); blocks", False, "?(actor state)")
+    sr = FakeReading({3: (3, None, None, {}, {"pos:local:203": ("set", 5), "var:1": ("set", 1),
+                                              "args:local:203": ("set", 77)}, []),
+                      8: (8, "local:203", 5, {"pos:local:203": {5}, "var:1": {1}, "args:local:203": {77}},
+                          {"pos:local:203": ("set", NOWHERE), "var:2": ("set", 4)}, [wait])})
+    i0 = mrec(0, "input", "click#3", writes={"pos:local:203", "var:1", "args:local:203"})
+    e1 = mrec(1, "event", "e#8", "local:203", 5, reads={"pos:local:203", "var:1"}, writes={"pos:local:203", "var:2"},
+              preds={0})
+    sr.by_name = {"click#3": 3, "e#8": 8}
+    plan = S.Plan(sr, [i0, e1], FakeCode(), {})
+    kept = S.Kept()
+    entries, rho = part_log(21, [0, 5, 9], -1)
+    kept.add_entries(entries)
+    v0 = {"pos:local:203": NOWHERE, "var:1": 0, "var:2": 0, "args:local:203": frozenset({0})}
+    vk = {"pos:local:203": NOWHERE, "var:1": 1, "var:2": 4, "args:local:203": frozenset({0})}
+    return sr, plan, kept, rho, v0, vk, i0, e1
+
+
+def test_the_clicks_record_matches_the_part_up_to_the_wait():
+    sr, plan, kept, rho, v0, vk, _, _ = split_case()
+    own = {"local:203": rho}
+    # off: the click's run ended the slot, the record ends at the wait
+    off = S.input_match(sr, plan, 3, ["local:203"], v0, None, {}, own, vk, [])
+    assert not off["ok"] and off["why"] == "end pos:local:203" and off["engine"] == NOWHERE
+    # on: part 1 ends at the wait; var:1 holds after; args: is the later part's (the slot moved on and ended)
+    parts = S.Parter(plan.code, kept)
+    on = S.input_match(sr, plan, 3, ["local:203"], v0, None, {}, own, vk, [], parts=parts)
+    assert on["ok"] and on["took"] and list(on["split"]) == ["local:203"] and len(on["split"]["local:203"]) == 2
+    assert parts.splits == 1 and 21 + 2 * S.PART_STEP in kept.ex.runs
+    # a record that ends elsewhere than the run's first passed wait does not match part 1
+    sr.recs[3] = (3, None, None, {}, {"pos:local:203": ("set", NOWHERE)}, [])
+    bad = S.input_match(sr, plan, 3, ["local:203"], v0, None, {}, own, vk, [], parts=parts)
+    assert not bad["ok"] and bad["why"] == "end pos:local:203" and bad["run"] is rho
+
+
+def test_the_plans_next_event_matches_the_rest_in_the_same_frame():
+    sr, plan, kept, rho, v0, vk, i0, e1 = split_case()
+    parts = S.Parter(plan.code, kept)
+    res = S.input_match(sr, plan, 3, ["local:203"], v0, None, {}, {"local:203": rho}, vk, [], parts=parts)
+    t = S.Track(plan, {})
+    t.matched[0], t.unit_seq[0], t.first_seq[0] = (30, 0, 21), {"local:203": 21}, 21
+    rest = res["split"]["local:203"][1:]
+    state = {**v0, "pos:local:203": 5, "var:1": 1, "args:local:203": 77}  # the click's record's set writes
+    vs = S.part_verdicts(plan, rest, state, vk, [], None, kept.ex, frozenset())
+    assert [v.status for _, v in vs] == ["explained"]  # M3: the wait passed, on the part's own opcodes
+    out = t.apply(31, vs[0][0], vs[0][1], vk)
+    assert out[0][1] == "matched" and t.matched[1][2] == 21 + 2 * S.PART_STEP
+    # the event's precondition on the state before the click (the record's writes not applied) fails M2
+    vs2 = S.part_verdicts(plan, rest, v0, vk, [], None, kept.ex, frozenset())
+    assert vs2[0][1].status == "unexplained"
+    # a step ordered between the click and the event that has not run: the event is refuted (9.2's order check)
+    t2 = S.Track(plan, {})
+    t2.matched[0], t2.unit_seq[0], t2.first_seq[0] = (30, 0, 21), {"local:203": 21}, 21
+    e1.preds = frozenset({0, 5})
+    plan.idx[5] = [None]
+    assert t2.apply(31, vs[0][0], vs[0][1], vk)[0][1] == "refuted"
+
+
+def test_an_event_run_that_passed_a_later_wait_is_two_events():
+    """At depth 0: the slot resumed at [0000], passed the wait at [0005] and ended. The event from [0000] (ends at the
+    wait, leaves its locals there) matches part 1, the event from [0005] part 2; off, the run matches neither."""
+    code = FakeCode()
+    sr = FakeReading({7: (7, "local:203", 0, {"pos:local:203": {0}}, {"pos:local:203": ("set", 5),
+                                                                       "args:local:203": ("set", 77)}, []),
+                      8: (8, "local:203", 5, {"pos:local:203": {5}}, {"pos:local:203": ("set", NOWHERE),
+                                                                       "var:2": ("set", 4)}, [])})
+    a = mrec(0, "event", "a#7", "local:203", 0, writes={"pos:local:203", "args:local:203"})
+    b = mrec(1, "event", "b#8", "local:203", 5, reads={"pos:local:203"}, writes={"pos:local:203", "var:2"}, preds={0})
+    sr.by_name = {"a#7": 7, "b#8": 8}
+    plan = S.Plan(sr, [a, b], code, {})
+    kept = S.Kept()
+    entries, rho = part_log(40, [0, 5, 9], -1, after=0, depth=0)
+    kept.add_entries(entries)
+    before = {"pos:local:203": 0, "var:2": 0, "args:local:203": frozenset({0})}
+    after = {"pos:local:203": NOWHERE, "var:2": 4, "args:local:203": frozenset({0})}
+    t = S.Track(plan, {})
+    off = t.verdicts([rho], before, after, None, kept.ex)
+    assert [v.status for _, v in off] == ["unexplained"]
+    on = t.verdicts([rho], before, after, None, kept.ex, S.Parter(code, kept))
+    assert [(r.code0, r.code1, v.status) for r, v in on] == [(0, 5, "explained"), (5, -1, "explained")]
+    for r_, v_ in on:
+        t.apply(41, r_, v_, after)
+    assert set(t.matched) == {0, 1}
+    assert S.plan_runs(plan, [rho]) == [rho]
