@@ -792,6 +792,9 @@ fn main() {
         b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
+    // the lists of locals the last pass folded (their `args:` numbers rewritten to 0 at its end): golden lines
+    // streamed as made (--golden without --keep) still carry their numbers (replay_part1.py read_rust's stream)
+    r["folded_lists"] = json!(b.folded.iter().copied().collect::<Vec<i64>>());
     r["outside_points"] = json!(b
         .outside_points
         .iter()

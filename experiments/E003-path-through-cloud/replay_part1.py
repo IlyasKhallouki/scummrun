@@ -300,7 +300,7 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
               slot_locals: list | None = None, domain_goals: str = "none", elsewhere: bool = False,
               live_locals: bool = False, split_limit: bool = False, switches: str = "", reach: bool = False,
               frame_costs: bool = False, reach_also: list | None = None, start_rows: Path | None = None,
-              fact_vars: list | None = None) -> Path:
+              fact_vars: list | None = None, stream: bool = False) -> Path:
     """A reading from the Rust reader (module docstring): reader-scope on ``rooms`` from results/start-part1.jsonl's
     seed ``seed`` (``domain_goals`` "none": golden.read_scope's domains), its records kept and written in golden.py's
     format, then packed_reading.reading_from_golden: the three files and the lists. ``slot_locals`` (F10): slots
@@ -312,7 +312,12 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
     further start files (reader-scope ``--reach-also``, with ``reach``); ``start_rows``: the start's row from that
     file (start-part1.jsonl's format) in place of results/start-part1.jsonl (reader-scope ``--start-rows``; off by
     default); ``fact_vars``: variables made facts (reader-scope ``--fact-vars``, E007's refinement; reading.json then
-    has ``fact_vars`` and the reader's report of them, ``fact_vars_report``; off by default). Returns reading.json."""
+    has ``fact_vars`` and the reader's report of them, ``fact_vars_report``; off by default); ``stream``: the reader
+    writes the records' golden lines as made (reader-scope ``--golden``) and keeps none in memory, in place of keeping
+    them and writing them at the end (``--keep --lines``). Those lines are the records before the last pass rewrites
+    the numbers of the lists it folded (``args:`` 0, builder.rs ``end_of_pass``), so the lists file leaves out the
+    folded lists the reader reports (``folded_lists``); the files are then the same as without it (E007's results,
+    the kitchen and k = 2). E007's refinement reads with it, for the memory; off by default. Returns reading.json."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     row = start_row(seed) if start_rows is None else start_row(seed, Path(start_rows))
@@ -320,8 +325,9 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
         raise SystemExit(f"no start for seed {seed} in {start_rows or START_ROWS}")
     cmd = ["nice", "-n", "10", str(READER_SCOPE), "--rooms", ",".join(map(str, rooms)), "--start-seed", str(seed),
            "--domain-goals", domain_goals, "--goal", goal_text, "--name", name, "--threads", str(threads),
-           "--out", str(out), "--packed", str(out / f"{name}.rust.tc"), "--keep", "--lines",
-           str(out / f"{name}.golden.jsonl.gz")]
+           "--out", str(out), "--packed", str(out / f"{name}.rust.tc")]
+    cmd += ["--golden", str(out / f"{name}.golden.jsonl.gz")] if stream else \
+        ["--keep", "--lines", str(out / f"{name}.golden.jsonl.gz")]
     if elsewhere:
         cmd.append("--elsewhere")
     if live_locals:
@@ -385,6 +391,11 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
     head = Path(info["json"])
     doc = json.loads(head.read_text())
     lists = out / doc["lists"]
+    if stream:  # the lines carry the numbers of the lists the last pass folded (the docstring): left out, as kept
+        folded = set(rep.get("folded_lists") or ())
+        kept = [ln for ln in lists.read_text().splitlines() if ln.strip() and json.loads(ln)["sig"] not in folded]
+        lists.write_text("".join(ln + "\n" for ln in kept))
+        info["lists"] = doc["n_lists"] = len(kept)
     have = {(x["name"], x["w"], x["sig"]) for x in (json.loads(ln) for ln in lists.read_text().splitlines()
                                                      if ln.strip())}
     extra = [x for x in rep.get("slot_events", []) if (x["name"], x["w"], x["sig"]) not in have]
@@ -493,7 +504,8 @@ def refiner(rd, run_dir: Path, threads: int, starts: list, facts: list):
     by the Rust reader with the reading's own switches, from its start, every start so far (``starts``, the reach
     extension's files, which it shares) and the engine's state now as one more ``--reach-also`` start, with the run's
     fact variables (``facts``, which the reach extension and F10's reread read with too) and the new ones made facts
-    (``--fact-vars``), in run_dir/refine-NN."""
+    (``--fact-vars``), in run_dir/refine-NN. The reader streams its golden lines (read_rust's ``stream``): it reads
+    while the harness holds its engines and the old reading, and keeps no record in memory."""
     doc = rd.doc
     if not doc.get("reach"):
         raise SystemExit("--refine-facts needs a reading made with --reach")
@@ -522,7 +534,7 @@ def refiner(rd, run_dir: Path, threads: int, starts: list, facts: list):
                          doc.get("domain_goals", "none"), elsewhere=elsewhere,
                          live_locals=doc.get("live_locals") is not None, split_limit=bool(doc.get("split_limit")),
                          **({"start_rows": start_rows} if start_rows is not None else {}),
-                         **with_facts(reader_switches(doc, starts), facts))
+                         **with_facts(reader_switches(doc, starts), facts), stream=True)
         return PR.load_reading(path)
     return refine
 
@@ -1179,6 +1191,7 @@ def main() -> None:
     rr.add_argument("--frame-costs", action="store_true", help="reader-scope's switch --frame-costs")
     rr.add_argument("--start-rows", type=Path, help="the start's row from this file, not results/start-part1.jsonl")
     rr.add_argument("--fact-vars", default="", help="reader-scope's --fact-vars N,... (E007: variables made facts)")
+    rr.add_argument("--stream", action="store_true", help="reader-scope's --golden: no records kept (E007, memory)")
     c = sub.add_parser("control")
     c.add_argument("reading", type=Path)
     s = sub.add_parser("start")
@@ -1241,7 +1254,7 @@ def main() -> None:
         print(read_rust(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out, a.threads,
                         elsewhere=a.elsewhere, live_locals=a.live_locals, split_limit=a.split_limit,
                         switches=a.switches, reach=a.reach, frame_costs=a.frame_costs, start_rows=a.start_rows,
-                        fact_vars=[int(x) for x in a.fact_vars.split(",") if x.strip()] or None))
+                        fact_vars=[int(x) for x in a.fact_vars.split(",") if x.strip()] or None, stream=a.stream))
     elif a.cmd == "control":
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
