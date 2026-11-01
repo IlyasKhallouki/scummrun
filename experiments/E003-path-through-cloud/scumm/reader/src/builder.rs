@@ -166,6 +166,9 @@ pub struct Ctx<'a> {
     pub game: &'a Game,
     pub scope: &'a Scope,
     pub table: &'a FactTable,
+    /// the switch --reach: the identity of the job being run (reach.rs `job_key`), by which its guides are found;
+    /// None: no guides
+    pub job_key: Option<&'a str>,
 }
 
 /// The next round's events as the records of a batch give them, in their order, each once: a later event with the
@@ -409,6 +412,8 @@ pub struct Builder<'g> {
     pub(crate) reach_state: Option<Box<crate::reach::ReachState>>,
     /// the switch --reach: the branches the job being run held back
     pub(crate) reach_out: Vec<crate::reach::Held>,
+    /// the switch --reach: the job being run, as reach.rs keys it (`job_key`)
+    pub(crate) cur_job_key: Option<Arc<str>>,
     /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs)
     pub(crate) memo_log: Option<crate::memo::RunLog>,
 }
@@ -585,12 +590,13 @@ impl<'g> Builder<'g> {
             reach_starts: Vec::new(),
             reach_state: None,
             reach_out: Vec::new(),
+            cur_job_key: None,
             memo_log: None,
         }
     }
 
     pub fn ctx(&self) -> Ctx<'_> {
-        Ctx { game: self.game, scope: &self.scope, table: &self.table }
+        Ctx { game: self.game, scope: &self.scope, table: &self.table, job_key: self.cur_job_key.as_deref() }
     }
 
     pub fn kind(&self, key: &str) -> Kind {
@@ -1334,6 +1340,9 @@ impl<'g> Builder<'g> {
 
     /// `Builder.run` for one input or event (the root call: its budget is made here).
     pub fn run_job(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
+        // the switch --reach: a job's guides are found by the whole job (reach.rs `job_key`), not by its label, which
+        // rooms share
+        self.cur_job_key = self.table.reach.is_some().then(|| Arc::from(crate::reach::job_key(job)));
         if self.args_log.is_some() {
             if let Some(memo) = self.table.memo.clone() {
                 return self.run_job_memo(&memo, m, job);

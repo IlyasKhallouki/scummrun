@@ -2265,8 +2265,9 @@ impl RunMachine for Reader<'_> {
         self.m.path_limit = if n == 0 { PATH_LIMIT } else { n };
     }
 
-    /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`.
-    fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+    /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`. The label names the run only; under --reach its
+    /// guides come by the job's key (`Ctx::job_key`).
+    fn run(&mut self, cx: &Ctx, _label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         {
             let s = st_mut(&mut self.m);
             s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing());
@@ -2275,7 +2276,7 @@ impl RunMachine for Reader<'_> {
         }
         if let Some(r) = &cx.table.reach {
             let s = st_mut(&mut self.m);
-            s.guides = r.guides_of(label);
+            s.guides = cx.job_key.and_then(|k| r.guides_of(k));
             s.reach = Some(r.clone());
             s.held.clear();
             s.held_seen.clear();

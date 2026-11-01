@@ -68,13 +68,17 @@ impl RunMemo {
         self.runs.lock().unwrap().clear();
     }
 
-    fn take(&self, label: &str, guides: &Option<Arc<Vec<Guide>>>) -> Option<MemoRun> {
+    /// Pass 1's run of the same job with the same guides (jobs of two rooms can share a label).
+    fn take(&self, job: &Job, guides: &Option<Arc<Vec<Guide>>>) -> Option<MemoRun> {
         let mut runs = self.runs.lock().unwrap();
-        let list = runs.get_mut(label)?;
-        let i = list.iter().position(|r| match (&r.guides, guides) {
-            (None, None) => true,
-            (Some(a), Some(b)) => a == b,
-            _ => false,
+        let list = runs.get_mut(&job.label)?;
+        let i = list.iter().position(|r| {
+            r.job == *job
+                && match (&r.guides, guides) {
+                    (None, None) => true,
+                    (Some(a), Some(b)) => a == b,
+                    _ => false,
+                }
         })?;
         Some(list.swap_remove(i))
     }
@@ -109,9 +113,12 @@ impl RunMemo {
 impl Builder<'_> {
     /// `run_job` on a worker's Builder, whose counters hold only this job's when it starts.
     pub(crate) fn run_job_memo(&mut self, memo: &RunMemo, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
-        let guides = self.table.reach.as_ref().and_then(|r| r.guides_of(&job.label));
+        let guides = match (&self.table.reach, &self.cur_job_key) {
+            (Some(r), Some(k)) => r.guides_of(k),
+            _ => None,
+        };
         if memo.reusing() {
-            match memo.take(&job.label, &guides) {
+            match memo.take(job, &guides) {
                 Some(run) => {
                     if memo.holds(&run, job, &self.table, &self.folded) {
                         memo.reused.fetch_add(1, Ordering::Relaxed);

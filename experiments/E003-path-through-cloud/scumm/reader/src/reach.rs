@@ -82,7 +82,7 @@ struct Inner {
     now: u32,
     /// fact -> value -> the round it arrived in
     vals: FxHashMap<String, FxHashMap<Label, u32>>,
-    /// a rerun's guides, by its job's label, for this round
+    /// a rerun's guides, by its job (`job_key`), for this round
     guides: FxHashMap<String, Arc<Vec<Guide>>>,
 }
 
@@ -181,8 +181,9 @@ impl Reached {
         queries.iter().all(|q| Self::meets_at(&i, table, &q.key, &q.set, if q.before { now - 1 } else { now }) == q.answer)
     }
 
-    pub fn guides_of(&self, label: &str) -> Option<Arc<Vec<Guide>>> {
-        self.inner.read().unwrap().guides.get(label).cloned()
+    /// A rerun's guides, by its job's key (`job_key`).
+    pub fn guides_of(&self, key: &str) -> Option<Arc<Vec<Guide>>> {
+        self.inner.read().unwrap().guides.get(key).cloned()
     }
 
     /// The reached values of a fact, in the domain's order.
@@ -236,7 +237,7 @@ struct PendingEff {
 /// The rounds' state on the reading's thread, for one pass. It stays after the pass: `Builder::reach_extend`.
 #[derive(Default)]
 pub struct ReachState {
-    /// the jobs that held something back (their labels are their identity), and their numbers
+    /// the jobs that held something back, and their numbers, by the whole job (`job_key`)
     jobs: Vec<Job>,
     ids: FxHashMap<String, u32>,
     waits: FxHashMap<String, Vec<Arc<Wait>>>,
@@ -251,13 +252,14 @@ pub struct ReachState {
 }
 
 impl ReachState {
-    fn id_of(&mut self, job: &Job) -> u32 {
-        if let Some(&i) = self.ids.get(&job.label) {
+    pub(crate) fn id_of(&mut self, job: &Job) -> u32 {
+        let key = job_key(job);
+        if let Some(&i) = self.ids.get(&key) {
             return i;
         }
         let i = self.jobs.len() as u32;
         self.jobs.push(job.clone());
-        self.ids.insert(job.label.clone(), i);
+        self.ids.insert(key, i);
         i
     }
 
@@ -269,9 +271,24 @@ impl ReachState {
     }
 }
 
+/// A job's identity under --reach: the whole job. Its label is not one: a room's local scripts, entry and exit code
+/// are named alike in every room (`local:N`, `entry`, `exit`), and `Event::label` leaves out the unit, so two rooms'
+/// events can share a label.
+pub fn job_key(job: &Job) -> String {
+    format!("{job:?}")
+}
+
 impl Builder<'_> {
     fn reach_arc(&self) -> Arc<Reached> {
         self.table.reach.clone().expect("the switch --reach")
+    }
+
+    /// The guides of the job being run (`Builder::run_job` keys it).
+    fn cur_guides(&self, reach: &Reached, job: &Job) -> Option<Arc<Vec<Guide>>> {
+        match &self.cur_job_key {
+            Some(k) => reach.guides_of(k),
+            None => reach.guides_of(&job_key(job)),
+        }
     }
 
     /// Stage 1 of a path's end: the path's precondition as its record will have it; false: it does not meet the
@@ -312,7 +329,7 @@ impl Builder<'_> {
             self.reach_hold_path(job, p, key, set);
             return false;
         }
-        if reach.guides_of(&job.label).is_some() && reach.was_met(&self.table, &pre, self.memo_log.as_mut()) {
+        if self.cur_guides(&reach, job).is_some() && reach.was_met(&self.table, &pre, self.memo_log.as_mut()) {
             self.counts.inc("reach: records of a rerun already written");
             return false;
         }
@@ -322,7 +339,7 @@ impl Builder<'_> {
     /// `run_split`'s parts under the switch: the values a part can run with; the others are held.
     pub(crate) fn reach_parts(&mut self, job: &Job, pre: &Pre, key: &str, vals: Labels) -> Labels {
         let reach = self.reach_arc();
-        let guides = reach.guides_of(&job.label);
+        let guides = self.cur_guides(&reach, job);
         let raw: BTreeMap<PKey, Labels> = pre.iter().map(|(k, v)| (pkey_of(k), v.clone())).collect();
         let seed: BTreeMap<PKey, Labels> = job.pre.iter().map(|(k, v)| (pkey_of(k), v.clone())).collect();
         let pk = pkey_of(key);
@@ -554,7 +571,7 @@ impl Builder<'_> {
             gs.sort();
             gs.dedup();
             let j = self.reach_state.as_ref().unwrap().jobs[id as usize].clone();
-            map.insert(j.label.clone(), Arc::new(gs));
+            map.insert(job_key(&j), Arc::new(gs));
             out.push(j);
             self.counts.inc("reach: reruns");
         }
@@ -671,4 +688,49 @@ impl Builder<'_> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::record::What;
+    use scumm_ir::UnitKey;
 
+    /// Room `room`'s local script 214, waiting at 57: the same label in every room.
+    fn job(room: i32) -> Job {
+        let ev = Event {
+            name: "local:214".into(),
+            unit: UnitKey::Local(room, 214),
+            w: 57,
+            sig: 0,
+            locals: vec![],
+            args_known: false,
+            recursive: crate::Py::None,
+            resistant: crate::Py::None,
+            owned: crate::Py::Bool(false),
+            abort: false,
+            override_: 0,
+            cut_data: vec![],
+        };
+        let mut pre = Pre::new();
+        pre.insert("room".into(), vec![Label::Int(room as i64)]);
+        Job { kind: "event".into(), label: ev.label(), pins: Default::default(), pre, what: What::Event(ev), checks: vec![] }
+    }
+
+    #[test]
+    fn jobs_of_two_rooms_with_one_label_are_two_jobs() {
+        let (a, b) = (job(28), job(35));
+        assert_eq!(a.label, b.label, "the label leaves out the unit");
+        assert_ne!(job_key(&a), job_key(&b));
+        let mut st = ReachState::default();
+        let (ia, ib) = (st.id_of(&a), st.id_of(&b));
+        assert_ne!(ia, ib, "each its own waits");
+        assert_eq!(st.id_of(&a), ia);
+        assert_eq!(st.jobs[ib as usize], b);
+        // a rerun's guides go to its own job only
+        let r = Reached::default();
+        let g: Guide = vec![(PKey::F("room".parse().unwrap()), vec![Label::Int(28)])];
+        r.inner.write().unwrap().guides.insert(job_key(&a), Arc::new(vec![g.clone()]));
+        assert_eq!(r.guides_of(&job_key(&a)).as_deref(), Some(&vec![g]));
+        assert!(r.guides_of(&job_key(&b)).is_none(), "room 35's job has none of room 28's guides");
+        assert!(r.guides_of(&a.label).is_none(), "nothing is found by a label");
+    }
+}

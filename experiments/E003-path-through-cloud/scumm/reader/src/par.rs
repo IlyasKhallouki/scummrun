@@ -54,6 +54,8 @@ enum PartState {
 /// One part of a split, which an idle worker may run before the job's own worker gets to it.
 struct Part {
     snap: Arc<Snap>,
+    /// the job's key (--reach: `Ctx::job_key`)
+    job_key: Option<Arc<str>>,
     label: String,
     pins: Pins,
     pre: Pre,
@@ -364,7 +366,7 @@ impl Machine for WorkerMachine<'_, '_> {
         Machine::set_path_limit(self.rd, n)
     }
 
-    fn prefetch(&mut self, _cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
+    fn prefetch(&mut self, cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
         // the first part is run here next; the others wait at the front of the queue for an idle worker
         if runs.len() < 2 {
             return;
@@ -374,6 +376,7 @@ impl Machine for WorkerMachine<'_, '_> {
             .map(|(pins, pre)| {
                 Arc::new(Part {
                     snap: self.snap.clone(),
+                    job_key: cx.job_key.map(Arc::from),
                     label: label.to_string(),
                     pins: pins.clone(),
                     pre: pre.clone(),
@@ -497,7 +500,7 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
         let r = panic::catch_unwind(AssertUnwindSafe(|| match task {
             Task::Part(p) => {
                 if p.claim() {
-                    let cx = Ctx { game, scope, table: &p.snap.base };
+                    let cx = Ctx { game, scope, table: &p.snap.base, job_key: p.job_key.as_deref() };
                     match panic::catch_unwind(AssertUnwindSafe(|| rd.run(&cx, &p.label, &p.pins, &p.pre, &p.what))) {
                         Ok(out) => p.finish(out),
                         Err(e) => {
