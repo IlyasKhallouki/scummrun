@@ -145,6 +145,16 @@ What the harness does, per plan step (plan.md step 5, with D5):
   rules above for one step (waits first, the precondition wait, retries, the replay checks' verdicts and bans) are not
   used. A window with no success, or a plan played out without the goal, is a replan from the engine's state; the
   record keeps every window (``windows``), the replans' causes and the run clock (``qf``).
+* **The refinement loop** (``refine``, off by default; E007, experiments/E007-fact-refinement/plan.md: the strict
+  window search with a ``--reach`` reading). After a window that ends a plan's play with a replan, the harness reads
+  B1's cause of it (window.py ``replan_cause_detail``). A cause of class split whose test read a variable the reading
+  holds no fact of (``refinable``) has every such variable added: ``refine(variables, start, harness)``, the caller's,
+  reads the scope again with them made facts (reader-scope ``--fact-vars``), from the reading's starts and the engine's
+  state now (``start``: the replan's start with the engine's values of the fact variables), and the harness takes that
+  reading as the reach extension does (``_swap``), closes the old planner and plans from the engine's state. Any other
+  cause adds nothing, and the harness's own rules go on. A cause that names a variable added before stops the run
+  ("refinement: ..."). Each turn is kept (``refinements``: the plan, the frame, the window's outcome, the cause and its
+  class, the variables added or why none, and for an addition the reading before and after).
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
   one), a planner timeout, the planner's memory limit (``memory_limit``: Fast Downward's search memory, this
   laptop's budget), the replan limit, the time limit, a start outside the task's domains (task.OutOfDomain: the task
@@ -1021,6 +1031,22 @@ def reach_start(start: dict) -> dict:
             and "\t" not in k and "\n" not in k}
 
 
+NOT_A_FACT = "not a fact of the reading"  # trace_explain.reading_kind: a variable the reading holds no fact of
+
+
+def refinable(cause: dict | None) -> list:
+    """E007's loop (module docstring, "The refinement loop"): the variables a B1 cause of class split names as read by
+    its test while the reading holds no fact of them, in the cause's order; [] for any other cause."""
+    if not cause or cause.get("class") != "split":
+        return []
+    out = []
+    for v in cause.get("values") or ():
+        m = re.fullmatch(r"var (\d+)", str(v.get("what", "")))
+        if m is not None and v.get("kind") == NOT_A_FACT and int(m[1]) not in out:
+            out.append(int(m[1]))
+    return out
+
+
 def _cpu_s() -> float:
     """This process's CPU seconds and those of its children that have ended (the reader a reach extension runs)."""
     import resource
@@ -1070,7 +1096,7 @@ class Harness:
                  slot_locals: bool = False, lists: dict | None = None, reread=None, taskcore_serve: bool = False,
                  cost_caps: bool = False, cost_dmax: int | None = None, reach_extend=None,
                  reach_extend_limit: int = 3, unobserved_actor_rooms: bool = False, stone_fork=None,
-                 window_search=None, fork=None):
+                 window_search=None, fork=None, refine=None):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         if reread is not None and planner != "taskcore":
@@ -1102,6 +1128,13 @@ class Harness:
             raise ValueError("the reach extension replaces the packed task: the taskcore planner only")
         self.reach_extend, self.reach_extend_limit = reach_extend, reach_extend_limit
         self.extensions: list = []  # per extension: the plan, the frame, the values, the seconds, the actions
+        # E007's loop (module docstring, "The refinement loop"), or None (off): ``refine(variables, start, harness)``
+        if refine is not None and (planner != "taskcore" or window_search is None or not window_search.strict):
+            raise ValueError("the refinement loop reads the strict window search's causes and replaces the packed "
+                             "task: the taskcore planner and window_search with strict")
+        self.refine = refine
+        self.refinements: list = []  # per turn: the plan, the frame, the cause, the variables added or why none
+        self.refined: dict = {}  # variable -> the plan whose window's cause added it
         self.memory_limit = memory_limit
         self.on_plan = on_plan  # called with the harness after each plan (the caller's snapshot of ``result``)
         self.workdir = Path(workdir) if workdir is not None else None
@@ -1903,9 +1936,13 @@ class Harness:
                     self.stop_reason = "goal"
                     break
                 if how == "stop":
+                    if self.refine is not None:
+                        self._refine_turn(stopped=True)
                     break
                 causes.append({"plan": len(self.plans) - 1, "frame": self.branch.frame,
                                "cause": self.windows.replan_cause})
+                if self.refine is not None and not self._refine_turn():
+                    break
                 if self.replans >= self.replan_limit:
                     self.stop_reason = "replan limit"
                     break
@@ -1950,6 +1987,72 @@ class Harness:
                 pass
         return out
 
+    def _refine_turn(self, stopped: bool = False) -> bool:
+        """E007's loop after a window that ended a plan's play (module docstring, "The refinement loop"): the cause read,
+        and, for a split on variables the reading holds no fact of, the reading made again with them as facts. Returns
+        False when the run stops (a variable named again); ``stopped``: the run has stopped already (the same empty
+        window again), and the turn is only recorded."""
+        import strict as S
+        d = getattr(self.windows, "replan_cause_detail", None) or {}
+        cause = d.get("cause") or {}
+        new = refinable(cause)
+        turn = {"plan": len(self.plans) - 1, "frame": self.branch.frame, "qf": self.branch.status.get("qf"),
+                "what": d.get("what") or self.windows.replan_cause, "cause": S.short(cause) if cause else None,
+                "class": cause.get("class"),
+                "values": [{k: v.get(k) for k in ("what", "value", "kind")} for v in cause.get("values") or ()],
+                "added": []}
+        self.refinements.append(turn)
+        again = [n for n in new if n in self.refined]
+        if again:
+            turn["why_not"] = f"named again: var {again[0]}, added at plan {self.refined[again[0]]}"
+            reason = (f"refinement: var {again[0]} added at plan {self.refined[again[0]]} is named again; "
+                      f"{S.short(cause)}")
+            self.stop_reason = reason if not stopped else f"{self.stop_reason}; {reason}"
+            return False
+        if not new:
+            turn["why_not"] = ("no cause" if not cause or not cause.get("cause") else
+                               f"class {cause.get('class')}" if cause.get("class") != "split" else
+                               "a split on no variable the reading holds no fact of")
+            return True
+        if stopped:
+            turn["why_not"] = "the run had stopped"
+            return False
+        # the replan's start, with the engine's values of the fact variables (the new reading's seeds, Lemma R (4))
+        start, _ = replan_start(self.b, self.obs, prediction(self.now, self.pred), self.base)
+        for n in list(self.refined) + new:
+            start[f"var:{n}"] = self.obs.get(f"var:{n}", 0)
+        turn.update(added=new, engine_values={n: self.obs.get(f"var:{n}", 0) for n in new},
+                    actions_before=len(self.base.actions),
+                    records_before=len(self.base.actions) + int(getattr(self.base, "folded", 0) or 0),
+                    operators_before=self.plans[-1].get("operators") if self.plans else None)
+        self.progress(f"refinement at frame {self.branch.frame}: var {new} made facts ({S.short(cause)})")
+        plan_fd.close_servers()  # the old reading's planner: its memory, while the reader reads
+        cpu0, wall0 = _cpu_s(), time.monotonic()
+        reading = self.refine(new, reach_start(start), self)
+        rep = {x["var"]: x for x in reading.doc.get("fact_vars_report") or ()}
+        rs = reading.doc.get("reader_scope") or {}
+        turn.update(seconds=round(time.monotonic() - wall0, 2), cpu_s=round(_cpu_s() - cpu0, 2),
+                    reader={k: rs.get(k) for k in ("read_wall_s", "read_cpu_s", "peak_rss_mb")},
+                    actions=len(reading.task.actions), records=reading.doc.get("n_records"),
+                    fact_vars=reading.doc.get("fact_vars"),
+                    facts={n: {"what": rep.get(n, {}).get("what"), "domain": len(rep.get(n, {}).get("domain") or ()),
+                               "outside_after_last_pass": rep.get(n, {}).get("outside_after_last_pass")}
+                           for n in new},
+                    reading=str(getattr(reading, "path", "")))
+        for n in new:
+            self.refined[n] = turn["plan"]
+        outside = [n for n in new if rep.get(n, {}).get("outside_after_last_pass")]
+        added = [n for n in new if rep.get(n, {}).get("what") == "added"]
+        if outside or len(added) < len(new):
+            turn["why_not"] = (f"Lemma R's premise R0: the last pass wrote values of var {outside} outside the domain"
+                               if outside else f"the reader did not make var {[n for n in new if n not in added]} a fact")
+            self.stop_reason = f"refinement: {turn['why_not']}"
+            return False
+        self._swap(reading)
+        self.progress(f"refinement {sum(1 for t in self.refinements if t['added'])}: {turn['actions_before']} -> "
+                      f"{turn['actions']} actions in {turn['seconds']} s ({turn['cpu_s']} CPU s)")
+        return True
+
     def _plan(self, first: bool) -> list:
         steps = self.plan(first)
         if self.on_plan is not None:
@@ -1968,6 +2071,7 @@ class Harness:
             "seconds": time.monotonic() - self.t0 if self.t0 is not None else 0.0, "inputs": self.inputs(),
             **({"rereads": self.rereads} if self.slot_locals else {}),
             **({"extensions": self.extensions} if self.reach_extend is not None else {}),
+            **({"refinements": self.refinements} if self.refine is not None else {}),
         }
 
     def inputs(self) -> list:
