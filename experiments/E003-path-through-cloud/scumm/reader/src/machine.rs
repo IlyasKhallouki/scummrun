@@ -320,6 +320,12 @@ struct St {
     queries: Vec<crate::memo::Query>,
     /// F1c: the run's input, where it starts at the input script
     settled: Option<Rc<SettledRun>>,
+    /// the switch shared_runs (shared.rs): the scope's dialog verbs, the run's reads of them but the click's own
+    /// (`click_read` while `eng_input` reads it), and whether the click read its verb
+    watch_verbs: Vec<i32>,
+    verb_reads: u64,
+    click_read: bool,
+    clicked: bool,
 }
 
 /// F1c: one input's run from input script `n` (machine.rs `f1c_click`).
@@ -827,6 +833,7 @@ impl Hooks for ReaderHooks {
     }
 
     fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+        watch_verb(m, k);
         let v = read_fact(m, p, k, o);
         match k {
             Fact::ActorRoom(a) => actor_room_value(m, a, v),
@@ -841,6 +848,7 @@ impl Hooks for ReaderHooks {
 
     /// `SymOracle.get`.
     fn oget(&self, m: &mut Machine<'_>, _o: &FactOracle, k: Fact) -> Val {
+        watch_verb(m, k);
         if let Some(&v) = st(m).pins.get(&k) {
             return v;
         }
@@ -1593,12 +1601,28 @@ fn restore_verbs(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: St
     Vec::new()
 }
 
+/// The switch shared_runs: a read of one of the scope's dialog verbs (shared.rs, condition 2).
+fn watch_verb(m: &mut Machine<'_>, k: Fact) {
+    if let Fact::Verb(v) = k {
+        let s = st_mut(m);
+        if !s.click_read && s.watch_verbs.binary_search(&v).is_ok() {
+            s.verb_reads += 1;
+        }
+    }
+}
+
 /// model.py `_eng_input` (its switch input_after_turns off): the click on a verb runs the input script.
 fn eng_input(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> Vec<Path> {
     let verb = st(m).verb;
     for k in [Fact::Var(VAR_VERB_SCRIPT), Fact::Var(VAR_USERPUT), Fact::Verb(verb)] {
         // the drift's reads (`Path.input_drift`, which the reader does not read): a fact may fork here
+        // (the switch shared_runs: the click's own read of its verb is not counted, `watch_verb`)
+        let own = k == Fact::Verb(verb);
+        st_mut(m).click_read = own;
         m.read(p, k, o);
+        let s = st_mut(m);
+        s.click_read = false;
+        s.clicked |= own;
     }
     let (_, cite) = call_at(p, ci);
     let n = m.oget(o, Fact::Var(VAR_VERB_SCRIPT));
@@ -2307,7 +2331,7 @@ impl RunMachine for Reader<'_> {
 
     /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`. The label names the run only; under --reach its
     /// guides come by the job's key (`Ctx::job_key`).
-    fn run(&mut self, cx: &Ctx, _label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
+    fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         {
             let s = st_mut(&mut self.m);
             s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing());
@@ -2321,6 +2345,103 @@ impl RunMachine for Reader<'_> {
             s.held.clear();
             s.held_seen.clear();
         }
+        // the switch shared_runs (shared.rs): a click that differs from another job's only in its verb takes its run
+        let mut mine: Option<(std::sync::Arc<crate::shared::SharedRuns>, String, i64, UnitKey, std::sync::Arc<Vec<bool>>)> = None;
+        if let (Some(sh), What::Verb(v)) = (&cx.table.shared, what) {
+            if let Some((key, unit, def)) = self.share_key(cx, pins, pre, *v, sh) {
+                match sh.look(&key) {
+                    crate::shared::Look::Hit(out, v0) => return crate::shared::rename(out, v0, *v),
+                    crate::shared::Look::Mine => mine = Some((sh.clone(), key, *v, unit, def)),
+                    crate::shared::Look::Alone => {}
+                }
+            }
+            let s = st_mut(&mut self.m);
+            s.watch_verbs = cx.scope.dialog_verbs.iter().map(|&x| x as i32).collect();
+            s.watch_verbs.sort_unstable();
+            s.verb_reads = 0;
+            s.click_read = false;
+            s.clicked = false;
+        }
+        let out = self.run_out(cx, pins, pre, what);
+        if let Some((sh, key, v, unit, def)) = mine {
+            let ok = self.shareable(&out, unit, &def);
+            if let Err(why) = ok {
+                crate::par::trace_shared(label, why);
+            }
+            sh.fill(&key, ok.is_ok().then(|| (out.clone(), v)));
+        }
+        out
+    }
+}
+
+impl Reader<'_> {
+    /// The switch shared_runs: the key of a click's run with its verb taken out, and the input script's unit; None
+    /// when the run is not one the switch shares (its verb not pinned to 1, its input script not known, or the script
+    /// names its verb argument).
+    #[allow(clippy::type_complexity)]
+    fn share_key(&self, cx: &Ctx, pins: &Pins, pre: &Pre, v: i64, sh: &crate::shared::SharedRuns) -> Option<(String, UnitKey, std::sync::Arc<Vec<bool>>)> {
+        let game = self.m.game;
+        let vk = format!("verb:{v}");
+        if pins.get(&vk) != Some(&RVal::Int(1)) || pre.get(&vk).map(|s| s.as_slice()) != Some(&[Label::Int(1)][..]) {
+            return None;
+        }
+        let Some(RVal::Int(n)) = pins.get(&format!("var:{VAR_VERB_SCRIPT}")) else { return None };
+        let n = *n as i32;
+        let unit = if n >= game.first_local {
+            let Some(RVal::Int(room)) = pins.get("room") else { return None };
+            UnitKey::Local(game.resource(*room as i32)?, n)
+        } else {
+            UnitKey::Global(n)
+        };
+        let uid = game.id(unit)?;
+        let def = sh.arg_written(game, uid)?;
+        let mut p2 = pins.clone();
+        p2.remove(&vk);
+        let mut q2 = pre.clone();
+        q2.remove(&vk);
+        let fv = PKey::F(Fact::Verb(v as i32));
+        let guides: Option<Vec<crate::reach::Guide>> = st(&self.m).guides.as_ref().map(|gs| {
+            gs.iter()
+                .map(|g| g.iter().map(|(k, l)| (if *k == fv { PKey::F(Fact::Verb(i32::MIN)) } else { *k }, l.clone())).collect())
+                .collect()
+        });
+        let _ = cx;
+        Some((format!("{}|{n}|{unit:?}|{p2:?}|{q2:?}|{guides:?}", self.m.path_limit), unit, def))
+    }
+
+    /// The switch shared_runs, conditions 2-4 on the run made (shared.rs): no read of another dialog verb, no write
+    /// of one, and a kept list of the input script holds `Local[1]` only where the script has written it.
+    fn shareable(&self, out: &RunOut, unit: UnitKey, def: &[bool]) -> Result<(), &'static str> {
+        let game = self.m.game;
+        let Some(uid) = game.id(unit) else { return Err("no unit") };
+        let s = st(&self.m);
+        if !s.clicked {
+            return Err("no click read");
+        }
+        if s.verb_reads != 0 {
+            return Err("it reads a dialog verb");
+        }
+        let watched = |k: &str| {
+            k.strip_prefix("verb:").and_then(|n| n.parse::<i32>().ok()).is_some_and(|n| s.watch_verbs.binary_search(&n).is_ok())
+        };
+        if out.paths.iter().any(|p| p.writes.keys().any(|k| watched(k))) {
+            return Err("it writes a dialog verb");
+        }
+        let kept_arg = out.paths.iter().any(|p| {
+            p.kept.values().any(|k| {
+                k.unit == unit
+                    && k.locals.iter().any(|(i, _)| *i == crate::shared::ARG as i64)
+                    && !game.at(uid, k.w as i32).is_some_and(|i| def.get(i as usize) == Some(&true))
+            })
+        });
+        if kept_arg {
+            return Err("a kept list holds its verb argument");
+        }
+        Ok(())
+    }
+
+    /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`, made.
+    fn run_out(&mut self, cx: &Ctx, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
         // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths

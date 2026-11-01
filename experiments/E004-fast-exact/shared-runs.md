@@ -25,20 +25,22 @@ Take two jobs `J` and `J'` that differ only in `v` and `v'`: their pins and prec
 `verb:v'` are taken out, both pin their verb to 1, and their guides are equal with the verb renamed. Let σ rename
 `verb:v` to `verb:v'`. Then the run of `J'` is σ of the run of `J` if all four of these hold on the run of `J`:
 
-1. **The argument is never read.** No instruction of the input script's unit names `Local[1]`, in any expression or
-   as a target, and the IR shows every local the unit reads (`locals::unit_reads`, no index on a local). Only the
-   running slot's own code reaches its locals (script.cpp:568-706), and a started script gets new locals.
+1. **The argument is never read.** In the input script's unit, every instruction that reads `Local[1]` comes, on
+   every path of the IR's control flow from the unit's start, after a plain write `Local[1] = e` (a must analysis,
+   shared.rs `arg_written`), and no instruction reads a local through an index. Only the running slot's own code
+   reaches its locals (script.cpp:568-706), and a started script gets new locals.
 2. **No other verb of the group is read.** After `eng_input`'s own read, the run reads no `verb:` fact of the scope's
    dialog verbs. Such a read gives 1 in one job, where it is pinned, and the fact's values in the other.
 3. **No verb of the group is written.** No path writes such a `verb:` fact. A record drops a write that equals its
    precondition's single value, which differs between the two jobs.
-4. **No list keeps the argument.** No slot a path leaves waiting keeps `Local[1]` in its list of locals. Under
-   `--live-locals` an unread local is never kept; without it the list holds `v`.
+4. **No list keeps the argument.** A slot of the input script that a path leaves waiting keeps `Local[1]` in its
+   list only at a wait point where (1)'s analysis has it written, so it holds the written value, not `v`.
 
 *Proof.* By induction on the machine's steps, the two runs are in states equal up to σ and up to the value of the
-input frame's `Local[1]`. A step reads facts, locals and the oracle. By (2) it never reads a fact whose value differs
-between the two. By (1) it never reads `Local[1]`, and no step writes it. So both runs take the same step, fork the
-same way and write the same values. Two paths of one run merge when their signatures are equal. A signature holds
+input frame's `Local[1]`, which differs only until the script writes it, and is equal after. A step reads facts,
+locals and the oracle. By (2) it never reads a fact whose value differs between the two. By (1) it reads `Local[1]`
+only after a write, where both runs hold the same value. So both runs take the same step, fork the same way and write
+the same values. Two paths of one run merge when their signatures are equal. A signature holds
 the precondition and the frames' locals, which differ between the runs only by σ and by `Local[1]` on every path
 alike, so the same paths merge. At the end, each path's precondition is σ of the other's, its writes are equal by
 (3) and its kept slots equal by (4). The held branches' guides and keys and the facts the run consulted are σ of the

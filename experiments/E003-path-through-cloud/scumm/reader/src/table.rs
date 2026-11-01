@@ -82,6 +82,8 @@ pub struct FactTable {
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
     pub memo: Option<std::sync::Arc<crate::memo::RunMemo>>,
+    /// the switch shared_runs: the batch's runs of clicks that differ only in their verb (shared.rs); None off
+    pub shared: Option<std::sync::Arc<crate::shared::SharedRuns>>,
     /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
     /// (inputs.rs); None with the switch off
     pub settled: Option<std::sync::Arc<crate::inputs::SettledRule>>,
@@ -196,6 +198,7 @@ impl FactTable {
             havoc_cut: false,
             reach: None,
             memo: None,
+            shared: None,
             settled: None,
         }
     }

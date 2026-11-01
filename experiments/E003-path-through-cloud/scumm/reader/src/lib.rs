@@ -31,6 +31,7 @@ pub mod record;
 pub mod replay;
 pub mod scaling;
 pub mod scope;
+pub mod shared;
 pub mod table;
 pub mod task;
 

@@ -232,6 +232,9 @@ pub struct Switches {
     /// A path the step limit ended becomes a havoc record (havoc.rs, experiments/E004-fast-exact/havoc-cut.md) in
     /// place of stopping the reading. Needs split_limit.
     pub havoc_cut: bool,
+    /// Jobs that differ only in an input argument their run never read share one run (machine.rs `SharedRuns`,
+    /// experiments/E004-fast-exact/shared-runs.md); the output is byte for byte the same.
+    pub shared_runs: bool,
 }
 
 impl Switches {
@@ -250,7 +253,8 @@ impl Switches {
                 "input_settled" => s.input_settled = true,
                 "grow_limit" => s.grow_limit = true,
                 "havoc_cut" => s.havoc_cut = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut)")),
+                "shared_runs" => s.shared_runs = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs)")),
             }
         }
         Ok(s)
@@ -286,6 +290,9 @@ impl Switches {
         }
         if self.havoc_cut {
             v.push("havoc_cut");
+        }
+        if self.shared_runs {
+            v.push("shared_runs");
         }
         v
     }
@@ -1997,6 +2004,9 @@ impl<'g> Builder<'g> {
         if self.switches.pass2_reuse {
             self.table.memo = Some(Arc::new(crate::memo::RunMemo::default()));
         }
+        if self.switches.shared_runs && self.table.shared.is_none() {
+            self.table.shared = Some(Arc::new(crate::shared::SharedRuns::default()));
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -2311,6 +2321,10 @@ impl<'g> Builder<'g> {
 
     /// `run_jobs_each` on jobs a machine can share with its threads.
     pub fn run_jobs_shared(&mut self, m: &mut dyn Machine, jobs: Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, Vec<Record>)) {
+        if let Some(sh) = &self.table.shared {
+            // the switch shared_runs: a run is shared within its batch only
+            sh.next_batch();
+        }
         for job in jobs.iter() {
             if let What::Event(e) = &job.what {
                 if e.sig != 0 {

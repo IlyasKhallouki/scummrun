@@ -459,6 +459,13 @@ pub(crate) fn trace_havoc(label: &str, units: usize, effects: usize, events: usi
     }
 }
 
+/// The switch shared_runs: a click's run that others with the same key cannot take, and why.
+pub(crate) fn trace_shared(label: &str, why: &str) {
+    if trace_on() {
+        eprintln!("shared {label}: not shared, {why}");
+    }
+}
+
 pub(crate) fn trace_grow(label: &str, depth: usize, limit: usize, cut: i64) {
     if trace_on() {
         eprintln!("grow {label} depth {depth}: read again with the path limit at {limit} ({cut} paths cut)");
