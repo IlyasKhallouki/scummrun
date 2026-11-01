@@ -105,6 +105,49 @@ def cpu_of(pid: int) -> float:
         return 0.0
 
 
+class FastView:
+    """replay.view(b, doms, obs, unobserved) for fixed ``doms``, computed only on the keys of ``doms``: the same values
+    (reader.task_start's positions for the ``pos:``/``escpos:`` keys, the ELSEWHERE rule, each value labelled by its
+    domain), without task_start's pass over every unit of the scope (``test_window.py``,
+    ``test_fast_view_is_view``). Its counters are not kept."""
+
+    def __init__(self, b, doms: dict, unobserved: tuple = RP.UNOBSERVED):
+        pts = b.table.points
+        self.elsewhere = getattr(b, "elsewhere", None) or set()
+        self.plain, self.pos = [], []
+        for k, dom in doms.items():
+            if k.startswith(unobserved) or dom is None:
+                continue
+            kind, _, name = k.partition(":")
+            if kind in R.POS_KINDS:
+                at = R.POS_KINDS[kind]
+                ws = pts[at].get(name)
+                cands = None if ws is None else [(f"{at}:{name}:{w}", w) for w in sorted(ws)]
+                self.pos.append((k, dom, at, name, cands, set(ws or ())))
+            else:
+                self.plain.append((k, dom))
+
+    def __call__(self, obs: dict) -> dict:
+        out = {k: dom.label(obs.get(k, 0)) for k, dom in self.plain}
+        seen = None
+        for k, dom, at, name, cands, ws in self.pos:
+            v = R.NOWHERE
+            if cands is not None:
+                v = next((w for key, w in cands if obs.get(key) == 1), R.NOWHERE)
+            if v == R.NOWHERE and k in self.elsewhere:
+                if seen is None:
+                    seen = {}
+                    for key, x in obs.items():
+                        if x == 1 and key.startswith(("at:", "esc:")):
+                            kd, rest = key.split(":", 1)
+                            nm, w = rest.rsplit(":", 1)
+                            seen.setdefault((kd, nm), []).append(w)
+                if any(w.lstrip("-").isdigit() and int(w) not in ws for w in seen.get((at, name), ())):
+                    v = RP.ELSEWHERE
+            out[k] = dom.label(v)
+        return out
+
+
 # --- section 1: the plan's records and the macro steps -------------------------------------------------------------
 
 def rec_reads_writes(rec) -> tuple:
@@ -138,6 +181,7 @@ class MRec:
     done: bool = False  # matched in the run
     done_frame: int | None = None
     path: int = 0  # the path that matched
+    checked: frozenset | None = None  # the facts its match checks (section 2, Lemma 8; None: every final write)
 
     @property
     def name(self) -> str:
@@ -181,6 +225,29 @@ def macro_steps(recs: list) -> list:
     return out
 
 
+def checked_keys(recs: list, goal) -> None:
+    """Section 2, the checked writes (Lemma 8): per record, the facts it writes that a later step reads before any later
+    step writes them, the goal's facts no later step writes, and its own slot (``pos:U`` of an event's unit, an input's
+    ``pos:`` writes). Sets each record's ``checked``."""
+    for i, r in enumerate(recs):
+        keep = set()
+        for k in r.writes:
+            for q in recs[i + 1:]:
+                if k in q.reads:
+                    keep.add(k)
+                    break
+                if k in q.writes:
+                    break
+            else:
+                if k in goal:
+                    keep.add(k)
+        if r.unit is not None:
+            keep.add(f"pos:{r.unit}")
+        if r.kind == "input":
+            keep |= {k for k in r.writes if k.startswith("pos:")}
+        r.checked = frozenset(keep)
+
+
 def build_recs(h, steps: list) -> list:
     """The plan's steps as MRecs, each path's predicted writes from the plan's state before it (window-search.md
     section 2): the harness's belief at the plan's start with the earlier steps' predicted writes applied."""
@@ -216,31 +283,38 @@ def input_clicks(rec) -> int:
 
 
 def chain_frames(recs: list, members: list) -> tuple:
-    """Lemma 4: the largest sum of event costs along one unit's chain from the input's record, within the macro step
-    ``members`` (indices, the input first). Returns (frames, the chain's step names)."""
+    """Lemmas 4 and 4′: the largest sum of event costs along the links from the input's record within the macro step
+    ``members`` (indices, the input first): a record that leaves unit U at wait point W (``pos:U`` set to W) links to
+    the first later event of U resuming at W with one path; through U's own slot (or from the input) it adds the
+    event's cost (at least 1), through a slot another event starts max(0, cost - 1). Returns (frames, the chain's step
+    names)."""
     first = recs[members[0]]
     if first.kind != "input" or len(first.paths) != 1:
         return 0, []
-    best, best_names = 0, []
-    for key, e in first.paths[0].what.effects.items():
-        if not key.startswith("pos:") or e[0] != "set" or not isinstance(e[1], int) or e[1] < 0:
-            continue
-        unit, w, total, names = key[4:], e[1], 0, []
-        rest = [recs[j] for j in members[1:]]
-        while True:
-            nxt = next((r for r in rest if r.kind == "event" and r.unit == unit and r.wait == w), None)
-            if nxt is None or len(nxt.paths) != 1:
-                break
-            total += max(1, nxt.cost)
-            names.append(nxt.name)
-            rest = [r for r in rest if r is not nxt]
-            e2 = nxt.paths[0].what.effects.get(key)
-            if not e2 or e2[0] != "set" or not isinstance(e2[1], int) or e2[1] < 0:
-                break
-            w = e2[1]
-        if total > best:
-            best, best_names = total, names
-    return best, best_names
+    rest = [recs[j] for j in members[1:]]
+
+    def leaves(x):
+        for key, e in x.paths[0].what.effects.items():
+            if key.startswith("pos:") and e[0] == "set" and isinstance(e[1], int) and e[1] >= 0:
+                yield key[4:], e[1]
+
+    def best_from(x, seen):
+        top, top_names = 0, []
+        for unit, w in leaves(x):
+            nxt = next((r for r in rest if r.i > x.i and r.kind == "event" and r.unit == unit and r.wait == w), None)
+            if nxt is None or len(nxt.paths) != 1 or nxt.i in seen:
+                continue
+            e2 = nxt.paths[0].what.effects.get(f"pos:{unit}")
+            if e2 is not None and e2[0] == "set" and e2[1] == w:
+                continue  # Lemma 4′: a yield at its own resume point shows nothing
+            own = x.kind == "input" or x.unit == unit
+            add = max(1, nxt.cost) if own else max(0, nxt.cost - 1)
+            sub, sub_names = best_from(nxt, seen | {nxt.i})
+            if add + sub > top:
+                top, top_names = add + sub, [nxt.name] + sub_names
+        return top, top_names
+
+    return best_from(first, frozenset())
 
 
 # --- section 2: the matcher ----------------------------------------------------------------------------------------------
@@ -258,7 +332,8 @@ class Matcher:
         self.final = {}
         for r in tracked:
             later = set().union(*[q.writes for q in tracked if q.i > r.i])
-            self.final[r.i] = [{k: x for k, x in exps.items() if k not in later} for exps in r.exps]
+            self.final[r.i] = [{k: x for k, x in exps.items() if k not in later and
+                                (r.checked is None or k in r.checked)} for exps in r.exps]
         self.preds = {r.i: r.preds & idx for r in tracked}
         self.input_issued = False
         self.choices: dict = {}  # i -> [(key, observed)]: a guessed write inside its values, not the plan's choice
@@ -299,14 +374,28 @@ class Matcher:
                 for k, vs in pre.items():
                     if k.startswith("pos:"):
                         allowed[k] |= set(vs)
-        checked = {k for r in self.pending() for exps, pre in zip(r.exps, r.pres) for k in list(exps) + list(pre)
-                   if k.startswith("pos:") or k == "room"} | {f"pos:{r.unit}" for r in self.pending() if r.unit}
+        # the slots a pending tracked record reads, and the pending events' own slots (section 3, Lemma 8); the room
+        checked = {k for r in self.pending() for pre in r.pres for k in pre if k.startswith("pos:")} | \
+            {f"pos:{r.unit}" for r in self.pending() if r.unit} | \
+            {"room" for r in self.pending() for exps, pre in zip(r.exps, r.pres) if "room" in exps or "room" in pre}
         for k in sorted(checked):
             v = now.get(k)
             if v is None or v == at_fork.get(k) or v in allowed[k]:
                 continue
             return k, v
         return None
+
+    def unmet(self, now: dict, limit: int = 4) -> list:
+        """The needed records still pending, each with its checked final writes that do not hold now (key, the
+        predicted values, the engine's): what B1 reads of a child that did not succeed."""
+        out = []
+        for r in self.pending():
+            if r.i not in self.needed:
+                continue
+            miss = [(k, sorted(map(str, x.values)), now.get(k)) for k, x in self.final[r.i][0].items()
+                    if now.get(k) not in x.values][:limit]
+            out.append((r.name, miss))
+        return out[:limit]
 
     def dead_needed(self, now: dict) -> list:
         """Section 3's spent test at an idle stop: the needed records still pending that nothing alive can run, the
@@ -453,10 +542,10 @@ class Search:
         if b is not None and b is not self.h.root:
             self.cpu[role] += cpu_of(b.pid)
 
-    def _observe(self, b, doms: dict) -> tuple:
+    def _observe(self, b, fv: FastView) -> tuple:
         s = b.state()
         obs = F.facts_of(s)
-        return s, obs, RP.view(self.h.b, doms, obs, self.h.unobserved)
+        return s, obs, fv(obs)
 
     def _play(self, ctx: _Ctx, inp: RP.Input, name: str) -> None:
         """The harness's input code (Harness._play_input) on the child: the camera wait and the ego check for a click,
@@ -498,7 +587,7 @@ class Search:
                     ch.outcome, ch.why = "ended", st["end"]
                     return ch
             snap = self.fork(cb, "snapshot")
-            s, obs, now = self._observe(cb, w["doms"])
+            s, obs, now = self._observe(cb, w["fv"])
             m = Matcher(w["tracked"], w["needed"], w["input"], ch.done, issued=w["issued"])
             m.input_issued = True
             m.plan_pending = w["plan_pending"]
@@ -537,23 +626,23 @@ class Search:
                 if f > ch.issue + 1 and "idle" in st:
                     dead = m.dead_needed(now)
                     if dead:
-                        ch.outcome, ch.why = "spent", dead[:3]
+                        ch.outcome, ch.why = "spent", m.unmet(now)
                         break
                 if f - ch.issue >= cfg.child_limit:
-                    ch.outcome = "limit"
+                    ch.outcome, ch.why = "limit", m.unmet(now)
                     break
                 st = cb.run(frame=f + 1)
                 if "end" in st:
                     ch.outcome, ch.why = "ended", st["end"]
                     break
-                s, obs, now = self._observe(cb, w["doms"])
+                s, obs, now = self._observe(cb, w["fv"])
             ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             ch.matched = {i: v for i, v in m.matched.items() if v[0] is not None}
             ch.choices = dict(m.choices)
             if ch.outcome in ("success", "goal"):
                 cps.append((cb.frame, dict(obs), RP.extra_of(s, cb.status)))
                 ch.checkpoints = cps
-                full = RP.view(h.b, w["full_doms"], obs, h.unobserved)
+                full = w["full_fv"](obs)
                 ch.unplanned = [{"key": x.key, "start": RP._str(ch.full_at_fork.get(x.key)), "changes": [],
                                  "count": 1, "end": RP._str(x.observed), "net": True}
                                 for x in RP.unplanned(ch.full_at_fork, full, w["predicted_keys"])][:40]
@@ -623,7 +712,8 @@ class Search:
         pm.plan_pending = [r for r in recs if not r.done]
         goal_writers = {r.i for r in tracked if r.i in self.goal_writers}
         w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name, "tracked": tracked, "needed": needed, "input": first if has_input else None,
-             "doms": doms, "full_doms": full_doms, "best": None, "firsts": set(), "b_qf": b_qf,
+             "doms": doms, "full_doms": full_doms, "fv": FastView(h.b, doms, h.unobserved),
+             "full_fv": FastView(h.b, full_doms, h.unobserved), "best": None, "firsts": set(), "b_qf": b_qf,
              "bound_violations": [], "delta_violation": None, "issued": issued,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps])}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None,
@@ -639,7 +729,7 @@ class Search:
             while True:
                 st = parent.status
                 g = parent.frame
-                s, obs, now = self._observe(parent, doms)
+                s, obs, now = self._observe(parent, w["fv"])
                 if cfg.delta_lo > 1 and max(1, st.get("v19", 0)) < cfg.delta_lo:
                     w["delta_violation"] = [g, st.get("v19")]
                     end_reason = "delta"
@@ -685,12 +775,13 @@ class Search:
                             time.sleep(0.05)
                         cb = self.fork(parent, "child")
                         ch = Child(g, st["qf"], not pre_now, frozenset(i for i, v in pm.matched.items()),
-                                   dict(now), RP.view(h.b, full_doms, obs, h.unobserved))
+                                   dict(now), w["full_fv"](obs))
                         children.append(ch)
                         futures.append(pool.submit(self._child, w, cb, ch))
                         if len(children) % 100 == 0:
                             done_ = collections.Counter(c.outcome for c in children if c.outcome)
-                            mk = collections.Counter(str(c.why) for c in children if c.outcome == "mismatch")
+                            mk = collections.Counter(str(c.why)[:160] for c in children
+                                                     if c.outcome in ("mismatch", "spent", "limit"))
                             h.progress(f"    window {k + 1}: {len(children)} children by frame {g}, {dict(done_)}"
                                        + (f"; mismatches {mk.most_common(3)}" if mk else ""))
                     else:
@@ -809,6 +900,7 @@ class Search:
         self.replan_cause = None
         recs = build_recs(h, steps)
         macros = macro_steps(recs)
+        checked_keys(recs, h.goal)
         self.goal_writers = self._goal_writers(recs)
         self.pred0 = dict(h.pred)
         h.plans[-1]["macro_steps"] = [[recs[j].name for j in m] for m in macros]

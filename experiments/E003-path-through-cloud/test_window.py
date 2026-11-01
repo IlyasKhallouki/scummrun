@@ -135,3 +135,66 @@ def test_the_end_rule_waits_for_the_inputs_predecessors():
     assert not e.closed(ready=True, pre_now=True) and e.open  # the model's window opens
     assert not e.closed(ready=True, pre_now=True)
     assert e.closed(ready=True, pre_now=False)  # and closes: the end
+
+
+def test_checked_keys_follow_causal_links():
+    recs = [rec(0, "input", writes={"pos:script:2", "var:1", "var:9"}),
+            rec(1, "event", reads={"pos:script:2"}, writes={"pos:script:2", "room", "pos:local:7", "pos:local:8"},
+                unit="script:2", wait=736),
+            rec(2, "event", reads={"pos:local:8"}, writes={"pos:local:8", "var:1"}, unit="local:8", wait=4),
+            rec(3, "input", reads={"room", "var:1"}, writes={"owner:5"})]
+    W.checked_keys(recs, {"owner:5": {1}})
+    assert recs[0].checked == {"pos:script:2"}  # var:1 is written again before it is read; var:9 never read
+    assert recs[1].checked == {"pos:script:2", "room", "pos:local:8"}  # pos:local:7: no step reads it
+    assert recs[2].checked == {"pos:local:8", "var:1"}
+    assert recs[3].checked == {"owner:5"}  # the goal
+
+
+def test_a_slot_no_pending_record_reads_runs_on():
+    # the room entry predicts local 7 at 5; the engine shows it at 15: no pending record reads pos:local:7
+    r0 = rec(0, "event", unit="script:2", wait=736, writes={"pos:script:2", "pos:local:7"},
+             exps={"pos:script:2": x("pos:script:2", -1), "pos:local:7": x("pos:local:7", 5)},
+             pre={"pos:script:2": {736}})
+    r0.preds = frozenset()
+    W.checked_keys([r0], {})
+    m = W.Matcher([r0], {0}, None)
+    assert m.mismatch({"pos:script:2": 736, "pos:local:7": 15}, {"pos:script:2": 736, "pos:local:7": -1}) is None
+    m.note(3, {"pos:script:2": -1, "pos:local:7": 15})
+    assert m.matched == {0: (3, 0)}
+
+
+def test_chain_frames_through_a_started_slot():
+    eff_in = {"pos:script:2": ("set", 736)}
+    recs = [rec(0, "input", effects=eff_in),
+            rec(1, "event", unit="script:2", wait=736, cost=1,
+                effects={"pos:script:2": ("set", -1), "pos:local:211": ("set", 4), "room": ("set", 28)}),
+            rec(2, "event", unit="local:211", wait=4, cost=1, effects={"pos:local:211": ("set", 33)}),
+            rec(3, "event", unit="local:211", wait=33, cost=301, effects={"pos:local:211": ("set", 40)}),
+            rec(4, "event", unit="local:9", wait=7, cost=50, effects={"pos:local:9": ("set", 7)})]
+    frames, names = W.chain_frames(recs, [0, 1, 2, 3, 4])
+    # 1 (the input's slot) + max(0, 1 - 1) (the started timer's first wait) + 301 (its own slot)
+    assert frames == 302 and names == ["s1", "s2", "s3"]
+
+
+def test_chain_frames_skip_a_yield_at_its_resume_point():
+    recs = [rec(0, "input", effects={"pos:local:5": ("set", 3)}),
+            rec(1, "event", unit="local:5", wait=3, cost=90, effects={"pos:local:5": ("set", 3)})]
+    assert W.chain_frames(recs, [0, 1]) == (0, [])
+
+
+def test_fast_view_is_view():
+    import random
+    import domains as D
+    import packed_reading as PR
+    facts = {"pos:local:1": D.Domain((-2, -1, 3, 5)), "pos:script:2": D.Domain((-1, 736, 915)),
+             "escpos:local:1": D.Domain((-1, 7)), "pos:local:9": D.Domain((-1, 4)), "var:3": D.Domain((0, 1, 2)),
+             "args:local:1": D.Domain((0, 11))}
+    b = PR.Points(facts)
+    del b.table.points["at"]["local:9"]  # a unit the points do not list: NOWHERE, as reader.task_start gives it
+    rng = random.Random(7)
+    keys = ["at:local:1:3", "at:local:1:5", "at:local:1:9", "at:script:2:736", "at:script:2:915", "esc:local:1:7",
+            "at:local:9:4", "var:3"]
+    fv = W.FastView(b, facts)
+    for _ in range(300):
+        obs = {k: rng.choice((0, 1)) if k != "var:3" else rng.choice((0, 1, 2, 7)) for k in keys if rng.random() < .7}
+        assert fv(obs) == RP.view(b, facts, obs), obs
