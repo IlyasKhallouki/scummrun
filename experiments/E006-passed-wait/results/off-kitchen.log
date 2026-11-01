@@ -1,0 +1,31 @@
+E006 off check: the strict window search with split_wait off (code at 1386267), the kitchen from the harness's boot, on a reading made by e006's reader with wait_pass_cost off (packed sha1 47583c54, the walk branch's kitchen reading's; actions and lists files byte for byte the same), walk's run.sh switches; seed 1; the ScummVM build of svm-w3b.
+Against walk's run (eaca9ca, results/walk-strict-kitchen-boot.log), compared field by field on the result files:
+DIFF run plans: only write_s, seconds, serve and decode_s (timings)
+DIFF run replan_causes [{'plan': 0, 'frame': 6376, 'cause': "window empty: 3600 frames; children {'refuted': 1, 'spent': 3599}; cause: input walk_to(428)#64 at 2798: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split"}] | [{'plan': 0, 'frame': 6376, 'cause': "window empty: 3600 frames; children {'refuted': 1, 'spent': 3599}; cause: input walk_to(428)#64 at 2797: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split"}]
+windows 3 3
+DIFF window 1 cause: {'failure': 'input', 'record': 'walk_to(428)#64', 'frame': 2798, 'why': 'end pos:script:2', 'unit': 'script:2', 'engine_end': -1, 'record_end': 736, 'cause': True, 'kind': 'the wait did not block', 'offset': 736, 'opcode': 'WaitForActor', 'values': [{'what': 'getActorMoving(1)', 'value': 0, 'source' | {'failure': 'input', 'record': 'walk_to(428)#64', 'frame': 2797, 'why': 'end pos:script:2', 'unit': 'script:2', 'engine_end': -1, 'record_end': 736, 'cause': True, 'kind': 'the wait did not block', 'offset': 736, 'opcode': 'WaitForActor', 'values': [{'what': 'getActorMoving(1)', 'value': 0, 'source'
+differences: 3
+(the cause's frame, 2797 against 2798, is the first child that finished with that failure, which depends on the 3 workers' order; walk's own runs show both: the trace branch's bar door 2797, k = 2 2798)
+
+file replay-part1-kitchen-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite.json
+stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split'; goal reached False; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 5 checkpoints, 0 differences, 27 inputs, goal at the end False, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 9976, qf 239236): 7248 frames, 173952 qf, 724.82 s
+plans 2, replans 1
+  replan after plan 0 at frame 6376: window empty: 3600 frames; children {'refuted': 1, 'spent': 3599}; cause: input walk_to(428)#64 at 2797: end pos:script:2: the wait did not block; script:2 [02E0] WaitForActor; getActorMoving(1) = 0 (actor state); class split
+  cause (window empty, plan 0 window 1): input walk_to(428)#64 at 2797: end pos:script:2: the wait did not block; script:2 736 WaitForActor; getActorMoving(1) = 0; class split
+  cause (window empty, plan 1 window 0): input walk_to(428)#64 at 6378: end pos:script:2: the wait did not block; script:2 736 WaitForActor; getActorMoving(1) = 0; class split
+windows 3; children 7266; child frames 24527; outcomes {'duplicate': 6, 'pruned': 59, 'success': 1, 'refuted': 1, 'spent': 7199}
+search CPU: engines 148.0 s {'child': 133.31, 'snapshot': 14.71, 'the last engine': 0.0}, Python 209.47 s, total 357.5 s
+Python CPU by part {'setup': 1.18, 'play': 14.08, 'child total': 152.81, 'cache: state, kept': 48660, 'cache: state, asked': 17200, 'cache: at, asked': 39185, 'cache: at, kept': 108325, 'observe': 100.1, 'match': 9.08}
+memory {'forks_pss_kb': 75163, 'python_rss_kb': 306636, 'live_forks': 13, 'min_available_kb': 7980180}
+steps: inputs 3 {'matched': 1, 'window empty': 2}; events 5 {'matched': 1, 'not reached': 4}
+  window 0.1 sentence(2,428)#44: frames 2728-2794 (stop: Q(g) + b reached the best success); 66 children {'duplicate': 6, 'pruned': 59, 'success': 1}, 2774 child frames, 13.91 s wall, 12.03 Python s; best success fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures []
+  window 0.2 walk_to(428)#64: frames 2776-6376 (3600 frames); 3600 children {'refuted': 1, 'spent': 3599}, 10953 child frames, 124.04 s wall, 108.38 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'end pos:script:2'], 3581], [['input', 'walk_to(428)#64', 'pre script:2'], 18]]
+  window 1.1 walk_to(428)#64: frames 6376-9976 (3600 frames); 3600 children {'spent': 3600}, 10800 child frames, 101.74 s wall, 89.06 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'end pos:script:2'], 3600]]
+windows with an input 3; search CPU per such window 119.2 s; x 250 = 8.28 CPU h
+effects outside their domain (M4 does not check them; the record still matches under trace-validation.md section 3): 0
+run seconds 377.5; reach extensions 0
+  plan 0 at frame 2728: plan, 27 steps, write 4.037288660998456, search None, plan_cost 343
+  plan 1 at frame 6376: plan, 25 steps, write 3.3930298319319263, search None, plan_cost 340
+planner: taskcore serve peak RSS 80 MB; plan seconds [51.5, 44.7]
