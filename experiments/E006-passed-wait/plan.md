@@ -170,3 +170,48 @@ origin/timed are not used.
   no fix beyond the split and the costs.
 - The harness's own limits are the walk branch's (replan limit 30, windows and children of 3,600 frames, plan memory
   3G); a run that hits one reports it as its stop. They are not decisions of this experiment.
+
+## Results (2026-11-01, written after the runs)
+
+Code at 1386267 (branch e006): the reader switch at 75fb3a0, strict.py at 8a7ab11, window.py and replay_part1.py at
+1386267. Files: `results/off-kitchen.log`, `results/readings.log`, `results/split-kitchen.log`, `results/split-bar.log`,
+`results/split-k2.log`. Lab note: `notes/log/2026-11-01-e006.md`.
+
+Off checks: the reader with `wait_pass_cost` off reads the kitchen to packed sha1 47583c54, with the actions and lists
+files byte for byte walk's. The strict kitchen from the boot with `split_wait` off gives walk's run: the same stop,
+7,248 frames, 173,952 qf, 7,266 children with the same outcomes and rows, the same 27 inputs, verify 5 checkpoints and
+0 differences. The one difference is the frame of the child the cause is read on (2797 against 2798), the first child
+to finish with the shared failure, which depends on the workers' order. With the switch on the readings keep their
+records and actions; 1,707 of the kitchen's 40,773 actions and 1,292 of the bar's 37,776 cost 0 instead of 1.
+
+| test | stop | goal from the plan's records | frames (qf, s) from 2728 | plans, replans | children | strict matches | search CPU s | peak memory |
+|---|---|---|---|---|---|---|---|---|
+| kitchen | the goal at 3216 | yes | 488 (11,712, 48.80) | 3, 2 | 501 | inputs 3 of 4, events 3 of 9 | 275.1 (engines 141.0, Python 134.1) | Python 298 MB, forks 78 MB, taskcore 88 MB |
+| bar door | goal, not from the plan, at 3129 | no | 401 (9,624, 40.10) | 2, 1 | 420 | inputs 2 of 3, events 1 of 3 | 43.0 (17.8, 25.2) | 276 MB, 64 MB, 72 MB |
+| k = 2 | the same empty window twice on walk_to(428)#64, at 9996 | no | 7,268 (174,432, 726.82) | 3, 2 | 7,268 | inputs 0 of 3, events 0 of 3 | 359.9 (95.9, 264.0) | 736 MB, 75 MB, 1,121 MB |
+
+Each verified from boot in a fresh engine with no fork: 9, 6 and 5 checkpoints, 0 differences; the kitchen's goal and
+the bar door's hold at the end.
+
+- At walk_to(428), no child of any of the three failed on "the wait did not block". On the kitchen and the bar door the
+  window took 22 children (3,600 before); 3 read the click's run as two parts, the click's record matched on part 1
+  and took effect, and #510 was refuted on M4 on its part: it predicts local:201 = 0, the engine had 1 at the next
+  decision point, and none of the fact's 18 write sites is in the part (the explainer gives no class). The window ended
+  in that deviation at 2798, as the non-strict search did there. On k = 2 every one of the 7,200 children read the
+  click's run as two parts, and the click's record failed (I3) on var 102, written at the sentence script's [002B]
+  after the test at [0000] on var 103, which the k = 2 reading holds no fact of: class split. No other record of the
+  click took effect on a fact a later step reads (its part writes var 102, which already held 0, and the slot's facts,
+  which part 2 moves on), so no deviation.
+- Kitchen: the replan from 2798 goes to the door window, which deviates on the cook's x (local:203 [001E], var 0 = 306,
+  class split) at 3204, as from S1#7; the pick-up then reaches the goal at 3216, 3 frames before the non-strict search.
+  b fell from 2 frames to 1 on the first two windows (the events at [02E0] cost 0); no bound violation.
+- Bar door: after the same deviation at 2798, the goal holds in the idling parent at 3129, written by local 209's
+  drawObject at [0033], a unit the plan does not name; class split. That is the next blocker.
+- k = 2: the next blocker is (I3) on var 102 at walk_to(428) (class split), behind the wait the split removed.
+
+Against the prediction: the off checks, the readings, the kitchen's window at walk_to(428) (2798, 22 children; local:201
+where local:208 was named) and the kitchen's run (3216, 488 frames, 2 replans, 275 s, under 0.5 GB) came as
+predicted; the bar door stopped as predicted, 9 frames earlier (3129, not 3138); k = 2 did not get past walk_to(428).
+By the threshold, the kitchen answers yes; the bar door gets past walk_to(428) and stops at a named blocker; k = 2
+meets the letter of the no clause (it stops at walk_to(428)) but not its diagnosis: Lemma P held in all its children,
+and the stop is (I3) on var 102. The stop rule did not fire.
