@@ -458,7 +458,8 @@ def reach_extender(rd, run_dir: Path, threads: int, starts: list):
         starts.append(f)
         path = read_rust(rooms, seed, goal, f"reach-{n:02d}", d, threads, None, doc.get("domain_goals", "none"),
                          elsewhere=elsewhere, live_locals=doc.get("live_locals") is not None,
-                         split_limit=bool(doc.get("split_limit")), start_rows=start_rows,
+                         split_limit=bool(doc.get("split_limit")),
+                         **({"start_rows": start_rows} if start_rows is not None else {}),
                          **reader_switches(doc, starts))
         return PR.load_reading(path)
     return extend
