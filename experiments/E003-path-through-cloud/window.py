@@ -1661,12 +1661,14 @@ class Search:
                 elif moved and ch.arrival is None:
                     ch.arrival = f
                 goal = not h._holds(h.goal, now)
-                if goal and not (w["goal_writers"] and all(i in track.matched for i in w["goal_writers"])):
+                credited = bool(w["goal_writers"]) and all(i in track.matched for i in w["goal_writers"])
+                if goal and not credited and not (ch.took == "n/a" and first.i in w["goal_writers"]):
                     ch.outcome, ch.why = "goal, not from the plan", sorted(w["goal_writers"])
                     break
-                if goal or all(i in track.matched for i in w["needed"]):
+                if (goal and credited) or all(i in track.matched for i in w["needed"]):
                     ch.outcome = "goal" if goal else "success"
                     break
+                # (a goal that holds while the click, a goal record, is not decided yet waits for it: Lemma 9′)
                 ref = [i for i in w["needed"] if i in track.refuted]
                 if ref:
                     fr, why_, run_ = track.refuted[ref[0]]
