@@ -17,7 +17,7 @@ usage (from this folder, with ../../.venv/bin/python, under nice):
        replay_part1.py run SEED --reading DIR/reading.json [--control] [--replan-limit 500] [--time-limit 86400]
                        [--plan-time 600] [--plan-memory 6G] [--results DIR] [--deadline EPOCH]
                        [--slot-locals [--reread]] [--serve] [--search S] [--cost-caps] [--reach-extend]
-                       [--unobserved-actor-rooms] [--approach-stones]
+                       [--unobserved-actor-rooms] [--approach-stones] [--window-search [--workers 7]]
        replay_part1.py log NAME [--results DIR]           (the log of NAME's runs and start checks, from the json)
        score_part1.py RESULT.json ...                     (after the run: the key's Part I goals, from boot)
 
@@ -131,6 +131,13 @@ the harness treats the ``actorroom:`` facts as unobserved, with the plan's value
 **Stepping stones** (``--approach-stones``, off by default): the Executor's stepping stones are tried on forks of the
 run's engine (replay.py, "The camera"), for an object off screen that floor clicks do not bring on screen. The run's
 file then ends in ``-stones``.
+
+**The window search** (``--window-search``, off by default; plan step A4, window-search.md, window.py): each plan is
+played as its macro steps, each input tried on every frame of its window on forked children (``--workers`` at a time,
+7), and the child that completes the macro step first on the bridge's clock kept (replay.py, "The window search").
+Lemma 2's floor on a frame's quarter-frames comes from the reading's frame costs (``frame_costs.dmax``). The run's
+file then ends in ``-window``, and its record has the windows, the replans' causes, the run clock in quarter-frames
+(``game_qf``) and the search's CPU.
 
 **Without reloading** (``--serve``, off by default): taskcore runs as one long-lived process per packed file
 (plan_fd ``serve``, taskcore/src/serve.rs), which keeps the loaded reading and what does not depend on the start, for
@@ -702,7 +709,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             plan_memory: str = replay.PLAN_MEMORY, deadline: float | None = None, slot_locals: bool = False,
             reread: bool = False, threads: int = 3, serve: bool = False, search: str = "lama-first",
             cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
-            approach_stones: bool = False) -> dict:
+            approach_stones: bool = False, window_search: bool = False, workers: int = 7) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -721,7 +728,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     tag = f"{name}-seed{seed}" + ("-control" if control else "") + ("-locals" if slot_locals else "") + \
         ("-serve" if serve else "") + (f"-{search}" if search != "lama-first" else "") + \
         ("-caps" if cost_caps else "") + ("-reachx" if reach_extend else "") + \
-        ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "")
+        ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "") + \
+        ("-window" if window_search else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
     goal = rd.task.goal
@@ -748,6 +756,12 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         out["unobserved_actor_rooms"] = True
     if approach_stones:
         out["approach_stones"] = True
+    wcfg = None
+    if window_search:
+        import window as WS
+        wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs))
+        out["window_search"] = dict(vars(wcfg))
+        out["sources"]["window.py"] = sha(HERE / "window.py")
     if reach_extend:
         out["reach_extend"] = {"threads": threads, "reader_scope": str(READER_SCOPE),
                                "reader_scope_sha1": sha(READER_SCOPE)}
@@ -788,7 +802,8 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
                            cost_dmax=(frame_costs or {}).get("dmax"),
                            reach_extend=reach_extender(rd, run_dir, threads, starts) if reach_extend else None,
                            unobserved_actor_rooms=unobserved_actor_rooms,
-                           stone_fork=ctl.fork if approach_stones else None)
+                           stone_fork=ctl.fork if approach_stones else None,
+                           window_search=wcfg, fork=ctl.fork if window_search else None)
         res = h.run()
         checkpoints = h.checkpoints
     finally:
@@ -808,6 +823,9 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     out["verify"] = ver
     out["seconds"] = round(time.monotonic() - t0, 1)
     out["game_seconds"] = releases.get(S.RELEASE).seconds(res["ticks"])
+    if "qf" in res:  # the window search's record: the run clock in quarter-frames
+        out["game_qf"] = res["qf"]
+        out["game_qf_seconds"] = res["qf"] / releases.get(S.RELEASE).timer_hz
     rd.close()
     results.mkdir(parents=True, exist_ok=True)
     (results / f"replay-part1-{tag}.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
@@ -883,6 +901,8 @@ def run_lines(o: dict) -> list:
                      + (f"dmax {fc.get('dmax')}, charinc {fc.get('charinc')}" if fc else "off (every action 1)"))
     if o.get("reader"):
         lines.append(f"reader: {o['reader']}")
+    if o.get("window_search"):
+        lines += window_lines(o)
     for p in r["plans"]:
         lines.append(f"  plan {p['plan']} at frame {p['frame']}: {p.get('status')}, {len(p.get('steps', []))} steps, "
                      f"taskcore {p.get('write_s', 0):.2f} s, {search} {p.get('seconds', 0):.2f} s, "
@@ -929,6 +949,31 @@ def run_lines(o: dict) -> list:
     for d in v["differ"][:5]:
         lines.append(f"  verify differs at {d}")
     return lines
+
+
+def window_lines(o: dict) -> list:
+    """The window search's lines (module docstring, "The window search"): the clock, the windows, the replans' causes and
+    the search's CPU."""
+    r = o["run"]
+    ws, sm = r.get("windows", []), r.get("window_summary", {})
+    q = o.get("game_qf")
+    out = [f"window search {o['window_search']}: run clock {q} quarter-frames ({o.get('game_qf_seconds', 0):.1f} s) "
+           f"from frame {r.get('frame0')} (qf {r.get('qf0')}) to {r.get('frame_end')} (qf {r.get('qf_end')})",
+           f"  {sm.get('windows')} windows, {sm.get('children')} children, {sm.get('child_frames')} child frames, "
+           f"outcomes {sm.get('outcomes')}; early successes {sm.get('early_successes')}; bound violations "
+           f"{sm.get('bound_violations')}; engine CPU s {sm.get('engine_cpu_s')}; Python CPU s {sm.get('python_cpu_s')}"]
+    for c in r.get("replan_causes", []):
+        out.append(f"  replan after plan {c['plan']} at frame {c['frame']}: {c['cause']}")
+    for w in ws:
+        b = w.get("best") or {}
+        out.append(f"  window {w['plan']}.{w['macro'] + 1} {w['input']}: frames {w['start']}-{w['end']} "
+                   f"({w['end_reason']}); {w['forks']} children {w['outcomes']}, {w['child_frames']} child frames, "
+                   f"{w['wall_s']} s; b {w['b_frames']} frames ({w['b_qf']} qf, chain {len(w['chain'])}); "
+                   + (f"best fork {b['g']}, inputs {b['first']}-{b['issue']}, done {b['end']} (qf {b['q_end']}, "
+                      f"{b['q_end'] - w['start_qf']} after the window's start), early {b['early']}, walk "
+                      f"{b.get('walk_frames')}" if b else "no success")
+                   + (f"; mismatches {w['mismatch_keys']}" if w.get("mismatch_keys") else ""))
+    return out
 
 
 def start_lines(o: dict) -> list:
@@ -1027,6 +1072,9 @@ def main() -> None:
                    help="the actors' rooms (reader switch actor_rooms) unobserved, with the plan's values (replay.py)")
     r.add_argument("--approach-stones", action="store_true",
                    help="the Executor's stepping stones on forks, for an object floor clicks do not bring on screen")
+    r.add_argument("--window-search", action="store_true",
+                   help="plan step A4: each input tried on every frame of its window on forked children (window.py)")
+    r.add_argument("--workers", type=int, default=7, help="the window search's children at a time")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -1050,7 +1098,7 @@ def main() -> None:
                 results=a.results, plan_memory=a.plan_memory, deadline=a.deadline, slot_locals=a.slot_locals,
                 reread=a.reread, threads=a.threads, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
                 reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms,
-                approach_stones=a.approach_stones)
+                approach_stones=a.approach_stones, window_search=a.window_search, workers=a.workers)
     else:
         cmd_log(a.name, a.results)
 

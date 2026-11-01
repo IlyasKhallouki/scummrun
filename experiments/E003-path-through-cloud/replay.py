@@ -138,6 +138,13 @@ What the harness does, per plan step (plan.md step 5, with D5):
   again and plans. Each extension is kept (``extensions``: the plan, the frame, the values, the wall and CPU seconds,
   the actions before and after). A start the extended reading still does not cover, or a further extension that adds
   no value, stops the run ("reach extension").
+* **The window search** (``window_search``, off by default: a window.WindowConfig, with ``fork`` the controller's
+  fork; plan step A4, window-search.md). Each plan is played as its macro steps (the plan deordered by its records'
+  read and write sets): the input is tried on every frame from the frame after the previous input landed, each on a
+  forked child, and the child that completes the macro step first on the bridge's clock is kept (window.py). The
+  rules above for one step (waits first, the precondition wait, retries, the replay checks' verdicts and bans) are not
+  used. A window with no success, or a plan played out without the goal, is a replan from the engine's state; the
+  record keeps every window (``windows``), the replans' causes and the run clock (``qf``).
 * **The stop**: the goal (checked on every frame), no plan (the planner proved none, or its search ended without
   one), a planner timeout, the planner's memory limit (``memory_limit``: Fast Downward's search memory, this
   laptop's budget), the replan limit, the time limit, a start outside the task's domains (task.OutOfDomain: the task
@@ -1062,7 +1069,8 @@ class Harness:
                  taskcore_args=(), keep_files: bool = False, memory_limit: str = PLAN_MEMORY, on_plan=None,
                  slot_locals: bool = False, lists: dict | None = None, reread=None, taskcore_serve: bool = False,
                  cost_caps: bool = False, cost_dmax: int | None = None, reach_extend=None,
-                 reach_extend_limit: int = 3, unobserved_actor_rooms: bool = False, stone_fork=None):
+                 reach_extend_limit: int = 3, unobserved_actor_rooms: bool = False, stone_fork=None,
+                 window_search=None, fork=None):
         if planner not in ("taskcore", "python"):
             raise ValueError(f"planner {planner!r}: taskcore or python")
         if reread is not None and planner != "taskcore":
@@ -1129,6 +1137,13 @@ class Harness:
         self.choices: dict = {}  # step's action index -> its paths, chosen in the engine (module docstring)
         self.landmarks = None  # the first plan's landmarks (plan_fd.Landmark), lama-first's dump
         self.t0 = None
+        # the window search (plan step A4, window.py; off by default): a window.WindowConfig, and the controller's
+        # fork for its children
+        if window_search is not None and (fork is None or planner != "taskcore"):
+            raise ValueError("the window search needs the controller's fork and the taskcore planner")
+        self.window_search, self.fork = window_search, fork
+        self.windows = None  # the window.Search of a run with the switch
+        self.root = branch
 
     # --- observing ------------------------------------------------------------------------------------------------
 
@@ -1786,6 +1801,8 @@ class Harness:
     def run(self) -> dict:
         """Plan and play until a stop (module docstring); the record (``result``). An exception the harness does not
         expect stops the run too, with its reason and traceback in the record, so a long run keeps what it did."""
+        if self.window_search is not None:
+            return self._run_windows()
         self.t0 = time.monotonic()
         self.observe()
         self.frame0, self.tick0 = self.branch.frame, self.branch.status.get("tick")
@@ -1854,6 +1871,83 @@ class Harness:
         out = self.result()
         if error:
             out["error"] = error
+        return out
+
+    def _run_windows(self) -> dict:
+        """``run`` with the window search (module docstring, "The window search"): each plan is played as its macro
+        steps' windows (window.Search.play_plan), and a window with no success, a guess the engine took otherwise, or a
+        plan played out without the goal is a replan from the engine's state. The record also has ``windows``, the
+        replans' causes and the run clock (``qf``)."""
+        import window as WS
+        self.windows = WS.Search(self, self.fork, self.window_search)
+        self.t0 = time.monotonic()
+        self.observe()
+        self.frame0, self.tick0 = self.branch.frame, self.branch.status.get("tick")
+        self.qf0 = self.branch.status.get("qf")
+        self.checkpoint()
+        error, causes = None, []
+        try:
+            steps = self._plan(first=True)
+            while True:
+                if self.goal_holds():
+                    self.stop_reason = "goal" if self.windows.goal_credited else \
+                        "goal, not from the plan: it held at a plan's start"
+                    break
+                if not steps and self.stop_reason:
+                    break
+                if time.monotonic() - self.t0 > self.time_limit:
+                    self.stop_reason = "time limit"
+                    break
+                how = self.windows.play_plan(len(self.plans) - 1, steps)
+                if how == "goal":
+                    self.stop_reason = "goal"
+                    break
+                if how == "stop":
+                    break
+                causes.append({"plan": len(self.plans) - 1, "frame": self.branch.frame,
+                               "cause": self.windows.replan_cause})
+                if self.replans >= self.replan_limit:
+                    self.stop_reason = "replan limit"
+                    break
+                if time.monotonic() - self.t0 > self.time_limit:
+                    self.stop_reason = "time limit"
+                    break
+                self.replans += 1
+                steps = self._plan(first=False)
+        except (Stop, ControlError) as e:
+            self.stop_reason = f"engine: {e}"
+        except Exception as e:  # noqa: BLE001 (the record is kept; the reason and the traceback say what happened)
+            import traceback
+            self.stop_reason = f"error: {type(e).__name__}: {e}"
+            error = traceback.format_exc()
+        try:
+            self.windows.flush()
+            self.observe()
+            self.checkpoint()
+        except (Stop, ControlError) as e:
+            error = (error or "") + f"\nthe last observation failed: {e}"
+        # every checkpoint is a state the inputs from boot reach (window.Search.flush); verify reads them in frame order
+        seen, cps = set(), []
+        for cp in sorted(self.checkpoints, key=lambda c: c[0]):
+            if cp[0] not in seen:
+                seen.add(cp[0])
+                cps.append(cp)
+        self.checkpoints = cps
+        out = self.result()
+        out["goal_from_the_plan"] = self.stop_reason == "goal"
+        out["qf"] = (self.branch.status.get("qf") or 0) - (self.qf0 or 0)
+        out["qf0"], out["qf_end"] = self.qf0, self.branch.status.get("qf")
+        out["replan_causes"] = causes
+        self.windows.note_cpu(self.branch, "the last engine")
+        out["windows"] = self.windows.windows
+        out["window_summary"] = self.windows.summary()
+        if error:
+            out["error"] = error
+        if self.branch is not self.root:
+            try:
+                self.branch.quit()
+            except OSError:
+                pass
         return out
 
     def _plan(self, first: bool) -> list:
