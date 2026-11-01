@@ -595,6 +595,33 @@ pub struct PathOut {
     pub unknown_writes: Vec<Py>,
     pub assumptions: Vec<Assumption>,
     pub notes: Vec<Py>,
+    /// the switch havoc_cut: where a path the step limit ended stood (None for every other path, and off)
+    pub cut: Option<Cut>,
+}
+
+/// The switch havoc_cut (havoc.rs): a path the step limit ended, where it stood. `frames` are the frames on its stack,
+/// bottom first, each with the instruction it runs next; `steps` the engine steps its calls have not run yet.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Cut {
+    pub frames: Vec<(UnitKey, Option<u32>)>,
+    pub steps: Vec<CutStep>,
+}
+
+/// An engine step a cut path has not run yet, as the havoc record's closure reads it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum CutStep {
+    /// runScript(N)
+    Script(i32),
+    /// runObjectScript(O)
+    Object(i32),
+    /// runScript(VAR(var))
+    Hook(i32),
+    /// a write of the engine's own, to this fact
+    Write(String),
+    /// a step of startScene
+    Room,
+    /// a step the closure does not follow: it reads every unit of the scope
+    Other(String),
 }
 
 impl PathOut {
@@ -613,6 +640,7 @@ impl PathOut {
             unknown_writes: p.get("unknown_writes").items().to_vec(),
             assumptions: p.get("assumptions").items().iter().map(Assumption::from_py).collect(),
             notes: p.get("notes").items().to_vec(),
+            cut: None,
         }
     }
 }

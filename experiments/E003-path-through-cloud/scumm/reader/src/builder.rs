@@ -229,6 +229,9 @@ pub struct Switches {
     /// A run past the path limit with no fact left to split on is read again whole with the limit 4 times larger,
     /// up to GROW_MAX, before the reading stops (`Builder::run_split`). Needs split_limit.
     pub grow_limit: bool,
+    /// A path the step limit ended becomes a havoc record (havoc.rs, experiments/E004-fast-exact/havoc-cut.md) in
+    /// place of stopping the reading. Needs split_limit.
+    pub havoc_cut: bool,
 }
 
 impl Switches {
@@ -246,7 +249,8 @@ impl Switches {
                 "pass2_reuse" => s.pass2_reuse = true,
                 "input_settled" => s.input_settled = true,
                 "grow_limit" => s.grow_limit = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit)")),
+                "havoc_cut" => s.havoc_cut = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut)")),
             }
         }
         Ok(s)
@@ -279,6 +283,9 @@ impl Switches {
         }
         if self.grow_limit {
             v.push("grow_limit");
+        }
+        if self.havoc_cut {
+            v.push("havoc_cut");
         }
         v
     }
@@ -1393,7 +1400,7 @@ impl<'g> Builder<'g> {
             // scumm-machine's step limit ends a path "limit" too; in a run the path limit cut nothing (limit 0)
             // every such end is the step limit's, and no split lifts it
             let n = run.paths.iter().filter(|p| p.end.as_deref() == Some("limit")).count();
-            if n != 0 {
+            if n != 0 && !self.table.havoc_cut {
                 panic!("split_limit: {} has {n} paths the step limit ended; the reading stops", job.label);
             }
         } else if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
@@ -1432,7 +1439,9 @@ impl<'g> Builder<'g> {
         let mut out = Vec::new();
         for p in &run.paths {
             self.ends.add(Py::Tuple(vec![Py::str(&job.kind), end_py(&p.end)]), 1);
-            if p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym {
+            // the switch havoc_cut: a path the step limit ended (machine.rs hands it over with where it stood)
+            let havoc = self.table.havoc_cut && p.cut.is_some();
+            if !havoc && (p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym) {
                 let base = job.label.split('#').next().unwrap().split('@').next().unwrap();
                 let lab = format!("{base}{}", if job.label.contains('@') { ")" } else { "" });
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
@@ -1441,7 +1450,8 @@ impl<'g> Builder<'g> {
             if self.table.reach.is_some() && !self.reach_path(job, p) {
                 continue;
             }
-            let Some(mut rec) = self.record(&job.kind, &job.label, p, &job.what) else {
+            let rec = if havoc { Some(self.havoc_record(&job.kind, &job.label, p, &job.what)) } else { self.record(&job.kind, &job.label, p, &job.what) };
+            let Some(mut rec) = rec else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
                 continue;
             };
@@ -1971,6 +1981,8 @@ impl<'g> Builder<'g> {
         self.table.split_limit = self.switches.split_limit;
         self.table.grow_limit = self.switches.grow_limit;
         assert!(!self.table.grow_limit || self.table.split_limit, "grow_limit needs split_limit");
+        self.table.havoc_cut = self.switches.havoc_cut;
+        assert!(!self.table.havoc_cut || self.table.split_limit, "havoc_cut needs split_limit");
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");

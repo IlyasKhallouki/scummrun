@@ -2018,10 +2018,12 @@ fn tri_py(t: &(S, S, S)) -> Py {
 }
 
 /// `Builder.run`'s and `Builder.record`'s reads of a path (reader_port_oracle.py's `_path_dict`).
-fn path_out(game: &Game, run: &Run, p: &Path) -> PathOut {
+fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool) -> PathOut {
     let end = p.end.map(|e| e.to_string());
     let sym = p.ext.is_some();
-    if !sym || end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) {
+    // the switch havoc_cut: a path the step limit ended is handed over whole, with where it stood (havoc.rs)
+    let cut = (havoc && sym && end.as_deref() == Some("limit")).then(|| cut_of(game, p));
+    if !sym || (cut.is_none() && end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e))) {
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
@@ -2073,7 +2075,45 @@ fn path_out(game: &Game, run: &Run, p: &Path) -> PathOut {
         unknown_writes: p.unknown_writes.iter().map(tri_py).collect(),
         assumptions,
         notes,
+        cut,
     }
+}
+
+/// The switch havoc_cut: the frames on a cut path's stack with the instruction each runs next, and the engine steps
+/// its calls have not run yet (`Call.i` is the next step's index).
+fn cut_of(game: &Game, p: &Path) -> crate::record::Cut {
+    use crate::record::CutStep;
+    let mut cut = crate::record::Cut::default();
+    for e in &p.stack {
+        match e {
+            Entry::Frame(f) => {
+                if f.unit != scumm_machine::path::NONE_UNIT {
+                    cut.frames.push((game.unit(f.unit).key, f.pc));
+                }
+            }
+            Entry::Call(c) => {
+                for st in c.steps.iter().skip(c.i as usize) {
+                    let s = match st {
+                        Step::Note(_) | Step::ScrollNote | Step::CutIndex(_) => continue,
+                        Step::Script { n, .. } => CutStep::Script(*n),
+                        Step::Object { obj, .. } => CutStep::Object(*obj),
+                        Step::Hook { var, .. } => CutStep::Hook(*var),
+                        Step::Write(k, _) => CutStep::Write(key_str(*k)),
+                        Step::Scene { .. }
+                        | Step::SceneBegin(_)
+                        | Step::RoomCode { .. }
+                        | Step::SceneKill
+                        | Step::SceneLoad(_)
+                        | Step::SceneEgo(_)
+                        | Step::Room1(_) => CutStep::Room,
+                        other => CutStep::Other(format!("{other:?}").chars().take(40).collect()),
+                    };
+                    cut.steps.push(s);
+                }
+            }
+        }
+    }
+    cut
 }
 
 // --- the Reader -----------------------------------------------------------------------------------------------------
@@ -2238,7 +2278,7 @@ impl Reader<'_> {
     pub fn path_dump(&self, run: &Run, p: &Path) -> Py {
         let game = self.m.game;
         let tri_list = |l: &scumm_machine::plist::PList<(S, S, S)>| Py::List(l.iter().map(tri_py).collect());
-        let o = path_out(game, run, &Path { notes: Default::default(), end: None, ..p.clone() });
+        let o = path_out(game, run, &Path { notes: Default::default(), end: None, ..p.clone() }, false);
         let mut f = vec![
             ("end", p.end.map_or(Py::None, Py::str)),
             ("end_at", p.end_at.as_ref().map_or(Py::None, |s| Py::str(&**s))),
@@ -2290,7 +2330,7 @@ impl RunMachine for Reader<'_> {
             run.paths
                 .iter()
                 .map(|p| {
-                    let mut out = path_out(game, &run, p);
+                    let mut out = path_out(game, &run, p, cx.table.havoc_cut);
                     if let Some(rule) = &cx.table.settled {
                         if out.sym && sx(p).carry && !out.kept.is_empty() {
                             f1c_carry(rule, &mut out);
