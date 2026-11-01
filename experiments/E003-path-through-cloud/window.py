@@ -65,6 +65,9 @@ class WindowConfig:
     # (strict.py); off by default, and off the search is sections 1-7
     strict: bool = False
     repeat_stop: int = 2  # section 9.5 (strict only): the run stops at this many empty windows of one input and cause
+    # section 9.7: a child's state dump and hit tests kept until its engine runs again, the first seeded with the
+    # parent's dump at the fork; off by default
+    cache: bool = False
 
 
 def delta_lo_of(frame_costs: dict | None) -> int:
@@ -547,6 +550,45 @@ class _Ctx:
         self.observe()
 
 
+class _Cached:
+    """A child's branch whose state dump and hit tests are kept until the engine runs again (window-search.md section
+    9.7): the engine's state changes only while it runs a frame (the bridge reads commands only while it is stopped,
+    and scheduled inputs land on later frames), so a second ``state`` or ``at`` at the same stop gives the first's
+    answer. The first dump is the parent's at the fork (A0: the child is the parent at that stop)."""
+
+    def __init__(self, b, seed: dict | None = None):
+        self._b, self._state, self._at = b, seed, {}
+        self.hits = collections.Counter()
+
+    def __getattr__(self, name):
+        return getattr(self._b, name)
+
+    def run(self, **kw) -> dict:
+        self._state, self._at = None, {}
+        return self._b.run(**kw)
+
+    def set_rng(self, state: int) -> None:
+        self._state, self._at = None, {}
+        self._b.set_rng(state)
+
+    def state(self) -> dict:
+        if self._state is None:
+            self._state = self._b.state()
+            self.hits["state, asked"] += 1
+        else:
+            self.hits["state, kept"] += 1
+        return self._state
+
+    def at(self, x: int, y: int) -> dict:
+        got = self._at.get((x, y))
+        if got is None:
+            got = self._at[(x, y)] = self._b.at(x, y)
+            self.hits["at, asked"] += 1
+        else:
+            self.hits["at, kept"] += 1
+        return got
+
+
 class _Stepper:
     """A child's branch while the input code plays, one frame at a time (section 9.1): after each frame ``on_frame``
     reads its runs, explain log and view. A run to a frame, or to a condition with a frame limit, is played as single
@@ -745,6 +787,8 @@ class Search:
         """Section 3 for one child forked at ``ch.g``."""
         h, cfg = self.h, self.cfg
         snap = None
+        if cfg.cache:  # section 9.7
+            cb = _Cached(cb, ch.d0)
         try:
             ctx = _Ctx(cb, self.release, self.stone_fork if self.stones else None)
             try:
@@ -1003,6 +1047,8 @@ class Search:
                         cb = self.fork(parent, "child")
                         ch = Child(g, st["qf"], not pre_now, frozenset(i for i, v in pm.matched.items()),
                                    dict(now), w["full_fv"](obs))
+                        if cfg.cache:
+                            ch.d0 = s
                         children.append(ch)
                         futures.append(pool.submit(self._child, w, cb, ch))
                         if len(children) % 100 == 0:
@@ -1147,7 +1193,7 @@ class Search:
              "issued": issued, "before_input": before_input, "alts": alts, "in_units": in_units,
              "lemma9_stops": 0, "b_dev_qf": 4 * cfg.delta_lo * n, "explain_units": explain_units,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps]),
-             "failures": collections.Counter(), "failure_of": {}, "k": k,
+             "failures": collections.Counter(), "failure_of": {}, "k": k, "first_g": {},
              # a tracked record that does not follow the input: its own run may come while the input code plays
              "early_recs": {r.i for r in tracked if not (has_input and first.i in r.preds) and r.i != first.i}}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None, "strict": True,
@@ -1263,6 +1309,8 @@ class Search:
                 x.result()
             pool.shutdown(wait=True)
         best = w["best"]
+        if best is not None and best.first in w["first_g"]:  # the earliest fork of the same run (Lemma 5)
+            best.g = min(best.g, w["first_g"][best.first])
         counts = collections.Counter(c.outcome for c in children)
         # section 9.5: the cause, on the kept failure of the chosen deviation or of the failure most children share
         cause, fail = None, None
@@ -1336,6 +1384,8 @@ class Search:
         frames_seen: dict = {}  # frame -> (view, dump), the frames this child observed
         track = ch.track
         first = w["input"]
+        if cfg.cache:  # section 9.7
+            cb = _Cached(cb, ch.d0)
         try:
             cb.explain(ch.g + 1, ch.g + cfg.child_limit + cfg.window_frames + 2, w["explain_units"])
             observe_play = any(i not in track.matched and i not in track.refuted for i in w["early_recs"])
@@ -1364,10 +1414,11 @@ class Search:
                 return ch
             ch.first, ch.issue = min(e["frame"] for e in ins), max(e["frame"] for e in ins)
             with self._lock:
-                if ch.first in w["firsts"]:
+                if ch.first in w["first_g"]:  # Lemma 5: the same run as the child whose first event lands there
+                    w["first_g"][ch.first] = min(w["first_g"][ch.first], ch.g)
                     ch.outcome = "duplicate"
                     return ch
-                w["firsts"].add(ch.first)
+                w["first_g"][ch.first] = ch.g
             if cb.frame != ch.issue:
                 st = cb.run(frame=ch.issue)
                 if "end" in st:
@@ -1591,6 +1642,14 @@ class Search:
             return ch
         finally:
             self._tick("child total", t_start)
+            if isinstance(cb, _Cached):
+                with self._lock:
+                    self.prof.update({f"cache: {k}": v for k, v in cb.hits.items()})
+            with self._lock:
+                if w["best"] is not ch:  # what only the chosen child needs
+                    ch.d0 = ch.full_at_fork = ch.at_fork = ch.track_issue = None
+                    if ch.fail is not None and w["failure_of"].get(self._sig(ch.fail)) is not ch.fail:
+                        ch.fail = dict(ch.fail, material=None)
             for b_ in (snap, cb):
                 if b_ is not None:
                     try:
@@ -1598,12 +1657,16 @@ class Search:
                     except OSError:
                         pass
 
+    @staticmethod
+    def _sig(fail: dict) -> tuple:
+        return fail["kind"], fail.get("record"), str(fail.get("why"))
+
     def _fail(self, w: dict, ch: Child, fail: dict) -> None:
         """A child's first failure (9.5), counted by its signature; the first child with a signature keeps it."""
         if ch.fail is not None:
             return
         ch.fail = fail
-        sig = (fail["kind"], fail.get("record"), str(fail.get("why")))
+        sig = self._sig(fail)
         with self._lock:
             w["failures"][sig] += 1
             w["failure_of"].setdefault(sig, fail)
