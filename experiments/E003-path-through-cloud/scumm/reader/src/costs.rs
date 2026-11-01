@@ -87,6 +87,9 @@ pub struct FrameCosts {
     waits: FxHashMap<(UnitKey, i64), Wait>,
     /// the wait points by rule (for the report)
     pub rules: Counter,
+    /// (unit, wait point) -> the yields that end there, by opcode name (the table of `wait-table`; read by nothing
+    /// else, so the costs and the packed file do not depend on it)
+    kinds: FxHashMap<(UnitKey, i64), Vec<&'static str>>,
 }
 
 /// The least frame `floor(n / dmax) + 1` a delay of `n` jiffies can end on.
@@ -102,11 +105,37 @@ impl FrameCosts {
         let ci = format!("var:{VAR_CHARINC}");
         let dmax = if scope.writes.has(&tn) { DELTA_CAP } else { scope.start.get0(&tn).clamp(1, DELTA_CAP) };
         let charinc = (!scope.writes.has(&ci)).then(|| scope.start.get0(&ci));
-        let mut fc = FrameCosts { dmax, charinc, waits: FxHashMap::default(), rules: Counter::default() };
+        FrameCosts::with(game, dmax, charinc)
+    }
+
+    /// The costs with a given `dmax` and VAR_CHARINC (`of` takes them from a scope): the wait points of every unit
+    /// of the game.
+    pub fn with(game: &Game, dmax: i64, charinc: Option<i64>) -> FrameCosts {
+        let mut fc =
+            FrameCosts { dmax, charinc, waits: FxHashMap::default(), rules: Counter::default(), kinds: FxHashMap::default() };
         for u in game.ids() {
             fc.add_unit(game, u);
         }
         fc
+    }
+
+    fn kind(&mut self, key: (UnitKey, i64), k: &'static str) {
+        let ks = self.kinds.entry(key).or_default();
+        if !ks.contains(&k) {
+            ks.push(k);
+        }
+    }
+
+    /// Every wait point: (unit, wait point, the yields that end there, the rule and its frames with no locals known:
+    /// `wait_point`'s). The table taskcore's `--timed` reads (experiments/E004-fast-exact/durations.md).
+    pub fn rows(&self) -> Vec<(UnitKey, i64, Vec<&'static str>, String)> {
+        let mut out: Vec<_> = self
+            .waits
+            .keys()
+            .map(|&(u, w)| (u, w, self.kinds.get(&(u, w)).cloned().unwrap_or_default(), self.wait_point(u, w).unwrap()))
+            .collect();
+        out.sort_by_key(|r| (crate::facts::unit_text(r.0), r.1));
+        out
     }
 
     fn put(&mut self, key: (UnitKey, i64), w: Wait) {
@@ -136,11 +165,13 @@ impl FrameCosts {
                     if let Some(w) = resume_next() {
                         self.rules.inc("breakHere: 1 frame");
                         self.put((key, w), Wait::Frames(1, "breakHere"));
+                        self.kind((key, w), "breakHere");
                     }
                 }
                 known::DELAY => {
                     if let Some(w) = resume_next() {
                         let n = game.ast.kids(args).first().and_then(|&e| game.ast.constant(e));
+                        self.kind((key, w), "delay");
                         match n {
                             Some(n) => {
                                 self.rules.inc("delay N: floor(N / dmax) + 1 frames");
@@ -167,10 +198,12 @@ impl FrameCosts {
                             "delayVariable, value from the event's locals or 1 frame"
                         });
                         self.put((key, w), Wait::DelayVar { local, least });
+                        self.kind((key, w), "delayVariable");
                     }
                 }
                 known::WAIT_FOR_MESSAGE => {
                     let w = x.offset as i64;
+                    self.kind((key, w), "WaitForMessage");
                     match self.message_before(game, u, i as u32) {
                         Some(n) => {
                             self.rules.inc("WaitForMessage after a talk: the talk delay's frames + 1");
@@ -185,6 +218,12 @@ impl FrameCosts {
                 known::WAIT_FOR_ACTOR | known::WAIT_FOR_CAMERA | known::WAIT_FOR_SENTENCE => {
                     self.rules.inc("WaitForActor, WaitForCamera, WaitForSentence: 1 frame");
                     self.put((key, x.offset as i64), Wait::Frames(1, "wait"));
+                    let k = match name {
+                        known::WAIT_FOR_ACTOR => "WaitForActor",
+                        known::WAIT_FOR_CAMERA => "WaitForCamera",
+                        _ => "WaitForSentence",
+                    };
+                    self.kind((key, x.offset as i64), k);
                 }
                 _ => {}
             }
@@ -296,6 +335,31 @@ impl FrameCosts {
             Wait::DelayVar { local, least } => format!("delayVariable(local {local:?}): least {least:?}"),
         })
     }
+}
+
+/// D9's walk wait points (experiments/E004-fast-exact/durations.md): for a WaitForActor at instruction `i`, the
+/// walkActorToObject on the straight code before it with no yield between, as (actor, object) operands: `var:N`,
+/// `local:N`, `const:N` or `other`.
+pub fn walk_before(game: &Game, u: UnitId, i: u32) -> Option<(String, String)> {
+    let ast = &game.ast;
+    let text = |e: ExprId| match ast.expr(e) {
+        Expr::Var(n) => format!("var:{n}"),
+        Expr::Local(n) => format!("local:{n}"),
+        Expr::Const(n) => format!("const:{n}"),
+        _ => "other".to_string(),
+    };
+    for j in straight_before(game, u, i) {
+        let st = game.ins(u)[j as usize].st?;
+        match st {
+            Stmt::Op { name, args, .. } if name == known::WALK_ACTOR_TO_OBJECT => {
+                let a = ast.kids(args);
+                return (a.len() >= 2).then(|| (text(a[0]), text(a[1])));
+            }
+            Stmt::Op { name, .. } if is_yield(name) => return None,
+            _ => {}
+        }
+    }
+    None
 }
 
 fn is_yield(name: scumm_ir::Sym) -> bool {

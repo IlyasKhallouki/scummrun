@@ -21,3 +21,7 @@ path = "src/bin/reader_port.rs"
 [[bin]]
 name = "reader-scope"
 path = "src/bin/reader_scope.rs"
+
+[[bin]]
+name = "wait-table"
+path = "src/bin/wait_table.rs"
