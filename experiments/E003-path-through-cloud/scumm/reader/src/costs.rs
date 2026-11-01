@@ -47,7 +47,15 @@
 //! * any other wait (an actor's walk, the camera, the sentence queue) or a yield the code does not show: the slot ran
 //!   in an earlier frame, so 1 frame. A walk's length is not known to the model (actor positions are not facts).
 //!
-//! Every cost is at least 1. It is a lower bound of the record's own duration. A plan's sum is not a lower bound of
+//! **A wait that passes at once** (the reader switch `wait_pass_cost`, off by default;
+//! experiments/E006-passed-wait/plan.md). A WaitFor op whose test passes at its first try returns having written
+//! nothing, and the run goes on at the next opcode in the same `executeScript` call (script_v5.cpp:3272-3310): the
+//! event that resumes there then runs 0 frames after the yield its wait point stands for. With the switch, an event at
+//! a WaitForActor, WaitForCamera or WaitForSentence op, or at a WaitForMessage op with no talk before it, costs 0
+//! frames. A WaitForMessage after a talk keeps its bound: the talk sets VAR_HAVE_MSG to 0xFF in the same run before
+//! the op (actorTalk, actor.cpp:3466-3540), so the op blocks at least once. breakHere and delay always yield.
+//!
+//! Every cost is at least 1, or 0 at such a wait with the switch. It is a lower bound of the record's own duration. A plan's sum is not a lower bound of
 //! the plan's game time where two slots wait at once, or where a slot waiting at the plan's start has already spent
 //! part of its wait (replay.py's cost caps lower such an event's cost at a replan to what the engine's dump shows).
 
@@ -87,6 +95,8 @@ pub struct FrameCosts {
     waits: FxHashMap<(UnitKey, i64), Wait>,
     /// the wait points by rule (for the report)
     pub rules: Counter,
+    /// the switch wait_pass_cost: a WaitFor op that can pass at once costs 0 frames (module docstring)
+    pub wait_pass: bool,
 }
 
 /// The least frame `floor(n / dmax) + 1` a delay of `n` jiffies can end on.
@@ -98,11 +108,16 @@ impl FrameCosts {
     /// The costs for a scope: its start's VAR_TIMER_NEXT and VAR_CHARINC where no unit of the scope writes them, and
     /// the wait points of every unit of the game.
     pub fn of(game: &Game, scope: &Scope) -> FrameCosts {
+        FrameCosts::of_with(game, scope, false)
+    }
+
+    /// `of`, with the switch wait_pass_cost when `wait_pass` (module docstring).
+    pub fn of_with(game: &Game, scope: &Scope, wait_pass: bool) -> FrameCosts {
         let tn = format!("var:{VAR_TIMER_NEXT}");
         let ci = format!("var:{VAR_CHARINC}");
         let dmax = if scope.writes.has(&tn) { DELTA_CAP } else { scope.start.get0(&tn).clamp(1, DELTA_CAP) };
         let charinc = (!scope.writes.has(&ci)).then(|| scope.start.get0(&ci));
-        let mut fc = FrameCosts { dmax, charinc, waits: FxHashMap::default(), rules: Counter::default() };
+        let mut fc = FrameCosts { dmax, charinc, waits: FxHashMap::default(), rules: Counter::default(), wait_pass };
         for u in game.ids() {
             fc.add_unit(game, u);
         }
@@ -111,15 +126,20 @@ impl FrameCosts {
 
     fn put(&mut self, key: (UnitKey, i64), w: Wait) {
         // two yields with the same wait point (a breakHere before a wait): the lesser bound holds for both
+        // (a bound of 0, only with the switch wait_pass_cost, is the lesser of any)
         let new = match self.waits.get(&key) {
             None => w,
             Some(old) if *old == w => return,
             Some(Wait::Frames(a, _)) => match w {
                 Wait::Frames(b, _) if *a <= b => return,
                 Wait::Frames(..) => w,
+                _ if *a == 0 => return,
                 _ => Wait::Frames(1, "two yields with one wait point"),
             },
-            Some(_) => Wait::Frames(1, "two yields with one wait point"),
+            Some(_) => match w {
+                Wait::Frames(0, _) => w,
+                _ => Wait::Frames(1, "two yields with one wait point"),
+            },
         };
         self.waits.insert(key, new);
     }
@@ -176,11 +196,19 @@ impl FrameCosts {
                             self.rules.inc("WaitForMessage after a talk: the talk delay's frames + 1");
                             self.put((key, w), Wait::Frames(n, "message"));
                         }
+                        None if self.wait_pass => {
+                            self.rules.inc("WaitForMessage, message not known, can pass at once: 0 frames");
+                            self.put((key, w), Wait::Frames(0, "message"));
+                        }
                         None => {
                             self.rules.inc("WaitForMessage, message not known: 1 frame");
                             self.put((key, w), Wait::Frames(1, "message"));
                         }
                     }
+                }
+                known::WAIT_FOR_ACTOR | known::WAIT_FOR_CAMERA | known::WAIT_FOR_SENTENCE if self.wait_pass => {
+                    self.rules.inc("WaitForActor, WaitForCamera, WaitForSentence, can pass at once: 0 frames");
+                    self.put((key, x.offset as i64), Wait::Frames(0, "wait"));
                 }
                 known::WAIT_FOR_ACTOR | known::WAIT_FOR_CAMERA | known::WAIT_FOR_SENTENCE => {
                     self.rules.inc("WaitForActor, WaitForCamera, WaitForSentence: 1 frame");

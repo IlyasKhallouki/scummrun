@@ -548,8 +548,9 @@ fn main() {
         b.table.live_locals = Some(Arc::new(ll));
     }
     b.slot_locals = slots;
+    assert!(frame_costs || !b.switches.wait_pass_cost, "--switches wait_pass_cost: a cost switch, it needs --frame-costs");
     if frame_costs {
-        let fc = scumm_reader::costs::FrameCosts::of(&game, &scope);
+        let fc = scumm_reader::costs::FrameCosts::of_with(&game, &scope, b.switches.wait_pass_cost);
         base["frame_costs_params"] = serde_json::from_str(&fc.py().text()).unwrap_or(Value::Null);
         b.frame_costs = Some(Arc::new(fc));
     }

@@ -220,6 +220,9 @@ pub struct Switches {
     /// A WaitFor op whose test reads engine state no fact holds both blocks and passes in the same run
     /// (experiments/E004-fast-exact/wait-both.md; machine.rs `wait_both`)
     pub wait_both: bool,
+    /// With --frame-costs: an event at a WaitFor op that can pass at once costs 0 frames (costs.rs,
+    /// experiments/E006-passed-wait/plan.md); the records are the same
+    pub wait_pass_cost: bool,
 }
 
 impl Switches {
@@ -237,7 +240,8 @@ impl Switches {
                 "pass2_reuse" => s.pass2_reuse = true,
                 "input_settled" => s.input_settled = true,
                 "wait_both" => s.wait_both = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, wait_both)")),
+                "wait_pass_cost" => s.wait_pass_cost = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, wait_both, wait_pass_cost)")),
             }
         }
         Ok(s)
@@ -270,6 +274,9 @@ impl Switches {
         }
         if self.wait_both {
             v.push("wait_both");
+        }
+        if self.wait_pass_cost {
+            v.push("wait_pass_cost");
         }
         v
     }

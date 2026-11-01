@@ -45,6 +45,27 @@ fn kitchen_clock_and_wait_points() {
 }
 
 #[test]
+fn wait_pass_cost_switch() {
+    // the switch wait_pass_cost (costs.rs, experiments/E006-passed-wait/plan.md): a wait that can pass at once costs
+    // 0, a wait after a talk keeps its bound, breakHere and delay keep theirs; off, `of` is as before
+    let st = Static::load();
+    let b = oracle::builder_with(game(), &st, "kitchen", Default::default());
+    let on = FrameCosts::of_with(game(), &b.scope, true);
+    let off = FrameCosts::of_with(game(), &b.scope, false);
+    assert_eq!(on.wait_point(UnitKey::Local(28, 216), 0x56).unwrap(), "wait: 0");
+    assert_eq!(off.wait_point(UnitKey::Local(28, 216), 0x56).unwrap(), "wait: 1");
+    assert_eq!(on.wait_point(UnitKey::Local(28, 214), 0x39).unwrap(), "message: 25");
+    assert_eq!(on.wait_point(UnitKey::Local(28, 211), 4).unwrap(), "breakHere: 1");
+    assert_eq!(on.wait_point(UnitKey::Local(28, 214), 0x0F).unwrap(), "delay: 7");
+    // the sentence script's wait for ego at [02E0], the one walk_to(428)'s sentence passed from the boot
+    assert_eq!(on.wait_point(UnitKey::Global(2), 0x2E0).unwrap(), "wait: 0");
+    assert_eq!(off.wait_point(UnitKey::Global(2), 0x2E0).unwrap(), "wait: 1");
+    let (n_on, n_off) = (on.rules.0.len(), kitchen_costs().rules.0.len());
+    assert_eq!(n_on, n_off, "the same rules, renamed where the switch gives 0");
+    assert!(!off.wait_pass && on.wait_pass);
+}
+
+#[test]
 #[ignore]
 fn kitchen_golden_records_costed() {
     let fc = kitchen_costs();
