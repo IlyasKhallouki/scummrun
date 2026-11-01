@@ -1,0 +1,37 @@
+E007 Lemma R check on the kitchen (plan.md, the check of the lemma; lemma_check.py): A = the kitchen read with E006's switches and wait_pass_cost (readings/kitchen-off, packed sha1 41c31b6d), A2 = the same with --fact-vars 103.
+
+First reading of A2 (code at e1881af: the refined fact forked per value on every read):
+  107,395 records, 102,711 actions (A: 41,877 and 40,773); read 21.3 s wall, 62.7 CPU s, peak 1071 MB
+  actions with a precondition on var:103: {'with a precondition on the new fact': 76632, 'its values: one': 76632, 'none on it': 26079}
+  (the sentence script compares var 103 with its local 2; F12's value sets took only comparisons with a constant, so every read forked into the 27 values: plan.md's amendment)
+
+A2 as read for the runs (code at 86a21cd: a refined fact compared with a local the path knows forks into the comparison's value sets):
+  41,895 records, 40,911 actions; read 15.5 s wall, 43.1 CPU s, peak 590 MB; packed sha1 f63b7dd3
+  fact_vars report: [{"domain": [0, 315, 316, 320, 321, 322, 323, 330, 333, 336, 339, 342, 345, 354, 357, 426, 427, 428, 429, 564, 565, 566, 567, 568, 569, 570, 574], "kind": "fact", "outside_after_last_pass": [], "seeds": [0], "var": 103, "what": "added"}]
+  reader counts: {'event rounds': 1028, 'pass 1: domain values added for the next pass': 49, 'pass 1: records': 34796, 'pass 2: records': 41895, 'reach: branches and jobs still held at the end': 19487, 'reach: most branches held at once': 19487, 'reach: records of a rerun already written': 318, 'reach: reruns': 1403, 'reach: values reached (facts written or seeded)': 9334, 'records': 41895} ; out-of-domain keys after the last pass: 0
+
+lemma_check.py A A2 --var 103 (record by record, the golden files):
+{
+ "A": "~/.cache/fast-mi-e007/readings/kitchen-off/reading.json",
+ "A2": "~/.cache/fast-mi-e007/readings/kitchen-fv103/reading.json",
+ "fact": "var:103",
+ "records": {
+  "A": 41877,
+  "A2": 41895
+ },
+ "A2 records refining no record of A": 0,
+ "why": {},
+ "of the others, refining a merged record of A only": 2620,
+ "examples": [],
+ "A2's preconditions on the fact": {
+  "one value": 13100,
+  "a set of values": 2620,
+  "no precondition on it": 26175
+ },
+ "A records with a check on the fact": 13082,
+ "those records": {
+  "refined by a record of A2": 10604,
+  "infeasible: no value of the domain passes its checks on the fact": 2478
+ },
+ "examples of those not refined": []
+}
