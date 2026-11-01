@@ -728,7 +728,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
             approach_stones: bool = False, window_search: bool = False, workers: int = 7, starter=None,
             window_strict: bool = False, window_cache: bool = False, window_fork_each: int = 0,
-            window_lite: bool = False) -> dict:
+            window_lite: bool = False, window_split_wait: bool = False) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -750,6 +750,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "") + \
         ("-window" if window_search else "") + ("-strict" if window_strict else "") + ("-cache" if window_cache else "") + \
         (f"-ahead{window_fork_each}" if window_fork_each else "") + ("-lite" if window_lite else "") + \
+        ("-split" if window_split_wait else "") + \
         (f"-{starter.name}" if starter is not None else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -782,9 +783,16 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         import window as WS
         if window_lite and not window_strict:
             raise SystemExit("--window-lite is a sub-switch of --window-strict")
+        if window_split_wait and not window_strict:
+            raise SystemExit("--window-split-wait is a sub-switch of --window-strict")
+        if window_split_wait and "wait_pass_cost" not in str(rd.doc.get("switches") or ""):
+            # window-search.md 9.9: under the split an event at a wait that passes at once runs 0 frames after the
+            # yield, and only the reader switch wait_pass_cost's costs are lower bounds there (Lemma 4's chain)
+            raise SystemExit(f"{path}: --window-split-wait needs a reading made with the reader switch wait_pass_cost")
         wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=window_strict,
-                               cache=window_cache, fork_each=window_fork_each, lite=window_lite)
-        out["window_search"] = dict(vars(wcfg))
+                               cache=window_cache, fork_each=window_fork_each, lite=window_lite,
+                               split_wait=window_split_wait)
+        out["window_search"] = {k: v for k, v in vars(wcfg).items() if k != "split_wait" or v}  # (9.9: on only)
         out["sources"]["window.py"] = sha(HERE / "window.py")
         if window_strict:  # window-search.md section 9: B1's matcher and explainer
             for n_ in ("strict.py", "trace_explain.py", "trace_check.py"):
@@ -1125,6 +1133,9 @@ def main() -> None:
                    help="the strict window search's sub-switch lite: a child's views from the bridge's lite dump (9.7)")
     r.add_argument("--window-cache", action="store_true",
                    help="the window search's sub-switch cache: a child's dump kept until it runs (section 9.7)")
+    r.add_argument("--window-split-wait", action="store_true",
+                   help="the strict window search's sub-switch split_wait: a run that passed a wait read as the "
+                        "records' parts (9.9); needs a reading with the reader switch wait_pass_cost")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -1150,7 +1161,7 @@ def main() -> None:
                 reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms,
                 approach_stones=a.approach_stones, window_search=a.window_search, workers=a.workers,
                 window_strict=a.window_strict, window_cache=a.window_cache, window_fork_each=a.window_fork_each,
-                window_lite=a.window_lite)
+                window_lite=a.window_lite, window_split_wait=a.window_split_wait)
     else:
         cmd_log(a.name, a.results)
 

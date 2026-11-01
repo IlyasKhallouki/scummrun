@@ -74,6 +74,10 @@ class WindowConfig:
     # section 9.7 (strict only): a child's views after its click from the bridge's dump of the fields facts_of reads,
     # for the window's objects only; off by default
     lite: bool = False
+    # section 9.9 (strict only): a run that passed a WaitFor op read as parts, the click's record on part 1 and the
+    # plan's next event of the unit on each later part (Lemma P, experiments/E006-passed-wait/plan.md); the chain adds
+    # a zero cost as it is. Needs a reading made with the reader switch wait_pass_cost. Off by default
+    split_wait: bool = False
 
 
 def delta_lo_of(frame_costs: dict | None) -> int:
@@ -300,12 +304,12 @@ def input_clicks(rec) -> int:
     return 1
 
 
-def chain_frames(recs: list, members: list) -> tuple:
+def chain_frames(recs: list, members: list, zero: bool = False) -> tuple:
     """Lemmas 4 and 4′: the largest sum of event costs along the links from the input's record within the macro step
     ``members`` (indices, the input first): a record that leaves unit U at wait point W (``pos:U`` set to W) links to
     the first later event of U resuming at W with one path; through U's own slot (or from the input) it adds the
-    event's cost (at least 1), through a slot another event starts max(0, cost - 1). Returns (frames, the chain's step
-    names)."""
+    event's cost (at least 1; with ``zero``, section 9.9, the cost as it is, 0 at a wait that can pass in the same run),
+    through a slot another event starts max(0, cost - 1). Returns (frames, the chain's step names)."""
     first = recs[members[0]]
     if first.kind != "input" or len(first.paths) != 1:
         return 0, []
@@ -326,7 +330,7 @@ def chain_frames(recs: list, members: list) -> tuple:
             if e2 is not None and e2[0] == "set" and e2[1] == w:
                 continue  # Lemma 4′: a yield at its own resume point shows nothing
             own = x.kind == "input" or x.unit == unit
-            add = max(1, nxt.cost) if own else max(0, nxt.cost - 1)
+            add = (nxt.cost if zero else max(1, nxt.cost)) if own else max(0, nxt.cost - 1)
             sub, sub_names = best_from(nxt, seen | {nxt.i})
             if add + sub > top:
                 top, top_names = add + sub, [nxt.name] + sub_names
@@ -1239,7 +1243,7 @@ class Search:
         input_reads = sorted(kk for kk in (first.reads if has_input else ()) if kk in doms)
         issued = {r.i for r in tracked if r.kind == "input" and r.macro < k}
         n = input_clicks(first.paths[0].what) if has_input else 0
-        chain, chain_names = chain_frames(recs, members) if has_input else (0, [])
+        chain, chain_names = chain_frames(recs, members, cfg.split_wait) if has_input else (0, [])
         b_frames = n + chain
         b_qf = 4 * cfg.delta_lo * b_frames
         goal_writers = {r.i for r in tracked if r.i in self.goal_writers}
@@ -1286,6 +1290,8 @@ class Search:
                "b_frames": b_frames, "b_qf": b_qf, "n_clicks": n, "chain": chain_names, "delta_lo": cfg.delta_lo,
                "observed_reads": len(observed_reads), "before_input": len(before_input), "open": None,
                "alternatives": len(alts), "args_units": len(args_units)}
+        if cfg.split_wait:
+            rec["split_wait"] = True
         # the parent: segment on, explain on every unit, its strict matches from the plan's so far
         parent.segment(True)
         parent.runs()
@@ -1293,6 +1299,7 @@ class Search:
         parent.explain_log()
         ptrack = self.strack.copy()
         pkept = S.Kept()
+        pparts = S.Parter(self.code, pkept) if cfg.split_wait else None  # section 9.9
         s = parent.state()
         obs = F.facts_of(s)
         now = sview(obs, s)
@@ -1413,7 +1420,7 @@ class Search:
                     R_ = S.by_frame(S.runs_of(rows)).get(g + 1, [])
                 obs = F.facts_of(s)
                 now = sview(obs, s)
-                for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump, pkept.ex):
+                for run_, v_ in ptrack.verdicts(R_, prev_view, now, prev_dump, pkept.ex, pparts):
                     ptrack.apply(g + 1, run_, v_, now, s)
                 pkept.frame(g + 1, R_, s, now)
                 prev_view, prev_dump = now, s
@@ -1466,6 +1473,9 @@ class Search:
                            "matched": {by.get(i, str(i)): f for i, (f, _, _) in best.track.matched.items()
                                        if i not in ptrack.matched or ptrack.matched[i][0] is None},
                            "unplanned": len(best.unplanned)}
+        if cfg.split_wait:  # section 9.9: runs read as parts, in the parent and in the children
+            rec["parts"] = {"parent": pparts.splits, "children": w.get("split_children", 0),
+                            "children_runs": w.get("split_runs", 0)}
         rec["parent_matched"] = {by.get(i, str(i)): f for i, (f, _, _) in ptrack.matched.items()}
         rec["parent_refuted"] = {by.get(i, str(i)): [f, why] for i, (f, why, _) in ptrack.refuted.items()}
         rec["outside_domain"] = self._outside(ptrack, best, first if has_input else None, by)
@@ -1528,6 +1538,7 @@ class Search:
         snap = None
         t_start = tt = time.thread_time()
         kept = S.Kept()
+        kparts = S.Parter(self.code, kept) if cfg.split_wait else None  # section 9.9
         frames_seen: dict = {}  # frame -> (view, dump), the frames this child observed
         track = ch.track
         first = w["input"]
@@ -1606,9 +1617,11 @@ class Search:
             decided: list = [None] * len(cands)
             matched_writes: list = []  # (seq of the run, its record's set writes), the event records matched here
             held: list = []  # event runs after the click's first run while its record is undecided (9.2)
+            run_ctx: dict = {}  # 9.9: a click's run's seq -> its R_k: (k, view and dump before, after, the runs)
 
-            def apply_run(f_, r, v, view):
-                for r_, how in track.apply(f_, r, v, view, frames_seen.get(f_, (None, None))[1]):
+            def apply_run(f_, r, v, view, dump_=None):
+                dump_ = dump_ if dump_ is not None else frames_seen.get(f_, (None, None))[1]
+                for r_, how in track.apply(f_, r, v, view, dump_):
                     if how == "matched":
                         idx_ = sp.idx[r_.i][track.matched[r_.i][1]]
                         matched_writes.append((r.seq, {kk: e[1] for kk, e in sr.rec(idx_)[4].items()
@@ -1631,14 +1644,47 @@ class Search:
                     if lo is None or sq < lo:
                         applied.update(wr)
                 later = [r for r in runs_f if hi is not None and r.seq > hi]
+                if kparts is not None:  # 9.9: a later run that passed a wait is its parts
+                    later = [p for r in later for p in ((kparts(r) if r.depth == 0 else None) or [r])]
 
                 def on_log(chk):  # (I4): the check on the click's own run of its unit, in the frame it ran
                     cu = S.cite_unit(chk[0])
                     r_ = chk_own.get(cu[0]) if cu is not None else None
+                    if r_ is not None and kparts is not None:  # 9.9: the click's record is the run's part 1
+                        ps_ = kparts(r_)
+                        r_ = ps_[0] if ps_ else r_
                     return S.decide_on_log(self.code, kept.ex, [r_], chk) if r_ is not None else S.NO_LOG
                 decided[n_] = S.input_match(sr, sp, c[2], c[3], v0, d0, applied, own[n_], va, later, on_log,
-                                            frames_seen.get(f, (None, None))[1])
+                                            frames_seen.get(f, (None, None))[1], kparts)
                 decided[n_]["frame"], decided[n_]["view"] = f, va
+
+            def apply_split(res_, idx_) -> None:
+                """9.9: the later parts of the click's runs that passed a wait, each the own run of the plan's next
+                event of its unit, matched in their R_k (``part_verdicts``): M2 on the view before the click's run with
+                the set writes of the records matched before it and of the click's record (its other keys open)."""
+                eff_ = sr.rec(idx_)[4]
+                for u_, ps in sorted(res_["split"].items(), key=lambda x: x[1][0].seq):
+                    seq0 = int(ps[0].seq)  # the click's whole run
+                    ctx_ = run_ctx.get(seq0)
+                    if ctx_ is None or len(ps) < 2:
+                        continue
+                    k_, (vb_, db_), (va_, da_), runs_k = ctx_
+                    if vb_ is None or va_ is None:
+                        continue  # (the frame before the run is not seen: its parts stay pending)
+                    prior = [x for x in runs_k if x.seq < seq0]
+                    open_ = set(S.open_keys_of(prior, vb_, va_)) if prior else set()
+                    prior_seqs = {x.seq for x in prior}
+                    state = dict(vb_)
+                    for sq, wr in matched_writes:
+                        if int(sq) in prior_seqs:
+                            state.update(wr)
+                    state.update({kk: e[1] for kk, e in eff_.items() if e[0] == "set"})
+                    open_ |= {kk for kk, e in eff_.items() if e[0] != "set"}
+                    later_ = [x for x in S.plan_runs(sp, runs_k, kparts) if x.seq > seq0]
+                    for pr, pv in S.part_verdicts(sp, ps[1:], state, va_, later_, db_, kept.ex, frozenset(open_)):
+                        apply_run(k_, pr, pv, va_, da_)
+                with self._lock:
+                    w["split_children"] = w.get("split_children", 0) + 1
 
             def settle(final: bool = False) -> None:
                 """The click's outcome once its candidates are decided (Lemma 9′); ``final`` at the idle stop or the
@@ -1654,6 +1700,8 @@ class Search:
                     track.first_seq[first.i] = res_["first_seq"]
                     ch.outside = list(res_.get("outside") or [])
                     ch.took = "plan" if res_["took"] else "plan, no change"
+                    if res_.get("split"):  # 9.9: its run's later parts are the plan's next events' (before the held)
+                        apply_split(res_, cands[ok][2])
                     ch.track_issue = track.copy()
                     return
                 if not final and any(decided[n_] is None for n_ in plan_c):
@@ -1672,16 +1720,21 @@ class Search:
 
             def frame_step(f) -> None:
                 """R_f in run order: the click's runs collected, a candidate decided once its runs have come (before
-                the event runs after them), the event runs matched (Definition S)."""
+                the event runs after them), the event runs matched (Definition S); with 9.9, a run that passed a
+                wait as its parts, in order."""
                 vb, va = frames_seen.get(f - 1, (None, None)), frames_seen.get(f, (None, None))
                 runs_f = Rk.get(f, [])
-                vs = dict((r.seq, v) for r, v in track.verdicts(runs_f, vb[0], va[0], vb[1], kept.ex)) \
-                    if vb[0] is not None and va[0] is not None else {}
+                vs: dict = {}
+                if vb[0] is not None and va[0] is not None:
+                    for r_, v_ in track.verdicts(runs_f, vb[0], va[0], vb[1], kept.ex, kparts):
+                        vs.setdefault(int(r_.seq), []).append((r_, v_))  # a part under its run's seq
                 for r in runs_f:
                     if r.depth >= 1 and r.frame >= s_issue and ch.took == "n/a":
                         for n_, c in enumerate(cands):
                             if r.unit in c[3] and r.unit not in own[n_]:
                                 own[n_][r.unit] = r
+                                if kparts is not None:
+                                    run_ctx.setdefault(r.seq, (f, vb, va, runs_f))
                         if r.unit in w["chk_units"] and r.unit not in chk_own:
                             chk_own[r.unit] = r
                             kept.pinned.add(r.seq)
@@ -1694,10 +1747,11 @@ class Search:
                             settle()
                             flush()
                         first_own = min((x.seq for o in own for x in o.values()), default=None)
-                        if ch.took == "n/a" and first_own is not None and r.seq > first_own:
-                            held.append((f, r, vs[r.seq], va[0]))  # whose own run it is waits for the click (9.2)
-                        else:
-                            apply_run(f, r, vs[r.seq], va[0])
+                        for pr, pv in vs[r.seq]:
+                            if ch.took == "n/a" and first_own is not None and pr.seq > first_own:
+                                held.append((f, pr, pv, va[0]))  # whose own run it is waits for the click (9.2)
+                            else:
+                                apply_run(f, pr, pv, va[0])
                 if ch.took == "n/a" and f >= s_issue + 1 and va[0] is not None:
                     for n_ in range(len(cands)):
                         if decided[n_] is None and all(u in own[n_] for u in needs[n_]):
@@ -1905,6 +1959,8 @@ class Search:
             self._tick("child total", t_start)
             with self._lock:
                 w["running"] -= 1
+                if kparts is not None:  # section 9.9
+                    w["split_runs"] = w.get("split_runs", 0) + kparts.splits
             if isinstance(cb, _Cached):
                 with self._lock:
                     self.prof.update({f"cache: {k}": v for k, v in cb.hits.items()})

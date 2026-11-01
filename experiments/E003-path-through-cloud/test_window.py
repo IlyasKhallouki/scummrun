@@ -254,3 +254,17 @@ def test_a_click_deviates_only_when_it_took_effect():
     assert W.is_deviation(m, r0, set())  # an input that is no click: its record's match
     assert not W.is_deviation(m, r0, set(), took=None)  # a click whose record did not show (Lemma 9)
     assert W.is_deviation(m, r0, set(), took="walk(1)#2")
+
+
+def test_chain_frames_add_a_zero_cost_as_it_is_with_the_split():
+    """window-search.md 9.9: under the split an event at a wait that passes at once runs in the click's own run; with
+    the reader switch wait_pass_cost it costs 0, and the chain adds 0 on that link (off: at least 1, as before)."""
+    eff_in = {"pos:script:2": ("set", 736)}
+    recs = [rec(0, "input", writes=set(eff_in), effects=eff_in),
+            rec(1, "event", reads={"pos:script:2"}, writes={"pos:script:2"}, unit="script:2", wait=736, cost=0,
+                effects={"pos:script:2": ("set", 915)}),
+            rec(2, "event", reads={"pos:script:2"}, writes={"pos:script:2"}, unit="script:2", wait=915, cost=5,
+                effects={"pos:script:2": ("set", -1)})]
+    assert W.chain_frames(recs, [0, 1, 2]) == (6, ["s1", "s2"])
+    assert W.chain_frames(recs, [0, 1, 2], zero=True) == (5, ["s1", "s2"])
+    assert W.WindowConfig().split_wait is False
