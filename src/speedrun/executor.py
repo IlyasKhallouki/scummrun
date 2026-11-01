@@ -165,6 +165,10 @@ class Executor:
         # Early inputs (_play_early): try each click move's inputs 1-2 frames before the executor
         # would send them, on forks, and keep the earliest that still completes the move.
         self.early = False
+        # A fork for the stepping stones' trials alone (_stepping_stone), for an executor with no
+        # fork otherwise (the replay harness's switch approach_stones, off by default): each trial
+        # plays on a fork with no fork of its own, and nothing else here forks.
+        self.stone_fork = None
 
     # --- scheduling -------------------------------------------------------------------
 
@@ -1101,8 +1105,9 @@ class Executor:
         stones = sorted((o for o in state["room_objects"]
                          if o["id"] != move.obj and abs(o["walk"][0] - gx) < abs(ego["x"] - gx)
                          and self.object_points(o["id"], state)), key=lambda o: abs(o["walk"][0] - gx))
-        for o in stones if self._fork is not None else []:
-            trial = Executor(self._fork(self.b), self.release, self._fork)
+        fork, nested = (self._fork, self._fork) if self._fork is not None else (self.stone_fork, None)
+        for o in stones if fork is not None else []:
+            trial = Executor(fork(self.b), self.release, nested)
             trial.skips = dict(self.skips)
             frames = None
             try:

@@ -1,0 +1,25 @@
+E003 step 5 on Part I: the runner (replay_part1.py) on the reading 'k1-boot'
+
+(replay-part1-k1-boot-seed1-serve-lama-first-costs-caps-reachx-uar-stones.json; sources {'replay_part1.py': '0ea0b941bd18', 'replay.py': 'a1a251d66f41', 'packed_reading.py': 'd945f6fcb09d', 'export_records.py': 'f0aa97ff0b22', 'plan_fd.py': 'ae5dda514eb4', 'reader.py': '94d495853f07', 'model.py': 'cc630446bdbe', 'task.py': 'c356a6df633a', 'domains.py': '19932b58530a', 'facts.py': 'c06fc3489018', 'start.py': '573ac0069ff6'})
+=== seed 1 ===
+reading /var/tmp/fast-mi/ksr-scratch/k1/reading/reading.json: 234,401 actions, 1,252 facts, packed file 190,257,136 bytes (sha1 0603983aa4ad); goal {'state:316': [1]} (not the Part I end); read with --live-locals
+start: idle stop at frame 2728 (sentence), room 33, boot 26.0 s; checks ok; against the reading's start (results/start-part1.jsonl seed 1): 0 facts differ, 0 of them the task's; taskcore start check: input ok, needed ok
+result: stop 'goal'; goal reached True; verify from boot: 0 differences at 5 checkpoints (28 inputs, 12.7 s), the goal at its end True
+replans 1; bans 0; plans 2; frames 1111 (game time 111.1 s); player inputs 28
+steps: 2 in the log, 2 executed (2 played); outcomes {'goal': 1, 'mismatch': 1}
+matched (plan.md: the predicted writes and no other tracked fact changed): 0 of 2 executed (0.0); predicted writes held: 0 (0.0); not matched: {'goal': 1, 'mismatch': 1}
+mismatches: 40 (20.0 per executed action): 4 predicted writes not seen (2.0), 36 tracked facts changed with no prediction (18.0; most often [['state:315', 1], ['state:428', 1], ['local:200', 1], ['local:201', 1], ['local:202', 1], ['local:206', 1], ['local:207', 1], ['local:208', 1]]); 0 steps with another guessed value than the plan's
+final path: 0 actions []
+Part I goals passed through: not scored yet (score_part1.py)
+time: run 793.4 s: load 13.12 s, boot 26.0 s, start check 275.42 s, harness 466.1 s (planning 414.0 s, playing 52.1 s), verify 12.7 s
+  per step (played): seconds {'n': 2, 'mean': 23.74, 'median': 23.74, 'max': 31.33, 'sum': 47.5}; frames {'n': 2, 'mean': 555.5, 'median': 555.5, 'max': 648, 'sum': 1111}
+  per plan: all {'n': 2, 'mean': 206.99, 'median': 206.99, 'max': 270.01, 'sum': 414.0}; taskcore {'n': 2, 'mean': 111.44, 'median': 111.44, 'max': 152.94, 'sum': 222.9}; lama-first {'n': 2, 'mean': 81.56, 'median': 81.56, 'max': 100.56, 'sum': 163.1}
+landmarks (plan 0, frame 2728): 17 nodes, 17 on game facts, 38 orderings; the game facts: state:316=1 (goal); room=28; state:316=0 (start); state:428=1; script:2=1; room=33 (start); pos:script:2=736; frozen:script:2=0 (start); args:script:2=239867291646052; state:428=0 (start); args:script:2=238143141588782; var:32=4 (start); script:2=0 (start); var:53=1 (start); pos:script:2=-1 (start); args:script:2=0 (start); verb:2=1 (start)
+search lama-first-costs; cost caps True; frame costs dmax 6, charinc 0
+reader: {'switches': 'value_sets,draw_clears,actor_rooms,input_settled', 'reach': True, 'split_limit': True, 'elsewhere': True, 'reach_also': None, 'live_locals': True}
+  plan 0 at frame 2728: plan, 7 steps, taskcore 152.94 s, lama-first-costs 100.56 s, 97,547 operators, 0 bans, landmarks 17, predicted 9 frames (FD plan cost 9): ['sentence(2,428)#44', 'event(script:2@736#d897055c2f2e)#163', 'walk_to(428)#245', 'event(script:2@736#da2874b63864)#1957', 'walk_to(316)[202]#2977', 'sentence(2,316)[202]#2808', 'event(local:203@58#5a49cf4aa671)#12618']
+  plan 1 at frame 3376: plan, 5 steps, taskcore 69.95 s, lama-first-costs 62.55 s, 97,547 operators, 0 bans, landmarks 14, predicted 6 frames (FD plan cost 6): ['walk_to(428)#64', 'event(script:2@736#da2874b63864)#1957', 'walk_to(316)[202]#2977', 'sentence(2,316)[202]#2808', 'event(local:203@58#5a49cf4aa671)#12618']
+    start: {'live slots with unknown locals (args 0)': 2}
+  reach extensions: 0, wall 0.0 s, CPU 0.0 s
+  0.1 sentence(2,428)#44 [sentence] click verb 2 on 428: frames 2728/3376, 31.3 s; mismatch -> replan; 1 tries; inputs [(2736, [319, 130]), (2751, [319, 130]), (2752, [319, 130]), (2753, [319, 130]), (2754, [319, 130]), (2755, [319, 130]), (2756, [319, 130]), (2757, [319, 130]), (2758, [319, 130]), (2759, [319, 130]), (2760, [319, 130]), (2761, [319, 130]), (2762, [319, 130]), (2763, [319, 130]), (2764, [319, 130]), (2765, [319, 130]), (2766, [319, 130]), (2767, [319, 130]), (2768, [319, 130]), (2769, [319, 130]), (2770, [319, 130]), (2771, [319, 130]), (2772, [319, 130]), (2773, [319, 130]), (2774, [319, 130]), (2775, 'o'), (2776, [311, 107])]; mismatches [('var:102', ['1'], 0)]; changed with no prediction [('state:315', 0, 1), ('state:428', 0, 1)]; waited 7 frames for the camera
+  1.1 walk_to(428)#64 [walk_to] click verb 11 on 428: frames 3376/3839, 16.2 s; goal -> goal; 1 tries; inputs [(3377, [163, 107])]; mismatches [('script:2', ['1'], 0), ('var:102', ['1'], 0), ('pos:script:2', ['736'], -1)]; changed with no prediction [('local:200', 0, 1), ('local:201', 0, 1), ('local:202', 1, 0), ('local:206', 0, 1), ('local:207', 0, 1), ('local:208', 0, 1)] (+28); retry 1 after 60 frames (the record's path never started)
