@@ -128,14 +128,16 @@ whose script number does not fold makes every global and local script recursive.
 
 ## D8. A slot already waiting at the start
 
-A slot that stands at W at the start s has waited an unknown part of its wait. Its next event e has
-lb(e) = min(lb(e) from D2-D7, cap) from s, with cap = 4 · max(δ_lo · (⌊d / dmax⌋ + 1), d + 1) for a slot paused with d
-jiffies left in the start's dump, and 4 · δ_lo for any other slot.
+A slot that stands at W at the start s has waited an unknown part of its wait. From s, its next event e has
+lb(e) = cap = 4 · max(δ_lo · (⌊d / dmax⌋ + 1), d + 1) for a slot paused with d jiffies left in the start's dump, and
+lb(e) = min(lb(e) from D2-D7, 4 · δ_lo) for any other slot (0 for D7's units, whatever the dump shows).
 
-*Proof.* The dump is taken after frame s's scripts, so D2 gives one frame. A paused slot has delay d left, and D4's
-proof from frame s gives the rest. The minimum of two bounds is a bound. ∎
+*Proof.* The dump is taken after frame s's scripts, so D2 gives one frame from s. A paused slot has delay d left, and
+D4's proof from frame s gives the cap whatever the code before W says: the delay left is the one the engine counts
+down. A unit of D7 has no bound. ∎
 
-These are replay.py's cost caps (`cost_caps_of`) in game time. The same caps apply at every engine node of C5.
+These are replay.py's cost caps (`cost_caps_of`, frames F = ⌊d / dmax⌋ + 1, so d ≥ dmax · (F − 1)) in game time:
+cap = 4 · max(δ_lo · F, dmax · (F − 1) + 1). The same caps apply at every engine node of C5.
 
 ## D9. Walks: ego_at and the walk floor
 
@@ -177,10 +179,13 @@ box flags the scope can set. Until they are established, a walk wait is D2's 1 f
 | event, delay or delayVariable | 4 · max(δ_lo · F, dmax · (F − 1) + 1) | its entry | D4 |
 | event, walk wait | 4 · δ_lo (D9's floor once W1-W4 are shown) | its entry | D2, D9 |
 | any other event | 4 · δ_lo · F | its entry | D2, D3 |
-| a slot waiting at the start | min(the above, cap) | the start | D8 |
+| a slot waiting at the start | the cap if paused, else min(the above, 4 · δ_lo) | the start | D8 |
 | input | 4 · δ_lo · c(r) | the previous input, or the start | D5 |
 
-A name that the task's labels share between units of different rooms (`local:N`) gets the least bound of its units.
+A name that the task's labels share between units of different rooms (`local:N`) names the current room's unit: a room
+change ends every local script (`startScene` → `killScriptsAndResources`, `room.cpp:80`, `script.cpp:1083-1105`), so
+a live `local:N` slot belongs to the room the task's `room` fact holds. Where the room is not known, the name gets the
+least bound of its units.
 
 ## The test
 
