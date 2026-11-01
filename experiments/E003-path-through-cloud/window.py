@@ -714,6 +714,7 @@ class Search:
         self.pending_cp = None  # (a success frame's checkpoint, the movie's length then): valid if no later input
         # lands on or before its frame (``_flush``)
         self.replan_cause = None
+        self.replan_cause_detail = None  # strict: {"what", "cause"} of the replan, B1's cause (E007's loop reads it)
         self.goal_writers: set = set()  # the plan's records that write a goal value (``play_plan``)
         self.goal_credited = False  # the goal came from the plan's records (the run's success)
         self.unplanned_goals: list = []  # children and parents where the goal held with no goal record matched
@@ -2077,6 +2078,7 @@ class Search:
         (``replan_cause`` says why) or "stop" (the harness's stop reason set)."""
         h = self.h
         self.replan_cause = None
+        self.replan_cause_detail = None
         recs = build_recs(h, steps)
         macros = macro_steps(recs)
         checked_keys(recs, h.goal)
@@ -2148,6 +2150,7 @@ class Search:
                 if strict:  # section 9.5: the cause, and the stop at the same empty window again
                     self._note_cause(n_plan, k, "window empty", cause)
                     self.replan_cause += f"; cause: {S.short(cause)}"
+                    self.replan_cause_detail = {"what": "window empty", "cause": cause}
                     key = (recs[members[0]].name, (cause or {}).get("kind"), (cause or {}).get("unit"),
                            (cause or {}).get("offset"), (cause or {}).get("why"))
                     self.empty_keys[key] += 1
@@ -2194,6 +2197,7 @@ class Search:
                 if strict:
                     self._note_cause(n_plan, k, "deviation", cause)
                     self.replan_cause += f"; cause: {S.short(cause)}"
+                    self.replan_cause_detail = {"what": "deviation", "cause": cause}
                 self.deviations.append({"plan": n_plan, "macro": k, "frame": best.dev_stop, "end": best.end,
                                         "qf": best.q_end,
                                         "why": str(best.why)[:300], "replan_frame": b_.frame,
@@ -2228,6 +2232,7 @@ class Search:
                     c_ = S.explain(self.code, self.sr, best.choice_fail)
                     self._note_cause(n_plan, k, "a guessed write", c_)
                     self.replan_cause += f"; cause: {S.short(c_)}"
+                    self.replan_cause_detail = {"what": "a guessed write", "cause": c_}
                 return "replan"
         self.replan_cause = "the plan played out without the goal"
         if strict:

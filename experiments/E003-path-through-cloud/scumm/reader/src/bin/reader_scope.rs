@@ -53,6 +53,12 @@
 //!               lower bound of its duration from the engine source, and the fold key holds the cost; the reading's
 //!               head (--golden) gives the parameters (`frame_costs`), which packed_reading.py copies into
 //!               reading.json. Off by default: every action costs 1, as before.
+//! --fact-vars N,... the reader switch for a refinement (experiments/E007-fact-refinement/plan.md, Lemma R): each
+//!               listed variable that is a non-fact of the reading (the scope writes it, no engine or settings variable,
+//!               no domain) is made a fact, its domain seeded with its start value and its value in each --reach-also
+//!               start and widened by the reader's passes (table.rs `add_fact_vars`); the report's `fact_vars` says
+//!               what was done per variable, its domain at the end, and the values the last pass still wrote outside
+//!               it. Off by default: the reading is byte for byte as before.
 //! --golden FILE golden.py's reader file streamed as the records are made, with no records kept: the head, one
 //!               "record" line per record (as made, before `_read_once`'s rewrite of folded lists, which changes only
 //!               `args:` values), the builder's counters; gzip. What packed_reading.py from-golden reads with the
@@ -480,6 +486,8 @@ fn main() {
     let reach = args.iter().any(|a| a == "--reach");
     let pass2_reuse = args.iter().any(|a| a == "--pass2-reuse");
     let step_limit: u32 = arg(&args, "--step-limit").map_or(0, |n| n.parse().expect("--step-limit N"));
+    let fact_vars: Option<Vec<i32>> = arg(&args, "--fact-vars")
+        .map(|s| s.split(',').filter(|x| !x.trim().is_empty()).map(|x| x.trim().parse().expect("--fact-vars N,...")).collect());
     let named = scumm_reader::builder::Switches::parse(&arg(&args, "--switches").unwrap_or_default()).unwrap_or_else(|e| panic!("{e}"));
     assert!(!named.due_first, "--switches due_first: the records are streamed as made, and due_first writes on the kept records");
     let golden: Option<PathBuf> = arg(&args, "--golden").map(PathBuf::from);
@@ -562,6 +570,17 @@ fn main() {
             base["reach_also"] = json!(also);
         }
     }
+    // the switch --fact-vars (E007, Lemma R): the listed non-facts made facts, seeded with every start's value
+    let fact_vars_done = fact_vars.as_ref().map(|vars| {
+        let starts: Vec<scumm_reader::Facts> = b.reach_starts.iter().skip(1).cloned().collect();
+        let refs: Vec<&scumm_reader::Facts> = starts.iter().collect();
+        let scope_ = b.scope.clone();
+        let done = b.table.add_fact_vars(&scope_, vars, &refs);
+        for d in &done {
+            eprintln!("[{name}] --fact-vars var:{}: {} (seeds {:?})", d.n, d.what, d.seeds);
+        }
+        done
+    });
     if live_locals {
         let ll = scumm_reader::locals::LiveLocals::of(&game);
         base["live_locals_units"] = json!(ll.counts(&game, &scope));
@@ -799,6 +818,9 @@ fn main() {
         b.counts.0.iter().filter(|(k, _)| k.starts_with("pass ") || k.starts_with("reach: ") || k.as_str() == "event rounds" || k.as_str() == "records").map(|(k, v)| (k.clone(), *v)).collect();
     r["reader_counts"] = json!(pass_counts);
     r["out_of_domain_keys"] = json!(b.out_of_domain.len());
+    // the lists of locals the last pass folded (their `args:` numbers rewritten to 0 at its end): golden lines
+    // streamed as made (--golden without --keep) still carry their numbers (replay_part1.py read_rust's stream)
+    r["folded_lists"] = json!(b.folded.iter().copied().collect::<Vec<i64>>());
     r["outside_points"] = json!(b
         .outside_points
         .iter()
@@ -856,6 +878,29 @@ fn main() {
             "not_kept": n(&sh.not_kept),
             "waited_s": (n(&sh.waited_ns) as f64 / 1e7).round() / 100.0,
         });
+    }
+    if let Some(done) = &fact_vars_done {
+        // the switch --fact-vars: per variable, what was done, its domain at the end, and the values the last pass
+        // wrote outside it (Lemma R's premise R0 asks for none)
+        r["fact_vars"] = json!(done
+            .iter()
+            .map(|d| {
+                let key = format!("var:{}", d.n);
+                let dom: Vec<Value> = b
+                    .table
+                    .domain(&key)
+                    .map(|x| x.values.iter().map(|l| l.int().map_or_else(|| json!(l.text()), |v| json!(v))).collect())
+                    .unwrap_or_default();
+                json!({
+                    "var": d.n,
+                    "what": d.what,
+                    "seeds": d.seeds,
+                    "kind": b.kind(&key).as_str(),
+                    "domain": dom,
+                    "outside_after_last_pass": b.out_of_domain.get(&key).map(|s| s.iter().copied().collect::<Vec<i64>>()).unwrap_or_default(),
+                })
+            })
+            .collect::<Vec<_>>());
     }
     r["sink_thread_busy_s"] = json!((tee.busy * 10.0).round() / 10.0);
     r["phases_s"] = json!(b.phase_secs.iter().map(|(k, v)| (k.to_string(), (v * 100.0).round() / 100.0)).collect::<BTreeMap<_, _>>());

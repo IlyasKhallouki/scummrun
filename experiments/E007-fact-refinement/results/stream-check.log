@@ -1,0 +1,25 @@
+E007: the reader's golden lines streamed (read-rust --stream, code at 8564d2c) against kept and written at the end (--keep --lines), the same scope, start and switches. Made after the first k = 2 run was stopped by the 3 GB rule while its refinement read k = 2 again (run-k2-refine.log, attempt 1).
+
+kitchen-off (kept) against kitchen-off-stream (streamed):
+  reading.tc the same
+  reading.actions.jsonl the same
+  reading.lists.jsonl the same
+  reading.reached the same
+  packed sha1 41c31b6d ; reading.json keys that differ: ['from_golden', 'read_s', 'reader_scope']
+  reader: kept 15.1 s wall, 41.2 CPU s, peak 609 MB; streamed 13.5 s wall, 50.5 CPU s, peak 262 MB
+kitchen-fv103 (kept) against kitchen-fv103-stream (streamed):
+  reading.tc the same
+  reading.actions.jsonl the same
+  reading.lists.jsonl the same
+  reading.reached the same
+  packed sha1 f63b7dd3 ; reading.json keys that differ: ['from_golden', 'read_s', 'reader_scope']
+  reader: kept 15.5 s wall, 43.1 CPU s, peak 590 MB; streamed 12.7 s wall, 46.0 CPU s, peak 270 MB
+k2-off (kept) against k2-off-stream (streamed):
+  reading.tc the same
+  reading.actions.jsonl the same
+  reading.lists.jsonl the same
+  reading.reached the same
+  packed sha1 f5ec2354 ; reading.json keys that differ: ['from_golden', 'read_s', 'reader_scope']
+  reader: kept 125.0 s wall, 384.6 CPU s, peak 3947 MB; streamed 105.7 s wall, 388.0 CPU s, peak 833 MB
+
+(the lists file of a streamed reading leaves out the lists the last pass folded, which the reader now reports as folded_lists: kept records have those numbers rewritten to 0 at the end of the pass, builder.rs end_of_pass, so the kept reading's lists file never had them; before that rule the streamed kitchen had 4 lists more, all folded ones)

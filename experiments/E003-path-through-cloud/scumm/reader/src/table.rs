@@ -101,6 +101,10 @@ pub struct FactTable {
     /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
     /// (inputs.rs); None with the switch off
     pub settled: Option<std::sync::Arc<crate::inputs::SettledRule>>,
+    /// the variables the switch `--fact-vars` made facts (`add_fact_vars`); empty with the switch off. A comparison
+    /// of one with a local the path knows splits its values as a comparison with a constant does (machine.rs
+    /// `compare_sets`)
+    pub refined: BTreeSet<i32>,
 }
 
 impl FactTable {
@@ -219,6 +223,7 @@ impl FactTable {
             memo: None,
             shared: None,
             settled: None,
+            refined: BTreeSet::new(),
         }
     }
 
@@ -341,6 +346,47 @@ impl FactTable {
         } else {
             w
         }
+    }
+}
+
+/// What the reader switch `--fact-vars` did with one listed variable (experiments/E007-fact-refinement/plan.md).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FactVar {
+    pub n: i32,
+    /// "added", or why the variable was left as it is
+    pub what: &'static str,
+    /// the domain's seeds: the table's start value and each further start's
+    pub seeds: Vec<i64>,
+}
+
+impl FactTable {
+    /// The reader switch `--fact-vars` (experiments/E007-fact-refinement/plan.md, Lemma R), off by default: each
+    /// variable of `vars` that is a non-fact of the reading (the scope writes it, it is no engine or settings variable,
+    /// and it has no domain) gets a domain in `extra`, seeded with its value in the table's start and in each of
+    /// `starts`, as `Builder::extend_domains` gives a widened one; the reader's passes then add every value a path
+    /// writes outside it. Every other variable is left as it is. Returns what was done, per variable in the order given.
+    pub fn add_fact_vars(&mut self, scope: &Scope, vars: &[i32], starts: &[&Facts]) -> Vec<FactVar> {
+        let mut out = Vec::new();
+        for &n in vars {
+            let key = format!("var:{n}");
+            let mut seeds: BTreeSet<i64> = [self.start.get0(&key)].into_iter().collect();
+            seeds.extend(starts.iter().map(|s| s.get0(&key)));
+            let what = if SETTINGS.iter().any(|s| s.0 == n) {
+                "fixed by the settings"
+            } else if self.engine.contains(&n) {
+                "written by the engine"
+            } else if !scope.writes.has(&key) {
+                "the scope does not write it (a constant at its start value)"
+            } else if self.domain(&key).is_some() {
+                "already a fact"
+            } else {
+                self.extra.insert(key, Domain::of(seeds.iter().copied(), None, None));
+                self.refined.insert(n);
+                "added"
+            };
+            out.push(FactVar { n, what, seeds: seeds.into_iter().collect() });
+        }
+        out
     }
 }
 

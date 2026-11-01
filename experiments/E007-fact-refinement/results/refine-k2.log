@@ -1,0 +1,67 @@
+E007: k = 2's state:316 = 1 from the harness's boot with the refinement loop on (code at 8564d2c: the refiner reads with streamed golden lines, stream-check.log), on the reading k2-off (e007's reader, no --fact-vars: packed sha1 f5ec2354, e006's k2-pass byte for byte); run.sh (E006's switches) plus --window-split-wait --refine-facts, under the heavy lock; seed 1; the ScummVM build of svm-w3b; taskcore of branch walk.
+
+Attempt 1 (code at a58d1f7, the refiner keeping the records in memory): the same plan 0 and window 0.1 (deviation at 2796, the cause on var 103), the turn added var 103 and started the reread; the guard stopped the run at 818 s wall when MemAvailable fell under 3 GB (3,112,704 kB) during that reread (the reader's k = 2 peak with the records kept is 3,947 MB; other jobs held about 17 GB). Its log: the progress lines below the first run's, kept in ~/.cache/fast-mi-e007/logs/run-k2-refine-attempt1-killed.log. Attempt 2 below, with the memory back above 5.5 GB.
+
+file replay-part1-k2-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine.json
+stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"; goal reached True; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 6 checkpoints, 0 differences, 28 inputs, goal at the end True, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 3129, qf 74908): 401 frames, 9624 qf, 40.10 s
+plans 3, replans 2
+  replan after plan 0 at frame 2796: deviation at frame 2796: [('sentence(2,428)#44', [('var:102', ['1'], 0)]), ('event(script:2@736#d897055c2f2e)#163', [])]; cause: input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  replan after plan 1 at frame 2798: deviation at frame 2798: ('event(script:2@736#da2874b63864)#219', 'effect local:201'); cause: refuted event(script:2@736#da2874b63864)#219 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+  cause (deviation, plan 0 window 0): input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 43 assign =; var 103 = 428; local 2 = 0; class split
+  cause (deviation, plan 1 window 0): refuted event(script:2@736#da2874b63864)#219 at 2798: effect local:201: the predicted write is not in the run; script:2 None None; ; class None
+  cause (goal, not from the plan, plan 2 window 0): goal writer None at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 51 drawObject; local 1 = 339; local 0 = 339; class split
+windows 3; children 403; child frames 4515; outcomes {'deviation': 5, 'duplicate': 6, 'pruned': 61, 'goal, not from the plan': 4, 'mismatch': 327}
+search CPU: engines 13.8 s {'child': 13.77, 'snapshot': 0.0, 'the last engine': 0.0}, Python 31.61 s, total 45.4 s
+Python CPU by part {'setup': 0.07, 'play': 6.33, 'observe': 6.71, 'child total': 21.79, 'cache: state, kept': 7628, 'cache: state, asked': 3551, 'cache: at, asked': 4948, 'cache: at, kept': 5330, 'match': 6.6}
+memory {'forks_pss_kb': 69991, 'python_rss_kb': 1166520, 'live_forks': 13, 'min_available_kb': 5380296}
+steps: inputs 3 {'deviation': 1, 'matched': 1, 'window empty': 1}; events 3 {'not reached': 3}
+  window 0.1 sentence(2,428)#44: frames 2728-2796 (stop: Q(g) + b reached the best deviation); 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}, 2861 child frames, 13.23 s wall, 11.95 Python s; best deviation fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures [[['input', 'sentence(2,428)#44', 'effect var:102'], 62]]
+  window 1.1 walk_to(428)#92: frames 2796-2800 (stop: Q(g) + b reached the best deviation); 4 children {'deviation': 4}, 8 child frames, 3.26 s wall, 3.18 Python s; best deviation fork 2796 inputs 2797-2797 end 2798 (qf 66964); failures [[['refuted', 'event(script:2@736#da2874b63864)#219', 'effect local:201'], 4]]
+  window 2.1 walk_to(315)[202]#3794: frames 2798-3129 (goal in the parent, not from the plan); 331 children {'goal, not from the plan': 4, 'mismatch': 327}, 1646 child frames, 18.89 s wall, 16.47 Python s; best None fork None inputs None-None end None (qf None); failures [[['mismatch', None, 'end room'], 327], [['input', 'walk_to(315)[202]#3794', 'no run pos:local:217'], 4]]
+windows with an input 3; search CPU per such window 15.1 s; x 250 = 1.05 CPU h
+effects outside their domain (M4 does not check them; the record still matches under trace-validation.md section 3): 0
+run seconds 659.5; reach extensions 0
+  plan 0 at frame 2728: plan, 6 steps, write 21.83540720900055, search None, plan_cost 5
+  plan 1 at frame 2796: plan, 4 steps, write 34.314643263001926, search None, plan_cost 3
+  plan 2 at frame 2798: plan, 2 steps, write 12.726509226020426, search None, plan_cost 2
+  window 0.1 sentence(2,428)#44: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 1 frames, chain []
+  window 1.1 walk_to(428)#92: runs read as parts {'parent': 0, 'children': 4, 'children_runs': 4}; b 1 frames, chain []
+  window 2.1 walk_to(315)[202]#3794: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 2 frames, chain ['event(local:217@18#d2acdc8c2415)#6775']
+planner: taskcore serve peak RSS 1124 MB; plan seconds [21.5, 30.6, 3.2]
+refinement loop: 3 turns, 1 with variables added [103]; reader wall 215.1 s, CPU 507.4 s
+  turn at plan 0, frame 2796 (qf 66916), deviation: class split; var [103] added, engine values {'103': 428}; records 451987 -> 452038, actions 450967 -> 451018; operators 143417 (plan 0) -> 193967 (plan 1); facts {'103': {'what': 'added', 'domain': 77, 'outside_after_last_pass': []}}; reader {'read_wall_s': 110.2, 'read_cpu_s': 404.1, 'peak_rss_mb': 1217}; 215.14 s wall, 507.36 CPU s
+    cause: input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  turn at plan 1, frame 2798 (qf 66964), deviation: class None; no variable added: no cause
+    cause: refuted event(script:2@736#da2874b63864)#219 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+  turn at plan 2, frame 3129 (qf 74908), the run stopped on the goal: class None; no variable added: no cause
+    cause: None
+(the third turn is the stop: the goal held in the idling engine, play_plan gives no replan cause there, and the turn records none)
+
+the run's progress log (every 100 children's line left out):
+[20:16:42] k2-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine: booting to the first idle stop
+[20:16:44] k2-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine: start at frame 2728; the start check
+[20:17:26] planning through taskcore (plan 0, frame 2728, 0 bans)
+[20:18:14] plan 0: plan, 6 steps, 21 s
+[20:20:03] plan 0 window 1/3: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+[20:20:16]   window 1: cause: input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+[20:20:16]   window 1: stop: Q(g) + b reached the best deviation; 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}; best 2796 (Q 66916); 13.23 s
+[20:20:16] refinement at frame 2796: var [103] made facts (input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split)
+[20:20:16] refinement 1: reading the scope again with var [103] made facts, from 2 starts
+[20:23:51] read refine-01: 452038 records in 113.0 s (3 threads, peak 1217 MB), files in 101.3 s: 451018 actions, 9866 lists
+[20:23:51] refinement 1: 450967 -> 451018 actions in 215.14 s (507.36 CPU s)
+[20:23:51] planning through taskcore (plan 1, frame 2796, 0 bans)
+[20:25:04] plan 1: plan, 4 steps, 31 s
+[20:26:55] plan 1 window 1/2: walk_to(428)#92 at frame 2796 (2 records needed, 2 tracked)
+[20:26:58]   window 1: cause: refuted event(script:2@736#da2874b63864)#219 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+[20:26:58]   window 1: stop: Q(g) + b reached the best deviation; 4 children {'deviation': 4}; best 2798 (Q 66964); 3.26 s
+[20:26:58] planning through taskcore (plan 2, frame 2798, 0 bans)
+[20:27:18] plan 2: plan, 2 steps, 3 s
+[20:27:18] plan 2 window 1/1: walk_to(315)[202]#3794 at frame 2798 (2 records needed, 2 tracked)
+[20:27:37]   window 1: cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split
+[20:27:37]   window 1: goal in the parent, not from the plan; 331 children {'goal, not from the plan': 4, 'mismatch': 327}; best None (Q None); 18.89 s
+[20:27:37] k2-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine: stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"; verifying from boot (6 checkpoints)
+[20:27:40] wrote ~/.cache/fast-mi-e007/results/replay-part1-k2-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine.json
+exit 0
+GUARD: rc 0 wall 662.3 s low 0 min MemAvailable 4970384 kB
