@@ -28,7 +28,8 @@ The steps (plan.md, "One job"):
 4. **Attempts.** Per target in order: a fork of the returned engine and replay.Harness with replay_part1.cmd_run's
    wiring for walk's run.sh switches plus ``--window-split-wait --refine-facts`` (taskcore served, lama-first-costs,
    cost caps, the reach extension, unobserved actor rooms, approach stones, the strict window search with 3 workers,
-   cache, fork-each 7, lite and split-wait, E007's refinement loop; replan limit 30, plan memory 3G), the target as the
+   cache, fork-each 7, lite and split-wait, E007's refinement loop; replan limit 30, plan memory 3G; the reading's
+   built lists, which cmd_run always hands over and the strict matcher's ``args:`` views read), the target as the
    goal (taskcore ``--goal K=V``; tier 0 the stage goal). A first plan that is not a plan is a probe, and the next
    target is planned; "out of domain" on a cached reading reads the scope fresh once and plans the same target
    again. The first attempt with a plan is played to the harness's own end, and the job ends there.
@@ -445,15 +446,17 @@ def attempt(rd, ctl, root, target: tuple, goal: dict, adir: Path, threads: int, 
     starts: list = []  # the reach extension's start files, which the refinement shares
     facts: list = list(rd.doc.get("fact_vars") or [])  # E007's loop: the attempt's fact variables so far
     adir.mkdir(parents=True, exist_ok=True)
+    def snapshot(hh):  # the record so far after each plan, as cmd_run's partial.json: a killed job keeps it
+        (adir / "partial.json").write_text(json.dumps(hh.result(), default=str) + "\n")
     cpu0, t0 = _cpu(), time.monotonic()
     branch = ctl.fork(root)
-    h = None
     try:
         wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=True, cache=True,
                                fork_each=FORK_EACH, lite=True, split_wait=True)
         h = replay.Harness(rd.b, rd.task, rd.task, branch, hgoal, replan_limit=REPLAN_LIMIT, time_limit=TIME_LIMIT,
                            plan_time=PLAN_TIME, progress=say, planner="taskcore", packed=rd.packed,
-                           workdir=adir / "plans", memory_limit=PLAN_MEMORY, taskcore_args=("--goal", text),
+                           workdir=adir / "plans", memory_limit=PLAN_MEMORY, on_plan=snapshot, slot_locals=False,
+                           lists=rd.lists, taskcore_args=("--goal", text),
                            taskcore_serve=True, search="lama-first-costs", cost_caps=True,
                            cost_dmax=frame_costs.get("dmax"),
                            reach_extend=P.reach_extender(rd, adir, threads, starts, facts),
