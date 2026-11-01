@@ -727,7 +727,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
             reread: bool = False, threads: int = 3, serve: bool = False, search: str = "lama-first",
             cost_caps: bool = False, reach_extend: bool = False, unobserved_actor_rooms: bool = False,
             approach_stones: bool = False, window_search: bool = False, workers: int = 7, starter=None,
-            window_strict: bool = False) -> dict:
+            window_strict: bool = False, window_cache: bool = False) -> dict:
     if seed == ANY_SEED or (seed in HELD_OUT and not test_seeds):
         raise SystemExit(f"seed {seed}: the run refuses the Any% seed and the test seeds 31-35 (module docstring)")
     t0 = time.monotonic()
@@ -747,7 +747,7 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
         ("-serve" if serve else "") + (f"-{search}" if search != "lama-first" else "") + \
         ("-caps" if cost_caps else "") + ("-reachx" if reach_extend else "") + \
         ("-uar" if unobserved_actor_rooms else "") + ("-stones" if approach_stones else "") + \
-        ("-window" if window_search else "") + ("-strict" if window_strict else "") + \
+        ("-window" if window_search else "") + ("-strict" if window_strict else "") + ("-cache" if window_cache else "") + \
         (f"-{starter.name}" if starter is not None else "")
     run_dir = out_root / tag
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -778,15 +778,16 @@ def cmd_run(seed: int, reading: Path, control: bool, replan_limit: int, time_lim
     wcfg = None
     if window_search:
         import window as WS
-        wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=window_strict)
+        wcfg = WS.WindowConfig(workers=workers, delta_lo=WS.delta_lo_of(frame_costs), strict=window_strict,
+                               cache=window_cache)
         out["window_search"] = dict(vars(wcfg))
         out["sources"]["window.py"] = sha(HERE / "window.py")
         if window_strict:  # window-search.md section 9: B1's matcher and explainer
             for n_ in ("strict.py", "trace_explain.py", "trace_check.py"):
                 out["sources"][n_] = sha(HERE / n_)
             out["window_strict"] = {"scummvm": str(paths.SCUMMVM_BIN), "scummvm_sha1": sha(paths.SCUMMVM_BIN)}
-    elif window_strict:
-        raise SystemExit("--window-strict is a sub-switch of --window-search")
+    elif window_strict or window_cache:
+        raise SystemExit("--window-strict and --window-cache are sub-switches of --window-search")
     if reach_extend:
         out["reach_extend"] = {"threads": threads, "reader_scope": str(READER_SCOPE),
                                "reader_scope_sha1": sha(READER_SCOPE)}
@@ -1114,6 +1115,8 @@ def main() -> None:
     r.add_argument("--workers", type=int, default=7, help="the window search's children at a time")
     r.add_argument("--window-strict", action="store_true",
                    help="the window search's sub-switch strict: B1's matcher (window-search.md section 9)")
+    r.add_argument("--window-cache", action="store_true",
+                   help="the window search's sub-switch cache: a child's dump kept until it runs (section 9.7)")
     lg = sub.add_parser("log")
     lg.add_argument("name")
     lg.add_argument("--results", type=Path, default=RESULTS)
@@ -1138,7 +1141,7 @@ def main() -> None:
                 reread=a.reread, threads=a.threads, serve=a.serve, search=a.search, cost_caps=a.cost_caps,
                 reach_extend=a.reach_extend, unobserved_actor_rooms=a.unobserved_actor_rooms,
                 approach_stones=a.approach_stones, window_search=a.window_search, workers=a.workers,
-                window_strict=a.window_strict)
+                window_strict=a.window_strict, window_cache=a.window_cache)
     else:
         cmd_log(a.name, a.results)
 

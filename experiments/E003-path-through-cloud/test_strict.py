@@ -209,3 +209,31 @@ def test_kept_frames_keep_the_last_three():
 def test_plain_turns_runs_and_sets_into_json_values():
     out = W._plain({"run": run(1, "script:2", 0, 5), "s": frozenset({2, 1})})
     assert out["run"]["seq"] == 1 and out["s"] == [1, 2]
+
+
+def test_kept_freeze_takes_frames_as_keys():
+    k = S.Kept()
+    k.frame(5, [], {"d": 5}, {"v": 5})
+    got = k.freeze({4: {"v": 4}}, {4: {"d": 4}})
+    assert sorted(got["views"]) == [4, 5] and sorted(got["dumps"]) == [4, 5]
+
+
+def test_the_cache_keeps_a_dump_until_the_engine_runs():
+    class B(FakeBranch):
+        def __init__(self):
+            super().__init__(5)
+            self.dumps = 0
+
+        def state(self):
+            self.dumps += 1
+            return {"frame": self.frame}
+
+        def at(self, x, y):
+            return {"obj": x + y + self.frame}
+    b = B()
+    c = W._Cached(b, {"frame": 5, "seeded": True})
+    assert c.state()["seeded"] and b.dumps == 0  # the parent's dump at the fork
+    assert c.at(1, 2) == c.at(1, 2) == {"obj": 8}
+    c.run(frame=6)
+    assert c.state() == {"frame": 6} and c.state() is c.state() and b.dumps == 1
+    assert c.at(1, 2) == {"obj": 9}
