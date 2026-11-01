@@ -1,0 +1,22 @@
+E006: the readings, made by e006's reader (reader-scope at 75fb3a0, built under ~/.cache/fast-mi-e006/target-scumm) through
+read-rust with the kitchen's switches (--elsewhere --live-locals --split-limit --switches
+value_sets,draw_clears,actor_rooms,input_settled[,wait_pass_cost] --reach --frame-costs), 3 threads, nice 10, seed 1.
+
+| reading | rooms | goal | wait_pass_cost | records | actions | packed sha1 | records s | files s | peak MB |
+|---|---|---|---|---|---|---|---|---|---|
+| kitchen-off | 33, 28, 41 | owner:566 = 1 | off | 41,877 | 40,773 | 47583c54 (walk's kitchen reading's) | 14.8 | 10.5 | 595 |
+| kitchen-pass | 33, 28, 41 | owner:566 = 1 | on | 41,877 | 40,773 | 41c31b6d | 15.0 | 9.4 | 594 |
+| bar-pass | 28, 33 | state:316 = 1 | on | 38,874 | 37,776 | 307952c0 | 14.6 | 10.2 | 575 |
+| k2-pass | 28, 29, 33, 34, 35, 38, 41, 83, 85, 96 | state:316 = 1 | on | 451,987 | 450,967 | f5ec2354 | 158.8 | 136.4 | 3,948 (heavy lock) |
+
+Off: kitchen-off's packed file, actions file and lists file are byte for byte walk's kitchen reading's.
+On: the actions files are byte for byte the readings without the switch (kitchen-off; the trace branch's bar-door-w3 and
+k2-w3), and the kitchen's lists file too. Only costs change. Loaded side by side (packed_reading.load_reading), every
+action keeps its name, and the costs that change all go from 1 to 0: 1,707 of the kitchen's 40,773 actions and 1,292
+of the bar's 37,776 (k = 2 not loaded side by side). The rules (reading.json frame_costs, over every unit of the game):
+"WaitForActor, WaitForCamera, WaitForSentence, can pass at once: 0 frames" 433 wait points and "WaitForMessage, message
+not known, can pass at once: 0 frames" 258, where the off readings have the same counts at 1 frame; the other rules
+unchanged (WaitForMessage after a talk 1,472, breakHere 4,625, delay 616, delayVariable 31 and 10).
+
+The Rust test tests/frame_costs.rs wait_pass_cost_switch: with the switch the sentence script's [02E0] and the cook's
+walk wait at local 216 [0056] cost 0, local 214's message wait keeps 25 frames, breakHere 1, delay 7; off, as before.

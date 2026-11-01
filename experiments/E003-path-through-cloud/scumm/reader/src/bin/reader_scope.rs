@@ -60,6 +60,8 @@
 //!               and compressed on --golden-threads N threads (default --threads, at most 16), one gzip member per
 //!               batch, written in order: the same lines as one stream, other compressed bytes.
 //! --start-seed N  the start: results/start-part1.jsonl's seed N (default 1)
+//! --start-rows FILE  the start's rows from FILE (start-part1.jsonl's format: one JSON object per line with "seed" and
+//!               "facts") in place of results/start-part1.jsonl, the row of --start-seed. Off by default.
 //! --domain-goals part1|none
 //!               the goal domains.build counts as compared constants: results/end-part1.json (default), or none
 //!               (golden.read_scope's and replay_part1.py export's readings)
@@ -433,7 +435,11 @@ fn main() {
     let root = scumm_ir::default_root();
     let game = scumm_ir::Game::load(&root).expect("the game");
     let start_seed: i64 = arg(&args, "--start-seed").map_or(scaling::SEED, |n| n.parse().unwrap());
-    let start = scaling::start_facts(&root, start_seed);
+    let start_rows = arg(&args, "--start-rows");
+    let start = match &start_rows {
+        Some(f) => scaling::start_facts_in(Path::new(f), start_seed),
+        None => scaling::start_facts(&root, start_seed),
+    };
     let goal = goal_arg(&arg(&args, "--goal").unwrap_or_else(|| "part1".into()), &root);
     let domain_goals = arg(&args, "--domain-goals").unwrap_or_else(|| "part1".into());
     let dom_goals = match domain_goals.as_str() {
@@ -504,7 +510,10 @@ fn main() {
         "n_units": scope.units.len(),
         "objects": scope.objects.len(),
         "slot_facts": scope.universe.len(),
-        "start": format!("results/start-part1.jsonl seed {start_seed}"),
+        "start": match &start_rows {
+            Some(f) => format!("{f} seed {start_seed}"),
+            None => format!("results/start-part1.jsonl seed {start_seed}"),
+        },
         "goal": goal.iter().map(|g| g.0.clone()).collect::<Vec<_>>(),
         "domain_goals": domain_goals,
         "slot_locals": slots.len(),
@@ -559,8 +568,9 @@ fn main() {
         b.table.live_locals = Some(Arc::new(ll));
     }
     b.slot_locals = slots;
+    assert!(frame_costs || !b.switches.wait_pass_cost, "--switches wait_pass_cost: a cost switch, it needs --frame-costs");
     if frame_costs {
-        let fc = scumm_reader::costs::FrameCosts::of(&game, &scope);
+        let fc = scumm_reader::costs::FrameCosts::of_with(&game, &scope, b.switches.wait_pass_cost);
         base["frame_costs_params"] = serde_json::from_str(&fc.py().text()).unwrap_or(Value::Null);
         b.frame_costs = Some(Arc::new(fc));
     }

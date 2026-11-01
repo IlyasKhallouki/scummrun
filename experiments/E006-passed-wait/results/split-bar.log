@@ -1,0 +1,50 @@
+E006: the strict window search with split_wait on (code at 1386267), the bar door (state:316 = 1) from the harness's boot, on the reading bar-pass (rooms 28, 33; e006's reader with wait_pass_cost: packed sha1 307952c0, its actions file byte for byte the trace branch's bar-door reading's); run.sh (walk's switches) plus --window-split-wait; seed 1; the ScummVM build of svm-w3b; taskcore of branch walk.
+
+file replay-part1-bar-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split.json
+stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"; goal reached True; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 6 checkpoints, 0 differences, 28 inputs, goal at the end True, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 3129, qf 74908): 401 frames, 9624 qf, 40.10 s
+plans 2, replans 1
+  replan after plan 0 at frame 2798: deviation at frame 2798: ('event(script:2@736#da2874b63864)#510', 'effect local:201'); cause: refuted event(script:2@736#da2874b63864)#510 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+  cause (deviation, plan 0 window 1): refuted event(script:2@736#da2874b63864)#510 at 2798: effect local:201: the predicted write is not in the run; script:2 None None; ; class None
+  cause (goal, not from the plan, plan 1 window 0): goal writer None at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 51 drawObject; local 1 = 339; local 0 = 339; class split
+windows 3; children 420; child frames 4680; outcomes {'duplicate': 6, 'pruned': 60, 'success': 1, 'deviation': 2, 'refuted': 2, 'spent': 18, 'goal, not from the plan': 4, 'mismatch': 327}
+search CPU: engines 17.8 s {'child': 17.59, 'snapshot': 0.18, 'the last engine': 0.0}, Python 25.21 s, total 43.0 s
+Python CPU by part {'setup': 0.08, 'play': 9.25, 'child total': 20.31, 'cache: state, kept': 7657, 'cache: state, asked': 3546, 'cache: at, asked': 4994, 'cache: at, kept': 5610, 'observe': 7.66, 'match': 1.66}
+memory {'forks_pss_kb': 63937, 'python_rss_kb': 276060, 'live_forks': 13, 'min_available_kb': 8278904}
+steps: inputs 3 {'matched': 2, 'window empty': 1}; events 3 {'matched': 1, 'not reached': 2}
+  window 0.1 sentence(2,428)#44: frames 2728-2795 (stop: Q(g) + b reached the best success); 67 children {'duplicate': 6, 'pruned': 60, 'success': 1}, 2818 child frames, 13.74 s wall, 11.95 Python s; best success fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures []
+  window 0.2 walk_to(428)#64: frames 2776-2798 (stop: Q(g) + b reached the best deviation); 22 children {'deviation': 2, 'refuted': 2, 'spent': 18}, 216 child frames, 1.56 s wall, 1.26 Python s; best deviation fork 2796 inputs 2797-2797 end 2798 (qf 66964); failures [[['input', 'walk_to(428)#64', 'pre script:2'], 18], [['refuted', 'event(script:2@736#da2874b63864)#510', 'effect local:201'], 3]]
+  window 1.1 walk_to(315)[202]#846: frames 2798-3129 (goal in the parent, not from the plan); 331 children {'goal, not from the plan': 4, 'mismatch': 327}, 1646 child frames, 13.84 s wall, 11.99 Python s; best None fork None inputs None-None end None (qf None); failures [[['mismatch', None, 'end room'], 327], [['input', 'walk_to(315)[202]#846', 'no run pos:local:217'], 4]]
+windows with an input 3; search CPU per such window 14.3 s; x 250 = 0.99 CPU h
+effects outside their domain (M4 does not check them; the record still matches under trace-validation.md section 3): 0
+run seconds 77.3; reach extensions 0
+  plan 0 at frame 2728: plan, 7 steps, write 4.123602845007554, search None, plan_cost 6
+  plan 1 at frame 2798: plan, 2 steps, write 4.684232038911432, search None, plan_cost 2
+  window 0.1 sentence(2,428)#44: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 1 frames, chain []
+  window 0.2 walk_to(428)#64: runs read as parts {'parent': 0, 'children': 3, 'children_runs': 3}; b 1 frames, chain []
+  window 1.1 walk_to(315)[202]#846: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 2 frames, chain ['event(local:217@18#d2acdc8c2415)#9633']
+planner: taskcore serve peak RSS 72 MB; plan seconds [5.9, 3.5]
+
+the run's progress log:
+bar-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: booting to the first idle stop
+bar-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: plan, 7 steps, 6 s
+plan 0 window 1/4: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+  window 1: stop: Q(g) + b reached the best success; 67 children {'duplicate': 6, 'pruned': 60, 'success': 1}; best 2796 (Q 66916); 13.74 s
+plan 0 window 2/4: walk_to(428)#64 at frame 2776 (3 records needed, 3 tracked)
+  window 2: cause: refuted event(script:2@736#da2874b63864)#510 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+  window 2: stop: Q(g) + b reached the best deviation; 22 children {'deviation': 2, 'refuted': 2, 'spent': 18}; best 2798 (Q 66964); 1.56 s
+planning through taskcore (plan 1, frame 2798, 0 bans)
+plan 1: plan, 2 steps, 3 s
+plan 1 window 1/1: walk_to(315)[202]#846 at frame 2798 (2 records needed, 2 tracked)
+    window 1: 100 children by frame 2897, {'mismatch': 97}; failures [(('mismatch', None, 'end room'), 97)]
+    window 1: 200 children by frame 2997, {'mismatch': 197}; failures [(('mismatch', None, 'end room'), 197)]
+    window 1: 300 children by frame 3097, {'mismatch': 297}; failures [(('mismatch', None, 'end room'), 297)]
+  window 1: cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split
+  window 1: goal in the parent, not from the plan; 331 children {'goal, not from the plan': 4, 'mismatch': 327}; best None (Q None); 13.84 s
+bar-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"; verifying from boot (6 checkpoints)
+wrote /home/ilyask/.cache/fast-mi-e006/results/replay-part1-bar-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split.json
+exit 0
+GUARD: rc 0 wall 78.5 s low 0 min MemAvailable 8097596 kB

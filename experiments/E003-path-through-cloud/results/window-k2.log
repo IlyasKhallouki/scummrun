@@ -1,0 +1,29 @@
+E004 plan step A4, the window search: k = 2 from boot on seed 1, goal state:316 = 1, held out (never played before; the method fixed before it ran). Branch window2.
+Laptop, nice 10, 7 children at a time; 1-minute load 5 to 8. ScummVM /var/tmp/fast-mi/svm-window.
+Reading: replay_part1.py read-rust 28,29,33,34,35,38,41,83,85,96 --seed 1 --goal state:316=1 with the kitchen's switches (--elsewhere --live-locals --split-limit --reach --frame-costs,
+  --switches value_sets,draw_clears,actor_rooms,input_settled): 451,987 records, 450,967 actions, 9,866 lists, read 563.7 s on 3 threads, peak 3,948 MB, files 366.2 s.
+Run: replay_part1.py run 1 --serve --search lama-first-costs --cost-caps --reach-extend --unobserved-actor-rooms --approach-stones --window-search, replan limit 30, plan memory 3G.
+
+file replay-part1-k2-w2-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window.json
+stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched"; goal reached True; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 6 checkpoints, 0 differences, 28 inputs, goal at the end True
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 3129, qf 74908): 401 frames, 9624 qf, 40.10 s
+  from the harness boot's first frame in room 33 (frame 2638, qf 63124): 491 frames, 11784 qf, 49.10 s
+plans 3, replans 2, reach extensions 0
+  replan after plan 0 at frame 2796: deviation at frame 2796: [('sentence(2,428)#44', [('var:102', ['1'], 0)]), ('event(script:2@736#d897055c2f2e)#163', [])]
+  replan after plan 1 at frame 2799: deviation at frame 2799: [('walk_to(428)#64', [('var:102', ['1'], 0)]), ('event(script:2@736#da2874b63864)#1957', [])]
+  deviation: plan 0 window 1, stop frame 2796 (qf 66916), replan at frame 2796 (0 frames to the click gate); [('sentence(2,428)#44', [('var:102', ['1'], 0)]), ('event(script:2@736#d897055c2f2e)#163', [])]
+  deviation: plan 1 window 1, stop frame 2799 (qf 66988), replan at frame 2799 (0 frames to the click gate); [('walk_to(428)#64', [('var:102', ['1'], 0)]), ('event(script:2@736#da2874b63864)#1957', [])]
+  plan 0 at frame 2728: plan, 6 steps, taskcore 55.1 CPU s, search 42.6 s wall
+  plan 1 at frame 2796: plan, 4 steps, taskcore 37.0 CPU s, search 42.3 s wall
+  plan 2 at frame 2799: plan, 2 steps, taskcore 26.2 CPU s, search 5.0 s wall
+windows 3; children 403; child frames 3487; outcomes {'deviation': 2, 'duplicate': 6, 'pruned': 65, 'goal, not from the plan': 1, 'spent': 329}
+search CPU: engines 42.4 s ({'child': 38.07, 'snapshot': 0.0, 'the last engine': 4.28}), Python 59.8 s, total 102.2 s; forks {'child': 403, 'snapshot': 397}
+search memory peaks: forks' Pss 58 MB with 10 live, the harness's RSS 358 MB, MemAvailable at least 5144 MB
+early successes 0; bound violations 0; goals not from the plan 2
+windows (plan.window input: start, first frame the model's window opened, end and why; children and outcomes; frames from the window's start to the chosen end point; b):
+  0.1 sentence(2,428)#44: frames 2728-2796 (open 2728; stop: Q(g) + b reached the best deviation); 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}, 2820 child frames, Lemma 9 stops 0, other paths {}; wall 40.79 s, Python 39.0 s; b 2 frames; chosen: deviation, fork 2728, inputs 2736-2776, end 2796: 68 frames and 1632 qf from the window's start, walk 20
+  1.1 walk_to(428)#64: frames 2796-2801 (open 2796; stop: Q(g) + b reached the best deviation); 5 children {'deviation': 1, 'pruned': 4}, 8 child frames, Lemma 9 stops 0, other paths {}; wall 0.62 s, Python 0.57 s; b 2 frames; chosen: deviation, fork 2796, inputs 2797-2797, end 2799: 3 frames and 72 qf from the window's start, walk None
+  2.1 walk_to(315)[202]#2733: frames 2799-3129 (open 2799; goal in the parent, not from the plan); 330 children {'goal, not from the plan': 1, 'spent': 329}, 659 child frames, Lemma 9 stops 329, other paths {}; wall 21.69 s, Python 20.24 s; b 2 frames; no end point
+steps in the record 6, executed 2; predicted writes held 0; matched (writes held, no tracked fact changed without a prediction) 0; outcomes {'not reached': 3, 'window empty': 3}; mismatches 2
+run wall 390.1 s

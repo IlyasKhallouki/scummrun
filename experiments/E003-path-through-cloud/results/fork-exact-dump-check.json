@@ -1,0 +1,22 @@
+{
+ "old": "/var/tmp/fast-mi/svm-fr1-main/build/scummvm/scummvm",
+ "old_sha1": "17864effa489",
+ "new": "/var/tmp/fast-mi/svm-window/build/scummvm/scummvm",
+ "new_sha1": "87066f13be73",
+ "end_frame": 3235,
+ "first_frame": 1,
+ "frames": 3234,
+ "to_frame": 3235,
+ "status_differ": 0,
+ "switch_off_differ": 0,
+ "switch_on_differ": 0,
+ "exact_object_misplaced": 0,
+ "trace_sha1": {
+  "old": "3c4fdad27400",
+  "new-off": "3c4fdad27400",
+  "new-on": "3c4fdad27400"
+ },
+ "traces_equal": true,
+ "differences": [],
+ "seconds": 154.7
+}

@@ -1,0 +1,43 @@
+E004 plan step A4, window search sections 1-7 with the sub-switches cache and fork_each 7 (9.7): window2's k=2 run again (branch trace). ScummVM build sha1 6249a8e7d911 (the bridge at a77a9af). The load from other jobs was not recorded for these runs.
+file replay-part1-k2-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-ahead7.json
+stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched"; goal reached True; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 6 checkpoints, 0 differences, 28 inputs, goal at the end True, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 3129, qf 74908): 401 frames, 9624 qf, 40.10 s
+plans 3, replans 2
+  replan after plan 0 at frame 2796: deviation at frame 2796: [('sentence(2,428)#44', [('var:102', ['1'], 0)]), ('event(script:2@736#d897055c2f2e)#163', [])]
+  replan after plan 1 at frame 2799: deviation at frame 2799: [('walk_to(428)#64', [('var:102', ['1'], 0)]), ('event(script:2@736#da2874b63864)#1957', [])]
+windows 3; children 403; child frames 3489; outcomes {'deviation': 2, 'duplicate': 6, 'pruned': 65, 'goal, not from the plan': 1, 'spent': 329}
+search CPU: engines 18.0 s {'child': 17.96, 'snapshot': 0.0, 'the last engine': 0.0}, Python 28.46 s, total 46.4 s
+Python CPU by part {}
+memory {'forks_pss_kb': 74036, 'python_rss_kb': 278528, 'live_forks': 13, 'min_available_kb': 6034452}
+steps: inputs 3 {'window empty': 3}; events 3 {'not reached': 3}
+  window 0.1 sentence(2,428)#44: frames 2728-2796 (stop: Q(g) + b reached the best deviation); 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}, 2820 child frames, 22.65 s wall, 18.83 Python s; best deviation fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures []
+  window 1.1 walk_to(428)#64: frames 2796-2801 (stop: Q(g) + b reached the best deviation); 5 children {'deviation': 1, 'pruned': 4}, 10 child frames, 0.28 s wall, 0.25 Python s; best deviation fork 2796 inputs 2797-2797 end 2799 (qf 66988); failures []
+  window 2.1 walk_to(315)[202]#2733: frames 2799-3129 (goal in the parent, not from the plan); 330 children {'goal, not from the plan': 1, 'spent': 329}, 659 child frames, 11.02 s wall, 9.38 Python s; best None fork None inputs None-None end None (qf None); failures []
+windows with an input 3; search CPU per such window 15.5 s; x 250 = 1.07 CPU h
+
+against window2's run (cache off): the same inputs True (28 and 28), stop frame 3129 and 3129, qf 9624 and 9624, stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched" and "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched"
+per window: input, children (cache, window2), chosen fork (cache, window2), child frames (cache, window2), Python CPU s (cache, window2)
+  sentence(2,428)#44: 68, 68; fork 2728, 2728; 2820, 2820; 18.83, 39.0
+  walk_to(428)#64: 5, 5; fork 2796, 2796; 10, 8; 0.25, 0.57
+  walk_to(315)[202]#2733: 330, 330; fork None, None; 659, 659; 9.38, 20.24
+engine CPU s 18.0 against 42.4; Python CPU s 28.46 against 59.8; total 46.4 against 102.2
+the run's progress log:
+k2-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-ahead7: booting to the first idle stop
+k2-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-ahead7: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: plan, 6 steps, 30 s
+plan 0 window 1/3: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+  window 1: stop: Q(g) + b reached the best deviation; 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}; best 2796 (Q 66916); 22.65 s
+planning through taskcore (plan 1, frame 2796, 0 bans)
+plan 1: plan, 4 steps, 32 s
+plan 1 window 1/2: walk_to(428)#64 at frame 2796 (2 records needed, 2 tracked)
+  window 1: stop: Q(g) + b reached the best deviation; 5 children {'deviation': 1, 'pruned': 4}; best 2799 (Q 66988); 0.28 s
+planning through taskcore (plan 2, frame 2799, 0 bans)
+plan 2: plan, 2 steps, 3 s
+plan 2 window 1/1: walk_to(315)[202]#2733 at frame 2799 (2 records needed, 2 tracked)
+  window 1: goal in the parent, not from the plan; 330 children {'goal, not from the plan': 1, 'spent': 329}; best None (Q None); 11.02 s
+k2-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-ahead7: stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched"; verifying from boot (6 checkpoints)
+wrote /home/ilyask/.cache/fast-mi/w3/results/replay-part1-k2-w3-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-cache-ahead7.json
+exit 0
+GUARD: rc 0 wall 293.053 s low 0 min MemAvailable 5103680 kB

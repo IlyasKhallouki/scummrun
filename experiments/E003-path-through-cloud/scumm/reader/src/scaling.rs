@@ -78,7 +78,11 @@ pub fn scopes(game: &Game, start_room: i32) -> Vec<Vec<i32>> {
 
 /// The start of size_scaling.py: results/start-part1.jsonl's line with `seed`, its facts in the file's order.
 pub fn start_facts(root: &Path, seed: i64) -> Facts {
-    let p = root.join("experiments/E003-path-through-cloud/results/start-part1.jsonl");
+    start_facts_in(&root.join("experiments/E003-path-through-cloud/results/start-part1.jsonl"), seed)
+}
+
+/// `start_facts` from another file of rows in start-part1.jsonl's format (reader-scope `--start-rows`).
+pub fn start_facts_in(p: &Path, seed: i64) -> Facts {
     let text = std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
     for line in text.lines() {
         let v = Json::parse(line);

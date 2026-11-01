@@ -1,0 +1,22 @@
+E004 wait_both: plan 0 from the harness's boot (frame 2728, seed 1), taskcore sas through the harness (serve), the same start, off
+and on. Off: the trace branch's strict runs (readings kitchen-w3 and bar-door-w3); on: this branch's runs on the readings with
+wait_both (kitchen-walk, bar-walk), walk-strict-kitchen-on.log and walk-strict-bar-on.log.
+
+| scope | switch | input actions | after fold and reductions | effects after | SAS operators | SAS effects | conditional effects | max variants | SAS bytes | taskcore s | RSS after reduce MB |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| kitchen | off | 40773 | 14323 | 146752 | 44605 | 1003925 | 514937 | 45 | 22273190 | 5.445 | 86 |
+| kitchen | on | 281977 | 167074 | 9554154 | 1712065 | 103868564 | 39912616 | 90 | 1605383967 | 94.8216 | 1675 |
+| kitchen | on / off | 6.9 | 11.7 | 65.1 | 38.4 | 103.5 | | | 72.1 | | |
+| bar door | off | 37776 | 4468 | 116324 | 31204 | 782430 | 456554 | 45 | 18228065 | 4.0685 | 71 |
+| bar door | on | 274289 | 155637 | 9087699 | 1690737 | 99705270 | 39658070 | 90 | 1534355851 | 100.7985 | 1639 |
+| bar door | on / off | 7.3 | 34.8 | 78.1 | 54.2 | 127.4 | | | 84.2 | | |
+
+Fast Downward's search on the kitchen's task.sas alone (lama-first-costs, the harness's search, --search-memory-limit 3G as the
+runs' --plan-memory 3G, time limit 600 s), nice 10, under the heavy lock, MemAvailable 5.9 GB at its lowest:
+fd exit 22 wall 63 s
+INFO     search memory limit: 3072 MB
+[t=0.000000s, 11932 KB] reading input...
+Failed to allocate memory.
+
+In the runs: plan 0's search ended with Fast Downward's memory status after 71 s (kitchen) and 83 s (bar door), and the
+harness stopped with 'planner memory limit (3G)'. MemAvailable fell to 3.25 GB in both (9.1 GB at the start).

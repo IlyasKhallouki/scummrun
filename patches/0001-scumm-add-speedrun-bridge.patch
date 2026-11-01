@@ -84,10 +84,10 @@ index ecef09cf..a3302152 100644
  
  	_mouseAndKeyboardStat = 0;
 diff --git a/engines/scumm/module.mk b/engines/scumm/module.mk
-index 2cee05ab..c7ba6c26 100644
+index 2cee05ab..7551ef95 100644
 --- a/engines/scumm/module.mk
 +++ b/engines/scumm/module.mk
-@@ -97,6 +97,18 @@ MODULE_OBJS := \
+@@ -97,6 +97,19 @@ MODULE_OBJS := \
  	vars.o \
  	verbs.o
  
@@ -95,6 +95,7 @@ index 2cee05ab..c7ba6c26 100644
 +	speedrun/speedrun_bridge.o \
 +	speedrun/speedrun_conditions.o \
 +	speedrun/speedrun_control.o \
++	speedrun/speedrun_explain.o \
 +	speedrun/speedrun_inputs.o \
 +	speedrun/speedrun_interrupts.o \
 +	speedrun/speedrun_json.o \
@@ -106,6 +107,74 @@ index 2cee05ab..c7ba6c26 100644
  ifdef USE_IMGUI
  MODULE_OBJS += \
  	debugger/debugtools.o \
+diff --git a/engines/scumm/script.cpp b/engines/scumm/script.cpp
+index ff91a786..b0c2f4f5 100644
+--- a/engines/scumm/script.cpp
++++ b/engines/scumm/script.cpp
+@@ -31,6 +31,7 @@
+ #include "scumm/scumm_v2.h"
+ #include "scumm/sound.h"
+ #include "scumm/verbs.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ 
+ namespace Scumm {
+ 
+@@ -493,6 +494,11 @@ void ScummEngine::refreshScriptPointer() {
+ /** Execute a script - Read opcode, and execute it from the table */
+ void ScummEngine::executeScript() {
+ 	int c;
++	// The speedrun bridge's segmentation and explain (speedrun_explain.cpp):
++	// one call is one slot run. Off, a null test or one member test.
++	const bool speedrunHooks = _speedrun && _speedrun->scriptHooks();
++	if (speedrunHooks)
++		_speedrun->onRunBegin();
+ 	while (_currentScript != 0xFF) {
+ 
+ 		if (_showStack == 1) {
+@@ -510,6 +516,8 @@ void ScummEngine::executeScript() {
+ 				(uint)(_scriptPointer - _scriptOrgPointer),
+ 				_opcode,
+ 				getOpcodeDesc(_opcode));
++		if (speedrunHooks)
++			_speedrun->onOpcode(_opcode);
+ 		if (_hexdumpScripts == true) {
+ 			for (c = -1; c < 15; c++) {
+ 				debugN(" %02x", *(_scriptPointer + c));
+@@ -520,6 +528,8 @@ void ScummEngine::executeScript() {
+ 		executeOpcode(_opcode);
+ 
+ 	}
++	if (speedrunHooks)
++		_speedrun->onRunEnd();
+ }
+ 
+ void ScummEngine::executeOpcode(byte i) {
+@@ -566,6 +576,16 @@ int ScummEngine::fetchScriptDWordSigned() {
+ }
+ 
+ int ScummEngine::readVar(uint var) {
++	// The speedrun bridge's explain log (speedrun_explain.cpp): the value read.
++	if (_speedrun && _speedrun->explaining()) {
++		const int value = readVarBody(var);
++		_speedrun->onReadVar(var, value);
++		return value;
++	}
++	return readVarBody(var);
++}
++
++int ScummEngine::readVarBody(uint var) {
+ 	int a;
+ 
+ 	debugC(DEBUG_VARS, "readvar(%d)", var);
+@@ -712,6 +732,8 @@ int ScummEngine::readVar(uint var) {
+ 
+ void ScummEngine::writeVar(uint var, int value) {
+ 	debugC(DEBUG_VARS, "writeVar(%d, %d)", var, value);
++	if (_speedrun && _speedrun->explaining())
++		_speedrun->onWriteVar(var, value);
+ 
+ 	if (!(var & 0xF000)) {
+ 		assertRange(0, var, _numVariables - 1, "variable (writing)");
 diff --git a/engines/scumm/scumm.cpp b/engines/scumm/scumm.cpp
 index f0bb1a53..9a19d373 100644
 --- a/engines/scumm/scumm.cpp
@@ -184,7 +253,7 @@ index f0bb1a53..9a19d373 100644
  
  	if (shouldQuit())
 diff --git a/engines/scumm/scumm.h b/engines/scumm/scumm.h
-index ae7b4bb7..816bf55d 100644
+index ae7b4bb7..44e64283 100644
 --- a/engines/scumm/scumm.h
 +++ b/engines/scumm/scumm.h
 @@ -98,6 +98,7 @@ class Player_Towns;
@@ -203,7 +272,15 @@ index ae7b4bb7..816bf55d 100644
  
  public:
  	/* Put often used variables at the top.
-@@ -1691,6 +1693,7 @@ public:
+@@ -1121,6 +1123,7 @@ protected:
+ 	void push(int a);
+ 	int pop();
+ 	virtual int readVar(uint var);
++	int readVarBody(uint var); // readVar's body; readVar passes its value to the speedrun bridge's explain log
+ 	virtual void writeVar(uint var, int value);
+ 	// SCUMM 1/2
+ 	virtual void resetSentence() {}
+@@ -1691,6 +1694,7 @@ public:
  
  	Graphics::Surface *_macScreen = nullptr;
  	MacGui *_macGui = nullptr;
@@ -240,10 +317,26 @@ index bfb33823..fb0ed0f3 100644
  }
  
 diff --git a/engines/scumm/sound.h b/engines/scumm/sound.h
-index 2b9b1e66..9e4a9ee5 100644
+index 2b9b1e66..f92ff394 100644
 --- a/engines/scumm/sound.h
 +++ b/engines/scumm/sound.h
-@@ -113,6 +113,7 @@ public:
+@@ -47,6 +47,7 @@ class SeekableAudioStream;
+ namespace Scumm {
+ 
+ class ScummEngine;
++class SpeedrunBridge;
+ 
+ struct MP3OffsetTable;
+ 
+@@ -57,6 +58,7 @@ enum {
+ // TODO: Consider splitting Sound into even more subclasses.
+ // E.g. for v1-v4, v5, v6+, ...
+ class Sound : public Common::Serializable {
++	friend class SpeedrunBridge; // the state dump's "exact" object reads the CD timers and the queues
+ public:
+ 	enum SoundMode {
+ 		kVOCMode,
+@@ -113,6 +115,7 @@ public:
  	byte _digiSndMode;
  	uint _lastSound;
  	uint32 _speechTimerMod;
@@ -251,7 +344,7 @@ index 2b9b1e66..9e4a9ee5 100644
  
  	MidiDriverFlags _musicType;
  
-@@ -144,6 +145,8 @@ public:
+@@ -144,6 +147,8 @@ public:
  	void resetSpeechTimer();
  	void startSpeechTimer();
  	void stopSpeechTimer();
@@ -339,10 +432,10 @@ index 6c161ccd..e62dc05f 100644
  	void playCDTrack(int track, int numLoops, int startFrame, int duration);
 diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
 new file mode 100644
-index 00000000..69447187
+index 00000000..0a89310f
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.cpp
-@@ -0,0 +1,798 @@
+@@ -0,0 +1,801 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -516,6 +609,7 @@ index 00000000..69447187
 +		{"SPEEDRUN_FRAME_LOG", &SpeedrunBridge::_frameLog},
 +		// Observation only: the state dump gains fields, nothing else changes.
 +		{"SPEEDRUN_DUMP_LOCALS", &SpeedrunBridge::_dumpLocals},
++		{"SPEEDRUN_DUMP_EXACT", &SpeedrunBridge::_dumpExact},
 +	};
 +	for (const auto &var : kBoolVars) {
 +		const char *value = envValue(var.name);
@@ -679,6 +773,7 @@ index 00000000..69447187
 +}
 +
 +void SpeedrunBridge::onFrameBegin(int delta) {
++	_afterDecision = false; // slot runs from here on are this frame's, before its decision point
 +	// This frame's input is unused so far (see onClearClicked()).
 +	_inputWindow = false;
 +	_escThisFrame = false;
@@ -812,6 +907,7 @@ index 00000000..69447187
 +
 +void SpeedrunBridge::onDecisionPoint() {
 +	_inputWindow = false; // checkExecVerbs() has run
++	_afterDecision = true; // slot runs from here on come after this frame's decision point
 +	if (_finished)
 +		return;
 +
@@ -1143,10 +1239,10 @@ index 00000000..69447187
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
 new file mode 100644
-index 00000000..ff09fe43
+index 00000000..d43d4757
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -0,0 +1,521 @@
+@@ -0,0 +1,581 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -1359,6 +1455,23 @@ index 00000000..ff09fe43
 +	 */
 +	void onClearClicked();
 +
++	// Segmentation and explain (speedrun_explain.cpp; experiments/E003-path-through-cloud/trace-validation.md).
++	// Off by default: the control commands "segment" and "explain" turn them on. They observe only.
++	/** executeScript() asks this once per call: the run hooks below have work to do. */
++	bool scriptHooks() const { return _segment || _explainArmed; }
++	/** The innermost slot run is in an armed explain: its reads and writes are logged. */
++	bool explaining() const { return _explainNow; }
++	/** executeScript(), before its loop: one call is one slot run (trace-validation.md, Lemma S). */
++	void onRunBegin();
++	/** executeScript(), after its loop: the innermost run ended. */
++	void onRunEnd();
++	/** executeScript(), before executeOpcode(): the opcode just fetched (DEBUG_OPCODES's call site). */
++	void onOpcode(byte opcode);
++	/** readVar(): the variable and the value it returns (DEBUG_VARS's readvar line, with the value). */
++	void onReadVar(uint var, int value);
++	/** writeVar(), first statement: the variable and the value (DEBUG_VARS's writeVar line). */
++	void onWriteVar(uint var, int value);
++
 +private:
 +	enum IdleKind { kNotIdle, kIdleSentence, kIdleDialog };
 +
@@ -1442,6 +1555,12 @@ index 00000000..ff09fe43
 +	/** Ego's inventory in display order (findInventory() is 1-based). */
 +	Common::Array<int> egoInventory() const;
 +	Common::String stateJson() const;
++	// The state dump's fields that facts_of reads, with owners, states and classes for the objects ``objects`` only
++	// and no room objects or inventory (the "state" command with "objects": window-search.md section 9.7); off unless
++	// a state command asks for it
++	Common::String stateLiteJson(const Common::Array<int> &objects) const;
++	/** The state dump's "exact" object (SPEEDRUN_DUMP_EXACT): reads only. */
++	Common::String exactJson() const;
 +	Common::String objectsJson();
 +	/** Write $SPEEDRUN_OUT/@p name whole (atomically); engine_error if that fails. */
 +	bool writeFile(const char *name, const Common::String &contents);
@@ -1558,6 +1677,7 @@ index 00000000..ff09fe43
 +	Common::Array<int32> _skipSpare; // the last skips event's "spare" (textSpared())
 +	bool _stepStates = false;       // SPEEDRUN_STEP_STATES
 +	bool _dumpLocals = false;       // SPEEDRUN_DUMP_LOCALS: slot locals and flags, cutscene data in the state dump
++	bool _dumpExact = false;        // SPEEDRUN_DUMP_EXACT: the state dump's "exact" object (RNG, clocks, sound, screens)
 +	Common::Array<SpeedrunInterrupt> _interrupts; // SPEEDRUN_INTERRUPTS
 +	Common::Array<SpeedrunInput> _inputs; // SPEEDRUN_INPUTS
 +	uint _inputIndex = 0;           // next event to deliver
@@ -1660,9 +1780,45 @@ index 00000000..ff09fe43
 +	bool _stopOnMenu = false;                    // run "menu": a dialogue menu takes a click
 +	SpeedrunConditions _stopUntil;
 +	Common::Array<SpeedrunConditions> _stopUntilAny; // run "until_any": any group holds
++	// run "fork_each": N: a child at each of the next N decision points, the run stops after the N-th (plan step A4's
++	// kill 2, experiments/E003-path-through-cloud/window-search.md section 9.7); off unless a run asks for it
++	uint _forkEachLeft = 0;
++	Common::Array<int64> _forkEachForks;  // (frame, child pid) pairs of the current fork_each run
 +	JsonlWriter _frameFile;         // $SPEEDRUN_OUT/frames.jsonl: one line per decision point
 +	const char *_errorCode = "engine_error"; // code for the next error() record
 +	bool _finished = false;
++
++	// Segmentation and explain (speedrun_explain.cpp). Observation only: game logic reads none of these.
++	struct RunInfo {
++		uint64 seq = 0;
++		uint64 frame = 0;
++		bool after = false;         // after this frame's decision point
++		int slot = -1, where = -1, number = -1, room = -1, depth = 0;
++		int64 start = -1;           // scriptStart(slot) at the run's start
++		int64 code0 = -1;           // the code offset the run starts from
++		uint32 ops = 0;             // opcodes it executed itself
++		bool explain = false;       // in an armed explain
++	};
++	/** {"runs": [...], "dropped": n, "violations": v}; clears the buffer (the "runs" command). */
++	Common::String runsJson();
++	/** {"explain": [...], "dropped": n}; clears the log (the "explain_log" command). */
++	Common::String explainJson();
++	/** The "explain" command: parse its frames and units; an error text, or empty. */
++	Common::String armExplain(const Common::JSONValue *cmd);
++	void logExplain(const Common::String &entry);
++	bool _segment = false;          // record every slot run ("segment")
++	bool _explainArmed = false;     // "explain" armed for [_explainFrom, _explainTo]
++	uint64 _explainFrom = 0, _explainTo = 0;
++	Common::Array<int32> _explainUnits; // (where, number) pairs; empty: every run
++	bool _explainNow = false;       // the innermost run is explained
++	bool _afterDecision = false;    // onDecisionPoint() has run in this frame
++	uint64 _runSeq = 0;
++	uint64 _slotViolations = 0;     // opcodes whose _currentScript was not their run's slot (Lemma S's premise)
++	Common::Array<RunInfo> _runStack;
++	Common::Array<Common::String> _runLog;
++	uint64 _runsDropped = 0;
++	Common::Array<Common::String> _explainLog;
++	uint64 _explainDropped = 0;
 +};
 +
 +} // End of namespace Scumm
@@ -2023,10 +2179,10 @@ index 00000000..49d670d5
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
 new file mode 100644
-index 00000000..62ec31be
+index 00000000..6fcf1a35
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_control.cpp
-@@ -0,0 +1,400 @@
+@@ -0,0 +1,476 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -2071,12 +2227,21 @@ index 00000000..62ec31be
 +//     {"cmd": "run", "until": [C3], "max_frame": N}   ... or until the conditions hold
 +//     {"cmd": "run", "control": true, "max_frame": N} ... or until a click would count
 +//     {"cmd": "fork"}                            fork; the child connects on its own
++//     {"cmd": "run", "fork_each": N}             a child at each of the next N decision points (each connects
++//                                                and stops there); the stop "fork_each" lists [frame, pid] pairs
 +//     {"cmd": "state"}                           C7 state dump
++//     {"cmd": "state", "objects": [ids]}         the dump's fields facts_of reads, objects' owners, states and
++//                                                classes for these ids only, no room objects or inventory
 +//     {"cmd": "holds", "until": [C3...]}         {"holds": bool} now, no frame run
 +//     run also takes "idle": true (stop when the bridge's idle rule holds), "menu": true
 +//     (stop when a dialogue menu takes a click) and
 +//     "until_any": [[C3...], ...] (stop when any group holds; reason "until_any:<i>")
 +//     {"cmd": "set_rng", "state": N}             search only: set the RNG state (trace "rng_set")
++//     {"cmd": "segment", "on": bool}             record every slot run from now on (speedrun_explain.cpp)
++//     {"cmd": "runs"}                            {"runs": [...], "dropped", "violations", "frame"}; clears them
++//     {"cmd": "explain", "from": F0, "to": F1, "units": [[where, number], ...]}  log the opcodes, reads and
++//                                                writes of those units' runs in frames F0..F1 ("off": true disarms)
++//     {"cmd": "explain_log"}                     {"explain": [...], "dropped", "violations"}; clears it
 +//     {"cmd": "quit"}                            exit at once
 +
 +#define FORBIDDEN_SYMBOL_ALLOW_ALL
@@ -2177,6 +2342,12 @@ index 00000000..62ec31be
 +	}
 +	s.add("cam", (int)e.camera._cur.x).add("xstart", (int)e._virtscr[kMainVirtScreen].xstart)
 +	 .add("room_w", (int)e._roomWidth);
++	if (!_forkEachForks.empty()) {
++		JsonArray forks;
++		for (uint i = 0; i + 1 < _forkEachForks.size(); i += 2)
++			forks.addRaw(JsonArray().add(_forkEachForks[i]).add(_forkEachForks[i + 1]).str());
++		s.addRaw("forks", forks.str());
++	}
 +	return s.str();
 +}
 +
@@ -2191,6 +2362,34 @@ index 00000000..62ec31be
 +void SpeedrunBridge::controlAtDecisionPoint() {
 +	if (_controlFd < 0 || _finished)
 +		return;
++	if (_forkEachLeft > 0) {
++		// "fork_each": a child at this decision point, made as the "fork" command makes one; it stops here and
++		// waits for commands. The parent runs on, and stops after the last child.
++		_vm->closeRoom();
++		const pid_t pid = fork();
++		if (pid == 0) {
++			_branchChild = true;
++			close(_controlFd);
++			_controlFd = -1;
++			_trace.close();
++			if (_frameLog)
++				_frameFile.close();
++			_frameLog = false;
++			_forkEachLeft = 0;
++			_forkEachForks.clear();
++			if (!controlConnect())
++				_exit(4);
++			controlLoop("forked");
++			return;
++		}
++		_forkEachForks.push_back((int64)_frames);
++		_forkEachForks.push_back(pid > 0 ? (int64)pid : -1);
++		if (--_forkEachLeft > 0)
++			return;
++		controlLoop("fork_each");
++		_forkEachForks.clear();
++		return;
++	}
 +	const char *reason = nullptr;
 +	if (_stopFrame && _frames >= _stopFrame)
 +		reason = "frame";
@@ -2257,6 +2456,13 @@ index 00000000..62ec31be
 +				_stopOnIdle = obj->getVal("idle")->isBool() && obj->getVal("idle")->asBool();
 +			if (obj->contains("menu"))
 +				_stopOnMenu = obj->getVal("menu")->isBool() && obj->getVal("menu")->asBool();
++			if (obj->contains("fork_each")) {
++				const Common::JSONValue *v = obj->getVal("fork_each");
++				if (!v->isIntegerNumber() || v->asIntegerNumber() < 1 || v->asIntegerNumber() > 64)
++					error = "fork_each needs a number of frames in 1..64";
++				else
++					_forkEachLeft = (uint)v->asIntegerNumber();
++			}
 +			if (error.empty() && obj->contains("until_any")) {
 +				const Common::JSONValue *groups = obj->getVal("until_any");
 +				if (!groups->isArray()) {
@@ -2273,8 +2479,13 @@ index 00000000..62ec31be
 +				}
 +			}
 +			if (error.empty() && !_stopFrame && !_stopMaxFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu &&
-+			    _stopUntil.empty() && _stopUntilAny.empty())
-+				error = "run needs frame, max_frame, control, idle, until or until_any";
++			    _stopUntil.empty() && _stopUntilAny.empty() && !_forkEachLeft)
++				error = "run needs frame, max_frame, control, idle, until, until_any or fork_each";
++			if (error.empty() && _forkEachLeft && (_stopFrame || _stopMaxFrame || _stopOnControl || _stopOnIdle ||
++			                                       _stopOnMenu || !_stopUntil.empty() || !_stopUntilAny.empty()))
++				error = "fork_each takes no other stop";
++			if (!error.empty())
++				_forkEachLeft = 0;
 +			if (error.empty() && _stopFrame && _stopFrame <= _frames)
 +				error = Common::String::format("frame %llu is not after the current frame %llu",
 +				                               (unsigned long long)_stopFrame, (unsigned long long)_frames);
@@ -2372,7 +2583,28 @@ index 00000000..62ec31be
 +			else
 +				controlSend(Common::String::format("{\"holds\":%s}", allHold(conds) ? "true" : "false"));
 +		} else if (cmd == "state") {
-+			controlSend("{\"state\":" + stateJson() + "}");
++			if (obj->contains("objects") && obj->getVal("objects")->isArray()) {
++				// window-search.md section 9.7: the dump's fields facts_of reads, for these objects only
++				Common::Array<int> objects;
++				for (const Common::JSONValue *v : obj->getVal("objects")->asArray())
++					if (v->isIntegerNumber())
++						objects.push_back((int)v->asIntegerNumber());
++				controlSend("{\"state\":" + stateLiteJson(objects) + "}");
++			} else {
++				controlSend("{\"state\":" + stateJson() + "}");
++			}
++		} else if (cmd == "segment") {
++			// trace-validation.md: record every slot run from now on, or stop.
++			_segment = obj->contains("on") && obj->getVal("on")->isBool() && obj->getVal("on")->asBool();
++			controlSend("{\"ok\":\"segment\"}");
++		} else if (cmd == "runs") {
++			controlSend(runsJson());
++		} else if (cmd == "explain") {
++			error = armExplain(root);
++			if (error.empty())
++				controlSend("{\"ok\":\"explain\"}");
++		} else if (cmd == "explain_log") {
++			controlSend(explainJson());
 +		} else if (cmd == "quit") {
 +			_exit(0);
 +		} else {
@@ -2424,6 +2656,229 @@ index 00000000..62ec31be
 +void SpeedrunBridge::captureClose(int fd) {
 +	if (fd >= 0)
 +		::close(fd);
++}
++
++} // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_explain.cpp b/engines/scumm/speedrun/speedrun_explain.cpp
+new file mode 100644
+index 00000000..ad605e36
+--- /dev/null
++++ b/engines/scumm/speedrun/speedrun_explain.cpp
+@@ -0,0 +1,217 @@
++/* ScummVM - Graphic Adventure Engine
++ *
++ * ScummVM is the legal property of its developers, whose names
++ * are too numerous to list here. Please refer to the COPYRIGHT
++ * file distributed with this source distribution.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++// Segmentation and explain (experiments/E003-path-through-cloud/trace-validation.md, plan step B1).
++//
++// One call of ScummEngine::executeScript() is one slot run (Lemma S): the
++// engine's own segmentation of a frame's script work. With "segment" on, the
++// bridge records each run: its frame, whether it came after the frame's
++// decision point, its sequence number, nesting depth, slot, where, number,
++// room resource, the code offsets it started from and stopped at (the
++// [XXXX] offsets of the decompiled scripts, scriptCode()), the slot's status,
++// freeze count and delay at its end, and the opcodes it executed itself.
++//
++// "explain" logs, for the runs of the armed units and frames, what the
++// engine's DEBUG_OPCODES and DEBUG_VARS channels print at the same call
++// sites (script.cpp, executeScript, readVar, writeVar), with the value
++// readVar returns added. Entries:
++//   ["b", seq, frame, after, slot, where, number, room, code0]   a run begins
++//   ["o", seq, code, opcode]                                     an opcode
++//   ["r", seq, var, value]                                       readVar
++//   ["w", seq, var, value]                                       writeVar
++//   ["e", seq, code1, status, frozen, delay]                     the run ends
++//
++// Observation only (Lemma O): the hooks read engine members and call const
++// members of the bridge; they write only the bridge's own buffers.
++
++#include "common/formats/json.h"
++
++#include "scumm/scumm.h"
++#include "scumm/script.h"
++#include "scumm/speedrun/speedrun_bridge.h"
++
++namespace Scumm {
++
++namespace {
++const uint kMaxRuns = 1 << 16;      // runs kept between two "runs" commands
++const uint kMaxExplain = 1 << 18;   // explain entries kept between two "explain_log" commands
++} // End of anonymous namespace
++
++void SpeedrunBridge::onRunBegin() {
++	const ScummEngine &e = *_vm;
++	RunInfo r;
++	r.seq = _runSeq++;
++	r.frame = _frames;
++	r.after = _afterDecision;
++	r.depth = (int)e.vm.numNestedScripts;
++	r.room = (int)e._roomResource;
++	if (e._currentScript != 0xFF) {
++		const ScriptSlot &ss = e.vm.slot[e._currentScript];
++		r.slot = e._currentScript;
++		r.where = ss.where;
++		r.number = ss.number;
++		r.start = scriptStart(r.slot);
++		r.code0 = r.start >= 0 ? (int64)ss.offs - r.start : -1;
++	}
++	if (_explainArmed && r.slot >= 0 && _frames >= _explainFrom && _frames <= _explainTo) {
++		bool match = _explainUnits.empty();
++		for (uint i = 0; !match && i + 1 < _explainUnits.size(); i += 2)
++			match = _explainUnits[i] == r.where && _explainUnits[i + 1] == r.number;
++		r.explain = match;
++	}
++	_runStack.push_back(r);
++	_explainNow = r.explain;
++	if (r.explain) {
++		logExplain(JsonArray().addRaw("\"b\"").add((int)r.seq).add((int)r.frame).add(r.after ? 1 : 0).add(r.slot)
++		           .add(r.where).add(r.number).add(r.room).add((int)r.code0).str());
++	}
++}
++
++void SpeedrunBridge::onRunEnd() {
++	if (_runStack.empty())
++		return;
++	const ScummEngine &e = *_vm;
++	const RunInfo r = _runStack.back();
++	_runStack.pop_back();
++	int64 code1 = -1;
++	int status = 0, frozen = 0, delay = 0;
++	if (r.slot >= 0) {
++		const ScriptSlot &ss = e.vm.slot[r.slot];
++		// The same script still holds the slot (a dead slot's number is 0).
++		if (ss.status != ssDead && (int)ss.number == r.number && (int)ss.where == r.where) {
++			const int64 start = scriptStart(r.slot);
++			code1 = start >= 0 ? (int64)ss.offs - start : -1;
++			status = ss.status;
++			frozen = ss.freezeCount;
++			delay = ss.delay;
++		}
++	}
++	if (_segment) {
++		if (_runLog.size() < kMaxRuns) {
++			_runLog.push_back(JsonArray().add((int)r.frame).add(r.after ? 1 : 0).add((int)r.seq).add(r.depth)
++			                  .add(r.slot).add(r.where).add(r.number).add(r.room).add((int)r.code0).add((int)code1)
++			                  .add(status).add(frozen).add(delay).add((int)r.ops).str());
++		} else {
++			_runsDropped++;
++		}
++	}
++	if (r.explain)
++		logExplain(JsonArray().addRaw("\"e\"").add((int)r.seq).add((int)code1).add(status).add(frozen).add(delay).str());
++	_explainNow = !_runStack.empty() && _runStack.back().explain;
++}
++
++void SpeedrunBridge::onOpcode(byte opcode) {
++	if (_runStack.empty())
++		return;
++	RunInfo &r = _runStack.back();
++	r.ops++;
++	const ScummEngine &e = *_vm;
++	if ((int)e._currentScript != r.slot)
++		_slotViolations++;
++	if (!r.explain)
++		return;
++	// fetchScriptByte() has moved past the opcode.
++	const int64 offs = (int64)(e._scriptPointer - e._scriptOrgPointer) - 1;
++	const int64 code = r.start >= 0 ? offs - r.start : -1;
++	logExplain(JsonArray().addRaw("\"o\"").add((int)r.seq).add((int)code).add((int)opcode).str());
++}
++
++void SpeedrunBridge::onReadVar(uint var, int value) {
++	if (!_explainNow || _runStack.empty())
++		return;
++	logExplain(JsonArray().addRaw("\"r\"").add((int)_runStack.back().seq).add((int)var).add(value).str());
++}
++
++void SpeedrunBridge::onWriteVar(uint var, int value) {
++	if (!_explainNow || _runStack.empty())
++		return;
++	logExplain(JsonArray().addRaw("\"w\"").add((int)_runStack.back().seq).add((int)var).add(value).str());
++}
++
++void SpeedrunBridge::logExplain(const Common::String &entry) {
++	if (_explainLog.size() < kMaxExplain)
++		_explainLog.push_back(entry);
++	else
++		_explainDropped++;
++}
++
++Common::String SpeedrunBridge::runsJson() {
++	Common::String out = "{\"runs\":[";
++	for (uint i = 0; i < _runLog.size(); i++) {
++		if (i)
++			out += ",";
++		out += _runLog[i];
++	}
++	out += Common::String::format("],\"dropped\":%llu,\"violations\":%llu,\"frame\":%llu}",
++	                              (unsigned long long)_runsDropped, (unsigned long long)_slotViolations,
++	                              (unsigned long long)_frames);
++	_runLog.clear();
++	_runsDropped = 0;
++	return out;
++}
++
++Common::String SpeedrunBridge::explainJson() {
++	Common::String out = "{\"explain\":[";
++	for (uint i = 0; i < _explainLog.size(); i++) {
++		if (i)
++			out += ",";
++		out += _explainLog[i];
++	}
++	out += Common::String::format("],\"dropped\":%llu,\"violations\":%llu}", (unsigned long long)_explainDropped,
++	                              (unsigned long long)_slotViolations);
++	_explainLog.clear();
++	_explainDropped = 0;
++	return out;
++}
++
++Common::String SpeedrunBridge::armExplain(const Common::JSONValue *cmd) {
++	const Common::JSONObject &obj = cmd->asObject();
++	if (obj.contains("off")) {
++		_explainArmed = false;
++		_explainUnits.clear();
++		return Common::String();
++	}
++	const Common::JSONValue *from = obj.contains("from") ? obj.getVal("from") : nullptr;
++	const Common::JSONValue *to = obj.contains("to") ? obj.getVal("to") : nullptr;
++	if (!from || !to || !from->isIntegerNumber() || !to->isIntegerNumber() || from->asIntegerNumber() < 0 ||
++	    to->asIntegerNumber() < from->asIntegerNumber())
++		return "explain needs integer frames from <= to";
++	Common::Array<int32> units;
++	if (obj.contains("units")) {
++		const Common::JSONValue *us = obj.getVal("units");
++		if (!us->isArray())
++			return "explain: units must be an array of [where, number]";
++		for (const Common::JSONValue *u : us->asArray()) {
++			if (!u->isArray() || u->asArray().size() != 2 || !u->asArray()[0]->isIntegerNumber() ||
++			    !u->asArray()[1]->isIntegerNumber())
++				return "explain: a unit is [where, number]";
++			units.push_back((int32)u->asArray()[0]->asIntegerNumber());
++			units.push_back((int32)u->asArray()[1]->asIntegerNumber());
++		}
++	}
++	_explainFrom = (uint64)from->asIntegerNumber();
++	_explainTo = (uint64)to->asIntegerNumber();
++	_explainUnits = units;
++	_explainArmed = true;
++	return Common::String();
 +}
 +
 +} // End of namespace Scumm
@@ -4201,10 +4656,10 @@ index 00000000..7263e24f
 +} // End of namespace Scumm
 diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
 new file mode 100644
-index 00000000..27e72a34
+index 00000000..8f0f384c
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_state.cpp
-@@ -0,0 +1,757 @@
+@@ -0,0 +1,989 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -4232,11 +4687,14 @@ index 00000000..27e72a34
 +#include "common/config-manager.h"
 +#include "common/endian.h"
 +#include "common/file.h"
++#include "common/system.h"
++#include "backends/audiocd/audiocd.h"
 +
 +#include "scumm/actor.h"
 +#include "scumm/object.h"
 +#include "scumm/resource.h"
 +#include "scumm/scumm.h"
++#include "scumm/sound.h"
 +#include "scumm/verbs.h"
 +#include "scumm/speedrun/speedrun_bridge.h"
 +
@@ -4831,7 +5289,236 @@ index 00000000..27e72a34
 +		actors.addRaw(o.str());
 +	}
 +	s.addRaw("actors", actors.str());
++	// With SPEEDRUN_DUMP_EXACT: what the fork-exactness check compares beyond
++	// the fields above (exactJson()).
++	if (_dumpExact)
++		s.addRaw("exact", exactJson());
 +	return s.str();
++}
++
++
++Common::String SpeedrunBridge::stateLiteJson(const Common::Array<int> &objects) const {
++	ScummEngine &e = *_vm;
++	const int ego = e._scummVars[e.VAR_EGO];
++	const Actor *egoActor = (ego > 0 && ego < e._numActors) ? e._actors[ego] : nullptr;
++
++	JsonObject s;
++	s.add("tick", _ticks).add("frame", _frames).add("room", (int)e._currentRoom).add("ego", ego);
++	if (egoActor)
++		s.addRaw("ego_pos", pointJson(egoActor->getRealPos().x, egoActor->getRealPos().y));
++	else
++		s.addNull("ego_pos");
++	if (ConfMan.hasKey("random_seed"))
++		s.add("seed", ConfMan.getInt("random_seed"));
++	else
++		s.addNull("seed");
++	s.add("boot_param", e._bootParam);
++
++	JsonArray vars;
++	for (int i = 0; i < e._numVariables; i++)
++		vars.add(e._scummVars[i]);
++	s.addRaw("vars", vars.str());
++
++	JsonArray bits;
++	for (int n = 0; n < e._numBitVariables; n++) {
++		if (e._bitVars[n >> 3] & (1 << (n & 7)))
++			bits.add(n);
++	}
++	s.addRaw("bits_set", bits.str());
++
++	JsonObject owners, states, classes;
++	for (uint k = 0; k < objects.size(); k++) {
++		const int obj = objects[k];
++		if (obj < 1 || obj >= e._numGlobalObjects)
++			continue;
++		const Common::String key = Common::String::format("%d", obj);
++		owners.add(key.c_str(), (int)e._objectOwnerTable[obj]);
++		states.add(key.c_str(), (int)e._objectStateTable[obj]);
++		if (e._classData[obj])
++			classes.addRaw(key.c_str(), classesJson(e._classData[obj]));
++	}
++	s.addRaw("owners", owners.str()).addRaw("states", states.str()).addRaw("classes", classes.str());
++
++	JsonArray verbs;
++	for (int slot = 1; slot < e._numVerbs; slot++) {
++		if (verbVisible(slot))
++			verbs.addRaw(verbJson(slot, true));
++	}
++	s.addRaw("verbs", verbs.str());
++
++	// Live script slots: number, where (WIO_*), status (ssRunning/ssPaused), the
++	// PC offset, frozen count and cutscene override count. "code" is the PC
++	// from the script's first opcode (scriptCode()), or -1. With
++	// SPEEDRUN_DUMP_LOCALS also "locals": the slot's NUM_SCRIPT_LOCAL locals
++	// (vm.localvar, script.h:136: initializeLocals sets them from the call's
++	// args, script.cpp:155-164; the scripts read and write them through
++	// readVar and writeVar, script.cpp:706, 846), and the slot's two flags
++	// (script.h:91; runScript and runObjectScript set them, script.cpp:98-99,
++	// 145-146): "resistant", freezeResistant (freezeScripts skips the slot,
++	// script.cpp:919, 928), and "recursive" (chainScript passes it on,
++	// script_v5.cpp:850). Whether a room change kills the slot is its "where".
++	JsonArray slots;
++	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
++		const ScriptSlot &ss = e.vm.slot[i];
++		if (ss.status == ssDead)
++			continue;
++		JsonObject o;
++		o.add("slot", i).add("number", (int)ss.number).add("where", (int)ss.where).add("status", (int)ss.status)
++		 .add("offs", (uint64)ss.offs).add("code", scriptCode(i, ss.offs)).add("frozen", (int)ss.freezeCount)
++		 .add("delay", (int)ss.delay).add("cutscene_override", (int)ss.cutsceneOverride);
++		if (_dumpLocals) {
++			JsonArray locals;
++			for (int n = 0; n < NUM_SCRIPT_LOCAL; n++)
++				locals.add((int)e.vm.localvar[i][n]);
++			o.addRaw("locals", locals.str());
++			o.add("resistant", ss.freezeResistant).add("recursive", ss.recursive);
++		}
++		slots.addRaw(o.str());
++	}
++	s.addRaw("slots", slots.str());
++
++	// The cutscene stack (script.cpp:1632-1737). beginCutscene() pushes a
++	// level and clears its override, endCutscene() pops it. beginOverride()
++	// arms the current level's override: cutScenePtr[level] is the offs of
++	// the jump after it, in slot cutSceneScript[level]; endOverride() clears
++	// it. Esc calls abortCutscene() while VAR_CUTSCENEEXIT_KEY is non-zero
++	// (input.cpp:966, 1423-1424), which resumes the top level's override, if
++	// armed, at that jump with VAR_OVERRIDE = 1.
++	// Level 0 is the stack's bottom: an override can be armed there with no
++	// cutscene open. The script that began a level is not kept, so a level
++	// names a script only through its override.
++	JsonObject cutscene;
++	const int depth = e.vm.cutSceneStackPointer;
++	cutscene.add("depth", depth);
++	JsonArray levels;
++	for (int level = 0; level <= depth && level < kMaxCutsceneNum; level++) {
++		const uint32 ptr = e.vm.cutScenePtr[level];
++		const int slot = e.vm.cutSceneScript[level];
++		JsonObject l;
++		l.add("level", level);
++		// With SPEEDRUN_DUMP_LOCALS: the level's cutSceneData, the beginCutscene
++		// argument that endCutscene hands to the end hook (script.cpp:1640, 1658).
++		if (_dumpLocals)
++			l.add("data", (int)e.vm.cutSceneData[level]);
++		if (!ptr || slot >= NUM_SCRIPT_SLOT) {
++			l.addNull("override");
++		} else {
++			const ScriptSlot &ss = e.vm.slot[slot];
++			JsonObject o;
++			o.add("slot", slot).add("number", (int)ss.number).add("where", (int)ss.where)
++			 .add("status", (int)ss.status).add("ptr", (uint64)ptr).add("code", scriptCode(slot, ptr))
++			 .add("stale", overrideStale(level));
++			l.addRaw("override", o.str());
++		}
++		levels.addRaw(l.str());
++	}
++	cutscene.addRaw("levels", levels.str());
++	s.addRaw("cutscene", cutscene.str());
++
++	// Actors in the current room: what a click on a person (Give fish to troll) aims at.
++	JsonArray actors;
++	for (int i = 1; i < e._numActors; i++) {
++		const Actor *a = e._actors[i];
++		if (!a || !a->isInCurrentRoom() || !a->_visible)
++			continue;
++		JsonObject o;
++		o.add("id", i).add("x", (int)a->getRealPos().x).add("y", (int)a->getRealPos().y)
++		 .add("elevation", (int)a->getElevation()).add("moving", (int)a->_moving);
++		actors.addRaw(o.str());
++	}
++	s.addRaw("actors", actors.str());
++	return s.str();
++}
++
++namespace {
++
++// 64-bit FNV-1a over raw bytes.
++void fnv64(uint64 &h, const byte *p, uint32 n) {
++	for (uint32 i = 0; i < n; i++) {
++		h ^= p[i];
++		h *= 1099511628211ULL; // FNV-1a 64 prime
++	}
++}
++
++} // End of anonymous namespace
++
++Common::String SpeedrunBridge::exactJson() const {
++	// Reads only: members (the bridge is a friend of ScummEngine and Sound),
++	// const calls, and the screens' and the palette's memory. The calls into
++	// the mixer and iMuse take and release their mutexes, nothing else.
++	const ScummEngine &e = *_vm;
++	JsonObject x;
++	// The RNG state (common/random.cpp, xorshift32; not in the save stream).
++	x.add("rng", (uint64)e._rnd.getSeed());
++	// The bridge clock (onWait's quarter-frames) and the segment start.
++	x.add("qf", _quarterFrames).add("qf0", _qf0).add("tick0", _tick0).add("seg", _segmentStarted);
++	// The raw input schedule's cursor and this frame's mouse and buttons
++	// (processInput() derives the last three from the first ones).
++	x.add("input", (uint)_inputIndex)
++	 .addRaw("raw_mouse", JsonArray().add((int)_rawMouseX).add((int)_rawMouseY).str())
++	 .addRaw("mouse", JsonArray().add((int)e._mouse.x).add((int)e._mouse.y).str())
++	 .addRaw("vmouse", JsonArray().add((int)e._virtualMouse.x).add((int)e._virtualMouse.y).str())
++	 .addRaw("buttons", JsonArray().add((int)e._leftBtnPressed).add((int)e._rightBtnPressed)
++	                               .add((int)e._mouseAndKeyboardStat).str());
++	// The audio pump (pumpAudio()): what the mixer, and with it the music
++	// driver's timer, has been fed.
++	x.add("audio_pumped", _audioPumped).add("audio_pending", _audioPending)
++	 .add("audio_owed", Common::String::format("%.17g", _audioOwed));
++	const Sound *snd = e._sound;
++	if (snd) {
++		if (snd->_soundCD) {
++			// The CD music timer that feeds VAR_MUSIC_TIMER (advanceCDTimer()),
++			// its quarter-frame phase, and the CD's play state.
++			const SoundCD *cd = snd->_soundCD;
++			const AudioCDManager::Status st = g_system->getAudioCDManager()->getStatus();
++			JsonObject c;
++			c.add("timer", (uint64)cd->_cdMusicTimer).add("timer_mod", (uint64)cd->_cdMusicTimerMod)
++			 .add("music_timer", cd->getMusicTimer()).add("sound", (int)cd->_currentCDSound).add("poll", snd->pollCD())
++			 .addRaw("status", JsonArray().add((int)st.playing).add(st.track).add(st.start).add(st.duration)
++			                              .add(st.numLoops).add(st.volume).add(st.balance).str());
++			x.addRaw("cd", c.str());
++		}
++		x.add("speech_timer", (uint64)snd->_speechTimerMod);
++		// Every sound the scripts' isSoundRunning would call running, with its status.
++		JsonArray running;
++		for (int n = 1; n < e._numSounds; n++) {
++			const int status = snd->isSoundRunning(n);
++			if (status)
++				running.addRaw(JsonArray().add(n).add(status).str());
++		}
++		x.addRaw("sounds", running.str());
++		JsonArray queue;
++		for (int i = 0; i < snd->_soundQueuePos && i < (int)ARRAYSIZE(snd->_soundQueue); i++)
++			queue.addRaw(JsonArray().add((int)snd->_soundQueue[i].sound).add((int)snd->_soundQueue[i].offset).str());
++		x.addRaw("sound_queue", queue.str());
++		JsonArray midi;
++		for (int i = 0; i < snd->_midiQueuePos && i < (int)ARRAYSIZE(snd->_midiQueue); i++)
++			midi.add((int)snd->_midiQueue[i]);
++		x.addRaw("midi_queue", midi.str());
++	}
++	const CameraData &cam = e.camera;
++	x.addRaw("camera", JsonArray().add((int)cam._cur.x).add((int)cam._cur.y).add((int)cam._dest.x).add((int)cam._dest.y)
++	                              .add((int)cam._accel.x).add((int)cam._accel.y).add((int)cam._last.x).add((int)cam._last.y)
++	                              .add(cam._leftTrigger).add(cam._rightTrigger).add((int)cam._follows).add((int)cam._mode)
++	                              .add((int)cam._movingToActor).str());
++	// The four virtual screens (front and back buffers, size and scroll) and
++	// the palette: what is drawn, costume frames included.
++	uint64 h = 14695981039346656037ULL; // FNV-1a 64 offset basis
++	for (int i = 0; i < 4; i++) {
++		const VirtScreen &vs = e._virtscr[i];
++		const int32 header[5] = {vs.w, vs.h, vs.pitch, vs.xstart, vs.topline};
++		fnv64(h, (const byte *)header, sizeof(header));
++		const uint32 size = (vs.h > 0 && vs.pitch > 0) ? (uint32)vs.pitch * (uint32)vs.h : 0;
++		const byte *front = vs.getPixels(-(int)vs.xstart, 0); // the buffer's start
++		const byte *back = vs.getBackPixels(-(int)vs.xstart, 0);
++		if (front && size)
++			fnv64(h, front, size);
++		if (back && size)
++			fnv64(h, back, size);
++	}
++	fnv64(h, e._currentPalette, sizeof(e._currentPalette));
++	x.add("screens", Common::String::format("%016llx", (unsigned long long)h));
++	return x.str();
 +}
 +
 +#pragma mark - Object dump (C6)

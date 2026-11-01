@@ -104,6 +104,12 @@ class Branch:
         self._send({"cmd": "state"})
         return self._recv()["state"]
 
+    def state_lite(self, objects) -> dict:
+        """The state dump's fields facts.py's facts_of reads, with the owners, states and classes of ``objects`` only and
+        no room objects or inventory (the bridge's ``state`` with ``objects``, a build that has it)."""
+        self._send({"cmd": "state", "objects": sorted(int(o) for o in objects)})
+        return self._recv()["state"]
+
     def set_rng(self, state: int) -> None:
         """Search only: put the RNG in ``state`` (the trace records it, so the run is not valid)."""
         self._send({"cmd": "set_rng", "state": state})
@@ -113,6 +119,37 @@ class Branch:
         """Whether the C3 conditions hold now; no frame runs."""
         self._send({"cmd": "holds", "until": until})
         return self._recv()["holds"]
+
+    def segment(self, on: bool = True) -> None:
+        """Record every slot run from the next one on, or stop (the bridge's ``segment``; trace-validation.md,
+        experiments/E003-path-through-cloud). Off by default; it observes only."""
+        self._send({"cmd": "segment", "on": on})
+        self._recv()
+
+    def runs(self) -> dict:
+        """The slot runs recorded since the last call, oldest last to end first: ``{"runs": [[frame, after, seq,
+        depth, slot, where, number, room, code0, code1, status, frozen, delay, ops], ...], "dropped", "violations",
+        "frame"}``; the bridge's buffer is cleared."""
+        self._send({"cmd": "runs"})
+        return self._recv()
+
+    def explain(self, first: int, last: int, units: list | None = None) -> None:
+        """Log the opcodes, reads and writes of the runs of ``units`` ([[where, number], ...]; None: every run) in
+        frames ``first`` to ``last`` (the bridge's ``explain``). Off by default; it observes only."""
+        cmd: dict = {"cmd": "explain", "from": first, "to": last}
+        if units is not None:
+            cmd["units"] = [list(u) for u in units]
+        self._send(cmd)
+        self._recv()
+
+    def explain_off(self) -> None:
+        self._send({"cmd": "explain", "off": True})
+        self._recv()
+
+    def explain_log(self) -> dict:
+        """The explain entries since the last call: ``{"explain": [entry, ...], "dropped", "violations"}``; cleared."""
+        self._send({"cmd": "explain_log"})
+        return self._recv()
 
     def quit(self) -> None:
         lag = getattr(self, "lag", None)  # the executor's lag snapshot of this branch (Executor._set_lag)
@@ -178,6 +215,24 @@ class Controller:
         child = self._accept()
         child.wait_first_stop()  # its "forked" status
         return child
+
+    def fork_each(self, branch: Branch, n: int) -> tuple[dict, list[Branch]]:
+        """A child at each of ``branch``'s next ``n`` decision points (the bridge's ``run`` with ``fork_each``, a build
+        that has it): returns ``branch``'s stop status at the last of them and the children in frame order, each
+        stopped at its frame as a ``fork`` child is."""
+        branch._send({"cmd": "run", "fork_each": n})
+        children = []
+        for _ in range(n):
+            child = self._accept()
+            child.wait_first_stop()  # its "forked" status
+            children.append(child)
+        st = branch._await_stop()
+        if "end" in st:
+            for c in children:
+                c.quit()
+            raise ControlError(f"fork_each: the run ended: {st}")
+        children.sort(key=lambda c: c.frame)
+        return st, children
 
     def close(self) -> None:
         if self.root is not None:

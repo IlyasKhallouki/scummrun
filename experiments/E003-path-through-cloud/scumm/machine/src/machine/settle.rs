@@ -859,6 +859,30 @@ impl<'g> Machine<'g> {
         }
     }
 
+    /// WaitForSentence's test where the path decides it whatever the engine's sentence queue held when the run began
+    /// (the reader's switch wait_both): Some(true) when it surely blocks, Some(false) when it surely passes, None when
+    /// the outcome needs what the path does not hold. o5_wait case 4 (script_v5.cpp:3296-3302) blocks when the
+    /// sentence script is in use, with or without a queued sentence; with the script not in use it blocks unless the
+    /// top sentence is frozen, and passes when no sentence is queued. The top sentence is the path's own last
+    /// doSentence when the path queued one (doSentence pushes at `_sentenceNum`, script.cpp:1164-1165, and only
+    /// checkAndRunSentenceScript pops); with none queued by the path, the queue the run began with decides. A read of a
+    /// fact here may fork on its values, as any read of a fact does.
+    pub fn sentence_wait_known(&mut self, p: &mut Path, o: &FactOracle) -> Option<bool> {
+        let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);
+        let Val::Int(n) = n else { return None };
+        let mut used = Vec::new();
+        for k in sentence_slots(self.game, n) {
+            used.push(self.read(p, k, o));
+        }
+        if used.iter().any(|v| !v.is_unknown() && v.truthy()) {
+            return Some(true);
+        }
+        if used.iter().any(|v| v.is_unknown()) {
+            return None;
+        }
+        p.queue.last().map(|&(_, _, _, frozen)| frozen == 0)
+    }
+
     /// WaitForSentence's test (model.py `_sentence_busy`): True, False or an unknown.
     pub(super) fn sentence_busy(&mut self, p: &mut Path, o: &FactOracle) -> Dec {
         let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);

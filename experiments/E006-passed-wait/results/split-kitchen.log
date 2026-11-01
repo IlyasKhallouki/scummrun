@@ -1,0 +1,61 @@
+E006: the strict window search with split_wait on (code at 1386267), the kitchen (owner:566 = 1) from the harness's boot, on the reading kitchen-pass (e006's reader with wait_pass_cost: packed sha1 41c31b6d, its actions and lists files byte for byte the off reading's); run.sh (walk's switches) plus --window-split-wait; seed 1; the ScummVM build of svm-w3b (bridge a77a9af); taskcore of branch walk.
+
+file replay-part1-kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split.json
+stop 'goal'; goal reached True; goal from the plan's goal records True
+verify from boot (fresh engine, no fork): 9 checkpoints, 0 differences, 36 inputs, goal at the end True, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 3216, qf 76996): 488 frames, 11712 qf, 48.80 s
+plans 3, replans 2
+  replan after plan 0 at frame 2798: deviation at frame 2798: ('event(script:2@736#da2874b63864)#510', 'effect local:201'); cause: refuted event(script:2@736#da2874b63864)#510 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+  replan after plan 1 at frame 3204: deviation at frame 3204: [('walk_to(316)[202]#1038', [('pos:local:203', ['40'], -1)]), ('event(local:215@16#45fc7932b71b)#9668', []), ('event(local:215@56#45fc7932b71b)#10087', []), ('event(local:215@64#45fc7932b71b)#15447', [])]; cause: input walk_to(316)[202]#1038 at 3166: no run pos:local:215: the click's run left the path to the start of local:215; local:203 [001E] jump if; var 0 = 306 (position); class split
+  cause (deviation, plan 0 window 1): refuted event(script:2@736#da2874b63864)#510 at 2798: effect local:201: the predicted write is not in the run; script:2 None None; ; class None
+  cause (deviation, plan 1 window 0): input walk_to(316)[202]#1038 at 3166: no run pos:local:215: the click's run left the path to the start of local:215; local:203 30 jump if; var 0 = 306; class split
+windows 4; children 501; child frames 43037; outcomes {'duplicate': 6, 'pruned': 173, 'success': 1, 'deviation': 3, 'refuted': 2, 'spent': 302, 'mismatch': 12, 'goal': 2}
+search CPU: engines 141.0 s {'child': 96.11, 'snapshot': 0.12, 'stone trial': 44.78, 'the last engine': 0.01}, Python 134.1 s, total 275.1 s
+Python CPU by part {'setup': 0.09, 'play': 96.54, 'child total': 128.54, 'cache: state, kept': 15421, 'cache: state, asked': 17447, 'cache: at, asked': 314075, 'cache: at, kept': 6795, 'observe': 21.99, 'match': 4.24}
+memory {'forks_pss_kb': 78252, 'python_rss_kb': 297636, 'live_forks': 15, 'min_available_kb': 8275540}
+steps: inputs 4 {'matched': 2, 'deviation': 1, 'goal': 1}; events 9 {'matched': 3, 'not reached': 6}
+  window 0.1 sentence(2,428)#44: frames 2728-2795 (stop: Q(g) + b reached the best success); 67 children {'duplicate': 6, 'pruned': 60, 'success': 1}, 2818 child frames, 8.39 s wall, 7.35 Python s; best success fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures []
+  window 0.2 walk_to(428)#64: frames 2776-2798 (stop: Q(g) + b reached the best deviation); 22 children {'deviation': 2, 'refuted': 2, 'spent': 18}, 216 child frames, 0.95 s wall, 0.78 Python s; best deviation fork 2796 inputs 2797-2797 end 2798 (qf 66964); failures [[['input', 'walk_to(428)#64', 'pre script:2'], 18], [['refuted', 'event(script:2@736#da2874b63864)#510', 'effect local:201'], 3]]
+  window 1.1 walk_to(316)[202]#1038: frames 2798-3203 (stop: Q(g) + b reached the best deviation); 405 children {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284}, 39938 child frames, 136.93 s wall, 125.78 Python s; best deviation fork 3091 inputs 3093-3165 end 3204 (qf 76708); failures [[['input', 'walk_to(316)[202]#1038', 'no run pos:local:215'], 258], [['input', 'walk_to(316)[202]#1038', 'effect args:local:203'], 27]]
+  window 2.1 sentence(9,566)#15899: frames 3204-3211 (stop: Q(g) + b reached the best success); 7 children {'goal': 2, 'pruned': 5}, 65 child frames, 0.24 s wall, 0.18 Python s; best goal fork 3204 inputs 3205-3206 end 3216 (qf 76996); failures []
+windows with an input 4; search CPU per such window 68.8 s; x 250 = 4.78 CPU h
+effects outside their domain (M4 does not check them; the record still matches under trace-validation.md section 3): 1
+  plan 2 window 0: event(script:2@915#fa5666eff670)#23924 (chosen child) var:133 = 566, domain ['0']
+run seconds 242.1; reach extensions 0
+  plan 0 at frame 2728: plan, 30 steps, write 4.2131696690339595, search None, plan_cost 336
+  plan 1 at frame 2798: plan, 14 steps, write 3.649975816020742, search None, plan_cost 21
+  plan 2 at frame 3204: plan, 3 steps, write 4.27462918299716, search None, plan_cost 6
+  window 0.1 sentence(2,428)#44: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 1 frames, chain []
+  window 0.2 walk_to(428)#64: runs read as parts {'parent': 0, 'children': 3, 'children_runs': 3}; b 1 frames, chain []
+  window 1.1 walk_to(316)[202]#1038: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 12 frames, chain ['event(local:215@16#45fc7932b71b)#9668', 'event(local:215@56#45fc7932b71b)#10087', 'event(local:215@64#45fc7932b71b)#15447']
+  window 2.1 sentence(9,566)#15899: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 5 frames, chain ['event(script:2@736#c1184912b947)#18658', 'event(script:2@915#fa5666eff670)#23924']
+planner: taskcore serve peak RSS 88 MB; plan seconds [44.5, 6.5, 4.9]
+
+the run's progress log:
+kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: booting to the first idle stop
+kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: plan, 30 steps, 44 s
+plan 0 window 1/9: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+  window 1: stop: Q(g) + b reached the best success; 67 children {'duplicate': 6, 'pruned': 60, 'success': 1}; best 2796 (Q 66916); 8.39 s
+plan 0 window 2/9: walk_to(428)#64 at frame 2776 (4 records needed, 4 tracked)
+  window 2: cause: refuted event(script:2@736#da2874b63864)#510 at 2798: effect local:201: the predicted write is not in the run; script:2 ; ; class None
+  window 2: stop: Q(g) + b reached the best deviation; 22 children {'deviation': 2, 'refuted': 2, 'spent': 18}; best 2798 (Q 66964); 0.95 s
+planning through taskcore (plan 1, frame 2798, 0 bans)
+plan 1: plan, 14 steps, 7 s
+plan 1 window 1/4: walk_to(316)[202]#1038 at frame 2798 (5 records needed, 5 tracked)
+    window 1: 100 children by frame 2897, {'spent': 97}; failures [(('input', 'walk_to(316)[202]#1038', 'no run pos:local:215'), 97)]
+    window 1: 200 children by frame 2997, {'spent': 197}; failures [(('input', 'walk_to(316)[202]#1038', 'no run pos:local:215'), 197)]
+    window 1: 300 children by frame 3097, {'spent': 281, 'mismatch': 12, 'deviation': 1, 'pruned': 3}; failures [(('input', 'walk_to(316)[202]#1038', 'no run pos:local:215'), 258), (('input', 'walk_to(316)[202]#1038', 'effect args:local:203'), 24)]
+    window 1: 400 children by frame 3197, {'spent': 284, 'mismatch': 12, 'deviation': 1, 'pruned': 100}; failures [(('input', 'walk_to(316)[202]#1038', 'no run pos:local:215'), 258), (('input', 'walk_to(316)[202]#1038', 'effect args:local:203'), 27)]
+  window 1: cause: input walk_to(316)[202]#1038 at 3166: no run pos:local:215: the click's run left the path to the start of local:215; local:203 [001E] jump if; var 0 = 306 (position); class split
+  window 1: stop: Q(g) + b reached the best deviation; 405 children {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284}; best 3204 (Q 76708); 136.93 s
+planning through taskcore (plan 2, frame 3204, 0 bans)
+plan 2: plan, 3 steps, 5 s
+plan 2 window 1/1: sentence(9,566)#15899 at frame 3204 (3 records needed, 3 tracked)
+  window 1: outside the domain: event(script:2@915#fa5666eff670)#23924 (chosen child) var:133 = 566, domain ['0']; M4 does not check it (trace-validation.md section 3), so the record still matches
+  window 1: stop: Q(g) + b reached the best success; 7 children {'goal': 2, 'pruned': 5}; best 3216 (Q 76996); 0.24 s
+kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: stop 'goal'; verifying from boot (9 checkpoints)
+wrote /home/ilyask/.cache/fast-mi-e006/results/replay-part1-kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split.json
+exit 0
+GUARD: rc 0 wall 243.2 s low 0 min MemAvailable 8168944 kB

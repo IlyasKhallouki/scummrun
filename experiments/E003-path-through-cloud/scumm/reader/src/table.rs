@@ -90,6 +90,8 @@ pub struct FactTable {
     /// the switch havoc_args (the Builder's, args.rs, experiments/E005-narrow-havoc/havoc-args.md): the analysis a
     /// computed start's values in a havoc closure come from; None off
     pub havoc_args: Option<std::sync::Arc<crate::args::HavocArgs>>,
+    /// the switch wait_both (the Builder's): a WaitFor op whose test no fact holds also passes (machine.rs `wait_both`)
+    pub wait_both: bool,
     /// the switch --reach: the reached values, shared with the machine half (reach.rs); None off
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
@@ -212,6 +214,7 @@ impl FactTable {
             havoc_starts: false,
             havoc_rooms: false,
             havoc_args: None,
+            wait_both: false,
             reach: None,
             memo: None,
             shared: None,

@@ -194,7 +194,7 @@ fn main() {
                     }
                     if frame_costs {
                         // the switch --frame-costs (costs.rs): the scope's frame clock and every unit's wait points
-                        let fc = scumm_reader::costs::FrameCosts::of(&game, &b.scope);
+                        let fc = scumm_reader::costs::FrameCosts::of_with(&game, &b.scope, sw.wait_pass_cost);
                         println!("frame costs: dmax {}, charinc {:?}; wait points {:?}", fc.dmax, fc.charinc, fc.rules.0);
                         b.frame_costs = Some(std::sync::Arc::new(fc));
                     }
