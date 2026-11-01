@@ -1,0 +1,66 @@
+E003, plan step C1: taskcore's pick windows (--pick-windows on; taskcore/README.md, "Pick windows"). Branch picks from ksr 04a3f70.
+Laptop, 2026-11-01; nice 10; one thread per search and per taskcore run, 3 per reading; load 10 to 29 from other jobs. Seed 1.
+Fast Downward rev 7ea2755 (third_party/downward, release build). A* is astar(landmark_cost_partitioning(lm_rhw())); search memory
+limit 3 GB; a guard stops a search when the machine has under 3 GB available (it fired once, below). Time limits are Fast Downward's
+--search-time-limit, in CPU seconds. "lb" is the last f-layer A* reached: every plan costs at least that much.
+Readings: --elsewhere --live-locals, switches value_sets,draw_clears,actor_rooms,split_limit,reach (the bar door and k = 1 through
+reader-scope with --split-limit --reach, goal state:316 = 1; the kitchen through reader-port, goal owner:566 = ego, start s17).
+
+== the writer against the prototype (scratchpad lockpicks.py)
+bar door, the reading without --reach, start "start": taskcore's file with the switch on and lockpicks.py's rewrite of taskcore's file
+with the switch off are the same 282,887 lines but for operator names and the lock's atom names: 9,489 operators, 187 windows, lock
+with 188 values. The file with the switch off is the committed run's (reach-scratch bar/plan-off/task.sas), byte for byte.
+
+== unit costs: A*'s optimum without and with pick windows
+| scope | reading | operators off | on | windows | window picks | A* off | A* on: cost, expanded, search s, total s, peak MB |
+| bar door | --reach, 26,185 actions | 5,523 | 9,478 | 187 | 3,830 | f = 5 not closed in 300 s, 2,503 MB | 6, 15, 0.016, 2.1, 53 |
+| k = 1 | --reach, 51,371 actions | 53,372 | 74,806 | 1,314 | 20,190 | f = 5 not closed in 300 s, 1,241 MB | 6, 18, 0.078, 11.8, 243 |
+| kitchen | --reach, 27,617 actions | 17,672 | 22,842 | 212 | 5,020 | 7, 8, 0.039, 3.7, 69 | 7, 8, 0.028, 3.9, 74 |
+| kitchen, F1c | --reach, input_settled, 39,661 actions | 43,323 | 130,558 | 9,179 | 78,126 | F1c's gate: f = 6 not closed in 1,800 s, 1,430 MB | 7, 4,953, 11.1, 26.7, 251 |
+Same optima where both decide (the kitchen, 7). The initial h is the same off and on: 5, 5, 7 and 6.
+lama-first, off: bar door 6 steps, kitchen 10. The plan of the F1c reading is F1c's cost-7 plan: event(local:211@33),
+fold:walk_to(316)[202], event(script:2@736), event(local:218@16), sentence(9,566), event(script:2@736), event(script:2@915).
+F1c's reading here: 40,765 records, packed sha1 4f19fb05 (F1c's gate's), 113.4 CPU s, peak 248 MB.
+A* on: f = 6 is entered after 0 expansions and closed after 4,945, at 15.6 and 26.3 s; so no plan costs 6.
+
+== frame costs (reader --frame-costs): A* with pick windows, and lama-first's greedy search with costs (upper bound U)
+| scope | start | operators off | on | U (steps) | A* on | A* off |
+| bar door | "start" | 5,523 | 9,478 | 12 frames (7) | optimum 12 (7 steps), 4,770 expanded, 0.80 s search, 2.7 s total, 53 MB | lb 5 (h0) when the guard stopped it, 429 s wall, 798 MB |
+| kitchen | s17 | 17,672 | 22,842 | 373 (8) | lb 33 at 490 s CPU (818,049 expanded, 356 MB); stopped at 600 s, peak 402 MB; h0 12 | lb 12 (h0) at 600 s, 1,465 MB |
+| kitchen, replan p0 | run kitchen-rust-costs-lama-first-costs-caps-seed1-all, plan 0 (frame 235, 9 caps) | 17,823 | 22,993 | 377 (11) | lb 27 at 438 s (673,405 expanded, 367 MB); stopped at 600 s, peak 475 MB; h0 12 | |
+Kitchen with frame costs, f-layers on (s17): f = 29 at 109 s (128,583 expanded), 30 at 158 s (200,248), 31 at 229 s (311,723), 32 at
+325 s (468,841), 33 at 491 s (818,049): 1.5 to 1.7 times the expansions per frame of bound.
+Replan p0 on, f = 25 after 275,142 expansions: the prototype's number on its file.
+Readings: the kitchen with --reach and frame costs, 27,739 records, packed sha1 33bc7f53. Replan p0 is the costs branch's reading
+(71,729 actions, without --reach) from the committed run's plan 0 start file and caps.
+The bar door with frame costs: 26,460 records, packed sha1 e181a47e. Its optimal plan: sentence(2,428) 2, event(script:2@736) 1,
+walk_to(428) 1, event(script:2@736) 1, sentence(2,316) 2, event(script:2@736) 1, event(script:2@915) 4; lama-first's greedy search with
+costs gives the same 7 steps.
+The kitchen's U are dominated by event(local:211@33) at 361 frames.
+
+== the maps of the two theorems, run on the files (test_pick_windows.py)
+Random tasks (test_taskcore's), 300 from seed 1, four configurations (PRODUCT_LIMIT 1 with no lever and with every lever,
+PRODUCT_LIMIT 2, the default): Fast Downward's astar(blind()) gives the task's own optimum off and on in every case (252 tasks per
+configuration; 250, 214, 240 and 3 of them with a window); 816 optimal plans each way mapped to the other file and run there at the same cost; decode reads the same steps from
+both in all 816. 299 files with no window and no pick operator are the same bytes off and on. 0 failures.
+The same on 60 tasks from seed 3: 164 plans each way, 54 of them through a window (68 and 65 windows).
+On the packed files, Π^W's optimal plan mapped to Π and run there at the same cost, with the same decoded steps: the bar door, the
+kitchen, k = 1, the kitchen F1c; Π's lama-first plan (bar door, kitchen) and A* plan (kitchen) mapped to Π^W the same way. None of
+these plans uses a consumer. 10 random operator sequences of 30 steps each way on the bar door: mapped, the same facts and cost.
+No consumer of the bar door applies in the first 20,000 states of a breadth-first search over Π's other operators.
+
+== switch off
+serve_check.py compare on the recorded requests (results/serve-check-*.json), ksr's taskcore (sha1 bf3409ec) against this branch's
+sas and serve, every switch off: the SAS file, the operator table, the kept list and the stats but for times, memory and paths are the same bytes.
+| recorded requests | requests | packed file | same bytes |
+| kitchen | 10 | out/E003-replay/kitchen-taskcore-all/kitchen.tc | yes |
+| kitchen-bans | 5 | the same, with bans | yes |
+| bar | 2 | fix-round1 c bar-door-rust/reading.tc | yes |
+| bar-control | 3 | fix-round1 c bar-door-rust/control.tc | yes |
+| k1-316 | 8 | partI-scratch vmk1/reading.tc, --goal state:316=1 | yes |
+| k1-part1 | 3 | the same, the file's goal | yes |
+Tests: pytest test_taskcore.py test_frame_costs.py test_replay_taskcore.py test_taskcore_serve.py test_pick_windows.py: 41 passed.
+test_taskcore_serve.py on 60 tasks from seed 3, with a server with the switch on and the switch as a request's option: 7,356
+requests with the same files, 1,884 with the same error, 0 failures.
+Every reader switch off on this branch: reader-port read kitchen --packed: 72,256 records, 71,729 actions, sha1 279b7a24, and the
+reading against golden.py's: 72,258 compared, 0 differences. The branch changes taskcore and its tests only.
