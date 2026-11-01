@@ -24,6 +24,9 @@ const VAR_INVENTORY_SCRIPT: i32 = 34;
 const VAR_CUTSCENE_START_SCRIPT: i32 = 35;
 const VAR_CUTSCENE_END_SCRIPT: i32 = 36;
 
+/// The fact kinds whose every writing construct [`sites`] reads, as `scope_writes` does.
+const MODELED: [&str; 7] = ["var:", "bit:", "state:", "owner:", "class:", "verb:", "saved:"];
+
 /// The code a cut path can still run (havoc-cut.md, "The write set").
 #[derive(Debug, Default)]
 pub struct Closure {
@@ -72,8 +75,10 @@ fn unit_res(k: UnitKey) -> Option<i32> {
 }
 
 /// The code a cut path can still run: the frames' code from where each stands, every unit a start in it names, the
-/// hooks it runs, and the room code of the scope when it can change the room (havoc-cut.md).
-pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> Closure {
+/// hooks it runs, and the room code of the scope when it can change the room (havoc-cut.md). `room` is the room
+/// resource the path stands in, when its room is known: while no instruction of the closure can change the room, a
+/// local script number names that room's script (`eng_script` reads the room when it starts it).
+pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: Option<i32>) -> Closure {
     let ast = &game.ast;
     let settings = domains::settings_env();
     let mut caps = 0i64;
@@ -101,7 +106,7 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> Clos
     }
     for s in &cut.steps {
         match s {
-            CutStep::Script(n) => add_script(*n, None, &mut todo, &mut locals),
+            CutStep::Script(n) => add_script(*n, room, &mut todo, &mut locals),
             CutStep::Object(o) => {
                 if let Some(u) = game.id(UnitKey::Obj(*o)) {
                     todo.push((u, entries(game, u)));
@@ -129,7 +134,7 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> Clos
             }
             have.extend(new.iter().copied());
             let key = game.unit(u).key;
-            let res = if c.room_change { None } else { unit_res(key) };
+            let res = if c.room_change { None } else { unit_res(key).or(room) };
             let ins = game.ins(u);
             for i in domains::live(game, u, &settings, Some(&new), &mut caps) {
                 let Some(st) = ins[i as usize].st else { continue };
@@ -253,7 +258,7 @@ pub fn closure(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> Clos
             match table.domain(&format!("var:{h}")) {
                 Some(d) => {
                     for v in d.values.iter().filter_map(|l| l.int()) {
-                        add_script(v as i32, None, &mut todo, &mut locals);
+                        add_script(v as i32, room, &mut todo, &mut locals);
                     }
                 }
                 None => c.every_unit = true,
@@ -292,8 +297,11 @@ impl Target {
 type Site = (Target, Option<BTreeSet<i64>>);
 
 /// The write sites of the code: every construct `scope_writes` reads a target from, with the value it writes when
-/// that is a constant (an assignment, setVarRange, setState, setOwnerOf, setClass), else None.
-fn sites(game: &Game, c: &Closure) -> Vec<Site> {
+/// that is a constant (an assignment, setVarRange, setState, setOwnerOf, setClass, drawObject), else None.
+/// drawObject draws and clears only objects of the room it runs in (o5_drawObject returns when getObjectIndex finds
+/// no local object, script_v5.cpp:1101-1130): the room of room code, else `room`, the path's, while the closure
+/// cannot change the room; else every scope room.
+fn sites(game: &Game, scope: &Scope, c: &Closure, room: Option<i32>) -> Vec<Site> {
     let ast = &game.ast;
     let settings = domains::settings_env();
     let mut caps = 0i64;
@@ -313,7 +321,7 @@ fn sites(game: &Game, c: &Closure) -> Vec<Site> {
     }
     for (&u, starts) in &c.starts {
         let starts: Vec<u32> = starts.iter().copied().collect();
-        let room = game.unit(u).room;
+        let room_of_unit = game.unit(u).room;
         let global = matches!(game.unit(u).key, UnitKey::Global(_));
         let ins = game.ins(u);
         for i in domains::live(game, u, &settings, Some(&starts), &mut caps) {
@@ -382,6 +390,7 @@ fn sites(game: &Game, c: &Closure) -> Vec<Site> {
                         }
                     } else if [known::SET_STATE, known::DRAW_OBJECT, known::PICKUP_OBJECT, known::SET_OWNER_OF].contains(&name) {
                         let os = objs(a[0], &mut caps);
+                        let one = || Some([1i64].into_iter().collect::<BTreeSet<i64>>());
                         let (kinds, v): (&[&str], Option<BTreeSet<i64>>) = if name == known::SET_STATE {
                             (&["state"], a.get(1).and_then(|&e| consts(e, &mut caps)))
                         } else if name == known::SET_OWNER_OF {
@@ -389,8 +398,16 @@ fn sites(game: &Game, c: &Closure) -> Vec<Site> {
                         } else if name == known::PICKUP_OBJECT {
                             (&["owner", "state"], None)
                         } else {
-                            (&["state"], None)
+                            (&["state"], one())
                         };
+                        // drawObject: the objects of the room it runs in
+                        let draw_rooms: Vec<i32> = match (if global { None } else { room_of_unit }, room) {
+                            _ if name != known::DRAW_OBJECT => vec![],
+                            (Some(r), _) => vec![r],
+                            (None, Some(r)) if !c.room_change => vec![r],
+                            _ => scope.rooms.clone(),
+                        };
+                        let in_rooms = |o: &i32| game.object_room.get(o).is_some_and(|r| draw_rooms.contains(r));
                         match &os {
                             Some(os) => {
                                 for o in os {
@@ -400,6 +417,11 @@ fn sites(game: &Game, c: &Closure) -> Vec<Site> {
                                     if name == known::PICKUP_OBJECT {
                                         out.push((Target::Exact(format!("class:{o}:{CLASS_UNTOUCHABLE}")), None));
                                     }
+                                }
+                            }
+                            None if name == known::DRAW_OBJECT => {
+                                for o in game.object_room.keys().filter(|o| in_rooms(o)) {
+                                    out.push((Target::Exact(format!("state:{o}")), v.clone()));
                                 }
                             }
                             None => {
@@ -412,16 +434,10 @@ fn sites(game: &Game, c: &Closure) -> Vec<Site> {
                             }
                         }
                         if name == known::DRAW_OBJECT {
-                            // it clears objects drawn at the same place (script_v5.cpp:1122-1126)
-                            match room {
-                                Some(r) if !global => {
-                                    for (o, rr) in &game.object_room {
-                                        if *rr == r {
-                                            out.push((Target::Exact(format!("state:{o}")), None));
-                                        }
-                                    }
-                                }
-                                _ => out.push((Target::Prefix("state:".into()), None)),
+                            // it clears objects drawn at the same place (script_v5.cpp:1122-1126): state 0
+                            let zero: BTreeSet<i64> = [0i64].into_iter().collect();
+                            for o in game.object_room.keys().filter(|o| in_rooms(o)) {
+                                out.push((Target::Exact(format!("state:{o}")), Some(zero.clone())));
                             }
                         }
                     } else if [known::VERB_OPS, known::SAVE_VERBS, known::RESTORE_VERBS].contains(&name) {
@@ -457,13 +473,15 @@ pub struct HavocWrites {
 }
 
 /// The facts and slots of the havoc record of a path cut at `cut` (havoc-cut.md, "The write set", "Values", "Slots").
-pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> HavocWrites {
-    let c = closure(game, scope, table, cut);
+pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut, room: Option<i32>) -> HavocWrites {
+    let c = closure(game, scope, table, cut, room);
     let units = c.units();
     let starts: FxHashMap<UnitId, Vec<u32>> = c.starts.iter().map(|(&u, s)| (u, s.iter().copied().collect())).collect();
     let w: Writes = scope::scope_writes_code(game, &units, Some(&starts));
     let mut fix = Writes::default();
-    scope::fix1_writes(game, &units, &scope.rooms, &scope.start, scope.switches, &mut fix);
+    // F5's objpos: of the scope's rooms' movable objects comes from loading a room: only with a room change
+    let fix_rooms: Vec<i32> = if c.room_change { scope.rooms.clone() } else { vec![] };
+    scope::fix1_writes(game, &units, &fix_rooms, &scope.start, scope.switches, &mut fix);
     let mut engine: BTreeSet<String> = c.engine_writes.clone();
     let v = |n: i32| format!("var:{n}");
     engine.insert(v(scope::VAR_RESULT));
@@ -488,7 +506,8 @@ pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> Havoc
     }
     let mut exact: FxHashMap<String, Vec<Option<BTreeSet<i64>>>> = FxHashMap::default();
     let mut wide: Vec<Site> = Vec::new();
-    for (t, v) in sites(game, &c) {
+    let room_no = room.and_then(|r| scope.rooms.iter().copied().find(|&x| game.resource(x) == Some(r)));
+    for (t, v) in sites(game, scope, &c, room_no) {
         match t {
             Target::Exact(k) => exact.entry(k).or_default().push(v),
             t => wide.push((t, v)),
@@ -504,12 +523,15 @@ pub fn writes(game: &Game, scope: &Scope, table: &FactTable, cut: &Cut) -> Havoc
             continue;
         }
         let in_engine = engine.contains(k.as_str()) || fix.has(k);
-        if !in_engine && !w.has(k) {
-            continue;
-        }
         let mut hit: Vec<&Option<BTreeSet<i64>>> = wide.iter().filter(|s| s.0.hits(k)).map(|s| &s.1).collect();
         if let Some(v) = exact.get(k.as_str()) {
             hit.extend(v.iter());
+        }
+        // the kinds `sites` reads every writer of (each construct scope_writes reads them from): written where a site
+        // hits; any other kind where scope_writes finds a writer
+        let modeled = MODELED.iter().any(|p| k.starts_with(p));
+        if !in_engine && (if modeled { hit.is_empty() } else { !w.has(k) }) {
+            continue;
         }
         let vals = if in_engine || hit.is_empty() || hit.iter().any(|s| s.is_none()) {
             None
@@ -639,7 +661,14 @@ impl Builder<'_> {
                 }
             }
         };
-        let hw = writes(self.game, &self.scope, &self.table, &cut);
+        // the room the path stands in: its own write, else its precondition's one value
+        let room = match p.writes.get("room") {
+            Some(crate::record::Val::Int(r)) => Some(*r),
+            Some(_) => None,
+            None => p.pre.get("room").filter(|s| s.len() == 1).and_then(|s| s[0].int()),
+        };
+        let res = room.and_then(|r| self.game.resource(r as i32));
+        let hw = writes(self.game, &self.scope, &self.table, &cut, res);
         let mut eff: BTreeMap<String, Eff> = BTreeMap::new();
         for (k, vals) in &hw.facts {
             let own = rec.effects.iter().find(|e| &e.0 == k).map(|e| &e.1);

@@ -54,7 +54,7 @@ fn setup(on: bool) -> (Builder<'static>, Fake, havoc::HavocWrites, UnitKey) {
     for &u in &b.scope.units {
         let k = game().unit(u).key;
         let cut = Cut { frames: vec![(k, Some(0))], steps: vec![] };
-        let hw = havoc::writes(game(), &b.scope, &b.table, &cut);
+        let hw = havoc::writes(game(), &b.scope, &b.table, &cut, None);
         if hw.facts.values().any(|v| v.is_some()) && !hw.slots.is_empty() {
             found = Some((cut, hw, k));
             break;
@@ -182,12 +182,12 @@ fn part1_the_job_that_stopped_the_reading() {
     assert!(!m.cuts.is_empty(), "paths the step limit ended");
     assert_eq!(h.len(), m.cuts.len(), "one havoc record per path the step limit ended");
     for (c, r) in m.cuts.iter().zip(&h) {
-        let hw = havoc::writes(game(), &b.scope, &b.table, c);
+        let hw = havoc::writes(game(), &b.scope, &b.table, c, Some(28));
         let facts: Vec<String> = hw.facts.iter().map(|(k, v)| format!("{k}{}", if v.is_some() { "=c" } else { "" })).collect();
         eprintln!(
-            "  cut at {:?}, {} steps pending; closure {} units; {} facts ({} with constants), {} slots; record: {} effects, {} events",
+            "  cut at {:?}, pending {:?}; closure {} units; {} facts ({} with constants), {} slots; record: {} effects, {} events",
             c.frames,
-            c.steps.len(),
+            c.steps,
             hw.closure_units,
             hw.facts.len(),
             hw.facts.values().filter(|v| v.is_some()).count(),

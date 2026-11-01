@@ -455,7 +455,7 @@ pub(crate) fn trace_run(label: &str, secs: f64, run: &crate::builder::RunOut) {
 pub(crate) fn trace_havoc(label: &str, units: usize, effects: usize, events: usize, cut: &crate::record::Cut) {
     if trace_on() {
         let at: Vec<String> = cut.frames.iter().map(|(k, pc)| format!("{}@{pc:?}", crate::facts::unit_text(*k))).collect();
-        eprintln!("havoc {label}: {units} units, {effects} effects, {events} events; at {}; {} steps pending", at.join(" > "), cut.steps.len());
+        eprintln!("havoc {label}: {units} units, {effects} effects, {events} events; at {}; pending {:?}", at.join(" > "), cut.steps);
     }
 }
 
