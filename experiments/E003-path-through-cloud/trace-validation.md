@@ -104,9 +104,40 @@ decides, and nothing on runs that were not made (Cirstea et al. 2024: partial tr
 engine ran them, so the sequence of matched records is applicable from V_{k-1} and ends in V_k on every key it writes
 that no later run writes. ∎
 
-**Cost.** The matcher indexes the records by (U, W) once. Per run it looks up the candidates and evaluates their
-preconditions and effects on the view's keys: no fork, no frame. Its cost per call is measured on the window runs and
-reported with the results.
+**Cost.** The matcher indexes the records by (U, W, the wait point their slot write sets) and, within that, by the
+locals list their precondition asks of their own slot. Per run it looks up the candidates and evaluates their
+preconditions and effects on the view's keys: no fork, no frame. Its cost per call is measured on the window runs, on
+every unit of the scope and on the plan's units only (what a window search's child asks), and reported with the
+results.
+
+### What the window runs called for
+
+Written after the first strict runs on the window search's kitchen run, each with the case that showed it:
+
+- **Stutter.** A run that executes one opcode, a WaitFor op, and stops at that op's own offset has blocked: o5_wait
+  only reads the engine and re-runs itself next frame (script_v5.cpp:3272-3310). It changes nothing, so it is no step
+  of the task; it is counted as *stutter*, not matched. The reading keeps no record for it (a record that changes
+  nothing adds nothing).
+- **The locals.** ``args:U`` is the built list a slot's dumped locals match (replay.replan_start_locals). Lists with
+  unknown locals overlap, so the view holds the set of every list the locals match, and a precondition on ``args:U``
+  holds when one of them is the record's. A run that two records match through two such lists is counted as
+  *ambiguous*: the reading's abstraction of the locals is a relation there, not a function.
+- **Open keys.** The sentence script and what it runs nested (a room change) run after a decision point and are not
+  matched as event runs. For the runs of the next frame, the facts that changed between the two decision points, and
+  the slot facts of the units that ran, are open in M2: the views do not give their value at those runs' start. The
+  matches that relied on an open key are counted.
+- **Facts outside the view.** An effect on a fact the view does not hold (unobserved, or a value outside its domain) is
+  not checked by M4; a value outside the domain is reported where it shows.
+- **Runs the reading has no record for.** A run at a wait point the reading has no event record at is *unplaced*. One
+  run per such point is explained: if it writes no fact of the task (no logged write of a task variable or bit, no op
+  that writes an object, a verb, a script's life or the room) and its slot stops where it started, the task cannot see
+  it. Otherwise its write is a cause.
+- **One run, one record.** An event record is one run, so Lemma X looks for the first opcode off a record's path within
+  that run only (no yield crossed). A WaitFor op where the record's path stops (it blocked there in the reading) and the
+  engine's run went on is the first opcode off the path, with the wait's condition as the engine's value.
+- **The plan's steps.** Each executed step of a window run is checked on its own run: an event on the first run of its
+  unit at its wait point from the step's start (after any stutter), an input on the views before its first click and
+  after its frame. Its record must hold there (every failing precondition key and effect is listed).
 
 ## 4. Locate
 
@@ -199,7 +230,8 @@ Written after the first runs, each with the case that showed it:
 ## 6. The wait check
 
 **Lemma W (frame costs).** For an event record r = event(U@W) matched to a run in frame k, let j be the frame of the run
-that left U's slot at W. The engine waited k − j frames. A2 (every cost a lower bound) requires k − j ≥ cost(r). The
+that left U's slot at W (the runs' own frames: a run after a decision point belongs to its frame). The engine waited
+k − j frames. A2 (every cost a lower bound) requires k − j ≥ cost(r). The
 check runs on every matched event of every validated run; a wait below its bound is a counterexample to the rule that
 priced r.
 
