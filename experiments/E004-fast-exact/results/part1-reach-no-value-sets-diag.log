@@ -1,0 +1,27 @@
+[diag2] 31 rooms [10, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 48, 49, 51, 52, 53, 57, 58, 59, 60, 61, 62, 64, 76, 83, 85, 96], 573 units, 12169 slot facts; 1 threads; load 12.16 14.35 14.60
+[diag2] pass 1 inputs: 44 runs, 88 records, 0.3 s; 82 records in the pass, 3 s, RSS 117 MB
+[diag2] pass 1 event round 1: 89 runs, 113 records, 0.8 s; 201 records in the pass, 3 s, RSS 138 MB
+[diag2] pass 1 event round 2: 898 runs, 2449 records, 2.9 s; 2650 records in the pass, 6 s, RSS 149 MB
+[diag2] pass 1 event round 3: 999 runs, 2412 records, 5.0 s; 5062 records in the pass, 11 s, RSS 161 MB
+[diag2] pass 1 event round 4: 1560 runs from 1560 events start; RSS 167 MB
+run event(obj:450@77#186649efdf4a): 1.6 s, 21 paths, 0 cut, 126 held, first fork Some("local:204")
+  counts: forks on non-fact tests=1102; non-fact tests forgotten where merged paths differ=497; unfreezes of a slot frozen before the path (count taken as 1)=318; paths from forks on read=190; forks on read=139; non-fact tests forgotten after an op that may change them=45; inventory hook runs summarized (writes guessed): loadRoomWithEgo=20; non-fact tests decided by the same test earlier in the frame=8; steps on a collapsed value (a guess)=2; events resuming a slot with its own open cutscenes (cutscene data carried)=1; inventory hook runs summarized (writes guessed): startScript=1
+  forks: var=75; script=41; bit=21; local=1; room=1
+  fork keys: var:33=52; script:2=40; var:111=20; bit:453=17; bit:563=4; local:204=1; room=1; script:137=1; var:196=1; var:248=1; var:52=1
+job event(obj:450@77#186649efdf4a): 1.8 s, 20 records, 0 splits, 0 parts, 0 deep
+run event(obj:451@21#7ba1220ae5cc): 1.6 s, 21 paths, 0 cut, 245 held, first fork Some("local:205")
+  counts: forks on non-fact tests=1082; non-fact tests forgotten where merged paths differ=497; unfreezes of a slot frozen before the path (count taken as 1)=318; paths from forks on read=252; forks on read=201; non-fact tests forgotten after an op that may change them=45; WaitFor ops that yield (their later part is an event)=20; inventory hook runs summarized (writes guessed): loadRoomWithEgo=20; non-fact tests decided by the same test earlier in the frame=8; steps on a collapsed value (a guess)=2; events resuming a slot with its own open cutscenes (cutscene data carried)=1; inventory hook runs summarized (writes guessed): startScript=1
+  forks: var=94; script=61; bit=44; local=1; room=1
+  fork keys: var:33=52; script:2=40; bit:453=20; bit:481=20; script:67=20; var:111=20; var:196=20; bit:563=4; local:205=1; room=1; script:137=1; var:248=1
+job event(obj:451@21#7ba1220ae5cc): 1.8 s, 20 records, 0 splits, 0 parts, 0 deep
+run event(obj:450@77): 2.9 s, 34 paths, 0 cut, 210 held, first fork Some("local:204")
+  counts: forks on non-fact tests=1800; non-fact tests forgotten where merged paths differ=814; unfreezes of a slot frozen before the path (count taken as 1)=318; paths from forks on read=220; forks on read=159; non-fact tests forgotten after an op that may change them=70; inventory hook runs summarized (writes guessed): loadRoomWithEgo=32; non-fact tests decided by the same test earlier in the frame=12; steps on a collapsed value (a guess)=4; inventory hook runs summarized (writes guessed): startScript=2; inventory hook runs summarized (writes guessed): actorFollowCamera=1
+  forks: var=80; script=42; bit=34; room=2; local=1
+  fork keys: var:33=53; script:2=40; bit:453=26; var:111=21; bit:563=8; room=2; script:137=2; var:196=2; var:248=2; var:52=2; local:204=1
+job event(obj:450@77): 3.2 s, 32 records, 0 splits, 0 parts, 0 deep
+run event(obj:451@21): 2.3 s, 34 paths, 0 cut, 400 held, first fork Some("local:205")
+  counts: forks on non-fact tests=1768; non-fact tests forgotten where merged paths differ=814; paths from forks on read=320; unfreezes of a slot frozen before the path (count taken as 1)=318; forks on read=259; non-fact tests forgotten after an op that may change them=70; WaitFor ops that yield (their later part is an event)=32; inventory hook runs summarized (writes guessed): loadRoomWithEgo=32; non-fact tests decided by the same test earlier in the frame=12; steps on a collapsed value (a guess)=4; inventory hook runs summarized (writes guessed): startScript=2; inventory hook runs summarized (writes guessed): actorFollowCamera=1
+  forks: var=110; script=74; bit=72; room=2; local=1
+  fork keys: var:33=53; script:2=40; bit:453=32; bit:481=32; script:67=32; var:196=32; var:111=21; bit:563=8; room=2; script:137=2; var:248=2; var:52=2
+job event(obj:451@21): 2.6 s, 32 records, 0 splits, 0 parts, 0 deep
+STOPPED: MemAvailable fell under 3.0 GB; 6762 records in pass 1; report p1/diag2/diag2.json
