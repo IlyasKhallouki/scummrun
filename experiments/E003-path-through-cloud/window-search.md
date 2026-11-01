@@ -536,3 +536,25 @@ Written before the code of branch walk, each with the case that showed it.
   split, as the section's rule says; and a write of a constant (no read) is classed by the test that sent the run to
   that write.
 
+
+### 9.9 A run that passed a wait (sub-switch `split_wait`, strict only, off by default)
+
+Written before the code of branch e006 (experiments/E006-passed-wait/plan.md, Lemma P). The reader ends a record at
+every WaitFor op it does not resume at; the engine's run goes on past such an op when its test passes at once (on the
+kitchen from the boot, walk_to(428)'s sentence passed the sentence script's WaitForActor at [02E0] and went through
+the door in the same run). With `split_wait` a slot run whose explain log shows a WaitFor op executed and another
+opcode after it is read as parts, split before each such op (not the op it resumed at): o5_wait writes nothing when it
+passes, so each part starts from the state the one before ends in, with no other run between them (Lemma P).
+
+- A click's run of U: the click's record matches part 1 ((I2): its end w is the first WaitFor op the run executed;
+  (I3) counts the later parts as later runs, their records' keys and U's `args:`; (I4) on part 1's opcodes). Part j ≥ 2
+  is the own run (Definition S) of the plan's next event record of U at its op, matched by M1-M4 on its own opcodes,
+  M2 on the view before the run with the earlier records' set writes applied, in the same R_k.
+- An event's own run at depth 0 that passed a later WaitFor op: the same, the event's record on part 1.
+- The plan's own records only: part 2 is armed by the record that left U at w, and 9.2's order check is unchanged. A
+  record of the reading the plan does not name is no success; with the click's part matched and taken effect it is a
+  deviation (section 3).
+- Costs: the chain (Lemma 4) adds the reading's cost on a link through the input's or the same slot as it is, 0
+  allowed, and the harness takes `split_wait` only with a reading made with the reader switch `wait_pass_cost`
+  (costs.rs: an event at a WaitForActor, WaitForCamera or WaitForSentence, or at a WaitForMessage with no talk before
+  it, costs 0 frames).
