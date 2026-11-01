@@ -50,6 +50,25 @@ A record's *final writes* are its predicted writes on facts no later record of t
 record overwrites are not checked: within one frame a slot can pass a wait point that does not block, and the frame end
 shows only the later value.
 
+**The checked writes (causal links).** Of its final writes, a record's match checks those on facts that a later step
+of the plan reads before any later step writes them (a causal link from the record to that step), those on the goal's
+facts that no later step writes, and the write of its own slot (`pos:U` for an event of unit U; for an input, the
+`pos:` writes of its path). Its other final writes are not checked.
+**Lemma 8 (the unchecked writes do not change what the plan needs).** Let the plan's steps after r be s_1 … s_m. If a
+fact k that r writes is read by no s_j before some s_i writes it, and is not a goal fact that no later step writes,
+then the value k holds after r changes no precondition or condition that s_1 … s_m read, nor the goal's test. *Proof.*
+Each s_j reads k only after some s_i (i < j) has written it, so it sees s_i's value, not r's; the goal reads k after
+the last write, which is not r's. This is the triangle table's kernel (Fikes, Hart and Nilsson 1972), the condition plan
+monitors check during execution (Fritz and McIlraith 2007). □
+*Why the checked writes.* The engine runs every event that comes due, the model only the events the plan names: a slot
+of a unit no plan step reads runs on, in the same frame or later, through events of the reading the plan leaves out
+(its events are may-steps). On the kitchen, the room entry's record predicts a local of the new room at its first wait
+point, and the engine shows that local one wait point further at the end of the entry frame, for every child: the first
+matcher never matched the record, and 1,557 of 1,576 children of that window ended as mismatches on that slot
+(`results/window-kitchen.log`). The own slot's write is kept as the evidence that the record ran: the slot yields there
+and runs at most once a frame (`runAllScripts`' `didexec`, `script.cpp:971-984`), unless a later tracked record of the
+same slot writes it, which the final writes then leave out.
+
 A record *matches* at the first frame, at or after the last input frame of the child, where all its final writes hold
 and every tracked record that precedes it has matched at that frame or before. Records are examined in plan order, so a
 record and its predecessor can match on the same frame. An input's record matches only in a branch where the input
@@ -74,9 +93,12 @@ Its events land on frames after g. It then runs one frame at a time until one of
   the goal by a path the plan did not predict, or by waiting. It is not a success; it is logged with its frame and Q as a
   baseline for B1. Where it happens in the idling parent, the run stops there with that reason: the goal came from
   waiting, and the frame is a timeout baseline, not a plan;
-- **mismatch**: a slot of a unit with a pending record stands at a wait point (`pos:U`) it did not hold at the fork and
-  that no pending record starts at or predicts, or the room becomes one no pending record predicts. A record outside
-  the plan ran. The child is kept for B1;
+- **mismatch**: a slot stands at a wait point (`pos:U`) it did not hold at the fork and that no pending record starts at
+  or predicts, where `pos:U` is read by a pending tracked record (its precondition) or U is a pending event's own unit;
+  or the room becomes one no pending record predicts. A record outside the plan wrote a fact a pending step needs. The
+  child is kept for B1. (The first rule also checked every slot a pending record's predicted writes name; by Lemma 8 a
+  slot no pending step reads may run on through events the plan leaves out, so that rule stopped children the plan
+  does not depend on.)
 - **spent**: an idle stop of the bridge (`Branch.run(idle=True)`'s rule: input on, no cutscene, no sentence, input or
   object script, no message wait, ego standing) more than one frame after the last input, while the input's record is
   unmatched or a needed record belongs to a unit with no live slot. Nothing that could still run the record is alive;
@@ -116,8 +138,22 @@ records', and the matcher's success needs e_t's final writes. The chain bound is
 the input's record leaves at a wait point. A link through a step with several paths, or through a write that is not a
 plain value, ends the chain.
 
+**Lemma 4′ (chains through the slots an event starts), given A1 and A2.** Add links from any event x of the macro step
+on a chain: where x writes `pos:V = W` for a unit V other than its own (it starts V, which runs to its first wait point
+in the same frame, or puts it there), x links to the first later event of the macro step that is an event of V
+resuming at W, has one path and leaves V at a point other than W. Such a link adds max(0, cost(e) − 1). The chain bound
+is the largest sum over the paths of links from the input's record. *Proof.* x runs in frame f_x, and V stands at W at
+its end or runs once more in f_x: a slot started from inside `runAllScripts` has not run in that pass yet and may be
+reached by it (`script.cpp:971-984`), and from then on runs at most once a frame. A paused slot (a delay) is skipped
+until a later frame's `decreaseScriptDelay`. So e resumes no earlier than frame f_x + cost(e) − 1, by A2, and each later
+link is Lemma 4's. A link to an event whose yield point equals its resume point is not taken: the slot standing at that
+point does not show that the event ran. □
+
 So b = 4 · δ_lo · (n + chain). Every success the search sees is checked against it: a success below its fork's Q + b
 would refute A2 or the chain's reading, and is reported.
+*Why Lemma 4′.* A macro step can hold another slot's long wait that its input starts (a room entry starts a room's
+timer). With Lemma 4 alone, b counts only the input's own slot, and the stop forks every frame up to the first
+success's frame, each child running to it: about D²/2 child frames for a step of D frames.
 
 **Lemma 6 (the walk floor). Proven under premises the search cannot yet establish, so the stop does not use it.**
 
