@@ -235,6 +235,10 @@ pub struct Switches {
     /// Jobs that differ only in an input argument their run never read share one run (machine.rs `SharedRuns`,
     /// experiments/E004-fast-exact/shared-runs.md); the output is byte for byte the same.
     pub shared_runs: bool,
+    /// B1 refine, Lemma N (experiments/E004-fast-exact/b1-refine.md, section 1): a path whose record has no effect
+    /// is kept as a record with no effect (a self-loop of the task) in place of being dropped, so trace validation
+    /// has the record of the engine's run.
+    pub noop_records: bool,
 }
 
 impl Switches {
@@ -254,7 +258,8 @@ impl Switches {
                 "grow_limit" => s.grow_limit = true,
                 "havoc_cut" => s.havoc_cut = true,
                 "shared_runs" => s.shared_runs = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs)")),
+                "noop_records" => s.noop_records = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, grow_limit, havoc_cut, shared_runs, noop_records)")),
             }
         }
         Ok(s)
@@ -293,6 +298,9 @@ impl Switches {
         }
         if self.shared_runs {
             v.push("shared_runs");
+        }
+        if self.noop_records {
+            v.push("noop_records");
         }
         v
     }
@@ -1457,11 +1465,19 @@ impl<'g> Builder<'g> {
             if self.table.reach.is_some() && !self.reach_path(job, p) {
                 continue;
             }
-            let rec = if havoc { Some(self.havoc_record(&job.kind, &job.label, p, &job.what)) } else { self.record(&job.kind, &job.label, p, &job.what) };
+            let rec = if havoc {
+                Some(self.havoc_record(&job.kind, &job.label, p, &job.what))
+            } else {
+                self.record_inner(&job.kind, &job.label, p, &job.what, self.switches.noop_records)
+            };
             let Some(mut rec) = rec else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
                 continue;
             };
+            if !havoc && rec.effects.is_empty() {
+                // the switch noop_records (b1-refine.md, Lemma N): the path changes nothing; its record is kept
+                self.counts.inc(format!("no-op paths kept as records with no effect (noop_records): {}", job.kind));
+            }
             for c in &job.checks {
                 rec.checks.push(c.clone());
                 self.nonfact_checks.inc(why_of(&c.why));
@@ -1558,6 +1574,12 @@ impl<'g> Builder<'g> {
 
     /// `Builder.record`: the record of one path, or None when it changes nothing.
     pub fn record(&mut self, kind: &str, label: &str, p: &PathOut, what: &What) -> Option<Record> {
+        self.record_inner(kind, label, p, what, false)
+    }
+
+    /// `record`, and with `keep_noop` (the switch noop_records, b1-refine.md Lemma N) a path that changes nothing
+    /// gives its record with no effect in place of None.
+    pub fn record_inner(&mut self, kind: &str, label: &str, p: &PathOut, what: &What, keep_noop: bool) -> Option<Record> {
         let mut pre = Pre::new();
         for (k, s) in &p.pre {
             if let Some(dom) = self.table.domain(k) {
@@ -1652,7 +1674,7 @@ impl<'g> Builder<'g> {
             .into_iter()
             .filter(|(k, e)| !matches!(e, Eff::Set(v) if pre.get(k).is_some_and(|s| s.len() == 1 && s[0] == *v)))
             .collect();
-        if effects.is_empty() {
+        if effects.is_empty() && !keep_noop {
             return None;
         }
         let mut sides: FxHashMap<(&str, &str), BTreeSet<String>> = FxHashMap::default();

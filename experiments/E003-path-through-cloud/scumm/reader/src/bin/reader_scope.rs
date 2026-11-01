@@ -41,7 +41,8 @@
 //!               file's `at:`/`esc:` facts (task.rs `task_start`), so a start from the engine is given as its facts.py
 //!               map (the replay harness's reach extension, replay_part1.py `--reach-extend`)
 //! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
-//!               draw_clears and actor_rooms, grow_limit, havoc_cut (havoc.rs), shared_runs (shared.rs). Not due_first,
+//!               draw_clears and actor_rooms, grow_limit, havoc_cut (havoc.rs), shared_runs (shared.rs), noop_records
+//!               (E004 b1-refine.md, Lemma N). Not due_first,
 //!               which writes on the kept records after the reading. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
