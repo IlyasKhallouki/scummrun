@@ -807,6 +807,9 @@ def reading_from_golden(golden, packed, out_dir, start: dict, start_name: str, n
         doc["live_locals"] = hd["live_locals"]  # the Rust reader's switch --live-locals (module docstring)
     if hd.get("frame_costs") is not None:
         doc["frame_costs"] = hd["frame_costs"]  # the Rust reader's switch --frame-costs (module docstring)
+    if hd.get("ghost_slots") is not None:
+        # the Rust reader's switch ghost_slots (scumm/reader/src/ghost.rs; E004 b1-refine.md, Lemma G)
+        doc["ghost_slots"] = hd["ghost_slots"]
     doc.update({k: v for k, v in (info or {}).items() if k not in doc})
     head_path.write_text(json.dumps(doc, indent=1, default=str) + "\n")
     return {"actions": len(want), "records": n_records, "facts": len(keys), "bounds": len(bounds), "lists": lw.n,

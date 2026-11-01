@@ -890,7 +890,39 @@ class WindowEngine:
         self.c.close()
 
 
-def unplaced_check(code: TE.Code, eng: "WindowEngine", k: int, run: TE.Run, rd) -> dict:
+def ghost_alpha(rd, runs: TE.Runs, dumps: dict, f0: int, f1: int) -> tuple:
+    """--ghosts (E004 b1-refine.md, Lemma G): α on a trace. For each unit the reading's ``ghost_slots`` verdicts name,
+    the newest instance is the slot of the unit's latest run from its first instruction (code 0); a run on another
+    slot of the unit after that is a ghost run, and a dumped slot of the unit that is not the newest is left out of the
+    view. Before the unit's first start in the trace nothing is left out. Returns (the dumps under α, the units, the
+    ghost runs' seq numbers, the frames whose dump had a slot left out)."""
+    gv = rd.rd.doc.get("ghost_slots")
+    if gv is None:
+        raise SystemExit("--ghosts needs a reading made with the reader's switch ghost_slots (its verdicts)")
+    units = {u for u in gv if not u.startswith("(")}
+    newest, newest_at, seqs = {}, {f0: {}}, set()
+    for k in range(f0 + 1, f1 + 1):
+        for r in sorted(runs.between(k), key=lambda r: r.seq):
+            if r.unit not in units:
+                continue
+            if r.code0 == 0:
+                newest[r.unit] = r.slot
+            elif r.unit in newest and r.slot != newest[r.unit]:
+                seqs.add(r.seq)
+        newest_at[k] = dict(newest)
+    out, frames = {}, {}
+    for k, d in dumps.items():
+        nw = newest_at.get(k, {})
+        keep = [s for s in d["slots"] if not ((u := F.unit_of(s["where"], s["number"])) in nw and s["slot"] != nw[u])]
+        if len(keep) != len(d["slots"]):
+            out[k] = dict(d, slots=keep)
+            frames[k] = len(d["slots"]) - len(keep)
+        else:
+            out[k] = d
+    return out, units, seqs, frames
+
+
+def unplaced_check(code: TE.Code, eng: "WindowEngine", k: int, run: TE.Run, rd, slot: int | None = None) -> dict:
     """A run at a wait point the reading has no event record at: whether it changed a fact of the task (a logged write
     of a task variable or bit, an op that writes an object's state, owner or class, a verb, or starts or stops a
     script), or left its slot elsewhere. If not, the task cannot see it: no record is needed."""
@@ -899,7 +931,7 @@ def unplaced_check(code: TE.Code, eng: "WindowEngine", k: int, run: TE.Run, rd) 
         return {"verdict": "unit not in the IR"}
     ex = eng.explain(k, [[run.where, run.number]])
     lg = next((r for r in ex.runs.values() if r.frame == run.frame and r.code0 == run.code0 and
-               r.where == run.where and r.number == run.number), None)
+               r.where == run.where and r.number == run.number and (slot is None or r.slot == slot)), None)
     if lg is None:
         return {"verdict": "the run is not in the explain log"}
     u = code.unit(key)
@@ -1133,6 +1165,9 @@ def cmd_window_validate(a) -> dict:
     eng = WindowEngine(doc, Path(a.bin), a.out / "engine")
     runs, dumps, trace_s = eng.trace()
     f0, f1 = eng.f0, eng.f1
+    ghost_seqs, ghost_units, ghost_frames = set(), set(), {}
+    if getattr(a, "ghosts", False):
+        dumps, ghost_units, ghost_seqs, ghost_frames = ghost_alpha(rd, runs, dumps, f0, f1)
     import replay as RP
     unobserved = RP.UNOBSERVED + ((RP.ACTOR_ROOM,) if doc.get("unobserved_actor_rooms") else ())
     views = {f: rd.view(F.facts_of(d), d) for f, d in dumps.items()}
@@ -1164,8 +1199,13 @@ def cmd_window_validate(a) -> dict:
     last_at = {}  # (where, number) -> frame where its slot last stopped at code1
     waits = C.Counter()
     below = []
+    ghost_verdicts = []
     for k in range(f0 + 1, f1 + 1):
         between = [r for r in runs.between(k) if r.depth == 0 and r.code0 >= 0]
+        if ghost_seqs:
+            # --ghosts (b1-refine.md, Lemma G): a run on an older instance's slot is a ghost run, not matched
+            ghost_verdicts.extend((k, r) for r in between if r.seq in ghost_seqs)
+            between = [r for r in between if r.seq not in ghost_seqs]
         if k - 1 not in views or k not in views:
             continue
         # work after the earlier decision point (the sentence script, a room change it makes) is no matched run
@@ -1199,7 +1239,7 @@ def cmd_window_validate(a) -> dict:
                         below.append({"frame": r.frame, "unit": r.unit, "w": r.code0, "waited": r.frame - j[0],
                                       "bound": cost, "record": rd.task.actions[v.record].name})
         for r in runs.between(k):
-            if r.code1 >= 0:
+            if r.code1 >= 0 and r.seq not in ghost_seqs:
                 last_at[(r.where, r.number, r.room)] = (r.frame, r.code1)
     counts = C.Counter(v.status for _, v in verdicts)
     unplaced = C.Counter((v.run.unit, v.run.code0) for _, v in verdicts if v.status == "unplaced")
@@ -1225,6 +1265,11 @@ def cmd_window_validate(a) -> dict:
         for (u, w), (k, run) in first_unplaced.items():
             invisible.append({"unit": u, "w": w, "runs": unplaced[(u, w)], "first_frame": k} |
                              unplaced_check(code, eng, k, run, rd))
+        ghost_checked = []
+        for k, run in ghost_verdicts:
+            # every ghost run of the trace: α holds on it when it writes no fact of the task (b1-refine.md)
+            ghost_checked.append({"unit": run.unit, "slot": run.slot, "frame": run.frame, "w": run.code0,
+                                  "end": run.code1} | unplaced_check(code, eng, run.frame, run, rd, slot=run.slot))
     finally:
         eng.close()
     # the matcher's cost when a window search's child asks it only about the units of the plan's steps
@@ -1306,6 +1351,12 @@ def cmd_window_validate(a) -> dict:
            "matcher_plan_units": {"units": sorted(plan_units), "calls": m2.calls,
                                   "per_call_us": round(m2.seconds / max(1, m2.calls) * 1e6, 1)},
            "open_key_matches": matcher.open_used,
+           "ghosts": None if not getattr(a, "ghosts", False) else {
+               "units": sorted(ghost_units), "ghost_runs": len(ghost_verdicts),
+               "frames_with_a_ghost_slot": len(ghost_frames),
+               "invisible": sum(1 for g in ghost_checked if g.get("verdict", "").startswith("invisible")),
+               "causes": [g for g in ghost_checked if g.get("cause")],
+               "by_unit": dict(C.Counter(g["unit"] for g in ghost_checked))},
            "steps": steps_out, "steps_summary": strict_summary, "wait_check": {"checked": waits["checked"], "below_bound": below[:20],
                                                "below_count": len(below)},
            "matcher": {"calls": matcher.calls, "seconds": round(matcher.seconds, 3),
@@ -1337,6 +1388,15 @@ def window_log(d: dict) -> list:
         lines.append(f"  {c['runs']}: {c['unit']}@{c['w']}: {c['verdict']}"
                      + (f" ([{c['offset']:04X}] {c.get('opcode')} {c.get('fact', '')} {c.get('value', '')})"
                         if isinstance(c.get("offset"), int) else ""))
+    g = d.get("ghosts")
+    if g:
+        lines.append(f"ghosts (--ghosts, α): {g['ghost_runs']} ghost runs of {len(g['units'])} units, by unit {g['by_unit']}; "
+                     f"{g['frames_with_a_ghost_slot']} decision points with an older instance's slot left out; "
+                     f"{g['invisible']} ghost runs invisible to the task, {len(g['causes'])} with a cause")
+        for c in g["causes"][:10]:
+            lines.append(f"  ghost cause: frame {c['frame']} {c['unit']} slot {c['slot']}@{c['w']}: {c.get('verdict')}"
+                         + (f" ([{c['offset']:04X}] {c.get('opcode')} {c.get('fact', '')} {c.get('value', '')})"
+                            if isinstance(c.get("offset"), int) else ""))
     mp = d["matcher_plan_units"]
     lines.append(f"matcher on the plan's units only ({len(mp['units'])} units): {mp['calls']} calls, "
                  f"{mp['per_call_us']} us per call")
@@ -1500,6 +1560,8 @@ def main() -> None:
     p.add_argument("--results", action="store_true")
     p = sub.add_parser("window-validate")
     p.add_argument("--run", type=Path, required=True, help="a window search run's result JSON")
+    p.add_argument("--ghosts", action="store_true",
+                   help="α of E004 b1-refine.md Lemma G: a recursive start's older instances left out (a ghost_slots reading)")
     p.add_argument("--reading", type=Path, help="its reading.json (default: the one the run names)")
     p.add_argument("--bin", required=True)
     p.add_argument("--out", type=Path, required=True)
