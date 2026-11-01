@@ -1,0 +1,35 @@
+# The five check scopes with --reach --elsewhere --live-locals --split-limit, 3 threads, nice 10, seed 1 (bar, jail, k = 1, k = 2:
+# reader-scope --goal state:316=1 --hash; kitchen: reader-port read kitchen with split_limit,value_sets,draw_clears,actor_rooms,reach).
+# run: base3a, base3b = the new switches off; on3a = havoc_cut,shared_runs; havoc = havoc_cut, shared = shared_runs (the binary
+# before e50023f and before shared_runs' must-write analysis). CPU s from the reader's report (kitchen: the process).
+run	scope	status	packed sha1	records sha1	counters sha1	read CPU s	shared runs
+base	kitchen	rc 0	94ae07f7			80.3	
+base	bar	done	00960d7d	ed817732	c72a6e85	81.4	
+base	jail	done	3aed04a5	1aa9e68a	21a4ef0e	0.8	
+base	k1	done	8cfca0ca	3ad8b5b7	36c17e08	234.0	
+base	k2	done	0737e8ca	7374d367	1de7b9da	431.3	
+havoc	kitchen	rc 0	94ae07f7			76.9	
+havoc	bar	done	00960d7d	ed817732	c72a6e85	77.4	
+havoc	jail	done	3aed04a5	1aa9e68a	21a4ef0e	0.9	
+havoc	k1	done	8cfca0ca	3ad8b5b7	36c17e08	223.5	
+havoc	k2	done	0737e8ca	7374d367	1de7b9da	403.0	
+shared	kitchen	rc 0	94ae07f7			77.5	
+shared	bar	done	00960d7d	ed817732	c72a6e85	75.8	{"made": 0, "read_their_verb": 2, "taken": 0, "waited_s": 0.0}
+shared	jail	done	3aed04a5	1aa9e68a	21a4ef0e	0.8	{"made": 0, "read_their_verb": 0, "taken": 0, "waited_s": 0.0}
+shared	k1	done	8cfca0ca	3ad8b5b7	36c17e08	222.4	{"made": 0, "read_their_verb": 6, "taken": 0, "waited_s": 0.0}
+shared	k2	done	0737e8ca	7374d367	1de7b9da	402.8	{"made": 0, "read_their_verb": 50, "taken": 0, "waited_s": 0.0}
+base3a	kitchen	rc 0	94ae07f7			76.6	
+base3a	bar	done	00960d7d	ed817732	c72a6e85	76.7	
+base3a	jail	done	3aed04a5	1aa9e68a	21a4ef0e	0.9	
+base3a	k1	done	8cfca0ca	3ad8b5b7	36c17e08	224.5	
+base3a	k2	done	0737e8ca	7374d367	1de7b9da	423.5	
+on3a	kitchen	rc 0	94ae07f7			74.4	
+on3a	bar	done	00960d7d	ed817732	c72a6e85	75.3	{"made": 0, "read_their_verb": 2, "taken": 0, "waited_s": 0.0}
+on3a	jail	done	3aed04a5	1aa9e68a	21a4ef0e	0.8	{"made": 0, "read_their_verb": 0, "taken": 0, "waited_s": 0.0}
+on3a	k1	done	8cfca0ca	3ad8b5b7	36c17e08	217.1	{"made": 6, "read_their_verb": 6, "taken": 12, "waited_s": 0.0}
+on3a	k2	done	0737e8ca	7374d367	1de7b9da	413.7	{"made": 30, "read_their_verb": 74, "taken": 78, "waited_s": 0.38}
+base3b	kitchen	rc 0	94ae07f7			81.0	
+base3b	bar	stopped: MemAvailable fell under 3.0 GB	153b0b65			60.4	
+base3b	jail	done	3aed04a5	1aa9e68a	21a4ef0e	0.8	
+base3b	k1	done	8cfca0ca	3ad8b5b7	36c17e08	222.2	
+base3b	k2	done	0737e8ca	7374d367	1de7b9da	435.8	
