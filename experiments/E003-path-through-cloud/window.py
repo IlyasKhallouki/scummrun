@@ -71,6 +71,9 @@ class WindowConfig:
     # section 9.7 (strict only): the parent forks a child at each of its next N frames with one bridge command (the
     # bridge's run "fork_each"); 0, the default: one fork and one frame per command, as before
     fork_each: int = 0
+    # section 9.7 (strict only): a child's views after its click from the bridge's dump of the fields facts_of reads,
+    # for the window's objects only; off by default
+    lite: bool = False
 
 
 def delta_lo_of(frame_costs: dict | None) -> int:
@@ -1220,6 +1223,10 @@ class Search:
         for _, _, us, _ in alts:
             units |= set(us)
         explain_units = [wn for u in sorted(units) for wn in S.unit_where(u)]
+        # section 9.7, lite: the objects whose owner, state or class the window's view reads, and those whose script
+        # units' locals it reads (their owner tells an inventory slot)
+        lite_objects = sorted({int(kk.split(":")[1]) for kk in doms if kk.startswith(("owner:", "state:", "class:"))} |
+                              {int(u[4:]) for u in args_units if u.startswith("obj:")})
         pm = Matcher(tracked, needed, None, issued=issued)  # the mismatch rule's predicted positions (section 3)
         pm.plan_pending = [r for r in recs if not r.done]
         w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name,
@@ -1230,6 +1237,7 @@ class Search:
              "lemma9_stops": 0, "b_dev_qf": 4 * cfg.delta_lo * n, "explain_units": explain_units,
              "predicted_keys": set().union(*[set(e) for r in tracked for e in r.exps]),
              "failures": collections.Counter(), "failure_of": {}, "k": k, "first_g": {}, "running": 0,
+             "lite_objects": lite_objects,
              # a tracked record that does not follow the input: its own run may come while the input code plays
              "early_recs": {r.i for r in tracked if not (has_input and first.i in r.preds) and r.i != first.i}}
         rec = {"plan": plan_no, "macro": k, "input": first.name if has_input else None, "strict": True,
@@ -1707,7 +1715,7 @@ class Search:
                 t_ = time.thread_time()
                 rows = cb.runs()["runs"]
                 kept.add_entries(cb.explain_log()["explain"])
-                s = cb.state()
+                s = cb.state_lite(w["lite_objects"]) if cfg.lite else cb.state()
                 obs = F.facts_of(s)
                 now = w["sview"](obs, s)
                 t_ = self._tick("observe", t_)
@@ -1747,6 +1755,9 @@ class Search:
                     obs = F.facts_of(s)
                 ch.end, ch.q_end = cb.frame, cb.status.get("qf")
             if ch.outcome in ("success", "goal", "deviation"):
+                if cfg.lite:  # the checkpoint and the unplanned facts read every fact: a full dump
+                    s = cb.state()
+                    obs = F.facts_of(s)
                 ch.checkpoints = [(s_issue, F.facts_of(d_issue), RP.extra_of(d_issue, st_issue)),
                                   (cb.frame, dict(obs), RP.extra_of(s, cb.status))]
                 if ch.full_at_fork is None:  # the parent's full view at the fork, from its dump there
