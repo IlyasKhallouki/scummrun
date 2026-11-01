@@ -1,0 +1,77 @@
+source	item	count	unit	offset	opcode	class	kind	engine values
+run B seed 1	S1#2 var:52	1	script:19	0005	CursorSoftOn	semantics	ran the write, another value at done	var 52=0(fact)
+run B seed 1	S1#2 var:53	1	script:19	0007	UserputSoftOn	semantics	ran the write, another value at done	var 53=0(fact)
+run B seed 1	S1#7 var:103	1	script:4	0407	doSentence	semantics	the engine queued another sentence	var 107=11(fact); var 108=323(fact); var 109=0(fact)
+run B seed 1	S1#10 local:211	1	local:211	001D	delay	split	still waiting	delay=20(time)
+run B seed 1	S1#12 local:207	1	local:207	0013	delay	split	still waiting	delay=120(time)
+run B seed 1	S1#17 var:103	1	script:4	03C5	jump if	semantics	left the path	var 108=0(fact)
+run B seed 1	S1#19 at:local:207:931	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 at:local:207:978	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 at:local:208:79	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 local:208	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 var:19	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 var:32	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 verb:120	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 verb:121	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 verb:122	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 verb:123	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#19 verb:124	1	local:207	03A3	jump unless	split	still waiting: its loop's test	var 194=0(fact); time=1(time)
+run B seed 1	S1#20 at:local:207:3007	1	local:207	0ACE	WaitForMessage	split	still waiting	var 3=255(time)
+run B seed 1	S1#20 var:229	1	local:207	0ACE	WaitForMessage	split	still waiting	var 3=255(time)
+run B seed 1	S1#20 var:230	1	local:207	0ACE	WaitForMessage	split	still waiting	var 3=255(time)
+run B seed 1	S1#22 var:103	1	script:4	03C0	jump if	semantics	left the path	local 6=0(fact)
+run B seed 1	S1#23 local:207	1	local:207	1119	breakHere	split	still waiting	frames to its next run=1(time)
+run B seed 1	S1#23 var:101	1	local:207	1119	breakHere	split	still waiting	frames to its next run=1(time)
+run B seed 1	S1#23 var:17	1	local:207	1119	breakHere	split	still waiting	frames to its next run=1(time)
+run B seed 1	S1#23 var:32	1	local:207	1119	breakHere	split	still waiting	frames to its next run=1(time)
+run B seed 1	S1#26 at:entry:2605	1	obj:685	0168	loadRoomWithEgo	semantics	started again	room=215(fact); entry restarted=1392(fact)
+run B seed 1	S2#2 rejected	1				outside V	a click on a floor point	
+run B seed 1	S2#3 rejected	1				outside V	a click on a floor point	
+window bar-door	local:200@43 pre var:70	341	local:200	0000	jump if	semantics	the records' precondition fails	var:70=0(fact)
+window bar-door	local:202@1 end pos:local:202	68	local:202	0006	jump unless	split	left the records' path	var 0=9(position)
+window bar-door	local:210@62 end pos:local:210	57	local:210	0000	WaitForCamera	split	the wait did not block	var 2=160(position)
+window bar-door	local:207@23 end pos:local:207	10	local:207	0005	WaitForCamera	split	the wait did not block	var 2=160(position)
+window bar-door	local:208@41 effect local:208	8	local:208				the predicted write is not in the run	
+window bar-door	local:208@41 pre pos:local:208	5	local:208	0029		semantics	two instances of the unit	live slots of local:208=2(fact)
+window bar-door	local:208@21 pre args:local:208	5	local:208	0015		semantics	two instances of the unit	live slots of local:208=2(fact)
+window bar-door	script:159@5 no record	410	script:159			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window bar-door	local:201@22 no record	341	local:201			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window k2	local:200@43 pre var:70	331	local:200	0000	jump if	semantics	the records' precondition fails	var:70=0(fact)
+window k2	local:202@1 end pos:local:202	69	local:202	0006	jump unless	split	left the records' path	var 0=9(position)
+window k2	local:210@62 end pos:local:210	52	local:210	0000	WaitForCamera	split	the wait did not block	var 2=160(position)
+window k2	local:207@23 end pos:local:207	10	local:207	0005	WaitForCamera	split	the wait did not block	var 2=160(position)
+window k2	local:208@41 effect local:208	5	local:208				the predicted write is not in the run	
+window k2	local:208@21 pre args:local:208	4	local:208	0015		semantics	two instances of the unit	live slots of local:208=2(fact)
+window k2	local:208@41 pre pos:local:208	4	local:208	0029		semantics	two instances of the unit	live slots of local:208=2(fact)
+window k2	script:159@5 no record	401	script:159			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window k2	local:201@22 no record	331	local:201			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window kitchen-boot	local:200@43 pre var:70	411	local:200	0000	jump if	semantics	the records' precondition fails	var:70=0(fact)
+window kitchen-boot	local:202@1 end pos:local:202	68	local:202	0006	jump unless	split	left the records' path	var 0=9(position)
+window kitchen-boot	local:210@62 end pos:local:210	60	local:210	0000	WaitForCamera	split	the wait did not block	var 2=160(position)
+window kitchen-boot	local:217@18 effect frozen:local:216	25	local:217	0007	jump if	split	left the path to the predicted write	var 0=275(position)
+window kitchen-boot	local:207@23 end pos:local:207	10	local:207	0005	WaitForCamera	split	the wait did not block	var 2=160(position)
+window kitchen-boot	local:208@41 effect local:208	9	local:208				the predicted write is not in the run	
+window kitchen-boot	local:204@18 end pos:local:204	7	local:204	0017	jump unless	split	left the records' path	var 0=51(position)
+window kitchen-boot	local:208@41 pre pos:local:208	6	local:208	0029		semantics	two instances of the unit	live slots of local:208=2(fact)
+window kitchen-boot	local:208@21 pre args:local:208	6	local:208	0015		semantics	two instances of the unit	live slots of local:208=2(fact)
+window kitchen-boot	script:2@702 pre room	1	script:2	02BE	jump goto	semantics	the records' precondition fails	room=28(fact)
+window kitchen-boot	local:217@18 effect local:216	1	local:217	0007	jump if	split	left the path to the predicted write	var 0=306(position)
+window kitchen-boot	local:206@49 effect args:local:206	1	local:206				the predicted write is not in the run	
+window kitchen-boot	script:2@915 pre room	1	script:2	0393	animateCostume	semantics	the records' precondition fails	room=41(fact)
+window kitchen-boot	script:23@409 pre frozen:script:23	1	script:23	0199	jump goto	semantics	the records' precondition fails	frozen:script:23=1(fact)
+window kitchen-boot	script:159@5 no record	456	script:159			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window kitchen-boot	local:201@22 no record	411	local:201			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window kitchen-boot	local:201@35 no record	1	local:201			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window kitchen-s17	local:200@43 pre var:70	463	local:200	0000	jump if	semantics	the records' precondition fails	var:70=0(fact)
+window kitchen-s17	local:210@62 end pos:local:210	57	local:210	0000	WaitForCamera	split	the wait did not block	var 2=480(position)
+window kitchen-s17	local:217@18 effect frozen:local:216	29	local:217	0007	jump if	split	left the path to the predicted write	var 0=95(position)
+window kitchen-s17	local:207@23 end pos:local:207	11	local:207	0005	WaitForCamera	split	the wait did not block	var 2=480(position)
+window kitchen-s17	local:204@18 end pos:local:204	7	local:204	0017	jump unless	split	left the records' path	var 0=51(position)
+window kitchen-s17	local:208@41 effect local:208	3	local:208				the predicted write is not in the run	
+window kitchen-s17	local:217@18 effect local:216	1	local:217	0007	jump if	split	left the path to the predicted write	var 0=388(position)
+window kitchen-s17	local:206@49 effect args:local:206	1	local:206				the predicted write is not in the run	
+window kitchen-s17	script:2@915 effect var:133	1	script:2				the predicted write is not in the run	
+window kitchen-s17	script:23@409 pre frozen:script:23	1	script:23	0199	jump goto	semantics	the records' precondition fails	frozen:script:23=1(fact)
+window kitchen-s17	local:201@22 no record	463	local:201			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window kitchen-s17	script:159@5 no record	435	script:159			invisible	invisible to the task: no task fact written, the slot back at its wait point	
+window kitchen-s17	local:201@35 no record	1	local:201			invisible	invisible to the task: no task fact written, the slot back at its wait point	
