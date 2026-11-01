@@ -98,6 +98,32 @@ fn engine_writes() -> [String; 13] {
 /// reader.py `scope_writes`: the `Writes` of `units` (in order), their locals bound from their call sites; `starts`
 /// reads a unit only from those instruction indices.
 pub fn scope_writes(game: &Game, units: &[UnitId], starts: Option<&FxHashMap<UnitId, Vec<u32>>>) -> Writes {
+    let mut out = scope_writes_code(game, units, starts);
+    out.exact.extend(engine_writes());
+    out.wild.insert("esc:".into());
+    out.wild.insert("frozen:".into());
+    for &u in units {
+        match game.unit(u).key {
+            UnitKey::Global(n) => {
+                out.exact.insert(format!("script:{n}"));
+            }
+            UnitKey::Local(_, n) => {
+                out.exact.insert(format!("local:{n}"));
+            }
+            UnitKey::Obj(o) => {
+                out.exact.insert(format!("objscript:{o}"));
+            }
+            _ => {}
+        }
+        out.wild.insert(format!("at:{}:", unit_name(game.unit(u).key)));
+    }
+    out
+}
+
+/// `scope_writes` without its fixed part: only the facts the instructions of `units` (from `starts`) write by their
+/// operands, not the engine's own writes, the slots' facts or the units' own slots (the switch havoc_cut, havoc.rs,
+/// adds those for the instructions it finds).
+pub fn scope_writes_code(game: &Game, units: &[UnitId], starts: Option<&FxHashMap<UnitId, Vec<u32>>>) -> Writes {
     let ast = &game.ast;
     let settings = domains::settings_env();
     let mut caps = 0i64;
@@ -264,24 +290,6 @@ pub fn scope_writes(game: &Game, units: &[UnitId], starts: Option<&FxHashMap<Uni
                 _ => {}
             }
         }
-    }
-    out.exact.extend(engine_writes());
-    out.wild.insert("esc:".into());
-    out.wild.insert("frozen:".into());
-    for &u in units {
-        match game.unit(u).key {
-            UnitKey::Global(n) => {
-                out.exact.insert(format!("script:{n}"));
-            }
-            UnitKey::Local(_, n) => {
-                out.exact.insert(format!("local:{n}"));
-            }
-            UnitKey::Obj(o) => {
-                out.exact.insert(format!("objscript:{o}"));
-            }
-            _ => {}
-        }
-        out.wild.insert(format!("at:{}:", unit_name(game.unit(u).key)));
     }
     out
 }
