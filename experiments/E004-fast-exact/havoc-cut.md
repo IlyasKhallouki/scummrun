@@ -116,3 +116,29 @@ optima do not change.
    code its unit can still run.
 5. Kill: a check scope's records grow by more than 10%, or Part I's round 5 by more than 2x, or plans on a check scope
    use havoc steps the engine refutes more than 3 times.
+
+## The switch havoc_starts: the starts the closure cannot fold
+
+Off by default; it needs `havoc_cut`. Measured need: in the rough reading (rough-reading.md), a closure that reaches a
+room change runs the inventory hook, and the hook starts an object by a local; such a closure named every unit of the
+scope, and its record then had an effect on every fact the scope writes and an event at every wait point of every unit.
+With the switch, a start whose operand does not fold names only the units the engine can run for it:
+
+- **`startObject(O, V)` whose object does not fold.** The engine runs `runObjectScript(O, V)` (script_v5.cpp
+  `o5_startObject`; script.cpp `runObjectScript`): it stops O's running script, then returns unless O is an object it
+  finds and `getVerbEntrypoint(O, V)` is not 0, which is O's entry for V, else O's 0xFF entry (script.cpp:242-248,
+  `Game::entry`). So the code that can run is, for each object unit of the scope, its entry for V, else its 0xFF
+  entry, and nothing for an object with neither; with V not folded, each of its entries. That object's slot is in
+  `S(p)` because its unit is in the closure. An object outside the scope is not read, as everywhere in the reading.
+- **`startObject(O, V)` whose object folds:** the same entry rule for each value of O, in place of every entry.
+- **A start whose number, or object, is a variable:** the values of that variable, as a hook is named by its
+  variable: its domain's values when it is a fact (each a plain value; a domain with a collapsed value names every
+  unit, as before), its value at the start (or its setting) when no code of the scope writes it. This rests on the
+  domain convention of "Values", item 3.
+- Any other operand that does not fold (a local, an indexed variable) names every unit, as before.
+
+Why the record still covers every engine run: each case lists every unit, and in it every entry, the engine can run
+for that instruction, so item 1 of "Why the record covers every engine run of the path" holds with the narrower
+`C(p)`; items 2 to 5 read only `C(p)`.
+
+With the switch off, `closure` is as before, byte for byte.
