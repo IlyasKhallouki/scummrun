@@ -1163,19 +1163,22 @@ class Search:
     # --- the strict search (window-search.md section 9) ---
 
     def _strict_setup(self) -> None:
-        """The reading as B1 reads it and the IR, once per run (strict.py)."""
-        if self.sr is not None:
-            return
+        """The reading as B1 reads it, made again whenever the harness's reading changed (a reach extension or F10's
+        reread replaces it), and the IR, once per run (strict.py)."""
         import model as M_
         import strict as S
         import trace_explain as TE
         h = self.h
+        if self.code is None:
+            self.code = TE.Code(M_.Game.load())
+        if self.sr is not None and self.sr.task is h.base:
+            return
         lines = getattr(getattr(h.base, "lines", None), "path", None)
         if lines is None:
             raise RP.Stop("the strict window search needs the reading's lines file (a packed reading)")
         unobserved = ("saved:",) + ((RP.ACTOR_ROOM,) if h.unobserved_actor_rooms else ())
         self.sr = S.Reading(h.base, h.doms, lines, h.lists, unobserved)
-        self.code = TE.Code(M_.Game.load())
+        self._strict_by_source = None
 
     def _tick(self, part: str, t0: float) -> float:
         t = time.thread_time()
@@ -1187,11 +1190,11 @@ class Search:
         """The click's other records (section 3, 9.3): (name, action index, the units their ``pos:`` writes name, their
         writes a later step reads)."""
         h = self.h
-        if self._by_source is None:
-            self._by_source = source_index(h.base.lines.path)
+        if getattr(self, "_strict_by_source", None) is None:  # the current reading's (``_strict_setup``)
+            self._strict_by_source = source_index(h.base.lines.path)
         own = {p.name for p in first.paths}
         out = []
-        for i in self._by_source.get(tuple(first.paths[0].what.source), ()):
+        for i in self._strict_by_source.get(tuple(first.paths[0].what.source), ()):
             a = h.base.actions[i]
             if a.name in own:
                 continue
