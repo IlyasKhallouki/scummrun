@@ -36,7 +36,7 @@ fn kitchen_clock_and_wait_points() {
     assert_eq!(fc.wait_point(UnitKey::Local(28, 211), 4).unwrap(), "breakHere: 1");
     // local 214: [000B] delay(30) -> [000F]: floor(30 / 5) + 1 = 7 frames
     assert_eq!(fc.wait_point(UnitKey::Local(28, 214), 0x0F).unwrap(), "delay: 7");
-    // [000F] print(255,[..,Text("Hey!" + wait() + "You can't come back here!")]); [0039] WaitForMessage():
+    // [000F] print(255,[..,Text(two parts joined by wait())]); [0039] WaitForMessage():
     // two parts of 60 jiffies, 12 frames each at 5 a frame, and the frame VAR_HAVE_MSG is copied: 25
     assert_eq!(fc.wait_point(UnitKey::Local(28, 214), 0x39).unwrap(), "message: 25");
     // local 216's walks: [0056] WaitForActor(6): 1 frame
