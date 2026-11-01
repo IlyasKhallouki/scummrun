@@ -102,10 +102,28 @@ Its events land on frames after g. It then runs one frame at a time until one of
 - **spent**: an idle stop of the bridge (`Branch.run(idle=True)`'s rule: input on, no cutscene, no sentence, input or
   object script, no message wait, ego standing) more than one frame after the last input, while the input's record is
   unmatched or a needed record belongs to a unit with no live slot. Nothing that could still run the record is alive;
-- **deviation**: a child that stops as spent, mismatch or limit after its input's record and every needed record that
-  precedes the input (≺) have matched. The input took effect as the plan predicts, and then a record the plan does not
-  name changed what a later step needs: the plan's prediction ends there, not the engine run. Its end point is its stop
-  frame h, c = Q(h);
+- **deviation**: a child that stops as spent, mismatch or limit after every needed record that precedes the input (≺)
+  has matched and the input took effect: its record matched, or it took another of its paths (below) with a change a
+  later step reads. Then a record the plan does not name changed what a later step needs: the plan's prediction ends
+  there, not the engine run. Its end point is its stop frame h, c = Q(h);
+- **another path** (a click's input): at the frame its last click lands, the slots the input's record leaves at wait
+  points (its `pos:` writes) do not all stand there, on any of its paths. The child then ran another record of the
+  reading for the same click (same verb and objects): if one of them shows (its `pos:` writes hold, and one of its
+  writes differs from the fork's value) and writes a fact a later step reads to a new value, the child goes on, as a
+  deviation candidate; otherwise it is spent at once.
+  **Lemma 9 (a click's record shows in its own frame).** In a frame, `scummLoop` takes the input
+  (`processInput`), then runs the scripts (`runAllScripts`), then the click: `checkExecVerbs` runs the room's or the
+  verb's input script nested until its first wait point, and `checkAndRunSentenceScript` the sentence script likewise
+  (`scumm.cpp`, the order in `time.md` §0). The record of a click is that run (the reader's F1b), so at the end of the
+  frame the click lands in, each slot the record leaves at a wait point stands there; a slot that has yielded runs no
+  more in that frame. *Premise:* no script that runs after it in the same frame stops or moves that slot. Under it, a
+  child whose record's slots do not stand there at that frame did not run the record's path, and cannot match it
+  later. A wrong premise loses children (a success the search would miss), never a route: what the search keeps are
+  engine runs. The count of children stopped this way is reported.
+  *Why.* A door click whose path depends on where another actor stands (a non-fact the reader reads as a replay check)
+  fails on most frames. Each failing child walked to the door and ran to the idle stop, 30 to 80 frames, before it
+  counted as spent: the kitchen's first door window from run B's start took 417 children and 12,148 child frames
+  (`results/window-kitchen.log`).
 - **pruned**: Q ≥ the best end point so far (a success, else a deviation) before it ends. It cannot end lower, since Q
   only grows;
 - **limit**: 3,600 frames after the last input;
