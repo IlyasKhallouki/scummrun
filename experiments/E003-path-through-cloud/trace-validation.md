@@ -169,6 +169,33 @@ getters. Its value in the engine is:
 A test whose fact the engine had at a value the model did not expect is neither: the cause lies in the run that wrote
 it, and the explanation follows that write.
 
+### What the first runs on run B called for
+
+Written after the first runs, each with the case that showed it:
+
+- **The writer.** A refuted prediction f = v names no unit. The candidates are the units with a write site of f: first
+  the model's last writer (the last unit in a feasible path's turns with a write site whose target is a constant: the
+  value at the end is the last write's), then the units both the model and the engine ran, then the rest; sites
+  through an index, or with an object that is not a constant, come after those that name f. The others' results are
+  kept as alternatives. (A loop over an indexed write was taken for the writer of a cursor variable.)
+- **Ops that write without writeVar.** o5_cursorCommand writes VAR_CURSORSTATE and VAR_USERPUT directly
+  (script_v5.cpp:935-938), and a room change writes the room's variables in startScene (room.cpp:76-205). Their write
+  sites are the ops; the log shows no value, so the engine's value is the fact at done.
+- **The sentence queue.** checkAndRunSentenceScript starts the sentence script with the queued (verb, A, B) as its
+  locals 0-2 (script.cpp:1240-1246). When the sentence script writes f from those locals with another value than
+  predicted, the slice goes on to the doSentence the engine ran last before that start, and its arguments' values.
+  When the slot that writes is the earlier sentence's instance, the cause is where that slot waited.
+- **A new instance.** A slot fact the engine's slot left as predicted and then holds again at done comes from a new
+  instance; the run that encloses its first run (the segmentation's depth) started it, with the opcode that ran it.
+- **Not there yet.** Lemma X's second outcome (the write still reachable from where the slot waits at done) is a cause
+  of class split: the job must split on the time the slot still waits (a delay's jiffies, the one frame after a
+  breakHere, a WaitFor op's condition) against the frame the next input comes. Its opcode is the polling loop's test
+  when the slot waits in one, else the yield.
+- **Run B on another seed.** Run B's recorded inputs played on seed 1 stop doing what they did in run B at some move.
+  Only the moves before it are checked: the first move whose room at done (or at the next move's start) is not run
+  B's, whose dialog line is not shown, whose sentence by done is not the scored action's where it was in run B's own
+  ground truth, or that the model does not accept for another reason than a missing action kind.
+
 ## 6. The wait check
 
 **Lemma W (frame costs).** For an event record r = event(U@W) matched to a run in frame k, let j be the frame of the run
