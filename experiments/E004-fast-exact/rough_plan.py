@@ -125,9 +125,9 @@ def main() -> None:
     ap.add_argument("--key", action="store_true")
     ap.add_argument("--goal", help="the goal facts to follow (K=V,...); default results/end-part1.json's")
     a = ap.parse_args()
-    out = Path(a.out)
+    out = Path(a.out).resolve()  # Fast Downward runs in out/fd
     out.mkdir(parents=True, exist_ok=True)
-    tc, packed = a.taskcore, a.packed
+    tc, packed = a.taskcore, str(Path(a.packed).resolve())
     summary = {"packed": packed}
     base = ["--task", packed, "--start", "start"]
     summary["sas"] = timed([tc, "sas", *base, "--out", out / "task.sas", "--ops", out / "ops.jsonl", "--stats",
