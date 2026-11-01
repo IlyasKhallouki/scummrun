@@ -217,6 +217,9 @@ pub struct Switches {
     /// Pass 2 reruns only what a widened value touches (memo.rs, experiments/E004-fast-exact/pass2-reuse.md); the output
     /// is byte for byte the same.
     pub pass2_reuse: bool,
+    /// A WaitFor op whose test reads engine state no fact holds both blocks and passes in the same run
+    /// (experiments/E004-fast-exact/wait-both.md; machine.rs `wait_both`)
+    pub wait_both: bool,
 }
 
 impl Switches {
@@ -233,7 +236,8 @@ impl Switches {
                 "reach" => s.reach = true,
                 "pass2_reuse" => s.pass2_reuse = true,
                 "input_settled" => s.input_settled = true,
-                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled)")),
+                "wait_both" => s.wait_both = true,
+                _ => return Err(format!("unknown reader switch {n} (known: due_first, value_sets, draw_clears, actor_rooms, split_limit, reach, pass2_reuse, input_settled, wait_both)")),
             }
         }
         Ok(s)
@@ -263,6 +267,9 @@ impl Switches {
         }
         if self.input_settled {
             v.push("input_settled");
+        }
+        if self.wait_both {
+            v.push("wait_both");
         }
         v
     }
@@ -1923,6 +1930,7 @@ impl<'g> Builder<'g> {
     ) -> usize {
         self.table.value_sets = self.switches.value_sets;
         self.table.split_limit = self.switches.split_limit;
+        self.table.wait_both = self.switches.wait_both;
         if self.switches.reach {
             assert!(self.switches.split_limit, "--reach needs --split-limit: the paths the limit ends depend on what else runs");
             assert!(!self.switches.due_first, "--reach reads no due: facts");

@@ -1055,6 +1055,9 @@ impl Hooks for ReaderHooks {
             p.assumptions.push(Assumption { cite, cond: cond.into(), side: Side::Bool(false), why: why.into() });
             return Vec::new();
         }
+        if st(m).table.as_ref().is_some_and(|t| t.wait_both) {
+            return wait_both(m, p, o, x, name);
+        }
         count(m, "WaitFor ops that yield (their later part is an event)");
         let c = m.cite(x);
         m.h_done(p, o, "yield", c, Some(ins.offset));
@@ -1828,6 +1831,45 @@ fn f1c_end(m: &mut Machine<'_>, p: &mut Path) -> Vec<Path> {
         cid,
     }));
     Vec::new()
+}
+
+/// The switch wait_both (the Builder's; experiments/E004-fast-exact/wait-both.md, Lemma W): a WaitFor op the path
+/// does not resume at, whose test reads engine state the reading holds no fact of, both blocks (the slot yields at the
+/// op, as without the switch) and passes (the run goes on at the next instruction in the same run, with the check
+/// "blocks" on the side false, as the wait an event resumes at). o5_wait (script_v5.cpp:3272-3310) either returns,
+/// writing nothing, or rewinds to the op and breaks; so every engine run takes one of the two, and the paths with the
+/// switch are those without it and the passing ones. The tests: WaitForActor reads `Actor::_moving`, WaitForMessage
+/// VAR_HAVE_MSG (var 3, which the engine writes every frame, domains::ENGINE), WaitForCamera the camera's current and
+/// target x; no fact of the reading holds them. WaitForSentence reads the sentence queue and whether the sentence
+/// script is in use: where the path decides it (`sentence_wait_known`), it takes that branch alone; else both.
+fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
+    let g = m.game;
+    let ins = &g.ins(x.u)[x.i as usize];
+    let known = if name == known::WAIT_FOR_SENTENCE { m.sentence_wait_known(p, o) } else { None };
+    let c = m.cite(x);
+    match known {
+        Some(true) => {
+            count(m, "wait_both: WaitForSentence blocks by the path's facts");
+            count(m, "WaitFor ops that yield (their later part is an event)");
+            m.h_done(p, o, "yield", c, Some(ins.offset));
+            Vec::new()
+        }
+        Some(false) => {
+            count(m, "wait_both: WaitForSentence passes by the path's facts");
+            Vec::new()
+        }
+        None => {
+            let (reason, what) = Machine::h_waits(name);
+            let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
+            let why = format!("?({}: {what})", reason.as_str());
+            let mut q = p.fork();
+            q.assumptions.push(Assumption { cite: c.clone(), cond: cond.into(), side: Side::Bool(false), why: why.into() });
+            count(m, "WaitFor ops that yield (their later part is an event)");
+            count(m, "wait_both: WaitFor ops that also pass in the same run");
+            m.h_done(p, o, "yield", c, Some(ins.offset));
+            vec![q]
+        }
+    }
 }
 
 /// F1c rule 8: a slot the path leaves waiting carries the five variables its own code reads, where the path knows them.
