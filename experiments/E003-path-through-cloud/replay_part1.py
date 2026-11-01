@@ -291,7 +291,8 @@ def goal_text_of(goal: dict) -> str:
 def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, threads: int = 3,
               slot_locals: list | None = None, domain_goals: str = "none", elsewhere: bool = False,
               live_locals: bool = False, split_limit: bool = False, switches: str = "", reach: bool = False,
-              frame_costs: bool = False, reach_also: list | None = None, start_rows: Path | None = None) -> Path:
+              frame_costs: bool = False, reach_also: list | None = None, start_rows: Path | None = None,
+              fact_vars: list | None = None) -> Path:
     """A reading from the Rust reader (module docstring): reader-scope on ``rooms`` from results/start-part1.jsonl's
     seed ``seed`` (``domain_goals`` "none": golden.read_scope's domains), its records kept and written in golden.py's
     format, then packed_reading.reading_from_golden: the three files and the lists. ``slot_locals`` (F10): slots
@@ -302,7 +303,8 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
     ``--switches``, ``--reach``, ``--frame-costs`` (module docstring, "The reader's other switches"); ``reach_also``:
     further start files (reader-scope ``--reach-also``, with ``reach``); ``start_rows``: the start's row from that
     file (start-part1.jsonl's format) in place of results/start-part1.jsonl (reader-scope ``--start-rows``; off by
-    default). Returns reading.json."""
+    default); ``fact_vars``: variables made facts (reader-scope ``--fact-vars``, E007's refinement; reading.json then
+    has ``fact_vars`` and the reader's report of them, ``fact_vars_report``; off by default). Returns reading.json."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     row = start_row(seed) if start_rows is None else start_row(seed, Path(start_rows))
@@ -330,6 +332,8 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
         cmd.append("--frame-costs")
     if start_rows is not None:
         cmd += ["--start-rows", str(start_rows)]
+    if fact_vars:
+        cmd += ["--fact-vars", ",".join(str(int(n)) for n in fact_vars)]
     if slot_locals:
         sl = out / "slot-locals.jsonl"
         sl.write_text("".join(json.dumps(x) + "\n" for x in slot_locals))
@@ -357,7 +361,9 @@ def read_rust(rooms: tuple, seed: int, goal_text: str, name: str, out: Path, thr
                                         **({"split_limit": True} if split_limit else {}),
                                         **({"switches": switches} if switches else {}),
                                         **({"reach": True} if reach else {}),
-                                        **({"reach_also": [str(f) for f in reach_also]} if reach_also else {})})
+                                        **({"reach_also": [str(f) for f in reach_also]} if reach_also else {}),
+                                        **({"fact_vars": [int(n) for n in fact_vars],
+                                            "fact_vars_report": rep.get("fact_vars")} if fact_vars else {})})
     (out / f"{name}.rust.tc").unlink(missing_ok=True)  # reading_from_golden copied it to reading.tc
     reached, kept = out / f"{name}.rust.reached", Path(info["packed"]).with_suffix(".reached")
     if reach:
@@ -416,9 +422,11 @@ def rereader(rd, run_dir: Path, control: bool, threads: int, reach_starts: list 
 
 
 def reader_switches(doc: dict, reach_also=None) -> dict:
-    """read_rust's ``switches``, ``reach``, ``frame_costs`` and ``reach_also`` for a reading made again with a
-    reading's own switches (reading.json, module docstring); none when it had none."""
+    """read_rust's ``switches``, ``reach``, ``frame_costs``, ``reach_also`` and ``fact_vars`` for a reading made again
+    with a reading's own switches (reading.json, module docstring); none when it had none."""
     out = {}
+    if doc.get("fact_vars"):
+        out["fact_vars"] = list(doc["fact_vars"])
     if doc.get("switches"):
         out["switches"] = doc["switches"]
     if doc.get("reach"):
@@ -1090,6 +1098,7 @@ def main() -> None:
     rr.add_argument("--reach", action="store_true", help="reader-scope's switch --reach (needs --split-limit)")
     rr.add_argument("--frame-costs", action="store_true", help="reader-scope's switch --frame-costs")
     rr.add_argument("--start-rows", type=Path, help="the start's row from this file, not results/start-part1.jsonl")
+    rr.add_argument("--fact-vars", default="", help="reader-scope's --fact-vars N,... (E007: variables made facts)")
     c = sub.add_parser("control")
     c.add_argument("reading", type=Path)
     s = sub.add_parser("start")
@@ -1148,7 +1157,8 @@ def main() -> None:
     elif a.cmd == "read-rust":
         print(read_rust(tuple(int(x) for x in a.rooms.split(",")), a.seed, a.goal, a.name, a.out, a.threads,
                         elsewhere=a.elsewhere, live_locals=a.live_locals, split_limit=a.split_limit,
-                        switches=a.switches, reach=a.reach, frame_costs=a.frame_costs, start_rows=a.start_rows))
+                        switches=a.switches, reach=a.reach, frame_costs=a.frame_costs, start_rows=a.start_rows,
+                        fact_vars=[int(x) for x in a.fact_vars.split(",") if x.strip()] or None))
     elif a.cmd == "control":
         out = make_control(a.reading)
         print(out, json.dumps(json.loads(out.read_text()).get("control_counts")))
