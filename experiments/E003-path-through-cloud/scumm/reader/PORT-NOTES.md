@@ -679,6 +679,28 @@ reader-scope `--switches S,...` takes reader switches by name as reader-port doe
 actor_rooms, grow_limit; not due_first). `READER_TRACE=1` writes to stderr each job's start, each split down to depth
 8, each run of 1 s or more with its paths, cut paths, held branches and largest counters, and each job of 1 s or more.
 
+## A path the step limit ended: the switch `havoc_cut`
+
+`havoc_cut` (reader-scope and reader-port `--switches havoc_cut`), off by default, needs `split_limit`. The rule and its
+proof are in `experiments/E004-fast-exact/havoc-cut.md`. Under it the machine half hands over a path the step limit
+ended whole, with `PathOut.cut`: the frames on its stack and the engine steps its calls have not run (`machine.rs`
+`cut_of`). `Builder::run` makes each such path one havoc record (`havoc.rs`) in place of stopping the reading: the
+path's own record, then for each fact the code it can still run may write (`havoc::closure`, `scope_writes_code` and
+`havoc::sites`) one of the constants written or no change, as cases on the current value, else a guess over the
+domain; for each slot of that code any wait point or none, the list 0, and an event with unknown locals at each wait
+point; end "havoc". `READER_TRACE` prints each one (`havoc LABEL: N units, N effects, N events; at ...; pending
+...`). Off, no line changes; on, a reading with no step-limit path writes the same files (`tests/havoc_cut.rs`, the
+five check scopes).
+
+## Clicks that differ only in their verb: the switch `shared_runs`
+
+`shared_runs` (`--switches shared_runs`), off by default. Claim and proof: `experiments/E004-fast-exact/shared-runs.md`.
+`machine::Reader::run` keys a click's run by its pins, precondition and guides with the verb taken out; within a batch
+the first run is made, checked (no read of `Local[1]` before a write, `shared::arg_written`; no read or write of
+another dialog verb; no kept list with the argument) and kept, and later jobs with the key take it renamed
+(`shared::rename`). A key whose run was not kept runs at once in later batches. The output is byte for byte the same
+(`tests/shared_runs.rs`, the five check scopes); reader-scope's report gives `shared_runs` counts.
+
 ## Frame costs, as a switch
 
 **The finding.** Every action cost 1 (build_task's `cost: 1`), so the planner minimized records, not game time. The
