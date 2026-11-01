@@ -311,4 +311,139 @@ made: a window's children name no tested value a ban could cut.
 ## 8. Off
 
 The switch `window_search` (replay_part1.py `--window-search`) is off by default. Off, the harness's code path is
-unchanged.
+unchanged. Its sub-switch `strict` (section 9, `--window-strict`) is off by default too; off, the search is sections 1-7.
+
+## 9. The strict window search (sub-switch `strict`)
+
+Sections 1-7 count a record as matched at the first frame where its final writes hold. B1 (trace-validation.md) checked
+the four runs with its strict matcher: of the 38 steps they counted as matched, 14 match on their own run; records
+counted as matched 2 to 11 frames before their run, or with no run. With `strict` on, the search uses B1's matcher.
+This section states what changes, for any SCUMM v5 game under the bridge. It was written before the code (`strict.py`).
+
+### 9.1 What a branch observes
+
+- With `segment` on (trace-validation.md section 2; Lemma O: it observes only) a branch reports every slot run. R_k
+  are the runs between D_{k−1} and D_k (trace-validation.md section 1). The parent turns `segment` on at the window's
+  start and reads R_k after each frame. A child inherits it with an empty buffer (the parent reads its runs before it
+  forks) and reads its runs after each frame it observes.
+- V_k is the window's view at D_k (FastView), plus `args:U` for each unit U whose `args:` a tracked record reads or
+  writes: the set of the reading's built lists at U's wait point that U's dumped locals match, {0} when none does
+  (B1's view, trace_check.py `Reading.view`). The engine runs with SPEEDRUN_DUMP_LOCALS, which observes only
+  (bridge_locals.py).
+- `explain` (Lemma O) is armed in the parent for every unit, and in a child for the units of the window's needed
+  records and of the input's `pos:` writes, from the frame after the fork. The logs are read with the runs. They are
+  kept only to explain a failure (9.5).
+- A child observes every frame from its fork when a tracked record of an earlier macro step is pending at the fork
+  (its run may come while the input code plays: the input code then runs one frame at a time); else from the frame
+  its last click lands, as before. *Why this is enough.* Only a pending record of an earlier macro step can run before
+  the input: every other record the window tracks follows the input (≺) or is done. The view before the input that
+  the input's record reads is the fork's (its first event lands on the frame after the fork, section 5).
+- Running one frame at a time or several at once gives the same run: a stop at a decision point waits no
+  quarter-frame and writes no game state; the bridge reads commands only while the engine is stopped. Verify from boot
+  already relies on this: it reaches the window's checkpoints, taken one frame at a time, in larger steps.
+
+### 9.2 Definition S: a record's own run
+
+- **Event.** For an event record r = event(U@W), r's own run in a branch is the first run of U at depth 0 with c0 = W
+  that is not a stutter (trace-validation.md section 3: one opcode, a WaitFor op, c1 = c0), after the record that left
+  U at W matched, or after the window's start when no tracked record of U before r is pending. r *matches strictly*
+  at that run's frame k when M1-M4 hold for r on it (Definition M: V_{k−1}, V_k, R_k and the open keys of
+  trace-validation.md section 3) and every tracked record r follows (≺) has matched before. Otherwise r is *refuted*.
+  **Lemma S1 (one run per event record).** A refuted record never matches. *Proof.* Any two of the plan's records of U
+  write `pos:U`, so they interfere and ≺ orders them in plan order. In the model, U's slot waits at W from the record
+  that left it there until r runs. The engine's first run of U from W after that is therefore the step the plan says is
+  r's. A later run from W needs U to come back to W, which is a step the plan does not name. □
+- **Input.** Let an input record I land its clicks on frames f_1 ≤ … ≤ f_n = s, with f_1 − 1 the fork's frame, and let
+  U_I be the units its `pos:` writes name. I *matches strictly* at s + 1 when:
+  - (I1) pre(I) holds on V_{f_1−1}, after the set writes of the tracked event records that matched strictly at frames
+    f_1 … s + 1 on runs before I's first run (`runAllScripts` runs before `checkExecVerbs` in a frame, so a slot run in
+    R_{f_1} comes before the click's work);
+  - (I2) for each `pos:U` = w of I, U has a run in R_s ∪ R_{s+1}, and the last of them ends at w (the slot dead for
+    NOWHERE);
+  - (I3) each other set or guessed write of I holds on V_{s+1}, unless a later run in R_{s+1} is at a point whose
+    records write that key (M4);
+  - (I4) each check of I that the dump at D_{f_1−1} decides (`replay.eval_check`) takes I's side (M3).
+
+  (I1)-(I3) are B1's check of an input step (trace_check.py window-validate), with M2's order of runs; (I4) is M3.
+  *I took effect* when it matches strictly and one of its writes changed: a `pos:U` whose last run left U elsewhere
+  than V_{f_1−1} has it, or another write whose value on V_{f_1−1} is not among its predicted values. A match on writes
+  that all held before is no evidence that the click ran its path (the check's item 3: walk_to(316)#10846 passed
+  Lemma 9 on `pos:script:4` = NOWHERE, which held before the click).
+- **Success.** A child succeeds at h when every record the window needs has matched strictly by h, in the child or, by
+  the fork, in the parent. A goal stop needs the goal records matched strictly. Writes that held before the fork never
+  complete a macro step, since each needed record needs its own run (the check's item 6: window 2.2 succeeded on its
+  click frame).
+  **Lemma S2.** On the view's facts, a strict success is a run of the needed records: each ran once, after the
+  records it follows, with its precondition before its run and its effects after it (Lemma M, trace-validation.md). □
+
+### 9.3 The child, strictly
+
+- **The click is decided at s + 1 (Lemma 9′).** After frame s + 1 the child has R_s, R_{s+1} and V_{s+1}. If I matches
+  strictly, the child goes on. Else, if another record J of the same click (same verb and objects) matches strictly and
+  took effect, and one of its writes that changed is a fact a later step reads, the child goes on as a deviation
+  candidate. Else it is spent.
+  *Proof that this loses no success and no deviation.* I's runs are the runs the click starts in R_s ∪ R_{s+1}, so if
+  I does not match at s + 1 it never does. Every needed record that follows I then cannot match, and the window needs
+  I: no success. With neither I nor another record of the click taking effect, the child is no deviation (section 3).
+  No premise is needed (section 3's Lemma 9 had three). The first version tried the click's other records at frame s,
+  before the plan's own record had its second frame, and a record that showed one frame late could then never succeed
+  (the check's item 6); here the plan's record is decided first, on both frames. □
+- **Refuted.** A child stops as *refuted* when a needed record is refuted (Lemma S1: no success). For the deviation
+  rule it counts as a mismatch. A needed record refuted in the parent ends the window: no child forked after can
+  succeed.
+- **Ties (the check's item 6).** At each frame a child first decides success and the goal, then the prune: it is
+  pruned at h when Q(h) ≥ c* and it has not ended at h. *Proof.* Q grows by at least 4 quarter-frames a frame (Lemma
+  2), so a child that has not ended at h ends at Q > c*. One that ends at h with Q(h) = c* is compared by end_key: a
+  success before a deviation, then the earlier fork. □ The deviation's walk to the click gate tests the gate first,
+  then the prune. The first version pruned first: a child ending at Q = c* was dropped, and which of two equal ends
+  won depended on which thread finished first.
+- **The parent's stop at a tie.** With a deviation c_d the best, a later fork can still win with a success at Q = c_d.
+  The parent stops forking once Q(g) + b > c_d and Q(g) + 4·δ_lo·n ≥ c_d. With a success c* the best, a later fork
+  loses every tie to the earlier one, and Q(g) + b ≥ c* stops as before.
+
+### 9.4 The end, strictly (the check's item 5)
+
+**Lemma 7′.** The parent is ready when every record of P (section 5, End) has matched strictly in it or was done
+before the window. Then Lemma 7's proof holds: each record of P has had its own run, so every write the plan predicts
+before I_k on a fact I_k reads has happened, and a later change of such a fact comes from a run that is no record of
+P. □ In the first version a record of P could count as matched before its run. In window 2.3 the previous step's record
+counted as matched before it ran; its run then changed a fact the input reads, and the window ended after one fork, on
+the plan's own write.
+
+### 9.5 The cause of each replan and each empty window
+
+A child keeps, for its first strict failure, the frame's runs, explain log, dumps and views. The failure is one of:
+
+- a needed event record refuted: its own run, and the first condition of Definition M that failed for it;
+- the input's record not matched at s + 1: the first of (I1)-(I4) that failed, with the run of the `pos:` unit it
+  names;
+- a mismatch (section 3): the run that left the slot where no pending record predicts;
+- a needed record whose run did not happen before the child stopped: where its unit's slot waits, and on what.
+
+At a deviation the chosen child's failure is explained; at an empty window, the failure most children share, on the
+first child that had it; at a guessed write the engine took otherwise, the run of that record and the key. A goal
+that holds with no goal record matched is explained by the run that wrote the goal's fact (the parent's explain log
+has every run). The explanation is B1's, on the kept log: trace_check.explain_unexplained (Lemma X, the first opcode
+off the records' path; Lemma B, the backward slice; the two classes), and for an input's `pos:` end the same Lemma X
+toward the record's own end. It is logged with the replan and the window: the record, the frame, the unit, the code
+offset, the opcode, the engine's values and the class.
+
+A run stops, instead of replanning, when a window is empty for the second time on the same input record with the same
+cause: the plan made from that state is the same, and so is the window.
+
+### 9.6 The guarantee
+
+Section 6 holds with success read as strict success (9.2): for one macro step, the search returns the strict success
+or deviation with the least Q over every fork frame up to its stop, ties to a success and then to the earliest fork.
+
+### 9.7 The cost
+
+**The approach once, in the parent: not exact.** A click on an object off screen plays an approach first (floor clicks,
+a stepping stone; executor.py `_approach`). Doing the approach once in the parent and forking only the click would
+search the runs "approach from the window's start, click at c", not "approach from g, click at g + a". Those are the
+same runs from the click on only when the state at the click frame does not depend on when the approach started. On
+the kitchen from boot's door window (window2's run) it does: with the chosen child's approach started at the window's
+start (frame 2798) instead of its fork (3076), the state dump at 3149, the frame before the door click, differs in 14
+places, among them the camera (440 against 480), the random state, four object states and vars 0, 2, 20 and 100. The
+room's camera script pans on ego's x (local 201 at [0000], `getActorX(VAR_EGO)`), so the camera at the click frame
+depends on when ego walked. The approach stays in each child (approach_check.py, `results/approach-check.log`).
