@@ -106,6 +106,7 @@ def main() -> None:
     u.add_argument("--workers", type=int, default=7)
     u.add_argument("--window-strict", action="store_true")
     u.add_argument("--window-cache", action="store_true")
+    u.add_argument("--window-fork-each", type=int, default=0)
     a = ap.parse_args()
     if a.cmd == "row":
         st = Starter(a.move, a.out)
@@ -122,7 +123,7 @@ def main() -> None:
                   unobserved_actor_rooms=a.unobserved_actor_rooms, approach_stones=a.approach_stones,
                   reach_extend=a.reach_extend,
                   window_search=a.window_search, workers=a.workers, starter=Starter(a.move, a.rows),
-                  window_strict=a.window_strict, window_cache=a.window_cache)
+                  window_strict=a.window_strict, window_cache=a.window_cache, window_fork_each=a.window_fork_each)
 
 
 if __name__ == "__main__":
