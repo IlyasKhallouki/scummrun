@@ -1,0 +1,32 @@
+closure units: count
+   8832 576
+every-unit reasons:
+   8111 ["start not folded at {\"$tuple\":[\"global\",73]}[41]", "start not folded at {\"$tuple\":[\"global\",23]}[56]", "start not folded at {\"$tuple\":[\"global\",73]}[41]"]
+    369 ["start not folded at {\"$tuple\":[\"global\",23]}[56]", "start not folded at {\"$tuple\":[\"global\",73]}[41]"]
+    352 ["start not folded at {\"$tuple\":[\"global\",73]}[41]", "start not folded at {\"$tuple\":[\"global\",23]}[56]"]
+jobs (label without list):
+    500 sentence(5,488)[inv]~frozen
+    500 sentence(5,488)[inv]
+    500 sentence(5,464)[inv]~frozen
+    500 sentence(5,464)[inv]
+    500 sentence(4,488)[inv]~frozen
+    500 sentence(4,488)[inv]
+    500 sentence(4,464)[inv]~frozen
+    500 sentence(4,464)[inv]
+    500 sentence(3,488)[inv]~frozen
+    500 sentence(3,488)[inv]
+    500 sentence(3,464)[inv]~frozen
+    500 sentence(3,464)[inv]
+slowest jobs:
+87.6 sentence(5,464)[inv]~frozen:
+87.6 sentence(4,488)[inv]:
+87.3 sentence(5,488)[inv]:
+87.2 sentence(4,464)[inv]~frozen:
+87.2 sentence(2,464)[inv]~frozen:
+86.7 sentence(2,464)[inv]:
+86.1 sentence(3,488)[inv]:
+84.5 sentence(3,488)[inv]~frozen:
+84.1 sentence(5,464)[inv]:
+83.6 sentence(4,464)[inv]:
+60.0 sentence(2,488)[inv]~frozen:
+56.8 sentence(3,464)[inv]:

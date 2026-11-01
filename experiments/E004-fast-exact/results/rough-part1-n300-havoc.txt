@@ -1,0 +1,17 @@
+closure units: count
+   9500 576
+every-unit reasons:
+   8380 ["start not folded at {\"$tuple\":[\"global\",73]}[41]", "start not folded at {\"$tuple\":[\"global\",23]}[56]", "start not folded at {\"$tuple\":[\"global\",73]}[41]"]
+    470 ["start not folded at {\"$tuple\":[\"global\",23]}[56]", "start not folded at {\"$tuple\":[\"global\",73]}[41]", "start not folded at {\"$tuple\":[\"global\",73]}[41]"]
+    340 ["start not folded at {\"$tuple\":[\"global\",73]}[41]", "start not folded at {\"$tuple\":[\"global\",23]}[56]"]
+    310 ["start not folded at {\"$tuple\":[\"global\",23]}[56]", "start not folded at {\"$tuple\":[\"global\",73]}[41]"]
+jobs (label without list):
+   1900 dialog_line(124)[202@85]
+   1900 dialog_line(123)[202@85]
+   1900 dialog_line(122)[202@85]
+   1900 dialog_line(121)[202@85]
+   1900 dialog_line(120)[202@85]
+slowest jobs:
+1.5 event(obj:451@21):
+1.5 event(obj:450@77):
+1.0 event(obj:451@21#7ba1220ae5cc):

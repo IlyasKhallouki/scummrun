@@ -1,0 +1,109 @@
+{
+  "batches": [
+    {
+      "job_s": 0.0,
+      "jobs": 44,
+      "longest_job_s": 0.0,
+      "records": 88,
+      "s": 0.1,
+      "what": "pass 1: inputs"
+    },
+    {
+      "job_s": 0.0,
+      "jobs": 89,
+      "longest_job_s": 0.0,
+      "records": 169,
+      "s": 1.5,
+      "what": "pass 1: event round 1"
+    }
+  ],
+  "cap_min": 120.0,
+  "cpu_use": 2.38,
+  "domain_goals": "part1",
+  "elsewhere": true,
+  "frame_costs": false,
+  "goal": [
+    "owner:901",
+    "owner:902",
+    "owner:903"
+  ],
+  "k": null,
+  "live_locals": true,
+  "live_locals_units": {
+    "reads no local": 318,
+    "reads some locals, known": 255
+  },
+  "load_at_end": "13.98 16.89 19.06",
+  "load_at_start": "13.48 17.18 19.80",
+  "n_rooms": 31,
+  "n_units": 573,
+  "name": "part1",
+  "objects": 384,
+  "packed_bytes_so_far": 17825792,
+  "pass": 1,
+  "peak_rss_mb": 4895,
+  "reach": true,
+  "read_cpu_s": 734.8,
+  "read_wall_s": 308.9,
+  "records_in_pass": 2563,
+  "rooms": [
+    10,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    41,
+    42,
+    43,
+    44,
+    48,
+    49,
+    51,
+    52,
+    53,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    64,
+    76,
+    83,
+    85,
+    96
+  ],
+  "rss_peak_seen": {
+    "at": "pass 1, event round 2 (24847 jobs), 309 s",
+    "mb": 4895
+  },
+  "runs_done_in_finished_batches": 133,
+  "setup_s": 0.2,
+  "slot_facts": 12169,
+  "slot_locals": 0,
+  "split_limit": true,
+  "start": "results/start-part1.jsonl seed 1",
+  "status": "stopped: MemAvailable fell under 3.0 GB",
+  "step_limit": 100,
+  "switches": [
+    "value_sets",
+    "draw_clears",
+    "actor_rooms",
+    "grow_limit",
+    "havoc_cut"
+  ],
+  "threads": 3,
+  "units": {
+    "entry": 31,
+    "exit": 31,
+    "global": 94,
+    "local": 215,
+    "obj": 202
+  }
+}

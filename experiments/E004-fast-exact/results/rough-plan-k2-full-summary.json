@@ -1,0 +1,45 @@
+{
+ "packed": "/home/ilyask/.cache/fast-mi-rough/check/exact/k2.tc",
+ "sas": {
+  "code": 0,
+  "wall_s": 40.41,
+  "cpu_s": 35.14,
+  "peak_rss_mb": 185
+ },
+ "operators": 90039,
+ "fd": {
+  "code": 0,
+  "wall_s": 41.89,
+  "cpu_s": 34.38,
+  "peak_rss_mb": 630
+ },
+ "status": "plan",
+ "decode": {
+  "code": 0,
+  "wall_s": 37.74,
+  "cpu_s": 30.96,
+  "peak_rss_mb": 170
+ },
+ "dump": {
+  "code": 0,
+  "wall_s": 15.8,
+  "cpu_s": 12.89,
+  "peak_rss_mb": 102
+ },
+ "plan_steps": 6,
+ "havoc_steps": 0,
+ "exact_steps": 6,
+ "steps_with_several_members_holding": 0,
+ "goal_first_step": {
+  "state:316": 5
+ },
+ "goal_reached": true,
+ "rooms": [
+  "33",
+  "33",
+  "33",
+  "28",
+  "28",
+  "28"
+ ]
+}

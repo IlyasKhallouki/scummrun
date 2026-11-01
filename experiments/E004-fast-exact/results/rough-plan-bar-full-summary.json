@@ -1,0 +1,45 @@
+{
+ "packed": "/home/ilyask/fast-mi/rough-out/check100/full/bar.tc",
+ "sas": {
+  "code": 0,
+  "wall_s": 3.55,
+  "cpu_s": 3.55,
+  "peak_rss_mb": 47
+ },
+ "operators": 5551,
+ "fd": {
+  "code": 0,
+  "wall_s": 1.44,
+  "cpu_s": 1.42,
+  "peak_rss_mb": 59
+ },
+ "status": "plan",
+ "decode": {
+  "code": 0,
+  "wall_s": 2.85,
+  "cpu_s": 2.85,
+  "peak_rss_mb": 43
+ },
+ "dump": {
+  "code": 0,
+  "wall_s": 1.13,
+  "cpu_s": 1.12,
+  "peak_rss_mb": 26
+ },
+ "plan_steps": 6,
+ "havoc_steps": 0,
+ "exact_steps": 6,
+ "steps_with_several_members_holding": 0,
+ "goal_first_step": {
+  "state:316": 5
+ },
+ "goal_reached": true,
+ "rooms": [
+  "33",
+  "33",
+  "33",
+  "28",
+  "28",
+  "28"
+ ]
+}
