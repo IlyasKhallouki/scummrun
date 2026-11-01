@@ -192,7 +192,10 @@ class Track:
         if not mine:
             return []
         m = _MatcherView(plan.matcher, dump_before)
-        vs = m.match(mine, before, after, open_keys_of(runs, before, after))
+        # trace-validation.md section 3, facts outside the view: a value outside its domain (None in the view) is not
+        # checked by M4
+        after_in = {k: v for k, v in after.items() if v is not None}
+        vs = m.match(mine, before, after_in, open_keys_of(runs, before, after))
         return [(v.run, v) for v in vs]
 
     def apply(self, k: int, run: TE.Run, v, after: dict) -> list:
@@ -285,8 +288,8 @@ def input_match(sr: Reading, plan: Plan, idx: int, units: list, v0: dict, d0: di
     seqs = [r.seq for r in own.values()]
     mine = sorted(own.values(), key=lambda r: r.seq)
     for k, e in eff.items():
-        if k.startswith("pos:") or e[0] not in ("set", "guess") or k not in vk:
-            continue
+        if k.startswith("pos:") or e[0] not in ("set", "guess") or vk.get(k) is None:
+            continue  # (a value outside its domain is not checked: trace-validation.md section 3)
         if not TE.StrictMatcher._value_ok(e, vk[k]):
             if any(k in plan.matcher.keys.get((r.unit, r.code0, r.code1 if r.code1 >= 0 else R.NOWHERE), ()) or
                    k in plan.matcher.keys.get((r.unit, r.code0, None), ()) for r in later):

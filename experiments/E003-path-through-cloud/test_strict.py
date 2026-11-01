@@ -242,3 +242,15 @@ def test_the_cache_keeps_a_dump_until_the_engine_runs():
     c.run(frame=6)
     assert c.state() == {"frame": 6} and c.state() is c.state() and b.dumps == 1
     assert c.at(1, 2) == {"obj": 9}
+
+
+def test_a_value_outside_its_domain_is_not_checked_by_m4():
+    """trace-validation.md section 3, facts outside the view: an effect whose fact the view gives no value (outside
+    the domain) is not checked."""
+    sr = FakeReading({7: (7, "local:3", 5, {}, {"pos:local:3": ("set", 9), "var:133": ("set", 4)}, [])})
+    r = mrec(0, "event", "e#7", "local:3", 5, writes={"pos:local:3", "var:133"})
+    t = S.Track(plan_of(sr, [r], {"e#7": 7}), {})
+    ru = run(11, "local:3", 5, 9)
+    vs = t.verdicts([ru], {"pos:local:3": 5, "var:133": 4}, {"pos:local:3": 9, "var:133": None}, None)
+    t.apply(10, ru, vs[0][1], {})
+    assert 0 in t.matched

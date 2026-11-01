@@ -1663,7 +1663,15 @@ class Search:
                 goal = not h._holds(h.goal, now)
                 credited = bool(w["goal_writers"]) and all(i in track.matched for i in w["goal_writers"])
                 if goal and not credited and not (ch.took == "n/a" and first.i in w["goal_writers"]):
-                    ch.outcome, ch.why = "goal, not from the plan", sorted(w["goal_writers"])
+                    ch.outcome = "goal, not from the plan"
+                    ch.why = [(sp.recs[i].name, "matched" if i in track.matched else
+                               f"refuted: {track.refuted[i][1]}" if i in track.refuted else "its run did not happen")
+                              for i in sorted(w["goal_writers"])]
+                    gi = next((i for i in sorted(w["goal_writers"]) if i in track.refuted), None)
+                    if gi is not None:  # 9.5: the goal record's own run failed
+                        fr, why_, run_ = track.refuted[gi]
+                        self._fail(w, ch, {"kind": "refuted", "record": sp.recs[gi].name, "frame": fr, "why": why_,
+                                           "run": run_, "material": kept.freeze()})
                     break
                 if (goal and credited) or all(i in track.matched for i in w["needed"]):
                     ch.outcome = "goal" if goal else "success"
