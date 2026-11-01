@@ -11,6 +11,7 @@
 //! * [`replay::Replay`]: a [`builder::Machine`] that plays back the machine runs reader_port_oracle.py captured
 //!   from the Python reading (the oracle for the Builder's half until the Rust machine lands).
 
+pub mod args;
 pub mod builder;
 pub mod costs;
 pub mod domain;
