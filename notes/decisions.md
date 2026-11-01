@@ -135,3 +135,12 @@ And dropping the time for the kitchen." Approved: F1b (a click's record ends whe
 the sentence, which then runs as its own event, as sentence records do today), the start-state bug fix,
 replanning on a task kept in memory instead of rebuilding it from the reading, and bringing the kitchen run's game
 time down. The next Part I run waits until the whole chain finds and plays a plan on a small scope on the laptop.
+
+## D11 (2026-11-01): Finish the game end to end first, speedrun later
+
+Decided by: Ilyas.
+
+"Honestly we should first solve the game by finishing it end to end then maybe use that for speedrunning later."
+The next goal is a route that finishes Part I, then the whole game, found from the game files and verified from
+boot. Proving a route shortest (the lower bound L and the search over input orders) and comparing with human runs
+wait until then. Game time still guides the planner's choices.
