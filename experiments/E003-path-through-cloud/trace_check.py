@@ -1390,6 +1390,44 @@ def causes_log(doc: dict, title: str) -> list:
     return lines
 
 
+def cmd_locate_fact(a) -> dict:
+    """Lemma L on a window run: the first frame in (lo, hi] where ``fact`` leaves ``value``, by bisection over forks of
+    the run's engine stopped at lo (its chosen inputs, or none after the run's start with ``--idle``), checked by a
+    frame-by-frame scan."""
+    doc = json.loads(Path(a.run).read_text())
+    if a.idle:
+        doc = json.loads(json.dumps(doc))
+        doc["run"]["inputs"] = [e for e in doc["run"]["inputs"] if e["frame"] <= a.lo]
+    eng = WindowEngine(doc, Path(a.bin), a.out / ("locate-idle" if a.idle else "locate"))
+    try:
+        if a.lo > eng.root.status["frame"]:
+            eng.root.run(frame=a.lo)
+        stats = {}
+        t0 = time.monotonic()
+        pred = lambda ch: F.facts_of(ch.state()).get(a.fact, 0) == a.value  # noqa: E731
+        lo_ok = pred(eng.root)
+        hi_ch = eng.c.fork(eng.root)
+        hi_ch.run(frame=a.hi)
+        hi_ok = pred(hi_ch)
+        hi_ch.quit()
+        k = TE.locate(lambda b: eng.c.fork(b), eng.root, a.lo, a.hi, pred, stats) if lo_ok and not hi_ok else None
+        bis_s = time.monotonic() - t0
+        # the check: every frame, one child
+        ch = eng.c.fork(eng.root)
+        first = None
+        for f in range(a.lo + 1, a.hi + 1):
+            ch.run(frame=f)
+            if not pred(ch):
+                first = f
+                break
+        ch.quit()
+    finally:
+        eng.close()
+    return {"run": Path(a.run).name, "idle": a.idle, "fact": a.fact, "value": a.value, "lo": a.lo, "hi": a.hi,
+            "holds_at_lo": lo_ok, "holds_at_hi": hi_ok, "bisection_frame": k, "scan_frame": first,
+            "forks": stats.get("forks", 0), "child_frames": stats.get("frames", 0), "bisection_s": round(bis_s, 2)}
+
+
 def cmd_causes_tsv(a) -> list:
     """The cause list as one table: per run B miss and per group of unexplained window runs, the unit, the code offset,
     the opcode, the class, the kind and the engine's values; numbers, units and offsets only."""
@@ -1468,8 +1506,24 @@ def main() -> None:
     p.add_argument("--tag", required=True)
     p.add_argument("--results", action="store_true")
     sub.add_parser("causes-tsv")
+    p = sub.add_parser("locate-fact")
+    p.add_argument("--run", type=Path, required=True)
+    p.add_argument("--bin", required=True)
+    p.add_argument("--fact", required=True)
+    p.add_argument("--value", type=int, required=True)
+    p.add_argument("--lo", type=int, required=True)
+    p.add_argument("--hi", type=int, required=True)
+    p.add_argument("--idle", action="store_true", help="no input after the start (the engine idles)")
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--results", action="store_true", help="append the result to results/b1-locate.jsonl")
     a = ap.parse_args()
-    if a.cmd == "causes-tsv":
+    if a.cmd == "locate-fact":
+        d = cmd_locate_fact(a)
+        print(json.dumps(d))
+        if a.results:
+            with open(RESULTS / "b1-locate.jsonl", "a") as fh:
+                fh.write(json.dumps(d) + "\n")
+    elif a.cmd == "causes-tsv":
         rows = cmd_causes_tsv(a)
         print(f"{len(rows) - 1} rows")
     elif a.cmd == "window-validate":
