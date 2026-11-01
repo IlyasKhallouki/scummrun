@@ -818,7 +818,10 @@ class Search:
         goal_writers = {r.i for r in tracked if r.i in self.goal_writers}
         click_paths, alts = None, []
         if has_input and inp.kind == "click":  # Lemma 9 and the click's other paths (section 3)
-            click_paths = [{kk: x for kk, x in e.items() if kk.startswith("pos:") and kk in doms_all}
+            # the slots the record leaves at wait points that no later tracked record resumes (Lemma 9): a wait the
+            # plan's next record of that slot resumes from may not block, and the frame end then shows the later value
+            later = set().union(*[q.writes for q in tracked if q.i > first.i])
+            click_paths = [{kk: x for kk, x in e.items() if kk.startswith("pos:") and kk in doms_all and kk not in later}
                            for e in first.exps]
             alts = self._alternatives(recs, first)
         w = {"goal_writers": goal_writers, "plan_pending": pm.plan_pending, "inp": inp, "name": first.name, "tracked": tracked, "needed": needed, "input": first if has_input else None,
