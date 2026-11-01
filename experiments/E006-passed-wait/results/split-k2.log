@@ -1,0 +1,53 @@
+E006: the strict window search with split_wait on (code at 1386267), k = 2's state:316 = 1 from the harness's boot, on the reading k2-pass (rooms 28, 29, 33, 34, 35, 38, 41, 83, 85, 96; e006's reader with wait_pass_cost: 450,967 actions, packed sha1 f5ec2354, its actions file byte for byte the trace branch's k2-w3 reading's; read under the heavy lock, peak 3,948 MB); run.sh (walk's switches) plus --window-split-wait, under the heavy lock; seed 1; the ScummVM build of svm-w3b; taskcore of branch walk.
+
+file replay-part1-k2-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split.json
+stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6398: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split'; goal reached False; goal from the plan's goal records False
+verify from boot (fresh engine, no fork): 5 checkpoints, 0 differences, 27 inputs, goal at the end False, error None
+game time from the run's start (frame 2728, qf 65284) to its stop (frame 9996, qf 239716): 7268 frames, 174432 qf, 726.82 s
+plans 3, replans 2
+  replan after plan 0 at frame 2796: deviation at frame 2796: [('sentence(2,428)#44', [('var:102', ['1'], 0)]), ('event(script:2@736#d897055c2f2e)#163', [])]; cause: input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  replan after plan 1 at frame 6396: window empty: 3600 frames; children {'spent': 3600}; cause: input walk_to(428)#64 at 2798: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  cause (deviation, plan 0 window 0): input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 43 assign =; var 103 = 428; local 2 = 0; class split
+  cause (window empty, plan 1 window 0): input walk_to(428)#64 at 2798: effect var:102: wrote another value; script:2 43 assign =; var 103 = 428; local 2 = 0; class split
+  cause (window empty, plan 2 window 0): input walk_to(428)#64 at 6398: effect var:102: wrote another value; script:2 43 assign =; var 103 = 428; local 2 = 0; class split
+windows 3; children 7268; child frames 24462; outcomes {'deviation': 1, 'duplicate': 6, 'pruned': 61, 'spent': 7200}
+search CPU: engines 95.9 s {'child': 95.86, 'snapshot': 0.0, 'the last engine': 0.0}, Python 264.03 s, total 359.9 s
+Python CPU by part {'setup': 1.01, 'play': 10.15, 'observe': 87.76, 'match': 89.78, 'child total': 209.17, 'cache: state, kept': 48828, 'cache: state, asked': 17284, 'cache: at, asked': 39283, 'cache: at, kept': 108335}
+memory {'forks_pss_kb': 75080, 'python_rss_kb': 735744, 'live_forks': 13, 'min_available_kb': 7772960}
+steps: inputs 3 {'deviation': 1, 'window empty': 2}; events 3 {'not reached': 3}
+  window 0.1 sentence(2,428)#44: frames 2728-2796 (stop: Q(g) + b reached the best deviation); 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}, 2862 child frames, 10.93 s wall, 9.86 Python s; best deviation fork 2728 inputs 2736-2776 end 2796 (qf 66916); failures [[['input', 'sentence(2,428)#44', 'effect var:102'], 62]]
+  window 1.1 walk_to(428)#64: frames 2796-6396 (3600 frames); 3600 children {'spent': 3600}, 10800 child frames, 137.14 s wall, 127.39 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'effect var:102'], 3600]]
+  window 2.1 walk_to(428)#64: frames 6396-9996 (3600 frames); 3600 children {'spent': 3600}, 10800 child frames, 137.1 s wall, 126.78 Python s; best None fork None inputs None-None end None (qf None); failures [[['input', 'walk_to(428)#64', 'effect var:102'], 3600]]
+windows with an input 3; search CPU per such window 120.0 s; x 250 = 8.33 CPU h
+effects outside their domain (M4 does not check them; the record still matches under trace-validation.md section 3): 0
+run seconds 607.2; reach extensions 0
+  plan 0 at frame 2728: plan, 6 steps, write 32.59800265310332, search None, plan_cost 5
+  plan 1 at frame 2796: plan, 4 steps, write 16.800695523037575, search None, plan_cost 3
+  plan 2 at frame 6396: plan, 4 steps, write 16.67054470302537, search None, plan_cost 3
+  window 0.1 sentence(2,428)#44: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 0}; b 1 frames, chain []
+  window 1.1 walk_to(428)#64: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 3600}; b 1 frames, chain []
+  window 2.1 walk_to(428)#64: runs read as parts {'parent': 0, 'children': 0, 'children_runs': 3600}; b 1 frames, chain []
+planner: taskcore serve peak RSS 1121 MB; plan seconds [22.7, 17.8, 17.9]
+
+the run's progress log (every 100 children's line left out):
+k2-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: booting to the first idle stop
+k2-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: start at frame 2728; the start check
+planning through taskcore (plan 0, frame 2728, 0 bans)
+plan 0: plan, 6 steps, 23 s
+plan 0 window 1/3: sentence(2,428)#44 at frame 2728 (2 records needed, 2 tracked)
+  window 1: cause: input sentence(2,428)#44 at 2777: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  window 1: stop: Q(g) + b reached the best deviation; 68 children {'deviation': 1, 'duplicate': 6, 'pruned': 61}; best 2796 (Q 66916); 10.93 s
+planning through taskcore (plan 1, frame 2796, 0 bans)
+plan 1: plan, 4 steps, 18 s
+plan 1 window 1/2: walk_to(428)#64 at frame 2796 (2 records needed, 2 tracked)
+  window 1: cause: input walk_to(428)#64 at 2798: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  window 1: 3600 frames; 3600 children {'spent': 3600}; best None (Q None); 137.14 s
+planning through taskcore (plan 2, frame 6396, 0 bans)
+plan 2: plan, 4 steps, 18 s
+plan 2 window 1/2: walk_to(428)#64 at frame 6396 (2 records needed, 2 tracked)
+  window 1: cause: input walk_to(428)#64 at 6398: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split
+  window 1: 3600 frames; 3600 children {'spent': 3600}; best None (Q None); 137.1 s
+k2-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split: stop 'the same empty window 2 times on walk_to(428)#64: input walk_to(428)#64 at 6398: effect var:102: wrote another value; script:2 [002B] assign =; var 103 = 428 (not a fact of the reading); local 2 = 0 (unknown); class split'; verifying from boot (5 checkpoints)
+wrote /home/ilyask/.cache/fast-mi-e006/results/replay-part1-k2-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split.json
+exit 0
+GUARD: rc 0 wall 609.7 s low 0 min MemAvailable 6950448 kB
