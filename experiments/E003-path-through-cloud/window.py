@@ -15,8 +15,13 @@ What it does (window-search.md, with its lemma numbers):
   pruned, limit or an Executor error (section 3; ``Matcher``, section 2). Forking stops once Q(g) + b reaches the best
   success (Lemmas 2-4, ``chain_frames``), and the window ends where a fact the macro step reads changes after the
   input's precondition held in the parent, or ``window_frames`` frames after its start (section 5).
+* the matcher checks the writes a later step reads (Lemma 8, ``checked_keys``); a click's record must show in its
+  frame or the next (Lemma 9), else another record of the same click (``source_index``, ``other_path``) or the child
+  is spent; a child whose input took effect and whose plan then failed is a deviation, an end point at the next frame
+  the engine takes a click (section 3).
 * ``Search.play_plan``: the windows of one plan in order; the chosen child's snapshot, taken at its last input frame,
-  is the next window's parent (section 7). It returns "goal", "replan" (with ``replan_cause``) or "stop".
+  is the next window's parent; at a deviation the deviating child's branch is the engine and the plan is made again
+  (section 7). It returns "goal", "replan" (with ``replan_cause``) or "stop".
 
 C1 and C2: it gives only the harness's player inputs and names no game's number.
 """
