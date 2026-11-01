@@ -12,7 +12,8 @@
 //! --out DIR     the report, DIR/NAME.json (and the packed file DIR/NAME.tc unless --packed)
 //! --cap-min M   stop the reading after M minutes (default 60); --max-rss-gb G (default 8) and --min-free-gb G
 //!               (MemAvailable, default 3) stop it too, and --max-files-gb G (the packed file and --golden's body
-//!               together, default no limit); the report then says where it stopped (exit code 3)
+//!               together, default no limit), and --max-cpu-s N (the reading's CPU seconds, all threads, default no
+//!               limit); the report then says where it stopped (exit code 3)
 //! --max-waiting N  records done and waiting for an earlier job past which workers start no new job but that
 //!               one (default 100,000: memory stays bounded when one job runs long)
 //! --hash        sha1 of the records' lines (golden.py's "record" lines, as made, before `_read_once`'s rewrite of
@@ -40,7 +41,8 @@
 //!               file's `at:`/`esc:` facts (task.rs `task_start`), so a start from the engine is given as its facts.py
 //!               map (the replay harness's reach extension, replay_part1.py `--reach-extend`)
 //! --switches S,... further reader switches by name (`Switches::parse`), as reader-port's: fix round 1's value_sets,
-//!               draw_clears and actor_rooms. Not due_first, which writes on the kept records after the reading. Off by default.
+//!               draw_clears and actor_rooms, grow_limit, havoc_cut (havoc.rs), shared_runs (shared.rs). Not due_first,
+//!               which writes on the kept records after the reading. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
@@ -452,6 +454,7 @@ fn main() {
     let max_rss_kb = (arg(&args, "--max-rss-gb").map_or(8.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let max_files_b = arg(&args, "--max-files-gb").map(|g| (g.parse::<f64>().unwrap() * 1073741824.0) as u64);
+    let max_cpu_s: Option<f64> = arg(&args, "--max-cpu-s").map(|c| c.parse().unwrap());
     let hash = args.iter().any(|a| a == "--hash");
     let keep = args.iter().any(|a| a == "--keep");
     let elsewhere = args.iter().any(|a| a == "--elsewhere");
@@ -651,6 +654,8 @@ fn main() {
             }
             let why = if wall > cap_s {
                 Some(format!("the reading passed {:.0} minutes", cap_s / 60.0))
+            } else if max_cpu_s.is_some_and(|m| cpu_secs() - cpu0 > m) {
+                Some(format!("the reading passed {:.0} CPU s", max_cpu_s.unwrap()))
             } else if rss > max_rss_kb {
                 Some(format!("the process's RSS passed {:.1} GB", max_rss_kb as f64 / 1048576.0))
             } else if free < min_free_kb {
@@ -810,6 +815,15 @@ fn main() {
             "ran_folded_list": n(&m.stale_list),
             "ran_reached_value": n(&m.stale_reached),
             "ran_not_in_pass_1": n(&m.none),
+        });
+    }
+    if let Some(sh) = &b.table.shared {
+        let n = |a: &std::sync::atomic::AtomicU64| a.load(std::sync::atomic::Ordering::Relaxed);
+        r["shared_runs"] = json!({
+            "made": n(&sh.made),
+            "taken": n(&sh.taken),
+            "read_their_verb": n(&sh.refused),
+            "waited_s": (n(&sh.waited_ns) as f64 / 1e7).round() / 100.0,
         });
     }
     r["sink_thread_busy_s"] = json!((tee.busy * 10.0).round() / 10.0);
