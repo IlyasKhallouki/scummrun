@@ -379,18 +379,24 @@ def read_ops(path) -> tuple:
 def decode_ops(text: str, ops: dict, acts: dict) -> list:
     """The plan's steps through the operator table, ``parse_plan``'s rules: goal operators left out, each pick folded
     into the steps that read it (a pick variable starts at its first value). Per step a dict: op, the reduced action
-    and its name, its members (the input actions), chosen and guessed as task.Op holds them."""
+    and its name, its members (the input actions), chosen and guessed as task.Op holds them.
+
+    A table written with taskcore's ``--pick-windows on`` (its rows name a ``window``) is read as taskcore's
+    ``decode`` reads it (sas.rs ``decode``; taskcore/README.md, "Pick windows", Lemma 2 and the corollary): a
+    window's ``begin`` is left out like a goal operator, its picks are read as pick operators, and after each step
+    every pick variable is at its first value again."""
     first = {}
     for n in sorted(ops):
         if "pick" in ops[n]:
             first.setdefault(ops[n]["pick"][0], _value(ops[n]["pick"][1]))
+    windows = any("window" in d for d in ops.values())
     steps, picks = [], {}
     for line in text.splitlines():
         line = line.strip()
         if not line.startswith("("):
             continue
         d = ops[int(line.strip("()").split()[0][1:])]
-        if d.get("goal"):
+        if d.get("goal") or d.get("begin"):
             continue
         if "pick" in d:
             picks[d["pick"][0]] = _value(d["pick"][1])
@@ -403,6 +409,8 @@ def decode_ops(text: str, ops: dict, acts: dict) -> list:
             guessed += ((k, u if u in vals else vals[0], _conds(w)),)
         steps.append({"op": f"a{d['op']}", "action": d["action"], "name": a["name"], "members": a["members"],
                       "chosen": tuple((k, _value(v)) for k, v in d["chosen"]), "guessed": guessed})
+        if windows:
+            picks = {}
     return steps
 
 

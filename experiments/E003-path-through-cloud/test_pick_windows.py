@@ -16,7 +16,8 @@ For each random task (test_taskcore's) and each configuration below, taskcore wr
 3. Theorem 2: Π^W's optimal plan, mapped back (each window's end becomes pick operators with the window's values, then
    the operator), is a plan of Π with the same cost;
 4. reading back: ``taskcore decode`` of Π^W's plan gives the same steps (actions, chosen, guessed and picked values)
-   as ``decode`` of the mapped plan on Π;
+   as ``decode`` of the mapped plan on Π, and ``plan_fd.decode_ops`` (the harness's reading through the operator
+   table) gives taskcore decode's steps from both tables: Π^W's with its window rows, and Π's;
 5. a file with no window and no pick operator is the same bytes with the switch on.
 
 ``real`` runs 2 to 4 on a packed file: the plans are Fast Downward plan files (``--plain-plan`` on Π, ``--window-plan``
@@ -215,6 +216,22 @@ def to_plain(plan: list, p: Ops, w: Ops) -> list:
     return out
 
 
+def py_decode(ops_path: Path, plan: list) -> list:
+    """``plan_fd.decode_ops`` of ``plan`` through the operator table at ``ops_path``, as comparable rows: (action,
+    name, members, chosen, guessed), values as their text."""
+    import plan_fd
+    _, ops, acts = plan_fd.read_ops(ops_path)
+    text = "".join(f"(a{n})\n" for n in plan)
+    return [(s["action"], s["name"], list(s["members"]), [[k, str(v)] for k, v in s["chosen"]],
+             [[k, str(v)] for k, v, _ in s["guessed"]]) for s in plan_fd.decode_ops(text, ops, acts)]
+
+
+def decode_rows(steps: list) -> list:
+    """taskcore decode's steps as ``py_decode``'s rows."""
+    return [(s["action"], s["name"], list(s["members"]), [[k, str(v)] for k, v in s["chosen"]],
+             [[k, str(v)] for k, v in s["guessed"]]) for s in steps]
+
+
 def fd_plan(sas: Path, work: Path, search="astar(blind())"):
     """Fast Downward on ``sas``: (cost, operator numbers), or None when it proves there is no plan."""
     plan = work / "fdplan"
@@ -294,6 +311,12 @@ def check_maps(work, task_args, args, plain, win, plain_plan, win_plan, counts, 
                 fails.append((name, "decode: other steps", a[:3], b[:3]))
             else:
                 counts["decode: the same steps"] += 1
+            pa, pb, ra = py_decode(win[1], win_plan), py_decode(plain[1], mapped), decode_rows(a)
+            if pa != ra or pb != ra:
+                fails.append((name, "decode_ops: other steps than taskcore decode", pa[:2], pb[:2], ra[:2]))
+            else:
+                counts["decode_ops: taskcore decode's steps from both tables"] += 1
+                counts["decode_ops: of them through a window"] += nw > 0
 
 
 def to_consumers(sp: Sas, P: Ops, consumer: set, rng, n: int, cap: int = 20000) -> list:
@@ -326,9 +349,11 @@ def to_consumers(sp: Sas, P: Ops, consumer: set, rng, n: int, cap: int = 20000) 
     return out
 
 
-def check_walks(plain, win, rng, n: int, length: int, counts, fails, name) -> None:
+def check_walks(plain, win, rng, n: int, length: int, counts, fails, name, dec=None) -> None:
     """The two maps on random operator sequences rather than plans: each walk on one file, mapped to the other, runs
-    there and ends in a state with the same facts (F). Consumers on Π, and windows on Π^W, are preferred."""
+    there and ends in a state with the same facts (F). Consumers on Π, and windows on Π^W, are preferred. With
+    ``dec`` (work, task_args, args), each walk on Π^W is also read back: taskcore decode on Π^W, and decode_ops on
+    both tables, give the same steps."""
     P, W = Ops(plain[1]), Ops(win[1])
     sp, sw = Sas(plain[0]), Sas(win[0])
     consumer = {p_op for p_op, w_op in zip(P.action_rows, W.action_rows) if "window" in W.op[w_op]}
@@ -366,6 +391,15 @@ def check_walks(plain, win, rng, n: int, length: int, counts, fails, name) -> No
             counts["walks on Π^W: mapped, the same facts and cost"] += 1
             counts["walks on Π^W: windows closed"] += sum(1 for m in walk if W.op[m].get("window") is not None
                                                           and "action" in W.op[m])
+            if dec is not None:
+                work, task_args, args = dec
+                ra = decode_rows(decode(work, task_args, args + ON, walk, "ww"))
+                rb = decode_rows(decode(work, task_args, args, mapped, "wp"))
+                pa, pb = py_decode(win[1], walk), py_decode(plain[1], mapped)
+                if not (ra == rb == pa == pb):
+                    fails.append((name, "theorem 2 on a walk: decode or decode_ops differ", i))
+                else:
+                    counts["walks on Π^W: decode and decode_ops, the same steps on both"] += 1
 
 
 def check_one(task, start, work: Path, counts: collections.Counter, fails: list) -> None:
@@ -449,7 +483,8 @@ def real(argv) -> int:
         wp = read_plan(a.window_plan) if a.window_plan else None
         check_maps(work, task_args, a.args, plain, win, pp, wp, counts, fails, "real")
         if a.walks:
-            check_walks(plain, win, random.Random(1), a.walks, a.length, counts, fails, "real")
+            check_walks(plain, win, random.Random(1), a.walks, a.length, counts, fails, "real",
+                        dec=(work, task_args, a.args))
     for k, v in sorted(counts.items()):
         print(f"{v:6d}  {k}")
     print(f"failures: {len(fails)}")
@@ -464,6 +499,7 @@ def test_random_tasks():
     assert counts["PRODUCT_LIMIT 1: tasks with a window"] > 0
     assert counts["theorem 2: the mapped plan runs on Π, the same cost"] > 0
     assert counts["decode: the same steps"] > 0 and counts["no window, no pick: the same bytes"] > 0
+    assert counts["decode_ops: of them through a window"] > 0
     assert counts["theorem 1: plans through a window"] > 0 and counts["theorem 2: plans through a window"] > 0
 
 
