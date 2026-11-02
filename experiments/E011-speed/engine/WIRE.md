@@ -92,7 +92,9 @@ Checks as the JSON parsers make them:
   - A lite dump has no inventory and no room objects (`None`), as the JSON lite dump has neither key.
   - Names only with `names` (the JSON always has them).
   - The exact object only with `exact`, on a full dump. It is `exactJson()`, key for key with its types: ints `Int`;
-    `seg` a `Bool`; `audio_owed` (`%.17g`) and `screens` (the digest) `Text`; arrays `List`; `cd` a `Map`.
+    `seg` a `Bool`; `audio_owed` (`%.17g`) and `screens` (the digest) `Text`; arrays `List`; `cd` a `Map`. With
+    patch 0003's pixel-free dump (SPEEDRUN_DUMP_NOPIXELS, on with SPEEDRUN_NO_PIXELS; CUTS.md, section 3) the digest's
+    key is `screens_np` and it covers the screens' headers and the palette only, in both encodings.
   - Locals, resistant, recursive and a level's data only with SPEEDRUN_DUMP_LOCALS, as in JSON.
 - **StateJson** is the JSON text the `state` command sends (without its `{"state": ...}` wrapper). It is the lite dump
   when `objects` is set, else the full dump, with the exact object when SPEEDRUN_DUMP_EXACT is on or `exact` is asked.
