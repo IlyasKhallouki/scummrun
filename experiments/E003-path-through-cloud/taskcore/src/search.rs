@@ -30,6 +30,8 @@
 
 use crate::model::*;
 use crate::sas::{self, Expander, Plan};
+
+mod watch;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::time::Instant;
 
@@ -507,6 +509,24 @@ pub fn build(x: &mut Expander, start: &[u32]) -> Result<(Plan, SasTask, Vec<OpOf
     Ok((plan, st, of))
 }
 
+/// This thread's CPU seconds (CLOCK_THREAD_CPUTIME_ID), for the bench's per-evaluation numbers.
+pub fn thread_cpu_s() -> f64 {
+    #[repr(C)]
+    struct Timespec {
+        tv_sec: i64,
+        tv_nsec: i64,
+    }
+    extern "C" {
+        fn clock_gettime(clk: i32, tp: *mut Timespec) -> i32;
+    }
+    let mut t = Timespec { tv_sec: 0, tv_nsec: 0 };
+    // SAFETY: clock_gettime writes one timespec; 3 is CLOCK_THREAD_CPUTIME_ID on Linux
+    if unsafe { clock_gettime(3, &mut t) } != 0 {
+        return 0.0;
+    }
+    t.tv_sec as f64 + t.tv_nsec as f64 * 1e-9
+}
+
 // --- the adapted costs ----------------------------------------------------------------------------------------------
 
 /// operator_cost.cc PLUSONE on the task: cost + 1, or 1 for every operator when every operator costs 1.
@@ -520,6 +540,7 @@ pub fn plusone(t: &SasTask) -> Vec<i32> {
 const MIN_BUCKETS_BEFORE_SWITCH: i32 = 100;
 
 /// algorithms/priority_queues.h `AdaptiveQueue<PropID>`: a bucket queue that turns into a heap (and stays one).
+#[derive(Clone, PartialEq, Debug)]
 enum AQueue {
     Bucket { buckets: Vec<Vec<u32>>, current: usize, entries: usize, pushes: i64 },
     Heap(Vec<(i32, u32)>),
@@ -655,6 +676,25 @@ const NO_OP: u32 = u32::MAX;
 const MAX_COST_VALUE: i32 = 100_000_000;
 const MAX_PRECONDITIONS_TO_TEST: usize = 5;
 
+/// How h_FF's exploration is computed (the same pushes either way, so the same values and preferred operators):
+/// `Fd`, FD's loop transcribed (the reference; the default), or `Watch`, by watched preconditions (search/watch.rs).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum HffMode {
+    #[default]
+    Fd,
+    Watch,
+}
+
+impl HffMode {
+    pub fn parse(s: &str) -> Result<HffMode, String> {
+        match s {
+            "fd" => Ok(HffMode::Fd),
+            "watch" => Ok(HffMode::Watch),
+            _ => Err(format!("h_FF mode {:?} (fd, watch)", s)),
+        }
+    }
+}
+
 /// The relaxed task (relaxation_heuristic.cc) and the FF heuristic's working state (ff_heuristic.cc), kept across
 /// evaluations as FD keeps it.
 pub struct Ff {
@@ -687,6 +727,18 @@ pub struct Ff {
     pub n_unary_built: usize,
     pub evaluations: u64,
     pub eval_s: f64,
+    /// the evaluations' CPU seconds, millions of instructions and of cycles (this thread's)
+    pub eval_cpu_s: f64,
+    pub eval_minstr: f64,
+    pub eval_mcyc: f64,
+    /// the exploration's mode, and the watch structure (built at the first evaluation in mode `Watch`)
+    pub mode: HffMode,
+    watch: Option<Box<watch::Watch>>,
+    check: bool,
+    prof: bool,
+    log: Vec<(i32, u32, u32)>,
+    /// when the watches are built again (watch.rs `maybe_rebuild`): (gap, least)
+    watch_policy: (u64, u64),
 }
 
 /// A small key for `simplify`'s map: the sorted preconditions (at most `MAX_PRECONDITIONS_TO_TEST + ..` are hashed
@@ -970,7 +1022,34 @@ impl Ff {
             n_unary_built: nb,
             evaluations: 0,
             eval_s: 0.0,
+            eval_cpu_s: 0.0,
+            eval_minstr: 0.0,
+            eval_mcyc: 0.0,
+            mode: HffMode::Fd,
+            watch: None,
+            check: std::env::var_os("TASKCORE_CHECK_HFF").is_some(),
+            prof: std::env::var_os("TASKCORE_PROFILE_HFF").is_some(),
+            log: Vec::new(),
+            watch_policy: match std::env::var("TASKCORE_HFF_REBUILD") {
+                Ok(v) => {
+                    let mut it = v.split(':').map(|x| x.parse::<u64>().unwrap_or(0));
+                    (it.next().unwrap_or(64), it.next().unwrap_or(20_000))
+                }
+                Err(_) => (64, 20_000),
+            },
         }
+    }
+
+    /// The relaxed task of `t`, its exploration in `mode`.
+    pub fn with_mode(t: &SasTask, adj: &[i32], mode: HffMode) -> Ff {
+        let mut ff = Ff::new(t, adj);
+        ff.mode = mode;
+        ff
+    }
+
+    /// The watch structure's numbers (builds, the last evaluation's moves and fires), in mode `Watch`.
+    pub fn watch_counts(&self) -> Option<(u64, u64, u64)> {
+        self.watch.as_ref().map(|w| (w.builds, w.moves, w.fires))
     }
 
     pub fn n_unary(&self) -> usize {
@@ -982,6 +1061,9 @@ impl Ff {
         let c = &mut self.cost[p as usize];
         if *c == -1 || *c > cost {
             *c = cost;
+            if self.check {
+                self.log.push((cost, p, op));
+            }
             self.reached_by[p as usize] = op;
             self.queue.push(cost, p);
         }
@@ -989,12 +1071,106 @@ impl Ff {
 
     /// h_FF of `s` (None: a dead end), with `preferred` set (ff_heuristic.cc `compute_heuristic`).
     pub fn eval(&mut self, s: &[u32]) -> Option<i64> {
+        let c0 = thread_cpu_s();
+        let k0 = crate::perf::now();
+        let r = self.eval_in(s);
+        self.eval_cpu_s += thread_cpu_s() - c0;
+        let (i, c) = crate::perf::since(k0);
+        self.eval_minstr += i;
+        self.eval_mcyc += c;
+        r
+    }
+
+    fn eval_in(&mut self, s: &[u32]) -> Option<i64> {
         let t0 = Instant::now();
+        let c_in = if self.prof { thread_cpu_s() } else { 0.0 };
+        let k_in = if self.prof { crate::perf::now() } else { (0, 0) };
         self.evaluations += 1;
         for p in &self.preferred {
             self.pref_mark[*p as usize] = false;
         }
         self.preferred.clear();
+        match self.mode {
+            HffMode::Fd => self.explore_fd(s),
+            HffMode::Watch => {
+                let mut w = match self.watch.take() {
+                    Some(w) => w,
+                    None => {
+                        // the first evaluation is FD's; the watches are built from its costs (watch.rs)
+                        self.explore_fd(s);
+                        let tb = thread_cpu_s();
+                        let rank: Vec<u32> = self.cost.iter().map(|&c| if c < 0 { u32::MAX } else { c as u32 }).collect();
+                        let w = Box::new(watch::Watch::new(self, &rank, self.watch_policy));
+                        if self.prof {
+                            eprintln!("profile hff eval 1 (FD's): {:.3} ms, watches built in {:.3} ms", (tb - c_in) * 1e3, (thread_cpu_s() - tb) * 1e3);
+                        }
+                        self.watch = Some(w);
+                        return self.after_exploration(t0);
+                    }
+                };
+                if self.check {
+                    // both from the queue as the evaluation found it (a bucket queue that turns into a heap during FD's
+                    // run must start as a bucket queue again)
+                    let q0 = self.queue.clone();
+                    self.log.clear();
+                    self.explore_fd(s);
+                    let fdlog = std::mem::take(&mut self.log);
+                    let (cost, by, queue) = (self.cost.clone(), self.reached_by.clone(), self.queue.clone());
+                    self.queue = q0;
+                    self.explore_watch(&mut w, s);
+                    if fdlog != self.log {
+                        let i = (0..fdlog.len().min(self.log.len())).find(|&i| fdlog[i] != self.log[i]).unwrap_or(fdlog.len().min(self.log.len()));
+                        panic!(
+                            "h_FF by watches: event {} of {} (FD) / {} differs at evaluation {}: FD {:?}, watches {:?} (cost, proposition, operator; cost -1: a pop)",
+                            i,
+                            fdlog.len(),
+                            self.log.len(),
+                            self.evaluations,
+                            fdlog.get(i),
+                            self.log.get(i)
+                        );
+                    }
+                    if cost != self.cost {
+                        let d: Vec<(usize, i32, i32)> = (0..cost.len()).filter(|&i| cost[i] != self.cost[i]).map(|i| (i, cost[i], self.cost[i])).take(10).collect();
+                        panic!("h_FF by watches: the costs differ from FD's exploration at evaluation {}: (prop, FD, watch) {:?}; goals {:?}", self.evaluations, d, self.goal_props);
+                    }
+                    assert!(by == self.reached_by, "h_FF by watches: reached_by differs from FD's exploration");
+                    assert!(queue == self.queue, "h_FF by watches: the queue differs from FD's exploration");
+                } else {
+                    self.explore_watch(&mut w, s);
+                }
+                let (b0, tb) = (w.builds, thread_cpu_s());
+                w.maybe_rebuild(self);
+                if self.prof {
+                    eprintln!(
+                        "profile hff eval {}: {:.3} ms, {:.2} M instructions, looks {}, moves {}, fires {}, segments {} live {}{}",
+                        self.evaluations,
+                        (tb - c_in) * 1e3,
+                        crate::perf::since(k_in).0,
+                        w.looks,
+                        w.moves,
+                        w.fires,
+                        w.segs.0,
+                        w.segs.1,
+                        if w.builds > b0 { format!(", rebuilt in {:.3} ms", (thread_cpu_s() - tb) * 1e3) } else { String::new() }
+                    );
+                }
+                self.watch = Some(w);
+            }
+        }
+        self.after_exploration(t0)
+    }
+
+    fn after_exploration(&mut self, t0: Instant) -> Option<i64> {
+        if self.goal_props.iter().any(|&g| self.cost[g as usize] == -1) {
+            self.eval_s += t0.elapsed().as_secs_f64();
+            return None;
+        }
+        self.relaxed_plan_h(t0)
+    }
+
+    /// FD's `setup_exploration_queue`, `setup_exploration_queue_state` and `relaxed_exploration`, transcribed.
+    fn explore_fd(&mut self, s: &[u32]) {
         // setup_exploration_queue
         self.queue.clear();
         self.cost.iter_mut().for_each(|c| *c = -1);
@@ -1019,6 +1195,9 @@ impl Ff {
             if pc < d {
                 continue;
             }
+            if self.check {
+                self.log.push((-1, p, d as u32));
+            }
             if self.is_goal[p as usize] {
                 unsolved -= 1;
                 if unsolved == 0 {
@@ -1037,10 +1216,10 @@ impl Ff {
                 }
             }
         }
-        if self.goal_props.iter().any(|&g| self.cost[g as usize] == -1) {
-            self.eval_s += t0.elapsed().as_secs_f64();
-            return None;
-        }
+    }
+
+    /// The relaxed plan and the preferred operators from the goals back (`compute_heuristic`'s rest): h_FF.
+    fn relaxed_plan_h(&mut self, t0: Instant) -> Option<i64> {
         // mark_preferred_operators_and_relaxed_plan from each goal (the sets it makes do not depend on the order)
         self.plan_ops.clear();
         for gi in 0..self.goal_props.len() {
@@ -1108,8 +1287,13 @@ pub struct Outcome {
     pub relax_s: f64,
     pub search_s: f64,
     pub eval_s: f64,
+    pub eval_cpu_s: f64,
+    pub eval_minstr: f64,
+    pub eval_mcyc: f64,
     pub unary: usize,
     pub unary_built: usize,
+    /// mode `Watch`: the watch structure's builds
+    pub watch_builds: u64,
 }
 
 /// FD's successor order (module docstring): the operators sorted by their sorted precondition list, then number.
@@ -1127,6 +1311,65 @@ pub fn successor_order(t: &SasTask) -> Vec<u32> {
     ids
 }
 
+/// FD's successor order by first precondition (mode `Watch`): `order` is sorted by the operators' sorted precondition
+/// lists, so the operators with no precondition come first, then those whose first (least) precondition is (v, x), in
+/// (v, x) order, each group contiguous. An operator applies in s only if its first precondition holds, so the groups
+/// (v, s[v]) for v in increasing order, after the empty group, hold every applicable operator in `order`'s order.
+pub struct SuccIndex {
+    empty: Vec<u32>,
+    /// per proposition (prop_off[v] + x): its group's range in `ops`
+    off: Vec<u32>,
+    ops: Vec<u32>,
+    prop_off: Vec<u32>,
+}
+
+impl SuccIndex {
+    pub fn new(t: &SasTask, order: &[u32]) -> SuccIndex {
+        let mut prop_off = Vec::with_capacity(t.sizes.len());
+        let mut n = 0u32;
+        for &s in &t.sizes {
+            prop_off.push(n);
+            n += s;
+        }
+        let first = |o: u32| t.pre(o as usize).iter().min().map(|&(v, x)| prop_off[v as usize] + x);
+        let mut cnt = vec![0u32; n as usize + 1];
+        let mut empty = Vec::new();
+        for &o in order {
+            match first(o) {
+                None => empty.push(o),
+                Some(p) => cnt[p as usize + 1] += 1,
+            }
+        }
+        for i in 0..n as usize {
+            cnt[i + 1] += cnt[i];
+        }
+        let off = cnt.clone();
+        let mut ops = vec![0u32; cnt[n as usize] as usize];
+        for &o in order {
+            if let Some(p) = first(o) {
+                ops[cnt[p as usize] as usize] = o;
+                cnt[p as usize] += 1;
+            }
+        }
+        SuccIndex { empty, off, ops, prop_off }
+    }
+
+    /// The operators of `order` that apply in `s`, in `order`'s order.
+    pub fn applicable(&self, t: &SasTask, s: &[u32], f: &mut impl FnMut(u32)) {
+        for &o in &self.empty {
+            f(o);
+        }
+        for (v, &x) in s.iter().enumerate() {
+            let p = (self.prop_off[v] + x) as usize;
+            for &o in &self.ops[self.off[p] as usize..self.off[p + 1] as usize] {
+                if t.applicable(o as usize, s) {
+                    f(o);
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum NodeStatus {
     New,
@@ -1137,9 +1380,14 @@ enum NodeStatus {
 /// `lazy_greedy([hff], preferred=[hff], reopen_closed=false)` from the task's start (module docstring); `deadline`:
 /// stop with status "time" past it.
 pub fn lazy_greedy(t: &SasTask, deadline: Option<Instant>) -> Outcome {
+    lazy_greedy_mode(t, deadline, HffMode::Fd)
+}
+
+/// `lazy_greedy` with h_FF's exploration in `mode` (the same plans and counts in every mode).
+pub fn lazy_greedy_mode(t: &SasTask, deadline: Option<Instant>, mode: HffMode) -> Outcome {
     let t0 = Instant::now();
     let adj = plusone(t);
-    let mut ff = Ff::new(t, &adj);
+    let mut ff = Ff::with_mode(t, &adj, mode);
     let order = successor_order(t);
     let relax_s = t0.elapsed().as_secs_f64();
     let t1 = Instant::now();
@@ -1154,8 +1402,11 @@ pub fn lazy_greedy(t: &SasTask, deadline: Option<Instant>) -> Outcome {
 /// The search with a built heuristic and successor order (`lazy_greedy`).
 pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Option<Instant>) -> Outcome {
     let nv = t.sizes.len();
+    let index = if ff.mode == HffMode::Watch { Some(SuccIndex::new(t, order)) } else { None };
     let ev0 = ff.evaluations;
     let es0 = ff.eval_s;
+    let ec0 = ff.eval_cpu_s;
+    let (ei0, ey0) = (ff.eval_minstr, ff.eval_mcyc);
     // the state registry: states by id in one arena; their ids by content
     let mut arena: Vec<u32> = Vec::with_capacity(nv * 64);
     let mut ids: HashMap<Box<[u32]>, u32, FxBuild> = HashMap::default();
@@ -1241,16 +1492,23 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
                         }
                     }
                     // generate_successors
-                    for &o in order {
-                        if !t.applicable(o as usize, &state) {
-                            continue;
-                        }
+                    let mut gen = |o: u32| {
                         out.generated += 1;
                         lists[0].entry(h).or_default().push_back((cur, o));
                         sizes[0] += 1;
                         if ff.is_preferred(o) {
                             lists[1].entry(h).or_default().push_back((cur, o));
                             sizes[1] += 1;
+                        }
+                    };
+                    match &index {
+                        Some(ix) => ix.applicable(t, &state, &mut gen),
+                        None => {
+                            for &o in order {
+                                if t.applicable(o as usize, &state) {
+                                    gen(o);
+                                }
+                            }
                         }
                     }
                     out.expanded += 1;
@@ -1292,6 +1550,10 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
     }
     out.evaluations = ff.evaluations - ev0;
     out.eval_s = ff.eval_s - es0;
+    out.eval_cpu_s = ff.eval_cpu_s - ec0;
+    out.eval_minstr = ff.eval_minstr - ei0;
+    out.eval_mcyc = ff.eval_mcyc - ey0;
+    out.watch_builds = ff.watch_counts().map_or(0, |w| w.0);
     out
 }
 
@@ -1390,5 +1652,79 @@ mod tests {
         assert_eq!(o.plan, vec![0, 1]);
         assert_eq!(plan_text(&t, &o.plan), "(a0)\n(a1)\n; cost = 2 (unit cost)\n");
         check_plan(&t, &o.plan).unwrap();
+        let w = lazy_greedy_mode(&t, None, HffMode::Watch);
+        assert_eq!((w.status, w.plan), (o.status, o.plan));
+    }
+
+    /// A random SAS task: `nv` variables of 2-4 values, `no` operators of 0-3 preconditions and 1-3 effects (some
+    /// conditional), costs 0-299 (so h_FF's queue turns into a heap) or all 1.
+    fn random_task(seed: u64, nv: usize, no: usize, unit: bool) -> SasTask {
+        let mut r = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
+        let mut next = move |n: u64| {
+            r ^= r << 13;
+            r ^= r >> 7;
+            r ^= r << 17;
+            r % n.max(1)
+        };
+        let mut t = SasTask { metric: !unit, pre_off: vec![0], eff_off: vec![0], ..Default::default() };
+        for v in 0..nv {
+            t.sizes.push(2 + next(3) as u32);
+            t.names.push(format!("v{}", v));
+        }
+        t.init = t.sizes.iter().map(|&s| next(s as u64) as u32).collect();
+        let g = next(nv as u64) as u32;
+        t.goal = vec![(g, (t.init[g as usize] + 1) % t.sizes[g as usize])];
+        for _ in 0..no {
+            let mut pre: Vec<(u32, u32)> = Vec::new();
+            for _ in 0..next(4) {
+                let v = next(nv as u64) as u32;
+                if pre.iter().all(|p| p.0 != v) {
+                    pre.push((v, next(t.sizes[v as usize] as u64) as u32));
+                }
+            }
+            let mut effs: Vec<EffSpec> = Vec::new();
+            for _ in 0..1 + next(3) {
+                let v = next(nv as u64) as u32;
+                if effs.iter().any(|e| e.1 == v) {
+                    continue;
+                }
+                let mut c = Vec::new();
+                if next(3) == 0 {
+                    let cv = next(nv as u64) as u32;
+                    c.push((cv, next(t.sizes[cv as usize] as u64) as u32));
+                }
+                effs.push((c, v, next(t.sizes[v as usize] as u64) as u32));
+            }
+            let cost = if unit { 1 } else { next(300) as u32 };
+            t.push_op(&pre, &effs, cost);
+        }
+        t
+    }
+
+    /// h_FF by watches makes FD's exploration, event for event, on random tasks (the check on in every evaluation), so
+    /// the searches give the same outcomes.
+    #[test]
+    fn watch_equals_fd_on_random_tasks() {
+        let mut plans = 0;
+        for seed in 0..300u64 {
+            let unit = seed % 5 == 0;
+            let t = random_task(seed, 4 + (seed % 9) as usize, 10 + (seed * 7 % 150) as usize, unit);
+            let adj = plusone(&t);
+            let order = successor_order(&t);
+            let mut a = Ff::with_mode(&t, &adj, HffMode::Fd);
+            let fd = lazy_greedy_with(&t, &mut a, &order, None);
+            let mut b = Ff::with_mode(&t, &adj, HffMode::Watch);
+            b.check = true;
+            if seed % 2 == 1 {
+                // the watches built again after every evaluation
+                b.watch_policy = (1, 0);
+            }
+            let w = lazy_greedy_with(&t, &mut b, &order, None);
+            assert_eq!((&fd.status, &fd.plan, fd.expanded, fd.evaluated, fd.generated), (&w.status, &w.plan, w.expanded, w.evaluated, w.generated), "seed {}", seed);
+            if fd.status == "plan" {
+                plans += 1;
+            }
+        }
+        assert!(plans > 50, "{} of 300 random tasks have a plan", plans);
     }
 }
