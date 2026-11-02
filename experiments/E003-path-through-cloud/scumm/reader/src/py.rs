@@ -8,7 +8,6 @@
 
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::fmt::Write;
 
 /// A Python value in golden.py's canonical encoding.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -63,37 +62,33 @@ impl Py {
         match self {
             Py::None => out.push_str("null"),
             Py::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-            Py::Int(n) => {
-                let _ = write!(out, "{n}");
-            }
+            Py::Int(n) => write_int(*n, out),
             Py::Str(s) => scumm_ir::json::write_str(s, out),
-            Py::List(xs) => write_seq(xs.iter().map(|x| x.text()), out),
+            Py::List(xs) => write_items(xs.iter(), out),
             Py::Tuple(xs) => {
                 out.push_str("{\"$tuple\":");
-                write_seq(xs.iter().map(|x| x.text()), out);
+                write_items(xs.iter(), out);
                 out.push('}');
             }
             Py::Set(xs) => {
                 out.push_str("{\"$set\":");
-                let mut items: Vec<(&Py, String)> = xs.iter().map(|x| (x, x.text())).collect();
-                order(&mut items);
-                write_seq(items.into_iter().map(|p| p.1), out);
-                out.push('}');
-            }
-            Py::Dict(kv) => {
-                let mut kv: Vec<&(String, Py)> = kv.iter().collect();
-                kv.sort_by(|a, b| a.0.cmp(&b.0));
-                out.push('{');
-                for (i, (k, v)) in kv.iter().enumerate() {
-                    if i > 0 {
-                        out.push(',');
-                    }
-                    scumm_ir::json::write_str(k, out);
-                    out.push(':');
-                    v.write(out);
+                // golden.py's order rule (`order`): ints numerically, strs by code point, else by the text
+                if xs.iter().all(|x| matches!(x, Py::Int(_))) {
+                    let mut v: Vec<&Py> = xs.iter().collect();
+                    v.sort_by_key(|x| x.int());
+                    write_items(v.into_iter(), out);
+                } else if xs.iter().all(|x| matches!(x, Py::Str(_))) {
+                    let mut v: Vec<&Py> = xs.iter().collect();
+                    v.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+                    write_items(v.into_iter(), out);
+                } else {
+                    let mut items: Vec<(&Py, String)> = xs.iter().map(|x| (x, x.text())).collect();
+                    order(&mut items);
+                    write_seq(items.into_iter().map(|p| p.1), out);
                 }
                 out.push('}');
             }
+            Py::Dict(kv) => write_dict(kv, out),
             Py::Map(kv) => {
                 if kv.is_empty() {
                     out.push_str("{}");
@@ -121,7 +116,7 @@ impl Py {
                 out.push_str("{\"$");
                 out.push_str(name);
                 out.push_str("\":");
-                Py::Dict(fields.clone()).write(out);
+                write_dict(fields, out);
                 out.push('}');
             }
         }
@@ -250,6 +245,55 @@ fn arr(v: &Value) -> &Vec<Value> {
         Value::Array(a) => a,
         _ => panic!("not an array: {v}"),
     }
+}
+
+/// An int as Python and `format!` write it.
+fn write_int(n: i64, out: &mut String) {
+    if n < 0 {
+        out.push('-');
+    }
+    let mut v = n.unsigned_abs();
+    let mut buf = [0u8; 20];
+    let mut i = buf.len();
+    loop {
+        i -= 1;
+        buf[i] = b'0' + (v % 10) as u8;
+        v /= 10;
+        if v == 0 {
+            break;
+        }
+    }
+    out.push_str(std::str::from_utf8(&buf[i..]).unwrap());
+}
+
+/// A JSON array of the values, written in place.
+fn write_items<'a>(items: impl Iterator<Item = &'a Py>, out: &mut String) {
+    out.push('[');
+    for (i, x) in items.enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        x.write(out);
+    }
+    out.push(']');
+}
+
+/// A JSON object of str keys, sorted by key (a stable sort, as golden.py's sorted keys), written in place.
+fn write_dict(kv: &[(String, Py)], out: &mut String) {
+    let mut kv: Vec<&(String, Py)> = kv.iter().collect();
+    if !kv.windows(2).all(|w| w[0].0 <= w[1].0) {
+        kv.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+    out.push('{');
+    for (i, (k, v)) in kv.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        scumm_ir::json::write_str(k, out);
+        out.push(':');
+        v.write(out);
+    }
+    out.push('}');
 }
 
 fn write_seq(items: impl Iterator<Item = String>, out: &mut String) {
