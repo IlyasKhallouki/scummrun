@@ -503,9 +503,10 @@ fn pool_cmd(o: &Opts) -> Res<()> {
     }
 }
 
+/// Wall time and the engine's CPU time (its main thread's, exact: /proc/PID/schedstat) over a measured loop.
 struct Clock {
     t: Instant,
-    cpu: f64,
+    cpu: u64,
     pid: u32,
 }
 
@@ -513,14 +514,14 @@ impl Clock {
     fn new(pid: u32) -> Clock {
         Clock {
             t: Instant::now(),
-            cpu: fmi_engine::sys::cpu_s(pid),
+            cpu: fmi_engine::sys::main_thread_cpu_ns(pid),
             pid,
         }
     }
     /// (wall ms, engine CPU ms) per item since start
     fn per(&self, n: u64) -> (f64, f64) {
         let w = self.t.elapsed().as_secs_f64() * 1e3 / n as f64;
-        let c = (fmi_engine::sys::cpu_s(self.pid) - self.cpu) * 1e3 / n as f64;
+        let c = (fmi_engine::sys::main_thread_cpu_ns(self.pid) - self.cpu) as f64 / 1e6 / n as f64;
         (w, c)
     }
 }
@@ -579,7 +580,7 @@ fn bench(o: &Opts) -> Res<()> {
     let own = (fmi_engine::sys::self_cpu_s() - s0) * 1e3 / n as f64;
     put(
         "a parent frame, observed (Step + facts)",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU, {own:.3} ms driver CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU, {own:.4} ms driver CPU"),
     );
 
     // (b) the same with fork_each 7: each child's runs, explain log and facts read, then quit
@@ -617,7 +618,7 @@ fn bench(o: &Opts) -> Res<()> {
         .map_err(e2s)?;
     }
     let (w, cpu) = c.per(n);
-    put("c bare frame", format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"));
+    put("c bare frame", format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"));
     let c = Clock::new(q.pid());
     for _ in 0..n {
         q.step(1, false, false).map_err(e2s)?;
@@ -626,7 +627,7 @@ fn bench(o: &Opts) -> Res<()> {
     let (w, cpu) = c.per(n);
     put(
         "c frame + facts (Step with the block)",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
     for _ in 0..n {
@@ -641,7 +642,7 @@ fn bench(o: &Opts) -> Res<()> {
     let (w, cpu) = c.per(n);
     put(
         "c frame + facts (run, then State)",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
     for _ in 0..n {
@@ -656,7 +657,7 @@ fn bench(o: &Opts) -> Res<()> {
     let (w, cpu) = c.per(n);
     put(
         "c frame + full binary Obs",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
     let reps = 50u64;
@@ -668,7 +669,7 @@ fn bench(o: &Opts) -> Res<()> {
     let own = (fmi_engine::sys::self_cpu_s() - s0) * 1e3 / (20 * reps) as f64;
     put(
         "full binary Obs alone",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU, {own:.3} ms driver CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU, {own:.4} ms driver CPU"),
     );
     let c = Clock::new(q.pid());
     for _ in 0..20 * reps {
@@ -677,7 +678,7 @@ fn bench(o: &Opts) -> Res<()> {
     let (w, cpu) = c.per(20 * reps);
     put(
         "State (the F2 block) alone",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
     for _ in 0..reps {
@@ -686,7 +687,7 @@ fn bench(o: &Opts) -> Res<()> {
     let (w, cpu) = c.per(reps);
     put(
         "JSON dump alone (StateJson)",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
     let m = (10 * n / 50).max(1);
@@ -701,7 +702,7 @@ fn bench(o: &Opts) -> Res<()> {
     let (w, cpu) = c.per(m * 50);
     put(
         "c frame in 50-frame commands",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.4} ms wall, {cpu:.4} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
     for _ in 0..20 * reps {
@@ -724,7 +725,7 @@ fn bench(o: &Opts) -> Res<()> {
     let own = (fmi_engine::sys::self_cpu_s() - s0) * 1e3 / 200.0;
     put(
         "d fork + quit",
-        format!("{w:.3} ms wall, {cpu:.3} ms parent CPU, {own:.3} ms driver CPU"),
+        format!("{w:.3} ms wall, {cpu:.3} ms parent CPU, {own:.4} ms driver CPU"),
     );
     let c = Clock::new(q.pid());
     for _ in 0..20 {

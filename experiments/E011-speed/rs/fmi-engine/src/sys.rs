@@ -74,7 +74,33 @@ pub fn mem_available_kb() -> Option<u64> {
         .ok()
 }
 
-/// This process's own CPU seconds (getrusage RUSAGE_SELF).
+/// This process's own CPU seconds (exact).
 pub fn self_cpu_s() -> f64 {
-    cpu_s(std::process::id())
+    self_cpu_ns() as f64 / 1e9
+}
+
+#[repr(C)]
+struct Timespec {
+    sec: i64,
+    nsec: i64,
+}
+
+/// This process's CPU time in nanoseconds (clock_gettime CLOCK_PROCESS_CPUTIME_ID): exact, for the bench.
+pub fn self_cpu_ns() -> u64 {
+    extern "C" {
+        fn clock_gettime(clk: i32, ts: *mut Timespec) -> i32;
+    }
+    const CLOCK_PROCESS_CPUTIME_ID: i32 = 2;
+    let mut ts = Timespec { sec: 0, nsec: 0 };
+    // SAFETY: a valid timespec for the call.
+    unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut ts) };
+    ts.sec as u64 * 1_000_000_000 + ts.nsec as u64
+}
+
+/// A process's main thread's CPU time in nanoseconds (/proc/PID/schedstat), exact; 0 when it is gone.
+pub fn main_thread_cpu_ns(pid: u32) -> u64 {
+    std::fs::read_to_string(format!("/proc/{pid}/schedstat"))
+        .ok()
+        .and_then(|s| s.split_whitespace().next()?.parse().ok())
+        .unwrap_or(0)
 }
