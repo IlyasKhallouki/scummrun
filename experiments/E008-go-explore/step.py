@@ -364,9 +364,18 @@ def read_fresh(job: dict, state: dict, status: dict, threads: int):
     return rd, wall, load_s
 
 
+def start_rows_of(doc: dict) -> Path | None:
+    """The start-rows file a reading names as its start (``PATH seed N``; a refinement reads from it again), or None
+    for results/start-part1.jsonl's starts."""
+    name = (doc.get("start") or {}).get("name") or ""
+    head, sep, _ = name.rpartition(" seed ")
+    return Path(head) if sep and head.startswith("/") and head.endswith(".jsonl") else None
+
+
 def cached_readings(job: dict) -> list:
     """The job's readings of its scope whose files exist, newest first (reading.json's modification time, then the
-    job's order)."""
+    job's order). The files include the start-rows file the reading names: a refinement reading keeps its first
+    reading's, and an eviction of that reading may have removed it."""
     scope = sorted(int(r) for r in job["scope"])
     out = []
     for i, r in enumerate(job.get("readings") or ()):
@@ -379,6 +388,9 @@ def cached_readings(job: dict) -> list:
             continue
         packed = p.parent / doc.get("packed", "reading.tc")
         if not packed.exists() or not packed.with_suffix(".reached").exists():
+            continue
+        rows = start_rows_of(doc)
+        if rows is not None and not rows.exists():
             continue
         out.append((-p.stat().st_mtime, i, p))
     return [p for _, _, p in sorted(out)]
