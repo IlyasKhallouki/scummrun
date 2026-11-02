@@ -1155,10 +1155,11 @@ pub fn check_hits() -> bool {
 /// returns its obj_nr when the point is inside. The state dump lists the table's entries with an obj_nr in table
 /// order (id, x, y, w, h, parent) and every object's classes. So when every listed entry's parent is 0, the answer
 /// at a point is the first listed entry, not untouchable, whose box holds the point: it depends only on the room,
-/// the main screen's xstart (the screen layout and topline are fixed in a v5 game) and the listed (id, x, y, w, h,
-/// untouchable). The cache keys a layout by exactly these, compared whole, and only for such tables; a table with a
-/// parent is asked of the engine every time. Off by default (`FMI_HIT_CACHE=1`): the screen layout (initScreens'
-/// b and h, the forced banner screen) can change during play and is not in the key yet (HITCACHE.md, "The gap").
+/// the main screen's xstart, the screen layout (initScreens' b and h and the forced banner screen, which give the
+/// virtual screen of y and the main screen's topline) and the listed (id, x, y, w, h, untouchable). The cache keys a
+/// layout by exactly these, compared whole, and only for such tables, at a stop whose status reports the screen
+/// layout (`Status::screen`, patch 0004); a table with a parent, or a stop without the screen layout, is asked of
+/// the engine every time. On unless FMI_HIT_CACHE=0 (window::Search::new).
 #[derive(Default)]
 pub struct HitCache {
     layouts: std::sync::Mutex<FxHashMap<Layout, u32>>,
@@ -1172,12 +1173,14 @@ pub struct HitCache {
 struct Layout {
     room: i32,
     xstart: i32,
+    screen: (i32, i32, bool),
     objs: Vec<(i32, i32, i32, i32, i32, bool)>,
 }
 
 impl HitCache {
     fn layout_of(&self, s: &Obs, st: &Status) -> Option<u32> {
         let ros = s.room_objects.as_deref()?;
+        let screen = st.screen?;
         if ros.iter().any(|o| o.parent != 0) {
             self.uncovered.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return None;
@@ -1192,6 +1195,7 @@ impl HitCache {
         let l = Layout {
             room: s.room,
             xstart: st.xstart,
+            screen,
             objs,
         };
         let mut m = self.layouts.lock().unwrap();

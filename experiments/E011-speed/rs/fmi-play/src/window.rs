@@ -2988,8 +2988,9 @@ impl Search {
             movie: vec![],
             root: None,
             windows_path: None,
-            // off by default: the screen layout is not in the cache's key yet (play/HITCACHE.md, "The gap")
-            hit_cache: if std::env::var("FMI_HIT_CACHE").is_ok_and(|v| v == "1") {
+            // on unless FMI_HIT_CACHE=0 (play/HITCACHE.md); it answers only at stops whose status reports the screen
+            // layout (patch 0004), so over the JSON protocol every hit test is still asked
+            hit_cache: if std::env::var("FMI_HIT_CACHE").map_or(true, |v| v != "0") {
                 Some(Arc::new(executor::HitCache::default()))
             } else {
                 None
