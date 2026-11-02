@@ -469,6 +469,8 @@ pub struct Builder<'g> {
     pub on_job: Option<JobHook>,
     /// `oracle_keys`' cache: the universe as a set, and its keys by prefix
     uni_keys: std::cell::RefCell<(FxHashSet<String>, FxHashMap<String, Vec<String>>)>,
+    /// `pin_kind`'s cache
+    pin_kinds: std::cell::RefCell<FxHashMap<String, Kind>>,
     /// `args_domain`'s cache: key -> (its count of list numbers, its domain)
     args_doms: std::cell::RefCell<FxHashMap<String, (usize, Domain)>>,
     /// F10: slots live in the engine with their dumped locals; their events are read with the start's (empty: the
@@ -555,6 +557,7 @@ impl<'g> Builder<'g> {
             self.fact_info.clear();
             self.ego_cache = None;
             self.memo_infos.clear();
+            self.pin_kinds.borrow_mut().clear();
         }
         if self.table.args_vals != *args_vals {
             self.table.args_vals.clone_from(args_vals);
@@ -671,6 +674,7 @@ impl<'g> Builder<'g> {
             phase_secs: BTreeMap::new(),
             uni_keys: Default::default(),
             args_doms: Default::default(),
+            pin_kinds: Default::default(),
             on_job: None,
             widened: Vec::new(),
             slot_locals: Vec::new(),
@@ -723,6 +727,17 @@ impl<'g> Builder<'g> {
         out
     }
 
+    /// `kind(key)`, kept for the table (a key's kind changes only with the table: `sync_table`, `reset` and
+    /// `extend_domains` forget them).
+    fn pin_kind(&self, key: &str) -> Kind {
+        if let Some(&k) = self.pin_kinds.borrow().get(key) {
+            return k;
+        }
+        let k = self.kind(key);
+        self.pin_kinds.borrow_mut().insert(key.to_string(), k);
+        k
+    }
+
     /// `table.domain` of an `args:` key, kept while its list numbers do not change (within a pass they only grow,
     /// so their count tells; `reset` forgets them).
     fn args_domain(&self, key: &str) -> Domain {
@@ -742,7 +757,7 @@ impl<'g> Builder<'g> {
     /// single value also a pin).
     pub fn pin(&self, pins: &mut Pins, pre: &mut Pre, key: &str, values: &[Label]) -> bool {
         let mut values: PinVals = lab_set(values.iter().copied());
-        if self.kind(key) == Kind::Const {
+        if self.pin_kind(key) == Kind::Const {
             return values.contains(&Label::Int(self.table.start.get0(key)));
         }
         let dom = if key.starts_with("args:") { Some(std::borrow::Cow::Owned(self.args_domain(key))) } else { self.table.domain(key) };
@@ -2229,6 +2244,7 @@ impl<'g> Builder<'g> {
         self.ego_cache = None;
         self.fact_info.clear();
         self.memo_infos.clear();
+        self.pin_kinds.borrow_mut().clear();
         self.n_records = 0;
         self.args_set.clear();
     }
@@ -2271,6 +2287,7 @@ impl<'g> Builder<'g> {
         }
         // reader.py reads VAR_EGO afresh on every call: its domain may have grown
         self.ego_cache = None;
+        self.pin_kinds.borrow_mut().clear();
         added
     }
 
