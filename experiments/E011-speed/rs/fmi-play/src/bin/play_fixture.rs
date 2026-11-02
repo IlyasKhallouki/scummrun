@@ -625,6 +625,308 @@ fn cmd_children(fx: &Fx, only: Option<usize>) -> bool {
     all_ok
 }
 
+// --- test 3 and 4: the plans played, every window -------------------------------------------------------------------
+
+fn cp_j(c: &Checkpoint) -> J {
+    let mut f: Vec<(String, Val)> = c.facts.text_sorted();
+    f.sort();
+    J::Arr(vec![
+        J::Int(c.frame as i64),
+        J::Arr(f.into_iter().map(|(k, v)| J::Arr(vec![J::Str(k), J::Int(v)])).collect()),
+        J::Obj(vec![
+            ("tick".into(), J::Int(c.tick as i64)),
+            ("rng".into(), J::Int(c.rng as i64)),
+            (
+                "actors".into(),
+                J::Arr(
+                    c.actors
+                        .iter()
+                        .map(|a| J::Arr(vec![J::Int(a.0 as i64), J::Int(a.1 as i64), J::Int(a.2 as i64)]))
+                        .collect(),
+                ),
+            ),
+        ]),
+    ])
+}
+
+/// Field by field: (equal fields, [(field, rust, python)]), times left out.
+fn rec_diff(a: &J, b: &J) -> (usize, Vec<(String, String, String)>) {
+    let skip = ["wall_s", "python_cpu_s"];
+    let mut keys: Vec<String> = a.obj().iter().map(|x| x.0.clone()).collect();
+    for (k, _) in b.obj() {
+        if !keys.contains(k) {
+            keys.push(k.clone());
+        }
+    }
+    let norm = |j: Option<&J>| -> J {
+        // dicts compare as dicts: their keys sorted
+        fn n(j: &J) -> J {
+            match j {
+                J::Obj(o) => {
+                    let mut v: Vec<(String, J)> = o.iter().map(|(k, x)| (k.clone(), n(x))).collect();
+                    v.sort_by(|x, y| x.0.cmp(&y.0));
+                    J::Obj(v)
+                }
+                J::Arr(a) => J::Arr(a.iter().map(n).collect()),
+                x => x.clone(),
+            }
+        }
+        j.map(n).unwrap_or(J::Str("<absent>".into()))
+    };
+    let (mut same, mut diffs) = (0, vec![]);
+    for k in keys {
+        if skip.contains(&k.as_str()) {
+            continue;
+        }
+        let (x, y) = (norm(a.get(&k)), norm(b.get(&k)));
+        if x == y {
+            same += 1;
+        } else {
+            diffs.push((k, pyj::dumps(&x), pyj::dumps(&y)));
+        }
+    }
+    (same, diffs)
+}
+
+fn cmd_play(fx: &Fx, ready: bool, others: &[String]) -> bool {
+    let t_all = Instant::now();
+    let reading = &fx.reading;
+    let cfg = if ready { Config::e010_ready(6) } else { Config::e009(6) };
+    let mut search = Search::new(cfg).unwrap();
+    search.progress = Some(Box::new(|m: &str| eprintln!("[play] {m}")));
+    let root = boot(
+        fx,
+        &J::Arr(vec![]),
+        fx.plans[0].i("frame").unwrap() as u64,
+        if ready { "ready-root" } else { "strict-root" },
+    );
+    let mut root = root;
+    let branch = root.fork().unwrap();
+    let mut ps = PlayState {
+        engine: branch,
+        state: Obs::default(),
+        obs: Facts::new(),
+        now: Facts::new(),
+        pred: Facts::new(),
+        kept: Facts::new(),
+        checkpoints: vec![],
+        stop_reason: None,
+        replan_cause: None,
+        records: vec![],
+        workdir: fx.dir.join("rust"),
+    };
+    let goal = conds_of(fx.plans[0].get("goal").unwrap());
+    let un = ["args:", "saved:", "actorroom:"];
+    let mut ok = true;
+    let mut outs = Vec::new();
+    for p in &fx.plans {
+        let n = p.i("n_plan").unwrap() as u32;
+        let res = plan_result(p);
+        let ctx = PlanCtx {
+            reading,
+            doms: reading.domains(),
+            unobserved: &un,
+            goal: &goal,
+            result: &res,
+            unobserved_actor_rooms: true,
+            time_limit_s: 1e9,
+        };
+        let f0 = ps.engine.status().frame;
+        if f0 != p.i("frame").unwrap() as u64 {
+            println!(
+                "plan {n}: the engine is at {f0}, the capture's plan started at {}",
+                p.i("frame").unwrap()
+            );
+            ok = false;
+            break;
+        }
+        // the harness's state at the plan's start (its planning loop's: the explore component's)
+        fmi_play::window::set_pred(&mut ps, &view_of(p.get("pred").unwrap()), &unobserved());
+        {
+            let data = search.reading_data(reading);
+            let rd = PlayReading::new(reading, data);
+            search.observe(&rd, &unobserved(), &mut ps).unwrap();
+        }
+        let n_cp = ps.checkpoints.len();
+        let n_mv = search.movie.len();
+        let t = Instant::now();
+        let out = search.play_plan(&ctx, &mut ps, n);
+        let secs = t.elapsed().as_secs_f64();
+        let out_s = match out {
+            PlayOutcome::Goal => "goal",
+            PlayOutcome::Replan => "replan",
+            PlayOutcome::Stop => "stop",
+        };
+        let rc = ps
+            .replan_cause
+            .as_ref()
+            .and_then(|t| pyj::parse(t).ok())
+            .and_then(|j| j.s("replan_cause").map(String::from));
+        let mut d = Vec::new();
+        if out_s != p.s("out").unwrap_or("") {
+            d.push(format!("outcome rust {out_s} / python {}", p.s("out").unwrap_or("")));
+        }
+        if out_s != "goal" && rc.as_deref() != p.s("replan_cause") {
+            d.push(format!("replan cause rust {rc:?} / python {:?}", p.s("replan_cause")));
+        }
+        let cps: Vec<J> = ps.checkpoints[n_cp..].iter().map(cp_j).collect();
+        let ccps = p.a("checkpoints");
+        if cps.len() != ccps.len() || cps.iter().zip(ccps).any(|(a, b)| a != b) {
+            d.push(format!(
+                "checkpoints rust {:?} / python {:?}",
+                cps.iter().map(|c| c.arr()[0].int()).collect::<Vec<_>>(),
+                ccps.iter().map(|c| c.arr()[0].int()).collect::<Vec<_>>()
+            ));
+            for (a, b) in cps.iter().zip(ccps) {
+                if a != b {
+                    let (fa, fb) = (a.arr()[1].arr(), b.arr()[1].arr());
+                    let bad: Vec<String> = fa
+                        .iter()
+                        .zip(fb)
+                        .filter(|(x, y)| x != y)
+                        .take(4)
+                        .map(|(x, y)| format!("{} / {}", pyj::dumps(x), pyj::dumps(y)))
+                        .collect();
+                    d.push(format!(
+                        "   checkpoint {}: {} facts / {}; extra {} / {}; {bad:?}",
+                        a.arr()[0].int().unwrap_or(0),
+                        fa.len(),
+                        fb.len(),
+                        pyj::dumps(&a.arr()[2]),
+                        pyj::dumps(&b.arr()[2])
+                    ));
+                }
+            }
+        }
+        let mv: Vec<J> = search.movie[n_mv..].iter().map(fmi_play::replay::event_j).collect();
+        if J::Arr(mv.clone()) != *p.get("movie_added").unwrap() {
+            d.push(format!(
+                "inputs rust {} / python {}",
+                pyj::dumps(&J::Arr(mv)),
+                pyj::dumps(p.get("movie_added").unwrap())
+            ));
+        }
+        if ps.engine.status().frame != p.i("branch_frame").unwrap_or(-1) as u64 {
+            d.push(format!(
+                "engine frame rust {} / python {}",
+                ps.engine.status().frame,
+                p.i("branch_frame").unwrap_or(-1)
+            ));
+        }
+        let pa = view_of(p.get("pred_after").unwrap());
+        let mine = fmi_play::window::facts_view(&ps.pred);
+        if pa != mine {
+            d.push("prediction after differs".into());
+        }
+        println!(
+            "plan {n}: {out_s} at frame {} in {secs:.1} s; {} differences",
+            ps.engine.status().frame,
+            d.len()
+        );
+        for x in &d {
+            println!("   {x}");
+        }
+        ok &= d.is_empty();
+        outs.push(out_s);
+        if out_s != "replan" {
+            break;
+        }
+    }
+    // the windows, against the capture's records and the other recorded runs'
+    let mut runs: Vec<(String, Vec<J>)> = vec![(
+        "capture".into(),
+        fx.windows.iter().map(|w| w.get("rec").unwrap().clone()).collect(),
+    )];
+    for o in others {
+        runs.push((o.clone(), lines(Path::new(o))));
+    }
+    let out = fx.dir.join("rust").join(if ready {
+        "ready-windows.jsonl"
+    } else {
+        "strict-windows.jsonl"
+    });
+    let _ = std::fs::write(
+        &out,
+        search.windows.iter().map(|w| pyj::dumps(w) + "\n").collect::<String>(),
+    );
+    for (wi, w) in search.windows.iter().enumerate() {
+        let best = w.get("best").and_then(|b| b.i("g"));
+        let cbest = runs[0].1.get(wi).and_then(|r| r.get("best")).and_then(|b| b.i("g"));
+        println!(
+            "window {wi}: {} children {} end {} {}; best {:?} (capture {:?}); {} s",
+            w.i("forks").unwrap_or(0),
+            pyj::dumps(w.get("outcomes").unwrap_or(&J::Null)),
+            w.i("end").unwrap_or(0),
+            w.s("end_reason").unwrap_or(""),
+            best,
+            cbest,
+            pyj::py_float(match w.get("wall_s") {
+                Some(J::Float(f)) => *f,
+                _ => 0.0,
+            })
+        );
+        if !ready {
+            ok &= best == cbest;
+            let mut field_ok: FxHashMap<String, Vec<String>> = FxHashMap::default();
+            for (name, rs) in &runs {
+                let Some(r) = rs.get(wi) else { continue };
+                let (same, diffs) = rec_diff(w, r);
+                println!(
+                    "   vs {name}: {same} fields equal, {} differ: {:?}",
+                    diffs.len(),
+                    diffs.iter().map(|d| d.0.clone()).collect::<Vec<_>>()
+                );
+                for dd in &diffs {
+                    field_ok.entry(dd.0.clone()).or_default().push(name.clone());
+                }
+                if name == "capture" {
+                    for (k, x, y) in diffs.iter().filter(|d| d.0 != "children").take(6) {
+                        println!("      {k}: rust {} / python {}", pyj::cut(x, 300), pyj::cut(y, 300));
+                    }
+                    if diffs.iter().any(|d| d.0 == "children") {
+                        let (a, b) = (w.a("children"), r.a("children"));
+                        let mut n = 0;
+                        for (x, y) in a.iter().zip(b) {
+                            if x != y {
+                                n += 1;
+                                if n <= 6 {
+                                    println!("      child rust {} / python {}", pyj::dumps(x), pyj::dumps(y));
+                                }
+                            }
+                        }
+                        println!("      children: {} rows rust, {} python, {n} differ", a.len(), b.len());
+                    }
+                }
+            }
+            // a field no recorded run has
+            let unmatched: Vec<&String> = field_ok
+                .iter()
+                .filter(|(_, v)| v.len() == runs.len())
+                .map(|(k, _)| k)
+                .collect();
+            println!("   fields no recorded run has: {unmatched:?}");
+        } else {
+            let r = w.get("ready").cloned().unwrap_or(J::Null);
+            println!("   ready: {}", pyj::cut(&pyj::dumps(&r), 600));
+            ok &= best == cbest;
+        }
+    }
+    println!(
+        "{}: plans {:?}; {} windows; best {}; {:.1} s",
+        if ready { "READY" } else { "STRICT" },
+        outs,
+        search.windows.len(),
+        if ok { "the same children" } else { "DIFFER" },
+        t_all.elapsed().as_secs_f64()
+    );
+    ps.engine.quit();
+    if let Some(r) = search.root.take() {
+        r.quit();
+    }
+    root.quit();
+    ok
+}
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     if a.len() < 3 {
@@ -635,6 +937,8 @@ fn main() {
     let ok = match a[1].as_str() {
         "recs" => cmd_recs(&fx),
         "children" => cmd_children(&fx, a.get(3).and_then(|x| x.parse().ok())),
+        "strict" => cmd_play(&fx, false, &a[3..]),
+        "ready" => cmd_play(&fx, true, &a[3..]),
         _ => {
             eprintln!("unknown command {}", a[1]);
             false
