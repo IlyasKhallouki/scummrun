@@ -764,6 +764,50 @@ pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32
     Needed { ncount, kept, rounds }
 }
 
+/// `sig_hash`'s buffers, kept from action to action.
+#[derive(Default)]
+struct SigScratch {
+    buf: Vec<u32>,
+    ranges: Vec<(usize, usize)>,
+}
+
+/// `hash_words` of (f)'s signature of an action (its effects, each as [fact, kind, n, values, nwhen, (fact, n,
+/// values) sorted], sorted, without duplicates, concatenated), with no allocation per effect: the effects are laid out
+/// in one buffer, their ranges sorted by content and deduplicated, and the words hashed in that order. `hash_words` is
+/// a fold over the words, so this is the hash of the concatenation (TASKCORE_CHECK_SIG checks it on every action).
+fn sig_hash(v: View, s: &mut SigScratch) -> u64 {
+    s.buf.clear();
+    s.ranges.clear();
+    let mut w: Vec<(u32, &[u32])> = Vec::new();
+    for e in v.effs() {
+        w.clear();
+        w.extend(e.when());
+        w.sort();
+        let st = s.buf.len();
+        s.buf.push(e.fact);
+        s.buf.push(e.kind);
+        s.buf.push(e.vals.len() as u32);
+        s.buf.extend_from_slice(e.vals);
+        s.buf.push(w.len() as u32);
+        for &(f, vs) in &w {
+            s.buf.push(f);
+            s.buf.push(vs.len() as u32);
+            s.buf.extend_from_slice(vs);
+        }
+        s.ranges.push((st, s.buf.len()));
+    }
+    let buf = &s.buf;
+    s.ranges.sort_by(|a, b| buf[a.0..a.1].cmp(&buf[b.0..b.1]));
+    s.ranges.dedup_by(|a, b| buf[a.0..a.1] == buf[b.0..b.1]);
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &(a, b) in &s.ranges {
+        for &x in &buf[a..b] {
+            h = (h.rotate_left(5) ^ x as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+        }
+    }
+    h
+}
+
 /// (f) Duplicates and dominance among actions with the same effects (the same set of effects, conditions and
 /// guessed values included). Action A dominates action B when every precondition set of A contains B's set on
 /// the same fact (so A applies wherever B does) and A costs no more. B is dropped. Identical actions (each
@@ -800,8 +844,14 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
         effs.concat()
     };
     let mut by_hash: FxMap<u64, Vec<usize>> = FxMap::default();
+    let check = std::env::var_os("TASKCORE_CHECK_SIG").is_some();
+    let mut scratch = SigScratch::default();
     for i in 0..n {
-        by_hash.entry(hash_words(&sig(i))).or_default().push(i);
+        let h = sig_hash(t.acts.view(i), &mut scratch);
+        if check {
+            assert_eq!(h, hash_words(&sig(i)), "(f): sig_hash differs from the signature's hash at action {}", i);
+        }
+        by_hash.entry(h).or_default().push(i);
     }
     let mut drop = vec![false; n];
     let (mut dup, mut dom) = (0u64, 0u64);
