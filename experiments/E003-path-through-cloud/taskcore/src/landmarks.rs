@@ -72,7 +72,8 @@ pub struct Graph {
     pub children: Vec<Vec<(u32, OrderingType)>>,
     /// per id: (parent id, type), by parent id
     pub parents: Vec<Vec<(u32, OrderingType)>>,
-    /// least adapted cost of a first achiever (i64::MAX: none)
+    /// least adapted cost of a first achiever (i64::MAX: none); for a landmark that holds at the start (past in every
+    /// state the search makes, so never read there) the least cost of a possible achiever
     pub min_first: Vec<i64>,
     /// least adapted cost of a possible achiever (i64::MAX: none)
     pub min_possible: Vec<i64>,
@@ -171,37 +172,103 @@ impl<'a> Tv<'a> {
 
 // --- the relaxed reachability (exploration.cc) -------------------------------------------------------------------
 
+/// Distinct sets of propositions, each interned once (flat storage, an open-addressing table by content).
+struct Sets {
+    off: Vec<u32>,
+    data: Vec<u32>,
+    table: Vec<u32>,
+}
+
+impl Sets {
+    fn new(cap: usize) -> Sets {
+        Sets { off: vec![0], data: Vec::new(), table: vec![u32::MAX; (2 * cap.max(8)).next_power_of_two()] }
+    }
+    fn get(&self, i: u32) -> &[u32] {
+        &self.data[self.off[i as usize] as usize..self.off[i as usize + 1] as usize]
+    }
+    fn len(&self) -> usize {
+        self.off.len() - 1
+    }
+    fn hash(x: &[u32]) -> u64 {
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ x.len() as u64;
+        for &v in x {
+            h = (h.rotate_left(5) ^ v as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+        }
+        h ^ (h >> 29)
+    }
+    /// the set's number (a new one when it is new)
+    fn intern(&mut self, x: &[u32]) -> u32 {
+        if 2 * (self.len() + 1) > self.table.len() {
+            let n = self.table.len() * 2;
+            self.table = vec![u32::MAX; n];
+            for i in 0..self.len() as u32 {
+                let mut slot = Self::hash(self.get(i)) as usize & (n - 1);
+                while self.table[slot] != u32::MAX {
+                    slot = (slot + 1) & (n - 1);
+                }
+                self.table[slot] = i;
+            }
+        }
+        let mask = self.table.len() - 1;
+        let mut slot = Self::hash(x) as usize & mask;
+        loop {
+            let i = self.table[slot];
+            if i == u32::MAX {
+                let id = self.len() as u32;
+                self.data.extend_from_slice(x);
+                self.off.push(self.data.len() as u32);
+                self.table[slot] = id;
+                return id;
+            }
+            if self.get(i) == x {
+                return i;
+            }
+            slot = (slot + 1) & mask;
+        }
+    }
+}
+
 /// Relaxed reachability from the start with some atoms excluded: the same fixpoint as Fast Downward's unary operators
 /// (exploration.cc: a unary operator (operator, effect) fires when the operator's preconditions and the effect's
 /// conditions are reached, unless its effect atom is excluded or the operator has an unconditional effect on an
-/// excluded atom), computed per operator: its distinct preconditions; its unconditional effect atoms, distinct; its
-/// conditional effects, distinct (conditions less the operator's preconditions, atom), without those on an atom an
-/// unconditional effect of the operator reaches (whenever such an effect fires, the unconditional one has).
+/// excluded atom), computed per operator and per set of conditions: an operator fires when its (distinct)
+/// preconditions are reached, its unconditional effect atoms then; a conditional effect (its conditions less the
+/// operator's preconditions) reaches its atom once its operator fired and its condition set is reached. Operators
+/// share precondition sets and conditional effects share condition sets (a few thousand on E011's tasks), so a
+/// reached proposition counts down sets, not operators or effects. Conditional effects on an atom an unconditional
+/// effect of the same operator reaches are left out (whenever such an effect fires, the unconditional one has).
 struct Reach {
-    op_pre_n: Vec<u32>,
-    /// per proposition: operators with it among their (distinct) preconditions
-    pre_of_off: Vec<u32>,
-    pre_of: Vec<u32>,
+    /// precondition sets: per set its size; per proposition the sets it is in; per set its operators
+    ps_n: Vec<u32>,
+    ps_of_off: Vec<u32>,
+    ps_of: Vec<u32>,
+    ps_ops_off: Vec<u32>,
+    ps_ops: Vec<u32>,
     /// per operator: its unconditional effect atoms
     unc_off: Vec<u32>,
     unc: Vec<u32>,
-    /// per operator: its conditional effects (global numbers): condition count, atom
+    /// per operator: its conditional effects (global numbers): condition set, atom
     op_ce_off: Vec<u32>,
-    ce_n: Vec<u32>,
+    ce_set: Vec<u32>,
     ce_prop: Vec<u32>,
     ce_op: Vec<u32>,
-    /// per proposition: the conditional effects with it among their conditions
-    cond_of_off: Vec<u32>,
-    cond_of: Vec<u32>,
+    /// condition sets: per set its size; per proposition the sets it is in; per set its conditional effects
+    cs_n: Vec<u32>,
+    cs_of_off: Vec<u32>,
+    cs_of: Vec<u32>,
+    cs_ce_off: Vec<u32>,
+    cs_ce: Vec<u32>,
     // working state
     reached: Vec<bool>,
     excluded: Vec<bool>,
     op_excluded: Vec<bool>,
-    op_unsat: Vec<u32>,
     op_fired: Vec<bool>,
-    ce_unsat: Vec<u32>,
+    ps_unsat: Vec<u32>,
+    cs_unsat: Vec<u32>,
     queue: Vec<u32>,
     pub runs: u64,
+    /// sizes for the profile: preconditions, conditions, conditional effects
+    pub sizes: [usize; 5],
 }
 
 fn csr(n: usize, pairs: &[(u32, u32)]) -> (Vec<u32>, Vec<u32>) {
@@ -221,52 +288,51 @@ fn csr(n: usize, pairs: &[(u32, u32)]) -> (Vec<u32>, Vec<u32>) {
     (off, out)
 }
 
+fn sorted_unique(v: &mut Vec<u32>, from: usize) {
+    v[from..].sort_unstable();
+    let mut k = from;
+    for i in from..v.len() {
+        if i == from || v[i] != v[k - 1] {
+            v[k] = v[i];
+            k += 1;
+        }
+    }
+    v.truncate(k);
+}
+
 impl Reach {
     fn new(tv: &Tv) -> Reach {
         let t = tv.t;
         let n_ops = t.n_ops();
-        let mut op_pre_n = vec![0u32; n_ops];
-        let mut pre_pairs: Vec<(u32, u32)> = Vec::new();
+        let mut psets = Sets::new(n_ops / 4);
+        let mut csets = Sets::new(4096);
+        let mut op_ps: Vec<u32> = Vec::with_capacity(n_ops);
         let mut unc_off = Vec::with_capacity(n_ops + 1);
         unc_off.push(0u32);
         let mut unc: Vec<u32> = Vec::new();
         let mut op_ce_off = Vec::with_capacity(n_ops + 1);
         op_ce_off.push(0u32);
-        let mut ce_n: Vec<u32> = Vec::new();
+        let mut ce_set: Vec<u32> = Vec::new();
         let mut ce_prop: Vec<u32> = Vec::new();
         let mut ce_op: Vec<u32> = Vec::new();
-        let mut cond_pairs: Vec<(u32, u32)> = Vec::new();
         let mut pre: Vec<u32> = Vec::new();
-        // the operator's conditional effects, to drop repeats: their conditions in one buffer, (start, end, atom)
         let mut cbuf: Vec<u32> = Vec::new();
-        let mut ces: Vec<(u32, u32, u32)> = Vec::new();
-        for (o, npre) in op_pre_n.iter_mut().enumerate() {
+        let mut ces: Vec<(u32, u32)> = Vec::new();
+        let mut n_conds = 0usize;
+        for o in 0..n_ops {
             pre.clear();
             pre.extend(t.pre(o).iter().map(|&f| tv.prop(f) as u32));
-            pre.sort_unstable();
-            pre.dedup();
-            *npre = pre.len() as u32;
-            for &p in &pre {
-                pre_pairs.push((p, o as u32));
-            }
+            sorted_unique(&mut pre, 0);
+            op_ps.push(psets.intern(&pre));
             let u0 = unc.len();
             for e in t.effs(o) {
                 if e.c0 == e.c1 {
                     unc.push(tv.prop((e.var, e.post)) as u32);
                 }
             }
-            unc[u0..].sort_unstable();
-            let mut k = u0;
-            for i in u0..unc.len() {
-                if i == u0 || unc[i] != unc[k - 1] {
-                    unc[k] = unc[i];
-                    k += 1;
-                }
-            }
-            unc.truncate(k);
+            sorted_unique(&mut unc, u0);
             unc_off.push(unc.len() as u32);
             ces.clear();
-            cbuf.clear();
             for e in t.effs(o) {
                 if e.c0 == e.c1 {
                     continue;
@@ -275,60 +341,72 @@ impl Reach {
                 if unc[u0..].binary_search(&p).is_ok() {
                     continue;
                 }
-                let c0 = cbuf.len();
+                cbuf.clear();
                 cbuf.extend(t.conds(e).iter().map(|&f| tv.prop(f) as u32).filter(|c| pre.binary_search(c).is_err()));
-                cbuf[c0..].sort_unstable();
-                let mut k = c0;
-                for i in c0..cbuf.len() {
-                    if i == c0 || cbuf[i] != cbuf[k - 1] {
-                        cbuf[k] = cbuf[i];
-                        k += 1;
-                    }
-                }
-                cbuf.truncate(k);
-                ces.push((c0 as u32, k as u32, p));
+                sorted_unique(&mut cbuf, 0);
+                n_conds += cbuf.len();
+                ces.push((csets.intern(&cbuf), p));
             }
-            let cs = |x: &(u32, u32, u32)| &cbuf[x.0 as usize..x.1 as usize];
-            ces.sort_unstable_by(|a, b| cs(a).cmp(cs(b)).then(a.2.cmp(&b.2)));
-            let mut last: Option<(u32, u32, u32)> = None;
-            for &x in &ces {
-                if last.is_some_and(|l| l.2 == x.2 && cs(&l) == cs(&x)) {
-                    continue;
-                }
-                last = Some(x);
-                let ei = ce_prop.len() as u32;
-                for &c in cs(&x) {
-                    cond_pairs.push((c, ei));
-                }
-                ce_n.push(x.1 - x.0);
-                ce_prop.push(x.2);
+            ces.sort_unstable();
+            ces.dedup();
+            for &(cs, p) in &ces {
+                ce_set.push(cs);
+                ce_prop.push(p);
                 ce_op.push(o as u32);
             }
             op_ce_off.push(ce_prop.len() as u32);
         }
-        let (pre_of_off, pre_of) = csr(tv.n_props, &pre_pairs);
-        let (cond_of_off, cond_of) = csr(tv.n_props, &cond_pairs);
-        let ne = ce_prop.len();
+        // precondition sets: membership and operators
+        let nps = psets.len();
+        let ps_n: Vec<u32> = (0..nps as u32).map(|i| psets.get(i).len() as u32).collect();
+        let mut pairs: Vec<(u32, u32)> = Vec::new();
+        for i in 0..nps as u32 {
+            for &p in psets.get(i) {
+                pairs.push((p, i));
+            }
+        }
+        let (ps_of_off, ps_of) = csr(tv.n_props, &pairs);
+        let ops_pairs: Vec<(u32, u32)> = op_ps.iter().enumerate().map(|(o, &ps)| (ps, o as u32)).collect();
+        let (ps_ops_off, ps_ops) = csr(nps, &ops_pairs);
+        // condition sets: membership and conditional effects
+        let ncs = csets.len();
+        let cs_n: Vec<u32> = (0..ncs as u32).map(|i| csets.get(i).len() as u32).collect();
+        pairs.clear();
+        for i in 0..ncs as u32 {
+            for &p in csets.get(i) {
+                pairs.push((p, i));
+            }
+        }
+        let (cs_of_off, cs_of) = csr(tv.n_props, &pairs);
+        let ce_pairs: Vec<(u32, u32)> = ce_set.iter().enumerate().map(|(e, &cs)| (cs, e as u32)).collect();
+        let (cs_ce_off, cs_ce) = csr(ncs, &ce_pairs);
+        let n_pre = psets.data.len();
         Reach {
-            op_pre_n,
-            pre_of_off,
-            pre_of,
+            ps_n,
+            ps_of_off,
+            ps_of,
+            ps_ops_off,
+            ps_ops,
             unc_off,
             unc,
             op_ce_off,
-            ce_n,
+            ce_set,
             ce_prop,
             ce_op,
-            cond_of_off,
-            cond_of,
+            cs_n,
+            cs_of_off,
+            cs_of,
+            cs_ce_off,
+            cs_ce,
             reached: vec![false; tv.n_props],
             excluded: vec![false; tv.n_props],
             op_excluded: vec![false; n_ops],
-            op_unsat: vec![0; n_ops],
             op_fired: vec![false; n_ops],
-            ce_unsat: vec![0; ne],
+            ps_unsat: vec![0; nps],
+            cs_unsat: vec![0; ncs],
             queue: Vec::new(),
             runs: 0,
+            sizes: [nps, n_pre, ncs, n_conds, 0],
         }
     }
 
@@ -350,8 +428,17 @@ impl Reach {
             }
         }
         for e in self.op_ce_off[o] as usize..self.op_ce_off[o + 1] as usize {
-            if self.ce_unsat[e] == 0 && !self.excluded[self.ce_prop[e] as usize] {
+            if self.cs_unsat[self.ce_set[e] as usize] == 0 && !self.excluded[self.ce_prop[e] as usize] {
                 self.reach(self.ce_prop[e]);
+            }
+        }
+    }
+
+    fn fire_set(&mut self, ps: usize) {
+        for i in self.ps_ops_off[ps] as usize..self.ps_ops_off[ps + 1] as usize {
+            let o = self.ps_ops[i] as usize;
+            if !self.op_excluded[o] {
+                self.fire(o);
             }
         }
     }
@@ -375,8 +462,8 @@ impl Reach {
                 }
             }
         }
-        self.op_unsat.copy_from_slice(&self.op_pre_n);
-        self.ce_unsat.copy_from_slice(&self.ce_n);
+        self.ps_unsat.copy_from_slice(&self.ps_n);
+        self.cs_unsat.copy_from_slice(&self.cs_n);
         self.op_fired.iter_mut().for_each(|x| *x = false);
         self.queue.clear();
         for v in 0..t.sizes.len() {
@@ -385,32 +472,31 @@ impl Reach {
                 self.reach(p as u32);
             }
         }
-        for o in 0..t.n_ops() {
-            if self.op_pre_n[o] == 0 && !self.op_excluded[o] {
-                self.fire(o);
+        for ps in 0..self.ps_n.len() {
+            if self.ps_n[ps] == 0 {
+                self.fire_set(ps);
             }
         }
         let mut qi = 0;
         while qi < self.queue.len() {
             let p = self.queue[qi] as usize;
             qi += 1;
-            for i in self.pre_of_off[p] as usize..self.pre_of_off[p + 1] as usize {
-                let o = self.pre_of[i] as usize;
-                if self.op_excluded[o] {
-                    continue;
-                }
-                self.op_unsat[o] -= 1;
-                if self.op_unsat[o] == 0 {
-                    self.fire(o);
+            for i in self.ps_of_off[p] as usize..self.ps_of_off[p + 1] as usize {
+                let ps = self.ps_of[i] as usize;
+                self.ps_unsat[ps] -= 1;
+                if self.ps_unsat[ps] == 0 {
+                    self.fire_set(ps);
                 }
             }
-            for i in self.cond_of_off[p] as usize..self.cond_of_off[p + 1] as usize {
-                let e = self.cond_of[i] as usize;
-                self.ce_unsat[e] -= 1;
-                if self.ce_unsat[e] == 0 {
-                    let o = self.ce_op[e] as usize;
-                    if self.op_fired[o] && !self.excluded[self.ce_prop[e] as usize] {
-                        self.reach(self.ce_prop[e]);
+            for i in self.cs_of_off[p] as usize..self.cs_of_off[p + 1] as usize {
+                let cs = self.cs_of[i] as usize;
+                self.cs_unsat[cs] -= 1;
+                if self.cs_unsat[cs] == 0 {
+                    for j in self.cs_ce_off[cs] as usize..self.cs_ce_off[cs + 1] as usize {
+                        let e = self.cs_ce[j] as usize;
+                        if self.op_fired[self.ce_op[e] as usize] && !self.excluded[self.ce_prop[e] as usize] {
+                            self.reach(self.ce_prop[e]);
+                        }
                     }
                 }
             }
@@ -1040,26 +1126,19 @@ pub fn build(t: &SasTask, adj: &[i32], pred: &[String], deadline: Option<Instant
     let classes = disjunction_classes(&tv, pred);
     let setup_s = t0.elapsed().as_secs_f64();
     if std::env::var_os("TASKCORE_PROFILE").is_some() {
-        let mut sets: std::collections::HashSet<&[u32]> = std::collections::HashSet::new();
-        let mut cond_lists: Vec<Vec<u32>> = vec![Vec::new(); reach.ce_prop.len()];
-        for p in 0..tv.n_props {
-            for i in reach.cond_of_off[p] as usize..reach.cond_of_off[p + 1] as usize {
-                cond_lists[reach.cond_of[i] as usize].push(p as u32);
-            }
-        }
-        for c in &cond_lists {
-            sets.insert(c.as_slice());
-        }
-        eprintln!("profile landmarks: {} distinct condition sets of conditional effects", sets.len());
         eprintln!(
-            "profile landmarks: {} operators, {} effects, {} propositions; reach: {} preconditions, {} unconditional atoms, {} conditional effects with {} conditions",
+            "profile landmarks: {} operators, {} effects, {} propositions; reach: {} precondition sets ({} atoms), {} unconditional atoms, {} conditional effects with {} conditions in {} condition sets ({} atoms); setup {:.4} s",
             t.n_ops(),
             t.effs.len(),
             tv.n_props,
-            reach.pre_of.len(),
+            reach.sizes[0],
+            reach.sizes[1],
             reach.unc.len(),
             reach.ce_prop.len(),
-            reach.cond_of.len()
+            reach.sizes[3],
+            reach.sizes[2],
+            reach.cs_of.len(),
+            setup_s
         );
     }
     let t1 = Instant::now();
@@ -1115,24 +1194,35 @@ pub fn build(t: &SasTask, adj: &[i32], pred: &[String], deadline: Option<Instant
         let mut possible: Vec<u32> = atoms.iter().flat_map(|&a| tv.providing(a).iter().copied()).collect();
         possible.sort_unstable();
         possible.dedup();
-        // the reachability without the landmark's atoms: the backchaining's when it processed the landmark
-        let kept: Vec<bool>;
-        let reached: &[bool] = match b.forward.get(&n) {
-            Some(bits) => {
-                kept = (0..tv.n_props).map(|p| bits[p / 64] >> (p % 64) & 1 == 1).collect();
-                &kept
-            }
-            None => reach.compute(&tv, &atoms),
-        };
-        let mut mf = i64::MAX;
         let mut mp = i64::MAX;
         for &o in &possible {
-            let c = adj[o as usize] as i64;
-            mp = mp.min(c);
-            if c < mf && possibly_reaches(&tv, reached, o as usize, &atoms) {
-                mf = c;
-            }
+            mp = mp.min(adj[o as usize] as i64);
         }
+        // the first achievers: possible achievers that reach the landmark in the relaxed task without its atoms (the
+        // backchaining's reachability, made when it processed the landmark). A landmark that holds at the start is
+        // past in the start and so in every state the search makes from it (a past landmark stays past), where
+        // landmark_sum reads only its possible achievers: its first achievers are not made (`min_first` is
+        // `min_possible` there, never read).
+        let mf = if b.is_true_in_init(n) {
+            mp
+        } else {
+            let kept: Vec<bool>;
+            let reached: &[bool] = match b.forward.get(&n) {
+                Some(bits) => {
+                    kept = (0..tv.n_props).map(|p| bits[p / 64] >> (p % 64) & 1 == 1).collect();
+                    &kept
+                }
+                None => reach.compute(&tv, &atoms),
+            };
+            let mut mf = i64::MAX;
+            for &o in &possible {
+                let c = adj[o as usize] as i64;
+                if c < mf && possibly_reaches(&tv, reached, o as usize, &atoms) {
+                    mf = c;
+                }
+            }
+            mf
+        };
         min_first.push(mf);
         min_possible.push(mp);
     }
