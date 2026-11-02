@@ -517,7 +517,7 @@ when its own log showed the method was not moving toward the goal. No stop rule 
 | scopes read | ring(33) cut to 28, 33, 35, 38 in 66 jobs, ring(38) = 33, 38, 83, 85, 96 in 88; room 41 never in a scope |
 | fresh readings | 114: 67 of ring(33), 235,579 records each, the same scope read again from states that differ in var 100 and other keys the idle engine changes; 46 of ring(38), 9,440 records |
 | targets | bit:108 = 1 first in 153 of 154 jobs, bit:109 = 1 in 71; the goal (tier 0) never offered |
-| new R atoms | 110 in 71 jobs, 74 of them values of var 100; the rest var 20, 44, 2, 103, 181 to 183; none after job 153 that was not var 100 since job 97 |
+| new R atoms | 110 in 71 jobs, 74 of them values of var 100; the rest var 20, 44, 2, 103, 181 to 183; the last atom that is not a value of var 100 came at job 97 |
 | CPU | 87,206 s (read 66,394, plan 19,969, play 499, return 343) |
 | goal | not reached; every return the same as its entry |
 
