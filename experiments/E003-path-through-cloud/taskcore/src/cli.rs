@@ -11,6 +11,8 @@
 //!   taskcore info   --task F.tc
 //!   taskcore serve  --task F.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
 //!                   (then one `sas` request per line on stdin: serve.rs)
+//!   taskcore search --sas F.sas [--plan sas_plan]   (search.rs: FD's lazy greedy h_FF search with plusone costs)
+//!   taskcore warm   --task F.tc [--keep N]   (warm.rs: serve's requests on stdin through the warm task, + --plan F)
 //!   --goal K=V[|V..][,K=V..]: the goal instead of the file's (sas, decode, validate, serve)
 //!   --pick-windows on: each guess through a pick variable chosen in a window just before the operator that reads it
 //!                      (sas, decode, serve; README "Pick windows"; off by default)
@@ -503,7 +505,224 @@ pub fn write_out(a: &Args, mut p: Prepared, t0: Instant) -> Result<(), String> {
     Ok(())
 }
 
+/// `taskcore search --sas F [--plan OUT]`: the Rust search (search.rs) on a SAS file: the plan file FD's
+/// `lazy_greedy([hff], preferred=[hff], reopen_closed=false)` with plusone costs writes, and a JSON line of numbers.
+fn search_cmd(argv: &[String]) -> Result<(), String> {
+    let mut sas_path = None;
+    let mut plan_path = None;
+    let mut it = argv.iter();
+    while let Some(k) = it.next() {
+        let v = it.next().ok_or(format!("{} needs a value", k))?;
+        match k.as_str() {
+            "--sas" => sas_path = Some(v.clone()),
+            "--plan" => plan_path = Some(v.clone()),
+            _ => return Err(format!("search: unknown option {}", k)),
+        }
+    }
+    let path = sas_path.ok_or("search: --sas is needed")?;
+    let t0 = Instant::now();
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {}", path, e))?;
+    let read_s = t0.elapsed().as_secs_f64();
+    let t1 = Instant::now();
+    let t = crate::search::parse_sas(&text).map_err(|e| format!("{}: {}", path, e))?;
+    drop(text);
+    let parse_s = t1.elapsed().as_secs_f64();
+    let o = crate::search::lazy_greedy(&t, None);
+    let mut j = J::new();
+    j.s("status", &o.status)
+        .n("plan_length", o.plan.len())
+        .n("plan_cost", o.cost)
+        .n("expanded", o.expanded)
+        .n("evaluated", o.evaluated)
+        .n("generated", o.generated)
+        .n("evaluations", o.evaluations)
+        .n("operators", t.n_ops())
+        .n("unary_built", o.unary_built)
+        .n("unary", o.unary)
+        .f("read_s", read_s)
+        .f("parse_s", parse_s)
+        .f("relax_s", o.relax_s)
+        .f("search_s", o.search_s)
+        .f("eval_s", o.eval_s);
+    if o.status == "plan" {
+        crate::search::check_plan(&t, &o.plan)?;
+        if let Some(p) = &plan_path {
+            std::fs::write(p, crate::search::plan_text(&t, &o.plan)).map_err(|e| format!("{}: {}", p, e))?;
+        }
+    }
+    println!("{}", j.done());
+    Ok(())
+}
+
+/// A start file's lines as (key, value text) (bans.rs `read_start`'s reading of it).
+pub fn start_lines(path: &std::path::Path) -> Result<Vec<(String, String)>, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {}", path.display(), e))?;
+    let mut out = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        if line.is_empty() {
+            continue;
+        }
+        let (k, v) = line.split_once('\t').ok_or(format!("{}:{}: no tab", path.display(), n + 1))?;
+        out.push((k.to_string(), v.to_string()));
+    }
+    Ok(out)
+}
+
+/// `taskcore warm --task F.tc [--keep N]`: `serve`'s requests on stdin, one per line, through the warm task
+/// (warm.rs): the same files `sas` writes for each (`--out`, `--ops`, `--stats`, `--kept`), and with `--plan F` the
+/// Rust search's plan (search.rs) on the task in memory. Replies `ok<TAB>{json}` or `error<TAB>message`. The test that
+/// the warm task is `sas`'s, and the planner's bench.
+fn warm_cmd(argv: &[String]) -> Result<(), String> {
+    use std::io::{BufRead, Write};
+    let mut task = None;
+    let mut cfg = crate::warm::Config::default();
+    let mut it = argv.iter();
+    while let Some(k) = it.next() {
+        let v = it.next().ok_or(format!("{} needs a value", k))?;
+        match k.as_str() {
+            "--task" => task = Some(PathBuf::from(v)),
+            "--keep" => cfg.keep = v.parse().map_err(|e| format!("--keep: {}", e))?,
+            _ => return Err(format!("warm: unknown option {}", k)),
+        }
+    }
+    let task = task.ok_or("warm: --task is needed")?;
+    let cpu0 = cpu_s();
+    let bytes = std::fs::read(&task).map_err(|e| format!("{}: {}", task.display(), e))?;
+    let reached = std::fs::read_to_string(task.with_extension("reached")).ok();
+    let mut w = crate::warm::Warm::new(&bytes, &task.display().to_string(), reached, cfg)?;
+    drop(bytes);
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    let mut j = J::new();
+    j.s("task", &task.display().to_string())
+        .n("input_actions", w.task().acts.len())
+        .n("facts", w.task().facts.len())
+        .f("seconds_load", w.seconds_load)
+        .f("cpu_seconds", cpu_s() - cpu0)
+        .n("peak_rss", peak_rss());
+    writeln!(out, "ready\t{}", j.done()).map_err(|e| e.to_string())?;
+    out.flush().map_err(|e| e.to_string())?;
+    for line in std::io::stdin().lock().lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let reply = (|| -> Result<String, String> {
+            let t0 = Instant::now();
+            let c0 = cpu_s();
+            let mut r = Args {
+                names: None,
+                cmd: "warm".into(),
+                task: task.clone(),
+                start: None,
+                fold: cfg.fold,
+                reduce: cfg.reduce,
+                limit: cfg.limit,
+                out: None,
+                stats: None,
+                plan: None,
+                check_fold: 0,
+                kept: None,
+                model: cfg.model,
+                start_file: None,
+                reached: None,
+                bans: None,
+                ops: None,
+                needed_check: false,
+                goal: None,
+                cost_caps: None,
+                pick_windows: false,
+            };
+            parse_opts(&mut r, line.split('\t').map(String::from))?;
+            let start_file = r.start_file.clone().ok_or("warm: a request needs --start-file")?;
+            let req = crate::warm::Request {
+                goal: r.goal.clone(),
+                start: start_lines(&start_file)?,
+                bans: match &r.bans {
+                    Some(p) => bans::read_bans(p)?,
+                    None => Vec::new(),
+                },
+                caps: match &r.cost_caps {
+                    Some(p) => Some(bans::read_caps(p)?),
+                    None => None,
+                },
+                needed_check: r.needed_check,
+                start_name: format!("file:{}", start_file.display()),
+            };
+            let red = w.request(&req)?;
+            let reduce_s = t0.elapsed().as_secs_f64();
+            let mut j = J::new();
+            j.s("kept", red.kept).f("seconds_reduce", reduce_s);
+            if let Some(plan_path) = &r.plan {
+                let t1 = Instant::now();
+                let mut x = sas::Expander::new(&red.task, cfg.limit);
+                x.model = cfg.model;
+                let plan = sas::pass1(&mut x)?;
+                let (st, _) = crate::search::from_task(&mut x, &plan, &red.task.starts[red.start].1)?;
+                let build_s = t1.elapsed().as_secs_f64();
+                let o = crate::search::lazy_greedy(&st, None);
+                if o.status == "plan" {
+                    crate::search::check_plan(&st, &o.plan)?;
+                    std::fs::write(plan_path, crate::search::plan_text(&st, &o.plan)).map_err(|e| e.to_string())?;
+                }
+                j.s("status", &o.status)
+                    .n("plan_length", o.plan.len())
+                    .n("plan_cost", o.cost)
+                    .n("operators", st.n_ops())
+                    .n("expanded", o.expanded)
+                    .n("evaluated", o.evaluated)
+                    .n("generated", o.generated)
+                    .n("unary", o.unary)
+                    .f("seconds_build", build_s)
+                    .f("seconds_relax", o.relax_s)
+                    .f("seconds_search", o.search_s)
+                    .f("seconds_eval", o.eval_s);
+            }
+            let cpu_plan = cpu_s() - c0;
+            if r.out.is_some() {
+                let p = Prepared {
+                    names: Vec::new(),
+                    task: red.task,
+                    start: red.start,
+                    stats: red.stats,
+                    replaced: red.replaced,
+                    needed: red.needed,
+                };
+                write_out(&r, p, t0)?;
+            }
+            j.f("seconds", t0.elapsed().as_secs_f64()).f("cpu_seconds", cpu_plan).f("cpu_seconds_total", cpu_s() - c0);
+            Ok(j.done())
+        })();
+        match reply {
+            Ok(js) => writeln!(out, "ok\t{}", js),
+            Err(e) => writeln!(out, "error\t{}", e.replace('\n', " ")),
+        }
+        .map_err(|e| e.to_string())?;
+        out.flush().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// CPU seconds of this process so far (utime + stime, /proc/self/stat), all threads.
+pub fn cpu_s() -> f64 {
+    let Ok(s) = std::fs::read_to_string("/proc/self/stat") else { return 0.0 };
+    let rest = match s.rfind(')') {
+        Some(i) => &s[i + 2..],
+        None => return 0.0,
+    };
+    let f: Vec<&str> = rest.split_whitespace().collect();
+    let ticks = |i: usize| f.get(i).and_then(|x| x.parse::<f64>().ok()).unwrap_or(0.0);
+    (ticks(11) + ticks(12)) / 100.0
+}
+
 pub fn run() -> Result<(), String> {
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    if argv.first().map(|s| s.as_str()) == Some("search") {
+        return search_cmd(&argv[1..]);
+    }
+    if argv.first().map(|s| s.as_str()) == Some("warm") {
+        return warm_cmd(&argv[1..]);
+    }
     let a = parse()?;
     let t0 = Instant::now();
     match a.cmd.as_str() {
