@@ -194,7 +194,10 @@ struct WRun {
     hash: u64,
     key: Vec<u8>,
     infos: Vec<Info>,
+    /// the list answers and reach questions
     rest: Vec<u8>,
+    /// the output, before deflate
+    out: Vec<u8>,
 }
 
 enum WMsg {
@@ -220,7 +223,8 @@ pub struct CrossStats {
     pub ran_list_differs: AtomicU64,
     pub ran_reached_differs: AtomicU64,
     pub stored: AtomicU64,
-    pub stored_bytes: AtomicU64,
+    /// the bytes the writer wrote (outputs deflated there)
+    pub stored_bytes: Arc<AtomicU64>,
     /// of the stored bytes: the keys, the rest of the conditions, the outputs before deflate
     pub key_bytes: AtomicU64,
     pub cond_bytes: AtomicU64,
@@ -377,26 +381,27 @@ impl CrossMemo {
             None => Some("the free space is not known (df)".to_string()),
             _ => None,
         };
+        let stats = CrossStats::default();
         let writer = match &no_write {
             Some(why) => {
                 eprintln!("[memo] {}: this reading stores no runs: {why}", dir.display());
                 None
             }
-            None => Some(Self::start_writer(&dir)?),
+            None => Some(Self::start_writer(&dir, stats.stored_bytes.clone())?),
         };
         Ok(CrossMemo {
             dir,
             files: RwLock::new(files),
             index: RwLock::new(index),
             writer: Mutex::new(writer),
-            stats: CrossStats::default(),
+            stats,
             opened_files,
             opened_runs: runs,
             no_write,
         })
     }
 
-    fn start_writer(dir: &std::path::Path) -> std::io::Result<Writer> {
+    fn start_writer(dir: &std::path::Path, written: Arc<AtomicU64>) -> std::io::Result<Writer> {
         use crate::wire::{put_len, Wire};
         use std::io::Write;
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
@@ -417,7 +422,7 @@ impl CrossMemo {
             for m in rx {
                 match m {
                     WMsg::Run(run) => {
-                        let WRun { hash, key, infos: run_infos, rest } = *run;
+                        let WRun { hash, key, infos: run_infos, rest, out: raw } = *run;
                         b.clear();
                         hash.put(&mut b);
                         put_len(&mut b, key.len());
@@ -434,6 +439,11 @@ impl CrossMemo {
                             id.put(&mut b);
                         }
                         b.extend_from_slice(&rest);
+                        let z = deflate(&raw);
+                        put_len(&mut b, raw.len());
+                        put_len(&mut b, z.len());
+                        b.extend_from_slice(&z);
+                        written.fetch_add(b.len() as u64, Ordering::Relaxed);
                         out.write_all(&b)?;
                         ix.push((hash, at, b.len() as u32));
                         at += b.len() as u64;
@@ -554,7 +564,7 @@ impl CrossMemo {
     /// Stores a run this reading made: its key bytes, the keys it consulted, its list answers and reach questions,
     /// its output (deflated: records and counters, much of them repeated text).
     pub fn store(&self, key: Vec<u8>, infos: Vec<Info>, sigs: &[(i64, bool)], queries: &[Query], out: &Out) {
-        use crate::wire::{put_len, Wire};
+        use crate::wire::Wire;
         let tx = match self.writer.lock().unwrap().as_ref() {
             Some(w) => w.tx.clone(),
             None => return,
@@ -567,17 +577,13 @@ impl CrossMemo {
         out.0.put(&mut o);
         out.1.put(&mut o);
         out.2.put(&mut o);
-        let z = deflate(&o);
-        put_len(&mut rest, o.len());
-        put_len(&mut rest, z.len());
-        rest.extend_from_slice(&z);
         let s = &self.stats;
         s.key_bytes.fetch_add(key.len() as u64, Ordering::Relaxed);
         s.cond_bytes.fetch_add((cond + 4 * infos.len()) as u64, Ordering::Relaxed);
         s.out_raw_bytes.fetch_add(o.len() as u64, Ordering::Relaxed);
-        s.stored_bytes.fetch_add((8 + 8 + key.len() + 4 * infos.len() + rest.len()) as u64, Ordering::Relaxed);
         s.stored.fetch_add(1, Ordering::Relaxed);
-        tx.send(WMsg::Run(Box::new(WRun { hash: key_hash(&key), key, infos, rest }))).expect("the memo writer");
+        // the output is deflated on the writer's thread, off the workers'
+        tx.send(WMsg::Run(Box::new(WRun { hash: key_hash(&key), key, infos, rest, out: o }))).expect("the memo writer");
     }
 
     /// Between passes: the runs this reading stored so far join the index (memo.md: pass 2 takes pass 1's runs), and
