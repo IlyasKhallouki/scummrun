@@ -13,8 +13,8 @@
 //!   writes object keys sorted).
 //! * [`PJ::from_json`]: a value of an input file read with its keys in the file's order (scaling.rs `Json`).
 
-use scumm_reader::py::Py;
-use scumm_reader::scaling::Json;
+use crate::py::Py;
+use crate::scaling::Json;
 use std::fmt::Write;
 
 #[derive(Clone, Debug, PartialEq)]

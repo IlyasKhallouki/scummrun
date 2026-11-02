@@ -154,6 +154,8 @@ pub struct Pool<'a, 'g> {
     coarse: FxHashMap<String, (f64, u32)>,
     all: (f64, u64),
     pub stats: PoolStats,
+    /// a reading in another process's run (run.rs `Ctl`): set, the reading stops at its next look (a panic)
+    abort: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// The label up to its list of locals (`event(script:2@721#a2bf3d907238)` -> `event(script:2@721`), the kind first.
@@ -168,6 +170,18 @@ impl<'a, 'g> Pool<'a, 'g> {
     /// when jobs start, not what they read.
     pub fn set_max_waiting(&mut self, n: u64) {
         self.sh.max_waiting.store(n, Ordering::Relaxed);
+    }
+
+    /// The flag that stops the reading: the reading's thread looks at it while it waits for the workers (at least
+    /// every 100 ms) and stops by a panic when it is set. It changes nothing a reading that is not stopped writes.
+    pub fn set_abort(&mut self, abort: Arc<std::sync::atomic::AtomicBool>) {
+        self.abort = Some(abort);
+    }
+
+    fn check_abort(&self) {
+        if self.abort.as_ref().is_some_and(|a| a.load(Ordering::Relaxed)) {
+            panic!("the reading was stopped");
+        }
     }
 
     fn estimate(&self, job: &Job) -> f64 {
@@ -275,7 +289,12 @@ impl Machine for Pool<'_, '_> {
                     if !ready.is_empty() {
                         break ready;
                     }
-                    q = self.sh.done.wait(q).unwrap();
+                    if self.abort.is_some() {
+                        self.check_abort();
+                        q = self.sh.done.wait_timeout(q, std::time::Duration::from_millis(100)).unwrap().0;
+                    } else {
+                        q = self.sh.done.wait(q).unwrap();
+                    }
                 }
             };
             let tm = Instant::now();
@@ -610,6 +629,7 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
             coarse: FxHashMap::default(),
             all: (0.0, 0),
             stats: PoolStats::default(),
+            abort: None,
         };
         let r = panic::catch_unwind(AssertUnwindSafe(|| f(&mut pool)));
         {

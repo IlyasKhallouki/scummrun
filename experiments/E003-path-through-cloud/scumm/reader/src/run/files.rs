@@ -18,9 +18,9 @@
 
 use super::pyjson::PJ;
 use rustc_hash::FxHashSet;
-use scumm_reader::domain::Label;
-use scumm_reader::py::Py;
-use scumm_reader::record::{Eff, Record, Val, What};
+use crate::domain::Label;
+use crate::py::Py;
+use crate::record::{Eff, Record, Val, What};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs::File;
@@ -564,7 +564,7 @@ pub fn goal_pj(tc: &Tc) -> PJ {
 
 /// `reading_from_golden`'s bounds: [low, high] of every fact whose values hold "below" or "above", from `dom`
 /// (the reader's own domains), checked as there; Err with the problems.
-pub fn bounds_pj(tc: &Tc, dom: &dyn Fn(&str) -> Option<scumm_reader::domain::Domain>) -> Result<PJ, String> {
+pub fn bounds_pj(tc: &Tc, dom: &dyn Fn(&str) -> Option<crate::domain::Domain>) -> Result<PJ, String> {
     let mut out = Vec::new();
     let mut problems = Vec::new();
     for (k, vals) in &tc.facts {

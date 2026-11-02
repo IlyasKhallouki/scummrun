@@ -31,6 +31,7 @@ pub mod py;
 pub mod reach;
 pub mod record;
 pub mod replay;
+pub mod run;
 pub mod scaling;
 pub mod scope;
 pub mod shared;
