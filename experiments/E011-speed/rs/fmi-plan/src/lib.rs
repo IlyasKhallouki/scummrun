@@ -356,7 +356,16 @@ impl WarmPlanner {
         let domains = self.domains.clone();
         let fbans = req.bans.clone();
         let acc = {
-            let mut cands = |label: &str| self.paths_of_label(label, &fbans);
+            // each label's paths once per check (the suffixes ask for the same labels again)
+            let mut seen: HashMap<String, Vec<Action>> = HashMap::new();
+            let mut cands = |label: &str| -> Result<Vec<Action>, String> {
+                if let Some(v) = seen.get(label) {
+                    return Ok(v.clone());
+                }
+                let v = self.paths_of_label(label, &fbans)?;
+                seen.insert(label.to_string(), v.clone());
+                Ok(v)
+            };
             tail::check_suffixes(&domains, names, &req.start, &req.goal, &mut cands)
         };
         let Ok(acc) = acc else { return Ok(None) };
