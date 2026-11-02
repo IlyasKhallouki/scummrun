@@ -595,10 +595,10 @@ index 8f0f384c..f56248d2 100644
  }
 diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
 new file mode 100644
-index 00000000..b352a151
+index 00000000..6b16ebc9
 --- /dev/null
 +++ b/engines/scumm/speedrun/speedrun_wire.cpp
-@@ -0,0 +1,1295 @@
+@@ -0,0 +1,1304 @@
 +/* ScummVM - Graphic Adventure Engine
 + *
 + * ScummVM is the legal property of its developers, whose names
@@ -941,16 +941,23 @@ index 00000000..b352a151
 +	}
 +	o.i32(e._bootParam);
 +	o.u32(e._numVariables);
-+	for (int i = 0; i < e._numVariables; i++)
-+		o.i32(e._scummVars[i]);
 +	{
++		byte *p = o.grow(4 * e._numVariables);
++		for (int i = 0; i < e._numVariables; i++)
++			WRITE_LE_UINT32(p + 4 * i, (uint32)e._scummVars[i]);
++	}
++	{
++		// the set bits in order: bytes that are 0 skipped, set bits found by ctz
 +		const uint32 at = o.size();
 +		o.u32(0);
 +		uint32 n = 0;
-+		for (int b = 0; b < e._numBitVariables; b++) {
-+			if (e._bitVars[b >> 3] & (1 << (b & 7))) {
-+				o.u32(b);
-+				n++;
++		for (int i = 0; i < (e._numBitVariables + 7) / 8; i++) {
++			for (uint32 v = e._bitVars[i]; v; v &= v - 1) {
++				const int b = i * 8 + __builtin_ctz(v);
++				if (b < e._numBitVariables) {
++					o.u32(b);
++					n++;
++				}
 +			}
 +		}
 +		o.setU32(at, n);
@@ -974,20 +981,17 @@ index 00000000..b352a151
 +	uint32 valid = 0;
 +	for (uint k = 0; k < objs.size(); k++)
 +		valid += (objs[k] >= 1 && objs[k] < e._numGlobalObjects) ? 1 : 0;
-+	o.u32(valid);
-+	for (uint k = 0; k < objs.size(); k++) {
-+		const int obj = objs[k];
-+		if (obj >= 1 && obj < e._numGlobalObjects) {
-+			o.u32(obj);
-+			o.i32((int)e._objectOwnerTable[obj]);
-+		}
-+	}
-+	o.u32(valid);
-+	for (uint k = 0; k < objs.size(); k++) {
-+		const int obj = objs[k];
-+		if (obj >= 1 && obj < e._numGlobalObjects) {
-+			o.u32(obj);
-+			o.i32((int)e._objectStateTable[obj]);
++	for (int table = 0; table < 2; table++) {
++		const byte *values = table == 0 ? e._objectOwnerTable : e._objectStateTable;
++		o.u32(valid);
++		byte *p = o.grow(8 * valid);
++		for (uint k = 0; k < objs.size(); k++) {
++			const int obj = objs[k];
++			if (obj >= 1 && obj < e._numGlobalObjects) {
++				WRITE_LE_UINT32(p, (uint32)obj);
++				WRITE_LE_UINT32(p + 4, (uint32)(int)values[obj]);
++				p += 8;
++			}
 +		}
 +	}
 +	{
@@ -998,16 +1002,15 @@ index 00000000..b352a151
 +			const int obj = objs[k];
 +			if (obj < 1 || obj >= e._numGlobalObjects || !e._classData[obj])
 +				continue;
-+			o.u32(obj);
-+			const uint32 bits = e._classData[obj];
-+			uint32 c = 0;
-+			for (int bit = 0; bit < 32; bit++)
-+				c += (bits & (1u << bit)) ? 1 : 0;
-+			o.u32(c);
-+			for (int bit = 0; bit < 32; bit++) {
-+				if (bits & (1u << bit))
-+					o.u32(bit + 1);
-+			}
++			uint32 bits = e._classData[obj];
++			uint32 count = 0;
++			for (uint32 v = bits; v; v &= v - 1)
++				count++;
++			byte *p = o.grow(8 + 4 * count);
++			WRITE_LE_UINT32(p, (uint32)obj);
++			WRITE_LE_UINT32(p + 4, count);
++			for (p += 8; bits; bits &= bits - 1, p += 4)
++				WRITE_LE_UINT32(p, (uint32)__builtin_ctz(bits) + 1); // classes ascending, as classesJson()
 +			n++;
 +		}
 +		o.setU32(at, n);
@@ -1327,16 +1330,22 @@ index 00000000..b352a151
 +	const int depth = e.vm.cutSceneStackPointer;
 +	o.i32(depth);
 +	o.u32(e._numVariables);
-+	for (int i = 0; i < e._numVariables; i++)
-+		o.i32(e._scummVars[i]);
++	{
++		byte *p = o.grow(4 * e._numVariables);
++		for (int i = 0; i < e._numVariables; i++)
++			WRITE_LE_UINT32(p + 4 * i, (uint32)e._scummVars[i]);
++	}
 +	o.u32(e._numBitVariables);
 +	o.put(e._bitVars, (e._numBitVariables + 7) / 8);
 +	const int nObj = e._numGlobalObjects;
 +	o.u32(nObj);
 +	o.put(e._objectOwnerTable, nObj);
 +	o.put(e._objectStateTable, nObj);
-+	for (int i = 0; i < nObj; i++)
-+		o.u32(e._classData[i]);
++	{
++		byte *p = o.grow(4 * nObj);
++		for (int i = 0; i < nObj; i++)
++			WRITE_LE_UINT32(p + 4 * i, e._classData[i]);
++	}
 +	const uint32 at = o.size();
 +	o.u32(0);
 +	uint32 n = 0;
