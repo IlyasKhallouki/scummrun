@@ -419,7 +419,7 @@ index bf85f13c..b84231a3 100644
  
  	default:
 diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
-index 649d0250..101469f8 100644
+index 649d0250..a514e3df 100644
 --- a/engines/scumm/speedrun/speedrun_bridge.cpp
 +++ b/engines/scumm/speedrun/speedrun_bridge.cpp
 @@ -41,6 +41,7 @@
@@ -442,7 +442,7 @@ index 649d0250..101469f8 100644
  		Audio::g_speedrunSilentChip = true;
  		Audio::g_speedrunSilentFLAC = true;
  	}
-+	// E011 (patch 0003): the count-only mixer (audio/rate.cpp) and no pixel output (gfx.h); never with a bad
++	// E011 (patch 0003): the count-only mixer (audio/rate.cpp) and no pixel output (speedrun_cuts.h); never with a bad
 +	// environment, which validateEnv() reports before the first frame
 +	if (bridge->_envError.empty()) {
 +		Audio::g_speedrunCountMixer = bridge->_cutCountMixer;
