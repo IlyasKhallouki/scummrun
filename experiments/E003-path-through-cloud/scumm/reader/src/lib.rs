@@ -36,6 +36,7 @@ pub mod scope;
 pub mod shared;
 pub mod table;
 pub mod task;
+pub mod wire;
 
 pub use builder::{Builder, Ctx, Job, Machine, RunOut};
 pub use domain::{Domain, Label};

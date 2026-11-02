@@ -96,6 +96,8 @@ pub struct FactTable {
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
     pub memo: Option<std::sync::Arc<crate::memo::RunMemo>>,
+    /// the switch --memo: the job memo across readings (memo.rs `CrossMemo`, experiments/E011-speed/memo.md); None off
+    pub cross: Option<std::sync::Arc<crate::memo::CrossMemo>>,
     /// the switch shared_runs: the batch's runs of clicks that differ only in their verb (shared.rs); None off
     pub shared: Option<std::sync::Arc<crate::shared::SharedRuns>>,
     /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
@@ -105,6 +107,32 @@ pub struct FactTable {
     /// of one with a local the path knows splits its values as a comparison with a constant does (machine.rs
     /// `compare_sets`)
     pub refined: BTreeSet<i32>,
+    /// the `pos:`/`escpos:` domains, made once from `points` (`PosDoms`)
+    pos_doms: std::sync::Arc<PosDoms>,
+}
+
+/// The domains of `pos:<unit>` and `escpos:<unit>` (`FactTable::domain`), worked out once from the table's points,
+/// which do not change after `FactTable::new`: per unit name its points with NOWHERE, without and with ELSEWHERE (the
+/// switch `elsewhere`, set after `new`), and the same for a name with no points.
+#[derive(Clone)]
+struct PosDoms {
+    at: rustc_hash::FxHashMap<String, [Domain; 2]>,
+    esc: rustc_hash::FxHashMap<String, [Domain; 2]>,
+    none: [Domain; 2],
+}
+
+impl PosDoms {
+    fn of(points: &BTreeMap<&'static str, BTreeMap<String, BTreeSet<i64>>>) -> PosDoms {
+        let both = |ws: Option<&BTreeSet<i64>>| -> [Domain; 2] {
+            let mut v: BTreeSet<i64> = ws.cloned().unwrap_or_default();
+            v.insert(NOWHERE);
+            let off = Domain::of(v.iter().copied(), None, None);
+            v.insert(ELSEWHERE);
+            [off, Domain::of(v, None, None)]
+        };
+        let side = |kind: &str| points[kind].iter().map(|(n, ws)| (n.clone(), both(Some(ws)))).collect();
+        PosDoms { at: side("at"), esc: side("esc"), none: both(None) }
+    }
 }
 
 impl FactTable {
@@ -199,6 +227,7 @@ impl FactTable {
             let (name, w) = rest.rsplit_once(':').unwrap();
             points.get_mut(kind).unwrap().entry(name.to_string()).or_default().insert(w.parse().unwrap());
         }
+        let pos_doms = std::sync::Arc::new(PosDoms::of(&points));
         FactTable {
             start,
             extra,
@@ -221,29 +250,42 @@ impl FactTable {
             wait_both: false,
             reach: None,
             memo: None,
+            cross: None,
             shared: None,
             settled: None,
             refined: BTreeSet::new(),
+            pos_doms,
         }
     }
 
     /// `FactTable.domain(key)`.
     pub fn domain(&self, key: &str) -> Option<Cow<'_, Domain>> {
         if key.starts_with("args:") {
-            let mut v: BTreeSet<i64> = self.args_vals.get(key).cloned().unwrap_or_default();
-            v.insert(0);
-            return Some(Cow::Owned(Domain::of(v, None, None)));
+            // the list numbers with 0, in order (`Domain::of` of the set with 0 added)
+            let set = self.args_vals.get(key);
+            let mut values = Vec::with_capacity(set.map_or(0, |s| s.len()) + 1);
+            let mut zero = false;
+            for &n in set.into_iter().flatten() {
+                if !zero && n >= 0 {
+                    zero = true;
+                    if n != 0 {
+                        values.push(Label::Int(0));
+                    }
+                }
+                values.push(Label::Int(n));
+            }
+            if !zero {
+                values.push(Label::Int(0));
+            }
+            return Some(Cow::Owned(Domain::plain(values)));
         }
         if key.starts_with("saved:") || key.starts_with(DUE) {
             return Some(Cow::Borrowed(&self.binary));
         }
         if let Some((kind, name)) = pos_key(key) {
-            let mut v: BTreeSet<i64> = self.points[kind].get(name).cloned().unwrap_or_default();
-            v.insert(NOWHERE);
-            if self.elsewhere {
-                v.insert(ELSEWHERE);
-            }
-            return Some(Cow::Owned(Domain::of(v, None, None)));
+            let side = if kind == "at" { &self.pos_doms.at } else { &self.pos_doms.esc };
+            let both = side.get(name).unwrap_or(&self.pos_doms.none);
+            return Some(Cow::Borrowed(&both[self.elsewhere as usize]));
         }
         self.extra.get(key).or_else(|| self.doms.get(key)).map(Cow::Borrowed)
     }

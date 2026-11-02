@@ -183,7 +183,8 @@ impl<'g> Machine<'g> {
         let mut h = FxHasher::default();
         p.slots.len().hash(&mut h);
         for (n, f) in &p.slots {
-            (n, f.unit, f.pc, f.locals.as_slice(), f.args_known, f.origin, f.owned, f.recursive, f.resistant).hash(&mut h);
+            (n, f.unit, f.pc, f.locals.as_slice(), f.args_known, f.origin, f.owned, f.recursive, f.resistant)
+                .hash(&mut h);
         }
         fmix(h.finish())
     }
@@ -459,13 +460,12 @@ impl<'g> Machine<'g> {
         if p.rw.owners().iter().filter(|&&k| k != Owner::Sentence).count() < 2 {
             return;
         }
-        let mut items: Vec<(String, Owner, FxHashSet<Fact>, FxHashSet<Fact>)> = p
-            .rw
-            .all_sets()
-            .into_iter()
-            .filter(|e| e.0 != Owner::Sentence)
-            .map(|(o, r, w)| (enc::owner_name(o), o, r, w))
-            .collect();
+        let mut items: Vec<(String, Owner, FxHashSet<Fact>, FxHashSet<Fact>)> =
+            p.rw.all_sets()
+                .into_iter()
+                .filter(|e| e.0 != Owner::Sentence)
+                .map(|(o, r, w)| (enc::owner_name(o), o, r, w))
+                .collect();
         items.sort_by(|x, y| x.0.cmp(&y.0));
         let mut found = Vec::new();
         for (i, (_, a, ra, wa)) in items.iter().enumerate() {
@@ -489,93 +489,102 @@ impl<'g> Machine<'g> {
     // --- one slot's turn ---------------------------------------------------------------------------------------
 
     /// The unit of a slot's name (model.py `_unit_named`): a local or the room's code is the room in use's.
-    pub(super) fn unit_named(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> Option<UnitKey> {
-        match name {
-            Slot::Script(n) => Some(UnitKey::Global(n)),
-            Slot::Obj(ob) => Some(UnitKey::Obj(ob)),
-            _ => {
-                let room = self.read(p, Fact::Room, o);
-                let Val::Int(res) = self.resource(room) else { return None };
-                Some(match name {
-                    Slot::Local(n) => UnitKey::Local(res, n),
-                    Slot::Entry => UnitKey::Entry(res),
-                    _ => UnitKey::Exit(res),
-                })
+    pub(super) fn unit_named(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> R<Option<UnitKey>> {
+        Ok({
+            match name {
+                Slot::Script(n) => Some(UnitKey::Global(n)),
+                Slot::Obj(ob) => Some(UnitKey::Obj(ob)),
+                _ => {
+                    let room = self.read(p, Fact::Room, o)?;
+                    let Val::Int(res) = self.resource(room) else { return Ok(None) };
+                    Some(match name {
+                        Slot::Local(n) => UnitKey::Local(res, n),
+                        Slot::Entry => UnitKey::Entry(res),
+                        _ => UnitKey::Exit(res),
+                    })
+                }
             }
-        }
+        })
     }
 
     /// The Frame settle would resume for slot `name`, or why not ("" for a dead slot or room code that is not
     /// running) (model.py `_slot_frame`).
-    fn slot_frame(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> Result<Frame, &'static str> {
-        let g = self.game;
-        let key = slot_key(name);
-        if let Some(k) = key {
-            let live = self.read(p, k, o);
-            if live.is_unknown() {
-                return Err("its liveness is not known");
+    fn slot_frame(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> R<Result<Frame, &'static str>> {
+        Ok({
+            let g = self.game;
+            let key = slot_key(name);
+            if let Some(k) = key {
+                let live = self.read(p, k, o)?;
+                if live.is_unknown() {
+                    return Ok(Err("its liveness is not known"));
+                }
+                if !live.truthy() {
+                    p.pop_slot(name);
+                    return Ok(Err(""));
+                }
             }
-            if !live.truthy() {
-                p.pop_slot(name);
-                return Err("");
+            let frozen = self.read(p, Fact::Frozen(name), o)?;
+            if frozen.is_unknown() {
+                return Ok(Err("its freeze count is not known"));
             }
-        }
-        let frozen = self.read(p, Fact::Frozen(name), o);
-        if frozen.is_unknown() {
-            return Err("its freeze count is not known");
-        }
-        if frozen.truthy() {
-            return Err("frozen");
-        }
-        let mut keys = self.prefixed(p, o, Prefix::At(name));
-        sort_str(&mut keys);
-        let vals: Vec<(Fact, Val)> = keys.iter().map(|&k| (k, self.read(p, k, o))).collect();
-        let waits: Vec<Fact> = vals.iter().filter(|e| e.1 == Val::Int(1)).map(|e| e.0).collect();
-        if let Some(f) = p.slot(name) {
-            let pc = f.pc.expect("a kept slot resumes at an instruction");
-            if pc >= g.unit(f.unit).ins_len {
-                return Err("its position is not known");
+            if frozen.truthy() {
+                return Ok(Err("frozen"));
             }
-            let at = Fact::At(name, g.ins(f.unit)[pc as usize].offset);
-            if vals.iter().find(|e| e.0 == at).map(|e| e.1) != Some(Val::Int(1)) {
-                return Err("its position is not known");
+            let mut keys = self.prefixed(p, o, Prefix::At(name));
+            sort_str(&mut keys);
+            let mut vals: Vec<(Fact, Val)> = Vec::with_capacity(keys.len());
+            for &k in &keys {
+                vals.push((k, self.read(p, k, o)?));
             }
-            return Ok(f.clone());
-        }
-        if key.is_none() && waits.is_empty() {
-            return Err(""); // room code that is not running
-        }
-        if waits.len() != 1 || vals.iter().any(|e| e.1.is_unknown()) {
-            return Err("it has no single wait point");
-        }
-        let unit = self.unit_named(p, o, name);
-        let uid = unit.and_then(|u| g.id(u));
-        let Fact::At(_, w) = waits[0] else { unreachable!() };
-        let Some(idx) = uid.and_then(|u| g.at(u, w)) else { return Err("its wait point is no instruction of its unit") };
-        let (unit, uid) = (unit.unwrap(), uid.unwrap());
-        let mut owned = Owned::Bool(false);
-        if let UnitKey::Obj(ob) = unit {
-            let owner = self.read(p, Fact::Owner(ob), o);
-            owned = match owner {
-                Val::Unk(_) => Owned::Unk(owner),
-                Val::Int(n) => Owned::Bool(n != OF_OWNER_ROOM),
+            let waits: Vec<Fact> = vals.iter().filter(|e| e.1 == Val::Int(1)).map(|e| e.0).collect();
+            if let Some(f) = p.slot(name) {
+                let pc = f.pc.expect("a kept slot resumes at an instruction");
+                if pc >= g.unit(f.unit).ins_len {
+                    return Ok(Err("its position is not known"));
+                }
+                let at = Fact::At(name, g.ins(f.unit)[pc as usize].offset);
+                if vals.iter().find(|e| e.0 == at).map(|e| e.1) != Some(Val::Int(1)) {
+                    return Ok(Err("its position is not known"));
+                }
+                return Ok(Ok(f.clone()));
+            }
+            if key.is_none() && waits.is_empty() {
+                return Ok(Err("")); // room code that is not running
+            }
+            if waits.len() != 1 || vals.iter().any(|e| e.1.is_unknown()) {
+                return Ok(Err("it has no single wait point"));
+            }
+            let unit = self.unit_named(p, o, name)?;
+            let uid = unit.and_then(|u| g.id(u));
+            let Fact::At(_, w) = waits[0] else { unreachable!() };
+            let Some(idx) = uid.and_then(|u| g.at(u, w)) else {
+                return Ok(Err("its wait point is no instruction of its unit"));
             };
-        }
-        let res = if let UnitKey::Local(..) = unit {
-            let r = self.read(p, Fact::Room, o);
-            self.resource(r).int()
-        } else {
-            None
-        };
-        let resistant = match key {
-            Some(k) => g.resistant(k, res),
-            None => Some(false),
-        };
-        let mut f = Frame::new(uid, Some(idx), false, owned, None);
-        f.resistant = resistant;
-        f.nested = false;
-        f.origin = "pre";
-        Ok(f)
+            let (unit, uid) = (unit.unwrap(), uid.unwrap());
+            let mut owned = Owned::Bool(false);
+            if let UnitKey::Obj(ob) = unit {
+                let owner = self.read(p, Fact::Owner(ob), o)?;
+                owned = match owner {
+                    Val::Unk(_) => Owned::Unk(owner),
+                    Val::Int(n) => Owned::Bool(n != OF_OWNER_ROOM),
+                };
+            }
+            let res = if let UnitKey::Local(..) = unit {
+                let r = self.read(p, Fact::Room, o)?;
+                self.resource(r).int()
+            } else {
+                None
+            };
+            let resistant = match key {
+                Some(k) => g.resistant(k, res),
+                None => Some(false),
+            };
+            let mut f = Frame::new(uid, Some(idx), false, owned, None);
+            f.resistant = resistant;
+            f.nested = false;
+            f.origin = "pre";
+            Ok(f)
+        })
     }
 
     /// Whether the path changed one of these facts from pre (model.py `_changed_any`).
@@ -584,9 +593,10 @@ impl<'g> Machine<'g> {
             let hit = match *r {
                 Read::Fact(k) => p.writes.get(&k).is_some_and(|&v| !self.eq_oracle(v, o, k)),
                 Read::Any(kind) => p.writes.iter().any(|(&k, &v)| kind_matches(kind, k) && !self.eq_oracle(v, o, k)),
-                Read::ClassOf(ob) => {
-                    p.writes.iter().any(|(&k, &v)| matches!(k, Fact::Class(c, _) if c == ob) && !self.eq_oracle(v, o, k))
-                }
+                Read::ClassOf(ob) => p
+                    .writes
+                    .iter()
+                    .any(|(&k, &v)| matches!(k, Fact::Class(c, _) if c == ob) && !self.eq_oracle(v, o, k)),
             };
             if hit {
                 return true;
@@ -597,45 +607,53 @@ impl<'g> Machine<'g> {
 
     /// The rule a slot live at pre runs its first turn by, from its pre wait point, or why not (model.py
     /// `_pre_rule`).
-    fn pre_rule(&mut self, p: &mut Path, o: &FactOracle, u: UnitId, wp: WaitPoint) -> Result<&'static str, &'static str> {
-        let g = self.game;
-        match wp.kind {
-            WaitKind::Wait => {
-                if wp.op != known::WAIT_FOR_SENTENCE {
-                    return Ok("b: a WaitFor op");
+    fn pre_rule(
+        &mut self,
+        p: &mut Path,
+        o: &FactOracle,
+        u: UnitId,
+        wp: WaitPoint,
+    ) -> R<Result<&'static str, &'static str>> {
+        Ok({
+            let g = self.game;
+            match wp.kind {
+                WaitKind::Wait => {
+                    if wp.op != known::WAIT_FOR_SENTENCE {
+                        return Ok(Ok("b: a WaitFor op"));
+                    }
+                    let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o)?;
+                    let reads: Vec<Read> = match n {
+                        Val::Int(n) => sentence_slots(g, n).into_iter().map(Read::Fact).collect(),
+                        Val::Unk(_) => Vec::new(),
+                    };
+                    if self.changed_any(p, o, &reads) {
+                        Ok("c: WaitForSentence, the sentence slot changed")
+                    } else {
+                        Err("WaitForSentence: the sentence script's slot has not changed")
+                    }
                 }
-                let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);
-                let reads: Vec<Read> = match n {
-                    Val::Int(n) => sentence_slots(g, n).into_iter().map(Read::Fact).collect(),
-                    Val::Unk(_) => Vec::new(),
-                };
-                if self.changed_any(p, o, &reads) {
-                    Ok("c: WaitForSentence, the sentence slot changed")
-                } else {
-                    Err("WaitForSentence: the sentence script's slot has not changed")
-                }
-            }
-            WaitKind::Delay => Ok("b: a delay"),
-            WaitKind::Parked => Ok("b: parked after an opcode, waits for nothing"),
-            WaitKind::Frame => {
-                let Some(li) = wp.loop_ else { return Ok("b: a breakHere outside any loop") };
-                let lp = &g.loops(u, self.switches.const_polls)[li as usize];
-                match lp.kind {
-                    LoopKind::Ambient => Ok("b: an ambient loop"),
-                    LoopKind::Time if lp.camera() => Ok("b: a loop on the camera position (its exit forks once)"),
-                    LoopKind::Time => Ok("b: a time-only loop"),
-                    LoopKind::Facts => {
-                        if self.changed_any(p, o, &lp.reads) {
-                            Ok("c: polls facts the path changed")
-                        } else {
-                            Err("polls facts the path has not changed")
+                WaitKind::Delay => Ok("b: a delay"),
+                WaitKind::Parked => Ok("b: parked after an opcode, waits for nothing"),
+                WaitKind::Frame => {
+                    let Some(li) = wp.loop_ else { return Ok(Ok("b: a breakHere outside any loop")) };
+                    let lp = &g.loops(u, self.switches.const_polls)[li as usize];
+                    match lp.kind {
+                        LoopKind::Ambient => Ok("b: an ambient loop"),
+                        LoopKind::Time if lp.camera() => Ok("b: a loop on the camera position (its exit forks once)"),
+                        LoopKind::Time => Ok("b: a time-only loop"),
+                        LoopKind::Facts => {
+                            if self.changed_any(p, o, &lp.reads) {
+                                Ok("c: polls facts the path changed")
+                            } else {
+                                Err("polls facts the path has not changed")
+                            }
                         }
                     }
                 }
+                WaitKind::Start => Err("its wait point is a start"),
+                WaitKind::Other => Err("its wait point is a other"),
             }
-            WaitKind::Start => Err("its wait point is a start"),
-            WaitKind::Other => Err("its wait point is a other"),
-        }
+        })
     }
 
     /// Where a slot settle meets comes from, for the skip counts (model.py `_origin`).
@@ -684,179 +702,185 @@ impl<'g> Machine<'g> {
     }
 
     /// One slot's turn in runAllScripts (model.py `_eng_turn`).
-    pub(super) fn eng_turn(&mut self, p: &mut Path, ci: usize, o: &FactOracle, name: Slot) -> Vec<Path> {
-        let g = self.game;
-        let cp = self.switches.const_polls;
-        p.owner = None;
-        if p.round_ran.contains(&name) {
-            if self.trace.is_some() {
-                let kw = vec![("name", enc::slot(name)), ("ran", J::Bool(false)), ("why", enc::s("didexec"))];
-                self.ev(p, "turn", kw);
+    pub(super) fn eng_turn(&mut self, p: &mut Path, ci: usize, o: &FactOracle, name: Slot) -> R<Vec<Path>> {
+        Ok({
+            let g = self.game;
+            let cp = self.switches.const_polls;
+            p.owner = None;
+            if p.round_ran.contains(&name) {
+                if self.trace.is_some() {
+                    let kw = vec![("name", enc::slot(name)), ("ran", J::Bool(false)), ("why", enc::s("didexec"))];
+                    self.ev(p, "turn", kw);
+                }
+                return Ok(Vec::new());
             }
-            return Vec::new();
-        }
-        let owner = Owner::Slot(name);
-        p.owner = Some(owner);
-        p.owner_rule = "";
-        p.rw.add_owner(owner);
-        let frame = match self.slot_frame(p, o, name) {
-            Ok(f) => f,
-            Err(why) => {
-                self.skip(p, name, why);
-                return Vec::new();
-            }
-        };
-        let u = frame.unit;
-        let pc = frame.pc.expect("a slot's pc");
-        let wp = g.wait_point(u, pc, cp);
-        let rule: &'static str = if frame.origin == "pre" && frame.sid == 0 {
-            // its first turn, from its pre wait point
-            let r = match self.pre_rule(p, o, u, wp) {
-                Ok(r) => r,
+            let owner = Owner::Slot(name);
+            p.owner = Some(owner);
+            p.owner_rule = "";
+            p.rw.add_owner(owner);
+            let frame = match self.slot_frame(p, o, name)? {
+                Ok(f) => f,
                 Err(why) => {
                     self.skip(p, name, why);
-                    return Vec::new();
+                    return Ok(Vec::new());
                 }
             };
-            if p.round == 0 && self.time_wait(u, wp) {
-                // the click's frame is one frame after pre: a time-only wait the slot was in at pre still holds
-                self.skip(p, name, "a time-only wait, held in the click's frame");
-                return Vec::new();
-            }
-            r
-        } else {
-            p.ran_by.get(&name).copied().unwrap_or(RULE_A)
-        };
-        if let Some(li) = wp.loop_ {
-            let lp = &g.loops(u, cp)[li as usize];
-            if lp.kind == LoopKind::Ambient {
-                if p.ambient_done.contains(&(name, lp.head)) {
-                    self.skip(p, name, "the ambient cap: its loop with no exit ran once");
-                    return Vec::new();
+            let u = frame.unit;
+            let pc = frame.pc.expect("a slot's pc");
+            let wp = g.wait_point(u, pc, cp);
+            let rule: &'static str = if frame.origin == "pre" && frame.sid == 0 {
+                // its first turn, from its pre wait point
+                let r = match self.pre_rule(p, o, u, wp)? {
+                    Ok(r) => r,
+                    Err(why) => {
+                        self.skip(p, name, why);
+                        return Ok(Vec::new());
+                    }
+                };
+                if p.round == 0 && self.time_wait(u, wp) {
+                    // the click's frame is one frame after pre: a time-only wait the slot was in at pre still holds
+                    self.skip(p, name, "a time-only wait, held in the click's frame");
+                    return Ok(Vec::new());
                 }
-                p.ambient_done.insert((name, lp.head));
-                p.ambient_slots.insert(name);
-                p.ambient_pass.insert(name);
-            }
-        }
-        p.ran_by.entry(name).or_insert(rule);
-        p.not_run.remove(&name);
-        let mut gf = frame;
-        gf.nested = false;
-        gf.killed = None;
-        gf.freeze = 0;
-        gf.time_loops = g.time_loops_at(u, pc, cp).to_vec();
-        if gf.sid == 0 {
-            gf.sid = p.next_sid;
-            p.next_sid += 1;
-            if gf.resistant.is_none() {
-                let (_, c) = Self::head_cite(p, ci);
-                self.note(p, c, "resume", &format!("{name}: F flag not known"));
-            }
-        }
-        p.owner_rule = rule;
-        p.timed = true;
-        self.clear(p, o, Prefix::At(name)); // it runs from its wait point now
-        let x = &g.ins(u)[pc as usize];
-        let xi = X { u, i: pc };
-        match wp.kind {
-            WaitKind::Wait if wp.op != known::WAIT_FOR_SENTENCE => {
-                let cite = self.cite(xi);
-                let cond = rc(&format!("{} is over", scumm_ir::py::strip(g.text(x))));
-                let why = rc(&format!("?({}: {})", Reason::WaitOver.as_str(), waits(wp.op).1));
-                p.assumptions.push(Assumption { cite, cond, side: Side::Bool(true), why });
-                gf.pc = x.next;
-            }
-            WaitKind::Delay => {
-                let cite = self.cite(X { u, i: pc - 1 });
-                let cond = rc(&format!("{name}'s delay is over"));
-                let why = rc(&format!("?({}: delay count)", Reason::WaitOver.as_str()));
-                p.assumptions.push(Assumption { cite, cond, side: Side::Bool(true), why });
-            }
-            _ => {}
-        }
-        let (sid, gpc) = (gf.sid, gf.pc);
-        p.stack.push(Entry::Frame(gf));
-        p.depth = p.depth.max(p.frames().count() as u32);
-        p.round_ran.insert(name);
-        p.seen.clear();
-        if self.trace.is_some() {
-            let offset = match gpc {
-                Some(i) if i < g.unit(u).ins_len => J::Int(g.ins(u)[i as usize].offset as i64),
-                _ => J::Null,
+                r
+            } else {
+                p.ran_by.get(&name).copied().unwrap_or(RULE_A)
             };
-            let kw = vec![
-                ("name", enc::slot(name)),
-                ("sid", J::Int(sid as i64)),
-                ("unit", enc::unit_key(self.unit_key(u))),
-                ("pc", gpc.map_or(J::Null, |i| J::Int(i as i64))),
-                ("offset", offset),
-                ("rule", enc::s(p.owner_rule)),
-                ("round", J::Int(p.round as i64)),
-            ];
-            self.ev(p, "turn", kw);
-        }
-        Vec::new()
+            if let Some(li) = wp.loop_ {
+                let lp = &g.loops(u, cp)[li as usize];
+                if lp.kind == LoopKind::Ambient {
+                    if p.ambient_done.contains(&(name, lp.head)) {
+                        self.skip(p, name, "the ambient cap: its loop with no exit ran once");
+                        return Ok(Vec::new());
+                    }
+                    p.ambient_done.insert((name, lp.head));
+                    p.ambient_slots.insert(name);
+                    p.ambient_pass.insert(name);
+                }
+            }
+            p.ran_by.entry(name).or_insert(rule);
+            p.not_run.remove(&name);
+            let mut gf = frame;
+            gf.nested = false;
+            gf.killed = None;
+            gf.freeze = 0;
+            gf.time_loops = g.time_loops_at(u, pc, cp).to_vec();
+            if gf.sid == 0 {
+                gf.sid = p.next_sid;
+                p.next_sid += 1;
+                if gf.resistant.is_none() {
+                    let (_, c) = Self::head_cite(p, ci);
+                    self.note(p, c, "resume", &format!("{name}: F flag not known"));
+                }
+            }
+            p.owner_rule = rule;
+            p.timed = true;
+            self.clear(p, o, Prefix::At(name))?; // it runs from its wait point now
+            let x = &g.ins(u)[pc as usize];
+            let xi = X { u, i: pc };
+            match wp.kind {
+                WaitKind::Wait if wp.op != known::WAIT_FOR_SENTENCE => {
+                    let cite = self.cite(xi);
+                    let cond = rc(&format!("{} is over", scumm_ir::py::strip(g.text(x))));
+                    let why = rc(&format!("?({}: {})", Reason::WaitOver.as_str(), waits(wp.op).1));
+                    p.assumptions.push(Assumption { cite, cond, side: Side::Bool(true), why });
+                    gf.pc = x.next;
+                }
+                WaitKind::Delay => {
+                    let cite = self.cite(X { u, i: pc - 1 });
+                    let cond = rc(&format!("{name}'s delay is over"));
+                    let why = rc(&format!("?({}: delay count)", Reason::WaitOver.as_str()));
+                    p.assumptions.push(Assumption { cite, cond, side: Side::Bool(true), why });
+                }
+                _ => {}
+            }
+            let (sid, gpc) = (gf.sid, gf.pc);
+            p.stack.push(Entry::Frame(gf));
+            p.depth = p.depth.max(p.frames().count() as u32);
+            p.round_ran.insert(name);
+            p.seen.clear();
+            if self.trace.is_some() {
+                let offset = match gpc {
+                    Some(i) if i < g.unit(u).ins_len => J::Int(g.ins(u)[i as usize].offset as i64),
+                    _ => J::Null,
+                };
+                let kw = vec![
+                    ("name", enc::slot(name)),
+                    ("sid", J::Int(sid as i64)),
+                    ("unit", enc::unit_key(self.unit_key(u))),
+                    ("pc", gpc.map_or(J::Null, |i| J::Int(i as i64))),
+                    ("offset", offset),
+                    ("rule", enc::s(p.owner_rule)),
+                    ("round", J::Int(p.round as i64)),
+                ];
+                self.ev(p, "turn", kw);
+            }
+            Vec::new()
+        })
     }
 
     /// checkAndRunSentenceScript at a round's end, on the sentence queue (model.py `_eng_sentences`); golden.py's
     /// queue event when the queue was not empty.
-    pub(super) fn eng_sentences(&mut self, p: &mut Path, ci: usize, o: &FactOracle) {
-        let before = p.queue.len();
-        self.eng_sentences_(p, ci, o);
-        if before > 0 && self.trace.is_some() {
-            let kw = vec![
-                ("before", J::Int(before as i64)),
-                ("after", J::Int(p.queue.len() as i64)),
-                ("round", J::Int(p.round as i64)),
-            ];
-            self.ev(p, "queue", kw);
-        }
+    pub(super) fn eng_sentences(&mut self, p: &mut Path, ci: usize, o: &FactOracle) -> R<()> {
+        Ok({
+            let before = p.queue.len();
+            self.eng_sentences_(p, ci, o)?;
+            if before > 0 && self.trace.is_some() {
+                let kw = vec![
+                    ("before", J::Int(before as i64)),
+                    ("after", J::Int(p.queue.len() as i64)),
+                    ("round", J::Int(p.round as i64)),
+                ];
+                self.ev(p, "queue", kw);
+            }
+        })
     }
 
-    fn eng_sentences_(&mut self, p: &mut Path, ci: usize, o: &FactOracle) {
-        p.owner = None;
-        if p.queue.is_empty() {
-            return;
-        }
-        let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);
-        let n = match n {
-            Val::Unk(_) => {
-                let (_, c) = Self::head_cite(p, ci);
-                let w = format!("VAR_SENTENCE_SCRIPT {}: the queue is not run", self.show(n));
-                self.note(p, c, "sentence queue", &w);
-                return;
+    fn eng_sentences_(&mut self, p: &mut Path, ci: usize, o: &FactOracle) -> R<()> {
+        Ok({
+            p.owner = None;
+            if p.queue.is_empty() {
+                return Ok(());
             }
-            Val::Int(n) => n,
-        };
-        let (busy, unknown) = if n != 0 { self.sentence_waits(p, o, n) } else { (Vec::new(), Vec::new()) };
-        if !busy.is_empty() {
-            return;
-        }
-        if !unknown.is_empty() {
-            let (_, c) = Self::head_cite(p, ci);
-            let w = format!("whether the sentence waits: {}", unknown.join("; "));
-            self.note(p, c, "sentence queue", &w);
-            return;
-        }
-        let (verb, a, b, frozen) = *p.queue.last().unwrap();
-        if frozen != 0 {
-            return;
-        }
-        p.queue.pop();
-        if b != 0 && b == a {
-            let (_, c) = Self::head_cite(p, ci);
-            self.note(p, c, "sentence queue", "a queued sentence whose B is its A is dropped");
-            return;
-        }
-        if n != 0 {
-            p.sentences += 1;
-            p.owner = Some(Owner::Sentence);
-            p.owner_rule = "the sentence queue";
-            p.rw.add_owner(Owner::Sentence);
-            let args = [(0, Val::Int(verb)), (1, Val::Int(a)), (2, Val::Int(b))];
-            self.eng_script(p, ci, o, n, Some(false), Some(false), &args);
-        }
+            let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o)?;
+            let n = match n {
+                Val::Unk(_) => {
+                    let (_, c) = Self::head_cite(p, ci);
+                    let w = format!("VAR_SENTENCE_SCRIPT {}: the queue is not run", self.show(n));
+                    self.note(p, c, "sentence queue", &w);
+                    return Ok(());
+                }
+                Val::Int(n) => n,
+            };
+            let (busy, unknown) = if n != 0 { self.sentence_waits(p, o, n)? } else { (Vec::new(), Vec::new()) };
+            if !busy.is_empty() {
+                return Ok(());
+            }
+            if !unknown.is_empty() {
+                let (_, c) = Self::head_cite(p, ci);
+                let w = format!("whether the sentence waits: {}", unknown.join("; "));
+                self.note(p, c, "sentence queue", &w);
+                return Ok(());
+            }
+            let (verb, a, b, frozen) = *p.queue.last().unwrap();
+            if frozen != 0 {
+                return Ok(());
+            }
+            p.queue.pop();
+            if b != 0 && b == a {
+                let (_, c) = Self::head_cite(p, ci);
+                self.note(p, c, "sentence queue", "a queued sentence whose B is its A is dropped");
+                return Ok(());
+            }
+            if n != 0 {
+                p.sentences += 1;
+                p.owner = Some(Owner::Sentence);
+                p.owner_rule = "the sentence queue";
+                p.rw.add_owner(Owner::Sentence);
+                let args = [(0, Val::Int(verb)), (1, Val::Int(a)), (2, Val::Int(b))];
+                self.eng_script(p, ci, o, n, Some(false), Some(false), &args)?;
+            }
+        })
     }
 
     /// WaitForSentence's test where the path decides it whatever the engine's sentence queue held when the run began
@@ -867,37 +891,41 @@ impl<'g> Machine<'g> {
     /// doSentence when the path queued one (doSentence pushes at `_sentenceNum`, script.cpp:1164-1165, and only
     /// checkAndRunSentenceScript pops); with none queued by the path, the queue the run began with decides. A read of a
     /// fact here may fork on its values, as any read of a fact does.
-    pub fn sentence_wait_known(&mut self, p: &mut Path, o: &FactOracle) -> Option<bool> {
-        let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);
-        let Val::Int(n) = n else { return None };
-        let mut used = Vec::new();
-        for k in sentence_slots(self.game, n) {
-            used.push(self.read(p, k, o));
-        }
-        if used.iter().any(|v| !v.is_unknown() && v.truthy()) {
-            return Some(true);
-        }
-        if used.iter().any(|v| v.is_unknown()) {
-            return None;
-        }
-        p.queue.last().map(|&(_, _, _, frozen)| frozen == 0)
+    pub fn sentence_wait_known(&mut self, p: &mut Path, o: &FactOracle) -> R<Option<bool>> {
+        Ok({
+            let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o)?;
+            let Val::Int(n) = n else { return Ok(None) };
+            let mut used = Vec::new();
+            for k in sentence_slots(self.game, n) {
+                used.push(self.read(p, k, o)?);
+            }
+            if used.iter().any(|v| !v.is_unknown() && v.truthy()) {
+                return Ok(Some(true));
+            }
+            if used.iter().any(|v| v.is_unknown()) {
+                return Ok(None);
+            }
+            p.queue.last().map(|&(_, _, _, frozen)| frozen == 0)
+        })
     }
 
     /// WaitForSentence's test (model.py `_sentence_busy`): True, False or an unknown.
-    pub(super) fn sentence_busy(&mut self, p: &mut Path, o: &FactOracle) -> Dec {
-        let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);
-        let Val::Int(n) = n else { return Dec::Unk(n) };
-        let mut used = Vec::new();
-        for k in sentence_slots(self.game, n) {
-            used.push(self.read(p, k, o));
-        }
-        if let Some(&bad) = used.iter().find(|v| v.is_unknown()) {
-            return Dec::Unk(bad);
-        }
-        let in_use = used.iter().any(|v| v.truthy());
-        Dec::Bool(match p.queue.last() {
-            Some(&(_, _, _, frozen)) => !(frozen != 0 && !in_use),
-            None => in_use,
+    pub(super) fn sentence_busy(&mut self, p: &mut Path, o: &FactOracle) -> R<Dec> {
+        Ok({
+            let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o)?;
+            let Val::Int(n) = n else { return Ok(Dec::Unk(n)) };
+            let mut used = Vec::new();
+            for k in sentence_slots(self.game, n) {
+                used.push(self.read(p, k, o)?);
+            }
+            if let Some(&bad) = used.iter().find(|v| v.is_unknown()) {
+                return Ok(Dec::Unk(bad));
+            }
+            let in_use = used.iter().any(|v| v.truthy());
+            Dec::Bool(match p.queue.last() {
+                Some(&(_, _, _, frozen)) => !(frozen != 0 && !in_use),
+                None => in_use,
+            })
         })
     }
 }

@@ -4,7 +4,7 @@
 //! in its order of reads, writes, forks and counts; the machine's own methods are the port's
 //! (machine/PORT-NOTES.md). PORT-NOTES.md says how Python's mechanisms map:
 //!
-//! * `Fork` (an exception) is a panic with a [`ForkOn`] payload, thrown by `resume_unwind` (no panic hook runs)
+//! * `Fork` (an exception) is the machine's `Fork` value with a [`ForkOn`] payload, returned up through the step
 //!   and caught in `advance` (`Reader._advance`), which reruns the step from its snapshot once per value;
 //! * `SymPath`'s fields are [`SymX`], the path's `ext`, cloned with the path; the Reader's state is [`St`], the
 //!   machine's `ext`; `SymOracle` is the `oget` and `okeys` hooks;
@@ -19,12 +19,16 @@
 use crate::builder::{Ctx, Machine as RunMachine, RdCounts, RunOut, DROP_ENDS};
 use crate::domain::{Domain, Label, Labels};
 use crate::py::Py;
-use crate::record::{Assumption as RAssumption, Event, Kept, PathOut, Pins, Pre, UClass, Unknown as RUnknown, Val as RVal, What};
+use crate::record::{
+    Assumption as RAssumption, Event, Kept, PathOut, Pins, Pre, UClass, Unknown as RUnknown, Val as RVal, What,
+};
 use crate::scope::{self, Scope};
 use crate::table::{FactTable, Kind};
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
-use scumm_ir::{known, CmpOp, Expr, ExprId, Fact, FactMap, Game, Reason, Slot, Span, Stmt, Sym, UnitId, UnitKey, Yield};
-use scumm_machine::machine::{Hooks, VAR_INVENTORY_SCRIPT, VAR_OVERRIDE, VAR_ROOM, VAR_ROOM_RESOURCE, X};
+use scumm_ir::{
+    known, CmpOp, Expr, ExprId, Fact, FactMap, Game, Reason, Slot, Span, Stmt, Sym, UnitId, UnitKey, Yield,
+};
+use scumm_machine::machine::{Fork, Hooks, R, VAR_INVENTORY_SCRIPT, VAR_OVERRIDE, VAR_ROOM, VAR_ROOM_RESOURCE, X};
 use scumm_machine::oracle::{FactOracle, Prefix};
 use scumm_machine::path::{fmix, Assumption, Call, Entry, Owned, Path, PathExt, Run, Side, Sig, Step, S};
 use scumm_machine::value::{i16w, Dec, Op, Unknown, Val};
@@ -32,7 +36,7 @@ use scumm_machine::{Features, Machine, Switches};
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::Hasher;
-use std::panic::{self, AssertUnwindSafe};
+
 use std::rc::Rc;
 
 /// reader.py `PATH_LIMIT`: paths per run.
@@ -64,7 +68,8 @@ const LEFT_CLICK: i32 = 1; // model.py, verbs.cpp:666
 const VAR_VERB_SCRIPT: i32 = 32;
 const VAR_USERPUT: i32 = 53;
 const VAR_CURSORSTATE: i32 = 52;
-const ESC_KEY: [&str; 3] = ["runInputScript", "input.cpp:1427-1428", "the Esc key code: checkExecVerbs and the input script, not run"];
+const ESC_KEY: [&str; 3] =
+    ["runInputScript", "input.cpp:1427-1428", "the Esc key code: checkExecVerbs and the input script, not run"];
 /// reader.py `MEMO_GETTERS`
 const MEMO_GETTERS: [(&str, &[&str]); 10] = [
     ("getActorRoom", &["putactor", "loadroom"]),
@@ -105,6 +110,10 @@ fn saved_of(f: Fact) -> Option<(i32, i32)> {
 
 /// The key's facts.py (or reader.py) string.
 pub fn key_str(f: Fact) -> String {
+    key_rc(f).to_string()
+}
+
+fn key_text(f: Fact) -> String {
     match f {
         Fact::At(s, MARK) => format!("at:{s}:*"),
         Fact::Esc(s, MARK) => format!("esc:{s}:*"),
@@ -113,6 +122,56 @@ pub fn key_str(f: Fact) -> String {
             None => f.to_string(),
         },
     }
+}
+
+/// The facts this thread named, each with its text (`key_text`, a function of the fact) and its place in the order of
+/// the texts: ranks with gaps between them (a new text takes the middle of its neighbours' gap; all are numbered
+/// again when a gap is used up), so that sorting facts by rank sorts them by text.
+#[derive(Default)]
+struct KeyOrder {
+    of: FxHashMap<Fact, (u64, Rc<str>)>,
+    by_text: BTreeMap<Rc<str>, Fact>,
+}
+
+const RANK_GAP: u64 = 1 << 32;
+
+impl KeyOrder {
+    fn get(&mut self, f: Fact) -> (u64, Rc<str>) {
+        if let Some(e) = self.of.get(&f) {
+            return e.clone();
+        }
+        let t: Rc<str> = key_text(f).into();
+        use std::ops::Bound::{Excluded, Unbounded};
+        let below = self.by_text.range::<str, _>((Unbounded, Excluded(&*t))).next_back().map(|(_, g)| self.of[g].0);
+        let above = self.by_text.range::<str, _>((Excluded(&*t), Unbounded)).next().map(|(_, g)| self.of[g].0);
+        let (lo, hi) = (below.unwrap_or(0), above.unwrap_or(u64::MAX));
+        self.by_text.insert(t.clone(), f);
+        if hi - lo >= 2 {
+            let r = lo + (hi - lo) / 2;
+            self.of.insert(f, (r, t.clone()));
+            return (r, t);
+        }
+        // no room: every fact numbered again, in order
+        self.of.insert(f, (0, t));
+        for (i, g) in self.by_text.values().enumerate() {
+            self.of.get_mut(g).unwrap().0 = (i as u64 + 1) * RANK_GAP;
+        }
+        self.of[&f].clone()
+    }
+}
+
+thread_local! {
+    static KEY_ORDER: std::cell::RefCell<KeyOrder> = Default::default();
+}
+
+/// `key_str` as a shared text, made once per fact and thread.
+pub fn key_rc(f: Fact) -> Rc<str> {
+    KEY_ORDER.with(|k| k.borrow_mut().get(f).1)
+}
+
+/// A fact's text and its rank among the texts this thread knows (`KeyOrder`).
+fn key_ranked(f: Fact) -> (u64, Rc<str>) {
+    KEY_ORDER.with(|k| k.borrow_mut().get(f))
 }
 
 /// model.py `family`.
@@ -142,20 +201,60 @@ pub(crate) fn pkey_of(s: &str) -> PKey {
     PKey::F(s.parse().unwrap_or_else(|_| panic!("a precondition key the machine half cannot hold: {s}")))
 }
 
-fn pkey_str(k: PKey) -> String {
+/// A precondition key's text (`pkey_of` reads it back).
+pub fn pkey_text(k: PKey) -> String {
+    pkey_rc(k).to_string()
+}
+
+/// A precondition key's text, shared (`key_rc`).
+fn pkey_rc(k: PKey) -> Rc<str> {
     match k {
-        PKey::F(f) => key_str(f),
-        PKey::Args(s) => format!("args:{s}"),
+        PKey::F(f) => key_rc(f),
+        PKey::Args(s) => format!("args:{s}").into(),
     }
+}
+
+/// A map keyed by texts, from (text, value) pairs whose texts are distinct: sorted by text before the map is built
+/// from them (the map's own sort then finds them in order), the texts made Strings only then.
+fn by_text<V, W>(mut items: Vec<(Rc<str>, V)>, f: impl Fn(V) -> W) -> BTreeMap<String, W> {
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+    items.into_iter().map(|(k, v)| (k.to_string(), f(v))).collect()
 }
 
 /// A Python reason string as the machine's `Reason`.
 fn reason_of(s: &str) -> Reason {
     use Reason::*;
     let all = [
-        Random, Position, Actor, Timer, Local, Held, Work, Sound, String, Inventory, Verb, Message, Sentence, Key, Freeze,
-        CutData, Cache, Branch, LoopExit, WaitOver, Settle, Camera, Input, Counter, R_FACT, R_NONFACT, R_COLLAPSED,
-        R_STEP, R_COND, R_COPY,
+        Random,
+        Position,
+        Actor,
+        Timer,
+        Local,
+        Held,
+        Work,
+        Sound,
+        String,
+        Inventory,
+        Verb,
+        Message,
+        Sentence,
+        Key,
+        Freeze,
+        CutData,
+        Cache,
+        Branch,
+        LoopExit,
+        WaitOver,
+        Settle,
+        Camera,
+        Input,
+        Counter,
+        R_FACT,
+        R_NONFACT,
+        R_COLLAPSED,
+        R_STEP,
+        R_COND,
+        R_COPY,
     ];
     if let Some(r) = all.iter().find(|r| r.as_str() == s) {
         return *r;
@@ -250,6 +349,8 @@ struct KeptS {
 #[derive(Clone, Debug, Default)]
 pub struct SymX {
     pre: Rc<BTreeMap<PKey, Labels>>,
+    /// `pre` encoded for the join signature (`Reader._join`), made when first needed; every change of `pre` drops it
+    pre_enc: std::cell::RefCell<Option<Rc<[u8]>>>,
     kept: Rc<BTreeMap<Slot, KeptS>>,
     /// unit name -> (freezes not yet undone, `frozen:` before: None for "unwritten")
     fz: Rc<BTreeMap<Slot, (i32, Option<Val>)>>,
@@ -285,8 +386,9 @@ struct St {
     table: Option<FactTable>,
     scope: Option<Scope>,
     info: FxHashMap<Fact, Rc<Info>>,
-    /// the universe's slot keys by prefix, in its order (`SymOracle.keys`)
+    /// the universe's slot keys by prefix, in its order (`SymOracle.keys`), and sorted, each once
     uni: FxHashMap<Prefix, Vec<Fact>>,
+    uni_sorted: FxHashMap<Prefix, Vec<Fact>>,
     uni_set: FxHashSet<Fact>,
     /// `{game.resource(r) for r in scope.rooms}`
     scope_rooms: Vec<Option<i32>>,
@@ -350,7 +452,12 @@ fn sx(p: &Path) -> &SymX {
 }
 
 fn sx_mut(p: &mut Path) -> &mut SymX {
-    p.ext.as_deref_mut().expect("a SymPath").as_any_mut().downcast_mut::<SymX>().unwrap()
+    // the path's own fields, copied first where its clones still share them
+    let e = p.ext.as_mut().expect("a SymPath");
+    if Rc::get_mut(e).is_none() {
+        *e = Rc::from(e.clone_box());
+    }
+    Rc::get_mut(e).unwrap().as_any_mut().downcast_mut::<SymX>().unwrap()
 }
 
 fn count(m: &mut Machine<'_>, what: &str) {
@@ -364,8 +471,8 @@ fn lazily<R>(m: &mut Machine<'_>, f: impl FnOnce(&mut Machine<'_>) -> R) -> R {
     r
 }
 
-fn fork(k: Fact) -> ! {
-    panic::resume_unwind(Box::new(ForkOn(k, None)))
+fn fork<T>(k: Fact) -> R<T> {
+    Err(Fork(Box::new(ForkOn(k, None))))
 }
 
 /// F12: a read of fact `k`, whose values left are `cands`, that only a comparison with a constant (or a zero test)
@@ -458,9 +565,9 @@ fn compare_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> Opti
 
 /// F12 at a fork on read: a comparison alone reads the fact. One value set left: its value set, no fork (the test
 /// decides on it); more: a fork into them.
-fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> Option<Val> {
+fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> R<Option<Val>> {
     if !st(m).table.as_ref().unwrap().value_sets {
-        return None;
+        return Ok(None);
     }
     let Some(sets) = compare_sets(m, k, cands, p) else {
         let at = match st(m).cur.and_then(|x| m.game.ins(x.u)[x.i as usize].st) {
@@ -471,15 +578,15 @@ fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> Opti
             Some(Stmt::Op { .. }) => "an op",
         };
         count(m, &format!("F12: fact reads forked per value: {at}"));
-        return None;
+        return Ok(None);
     };
     if sets.len() == 1 {
         count(m, "F12: fact reads a comparison alone reads, decided on their value set (no fork)");
         let i = info(m, k);
-        return Some(lazy_of(m, &i, Some(cands)));
+        return Ok(Some(lazy_of(m, &i, Some(cands))));
     }
     count(m, "F12: forks on read into value sets");
-    panic::resume_unwind(Box::new(ForkOn(k, Some(sets))))
+    Err(Fork(Box::new(ForkOn(k, Some(sets)))))
 }
 
 fn info(m: &mut Machine<'_>, k: Fact) -> Rc<Info> {
@@ -694,96 +801,142 @@ fn forget(m: &mut Machine<'_>, q: &mut Path, op: Option<&str>, var_writes: bool)
 }
 
 /// `Reader.read` (the hook's body; the hook adds F9's not-known actor rooms, `actor_room_value`).
-fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
-    let stepping = st(m).step_key == Some(k);
-    if let Some(&v) = p.writes.get(&k) {
-        if !stepping && is_step(m, v) {
-            // a counter the path stepped is read: its value is needed now
-            let base = sx(p).pre.get(&PKey::F(k)).filter(|b| b.len() == 1).map(|b| b[0]);
-            match base {
-                Some(b) => {
-                    let d = step_of(m, v);
-                    return stepped(m, k, b, d);
+fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
+    Ok({
+        let stepping = st(m).step_key == Some(k);
+        if let Some(&v) = p.writes.get(&k) {
+            if !stepping && is_step(m, v) {
+                // a counter the path stepped is read: its value is needed now
+                let base = sx(p).pre.get(&PKey::F(k)).filter(|b| b.len() == 1).map(|b| b[0]);
+                match base {
+                    Some(b) => {
+                        let d = step_of(m, v);
+                        return Ok(stepped(m, k, b, d));
+                    }
+                    None => return fork(k),
                 }
-                None => fork(k),
+            }
+            return Ok(v);
+        }
+        match k {
+            Fact::At(s @ (Slot::Entry | Slot::Exit), _) => {
+                if let Some(&v) = p.writes.get(&Fact::At(s, MARK)) {
+                    return Ok(v);
+                }
+            }
+            Fact::Esc(s @ (Slot::Entry | Slot::Exit), _) => {
+                if let Some(&v) = p.writes.get(&Fact::Esc(s, MARK)) {
+                    return Ok(v);
+                }
+            }
+            _ => {}
+        }
+        if let Some(s) = sx(p).pre.get(&PKey::F(k)) {
+            if s.len() == 1 {
+                let l = s[0];
+                let i = info(m, k);
+                return Ok(value(m, &i, l));
+            }
+            if stepping {
+                return Ok(step0(m));
+            }
+            if st(m).lazy > 0 {
+                let s = s.clone();
+                let i = info(m, k);
+                return Ok(lazy_of(m, &i, Some(&s)));
+            }
+            let s = s.clone();
+            if let Some(v) = read_by_sets(m, k, &s, p)? {
+                return Ok(v);
+            }
+            return fork(k);
+        }
+        if let Some(&v) = st(m).pins.get(&k) {
+            return Ok(v);
+        }
+        if k == Fact::Var(VAR_ROOM) {
+            // the engine writes it with the room (room.cpp:149, 155): the same fact
+            return Ok(m.read(p, Fact::Room, o)?);
+        }
+        if k == Fact::Var(VAR_ROOM_RESOURCE) {
+            let r = m.read(p, Fact::Room, o)?;
+            return Ok(m.h_resource(r));
+        }
+        let i = info(m, k);
+        match i.kind {
+            Kind::Const => Val::Int(i.start as i32),
+            Kind::Fact => {
+                let d = i.dom.as_ref().unwrap();
+                if d.values.len() == 1 {
+                    return Ok(value(m, &i, d.values[0]));
+                }
+                if stepping {
+                    return Ok(step0(m));
+                }
+                if st(m).lazy > 0 {
+                    return Ok(lazy_of(m, &i, None));
+                }
+                let all = d.values.clone();
+                if let Some(v) = read_by_sets(m, k, &all, p)? {
+                    return Ok(v);
+                }
+                return fork(k);
+            }
+            Kind::NonFact => {
+                if let (true, Fact::Var(n @ (20 | 21 | 44 | 45))) = (st(m).table.as_ref().unwrap().value_sets, k) {
+                    // F12: the mouse is a range (scumm-machine `mouse_range`), in the scope's rooms
+                    let rooms: Vec<i32> = st(m).scope_rooms.iter().flatten().copied().collect();
+                    let (lo, hi) = m.mouse_range(n, Some(&rooms));
+                    return Ok(m.vals().mk_range(R_NONFACT, &i.key, lo, hi));
+                }
+                m.vals().mk(R_NONFACT, &*i.key)
             }
         }
-        return v;
+    })
+}
+
+/// `clear_base`'s test of an `at:`/`esc:` key, read lazily: whether `read_fact` gives a value other than 0, worked out as
+/// it would (its order of tests, its `info` lookups, which the memo logs), but without the unknown its lazy read makes
+/// (any unknown is not 0; making it only numbers it). None: a step value, read for real.
+fn cleared_nonzero(m: &mut Machine<'_>, p: &Path, k: Fact) -> Option<bool> {
+    debug_assert!(matches!(k, Fact::At(..) | Fact::Esc(..)) && st(m).lazy > 0 && st(m).step_key != Some(k));
+    if let Some(&v) = p.writes.get(&k) {
+        if is_step(m, v) {
+            return None;
+        }
+        return Some(v != Val::Int(0));
     }
     match k {
         Fact::At(s @ (Slot::Entry | Slot::Exit), _) => {
             if let Some(&v) = p.writes.get(&Fact::At(s, MARK)) {
-                return v;
+                return Some(v != Val::Int(0));
             }
         }
         Fact::Esc(s @ (Slot::Entry | Slot::Exit), _) => {
             if let Some(&v) = p.writes.get(&Fact::Esc(s, MARK)) {
-                return v;
+                return Some(v != Val::Int(0));
             }
         }
         _ => {}
     }
     if let Some(s) = sx(p).pre.get(&PKey::F(k)) {
-        if s.len() == 1 {
-            let l = s[0];
-            let i = info(m, k);
-            return value(m, &i, l);
-        }
-        if stepping {
-            return step0(m);
-        }
-        if st(m).lazy > 0 {
-            let s = s.clone();
-            let i = info(m, k);
-            return lazy_of(m, &i, Some(&s));
-        }
-        let s = s.clone();
-        if let Some(v) = read_by_sets(m, k, &s, p) {
-            return v;
-        }
-        fork(k);
+        let one = (s.len() == 1).then(|| s[0]);
+        info(m, k);
+        // one value: `value`, an int or a collapsed value's unknown; more: `lazy_of`'s unknown
+        return Some(!matches!(one, Some(Label::Int(n)) if n as i32 == 0));
     }
     if let Some(&v) = st(m).pins.get(&k) {
-        return v;
-    }
-    if k == Fact::Var(VAR_ROOM) {
-        // the engine writes it with the room (room.cpp:149, 155): the same fact
-        return m.read(p, Fact::Room, o);
-    }
-    if k == Fact::Var(VAR_ROOM_RESOURCE) {
-        let r = m.read(p, Fact::Room, o);
-        return m.h_resource(r);
+        return Some(v != Val::Int(0));
     }
     let i = info(m, k);
-    match i.kind {
-        Kind::Const => Val::Int(i.start as i32),
+    Some(match i.kind {
+        Kind::Const => i.start as i32 != 0,
         Kind::Fact => {
             let d = i.dom.as_ref().unwrap();
-            if d.values.len() == 1 {
-                return value(m, &i, d.values[0]);
-            }
-            if stepping {
-                return step0(m);
-            }
-            if st(m).lazy > 0 {
-                return lazy_of(m, &i, None);
-            }
-            let all = d.values.clone();
-            if let Some(v) = read_by_sets(m, k, &all, p) {
-                return v;
-            }
-            fork(k)
+            d.values.len() != 1 || !matches!(d.values[0], Label::Int(n) if n as i32 == 0)
         }
-        Kind::NonFact => {
-            if let (true, Fact::Var(n @ (20 | 21 | 44 | 45))) = (st(m).table.as_ref().unwrap().value_sets, k) {
-                // F12: the mouse is a range (scumm-machine `mouse_range`), in the scope's rooms
-                let rooms: Vec<i32> = st(m).scope_rooms.iter().flatten().copied().collect();
-                let (lo, hi) = m.mouse_range(n, Some(&rooms));
-                return m.vals().mk_range(R_NONFACT, &i.key, lo, hi);
-            }
-            m.vals().mk(R_NONFACT, &*i.key)
-        }
-    }
+        Kind::NonFact => true,
+    })
 }
 
 /// F9 (switch actor_rooms): an actor's room the reading does not know (crate::table::NOT_KNOWN, a lazy set holding it, or
@@ -821,7 +974,7 @@ impl Hooks for ReaderHooks {
     fn advance(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> Vec<Path> {
         if p.ext.is_none() {
             // `Reader._drive`'s `_to_sym`: the first path of a run_sentence (whose call is no join)
-            p.ext = Some(sym_path(st(m)));
+            p.ext = Some(Rc::from(sym_path(st(m))));
         }
         let snap = p.clone();
         let op = if sx(p).nf.is_empty() { None } else { op_at(m, p) };
@@ -832,14 +985,14 @@ impl Hooks for ReaderHooks {
             _ => None,
         };
         let unknown = p.unknown_writes.len();
-        let res = panic::catch_unwind(AssertUnwindSafe(|| m.advance_base(p, o)));
+        let res = m.advance_base(p, o);
         st_mut(m).cur = None; // a read outside a step is not the step's
         let mut more = match res {
             Ok(more) => more,
-            Err(e) => {
+            Err(Fork(e)) => {
                 let (key, sets) = match e.downcast::<ForkOn>() {
                     Ok(f) => (f.0, f.1),
-                    Err(e) => panic::resume_unwind(e),
+                    Err(_) => panic!("a fork the reader did not make"),
                 };
                 // the `finally` blocks of the methods the Fork went through
                 let s = st_mut(m);
@@ -865,17 +1018,19 @@ impl Hooks for ReaderHooks {
         more
     }
 
-    fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
-        watch_verb(m, k);
-        let v = read_fact(m, p, k, o);
-        match k {
-            Fact::ActorRoom(a) => actor_room_value(m, a, v),
-            _ => v,
-        }
+    fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
+        Ok({
+            watch_verb(m, k);
+            let v = read_fact(m, p, k, o)?;
+            match k {
+                Fact::ActorRoom(a) => actor_room_value(m, a, v),
+                _ => v,
+            }
+        })
     }
 
     /// Fix round 1: a read that does not fork (the machine's `read_soft`): the fact's values as a set, lazily.
-    fn read_soft(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+    fn read_soft(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
         lazily(m, |m| m.read(p, k, o))
     }
 
@@ -911,143 +1066,185 @@ impl Hooks for ReaderHooks {
         out
     }
 
-    /// `Reader.val`: a negated non-fact gets a name of its own.
-    fn val(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
-        let v = m.val_base(p, o, e, x);
-        if matches!(m.game.ast.expr(e), Expr::Neg(_)) && m.vals_ref().range(v).is_none() {
-            if let Some((r, what)) = plain(m, v) {
-                return m.vals().mk(r, format!("-({what})"));
+    /// `okeys` sorted, each once: the universe's part kept sorted (`St.uni_sorted`), the pins' put in place.
+    fn okeys_sorted(&self, m: &Machine<'_>, _o: &FactOracle, pre: Prefix) -> Vec<Fact> {
+        let s = st(m);
+        let mut out = s.uni_sorted.get(&pre).cloned().unwrap_or_default();
+        for k in s.pin_extra.iter().copied().filter(|&k| pre.matches(k)) {
+            if let Err(i) = out.binary_search(&k) {
+                out.insert(i, k);
             }
         }
-        v
-    }
-
-    /// `Reader.test`: a test on a non-fact value the path already tested in this frame.
-    fn test(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> Dec {
-        st_mut(m).pending = None;
-        let (out, pred, mode) = match m.game.ast.expr(c) {
-            Expr::Cmp { op, a, b } => {
-                let va = m.val(p, o, a, x);
-                let vb = m.val(p, o, b, x);
-                let out = m.vals().decide(&[va, vb], |v| {
-                    let (y, z) = (i16w(v[0]), i16w(v[1]));
-                    match op {
-                        CmpOp::Eq => y == z,
-                        CmpOp::Ne => y != z,
-                        CmpOp::Lt => y < z,
-                        CmpOp::Le => y <= z,
-                        CmpOp::Gt => y > z,
-                        CmpOp::Ge => y >= z,
-                    }
-                });
-                let pred = match (out, va, vb) {
-                    (Dec::Unk(u), _, Val::Int(b)) if u == va => Some((COp::of(op), i16w(b) as i64)),
-                    (Dec::Unk(u), Val::Int(a), _) if u == vb => Some((COp::of(op).flip(), i16w(a) as i64)),
-                    _ => None,
-                };
-                (out, pred, Mode::I16)
-            }
-            Expr::Not(a) => {
-                let v = m.val(p, o, a, x);
-                let out = m.vals().decide(&[v], |y| y[0] == 0);
-                (out, (out == Dec::Unk(v)).then_some((COp::Eq, 0)), Mode::Full)
-            }
-            Expr::Truth(a) => {
-                let v = m.val(p, o, a, x);
-                let out = m.vals().decide(&[v], |y| y[0] != 0);
-                (out, (out == Dec::Unk(v)).then_some((COp::Ne, 0)), Mode::Full)
-            }
-            _ => return m.test_base(p, o, c, x),
-        };
-        let Dec::Unk(u) = out else { return out };
-        let Some(pred) = pred else { return out };
-        let Some(ident) = memo_ident(m, u, mode) else { return out };
-        let have: Vec<Test> = sx(p).nf.get(&ident).cloned().unwrap_or_default();
-        let sides: Vec<bool> = [true, false]
-            .into_iter()
-            .filter(|&s| {
-                let mut t = have.clone();
-                t.push((pred.0, pred.1, s));
-                consistent(&t)
-            })
-            .collect();
-        if sides.len() == 1 {
-            count(m, "non-fact tests decided by the same test earlier in the frame");
-            return Dec::Bool(sides[0]);
-        }
-        st_mut(m).pending = Some((ident, pred));
         out
     }
 
-    /// `Reader.getter`: a MEMO_GETTERS getter whose arguments are known names them.
-    fn getter(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
-        if let Some(v) = f1c_at_mouse(m, p, name, args, x) {
-            return v;
-        }
-        let v = m.getter_base(p, o, name, args, x);
-        let g = m.game;
-        let nm = g.syms.str(name);
-        if memo_subs(nm).is_none() {
-            return v;
-        }
-        let Some((r, what)) = plain(m, v) else { return v };
-        if what != nm {
-            return v;
-        }
-        let mut vals = Vec::new();
-        for &a in g.ast.kids(args) {
-            if !matches!(g.ast.expr(a), Expr::List(_)) {
-                vals.push(m.val(p, o, a, x));
+    /// `Reader.val`: a negated non-fact gets a name of its own.
+    fn val(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> R<Val> {
+        Ok({
+            let v = m.val_base(p, o, e, x)?;
+            if matches!(m.game.ast.expr(e), Expr::Neg(_)) && m.vals_ref().range(v).is_none() {
+                if let Some((r, what)) = plain(m, v) {
+                    return Ok(m.vals().mk(r, format!("-({what})")));
+                }
             }
-        }
-        if vals.iter().all(|v| v.int().is_some()) {
-            let parts: Vec<String> = vals.iter().map(|v| v.int().unwrap().to_string()).collect();
-            return m.vals().mk(r, format!("{nm}({})", parts.join(", ")));
-        }
-        v
+            v
+        })
+    }
+
+    /// `Reader.test`: a test on a non-fact value the path already tested in this frame.
+    fn test(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> R<Dec> {
+        Ok({
+            st_mut(m).pending = None;
+            let (out, pred, mode) = match m.game.ast.expr(c) {
+                Expr::Cmp { op, a, b } => {
+                    let va = m.val(p, o, a, x)?;
+                    let vb = m.val(p, o, b, x)?;
+                    let out = m.vals().decide(&[va, vb], |v| {
+                        let (y, z) = (i16w(v[0]), i16w(v[1]));
+                        match op {
+                            CmpOp::Eq => y == z,
+                            CmpOp::Ne => y != z,
+                            CmpOp::Lt => y < z,
+                            CmpOp::Le => y <= z,
+                            CmpOp::Gt => y > z,
+                            CmpOp::Ge => y >= z,
+                        }
+                    });
+                    let pred = match (out, va, vb) {
+                        (Dec::Unk(u), _, Val::Int(b)) if u == va => Some((COp::of(op), i16w(b) as i64)),
+                        (Dec::Unk(u), Val::Int(a), _) if u == vb => Some((COp::of(op).flip(), i16w(a) as i64)),
+                        _ => None,
+                    };
+                    (out, pred, Mode::I16)
+                }
+                Expr::Not(a) => {
+                    let v = m.val(p, o, a, x)?;
+                    let out = m.vals().decide(&[v], |y| y[0] == 0);
+                    (out, (out == Dec::Unk(v)).then_some((COp::Eq, 0)), Mode::Full)
+                }
+                Expr::Truth(a) => {
+                    let v = m.val(p, o, a, x)?;
+                    let out = m.vals().decide(&[v], |y| y[0] != 0);
+                    (out, (out == Dec::Unk(v)).then_some((COp::Ne, 0)), Mode::Full)
+                }
+                _ => return Ok(m.test_base(p, o, c, x)?),
+            };
+            let Dec::Unk(u) = out else { return Ok(out) };
+            let Some(pred) = pred else { return Ok(out) };
+            let Some(ident) = memo_ident(m, u, mode) else { return Ok(out) };
+            let have: Vec<Test> = sx(p).nf.get(&ident).cloned().unwrap_or_default();
+            let sides: Vec<bool> = [true, false]
+                .into_iter()
+                .filter(|&s| {
+                    let mut t = have.clone();
+                    t.push((pred.0, pred.1, s));
+                    consistent(&t)
+                })
+                .collect();
+            if sides.len() == 1 {
+                count(m, "non-fact tests decided by the same test earlier in the frame");
+                return Ok(Dec::Bool(sides[0]));
+            }
+            st_mut(m).pending = Some((ident, pred));
+            out
+        })
+    }
+
+    /// `Reader.getter`: a MEMO_GETTERS getter whose arguments are known names them.
+    fn getter(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> R<Val> {
+        Ok({
+            if let Some(v) = f1c_at_mouse(m, p, name, args, x) {
+                return Ok(v);
+            }
+            let v = m.getter_base(p, o, name, args, x)?;
+            let g = m.game;
+            let nm = g.syms.str(name);
+            if memo_subs(nm).is_none() {
+                return Ok(v);
+            }
+            let Some((r, what)) = plain(m, v) else { return Ok(v) };
+            if what != nm {
+                return Ok(v);
+            }
+            let mut vals = Vec::new();
+            for &a in g.ast.kids(args) {
+                if !matches!(g.ast.expr(a), Expr::List(_)) {
+                    vals.push(m.val(p, o, a, x)?);
+                }
+            }
+            if vals.iter().all(|v| v.int().is_some()) {
+                let parts: Vec<String> = vals.iter().map(|v| v.int().unwrap().to_string()).collect();
+                return Ok(m.vals().mk(r, format!("{nm}({})", parts.join(", "))));
+            }
+            v
+        })
     }
 
     /// `Reader._owned_by`: the inventory is not enumerated.
-    fn owned_by(&self, m: &mut Machine<'_>, _p: &mut Path, _o: &FactOracle, owner: i32) -> Result<Vec<i32>, (Fact, Val)> {
-        count(m, "inventory reads left unknown (getInventoryCount, findInventory)");
-        let u = m.vals().mk(Reason::Inventory, "the inventory is not enumerated by the reader");
-        Err((Fact::Owner(owner), u))
+    fn owned_by(
+        &self,
+        m: &mut Machine<'_>,
+        _p: &mut Path,
+        _o: &FactOracle,
+        owner: i32,
+    ) -> R<Result<Vec<i32>, (Fact, Val)>> {
+        Ok({
+            count(m, "inventory reads left unknown (getInventoryCount, findInventory)");
+            let u = m.vals().mk(Reason::Inventory, "the inventory is not enumerated by the reader");
+            Err((Fact::Owner(owner), u))
+        })
     }
 
     /// model.py `_find_inventory` with `Reader._owned_by`'s `(None, unknown)`: the unknown.
-    fn find_inventory(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> Val {
-        let ks = m.game.ast.kids(args);
-        assert_eq!(ks.len(), 2, "findInventory takes two values");
-        let (a0, a1) = (ks[0], ks[1]);
-        let owner = m.val(p, o, a0, x);
-        let n = m.val(p, o, a1, x);
-        let (Val::Int(ow), Val::Int(_)) = (owner, n) else {
-            let w = format!("findInventory({},{})", m.vals_ref().show(owner), m.vals_ref().show(n));
-            return m.vals().mk(Reason::Inventory, w);
-        };
-        match m.owned_by(p, o, ow) {
-            Err((_, v)) => v,
-            Ok(_) => unreachable!("the reader's _owned_by never lists"),
-        }
+    fn find_inventory(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> R<Val> {
+        Ok({
+            let ks = m.game.ast.kids(args);
+            assert_eq!(ks.len(), 2, "findInventory takes two values");
+            let (a0, a1) = (ks[0], ks[1]);
+            let owner = m.val(p, o, a0, x)?;
+            let n = m.val(p, o, a1, x)?;
+            let (Val::Int(ow), Val::Int(_)) = (owner, n) else {
+                let w = format!("findInventory({},{})", m.vals_ref().show(owner), m.vals_ref().show(n));
+                return Ok(m.vals().mk(Reason::Inventory, w));
+            };
+            match m.owned_by(p, o, ow)? {
+                Err((_, v)) => v,
+                Ok(_) => unreachable!("the reader's _owned_by never lists"),
+            }
+        })
     }
 
     /// `Reader.clear`: one mark for a prefix with two colons (`at:entry:`, `esc:exit:`), else lazily.
-    fn clear(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, pre: Prefix) {
-        let mark = match pre {
-            Prefix::At(s @ (Slot::Entry | Slot::Exit)) => Some(Fact::At(s, MARK)),
-            Prefix::Esc(s @ (Slot::Entry | Slot::Exit)) => Some(Fact::Esc(s, MARK)),
-            _ => None,
-        };
-        match mark {
-            Some(mk) => {
-                let keys: Vec<Fact> = p.writes.keys().copied().filter(|&k| pre.matches(k)).collect();
-                for k in keys {
-                    p.writes.remove(&k);
+    fn clear(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, pre: Prefix) -> R<()> {
+        Ok({
+            let mark = match pre {
+                Prefix::At(s @ (Slot::Entry | Slot::Exit)) => Some(Fact::At(s, MARK)),
+                Prefix::Esc(s @ (Slot::Entry | Slot::Exit)) => Some(Fact::Esc(s, MARK)),
+                _ => None,
+            };
+            match mark {
+                Some(mk) => {
+                    let keys: Vec<Fact> = p.writes.keys().copied().filter(|&k| pre.matches(k)).collect();
+                    for k in keys {
+                        p.writes.remove(&k);
+                    }
+                    m.h_write(p, mk, Val::Int(0));
                 }
-                m.h_write(p, mk, Val::Int(0));
+                None => lazily(m, |m| -> R<()> {
+                    // `clear_base`, each key's lazy read tested for 0 without the unknown it would make
+                    for k in m.h_prefixed(p, o, pre) {
+                        let nonzero = match cleared_nonzero(m, p, k) {
+                            Some(nz) => nz,
+                            None => m.read(p, k, o)? != Val::Int(0),
+                        };
+                        if nonzero {
+                            m.h_write(p, k, Val::Int(0));
+                        }
+                    }
+                    Ok(())
+                })?,
             }
-            None => lazily(m, |m| m.clear_base(p, o, pre)),
-        }
+        })
     }
 
     /// `Reader._arith_at`: a value computed from a non-fact gets a name of its own.
@@ -1069,58 +1266,78 @@ impl Hooks for ReaderHooks {
     }
 
     /// `Reader._jump`: a fork on a non-fact test `test` keeps records the side each path took.
-    fn jump(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> Vec<Path> {
-        st_mut(m).pending = None;
-        let mut more = m.jump_base(p, o, x, cond, idx);
-        let pend = st_mut(m).pending.take();
-        if !more.is_empty() {
-            count(m, "forks on non-fact tests");
-        }
-        if let Some((ident, (op, k))) = pend {
-            if more.len() == 1 && more[0].ext.is_some() {
-                Rc::make_mut(&mut sx_mut(p).nf).entry(ident.clone()).or_default().push((op, k, true));
-                Rc::make_mut(&mut sx_mut(&mut more[0]).nf).entry(ident).or_default().push((op, k, false));
+    fn jump(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        x: X,
+        cond: Option<ExprId>,
+        idx: Option<u32>,
+    ) -> R<Vec<Path>> {
+        Ok({
+            st_mut(m).pending = None;
+            let mut more = m.jump_base(p, o, x, cond, idx)?;
+            let pend = st_mut(m).pending.take();
+            if !more.is_empty() {
+                count(m, "forks on non-fact tests");
             }
-        }
-        more
+            if let Some((ident, (op, k))) = pend {
+                if more.len() == 1 && more[0].ext.is_some() {
+                    Rc::make_mut(&mut sx_mut(p).nf).entry(ident.clone()).or_default().push((op, k, true));
+                    Rc::make_mut(&mut sx_mut(&mut more[0]).nf).entry(ident).or_default().push((op, k, false));
+                }
+            }
+            more
+        })
     }
 
     /// `Reader._wait`: the wait an event resumes at falls through; any other blocks (the slot yields there).
-    fn wait(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
-        let g = m.game;
-        let unit = p.frame().expect("a frame").unit;
-        let ins = &g.ins(x.u)[x.i as usize];
-        if sx(p).resume_wait == Some((unit, ins.offset)) {
-            sx_mut(p).resume_wait = None;
-            let (reason, what) = Machine::h_waits(name);
-            let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
-            let why = format!("?({}: {what})", reason.as_str());
-            let cite = m.cite(x);
-            p.assumptions.push(Assumption { cite, cond: cond.into(), side: Side::Bool(false), why: why.into() });
-            return Vec::new();
-        }
-        if st(m).table.as_ref().is_some_and(|t| t.wait_both) {
-            return wait_both(m, p, o, x, name);
-        }
-        count(m, "WaitFor ops that yield (their later part is an event)");
-        let c = m.cite(x);
-        m.h_done(p, o, "yield", c, Some(ins.offset));
-        Vec::new()
+    fn wait(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
+        Ok({
+            let g = m.game;
+            let unit = p.frame().expect("a frame").unit;
+            let ins = &g.ins(x.u)[x.i as usize];
+            if sx(p).resume_wait == Some((unit, ins.offset)) {
+                sx_mut(p).resume_wait = None;
+                let (reason, what) = Machine::h_waits(name);
+                let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
+                let why = format!("?({}: {what})", reason.as_str());
+                let cite = m.cite(x);
+                p.assumptions.push(Assumption { cite, cond: cond.into(), side: Side::Bool(false), why: why.into() });
+                return Ok(Vec::new());
+            }
+            if st(m).table.as_ref().is_some_and(|t| t.wait_both) {
+                return wait_both(m, p, o, x, name);
+            }
+            count(m, "WaitFor ops that yield (their later part is an event)");
+            let c = m.cite(x);
+            m.h_done(p, o, "yield", c, Some(ins.offset))?;
+            Vec::new()
+        })
     }
 
     /// The ops reader.py wraps or overrides: STEP_OPS, saveVerbs, restoreVerbs, VerbOps (lazily).
-    fn op(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
-        let Stmt::Op { name, args, .. } = st else { unreachable!() };
-        match name {
-            known::CUTSCENE | known::END_CUTSCENE => step_op(m, p, o, x, st, Fact::Cutscene, name == known::END_CUTSCENE),
-            known::USERPUT_SOFT_ON | known::USERPUT_SOFT_OFF => step_op(m, p, o, x, st, Fact::Var(VAR_USERPUT), false),
-            known::CURSOR_SOFT_ON | known::CURSOR_SOFT_OFF => step_op(m, p, o, x, st, Fact::Var(VAR_CURSORSTATE), false),
-            known::SAVE_VERBS => save_verbs(m, p, o, x, st, args),
-            known::RESTORE_VERBS => restore_verbs(m, p, o, x, st, args),
-            known::VERB_OPS => lazily(m, |m| m.op_base(p, o, x, st)),
-            known::DO_SENTENCE if sx(p).settled_target != 0 => f1c_do_sentence(m, p, o, x, st),
-            _ => m.op_base(p, o, x, st),
-        }
+    fn op(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
+        Ok({
+            let Stmt::Op { name, args, .. } = st else { unreachable!() };
+            match name {
+                known::CUTSCENE | known::END_CUTSCENE => {
+                    step_op(m, p, o, x, st, Fact::Cutscene, name == known::END_CUTSCENE)?
+                }
+                known::USERPUT_SOFT_ON | known::USERPUT_SOFT_OFF => {
+                    step_op(m, p, o, x, st, Fact::Var(VAR_USERPUT), false)?
+                }
+                known::CURSOR_SOFT_ON | known::CURSOR_SOFT_OFF => {
+                    step_op(m, p, o, x, st, Fact::Var(VAR_CURSORSTATE), false)?
+                }
+                known::SAVE_VERBS => save_verbs(m, p, o, x, st, args)?,
+                known::RESTORE_VERBS => restore_verbs(m, p, o, x, st, args)?,
+                known::VERB_OPS => lazily(m, |m| m.op_base(p, o, x, st))?,
+                known::DO_SENTENCE if sx(p).settled_target != 0 => f1c_do_sentence(m, p, o, x, st)?,
+                _ => m.op_base(p, o, x, st)?,
+            }
+        })
     }
 
     /// `Reader._join`: the machine's signature with the assumed values, the steps, the kept slots and the freezes.
@@ -1128,12 +1345,19 @@ impl Hooks for ReaderHooks {
         let mut sig = m.join_base(p, o)?;
         let x = sx(p);
         let mut b: Vec<u8> = Vec::with_capacity(256);
-        b.extend_from_slice(&(x.pre.len() as u32).to_le_bytes());
-        for (k, labels) in x.pre.iter() {
-            enc_pkey(&mut b, *k);
-            b.extend_from_slice(&(labels.len() as u32).to_le_bytes());
-            for l in labels {
-                enc_label(&mut b, *l);
+        let pre_enc = x.pre_enc.borrow().clone();
+        match pre_enc {
+            Some(e) => b.extend_from_slice(&e),
+            None => {
+                b.extend_from_slice(&(x.pre.len() as u32).to_le_bytes());
+                for (k, labels) in x.pre.iter() {
+                    enc_pkey(&mut b, *k);
+                    b.extend_from_slice(&(labels.len() as u32).to_le_bytes());
+                    for l in labels {
+                        enc_label(&mut b, *l);
+                    }
+                }
+                *x.pre_enc.borrow_mut() = Some(Rc::from(&b[..]));
             }
         }
         // reader.py walks every write for a step; only the counters STEP_OPS step ever hold one (a read of a
@@ -1191,14 +1415,16 @@ impl Hooks for ReaderHooks {
         let g0 = &group[0];
         let x0 = sx(g0);
         let frames0: Vec<&[(i32, Val)]> = g0.frames().map(|f| f.locals.as_slice()).collect();
-        let same = group[1..].iter().all(|g| {
-            g.writes == g0.writes && {
+        // every path with g0's writes and locals: the locals here; the writes' equality from the merge itself
+        // (`merged_equal_writes`), after a cheap test that equal stores pass (the same count and hash sum)
+        let may = group[1..].iter().all(|g| {
+            g.writes.len() == g0.writes.len() && g.writes.hash_sum() == g0.writes.hash_sum() && {
                 let fl: Vec<&[(i32, Val)]> = g.frames().map(|f| f.locals.as_slice()).collect();
                 fl == frames0
             }
         });
         let mut nf: BTreeMap<Ident, Vec<Test>> = BTreeMap::new();
-        if same {
+        if may {
             for (ident, tests) in x0.nf.iter() {
                 let common: Vec<Test> = tests
                     .iter()
@@ -1210,7 +1436,8 @@ impl Hooks for ReaderHooks {
                 }
             }
         }
-        let forgot = nf != *x0.nf;
+        // whether tests are forgotten, as it will be once the merge has told whether the stores were equal
+        let (forgot_if_equal, forgot_if_not) = (nf != *x0.nf, !x0.nf.is_empty());
         let mut kept = (*x0.kept).clone();
         let names: Vec<Slot> = kept.keys().copied().collect();
         for name in names {
@@ -1238,6 +1465,12 @@ impl Hooks for ReaderHooks {
         st_mut(m).view = Some(view);
         let mut q = m.merge_base(o, group, sig);
         st_mut(m).view = None;
+        let forgot = if may && m.merged_equal_writes {
+            forgot_if_equal
+        } else {
+            nf.clear(); // the stores differ: not the same paths
+            forgot_if_not
+        };
         if forgot {
             count(m, "non-fact tests forgotten where merged paths differ");
         }
@@ -1250,32 +1483,34 @@ impl Hooks for ReaderHooks {
     /// The call steps reader.py overrides or wraps (`_eng_scene`; LAZY_METHODS' `_kill_room`, `_eng_scene_begin`,
     /// `_eng_scene_load`, `_eng_scene_ego`, `_eng_scroll_note`) and its two of its own (`_eng_input`,
     /// `_eng_resume_at`).
-    fn eng(&self, m: &mut Machine<'_>, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> Vec<Path> {
-        match step {
-            Step::Note(s) if &**s == INPUT_STEP => eng_input(m, p, ci, o),
-            Step::Note(s) if &**s == RESUME_STEP => eng_resume_at(m, p, ci, o),
-            Step::Note(s) if &**s == F1C_CLICK_A => f1c_click(m, p, false),
-            Step::Note(s) if &**s == F1C_CLICK_B => f1c_click(m, p, true),
-            Step::Note(s) if &**s == F1C_END => f1c_end(m, p),
-            Step::Scene { room, .. } => {
-                // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
-                let res = match *room {
-                    Val::Int(r) => m.game.resource(r),
-                    Val::Unk(_) => None,
-                };
-                if res.is_none() || !st(m).scope_rooms.contains(&res) {
-                    let (_, cite) = call_at(p, ci);
-                    let at = format!("{cite}: room {}", m.vals_ref().show(*room));
-                    m.h_halt(p, "left the scope", at.into());
-                    return Vec::new();
+    fn eng(&self, m: &mut Machine<'_>, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> R<Vec<Path>> {
+        Ok({
+            match step {
+                Step::Note(s) if &**s == INPUT_STEP => eng_input(m, p, ci, o)?,
+                Step::Note(s) if &**s == RESUME_STEP => eng_resume_at(m, p, ci, o)?,
+                Step::Note(s) if &**s == F1C_CLICK_A => f1c_click(m, p, false),
+                Step::Note(s) if &**s == F1C_CLICK_B => f1c_click(m, p, true),
+                Step::Note(s) if &**s == F1C_END => f1c_end(m, p),
+                Step::Scene { room, .. } => {
+                    // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
+                    let res = match *room {
+                        Val::Int(r) => m.game.resource(r),
+                        Val::Unk(_) => None,
+                    };
+                    if res.is_none() || !st(m).scope_rooms.contains(&res) {
+                        let (_, cite) = call_at(p, ci);
+                        let at = format!("{cite}: room {}", m.vals_ref().show(*room));
+                        m.h_halt(p, "left the scope", at.into());
+                        return Ok(Vec::new());
+                    }
+                    m.eng_base(p, ci, step, o)?
                 }
-                m.eng_base(p, ci, step, o)
+                Step::SceneBegin(_) | Step::SceneLoad(_) | Step::SceneEgo(_) | Step::SceneKill | Step::ScrollNote => {
+                    lazily(m, |m| m.eng_base(p, ci, step, o))?
+                }
+                _ => m.eng_base(p, ci, step, o)?,
             }
-            Step::SceneBegin(_) | Step::SceneLoad(_) | Step::SceneEgo(_) | Step::SceneKill | Step::ScrollNote => {
-                lazily(m, |m| m.eng_base(p, ci, step, o))
-            }
-            _ => m.eng_base(p, ci, step, o),
-        }
+        })
     }
 
     /// `Reader._eng_script`: the inventory hook is not run; its writes are guessed.
@@ -1289,165 +1524,194 @@ impl Hooks for ReaderHooks {
         resistant: Option<bool>,
         recursive: Option<bool>,
         args: &[(i32, Val)],
-    ) {
-        if n != 0 && m.game.id(UnitKey::Global(n)).is_some() {
-            let hook = lazily(m, |m| m.read(p, Fact::Var(VAR_INVENTORY_SCRIPT), o));
-            if hook == Val::Int(n) {
-                let (head, cite) = call_at(p, ci);
-                if recursive != Some(true) {
-                    m.h_stop_script(p, o, n, &cite, &head);
+    ) -> R<()> {
+        Ok({
+            if n != 0 && m.game.id(UnitKey::Global(n)).is_some() {
+                let hook = lazily(m, |m| m.read(p, Fact::Var(VAR_INVENTORY_SCRIPT), o))?;
+                if hook == Val::Int(n) {
+                    let (head, cite) = call_at(p, ci);
+                    if recursive != Some(true) {
+                        m.h_stop_script(p, o, n, &cite, &head)?;
+                    }
+                    count(m, &format!("inventory hook runs summarized (writes guessed): {head}"));
+                    let keys = hook_writes(m, n);
+                    let u = m.vals().mk(Reason::Inventory, format!("written by the inventory hook {n} (not run)"));
+                    for &k in keys.iter() {
+                        m.h_write(p, k, u);
+                    }
+                    m.h_note(p, cite, "inventory hook", &format!("script {n} not run: its writes are guessed"));
+                    return Ok(());
                 }
-                count(m, &format!("inventory hook runs summarized (writes guessed): {head}"));
-                let keys = hook_writes(m, n);
-                let u = m.vals().mk(Reason::Inventory, format!("written by the inventory hook {n} (not run)"));
-                for &k in keys.iter() {
-                    m.h_write(p, k, u);
-                }
-                m.h_note(p, cite, "inventory hook", &format!("script {n} not run: its writes are guessed"));
-                return;
             }
-        }
-        m.eng_script_base(p, ci, o, n, resistant, recursive, args)
+            m.eng_script_base(p, ci, o, n, resistant, recursive, args)?
+        })
     }
 
     /// `Reader._finish`: a slot left waiting is kept with its locals (`SymPath.kept`).
-    fn finish(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
-        let f = match p.stack.last() {
-            Some(Entry::Frame(f)) => f.clone(),
-            _ => panic!("finish: the top is not a frame"),
-        };
-        m.finish_base(p, o, how, at, resume);
-        let g = m.game;
-        let name = Game::unit_name(g.unit(f.unit).key);
-        if how == "yield" || how == "parked" {
-            let w = if how == "yield" {
-                resume
-            } else {
-                f.pc.filter(|&pc| pc < g.unit(f.unit).ins_len).map(|pc| g.ins(f.unit)[pc as usize].offset)
+    fn finish(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        how: &'static str,
+        at: S,
+        resume: Option<i32>,
+    ) -> R<()> {
+        Ok({
+            let f = match p.stack.last() {
+                Some(Entry::Frame(f)) => f.clone(),
+                _ => panic!("finish: the top is not a frame"),
             };
-            if let Some(w) = w {
-                let ov = f.override_;
-                let cd: Vec<Val> = if ov != 0 && p.cut_data.len() >= ov as usize {
-                    p.cut_data[p.cut_data.len() - ov as usize..].to_vec()
+            m.finish_base(p, o, how, at, resume)?;
+            let g = m.game;
+            let name = Game::unit_name(g.unit(f.unit).key);
+            if how == "yield" || how == "parked" {
+                let w = if how == "yield" {
+                    resume
                 } else {
-                    Vec::new()
+                    f.pc.filter(|&pc| pc < g.unit(f.unit).ins_len).map(|pc| g.ins(f.unit)[pc as usize].offset)
                 };
-                let ov = if cd.len() == ov as usize { ov } else { 0 };
-                let k = KeptS {
-                    unit: f.unit,
-                    w,
-                    locals: f.locals.as_slice().to_vec(),
-                    known: f.args_known,
-                    rec: f.recursive,
-                    res: f.resistant,
-                    owned: f.owned,
-                    ov,
-                    cd,
-                };
-                Rc::make_mut(&mut sx_mut(p).kept).insert(name, k);
+                if let Some(w) = w {
+                    let ov = f.override_;
+                    let cd: Vec<Val> = if ov != 0 && p.cut_data.len() >= ov as usize {
+                        p.cut_data[p.cut_data.len() - ov as usize..].to_vec()
+                    } else {
+                        Vec::new()
+                    };
+                    let ov = if cd.len() == ov as usize { ov } else { 0 };
+                    let k = KeptS {
+                        unit: f.unit,
+                        w,
+                        locals: f.locals.as_slice().to_vec(),
+                        known: f.args_known,
+                        rec: f.recursive,
+                        res: f.resistant,
+                        owned: f.owned,
+                        ov,
+                        cd,
+                    };
+                    Rc::make_mut(&mut sx_mut(p).kept).insert(name, k);
+                }
+            } else if sx(p).kept.contains_key(&name) {
+                Rc::make_mut(&mut sx_mut(p).kept).remove(&name);
             }
-        } else if sx(p).kept.contains_key(&name) {
-            Rc::make_mut(&mut sx_mut(p).kept).remove(&name);
-        }
+        })
     }
 
     /// `Reader._count`: a freeze this path recorded has no count; else lazily.
-    fn count(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Slot) -> Option<(i32, bool)> {
-        if let Some(&n) = p.freeze.get(&name) {
-            if is_sym_count(n) {
-                return None;
+    fn count(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Slot) -> R<Option<(i32, bool)>> {
+        Ok({
+            if let Some(&n) = p.freeze.get(&name) {
+                if is_sym_count(n) {
+                    return Ok(None);
+                }
             }
-        }
-        lazily(m, |m| m.count_base(p, o, name))
+            lazily(m, |m| m.count_base(p, o, name))?
+        })
     }
 
-    fn set_freeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Slot, n: Option<(i32, bool)>, why: &str) {
+    fn set_freeze(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        name: Slot,
+        n: Option<(i32, bool)>,
+        why: &str,
+    ) -> R<()> {
         lazily(m, |m| m.set_freeze_base(p, o, name, n, why))
     }
 
     /// `Reader._freeze`: the machine's rule, read lazily; a slot whose liveness is not known gets its freeze
     /// recorded, and `frozen:` where it is live.
-    fn freeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, flag: i32, x: X) {
-        let before: FxHashMap<Slot, Val> =
-            p.writes.iter().filter_map(|(k, v)| if let Fact::Frozen(s) = k { Some((*s, *v)) } else { None }).collect();
-        lazily(m, |m| m.freeze_base(p, o, flag, x));
-        let mut names: Vec<Slot> = p.freeze.iter().filter(|(_, n)| n.is_none()).map(|(s, _)| *s).collect();
-        names.sort_unstable();
-        for name in names {
-            let k = Fact::Frozen(name);
-            if !matches!(p.writes.get(&k), Some(Val::Unk(_))) {
-                continue;
-            }
-            let b = before.get(&name).copied();
-            let c = {
-                let fz = Rc::make_mut(&mut sx_mut(p).fz);
-                let e = fz.entry(name).or_insert((0, b));
-                e.0 += 1;
-                e.0
-            };
-            p.freeze.insert(name, Some(sym_count(c)));
-            let live = match name {
-                Slot::Script(n) => Some(Fact::Script(n)),
-                Slot::Local(n) => Some(Fact::Local(n)),
-                Slot::Obj(ob) => Some(Fact::ObjScript(ob)),
-                Slot::Entry | Slot::Exit => None,
-            };
-            if let Some(live) = live {
-                if !matches!(p.writes.get(&live), Some(Val::Int(_))) {
-                    let v = mk_unknown(m, R_COND, &live.to_string(), Some(vec![1]), COND);
-                    p.writes.insert(k, v);
-                    count(m, "freezes of a slot whose liveness is not known (frozen: where live)");
+    fn freeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, flag: i32, x: X) -> R<()> {
+        Ok({
+            let before: FxHashMap<Slot, Val> = p
+                .writes
+                .iter()
+                .filter_map(|(k, v)| if let Fact::Frozen(s) = k { Some((*s, *v)) } else { None })
+                .collect();
+            lazily(m, |m| m.freeze_base(p, o, flag, x))?;
+            let mut names: Vec<Slot> = p.freeze.iter().filter(|(_, n)| n.is_none()).map(|(s, _)| *s).collect();
+            names.sort_unstable();
+            for name in names {
+                let k = Fact::Frozen(name);
+                if !matches!(p.writes.get(&k), Some(Val::Unk(_))) {
+                    continue;
+                }
+                let b = before.get(&name).copied();
+                let c = {
+                    let fz = Rc::make_mut(&mut sx_mut(p).fz);
+                    let e = fz.entry(name).or_insert((0, b));
+                    e.0 += 1;
+                    e.0
+                };
+                p.freeze.insert(name, Some(sym_count(c)));
+                let live = match name {
+                    Slot::Script(n) => Some(Fact::Script(n)),
+                    Slot::Local(n) => Some(Fact::Local(n)),
+                    Slot::Obj(ob) => Some(Fact::ObjScript(ob)),
+                    Slot::Entry | Slot::Exit => None,
+                };
+                if let Some(live) = live {
+                    if !matches!(p.writes.get(&live), Some(Val::Int(_))) {
+                        let v = mk_unknown(m, R_COND, &live.to_string(), Some(vec![1]), COND);
+                        p.writes.insert(k, v);
+                        count(m, "freezes of a slot whose liveness is not known (frozen: where live)");
+                    }
                 }
             }
-        }
+        })
     }
 
     /// `Reader._unfreeze`: a freeze this path recorded is undone by as many unfreezes; a slot frozen before the
     /// path is taken as frozen once.
-    fn unfreeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) {
-        st_mut(m).lazy += 1;
-        let mut saved: FxHashMap<Slot, Option<(i32, bool)>> = FxHashMap::default();
-        let in_freeze: Vec<Slot> = p.freeze.keys().copied().collect();
-        for name in in_freeze {
-            if sx(p).fz.contains_key(&name) {
-                let v = p.freeze.remove(&name).unwrap();
-                saved.insert(name, v);
-            }
-        }
-        m.unfreeze_base(p, o);
-        st_mut(m).lazy -= 1;
-        let names: Vec<Slot> = sx(p).fz.keys().copied().collect();
-        for name in names {
-            let (left, before) = {
-                let fz = Rc::make_mut(&mut sx_mut(p).fz);
-                let e = fz.get_mut(&name).unwrap();
-                e.0 -= 1;
-                (e.0, e.1)
-            };
-            if left > 0 {
-                p.freeze.insert(name, saved.get(&name).copied().unwrap_or(None));
-                continue;
-            }
-            let k = Fact::Frozen(name);
-            match before {
-                None => {
-                    p.writes.remove(&k);
+    fn unfreeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> R<()> {
+        Ok({
+            st_mut(m).lazy += 1;
+            let mut saved: FxHashMap<Slot, Option<(i32, bool)>> = FxHashMap::default();
+            let in_freeze: Vec<Slot> = p.freeze.keys().copied().collect();
+            for name in in_freeze {
+                if sx(p).fz.contains_key(&name) {
+                    let v = p.freeze.remove(&name).unwrap();
+                    saved.insert(name, v);
                 }
-                Some(v) => p.writes.insert(k, v),
             }
-            p.freeze.remove(&name);
-            Rc::make_mut(&mut sx_mut(p).fz).remove(&name);
-            count(m, "freezes undone in the same path (frozen: restored)");
-        }
-        let slots = lazily(m, |m| m.h_live_slots(p, o));
-        for (name, _, _) in slots {
-            let k = Fact::Frozen(name);
-            if sx(p).fz.contains_key(&name) || p.freeze.contains_key(&name) || p.writes.contains_key(&k) {
-                continue;
+            m.unfreeze_base(p, o)?;
+            st_mut(m).lazy -= 1;
+            let names: Vec<Slot> = sx(p).fz.keys().copied().collect();
+            for name in names {
+                let (left, before) = {
+                    let fz = Rc::make_mut(&mut sx_mut(p).fz);
+                    let e = fz.get_mut(&name).unwrap();
+                    e.0 -= 1;
+                    (e.0, e.1)
+                };
+                if left > 0 {
+                    p.freeze.insert(name, saved.get(&name).copied().unwrap_or(None));
+                    continue;
+                }
+                let k = Fact::Frozen(name);
+                match before {
+                    None => {
+                        p.writes.remove(&k);
+                    }
+                    Some(v) => p.writes.insert(k, v),
+                }
+                p.freeze.remove(&name);
+                Rc::make_mut(&mut sx_mut(p).fz).remove(&name);
+                count(m, "freezes undone in the same path (frozen: restored)");
             }
-            p.writes.insert(k, Val::Int(0));
-            count(m, "unfreezes of a slot frozen before the path (count taken as 1)");
-        }
+            let slots = lazily(m, |m| m.h_live_slots(p, o))?;
+            for (name, _, _) in slots {
+                let k = Fact::Frozen(name);
+                if sx(p).fz.contains_key(&name) || p.freeze.contains_key(&name) || p.writes.contains_key(&k) {
+                    continue;
+                }
+                p.writes.insert(k, Val::Int(0));
+                count(m, "unfreezes of a slot frozen before the path (count taken as 1)");
+            }
+        })
     }
 }
 
@@ -1459,7 +1723,7 @@ fn sym_path(s: &St) -> Box<dyn PathExt> {
 /// `Reader._go`'s first path: the call, a SymPath.
 fn first_path(m: &mut Machine<'_>, call: Call) -> Path {
     let mut p = Path::new(vec![Entry::Call(call)]);
-    p.ext = Some(sym_path(st(m)));
+    p.ext = Some(Rc::from(sym_path(st(m))));
     p
 }
 
@@ -1501,11 +1765,15 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
     let mut forks = Vec::with_capacity(groups.len());
     for g in groups.iter().skip(1) {
         let mut q = snap.clone();
-        Rc::make_mut(&mut sx_mut(&mut q).pre).insert(PKey::F(key), g.clone());
+        let xq = sx_mut(&mut q);
+        Rc::make_mut(&mut xq.pre).insert(PKey::F(key), g.clone());
+        xq.pre_enc = Default::default();
         forks.push(q);
     }
     let mut first = snap;
-    Rc::make_mut(&mut sx_mut(&mut first).pre).insert(PKey::F(key), groups[0].clone());
+    let xf = sx_mut(&mut first);
+    Rc::make_mut(&mut xf.pre).insert(PKey::F(key), groups[0].clone());
+    xf.pre_enc = Default::default();
     *p = first;
     forks
 }
@@ -1548,93 +1816,103 @@ fn reach_groups(m: &mut Machine<'_>, p: &Path, key: Fact, text: &str, groups: Ve
 }
 
 /// reader.py `_make_step`: the op with its counter kept as a step until something reads it.
-fn step_op(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, key: Fact, end: bool) -> Vec<Path> {
-    {
-        let s = st_mut(m);
-        s.step_key = Some(key);
-        if end {
-            // its test of an armed override reads every esc: key: lazily
-            s.lazy += 1;
+fn step_op(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, key: Fact, end: bool) -> R<Vec<Path>> {
+    Ok({
+        {
+            let s = st_mut(m);
+            s.step_key = Some(key);
+            if end {
+                // its test of an armed override reads every esc: key: lazily
+                s.lazy += 1;
+            }
         }
-    }
-    let out = m.op_base(p, o, x, st);
-    {
-        let s = st_mut(m);
-        s.step_key = None;
-        if end {
-            s.lazy -= 1;
+        let out = m.op_base(p, o, x, st)?;
+        {
+            let s = st_mut(m);
+            s.step_key = None;
+            if end {
+                s.lazy -= 1;
+            }
         }
-    }
-    if end {
-        if let Some(&v) = p.writes.get(&key) {
-            if is_step(m, v) {
-                // endCutscene with no cutscene open is the engine's error() (script.cpp:1668-1681): the depth
-                // before it, the start's plus the steps before, is at least 1, a precondition
-                let d = step_of(m, v) + 1;
-                let i = info(m, key);
-                let dom = i.dom.as_ref().unwrap();
-                let have: Labels = sx(p).pre.get(&PKey::F(key)).cloned().unwrap_or_else(|| dom.values.clone());
-                let ok: Labels =
-                    have.into_iter().filter(|&u| u == Label::Above || matches!(u, Label::Int(n) if n + d >= 1)).collect();
-                if ok.is_empty() {
-                    let c = m.cite(x);
-                    m.error(p, "cutscene stack underflow", c, "endCutscene's error() (script.cpp:1668-1681)", true);
-                } else if ok != dom.values {
-                    Rc::make_mut(&mut sx_mut(p).pre).insert(PKey::F(key), ok);
+        if end {
+            if let Some(&v) = p.writes.get(&key) {
+                if is_step(m, v) {
+                    // endCutscene with no cutscene open is the engine's error() (script.cpp:1668-1681): the depth
+                    // before it, the start's plus the steps before, is at least 1, a precondition
+                    let d = step_of(m, v) + 1;
+                    let i = info(m, key);
+                    let dom = i.dom.as_ref().unwrap();
+                    let have: Labels = sx(p).pre.get(&PKey::F(key)).cloned().unwrap_or_else(|| dom.values.clone());
+                    let ok: Labels = have
+                        .into_iter()
+                        .filter(|&u| u == Label::Above || matches!(u, Label::Int(n) if n + d >= 1))
+                        .collect();
+                    if ok.is_empty() {
+                        let c = m.cite(x);
+                        m.error(p, "cutscene stack underflow", c, "endCutscene's error() (script.cpp:1668-1681)", true);
+                    } else if ok != dom.values {
+                        let xp = sx_mut(p);
+                        Rc::make_mut(&mut xp.pre).insert(PKey::F(key), ok);
+                        xp.pre_enc = Default::default();
+                    }
                 }
             }
         }
-    }
-    out
+        out
+    })
 }
 
 /// `Reader._op_saveVerbs`: whether each verb was shown is kept as `saved:<verb>:<id>`.
-fn save_verbs(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, args: Span) -> Vec<Path> {
-    let ks = m.game.ast.kids(args);
-    let vals: Vec<Val> = ks.iter().map(|&e| m.val(p, o, e, Some(x))).collect();
-    let [a, b, sid] = vals[..] else { panic!("saveVerbs takes three values") };
-    let (Val::Int(a), Val::Int(b), Val::Int(sid)) = (a, b, sid) else {
-        return lazily(m, |m| m.op_base(p, o, x, st));
-    };
-    for v in a..=b {
-        let now = lazily(m, |m| m.read(p, Fact::Verb(v), o));
-        let s = match now {
-            Val::Int(_) => now,
-            _ if class_of(m, now) == Some(COPY) => now,
-            _ => mk_unknown(m, R_COPY, &format!("verb:{v}"), Some(vec![0, 1]), COPY),
+fn save_verbs(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, args: Span) -> R<Vec<Path>> {
+    Ok({
+        let ks = m.game.ast.kids(args);
+        let vals: Vec<Val> = ks.iter().map(|&e| m.val(p, o, e, Some(x))).collect::<R<Vec<Val>>>()?;
+        let [a, b, sid] = vals[..] else { panic!("saveVerbs takes three values") };
+        let (Val::Int(a), Val::Int(b), Val::Int(sid)) = (a, b, sid) else {
+            return Ok(lazily(m, |m| m.op_base(p, o, x, st))?);
         };
-        m.h_write(p, saved_fact(v, sid), s);
-        m.h_write(p, Fact::Verb(v), Val::Int(0));
-    }
-    Vec::new()
+        for v in a..=b {
+            let now = lazily(m, |m| m.read(p, Fact::Verb(v), o))?;
+            let s = match now {
+                Val::Int(_) => now,
+                _ if class_of(m, now) == Some(COPY) => now,
+                _ => mk_unknown(m, R_COPY, &format!("verb:{v}"), Some(vec![0, 1]), COPY),
+            };
+            m.h_write(p, saved_fact(v, sid), s);
+            m.h_write(p, Fact::Verb(v), Val::Int(0));
+        }
+        Vec::new()
+    })
 }
 
 /// `Reader._op_restoreVerbs`: a saved verb that was shown is shown again (`saved:<verb>:<id>`).
-fn restore_verbs(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, args: Span) -> Vec<Path> {
-    let ks = m.game.ast.kids(args);
-    let vals: Vec<Val> = ks.iter().map(|&e| m.val(p, o, e, Some(x))).collect();
-    let [a, b, sid] = vals[..] else { panic!("restoreVerbs takes three values") };
-    let (Val::Int(a), Val::Int(b), Val::Int(sid)) = (a, b, sid) else {
-        return m.op_base(p, o, x, st);
-    };
-    for v in a..=b {
-        let key = saved_fact(v, sid);
-        let s = lazily(m, |m| m.read(p, key, o));
-        match s {
-            Val::Int(n) => {
-                if n != 0 {
-                    m.h_write(p, Fact::Verb(v), Val::Int(1));
+fn restore_verbs(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, args: Span) -> R<Vec<Path>> {
+    Ok({
+        let ks = m.game.ast.kids(args);
+        let vals: Vec<Val> = ks.iter().map(|&e| m.val(p, o, e, Some(x))).collect::<R<Vec<Val>>>()?;
+        let [a, b, sid] = vals[..] else { panic!("restoreVerbs takes three values") };
+        let (Val::Int(a), Val::Int(b), Val::Int(sid)) = (a, b, sid) else {
+            return Ok(m.op_base(p, o, x, st)?);
+        };
+        for v in a..=b {
+            let key = saved_fact(v, sid);
+            let s = lazily(m, |m| m.read(p, key, o))?;
+            match s {
+                Val::Int(n) => {
+                    if n != 0 {
+                        m.h_write(p, Fact::Verb(v), Val::Int(1));
+                    }
+                }
+                _ if class_of(m, s) == Some(COPY) => m.h_write(p, Fact::Verb(v), s),
+                _ => {
+                    let c = mk_unknown(m, R_COND, &key_str(key), Some(vec![1]), COND);
+                    m.h_write(p, Fact::Verb(v), c);
                 }
             }
-            _ if class_of(m, s) == Some(COPY) => m.h_write(p, Fact::Verb(v), s),
-            _ => {
-                let c = mk_unknown(m, R_COND, &key_str(key), Some(vec![1]), COND);
-                m.h_write(p, Fact::Verb(v), c);
-            }
+            m.h_write(p, key, Val::Int(0));
         }
-        m.h_write(p, key, Val::Int(0));
-    }
-    Vec::new()
+        Vec::new()
+    })
 }
 
 /// The switch shared_runs: a read of one of the scope's dialog verbs (shared.rs, condition 2).
@@ -1648,98 +1926,106 @@ fn watch_verb(m: &mut Machine<'_>, k: Fact) {
 }
 
 /// model.py `_eng_input` (its switch input_after_turns off): the click on a verb runs the input script.
-fn eng_input(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> Vec<Path> {
-    let verb = st(m).verb;
-    for k in [Fact::Var(VAR_VERB_SCRIPT), Fact::Var(VAR_USERPUT), Fact::Verb(verb)] {
-        // the drift's reads (`Path.input_drift`, which the reader does not read): a fact may fork here
-        // (the switch shared_runs: the click's own read of its verb is not counted, `watch_verb`)
-        let own = k == Fact::Verb(verb);
-        st_mut(m).click_read = own;
-        m.read(p, k, o);
-        let s = st_mut(m);
-        s.click_read = false;
-        s.clicked |= own;
-    }
-    let (_, cite) = call_at(p, ci);
-    let n = m.oget(o, Fact::Var(VAR_VERB_SCRIPT));
-    match n {
-        Val::Unk(_) => {
-            let w = format!("input script {}", m.vals_ref().show(n));
-            p.unknown_writes.push(("runInputScript".into(), cite, w.into()));
+fn eng_input(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> R<Vec<Path>> {
+    Ok({
+        let verb = st(m).verb;
+        for k in [Fact::Var(VAR_VERB_SCRIPT), Fact::Var(VAR_USERPUT), Fact::Verb(verb)] {
+            // the drift's reads (`Path.input_drift`, which the reader does not read): a fact may fork here
+            // (the switch shared_runs: the click's own read of its verb is not counted, `watch_verb`)
+            let own = k == Fact::Verb(verb);
+            st_mut(m).click_read = own;
+            m.read(p, k, o)?;
+            let s = st_mut(m);
+            s.click_read = false;
+            s.clicked |= own;
         }
-        Val::Int(0) => m.h_note(p, cite, "runInputScript", "VAR_VERB_SCRIPT is 0: no input script runs"),
-        Val::Int(n) => {
-            let args = vec![(0, Val::Int(VERB_CLICK_AREA)), (1, Val::Int(verb)), (2, Val::Int(LEFT_CLICK))];
-            let step = Step::Script { n, resistant: Some(false), recursive: Some(false), args };
-            let cid = m.h_cid();
-            p.stack.push(Entry::Call(Call {
-                head: "runInputScript".into(),
-                cite: "script.cpp:1478-1511".into(),
-                steps: vec![step].into(),
-                caller: None,
-                active: false,
-                i: 0,
-                cid,
-            }));
+        let (_, cite) = call_at(p, ci);
+        let n = m.oget(o, Fact::Var(VAR_VERB_SCRIPT));
+        match n {
+            Val::Unk(_) => {
+                let w = format!("input script {}", m.vals_ref().show(n));
+                p.unknown_writes.push(("runInputScript".into(), cite, w.into()));
+            }
+            Val::Int(0) => m.h_note(p, cite, "runInputScript", "VAR_VERB_SCRIPT is 0: no input script runs"),
+            Val::Int(n) => {
+                let args = vec![(0, Val::Int(VERB_CLICK_AREA)), (1, Val::Int(verb)), (2, Val::Int(LEFT_CLICK))];
+                let step = Step::Script { n, resistant: Some(false), recursive: Some(false), args };
+                let cid = m.h_cid();
+                p.stack.push(Entry::Call(Call {
+                    head: "runInputScript".into(),
+                    cite: "script.cpp:1478-1511".into(),
+                    steps: vec![step].into(),
+                    caller: None,
+                    active: false,
+                    i: 0,
+                    cid,
+                }));
+            }
         }
-    }
-    Vec::new()
+        Vec::new()
+    })
 }
 
 /// `Reader._eng_resume_at`: runAllScripts gives the event's slot its turn from its wait point, with its locals.
-fn eng_resume_at(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> Vec<Path> {
-    let ev = st(m).event.clone().expect("the run's event");
-    let g = m.game;
-    let uid = g.id(ev.unit).expect("the event's unit");
-    let idx = g.at(uid, ev.w as i32).expect("the event's wait point");
-    let key = g.lifecycle_key(ev.unit);
-    let name = slot_of(&ev.name);
-    if ev.abort {
-        m.h_write(p, Fact::Var(VAR_OVERRIDE), Val::Int(1));
-        m.clear(p, o, Prefix::Esc(name));
-        m.set_freeze(p, o, name, Some((0, true)), "");
-        p.unknown_writes.push((ESC_KEY[0].into(), ESC_KEY[1].into(), ESC_KEY[2].into()));
-        count(m, "Esc keys whose input-script run is left out (ESC_KEY)");
-    }
-    if !ev.abort && idx > 0 {
-        let prev = &g.ins(uid)[idx as usize - 1];
-        let delay = matches!(prev.st, Some(Stmt::Op { name: known::DELAY | known::DELAY_VARIABLE, .. }));
-        if prev.next == Some(idx) && delay {
-            let c = m.cite(X { u: uid, i: idx - 1 });
-            let cond = format!("{}'s delay is over", ev.name);
-            let why = format!("?({}: {}'s delay count)", Reason::Timer.as_str(), ev.name);
-            p.assumptions.push(Assumption { cite: c, cond: cond.into(), side: Side::Bool(true), why: why.into() });
+fn eng_resume_at(m: &mut Machine<'_>, p: &mut Path, ci: usize, o: &FactOracle) -> R<Vec<Path>> {
+    Ok({
+        let ev = st(m).event.clone().expect("the run's event");
+        let g = m.game;
+        let uid = g.id(ev.unit).expect("the event's unit");
+        let idx = g.at(uid, ev.w as i32).expect("the event's wait point");
+        let key = g.lifecycle_key(ev.unit);
+        let name = slot_of(&ev.name);
+        if ev.abort {
+            m.h_write(p, Fact::Var(VAR_OVERRIDE), Val::Int(1));
+            m.clear(p, o, Prefix::Esc(name))?;
+            m.set_freeze(p, o, name, Some((0, true)), "")?;
+            p.unknown_writes.push((ESC_KEY[0].into(), ESC_KEY[1].into(), ESC_KEY[2].into()));
+            count(m, "Esc keys whose input-script run is left out (ESC_KEY)");
         }
-    }
-    m.clear(p, o, Prefix::At(name));
-    if g.ins(uid)[idx as usize].yields == Some(Yield::Wait) {
-        sx_mut(p).resume_wait = Some((uid, ev.w as i32));
-    }
-    // F1c rule 8: the constants the slot's list carries go on the path, and on with it
-    let settled = ev.locals.iter().filter(|e| e.0 >= crate::inputs::SETTLED_LOCAL);
-    for (n, v) in settled {
-        let v = mval(m, v);
-        m.h_write(p, Fact::Var((*n - crate::inputs::SETTLED_LOCAL) as i32), v);
-        sx_mut(p).carry = true;
-    }
-    let locals: Vec<(i32, Val)> =
-        ev.locals.iter().filter(|e| e.0 < crate::inputs::SETTLED_LOCAL).map(|(n, v)| (*n as i32, mval(m, v))).collect();
-    let owned = match &ev.owned {
-        Py::Bool(b) => Owned::Bool(*b),
-        other => Owned::Unk(mval(m, &RVal::from_py(other))),
-    };
-    let rec = opt_bool(&ev.recursive);
-    let res = opt_bool(&ev.resistant);
-    m.h_push_frame(p, ci, uid, idx, &locals, owned, rec, res, key, ev.args_known, false);
-    let ov = ev.override_;
-    if ov != 0 && ev.cut_data.len() as i64 == ov && p.end.is_none() {
-        // the cutscenes this slot began in an earlier turn, and their data
-        let top = p.stack.len() - 1;
-        p.frame_at(top).override_ = (if ev.abort { ov - 1 } else { ov }) as i32;
-        p.cut_data = ev.cut_data.iter().map(|&c| Val::Int(c as i32)).collect();
-        count(m, "events resuming a slot with its own open cutscenes (cutscene data carried)");
-    }
-    Vec::new()
+        if !ev.abort && idx > 0 {
+            let prev = &g.ins(uid)[idx as usize - 1];
+            let delay = matches!(prev.st, Some(Stmt::Op { name: known::DELAY | known::DELAY_VARIABLE, .. }));
+            if prev.next == Some(idx) && delay {
+                let c = m.cite(X { u: uid, i: idx - 1 });
+                let cond = format!("{}'s delay is over", ev.name);
+                let why = format!("?({}: {}'s delay count)", Reason::Timer.as_str(), ev.name);
+                p.assumptions.push(Assumption { cite: c, cond: cond.into(), side: Side::Bool(true), why: why.into() });
+            }
+        }
+        m.clear(p, o, Prefix::At(name))?;
+        if g.ins(uid)[idx as usize].yields == Some(Yield::Wait) {
+            sx_mut(p).resume_wait = Some((uid, ev.w as i32));
+        }
+        // F1c rule 8: the constants the slot's list carries go on the path, and on with it
+        let settled = ev.locals.iter().filter(|e| e.0 >= crate::inputs::SETTLED_LOCAL);
+        for (n, v) in settled {
+            let v = mval(m, v);
+            m.h_write(p, Fact::Var((*n - crate::inputs::SETTLED_LOCAL) as i32), v);
+            sx_mut(p).carry = true;
+        }
+        let locals: Vec<(i32, Val)> = ev
+            .locals
+            .iter()
+            .filter(|e| e.0 < crate::inputs::SETTLED_LOCAL)
+            .map(|(n, v)| (*n as i32, mval(m, v)))
+            .collect();
+        let owned = match &ev.owned {
+            Py::Bool(b) => Owned::Bool(*b),
+            other => Owned::Unk(mval(m, &RVal::from_py(other))),
+        };
+        let rec = opt_bool(&ev.recursive);
+        let res = opt_bool(&ev.resistant);
+        m.h_push_frame(p, ci, uid, idx, &locals, owned, rec, res, key, ev.args_known, false);
+        let ov = ev.override_;
+        if ov != 0 && ev.cut_data.len() as i64 == ov && p.end.is_none() {
+            // the cutscenes this slot began in an earlier turn, and their data
+            let top = p.stack.len() - 1;
+            p.frame_at(top).override_ = (if ev.abort { ov - 1 } else { ov }) as i32;
+            p.cut_data = ev.cut_data.iter().map(|&c| Val::Int(c as i32)).collect();
+            count(m, "events resuming a slot with its own open cutscenes (cutscene data carried)");
+        }
+        Vec::new()
+    })
 }
 
 // --- fix round 1, F1c: a sentence from the input script (fix-round1.md, F1c; inputs.rs) -----------------------------
@@ -1843,31 +2129,33 @@ fn f1c_at_mouse(m: &mut Machine<'_>, p: &mut Path, name: Sym, args: Span, x: Opt
 
 /// F1c rule 7: doSentence on a click's path: STOP is the machine's own op and empties what is held; a push is held on the
 /// path, and the click's scripts go on.
-fn f1c_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
-    let Stmt::Op { args, flags, .. } = st else { unreachable!() };
-    let g = m.game;
-    if g.ast.flags(flags).contains(&known::STOP) {
-        sx_mut(p).queued = None;
-        return m.op_base(p, o, x, st);
-    }
-    let cite = m.cite(x);
-    if sx(p).queued.is_some() {
-        count(m, "F1c: a second sentence on one click (dropped)");
-        m.h_halt(p, "unmodelled", format!("{cite}: a second doSentence on one click").into());
-        return Vec::new();
-    }
-    let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
-    let vals: Vec<Val> = kids.iter().map(|&a| m.val(p, o, a, Some(x))).collect();
-    if let [Val::Int(v), Val::Int(a), Val::Int(b)] = vals[..] {
-        sx_mut(p).queued = Some((v, a, b));
-        m.h_note(p, cite, "doSentence", "sentence queued (F1c): it runs where the click's run ends");
-    } else {
-        let strs: Vec<String> = vals.iter().map(|&v| m.vals_ref().show(v).to_string()).collect();
-        let w = format!("sentence [{}]", strs.join(", "));
-        count(m, "F1c: sentences with a value not known (listed, not run)");
-        p.unknown_writes.push(("doSentence".into(), cite, w.into()));
-    }
-    Vec::new()
+fn f1c_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
+    Ok({
+        let Stmt::Op { args, flags, .. } = st else { unreachable!() };
+        let g = m.game;
+        if g.ast.flags(flags).contains(&known::STOP) {
+            sx_mut(p).queued = None;
+            return Ok(m.op_base(p, o, x, st)?);
+        }
+        let cite = m.cite(x);
+        if sx(p).queued.is_some() {
+            count(m, "F1c: a second sentence on one click (dropped)");
+            m.h_halt(p, "unmodelled", format!("{cite}: a second doSentence on one click").into());
+            return Ok(Vec::new());
+        }
+        let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
+        let vals: Vec<Val> = kids.iter().map(|&a| m.val(p, o, a, Some(x))).collect::<R<Vec<Val>>>()?;
+        if let [Val::Int(v), Val::Int(a), Val::Int(b)] = vals[..] {
+            sx_mut(p).queued = Some((v, a, b));
+            m.h_note(p, cite, "doSentence", "sentence queued (F1c): it runs where the click's run ends");
+        } else {
+            let strs: Vec<String> = vals.iter().map(|&v| m.vals_ref().show(v).to_string()).collect();
+            let w = format!("sentence [{}]", strs.join(", "));
+            count(m, "F1c: sentences with a value not known (listed, not run)");
+            p.unknown_writes.push(("doSentence".into(), cite, w.into()));
+        }
+        Vec::new()
+    })
 }
 
 /// F1c rule 7: where the click's run ends, a sentence held runs as today's record runs it (the job's pins hold the
@@ -1907,34 +2195,41 @@ fn f1c_end(m: &mut Machine<'_>, p: &mut Path) -> Vec<Path> {
 /// VAR_HAVE_MSG (var 3, which the engine writes every frame, domains::ENGINE), WaitForCamera the camera's current and
 /// target x; no fact of the reading holds them. WaitForSentence reads the sentence queue and whether the sentence
 /// script is in use: where the path decides it (`sentence_wait_known`), it takes that branch alone; else both.
-fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
-    let g = m.game;
-    let ins = &g.ins(x.u)[x.i as usize];
-    let known = if name == known::WAIT_FOR_SENTENCE { m.sentence_wait_known(p, o) } else { None };
-    let c = m.cite(x);
-    match known {
-        Some(true) => {
-            count(m, "wait_both: WaitForSentence blocks by the path's facts");
-            count(m, "WaitFor ops that yield (their later part is an event)");
-            m.h_done(p, o, "yield", c, Some(ins.offset));
-            Vec::new()
+fn wait_both(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
+    Ok({
+        let g = m.game;
+        let ins = &g.ins(x.u)[x.i as usize];
+        let known = if name == known::WAIT_FOR_SENTENCE { m.sentence_wait_known(p, o)? } else { None };
+        let c = m.cite(x);
+        match known {
+            Some(true) => {
+                count(m, "wait_both: WaitForSentence blocks by the path's facts");
+                count(m, "WaitFor ops that yield (their later part is an event)");
+                m.h_done(p, o, "yield", c, Some(ins.offset))?;
+                Vec::new()
+            }
+            Some(false) => {
+                count(m, "wait_both: WaitForSentence passes by the path's facts");
+                Vec::new()
+            }
+            None => {
+                let (reason, what) = Machine::h_waits(name);
+                let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
+                let why = format!("?({}: {what})", reason.as_str());
+                let mut q = p.fork();
+                q.assumptions.push(Assumption {
+                    cite: c.clone(),
+                    cond: cond.into(),
+                    side: Side::Bool(false),
+                    why: why.into(),
+                });
+                count(m, "WaitFor ops that yield (their later part is an event)");
+                count(m, "wait_both: WaitFor ops that also pass in the same run");
+                m.h_done(p, o, "yield", c, Some(ins.offset))?;
+                vec![q]
+            }
         }
-        Some(false) => {
-            count(m, "wait_both: WaitForSentence passes by the path's facts");
-            Vec::new()
-        }
-        None => {
-            let (reason, what) = Machine::h_waits(name);
-            let cond = format!("{} blocks", scumm_ir::py::strip(g.text(ins)));
-            let why = format!("?({}: {what})", reason.as_str());
-            let mut q = p.fork();
-            q.assumptions.push(Assumption { cite: c.clone(), cond: cond.into(), side: Side::Bool(false), why: why.into() });
-            count(m, "WaitFor ops that yield (their later part is an event)");
-            count(m, "wait_both: WaitFor ops that also pass in the same run");
-            m.h_done(p, o, "yield", c, Some(ins.offset));
-            vec![q]
-        }
-    }
+    })
 }
 
 /// F1c rule 8: a slot the path leaves waiting carries the five variables its own code reads, where the path knows them.
@@ -2126,8 +2421,20 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
-    let pre: Pre = x.pre.iter().map(|(k, v)| (pkey_str(*k), v.clone())).collect();
-    let writes: BTreeMap<String, RVal> = p.writes.iter().map(|(&k, &v)| (key_str(k), rval(run, v))).collect();
+    let pre: Pre = by_text(x.pre.iter().map(|(k, v)| (pkey_rc(*k), v)).collect(), |v| v.clone());
+    let writes: BTreeMap<String, RVal> = {
+        // sorted by rank, which is the texts' order (the keys are distinct facts, so distinct texts)
+        let mut w: Vec<(u64, Rc<str>, Val)> = p
+            .writes
+            .iter()
+            .map(|(&k, &v)| {
+                let (r, t) = key_ranked(k);
+                (r, t, v)
+            })
+            .collect();
+        w.sort_unstable_by_key(|e| e.0);
+        w.into_iter().map(|(_, t, v)| (t.to_string(), rval(run, v))).collect()
+    };
     let kept: BTreeMap<String, Kept> = x
         .kept
         .iter()
@@ -2164,7 +2471,7 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
         })
         .collect();
     let n = p.notes.len();
-    let notes = p.notes.iter().skip(n.saturating_sub(5)).map(tri_py).collect();
+    let notes = p.notes.iter_from(n.saturating_sub(5)).map(tri_py).collect();
     PathOut {
         end,
         sym,
@@ -2224,14 +2531,17 @@ fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::C
         // checkAndRunSentenceScript runs VAR_SENTENCE_SCRIPT's script (script.cpp:1244-1246)
         Step::Sentence { .. } => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
         Step::ScrollNote => vec![CutStep::Hook(scumm_machine::machine::VAR_SCROLL_SCRIPT)],
-        Step::Note(s) if &**s == scumm_machine::machine::SECOND_INVENTORY_HOOK => vec![CutStep::Hook(VAR_INVENTORY_SCRIPT)],
+        Step::Note(s) if &**s == scumm_machine::machine::SECOND_INVENTORY_HOOK => {
+            vec![CutStep::Hook(VAR_INVENTORY_SCRIPT)]
+        }
         // a click on a verb: the input script (`eng_input`)
         Step::Note(s) if &**s == INPUT_STEP => vec![CutStep::Hook(VAR_VERB_SCRIPT)],
         // F1c's clicks: the sentence variables and the mouse (`f1c_click`, `f1c_mouse`), then the input script again
         Step::Note(s) if &**s == F1C_CLICK_A || &**s == F1C_CLICK_B => match settled {
             Some(run) => {
                 let r = &run.rule;
-                let vars: Vec<i32> = if &**s == F1C_CLICK_A { vec![r.v, r.a, r.b, r.p, r.last] } else { vec![r.b, r.last] };
+                let vars: Vec<i32> =
+                    if &**s == F1C_CLICK_A { vec![r.v, r.a, r.b, r.p, r.last] } else { vec![r.b, r.last] };
                 let mut out: Vec<CutStep> = vars.into_iter().map(var).collect();
                 out.push(var(crate::inputs::VAR_VIRT_MOUSE_X));
                 out.push(var(crate::inputs::VAR_VIRT_MOUSE_Y));
@@ -2257,7 +2567,8 @@ pub struct Reader<'g> {
 
 impl<'g> Reader<'g> {
     pub fn new(game: &'g Game) -> Reader<'g> {
-        let features = Features { own_entry: true, dispatch: true, calls: true, room_change: true, ..Default::default() };
+        let features =
+            Features { own_entry: true, dispatch: true, calls: true, room_change: true, ..Default::default() };
         let mut m = Machine::new(game, features, Switches::default());
         m.path_limit = PATH_LIMIT;
         m.hooks = Some(&HOOKS);
@@ -2280,6 +2591,16 @@ impl<'g> Reader<'g> {
                     s.uni.entry(pre).or_default().push(f);
                 }
             }
+            s.uni_sorted = s
+                .uni
+                .iter()
+                .map(|(pre, keys)| {
+                    let mut k = keys.clone();
+                    k.sort_unstable();
+                    k.dedup();
+                    (*pre, k)
+                })
+                .collect();
             s.scope_rooms = scope.rooms.iter().map(|&r| game.resource(r)).collect();
             s.scope = Some(scope);
         }
@@ -2356,14 +2677,28 @@ impl Reader<'_> {
                 // F1c: the click (with B, both clicks) from the input script, then what it queued
                 let n = settled_n.unwrap();
                 let b = b.unwrap_or(0) as i32;
-                st_mut(m).settled = Some(Rc::new(SettledRun { rule: cx.table.settled.clone().unwrap(), n, verb: *verb as i32, a: *a as i32, b }));
+                st_mut(m).settled = Some(Rc::new(SettledRun {
+                    rule: cx.table.settled.clone().unwrap(),
+                    n,
+                    verb: *verb as i32,
+                    a: *a as i32,
+                    b,
+                }));
                 let mut steps = vec![Step::Note(F1C_CLICK_A.into())];
                 if b != 0 {
                     steps.push(Step::Note(F1C_CLICK_B.into()));
                 }
                 steps.push(Step::Note(F1C_END.into()));
                 let cid = m.h_cid();
-                let call = Call { head: "click".into(), cite: "scumm.cpp:3175-3255".into(), steps: steps.into(), caller: None, active: false, i: 0, cid };
+                let call = Call {
+                    head: "click".into(),
+                    cite: "scumm.cpp:3175-3255".into(),
+                    steps: steps.into(),
+                    caller: None,
+                    active: false,
+                    i: 0,
+                    cid,
+                };
                 let first = first_path(m, call);
                 m.h_drive(o, first, format!("input script {n}"), None)
             }
@@ -2420,7 +2755,10 @@ impl Reader<'_> {
             ("unknown_writes", tri_list(&p.unknown_writes)),
             ("errors", tri_list(&p.errors)),
             ("unmodelled", tri_list(&p.unmodelled)),
-            ("turns", Py::List(p.turns.iter().map(|t| Py::Tuple(vec![Py::str(t.0.to_string()), Py::str(t.1)])).collect())),
+            (
+                "turns",
+                Py::List(p.turns.iter().map(|t| Py::Tuple(vec![Py::str(t.0.to_string()), Py::str(t.1)])).collect()),
+            ),
         ];
         if p.ext.is_some() {
             f.push(("pre", crate::record::pre_py(&o.pre)));
@@ -2439,10 +2777,11 @@ impl RunMachine for Reader<'_> {
     /// guides come by the job's key (`Ctx::job_key`).
     fn run(&mut self, cx: &Ctx, label: &str, pins: &Pins, pre: &Pre, what: &What) -> RunOut {
         // the rough reading (rough-reading.md): every run with the reading's step limit, else the machine's own
-        self.m.step_limit = if cx.table.step_limit == 0 { scumm_machine::machine::STEP_LIMIT } else { cx.table.step_limit };
+        self.m.step_limit =
+            if cx.table.step_limit == 0 { scumm_machine::machine::STEP_LIMIT } else { cx.table.step_limit };
         {
             let s = st_mut(&mut self.m);
-            s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing());
+            s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing()) || cx.table.cross.is_some();
             s.touched.clear();
             s.queries.clear();
         }
@@ -2454,7 +2793,13 @@ impl RunMachine for Reader<'_> {
             s.held_seen.clear();
         }
         // the switch shared_runs (shared.rs): a click that differs from another job's only in its verb takes its run
-        let mut mine: Option<(std::sync::Arc<crate::shared::SharedRuns>, (String, String), i64, UnitKey, std::sync::Arc<Vec<bool>>)> = None;
+        let mut mine: Option<(
+            std::sync::Arc<crate::shared::SharedRuns>,
+            (String, String),
+            i64,
+            UnitKey,
+            std::sync::Arc<Vec<bool>>,
+        )> = None;
         if let (Some(sh), What::Verb(v)) = (&cx.table.shared, what) {
             if let Some((key, unit, def)) = self.share_key(cx, pins, pre, *v, sh) {
                 match sh.look(&key.0, &key.1) {
@@ -2487,7 +2832,14 @@ impl Reader<'_> {
     /// when the run is not one the switch shares (its verb not pinned to 1, its input script not known, or the script
     /// names its verb argument).
     #[allow(clippy::type_complexity)]
-    fn share_key(&self, cx: &Ctx, pins: &Pins, pre: &Pre, v: i64, sh: &crate::shared::SharedRuns) -> Option<((String, String), UnitKey, std::sync::Arc<Vec<bool>>)> {
+    fn share_key(
+        &self,
+        cx: &Ctx,
+        pins: &Pins,
+        pre: &Pre,
+        v: i64,
+        sh: &crate::shared::SharedRuns,
+    ) -> Option<((String, String), UnitKey, std::sync::Arc<Vec<bool>>)> {
         let game = self.m.game;
         let vk = format!("verb:{v}");
         if pins.get(&vk) != Some(&RVal::Int(1)) || pre.get(&vk).map(|s| s.as_slice()) != Some(&[Label::Int(1)][..]) {
@@ -2510,7 +2862,11 @@ impl Reader<'_> {
         let fv = PKey::F(Fact::Verb(v as i32));
         let guides: Option<Vec<crate::reach::Guide>> = st(&self.m).guides.as_ref().map(|gs| {
             gs.iter()
-                .map(|g| g.iter().map(|(k, l)| (if *k == fv { PKey::F(Fact::Verb(i32::MIN)) } else { *k }, l.clone())).collect())
+                .map(|g| {
+                    g.iter()
+                        .map(|(k, l)| (if *k == fv { PKey::F(Fact::Verb(i32::MIN)) } else { *k }, l.clone()))
+                        .collect()
+                })
                 .collect()
         });
         let _ = cx;
@@ -2531,7 +2887,9 @@ impl Reader<'_> {
             return Err("it reads a dialog verb");
         }
         let watched = |k: &str| {
-            k.strip_prefix("verb:").and_then(|n| n.parse::<i32>().ok()).is_some_and(|n| s.watch_verbs.binary_search(&n).is_ok())
+            k.strip_prefix("verb:")
+                .and_then(|n| n.parse::<i32>().ok())
+                .is_some_and(|n| s.watch_verbs.binary_search(&n).is_ok())
         };
         if out.paths.iter().any(|p| p.writes.keys().any(|k| watched(k))) {
             return Err("it writes a dialog verb");
@@ -2575,7 +2933,16 @@ impl Reader<'_> {
         let held = std::mem::take(&mut s.held);
         let touched = s.touched.drain().map(key_str).collect();
         let queries = std::mem::take(&mut s.queries);
-        RunOut { paths, limit: run.limit as i64, value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(), first_fork, rd, held, touched, queries }
+        RunOut {
+            paths,
+            limit: run.limit as i64,
+            value_caps: run.value_caps.iter().map(|c| c.1 as i64).sum(),
+            first_fork,
+            rd,
+            held,
+            touched,
+            queries,
+        }
     }
 }
 
@@ -2586,13 +2953,17 @@ pub fn dump_capture_run(rd: &mut Reader, cx: &Ctx, i: usize, c: &Py) -> Py {
     let pre = crate::record::pre_from_py(c.get("pre"));
     let w = c.get("what").items();
     let what = match w[0].as_str() {
-        "run_sentence_sym" => What::Sentence { verb: w[1].int(), a: w[2].int(), b: (!w[3].is_none()).then(|| w[3].int()) },
+        "run_sentence_sym" => {
+            What::Sentence { verb: w[1].int(), a: w[2].int(), b: (!w[3].is_none()).then(|| w[3].int()) }
+        }
         "run_click_verb" => What::Verb(w[1].int()),
         "run_event" => What::Event(Event::from_py(&w[1])),
         k => panic!("not a run: {k}"),
     };
     let (run, first_fork, rdc) = rd.run_full(cx, &pins, &pre, &what);
-    let nz = |c: &crate::py::Counter| Py::Dict(c.0.iter().filter(|(_, &v)| v != 0).map(|(k, v)| (k.clone(), Py::Int(*v))).collect());
+    let nz = |c: &crate::py::Counter| {
+        Py::Dict(c.0.iter().filter(|(_, &v)| v != 0).map(|(k, v)| (k.clone(), Py::Int(*v))).collect())
+    };
     Py::dict(vec![
         ("run", Py::Int(i as i64)),
         ("label", c.get("label").clone()),
@@ -2600,7 +2971,10 @@ pub fn dump_capture_run(rd: &mut Reader, cx: &Ctx, i: usize, c: &Py) -> Py {
         ("limit", Py::Int(run.limit as i64)),
         ("value_caps", Py::Int(run.value_caps.iter().map(|c| c.1 as i64).sum())),
         ("first_fork", first_fork.map_or(Py::None, Py::str)),
-        ("rd", Py::dict(vec![("counts", nz(&rdc.counts)), ("forks", nz(&rdc.forks)), ("fork_keys", nz(&rdc.fork_keys))])),
+        (
+            "rd",
+            Py::dict(vec![("counts", nz(&rdc.counts)), ("forks", nz(&rdc.forks)), ("fork_keys", nz(&rdc.fork_keys))]),
+        ),
         ("paths", Py::List(run.paths.iter().map(|p| rd.path_dump(&run, p)).collect())),
     ])
 }
@@ -2612,7 +2986,15 @@ mod tests {
 
     /// A path whose stack holds one call with these steps, `done` of them run.
     fn path(steps: Vec<Step>, done: u32) -> Path {
-        Path::new(vec![Entry::Call(Call { head: "t".into(), cite: "t".into(), steps: steps.into(), caller: None, active: false, i: done, cid: 1 })])
+        Path::new(vec![Entry::Call(Call {
+            head: "t".into(),
+            cite: "t".into(),
+            steps: steps.into(),
+            caller: None,
+            active: false,
+            i: done,
+            cid: 1,
+        })])
     }
 
     fn settled() -> SettledRun {
@@ -2638,7 +3020,8 @@ mod tests {
     #[test]
     fn a_cut_in_the_first_click_keeps_the_second_click_and_the_sentence() {
         let game = crate::oracle::load_game();
-        let p = path(vec![Step::Note(F1C_CLICK_A.into()), Step::Note(F1C_CLICK_B.into()), Step::Note(F1C_END.into())], 1);
+        let p =
+            path(vec![Step::Note(F1C_CLICK_A.into()), Step::Note(F1C_CLICK_B.into()), Step::Note(F1C_END.into())], 1);
         let run = settled();
         let cut = cut_of(&game, &p, Some(&run));
         let w = |n: i32| CutStep::Write(format!("var:{n}"));

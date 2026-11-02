@@ -368,51 +368,143 @@ pub fn fx<T: std::hash::Hash>(t: &T) -> u64 {
 
 /// A fact map of writes (model.py's `dict` of fact -> value). It keeps the sum of its entries' hashes as they are
 /// written, so that a hash of the whole store (`_spins`, `_state_key`) costs nothing.
+///
+/// It is a shared base (the entries when the store was last flattened) and its own changes since (`delta`: a key's
+/// value, or None for a base key removed; never a key's base value). A clone shares both until one changes them; the
+/// changes stay few (past `DELTA_MAX` they are flattened into a new base), so a step's copy of them is small, and the
+/// paths a fork made, which share their base, differ only where their changes do (`merge_base`). Only the order its
+/// entries are listed in (`iter`, `keys`) differs from one map's: an order nothing the reading writes depends on.
 #[derive(Clone, Debug, Default)]
 pub struct Store {
-    map: FxHashMap<Fact, Val>,
+    base: Rc<FxHashMap<Fact, Val>>,
+    delta: Rc<FxHashMap<Fact, Option<Val>>>,
+    len: usize,
     sum: u64,
+    /// the places of the `at:` and `esc:` keys held, per slot (false: `at:`, true: `esc:`): what a prefix of a
+    /// slot's places lists without going through every key (`Machine::prefixed`)
+    places: Rc<FxHashMap<(bool, Slot), Vec<i32>>>,
+}
+
+/// The changes a store keeps apart from its base before it flattens them into a new one.
+const DELTA_MAX: usize = 64;
+
+fn place_of(k: Fact) -> Option<((bool, Slot), i32)> {
+    match k {
+        Fact::At(s, w) => Some(((false, s), w)),
+        Fact::Esc(s, w) => Some(((true, s), w)),
+        _ => None,
+    }
 }
 
 impl Store {
     #[inline]
     pub fn get(&self, k: &Fact) -> Option<&Val> {
-        self.map.get(k)
+        if !self.delta.is_empty() {
+            if let Some(e) = self.delta.get(k) {
+                return e.as_ref();
+            }
+        }
+        self.base.get(k)
     }
 
     #[inline]
     pub fn contains_key(&self, k: &Fact) -> bool {
-        self.map.contains_key(k)
+        self.get(k).is_some()
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.map.len()
+        self.len
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
+        self.len == 0
     }
 
     /// `store[k] = v`.
     #[inline]
     pub fn insert(&mut self, k: Fact, v: Val) {
-        if let Some(old) = self.map.insert(k, v) {
-            self.sum = self.sum.wrapping_sub(fx(&(k, old)));
+        let old = self.get(&k).copied();
+        if old == Some(v) {
+            return; // the same entry: nothing changes (a shared store stays shared)
+        }
+        let d = Rc::make_mut(&mut self.delta);
+        if self.base.get(&k) == Some(&v) {
+            d.remove(&k);
+        } else {
+            d.insert(k, Some(v));
+        }
+        match old {
+            Some(o) => self.sum = self.sum.wrapping_sub(fx(&(k, o))),
+            None => {
+                self.len += 1;
+                if let Some((slot, w)) = place_of(k) {
+                    Rc::make_mut(&mut self.places).entry(slot).or_default().push(w);
+                }
+            }
         }
         self.sum = self.sum.wrapping_add(fx(&(k, v)));
+        if self.delta.len() > DELTA_MAX {
+            self.flatten();
+        }
     }
 
-    /// Every (key, value), in no order.
+    /// The changes made the base: a new base, no changes.
+    fn flatten(&mut self) {
+        let mut m = (*self.base).clone();
+        for (k, e) in self.delta.iter() {
+            match e {
+                Some(v) => {
+                    m.insert(*k, *v);
+                }
+                None => {
+                    m.remove(k);
+                }
+            }
+        }
+        self.base = Rc::new(m);
+        self.delta = Rc::default();
+    }
+
+    /// The places of the `at:` (`esc` false) or `esc:` keys of slot `s` the store holds, in no order.
     #[inline]
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, Fact, Val> {
-        self.map.iter()
+    pub fn places(&self, esc: bool, s: Slot) -> &[i32] {
+        self.places.get(&(esc, s)).map_or(&[], |v| v.as_slice())
+    }
+
+    /// Every (key, value), in no order: the base's not changed, then the changes.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (&Fact, &Val)> + '_ {
+        let d = &self.delta;
+        self.base
+            .iter()
+            .filter(move |(k, _)| d.is_empty() || !d.contains_key(*k))
+            .chain(d.iter().filter_map(|(k, e)| e.as_ref().map(|v| (k, v))))
     }
 
     #[inline]
-    pub fn keys(&self) -> std::collections::hash_map::Keys<'_, Fact, Val> {
-        self.map.keys()
+    pub fn keys(&self) -> impl Iterator<Item = &Fact> + '_ {
+        self.iter().map(|(k, _)| k)
+    }
+
+    /// Whether the two stores share their base: then they differ at most at the keys either changed (`changed`).
+    #[inline]
+    pub fn shares_base(&self, other: &Store) -> bool {
+        Rc::ptr_eq(&self.base, &other.base)
+    }
+
+    /// The keys this store changed since its base (set or removed), in no order.
+    #[inline]
+    pub fn changed(&self) -> impl Iterator<Item = &Fact> + '_ {
+        self.delta.keys()
+    }
+
+    /// Whether the two stores share their base and their changes (clones neither has changed since): then they
+    /// hold the same entries.
+    #[inline]
+    pub fn same_map(&self, other: &Store) -> bool {
+        self.shares_base(other) && Rc::ptr_eq(&self.delta, &other.delta)
     }
 
     /// An order-free hash of the entries (the set of items, as model.py's `frozenset(writes.items())`).
@@ -423,16 +515,108 @@ impl Store {
 
     /// `store.pop(k, None)` (a hook's: reader.py deletes writes).
     pub fn remove(&mut self, k: &Fact) -> Option<Val> {
-        let old = self.map.remove(k)?;
+        let old = *self.get(k)?;
+        let d = Rc::make_mut(&mut self.delta);
+        if self.base.contains_key(k) {
+            d.insert(*k, None);
+        } else {
+            d.remove(k);
+        }
+        self.len -= 1;
         self.sum = self.sum.wrapping_sub(fx(&(*k, old)));
+        if let Some((slot, w)) = place_of(*k) {
+            let ps = Rc::make_mut(&mut self.places);
+            let v = ps.get_mut(&slot).expect("a held place");
+            v.swap_remove(v.iter().position(|&x| x == w).expect("a held place"));
+            if v.is_empty() {
+                ps.remove(&slot);
+            }
+        }
+        if self.delta.len() > DELTA_MAX {
+            self.flatten();
+        }
         Some(old)
     }
 }
 
 impl PartialEq for Store {
-    /// model.py's dict equality (`g.writes == base.writes`).
+    /// model.py's dict equality (`g.writes == base.writes`). Two stores of one base hold the same entries exactly when
+    /// their changes are the same (a change never holds the base's value).
     fn eq(&self, other: &Store) -> bool {
-        self.sum == other.sum && self.map == other.map
+        if self.sum != other.sum || self.len != other.len {
+            return false;
+        }
+        if self.shares_base(other) {
+            return Rc::ptr_eq(&self.delta, &other.delta) || self.delta == other.delta;
+        }
+        self.iter().all(|(k, v)| other.get(k) == Some(v))
+    }
+}
+
+/// `Path.freeze`: unit name -> (count, exact) of slots off the stack whose count the path set (None: not known), shared
+/// by a path's clones until one of them changes it. Reads go through the map (`Deref`).
+#[derive(Clone, Debug, Default)]
+pub struct Freeze(Rc<FxHashMap<Slot, Option<(i32, bool)>>>);
+
+impl std::ops::Deref for Freeze {
+    type Target = FxHashMap<Slot, Option<(i32, bool)>>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> IntoIterator for &'a Freeze {
+    type Item = (&'a Slot, &'a Option<(i32, bool)>);
+    type IntoIter = std::collections::hash_map::Iter<'a, Slot, Option<(i32, bool)>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl Freeze {
+    #[inline]
+    pub fn insert(&mut self, k: Slot, v: Option<(i32, bool)>) -> Option<Option<(i32, bool)>> {
+        if self.0.get(&k) == Some(&v) {
+            return Some(v); // the same entry: nothing changes
+        }
+        Rc::make_mut(&mut self.0).insert(k, v)
+    }
+    #[inline]
+    pub fn remove(&mut self, k: &Slot) -> Option<Option<(i32, bool)>> {
+        if !self.0.contains_key(k) {
+            return None;
+        }
+        Rc::make_mut(&mut self.0).remove(k)
+    }
+}
+
+/// `Path.seen`: a set of state hashes, shared by a path's clones until one of them changes it.
+#[derive(Clone, Debug, Default)]
+pub struct Seen(Rc<FxHashSet<u64>>);
+
+impl Seen {
+    #[inline]
+    pub fn contains(&self, h: &u64) -> bool {
+        self.0.contains(h)
+    }
+    #[inline]
+    pub fn insert(&mut self, h: u64) -> bool {
+        if self.0.contains(&h) {
+            return false;
+        }
+        Rc::make_mut(&mut self.0).insert(h)
+    }
+    pub fn clear(&mut self) {
+        if !self.0.is_empty() {
+            Rc::make_mut(&mut self.0).clear();
+        }
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -666,7 +850,7 @@ pub struct Path {
     pub end_at: Option<S>,
     pub steps: u32,
     /// unit name -> (count, exact) of slots off the stack whose count the path set; None: not known
-    pub freeze: FxHashMap<Slot, Option<(i32, bool)>>,
+    pub freeze: Freeze,
     pub cut_index: Option<u32>,
     pub cut_data: Vec<Val>,
     pub turns: PList<(Slot, &'static str)>,
@@ -679,7 +863,7 @@ pub struct Path {
     /// the join it was last merged at (calls; not dumped)
     pub joined: Option<Rc<Sig>>,
     /// states met at jump targets in the running frame's turn (calls; not dumped)
-    pub seen: FxHashSet<u64>,
+    pub seen: Seen,
     pub resumed: bool,
     // --- settle
     pub settle: bool,
@@ -730,7 +914,7 @@ pub struct Path {
     // --- golden.py's trace bookkeeping
     pub tid: Option<u32>,
     /// what a hook adds to a path (reader.py's `SymPath` fields); None without hooks. Forks copy it
-    pub ext: Option<Box<dyn PathExt>>,
+    pub ext: Option<Rc<dyn PathExt>>,
 }
 
 /// The fields a hook adds to a path (reader.py's `SymPath` subclass of `model.Path`): cloned with the path.

@@ -299,6 +299,16 @@ impl Assumption {
         assert_eq!(t.len(), 4, "an assumption is a 4-tuple: {}", p.text());
         Assumption { cite: t[0].as_str().into(), cond: t[1].as_str().into(), side: t[2].clone(), why: t[3].as_str().into() }
     }
+    /// `side_str` without a copy where the text is there already.
+    pub fn side_text(&self) -> std::borrow::Cow<'_, str> {
+        match &self.side {
+            Py::Bool(true) => "True".into(),
+            Py::Bool(false) => "False".into(),
+            Py::Str(s) => s.as_str().into(),
+            Py::None => "None".into(),
+            _ => self.side_str().into(),
+        }
+    }
     /// Python's `str(a[2])`.
     pub fn side_str(&self) -> String {
         match &self.side {
@@ -667,7 +677,7 @@ pub fn cut_text(v: &Val) -> CutData {
 }
 
 /// An item of the cutscene data as `Builder.record` keeps it: an int, or an unknown's text.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CutData {
     Int(i64),
     Str(String),

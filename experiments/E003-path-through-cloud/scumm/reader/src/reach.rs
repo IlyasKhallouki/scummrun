@@ -186,6 +186,11 @@ impl Reached {
         self.inner.read().unwrap().guides.get(key).cloned()
     }
 
+    /// Whether any rerun has guides in the round being read (set between batches, `reach_batch`).
+    pub fn has_guides(&self) -> bool {
+        !self.inner.read().unwrap().guides.is_empty()
+    }
+
     /// The reached values of a fact, in the domain's order.
     pub fn values(&self, table: &FactTable, key: &str) -> Labels {
         let i = self.inner.read().unwrap();
@@ -296,9 +301,13 @@ impl ReachState {
 
 /// A job's identity under --reach: the whole job. Its label is not one: a room's local scripts, entry and exit code
 /// are named alike in every room (`local:N`, `entry`, `exit`), and `Event::label` leaves out the unit, so two rooms'
-/// events can share a label.
+/// events can share a label. The job's bytes (wire.rs: equal jobs, equal bytes; unequal jobs, unequal bytes), one
+/// char per byte: a text that names the job as its Debug text did, made without formatting it.
 pub fn job_key(job: &Job) -> String {
-    format!("{job:?}")
+    use crate::wire::Wire;
+    let mut b = Vec::with_capacity(512);
+    job.put(&mut b);
+    b.iter().map(|&x| x as char).collect()
 }
 
 impl Builder<'_> {
@@ -310,13 +319,14 @@ impl Builder<'_> {
     fn cur_guides(&self, reach: &Reached, job: &Job) -> Option<Arc<Vec<Guide>>> {
         match &self.cur_job_key {
             Some(k) => reach.guides_of(k),
-            None => reach.guides_of(&job_key(job)),
+            None if reach.has_guides() => reach.guides_of(&job_key(job)),
+            None => None,
         }
     }
 
-    /// Stage 1 of a path's end: the path's precondition as its record will have it; false: it does not meet the
-    /// reached values, and is held on the first set that fails, so no record is made of it.
-    pub(crate) fn reach_path(&mut self, job: &Job, p: &PathOut) -> bool {
+    /// Stage 1 of a path's end: the path's precondition as its record will have it (placed), or None: it does not
+    /// meet the reached values, and is held on the first set that fails, so no record is made of it.
+    pub(crate) fn reach_path(&mut self, job: &Job, p: &PathOut) -> Option<Pre> {
         let reach = self.reach_arc();
         let mut pre = Pre::new();
         for (k, s) in &p.pre {
@@ -328,10 +338,10 @@ impl Builder<'_> {
         }
         let (pre, _) = self.positions(pre, Vec::new());
         match reach.first_unmet(&self.table, pre.iter(), self.memo_log.as_mut()) {
-            None => true,
+            None => Some(pre),
             Some((key, set)) => {
                 self.reach_hold_path(job, p, key, set);
-                false
+                None
             }
         }
     }
