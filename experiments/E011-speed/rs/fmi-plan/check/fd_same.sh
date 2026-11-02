@@ -25,8 +25,8 @@ for g in "$@"; do
   elif [ ! -f "$d/sas_plan" ] && [ ! -f "$d/rust_plan" ]; then
     fdst=$(grep -E "Completely explored|Search stopped without|no solution|Time limit" "$d/fd.log" | head -1)
     rst=$(python3 -c "import json;print(json.load(open('$d/rust.json'))['status'])" 2>/dev/null)
-    if [ "$fdrc" = 12 ] && [ "$rst" = incomplete ] && [ "$fdc" = "$rc" ]; then
-      same=$((same+1)); echo "same  $g: no plan (FD exit 12, Rust incomplete), counts $rc"
+    if [ "$fdrc" = 11 ] && [ "$rst" = unsolvable ] && [ "$fdc" = "$rc" ]; then
+      same=$((same+1)); echo "same  $g: no plan (FD exit 11, Rust unsolvable), counts $rc"
     else
       both_out=$((both_out+1)); echo "nopl  $g: FD rc $fdrc ($fdst) counts '$fdc'; Rust rc $rrc status '$rst' counts '$rc'"
     fi

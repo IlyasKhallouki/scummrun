@@ -8,6 +8,9 @@ from pathlib import Path
 
 
 def norm(d):
+    # fmi-core's predicted_goal is a bool; plan_fd's is None when there is no plan
+    if d.get("predicted_goal") is None:
+        d["predicted_goal"] = False
     for s in d.get("steps", []):
         s[4] = [[k, v, [[c, sorted(x)] for c, x in w]] for k, v, w in s[4]]
     return d
