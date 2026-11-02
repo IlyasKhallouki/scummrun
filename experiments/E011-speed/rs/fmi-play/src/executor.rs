@@ -95,9 +95,12 @@ pub struct Br<'a> {
     pub hits: [u64; 4], // state asked, state kept, at asked, at kept
     /// the AtMany commands sent (`prefetch`)
     pub batches: u64,
-    /// the input code reads the state after almost every run: with batching each run brings the full dump at its
-    /// stop (RunObs), kept as this stop's state
+    /// the input code reads the state after almost every run: with batching each run brings the dump at its stop
+    /// (RunObs), kept as this stop's state: the room's dump (`fmi_core::room_cut`: what the input code reads), or the
+    /// full dump when an observer is set
     pub fuse: bool,
+    /// `state` holds the room's dump, not the full one (`full` asks the full one)
+    partial: bool,
     /// this thread's CPU ns in the engine calls: run, obs, at, and the stone trials' fork and quit
     pub cpu: [u64; 4],
 }
@@ -123,6 +126,7 @@ impl<'a> Br<'a> {
             hits: [0; 4],
             batches: 0,
             fuse: false,
+            partial: false,
             cpu: [0; 4],
         }
     }
@@ -132,16 +136,29 @@ impl<'a> Br<'a> {
     pub fn status(&self) -> &Status {
         self.e.status()
     }
+    /// This stop's dump for the input code: the room's dump or the full one (the input code reads the room, the
+    /// verbs, the variables, the inventory, the actors, the room's objects and their classes, which both hold alike).
     pub fn state(&mut self) -> EResult<Arc<Obs>> {
         if let Some(s) = &self.state {
             self.hits[1] += 1;
             return Ok(s.clone());
+        }
+        self.full()
+    }
+    /// This stop's full dump.
+    pub fn full(&mut self) -> EResult<Arc<Obs>> {
+        if let Some(s) = &self.state {
+            if !self.partial {
+                self.hits[1] += 1;
+                return Ok(s.clone());
+            }
         }
         let t = thread_ns();
         let s = Arc::new(self.e.obs(&ObsReq::default())?);
         self.cpu[1] += thread_ns() - t;
         self.hits[0] += 1;
         self.state = Some(s.clone());
+        self.partial = false;
         Ok(s)
     }
     pub fn at(&mut self, x: i32, y: i32) -> EResult<At> {
@@ -158,6 +175,7 @@ impl<'a> Br<'a> {
     }
     fn invalidate(&mut self) {
         self.state = None;
+        self.partial = false;
         self.at.clear();
         self.layout = None;
     }
@@ -229,7 +247,7 @@ impl<'a> Br<'a> {
     }
     pub fn inputs(&mut self, events: &[Event]) -> EResult<()> {
         if self.watch_first && self.first_before.is_none() && !events.is_empty() && events.iter().any(is_input) {
-            let s = self.state()?;
+            let s = self.full()?;
             self.first_before = Some((self.frame(), s));
         }
         self.e.inputs(events)
@@ -238,11 +256,17 @@ impl<'a> Br<'a> {
         self.invalidate();
         let t = thread_ns();
         if self.fuse && batch() {
-            let r = self.e.run_obs(spec, &ObsReq::default());
+            let room = self.obs.is_none();
+            let r = if room {
+                self.e.run_room(spec)
+            } else {
+                self.e.run_obs(spec, &ObsReq::default())
+            };
             self.cpu[0] += thread_ns() - t;
             let (st, o) = r?;
             self.hits[0] += 1;
             self.state = Some(Arc::new(o));
+            self.partial = room;
             return Ok(st);
         }
         let r = self.e.run(spec);
@@ -251,7 +275,7 @@ impl<'a> Br<'a> {
     }
     fn on(&mut self) -> EResult<()> {
         if self.obs.is_some() {
-            let s = self.state()?;
+            let s = self.full()?;
             let o = self.obs.as_mut().unwrap();
             o.on_frame(&mut *self.e, &s, None)?;
         }
