@@ -409,6 +409,87 @@ its targets in turn until one plans.
 
 The predictions above stand as written.
 
+## Results (2026-11-02, written after the runs)
+
+Code on branch e008 at c09053a (the three components merged with no conflict; no existing file edited, no fix needed
+after the merge). Files: `results/step0.txt`, `results/smoke.txt`, `results/stage1-door.log`,
+`results/stage1-kitchen.log`, `results/verify-smoke-15.json`, `results/verify-door-5.json`,
+`results/verify-kitchen-18.json`. Lab note: `notes/log/2026-11-02-e008.md`. Both stages ran from the boot (frame 2728,
+qf 65,284, room 33), allowed rooms the k = 2 scope's 10, b = 2, on the laptop.
+
+| stage | stop | jobs | entries, cells | readings (fresh, reused; scopes) | goal | frames (qf, s) from 2728 | CPU s (return, read, plan, play) | peak memory |
+|---|---|---|---|---|---|---|---|---|
+| door | the goal entry, then verify | 1 | 6, 6 | 1 fresh of ring(33) = 28, 33, 35, 38: 235,579 records, 93 s wall, 312.5 CPU s, 516 MB; one refinement reading (var 103) | state:316 = 1 at 3129, while the engine idled | 401 (9,624, 40.10) | 889.9 (2.2, 654.7, 197.7, 35.3) | Python 1,149 MB, reader 720 MB (the refinement) |
+| kitchen | stopped by hand after 15 jobs, no stop rule fired | 15 | 20, 13 | 9 fresh (1 of ring(33), 235,579 records; 8 of ring(38) = 33, 38, 83, 85, 96, 9,440 records each), 6 reused | not reached | the best chain to 2869 (room 38): 141 (3,384, 14.10) | 1,433.7 (29.1, 1,075.4, 293.9, 35.3) | Python 1,134 MB, reader 549 MB (a refinement) |
+
+Every return was the same as its entry (16 of 16). Verify from boot in a fresh engine with no fork: the door's goal
+entry, 6 checkpoints, 0 differences, 28 inputs, the goal at the end; the kitchen's deepest chain (entry 18, 8 segments
+from 8 jobs), 12 checkpoints, 0 differences, 21 inputs. Lemma C held on every chain checked.
+
+- **Door.** One job from the root on ring(33). Tier 0 was the first of 55 targets (54 tier 1) and planned in 15 s. The
+  run was E007's k = 2 run on 4 rooms instead of 10: plan 0's open-door sentence deviated at 2796 on var 103 (class
+  split), the harness made var 103 a fact (116 s wall, 286 CPU s), the next turn deviated at 2798 with no class, and
+  state:316 = 1 held in the idling engine at 3129, written by local 209's drawObject at [0033], a unit the plan does not
+  name. 403 children (E007's k = 2 run: 403), window search 35.3 CPU s. 5 entries (2776, 2796, 2797, 2798, 3129), 34
+  new atoms. The explorer stopped on its first goal entry and verified it.
+- **Kitchen.** Job 0 from the root read ring(33); the reading reaches no value of room 41 and owner:566 = 1 was no
+  target (tier 0 empty). Its first target in the order, bit:108 = 1 (depth 2), planned in 13 s: plan 0 walked to
+  room 38, the window refined var 103 at 2848 (132 s, 317 CPU s), and plan 1's sentence (verb 10 on object 489) began
+  room 38's local 202, which waits in a dialog. At 2862 the window refuted local 202's event on its test of var 194 at
+  [031A] (class split); the harness made var 194 a fact, the refined reading broke Lemma R's premise R0 (the last pass
+  wrote values of var 194 outside its domain), and the harness stopped. Job 0 left 4 entries, the last in the dialog
+  at 2862.
+- From there every job was the same: return, a ring(38) reading from the dialog state (9,440 records in 3 to 4 s;
+  reused only by the next job on the same entry, since var 100 differs from frame to frame), the first untried target
+  planned in 1 s with plan 0's first step the dialog's escape input, its window refuted the dialog's event one frame on
+  (var 194 not a fact), the refinement broke R0 again, and the harness stopped before any input: one entry one frame
+  later. The facts of consecutive entries differ only in var 100, which takes a new value each frame; (var:100, any) is
+  in R at depth 1, so each new frame is a new cell and holds a new pair. The order then takes the newest frame first
+  (favoured, n = 0, the most #r) and the entry before it second (its next target, a duplicate state). 14 jobs moved the
+  frontier from 2862 to 2869 in 4.2 minutes, about 20 s per job.
+- An analysis of the archive (not an input): entry 12's movie run on with no input stays in room 38, idle in the
+  dialog, with local 202 running, at every frame checked from 2870 to 4000. So no job from the frontier can leave the
+  dialog, and none of the stop rules can fire soon: nothing is exhausted (the dialog-frame representatives have 20 or
+  more untried targets each, and four representatives were never selected), and stagnation needs a sweep with no new
+  pair, while each frame brings a new value of var 100 and a new cell. On that analysis the run was stopped by hand at
+  01:04:43, 14.5 minutes after its start, with 15 jobs committed; the two running jobs were killed and left uncommitted.
+- Cells left (13, all selectable): the root and entry 1 in room 33, entries 2, 3 and 6 in room 38 at 2848 to 2852,
+  and eight representatives at 2862 to 2869 in the dialog; every job ended on the harness's R0 stop for var 194, after
+  B1's cause "refuted event(local:202@794): local:202 [031A] jump unless; var 194 = 0 (not a fact of the reading); class
+  split". No reading was stopped by a watchdog.
+- The smoke (rooms 28, 33, 41 allowed, b = 1; a wiring check, not one of the plan's runs) reached the kitchen goal in
+  2 jobs: bit:348 = 1 from the root on ring(33) cut to (28, 33), then the goal from entry 11 (room 28) on (28, 33, 41)
+  from the plan's records at 3216, verified from boot: 488 frames, 11,712 qf, 48.80 s, 41 inputs, 2 segments.
+
+Against the prediction:
+
+| | predicted | measured |
+|---|---|---|
+| guides, off check | (the amendment above) | (the amendment above) |
+| door, jobs | 1 (at most 3) | 1 |
+| door, reading | one, fresh, ring(33) = 28, 33, 35, 38 from the boot: 40,000 to 70,000 records, 60 to 300 CPU s, peak under 1.5 GB | so; 235,579 records (outside), 312.5 CPU s (outside), 516 MB |
+| door, target and refinement | tier 0; 0 or 1 refinement (var 103) | tier 0; 1 (var 103 at 2796) |
+| door, goal | state:316 = 1 at 3129 ± 10, 401 frames, 9,624 qf ± 10%, while the engine idles, local 209 | 3129, 401, 9,624; idling; local 209 [0033] |
+| door, archive and cost | 4 to 15 entries, 3 to 12 cells; 3 to 15 CPU min | 6, 6; 14.8 CPU min |
+| kitchen, jobs | 2 (at most 6) | 15 when stopped by hand, no goal (outside) |
+| kitchen, readings | ring(33), then ring(28) or ring(41) cut to k = 2: 20,000 to 50,000 records, 20 to 120 CPU s | ring(33), then ring(38) (33, 38, 83, 85, 96) eight times: 9,440 records, 10 to 15 CPU s (outside) |
+| kitchen, targets | the first job tier 1 (room = 41 if reached), the second the goal | tier 1, bit:108 = 1 (room = 41 not reached); tier 0 never offered |
+| kitchen, goal | owner:566 = 1 from the plan's records, 480 to 800 frames | not reached (outside) |
+| kitchen, archive and cost | 8 to 40 entries, 6 to 30 cells; 10 to 40 CPU min | 20, 13; 23.9 CPU min until stopped |
+| both | every return the same; verify 0 differences; Python, taskcore under 1.2 GB, reader under 1.5 GB; readings under 2 GB on disk | 16 of 16; 0 (door's goal, kitchen's best chain); Python 1,149 MB; taskcore not measured apart (the children's peak, 1,149 MB, includes the forks); reader 720 MB; 727 MB and 814 MB |
+
+By the threshold, partly: the door was reached by the explorer from the boot, with one reading of a ring it chose from
+the files, verified from boot with 0 differences and no manual step; the kitchen was not reached. The stop rule for
+stage 2 fires: stage 2 runs only if stage 1 is yes, so stage 2 does not run, and E008 tries no further idea.
+
+Next blocker, named by the run: a played step can end in an engine state the harness cannot act from, here room 38's
+dialog, where the dialog's test on var 194 makes the refinement break R0 before any input, so each job from the
+frontier only lets the engine idle one frame. Two parts of the method turn that into an endless frontier instead of an
+exhausted or stagnant one: the cell key and the held pairs include a key whose value changes every frame while the
+engine idles (var 100, in R as (var:100, any) at depth 1), and the order prefers the newest such entry. Before it, the
+order sent the kitchen's first job to bit:108 = 1, whose plan leads into that dialog; in the smoke the first played
+target (bit:348 = 1) ended in room 28, and the next job reached the goal from there.
+
 ## Sources
 
 - Ecoffet, Huizinga, Lehman, Stanley, Clune, "Go-Explore: a New Approach for Hard-Exploration Problems" (2019,
