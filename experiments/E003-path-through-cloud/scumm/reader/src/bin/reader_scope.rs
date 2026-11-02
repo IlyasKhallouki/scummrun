@@ -47,6 +47,10 @@
 //! --step-limit N  the rough reading (experiments/E004-fast-exact/rough-reading.md): every job read with the machine's
 //!               step limit N in place of its own (5,000); a path past N steps becomes a havoc record. Needs
 //!               --switches havoc_cut. The report counts the havoc records (`havoc_records`). Off by default.
+//! --memo DIR   the job memo across readings (memo.rs `CrossMemo`, experiments/E011-speed/memo.md): a job takes the run
+//!               another reading (or this reading's earlier pass) stored under DIR for the same whole-reading inputs
+//!               when what the run consulted reads the same here; the runs made are stored. The output is byte for
+//!               byte the same. Needs --reach and --split-limit. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
@@ -612,6 +616,7 @@ fn main() {
     b.switches.split_limit |= split_limit;
     b.switches.reach |= reach;
     b.switches.pass2_reuse |= pass2_reuse;
+    b.memo_dir = arg(&args, "--memo").map(PathBuf::from);
     if step_limit != 0 {
         b.switches.step_limit = step_limit;
     }
@@ -932,6 +937,9 @@ fn main() {
             "ran_reached_value": n(&m.stale_reached),
             "ran_not_in_pass_1": n(&m.none),
         });
+    }
+    if let Some(m) = b.memo_json() {
+        r["memo"] = m;
     }
     if let Some(sh) = &b.table.shared {
         let n = |a: &std::sync::atomic::AtomicU64| a.load(std::sync::atomic::Ordering::Relaxed);
