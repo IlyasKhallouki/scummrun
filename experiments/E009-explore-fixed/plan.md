@@ -247,3 +247,10 @@ tables, or measured from the engine by code.
 - On that machine `E008_HEAVY_LOCK=none`: jobs whose scope has 5 rooms or more run side by side instead of one at a
   time. The lock guards the laptop's memory; 120 GB holds 24 jobs (about 1.5 to 2 GB each). Nothing else changes.
 - How many jobs run at once is also bounded by the selectable cells, since a busy cell is not selected again.
+
+## Note 2026-11-02, 12:50: the VM was preempted twice
+
+The VM is a Spot VM (`scripts/cloud.py` creates it with `--provisioning-model=SPOT`). Both stops were Spot
+preemptions by Google (`compute.instances.preempted`, 11:53:50 and 12:22:46), 9 and 8 minutes after the kitchen was
+resumed. Each lost the jobs then running; the archive's files were kept on the VM's disk. The kitchen run stands at 15
+committed jobs and is not resumed for now: E010 (play when ready) runs the kitchen with E009's switches on the laptop.
