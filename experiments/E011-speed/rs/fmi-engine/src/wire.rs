@@ -53,24 +53,31 @@ impl W {
         self.0[..4].copy_from_slice(&n.to_le_bytes());
         self.0
     }
+    #[inline]
     pub fn u8(&mut self, v: u8) {
         self.0.push(v)
     }
+    #[inline]
     pub fn b(&mut self, v: bool) {
         self.0.push(v as u8)
     }
+    #[inline]
     pub fn u32(&mut self, v: u32) {
         self.0.extend_from_slice(&v.to_le_bytes())
     }
+    #[inline]
     pub fn i32(&mut self, v: i32) {
         self.0.extend_from_slice(&v.to_le_bytes())
     }
+    #[inline]
     pub fn u64(&mut self, v: u64) {
         self.0.extend_from_slice(&v.to_le_bytes())
     }
+    #[inline]
     pub fn i64(&mut self, v: i64) {
         self.0.extend_from_slice(&v.to_le_bytes())
     }
+    #[inline]
     pub fn str(&mut self, s: &str) {
         self.u32(s.len() as u32);
         self.0.extend_from_slice(s.as_bytes());
@@ -195,13 +202,19 @@ impl<'a> R<'a> {
     pub fn new(buf: &'a [u8]) -> R<'a> {
         R { buf, pos: 0 }
     }
+    #[inline]
     fn take(&mut self, n: usize) -> DResult<&'a [u8]> {
-        if self.buf.len() - self.pos < n {
-            return Err(format!("payload ends at {} (needs {} more)", self.buf.len(), n));
+        match self.buf.get(self.pos..self.pos + n) {
+            Some(s) => {
+                self.pos += n;
+                Ok(s)
+            }
+            None => Err(self.short(n)),
         }
-        let s = &self.buf[self.pos..self.pos + n];
-        self.pos += n;
-        Ok(s)
+    }
+    #[cold]
+    fn short(&self, n: usize) -> String {
+        format!("payload ends at {} (needs {} more)", self.buf.len(), n)
     }
     pub fn done(&self) -> DResult<()> {
         if self.pos == self.buf.len() {
@@ -213,9 +226,11 @@ impl<'a> R<'a> {
     pub fn rest(&self) -> &'a [u8] {
         &self.buf[self.pos..]
     }
+    #[inline]
     pub fn u8(&mut self) -> DResult<u8> {
         Ok(self.take(1)?[0])
     }
+    #[inline]
     pub fn b(&mut self) -> DResult<bool> {
         match self.u8()? {
             0 => Ok(false),
@@ -223,19 +238,24 @@ impl<'a> R<'a> {
             v => Err(format!("bool {v}")),
         }
     }
+    #[inline]
     pub fn u32(&mut self) -> DResult<u32> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
     }
+    #[inline]
     pub fn i32(&mut self) -> DResult<i32> {
         Ok(i32::from_le_bytes(self.take(4)?.try_into().unwrap()))
     }
+    #[inline]
     pub fn u64(&mut self) -> DResult<u64> {
         Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
+    #[inline]
     pub fn i64(&mut self) -> DResult<i64> {
         Ok(i64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
     /// A count, no more items than bytes left divided by `min_item`.
+    #[inline]
     pub fn count(&mut self, min_item: usize) -> DResult<usize> {
         let n = self.u32()? as usize;
         if min_item > 0 && n.saturating_mul(min_item) > self.buf.len() - self.pos {
@@ -243,13 +263,16 @@ impl<'a> R<'a> {
         }
         Ok(n)
     }
+    #[inline]
     pub fn bytes(&mut self) -> DResult<&'a [u8]> {
         let n = self.count(1)?;
         self.take(n)
     }
+    #[inline]
     pub fn str(&mut self) -> DResult<String> {
         String::from_utf8(self.bytes()?.to_vec()).map_err(|e| e.to_string())
     }
+    #[inline]
     pub fn tag(&mut self) -> DResult<bool> {
         match self.u8()? {
             0 => Ok(false),
@@ -257,15 +280,19 @@ impl<'a> R<'a> {
             v => Err(format!("option tag {v}")),
         }
     }
+    #[inline]
     pub fn opt_i32(&mut self) -> DResult<Option<i32>> {
         Ok(if self.tag()? { Some(self.i32()?) } else { None })
     }
+    #[inline]
     pub fn opt_str(&mut self) -> DResult<Option<String>> {
         Ok(if self.tag()? { Some(self.str()?) } else { None })
     }
+    #[inline]
     pub fn opt_bool(&mut self) -> DResult<Option<bool>> {
         Ok(if self.tag()? { Some(self.b()?) } else { None })
     }
+    #[inline]
     pub fn i32s(&mut self) -> DResult<Vec<i32>> {
         let n = self.count(4)?;
         let raw = self.take(n * 4)?;
@@ -274,6 +301,7 @@ impl<'a> R<'a> {
             .map(|c| i32::from_le_bytes(c.try_into().unwrap()))
             .collect())
     }
+    #[inline]
     pub fn u32s(&mut self) -> DResult<Vec<u32>> {
         let n = self.count(4)?;
         let raw = self.take(n * 4)?;
@@ -486,11 +514,13 @@ impl<'a> R<'a> {
         let inventory = if self.tag()? { Some(self.i32s()?) } else { None };
         let pairs = |r: &mut R| -> DResult<Vec<(u32, i32)>> {
             let n = r.count(8)?;
-            let mut v = Vec::with_capacity(n);
-            for _ in 0..n {
-                v.push((r.u32()?, r.i32()?));
-            }
-            Ok(v)
+            let raw = r.take(8 * n)?;
+            Ok(raw
+                .chunks_exact(8)
+                .map(|c| {
+                    (u32::from_le_bytes(c[..4].try_into().unwrap()), i32::from_le_bytes(c[4..].try_into().unwrap()))
+                })
+                .collect())
         };
         let owners = pairs(self)?;
         let states = pairs(self)?;
