@@ -478,7 +478,12 @@ impl BinEngine {
             if self.rbuf.len() < need {
                 self.rbuf.resize(need.next_power_of_two(), 0);
             }
-            let n = self.stream.read(&mut self.rbuf[self.rlen..]).map_err(io_err)?;
+            let n = match self.stream.read(&mut self.rbuf[self.rlen..]) {
+                Ok(n) => n,
+                // a signal (a debugger's or a profiler's stop) interrupted the read: read again
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(io_err(e)),
+            };
             if n == 0 {
                 return Err(EngineError::Io(std::io::Error::new(
                     std::io::ErrorKind::UnexpectedEof,
