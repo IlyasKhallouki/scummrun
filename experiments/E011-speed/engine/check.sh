@@ -17,7 +17,7 @@ O=${E011_ENGINE_OUT:-$HOME/.cache/fast-mi-e011/engine}
 PY=$WT/.venv/bin/python
 W3B=$HOME/.cache/fast-mi/svm-w3b/build/scummvm/scummvm
 LEANW=$HERE/svm-lean.sh
-FMI=$WT/experiments/E011-speed/rs/fmi-engine/target/release/fmi-engine
+FMI=${FMI_ENGINE_TOOL:-$WT/experiments/E011-speed/rs/fmi-engine/target/release/fmi-engine}  # the workspace build: env.sh
 DOOR=$HOME/.cache/fast-mi-e009/archives/door
 KITCHEN=$O/kitchen-arch # entries -> E009's off check job's new entries
 mkdir -p "$O" "$KITCHEN"
