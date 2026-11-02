@@ -2,7 +2,7 @@
 //! is built and tested against until readio's fmi-reading replaces it at integration (plan.md, "Components").
 //!
 //! It reads what packed_reading.load_reading reads: reading.json (its goal, the bounds of its domains, its start),
-//! reading.tc (held in memory here; fmi-reading maps it), reading.actions.jsonl (an index of its lines),
+//! reading.tc (held in memory here; fmi-reading maps it), reading.actions.jsonl (read when a line is first asked for),
 //! reading.reached. `action(i)` is PackedTask._action's action (raw.rs); `record(i)` is not in the double (the planner
 //! does not read records). `domains()` is PackedTask.facts: each packed fact's values, with reading.json's bounds where
 //! BELOW or ABOVE is a value.
@@ -17,8 +17,9 @@ pub struct FileReading {
     head: String,
     packed: Vec<u8>,
     id: [u8; 20],
-    lines: Vec<u8>,
-    line_off: Vec<usize>,
+    lines_path: PathBuf,
+    /// reading.actions.jsonl and its line offsets, read when a line is first asked for
+    lines: std::sync::OnceLock<(Vec<u8>, Vec<usize>)>,
     reached: String,
     domains: Domains,
     goal: Vec<(Key, Vec<Val>)>,
@@ -40,13 +41,6 @@ impl FileReading {
         let lines_name = doc.get("actions").and_then(Json::as_str).ok_or("reading.json: no actions")?.to_string();
         let packed = rd(&packed_name)?;
         let id = taskcore::cache::sha1(&packed);
-        let lines = rd(&lines_name)?;
-        let mut line_off = vec![0usize];
-        for (i, &c) in lines.iter().enumerate() {
-            if c == b'\n' {
-                line_off.push(i + 1);
-            }
-        }
         let reached = String::from_utf8(rd("reading.reached").unwrap_or_default()).map_err(|e| e.to_string())?;
         // the packed file's tables (taskcore/README.md): strings, facts, goal
         let w = words(&packed);
@@ -109,8 +103,8 @@ impl FileReading {
             head,
             packed,
             id,
-            lines,
-            line_off,
+            lines_path: dir.join(&lines_name),
+            lines: std::sync::OnceLock::new(),
             reached,
             domains: Domains(doms),
             goal,
@@ -137,8 +131,14 @@ impl ReadingSource for FileReading {
         self.raw.n() as u32
     }
     fn action_line(&self, i: u32) -> &str {
-        let (a, b) = (self.line_off[i as usize], self.line_off[i as usize + 1] - 1);
-        std::str::from_utf8(&self.lines[a..b]).unwrap_or("")
+        let (lines, off) = self.lines.get_or_init(|| {
+            let lines = std::fs::read(&self.lines_path).unwrap_or_default();
+            let mut off = vec![0usize];
+            off.extend(lines.iter().enumerate().filter(|(_, &c)| c == b'\n').map(|(j, _)| j + 1));
+            (lines, off)
+        });
+        let (a, b) = (off[i as usize], off[i as usize + 1] - 1);
+        std::str::from_utf8(&lines[a..b]).unwrap_or("")
     }
     fn by_name(&self, name: &str) -> Option<u32> {
         (0..self.raw.n() as u32).rev().find(|&i| self.raw.action(i).map(|a| a.name == name).unwrap_or(false))

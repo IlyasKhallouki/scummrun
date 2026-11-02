@@ -464,6 +464,9 @@ impl WarmPlanner {
             ..Default::default()
         };
         if status != "plan" {
+            // plan_fd reads the operator table's facts only for a plan
+            res.file_facts.clear();
+            res.needed_facts.clear();
             res.stats = stats.done();
             return Ok(res);
         }
