@@ -271,6 +271,9 @@ fn run() -> Result<(), String> {
             esc(&err),
             tail_info
         );
+        if opt.contains_key("--rss") {
+            println!("{{\"rss\": {}, \"peak_rss_mb\": {}}}", esc(f[0]), taskcore::model::peak_rss() / (1 << 20));
+        }
         if let (Some(d), Ok(r)) = (&dump, &r) {
             std::fs::write(d.join(format!("{}.json", f[0])), result_json(r)).map_err(|e| e.to_string())?;
         }
