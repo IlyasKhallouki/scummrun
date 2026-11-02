@@ -118,3 +118,92 @@ pub fn step_check(path: &Path) -> Res<CheckReport> {
     }
     Ok(rep)
 }
+
+/// A reading's domains as the fixtures write them (key -> [values, low, high]; "below"/"above" as text).
+pub fn domains_of_fixture(v: &Value) -> crate::files::Res<fmi_core::Domains> {
+    let mut out = Vec::new();
+    for (k, d) in v.as_object().ok_or("domains: not an object")? {
+        let mut values: Vec<fmi_core::Val> = d[0].as_array().cloned().unwrap_or_default().iter().map(|x| match x {
+            Value::String(s) if s == "below" => fmi_core::BELOW,
+            Value::String(s) if s == "above" => fmi_core::ABOVE,
+            x => x.as_i64().unwrap_or(fmi_core::NONE),
+        }).collect();
+        values.sort();
+        out.push((fmi_core::Key::parse(k), fmi_core::Domain { values, low: d[1].as_i64(), high: d[2].as_i64() }));
+    }
+    out.sort_by_key(|p| p.0);
+    Ok(fmi_core::Domains(out))
+}
+
+fn counts_json(c: &std::collections::BTreeMap<String, i64>) -> Value {
+    let mut m = serde_json::Map::new();
+    for (k, v) in c {
+        m.insert(k.clone(), json!(v));
+    }
+    Value::Object(m)
+}
+
+/// The harness's start rules against the reference's outputs (experiments/E011-speed/explore/harness_fixtures.py).
+pub fn harness_check(path: &Path) -> Res<CheckReport> {
+    use crate::start;
+    let text = files::read_text(path)?;
+    let mut rep = CheckReport { cases: 0, by_kind: Vec::new(), first_bad: Vec::new(), seconds: Vec::new() };
+    let mut doms_cache: std::collections::HashMap<String, fmi_core::Domains> = Default::default();
+    let mut live_cache: std::collections::HashMap<String, Option<Value>> = Default::default();
+    for (n, ln) in files::py_splitlines(&text).into_iter().enumerate() {
+        if ln.trim().is_empty() {
+            continue;
+        }
+        let c = pyjson::loads(ln).map_err(|e| format!("{}: line {}: {e}", path.display(), n + 1))?;
+        let kind = c["kind"].as_str().unwrap_or("").to_string();
+        rep.cases += 1;
+        let df = c["domains"].as_str().unwrap_or("").to_string();
+        if !doms_cache.contains_key(&df) {
+            let d = read_json(Path::new(&df))?;
+            doms_cache.insert(df.clone(), domains_of_fixture(&d["domains"])?);
+            live_cache.insert(df.clone(), d.get("live_locals").filter(|x| !x.is_null()).cloned());
+        }
+        let rp = df.clone();
+        let doms = &doms_cache[&df];
+        let job = read_json(&Path::new(c["job_dir"].as_str().unwrap_or("")).join("job.json"))?;
+        let obs = start::facts_of_json(&job["entry"]["checkpoint"][1]);
+        let frame = c["frame"].as_u64().unwrap_or(0);
+        let unob = start::unobserved(true);
+        let t = Instant::now();
+        let mut b = start::Points::of(doms, live_cache[&rp].clone());
+        let (ok, what) = match kind.as_str() {
+            "first" => {
+                let mut st = start::task_start(&mut b, &obs, doms);
+                start::actor_rooms_start(&mut st, doms, &fmi_core::Facts::new(), true);
+                let now = start::view(&mut b, doms, &obs, &unob);
+                let text = start::start_text(doms, &st);
+                let key = start::input_key(frame, 0, &st);
+                let view = start::facts_json(&now);
+                let okv = same_map(&view, &c["view"]);
+                let okc = same_map(&counts_json(&b.counts), &c["counts"]);
+                (text == c["start_text"].as_str().unwrap_or("") && key == c["input_key"].as_str().unwrap_or("") && okv && okc,
+                 format!("{} at {frame}: text {}, key {}, view {okv}, counts {okc}", c["job_dir"], text == c["start_text"].as_str().unwrap_or(""),
+                         key == c["input_key"].as_str().unwrap_or("")))
+            }
+            "replan" => {
+                let pred = start::facts_of_json(&c["pred"]);
+                let now = start::view(&mut b, doms, &obs, &unob);
+                let (mut st, counts) = start::replan_start(&mut b, &obs, &start::prediction(&now, &pred), doms);
+                start::actor_rooms_start(&mut st, doms, &pred, false);
+                let text = start::start_text(doms, &st);
+                let key = start::input_key(frame, 0, &st);
+                let okc = same_map(&counts_json(&counts), &c["counts"]);
+                (text == c["start_text"].as_str().unwrap_or("") && key == c["input_key"].as_str().unwrap_or("") && okc,
+                 format!("{} at {frame}: text {}, key {}, counts {okc}", c["job_dir"], text == c["start_text"].as_str().unwrap_or(""),
+                         key == c["input_key"].as_str().unwrap_or("")))
+            }
+            k => (false, format!("unknown kind {k}")),
+        };
+        add_s(&mut rep.seconds, &kind, t.elapsed().as_secs_f64());
+        bump(&mut rep.by_kind, &kind, !ok);
+        if !ok && rep.first_bad.len() < 10 {
+            rep.first_bad.push(format!("line {}: {kind}: {what}", n + 1));
+        }
+    }
+    Ok(rep)
+}

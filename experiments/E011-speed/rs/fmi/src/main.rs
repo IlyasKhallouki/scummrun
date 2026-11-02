@@ -26,7 +26,7 @@ fn usage() -> ! {
 const USAGE: &str = "usage: fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify]
        fmi explore status ARCHIVE
        fmi fake-step run JOB_DIR
-       fmi check step FIXTURES.jsonl
+       fmi check step|harness FIXTURES.jsonl
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
        fmi guide stats GUIDE.json [--key KEY.json]";
 
@@ -104,6 +104,7 @@ fn main() {
         ("explore", Some("status")) => cmd_status(&argv[2..]),
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
         ("check", Some("step")) => cmd_check_step(&argv[2..]),
+        ("check", Some("harness")) => cmd_check_harness(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         _ => usage(),
@@ -187,9 +188,18 @@ fn cmd_fake(argv: &[String]) -> i32 {
     }
 }
 
+fn cmd_check_harness(argv: &[String]) -> i32 {
+    let Some(p) = argv.first() else { usage() };
+    report_check("harness", fmi_explore::check::harness_check(&PathBuf::from(p)))
+}
+
 fn cmd_check_step(argv: &[String]) -> i32 {
     let Some(p) = argv.first() else { usage() };
-    match fmi_explore::check::step_check(&PathBuf::from(p)) {
+    report_check("step", fmi_explore::check::step_check(&PathBuf::from(p)))
+}
+
+fn report_check(what: &str, r: Result<fmi_explore::check::CheckReport, String>) -> i32 {
+    match r {
         Ok(r) => {
             for (k, n, bad) in &r.by_kind {
                 let s = r.seconds.iter().find(|x| x.0 == *k).map(|x| x.1).unwrap_or(0.0);
@@ -199,11 +209,11 @@ fn cmd_check_step(argv: &[String]) -> i32 {
                 println!("  {b}");
             }
             let bad: usize = r.by_kind.iter().map(|x| x.2).sum();
-            println!("step check: {} cases, {bad} differ", r.cases);
+            println!("{what} check: {} cases, {bad} differ", r.cases);
             (bad > 0) as i32
         }
         Err(e) => {
-            eprintln!("fmi check step: {e}");
+            eprintln!("fmi check {what}: {e}");
             1
         }
     }
