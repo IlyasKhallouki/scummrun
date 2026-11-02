@@ -219,6 +219,110 @@ def reusable_detail(reading_doc: dict, task_fact_keys, entry_facts: dict) -> dic
             "first": [[k, *d[k]] for k in bad[:12]]}
 
 
+# --- E009 fix c: the keys a reading's start value provably does not enter (plan.md (c)) ---------------------------------
+
+REUSE_KEYS_FILE = "reuse-keys.json"  # next to reading.json: K of the reading, computed once
+# domains.build's reason for a counter left with no domain by the closure (it looks at other variables' domains, so
+# its reason is not one of the writes alone): such a variable keeps E008's rule (plan.md (c), 1)
+COUNTER_WHY = "a counter never compared with a constant"
+_GAME = {}
+
+
+def _game():
+    import model as M
+    if "game" not in _GAME:
+        _GAME["game"] = M.Game.load()
+    return _GAME["game"]
+
+
+def named_start_vars() -> set:
+    """The variables whose start value the reader reads by number (plan.md (c), 2): the settings, the hook, cursor,
+    room and boolean variables, VAR_WALKTO_OBJ, VAR_VERB_SCRIPT, VAR_CUTSCENEEXIT_KEY, VAR_TIMER_NEXT, VAR_CHARINC,
+    from the reader's own tables (domains.py, model.py, reader.py, ir.VARS)."""
+    import domains as D
+    import ir
+    import model as M
+    import reader as R
+    return (set(D.SETTINGS) | set(M.HOOK_VARS) | set(R.CURSOR_VARS) | set(D.ROOM_VARS) | set(D.BOOL_VARS)
+            | {D.VAR_WALKTO_OBJ, M.VAR_VERB_SCRIPT, M.VAR_CUTSCENEEXIT_KEY, ir.VARS["VAR_TIMER_NEXT"],
+               ir.VARS["VAR_CHARINC"]})
+
+
+def hover_guard_vars(units: dict) -> set:
+    """plan.md (c), 3: the variables any global unit with findObject(VAR_VIRT_MOUSE_X, VAR_VIRT_MOUSE_Y) compares with
+    a constant (or tests alone) in a jump before that findObject whose target lies past it: a superset of the input
+    script's guards (scumm/reader/src/inputs.rs hover_roles)."""
+    import domains as D
+    import ir
+    mx, my = ir.VARS["VAR_VIRT_MOUSE_X"], ir.VARS["VAR_VIRT_MOUSE_Y"]
+    out = set()
+    for key, u in units.items():
+        if key[0] != "global":
+            continue
+        finds = [i for i, x in enumerate(u.ins) if x.st is not None and any(
+            isinstance(y, ir.Getter) and y.name == "findObject" and tuple(y.args) == (ir.Var(mx), ir.Var(my))
+            for y in D._walk(x.st))]
+        for f in finds:
+            for j, x in enumerate(u.ins[:f]):
+                if not isinstance(x.st, ir.Jump) or x.st.cond is None:
+                    continue
+                target = x.target if x.target is not None else len(u.ins)
+                if target <= f:
+                    continue
+                c = x.st.cond
+                if isinstance(c, ir.Cmp):
+                    for a, b in ((c.a, c.b), (c.b, c.a)):
+                        if isinstance(a, ir.Var) and isinstance(b, ir.Const):
+                            out.add(a.n)
+                elif isinstance(c, (ir.Truth, ir.Not)) and isinstance(c.x, ir.Var):
+                    out.add(c.x.n)
+    return out
+
+
+def reuse_keys_of(rooms, start: dict, game=None) -> dict:
+    """plan.md (c): K, the keys var:N whose start value the reader reads at no site: a non-fact for every start (an
+    engine variable, or a variable the domain analysis gives no domain for a reason in its writes that the scope
+    writes), none of the named variables and no input script's guard. {"keys": sorted, "named", "guards", "s"}."""
+    import domains as D
+    import reader as R
+    t = time.monotonic()
+    game = game or _game()
+    doms = D.build(start)
+    sc = R.Scope.of(game, tuple(sorted(int(r) for r in rooms)), start)
+    named, guards = named_start_vars(), hover_guard_vars(game.units)
+    keys = set()
+    for n in D.ENGINE:
+        if n not in named and n not in guards:
+            keys.add(f"var:{n}")
+    for k, why in doms.why.items():
+        n = int(k[4:])
+        if n in named or n in guards or n in D.SETTINGS or why == COUNTER_WHY:
+            continue
+        if n in D.ENGINE or sc.writes.has(k):
+            keys.add(k)
+    return {"keys": sorted(keys), "named": sorted(named), "guards": sorted(guards),
+            "s": round(time.monotonic() - t, 1)}
+
+
+def reuse_keys(rd) -> set:
+    """K of a loaded reading, cached in REUSE_KEYS_FILE next to its reading.json (written atomically)."""
+    p = Path(rd.path).parent / REUSE_KEYS_FILE
+    try:
+        doc = json.loads(p.read_text())
+        if doc.get("start") == rd.doc["start"]["name"]:
+            return set(doc["keys"])
+    except (OSError, ValueError, KeyError):
+        pass
+    doc = reuse_keys_of(rd.doc["scope"]["rooms"], rd.doc["start"]["facts"])
+    doc["start"] = rd.doc["start"]["name"]
+    made = {f"var:{n}" for n in rd.doc.get("fact_vars") or ()}  # facts of this reading (E007's refinement)
+    doc["keys"] = sorted(set(doc["keys"]) - made)
+    tmp = p.with_name(p.name + f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(doc) + "\n")
+    os.replace(tmp, p)
+    return set(doc["keys"])
+
+
 # --- E009 fix a: idle keys -------------------------------------------------------------------------------------------
 
 def idle_rule(start: dict, frames) -> dict:
@@ -474,7 +578,8 @@ def cached_readings(job: dict) -> list:
 
 
 def choose_reading(job: dict, facts: dict) -> tuple:
-    """Step 2 on the cached readings: (Reading or None, why, the candidates checked)."""
+    """Step 2 on the cached readings: (Reading or None, why, the candidates checked). With job ``reuse`` "e009" a
+    reading E008's rule refuses is checked again with ``reuse_keys`` allowed to differ too (fix c)."""
     cands = cached_readings(job)
     if not cands:
         return None, "no cached reading", []
@@ -482,11 +587,18 @@ def choose_reading(job: dict, facts: dict) -> tuple:
     for p in cands:
         rd = PR.load_reading(p)
         ok, n = reusable(rd.doc, rd.task.facts, facts)
-        checked.append(dict(path=str(p), reusable=ok, **reusable_detail(rd.doc, rd.task.facts, facts)))
+        row = dict(path=str(p), reusable=ok, **reusable_detail(rd.doc, rd.task.facts, facts))
+        if not ok and job.get("reuse") == "e009":
+            extra = reuse_keys(rd)
+            keys = set(rd.task.facts) | extra
+            ok, n = reusable(rd.doc, keys, facts)
+            row.update(reusable=ok, reuse_keys=len(extra), e009=reusable_detail(rd.doc, keys, facts))
+        checked.append(row)
         if ok:
-            return rd, "reused", checked
+            return rd, "reused" if "e009" not in row else "reused (e009 keys)", checked
         rd.close()
-    return None, f"differs on {checked[0]['other']} keys", checked
+    first = checked[0].get("e009") or checked[0]
+    return None, f"differs on {first['other']} keys", checked
 
 
 def root_facts_of(job: dict, job_dir: Path) -> dict | None:
