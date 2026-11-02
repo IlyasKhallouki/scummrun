@@ -419,6 +419,12 @@ impl Store {
         self.map.keys()
     }
 
+    /// Whether the two stores share one map (clones neither has changed since): then they hold the same entries.
+    #[inline]
+    pub fn same_map(&self, other: &Store) -> bool {
+        Rc::ptr_eq(&self.map, &other.map)
+    }
+
     /// An order-free hash of the entries (the set of items, as model.py's `frozenset(writes.items())`).
     #[inline]
     pub fn hash_sum(&self) -> u64 {
@@ -440,6 +446,44 @@ impl PartialEq for Store {
     /// model.py's dict equality (`g.writes == base.writes`).
     fn eq(&self, other: &Store) -> bool {
         self.sum == other.sum && (Rc::ptr_eq(&self.map, &other.map) || self.map == other.map)
+    }
+}
+
+/// `Path.freeze`: unit name -> (count, exact) of slots off the stack whose count the path set (None: not known), shared
+/// by a path's clones until one of them changes it. Reads go through the map (`Deref`).
+#[derive(Clone, Debug, Default)]
+pub struct Freeze(Rc<FxHashMap<Slot, Option<(i32, bool)>>>);
+
+impl std::ops::Deref for Freeze {
+    type Target = FxHashMap<Slot, Option<(i32, bool)>>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> IntoIterator for &'a Freeze {
+    type Item = (&'a Slot, &'a Option<(i32, bool)>);
+    type IntoIter = std::collections::hash_map::Iter<'a, Slot, Option<(i32, bool)>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl Freeze {
+    #[inline]
+    pub fn insert(&mut self, k: Slot, v: Option<(i32, bool)>) -> Option<Option<(i32, bool)>> {
+        if self.0.get(&k) == Some(&v) {
+            return Some(v); // the same entry: nothing changes
+        }
+        Rc::make_mut(&mut self.0).insert(k, v)
+    }
+    #[inline]
+    pub fn remove(&mut self, k: &Slot) -> Option<Option<(i32, bool)>> {
+        if !self.0.contains_key(k) {
+            return None;
+        }
+        Rc::make_mut(&mut self.0).remove(k)
     }
 }
 
@@ -702,7 +746,7 @@ pub struct Path {
     pub end_at: Option<S>,
     pub steps: u32,
     /// unit name -> (count, exact) of slots off the stack whose count the path set; None: not known
-    pub freeze: FxHashMap<Slot, Option<(i32, bool)>>,
+    pub freeze: Freeze,
     pub cut_index: Option<u32>,
     pub cut_data: Vec<Val>,
     pub turns: PList<(Slot, &'static str)>,
