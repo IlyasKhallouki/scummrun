@@ -406,6 +406,54 @@ mod tests {
         assert_eq!(n[&k], UNKNOWN);
     }
 
+    /// A step whose paths differ only on a fact the file does not hold, read while it is unknown, is left to the
+    /// engine (plan_fd `predict` with `choices`): `either` of its paths, the state they agree on.
+    #[test]
+    fn engine_choice() {
+        let (a, b, c, h) = (Key::var(1), Key::var(2), Key::var(3), Key::var(4));
+        let facts = Domains(vec![(a, dom(&[0, 1])), (b, dom(&[0, 1])), (c, dom(&[0, 2])), (h, dom(&[0, 1]))]);
+        let mut start = Facts::new();
+        start.set(a, 1);
+        let set = |k: Key, v: Val| Effect { key: k, v: EffVal::Value(v), when: vec![] };
+        let g = Action {
+            name: "g#0".into(),
+            pre: vec![],
+            effects: vec![Effect { key: h, v: EffVal::Values(vec![0, 1]), when: vec![] }],
+            what: 0,
+            cost: 1,
+        };
+        let p1 = Action { name: "e#1".into(), pre: vec![(a, vec![1]), (h, vec![0])], effects: vec![set(b, 1)], what: 1, cost: 1 };
+        let p2 = Action {
+            name: "e#2".into(),
+            pre: vec![(a, vec![1]), (h, vec![1])],
+            effects: vec![set(b, 1), set(c, 2)],
+            what: 2,
+            cost: 1,
+        };
+        let all = [g.clone(), p1.clone(), p2.clone()];
+        let mut pieces = |m: u32| vec![all[m as usize].clone()];
+        let label = |m: u32| ["g", "e", "e"][m as usize].to_string();
+        let step = |op: &str, name: &str, members: Vec<u32>| Step {
+            op: op.into(),
+            name: name.into(),
+            members,
+            chosen: vec![],
+            guessed: vec![],
+        };
+        let steps = vec![step("a0", "g#0", vec![0]), step("a5", "fold:e#1+1", vec![1, 2])];
+        let held: std::collections::HashSet<Key> = [a, b, c].into_iter().collect();
+        let (paths, end, choices) = predict(&facts, &mut pieces, &label, &steps, &start, &held, true).unwrap();
+        assert_eq!(choices.len(), 1);
+        assert_eq!(choices[0].0, 1);
+        assert_eq!(paths[1].name, "fold:e#1+1");
+        assert_eq!(paths[1].pre, vec![(a, vec![1]), (h, vec![0, 1])]);
+        assert_eq!(paths[1].effects, vec![set(b, 1), set(c, 2)]);
+        assert_eq!((end[&b], end[&c], end[&h]), (1, UNKNOWN, UNKNOWN));
+        // without the engine's choice the step does not choose: PathChoice
+        let e = predict(&facts, &mut pieces, &label, &steps, &start, &held, false).unwrap_err();
+        assert!(matches!(e, PredictError::PathChoice(_)));
+    }
+
     #[test]
     fn cut_pieces() {
         let k = Key::var(1);
