@@ -97,14 +97,88 @@ fn stdhash(path: &str) {
     }
 }
 
+fn read_sas(args: &[String]) -> taskcore::lama::Parsed {
+    let path = arg(args, "--sas").expect("--sas FILE");
+    let text = std::fs::read_to_string(&path).expect("the SAS file");
+    taskcore::lama::parse_with_predicates(&text).expect("a SAS file")
+}
+
+fn graph(args: &[String]) {
+    let (t, pred, names) = read_sas(args);
+    let adj = taskcore::search::plusone(&t);
+    let t0 = std::time::Instant::now();
+    let g = taskcore::landmarks::build(&t, &adj, &pred, None).expect("the landmark graph");
+    let s = t0.elapsed().as_secs_f64();
+    print!("{}", g.dump(&t.init, &|v, x| names[v as usize][x as usize].clone()));
+    eprintln!(
+        "landmarks {} disjunctive {} orderings {} explorations {} seconds {:.3} (setup {:.3} rhw {:.3} achievers {:.3} hps {:.3})",
+        g.len(),
+        g.n_disjunctive,
+        g.n_orderings,
+        g.stats.explorations,
+        s,
+        g.stats.setup_s,
+        g.stats.rhw_s,
+        g.stats.achievers_s,
+        g.stats.hps_s
+    );
+    if args.iter().any(|a| a == "--costs") {
+        for i in 0..g.len() {
+            eprintln!("lm{} first {} possible {}", i, g.min_first[i], g.min_possible[i]);
+        }
+    }
+}
+
+fn search(args: &[String]) {
+    let t0 = std::time::Instant::now();
+    let c0 = taskcore::cli::cpu_s();
+    let (t, pred, _) = read_sas(args);
+    let read_s = t0.elapsed().as_secs_f64();
+    let limit: Option<u64> = arg(args, "--limit").map(|s| s.parse().expect("--limit S"));
+    let deadline = limit.map(|s| std::time::Instant::now() + std::time::Duration::from_secs(s));
+    let c1 = taskcore::cli::cpu_s();
+    let o = taskcore::lama::lama_first_costs(&t, &pred, deadline);
+    let cpu = taskcore::cli::cpu_s() - c1;
+    if o.status == "plan" {
+        taskcore::search::check_plan(&t, &o.plan).expect("the plan checks");
+        if let Some(p) = arg(args, "--plan") {
+            std::fs::write(p, taskcore::search::plan_text(&t, &o.plan)).expect("the plan file");
+        }
+    }
+    println!(
+        "{{\"status\": \"{}\", \"steps\": {}, \"cost\": {}, \"expanded\": {}, \"evaluated\": {}, \"generated\": {}, \"dead_ends\": {}, \"h0\": {:?}, \"landmarks\": {}, \"disjunctive\": {}, \"orderings\": {}, \"explorations\": {}, \"read_s\": {:.3}, \"graph_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"eval_s\": {:.3}, \"lm_s\": {:.3}, \"cpu_s\": {:.3}, \"read_cpu_s\": {:.3}}}",
+        o.status,
+        o.plan.len(),
+        o.cost,
+        o.expanded,
+        o.evaluated,
+        o.generated,
+        o.dead_ends,
+        o.h0.map(|(a, b)| vec![a, b]).unwrap_or_default(),
+        o.landmarks,
+        o.disjunctive,
+        o.orderings,
+        o.explorations,
+        read_s,
+        o.graph_s,
+        o.relax_s,
+        o.search_s,
+        o.eval_s,
+        o.lm_s,
+        cpu,
+        c1 - c0
+    );
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("stdhash") => stdhash(&args[1]),
+        Some("graph") => graph(&args),
+        Some("search") => search(&args),
         _ => {
             eprintln!("usage: lama search --sas FILE [--plan FILE] [--limit S] | lama graph --sas FILE | lama stdhash FILE");
             std::process::exit(2);
         }
     }
-    let _ = arg;
 }
