@@ -679,8 +679,17 @@ impl IdleRule {
 pub fn diff_into(a: &fmi_core::Facts, b: &fmi_core::Facts, out: &mut Vec<(fmi_core::Key, fmi_core::Val, fmi_core::Val)>) {
     let (a, b) = (&a.0, &b.0);
     let (mut i, mut j) = (0, 0);
+    const RUN: usize = 16;
     loop {
-        // equal pairs give nothing
+        // equal pairs give nothing: whole runs of them compared with no branch inside, then pair by pair
+        while i + RUN <= a.len() && j + RUN <= b.len() {
+            let x = a[i..i + RUN].iter().zip(&b[j..j + RUN]).fold(0u64, |m, (p, q)| m | (p.0 .0 ^ q.0 .0) | (p.1 ^ q.1) as u64);
+            if x != 0 {
+                break;
+            }
+            i += RUN;
+            j += RUN;
+        }
         while i < a.len() && j < b.len() && a[i] == b[j] {
             i += 1;
             j += 1;
