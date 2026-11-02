@@ -27,6 +27,7 @@ const USAGE: &str = "usage: fmi explore run ARCHIVE --workers B [--step-cmd CMD 
        fmi explore status ARCHIVE
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
+       fmi check replay JOB_DIR --out DIR [--domains DIR]
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
        fmi guide stats GUIDE.json [--key KEY.json]";
 
@@ -105,6 +106,7 @@ fn main() {
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
         ("check", Some("step")) => cmd_check_step(&argv[2..]),
         ("check", Some("harness")) => cmd_check_harness(&argv[2..]),
+        ("check", Some("replay")) => cmd_check_replay(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         _ => usage(),
@@ -183,6 +185,27 @@ fn cmd_fake(argv: &[String]) -> i32 {
         Ok(rc) => rc,
         Err(e) => {
             eprintln!("fake step: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_check_replay(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["out", "domains"]);
+    let (Some(job), Some(out)) = (a.pos.first(), a.get("out")) else { usage() };
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+    let doms = a.get("domains").map(PathBuf::from).unwrap_or(home.join(".cache/fast-mi-e011/explore/fixtures/harness/domains"));
+    match fmi_explore::check::replay_check(&PathBuf::from(job), &PathBuf::from(out), &doms) {
+        Ok((rows, secs)) => {
+            let bad = rows.iter().filter(|r| !r.1).count();
+            for (what, ok, why) in &rows {
+                println!("{} {what}{}", if *ok { "same" } else { "DIFF" }, if why.is_empty() { String::new() } else { format!(": {}", &why[..why.len().min(600)]) });
+            }
+            println!("replay of {job}: {} checks, {bad} differ; the try took {:.3} s with the doubles", rows.len(), secs);
+            (bad > 0) as i32
+        }
+        Err(e) => {
+            eprintln!("fmi check replay: {e}");
             1
         }
     }

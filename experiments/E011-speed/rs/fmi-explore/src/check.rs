@@ -8,7 +8,7 @@ use crate::pyjson;
 use crate::step;
 use serde_json::{json, Value};
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 pub struct CheckReport {
@@ -206,4 +206,128 @@ pub fn harness_check(path: &Path) -> Res<CheckReport> {
         }
     }
     Ok(rep)
+}
+
+/// A recorded job of the reference replayed through `fmi try`'s code with every port a double (crate::doubles), in a
+/// copy of its job dir under `out`: the try's decisions and records against the recorded ones.
+pub fn replay_check(rec_dir: &Path, out: &Path, domains_dir: &Path) -> Res<(Vec<(String, bool, String)>, f64)> {
+    use crate::doubles::*;
+    use crate::driver::JobLog;
+    use crate::harness::PlannerCache;
+    use crate::tryjob::{run_job, Resident};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::{Arc, Mutex};
+    let job = read_json(&rec_dir.join("job.json"))?;
+    let want = read_json(&rec_dir.join("result.json"))?;
+    let _ = std::fs::remove_dir_all(out);
+    std::fs::create_dir_all(out).map_err(|e| files::io_err(out, e))?;
+    let mut j2 = job.clone();
+    let rdname = Path::new(job["reading_dir"].as_str().unwrap_or("r")).file_name().unwrap().to_string_lossy().into_owned();
+    j2["reading_dir"] = json!(out.join("readings").join(&rdname).to_string_lossy());
+    std::fs::write(out.join("job.json"), pyjson::dumps(&j2, pyjson::Opts::INDENT1) + "\n").map_err(|e| files::io_err(out, e))?;
+    // the attempts' runs, in order
+    let mut runs = Vec::new();
+    for k in 0..100 {
+        let p = rec_dir.join("run").join(format!("a{k:02}")).join("run.json");
+        if !p.exists() {
+            break;
+        }
+        runs.push(read_json(&p)?);
+    }
+    let played = runs.last().cloned().unwrap_or(json!({}));
+    let tl = Arc::new(timeline_of(rec_dir, &job, &played)?);
+    let mut readings: Vec<PathBuf> = Vec::new();
+    if let Some(p) = want["reading"]["path"].as_str() {
+        readings.push(PathBuf::from(p));
+    }
+    for r in job["readings"].as_array().cloned().unwrap_or_default() {
+        readings.push(PathBuf::from(r["path"].as_str().unwrap_or("")));
+    }
+    let run_dir = rec_dir.join("run").join(format!("a{:02}", runs.len().saturating_sub(1)));
+    if let Ok(rd) = std::fs::read_dir(&run_dir) {
+        for d in rd.flatten() {
+            if d.path().join("reading.json").exists() {
+                readings.push(d.path().join("reading.json"));
+            }
+        }
+    }
+    let fresh = if files::truthy(want["reading"].get("fresh")) { want["reading"]["path"].as_str().map(PathBuf::from) } else { None };
+    let rr = Arc::new(RecordedReadings::with_dumps(domains_dir, &readings, fresh, run_dir.clone()));
+    let plans: Vec<Value> = runs.iter().flat_map(|r| r["plans"].as_array().cloned().unwrap_or_default()).collect();
+    let resident = Resident {
+        returns: Mutex::new(Box::new(ScriptReturns(tl.clone()))),
+        readings: rr.clone(),
+        planners: Mutex::new(PlannerCache::new(Arc::new(ScriptPlanners { plans, next: Arc::new(Mutex::new(0)) }))),
+        players: Arc::new(ScriptPlayers { run: played.clone(), tl: tl.clone() }),
+        search: fmi_core::Search::FdLamaFirstCosts,
+        search_name: "lama-first-costs".into(),
+        forced_targets: None,
+    };
+    let log = JobLog::create(&out.join("log"))?;
+    let t = Instant::now();
+    let got = run_job(out, &resident, &log, &AtomicBool::new(false));
+    let secs = t.elapsed().as_secs_f64();
+    let mut rows: Vec<(String, bool, String)> = Vec::new();
+    let mut cmp = |what: &str, a: Value, b: Value| {
+        let ok = a == b;
+        rows.push((what.to_string(), ok, if ok { String::new() } else { format!("got {} want {}", pyjson::compact(&a), pyjson::compact(&b)) }));
+    };
+    let pick = |v: &Value, keys: &[&str]| -> Value {
+        let mut m = serde_json::Map::new();
+        for k in keys {
+            m.insert((*k).into(), v.get(*k).cloned().unwrap_or(Value::Null));
+        }
+        Value::Object(m)
+    };
+    cmp("ok, error", json!([got["ok"], got["error"]]), json!([want["ok"], want["error"]]));
+    cmp("return same", got["return"]["same"].clone(), want["return"]["same"].clone());
+    cmp("reading", pick(&got["reading"], &["path", "fresh", "why", "scope", "records", "actions"]),
+        pick(&want["reading"], &["path", "fresh", "why", "scope", "records", "actions"]));
+    cmp("candidates", got["reading"]["candidates"].clone(), want["reading"]["candidates"].clone());
+    cmp("targets", got["targets"].clone(), want["targets"].clone());
+    let probe_keys = ["target", "tier", "depth", "status", "stop", "attempt"];
+    cmp("probes", json!(got["probes"].as_array().cloned().unwrap_or_default().iter().map(|p| pick(p, &probe_keys)).collect::<Vec<_>>()),
+        json!(want["probes"].as_array().cloned().unwrap_or_default().iter().map(|p| pick(p, &probe_keys)).collect::<Vec<_>>()));
+    cmp("tried, exhausted", json!([got["tried"], got["exhausted"]]), json!([want["tried"], want["exhausted"]]));
+    let att_keys = ["target", "tier", "depth", "stop", "reached", "goal_from_the_plan", "frames", "frame0", "frame_end", "qf0",
+                    "qf_end", "qf", "replans", "inputs", "checkpoints"];
+    cmp("attempt", pick(&got["attempt"], &att_keys), pick(&want["attempt"], &att_keys));
+    let ref_keys = ["plan", "frame", "class", "added", "why_not"];
+    let refs = |v: &Value| json!(v["attempt"]["refinements"].as_array().cloned().unwrap_or_default().iter().map(|t| pick(t, &ref_keys)).collect::<Vec<_>>());
+    cmp("refinements", refs(&got), refs(&want));
+    let ext_keys = ["plan", "frame", "n_values", "actions_before", "actions"];
+    let exts = |v: &Value| json!(v["attempt"]["extensions"].as_array().cloned().unwrap_or_default().iter().map(|t| pick(t, &ext_keys)).collect::<Vec<_>>());
+    cmp("extensions", exts(&got), exts(&want));
+    let new_keys = ["file", "frame", "tick", "how"];
+    let news = |v: &Value| json!(v["new"].as_array().cloned().unwrap_or_default().iter().map(|t| pick(t, &new_keys)).collect::<Vec<_>>());
+    cmp("new", news(&got), news(&want));
+    for n in got["new"].as_array().cloned().unwrap_or_default() {
+        let f = n["file"].as_str().unwrap_or("");
+        let a = read_gz(&out.join(f)).unwrap_or(Value::Null);
+        let b = read_gz(&rec_dir.join(f)).unwrap_or(Value::Null);
+        cmp(&format!("{f}"), a, b);
+    }
+    // the played attempt's record
+    let k = runs.len().saturating_sub(1);
+    let gr = read_json(&out.join("run").join(format!("a{k:02}")).join("run.json")).unwrap_or(Value::Null);
+    let plan_keys = ["plan", "frame", "bans", "status", "steps", "reach_misses", "reach_values", "costs", "plan_cost"];
+    let plans_of = |v: &Value| json!(v["plans"].as_array().cloned().unwrap_or_default().iter().map(|t| pick(t, &plan_keys)).collect::<Vec<_>>());
+    cmp("run plans", plans_of(&gr), plans_of(&played));
+    let rk = ["plan", "frame", "qf", "what", "cause", "class", "values", "added", "why_not"];
+    let turns = |v: &Value| json!(v["refinements"].as_array().cloned().unwrap_or_default().iter().map(|t| pick(t, &rk)).collect::<Vec<_>>());
+    cmp("run refinements", turns(&gr), turns(&played));
+    cmp("run replan causes", gr["replan_causes"].clone(), played["replan_causes"].clone());
+    cmp("run stop, replans, frames", json!([gr["stop"], gr["replans"], gr["frames"], gr["goal_from_the_plan"]]),
+        json!([played["stop"], played["replans"], played["frames"], played["goal_from_the_plan"]]));
+    cmp("run inputs", gr["inputs"].clone(), played["inputs"].clone());
+    // the first plan's start file (its start does not depend on the window search)
+    let a = std::fs::read_to_string(out.join("run").join(format!("a{k:02}")).join("plans").join("plan-000").join("start.txt")).unwrap_or_default();
+    let b = std::fs::read_to_string(run_dir.join("plans").join("plan-000").join("start.txt")).unwrap_or_default();
+    if !b.is_empty() && !a.is_empty() {
+        cmp("plan-000 start.txt", json!(a == b), json!(true));
+    }
+    // the reads the try asked for (the reference's folders)
+    let reads: Vec<String> = rr.reads.lock().unwrap().iter().map(|r| r.name.clone()).collect();
+    rows.push(("reads".into(), true, format!("{reads:?}")));
+    Ok((rows, secs))
 }

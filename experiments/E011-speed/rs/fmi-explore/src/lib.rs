@@ -10,6 +10,7 @@
 
 pub mod archive;
 pub mod check;
+pub mod doubles;
 pub mod driver;
 pub mod events;
 pub mod fake;
