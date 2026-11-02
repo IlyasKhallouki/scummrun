@@ -146,7 +146,7 @@ fn search(args: &[String]) {
         }
     }
     println!(
-        "{{\"status\": \"{}\", \"steps\": {}, \"cost\": {}, \"expanded\": {}, \"evaluated\": {}, \"generated\": {}, \"dead_ends\": {}, \"h0\": {:?}, \"landmarks\": {}, \"disjunctive\": {}, \"orderings\": {}, \"explorations\": {}, \"read_s\": {:.3}, \"graph_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"eval_s\": {:.3}, \"lm_s\": {:.3}, \"cpu_s\": {:.3}, \"read_cpu_s\": {:.3}}}",
+        "{{\"status\": \"{}\", \"steps\": {}, \"cost\": {}, \"expanded\": {}, \"evaluated\": {}, \"generated\": {}, \"dead_ends\": {}, \"h0\": {:?}, \"landmarks\": {}, \"disjunctive\": {}, \"orderings\": {}, \"explorations\": {}, \"read_s\": {:.3}, \"graph_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"eval_s\": {:.3}, \"lm_s\": {:.3}, \"cpu_s\": {:.3}, \"read_cpu_s\": {:.3}, \"peak_rss_mb\": {}}}",
         o.status,
         o.plan.len(),
         o.cost,
@@ -166,7 +166,8 @@ fn search(args: &[String]) {
         o.eval_s,
         o.lm_s,
         cpu,
-        c1 - c0
+        c1 - c0,
+        taskcore::model::peak_rss() / (1 << 20)
     );
 }
 
