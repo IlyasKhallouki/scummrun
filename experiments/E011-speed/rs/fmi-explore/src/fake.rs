@@ -171,11 +171,14 @@ pub fn fake(d: &Path, log: &JobLog) -> Res<i32> {
     let x2 = json!({"tick": tick + 7, "rng": rng, "actors": []});
     let cp1 = json!([frame + 3, Value::Object(f1), x1]);
     let cp2 = json!([frame + 7, Value::Object(f2), x2]);
-    files::write_gz_default(&d.join("new").join("0.json.gz"),
-        &json!({"id": null, "parent": eid, "frame": frame + 3, "tick": x1["tick"], "events": [ev1], "checkpoints": [cp1]}))?;
-    files::write_gz_default(&d.join("new").join("1.json.gz"),
-        &json!({"id": null, "parent": eid, "frame": frame + 7, "tick": x2["tick"], "events": [ev1, ev2],
-                "checkpoints": [cp1, cp2]}))?;
+    let n0 = json!({"id": null, "parent": eid, "frame": frame + 3, "tick": x1["tick"], "events": [ev1], "checkpoints": [cp1]});
+    let n1 = json!({"id": null, "parent": eid, "frame": frame + 7, "tick": x2["tick"], "events": [ev1, ev2],
+                    "checkpoints": [cp1, cp2]});
+    for (k, n) in [n0, n1].into_iter().enumerate() {
+        let p = d.join("new").join(format!("{k}.json.gz"));
+        files::write_gz_default(&p, &n)?;
+        crate::archive::stash_new(&p, n);
+    }
     out["new"] = json!([{"file": "new/0.json.gz", "frame": frame + 3, "tick": x1["tick"], "how": "checkpoint"},
                         {"file": "new/1.json.gz", "frame": frame + 7, "tick": x2["tick"], "how": "end"}]);
     out["attempt"] = json!({"target": [k, v], "stop": "goal", "reached": true, "goal_from_the_plan": true, "frames": 7,

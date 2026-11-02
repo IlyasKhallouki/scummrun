@@ -110,6 +110,8 @@ pub struct Harness<'a> {
     unobserved: Vec<&'static str>,
     predicted: Vec<&'static str>,
     progress: &'a dyn Fn(&str),
+    /// the reading's domain keys in their text order (the start files'), and the reading's id
+    order: Option<([u8; 20], Vec<(std::rc::Rc<str>, Key)>)>,
 }
 
 impl<'a> Harness<'a> {
@@ -147,6 +149,7 @@ impl<'a> Harness<'a> {
             qf0: 0,
             t0: Instant::now(),
             progress,
+            order: None,
         })
     }
 
@@ -160,7 +163,7 @@ impl<'a> Harness<'a> {
             unobserved_actor_rooms: self.cfg.unobserved_actor_rooms,
             time_limit_s: self.cfg.time_limit_s,
         };
-        self.player.observe(&ctx, &mut self.ps)
+        crate::machine::port(|| self.player.observe(&ctx, &mut self.ps))
     }
 
     fn goal_holds(&self) -> bool {
@@ -168,6 +171,10 @@ impl<'a> Harness<'a> {
     }
 
     fn checkpoint(&mut self) {
+        crate::machine::section("checkpoint", || self.checkpoint_())
+    }
+
+    fn checkpoint_(&mut self) {
         let frame = self.ps.engine.status().frame;
         if self.ps.checkpoints.last().map(|c| c.frame != frame).unwrap_or(true) {
             let st = self.ps.engine.status().clone();
@@ -190,15 +197,16 @@ impl<'a> Harness<'a> {
     /// Harness.plan → _plan_taskcore (the taskcore planner, served): a plan from the engine's state; false when the
     /// planner gives none (the stop reason is set).
     fn plan(&mut self, first: bool) -> Result<bool, EngineError> {
-        let doms: Domains = self.reading.domains().clone();
+        let rd = self.reading.clone();
+        let doms: &Domains = rd.domains();
         let (mut start_f, counts) = if first {
-            (start::task_start(&mut self.b, &self.ps.obs, &doms), BTreeMap::new())
+            crate::machine::section("task_start", || (start::task_start(&mut self.b, &self.ps.obs, doms), BTreeMap::new()))
         } else {
             let pr = start::prediction(&self.ps.now, &self.ps.pred);
-            start::replan_start(&mut self.b, &self.ps.obs, &pr, &doms)
+            crate::machine::section("replan_start", || start::replan_start(&mut self.b, &self.ps.obs, &pr, doms))
         };
         if self.cfg.unobserved_actor_rooms {
-            start::actor_rooms_start(&mut start_f, &doms, &self.ps.pred, first);
+            start::actor_rooms_start(&mut start_f, doms, &self.ps.pred, first);
         }
         let n = self.plans.len();
         let frame = self.ps.engine.status().frame;
@@ -211,7 +219,7 @@ impl<'a> Harness<'a> {
         entry.insert("planner".into(), json!("taskcore"));
         entry.insert("search".into(), json!(self.cfg.search_name));
         // _same_input: the planner's input (the start, the bans) is the previous plan's on the same frame
-        let key = start::input_key(frame, 0, &start_f);
+        let key = crate::machine::section("input_key", || start::input_key(frame, 0, &start_f));
         entry.insert("input_key".into(), json!(key));
         self.plans.push(entry);
         if let Some(prev) = n.checked_sub(1).map(|i| &self.plans[i]) {
@@ -233,7 +241,12 @@ impl<'a> Harness<'a> {
             let big: BTreeMap<&String, &i64> = caps.iter().filter(|(_, v)| **v > 1).collect();
             self.plans.last_mut().unwrap().insert("cost_caps".into(), json!(big));
         }
-        let _ = start::write_text(&pdir.join("start.txt"), &start::start_text(&doms, &start_f));
+        if self.order.as_ref().map(|o| o.0 != rd.id()).unwrap_or(true) {
+            self.order = Some((rd.id(), crate::machine::section("text_order", || start::text_order(doms))));
+        }
+        crate::machine::section("start.txt", || {
+            let _ = start::write_text(&pdir.join("start.txt"), &start::start_text_in(&self.order.as_ref().unwrap().1, doms, &start_f));
+        });
         let req = PlanRequest {
             goal: self.goal.clone(),
             start: start_f.clone(),
@@ -247,7 +260,7 @@ impl<'a> Harness<'a> {
         // the planners' lock is held for the request only (an extension below plans again)
         let planned = {
             let mut g = self.planners.lock().unwrap();
-            g.get(&*self.reading).and_then(|p| p.plan(&req))
+            crate::machine::port(|| g.get(&*self.reading).and_then(|p| p.plan(&req)))
         };
         let res = match planned {
             Ok(r) => r,
@@ -268,7 +281,7 @@ impl<'a> Harness<'a> {
                 return Ok(false);
             }
         };
-        self.record_plan(&res, &caps);
+        crate::machine::section("record_plan", || self.record_plan(&res, &caps));
         if res.status == "out of domain" {
             let e = self.plans.last_mut().unwrap();
             e.insert("misses".into(), json!(res.misses.iter().map(|(k, v)| json!([k.text(), start::val_json(*v)])).collect::<Vec<_>>()));
@@ -356,7 +369,8 @@ impl<'a> Harness<'a> {
         let actions_before = self.reading.n_actions();
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let new = match rr.extend(&start::reach_start(&start_f)) {
+        let rs_ = start::reach_start(&start_f);
+        let new = match crate::machine::port(|| rr.extend(&rs_)) {
             Ok(r) => r,
             Err(e) => {
                 self.stop(format!("error: reach extension: {e}"));
@@ -379,12 +393,16 @@ impl<'a> Harness<'a> {
         let head: Value = pyjson::loads(new.head()).unwrap_or(Value::Null);
         self.b = Points::of(new.domains(), head.get("live_locals").filter(|v| !v.is_null()).cloned());
         self.reading = new;
-        let doms = self.reading.domains().clone();
-        self.ps.now = start::view(&mut self.b, &doms, &self.ps.obs, &self.unobserved);
+        let rd = self.reading.clone();
+        self.ps.now = start::view(&mut self.b, rd.domains(), &self.ps.obs, &self.unobserved);
     }
 
     /// Harness._refine_turn: E007's loop after a window that ended a plan's play. False when the run stops.
     fn refine_turn(&mut self, stopped: bool) -> bool {
+        crate::machine::section("refine_turn", || self.refine_turn_(stopped))
+    }
+
+    fn refine_turn_(&mut self, stopped: bool) -> bool {
         let d = self.player.replan_cause_detail().unwrap_or(Value::Null);
         let cause = d.get("cause").cloned().unwrap_or(Value::Null);
         let cause_obj = if cause.is_object() { cause.clone() } else { json!({}) };
@@ -425,9 +443,9 @@ impl<'a> Harness<'a> {
             return false;
         }
         // the replan's start, with the engine's values of the fact variables (the new reading's seeds, Lemma R (4))
-        let doms = self.reading.domains().clone();
+        let rd = self.reading.clone();
         let pr = start::prediction(&self.ps.now, &self.ps.pred);
-        let (mut st, _) = start::replan_start(&mut self.b, &self.ps.obs, &pr, &doms);
+        let (mut st, _) = start::replan_start(&mut self.b, &self.ps.obs, &pr, rd.domains());
         let mut vars: Vec<i64> = self.refined.iter().map(|(r, _)| *r).collect();
         vars.extend(new.iter().copied());
         for n in &vars {
@@ -449,7 +467,8 @@ impl<'a> Harness<'a> {
         self.planners.lock().unwrap().close(&old_id); // the old reading's planner: its memory, while the reader reads
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let reading = match rr.refine(&new, &start::reach_start(&st)) {
+        let rs_ = start::reach_start(&st);
+        let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
             Ok(r) => r,
             Err(e) => {
                 self.refinements.push(turn);
@@ -512,7 +531,7 @@ impl<'a> Harness<'a> {
             unobserved_actor_rooms: self.cfg.unobserved_actor_rooms,
             time_limit_s: self.cfg.time_limit_s,
         };
-        let how = self.player.play_plan(&ctx, &mut self.ps, n);
+        let how = crate::machine::port(|| self.player.play_plan(&ctx, &mut self.ps, n));
         if let Some(notes) = self.player.plan_notes() {
             if let (Some(m), Some(e)) = (notes.as_object(), self.plans.last_mut()) {
                 for (k, v) in m {
@@ -584,7 +603,7 @@ impl<'a> Harness<'a> {
         if let Err(e) = r {
             self.stop(engine_stop(&e));
         }
-        self.player.flush(&mut self.ps);
+        crate::machine::port(|| self.player.flush(&mut self.ps));
         match self.observe() {
             Ok(()) => self.checkpoint(),
             Err(e) => error = Some(format!("{}\nthe last observation failed: {e}", error.unwrap_or_default())),
@@ -601,8 +620,8 @@ impl<'a> Harness<'a> {
         out["qf0"] = json!(self.qf0);
         out["qf_end"] = json!(st.qf);
         out["replan_causes"] = json!(causes);
-        out["windows"] = json!(self.player.windows());
-        out["window_summary"] = self.player.summary(&self.ps);
+        out["windows"] = json!(crate::machine::port(|| self.player.windows()));
+        out["window_summary"] = crate::machine::port(|| self.player.summary(&self.ps));
         if let Some(e) = error {
             out["error"] = json!(e);
         }
@@ -611,6 +630,10 @@ impl<'a> Harness<'a> {
 
     /// Harness.result: the record of the run so far, from what the harness holds.
     pub fn result(&self) -> Value {
+        crate::machine::section("result", || self.result_())
+    }
+
+    fn result_(&self) -> Value {
         let st = self.ps.engine.status();
         let mut out = json!({
             "stop": self.ps.stop_reason, "goal": self.goal_holds(), "replans": self.replans, "bans": [],

@@ -509,7 +509,8 @@ fn pick(x: &Value, keys: &[&str]) -> Value {
 }
 
 pub fn attempt_record(t: &Target, res: &Value, seconds: f64) -> Value {
-    let cps = res.get("_checkpoints").and_then(|c| c.as_array()).map(|a| a.len()).unwrap_or(0);
+    // `_checkpoints`: the checkpoints, or their count (a try of fmi keeps them as packed facts)
+    let cps = res.get("_checkpoints").map(|c| c.as_array().map(|a| a.len()).or(c.as_u64().map(|n| n as usize)).unwrap_or(0)).unwrap_or(0);
     let list = |k: &str| res.get(k).and_then(|x| x.as_array()).cloned().unwrap_or_default();
     let mut out = json!({"target": [t.k, t.v.json()], "tier": t.tier, "depth": t.depth, "stop": res.get("stop"),
         "reached": res.get("_reached"), "goal_from_the_plan": res.get("goal_from_the_plan"), "frames": res.get("frames"),
@@ -679,4 +680,32 @@ pub fn start_row(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) ->
               "dump": {"frame": state.frame, "tick": state.tick, "room": state.room, "ego": state.ego,
                        "ego_pos": state.ego_pos.map(|(x, y)| json!([x, y])), "seed": state.seed, "boot_param": state.boot_param},
               "facts": facts_of_ordered(state)}))
+}
+
+/// entries_from's plan on frames alone: per entry (in frame order) the number of the attempt's checkpoints it holds
+/// (frames > the entry's frame, one per frame, in order: a prefix), its events (the inputs up to its frame) and its
+/// `how`; the same rules and the same error as entries_from.
+pub fn entries_plan(entry_frame: i64, inputs: &[Value], frames: &[i64]) -> Res<Vec<(usize, Vec<Value>, &'static str)>> {
+    let early: Vec<&Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MIN) <= entry_frame).collect();
+    if let Some(e0) = early.first() {
+        return Err(format!("ValueError: {} inputs at or before the entry's frame {entry_frame}: first {}", early.len(), files::py_repr(e0)));
+    }
+    let kept: Vec<i64> = frames.iter().copied().filter(|f| *f > entry_frame).collect();
+    let n = kept.len();
+    Ok(kept.iter().enumerate().map(|(i, &f)| {
+        let events: Vec<Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
+        (i + 1, events, if i == n - 1 { "end" } else { "checkpoint" })
+    }).collect())
+}
+
+/// target_holds on any facts map.
+pub fn target_holds_in<F: crate::archive::FactLook + ?Sized>(t: &Target, goal: &[(String, Vec<i64>)], facts: &F) -> bool {
+    let get = |k: &str| facts.look(k).unwrap_or(0);
+    if t.tier == 0 {
+        return goal.iter().all(|(k, vs)| vs.contains(&get(k)));
+    }
+    match t.v {
+        TV::Int(v) => get(&t.k) == v,
+        TV::Text(_) => false,
+    }
 }

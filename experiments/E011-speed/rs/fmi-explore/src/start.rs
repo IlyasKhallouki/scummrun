@@ -22,6 +22,24 @@ pub const ELSEWHERE: Val = -2;
 /// an actor's room the start does not give (replay.ACTOR_ROOM_NOT_KNOWN)
 pub const ACTOR_ROOM_NOT_KNOWN: Val = -1;
 
+thread_local! {
+    static TEXTS: std::cell::RefCell<HashMap<Key, std::rc::Rc<str>>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// A key's text, made once per thread (the harness sorts and writes the same keys at every plan).
+pub fn key_text(k: Key) -> std::rc::Rc<str> {
+    TEXTS.with(|t| {
+        if let Some(x) = t.borrow().get(&k) {
+            return x.clone();
+        }
+        let mut s = String::with_capacity(24);
+        crate::archive::write_key(&mut s, k);
+        let r: std::rc::Rc<str> = s.into();
+        t.borrow_mut().insert(k, r.clone());
+        r
+    })
+}
+
 /// The unobserved prefixes (replay.UNOBSERVED), with actorroom: under unobserved_actor_rooms.
 pub fn unobserved(actor_rooms: bool) -> Vec<&'static str> {
     let mut v = vec!["args:", "saved:"];
@@ -368,10 +386,10 @@ pub fn reach_misses(message: &str) -> Option<(i64, Vec<String>)> {
 
 /// replay.reach_start: every int value, sorted by key text (as reader-scope's --reach-also reads it).
 pub fn reach_start(start: &Facts) -> Vec<(String, i64)> {
-    let mut v: Vec<(String, i64)> = start.0.iter().filter(|(_, x)| is_int(*x)).map(|(k, x)| (k.text(), *x))
+    let mut v: Vec<(std::rc::Rc<str>, i64)> = start.0.iter().filter(|(_, x)| is_int(*x)).map(|(k, x)| (key_text(*k), *x))
         .filter(|(k, _)| !k.contains('\t') && !k.contains('\n')).collect();
-    v.sort();
-    v
+    v.sort_unstable_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    v.into_iter().map(|(k, x)| (k.to_string(), x)).collect()
 }
 
 /// The text of a start file of `reach_start` (replay_part1's reach_extender and refiner).
@@ -388,25 +406,59 @@ pub fn start_file_text(start: &[(String, i64)]) -> String {
 
 /// Harness._same_input's key: sha1 of json.dumps([frame, len(bans), sorted((k, str(v)))]) [:16].
 pub fn input_key(frame: u64, n_bans: usize, start: &Facts) -> String {
-    let mut kv: Vec<(String, String)> = start.0.iter().map(|(k, v)| (k.text(), val_text(*v))).collect();
-    kv.sort();
-    let doc = json!([frame, n_bans, kv.iter().map(|(k, v)| json!([k, v])).collect::<Vec<_>>()]);
-    let h = sha1_smol::Sha1::from(pyjson::dumps_default(&doc).as_bytes()).digest().to_string();
+    // json.dumps([frame, n, [[k, str(v)], ...]]) with the pairs sorted (keys are unique: by the key's text)
+    let mut kv: Vec<(std::rc::Rc<str>, Val)> = start.0.iter().map(|(k, v)| (key_text(*k), *v)).collect();
+    kv.sort_unstable_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    let mut s = String::with_capacity(kv.len() * 28 + 32);
+    let mut nb = itoa::Buffer::new();
+    s.push('[');
+    s.push_str(nb.format(frame));
+    s.push_str(", ");
+    s.push_str(nb.format(n_bans));
+    s.push_str(", [");
+    for (i, (k, v)) in kv.iter().enumerate() {
+        if i > 0 {
+            s.push_str(", ");
+        }
+        s.push('[');
+        pyjson::write_str(&mut s, k);
+        s.push_str(", \"");
+        match *v {
+            BELOW => s.push_str("below"),
+            ABOVE => s.push_str("above"),
+            NONE => s.push_str("None"),
+            n => s.push_str(nb.format(n)),
+        }
+        s.push_str("\"]");
+    }
+    s.push_str("]]");
+    let h = sha1_smol::Sha1::from(s.as_bytes()).digest().to_string();
     h[..16].to_string()
 }
 
 /// export_records.write_start's text: one line per fact of the domains, sorted by key text, its start value's label
 /// text, or nothing after the tab where the domain lacks it.
 pub fn start_text(doms: &Domains, start: &Facts) -> String {
-    let mut keys: Vec<(String, Key)> = doms.0.iter().map(|(k, _)| (k.text(), *k)).collect();
+    start_text_in(&text_order(doms), doms, start)
+}
+
+/// A reading's domain keys in their text order (the start file's), made once per reading.
+pub fn text_order(doms: &Domains) -> Vec<(std::rc::Rc<str>, Key)> {
+    let mut keys: Vec<(std::rc::Rc<str>, Key)> = doms.0.iter().map(|(k, _)| (key_text(*k), *k)).collect();
     keys.sort();
-    let mut s = String::new();
-    for (t, k) in keys {
+    keys
+}
+
+/// `start_text` with the keys' order made already.
+pub fn start_text_in(order: &[(std::rc::Rc<str>, Key)], doms: &Domains, start: &Facts) -> String {
+    let mut s = String::with_capacity(order.len() * 28);
+    for (t, k) in order {
+        let (t, k) = (&**t, *k);
         let d = doms.get(k).unwrap();
         let v = start.get(k).unwrap_or(0);
         let lab = if v == BELOW || v == ABOVE || v == NONE { v } else { d.label(v) };
         let txt = if lab == NONE || !d.values.contains(&lab) { String::new() } else { val_text(lab) };
-        s.push_str(&t);
+        s.push_str(t);
         s.push('\t');
         s.push_str(&txt);
         s.push('\n');

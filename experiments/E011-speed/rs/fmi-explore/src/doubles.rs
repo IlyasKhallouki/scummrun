@@ -378,7 +378,8 @@ impl PlannerHost for ScriptPlanners {
 impl Planner for ScriptPlanner {
     fn plan(&mut self, _req: &PlanRequest) -> Result<PlanResult, PlanError> {
         let mut n = self.next.lock().unwrap();
-        let p = self.plans.get(*n).cloned().ok_or_else(|| PlanError::Taskcore("the script has no more plans".into()))?;
+        // the script again from its start once it is played out (a try repeated as a benchmark)
+        let p = self.plans.get(*n % self.plans.len().max(1)).cloned().ok_or_else(|| PlanError::Taskcore("the script has no plans".into()))?;
         *n += 1;
         let status = p["status"].as_str().unwrap_or("error").to_string();
         if status == "reach extension" {

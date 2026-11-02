@@ -46,6 +46,209 @@ pub fn fact_map(v: &Value) -> FactMap {
 /// a fact value that is not an int (never in facts.py's maps): equal to no int
 pub const NOT_INT: i64 = i64::MIN + 7;
 
+/// A facts.py map as the archive reads it: a parsed map, or a checkpoint's JSON object read in place (no key copied).
+pub trait FactLook {
+    fn look(&self, k: &str) -> Option<i64>;
+    /// (object, value) of every owner:O key
+    fn owners(&self) -> Vec<(i64, i64)>;
+}
+
+impl FactLook for FactMap {
+    fn look(&self, k: &str) -> Option<i64> {
+        self.get(k).copied()
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        self.iter().filter_map(|(k, v)| Some((k.strip_prefix("owner:")?.parse().ok()?, *v))).collect()
+    }
+}
+
+impl FactLook for Map<String, Value> {
+    fn look(&self, k: &str) -> Option<i64> {
+        self.get(k).map(|x| as_i64(Some(x)).unwrap_or(NOT_INT))
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        self.iter().filter_map(|(k, v)| Some((k.strip_prefix("owner:")?.parse().ok()?, as_i64(Some(v)).unwrap_or(NOT_INT)))).collect()
+    }
+}
+
+impl FactLook for fmi_core::Facts {
+    fn look(&self, k: &str) -> Option<i64> {
+        self.get(fmi_core::Key::parse(k)).map(|v| if v == fmi_core::NONE || v == fmi_core::BELOW || v == fmi_core::ABOVE { NOT_INT } else { v })
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        self.0.iter().filter(|(k, _)| k.kind() == fmi_core::K_OWNER).map(|(k, v)| (k.a() as i64, *v)).collect()
+    }
+}
+
+/// A key's text written in place (fmi-core's `Key::text` without its allocation, for the packed kinds).
+pub fn write_key(s: &mut String, k: fmi_core::Key) {
+    use fmi_core::*;
+    let mut b = itoa::Buffer::new();
+    let unit = |s: &mut String, u: u8, a: u64| match u {
+        U_SCRIPT => {
+            s.push_str("script:");
+            s.push_str(itoa::Buffer::new().format(a));
+        }
+        U_LOCAL => {
+            s.push_str("local:");
+            s.push_str(itoa::Buffer::new().format(a));
+        }
+        U_OBJ => {
+            s.push_str("obj:");
+            s.push_str(itoa::Buffer::new().format(a));
+        }
+        U_ENTRY => s.push_str("entry"),
+        U_EXIT => s.push_str("exit"),
+        _ => s.push('?'),
+    };
+    let (a, bb) = (k.a(), k.b());
+    match k.kind() {
+        K_VAR | K_BIT | K_OWNER | K_STATE | K_SCRIPT | K_LOCAL | K_OBJSCRIPT | K_VERB | K_ACTORROOM | K_OBJPOS => {
+            s.push_str(match k.kind() {
+                K_VAR => "var:",
+                K_BIT => "bit:",
+                K_OWNER => "owner:",
+                K_STATE => "state:",
+                K_SCRIPT => "script:",
+                K_LOCAL => "local:",
+                K_OBJSCRIPT => "objscript:",
+                K_VERB => "verb:",
+                K_ACTORROOM => "actorroom:",
+                _ => "objpos:",
+            });
+            s.push_str(b.format(a));
+        }
+        K_CLASS | K_SAVED => {
+            s.push_str(if k.kind() == K_CLASS { "class:" } else { "saved:" });
+            s.push_str(b.format(a));
+            s.push(':');
+            s.push_str(itoa::Buffer::new().format(bb));
+        }
+        K_ROOM => s.push_str("room"),
+        K_EGO => s.push_str("ego"),
+        K_CUTSCENE => s.push_str("cutscene"),
+        K_GOAL => s.push_str("goal"),
+        K_AT | K_ESC => {
+            s.push_str(if k.kind() == K_AT { "at:" } else { "esc:" });
+            unit(s, k.unit(), a);
+            s.push(':');
+            s.push_str(b.format(bb));
+        }
+        K_FROZEN | K_POS | K_ESCPOS | K_ARGS => {
+            s.push_str(match k.kind() {
+                K_FROZEN => "frozen:",
+                K_POS => "pos:",
+                K_ESCPOS => "escpos:",
+                _ => "args:",
+            });
+            unit(s, k.unit(), a);
+        }
+        _ => s.push_str(&k.text()),
+    }
+}
+
+/// A checkpoint's compact text [frame,{facts, in key order},{"tick","rng","actors"}] (the entry files' JSON).
+pub fn checkpoint_text(c: &fmi_core::Checkpoint) -> String {
+    let mut s = String::with_capacity(16 * c.facts.len() + 64);
+    s.push('[');
+    s.push_str(itoa::Buffer::new().format(c.frame));
+    s.push_str(",{");
+    for (i, (k, v)) in c.facts.0.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        let mut kt = String::with_capacity(24);
+        write_key(&mut kt, *k);
+        crate::pyjson::write_str(&mut s, &kt);
+        s.push(':');
+        match *v {
+            fmi_core::BELOW => s.push_str("\"below\""),
+            fmi_core::ABOVE => s.push_str("\"above\""),
+            fmi_core::NONE => s.push_str("null"),
+            n => s.push_str(itoa::Buffer::new().format(n)),
+        }
+    }
+    s.push_str("},{\"tick\":");
+    s.push_str(itoa::Buffer::new().format(c.tick));
+    s.push_str(",\"rng\":");
+    s.push_str(itoa::Buffer::new().format(c.rng));
+    s.push_str(",\"actors\":[");
+    for (i, (id, x, y)) in c.actors.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(&format!("[{id},{x},{y}]"));
+    }
+    s.push_str("]}]");
+    s
+}
+
+/// An attempt's checkpoints, shared by the entries it gives (each entry holds a prefix), with their texts.
+pub struct SharedCps {
+    pub cps: Vec<fmi_core::Checkpoint>,
+    pub texts: Vec<String>,
+}
+
+impl SharedCps {
+    pub fn new(cps: Vec<fmi_core::Checkpoint>) -> SharedCps {
+        let texts = std::thread::scope(|sc| {
+            let hs: Vec<_> = cps.iter().map(|c| sc.spawn(move || checkpoint_text(c))).collect();
+            hs.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        SharedCps { cps, texts }
+    }
+    /// The checkpoint as a JSON value (its text parsed), for an entry's last checkpoint.
+    pub fn value(&self, j: usize) -> Value {
+        crate::pyjson::loads(&self.texts[j]).unwrap_or(Value::Null)
+    }
+}
+
+/// A new entry a try of this process wrote: its file's fields but the checkpoints, which are the first `n` of `shared`.
+pub struct NewEntry {
+    pub parent: i64,
+    pub frame: i64,
+    pub tick: Option<i64>,
+    pub events: Vec<Value>,
+    pub shared: std::sync::Arc<SharedCps>,
+    pub n: usize,
+}
+
+impl NewEntry {
+    /// The entry file's compact text with this id (null: the try's new/K.json.gz).
+    pub fn text(&self, id: Option<usize>) -> String {
+        let total: usize = self.shared.texts[..self.n].iter().map(|t| t.len() + 1).sum();
+        let mut text = String::with_capacity(total + 256);
+        text.push_str(&format!("{{\"id\":{},\"parent\":{},\"frame\":{},\"tick\":{},\"events\":",
+                               id.map(|i| i.to_string()).unwrap_or("null".into()), self.parent, self.frame,
+                               self.tick.map(|t| t.to_string()).unwrap_or("null".into())));
+        crate::pyjson::write_compact_slice(&mut text, &self.events);
+        text.push_str(",\"checkpoints\":[");
+        for (j, t) in self.shared.texts[..self.n].iter().enumerate() {
+            if j > 0 {
+                text.push(',');
+            }
+            text.push_str(t);
+        }
+        text.push_str("]}");
+        text
+    }
+}
+
+/// What the ingest gets for a new entry: the file's document, or a try's entry from the stash.
+pub enum NewDoc {
+    Doc(Value),
+    Shared(NewEntry),
+}
+
+fn obj_of(v: &Value) -> &Map<String, Value> {
+    static EMPTY: std::sync::OnceLock<Map<String, Value>> = std::sync::OnceLock::new();
+    v.as_object().unwrap_or_else(|| EMPTY.get_or_init(Map::new))
+}
+
+fn lk<F: FactLook + ?Sized>(f: &F, k: &str) -> i64 {
+    f.look(k).unwrap_or(0)
+}
+
 fn get0(f: &FactMap, k: &str) -> i64 {
     f.get(k).copied().unwrap_or(0)
 }
@@ -208,7 +411,6 @@ impl Row {
 pub struct EntryInfo {
     pub events: Value,
     pub last_cp: Value,
-    pub facts: FactMap,
 }
 
 /// A reading of readings.jsonl.
@@ -244,6 +446,13 @@ pub struct Archive {
     pub idle_measured: BTreeSet<i64>,
     pub last_place: (bool, bool),
     entries: RefCell<HashMap<usize, Rc<EntryInfo>>>,
+    /// cells.json's text per cell (json.dumps of the cell) and the cell's shape it was made from: a cell's lists only
+    /// grow and its n changes, so an equal shape is an equal cell (rekey clears it)
+    cell_text: RefCell<HashMap<String, ((bool, usize, usize, i64, usize, usize, usize), String)>>,
+    /// during an ingest: the entries.jsonl rows written in one append (one sync) after the entries' files
+    pending_rows: Option<Vec<Value>>,
+    /// during an ingest: the entries' files (path, text), compressed and written together before the rows
+    pending_files: Option<Vec<(PathBuf, String)>>,
 }
 
 fn goal_pairs(v: &Value) -> Vec<(String, Vec<i64>)> {
@@ -256,6 +465,23 @@ fn goal_pairs(v: &Value) -> Vec<(String, Vec<i64>)> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// The new entries a try of this process wrote (JOB_DIR/new/K.json.gz -> its document): ingest takes them from here
+/// instead of reading the file back, once it has seen the file is there.
+fn new_cache() -> &'static std::sync::Mutex<HashMap<PathBuf, NewDoc>> {
+    static C: std::sync::OnceLock<std::sync::Mutex<HashMap<PathBuf, NewDoc>>> = std::sync::OnceLock::new();
+    C.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
+/// A try's new entry, written to `path`, kept for the ingest.
+pub fn stash_new(path: &Path, doc: Value) {
+    new_cache().lock().unwrap().insert(resolve(path), NewDoc::Doc(doc));
+}
+
+/// A try's new entry, its checkpoints shared with the attempt's other entries, kept for the ingest.
+pub fn stash_shared(path: &Path, e: NewEntry) {
+    new_cache().lock().unwrap().insert(resolve(path), NewDoc::Shared(e));
 }
 
 pub fn committed(x: &Value) -> bool {
@@ -319,6 +545,9 @@ impl Archive {
             idle_measured: BTreeSet::new(),
             last_place: (false, false),
             entries: RefCell::new(HashMap::new()),
+            cell_text: RefCell::new(HashMap::new()),
+            pending_rows: None,
+            pending_files: None,
         })
     }
 
@@ -499,14 +728,13 @@ impl Archive {
         }
         let doc = self.entry(i)?;
         let last_cp = doc["checkpoints"].as_array().and_then(|a| a.last()).cloned().ok_or(format!("entry {i}: no checkpoint"))?;
-        let facts = fact_map(&last_cp[1]);
-        let info = Rc::new(EntryInfo { events: doc["events"].clone(), last_cp, facts });
+        let info = Rc::new(EntryInfo { events: doc["events"].clone(), last_cp });
         self.entries.borrow_mut().insert(i, info.clone());
         Ok(info)
     }
 
     pub fn facts(&self, i: usize) -> Res<FactMap> {
-        Ok(self.info(i)?.facts.clone())
+        Ok(fact_map(&self.info(i)?.last_cp[1]))
     }
 
     fn goal_keys(&self) -> HashSet<&str> {
@@ -514,24 +742,16 @@ impl Archive {
     }
 
     /// explore.py `cell_key`.
-    pub fn cell_key(&self, facts: &FactMap) -> Value {
-        let ego = facts.get("ego");
+    pub fn cell_key<F: FactLook + ?Sized>(&self, facts: &F) -> Value {
+        let ego = facts.look("ego");
         let mut owned: Vec<i64> = Vec::new();
-        if let Some(&ego) = ego {
-            for (k, &v) in facts {
-                if let Some(o) = k.strip_prefix("owner:") {
-                    if v == ego {
-                        if let Ok(o) = o.parse::<i64>() {
-                            owned.push(o);
-                        }
-                    }
-                }
-            }
+        if let Some(ego) = ego {
+            owned = facts.owners().into_iter().filter(|(_, v)| *v == ego).map(|(o, _)| o).collect();
         }
         owned.sort();
         let kv: Vec<Value> =
-            self.cell_keys.iter().filter(|k| !self.idle.contains(*k)).map(|k| json!([k, get0(facts, k)])).collect();
-        json!([facts.get("room"), owned, kv])
+            self.cell_keys.iter().filter(|k| !self.idle.contains(*k)).map(|k| json!([k, lk(facts, k)])).collect();
+        json!([facts.look("room"), owned, kv])
     }
 
     pub fn cell_id(key: &Value) -> String {
@@ -539,15 +759,18 @@ impl Archive {
     }
 
     /// The R atoms ``facts`` holds, as (k, v) pairs (module docstring).
-    pub fn held(&self, facts: &FactMap) -> Vec<(String, i64)> {
-        let root = self.root_facts.as_ref().unwrap_or(facts);
+    pub fn held<F: FactLook + ?Sized>(&self, facts: &F) -> Vec<(String, i64)> {
         let mut out = Vec::new();
         for (k, a) in &self.atoms {
             if self.idle.contains(k) {
                 continue;
             }
-            let v = get0(facts, k);
-            if a.values.contains(&v) || (a.any && v != get0(root, k)) {
+            let v = lk(facts, k);
+            let rv = match &self.root_facts {
+                Some(r) => get0(r, k),
+                None => v,
+            };
+            if a.values.contains(&v) || (a.any && v != rv) {
                 out.push((k.clone(), v));
             }
         }
@@ -556,8 +779,8 @@ impl Archive {
     }
 
     /// #g: the goal keys whose value is not the goal's.
-    pub fn g(&self, facts: &FactMap) -> i64 {
-        self.goal.iter().filter(|(k, vs)| !vs.contains(&get0(facts, k))).count() as i64
+    pub fn g<F: FactLook + ?Sized>(&self, facts: &F) -> i64 {
+        self.goal.iter().filter(|(k, vs)| !vs.contains(&lk(facts, k))).count() as i64
     }
 
     pub fn chain(&self, i: usize) -> Vec<usize> {
@@ -611,7 +834,7 @@ impl Archive {
     pub fn add(&mut self, parent: Option<usize>, frame: i64, tick: Option<i64>, events: &[Value], checkpoints: &[Value],
                job: Option<&str>, how: &str) -> Res<usize> {
         let i = self.rows.len();
-        let cps: Vec<Value> = checkpoints.to_vec();
+        let cps: &[Value] = checkpoints;
         if cps.is_empty() || as_i64(cps.last().unwrap().get(0)) != Some(frame) {
             return Err(format!("ValueError: entry {i}: the last checkpoint is not at the entry's frame {frame}"));
         }
@@ -642,16 +865,17 @@ impl Archive {
                 }
             }
         }
-        let facts = fact_map(&cps.last().unwrap()[1]);
+        let ta = std::time::Instant::now();
+        let last = obj_of(&cps.last().unwrap()[1]);
         if parent.is_none() {
-            self.root_facts = Some(facts.clone());
+            self.root_facts = Some(fact_map(&cps.last().unwrap()[1]));
         }
-        let key = self.cell_key(&facts);
+        let key = self.cell_key(last);
         let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
-        for c in &cps {
-            seg.extend(self.held(&fact_map(&c[1])));
+        for c in cps {
+            seg.extend(self.held(obj_of(&c[1])));
         }
-        let g = self.g(&facts);
+        let g = self.g(last);
         let r_path = {
             let cr = self.chain_r(parent);
             let mut u: HashSet<&(String, i64)> = cr.iter().collect();
@@ -663,20 +887,109 @@ impl Archive {
             parent,
             frame,
             tick,
-            room: facts.get("room").copied(),
+            room: last.look("room"),
             cell: Self::cell_id(&key),
             g,
-            held: self.held(&facts),
+            held: self.held(last),
             r_path,
             job: job.map(|s| s.to_string()),
             how: how.to_string(),
             goal: g == 0,
             seg_held: seg.into_iter().collect(),
         };
-        let doc = json!({"id": i, "parent": parent, "frame": frame, "tick": tick, "events": events, "checkpoints": cps});
-        files::write_gz(&self.root.join("entries").join(format!("{i}.json.gz")), &doc)?;
-        files::append_jsonl(&self.root.join("entries.jsonl"), &[row.to_json()])?;
-        let info = Rc::new(EntryInfo { events: doc["events"].clone(), last_cp: cps.last().unwrap().clone(), facts });
+        let t1 = ta.elapsed().as_secs_f64();
+        // write_gz's text of {"id", "parent", "frame", "tick", "events", "checkpoints"}, from the slices (no copy)
+        let mut text = String::with_capacity(1 << 16);
+        text.push_str(&format!("{{\"id\":{i},\"parent\":{},\"frame\":{frame},\"tick\":{},\"events\":",
+                               parent.map(|p| p.to_string()).unwrap_or("null".into()), tick.map(|t| t.to_string()).unwrap_or("null".into())));
+        crate::pyjson::write_compact_slice(&mut text, events);
+        text.push_str(",\"checkpoints\":");
+        crate::pyjson::write_compact_slice(&mut text, cps);
+        text.push('}');
+        let t2 = ta.elapsed().as_secs_f64();
+        let path = self.root.join("entries").join(format!("{i}.json.gz"));
+        match self.pending_files.as_mut() {
+            Some(p) => p.push((path, std::mem::take(&mut text))),
+            None => files::write_gz_text(&path, &text)?,
+        }
+        if std::env::var("FMI_ARCHIVE_PROFILE").is_ok() {
+            eprintln!("add {i}: {} cps, {} bytes; keys and atoms {:.2} ms, text {:.2} ms, gz {:.2} ms", cps.len(), text.len(),
+                      t1 * 1e3, (t2 - t1) * 1e3, (ta.elapsed().as_secs_f64() - t2) * 1e3);
+        }
+        match self.pending_rows.as_mut() {
+            Some(p) => p.push(row.to_json()),
+            None => files::append_jsonl(&self.root.join("entries.jsonl"), &[row.to_json()])?,
+        }
+        let info = Rc::new(EntryInfo { events: Value::Array(events.to_vec()), last_cp: cps.last().unwrap().clone() });
+        self.entries.borrow_mut().insert(i, info);
+        self.last_place = self.place(row, Some(key));
+        Ok(i)
+    }
+
+    /// `add` for a try's entry of this process: the checkpoints read in place and their texts reused.
+    pub fn add_shared(&mut self, parent: Option<usize>, ne: &NewEntry, job: Option<&str>, how: &str) -> Res<usize> {
+        let i = self.rows.len();
+        let cps = &ne.shared.cps[..ne.n];
+        let frame = ne.frame;
+        if cps.is_empty() || cps.last().unwrap().frame as i64 != frame {
+            return Err(format!("ValueError: entry {i}: the last checkpoint is not at the entry's frame {frame}"));
+        }
+        if cps.windows(2).any(|w| w[1].frame < w[0].frame) {
+            return Err(format!("ValueError: entry {i}: checkpoints out of frame order"));
+        }
+        let p = parent.ok_or("ValueError: a try's entry has a parent")?;
+        if p >= i {
+            return Err(format!("ValueError: entry {i}: parent {p} is not in the archive"));
+        }
+        let f0 = self.rows[p].frame;
+        if ne.events.iter().any(|e| {
+            let f = as_i64(e.get("frame")).unwrap_or(i64::MIN);
+            !(f0 < f && f <= frame)
+        }) {
+            return Err(format!("ValueError: entry {i}: an event outside its segment ({f0}, {frame}]"));
+        }
+        if cps.iter().any(|c| c.frame as i64 <= f0) {
+            return Err(format!("ValueError: entry {i}: a checkpoint at or before the parent's frame {f0}"));
+        }
+        let last = &cps.last().unwrap().facts;
+        let key = self.cell_key(last);
+        let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
+        for c in cps {
+            seg.extend(self.held(&c.facts));
+        }
+        let g = self.g(last);
+        let r_path = {
+            let cr = self.chain_r(parent);
+            let mut u: HashSet<&(String, i64)> = cr.iter().collect();
+            u.extend(seg.iter());
+            u.len()
+        };
+        let row = Row {
+            id: i,
+            parent,
+            frame,
+            tick: ne.tick,
+            room: last.look("room"),
+            cell: Self::cell_id(&key),
+            g,
+            held: self.held(last),
+            r_path,
+            job: job.map(|s| s.to_string()),
+            how: how.to_string(),
+            goal: g == 0,
+            seg_held: seg.into_iter().collect(),
+        };
+        let text = ne.text(Some(i));
+        let path = self.root.join("entries").join(format!("{i}.json.gz"));
+        match self.pending_files.as_mut() {
+            Some(pf) => pf.push((path, text)),
+            None => files::write_gz_text(&path, &text)?,
+        }
+        match self.pending_rows.as_mut() {
+            Some(pr) => pr.push(row.to_json()),
+            None => files::append_jsonl(&self.root.join("entries.jsonl"), &[row.to_json()])?,
+        }
+        let info = Rc::new(EntryInfo { events: Value::Array(ne.events.clone()), last_cp: ne.shared.value(ne.n - 1) });
         self.entries.borrow_mut().insert(i, info);
         self.last_place = self.place(row, Some(key));
         Ok(i)
@@ -751,23 +1064,25 @@ impl Archive {
         let rows = std::mem::take(&mut self.rows);
         self.cells.clear();
         self.cell_ix.clear();
+        self.cell_text.borrow_mut().clear();
         self.held_by.clear();
         self.chain_r.borrow_mut().clear();
         for row in rows {
             let e = self.entry(row.id)?;
             let cps = e["checkpoints"].as_array().cloned().unwrap_or_default();
-            let facts = fact_map(&cps.last().ok_or("rekey: an entry with no checkpoint")?[1]);
+            let last = obj_of(&cps.last().ok_or("rekey: an entry with no checkpoint")?[1]);
             if row.parent.is_none() {
-                self.root_facts = Some(facts.clone());
+                self.root_facts = Some(fact_map(&cps.last().unwrap()[1]));
             }
-            let key = self.cell_key(&facts);
+            let facts = last;
+            let key = self.cell_key(facts);
             let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
             for c in &cps {
-                seg.extend(self.held(&fact_map(&c[1])));
+                seg.extend(self.held(obj_of(&c[1])));
             }
             let mut new = row.clone();
             new.cell = Self::cell_id(&key);
-            new.held = self.held(&facts);
+            new.held = self.held(facts);
             new.seg_held = seg.iter().cloned().collect();
             let cr = self.chain_r(row.parent);
             let mut u: HashSet<&(String, i64)> = cr.iter().collect();
@@ -1172,7 +1487,7 @@ impl Archive {
         line.insert("scope".into(), job["scope"].clone());
         let ok = truthy(res.get("ok"));
         let mut error = if !ok { res.get("error").cloned().unwrap_or(Value::Null) } else { Value::Null };
-        let mut new_files: Vec<(Value, Value)> = Vec::new();
+        let mut new_files: Vec<(Value, NewDoc)> = Vec::new();
         let outcome;
         if ret.get("same") == Some(&Value::Bool(false)) {
             outcome = "return differs";
@@ -1188,23 +1503,48 @@ impl Archive {
             }
             outcome = oc;
         }
+        let prof = std::env::var("FMI_ARCHIVE_PROFILE").is_ok();
+        let tp = std::time::Instant::now();
+        let cp0 = crate::machine::thread_cpu_s();
         let before: HashSet<(String, i64)> = self.held_by.keys().cloned().collect();
         let (mut ids, mut new_cells, mut new_reps) = (Vec::new(), 0i64, 0i64);
+        self.pending_rows = Some(Vec::new());
+        self.pending_files = Some(Vec::new());
         for (n, doc) in &new_files {
             let how = n.get("how").and_then(|h| h.as_str()).filter(|h| !h.is_empty()).unwrap_or("checkpoint").to_string();
-            let id = self.add(
-                Some(e),
-                as_i64(doc.get("frame")).unwrap_or(0),
-                as_i64(doc.get("tick")),
-                doc["events"].as_array().map(|a| a.as_slice()).unwrap_or(&[]),
-                doc["checkpoints"].as_array().map(|a| a.as_slice()).unwrap_or(&[]),
-                Some(&name),
-                &how,
-            )?;
+            let id = match doc {
+                NewDoc::Doc(doc) => self.add(
+                    Some(e),
+                    as_i64(doc.get("frame")).unwrap_or(0),
+                    as_i64(doc.get("tick")),
+                    doc["events"].as_array().map(|a| a.as_slice()).unwrap_or(&[]),
+                    doc["checkpoints"].as_array().map(|a| a.as_slice()).unwrap_or(&[]),
+                    Some(&name),
+                    &how,
+                )?,
+                NewDoc::Shared(ne) => self.add_shared(Some(e), ne, Some(&name), &how)?,
+            };
             ids.push(id);
             new_cells += self.last_place.0 as i64;
             new_reps += self.last_place.1 as i64;
         }
+        // the entries' files first (compressed in parallel), then their rows
+        if let Some(fs) = self.pending_files.take() {
+            let errs: Vec<String> = std::thread::scope(|sc| {
+                let hs: Vec<_> = fs.iter().map(|(p, t)| sc.spawn(move || files::write_gz_text(p, t))).collect();
+                hs.into_iter().filter_map(|h| h.join().ok().and_then(|r| r.err())).collect()
+            });
+            if let Some(e) = errs.into_iter().next() {
+                self.pending_rows = None;
+                return Err(e);
+            }
+        }
+        if let Some(rows) = self.pending_rows.take() {
+            if !rows.is_empty() {
+                files::append_jsonl(&self.root.join("entries.jsonl"), &rows)?;
+            }
+        }
+        let t_add = tp.elapsed().as_secs_f64();
         let mut new_r: Vec<(String, i64)> = self.held_by.keys().filter(|p| !before.contains(*p)).cloned().collect();
         new_r.sort();
         if outcome != "return differs" {
@@ -1250,7 +1590,9 @@ impl Archive {
                 }
             }
         }
+        let t_read = tp.elapsed().as_secs_f64();
         self.write_cells()?;
+        let t_cells = tp.elapsed().as_secs_f64();
         let att = or(res.get("attempt"), &empty).clone();
         let n_now = self.cell(&cell).n;
         let tried_now = self.cell(&cell).tried_of(&e.to_string()).cloned().unwrap_or(Value::Null);
@@ -1300,14 +1642,21 @@ impl Archive {
             }
         }
         let line = Value::Object(line);
+        let t_line = tp.elapsed().as_secs_f64();
         files::append_jsonl(&self.root.join("log.jsonl"), std::slice::from_ref(&line))?;
         self.logs.push(line.clone());
+        if prof {
+            let t = tp.elapsed().as_secs_f64();
+            eprintln!("ingest {name}: {} entries; add {:.2} ms, readings {:.2}, cells {:.2}, line {:.2}, log append {:.2} ms; CPU {:.2} ms",
+                      ids.len(), t_add * 1e3, (t_read - t_add) * 1e3, (t_cells - t_read) * 1e3, (t_line - t_cells) * 1e3, (t - t_line) * 1e3,
+                      (crate::machine::thread_cpu_s() - cp0) * 1e3);
+        }
         Ok(line)
     }
 
     /// ingest's checks of the result and its new entries (explore.py's try block): the entry files, or the error's
     /// text as Python gives it (`TypeName: message`).
-    fn check_new(&self, res: &Value, name: &str, e: usize, job_dir: &Path) -> Result<Vec<(Value, Value)>, String> {
+    fn check_new(&self, res: &Value, name: &str, e: usize, job_dir: &Path) -> Result<Vec<(Value, NewDoc)>, String> {
         if res.get("job").and_then(|j| j.as_str()) != Some(name) || res.get("entry").and_then(|x| x.as_u64()) != Some(e as u64) {
             return Err(format!("ValueError: result.json names job {} entry {}", py_str(res.get("job")), py_str(res.get("entry"))));
         }
@@ -1319,22 +1668,41 @@ impl Archive {
             let p = job_dir.join(&fname);
             let doc = match std::fs::File::open(&p) {
                 Err(err) => return Err(format!("{}: {}", files::python_os_error_class(&err), files::python_os_error(&p, err))),
-                Ok(_) => read_gz(&p).map_err(|m| format!("JSONDecodeError: {m}"))?,
+                Ok(_) => match new_cache().lock().unwrap().remove(&resolve(&p)) {
+                    Some(d) => d,
+                    None => NewDoc::Doc(read_gz(&p).map_err(|m| format!("JSONDecodeError: {m}"))?),
+                },
             };
-            if doc.get("parent").and_then(|x| x.as_u64()) != Some(e as u64) {
-                return Err(format!("ValueError: {fname}: parent {}, not the job's entry {e}", py_str(doc.get("parent"))));
-            }
             let f0 = self.rows[e].frame;
-            let frame = as_i64(doc.get("frame")).ok_or("KeyError: 'frame'")?;
-            let cps = doc.get("checkpoints").ok_or("KeyError: 'checkpoints'")?.as_array().cloned().unwrap_or_default();
-            let events = doc.get("events").ok_or("KeyError: 'events'")?.as_array().cloned().unwrap_or_default();
-            let bad = cps.is_empty()
-                || as_i64(cps.last().unwrap().get(0)) != Some(frame)
-                || frame <= f0
-                || events.iter().any(|ev| {
-                    let f = as_i64(ev.get("frame")).unwrap_or(i64::MIN);
-                    !(f0 < f && f <= frame)
-                });
+            let bad = match &doc {
+                NewDoc::Doc(doc) => {
+                    if doc.get("parent").and_then(|x| x.as_u64()) != Some(e as u64) {
+                        return Err(format!("ValueError: {fname}: parent {}, not the job's entry {e}", py_str(doc.get("parent"))));
+                    }
+                    let frame = as_i64(doc.get("frame")).ok_or("KeyError: 'frame'")?;
+                    let cps = doc.get("checkpoints").ok_or("KeyError: 'checkpoints'")?.as_array().cloned().unwrap_or_default();
+                    let events = doc.get("events").ok_or("KeyError: 'events'")?.as_array().cloned().unwrap_or_default();
+                    cps.is_empty()
+                        || as_i64(cps.last().unwrap().get(0)) != Some(frame)
+                        || frame <= f0
+                        || events.iter().any(|ev| {
+                            let f = as_i64(ev.get("frame")).unwrap_or(i64::MIN);
+                            !(f0 < f && f <= frame)
+                        })
+                }
+                NewDoc::Shared(ne) => {
+                    if ne.parent != e as i64 {
+                        return Err(format!("ValueError: {fname}: parent {}, not the job's entry {e}", ne.parent));
+                    }
+                    ne.n == 0
+                        || ne.shared.cps[ne.n - 1].frame as i64 != ne.frame
+                        || ne.frame <= f0
+                        || ne.events.iter().any(|ev| {
+                            let f = as_i64(ev.get("frame")).unwrap_or(i64::MIN);
+                            !(f0 < f && f <= ne.frame)
+                        })
+                }
+            };
             if bad {
                 return Err(format!("ValueError: {fname}: not a segment after frame {f0}"));
             }
@@ -1350,8 +1718,30 @@ impl Archive {
         Ok(())
     }
 
+    /// cells.json (`json.dumps(cellmap, indent=None) + "\n"`), from each cell's text, made again for a changed cell only.
     pub fn write_cells(&self) -> Res<()> {
-        files::write_json(&self.root.join("cells.json"), &self.cells_json(), None)
+        let mut cache = self.cell_text.borrow_mut();
+        let mut out = String::with_capacity(1 << 16);
+        out.push('{');
+        for (i, (id, c)) in self.cells.iter().enumerate() {
+            let shape = (c.key.is_some(), c.rep, c.entries.len(), c.n, c.exhausted.len(), c.tried.len(),
+                         c.tried.iter().map(|(_, v)| v.as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>());
+            let fresh = match cache.get(id) {
+                Some((sh, _)) => *sh != shape,
+                None => true,
+            };
+            if fresh {
+                cache.insert(id.clone(), (shape, crate::pyjson::dumps_default(&c.to_json())));
+            }
+            if i > 0 {
+                out.push_str(", ");
+            }
+            crate::pyjson::write_str(&mut out, id);
+            out.push_str(": ");
+            out.push_str(&cache[id].1);
+        }
+        out.push_str("}\n");
+        files::write_text_atomic(&self.root.join("cells.json"), &out)
     }
 }
 

@@ -331,3 +331,158 @@ pub fn replay_check(rec_dir: &Path, out: &Path, domains_dir: &Path) -> Res<(Vec<
     rows.push(("reads".into(), true, format!("{reads:?}")));
     Ok((rows, secs))
 }
+
+/// A recorded archive's jobs ingested again, in its log's order, into a fresh archive with its stage (the jobs'
+/// job.json, select.json, result.json and new entries copied; each log line's driver fields given as the extra): the
+/// archive's logic on real results. Compared: entries.jsonl and cells.json byte for byte, log.jsonl line by line,
+/// each job's job.json against job_doc of the archive before it (but "readings", which eviction changed during the
+/// run), and readings.jsonl without the eviction's fields. Also the archive's own time per job (job_doc + select +
+/// ingest), the driver's work on a fixed real input.
+pub fn reingest_check(rec: &Path, out: &Path) -> Res<(Vec<(String, bool, String)>, Vec<f64>)> {
+    use crate::archive::Archive;
+    let _ = std::fs::remove_dir_all(out);
+    std::fs::create_dir_all(out.join("jobs")).map_err(|e| files::io_err(out, e))?;
+    let stage = read_json(&rec.join("stage.json"))?;
+    let root0 = read_gz(&rec.join("entries").join("0.json.gz"))?;
+    let allowed: Vec<i64> = stage["allowed_rooms"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x.as_i64()).collect();
+    let mut a = Archive::create(out, stage["stage"].as_str().unwrap_or(""), &stage["goal"], Path::new(stage["guide"].as_str().unwrap_or("")),
+                                &allowed, stage["workers"].as_i64().unwrap_or(2), stage.get("root").cloned(),
+                                stage.get("e009").cloned(), stage.get("e010").cloned())?;
+    let cp = root0["checkpoints"].as_array().cloned().unwrap_or_default();
+    a.add(None, root0["frame"].as_i64().unwrap_or(0), root0["tick"].as_i64(), &[], &cp, None, "boot")?;
+    a.write_cells()?;
+    let (logs, _) = files::read_jsonl(&rec.join("log.jsonl"))?;
+    let mut rows = Vec::new();
+    let mut times = Vec::new();
+    let mut cpus = Vec::new();
+    let mut parts: Vec<(f64, f64, f64)> = Vec::new();
+    let mut job_docs_bad = Vec::new();
+    // with b workers the driver prepares job k after committing job k - b (one commit, then its fill): job.json is
+    // compared with job_doc at that moment
+    let workers = stage["workers"].as_u64().unwrap_or(2).max(1) as usize;
+    let order: Vec<String> = logs.iter().filter(|x| crate::archive::committed(x)).map(|x| x["job"].as_str().unwrap_or("").to_string()).collect();
+    let mut docs: std::collections::HashMap<String, Value> = Default::default();
+    // a job whose entry is not in the archive yet was prepared later (its cell busy, or its entry not made yet): its
+    // job.json is taken at the first fill after its entry exists
+    let mut pending: Vec<usize> = Vec::new();
+    let take_doc = |a: &Archive, k: usize, docs: &mut std::collections::HashMap<String, Value>, pending: &mut Vec<usize>| -> Res<()> {
+        if let Some(j) = order.get(k) {
+            let want = read_json(&rec.join("jobs").join(j).join("job.json"))?;
+            let e = want["entry"]["id"].as_u64().unwrap_or(0) as usize;
+            if e < a.rows.len() {
+                docs.insert(j.clone(), a.job_doc(j, e)?);
+            } else {
+                pending.push(k);
+            }
+        }
+        Ok(())
+    };
+    for k in 0..workers {
+        take_doc(&a, k, &mut docs, &mut pending)?;
+    }
+    let mut done = 0;
+    for x in &logs {
+        let job = x["job"].as_str().unwrap_or("").to_string();
+        if !crate::archive::committed(x) {
+            a.log_event(x.clone())?;
+            continue;
+        }
+        let src = rec.join("jobs").join(&job);
+        let dst = out.join("jobs").join(&job);
+        std::fs::create_dir_all(dst.join("new")).map_err(|e| files::io_err(&dst, e))?;
+        for f in ["job.json", "select.json", "result.json"] {
+            if src.join(f).exists() {
+                std::fs::copy(src.join(f), dst.join(f)).map_err(|e| files::io_err(&src, e))?;
+            }
+        }
+        if let Ok(rd) = std::fs::read_dir(src.join("new")) {
+            for e in rd.flatten() {
+                std::fs::copy(e.path(), dst.join("new").join(e.file_name())).map_err(|e2| files::io_err(&e.path(), e2))?;
+            }
+        }
+        let want_job = read_json(&src.join("job.json"))?;
+        let t = Instant::now();
+        let c0 = crate::machine::thread_cpu_s();
+        // the driver's work for this job: its job.json (from the archive before it) and the selection, then the ingest
+        let e = want_job["entry"]["id"].as_u64().unwrap_or(0) as usize;
+        let jd = a.job_doc(&job, e)?;
+        let _ = pyjson::dumps(&jd, pyjson::Opts::INDENT1);
+        let c1 = crate::machine::thread_cpu_s();
+        let mut got_job = docs.remove(&job).unwrap_or(Value::Null);
+        let _ = a.select(1);
+        let _ = a.sel_key_json(e);
+        let _ = a.n_selectable();
+        let c2 = crate::machine::thread_cpu_s();
+        let mut extra = serde_json::Map::new();
+        for k in ["started", "ended", "driver_wall_s", "rc", "rusage", "guard"] {
+            if let Some(v) = x.get(k) {
+                extra.insert(k.into(), v.clone());
+            }
+        }
+        let line = a.ingest(&dst, Some(&extra))?;
+        times.push(t.elapsed().as_secs_f64());
+        cpus.push(crate::machine::thread_cpu_s() - c0);
+        parts.push((c1 - c0, c2 - c1, crate::machine::thread_cpu_s() - c2));
+        done += 1;
+        for k in std::mem::take(&mut pending) {
+            take_doc(&a, k, &mut docs, &mut pending)?;
+        }
+        take_doc(&a, done + workers - 1, &mut docs, &mut pending)?;
+        let mut wj = want_job.clone();
+        for v in [&mut got_job, &mut wj] {
+            if let Some(m) = v.as_object_mut() {
+                m.remove("readings");
+                // the archive's own path
+                let rd = m.get("reading_dir").and_then(|r| r.as_str()).map(|r| Path::new(r).file_name().map(|n| n.to_string_lossy().into_owned()));
+                if let Some(Some(n)) = rd {
+                    m.insert("reading_dir".into(), json!(n));
+                }
+            }
+        }
+        if got_job != wj && job_docs_bad.len() < 5 {
+            let diffk: Vec<String> = wj.as_object().map(|m| m.keys().filter(|k| got_job.get(*k) != wj.get(*k)).cloned().collect()).unwrap_or_default();
+            job_docs_bad.push(format!("{job}: {diffk:?}"));
+        }
+        if &line != x {
+            let diffk: Vec<String> = x.as_object().map(|m| m.keys().filter(|k| line.get(*k) != x.get(*k)).cloned().collect()).unwrap_or_default();
+            rows.push((format!("log line {job}"), false, format!("{diffk:?}")));
+        }
+    }
+    let same_file = |f: &str| -> (bool, String) {
+        let a = std::fs::read(out.join(f)).unwrap_or_default();
+        let b = std::fs::read(rec.join(f)).unwrap_or_default();
+        (a == b, format!("{} vs {} bytes", a.len(), b.len()))
+    };
+    for f in ["entries.jsonl", "cells.json", "log.jsonl"] {
+        let (ok, why) = same_file(f);
+        rows.push((f.into(), ok, if ok { String::new() } else { why }));
+    }
+    rows.push(("job.json = job_doc at the fill (but readings)".into(), job_docs_bad.is_empty(), job_docs_bad.join("; ")));
+    let strip = |p: &Path| -> Vec<Value> {
+        files::read_jsonl(p).map(|r| r.0).unwrap_or_default().into_iter().map(|mut v| {
+            if let Some(m) = v.as_object_mut() {
+                m.remove("evicted");
+                m.remove("bytes");
+            }
+            v
+        }).collect()
+    };
+    let ra = strip(&out.join("readings.jsonl"));
+    let rb = strip(&rec.join("readings.jsonl"));
+    rows.push(("readings.jsonl (but evicted, bytes)".into(), ra == rb, format!("{} vs {} rows", ra.len(), rb.len())));
+    for i in 0..a.rows.len() {
+        let x = read_gz(&out.join("entries").join(format!("{i}.json.gz")))?;
+        let y = read_gz(&rec.join("entries").join(format!("{i}.json.gz")))?;
+        if x != y {
+            rows.push((format!("entries/{i}.json.gz"), false, String::new()));
+        }
+    }
+    rows.push((format!("entries/*.json.gz ({})", a.rows.len()), true, String::new()));
+    let mut c = cpus.clone();
+    c.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    let n = parts.len().max(1) as f64;
+    rows.push(("cpu".into(), true, format!("the archive's CPU per job: median {:.2} ms, mean {:.2} ms, max {:.2} ms; mean by part: job.json {:.2} ms (built and written as text), selection {:.2} ms, ingest {:.2} ms",
+        c.get(c.len() / 2).copied().unwrap_or(0.0) * 1e3, c.iter().sum::<f64>() * 1e3 / c.len().max(1) as f64, c.last().copied().unwrap_or(0.0) * 1e3,
+        parts.iter().map(|p| p.0).sum::<f64>() * 1e3 / n, parts.iter().map(|p| p.1).sum::<f64>() * 1e3 / n, parts.iter().map(|p| p.2).sum::<f64>() * 1e3 / n)));
+    Ok((rows, times))
+}

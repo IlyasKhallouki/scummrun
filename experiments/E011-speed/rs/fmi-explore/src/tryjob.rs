@@ -51,6 +51,39 @@ impl Step for TryStep {
 
 struct ReturnDiffers(String);
 
+/// FMI_TRY_PROFILE: the try's own time by section (wall less the ports), on stderr.
+struct Prof {
+    on: bool,
+    t: Instant,
+    p: f64,
+    rows: Vec<(String, f64, f64)>,
+}
+
+impl Prof {
+    fn new() -> Prof {
+        Prof { on: std::env::var("FMI_TRY_PROFILE").is_ok(), t: Instant::now(), p: machine::port_s(), rows: vec![] }
+    }
+    fn mark(&mut self, what: &str) {
+        if self.on {
+            let (w, p) = (self.t.elapsed().as_secs_f64(), machine::port_s());
+            self.rows.push((what.into(), w, p - self.p));
+            self.t = Instant::now();
+            self.p = p;
+        }
+    }
+    fn print(&self) {
+        let secs = machine::sections_take();
+        if self.on {
+            for (w, t, p) in &self.rows {
+                eprintln!("try profile: {w}: {:.2} ms, of which ports {:.2} ms", t * 1e3, p * 1e3);
+            }
+            for (w, t, n) in secs {
+                eprintln!("try profile:   section {w}: {:.2} ms in {n} calls", t * 1e3);
+            }
+        }
+    }
+}
+
 fn cpu_now() -> f64 {
     machine::thread_cpu_s()
 }
@@ -109,8 +142,8 @@ fn boot_entry(r: &Resident, entry: &Value, out_dir: &Path) -> Result<(Box<dyn En
         return Err("ValueError: a root entry has no events".into());
     }
     let er = EntryRef { id: files::as_i64(entry.get("id")).unwrap_or(-1), root, frame: entry["frame"].as_u64().unwrap_or(0), events: evs };
-    let mut b = r.returns.lock().unwrap().return_to(&er, out_dir).map_err(|e| format!("EngineError: {e}"))?;
-    let obs = b.obs(&ObsReq::default()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| r.returns.lock().unwrap().return_to(&er, out_dir)).map_err(|e| format!("EngineError: {e}"))?;
+    let obs = machine::port(|| b.obs(&ObsReq::default())).map_err(|e| format!("EngineError: {e}"))?;
     let st = b.status().clone();
     let mut d = compare_checkpoint(&entry["checkpoint"], &obs, &st);
     if st.frame != er.frame {
@@ -129,17 +162,17 @@ fn boot_entry(r: &Resident, entry: &Value, out_dir: &Path) -> Result<(Box<dyn En
 /// E009 fix a: a fork of the returned engine run `frames` frames with no input, the facts taken at each.
 fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
     let t = Instant::now();
-    let mut b = root.fork().map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;
-    let start_f = b.facts().map_err(|e| format!("EngineError: {e}"))?;
+    let start_f = machine::port(|| b.facts()).map_err(|e| format!("EngineError: {e}"))?;
     let mut seq = Vec::with_capacity(frames as usize);
     let mut err = None;
     for i in 1..=frames {
-        if let Err(e) = b.run(&RunSpec { frame: Some(f0 + i), ..Default::default() }) {
+        if let Err(e) = machine::port(|| b.run(&RunSpec { frame: Some(f0 + i), ..Default::default() })) {
             err = Some(e);
             break;
         }
-        match b.facts() {
+        match machine::port(|| b.facts()) {
             Ok(f) => seq.push((i as i64, f)),
             Err(e) => {
                 err = Some(e);
@@ -202,7 +235,7 @@ fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) ->
     }
     let mut checked = Vec::new();
     for p in cands {
-        let rd = r.readings.open(&p)?;
+        let rd = machine::port(|| r.readings.open(&p))?;
         let doc = doc_of(&*rd);
         let sf = crate::archive::fact_map(&doc["start"]["facts"]);
         let keys = task_keys(&*rd);
@@ -212,7 +245,7 @@ fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) ->
             row[k] = v.clone();
         }
         if !ok && job.get("reuse").and_then(|x| x.as_str()) == Some("e009") {
-            let extra = r.readings.reuse_keys(&*rd)?;
+            let extra = machine::port(|| r.readings.reuse_keys(&*rd))?;
             let mut k2 = keys.clone();
             k2.extend(extra.iter().cloned());
             ok = step::reusable(&sf, &k2, facts).0;
@@ -266,10 +299,10 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
         fact_vars: vec![],
         stream: true,
     };
-    let path = r.readings.read(&req, cancel)?;
+    let path = machine::port(|| r.readings.read(&req, cancel))?;
     let wall = t.elapsed().as_secs_f64();
     let t = Instant::now();
-    let rd = r.readings.open(&path)?;
+    let rd = machine::port(|| r.readings.open(&path))?;
     let load_s = t.elapsed().as_secs_f64();
     let _ = std::fs::remove_file(rdir.join(format!("{}.golden.jsonl.gz", rdir.file_name().unwrap().to_string_lossy())));
     Ok((rd, wall, load_s))
@@ -279,7 +312,8 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
 struct Attempt {
     res: Value,
     packed: PathBuf,
-    checkpoints: Vec<Value>,
+    /// the harness's checkpoints, in frame order, one per frame
+    checkpoints: Vec<Checkpoint>,
     inputs: Vec<Value>,
     secs: f64,
     cpu: f64,
@@ -303,7 +337,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let frame_costs = files::or(doc.get("frame_costs"), &json!({})).clone();
     std::fs::create_dir_all(adir).map_err(|e| files::io_err(adir, e))?;
     let (cpu0, t0) = (cpu_now(), Instant::now());
-    let branch = root.fork().map_err(|e| format!("EngineError: {e}"))?;
+    let branch = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
     let cfg = HarnessCfg {
         replan_limit: step::REPLAN_LIMIT,
         time_limit_s: step::TIME_LIMIT,
@@ -320,7 +354,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
         search_name: r.search_name.clone(),
     };
     let mut wiring = Wiring::new(r.readings.clone(), &**rd, adir, threads, cancel.clone())?;
-    let player = r.players.player(&WindowCfg { workers, fork_each: step::FORK_EACH, ready, frame_costs: frame_costs.clone() });
+    let player = machine::port(|| r.players.player(&WindowCfg { workers, fork_each: step::FORK_EACH, ready, frame_costs: frame_costs.clone() }));
     let ps = PlayState {
         engine: branch,
         state: Obs::default(),
@@ -337,13 +371,22 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let say = |m: &str| log.say(m);
     log.say(&format!("attempt {}: target {} (tier {}) from frame {}", adir.file_name().unwrap().to_string_lossy(), tg.text(), tg.tier, root.status().frame));
     let mut h = Harness::new(cfg, &r.planners, player, Some(&mut wiring), rd.clone(), hgoal, ps, &say)?;
+    let ta = Instant::now();
+    let pa = machine::port_s();
     let res = h.run();
-    let checkpoints = h.checkpoints_json();
+    let tb = Instant::now();
+    let pb = machine::port_s();
+    let checkpoints = h.ps.checkpoints.clone();
     let inputs = res["inputs"].as_array().cloned().unwrap_or_default();
     let (ps, last) = h.into_parts();
-    ps.engine.quit();
+    machine::port(|| ps.engine.quit());
     let packed = last.dir().join(pyjson::loads(last.head()).ok().and_then(|d| d.get("packed").and_then(|p| p.as_str()).map(|s| s.to_string())).unwrap_or("reading.tc".into()));
+    let tc = Instant::now();
     let _ = std::fs::write(adir.join("run.json"), pyjson::dumps_default(&res) + "\n");
+    if std::env::var("FMI_TRY_PROFILE").is_ok() {
+        eprintln!("try profile:   harness run {:.2} ms (ports {:.2} ms), checkpoints {:.2} ms, run.json {:.2} ms",
+                  (tb - ta).as_secs_f64() * 1e3, (pb - pa) * 1e3, (tc - tb).as_secs_f64() * 1e3, tc.elapsed().as_secs_f64() * 1e3);
+    }
     // the readings the harness made: their golden lines go
     if let Ok(rd) = std::fs::read_dir(adir) {
         for d in rd.flatten() {
@@ -386,6 +429,7 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
 pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) -> Value {
     let job_dir = crate::archive::resolve(job_dir);
     let (t_job, cpu_job) = (Instant::now(), cpu_now());
+    let port0 = machine::port_s();
     let job = match read_json(&job_dir.join("job.json")) {
         Ok(j) => j,
         Err(e) => {
@@ -400,6 +444,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     let mut cpu: Vec<(&str, f64)> = vec![("return", 0.0), ("read", 0.0), ("plan", 0.0), ("play", 0.0)];
     let cancel_arc = Arc::new(AtomicBool::new(cancel.load(Ordering::SeqCst)));
     let mut root_engine: Option<Box<dyn Engine>> = None;
+    let mut prof = Prof::new();
     let res: Result<(), Result<ReturnDiffers, String>> = (|| {
         if job.get("seed").and_then(|s| s.as_i64()) != Some(step::SEED) {
             return Err(Err(format!("ValueError: seed {}: E008 runs seed {} only (plan.md)", files::py_str(job.get("seed")), step::SEED)));
@@ -417,11 +462,12 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         let root = root_engine.insert(root);
         cpu_set(&mut cpu, "return", cpu_now() - c0 + root.cpu_s());
         out["return"] = ret.clone();
+        prof.mark("return");
         if !ret["same"].as_bool().unwrap_or(false) {
             return Err(Ok(ReturnDiffers(format!("the return to entry {} differs from its checkpoint: {}",
                                                 files::py_str(entry.get("id")), files::py_repr(&ret["differ"])))));
         }
-        let state = root.obs(&ObsReq::default()).map_err(|e| Err(format!("EngineError: {e}")))?;
+        let state = machine::port(|| root.obs(&ObsReq::default())).map_err(|e| Err(format!("EngineError: {e}")))?;
         let status = root.status().clone();
         let facts_v = step::facts_of_ordered(&state);
         let facts = crate::archive::fact_map(&facts_v);
@@ -435,6 +481,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                              idle["returns"].as_array().unwrap().len(), idle["seconds"]));
             out["idle"] = idle;
         }
+        prof.mark("facts and idle");
         // 2. reading
         let c0 = cpu_now();
         let t = Instant::now();
@@ -455,12 +502,14 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         cpu_add(&mut cpu, "read", cpu_now() - c0);
         log.say(&format!("reading {}: {} ({why})", out["reading"]["path"].as_str().unwrap_or(""),
                          if files::truthy(out["reading"].get("fresh")) { "fresh" } else { "reused" }));
+        prof.mark("reading");
         // 3. targets
         let ts = targets_of(r, &*rd, &job, &job_dir, &facts, &goal).map_err(Err)?;
         let by = |n: i64| ts.iter().filter(|x| x.tier == n).count();
         out["targets"] = json!({"by_tier": {"0": by(0), "1": by(1), "2": by(2)},
                                 "first": ts.iter().take(20).map(|x| x.json()).collect::<Vec<_>>(), "n": ts.len()});
         log.say(&format!("{} targets: {}", ts.len(), pyjson::compact(&out["targets"]["by_tier"])));
+        prof.mark("targets");
         // 4. attempts
         let ready = files::truthy(job.get("ready"));
         let mut played: Option<(Target, Attempt)> = None;
@@ -473,6 +522,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             }
             let adir = run_dir.join(format!("a{n_att:02}"));
             let att = attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, log, &cancel_arc).map_err(Err)?;
+            prof.mark("attempt");
             n_att += 1;
             let status_ = step::first_plan_status(att.res["plans"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
             let rd_packed = rd.dir().join(doc_of(&*rd).get("packed").and_then(|p| p.as_str()).unwrap_or("reading.tc"));
@@ -508,24 +558,48 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 queue.push_front(tg);
             }
         }
+        prof.mark("probes");
         if let Some((tg, mut att)) = played {
             out["tried"].as_array_mut().unwrap().push(json!([tg.k, tg.v.json()]));
-            let ents = step::entries_from(entry["frame"].as_i64().unwrap_or(0), &att.inputs, &att.checkpoints).map_err(Err)?;
-            let end_facts = att.checkpoints.last().map(|c| crate::archive::fact_map(&c[1])).unwrap_or_else(|| facts.clone());
-            att.res["_checkpoints"] = json!(att.checkpoints);
-            att.res["_reached"] = json!(step::target_holds(&tg, &goal, &end_facts));
+            let entry_frame = entry["frame"].as_i64().unwrap_or(0);
+            let frames: Vec<i64> = att.checkpoints.iter().map(|c| c.frame as i64).collect();
+            let plan = step::entries_plan(entry_frame, &att.inputs, &frames).map_err(Err)?;
+            let reached = match att.checkpoints.last() {
+                Some(c) => step::target_holds_in(&tg, &goal, &c.facts),
+                None => step::target_holds(&tg, &goal, &facts),
+            };
+            att.res["_checkpoints"] = json!(att.checkpoints.len());
+            att.res["_reached"] = json!(reached);
             att.res["_ready"] = json!(ready);
             out["attempt"] = step::attempt_record(&tg, &att.res, att.secs);
+            // the entries share the attempt's checkpoints (each a prefix): each checkpoint's text is made once, and the
+            // files are written together; the ingest of this process takes them from the stash
+            let kept: Vec<Checkpoint> = att.checkpoints.into_iter().filter(|c| c.frame as i64 > entry_frame).collect();
+            let shared = Arc::new(crate::archive::SharedCps::new(kept));
+            let parent = files::as_i64(entry.get("id")).unwrap_or(-1);
             let new_dir = job_dir.join("new");
-            for (i, mut e) in ents.into_iter().enumerate() {
-                let how = e.as_object_mut().unwrap().remove("how").unwrap_or(Value::Null);
-                e["parent"] = entry.get("id").cloned().unwrap_or(Value::Null);
-                files::write_gz_default(&new_dir.join(format!("{i}.json.gz")), &e).map_err(Err)?;
-                out["new"].as_array_mut().unwrap().push(json!({"file": format!("new/{i}.json.gz"), "frame": e["frame"], "tick": e["tick"], "how": how}));
+            std::fs::create_dir_all(&new_dir).map_err(|e| Err(files::io_err(&new_dir, e)))?;
+            let ents: Vec<crate::archive::NewEntry> = plan.iter().map(|(n, evs, _)| crate::archive::NewEntry {
+                parent, frame: shared.cps[n - 1].frame as i64, tick: Some(shared.cps[n - 1].tick as i64), events: evs.clone(),
+                shared: shared.clone(), n: *n }).collect();
+            let errs: Vec<String> = std::thread::scope(|sc| {
+                let hs: Vec<_> = ents.iter().enumerate().map(|(i, e)| {
+                    let p = new_dir.join(format!("{i}.json.gz"));
+                    sc.spawn(move || files::write_gz_text(&p, &e.text(None)))
+                }).collect();
+                hs.into_iter().filter_map(|h| h.join().ok().and_then(|r| r.err())).collect()
+            });
+            if let Some(e) = errs.into_iter().next() {
+                return Err(Err(e));
+            }
+            for (i, (e, (_, _, how))) in ents.into_iter().zip(plan.iter()).enumerate() {
+                out["new"].as_array_mut().unwrap().push(json!({"file": format!("new/{i}.json.gz"), "frame": e.frame, "tick": e.tick, "how": how}));
+                crate::archive::stash_shared(&new_dir.join(format!("{i}.json.gz")), e);
             }
             log.say(&format!("played {}: stop {}, {} frames, {} entries", tg.text(), files::py_repr(att.res.get("stop").unwrap_or(&Value::Null)),
                              files::py_str(att.res.get("frames")), out["new"].as_array().unwrap().len()));
         }
+        prof.mark("new entries");
         out["exhausted"] = json!(played_none(&out));
         out["ok"] = json!(true);
         Ok(())
@@ -541,7 +615,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     if let Some(root) = root_engine {
         // the returned engine is kept for later returns to the same entry (the pool decides)
         let id = files::as_i64(job["entry"].get("id")).unwrap_or(-1);
-        r.returns.lock().unwrap().keep(id, root);
+        machine::port(|| r.returns.lock().unwrap().keep(id, root));
     }
     let mut cpu_v = Map::new();
     let mut total = 0.0;
@@ -556,7 +630,13 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     let (p, c) = machine::peaks_mb();
     out["peak_rss_mb"] = json!({"python": p, "children": c});
     out["wall_s"] = json!(pyjson::round(t_job.elapsed().as_secs_f64(), 1));
+    // fmi's own account (not a reference field; the archive reads none of it): the try's wall in the ports and outside
+    let wall = t_job.elapsed().as_secs_f64();
+    let ports = machine::port_s() - port0;
+    out["explore_s"] = json!({"wall": wall, "ports": ports, "own": wall - ports});
     let _ = files::write_json(&job_dir.join("result.json"), &out, Some(1));
+    prof.mark("result");
+    prof.print();
     out
 }
 

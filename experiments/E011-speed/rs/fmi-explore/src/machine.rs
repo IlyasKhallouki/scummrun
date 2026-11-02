@@ -192,3 +192,52 @@ pub fn nice10() {
         }
     }
 }
+
+thread_local! {
+    static PORT_S: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+}
+
+/// Runs `f` (a call into another component's port) and adds its wall time to this thread's port clock: a try's own
+/// time is its wall less this (the plan's "time a try spends outside the ports").
+pub fn port<T>(f: impl FnOnce() -> T) -> T {
+    let t = std::time::Instant::now();
+    let r = f();
+    PORT_S.with(|c| c.set(c.get() + t.elapsed().as_secs_f64()));
+    r
+}
+
+/// This thread's port clock, and a reset.
+pub fn port_s() -> f64 {
+    PORT_S.with(|c| c.get())
+}
+
+pub fn port_reset() {
+    PORT_S.with(|c| c.set(0.0));
+}
+
+thread_local! {
+    static SECTIONS: std::cell::RefCell<Vec<(&'static str, f64, u32)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Runs `f` and adds its wall time to this thread's named section (FMI_TRY_PROFILE's finer account).
+pub fn section<T>(name: &'static str, f: impl FnOnce() -> T) -> T {
+    let t = std::time::Instant::now();
+    let r = f();
+    let dt = t.elapsed().as_secs_f64();
+    SECTIONS.with(|s| {
+        let mut s = s.borrow_mut();
+        match s.iter_mut().find(|x| x.0 == name) {
+            Some(x) => {
+                x.1 += dt;
+                x.2 += 1;
+            }
+            None => s.push((name, dt, 1)),
+        }
+    });
+    r
+}
+
+/// This thread's sections so far, and a reset.
+pub fn sections_take() -> Vec<(&'static str, f64, u32)> {
+    SECTIONS.with(|s| std::mem::take(&mut *s.borrow_mut()))
+}
