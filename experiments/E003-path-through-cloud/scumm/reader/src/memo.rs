@@ -843,3 +843,64 @@ impl Builder<'_> {
         records
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Domain, Label};
+    use crate::record::{Val, What};
+
+    fn out(n: i64) -> Out {
+        let rec = Record {
+            kind: "event".into(),
+            label: format!("event(local:{n})"),
+            pre: [("var:5".to_string(), vec![Label::Int(1)])].into_iter().collect(),
+            effects: vec![("var:6".to_string(), crate::record::Eff::Set(Label::Int(n)))],
+            checks: vec![],
+            end: Some("yield".into()),
+            notes: vec![],
+            next_events: vec![],
+            source: What::Verb(n),
+            either: vec![],
+            engine_pre: vec![],
+            unknown: vec![],
+        };
+        let mut d = Deltas::default();
+        d.counts.inc("runs: event");
+        d.args.push(("args:local:200".into(), 77));
+        (vec![rec], d, [("var:5".to_string(), Val::Int(1))].into_iter().collect())
+    }
+
+    /// A run stored by one reading is taken by another when its consulted keys read the same, and not otherwise; a
+    /// run joins its own reading's index between passes.
+    #[test]
+    fn a_stored_run_is_taken_where_its_keys_read_the_same() {
+        let root = std::env::temp_dir().join(format!("memo-test-{}", std::process::id()));
+        std::fs::remove_dir_all(&root).ok();
+        let info: Info = ("var:7".into(), 1, Some(Domain::of([0, 1, 2], None, None)), None);
+        let key = b"job and guides".to_vec();
+        {
+            let cm = CrossMemo::open(&root, "k").unwrap();
+            if !cm.writes() {
+                return; // no room on this disk: nothing to check
+            }
+            cm.store(key.clone(), vec![info.clone()], &[(5, false)], &[], &out(3));
+            assert!(cm.take(&key, &mut |_| true, &mut |_, _| Ok(())).is_none(), "not indexed before the pass ends");
+            cm.index_own();
+            let got = cm.take(&key, &mut |i| *i == info, &mut |s, _| if s == [(5, false)] { Ok(()) } else { Err(Miss::List) });
+            assert_eq!(got.as_ref().map(|o| (&o.0, &o.2)), Some((&out(3).0, &out(3).2)));
+            assert_eq!(got.unwrap().1.args, out(3).1.args);
+            assert_eq!(cm.finish().unwrap(), 1);
+        }
+        let cm = CrossMemo::open(&root, "k").unwrap();
+        assert_eq!((cm.opened_files, cm.opened_runs), (1, 1));
+        assert!(cm.take(b"another job", &mut |_| true, &mut |_, _| Ok(())).is_none());
+        assert!(cm.take(&key, &mut |_| false, &mut |_, _| Ok(())).is_none(), "a key that reads otherwise");
+        cm.index_own(); // a new pass: the keys are asked again
+        assert!(cm.take(&key, &mut |_| true, &mut |_, _| Err(Miss::Reached)).is_none());
+        assert!(cm.take(&key, &mut |_| true, &mut |_, _| Ok(())).is_some());
+        assert_eq!(cm.stats.taken.load(Ordering::Relaxed), 1);
+        cm.finish().unwrap();
+        std::fs::remove_dir_all(&root).ok();
+    }
+}
