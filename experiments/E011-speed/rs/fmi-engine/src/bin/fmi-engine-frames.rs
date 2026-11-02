@@ -8,7 +8,8 @@
 //!         bare   one Run command per frame;
 //!         step   one Step per frame with runs, explain entries and the F2 block, then facts() from the block (the
 //!                window search's observed frame, as `fmi-engine bench` (a) runs it).
-//!       N = 0 is the boot alone: `perf stat` of N frames less N = 0 is the frames' own count.
+//!       N = 0 is the boot alone: `perf stat` of N frames less N = 0 is the frames' own count. Mode start (N ignored):
+//!       the engine's start to its first stop, then quit (the start's own count).
 //!       Prints one JSON line: mode, n, the first and last frame, wall ms, engine CPU ms (its main thread), driver
 //!       CPU ms.
 
@@ -36,7 +37,7 @@ fn main() {
         i += 1;
     }
     if pos.len() != 3 {
-        eprintln!("usage: fmi-engine-frames OUT cmd50|bare|step N [--lean] [--env K=V]...");
+        eprintln!("usage: fmi-engine-frames OUT cmd50|bare|step|start N [--lean] [--env K=V]...");
         std::process::exit(2);
     }
     let out = PathBuf::from(&pos[0]);
@@ -53,7 +54,16 @@ fn main() {
         lean,
         out_dir: out.join("root"),
     };
+    let t0 = Instant::now();
     let mut e = h.spawn(&boot).expect("spawn");
+    if mode == "start" {
+        let wall = t0.elapsed().as_secs_f64() * 1e3;
+        let cpu = fmi_engine::sys::main_thread_cpu_ns(e.pid()) as f64 / 1e6;
+        let f = e.status().frame;
+        Box::new(e).quit();
+        println!("{{\"mode\": \"start\", \"frame\": {f}, \"wall_ms\": {wall:.3}, \"engine_cpu_ms\": {cpu:.3}}}");
+        return;
+    }
     e.run(&RunSpec {
         idle: true,
         max_frame: Some(200_000),
