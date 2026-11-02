@@ -6,7 +6,7 @@
 //! usage: reader-scope (--k K | --part1 | --rooms R,R,...) [--name NAME] [--threads N] [--out DIR] [--packed FILE]
 //!                     [--cap-min M] [--max-rss-gb G] [--min-free-gb G] [--hash] [--keep] [--lines FILE]
 //!                     [--elsewhere] [--live-locals] [--split-limit] [--golden FILE] [--max-files-gb G] [--frame-costs]
-//!                     [--step-limit N]
+//!                     [--step-limit N] [--out-dir DIR]
 //!
 //! --part1       the Part I scope: the rooms of results/groundtruth-part1.jsonl's moves (scaling.rs `part1_rooms`)
 //! --threads N   worker threads (0: the reading's own thread alone, as `machine::Reader` alone reads)
@@ -78,6 +78,15 @@
 //!               line ({"name", "room", "w", "esc", "locals", "override", "cut_data", "owned"}, and "flags":
 //!               {"resistant", "recursive", "owned"} from a dump that has them, which --live-locals needs); their
 //!               events are read with the start's (`Builder.slot_locals`). Without it the reading is as before.
+//! --out-dir DIR the reading's own files (E011, experiments/E011-speed/plan.md, readio), written as the records are
+//!               made, with no golden stream and no Python: DIR/reading.tc (the packed file), DIR/reading.reached (with
+//!               --reach), DIR/reading.actions.jsonl, DIR/reading.lists.jsonl and DIR/reading.json, byte for byte what
+//!               replay_part1.py `read_rust` (with `stream`) makes with packed_reading.py `reading_from_golden` from the
+//!               golden stream, but for reading.json's measured times and its `from_golden` (the golden file when
+//!               --golden is given, else null; the packed file); and DIR/reading.idx (plan.md, F3: the line offsets,
+//!               the actions' word offsets, the names by hash, the three files' sha1). The report is DIR/NAME.json
+//!               unless --out names another folder (NAME is the reading's name, as read_rust gives it: not
+//!               "reading"). The bounds in reading.json are the reader's own domains'. Off by default: no such file.
 //! --sample N --seed S --dump FILE
 //!               the spot-check's jobs: of the last pass, N per stratum (the room a job's unit or object belongs
 //!               to, or "global"), drawn by reservoir sampling with seed S; each written to FILE with what its batch
@@ -98,6 +107,12 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+
+#[path = "reader_scope/files.rs"]
+mod files;
+#[path = "reader_scope/pyjson.rs"]
+mod pyjson;
+use pyjson::PJ;
 
 /// mimalloc: the workers allocate and free many small objects at once, and the sink thread frees what they made
 #[global_allocator]
@@ -150,6 +165,8 @@ struct Tee {
     /// the pass's records that end "havoc" (the switch havoc_cut)
     havoc: usize,
     prog: Arc<Mutex<Prog>>,
+    /// --out-dir: the reading's line files as the records come (files.rs)
+    files: Option<files::Files>,
 }
 
 impl RecordSink for Tee {
@@ -173,6 +190,9 @@ impl RecordSink for Tee {
         if let Some(s) = &mut self.stream {
             s.reset().expect("the packed file");
         }
+        if let Some(f) = &mut self.files {
+            f.reset().expect("the reading's files");
+        }
         if self.hash.is_some() {
             self.hash = Some(sha1_smol::Sha1::new());
         }
@@ -192,7 +212,14 @@ impl Tee {
     /// The packed file, the hash and the kinds; the golden lines go to the pool (`batch`, `batch_owned`).
     fn batch_timed(&mut self, first: usize, recs: &[Record], table: &FactTable) {
         if let Some(s) = &mut self.stream {
-            s.records(first, recs, table).expect("the packed file");
+            match &mut self.files {
+                Some(f) => {
+                    let mut written = Vec::new();
+                    s.records_with(first, recs, table, &mut |j| written.push(j)).expect("the packed file");
+                    f.batch(first, recs, &written).expect("the reading's files");
+                }
+                None => s.records(first, recs, table).expect("the packed file"),
+            }
         }
         for (j, r) in recs.iter().enumerate() {
             if let Some(h) = &mut self.hash {
@@ -429,6 +456,18 @@ fn slot_locals(path: &str) -> Vec<SlotLocals> {
         .collect()
 }
 
+/// The facts of the start row of `seed` in a file of start-part1.jsonl's format, as json.loads gives them.
+fn start_row_facts(path: &Path, seed: i64) -> PJ {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    for line in text.lines() {
+        let v = scumm_reader::scaling::Json::parse(line);
+        if v.get("seed").and_then(scumm_reader::scaling::Json::int) == Some(seed) {
+            return PJ::from_json(v.get("facts").expect("facts"));
+        }
+    }
+    panic!("no seed {seed} in {}", path.display())
+}
+
 fn write_json(path: &Path, v: &Value) {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, serde_json::to_string_pretty(v).unwrap() + "\n").unwrap();
@@ -469,9 +508,21 @@ fn main() {
     });
     let threads: usize = arg(&args, "--threads").map_or(6, |n| n.parse().unwrap());
     let golden_threads: usize = arg(&args, "--golden-threads").map_or(threads.clamp(1, 16), |n| n.parse().unwrap());
-    let out = PathBuf::from(arg(&args, "--out").unwrap_or_else(|| ".".into()));
+    let out_dir: Option<PathBuf> = arg(&args, "--out-dir").map(PathBuf::from);
+    let out = PathBuf::from(arg(&args, "--out").or_else(|| out_dir.as_ref().map(|d| d.display().to_string())).unwrap_or_else(|| ".".into()));
     std::fs::create_dir_all(&out).unwrap();
-    let packed = arg(&args, "--packed").map_or_else(|| out.join(format!("{name}.tc")), PathBuf::from);
+    let packed = match &out_dir {
+        Some(d) => {
+            std::fs::create_dir_all(d).unwrap();
+            let p = d.join(files::PACKED);
+            if let Some(q) = arg(&args, "--packed") {
+                assert_eq!(PathBuf::from(q), p, "--out-dir writes the packed file as DIR/{}", files::PACKED);
+            }
+            assert!(!(out == *d && format!("{name}.json") == files::HEAD), "--out-dir: the report NAME.json would be {}", files::HEAD);
+            p
+        }
+        None => arg(&args, "--packed").map_or_else(|| out.join(format!("{name}.tc")), PathBuf::from),
+    };
     let cap_s = arg(&args, "--cap-min").map_or(60.0, |m| m.parse::<f64>().unwrap()) * 60.0;
     let max_rss_kb = (arg(&args, "--max-rss-gb").map_or(8.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
@@ -509,6 +560,10 @@ fn main() {
         };
         *kinds.entry(kind).or_default() += 1;
     }
+    let base_start = match &start_rows {
+        Some(f) => format!("{f} seed {start_seed}"),
+        None => format!("results/start-part1.jsonl seed {start_seed}"),
+    };
     let mut base = json!({
         "name": name,
         "k": k,
@@ -518,10 +573,7 @@ fn main() {
         "n_units": scope.units.len(),
         "objects": scope.objects.len(),
         "slot_facts": scope.universe.len(),
-        "start": match &start_rows {
-            Some(f) => format!("{f} seed {start_seed}"),
-            None => format!("results/start-part1.jsonl seed {start_seed}"),
-        },
+        "start": base_start.clone(),
         "goal": goal.iter().map(|g| g.0.clone()).collect::<Vec<_>>(),
         "domain_goals": domain_goals,
         "slot_locals": slots.len(),
@@ -676,6 +728,7 @@ fn main() {
         kinds: BTreeMap::new(),
         havoc: 0,
         prog: prog.clone(),
+        files: out_dir.as_ref().map(|d| files::Files::create(d, live_locals).expect("the reading's files")),
     };
 
     // the watchdog: the cap, the process's memory, the machine's free memory
@@ -771,7 +824,7 @@ fn main() {
     let goal_labels: Vec<(String, Vec<Label>)> = goal.iter().map(|(k, v)| (k.clone(), v.iter().map(|&x| Label::Int(x)).collect())).collect();
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
     let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
-    let (info, folded) = stream.finish(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+    let (info, folded, kept_actions) = stream.finish_keep(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
     let reached_path = packed.with_extension("reached");
     if let Some(reached) = &b.table.reach {
         std::fs::write(&reached_path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").expect("the reached values");
@@ -781,7 +834,13 @@ fn main() {
         std::fs::remove_file(&reached_path).ok();
     }
     let fin_s = t_fin.elapsed().as_secs_f64();
-    let packed_sha1 = {
+    // --out-dir: the packed file read once for the index and the head, which gives its sha1 too
+    let t_tc = Instant::now();
+    let tc = out_dir.as_ref().map(|_| files::Tc::read(&packed).expect("the packed file"));
+    let tc_s = t_tc.elapsed().as_secs_f64();
+    let packed_sha1 = if let Some(tc) = &tc {
+        tc.sha1_hex()
+    } else {
         let mut h = sha1_smol::Sha1::new();
         let mut f = std::fs::File::open(&packed).unwrap();
         let mut buf = vec![0u8; 1 << 20];
@@ -939,6 +998,109 @@ fn main() {
     r["total_s"] = json!((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0);
     r["load_at_end"] = json!(loadavg());
     write_json(&report_path, &r);
+    if let (Some(dir), Some(fl), Some(tc)) = (&out_dir, tee.files.take(), &tc) {
+        // --out-dir: the line files made final, the index, the head (files.rs)
+        let t = Instant::now();
+        let extra: Vec<PJ> = r["slot_events"].as_array().map_or_else(Vec::new, |xs| xs.iter().map(PJ::from_serde).collect());
+        let lines = fl.finish(&kept_actions, &b.folded, &extra).expect("the reading's line files");
+        files::write_idx(&dir.join(files::IDX), tc, &lines).expect("the reading's index");
+        let bounds = files::bounds_pj(tc, &|k| b.table.domain(k).map(|d| d.into_owned())).unwrap_or_else(|e| panic!("{e}"));
+        let rows = match &start_rows {
+            Some(f) => PathBuf::from(f),
+            None => root.join("experiments/E003-path-through-cloud/results/start-part1.jsonl"),
+        };
+        let start_facts = start_row_facts(&rows, start_seed);
+        let slot_locals_pj: Vec<PJ> = arg(&args, "--slot-locals").map_or_else(Vec::new, |p| {
+            std::fs::read_to_string(&p)
+                .unwrap_or_else(|e| panic!("{p}: {e}"))
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .map(|l| PJ::from_json(&scumm_reader::scaling::Json::parse(l)))
+                .collect()
+        });
+        // replay_part1.py read_rust's info, in its order
+        let mut rs: Vec<(String, PJ)> = ["records", "read_wall_s", "peak_rss_mb", "threads", "slot_locals"]
+            .iter()
+            .map(|k| (k.to_string(), PJ::from_serde(&r[*k])))
+            .collect();
+        if reach {
+            rs.push(("read_cpu_s".into(), PJ::from_serde(&r["read_cpu_s"])));
+        }
+        let mut info: Vec<(String, PJ)> = vec![
+            ("name".into(), PJ::str(name.clone())),
+            ("rooms".into(), PJ::ints(rooms.iter().map(|&x| x as i64))),
+            ("domain_goals".into(), PJ::str(domain_goals.clone())),
+            ("reader".into(), PJ::str("rust")),
+            ("read_s".into(), PJ::Float((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0)),
+            ("reader_scope".into(), PJ::Obj(rs)),
+            ("slot_locals".into(), PJ::List(slot_locals_pj)),
+        ];
+        let flag = |info: &mut Vec<(String, PJ)>, k: &str, on: bool| {
+            if on {
+                info.push((k.into(), PJ::Bool(true)));
+            }
+        };
+        flag(&mut info, "elsewhere", elsewhere);
+        flag(&mut info, "split_limit", split_limit);
+        if let Some(sw) = arg(&args, "--switches").filter(|s| !s.is_empty()) {
+            info.push(("switches".into(), PJ::str(sw)));
+        }
+        flag(&mut info, "reach", reach);
+        let also: Vec<PJ> = args.windows(2).filter(|w| w[0] == "--reach-also").map(|w| PJ::str(w[1].clone())).collect();
+        if !also.is_empty() {
+            info.push(("reach_also".into(), PJ::List(also)));
+        }
+        if let Some(fv) = fact_vars.as_ref().filter(|v| !v.is_empty()) {
+            info.push(("fact_vars".into(), PJ::ints(fv.iter().map(|&n| n as i64))));
+            info.push(("fact_vars_report".into(), PJ::from_serde(&r["fact_vars"])));
+        }
+        let n_lists = lines.list_off.len() - 1;
+        let doc = files::head(
+            tc,
+            files::HeadIn {
+                name: &name,
+                n_lists,
+                n_actions: tc.words.len(),
+                n_records: lines.n_records,
+                start_name: base_start.clone(),
+                start_facts: &start_facts,
+                rooms_scope: &b.scope.rooms,
+                walk_verb: b.scope.walk_verb,
+                verbs: &b.scope.verbs,
+                dialog_verbs: &b.scope.dialog_verbs,
+                bounds,
+                counts: PJ::from_py(&b.counts.py()),
+                golden: golden.as_deref(),
+                packed: &packed,
+                live_locals: b.table.live_locals.as_ref().map(|ll| {
+                    PJ::from_py(&Py::dict(vec![("switch", Py::str("--live-locals")), ("slots", ll.slots_py(&game))]))
+                }),
+                frame_costs: b.frame_costs.as_ref().map(|fc| PJ::from_py(&fc.py())),
+                info,
+                slot_lists: extra.len(),
+            },
+        );
+        files::write_atomic(&dir.join(files::HEAD), doc.indent1_text().as_bytes()).expect("reading.json");
+        let files_s = t.elapsed().as_secs_f64();
+        r["files"] = json!({
+            "actions": tc.words.len(),
+            "lists": n_lists,
+            "records": lines.n_records,
+            "sink_s": (lines.sink_s * 100.0).round() / 100.0,
+            "tc_s": (tc_s * 100.0).round() / 100.0,
+            "finish_s": (files_s * 100.0).round() / 100.0,
+        });
+        write_json(&report_path, &r);
+        eprintln!(
+            "[{name}] reading files in {}: {} actions, {} lists; {:.2} s in the sink, {:.2} s reading the packed file, {:.2} s at the end",
+            dir.display(),
+            tc.words.len(),
+            n_lists,
+            lines.sink_s,
+            tc_s,
+            files_s
+        );
+    }
     if let Some(dump) = &dump {
         let smp = sample.lock().unwrap();
         let mut f = std::io::BufWriter::new(std::fs::File::create(dump).unwrap());
