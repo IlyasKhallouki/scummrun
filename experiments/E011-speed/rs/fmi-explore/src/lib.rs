@@ -10,6 +10,7 @@ pub mod check;
 pub mod driver;
 pub mod fake;
 pub mod files;
+pub mod guide;
 pub mod machine;
 pub mod pyjson;
 pub mod step;

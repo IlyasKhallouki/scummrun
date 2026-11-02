@@ -5,6 +5,8 @@
 //!   fmi explore status ARCHIVE
 //!   fmi fake-step run JOB_DIR          (fake_step.py, for the driver's tests)
 //!   fmi check step FIXTURES.jsonl      (step.py's targets, reusable and idle_rule against the reference's outputs)
+//!   fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]   (guide.py map)
+//!   fmi guide stats GUIDE.json [--key KEY.json]                                     (guide.py stats)
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process.
@@ -24,7 +26,9 @@ fn usage() -> ! {
 const USAGE: &str = "usage: fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify]
        fmi explore status ARCHIVE
        fmi fake-step run JOB_DIR
-       fmi check step FIXTURES.jsonl";
+       fmi check step FIXTURES.jsonl
+       fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
+       fmi guide stats GUIDE.json [--key KEY.json]";
 
 struct Args {
     pos: Vec<String>,
@@ -100,6 +104,8 @@ fn main() {
         ("explore", Some("status")) => cmd_status(&argv[2..]),
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
         ("check", Some("step")) => cmd_check_step(&argv[2..]),
+        ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
+        ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         _ => usage(),
     };
     std::process::exit(code)
@@ -198,6 +204,70 @@ fn cmd_check_step(argv: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("fmi check step: {e}");
+            1
+        }
+    }
+}
+
+fn repo_root() -> PathBuf {
+    scumm_root()
+}
+
+fn scumm_root() -> PathBuf {
+    std::env::var_os("FAST_MI_ROOT").map(PathBuf::from).unwrap_or_else(scumm_ir_default_root)
+}
+
+fn scumm_ir_default_root() -> PathBuf {
+    fmi_explore::guide::default_root()
+}
+
+fn cmd_guide_map(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["goal", "out", "seed"]);
+    let (Some(goal), Some(out)) = (a.get("goal"), a.get("out")) else { usage() };
+    let seed: i64 = a.get("seed").and_then(|s| s.parse().ok()).unwrap_or(1);
+    let t0 = std::time::Instant::now();
+    let root = repo_root();
+    let e003 = root.join("experiments").join("E003-path-through-cloud");
+    let run = || -> Result<String, String> {
+        let goal = fmi_explore::guide::parse_goal(goal, &e003)?;
+        let start = fmi_explore::guide::start_row(&e003, seed)?;
+        let game = fmi_explore::guide::load_game(&root)?;
+        if std::env::var("FMI_GUIDE_PROFILE").is_ok() {
+            eprintln!("Game::load and the start row: {:.3} s", t0.elapsed().as_secs_f64());
+        }
+        let g = fmi_explore::guide::build(&game, &goal, a.flag("wide"), &start, &mut || t0.elapsed().as_secs_f64())?;
+        std::fs::write(out, fmi_explore::guide::dumps(&g)).map_err(|e| format!("{out}: {e}"))?;
+        fmi_explore::guide::stats_text(&g, None)
+    };
+    match run() {
+        Ok(t) => {
+            print!("{t}");
+            0
+        }
+        Err(e) => {
+            eprintln!("fmi guide map: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_guide_stats(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["key"]);
+    let Some(p) = a.pos.first() else { usage() };
+    let run = || -> Result<String, String> {
+        let g = files::read_json(&PathBuf::from(p))?;
+        if g.get("format").and_then(|f| f.as_str()) != Some(fmi_explore::guide::FORMAT) {
+            return Err(format!("{p}: format {}, not {}", files::py_repr(g.get("format").unwrap_or(&serde_json::Value::Null)), fmi_explore::guide::FORMAT));
+        }
+        fmi_explore::guide::stats_text(&g, a.get("key").map(std::path::Path::new))
+    };
+    match run() {
+        Ok(t) => {
+            print!("{t}");
+            0
+        }
+        Err(e) => {
+            eprintln!("fmi guide stats: {e}");
             1
         }
     }
