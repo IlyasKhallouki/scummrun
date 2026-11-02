@@ -479,6 +479,7 @@ pub struct W<'a> {
     /// the test oracle: per child, recorded answers to its reads of the best (test 2)
     pub oracle: Option<&'a dyn ChildOracle>,
     pub prof: Prof,
+    pub hit_cache: Option<&'a executor::HitCache>,
 }
 
 /// Where an observed child frame's wall goes (summed over the window's children), and the input code's.
@@ -493,6 +494,8 @@ pub struct Prof {
     pub play_hits: [AtomicU64; 4],
     pub forks: AtomicU64,
     pub fork_ns: AtomicU64,
+    /// stone trials: count, wall, frames, hit tests
+    pub stone: [AtomicU64; 4],
 }
 
 pub const PROF_PARTS: [&str; 7] = [
@@ -520,6 +523,11 @@ impl Prof {
             a.fetch_add(h, Ordering::Relaxed);
         }
     }
+    fn stones(&self, n: u64, ns: u64, frames: u64, at: u64) {
+        for (a, x) in self.stone.iter().zip([n, ns, frames, at]) {
+            a.fetch_add(x, Ordering::Relaxed);
+        }
+    }
     fn fork(&self, d: std::time::Duration) {
         self.forks.fetch_add(1, Ordering::Relaxed);
         self.fork_ns.fetch_add(d.as_nanos() as u64, Ordering::Relaxed);
@@ -529,7 +537,7 @@ impl Prof {
         let fr = self.play_frames.load(Ordering::Relaxed);
         let h: Vec<u64> = self.play_hits.iter().map(|a| a.load(Ordering::Relaxed)).collect();
         format!(
-            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms",
+            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms; stone trials {} in {:.2} s, {} frames, {} hit tests",
             self.plays.load(Ordering::Relaxed),
             self.play_ns.load(Ordering::Relaxed) as f64 / n / 1e6,
             fr as f64 / n,
@@ -539,7 +547,11 @@ impl Prof {
             h[2],
             h[3],
             self.forks.load(Ordering::Relaxed),
-            self.fork_ns.load(Ordering::Relaxed) as f64 / (self.forks.load(Ordering::Relaxed).max(1) as f64) / 1e6
+            self.fork_ns.load(Ordering::Relaxed) as f64 / (self.forks.load(Ordering::Relaxed).max(1) as f64) / 1e6,
+            self.stone[0].load(Ordering::Relaxed),
+            self.stone[1].load(Ordering::Relaxed) as f64 / 1e9,
+            self.stone[2].load(Ordering::Relaxed),
+            self.stone[3].load(Ordering::Relaxed)
         )
     }
     pub fn line(&self) -> String {
@@ -1073,6 +1085,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
         {
             let mut br = Br::new(&mut *cb, if w.cfg.cache { ch.d0.clone() } else { None });
             br.watch_first = true;
+            br.hc = w.hit_cache;
             if observe_play {
                 br.obs = Some(&mut obsv);
             }
@@ -1082,6 +1095,8 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
             w.prof.play(t0.elapsed(), br.frame().saturating_sub(f0), br.hits);
         }
         ch.stone_trials += ex.stone_trials;
+        w.prof
+            .stones(ex.stone_trials as u64, ex.stone_ns, ex.stone_frames, ex.stone_at);
         ch.cpu_s += ex.stone_cpu;
         w.board.progress(c, cb.status().qf);
         if let Some(m) = obsv.err.take() {
@@ -1945,6 +1960,7 @@ impl Search {
             ready_failed_firsts: Mutex::new(FxHashSet::default()),
             oracle: self.oracle,
             prof: Prof::default(),
+            hit_cache: self.hit_cache.as_deref(),
         };
         let mut rec = J::Obj(vec![]);
         let rr = |rec: &mut J, k: &str, v: J| rec.set(k, v);
@@ -2569,6 +2585,9 @@ impl Search {
         parent.explain(None).map_err(|e| e.to_string())?;
         self.say(&format!("  window {}: {}", k + 1, w.prof.line()));
         self.say(&format!("  window {}: {}", k + 1, w.prof.play_line()));
+        if let Some(hc) = &self.hit_cache {
+            self.say(&format!("  window {}: {}", k + 1, hc.line()));
+        }
         let best = best_i.map(|b| children.swap_remove(b));
         let parent_matched = ptrack.matched.iter().map(|(i, v)| (*i, (v.0, v.1))).collect();
         Ok(WinRes {
@@ -2832,6 +2851,8 @@ pub struct Search {
     pub movie: Vec<Event>,
     pub root: Option<Box<dyn Engine>>,
     pub windows_path: Option<std::path::PathBuf>,
+    /// the hit tests' object answers (executor::HitCache), kept across windows; None: every hit test is asked
+    pub hit_cache: Option<Arc<executor::HitCache>>,
 }
 
 /// window.Search._goal_writers
@@ -2878,6 +2899,12 @@ impl Search {
             movie: vec![],
             root: None,
             windows_path: None,
+            // off by default: the screen layout is not in the cache's key yet (play/HITCACHE.md, "The gap")
+            hit_cache: if std::env::var("FMI_HIT_CACHE").is_ok_and(|v| v == "1") {
+                Some(Arc::new(executor::HitCache::default()))
+            } else {
+                None
+            },
         })
     }
 

@@ -83,6 +83,10 @@ pub struct Br<'a> {
     pub e: &'a mut dyn Engine,
     state: Option<Arc<Obs>>,
     at: FxHashMap<(i32, i32), At>,
+    /// the hit tests' object answers across frames and branches (`HitCache`), and this frame's layout in it (None:
+    /// not looked up yet; Some(None): a layout the cache does not cover)
+    pub hc: Option<&'a HitCache>,
+    layout: Option<Option<u32>>,
     pub obs: Option<&'a mut dyn FrameObs>,
     pub first_before: Option<(u64, Arc<Obs>)>,
     pub watch_first: bool,
@@ -95,6 +99,8 @@ impl<'a> Br<'a> {
             e,
             state: seed,
             at: FxHashMap::default(),
+            hc: None,
+            layout: None,
             obs: None,
             first_before: None,
             watch_first: false,
@@ -130,6 +136,32 @@ impl<'a> Br<'a> {
     fn invalidate(&mut self) {
         self.state = None;
         self.at.clear();
+        self.layout = None;
+    }
+    /// The object a click at screen (x, y) hits now (`at(x, y)`'s "obj", None off the main virtual screen), through
+    /// the hit cache when one is set (its argument: `HitCache`).
+    pub fn at_obj(&mut self, x: i32, y: i32) -> EResult<Option<i32>> {
+        let Some(hc) = self.hc else {
+            return Ok(self.at(x, y)?.main.map(|m| m.2));
+        };
+        if self.layout.is_none() {
+            let s = self.state()?;
+            self.layout = Some(hc.layout_of(&s, self.e.status()));
+        }
+        let Some(lid) = self.layout.unwrap() else {
+            return Ok(self.at(x, y)?.main.map(|m| m.2));
+        };
+        if let Some(v) = hc.get(lid, x, y) {
+            self.hits[3] += 1;
+            if check_hits() {
+                let e = self.at(x, y)?.main.map(|m| m.2);
+                assert_eq!(v, e, "FMI_CHECK_HITS: the cached hit at ({x}, {y}) is not the engine's");
+            }
+            return Ok(v);
+        }
+        let v = self.at(x, y)?.main.map(|m| m.2);
+        hc.put(lid, x, y, v);
+        Ok(v)
     }
     pub fn inputs(&mut self, events: &[Event]) -> EResult<()> {
         if self.watch_first && self.first_before.is_none() && !events.is_empty() && events.iter().any(is_input) {
@@ -235,6 +267,10 @@ pub struct Executor {
     /// the forks the stone trials made (a role's count, as Search.fork's)
     pub stone_trials: u32,
     pub stone_cpu: f64,
+    /// the stone trials' wall, frames and hit tests asked
+    pub stone_ns: u64,
+    pub stone_frames: u64,
+    pub stone_at: u64,
 }
 
 impl Executor {
@@ -246,6 +282,9 @@ impl Executor {
             p: &DOS_CD,
             stone_trials: 0,
             stone_cpu: 0.0,
+            stone_ns: 0,
+            stone_frames: 0,
+            stone_at: 0,
         }
     }
 
@@ -356,7 +395,7 @@ impl Executor {
         ];
         let mut hits = Vec::new();
         for p in cands {
-            if !hits.contains(&p) && b.at(p.0 + lag, p.1)?.main.map(|m| m.2 as i64) == Some(obj) {
+            if !hits.contains(&p) && b.at_obj(p.0 + lag, p.1)?.map(|o| o as i64) == Some(obj) {
                 hits.push(p);
             }
         }
@@ -669,7 +708,7 @@ impl Executor {
             for dy in [0, -4, 4, -8, 8] {
                 let (px, py) = (x + step * dx, y + dy);
                 if 0 <= px && px < SCREEN_W && 0 <= py && py < self.main_h(b) {
-                    let hit = b.at(px + lag, py)?.main.map(|m| m.2 as i64).unwrap_or(0);
+                    let hit = b.at_obj(px + lag, py)?.map(|o| o as i64).unwrap_or(0);
                     if hit == 0 || Some(hit) == goal {
                         return Ok((px, py));
                     }
@@ -767,11 +806,13 @@ impl Executor {
         stones.sort_by_key(|o| (o.walk.0 - gx).abs()); // (a stable sort, as Python's sorted)
         if self.stone_fork {
             for o in &stones {
+                let t_trial = std::time::Instant::now();
                 let mut child = b.e.fork()?;
                 self.stone_trials += 1;
                 let mut frames = None;
                 {
                     let mut tb = Br::new(&mut *child, None);
+                    tb.hc = b.hc;
                     let mut trial = Executor::new(false);
                     let m = Move {
                         name: format!("{}: via {}", mv.name, o.id),
@@ -796,6 +837,8 @@ impl Executor {
                         }
                         Ok(())
                     })();
+                    self.stone_frames += tb.frame().saturating_sub(b.frame());
+                    self.stone_at += tb.hits[2];
                     match r {
                         Ok(()) | Err(PlayErr::Route(_)) => {}
                         Err(PlayErr::Engine(e)) => {
@@ -807,6 +850,7 @@ impl Executor {
                 }
                 self.stone_cpu += child.cpu_s();
                 child.quit();
+                self.stone_ns += t_trial.elapsed().as_nanos() as u64;
                 if let Some(fr) = frames {
                     let m = Move {
                         name: format!("{}: via {}", mv.name, o.id),
@@ -944,4 +988,85 @@ fn click_verb(ex: &mut Executor, b: &mut Br, verb: i64, name: &str) -> PResult<(
     b.inputs(&ev)?;
     ex.movie.extend(ev);
     advance(ex, b)
+}
+
+/// FMI_CHECK_HITS=1: every hit the cache answers is asked of the engine too and compared.
+pub fn check_hits() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_CHECK_HITS").is_ok_and(|v| v == "1"))
+}
+
+/// The hit test's object answer as a function of what it reads (experiments/E011-speed/play/HITCACHE.md).
+///
+/// The bridge's `at(x, y)` gives, for a point on the main virtual screen, `findObject(x + xstart, y - topline)`
+/// (speedrun_control.cpp). findObject (object.cpp:557-598) walks the room's object table `_objs[1..n)` in order,
+/// skips an entry whose obj_nr is 0 or whose object has the untouchable class (32), and for the others follows the
+/// parent chain; for an entry whose parent is 0 it tests only the entry's box (x_pos, y_pos, width, height) and
+/// returns its obj_nr when the point is inside. The state dump lists the table's entries with an obj_nr in table
+/// order (id, x, y, w, h, parent) and every object's classes. So when every listed entry's parent is 0, the answer
+/// at a point is the first listed entry, not untouchable, whose box holds the point: it depends only on the room,
+/// the main screen's xstart (the screen layout and topline are fixed in a v5 game) and the listed (id, x, y, w, h,
+/// untouchable). The cache keys a layout by exactly these, compared whole, and only for such tables; a table with a
+/// parent is asked of the engine every time. Off by default (`FMI_HIT_CACHE=1`): the screen layout (initScreens'
+/// b and h, the forced banner screen) can change during play and is not in the key yet (HITCACHE.md, "The gap").
+#[derive(Default)]
+pub struct HitCache {
+    layouts: std::sync::Mutex<FxHashMap<Layout, u32>>,
+    hits: std::sync::Mutex<FxHashMap<(u32, i32, i32), Option<i32>>>,
+    pub asked: std::sync::atomic::AtomicU64,
+    pub kept: std::sync::atomic::AtomicU64,
+    pub uncovered: std::sync::atomic::AtomicU64,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+struct Layout {
+    room: i32,
+    xstart: i32,
+    objs: Vec<(i32, i32, i32, i32, i32, bool)>,
+}
+
+impl HitCache {
+    fn layout_of(&self, s: &Obs, st: &Status) -> Option<u32> {
+        let ros = s.room_objects.as_deref()?;
+        if ros.iter().any(|o| o.parent != 0) {
+            self.uncovered.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return None;
+        }
+        let objs = ros
+            .iter()
+            .map(|o| {
+                let untouchable = s.classes.iter().any(|c| c.0 as i32 == o.id && c.1.contains(&32));
+                (o.id, o.x, o.y, o.w, o.h, untouchable)
+            })
+            .collect();
+        let l = Layout {
+            room: s.room,
+            xstart: st.xstart,
+            objs,
+        };
+        let mut m = self.layouts.lock().unwrap();
+        let n = m.len() as u32;
+        Some(*m.entry(l).or_insert(n))
+    }
+    fn get(&self, lid: u32, x: i32, y: i32) -> Option<Option<i32>> {
+        let v = self.hits.lock().unwrap().get(&(lid, x, y)).copied();
+        if v.is_some() {
+            self.kept.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        v
+    }
+    fn put(&self, lid: u32, x: i32, y: i32, v: Option<i32>) {
+        self.asked.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.hits.lock().unwrap().insert((lid, x, y), v);
+    }
+    pub fn line(&self) -> String {
+        use std::sync::atomic::Ordering::Relaxed;
+        format!(
+            "hit cache: {} layouts, {} asked, {} kept, {} frames with a parent (uncovered)",
+            self.layouts.lock().unwrap().len(),
+            self.asked.load(Relaxed),
+            self.kept.load(Relaxed),
+            self.uncovered.load(Relaxed)
+        )
+    }
 }
