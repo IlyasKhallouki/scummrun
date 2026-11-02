@@ -776,6 +776,27 @@ struct SigScratch {
 /// in one buffer, their ranges sorted by content and deduplicated, and the words hashed in that order. `hash_words` is
 /// a fold over the words, so this is the hash of the concatenation (TASKCORE_CHECK_SIG checks it on every action).
 fn sig_hash(v: View, s: &mut SigScratch) -> u64 {
+    sig_layout(v, s);
+    let buf = &s.buf;
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &(a, b) in &s.ranges {
+        for &x in &buf[a..b] {
+            h = (h.rotate_left(5) ^ x as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+        }
+    }
+    h
+}
+
+/// (f)'s signature of an action appended to `out` (the concatenation `sig_hash` hashes).
+fn sig_into(v: View, s: &mut SigScratch, out: &mut Vec<u32>) {
+    sig_layout(v, s);
+    for &(a, b) in &s.ranges {
+        out.extend_from_slice(&s.buf[a..b]);
+    }
+}
+
+/// The effects laid out in `s.buf`, their ranges in `s.ranges` sorted by content without duplicates.
+fn sig_layout(v: View, s: &mut SigScratch) {
     s.buf.clear();
     s.ranges.clear();
     let mut w: Vec<(u32, &[u32])> = Vec::new();
@@ -799,13 +820,6 @@ fn sig_hash(v: View, s: &mut SigScratch) -> u64 {
     let buf = &s.buf;
     s.ranges.sort_by(|a, b| buf[a.0..a.1].cmp(&buf[b.0..b.1]));
     s.ranges.dedup_by(|a, b| buf[a.0..a.1] == buf[b.0..b.1]);
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for &(a, b) in &s.ranges {
-        for &x in &buf[a..b] {
-            h = (h.rotate_left(5) ^ x as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
-        }
-    }
-    h
 }
 
 /// (f) Duplicates and dominance among actions with the same effects (the same set of effects, conditions and
@@ -857,15 +871,27 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
     let (mut dup, mut dom) = (0u64, 0u64);
     let mut groups: Vec<Vec<usize>> = by_hash.into_values().filter(|g| g.len() > 1).collect();
     groups.sort();
+    let mut arena: Vec<u32> = Vec::new();
+    let mut spans: Vec<(usize, usize)> = Vec::new();
     for hg in groups {
-        // exact groups inside the hash group
-        let sigs: Vec<Vec<u32>> = hg.iter().map(|&i| sig(i)).collect();
+        // exact groups inside the hash group: each member's signature laid out once in one arena
+        arena.clear();
+        spans.clear();
+        for &i in &hg {
+            let a = arena.len();
+            sig_into(t.acts.view(i), &mut scratch, &mut arena);
+            if check {
+                assert_eq!(arena[a..], sig(i)[..], "(f): sig_into differs from the signature at action {}", i);
+            }
+            spans.push((a, arena.len()));
+        }
+        let sigs = |y: usize| &arena[spans[y].0..spans[y].1];
         let mut done = vec![false; hg.len()];
         for x in 0..hg.len() {
             if done[x] {
                 continue;
             }
-            let g: Vec<usize> = (x..hg.len()).filter(|&y| !done[y] && sigs[y] == sigs[x]).collect();
+            let g: Vec<usize> = (x..hg.len()).filter(|&y| !done[y] && sigs(y) == sigs(x)).collect();
             for &y in &g {
                 done[y] = true;
             }
