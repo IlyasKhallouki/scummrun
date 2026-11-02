@@ -119,22 +119,54 @@ fn key_text(f: Fact) -> String {
     }
 }
 
+/// The facts this thread named, each with its text (`key_text`, a function of the fact) and its place in the order of
+/// the texts: ranks with gaps between them (a new text takes the middle of its neighbours' gap; all are numbered
+/// again when a gap is used up), so that sorting facts by rank sorts them by text.
+#[derive(Default)]
+struct KeyOrder {
+    of: FxHashMap<Fact, (u64, Rc<str>)>,
+    by_text: BTreeMap<Rc<str>, Fact>,
+}
+
+const RANK_GAP: u64 = 1 << 32;
+
+impl KeyOrder {
+    fn get(&mut self, f: Fact) -> (u64, Rc<str>) {
+        if let Some(e) = self.of.get(&f) {
+            return e.clone();
+        }
+        let t: Rc<str> = key_text(f).into();
+        use std::ops::Bound::{Excluded, Unbounded};
+        let below = self.by_text.range::<str, _>((Unbounded, Excluded(&*t))).next_back().map(|(_, g)| self.of[g].0);
+        let above = self.by_text.range::<str, _>((Excluded(&*t), Unbounded)).next().map(|(_, g)| self.of[g].0);
+        let (lo, hi) = (below.unwrap_or(0), above.unwrap_or(u64::MAX));
+        self.by_text.insert(t.clone(), f);
+        if hi - lo >= 2 {
+            let r = lo + (hi - lo) / 2;
+            self.of.insert(f, (r, t.clone()));
+            return (r, t);
+        }
+        // no room: every fact numbered again, in order
+        self.of.insert(f, (0, t));
+        for (i, g) in self.by_text.values().enumerate() {
+            self.of.get_mut(g).unwrap().0 = (i as u64 + 1) * RANK_GAP;
+        }
+        self.of[&f].clone()
+    }
+}
+
 thread_local! {
-    /// `key_text` of each fact this thread named: the text is a function of the fact, made once
-    static KEY_TEXTS: std::cell::RefCell<FxHashMap<Fact, Rc<str>>> = Default::default();
+    static KEY_ORDER: std::cell::RefCell<KeyOrder> = Default::default();
 }
 
 /// `key_str` as a shared text, made once per fact and thread.
 pub fn key_rc(f: Fact) -> Rc<str> {
-    KEY_TEXTS.with(|m| {
-        let mut m = m.borrow_mut();
-        if let Some(t) = m.get(&f) {
-            return t.clone();
-        }
-        let t: Rc<str> = key_text(f).into();
-        m.insert(f, t.clone());
-        t
-    })
+    KEY_ORDER.with(|k| k.borrow_mut().get(f).1)
+}
+
+/// A fact's text and its rank among the texts this thread knows (`KeyOrder`).
+fn key_ranked(f: Fact) -> (u64, Rc<str>) {
+    KEY_ORDER.with(|k| k.borrow_mut().get(f))
 }
 
 /// model.py `family`.
@@ -2162,7 +2194,15 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
     }
     let x = sx(p);
     let pre: Pre = by_text(x.pre.iter().map(|(k, v)| (pkey_rc(*k), v)).collect(), |v| v.clone());
-    let writes: BTreeMap<String, RVal> = by_text(p.writes.iter().map(|(&k, &v)| (key_rc(k), v)).collect(), |v| rval(run, v));
+    let writes: BTreeMap<String, RVal> = {
+        // sorted by rank, which is the texts' order (the keys are distinct facts, so distinct texts)
+        let mut w: Vec<(u64, Rc<str>, Val)> = p.writes.iter().map(|(&k, &v)| {
+            let (r, t) = key_ranked(k);
+            (r, t, v)
+        }).collect();
+        w.sort_unstable_by_key(|e| e.0);
+        w.into_iter().map(|(_, t, v)| (t.to_string(), rval(run, v))).collect()
+    };
     let kept: BTreeMap<String, Kept> = x
         .kept
         .iter()
