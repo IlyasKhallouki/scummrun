@@ -664,8 +664,7 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
                 let t1 = Instant::now();
                 let mut x = sas::Expander::new(&red.task, cfg.limit);
                 x.model = cfg.model;
-                let plan = sas::pass1(&mut x)?;
-                let (st, of) = crate::search::from_task(&mut x, &plan, &red.task.starts[red.start].1)?;
+                let (_, st, of) = crate::search::build(&mut x, &red.task.starts[red.start].1)?;
                 let build_s = t1.elapsed().as_secs_f64();
                 let o = crate::search::lazy_greedy(&st, None);
                 if o.status == "plan" {
