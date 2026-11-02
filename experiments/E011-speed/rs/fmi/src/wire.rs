@@ -49,8 +49,34 @@ const NOT_WIRED: &str = "the engine, reading, planner and play ports are wired a
 
 /// The run's ports.
 pub fn wire(o: &WireOpts) -> Result<Wired, String> {
-    let Some(rec) = &o.doubles else { return Err(NOT_WIRED.into()) };
-    doubles(rec, o)
+    if let Some(rec) = &o.doubles {
+        return doubles(rec, o);
+    }
+    let _ = NOT_WIRED;
+    real(o)
+}
+
+fn real(o: &WireOpts) -> Result<Wired, String> {
+    use crate::wire_real::*;
+    let host = fmi_engine::Host::from_env().map_err(|e| format!("the engine host: {e}"))?;
+    let lean = std::env::var("FMI_LEAN").map(|v| v != "0").unwrap_or(true);
+    let pool_dir = PathBuf::from(std::env::var("FMI_POOL_DIR").unwrap_or_else(|_| format!("/var/tmp/fast-mi/fmi-pool-{}", std::process::id())));
+    let pool = fmi_engine::Pool::new(host.clone(), 1, true, lean, pool_dir);
+    let root = fmi_explore::guide::default_root();
+    let reader = PathBuf::from(std::env::var("FMI_READER_SCOPE").map_err(|_| "FMI_READER_SCOPE: the reader-scope binary (readio's, --out-dir)".to_string())?);
+    Ok(Wired {
+        host: Some(Arc::new(host)),
+        resident: Arc::new(Resident {
+            returns: Mutex::new(Box::new(PoolReturns::new(pool))),
+            readings: Arc::new(RealReadings::new(reader, root)?),
+            planners: Mutex::new(PlannerCache::new(Arc::new(fmi_plan::Host::from_env()))),
+            players: Arc::new(PlayHost),
+            search: o.search,
+            search_name: search_name(o.search).into(),
+            forced_targets: o.forced_targets.clone(),
+            tail: o.tail,
+        }),
+    })
 }
 
 /// Round 1's doubles from a recorded job of the reference.
