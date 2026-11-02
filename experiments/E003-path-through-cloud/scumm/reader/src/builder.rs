@@ -1408,7 +1408,8 @@ impl<'g> Builder<'g> {
     pub fn run_job(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
         // the switch --reach: a job's guides are found by the whole job (reach.rs `job_key`), not by its label, which
         // rooms share
-        self.cur_job_key = self.table.reach.is_some().then(|| Arc::from(crate::reach::job_key(job)));
+        // (the key is made only when some rerun has guides this batch: with none, no key finds any)
+        self.cur_job_key = self.table.reach.as_ref().filter(|r| r.has_guides()).map(|_| Arc::from(crate::reach::job_key(job)));
         if self.args_log.is_some() {
             if let Some(memo) = self.table.memo.clone() {
                 return self.run_job_memo(&memo, m, job);

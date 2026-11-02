@@ -186,6 +186,11 @@ impl Reached {
         self.inner.read().unwrap().guides.get(key).cloned()
     }
 
+    /// Whether any rerun has guides in the round being read (set between batches, `reach_batch`).
+    pub fn has_guides(&self) -> bool {
+        !self.inner.read().unwrap().guides.is_empty()
+    }
+
     /// The reached values of a fact, in the domain's order.
     pub fn values(&self, table: &FactTable, key: &str) -> Labels {
         let i = self.inner.read().unwrap();
@@ -310,7 +315,8 @@ impl Builder<'_> {
     fn cur_guides(&self, reach: &Reached, job: &Job) -> Option<Arc<Vec<Guide>>> {
         match &self.cur_job_key {
             Some(k) => reach.guides_of(k),
-            None => reach.guides_of(&job_key(job)),
+            None if reach.has_guides() => reach.guides_of(&job_key(job)),
+            None => None,
         }
     }
 
