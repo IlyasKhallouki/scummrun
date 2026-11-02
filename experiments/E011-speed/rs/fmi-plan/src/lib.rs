@@ -316,6 +316,21 @@ impl WarmPlanner {
         Ok(r)
     }
 
+    /// The old tail alone (the check of item 6): Some(the result) when the request's tail holds, None when it does
+    /// not (no search).
+    pub fn tail_only(&mut self, req: &PlanRequest) -> Result<Option<PlanResult>, PlanError> {
+        let t0 = Instant::now();
+        self.last = Timing::default();
+        let lines = self.start_lines(&req.start);
+        let bans = Self::bans_of(&req.bans);
+        let goal = goal_text(&req.goal);
+        let names = req.tail.clone().unwrap_or_default();
+        let r = self.try_tail(req, &names, &lines, &bans, &goal);
+        self.last.tail = t0.elapsed().as_secs_f64();
+        self.last.total = self.last.tail;
+        r
+    }
+
     /// The old tail (taskcore tail.rs): Some(the result) when it holds, None when the planner must plan.
     fn try_tail(
         &mut self,
@@ -333,12 +348,13 @@ impl WarmPlanner {
         let fbans = req.bans.clone();
         let acc = {
             let mut cands = |label: &str| self.paths_of_label(label, &fbans);
-            tail::check(&domains, names, &req.start, &req.goal, &mut cands)
+            tail::check_suffixes(&domains, names, &req.start, &req.goal, &mut cands)
         };
         let Ok(acc) = acc else { return Ok(None) };
         let needed = self.warm.needed_for(bans, Some(goal)).map_err(tc_err)?;
         let nset: HashSet<Key> = needed.iter().map(|k| Key::parse(k)).collect();
         let n = acc.paths.len();
+        let skipped = acc.skipped;
         let steps = acc
             .paths
             .iter()
@@ -358,7 +374,7 @@ impl WarmPlanner {
             needed_facts: needed.iter().map(|k| Key::parse(k)).collect(),
             misses: vec![],
             n_misses: 0,
-            stats: "{\"tail\": true}".into(),
+            stats: format!("{{\"tail\": true, \"skipped\": {}}}", skipped),
             source: "tail".into(),
             seconds: 0.0,
             cpu_s: 0.0,

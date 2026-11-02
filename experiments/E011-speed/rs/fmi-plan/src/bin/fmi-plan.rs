@@ -8,6 +8,7 @@
 //!   harness writes them (start: `key<TAB>value`, "" where the domain lacks it; caps: `prefix<TAB>frames`; bans:
 //!   `label<TAB>key<TAB>value...`; tail: one step name per line; goal: `K=V[|V],..`); "-" for none
 //!   The result of request NAME goes to DIR/NAME.json; one JSON line of seconds per request on stdout.
+//!   --tail-only 1: only the old tail's check (no search): status "plan" (source "tail") or "no tail".
 
 use fmi_core::{val_text, Action, Ban, EffVal, Facts, Key, PlanRequest, PlanResult, Planner, Search, Val};
 use fmi_plan::double::FileReading;
@@ -221,14 +222,30 @@ fn run() -> Result<(), String> {
             },
             time_limit_s: 600,
         };
-        let r = planner.plan(&req);
+        let r = if opt.contains_key("--tail-only") {
+            match planner.tail_only(&req) {
+                Ok(Some(r)) => Ok(r),
+                Ok(None) => Ok(PlanResult { status: "no tail".into(), source: "tail".into(), ..Default::default() }),
+                Err(e) => Err(e),
+            }
+        } else {
+            planner.plan(&req)
+        };
         let tm = planner.last.clone();
         let (status, n, source, err) = match &r {
             Ok(r) => (r.status.clone(), r.steps.len(), r.source.clone(), String::new()),
             Err(e) => ("error".to_string(), 0, String::new(), format!("{:?}", e)),
         };
+        let tail_info = match &r {
+            Ok(r) if r.source == "tail" && r.status == "plan" => format!(
+                ", \"tail\": {}, \"tail_names\": [{}]",
+                r.stats,
+                r.steps.iter().map(|s| esc(&s.name)).collect::<Vec<_>>().join(", ")
+            ),
+            _ => String::new(),
+        };
         println!(
-            "{{\"name\": {}, \"status\": {}, \"source\": {}, \"steps\": {}, \"kept\": {}, \"total_s\": {:.4}, \"cpu_s\": {:.2}, \"key_s\": {:.4}, \"tail_s\": {:.4}, \"reduce_s\": {:.3}, \"build_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"check_s\": {:.4}, \"decode_s\": {:.4}, \"predict_s\": {:.4}, \"store_s\": {:.4}, \"operators\": {}, \"unary\": {}, \"expanded\": {}, \"evaluated\": {}, \"error\": {}}}",
+            "{{\"name\": {}, \"status\": {}, \"source\": {}, \"steps\": {}, \"kept\": {}, \"total_s\": {:.4}, \"cpu_s\": {:.2}, \"key_s\": {:.4}, \"tail_s\": {:.4}, \"reduce_s\": {:.3}, \"build_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"check_s\": {:.4}, \"decode_s\": {:.4}, \"predict_s\": {:.4}, \"store_s\": {:.4}, \"operators\": {}, \"unary\": {}, \"expanded\": {}, \"evaluated\": {}, \"error\": {}{}}}",
             esc(f[0]),
             esc(&status),
             esc(&source),
@@ -250,7 +267,8 @@ fn run() -> Result<(), String> {
             tm.unary,
             tm.expanded,
             tm.evaluated,
-            esc(&err)
+            esc(&err),
+            tail_info
         );
         if let (Some(d), Ok(r)) = (&dump, &r) {
             std::fs::write(d.join(format!("{}.json", f[0])), result_json(r)).map_err(|e| e.to_string())?;
