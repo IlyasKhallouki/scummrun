@@ -642,10 +642,12 @@ struct Obsv<'a, 'w> {
 }
 
 impl<'a, 'w> FrameObs for Obsv<'a, 'w> {
-    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>) -> EResult<()> {
-        let rows = e.runs()?;
+    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>, got: Option<(RunsReply, ExplainReply)>) -> EResult<()> {
+        let (rows, ents) = match got {
+            Some(x) => x,
+            None => (e.runs()?, e.explain_log()?),
+        };
         self.rows_all.extend(strict::runs_of(&rows.runs));
-        let ents = e.explain_log()?;
         self.log.kept.add_entries(&strict::ents_of(&ents.entries));
         let f = e.status().frame;
         let v = match self.w.sview(s) {
@@ -1123,6 +1125,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
             let mut br = Br::new(&mut *cb, if w.cfg.cache { ch.d0.clone() } else { None });
             br.watch_first = true;
             br.hc = w.hit_cache;
+            br.fuse = true;
             if observe_play {
                 br.obs = Some(&mut obsv);
             }
@@ -1498,26 +1501,6 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
                     }
                     break;
                 }
-                let t0 = Instant::now();
-                match cb.run(&RunSpec {
-                    frame: Some(f + 1),
-                    ..Default::default()
-                }) {
-                    Ok(_) => {}
-                    Err(EngineError::Ended(st)) => {
-                        cr.ch.set("ended", Some(Py::s(st.reason.clone())));
-                        ended_engine = true;
-                        break;
-                    }
-                    Err(e) => return Err(e),
-                }
-                w.board.progress(c, cb.status().qf);
-                let t1 = Instant::now();
-                let rows = cb.runs()?;
-                let t2 = Instant::now();
-                let ents = cb.explain_log()?;
-                let t3 = Instant::now();
-                cr.log.kept.add_entries(&strict::ents_of(&ents.entries));
                 let req = if w.cfg.lite {
                     ObsReq {
                         objects: Some(w.lite_objects.clone()),
@@ -1527,9 +1510,52 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
                 } else {
                     ObsReq::default()
                 };
-                let t4 = Instant::now();
-                s = Arc::new(cb.obs(&req)?);
-                let t5 = Instant::now();
+                let t0 = Instant::now();
+                let (rows, t1, t2, t3, t4, t5);
+                if executor::batch() {
+                    // one command: the frame, its runs, its explain entries and the dump (patch 0004's StepObs)
+                    match cb.step_observe(f + 1, &req) {
+                        Ok((_, r_, e_, o_)) => {
+                            w.board.progress(c, cb.status().qf);
+                            t1 = Instant::now();
+                            rows = r_;
+                            cr.log.kept.add_entries(&strict::ents_of(&e_.entries));
+                            (t2, t3) = (t1, t1);
+                            t4 = Instant::now();
+                            s = Arc::new(o_);
+                            t5 = t4;
+                        }
+                        Err(EngineError::Ended(st)) => {
+                            cr.ch.set("ended", Some(Py::s(st.reason.clone())));
+                            ended_engine = true;
+                            break;
+                        }
+                        Err(e) => return Err(e),
+                    }
+                } else {
+                    match cb.run(&RunSpec {
+                        frame: Some(f + 1),
+                        ..Default::default()
+                    }) {
+                        Ok(_) => {}
+                        Err(EngineError::Ended(st)) => {
+                            cr.ch.set("ended", Some(Py::s(st.reason.clone())));
+                            ended_engine = true;
+                            break;
+                        }
+                        Err(e) => return Err(e),
+                    }
+                    w.board.progress(c, cb.status().qf);
+                    t1 = Instant::now();
+                    rows = cb.runs()?;
+                    t2 = Instant::now();
+                    let ents = cb.explain_log()?;
+                    t3 = Instant::now();
+                    cr.log.kept.add_entries(&strict::ents_of(&ents.entries));
+                    t4 = Instant::now();
+                    s = Arc::new(cb.obs(&req)?);
+                    t5 = Instant::now();
+                }
                 now = w.sview(&s).map_err(EngineError::Bridge)?;
                 let t6 = Instant::now();
                 let nf = f + 1;
@@ -2291,23 +2317,37 @@ impl Search {
                             gate_shut += 1;
                         }
                     }
-                    // the parent's next frame
-                    match parent.run(&RunSpec {
-                        frame: Some(g + 1),
-                        ..Default::default()
-                    }) {
-                        Ok(_) => {}
-                        Err(EngineError::Ended(st)) => {
-                            end_reason = format!("engine ended: {}", st.reason);
-                            break;
+                    // the parent's next frame (one command when batching: patch 0004's StepObs)
+                    let (rows, s) = if executor::batch() {
+                        match parent.step_observe(g + 1, &ObsReq::default()) {
+                            Ok((_, rows, ents, o)) => {
+                                plog.kept.add_entries(&strict::ents_of(&ents.entries));
+                                (rows, Arc::new(o))
+                            }
+                            Err(EngineError::Ended(st)) => {
+                                end_reason = format!("engine ended: {}", st.reason);
+                                break;
+                            }
+                            Err(e) => return Err(e.to_string()),
                         }
-                        Err(e) => return Err(e.to_string()),
-                    }
-                    let rows = parent.runs().map_err(|e| e.to_string())?;
-                    plog.kept.add_entries(&strict::ents_of(
-                        &parent.explain_log().map_err(|e| e.to_string())?.entries,
-                    ));
-                    let s = Arc::new(parent.obs(&ObsReq::default()).map_err(|e| e.to_string())?);
+                    } else {
+                        match parent.run(&RunSpec {
+                            frame: Some(g + 1),
+                            ..Default::default()
+                        }) {
+                            Ok(_) => {}
+                            Err(EngineError::Ended(st)) => {
+                                end_reason = format!("engine ended: {}", st.reason);
+                                break;
+                            }
+                            Err(e) => return Err(e.to_string()),
+                        }
+                        let rows = parent.runs().map_err(|e| e.to_string())?;
+                        plog.kept.add_entries(&strict::ents_of(
+                            &parent.explain_log().map_err(|e| e.to_string())?.entries,
+                        ));
+                        (rows, Arc::new(parent.obs(&ObsReq::default()).map_err(|e| e.to_string())?))
+                    };
                     let r_ = strict::by_frame(&strict::runs_of(&rows.runs))
                         .remove(&(g + 1))
                         .unwrap_or_default();

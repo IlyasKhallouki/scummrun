@@ -67,7 +67,9 @@ fn route<T>(s: String) -> PResult<T> {
 
 /// What a child observes after each frame its input code runs (window._Stepper's `on_frame`).
 pub trait FrameObs {
-    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>) -> EResult<()>;
+    /// `got`: the frame's runs and explain entries when the step already read them (StepObs), else None and the
+    /// observer asks for them
+    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>, got: Option<(RunsReply, ExplainReply)>) -> EResult<()>;
 }
 
 /// `"end" in st`: the run ended where a stop was expected.
@@ -91,6 +93,11 @@ pub struct Br<'a> {
     pub first_before: Option<(u64, Arc<Obs>)>,
     pub watch_first: bool,
     pub hits: [u64; 4], // state asked, state kept, at asked, at kept
+    /// the AtMany commands sent (`prefetch`)
+    pub batches: u64,
+    /// the input code reads the state after almost every run: with batching each run brings the full dump at its
+    /// stop (RunObs), kept as this stop's state
+    pub fuse: bool,
     /// this thread's CPU ns in the engine calls: run, obs, at, and the stone trials' fork and quit
     pub cpu: [u64; 4],
 }
@@ -114,6 +121,8 @@ impl<'a> Br<'a> {
             first_before: None,
             watch_first: false,
             hits: [0; 4],
+            batches: 0,
+            fuse: false,
             cpu: [0; 4],
         }
     }
@@ -152,17 +161,58 @@ impl<'a> Br<'a> {
         self.at.clear();
         self.layout = None;
     }
+    /// This stop's layout in the hit cache (None: no cache, or a layout it does not cover).
+    fn layout_id(&mut self) -> EResult<Option<u32>> {
+        let Some(hc) = self.hc else {
+            return Ok(None);
+        };
+        if self.layout.is_none() {
+            let s = self.state()?;
+            self.layout = Some(hc.layout_of(&s, self.e.status()));
+        }
+        Ok(self.layout.unwrap())
+    }
+    /// The hit tests at `pts` asked in one AtMany when batching is on (`batch`), so that the `at` and `at_obj` calls
+    /// that follow at this stop read them from this frame's answers. With `obj_only` a point the hit cache answers
+    /// is left out. The hit tests read the engine and change nothing, so asking a point early, or a point the calls
+    /// then never read, changes no answer.
+    pub fn prefetch(&mut self, pts: &[(i32, i32)], obj_only: bool) -> EResult<()> {
+        if !batch() || pts.len() < 2 {
+            return Ok(());
+        }
+        let lid = if obj_only { self.layout_id()? } else { None };
+        let mut need: Vec<(i32, i32)> = Vec::with_capacity(pts.len());
+        for &p in pts {
+            if self.at.contains_key(&p) || need.contains(&p) {
+                continue;
+            }
+            if let (Some(hc), Some(l)) = (self.hc, lid) {
+                if hc.has(l, p.0, p.1) {
+                    continue;
+                }
+            }
+            need.push(p);
+        }
+        if need.len() < 2 {
+            return Ok(());
+        }
+        let t = thread_ns();
+        let r = self.e.at_many(&need)?;
+        self.cpu[2] += thread_ns() - t;
+        self.hits[2] += need.len() as u64;
+        self.batches += 1;
+        for (p, a) in need.into_iter().zip(r) {
+            self.at.insert(p, a);
+        }
+        Ok(())
+    }
     /// The object a click at screen (x, y) hits now (`at(x, y)`'s "obj", None off the main virtual screen), through
     /// the hit cache when one is set (its argument: `HitCache`).
     pub fn at_obj(&mut self, x: i32, y: i32) -> EResult<Option<i32>> {
         let Some(hc) = self.hc else {
             return Ok(self.at(x, y)?.main.map(|m| m.2));
         };
-        if self.layout.is_none() {
-            let s = self.state()?;
-            self.layout = Some(hc.layout_of(&s, self.e.status()));
-        }
-        let Some(lid) = self.layout.unwrap() else {
+        let Some(lid) = self.layout_id()? else {
             return Ok(self.at(x, y)?.main.map(|m| m.2));
         };
         if let Some(v) = hc.get(lid, x, y) {
@@ -187,6 +237,14 @@ impl<'a> Br<'a> {
     fn raw_run(&mut self, spec: &RunSpec) -> EResult<Status> {
         self.invalidate();
         let t = thread_ns();
+        if self.fuse && batch() {
+            let r = self.e.run_obs(spec, &ObsReq::default());
+            self.cpu[0] += thread_ns() - t;
+            let (st, o) = r?;
+            self.hits[0] += 1;
+            self.state = Some(Arc::new(o));
+            return Ok(st);
+        }
         let r = self.e.run(spec);
         self.cpu[0] += thread_ns() - t;
         r
@@ -195,9 +253,33 @@ impl<'a> Br<'a> {
         if self.obs.is_some() {
             let s = self.state()?;
             let o = self.obs.as_mut().unwrap();
-            o.on_frame(&mut *self.e, &s)?;
+            o.on_frame(&mut *self.e, &s, None)?;
         }
         Ok(())
+    }
+    /// One frame and its observation (window._Stepper's step with an observer): with batching one StepObs (the run,
+    /// the runs, the explain entries and the full dump), else the run and then `on`.
+    fn step_on(&mut self) -> EResult<Status> {
+        let f = self.frame() + 1;
+        if !batch() {
+            let st = self.raw_run(&RunSpec {
+                frame: Some(f),
+                ..Default::default()
+            })?;
+            self.on()?;
+            return Ok(st);
+        }
+        self.invalidate();
+        let t = thread_ns();
+        let r = self.e.step_observe(f, &ObsReq::default());
+        self.cpu[0] += thread_ns() - t;
+        let (st, rows, ents, o) = r?;
+        let s = Arc::new(o);
+        self.hits[0] += 1;
+        self.state = Some(s.clone());
+        let ob = self.obs.as_mut().unwrap();
+        ob.on_frame(&mut *self.e, &s, Some((rows, ents)))?;
+        Ok(st)
     }
     /// window._Stepper.run when an observer is set, else one command.
     pub fn run(&mut self, spec: &RunSpec) -> EResult<Status> {
@@ -228,11 +310,7 @@ impl<'a> Br<'a> {
                 }
                 let mut st = self.status().clone();
                 while self.frame() < fr {
-                    st = self.raw_run(&RunSpec {
-                        frame: Some(self.frame() + 1),
-                        ..Default::default()
-                    })?;
-                    self.on()?;
+                    st = self.step_on()?;
                 }
                 return Ok(st);
             }
@@ -373,17 +451,44 @@ impl Executor {
         };
         let xs = self.xstart(b);
         let lag = xs - b.status().xstart;
+        let mh = self.main_h(b);
+        let pts: Vec<(i32, i32)> = [20, 35, 10, 50, 5, 1, 0]
+            .into_iter()
+            .map(|dy| (a.x - xs, a.y - a.elevation - dy))
+            .filter(|p| 0 <= p.0 && p.0 < SCREEN_W && 0 <= p.1 && p.1 < mh)
+            .collect();
+        b.prefetch(&pts.iter().map(|p| (p.0 + lag, p.1)).collect::<Vec<_>>(), false)?;
         let mut hits = Vec::new();
-        for dy in [20, 35, 10, 50, 5, 1, 0] {
-            let p = (a.x - xs, a.y - a.elevation - dy);
-            if 0 <= p.0 && p.0 < SCREEN_W && 0 <= p.1 && p.1 < self.main_h(b) {
-                let at = b.at(p.0 + lag, p.1)?;
-                if at.main.map(|m| m.3 as i64) == Some(actor) {
-                    hits.push(p);
-                }
+        for p in pts {
+            let at = b.at(p.0 + lag, p.1)?;
+            if at.main.map(|m| m.3 as i64) == Some(actor) {
+                hits.push(p);
             }
         }
         Ok(hits)
+    }
+
+    /// object_points' screen points for a room object's box (empty when the box is off screen), and the lag to add
+    /// for the hit test.
+    fn object_cands(&self, b: &Br, bx: &RoomObject) -> (Vec<(i32, i32)>, i32) {
+        let xs = self.xstart(b);
+        let lag = xs - b.status().xstart;
+        let (x0, x1) = ((bx.x - xs).max(0), (bx.x + bx.w - xs).min(SCREEN_W) - 1);
+        let (y0, y1) = (bx.y.max(0), (bx.y + bx.h).min(self.main_h(b)) - 1);
+        if x0 > x1 || y0 > y1 {
+            return (vec![], lag);
+        }
+        let fl = |a: i32, c: i32| (a + c).div_euclid(2);
+        (
+            vec![
+                (fl(x0, x1), fl(y0, y1)),
+                (x0, fl(y0, y1)),
+                (x1, fl(y0, y1)),
+                (fl(x0, x1), y0),
+                (fl(x0, x1), y1),
+            ],
+            lag,
+        )
     }
 
     pub fn object_points(&self, b: &mut Br, obj: i64, state: &Obs) -> PResult<Vec<(i32, i32)>> {
@@ -395,21 +500,11 @@ impl Executor {
                 Ok(vec![])
             };
         };
-        let xs = self.xstart(b);
-        let lag = xs - b.status().xstart;
-        let (x0, x1) = ((bx.x - xs).max(0), (bx.x + bx.w - xs).min(SCREEN_W) - 1);
-        let (y0, y1) = (bx.y.max(0), (bx.y + bx.h).min(self.main_h(b)) - 1);
-        if x0 > x1 || y0 > y1 {
+        let (cands, lag) = self.object_cands(b, bx);
+        if cands.is_empty() {
             return Ok(vec![]);
         }
-        let fl = |a: i32, c: i32| (a + c).div_euclid(2);
-        let cands = [
-            (fl(x0, x1), fl(y0, y1)),
-            (x0, fl(y0, y1)),
-            (x1, fl(y0, y1)),
-            (fl(x0, x1), y0),
-            (fl(x0, x1), y1),
-        ];
+        b.prefetch(&cands.iter().map(|p| (p.0 + lag, p.1)).collect::<Vec<_>>(), true)?;
         let mut hits = Vec::new();
         for p in cands {
             if !hits.contains(&p) && b.at_obj(p.0 + lag, p.1)?.map(|o| o as i64) == Some(obj) {
@@ -721,14 +816,23 @@ impl Executor {
     fn floor_point(&self, b: &mut Br, x: i32, y: i32, goal: Option<i64>) -> PResult<(i32, i32)> {
         let lag = self.xstart(b) - b.status().xstart;
         let step = if x > SCREEN_W / 2 { -1 } else { 1 };
+        let mh = self.main_h(b);
+        let mut pts = Vec::with_capacity(80);
         for dx in (0..64).step_by(4) {
             for dy in [0, -4, 4, -8, 8] {
                 let (px, py) = (x + step * dx, y + dy);
-                if 0 <= px && px < SCREEN_W && 0 <= py && py < self.main_h(b) {
-                    let hit = b.at_obj(px + lag, py)?.map(|o| o as i64).unwrap_or(0);
-                    if hit == 0 || Some(hit) == goal {
-                        return Ok((px, py));
-                    }
+                if 0 <= px && px < SCREEN_W && 0 <= py && py < mh {
+                    pts.push((px, py));
+                }
+            }
+        }
+        // asked FLOOR_CHUNK points at a time (in order), so a point found early asks few more
+        for chunk in pts.chunks(FLOOR_CHUNK) {
+            b.prefetch(&chunk.iter().map(|p| (p.0 + lag, p.1)).collect::<Vec<_>>(), true)?;
+            for &(px, py) in chunk {
+                let hit = b.at_obj(px + lag, py)?.map(|o| o as i64).unwrap_or(0);
+                if hit == 0 || Some(hit) == goal {
+                    return Ok((px, py));
                 }
             }
         }
@@ -811,6 +915,14 @@ impl Executor {
             return route(format!("{}: no actor 1 in the dump", mv.name)); // (Python: StopIteration)
         };
         let gx = bx.walk.0;
+        let mut pre = Vec::new();
+        for o in state.room_objects.as_deref().unwrap_or(&[]) {
+            if o.id as i64 != obj && (o.walk.0 - gx).abs() < (ego.x - gx).abs() {
+                let (c, lag) = self.object_cands(b, o);
+                pre.extend(c.into_iter().map(|p| (p.0 + lag, p.1)));
+            }
+        }
+        b.prefetch(&pre, true)?;
         let mut stones: Vec<RoomObject> = Vec::new();
         for o in state.room_objects.as_deref().unwrap_or(&[]) {
             if o.id as i64 != obj
@@ -832,6 +944,7 @@ impl Executor {
                 {
                     let mut tb = Br::new(&mut *child, None);
                     tb.hc = b.hc;
+                    tb.fuse = b.fuse;
                     let mut trial = Executor::new(false);
                     let m = Move {
                         name: format!("{}: via {}", mv.name, o.id),
@@ -989,6 +1102,7 @@ fn click_verb(ex: &mut Executor, b: &mut Br, verb: i64, name: &str) -> PResult<(
     let p = loop {
         let p = if b.status().up > 0 {
             let s = b.state()?;
+            b.prefetch(&crate::replay::verb_candidates(verb, &s), false)?;
             let mut at = |x: i32, y: i32| b.at(x, y);
             verb_point(verb, &s, &mut at)?
         } else {
@@ -1012,6 +1126,18 @@ fn click_verb(ex: &mut Executor, b: &mut Br, verb: i64, name: &str) -> PResult<(
     b.inputs(&ev)?;
     ex.movie.extend(ev);
     advance(ex, b)
+}
+
+/// The input code's hit tests are asked FLOOR_CHUNK at a time by `floor_point` (a batch of up to about 20 costs
+/// about two single hit tests on the lean build: play-wire bench).
+pub const FLOOR_CHUNK: usize = 10;
+
+/// FMI_PLAY_BATCH=0: every engine query is its own command, as in round 1 (an observed frame as run, runs,
+/// explain_log and obs; one `at` per hit test). On by default: `Engine::step_observe` and `Engine::at_many` give
+/// what those commands give at the same stop.
+pub fn batch() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_PLAY_BATCH").map_or(true, |v| v != "0"))
 }
 
 /// FMI_CHECK_HITS=1: every hit the cache answers is asked of the engine too and compared.
@@ -1078,6 +1204,10 @@ impl HitCache {
             self.kept.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
         v
+    }
+    /// whether the cache holds the answer (not counted)
+    fn has(&self, lid: u32, x: i32, y: i32) -> bool {
+        self.hits.lock().unwrap().contains_key(&(lid, x, y))
     }
     fn put(&self, lid: u32, x: i32, y: i32, v: Option<i32>) {
         self.asked.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
