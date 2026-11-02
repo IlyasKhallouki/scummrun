@@ -17,4 +17,5 @@ pub mod reduce;
 pub mod sas;
 pub mod search;
 pub mod serve;
+pub mod tail;
 pub mod warm;

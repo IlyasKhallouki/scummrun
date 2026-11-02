@@ -112,6 +112,8 @@ pub struct Warm {
     reached: Option<String>,
     fact_of: HashMap<String, u32>,
     kept: Vec<Kept>,
+    /// (bans text, goal) -> the facts (e) needs on the banned task (they read no cost: no caps in the key)
+    needed_memo: HashMap<(String, Option<String>), Vec<String>>,
     clock: u64,
     pub file_bytes: u64,
     pub add_effects: u64,
@@ -175,6 +177,7 @@ impl Warm {
             reached,
             fact_of,
             kept: Vec::new(),
+            needed_memo: HashMap::new(),
             clock: 0,
             file_bytes: loaded.file_bytes,
             add_effects: loaded.add_effects,
@@ -355,6 +358,47 @@ impl Warm {
             self.kept[k].needed_after = Some(keys);
         }
         self.kept[k].needed_after.clone().unwrap()
+    }
+
+    /// The reached check of a request's start (`sas`'s, on the reading's .reached text): the error `request` stops
+    /// with, if any.
+    pub fn reached_error(&self, start: &[(String, String)]) -> Result<(), String> {
+        let (vals, _) = self.start_values(start)?;
+        if let Some(text) = &self.reached {
+            let m = bans::reached_misses_text(&self.t, &vals, text);
+            if !m.is_empty() {
+                return Err(format!(
+                    "the start holds {} values the reading did not reach: {:?}; extend the reading",
+                    m.len(),
+                    &m[..m.len().min(20)]
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// The facts (e) needs on the banned task for (bans, goal) (the operator table's "needed"): what is kept for them
+    /// when a request built it, else the banned view and (e)'s needed values alone (no fold, no reduction).
+    pub fn needed_for(&mut self, bans_list: &[Ban], goal: Option<&str>) -> Result<Vec<String>, String> {
+        let bt = bans_text(bans_list);
+        if let Some(k) = self.kept.iter().position(|k| k.key.0 == bt && k.key.1.as_deref() == goal) {
+            return Ok(self.needed(k));
+        }
+        let mk = (bt, goal.map(String::from));
+        if let Some(n) = self.needed_memo.get(&mk) {
+            return Ok(n.clone());
+        }
+        let goal_ids = match goal {
+            Some(g) => parse_goal(&self.t, g)?,
+            None => self.t.goal.clone(),
+        };
+        let mut bc = BanCounts::default();
+        let b = bans::banned(&self.t, bans_list, None, &mut bc)?;
+        let nd = reduce::needed_src(&b, &self.t.facts, &goal_ids);
+        drop(b);
+        let keys = needed_keys(&nd, &self.t);
+        self.needed_memo.insert(mk, keys.clone());
+        Ok(keys)
     }
 
     /// One request (module docstring): serve.rs `request`'s steps on these inputs, to the reduced task.
