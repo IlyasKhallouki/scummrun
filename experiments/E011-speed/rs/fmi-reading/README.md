@@ -35,3 +35,51 @@ and step.py.
 - `ref/g8.sh` (with `ref/dump_reading.py`) is G8: `action` and `record`, `by_name`, K, the index, and the measures.
 - `fmi-reading reusable` and `dump_reading.py reusable` compare the reuse rules.
 - `cargo test` covers the line reader, the index, the JSON writer and the cache's store.
+
+## Results (2026-11-02, laptop, load average 10-28)
+
+**Inputs.** The three readings run with E009's switches and the kitchen goal owner:566=1:
+
+- ring(38) [33,38,83,85,96] from j00091's start row;
+- ring(33) [28,33,35,38] from j00089's start row;
+- the refinement j00089 [103, 194]: ring(33) from j00089's row, `--fact-vars 103,194`, and j00089's two
+  `refine-0N/start.txt` as `--reach-also`.
+
+**Binaries.** The reference is E009's binary (2a3cf8a1) through `read_rust`. The new reader is reader-scope built from
+4dbb43f, with the scumm workspace's release profile.
+
+Wall times are inflated by the shared load, so CPU seconds are given where the comparison needs them.
+
+**Gates**
+
+| gate | ring(38) | ring(33) | refinement |
+|---|---|---|---|
+| G6, the four files and reached: same sha1 as the reference; reading.json the reference's but for the measured fields and `from_golden` | pass | pass | pass |
+| G8 action and record = PackedTask._action | all 9,286 | 4,988 (every 47th) | all 74,995 |
+| G8 by_name = strict.Reading.by_name (every name, plus 207 names no action has) | pass | pass | pass |
+| G8 K = step.reuse_keys_of | 61 keys, pass | 45 keys, pass | 45 keys, pass |
+| index built from the files = reader-scope's reading.idx | pass | pass | pass |
+
+- **Without `--out-dir`** (ring(33)), the packed file and the reached file have E009's binary's sha1 (a1ed4f5c,
+  9b0c87b7).
+- **`reusable` and `reusable_detail`, E008's rule and with E009's K,** equal step.py's on ring(38) for four entry
+  starts: j00091, boot, j00089 and j00119.
+
+**Measures**
+
+| | before (Python reference) | after (Rust) |
+|---|---|---|
+| read_rust's Python side | ring(33) 261.2 s, refinement 96.7 s, ring(38) 54.3 s | none |
+| files at the reading's end (wall) | | ring(33): packed file read 0.83 s, then 0.33 s; refinement 0.21 + 0.33 s; ring(38) 0.16 + 0.01 s |
+| files on the sink's thread, during the reading | | ring(33) 5.1 CPU s (sink thread busy 38.7 s of a 132.6 s read); refinement 1.9 CPU s |
+| strict setup (by_name over every action) | ring(33) 103.6 s, refinement 52.6 s, ring(38) 7.6 s | opening the reading: ring(33) 10-17 ms wall, 9.4-11.5 CPU ms |
+| cached open (lookup and open) | | ring(33) 13-15 ms, plus 6-8 ms for the key |
+| K (reuse_keys_of) | ring(33) 7.3 s, ring(38) 9.8 s, refinement 5.6 s | 0.14-0.23 s, plus 0.24-0.36 s to load the game once per process |
+| action(i) | | ring(33) 8.8 µs CPU (mean over 4,988), ring(38) 6 µs, refinement 9-10 µs |
+| record(i) | | 19-30 µs CPU |
+| by_name | | 0.5-1.0 µs |
+
+- **Files at the reading's end.** "packed file read" is one pass over reading.tc. It replaces the reader's own sha1
+  pass over the same file and gives the index its word offsets and names.
+- **Cached open.** The key also needs the reader binary's sha1 and the game index's, 70-170 ms, which a resident
+  process computes once.
