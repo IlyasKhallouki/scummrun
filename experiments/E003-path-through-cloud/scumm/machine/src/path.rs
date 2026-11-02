@@ -367,10 +367,11 @@ pub fn fx<T: std::hash::Hash>(t: &T) -> u64 {
 }
 
 /// A fact map of writes (model.py's `dict` of fact -> value). It keeps the sum of its entries' hashes as they are
-/// written, so that a hash of the whole store (`_spins`, `_state_key`) costs nothing.
+/// written, so that a hash of the whole store (`_spins`, `_state_key`) costs nothing. A clone shares the map until one
+/// of them changes it (the copy is then made, the same table, so the same iteration order as a copy made at once).
 #[derive(Clone, Debug, Default)]
 pub struct Store {
-    map: FxHashMap<Fact, Val>,
+    map: Rc<FxHashMap<Fact, Val>>,
     sum: u64,
 }
 
@@ -398,7 +399,10 @@ impl Store {
     /// `store[k] = v`.
     #[inline]
     pub fn insert(&mut self, k: Fact, v: Val) {
-        if let Some(old) = self.map.insert(k, v) {
+        if self.map.get(&k) == Some(&v) {
+            return; // the same entry: nothing changes (a shared map stays shared)
+        }
+        if let Some(old) = Rc::make_mut(&mut self.map).insert(k, v) {
             self.sum = self.sum.wrapping_sub(fx(&(k, old)));
         }
         self.sum = self.sum.wrapping_add(fx(&(k, v)));
@@ -423,7 +427,10 @@ impl Store {
 
     /// `store.pop(k, None)` (a hook's: reader.py deletes writes).
     pub fn remove(&mut self, k: &Fact) -> Option<Val> {
-        let old = self.map.remove(k)?;
+        if !self.map.contains_key(k) {
+            return None;
+        }
+        let old = Rc::make_mut(&mut self.map).remove(k)?;
         self.sum = self.sum.wrapping_sub(fx(&(*k, old)));
         Some(old)
     }
@@ -432,7 +439,36 @@ impl Store {
 impl PartialEq for Store {
     /// model.py's dict equality (`g.writes == base.writes`).
     fn eq(&self, other: &Store) -> bool {
-        self.sum == other.sum && self.map == other.map
+        self.sum == other.sum && (Rc::ptr_eq(&self.map, &other.map) || self.map == other.map)
+    }
+}
+
+/// `Path.seen`: a set of state hashes, shared by a path's clones until one of them changes it.
+#[derive(Clone, Debug, Default)]
+pub struct Seen(Rc<FxHashSet<u64>>);
+
+impl Seen {
+    #[inline]
+    pub fn contains(&self, h: &u64) -> bool {
+        self.0.contains(h)
+    }
+    #[inline]
+    pub fn insert(&mut self, h: u64) -> bool {
+        if self.0.contains(&h) {
+            return false;
+        }
+        Rc::make_mut(&mut self.0).insert(h)
+    }
+    pub fn clear(&mut self) {
+        if !self.0.is_empty() {
+            Rc::make_mut(&mut self.0).clear();
+        }
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -679,7 +715,7 @@ pub struct Path {
     /// the join it was last merged at (calls; not dumped)
     pub joined: Option<Rc<Sig>>,
     /// states met at jump targets in the running frame's turn (calls; not dumped)
-    pub seen: FxHashSet<u64>,
+    pub seen: Seen,
     pub resumed: bool,
     // --- settle
     pub settle: bool,
