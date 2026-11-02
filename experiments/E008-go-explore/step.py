@@ -447,6 +447,34 @@ def made_reading(h, rd) -> dict | None:
     return {"path": str(head), "scope": scope, "kind": kind}
 
 
+MADE_KINDS = ("reach", "refine", "reread")  # the folders the harness reads into during an attempt (made_reading)
+KEEP_FILES = ("reading.json", "start.txt", "start.jsonl")  # what drop_unused leaves (start files: --reach-also, rows)
+
+
+def drop_unused(adir: Path, made: dict | None) -> list:
+    """The readings the harness made in the attempt's folder ``adir`` and did not end on (a refinement it refused, or
+    one a later reading of the attempt replaced). Only ``made`` (made_reading's) is registered, so no job.json can
+    name the others and no eviction ever reaches them: their files go now, but for reading.json and the start files,
+    which a registered reading may name. Returns [[folder, bytes freed], ...]."""
+    keep = Path(made["path"]).parent.resolve() if made else None
+    out = []
+    for d in (sorted(p for p in adir.iterdir() if p.is_dir()) if adir.is_dir() else ()):
+        if d.name.split("-")[0] not in MADE_KINDS or (keep is not None and d.resolve() == keep):
+            continue
+        freed = 0
+        for p, _, files in os.walk(d):
+            for f in files:
+                if f not in KEEP_FILES:
+                    q = Path(p) / f
+                    try:
+                        freed += q.stat().st_size
+                        q.unlink()
+                    except OSError:
+                        pass
+        out.append([d.name, freed])
+    return out
+
+
 def attempt(rd, ctl, root, target: tuple, goal: dict, adir: Path, threads: int, workers: int) -> tuple:
     """Step 4 for one target: (the harness's record, the Harness, the attempt's seconds, its CPU)."""
     k, v, tier, _depth = target
@@ -583,11 +611,12 @@ def run_job(job_dir) -> dict:
             made = made_reading(h, rd)
             if made is not None:
                 out["readings_made"].append(made)
+            dropped = drop_unused(run_dir / f"a{n_att - 1:02d}", made)
             for part, x in attempt_costs(res, att_cpu).items():
                 cpu[part] += x
             out["probes"].append({"target": [tg[0], tg[1]], "tier": tg[2], "depth": tg[3], "status": status_,
                                   "stop": res.get("stop"), "seconds": round(secs, 1), "attempt": f"a{n_att - 1:02d}",
-                                  "reading": str(rd.path)})
+                                  "reading": str(rd.path), "dropped": dropped})
             if status_ == "plan":
                 played = (tg, res, h, secs)
                 break

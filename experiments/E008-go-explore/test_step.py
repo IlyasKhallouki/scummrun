@@ -260,6 +260,33 @@ def test_cached_readings_newest_first_and_same_scope(tmp_path):
     (tmp_path / "r3" / "reading.json").write_text(json.dumps({"scope": {"rooms": [28, 33, 41]}, "packed": "x.tc"}))
     job = {"scope": [33, 28, 41], "readings": [{"path": str(p)} for p in paths + [tmp_path / "r3" / "reading.json"]]}
     assert step.cached_readings(job) == [paths[2], paths[0]]
+    # a reading whose start-rows file is gone (its first reading evicted) is not a cached reading
+    rows = tmp_path / "first" / "start.jsonl"
+    doc = json.loads(paths[2].read_text())
+    paths[2].write_text(json.dumps(dict(doc, start={"name": f"{rows} seed 1"})))
+    os.utime(paths[2], (1002, 1002))
+    assert step.cached_readings(job) == [paths[0]]
+    rows.parent.mkdir()
+    rows.write_text("{}\n")
+    assert step.cached_readings(job) == [paths[2], paths[0]]
+    assert step.start_rows_of({"start": {"name": "results/start-part1.jsonl seed 1"}}) is None
+
+
+def test_drop_unused_keeps_the_registered_reading_and_the_start_files(tmp_path):
+    adir = tmp_path / "a00"
+    for name in ("refine-01", "refine-02", "reach-01", "plans"):
+        d = adir / name
+        d.mkdir(parents=True)
+        for f in ("reading.json", "reading.tc", "reading.actions.jsonl", "start.txt", "start.jsonl"):
+            (d / f).write_bytes(b"x" * 10)
+    made = {"path": str(adir / "refine-01" / "reading.json"), "scope": [28, 33], "kind": "refine"}
+    out = step.drop_unused(adir, made)
+    assert out == [["reach-01", 20], ["refine-02", 20]]
+    for name in ("refine-02", "reach-01"):
+        assert sorted(p.name for p in (adir / name).iterdir()) == ["reading.json", "start.jsonl", "start.txt"]
+    assert len(list((adir / "refine-01").iterdir())) == 5 and len(list((adir / "plans").iterdir())) == 5
+    assert step.drop_unused(adir, None) == [["reach-01", 0], ["refine-01", 20], ["refine-02", 0]]
+    assert step.drop_unused(tmp_path / "none", None) == []
 
 
 # --- run_job's bookkeeping, with the engine, the reader and the harness stubbed ------------------------------------------
