@@ -256,6 +256,8 @@ pub struct Machine<'g> {
     merges: u32,
     settle_merges: u32,
     value_merges: u32,
+    /// whether the last merge's paths all had equal stores (`merge_base`; a hook reads it after the merge)
+    pub merged_equal_writes: bool,
     /// the next `Call.cid`
     next_cid: u64,
     /// the run's unknowns of the oracle and of TIME_VARS, by key (with `v`, a run's)
@@ -389,6 +391,7 @@ impl<'g> Machine<'g> {
             merges: 0,
             settle_merges: 0,
             value_merges: 0,
+            merged_equal_writes: false,
             next_cid: 0,
             ocache: FxHashMap::default(),
             conds: FxHashMap::default(),

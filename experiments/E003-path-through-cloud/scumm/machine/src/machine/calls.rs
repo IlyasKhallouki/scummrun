@@ -330,6 +330,7 @@ impl<'g> Machine<'g> {
         // same value in every path, so the others' keys are among the first's), and no path holds fewer keys
         let same_writes = writes.is_empty() && group[1..].iter().all(|gp| gp.writes.len() == base.writes.len());
         debug_assert_eq!(same_writes, group[1..].iter().all(|gp| gp.writes == base.writes));
+        self.merged_equal_writes = same_writes;
         let same = same_writes && group[1..].iter().all(|gp| slots_eq(&gp.slots, &base.slots));
         let cut_data: Vec<Val> = (0..base.cut_data.len())
             .map(|i| {

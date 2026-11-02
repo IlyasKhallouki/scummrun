@@ -1258,14 +1258,16 @@ impl Hooks for ReaderHooks {
         let g0 = &group[0];
         let x0 = sx(g0);
         let frames0: Vec<&[(i32, Val)]> = g0.frames().map(|f| f.locals.as_slice()).collect();
-        let same = group[1..].iter().all(|g| {
-            g.writes == g0.writes && {
+        // every path with g0's writes and locals: the locals here; the writes' equality from the merge itself
+        // (`merged_equal_writes`), after a cheap test that equal stores pass (the same count and hash sum)
+        let may = group[1..].iter().all(|g| {
+            g.writes.len() == g0.writes.len() && g.writes.hash_sum() == g0.writes.hash_sum() && {
                 let fl: Vec<&[(i32, Val)]> = g.frames().map(|f| f.locals.as_slice()).collect();
                 fl == frames0
             }
         });
         let mut nf: BTreeMap<Ident, Vec<Test>> = BTreeMap::new();
-        if same {
+        if may {
             for (ident, tests) in x0.nf.iter() {
                 let common: Vec<Test> = tests
                     .iter()
@@ -1277,7 +1279,8 @@ impl Hooks for ReaderHooks {
                 }
             }
         }
-        let forgot = nf != *x0.nf;
+        // whether tests are forgotten, as it will be once the merge has told whether the stores were equal
+        let (forgot_if_equal, forgot_if_not) = (nf != *x0.nf, !x0.nf.is_empty());
         let mut kept = (*x0.kept).clone();
         let names: Vec<Slot> = kept.keys().copied().collect();
         for name in names {
@@ -1305,6 +1308,12 @@ impl Hooks for ReaderHooks {
         st_mut(m).view = Some(view);
         let mut q = m.merge_base(o, group, sig);
         st_mut(m).view = None;
+        let forgot = if may && m.merged_equal_writes {
+            forgot_if_equal
+        } else {
+            nf.clear(); // the stores differ: not the same paths
+            forgot_if_not
+        };
         if forgot {
             count(m, "non-fact tests forgotten where merged paths differ");
         }
