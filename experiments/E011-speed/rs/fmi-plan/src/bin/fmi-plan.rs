@@ -3,7 +3,7 @@
 //! seconds (the bench).
 //!
 //! usage:
-//!   fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd] [--dump DIR] [--cache DIR|none] [--keep N]
+//!   fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd] [--dump DIR] [--cache DIR|none|off] [--keep N]
 //!   FILE: one request per line, `name<TAB>start.txt<TAB>caps.txt<TAB>goal[<TAB>bans.txt[<TAB>tail.txt]]`, as the
 //!   harness writes them (start: `key<TAB>value`, "" where the domain lacks it; caps: `prefix<TAB>frames`; bans:
 //!   `label<TAB>key<TAB>value...`; tail: one step name per line; goal: `K=V[|V],..`); "-" for none
@@ -164,6 +164,7 @@ fn run() -> Result<(), String> {
     }
     let mut host = Host::from_env();
     match opt.get("--cache").map(String::as_str) {
+        Some("off") => host.cache = false,
         Some("none") => host.cache_dir = None,
         Some(d) => host.cache_dir = Some(PathBuf::from(d)),
         None => {}

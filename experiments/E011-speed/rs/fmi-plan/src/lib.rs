@@ -44,6 +44,8 @@ pub const LAMA_FIRST_COSTS: &str = "let(hlm,eval_modify_costs(landmark_sum(lm_fa
 /// Makes the warm planners (`PlannerHost`).
 #[derive(Clone, Debug)]
 pub struct Host {
+    /// the plan cache (in memory, and in `cache_dir`); false: every request plans (the old behaviour)
+    pub cache: bool,
     /// the plan store on disk (F4); None: in memory only
     pub cache_dir: Option<PathBuf>,
     /// how many (bans, goal, caps) each planner keeps warm
@@ -55,8 +57,8 @@ pub struct Host {
 }
 
 impl Host {
-    /// The host E011 runs: the store `~/.cache/fast-mi-e011/plans` (FMI_PLAN_CACHE, "" for none), Fast Downward from
-    /// DOWNWARD_DIR.
+    /// The host E011 runs: the plan cache on (FMI_PLAN_NO_CACHE set: off), its store `~/.cache/fast-mi-e011/plans`
+    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR.
     pub fn from_env() -> Host {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
         let cache_dir = match std::env::var("FMI_PLAN_CACHE") {
@@ -66,6 +68,7 @@ impl Host {
         };
         let dw = std::env::var("DOWNWARD_DIR").unwrap_or_else(|_| "/home/ilyask/projects/fast-mi/third_party/downward".into());
         Host {
+            cache: std::env::var("FMI_PLAN_NO_CACHE").is_err(),
             cache_dir,
             keep: 4,
             downward: PathBuf::from(dw).join("builds/release/bin/downward"),
@@ -285,7 +288,11 @@ impl WarmPlanner {
         let lowered = self.lowered(&caps);
         let key = self.key(req, &lines, &lowered);
         self.last.key = t0.elapsed().as_secs_f64();
-        let hit = self.memo.get(&key).cloned().or_else(|| {
+        let use_cache = self.host.cache;
+        let hit = if !use_cache { None } else { self.memo.get(&key).cloned() }.or_else(|| {
+            if !use_cache {
+                return None;
+            }
             let r = cache::load(self.host.cache_dir.as_deref()?, &key)?;
             self.memo.insert(key, r.clone());
             Some(r)
@@ -315,7 +322,7 @@ impl WarmPlanner {
         let mut r = self.search(req, lines, bans, goal, caps)?;
         r.seconds = t0.elapsed().as_secs_f64();
         r.cpu_s = cpu_s() - cpu0;
-        if matches!(r.status.as_str(), "plan" | "unsolvable" | "incomplete" | "out of domain") {
+        if use_cache && matches!(r.status.as_str(), "plan" | "unsolvable" | "incomplete" | "out of domain") {
             let t1 = Instant::now();
             self.memo.insert(key, r.clone());
             if let Some(dir) = &self.host.cache_dir {
