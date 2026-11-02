@@ -1,15 +1,24 @@
 //! fmi: E011's one resident process (experiments/E011-speed/plan.md, "Architecture").
 //!
 //! usage:
-//!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify]
+//!   fmi explore init ARCHIVE --stage NAME --goal K=V[,K=V]|part1 --guide GUIDE.json --allowed kN|files|R,R,...
+//!                    [--workers B] [--idle-frames L] [--rotate] [--evict-by-size] [--reuse-nonfacts] [--stop-jobs N]
+//!                    [--ready] [--commit-as-finished]
+//!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs]
+//!   fmi explore verify ARCHIVE [--entry ID]
 //!   fmi explore status ARCHIVE
+//!   fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--doubles RECORDED_JOB_DIR]
 //!   fmi fake-step run JOB_DIR          (fake_step.py, for the driver's tests)
 //!   fmi check step FIXTURES.jsonl      (step.py's targets, reusable and idle_rule against the reference's outputs)
 //!   fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]   (guide.py map)
 //!   fmi guide stats GUIDE.json [--key KEY.json]                                     (guide.py stats)
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
-//! runs it; with `--fake` each job is fake_step.py's port run inside this process.
+//! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
+//! run_job, fmi-explore's tryjob) inside this process, its ports warm from job to job (wire.rs).
+//! `try` is step.py's `run JOB_DIR`: one try from a job.json; `--targets` forces the targets, in order (the benchmark).
+
+mod wire;
 
 use fmi_explore::driver::{self, DriverStats, JobLog, StepMode};
 use fmi_explore::fake::FakeStep;
@@ -23,11 +32,17 @@ fn usage() -> ! {
     std::process::exit(2)
 }
 
-const USAGE: &str = "usage: fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify]
+const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=V]|part1 --guide GUIDE.json --allowed kN|files|R,..
+                [--workers B] [--idle-frames L] [--rotate] [--evict-by-size] [--reuse-nonfacts] [--stop-jobs N] [--ready]
+                [--commit-as-finished]
+       fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs]
+       fmi explore verify ARCHIVE [--entry ID]
        fmi explore status ARCHIVE
+       fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--doubles RECORDED_JOB_DIR]
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
        fmi check replay JOB_DIR --out DIR [--domains DIR]
+       fmi check reingest ARCHIVE --out DIR
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
        fmi guide stats GUIDE.json [--key KEY.json]";
 
@@ -102,11 +117,15 @@ fn main() {
     }
     let code = match (argv[0].as_str(), argv.get(1).map(|s| s.as_str())) {
         ("explore", Some("run")) => cmd_run(&argv[2..]),
+        ("explore", Some("init")) => cmd_init(&argv[2..]),
+        ("explore", Some("verify")) => cmd_verify(&argv[2..]),
         ("explore", Some("status")) => cmd_status(&argv[2..]),
+        ("try", Some(_)) => cmd_try(&argv[1..]),
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
         ("check", Some("step")) => cmd_check_step(&argv[2..]),
         ("check", Some("harness")) => cmd_check_harness(&argv[2..]),
         ("check", Some("replay")) => cmd_check_replay(&argv[2..]),
+        ("check", Some("reingest")) => cmd_check_reingest(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         _ => usage(),
@@ -114,24 +133,163 @@ fn main() {
     std::process::exit(code)
 }
 
+fn targets_of(t: Option<&str>) -> Result<Option<Vec<(String, i64)>>, String> {
+    let Some(t) = t else { return Ok(None) };
+    let mut out = Vec::new();
+    for part in t.split(',').filter(|p| !p.trim().is_empty()) {
+        let (k, v) = part.split_once('=').ok_or(format!("--targets {t}: K=V,..."))?;
+        out.push((k.trim().to_string(), v.trim().parse().map_err(|_| format!("--targets {t}: {v} is not an int"))?));
+    }
+    Ok(Some(out))
+}
+
+fn wire_opts(a: &Args) -> Result<wire::WireOpts, String> {
+    Ok(wire::WireOpts { search: wire::search_of(a.get("search"))?, doubles: a.get("doubles").map(PathBuf::from),
+                        forced_targets: targets_of(a.get("targets"))? })
+}
+
+fn cmd_try(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["targets", "search", "doubles", "repeat"]);
+    let Some(jd) = a.pos.first() else { usage() };
+    let w = match wire_opts(&a).and_then(|o| wire::wire(&o)) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("fmi try: {e}");
+            return 2;
+        }
+    };
+    fmi_explore::machine::nice10();
+    let jd = PathBuf::from(jd);
+    let log = match JobLog::append(&jd.join("log")) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("fmi try: {e}");
+            return 1;
+        }
+    };
+    // --repeat N: the same try N times in this process (a benchmark of the try's own time on a fixed input)
+    let n: usize = a.get("repeat").and_then(|x| x.parse().ok()).unwrap_or(1);
+    let mut r = serde_json::Value::Null;
+    let mut own = Vec::new();
+    for k in 0..n {
+        if k > 0 {
+            for d in ["run", "new"] {
+                let _ = std::fs::remove_dir_all(jd.join(d));
+            }
+        }
+        r = fmi_explore::tryjob::run_job(&jd, &w.resident, &log, &AtomicBool::new(false));
+        own.push(r["explore_s"]["own"].as_f64().unwrap_or(0.0));
+    }
+    if n > 1 {
+        own.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        eprintln!("try x{n}: own time median {:.2} ms, min {:.2} ms, max {:.2} ms", own[n / 2] * 1e3, own[0] * 1e3, own[n - 1] * 1e3);
+    }
+    fmi_explore::step::exit_code(&r)
+}
+
+fn cmd_init(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["stage", "goal", "guide", "allowed", "workers", "idle-frames", "stop-jobs", "search", "doubles"]);
+    let Some(arch) = a.pos.first() else { usage() };
+    let (Some(stage), Some(goal), Some(guide), Some(allowed)) = (a.get("stage"), a.get("goal"), a.get("guide"), a.get("allowed")) else { usage() };
+    let ia = fmi_explore::explorecmd::InitArgs {
+        archive: arch.clone(),
+        stage: stage.into(),
+        goal: goal.into(),
+        guide: guide.into(),
+        allowed: allowed.into(),
+        workers: a.get("workers").and_then(|w| w.parse().ok()).unwrap_or(2),
+        idle_frames: a.get("idle-frames").and_then(|w| w.parse().ok()).unwrap_or(0),
+        rotate: a.flag("rotate"),
+        evict_by_size: a.flag("evict-by-size"),
+        reuse_nonfacts: a.flag("reuse-nonfacts"),
+        stop_jobs: a.get("stop-jobs").and_then(|w| w.parse().ok()).unwrap_or(0),
+        ready: a.flag("ready"),
+        commit_as_finished: a.flag("commit-as-finished"),
+    };
+    let w = match wire_opts(&a).and_then(|o| wire::wire(&o)) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("fmi explore init: {e}");
+            return 2;
+        }
+    };
+    let game = if allowed.starts_with('k') { fmi_explore::guide::load_game(&fmi_explore::guide::default_root()).ok() } else { None };
+    let mut ret = w.resident.returns.lock().unwrap();
+    match fmi_explore::explorecmd::init(&ia, &mut **ret, game.as_ref()) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("fmi explore init: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_verify(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["entry", "search", "doubles"]);
+    let Some(arch) = a.pos.first() else { usage() };
+    let host = match wire_opts(&a).and_then(|o| wire::wire(&o)).and_then(|w| w.host.ok_or_else(|| "no engine host wired".to_string())) {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("fmi explore verify: {e}");
+            return 2;
+        }
+    };
+    let run = || -> Result<serde_json::Value, String> {
+        let ar = fmi_explore::archive::Archive::open(&PathBuf::from(arch))?;
+        let i = match a.get("entry").and_then(|e| e.parse::<usize>().ok()) {
+            Some(i) => i,
+            None => *ar.goal_entries().first().ok_or(format!("{arch}: no goal entry to verify"))?,
+        };
+        use fmi_explore::driver::Verifier;
+        fmi_explore::explorecmd::HostVerifier { host, lean: true }.verify(&ar, i)
+    };
+    match run() {
+        Ok(v) => {
+            let mut m = serde_json::Map::new();
+            for k in ["entry", "same", "goal", "frames", "qf", "seconds", "inputs", "segments"] {
+                m.insert(k.into(), v.get(k).cloned().unwrap_or(serde_json::Value::Null));
+            }
+            println!("{}", fmi_explore::pyjson::dumps_default(&serde_json::Value::Object(m)));
+            println!("differences: {}; final {}", v["verify"]["differ"].as_array().map(|d| d.len()).unwrap_or(0),
+                     files::py_repr(&v["verify"]["final"]));
+            0
+        }
+        Err(e) => {
+            eprintln!("fmi explore verify: {e}");
+            1
+        }
+    }
+}
+
 fn cmd_run(argv: &[String]) -> i32 {
-    let a = Args::parse(argv, &["workers", "step-cmd"]);
+    let a = Args::parse(argv, &["workers", "step-cmd", "search", "doubles"]);
     let Some(root) = a.pos.first() else { usage() };
     let workers: usize = a.get("workers").and_then(|w| w.parse().ok()).unwrap_or(2);
+    let mut verifier: Option<fmi_explore::explorecmd::HostVerifier> = None;
     let mode = if let Some(cmd) = a.get("step-cmd") {
         StepMode::Command(shlex_split(cmd))
     } else if a.flag("fake") {
         StepMode::InProcess(Arc::new(FakeStep))
     } else {
-        eprintln!("fmi explore run: the real try is wired at integration; give --fake or --step-cmd");
-        return 2;
+        match wire_opts(&a).and_then(|o| wire::wire(&o)) {
+            Ok(w) => {
+                verifier = w.host.clone().map(|host| fmi_explore::explorecmd::HostVerifier { host, lean: true });
+                fmi_explore::machine::nice10();
+                StepMode::InProcess(Arc::new(fmi_explore::tryjob::TryStep(w.resident)))
+            }
+            Err(e) => {
+                eprintln!("fmi explore run: {e}");
+                return 2;
+            }
+        }
     };
-    if !a.flag("no-verify") {
-        eprintln!("fmi explore run: the verify needs the engine (integration); give --no-verify");
+    if !a.flag("no-verify") && verifier.is_none() {
+        eprintln!("fmi explore run: the verify needs the engine host (wire.rs); give --no-verify");
         return 2;
     }
     let mut stats = DriverStats::default();
-    match driver::run(&PathBuf::from(root), workers, &mode, None, &mut stats) {
+    let ver: Option<&dyn fmi_explore::driver::Verifier> = if a.flag("no-verify") { None } else { verifier.as_ref().map(|v| v as &dyn fmi_explore::driver::Verifier) };
+    match driver::run(&PathBuf::from(root), workers, &mode, ver, &mut stats) {
         Ok(_) => {
             if std::env::var("FMI_DRIVER_STATS").is_ok() {
                 eprintln!(
@@ -206,6 +364,32 @@ fn cmd_check_replay(argv: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("fmi check replay: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_check_reingest(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["out"]);
+    let (Some(arch), Some(out)) = (a.pos.first(), a.get("out")) else { usage() };
+    match fmi_explore::check::reingest_check(&PathBuf::from(arch), &PathBuf::from(out)) {
+        Ok((rows, times)) => {
+            let bad = rows.iter().filter(|r| !r.1).count();
+            for (what, ok, why) in &rows {
+                if !ok || what == "cpu" || what.starts_with("entries") || what.ends_with("json") || what.ends_with("jsonl") || what.contains("(") {
+                    println!("{} {what}{}", if *ok { "same" } else { "DIFF" }, if why.is_empty() { String::new() } else { format!(": {why}") });
+                }
+            }
+            let mut t = times.clone();
+            t.sort_by(|x, y| x.partial_cmp(y).unwrap());
+            let med = t.get(t.len() / 2).copied().unwrap_or(0.0);
+            let total: f64 = t.iter().sum();
+            println!("reingest of {arch}: {} jobs, {} checks differ; the archive's time per job: median {:.2} ms, mean {:.2} ms, max {:.2} ms",
+                     times.len(), bad, med * 1e3, total * 1e3 / t.len().max(1) as f64, t.last().copied().unwrap_or(0.0) * 1e3);
+            (bad > 0) as i32
+        }
+        Err(e) => {
+            eprintln!("fmi check reingest: {e}");
             1
         }
     }
@@ -306,7 +490,4 @@ fn cmd_guide_stats(argv: &[String]) -> i32 {
     }
 }
 
-#[allow(dead_code)]
-fn no_cancel() -> AtomicBool {
-    AtomicBool::new(false)
-}
+

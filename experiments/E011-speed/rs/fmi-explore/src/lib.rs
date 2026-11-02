@@ -13,6 +13,7 @@ pub mod check;
 pub mod doubles;
 pub mod driver;
 pub mod events;
+pub mod explorecmd;
 pub mod fake;
 pub mod files;
 pub mod guide;
