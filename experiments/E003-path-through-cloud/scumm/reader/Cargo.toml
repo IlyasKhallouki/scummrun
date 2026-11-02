@@ -8,7 +8,7 @@ publish.workspace = true
 [dependencies]
 scumm-ir.workspace = true
 scumm-machine = { path = "../machine" }
-flate2.workspace = true
+flate2 = { workspace = true, features = ["zlib-rs"] }
 rustc-hash.workspace = true
 serde_json.workspace = true
 sha1_smol.workspace = true
