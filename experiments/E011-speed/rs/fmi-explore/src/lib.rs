@@ -6,5 +6,8 @@
 //! * `fake`: fake_step.py, the try's stand-in in the driver's tests.
 
 pub mod archive;
+pub mod driver;
+pub mod fake;
 pub mod files;
+pub mod machine;
 pub mod pyjson;
