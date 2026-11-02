@@ -3,7 +3,8 @@
 //! seconds (the bench).
 //!
 //! usage:
-//!   fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd] [--dump DIR] [--cache DIR|none|off] [--keep N]
+//!   fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd|lama] [--dump DIR] [--cache DIR|none|off] [--keep N]
+//!   (lama: FdLamaFirstCosts by the Rust port, Host::rust_lama)
 //!   FILE: one request per line, `name<TAB>start.txt<TAB>caps.txt<TAB>goal[<TAB>bans.txt[<TAB>tail.txt]]`, as the
 //!   harness writes them (start: `key<TAB>value`, "" where the domain lacks it; caps: `prefix<TAB>frames`; bans:
 //!   `label<TAB>key<TAB>value...`; tail: one step name per line; goal: `K=V[|V],..`); "-" for none
@@ -160,7 +161,7 @@ fn run() -> Result<(), String> {
         opt.insert(k.clone(), it.next().cloned().ok_or(format!("{} needs a value", k))?);
     }
     if cmd != "seq" {
-        return Err("usage: fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd] [--dump DIR] [--cache DIR|none]".into());
+        return Err("usage: fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd|lama] [--dump DIR] [--cache DIR|none]".into());
     }
     let mut host = Host::from_env();
     match opt.get("--cache").map(String::as_str) {
@@ -175,7 +176,12 @@ fn run() -> Result<(), String> {
     let search = match opt.get("--search").map(String::as_str).unwrap_or("gbfs") {
         "gbfs" => Search::Gbfs,
         "fd" => Search::FdLamaFirstCosts,
-        s => return Err(format!("--search {}: gbfs or fd", s)),
+        // FdLamaFirstCosts by the Rust port (Host::rust_lama, as FMI_PLAN_LAMA=rust)
+        "lama" => {
+            host.rust_lama = true;
+            Search::FdLamaFirstCosts
+        }
+        s => return Err(format!("--search {}: gbfs, fd or lama", s)),
     };
     let dump = opt.get("--dump").map(PathBuf::from);
     if let Some(d) = &dump {

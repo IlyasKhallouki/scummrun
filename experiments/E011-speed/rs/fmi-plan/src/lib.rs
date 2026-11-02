@@ -52,13 +52,17 @@ pub struct Host {
     pub keep: usize,
     /// Fast Downward's search binary (`Search::FdLamaFirstCosts`)
     pub downward: PathBuf,
+    /// `Search::FdLamaFirstCosts` by the Rust port of the same search (taskcore lama.rs: the same plans, byte for
+    /// byte) instead of Fast Downward's binary; false: Fast Downward's binary (the old behaviour)
+    pub rust_lama: bool,
     /// where Fast Downward's files go
     pub work: PathBuf,
 }
 
 impl Host {
     /// The host E011 runs: the plan cache on (FMI_PLAN_NO_CACHE set: off), its store `~/.cache/fast-mi-e011/plans`
-    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR.
+    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR; FMI_PLAN_LAMA=rust: `FdLamaFirstCosts` by the
+    /// Rust port (`rust_lama`).
     pub fn from_env() -> Host {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
         let cache_dir = match std::env::var("FMI_PLAN_CACHE") {
@@ -72,6 +76,7 @@ impl Host {
             cache_dir,
             keep: 4,
             downward: PathBuf::from(dw).join("builds/release/bin/downward"),
+            rust_lama: std::env::var("FMI_PLAN_LAMA").is_ok_and(|v| v == "rust"),
             work: std::env::temp_dir().join("fmi-plan"),
         }
     }
@@ -461,6 +466,18 @@ impl WarmPlanner {
                 self.last.expanded = o.expanded;
                 self.last.evaluated = o.evaluated;
                 self.last.unary = o.unary;
+                let cost = if o.status == "plan" { Some(o.cost) } else { None };
+                (o.status, o.plan, cost)
+            }
+            Search::FdLamaFirstCosts if self.host.rust_lama => {
+                let o = taskcore::lama::lama_first_costs(&st, &taskcore::lama::predicates_of(&st), deadline);
+                if let Some(e) = o.status.strip_prefix("error: ") {
+                    return Err(tc_err(format!("lama: {}", e)));
+                }
+                self.last.relax = o.graph_s + o.relax_s;
+                self.last.search = o.search_s;
+                self.last.expanded = o.expanded;
+                self.last.evaluated = o.evaluated;
                 let cost = if o.status == "plan" { Some(o.cost) } else { None };
                 (o.status, o.plan, cost)
             }
