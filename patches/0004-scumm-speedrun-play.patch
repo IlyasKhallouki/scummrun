@@ -1,0 +1,237 @@
+diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+index 1a5e6e0a..91e41c95 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -726,6 +726,13 @@ private:
+ 	};
+ 	Common::Array<RunRow> _runRows;
+ 	Common::Array<ExplainRow> _explainRows;
++	// E011 round 2 (patch 0004): StepObs, a run to a frame whose stop replies with the runs, the explain entries and
++	// a dump in one message (the window search's observed child frame); RunObs, a run whose stop replies with a dump
++	// (the input code's run and dump); the dump's ObsReq
++	bool _wireStepObs = false;
++	bool _wireRunObs = false;
++	bool _wireObsLite = false, _wireObsNames = false, _wireObsExact = false;
++	Common::Array<int> _wireObsObjects;
+ 	void wireSendAll(const byte *p, uint32 n);
+ 	void wireBegin(uint8 type);
+ 	void wireFlush();
+@@ -743,6 +750,10 @@ private:
+ 	void wireRuns(SpeedrunBytes &o);
+ 	void wireExplainLog(SpeedrunBytes &o);
+ 	bool wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const;
++	/** An ObsReq, kept in _wireObs* (StepObs, RunObs). */
++	void wireObsReq(SpeedrunReader &in);
++	/** fmi-core At: the "at" reply's fields for screen point (x, y) now (At and AtMany). */
++	void wireAt(SpeedrunBytes &o, int x, int y);
+ 	void logExplainRow(byte kind, int64 a, int64 b, int64 c, int64 d = 0, int64 e = 0, int64 f = 0, int64 g = 0,
+ 	                   int64 h = 0);
+ };
+diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
+index 6b16ebc9..25318d84 100644
+--- a/engines/scumm/speedrun/speedrun_wire.cpp
++++ b/engines/scumm/speedrun/speedrun_wire.cpp
+@@ -74,7 +74,10 @@ enum : uint8 {
+ 	kWExplainLog = 0x8D,
+ 	kWStateJson = 0x8E,
+ 	kWQuit = 0x8F,
+-	kWStep = 0x90
++	kWStep = 0x90,
++	kWStepObs = 0x91, // E011 round 2 (patch 0004)
++	kWAtMany = 0x92,  // E011 round 2 (patch 0004)
++	kWRunObs = 0x93   // E011 round 2 (patch 0004)
+ };
+ 
+ // Engine to controller
+@@ -92,7 +95,10 @@ enum : uint8 {
+ 	kROk = 0x0B,
+ 	kRError = 0x0C,
+ 	kRJson = 0x0D,
+-	kRStepReply = 0x0E
++	kRStepReply = 0x0E,
++	kRStepObsReply = 0x0F, // E011 round 2 (patch 0004)
++	kRAtMany = 0x10,       // E011 round 2 (patch 0004)
++	kRRunObsReply = 0x11   // E011 round 2 (patch 0004)
+ };
+ 
+ const uint32 kBlockMagic = 0x31534D46; // "FMS1"
+@@ -269,6 +275,7 @@ void SpeedrunBridge::wireStatus(SpeedrunBytes &o, const char *reason, bool ended
+ 			o.u64((uint64)(int64)(int)_forkEachForks[i]);
+ 			o.u32((uint32)(int)_forkEachForks[i + 1]);
+ 		}
++		o.u8(0);                         // screen (patch 0004): None
+ 		return;
+ 	}
+ 	o.u64(_qf0);
+@@ -312,6 +319,12 @@ void SpeedrunBridge::wireStatus(SpeedrunBytes &o, const char *reason, bool ended
+ 		o.u64((uint64)(int64)(int)_forkEachForks[i]); // the JSON array's int
+ 		o.u32((uint32)(int)_forkEachForks[i + 1]);
+ 	}
++	// E011 round 2 (patch 0004): the screen layout the hit test reads besides the room's objects
++	// (experiments/E011-speed/play/HITCACHE.md): initScreens' b and h, and the forced banner screen
++	o.u8(1);
++	o.i32((int)e._screenB);
++	o.i32((int)e._screenH);
++	o.b(e._forceBannerVirtScreen);
+ }
+ 
+ void SpeedrunBridge::wireObs(SpeedrunBytes &o, const Common::Array<int> *objects, bool names, bool exact) const {
+@@ -871,6 +884,39 @@ void SpeedrunBridge::wireExplainLog(SpeedrunBytes &o) {
+ 	_explainDropped = 0;
+ }
+ 
++void SpeedrunBridge::wireObsReq(SpeedrunReader &in) {
++	// fmi-core ObsReq (objects, names, exact), kept for the dump a StepObs or RunObs stop replies with
++	_wireObsObjects.clear();
++	_wireObsLite = false;
++	if (in.u8()) {
++		_wireObsLite = true;
++		const uint32 n = in.count(4);
++		for (uint32 i = 0; i < n && in.ok(); i++)
++			_wireObsObjects.push_back((int)in.u32());
++	}
++	_wireObsNames = in.b();
++	_wireObsExact = in.b();
++}
++
++void SpeedrunBridge::wireAt(SpeedrunBytes &o, int x, int y) {
++	// fmi-core At, as the JSON "at" reply: the virtual screen of y, and on the main one the object and actor there
++	VirtScreen *vs = _vm->findVirtScreen(y);
++	o.i32(x);
++	o.i32(y);
++	o.i32(vs ? (int)vs->number : -1);
++	if (vs && vs->number == kMainVirtScreen) {
++		const int virtX = x + vs->xstart, virtY = y - vs->topline;
++		o.u8(1);
++		o.i32(virtX);
++		o.i32(virtY);
++		o.i32(_vm->findObject(virtX, virtY));
++		o.i32(_vm->getActorFromPos(virtX, virtY));
++	} else {
++		o.u8(0);
++	}
++	o.i32(_vm->findVerbAtPos(x, y));
++}
++
+ #pragma mark - Decoders
+ 
+ bool SpeedrunBridge::wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const {
+@@ -937,8 +983,20 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 	_stopOnMenu = false;
+ 	_stopUntil.clear();
+ 	_stopUntilAny.clear();
+-	wireBegin(_wireStep ? kRStepReply : kRStop);
++	wireBegin(_wireStepObs ? kRStepObsReply : _wireRunObs ? kRRunObsReply : _wireStep ? kRStepReply : kRStop);
+ 	wireStatus(_wireOut, reason, false);
++	if (_wireStepObs) {
++		// patch 0004: what Runs, ExplainLog and Obs would reply at this stop, in that order (each as its command)
++		wireRuns(_wireOut);
++		wireExplainLog(_wireOut);
++		wireObs(_wireOut, _wireObsLite ? &_wireObsObjects : nullptr, _wireObsNames, _wireObsExact);
++		_wireStepObs = false;
++	}
++	if (_wireRunObs) {
++		// patch 0004: what Obs would reply at this stop
++		wireObs(_wireOut, _wireObsLite ? &_wireObsObjects : nullptr, _wireObsNames, _wireObsExact);
++		_wireRunObs = false;
++	}
+ 	if (_wireStep) {
+ 		wireBlockOrDelta(_wireOut);
+ 		if (_wireStepRuns) {
+@@ -971,8 +1029,10 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 		bool resume = false;
+ 
+ 		switch (type) {
+-		case kWRun: {
+-			// fmi-core RunSpec: frame, max_frame, until, until_any, control, idle, menu
++		case kWRun:
++		case kWRunObs: {
++			// fmi-core RunSpec: frame, max_frame, until, until_any, control, idle, menu; RunObs (patch 0004) then
++			// an ObsReq: the stop replies with a RunObsReply (the status and that dump)
+ 			if (in.u8())
+ 				_stopFrame = in.u64();
+ 			if (in.u8())
+@@ -990,6 +1050,8 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 			_stopOnControl = in.b();
+ 			_stopOnIdle = in.b();
+ 			_stopOnMenu = in.b();
++			if (type == kWRunObs)
++				wireObsReq(in);
+ 			if (error.empty() && !in.done())
+ 				error = "run: bad payload";
+ 			if (error.empty() && !_stopFrame && !_stopMaxFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu &&
+@@ -1004,6 +1066,7 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 				_stopUntil.clear();
+ 				_stopUntilAny.clear();
+ 			}
++			_wireRunObs = error.empty() && type == kWRunObs;
+ 			resume = error.empty();
+ 			break;
+ 		}
+@@ -1022,6 +1085,22 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 			}
+ 			break;
+ 		}
++		case kWStepObs: {
++			// patch 0004: u64 frame (Run's frame stop), then fmi-core ObsReq; the stop replies with a StepObsReply
++			const uint64 frame = in.u64();
++			wireObsReq(in);
++			if (!in.done())
++				error = "step_obs: bad payload";
++			else if (frame <= _frames)
++				error = Common::String::format("frame %llu is not after the current frame %llu",
++				                               (unsigned long long)frame, (unsigned long long)_frames);
++			if (error.empty()) {
++				_stopFrame = frame;
++				_wireStepObs = true;
++				resume = true;
++			}
++			break;
++		}
+ 		case kWForkEach: {
+ 			const uint32 n = in.u32();
+ 			if (!in.done() || n < 1 || n > 64)
+@@ -1191,22 +1270,29 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 				error = "at needs integer x and y";
+ 				break;
+ 			}
+-			VirtScreen *vs = _vm->findVirtScreen(y);
+ 			wireBegin(kRAt);
+-			_wireOut.i32(x);
+-			_wireOut.i32(y);
+-			_wireOut.i32(vs ? (int)vs->number : -1);
+-			if (vs && vs->number == kMainVirtScreen) {
+-				const int virtX = x + vs->xstart, virtY = y - vs->topline;
+-				_wireOut.u8(1);
+-				_wireOut.i32(virtX);
+-				_wireOut.i32(virtY);
+-				_wireOut.i32(_vm->findObject(virtX, virtY));
+-				_wireOut.i32(_vm->getActorFromPos(virtX, virtY));
+-			} else {
+-				_wireOut.u8(0);
++			wireAt(_wireOut, x, y);
++			wireFlush();
++			break;
++		}
++		case kWAtMany: {
++			// patch 0004: fmi-core Vec<(i32, i32)>; replies Vec<At>, each what At would reply at this stop (the hit
++			// tests read the engine and change nothing, so their order does not matter)
++			const uint32 n = in.count(8);
++			Common::Array<int> pts;
++			pts.reserve(2 * n);
++			for (uint32 i = 0; i < n && in.ok(); i++) {
++				pts.push_back(in.i32());
++				pts.push_back(in.i32());
++			}
++			if (!in.done()) {
++				error = "at_many needs a list of integer points";
++				break;
+ 			}
+-			_wireOut.i32(_vm->findVerbAtPos(x, y));
++			wireBegin(kRAtMany);
++			_wireOut.u32(n);
++			for (uint32 i = 0; i < n; i++)
++				wireAt(_wireOut, pts[2 * i], pts[2 * i + 1]);
+ 			wireFlush();
+ 			break;
+ 		}
