@@ -12,4 +12,6 @@ pub mod model;
 pub mod packed;
 pub mod reduce;
 pub mod sas;
+pub mod search;
 pub mod serve;
+pub mod warm;
