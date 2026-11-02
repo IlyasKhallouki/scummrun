@@ -1,0 +1,42 @@
+[package]
+name = "fmi-play"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the window search with play when ready, B1's strict matcher, the harness's input code (experiments/E011-speed/plan.md, play)"
+
+[features]
+# the test doubles (plan.md, "play"): JsonEngine (the JSON control protocol against svm-w3b) and FileReading (a
+# reading's four files); replaced at integration by fmi-engine and fmi-reading
+json-double = []
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
+rustc-hash = "2"
+serde_json = { version = "1", features = ["preserve_order"] }
+libc = "0.2"
+indexmap = "2"
+sha1_smol = "1"
+
+[dev-dependencies]
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[[bin]]
+name = "play-fixture"
+path = "src/bin/play_fixture.rs"
+required-features = ["json-double"]
+
+# for iterating: release code without LTO
+[profile.fast]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
