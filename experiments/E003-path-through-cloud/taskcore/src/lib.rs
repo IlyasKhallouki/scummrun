@@ -12,6 +12,7 @@ pub mod decode;
 pub mod fold;
 pub mod model;
 pub mod packed;
+pub mod perf;
 pub mod predict;
 pub mod reduce;
 pub mod sas;
