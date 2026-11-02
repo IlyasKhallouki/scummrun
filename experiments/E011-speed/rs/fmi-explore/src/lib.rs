@@ -5,5 +5,6 @@
 //! * `archive`: explore.py `Archive`; `driver`: explore.py `run` and `Job`; `machine`: its thresholds and /proc.
 //! * `fake`: fake_step.py, the try's stand-in in the driver's tests.
 
+pub mod archive;
 pub mod files;
 pub mod pyjson;
