@@ -53,6 +53,11 @@ pub fn reached_file(given: Option<&Path>, task: &Path) -> Option<std::path::Path
 /// not checked (its start is the file's start and nothing reads it). A value outside the domain is the start check's.
 pub fn reached_misses(t: &Task, start: &[u32], path: &Path) -> Result<Vec<String>, String> {
     let text = read_lines(path)?;
+    Ok(reached_misses_text(t, start, &text))
+}
+
+/// `reached_misses` on the file's text (a reading held in memory, E011's warm planner).
+pub fn reached_misses_text(t: &Task, start: &[u32], text: &str) -> Vec<String> {
     let mut reached: std::collections::HashMap<&str, std::collections::HashSet<&str>> = std::collections::HashMap::new();
     for line in text.lines() {
         let mut parts = line.split('\t');
@@ -72,7 +77,7 @@ pub fn reached_misses(t: &Task, start: &[u32], path: &Path) -> Result<Vec<String
             }
         }
     }
-    Ok(out)
+    out
 }
 
 fn value_index(t: &Task, f: u32, v: &str) -> u32 {
@@ -108,6 +113,7 @@ pub fn read_start(t: &Task, path: &Path) -> Result<(Vec<u32>, HashSet<String>), 
     Ok((out, by.keys().map(|k| k.to_string()).collect()))
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Ban {
     pub label: String,
     pub point: Vec<(String, String)>,
@@ -212,7 +218,8 @@ pub struct Banned<'a> {
     pub order: Vec<u32>,
 }
 
-const PIECE: u32 = 1 << 31;
+/// `Banned::order`'s mark of a piece (its index in `pieces`)
+pub const PIECE: u32 = 1 << 31;
 
 impl<'a> Banned<'a> {
     fn at(&self, i: usize) -> (&Actions, usize) {
