@@ -192,6 +192,159 @@ def test_run_job_skips_an_entry_measured_before(tmp_path, monkeypatch):
     assert r["ok"] and "idle" not in r
 
 
+# --- explore.py: the archive with the switches --------------------------------------------------------------------
+
+import explore as X  # noqa: E402
+from test_explore import GUIDE, ROOT_FACTS, child, cp, job_with, loop_env, make_archive, run_loop  # noqa: E402
+
+
+def make_e009(tmp: Path, **e009) -> X.Archive:
+    tmp.mkdir(parents=True, exist_ok=True)
+    gp = tmp / "GUIDE.json"
+    gp.write_text(json.dumps(GUIDE))
+    a = X.Archive.create(tmp / "arch", "test", {"owner:566": [1]}, gp, [28, 33, 35, 38, 41], 2,
+                         {"frame": 100, "tick": 0, "qf": 1000, "room": 33}, e009 or {"idle_frames": 1600})
+    a.add(None, 100, 0, [], [cp(100, dict(ROOT_FACTS), 0)], None, "boot")
+    a.write_cells()
+    return a
+
+
+def with_idle(d: Path, keys) -> Path:
+    r = json.loads((d / "result.json").read_text())
+    r["idle"] = {"returns": list(keys), "first_return": {}, "changes": {}, "frames": 1600, "seconds": 0.0}
+    (d / "result.json").write_text(json.dumps(r))
+    return d
+
+
+def test_stage_json_keeps_the_switches_only_when_given(tmp_path):
+    assert "e009" not in json.loads((make_archive(tmp_path / "off").root / "stage.json").read_text())
+    a = make_e009(tmp_path / "on", idle_frames=1600, rotate=True, stop_jobs=80)
+    assert json.loads((a.root / "stage.json").read_text())["e009"] == {"idle_frames": 1600, "rotate": True,
+                                                                      "stop_jobs": 80}
+    assert X.Archive.open(a.root).idle_frames == 1600
+
+
+def test_idle_keys_leave_the_cell_key_and_the_atoms_and_the_rows_are_keyed_again(tmp_path):
+    a = make_e009(tmp_path)
+    e1 = child(a, 0, 5, 5, room=35, var__103=1)
+    e2 = child(a, 0, 6, 6, room=35, var__103=2)
+    assert len({a.rows[i]["cell"] for i in (0, e1, e2)}) == 3 and ("var:103", 2) in a.held_by
+    new = a.merge_idle(0, ["var:103", "owner:566", "var:990"])  # the goal's key never joins I
+    assert new == ["var:103", "var:990"] and a.idle == {"var:103", "var:990"}
+    assert a.rows[e1]["cell"] == a.rows[e2]["cell"] != a.rows[0]["cell"] and len(a.cells()) == 2
+    assert a.representative(a.rows[e1]["cell"]) == e1
+    assert not any(k == "var:103" for k, _ in a.held_by) and a.rows[e2]["held"] == a.rows[0]["held"]
+    assert a.merge_idle(e1, ["var:103"]) == [] and a.idle_measured == {0, e1}
+    # the archive's files give the same: I from the log, the rows keyed again on open
+    line = a.ingest(with_idle(job_with(a, e2, [(3, 9, {"var:103": 7})]), ["var:103", "owner:566"]))
+    assert line["idle"] == {"entry": e2, "keys": ["var:103"], "new": [], "size": 2, "frames": 1600,
+                            "seconds": 0.0} and line["new_cells"] == 0
+    b = X.Archive.open(a.root)
+    assert b.idle == {"var:103"} and b.idle_measured == {e2}  # merge_idle above was in memory only
+    assert len(b.cells()) == 2 and b.rows[e1]["cell"] == b.rows[e2]["cell"]
+
+
+def test_off_the_rows_are_e008s(tmp_path):
+    a = make_archive(tmp_path)
+    e1, e2 = child(a, 0, 5, 5, var__103=1), child(a, 0, 6, 6, var__103=2)
+    assert len({a.rows[i]["cell"] for i in (0, e1, e2)}) == 3 and a.job_e009(e1) == {} and not a.idle_frames
+
+
+def test_a_cell_offers_its_next_entry_once_its_first_is_exhausted(tmp_path):
+    a = make_e009(tmp_path)
+    a.merge_idle(0, ["var:103"])
+    e1, e2 = child(a, 0, 5, 5, room=35, var__103=1), child(a, 0, 6, 6, room=35, var__103=2)
+    c = a.rows[e1]["cell"]
+    assert a.rows[e2]["cell"] == c and a.candidate(c) == e1
+    a.ingest(job_with(a, e1, [], exhausted=True))
+    assert a.candidate(c) == e2 and e2 in a.select(10)
+    a.ingest(job_with(a, e2, [], exhausted=True))
+    assert a.candidate(c) is None and not a.selectable(c)
+    off = make_archive(tmp_path / "off")  # E008: the representative alone
+    x, y = child(off, 0, 5, 5, room=35), child(off, 0, 6, 6, room=35, var__5=7)
+    cc = off.rows[x]["cell"]
+    assert off.rows[y]["cell"] == cc
+    off.ingest(job_with(off, x, [], exhausted=True))
+    assert off.candidate(cc) is None and y not in off.select(10)
+
+
+def test_n_counted_again_from_the_log_when_cells_merge(tmp_path):
+    a = make_e009(tmp_path)
+    e1, e2 = child(a, 0, 5, 5, room=35, var__103=1), child(a, 0, 6, 6, room=35, var__103=2)
+    a.ingest(job_with(a, e1, [(2, 7, {"var:5": 1})]))  # no new cell: n of e1's cell 1
+    a.ingest(job_with(a, e2, [(2, 8, {"var:5": 1})]))  # n of e2's cell 1
+    assert a.cells()[a.rows[e1]["cell"]]["n"] == 1 and a.cells()[a.rows[e2]["cell"]]["n"] == 1
+    a.merge_idle(0, ["var:103"])
+    assert a.cells()[a.rows[e1]["cell"]]["n"] == 2  # one cell, two jobs with no new cell
+
+
+def test_rotation_counts_per_cell_and_in_all(tmp_path):
+    a = make_e009(tmp_path, rotate=True)
+    e1, e2 = child(a, 0, 5, 5, room=35), child(a, 0, 6, 6, room=38)
+    a.ingest(job_with(a, e1, [], tried=[["bit:7", 1], ["room", 41]]))
+    a.ingest(job_with(a, e2, [], tried=[["bit:7", 1]]))
+    a.ingest(job_with(a, e1, [], tried=[["state:316", 1]]))
+    assert a.rotation(e1) == {"cell": [["bit:7", 1, 1], ["room", 41, 1], ["state:316", 1, 1]],
+                              "all": [["bit:7", 1, 2], ["room", 41, 1], ["state:316", 1, 1]]}
+    assert a.rotation(e2)["cell"] == [["bit:7", 1, 1]]
+    d = a.prepare_job(e2)
+    job = json.loads((d / "job.json").read_text())
+    assert job["rotation"] == a.rotation(e2) and "idle_frames" not in job and "reuse" not in job
+
+
+def test_job_json_carries_the_switches(tmp_path):
+    a = make_e009(tmp_path, idle_frames=1600, reuse_nonfacts=True)
+    a.merge_idle(0, [])
+    job = json.loads((a.prepare_job(0) / "job.json").read_text())
+    assert job["idle_frames"] == 1600 and job["idle_measured"] is True and job["reuse"] == "e009"
+    assert "rotation" not in job
+
+
+def test_evict_level_from_the_largest_reading(tmp_path):
+    a = make_e009(tmp_path, evict_by_size=True)
+    assert a.evict_level_gb(8.0) == 8.0
+    for k, n in enumerate((1000, 3 * X.GIB // 10, 2000)):
+        d = a.root / "readings" / f"r{k}"
+        d.mkdir(parents=True)
+        (d / "reading.json").write_text("{}")
+        (d / "big.bin").write_bytes(b"x" * min(n, 4096))
+        a.register_reading([33], d / "reading.json", 0, None, used=k)
+        a.readings[-1]["bytes"] = n
+    assert a.evict_level_gb(8.0) == pytest.approx(8.6)
+
+
+def test_stagnation_counts_only_atoms_of_keys_outside_i(tmp_path):
+    a = make_e009(tmp_path)
+    a.ingest(job_with(a, 0, [(5, 5, {"var:103": 1})]))  # a new atom (var:103, 1), I empty
+    assert not a.stagnant()
+    a.idle.add("var:103")  # the same log, with var:103 idle: no atom outside I since the start
+    assert a.stagnant()
+
+
+def test_loop_with_an_idle_counter_stagnates_where_e008_runs_on(tmp_path):
+    """FAKE_IDLE_KEY var:103 ((var:103, any) in R) takes a new value in every job and the fake target is a cell
+    of no atom (FAKE_NO_PROGRESS): E008 counts each value a new atom and runs to the fake goal; with fix a the
+    first job measures var:103 idle and one sweep of the frontier stops the run."""
+    env = dict(loop_env(tmp_path, FAKE_NO_PROGRESS="state:316", FAKE_IDLE_KEY="var:103", FAKE_GOAL_AFTER=7))
+    off = make_archive(tmp_path / "off")
+    s = run_loop(off.root, env)
+    assert s["stop"] == "goal" and s["jobs"] >= 6
+    on = make_e009(tmp_path / "on")
+    s = run_loop(on.root, env)
+    assert s["stop"] == "stagnation" and s["jobs"] < 6
+    b = X.Archive.open(on.root)
+    assert b.idle == {"var:103"} and "owner:566" not in b.idle
+
+
+def test_loop_the_falsifier_stops_starting_jobs(tmp_path):
+    a = make_e009(tmp_path, stop_jobs=3)
+    s = run_loop(a.root, loop_env(tmp_path, FAKE_GOAL_AFTER=50))
+    assert s["stop"] == "prediction bound" and s["jobs"] == 3 and s["detail"] == {"jobs": 3, "stop_jobs": 3}
+    a = make_e009(tmp_path / "goal", stop_jobs=3)  # the goal inside the bound is the goal
+    s = run_loop(a.root, loop_env(tmp_path, FAKE_GOAL_AFTER=2))
+    assert s["stop"] == "goal"
+
+
 # --- in the engine ----------------------------------------------------------------------------------------------------
 
 @pytest.mark.skipif(os.environ.get("E008_ENGINE") != "1", reason="engine tests: E008_ENGINE=1")
