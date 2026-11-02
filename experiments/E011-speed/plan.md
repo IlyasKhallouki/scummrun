@@ -960,7 +960,7 @@ before).
 - Reader: predicted a fresh ring(33) reading at 45-60% of the old CPU (measured 42%, 34.3 s of wall at 3 threads
   against the predicted 35-60 s), a refinement from another entry with the memo in 6-15 s (11.1 s), an exact repeat in
   0.05 s (5-8 ms).
-- Planner: predicted a new ring(33) request in 6-13 s of CPU (8.5-11.7 s for another start or caps at load 5; 12.6-23.2
+- Planner: predicted a new ring(33) request in 6-13 s of CPU (8.5-11.7 s for another start or caps at load 5; 12.9-22.3
   s for a new goal in B3), ring(38) 0.1-0.3 s (0.11-0.21 s), the Rust search's plans equal FD's h_FF plans on every
   fixed task (yes), a repeat or a held tail 1-10 ms (0.2-13 ms; 135 ms to 1.7 s for a tail on its reading's first use).
 - Play: predicted test (a)'s third window in 1-5 s (10.8 s ready, 14.9 s strict), a first-try window in 10-50 ms

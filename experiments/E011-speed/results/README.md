@@ -82,9 +82,9 @@ By part, the medians of the walls (the read part counts the try's readings and i
   refinements on an empty memo store (49 s and 20 s), then two plans (17 s). Later ring(33) tries reuse its refined
   reading; their refinements are taken from the reading cache when the refinement's inputs repeat (j00009, j00011,
   j00012, j00014: 0.02 s) and from the memo otherwise (j00006, j00008: 9.5 s and 11.1 s).
-- **The ring(33) plan** is the first request of a new goal on the refined reading (j00006: 12.6 s, j00008 23 s, j00009
-  17.5 s, j00011 13.3 s, j00014 16.4 s); the one try whose goal repeats an earlier one plans in 3.6 s (j00012). With
-  FdLamaFirstCosts the same requests take 38-47 s.
+- **The ring(33) plan** (the attempt less its window search and refinements) is the first request of a new goal on the
+  refined reading: j00006 15.6 s, j00008 22.3 s, j00009 17.0 s, j00011 12.9 s, j00014 16.0 s; the one try whose goal
+  repeats an earlier one's plans in 3.2 s (j00012). With FdLamaFirstCosts the same tries take 37.2-46.4 s.
 - **ring(38)**: a fresh reading 1.7-1.8 s, a reused one 0.02-0.06 s to open, the refinement 1.3 s or a cache hit, the
   plan 0.4-0.6 s, the idle 0.2 s, the return 0.01 s.
 - **The try's own time** outside the ports (fmi's `explore_s.own`): median 78-90 ms over the four regimes (34-290 ms).
@@ -191,7 +191,7 @@ and the components' measured ones); after/floor where both are numbers.
 | read, a refinement from another entry with the memo (B1) | 62.4 s | 11.1 s (9.4 s reading) | | | 35% of the old job-s | yes: 15.9 vs 106.5 job-s (15%) |
 | read, a cache hit (B1, B3) | 0.05-0.1 s load + 75-114 s strict setup | 5-8 ms (key 1.6-3.1, open 3.5-4.5); B3 0.02-0.06 s | the open, 2 ms | 2.5-4 | 50 ms | yes |
 | read, ring(38) fresh (B1) | 13.1 s | 3.0 s | | | | |
-| plan, ring(33): a new goal on the refined reading (B3) | 100-126 s | 16.0 s (12.6-23.2) | the per-start reductions 5.5-6.1 s + h_FF 0.45 s | 2.5 | 13 s CPU a new request | no |
+| plan, ring(33): a new goal on the refined reading (B3) | 100-126 s | 16.0 s (12.9-22.3) | the per-start reductions 5.5-6.1 s + h_FF 0.45 s | 2.5 | 13 s CPU a new request | no |
 | plan, ring(33): another start, same goal (B1) | 29.6 s | 11.7 s (load 5), 8.5 s other caps; 7.6-8.7 s at load 2.5 (plan component) | 6-6.5 s | 1.3-1.8 | 13 s CPU | yes |
 | plan, the search on test (a)'s first request (B2) | FD 48 s | Gbfs 56.5 s (2,430 h_FF evaluations at 23 ms) | | | 1 s | no |
 | plan, ring(38) (B1) | 1.2-1.5 s | 0.11-0.21 s | 0.16 s (plan component) | 0.7-1.3 | 0.3 s | yes |
@@ -221,7 +221,7 @@ none is built before its exactness argument is written.
    and 7. Target: a fresh ring(33) reading at most 15 s
    of wall cold; a refinement or a fresh reading taken from the memo at most 3 s. Gate: G6 (kitchen golden, the three
    readings' packed file, golden body and reached file, the four files) with the memo off and on, at two thread counts.
-2. **plan** (45%). The first request of a new goal on the refined ring(33) reading takes 12.6-23.2 s (median 16.0),
+2. **plan** (45%). The first request of a new goal on the refined ring(33) reading takes 12.9-22.3 s (median 16.0),
    another start 8.5-11.7 s, of which the reductions are 6.5-12.6 s; on test (a)'s first request the search itself
    takes 56.5 s (2,430 h_FF evaluations at 23 ms over 331,165 unary operators). Build: the goal-independent reductions
    once per reading, the goal-dependent first round once per goal, only (d) and the finish per start (plan.md's
