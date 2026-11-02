@@ -32,6 +32,8 @@ pub struct Resident {
     pub search_name: String,
     /// `--targets K=V,...`: the targets forced, in order (the benchmark's B0/B3)
     pub forced_targets: Option<Vec<(String, i64)>>,
+    /// E011's old tail first at a replan (the fast settings)
+    pub tail: bool,
 }
 
 /// The try as the driver's in-process step.
@@ -352,6 +354,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
         start_check: "needed".into(),
         workdir: adir.join("plans"),
         search_name: r.search_name.clone(),
+        tail: r.tail,
     };
     let mut wiring = Wiring::new(r.readings.clone(), &**rd, adir, threads, cancel.clone())?;
     let player = machine::port(|| r.players.player(&WindowCfg { workers, fork_each: step::FORK_EACH, ready, frame_costs: frame_costs.clone() }));

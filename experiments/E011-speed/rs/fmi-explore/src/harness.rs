@@ -41,6 +41,9 @@ pub struct HarnessCfg {
     pub workdir: PathBuf,
     /// the search's name in the plans' entries ("lama-first-costs" for FdLamaFirstCosts)
     pub search_name: String,
+    /// E011's old tail first (the fast settings; off: the reference's planner calls): at a replan the planner is
+    /// given the last plan's steps, and takes the shortest suffix that is a plan from the new start when one is
+    pub tail: bool,
 }
 
 /// The reader for the reach extension and the refinement (replay_part1's reach_extender and refiner).
@@ -254,7 +257,12 @@ impl<'a> Harness<'a> {
             caps: caps.iter().map(|(k, v)| (k.clone(), *v)).collect(),
             search: self.cfg.search,
             start_check: self.cfg.start_check.clone(),
-            tail: None,
+            // the last plan's steps (the planner checks their suffixes from the new start); none at the first plan
+            tail: if self.cfg.tail && !first && self.cur.status == "plan" {
+                Some(self.cur.steps.iter().map(|st| st.name.clone()).collect())
+            } else {
+                None
+            },
             time_limit_s: self.cfg.plan_time_s,
         };
         // the planners' lock is held for the request only (an extension below plans again)

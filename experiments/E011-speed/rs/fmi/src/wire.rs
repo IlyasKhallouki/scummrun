@@ -21,6 +21,7 @@ pub struct WireOpts {
     pub search: Search,
     pub doubles: Option<PathBuf>,
     pub forced_targets: Option<Vec<(String, i64)>>,
+    pub tail: bool,
 }
 
 pub struct Wired {
@@ -92,6 +93,7 @@ fn doubles(rec: &Path, o: &WireOpts) -> Result<Wired, String> {
             search: o.search,
             search_name: search_name(o.search).into(),
             forced_targets: o.forced_targets.clone(),
+            tail: o.tail,
         }),
     })
 }

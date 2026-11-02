@@ -262,6 +262,7 @@ pub fn replay_check(rec_dir: &Path, out: &Path, domains_dir: &Path) -> Res<(Vec<
         search: fmi_core::Search::FdLamaFirstCosts,
         search_name: "lama-first-costs".into(),
         forced_targets: None,
+        tail: false,
     };
     let log = JobLog::create(&out.join("log"))?;
     let t = Instant::now();

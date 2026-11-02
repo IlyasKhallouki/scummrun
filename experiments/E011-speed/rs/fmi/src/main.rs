@@ -4,10 +4,13 @@
 //!   fmi explore init ARCHIVE --stage NAME --goal K=V[,K=V]|part1 --guide GUIDE.json --allowed kN|files|R,R,...
 //!                    [--workers B] [--idle-frames L] [--rotate] [--evict-by-size] [--reuse-nonfacts] [--stop-jobs N]
 //!                    [--ready] [--commit-as-finished]
-//!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs]
+//!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
 //!   fmi explore verify ARCHIVE [--entry ID]
 //!   fmi explore status ARCHIVE
-//!   fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--doubles RECORDED_JOB_DIR]
+//!   fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
+//!
+//! `--search gbfs --tail` are the fast settings (the Rust search; at a replan the last plan's valid suffix first);
+//! without them the planner is called as the reference calls it.
 //!   fmi fake-step run JOB_DIR          (fake_step.py, for the driver's tests)
 //!   fmi check step FIXTURES.jsonl      (step.py's targets, reusable and idle_rule against the reference's outputs)
 //!   fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]   (guide.py map)
@@ -35,10 +38,10 @@ fn usage() -> ! {
 const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=V]|part1 --guide GUIDE.json --allowed kN|files|R,..
                 [--workers B] [--idle-frames L] [--rotate] [--evict-by-size] [--reuse-nonfacts] [--stop-jobs N] [--ready]
                 [--commit-as-finished]
-       fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs]
+       fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
        fmi explore verify ARCHIVE [--entry ID]
        fmi explore status ARCHIVE
-       fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--doubles RECORDED_JOB_DIR]
+       fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
        fmi check replay JOB_DIR --out DIR [--domains DIR]
@@ -145,7 +148,7 @@ fn targets_of(t: Option<&str>) -> Result<Option<Vec<(String, i64)>>, String> {
 
 fn wire_opts(a: &Args) -> Result<wire::WireOpts, String> {
     Ok(wire::WireOpts { search: wire::search_of(a.get("search"))?, doubles: a.get("doubles").map(PathBuf::from),
-                        forced_targets: targets_of(a.get("targets"))? })
+                        forced_targets: targets_of(a.get("targets"))?, tail: a.flag("tail") })
 }
 
 fn cmd_try(argv: &[String]) -> i32 {
