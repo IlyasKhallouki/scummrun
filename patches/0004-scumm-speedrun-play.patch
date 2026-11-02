@@ -1,8 +1,8 @@
 diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
-index 1a5e6e0a..91e41c95 100644
+index 1a5e6e0a..8e2ec3e4 100644
 --- a/engines/scumm/speedrun/speedrun_bridge.h
 +++ b/engines/scumm/speedrun/speedrun_bridge.h
-@@ -726,6 +726,13 @@ private:
+@@ -726,6 +726,15 @@ private:
  	};
  	Common::Array<RunRow> _runRows;
  	Common::Array<ExplainRow> _explainRows;
@@ -11,12 +11,14 @@ index 1a5e6e0a..91e41c95 100644
 +	// (the input code's run and dump); the dump's ObsReq
 +	bool _wireStepObs = false;
 +	bool _wireRunObs = false;
++	bool _wireRunRoom = false;  // the RunObs asked the room's dump (below)
++	bool _wireRoomDump = false; // wireObs: a lite dump that also holds the inventory and the room's objects
 +	bool _wireObsLite = false, _wireObsNames = false, _wireObsExact = false;
 +	Common::Array<int> _wireObsObjects;
  	void wireSendAll(const byte *p, uint32 n);
  	void wireBegin(uint8 type);
  	void wireFlush();
-@@ -743,6 +750,10 @@ private:
+@@ -743,6 +752,10 @@ private:
  	void wireRuns(SpeedrunBytes &o);
  	void wireExplainLog(SpeedrunBytes &o);
  	bool wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const;
@@ -28,7 +30,7 @@ index 1a5e6e0a..91e41c95 100644
  	                   int64 h = 0);
  };
 diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
-index 6b16ebc9..25318d84 100644
+index 6b16ebc9..1de9a013 100644
 --- a/engines/scumm/speedrun/speedrun_wire.cpp
 +++ b/engines/scumm/speedrun/speedrun_wire.cpp
 @@ -74,7 +74,10 @@ enum : uint8 {
@@ -76,6 +78,24 @@ index 6b16ebc9..25318d84 100644
  }
  
  void SpeedrunBridge::wireObs(SpeedrunBytes &o, const Common::Array<int> *objects, bool names, bool exact) const {
+@@ -361,7 +374,7 @@ void SpeedrunBridge::wireObs(SpeedrunBytes &o, const Common::Array<int> *objects
+ 		}
+ 		o.setU32(at, n);
+ 	}
+-	if (objects) {
++	if (objects && !_wireRoomDump) {
+ 		o.u8(0); // no inventory in a lite dump
+ 	} else {
+ 		const Common::Array<int> items = egoInventory();
+@@ -414,7 +427,7 @@ void SpeedrunBridge::wireObs(SpeedrunBytes &o, const Common::Array<int> *objects
+ 		}
+ 		o.setU32(at, n);
+ 	}
+-	if (objects) {
++	if (objects && !_wireRoomDump) {
+ 		o.u8(0); // no room objects in a lite dump
+ 	} else {
+ 		o.u8(1);
 @@ -871,6 +884,39 @@ void SpeedrunBridge::wireExplainLog(SpeedrunBytes &o) {
  	_explainDropped = 0;
  }
@@ -116,7 +136,7 @@ index 6b16ebc9..25318d84 100644
  #pragma mark - Decoders
  
  bool SpeedrunBridge::wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const {
-@@ -937,8 +983,20 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+@@ -937,8 +983,36 @@ void SpeedrunBridge::wireLoop(const char *reason) {
  	_stopOnMenu = false;
  	_stopUntil.clear();
  	_stopUntilAny.clear();
@@ -130,7 +150,23 @@ index 6b16ebc9..25318d84 100644
 +		wireObs(_wireOut, _wireObsLite ? &_wireObsObjects : nullptr, _wireObsNames, _wireObsExact);
 +		_wireStepObs = false;
 +	}
-+	if (_wireRunObs) {
++	if (_wireRunObs && _wireRunRoom) {
++		// patch 0004: the room's dump: the full dump with the owners, states and classes of the room's objects only
++		// (those the room's object table lists, in object order); the exact object is left out
++		Common::Array<int> objs;
++		for (int i = 1; i < _vm->_numLocalObjects; i++)
++			if (_vm->_objs[i].obj_nr)
++				objs.push_back((int)_vm->_objs[i].obj_nr);
++		Common::sort(objs.begin(), objs.end());
++		Common::Array<int> uniq;
++		for (uint i = 0; i < objs.size(); i++)
++			if (uniq.empty() || uniq.back() != objs[i])
++				uniq.push_back(objs[i]);
++		_wireRoomDump = true;
++		wireObs(_wireOut, &uniq, _wireObsNames, false);
++		_wireRoomDump = false;
++		_wireRunObs = false;
++	} else if (_wireRunObs) {
 +		// patch 0004: what Obs would reply at this stop
 +		wireObs(_wireOut, _wireObsLite ? &_wireObsObjects : nullptr, _wireObsNames, _wireObsExact);
 +		_wireRunObs = false;
@@ -138,7 +174,7 @@ index 6b16ebc9..25318d84 100644
  	if (_wireStep) {
  		wireBlockOrDelta(_wireOut);
  		if (_wireStepRuns) {
-@@ -971,8 +1029,10 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+@@ -971,8 +1045,10 @@ void SpeedrunBridge::wireLoop(const char *reason) {
  		bool resume = false;
  
  		switch (type) {
@@ -151,16 +187,18 @@ index 6b16ebc9..25318d84 100644
  			if (in.u8())
  				_stopFrame = in.u64();
  			if (in.u8())
-@@ -990,6 +1050,8 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+@@ -990,6 +1066,10 @@ void SpeedrunBridge::wireLoop(const char *reason) {
  			_stopOnControl = in.b();
  			_stopOnIdle = in.b();
  			_stopOnMenu = in.b();
-+			if (type == kWRunObs)
++			if (type == kWRunObs) {
 +				wireObsReq(in);
++				_wireRunRoom = in.u8() != 0; // the room's dump instead of ObsReq's objects
++			}
  			if (error.empty() && !in.done())
  				error = "run: bad payload";
  			if (error.empty() && !_stopFrame && !_stopMaxFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu &&
-@@ -1004,6 +1066,7 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+@@ -1004,6 +1084,7 @@ void SpeedrunBridge::wireLoop(const char *reason) {
  				_stopUntil.clear();
  				_stopUntilAny.clear();
  			}
@@ -168,7 +206,7 @@ index 6b16ebc9..25318d84 100644
  			resume = error.empty();
  			break;
  		}
-@@ -1022,6 +1085,22 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+@@ -1022,6 +1103,22 @@ void SpeedrunBridge::wireLoop(const char *reason) {
  			}
  			break;
  		}
@@ -191,7 +229,7 @@ index 6b16ebc9..25318d84 100644
  		case kWForkEach: {
  			const uint32 n = in.u32();
  			if (!in.done() || n < 1 || n > 64)
-@@ -1191,22 +1270,29 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+@@ -1191,22 +1288,29 @@ void SpeedrunBridge::wireLoop(const char *reason) {
  				error = "at needs integer x and y";
  				break;
  			}

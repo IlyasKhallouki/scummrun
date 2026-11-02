@@ -183,7 +183,7 @@ JSON is unchanged.
 |---|---|---|---|
 | 0x91 | StepObs | u64 frame, `ObsReq` | StepObsReply (0x0F) or End |
 | 0x92 | AtMany | `Vec<(i32, i32)>` | AtMany (0x10) |
-| 0x93 | RunObs | `RunSpec`, `ObsReq` | RunObsReply (0x11) or End |
+| 0x93 | RunObs | `RunSpec`, `ObsReq`, bool room | RunObsReply (0x11) or End |
 
 | type | message | payload |
 |---|---|---|
@@ -196,6 +196,12 @@ JSON is unchanged.
   order; the runs and explain buffers are cleared, as those commands clear them. fmi-core: `Engine::step_observe`.
 - **RunObs** is Run (the same checks and stops) whose stop answers with the status and what Obs(`ObsReq`) would answer
   there. The runs and explain buffers are left as they are. fmi-core: `Engine::run_obs`.
+  - With `room` set, the dump is *the room's dump*: the full dump (no exact object) whose owners, states and classes
+    hold only the objects the room's object table lists (`_objs[1.._numLocalObjects)` with an object number), in
+    object order. It is the lite dump of those objects plus the inventory and the room's objects, made by the same
+    encoder, so each field equals the full dump's; fmi-core's `room_cut` makes it from a full dump.
+    fmi-core: `Engine::run_room`. (The window search's input code reads only the room, the verbs, the variables, the
+    inventory, the actors, the room's objects and their classes.)
 - **AtMany** answers what At would answer for each point at this stop. A hit test reads the engine and changes
   nothing (`findVirtScreen`, `findObject`, `getActorFromPos`, `findVerbAtPos`), so the order does not matter. fmi-core:
   `Engine::at_many`.
@@ -206,5 +212,6 @@ JSON is unchanged.
   main screen only for v7 and up), and `findVirtScreen` reads those and `_forceBannerVirtScreen` only.
 
 Checked by `fmi-checks`' `play-wire check` (two engines in lockstep on the kitchen chain from 2728 and the door chain
-from 1500, every command answered equal to the commands it stands for, AtMany equal to one At per point over a grid of
-screen points) and by play's tests 2-4 through fmi-engine.
+from 1500, every command answered equal to the commands it stands for: StepObs against Run, Runs, ExplainLog and Obs;
+RunObs against Run and Obs; RunObs with the room's dump against Run, Obs and `room_cut`; AtMany equal to one At per
+point over a grid of screen points) and by play's tests 2-4 through fmi-engine.
