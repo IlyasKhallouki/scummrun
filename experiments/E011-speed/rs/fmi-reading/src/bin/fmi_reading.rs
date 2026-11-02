@@ -25,6 +25,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+/// CPU seconds of this thread (CLOCK_THREAD_CPUTIME_ID): the measures, less the machine's load.
+fn cpu() -> f64 {
+    let mut t = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    // SAFETY: clock_gettime fills the timespec it is given
+    unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut t) };
+    t.tv_sec as f64 + t.tv_nsec as f64 / 1e9
+}
+
 fn arg(args: &[String], flag: &str) -> Option<String> {
     args.iter().position(|a| a == flag).map(|i| args[i + 1].clone())
 }
@@ -226,21 +234,25 @@ fn main() {
             let dir = PathBuf::from(&args[1]);
             let reps: usize = arg(&args, "--reps").map_or(5, |n| n.parse().unwrap());
             let mut opens = Vec::new();
+            let mut opens_cpu = Vec::new();
             for _ in 0..reps {
-                let t = Instant::now();
+                let (t, c) = (Instant::now(), cpu());
                 let rd = Reading::open(&dir).expect("the reading");
                 opens.push(t.elapsed().as_secs_f64());
+                opens_cpu.push(cpu() - c);
                 drop(rd);
             }
             let rd = Reading::open(&dir).unwrap();
             let idxs: Vec<u32> = (0..rd.n_actions()).step_by(every as usize).collect();
             let names: Vec<String> = idxs.iter().map(|&i| rd.action(i).name).collect();
+            // (wall us, CPU us) per call, over the sample
             let time = |f: &dyn Fn(u32)| {
-                let t = Instant::now();
+                let (t, c) = (Instant::now(), cpu());
                 for &i in &idxs {
                     f(i);
                 }
-                t.elapsed().as_secs_f64() / idxs.len() as f64 * 1e6
+                let n = idxs.len() as f64;
+                (t.elapsed().as_secs_f64() / n * 1e6, (cpu() - c) / n * 1e6)
             };
             let action_us = time(&|i| {
                 std::hint::black_box(rd.action(i));
@@ -257,11 +269,12 @@ fn main() {
             let parse_us = time(&|i| {
                 std::hint::black_box(fmi_reading::line::parse(rd.action_line(i)).unwrap());
             });
-            let t = Instant::now();
+            let (t, c) = (Instant::now(), cpu());
             for n in &names {
                 std::hint::black_box(rd.by_name(n));
             }
-            let by_name_us = t.elapsed().as_secs_f64() / names.len() as f64 * 1e6;
+            let nn = names.len() as f64;
+            let by_name_us = (t.elapsed().as_secs_f64() / nn * 1e6, (cpu() - c) / nn * 1e6);
             let mut action_max = 0f64;
             for &i in &idxs {
                 let t = Instant::now();
@@ -269,20 +282,23 @@ fn main() {
                 action_max = action_max.max(t.elapsed().as_secs_f64() * 1e6);
             }
             opens.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            opens_cpu.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let r3 = |x: f64| PJ::Float((x * 1000.0).round() / 1000.0);
+            let pair = |x: (f64, f64)| PJ::List(vec![r3(x.0), r3(x.1)]);
             println!(
                 "{}",
                 PJ::obj(vec![
                     ("actions", PJ::Int(rd.n_actions() as i64)),
                     ("sampled", PJ::Int(idxs.len() as i64)),
                     ("open_ms", PJ::List(opens.iter().map(|x| r3(x * 1000.0)).collect())),
-                    ("action_us_mean", r3(action_us)),
-                    ("action_us_max", r3(action_max)),
-                    ("record_us_mean", r3(record_us)),
-                    ("action_line_us_mean", r3(line_us)),
-                    ("raw_us_mean", r3(raw_us)),
-                    ("line_parse_us_mean", r3(parse_us)),
-                    ("by_name_us_mean", r3(by_name_us)),
+                    ("open_cpu_ms", PJ::List(opens_cpu.iter().map(|x| r3(x * 1000.0)).collect())),
+                    ("action_us_wall_cpu", pair(action_us)),
+                    ("action_us_max_wall", r3(action_max)),
+                    ("record_us_wall_cpu", pair(record_us)),
+                    ("action_line_us_wall_cpu", pair(line_us)),
+                    ("raw_us_wall_cpu", pair(raw_us)),
+                    ("line_parse_us_wall_cpu", pair(parse_us)),
+                    ("by_name_us_wall_cpu", pair(by_name_us)),
                 ])
                 .compact_text()
             );

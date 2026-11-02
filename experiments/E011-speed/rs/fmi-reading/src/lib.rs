@@ -351,20 +351,16 @@ impl ReadingSource for Reading {
     fn record(&self, i: u32) -> Record {
         let raw = self.packed.raw(self.idx.tc_word(i));
         let ln = self.checked_line(i, &raw);
-        let pre = self.pre_dict(raw.pre.clone());
-        // the line's keys as the action's facts (no key text made again); a key that is not one is parsed
-        let fact = |k: &str| {
-            raw.pre.iter().map(|x| x.0).find(|&f| self.packed.s(self.packed.fact_sid[f as usize]) == k).map(|f| self.packed.fact_keys[f as usize])
-        };
+        // a key of the line as the action's precondition holds it (the last set of that key, as the dict keeps it):
+        // matched by text against the packed file's fact names, so no key text is made again
+        let in_pre = |k: &str| raw.pre.iter().rev().find(|x| self.packed.s(self.packed.fact_sid[x.0 as usize]) == k);
         let rec_pre = ln
             .pre_keys
             .iter()
-            .filter_map(|k| {
-                let k = fact(k).unwrap_or_else(|| Key::parse(k));
-                pre.iter().find(|x| x.0 == k).cloned()
-            })
+            .filter_map(|k| in_pre(k).map(|(f, v)| (self.packed.fact_keys[*f as usize], tc::sorted(v.clone()))))
             .collect();
-        let engine_pre = ln.engine_pre.iter().map(|k| fact(k).unwrap_or_else(|| Key::parse(k))).collect();
+        let engine_pre =
+            ln.engine_pre.iter().map(|k| in_pre(k).map_or_else(|| Key::parse(k), |x| self.packed.fact_keys[x.0 as usize])).collect();
         Record {
             kind: self.packed.s(raw.kind).to_string(),
             label: self.packed.s(raw.label).to_string(),
