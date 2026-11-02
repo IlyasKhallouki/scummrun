@@ -918,6 +918,70 @@ This runs once, when every gate G1-G12 passes and B3's warm median per try is un
 - **Watchdogs.** The harness's, the window search's and the reader's limits are E006's. The guard's 3 GB and the
   disk's 8 GB floors are the machine's. Both are engineering watchdogs, reported where they fire.
 
+## Results, round 1 (2026-11-02, written after the runs)
+
+Branch e011: the six component branches merged (engine 2fa0789, play dc955bf, readio a4c925a, readcore f386535, plan
+6a995cb, explore 7d57f27), then the integration commits (the rs/ workspace, reader-scope --memo, the real ports in
+fmi with the reading cache and the memo, warm tries in one process, one fix for serde_json's map order in the
+workspace). Benchmark scripts: `bench/` (branch e011-bench, merged). Numbers and tables: `results/README.md`,
+`results/gates.md`, `results/tries.md`. Lab note: `notes/log/2026-11-02-e011.md`. Laptop, seed 1, nice 10.
+
+**Gates.** G1-G9, G11 and G12 pass on the integrated build, with each component's switches off and on (gates.md). G10
+passes its FdLamaFirstCosts clauses and fails its Gbfs clause:
+
+- `fmi try` on test (a) with FdLamaFirstCosts, strict, prints `CHECK (a): 0 goal True 2728 3216 488 11712 2 36` and
+  its goal verifies from boot with 0 differences; with ready, the same route.
+- With Gbfs, test (a) stops without the goal: no plan at 3174 (strict); the planner's 600 s limit at 7086 (ready, tail).
+  Gbfs's second plan names a record whose precondition the engine refutes at 3171 (class semantics); FD's does not.
+- G11: under the reference settings all 15 tries equal B0's in everything, cold and warm. Under the fast settings the
+  stop class is B0's in 15, and 3 tries play another route; all 110 new entries of the fast sequences verify from boot.
+- G12: 3,326 samples of /proc during B3 and B4, no python process in an fmi tree.
+
+**B3 and B4** (wall per try, before = B4 interleaved on the same load):
+
+| | median, 15 | ring(33), 7 | ring(38), 8 | mean | sum |
+|---|---:|---:|---:|---:|---:|
+| before (Python) | 29.4 s | 186.2 s | 23.8 s | 118.7 s | 1,779.8 s |
+| cold, reference | 5.2 s | 63.3 s | 4.2 s | 37.7 s | 565.6 s |
+| cold, fast | 4.4 s | 38.3 s | 2.8 s | 25.2 s | 378.6 s |
+| warm, reference | 3.8 s | 44.6 s | 2.3 s | 27.6 s | 414.3 s |
+| warm, fast | 3.8 s | 17.5 s | 1.1 s | 16.0 s | 240.6 s |
+
+**Route replay** (B1): by fork of a kept entry 0.55-0.84 ms on both chains; from boot 0.33-0.43 s (2.26-3.60 s
+before).
+
+**Against the prediction.**
+
+- Gates: predicted G1-G9 in round 1 and G10-G12 after the first integration. G1-G9 and G11-G12 came; G10's Gbfs
+  clause did not.
+- Engine: predicted a frame of 0.09-0.11 ms inside a command (measured 0.036-0.052 ms), a start of 0.1-0.2 s (37-64
+  ms), fork + quit 0.7-1.3 ms (0.66-0.77 ms), a return by fork 1-4 ms (0.55-0.84 ms), the door chain from boot
+  0.3-0.6 s (0.30-0.47 s), an observed frame 0.05-0.2 ms (0.063-0.101 ms). All inside or under the predicted ranges.
+- Reader: predicted a fresh ring(33) reading at 45-60% of the old CPU (measured 42%, 34.3 s of wall at 3 threads
+  against the predicted 35-60 s), a refinement from another entry with the memo in 6-15 s (11.1 s), an exact repeat in
+  0.05 s (5-8 ms).
+- Planner: predicted a new ring(33) request in 6-13 s of CPU (8.5-11.7 s for another start or caps at load 5; 12.6-23.2
+  s for a new goal in B3), ring(38) 0.1-0.3 s (0.11-0.21 s), the Rust search's plans equal FD's h_FF plans on every
+  fixed task (yes), a repeat or a held tail 1-10 ms (0.2-13 ms; 135 ms to 1.7 s for a tail on its reading's first use).
+- Play: predicted test (a)'s third window in 1-5 s (10.8 s ready, 14.9 s strict), a first-try window in 10-50 ms
+  (10-80 ms), the idle measurement in 0.2-0.5 s (0.2-0.4 s).
+- 15 tries, warm, fast: predicted ring(38) median 0.2-1.5 s (1.1 s), ring(33) 8-35 s (17.5 s), all 15 0.5-2 s (3.8 s),
+  mean 4-15 s (16.0 s). The overall median falls on a fresh ring(38) reading (3.8 s), which the prediction did not
+  count.
+- 15 tries, cold: predicted ring(38) median 0.5-3 s (2.8 s fast, 4.2 s reference) and ring(33) 20-60 s (38.3 s and
+  63.3 s).
+- Route replay: predicted 1-5 ms by fork (0.55-0.84 ms) and 0.3-0.6 s from boot (0.33-0.43 s).
+- The answer: predicted "partly", with ring(33) tries at 8-35 s after round 1. That is what came (17.5 s).
+
+**Threshold.** "Yes" fails on the warm median (3.8 s against 1 s), the ring(33) median (17.5 s against 10 s) and G10.
+"Partly" holds for the route replay and the warm median under 10 s, but its gates clause fails on G10. So the kitchen
+check does not run in this round.
+
+**Stop rule.** The next round goes to what has the largest share of B3's warm total: the reading (53%), then the
+planner (45%); G10's Gbfs clause needs the search that FD's lama-first runs, in Rust. The items, with targets and gates,
+are at the end of results/README.md. Round 1 gained 86% of the before total (1,780 s to 241 s), so the 10% rule does
+not stop the rounds.
+
 ## Coordination
 
 - **COORD.md.** Builders coordinate only through `/home/ilyask/.cache/fast-mi-e011/COORD.md`, never through messages.
