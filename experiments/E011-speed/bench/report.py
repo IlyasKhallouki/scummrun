@@ -78,6 +78,11 @@ def main() -> None:
     b, out = Path(sys.argv[1]), Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
     times = {(t["regime"], t["job"]): t for t in load_jsonl(b / "b3" / "times.jsonl")}
+    fix = b / "b3" / "times-fixup.txt"  # lines "REGIME JOB cpu_s X": a measurement recovered by hand, with its reason
+    for ln in (fix.read_text().splitlines() if fix.exists() else ()):
+        w = ln.split()
+        if len(w) == 4 and not ln.startswith("#") and (w[0], w[1]) in times:
+            times[(w[0], w[1])]["cpu_s"] = float(w[3])
     jobs = [f"j{n:05d}" for n in range(15)]
     seqs = {"b0": b / "b0", "b4": b / "b4", **{r: b / "b3" / r for r in REGIMES[2:]}}
     data = {}
