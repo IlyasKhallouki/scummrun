@@ -501,6 +501,43 @@ engine idles (var 100, in R as (var:100, any) at depth 1), and the order prefers
 order sent the kitchen's first job to bit:108 = 1, whose plan leads into that dialog; in the smoke the first played
 target (bit:348 = 1) ended in room 28, and the next job reached the goal from there.
 
+## Results of the resume (2026-11-02)
+
+Two statements above do not hold, as the check in the lab note found: the dialog's frontier is not endless (var 100
+takes 233 values, and the dialog trajectory's cells repeat from frame 2902), and not every later job was the same
+(j00002 sent 2 inputs; the reused-reading jobs began with local 202's event at 794, not the escape input).
+
+The resumed run (the same code, guide, allowed rooms and b = 2) added 139 jobs, 154 in all, and was stopped by hand
+when its own log showed the method was not moving toward the goal. No stop rule had fired.
+
+| | measured |
+|---|---|
+| jobs | 154 (152 ok, 2 errors "no start for seed 1" on an evicted reading) |
+| entries, cells | 372 (304 in room 38, 68 in room 33), about 85 cells; the latest frame 2898 (170 frames from 2728) |
+| scopes read | ring(33) cut to 28, 33, 35, 38 in 66 jobs, ring(38) = 33, 38, 83, 85, 96 in 88; room 41 never in a scope |
+| fresh readings | 114: 67 of ring(33), 235,579 records each, the same scope read again from states that differ in var 100 and other keys the idle engine changes; 46 of ring(38), 9,440 records |
+| targets | bit:108 = 1 first in 153 of 154 jobs, bit:109 = 1 in 71; the goal (tier 0) never offered |
+| new R atoms | 110 in 71 jobs, 74 of them values of var 100; the rest var 20, 44, 2, 103, 181 to 183; none after job 153 that was not var 100 since job 97 |
+| CPU | 87,206 s (read 66,394, plan 19,969, play 499, return 343) |
+| goal | not reached; every return the same as its entry |
+
+Why it does not progress, from these numbers:
+
+- **Keys the idle engine changes count as progress.** Var 100 (and var 20, 44 and others) change while the engine
+  idles; each new value is a new atom of R and a new cell, so stagnation does not fire and the frontier keeps idle
+  frames.
+- **The target order is fixed.** Each job plays the first target with a plan, and the order puts bit:108 = 1 first
+  from every entry in these rooms; it was tried 153 times. Room = 28, which leads to ring(28) with room 41 and the goal,
+  is 29th.
+- **The guide does not narrow.** R holds about 1,162 atoms for every goal (step 0), so its depth orders nearly every
+  key the scope reads.
+- **The cache misses on idle keys.** A reading is reused only when the entry's facts match outside task facts and
+  slot keys, so states that differ in an idle key read the same scope again: 67 readings of one ring, 76% of the CPU.
+
+E008's answer: exploring from the real game with exact returns works (every return the same, every verify 0
+differences, the door from the boot in one job on 4 rooms), but with this cell key, progress measure and target order
+the kitchen is not reached in 154 jobs.
+
 ## Sources
 
 - Ecoffet, Huizinga, Lehman, Stanley, Clune, "Go-Explore: a New Approach for Hard-Exploration Problems" (2019,
