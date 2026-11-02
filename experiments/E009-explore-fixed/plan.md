@@ -227,3 +227,14 @@ tables, or measured from the engine by code.
 - **Records.** Each archive's log.jsonl is copied to the laptop's `~/.cache/fast-mi-e009/archives/<stage>/` every two
   minutes. At the end the archives come back without readings and run folders, and each goal entry (or the deepest
   chain) is verified from boot on the VM and again on the laptop. CPU seconds are the VM's (n2 cores), reported as such.
+
+## Amendment 2026-11-02, during the kitchen's stage 1: b = 10 on the VM
+
+- **Why.** The kitchen ran with b = 2, the laptop's setting, on the VM's 16 vCPUs and 62 GB: load average 2.1 to 2.6,
+  most of the machine idle, 15 jobs committed in 18 minutes.
+- **What.** At 11:45 the run was stopped after 15 committed jobs (j00015 and j00016 running, uncommitted) and resumed
+  from its files with `vm_stage1.sh restart kitchen 10`; the two uncommitted jobs run again in place. Code, guide,
+  switches and stop rules are unchanged; `--stop-jobs 80` counts jobs as before.
+- **Effect on the results.** A job's own result does not depend on b. The order of selection does: with more jobs
+  running, more entries are busy when the next one is chosen. Results report b per job range (1 to 15 at b = 2, the
+  rest at b = 10).

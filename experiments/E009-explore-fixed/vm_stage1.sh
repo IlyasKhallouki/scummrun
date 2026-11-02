@@ -141,6 +141,23 @@ start() {  # NAME GOAL STOP_JOBS, detached from the ssh session
     say "started $1 (pid $!)"
 }
 
+resume() {  # NAME WORKERS: run a stopped archive on from its files, then verify and report
+    vm_env
+    local name=$1 w=$2
+    export E008_HEAVY_LOCK=/var/tmp/fast-mi/heavy-$name.lock
+    cd $WT/experiments/E008-go-explore
+    nice -n 10 $PY -u explore.py run $E/archives/$name --workers $w
+    echo "run exit $?"
+    $PY explore.py verify $E/archives/$name; echo "verify exit $?"
+    $PY explore.py report $E/archives/$name > $E/logs/$name.report; echo "report exit $?"
+}
+
+restart() {  # NAME WORKERS, detached from the ssh session
+    mkdir -p $E/logs
+    setsid nohup bash $WT/experiments/E009-explore-fixed/vm_stage1.sh resume "$@" > $E/logs/$1-resume.log 2>&1 < /dev/null &
+    say "resumed $1 with $2 workers (pid $!)"
+}
+
 pull() {  # NAME
     local IP; IP=$(ip)
     mkdir -p $E/archives/$1
@@ -167,6 +184,6 @@ vm() {  # run a subcommand of this script on the VM
 
 cmd=${1:-}; shift || true
 case "$cmd" in
-    push|pull|follow|vm|setup|offcheck|stage|start) $cmd "$@" ;;
+    push|pull|follow|vm|setup|offcheck|stage|start|resume|restart) $cmd "$@" ;;
     *) sed -n '2,20p' "$0"; exit 2 ;;
 esac
