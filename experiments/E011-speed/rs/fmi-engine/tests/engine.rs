@@ -32,7 +32,7 @@ fn concurrent_forks_reach_their_engines() {
                 let mut c = root.fork_bin().unwrap();
                 assert_eq!(c.status().frame, 300 + 50 * t);
                 assert_eq!(c.status().reason, "forked");
-                assert_eq!(c.block_fresh().map(|b| b.len()).unwrap() > 0, true);
+                assert!(!c.block_fresh().unwrap().is_empty());
                 let f = fmi_engine::block::Block::parse(c.block_fresh().unwrap())
                     .unwrap()
                     .facts();
