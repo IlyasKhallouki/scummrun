@@ -706,6 +706,9 @@ pub struct Status {
     pub room_w: i32,
     /// fork_each: (frame, pid) of each child
     pub forks: Vec<(u64, u32)>,
+    /// the screen layout at the stop: initScreens' b and h and `_forceBannerVirtScreen` (the hit test's screens,
+    /// play/HITCACHE.md); reported by the binary channel with patch 0004, None otherwise (the JSON protocol, an end)
+    pub screen: Option<(i32, i32, bool)>,
 }
 
 /// The "at" reply: what a click at screen (x, y) would hit now.
@@ -851,6 +854,30 @@ pub trait Engine: Send {
     /// CPU seconds of this process so far (utime + stime)
     fn cpu_s(&self) -> f64;
     fn quit(self: Box<Self>);
+    /// An observed frame in one command: run to the decision point of `frame`, then what `runs`, `explain_log` and
+    /// `obs(req)` give at that stop (the window search's observed child frame). The default makes the four calls.
+    fn step_observe(&mut self, frame: u64, req: &ObsReq) -> EResult<(Status, RunsReply, ExplainReply, Obs)> {
+        let st = self.run(&RunSpec {
+            frame: Some(frame),
+            ..Default::default()
+        })?;
+        let runs = self.runs()?;
+        let ents = self.explain_log()?;
+        let o = self.obs(req)?;
+        Ok((st, runs, ents, o))
+    }
+    /// A run and the dump at its stop in one command (the input code's run when it reads the state next). The
+    /// default makes the two calls.
+    fn run_obs(&mut self, spec: &RunSpec, req: &ObsReq) -> EResult<(Status, Obs)> {
+        let st = self.run(spec)?;
+        let o = self.obs(req)?;
+        Ok((st, o))
+    }
+    /// `at` at each point, in order, at the current stop (the hit tests read and change nothing). The default makes
+    /// one call per point.
+    fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
+        pts.iter().map(|&(x, y)| self.at(x, y)).collect()
+    }
 }
 
 /// How an engine starts (replay_part1.config): seed 1, the input movie from boot, the bridge's settings.

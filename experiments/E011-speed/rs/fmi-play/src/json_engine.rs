@@ -199,6 +199,8 @@ pub fn status_of(j: &J) -> Status {
             .iter()
             .filter_map(|p| Some((p.arr().first()?.int()? as u64, p.arr().get(1)?.int()? as u32)))
             .collect(),
+        // the JSON protocol does not report the screen layout (patch 0004's binary status does)
+        screen: None,
     }
 }
 

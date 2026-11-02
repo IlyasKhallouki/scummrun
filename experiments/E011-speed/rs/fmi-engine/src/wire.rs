@@ -22,6 +22,12 @@ pub const C_EXPLAIN_LOG: u8 = 0x8D;
 pub const C_STATE_JSON: u8 = 0x8E;
 pub const C_QUIT: u8 = 0x8F;
 pub const C_STEP: u8 = 0x90;
+/// patch 0004 (round 2, play): a run to a frame answered with the runs, the explain entries and a dump
+pub const C_STEP_OBS: u8 = 0x91;
+/// patch 0004 (round 2, play): several hit tests in one message
+pub const C_AT_MANY: u8 = 0x92;
+/// patch 0004 (round 2, play): a run answered with the dump at its stop
+pub const C_RUN_OBS: u8 = 0x93;
 
 // engine to controller
 pub const R_HELLO: u8 = 0x01;
@@ -38,6 +44,12 @@ pub const R_OK: u8 = 0x0B;
 pub const R_ERROR: u8 = 0x0C;
 pub const R_JSON: u8 = 0x0D;
 pub const R_STEP_REPLY: u8 = 0x0E;
+/// patch 0004: `Status`, `RunsReply`, `ExplainReply`, `Obs`
+pub const R_STEP_OBS_REPLY: u8 = 0x0F;
+/// patch 0004: `Vec<At>`
+pub const R_AT_MANY: u8 = 0x10;
+/// patch 0004: `Status`, `Obs`
+pub const R_RUN_OBS_REPLY: u8 = 0x11;
 
 /// A message being written: the 5-byte header first, its length set by `finish`.
 pub struct W(pub Vec<u8>);
@@ -343,6 +355,12 @@ impl<'a> R<'a> {
         for _ in 0..n {
             forks.push((self.u64()?, self.u32()?));
         }
+        // patch 0004: the screen layout (initScreens' b and h, the forced banner screen); None at an end
+        let screen = if self.tag()? {
+            Some((self.i32()?, self.i32()?, self.b()?))
+        } else {
+            None
+        };
         Ok(Status {
             reason,
             ended,
@@ -367,6 +385,7 @@ impl<'a> R<'a> {
             xstart,
             room_w,
             forks,
+            screen,
         })
     }
 
