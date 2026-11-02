@@ -564,3 +564,119 @@ pub fn facts_json(f: &FactMap) -> Value {
     }
     Value::Object(m)
 }
+
+/// E009 fix a's rule on fmi-core's packed facts (the try's hot path: one diff per frame, no key text built but for
+/// the keys that change). The same result as `idle_rule` (its maps in key order).
+pub fn idle_rule_facts<I>(start: &fmi_core::Facts, frames: I) -> Value
+where
+    I: IntoIterator<Item = (i64, fmi_core::Facts)>,
+{
+    let mut seen: HashMap<fmi_core::Key, HashSet<i64>> = HashMap::new();
+    let mut first: Vec<(fmi_core::Key, i64)> = Vec::new();
+    let mut first_set: HashSet<fmi_core::Key> = HashSet::new();
+    let mut changes: Vec<(fmi_core::Key, i64)> = Vec::new();
+    let mut ch_ix: HashMap<fmi_core::Key, usize> = HashMap::new();
+    let mut prev = start.clone();
+    for (off, fa) in frames {
+        for (k, _old, v) in prev.diff(&fa) {
+            match ch_ix.get(&k) {
+                Some(&i) => changes[i].1 += 1,
+                None => {
+                    ch_ix.insert(k, changes.len());
+                    changes.push((k, 1));
+                }
+            }
+            let s = seen.entry(k).or_insert_with(|| HashSet::from([start.get(k).unwrap_or(0)]));
+            if s.contains(&v) && first_set.insert(k) {
+                first.push((k, off));
+            }
+            s.insert(v);
+        }
+        prev = fa;
+    }
+    let mut returns: Vec<String> = first_set.iter().map(|k| k.text()).collect();
+    returns.sort();
+    let mut fr = Map::new();
+    for (k, o) in &first {
+        fr.insert(k.text(), json!(o));
+    }
+    let mut chm = Map::new();
+    for (k, n) in &changes {
+        chm.insert(k.text(), json!(n));
+    }
+    json!({"returns": returns, "first_return": Value::Object(fr), "changes": Value::Object(chm)})
+}
+
+/// facts.py `facts_of` as an ordered JSON object, keys in the order facts.py inserts them (the start row's file).
+pub fn facts_of_ordered(s: &fmi_core::Obs) -> Value {
+    use fmi_core::{CLOCKS, ENCD, EXCD, WIO_FLOBJECT, WIO_GLOBAL, WIO_INVENTORY, WIO_LOCAL, WIO_ROOM};
+    let mut f = Map::new();
+    for (n, &v) in s.vars.iter().enumerate() {
+        if !CLOCKS.contains(&n) {
+            f.insert(format!("var:{n}"), json!(v));
+        }
+    }
+    for n in &s.bits_set {
+        f.insert(format!("bit:{n}"), json!(1));
+    }
+    for (o, v) in &s.owners {
+        f.insert(format!("owner:{o}"), json!(v));
+    }
+    for (o, v) in &s.states {
+        f.insert(format!("state:{o}"), json!(v));
+    }
+    for (o, cs) in &s.classes {
+        for c in cs {
+            f.insert(format!("class:{o}:{c}"), json!(1));
+        }
+    }
+    f.insert("room".into(), json!(s.room));
+    if let Some(e) = s.ego {
+        f.insert("ego".into(), json!(e));
+    }
+    for sl in &s.slots {
+        if sl.where_ == WIO_GLOBAL {
+            f.insert(format!("script:{}", sl.number), json!(1));
+        } else if sl.where_ == WIO_LOCAL {
+            f.insert(format!("local:{}", sl.number), json!(1));
+        } else if [WIO_INVENTORY, WIO_ROOM, WIO_FLOBJECT].contains(&sl.where_) && sl.number != ENCD && sl.number != EXCD {
+            f.insert(format!("objscript:{}", sl.number), json!(1));
+        }
+        let unit = crate::start::unit_name(sl.where_, sl.number);
+        if let Some(u) = &unit {
+            if sl.code >= 0 {
+                f.insert(format!("at:{u}:{}", sl.code), json!(1));
+            }
+            if sl.frozen > 0 {
+                f.insert(format!("frozen:{u}"), json!(1));
+            }
+        }
+    }
+    f.insert("cutscene".into(), json!(s.cutscene.depth));
+    if let Some(top) = s.cutscene.levels.last().and_then(|l| l.override_.as_ref()) {
+        if !top.stale && top.code >= 0 {
+            if let Some(u) = crate::start::unit_name(top.where_, top.number) {
+                f.insert(format!("esc:{u}:{}", top.code), json!(1));
+            }
+        }
+    }
+    for v in &s.verbs {
+        f.insert(format!("verb:{}", v.id), json!(1));
+    }
+    Value::Object(f)
+}
+
+/// step.py `start_row`: the entry's start row in start-part1.jsonl's format (reader-scope --start-rows reads seed
+/// and facts).
+pub fn start_row(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) -> Res<Value> {
+    if seed != SEED {
+        return Err(format!("ValueError: seed {seed}: E008 runs seed {SEED} only (plan.md)"));
+    }
+    let ego = status.ego.map(|(x, y)| json!([x, y])).unwrap_or(Value::Null);
+    Ok(json!({"seed": seed, "frame": status.frame,
+              "stop": {"stop": status.reason, "frame": status.frame, "tick": status.tick, "qf": status.qf, "room": status.room,
+                       "idle": status.idle, "rng": status.rng, "up": status.up, "cs": status.cs, "ego": ego},
+              "dump": {"frame": state.frame, "tick": state.tick, "room": state.room, "ego": state.ego,
+                       "ego_pos": state.ego_pos.map(|(x, y)| json!([x, y])), "seed": state.seed, "boot_param": state.boot_param},
+              "facts": facts_of_ordered(state)}))
+}
