@@ -16,7 +16,9 @@ env: FAKE_GOAL_AFTER (default 4); FAKE_SLEEP_S (default 0; even job numbers slee
      FAKE_FAIL (an entry id whose jobs fail with one error); FAKE_DIFFER (an entry id whose return differs);
      FAKE_GUARD_ONCE (a marker file: the first job to find it absent creates it and exits as the guard's kill does,
      with no result.json and the guard's line in its log); FAKE_NO_PROGRESS (a key: the target is that key at the
-     entry's value plus 2, whatever R holds).
+     entry's value plus 2, whatever R holds); FAKE_IDLE_KEY (E009: a key the end entry raises by 1 in every job, as
+     an idle engine's counter would; with job.json idle_frames and not idle_measured the result's idle lists it and
+     the goal's keys as returning).
 """
 
 import gzip
@@ -107,6 +109,12 @@ def main() -> None:
     out["tried"] = [[k, v]]
     f1 = dict(facts, **{"var:990": facts.get("var:990", 0) + 1})
     f2 = dict(f1, **{k: v})
+    idle_key = os.environ.get("FAKE_IDLE_KEY")
+    if idle_key:
+        f2[idle_key] = facts.get(idle_key, 0) + 1
+        if job.get("idle_frames") and not job.get("idle_measured"):
+            out["idle"] = {"returns": sorted({idle_key} | set(job["goal"])), "first_return": {idle_key: 2},
+                           "changes": {idle_key: 9}, "frames": job["idle_frames"], "seconds": 0.0, "cpu_s": 0.0}
     if n >= int(os.environ.get("FAKE_GOAL_AFTER") or 4) - 1:
         f2.update({g: vals[0] for g, vals in job["goal"].items()})
     ev1, ev2 = {"frame": frame + 3, "click": [10, 10]}, {"frame": frame + 7, "key": "p"}
