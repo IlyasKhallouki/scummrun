@@ -1161,6 +1161,9 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
     let mut ids: HashMap<Box<[u32]>, u32, FxBuild> = HashMap::default();
     let mut status: Vec<NodeStatus> = Vec::new();
     let mut parent: Vec<(u32, u32)> = Vec::new();
+    // TASKCORE_TRACE: FD's progress lines (search_progress.cc, search_statistics.cc), for the comparison of long searches
+    let trace = std::env::var_os("TASKCORE_TRACE").is_some();
+    let mut g_of: HashMap<u32, i64> = HashMap::new();
     let register = |s: &[u32], arena: &mut Vec<u32>, ids: &mut HashMap<Box<[u32]>, u32, FxBuild>, status: &mut Vec<NodeStatus>, parent: &mut Vec<(u32, u32)>| -> u32 {
         if let Some(&id) = ids.get(s) {
             return id;
@@ -1200,9 +1203,21 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
                         parent[cur as usize] = p;
                     }
                     status[cur as usize] = NodeStatus::Closed;
+                    let g = if trace {
+                        let g = cur_pred.map_or(0, |(p, o)| g_of[&p] + t.cost[o as usize] as i64);
+                        g_of.insert(cur, g);
+                        g
+                    } else {
+                        0
+                    };
                     if cur_pred.is_none() {
                         out.h0 = Some(h);
                         best = Some(h);
+                        if trace {
+                            eprintln!("New best heuristic value for ff: {}", h);
+                            eprintln!("g={}, {} evaluated, {} expanded", g, out.evaluated, out.expanded);
+                            eprintln!("Initial heuristic value for ff: {}", h);
+                        }
                     }
                     if t.is_goal(&state) {
                         let mut plan = Vec::new();
@@ -1220,6 +1235,10 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
                     if cur_pred.is_some() && best.is_none_or(|b| h < b) {
                         best = Some(h);
                         prio[1] -= 1000; // boost_preferred: the preferred-only list
+                        if trace {
+                            eprintln!("New best heuristic value for ff: {}", h);
+                            eprintln!("g={}, {} evaluated, {} expanded", g, out.evaluated, out.expanded);
+                        }
                     }
                     // generate_successors
                     for &o in order {
