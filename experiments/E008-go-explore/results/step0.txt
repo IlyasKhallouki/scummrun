@@ -55,7 +55,7 @@ part1-wide: exit 0, wall 15.0 s, peak rss 100 MB (a second run: wall 21.2 s, use
     game loaded in 0.30 s
     kitchen: 72256 records, reading 45.39 s, 45.0 CPU s, peak RSS 709 MB
     kitchen reading against golden.py's: 72258 compared, 0 differences
-    /home/ilyask/.cache/fast-mi-e008/off/kitchen.tc: 71729 actions (527 folded), 44792868 bytes
+    ~/.cache/fast-mi-e008/off/kitchen.tc: 71729 actions (527 folded), 44792868 bytes
     total 49.96 s, peak RSS 729852 kB
     279b7a24dc91a76a94aa75a1c23b7a750e335152  kitchen.tc
 - E003 tests (test_replay_part1, test_window, test_strict, test_refine, test_reach_extend), unchanged: 108 passed, 1 skipped (needs READER_PICKLE)
@@ -77,7 +77,7 @@ part1-wide: exit 0, wall 15.0 s, peak rss 100 MB (a second run: wall 21.2 s, use
       targets {'0': 1, '1': 0, '2': 0}, first [['owner:566', 1, 0, 0]]; probes [(['owner:566', 1], 'plan', 129.6)]
       attempt: target ['owner:566', 1], stop 'goal', reached True, from the plan True, frames 51 (3165 -> 3216), qf 1224 (75772 -> 76996), replans 1, refinements [{'plan': 0, 'frame': 3204, 'class': 'split', 'added': [], 'why_not': 'a split on no variable the reading holds no fact of', 'seconds': None, 'cpu_s': None}], extensions [{'plan': 1, 'frame': 3204, 'n_values': 2, 'seconds': 59.23, 'cpu_s': 109.94, 'actions_before': 39661, 'actions': 39661}], inputs 3, 129.6 s
       window search: 2 windows, 8 children, engine CPU {'child': 0.2, 'snapshot': 0.0, 'the last engine': 0.02}, Python CPU 1.44
-      new entries 4: [(3166, 'checkpoint'), (3204, 'checkpoint'), (3206, 'checkpoint'), (3216, 'end')]; readings made [{'path': '/home/ilyask/.cache/fast-mi-e008/int-step-tests/jobs/tb/run/a00/reach-01/reading.json', 'scope': [28, 33, 41], 'kind': 'reach'}]
+      new entries 4: [(3166, 'checkpoint'), (3204, 'checkpoint'), (3206, 'checkpoint'), (3216, 'end')]; readings made [{'path': '~/.cache/fast-mi-e008/int-step-tests/jobs/tb/run/a00/reach-01/reading.json', 'scope': [28, 33, 41], 'kind': 'reach'}]
       CPU s {'return': 2.5, 'read': 216.9, 'plan': 67.6, 'play': 1.7, 'total': 288.7, 'rusage_total': 289.3}; peak RSS MB {'python': 397, 'children': 587}
     [b] verify from boot of (a)'s entry at 3165 then (b)'s segment to 3216: 0 differences at 10 checkpoints, 37 inputs, final {'owner:566': 1}, 3.1 s
   explore's: the root at 2728 (qf 65,284, room 33), E007's kitchen movie as a two-entry chain verified from boot, 0 differences, 488 frames, 11,712 qf
