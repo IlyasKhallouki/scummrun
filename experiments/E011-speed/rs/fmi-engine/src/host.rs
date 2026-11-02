@@ -150,16 +150,21 @@ pub struct Hello {
     pub tick: u64,
 }
 
-struct Shared {
-    cfg: HostCfg,
+/// One root engine and every process forked from it: the socket they connect to (as control.py's Controller has one
+/// per root engine). The root is the connection whose hello has no parent; a fork's is found by its pid.
+struct Family {
+    timeout: Duration,
     dir: PathBuf,
     sock: PathBuf,
     listener: Mutex<UnixListener>,
-    /// connections accepted for another pid than the one asked for
+    /// connections accepted for another process than the one asked for
     pending: Mutex<HashMap<u32, (UnixStream, Hello)>>,
 }
 
-impl Drop for Shared {
+/// The pid that stands for the root in `Family::accept` (a hello's parent 0).
+const ROOT: u32 = 0;
+
+impl Drop for Family {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.sock);
         let _ = std::fs::remove_dir(&self.dir);
@@ -183,10 +188,31 @@ fn read_msg(s: &mut UnixStream) -> EResult<(u8, Vec<u8>)> {
     Ok((h[4], p))
 }
 
-impl Shared {
-    /// The connection of engine process `pid` and its hello: accepted now, or earlier for another caller.
+impl Family {
+    fn new(timeout: Duration) -> std::io::Result<Family> {
+        let dir = std::env::temp_dir().join(format!(
+            "fmi-ctl-{}-{}",
+            std::process::id(),
+            SEQ.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&dir)?;
+        let sock = dir.join("control.sock");
+        let _ = std::fs::remove_file(&sock);
+        let listener = UnixListener::bind(&sock)?;
+        listener.set_nonblocking(true)?;
+        Ok(Family {
+            timeout,
+            dir,
+            sock,
+            listener: Mutex::new(listener),
+            pending: Mutex::new(HashMap::new()),
+        })
+    }
+
+    /// The connection of engine process `pid` (`ROOT`: the family's root) and its hello: accepted now, or earlier
+    /// for another caller.
     fn accept_pid(&self, pid: u32) -> EResult<(UnixStream, Hello)> {
-        let deadline = Instant::now() + self.cfg.timeout;
+        let deadline = Instant::now() + self.timeout;
         loop {
             if let Some(c) = self.pending.lock().unwrap().remove(&pid) {
                 return Ok(c);
@@ -210,7 +236,7 @@ impl Shared {
                 Err(e) => return Err(io_err(e)),
             };
             drop(l);
-            s.set_read_timeout(Some(self.cfg.timeout)).map_err(io_err)?;
+            s.set_read_timeout(Some(self.timeout)).map_err(io_err)?;
             let (ty, p) = read_msg(&mut s)?;
             if ty != wire::R_HELLO {
                 return Err(bad(format!("type {ty:#x} where a hello was expected")));
@@ -227,44 +253,27 @@ impl Shared {
                 Ok(h)
             })()
             .map_err(bad)?;
-            if h.pid == pid {
+            let key = if h.parent == 0 { ROOT } else { h.pid };
+            if key == pid {
                 return Ok((s, h));
             }
-            self.pending.lock().unwrap().insert(h.pid, (s, h));
+            self.pending.lock().unwrap().insert(key, (s, h));
         }
     }
 }
 
-/// Starts engine processes (EngineHost) and accepts their forks' connections. One listening socket serves every
-/// engine this host starts; connections are matched to their engine by pid.
+/// Starts engine processes (EngineHost). Each root engine gets its own listening socket, which its forks connect
+/// to; their connections are matched to their processes by pid.
 #[derive(Clone)]
 pub struct Host {
-    shared: Arc<Shared>,
+    cfg: Arc<HostCfg>,
 }
 
 static SEQ: AtomicU64 = AtomicU64::new(0);
 
 impl Host {
     pub fn new(cfg: HostCfg) -> std::io::Result<Host> {
-        let dir = std::env::temp_dir().join(format!(
-            "fmi-ctl-{}-{}",
-            std::process::id(),
-            SEQ.fetch_add(1, Ordering::Relaxed)
-        ));
-        std::fs::create_dir_all(&dir)?;
-        let sock = dir.join("control.sock");
-        let _ = std::fs::remove_file(&sock);
-        let listener = UnixListener::bind(&sock)?;
-        listener.set_nonblocking(true)?;
-        Ok(Host {
-            shared: Arc::new(Shared {
-                cfg,
-                dir,
-                sock,
-                listener: Mutex::new(listener),
-                pending: Mutex::new(HashMap::new()),
-            }),
-        })
+        Ok(Host { cfg: Arc::new(cfg) })
     }
 
     pub fn from_env() -> std::io::Result<Host> {
@@ -272,7 +281,7 @@ impl Host {
     }
 
     pub fn cfg(&self) -> &HostCfg {
-        &self.shared.cfg
+        &self.cfg
     }
 
     /// A fresh engine (replay_part1.config's settings, the binary channel, the lean switches when `cfg.lean`), its
@@ -283,7 +292,8 @@ impl Host {
                 "the Any% seed is never used by the system's runs".into(),
             ));
         }
-        let h = &self.shared.cfg;
+        let h = &*self.cfg;
+        let family = Arc::new(Family::new(h.timeout).map_err(io_err)?);
         let out = &cfg.out_dir;
         for d in [
             out.clone(),
@@ -324,7 +334,7 @@ impl Host {
             .env("XDG_CACHE_HOME", out.join("xdg/cache"))
             .env("SDL_VIDEODRIVER", "dummy")
             .env("SDL_AUDIODRIVER", "dummy")
-            .env("SPEEDRUN_CONTROL", &self.shared.sock)
+            .env("SPEEDRUN_CONTROL", &family.sock)
             .env("SPEEDRUN_WIRE", "bin");
         if !sorted.is_empty() {
             let movie = out.join("prefix.jsonl");
@@ -345,8 +355,8 @@ impl Host {
         let log2 = log.try_clone().map_err(io_err)?;
         cmd.stdin(Stdio::null()).stdout(log).stderr(log2);
         let mut child = cmd.spawn().map_err(io_err)?;
-        let pid = child.id();
-        let conn = match self.shared.accept_pid(pid) {
+        // the root by its hello (no parent), not by the pid spawned: a wrapper may run the engine as its child
+        let conn = match family.accept_pid(ROOT) {
             Ok(c) => c,
             Err(e) => {
                 let _ = child.kill();
@@ -354,7 +364,7 @@ impl Host {
                 return Err(e);
             }
         };
-        let mut e = BinEngine::new(self.shared.clone(), conn.0, conn.1);
+        let mut e = BinEngine::new(family, conn.0, conn.1);
         e.proc_ = Some(child);
         e.first_stop()?;
         Ok(e)
@@ -403,7 +413,7 @@ pub struct StepOut {
 
 /// One engine process over the binary channel (control.py's Branch).
 pub struct BinEngine {
-    shared: Arc<Shared>,
+    shared: Arc<Family>,
     pid: u32,
     stream: UnixStream,
     rbuf: Vec<u8>,
@@ -424,7 +434,7 @@ pub struct BinEngine {
 }
 
 impl BinEngine {
-    fn new(shared: Arc<Shared>, stream: UnixStream, h: Hello) -> BinEngine {
+    fn new(shared: Arc<Family>, stream: UnixStream, h: Hello) -> BinEngine {
         let status = Status {
             frame: h.frame,
             tick: h.tick,
@@ -507,7 +517,7 @@ impl BinEngine {
 
     fn first_stop(&mut self) -> EResult<()> {
         self.stream
-            .set_read_timeout(Some(self.shared.cfg.timeout))
+            .set_read_timeout(Some(self.shared.timeout))
             .map_err(io_err)?;
         self.stop()?;
         Ok(())
