@@ -514,6 +514,10 @@ fn main() {
     let packed = match &out_dir {
         Some(d) => {
             std::fs::create_dir_all(d).unwrap();
+            // an older reading's head and index go first: the folder holds a whole reading only once they are back
+            for f in [files::HEAD, files::IDX] {
+                std::fs::remove_file(d.join(f)).ok();
+            }
             let p = d.join(files::PACKED);
             if let Some(q) = arg(&args, "--packed") {
                 assert_eq!(PathBuf::from(q), p, "--out-dir writes the packed file as DIR/{}", files::PACKED);
