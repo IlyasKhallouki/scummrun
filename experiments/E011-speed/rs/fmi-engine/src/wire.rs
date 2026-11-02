@@ -518,7 +518,10 @@ impl<'a> R<'a> {
             Ok(raw
                 .chunks_exact(8)
                 .map(|c| {
-                    (u32::from_le_bytes(c[..4].try_into().unwrap()), i32::from_le_bytes(c[4..].try_into().unwrap()))
+                    (
+                        u32::from_le_bytes(c[..4].try_into().unwrap()),
+                        i32::from_le_bytes(c[4..].try_into().unwrap()),
+                    )
                 })
                 .collect())
         };

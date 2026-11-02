@@ -666,7 +666,10 @@ fn bench(o: &Opts) -> Res<()> {
         q.block_fresh().map_err(e2s)?;
     }
     let (w, cpu) = c.per(20 * reps);
-    put("State (the F2 block) alone", format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"));
+    put(
+        "State (the F2 block) alone",
+        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+    );
     let c = Clock::new(q.pid());
     for _ in 0..reps {
         q.state_json(&ObsReq::default()).map_err(e2s)?;

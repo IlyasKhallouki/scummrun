@@ -172,7 +172,11 @@ impl<'a> Block<'a> {
     pub fn facts(&self) -> Facts {
         let n_objs = self.n_objs();
         let set_bits: usize = self.bits.iter().map(|b| b.count_ones() as usize).sum();
-        let classes: usize = self.class.chunks_exact(4).map(|c| rd32(c, 0).count_ones() as usize).sum();
+        let classes: usize = self
+            .class
+            .chunks_exact(4)
+            .map(|c| rd32(c, 0).count_ones() as usize)
+            .sum();
         let mut f: Vec<(Key, Val)> =
             Vec::with_capacity(self.n_vars() + set_bits + 2 * n_objs + classes + 4 * self.slots.len() + 64);
         // the clocks (facts.py CLOCKS) are all below 64: a mask
@@ -192,8 +196,20 @@ impl<'a> Block<'a> {
                 b &= b - 1;
             }
         }
-        f.extend(self.owner.iter().enumerate().skip(1).map(|(o, &v)| (Key::owner(o as u64), v as Val)));
-        f.extend(self.state.iter().enumerate().skip(1).map(|(o, &v)| (Key::state(o as u64), v as Val)));
+        f.extend(
+            self.owner
+                .iter()
+                .enumerate()
+                .skip(1)
+                .map(|(o, &v)| (Key::owner(o as u64), v as Val)),
+        );
+        f.extend(
+            self.state
+                .iter()
+                .enumerate()
+                .skip(1)
+                .map(|(o, &v)| (Key::state(o as u64), v as Val)),
+        );
         for (o, c) in self.class.chunks_exact(4).enumerate().skip(1) {
             let mut c = rd32(c, 0);
             while c != 0 {
