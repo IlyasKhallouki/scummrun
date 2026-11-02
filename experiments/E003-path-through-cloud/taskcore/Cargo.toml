@@ -5,6 +5,8 @@ edition = "2021"
 description = "E003 step 4: the planner's task as flat integer arrays, exact reductions, and Fast Downward's SAS file"
 
 [dependencies]
+# E011: the types the planner's port returns (experiments/E011-speed/plan.md, Appendix A); no dependency of its own
+fmi-core = { path = "../../E011-speed/rs/fmi-core" }
 
 [profile.release]
 opt-level = 3

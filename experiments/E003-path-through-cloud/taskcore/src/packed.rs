@@ -40,21 +40,32 @@ pub struct Loaded {
 
 pub fn load(path: &Path) -> Result<Loaded, String> {
     let err = |e: std::io::Error| format!("{}: {}", path.display(), e);
-    let mut f = File::open(path).map_err(err)?;
+    let f = File::open(path).map_err(err)?;
     let len = f.metadata().map_err(err)?.len();
+    load_from(f, len, &path.display().to_string())
+}
+
+/// `load` from a packed file's bytes held in memory (a mapped reading, E011's warm planner): the same task.
+pub fn load_bytes(bytes: &[u8], name: &str) -> Result<Loaded, String> {
+    load_from(std::io::Cursor::new(bytes), bytes.len() as u64, name)
+}
+
+/// `load` on any reader of the file's `len` bytes; `name` names it in errors.
+pub fn load_from<R: Read + Seek>(mut f: R, len: u64, name: &str) -> Result<Loaded, String> {
+    let err = |e: std::io::Error| format!("{}: {}", name, e);
     if len < 40 {
-        return Err(format!("{}: too short", path.display()));
+        return Err(format!("{}: too short", name));
     }
     let mut hdr = Vec::new();
     read_words(&mut f, 2, &mut hdr).map_err(err)?;
     if hdr[0] != MAGIC || hdr[1] != VERSION {
-        return Err(format!("{}: not a taskcore file of version {}", path.display(), VERSION));
+        return Err(format!("{}: not a taskcore file of version {}", name, VERSION));
     }
     f.seek(SeekFrom::End(-32)).map_err(err)?;
     let mut foot = Vec::new();
     read_words(&mut f, 8, &mut foot).map_err(err)?;
     if foot[7] != END_MAGIC {
-        return Err(format!("{}: bad footer", path.display()));
+        return Err(format!("{}: bad footer", name));
     }
     let (body_start, nact, o_str, o_facts, o_adds, o_goal, o_starts) =
         (foot[0] as u64, foot[1] as usize, foot[2] as usize, foot[3] as usize, foot[4] as usize, foot[5] as usize, foot[6] as usize);

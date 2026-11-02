@@ -217,6 +217,26 @@ impl<'a> View<'a> {
     pub fn neff(&self) -> u32 {
         self.w[skip_sets(self.w, 0)]
     }
+    /// The action's words with only the effects `keep` holds for (by index, in order): the words `Actions::push`
+    /// writes for the action with those effects (E011: no owned copy of the action).
+    pub fn words_keeping(&self, keep: impl Fn(usize, &EffView) -> bool) -> Vec<u32> {
+        let p = skip_sets(self.w, 0);
+        let mut out = Vec::with_capacity(self.w.len());
+        out.extend_from_slice(&self.w[..p]);
+        out.push(0);
+        let mut pos = p + 1;
+        let mut n = 0u32;
+        for (j, e) in self.effs().enumerate() {
+            let end = skip_sets(self.w, e.when_pos);
+            if keep(j, &e) {
+                out.extend_from_slice(&self.w[pos..end]);
+                n += 1;
+            }
+            pos = end;
+        }
+        out[p] = n;
+        out
+    }
     pub fn to_owned(&self) -> OAct {
         OAct {
             pre: self.pre().map(|(f, s)| OSet { fact: f, vals: s.to_vec() }).collect(),

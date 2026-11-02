@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "fmi-core"
+version = "0.1.0"
+
+[[package]]
 name = "taskcore"
 version = "0.1.0"
+dependencies = [
+ "fmi-core",
+]
