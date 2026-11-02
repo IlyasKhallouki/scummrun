@@ -667,6 +667,11 @@ impl<'a> Harness<'a> {
     pub fn into_parts(self) -> (PlayState, Arc<dyn ReadingSource>) {
         (self.ps, self.reading)
     }
+
+    /// `into_parts` with the window search's player, whose end the caller decides (`PlayerHost::done`).
+    pub fn into_all(self) -> (PlayState, Arc<dyn ReadingSource>, Box<dyn WindowPlayer>) {
+        (self.ps, self.reading, self.player)
+    }
 }
 
 /// A checkpoint as the archive's files write it: [frame, facts (sorted by key text), {"tick", "rng", "actors"}].

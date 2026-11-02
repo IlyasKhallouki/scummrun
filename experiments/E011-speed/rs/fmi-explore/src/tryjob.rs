@@ -456,13 +456,19 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let pb = machine::port_s();
     let checkpoints = std::mem::take(&mut h.ps.checkpoints);
     let inputs = res["inputs"].as_array().cloned().unwrap_or_default();
-    let (ps, last) = h.into_parts();
+    let (ps, last, player) = h.into_all();
     machine::port(|| ps.engine.quit());
+    // the window search's player: its reading data and game go off this thread (FMI_PLAYER_DONE), or here (round 1)
+    if switch("FMI_PLAYER_DONE") {
+        r.players.done(player);
+    } else {
+        drop(player);
+    }
     let packed = last.dir().join(crate::warm::head(&*last).get("packed").and_then(|p| p.as_str()).unwrap_or("reading.tc"));
     let tc = Instant::now();
     let _ = std::fs::write(adir.join("run.json"), pyjson::dumps_default(&res) + "\n");
     if std::env::var("FMI_TRY_PROFILE").is_ok() {
-        eprintln!("try profile:   harness run {:.2} ms (ports {:.2} ms), checkpoints {:.2} ms, run.json {:.2} ms",
+        eprintln!("try profile:   harness run {:.2} ms (ports {:.2} ms), its end (the player's) {:.2} ms, run.json {:.2} ms",
                   (tb - ta).as_secs_f64() * 1e3, (pb - pa) * 1e3, (tc - tb).as_secs_f64() * 1e3, tc.elapsed().as_secs_f64() * 1e3);
     }
     // the readings the harness made: their golden lines go
