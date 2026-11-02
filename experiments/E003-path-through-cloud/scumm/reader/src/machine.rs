@@ -349,6 +349,8 @@ struct KeptS {
 #[derive(Clone, Debug, Default)]
 pub struct SymX {
     pre: Rc<BTreeMap<PKey, Labels>>,
+    /// `pre` encoded for the join signature (`Reader._join`), made when first needed; every change of `pre` drops it
+    pre_enc: std::cell::RefCell<Option<Rc<[u8]>>>,
     kept: Rc<BTreeMap<Slot, KeptS>>,
     /// unit name -> (freezes not yet undone, `frozen:` before: None for "unwritten")
     fz: Rc<BTreeMap<Slot, (i32, Option<Val>)>>,
@@ -1343,12 +1345,19 @@ impl Hooks for ReaderHooks {
         let mut sig = m.join_base(p, o)?;
         let x = sx(p);
         let mut b: Vec<u8> = Vec::with_capacity(256);
-        b.extend_from_slice(&(x.pre.len() as u32).to_le_bytes());
-        for (k, labels) in x.pre.iter() {
-            enc_pkey(&mut b, *k);
-            b.extend_from_slice(&(labels.len() as u32).to_le_bytes());
-            for l in labels {
-                enc_label(&mut b, *l);
+        let pre_enc = x.pre_enc.borrow().clone();
+        match pre_enc {
+            Some(e) => b.extend_from_slice(&e),
+            None => {
+                b.extend_from_slice(&(x.pre.len() as u32).to_le_bytes());
+                for (k, labels) in x.pre.iter() {
+                    enc_pkey(&mut b, *k);
+                    b.extend_from_slice(&(labels.len() as u32).to_le_bytes());
+                    for l in labels {
+                        enc_label(&mut b, *l);
+                    }
+                }
+                *x.pre_enc.borrow_mut() = Some(Rc::from(&b[..]));
             }
         }
         // reader.py walks every write for a step; only the counters STEP_OPS step ever hold one (a read of a
@@ -1756,11 +1765,15 @@ fn on_fork(m: &mut Machine<'_>, p: &mut Path, snap: Path, key: Fact, sets: Optio
     let mut forks = Vec::with_capacity(groups.len());
     for g in groups.iter().skip(1) {
         let mut q = snap.clone();
-        Rc::make_mut(&mut sx_mut(&mut q).pre).insert(PKey::F(key), g.clone());
+        let xq = sx_mut(&mut q);
+        Rc::make_mut(&mut xq.pre).insert(PKey::F(key), g.clone());
+        xq.pre_enc = Default::default();
         forks.push(q);
     }
     let mut first = snap;
-    Rc::make_mut(&mut sx_mut(&mut first).pre).insert(PKey::F(key), groups[0].clone());
+    let xf = sx_mut(&mut first);
+    Rc::make_mut(&mut xf.pre).insert(PKey::F(key), groups[0].clone());
+    xf.pre_enc = Default::default();
     *p = first;
     forks
 }
@@ -1838,7 +1851,9 @@ fn step_op(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt, ke
                         let c = m.cite(x);
                         m.error(p, "cutscene stack underflow", c, "endCutscene's error() (script.cpp:1668-1681)", true);
                     } else if ok != dom.values {
-                        Rc::make_mut(&mut sx_mut(p).pre).insert(PKey::F(key), ok);
+                        let xp = sx_mut(p);
+                        Rc::make_mut(&mut xp.pre).insert(PKey::F(key), ok);
+                        xp.pre_enc = Default::default();
                     }
                 }
             }
