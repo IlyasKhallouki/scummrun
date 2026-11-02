@@ -171,37 +171,34 @@ impl<'a> Block<'a> {
     /// `facts_of` of the dump this block was taken with (the same `Facts`, pair for pair).
     pub fn facts(&self) -> Facts {
         let n_objs = self.n_objs();
-        let mut f: Vec<(Key, Val)> = Vec::with_capacity(self.n_vars() + 3 * n_objs + 256);
-        for n in 0..self.n_vars() {
-            if !CLOCKS.contains(&n) {
-                f.push((Key::var(n as u64), self.var(n) as Val));
+        let set_bits: usize = self.bits.iter().map(|b| b.count_ones() as usize).sum();
+        let classes: usize = self.class.chunks_exact(4).map(|c| rd32(c, 0).count_ones() as usize).sum();
+        let mut f: Vec<(Key, Val)> =
+            Vec::with_capacity(self.n_vars() + set_bits + 2 * n_objs + classes + 4 * self.slots.len() + 64);
+        // the clocks (facts.py CLOCKS) are all below 64: a mask
+        let clocks: u64 = CLOCKS.iter().fold(0, |m, &c| m | (1u64 << c));
+        for (n, c) in self.vars.chunks_exact(4).enumerate() {
+            if n >= 64 || clocks & (1u64 << n) == 0 {
+                f.push((Key::var(n as u64), i32::from_le_bytes(c.try_into().unwrap()) as Val));
             }
         }
         for (i, &byte) in self.bits.iter().enumerate() {
-            if byte == 0 {
-                continue;
-            }
-            for k in 0..8 {
-                let n = i * 8 + k;
-                if byte & (1 << k) != 0 && (n as u32) < self.n_bits {
+            let mut b = byte;
+            while b != 0 {
+                let n = i * 8 + b.trailing_zeros() as usize;
+                if (n as u32) < self.n_bits {
                     f.push((Key::bit(n as u64), 1));
                 }
+                b &= b - 1;
             }
         }
-        for o in 1..n_objs {
-            f.push((Key::owner(o as u64), self.owner[o] as Val));
-        }
-        for o in 1..n_objs {
-            f.push((Key::state(o as u64), self.state[o] as Val));
-        }
-        for o in 1..n_objs {
-            let c = self.class_of(o);
-            if c != 0 {
-                for bit in 0..32 {
-                    if c & (1 << bit) != 0 {
-                        f.push((Key::class(o as u64, bit as u64 + 1), 1));
-                    }
-                }
+        f.extend(self.owner.iter().enumerate().skip(1).map(|(o, &v)| (Key::owner(o as u64), v as Val)));
+        f.extend(self.state.iter().enumerate().skip(1).map(|(o, &v)| (Key::state(o as u64), v as Val)));
+        for (o, c) in self.class.chunks_exact(4).enumerate().skip(1) {
+            let mut c = rd32(c, 0);
+            while c != 0 {
+                f.push((Key::class(o as u64, c.trailing_zeros() as u64 + 1), 1));
+                c &= c - 1;
             }
         }
         f.push((Key::pack(K_ROOM, 0, 0, 0), self.room as Val));
