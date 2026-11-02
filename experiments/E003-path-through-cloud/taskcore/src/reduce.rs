@@ -922,6 +922,9 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
     }
     let mut drop = vec![false; n];
     let (mut dup, mut dom) = (0u64, 0u64);
+    let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
+    let t_groups = std::time::Instant::now();
+    let (mut n_exact, mut max_exact, mut n_checks, mut n_walks) = (0u64, 0usize, 0u64, 0u64);
     let mut groups: Vec<Vec<usize>> = by_hash.into_values().filter(|g| g.len() > 1).collect();
     groups.sort();
     let mut arena: Vec<u32> = Vec::new();
@@ -952,6 +955,8 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
                 continue;
             }
             let mut ix: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
+            n_exact += 1;
+            max_exact = max_exact.max(ix.len());
             // each member's precondition sorted (by fact, then values), in one arena: pre_at[i] its sets
             let mut parena: Vec<u32> = Vec::new();
             let mut pspan: FxMap<usize, (usize, usize)> = FxMap::default();
@@ -984,9 +989,17 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
                 let pi = &parena[pa..pb];
                 let bi = bits[&i];
                 let by = keep.iter().copied().find(|&k| {
+                    if prof {
+                        n_checks += 1;
+                    }
                     t.acts.meta[k].cost <= t.acts.meta[i].cost
                         && bits[&k] & !bi == 0
-                        && pre_within(&parena[pspan[&k].0..pspan[&k].1], pi)
+                        && {
+                            if prof {
+                                n_walks += 1;
+                            }
+                            pre_within(&parena[pspan[&k].0..pspan[&k].1], pi)
+                        }
                 });
                 match by {
                     Some(k) => {
@@ -1002,6 +1015,16 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
                 }
             }
         }
+    }
+    if prof {
+        eprintln!(
+            "profile f: groups {:.3} s, {} exact groups of up to {}, {} dominance checks, {} walks",
+            t_groups.elapsed().as_secs_f64(),
+            n_exact,
+            max_exact,
+            n_checks,
+            n_walks
+        );
     }
     // the replaced pairs as members (input actions), for the record: every member of the dropped action (a folded
     // action has one per path) points at the first member of the action that replaced it
