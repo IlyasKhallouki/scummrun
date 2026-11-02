@@ -19,3 +19,5 @@ pub mod search;
 pub mod serve;
 pub mod tail;
 pub mod warm;
+// E011 route: the libstdc++ container order Fast Downward's landmark code depends on
+pub mod stdhash;
