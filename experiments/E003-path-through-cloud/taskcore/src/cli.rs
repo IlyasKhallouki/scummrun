@@ -633,7 +633,14 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
                 cost_caps: None,
                 pick_windows: false,
             };
-            parse_opts(&mut r, line.split('\t').map(String::from))?;
+            // --steps F (warm's own): the plan's steps read back (decode.rs), as JSON lines
+            let mut parts: Vec<String> = line.split('\t').map(String::from).collect();
+            let mut steps_path = None;
+            if let Some(i) = parts.iter().position(|p| p == "--steps") {
+                steps_path = parts.get(i + 1).cloned();
+                parts.drain(i..(i + 2).min(parts.len()));
+            }
+            parse_opts(&mut r, parts.into_iter())?;
             let start_file = r.start_file.clone().ok_or("warm: a request needs --start-file")?;
             let req = crate::warm::Request {
                 goal: r.goal.clone(),
@@ -658,12 +665,20 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
                 let mut x = sas::Expander::new(&red.task, cfg.limit);
                 x.model = cfg.model;
                 let plan = sas::pass1(&mut x)?;
-                let (st, _) = crate::search::from_task(&mut x, &plan, &red.task.starts[red.start].1)?;
+                let (st, of) = crate::search::from_task(&mut x, &plan, &red.task.starts[red.start].1)?;
                 let build_s = t1.elapsed().as_secs_f64();
                 let o = crate::search::lazy_greedy(&st, None);
                 if o.status == "plan" {
                     crate::search::check_plan(&st, &o.plan)?;
                     std::fs::write(plan_path, crate::search::plan_text(&st, &o.plan)).map_err(|e| e.to_string())?;
+                    if let Some(sp) = &steps_path {
+                        let t2 = Instant::now();
+                        let mut x = sas::Expander::new(&red.task, cfg.limit);
+                        x.model = cfg.model;
+                        let steps = crate::decode::decode(&mut x, &of, &o.plan)?;
+                        j.f("seconds_decode", t2.elapsed().as_secs_f64());
+                        std::fs::write(sp, crate::decode::steps_json(&red.task, &steps)).map_err(|e| e.to_string())?;
+                    }
                 }
                 j.s("status", &o.status)
                     .n("plan_length", o.plan.len())

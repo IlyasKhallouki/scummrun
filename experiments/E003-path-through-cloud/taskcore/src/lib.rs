@@ -7,9 +7,11 @@
 
 pub mod bans;
 pub mod cli;
+pub mod decode;
 pub mod fold;
 pub mod model;
 pub mod packed;
+pub mod predict;
 pub mod reduce;
 pub mod sas;
 pub mod search;
