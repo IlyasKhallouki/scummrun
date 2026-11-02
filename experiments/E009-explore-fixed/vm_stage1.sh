@@ -86,6 +86,10 @@ setup() {
     sudo apt-get install -yq patchelf binutils >/dev/null
     cp $SVM.laptop $SVM
     patchelf --set-interpreter $LIB/ld-linux-x86-64.so.2 --force-rpath --set-rpath $LIB $SVM
+    # a library with its own RUNPATH (the laptop's /usr/lib/pulseaudio, ...) looks for its own needs there only
+    for f in $LIB/*.so*; do
+        if readelf -d $f 2>/dev/null | grep -q RUNPATH; then patchelf --set-rpath $LIB $f; fi
+    done
     local a b t; t=$(mktemp -d)
     objcopy -O binary --only-section=.text $SVM.laptop $t/a; objcopy -O binary --only-section=.text $SVM $t/b
     a=$(sha1sum < $t/a | cut -c1-12); b=$(sha1sum < $t/b | cut -c1-12); rm -rf $t
@@ -93,10 +97,10 @@ setup() {
     [ "$a" = "$b" ] || { echo "the code section differs"; exit 1; }
     say "loader: $(readelf -l $SVM | grep -o 'interpreter: [^]]*')"
     say "missing libraries: $(ldd $SVM | grep -c 'not found' || true)"
-    $SVM --version | head -2
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy $SVM --version | head -2
     $WT/.venv/bin/python -c 'import sys; print(sys.version)'
-    $TC --help >/dev/null 2>&1; echo "taskcore rc $?"
-    $FD/builds/release/bin/downward --help >/dev/null 2>&1; echo "downward rc $?"
+    echo "taskcore rc $($TC --help >/dev/null 2>&1; echo $?)"
+    echo "downward rc $($FD/builds/release/bin/downward --help >/dev/null 2>&1; echo $?)"
     nproc; free -g | head -2; df -h /home /var/tmp /dev/shm
 }
 
