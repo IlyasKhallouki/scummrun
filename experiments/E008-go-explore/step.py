@@ -146,10 +146,12 @@ def goal_target(goal: dict) -> tuple:
 
 
 def targets(reached_path, guide_doc: dict, entry_facts: dict, root_facts: dict | None = None, held=(), tried=(),
-            goal: dict | None = None) -> list:
+            goal: dict | None = None, rotation: dict | None = None) -> list:
     """Step 3 (module docstring): [(k, v, tier, depth)], tier 0 first, then by (depth, key, value) within a tier.
     ``root_facts``, when given: a value of a key whose only atom is (k, any) at its root value holds no atom of R
-    (plan.md's hold rule), so it is no target. ``held`` and ``tried``: [[k, v], ...] (v null: the any atom held)."""
+    (plan.md's hold rule), so it is no target. ``held`` and ``tried``: [[k, v], ...] (v null: the any atom held).
+    ``rotation`` (E009 fix b): {"cell": [[k, v, n], ...], "all": [...]}, the times each target was tried from the
+    entry's cell and in all; the same targets are then ordered by (cell, all, depth, tier, key, value)."""
     reached = read_reached(reached_path) if not isinstance(reached_path, dict) else reached_path
     atoms = guide_atoms(guide_doc)
     held_set = {(k, v) for k, v in held}
@@ -180,7 +182,23 @@ def targets(reached_path, guide_doc: dict, entry_facts: dict, root_facts: dict |
             is_held = (k, v) in held_set or (not concrete and (k, None) in held_set)
             rest.append((k, v, 2 if is_held else 1, d))
     rest.sort(key=lambda t: (t[2], t[3], t[0], t[1]))
-    return out + rest
+    if rotation is None:
+        return out + rest
+    return rotate(out + rest, rotation)
+
+
+def rotate(ts: list, rotation: dict) -> list:
+    """E009 fix b: ``ts`` [(k, v, tier, depth)] ordered by (tried in the cell, tried in all, depth, then E008's order
+    (tier, depth, key, value)); the counts are [[k, v, n], ...] lists."""
+    cell = {(k, v): n for k, v, n in rotation.get("cell") or ()}
+    every = {(k, v): n for k, v, n in rotation.get("all") or ()}
+
+
+    def order(t):
+        a = (t[0], t[1])
+        return (cell.get(a, 0), every.get(a, 0), t[3], t[2], t[0], (0, t[1], "") if isinstance(t[1], int) else
+                (1, 0, str(t[1])))
+    return sorted(ts, key=order)
 
 
 def reusable(reading_doc: dict, task_fact_keys, entry_facts: dict) -> tuple:
@@ -661,7 +679,7 @@ def run_job(job_dir) -> dict:
         guide = json.loads(Path(job["guide"]).read_text())
         reached = Path(rd.packed).with_suffix(".reached")
         ts = targets(reached, guide, facts, root_facts_of(job, job_dir), job.get("held") or (),
-                     job.get("tried") or (), goal)
+                     job.get("tried") or (), goal, job.get("rotation"))
         out["targets"] = {"by_tier": {str(n): sum(1 for x in ts if x[2] == n) for n in (0, 1, 2)},
                           "first": [list(x) for x in ts[:20]], "n": len(ts)}
         say(f"{len(ts)} targets: {out['targets']['by_tier']}; first {ts[:5]}")
