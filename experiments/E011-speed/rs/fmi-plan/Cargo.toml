@@ -1,0 +1,21 @@
+[package]
+name = "fmi-plan"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the planner port (fmi_core::PlannerHost, Planner) over a ReadingSource: taskcore's warm task, the Rust search or Fast Downward, the decode, the prediction, the plan cache and the old tail"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+taskcore = { path = "../../../E003-path-through-cloud/taskcore" }
+
+[features]
+default = ["file-reading"]
+# the test double of the reading port (ReadingSource over a reading's files), until readio's fmi-reading is wired in
+file-reading = []
+
+[profile.release]
+opt-level = 3
+codegen-units = 4
+lto = "thin"
+debug = false
