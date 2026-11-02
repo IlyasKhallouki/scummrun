@@ -1,0 +1,31 @@
+E008 smoke, 2026-11-02: explore.py run with the real step on the merged branch (e008 at c09053a); the kitchen guide, goal owner:566 = 1, allowed rooms 28, 33, 41, b = 1. A wiring check, not one of plan.md's runs.
+
+== the driver's log
+[00:20:23] j00000: entry 0 (room 33), scope [28, 33], key [1, 0, 0, -95, 16321, 0]
+[00:37:16] j00000: entry 0 ok; 11 entries, 10 new cells, 55 new atoms; archive 12 entries, 11 cells
+[00:37:16] j00001: entry 11 (room 28), scope [28, 33, 41], key [1, 0, 0, -150, 18391, 11]
+[00:39:28] j00001: entry 11 ok; 4 entries, 4 new cells, 23 new atoms; archive 16 entries, 15 cells
+[00:39:28] goal entry 15: verifying its movie from boot
+[00:39:41] stop: goal {'entry': 15}
+
+== explore.py report
+stage smoke: goal {'owner:566': [1]}, allowed rooms [28, 33, 41]
+jobs {'committed': 2, 'ok': 2, 'errors': 0, 'guard_kills': 0, 'exhausted': 0}
+entries 16, cells 15 (15 selectable), R atoms held 173
+readings {'registered': 3, 'fresh': 2, 'reused': 0, 'by_kind': {'fresh': 2, 'refine': 1}, 'scopes': {'28-33': 1, '28-33-41': 1}, 'records': 79498, 'read_cpu_s': 197.2, 'read_wall_s': 154.6, 'peak_rss_mb': 251, 'bytes': 291132115, 'evicted': 0}
+targets by tier {'0': 1, '1': 56, '2': 3}, probes {'time': 1, 'plan': 2}, attempts 2, refinements 6
+CPU s {'return': 5.7, 'read': 332.0, 'plan': 747.5, 'play': 105.4, 'total': 1190.6, 'rusage_total': 1141.7}, peak MB {'python': 409, 'children': 409}, driver 25.3 MB, disk 293.6 MB
+goal chain {'entry': 15, 'chain': [0, 11, 15], 'frames': 488, 'inputs': 41, 'goal_from_the_plan': True, 'stop': 'goal'}
+verified entry 15: same True, goal True, 488 frames, 11712 qf, 48.80 s from the root, 41 inputs, 2 segments
+stop goal {'entry': 15}
+
+== per job (log.jsonl)
+j00000 entry 0 key [1, 0, 0, -95, 16321, 0] scope [28, 33]: ok; reading fresh True (no cached reading) 38874 records, read wall 123.9 s, CPU 102.5 s, peak 238 MB
+  targets {'0': 0, '1': 26, '2': 0}; probes [(['bit:118', 1], 'time', 645.2), (['bit:348', 1], 'plan', 201.5)]
+  played ['bit:348', 1] stop "goal, not from the plan: it held at a plan's start", from the plan False, frames 345 (2728 -> 3073), replans 5, inputs 33, refinements [(2798, None, []), (2848, None, []), (2849, 'split', [194]), (2935, None, []), (3073, None, [])], extensions 0
+  entries 11, new cells 10, new reps 0, new atoms 55; CPU s {'return': 3.0, 'read': 217.0, 'plan': 705.6, 'play': 41.5, 'total': 967.1, 'rusage_total': 951.8}; peak MB {'python': 409, 'children': 409}; wall 1008.3 s
+j00001 entry 11 key [1, 0, 0, -150, 18391, 11] scope [28, 33, 41]: ok; reading fresh True (no cached reading) 40624 records, read wall 30.7 s, CPU 94.7 s, peak 251 MB
+  targets {'0': 1, '1': 30, '2': 3}; probes [(['owner:566', 1], 'plan', 75.9)]
+  played ['owner:566', 1] stop 'goal', from the plan True, frames 143 (3073 -> 3216), replans 1, inputs 8, refinements [(3204, 'split', [])], extensions 0
+  entries 4, new cells 4, new reps 0, new atoms 23; CPU s {'return': 2.7, 'read': 115.0, 'plan': 41.9, 'play': 63.9, 'total': 223.5, 'rusage_total': 189.9}; peak MB {'python': 347, 'children': 309}; wall 130.7 s
+verify of goal entry 15 (chain [0, 11, 15]): same True, differences 0, checkpoints 16, 488 frames, 11712 qf, 48.80 s from the root, 41 inputs, final {'owner:566': 1}
