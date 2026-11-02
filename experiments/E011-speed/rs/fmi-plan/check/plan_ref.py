@@ -6,6 +6,7 @@ usage: plan_ref.py READING_DIR REQS OUT_DIR [TASKCORE_BIN]
 """
 import json
 import os
+import resource
 import sys
 import time
 from pathlib import Path
@@ -92,12 +93,21 @@ def main():
         args = ["--goal", goal_text] + (["--cost-caps", caps] if caps not in ("", "-") else [])
         t0 = time.monotonic()
         c0 = time.process_time()
+        k0 = resource.getrusage(resource.RUSAGE_CHILDREN)
         res = plan_fd.plan_taskcore(rd.packed, task.facts, goal, task.ban_pieces(bans), start, bans,
                                     search="lama-first-costs", workdir=out / f"work-{name}", binary=binary, args=args,
                                     serve=True)
         (out / f"{name}.json").write_text(json.dumps(canon(res)) + "\n")
+        k1 = resource.getrusage(resource.RUSAGE_CHILDREN)
+        # CPU: this process (the decode and the rest of plan_taskcore), the taskcore server's request (its reply), and
+        # Fast Downward with its driver (the children waited for during the request)
+        fd_cpu = (k1.ru_utime - k0.ru_utime) + (k1.ru_stime - k0.ru_stime)
+        serve_cpu = (res.serve or {}).get("cpu_seconds", 0.0)
+        py_cpu = time.process_time() - c0
         print(json.dumps({"name": name, "status": res.status, "steps": len(res.steps), "wall_s": round(time.monotonic() - t0, 2),
-                          "py_cpu_s": round(time.process_time() - c0, 2), "write_s": round(res.write_s, 2),
+                          "cpu_s": round(py_cpu + serve_cpu + fd_cpu, 2), "py_cpu_s": round(py_cpu, 2),
+                          "serve_cpu_s": round(serve_cpu, 2), "serve_kept": (res.serve or {}).get("kept"),
+                          "fd_cpu_s": round(fd_cpu, 2), "write_s": round(res.write_s, 2),
                           "fd_s": round(res.seconds, 2), "decode_s": round(res.decode_s, 2)}), flush=True)
     plan_fd.close_servers()
 
