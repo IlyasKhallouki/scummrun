@@ -1,0 +1,22 @@
+[package]
+name = "fmi"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the one resident process of a run (fmi explore|try|guide)"
+
+[[bin]]
+name = "fmi"
+path = "src/main.rs"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+fmi-explore = { path = "../fmi-explore" }
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+
+[profile.dev.package."*"]
+opt-level = 2
