@@ -1,0 +1,1896 @@
+diff --git a/audio/chip.cpp b/audio/chip.cpp
+index 68bc3613..a9781956 100644
+--- a/audio/chip.cpp
++++ b/audio/chip.cpp
+@@ -93,6 +93,10 @@ void RealChip::onTimer() {
+ 			(*_callback)();
+ }
+ 
++// E011 (patch 0002), the speedrun bridge's silent audio (SPEEDRUN_SILENT_AUDIO): readBuffer writes zeros instead of
++// synthesizing and keeps its callback timing. The game reads no sample.
++bool g_speedrunSilentChip = false;
++
+ EmulatedChip::EmulatedChip() :
+ 	_nextTick(0),
+ 	_samplesPerTick(0),
+@@ -119,7 +123,10 @@ int EmulatedChip::readBuffer(int16 *buffer, const int numSamples) {
+ 		if (step > (_nextTick >> FIXP_SHIFT))
+ 			step = (_nextTick >> FIXP_SHIFT);
+ 
+-		generateSamples(buffer, step * stereoFactor);
++		if (g_speedrunSilentChip)
++			memset(buffer, 0, step * stereoFactor * sizeof(int16));
++		else
++			generateSamples(buffer, step * stereoFactor);
+ 
+ 		_nextTick -= step << FIXP_SHIFT;
+ 		if (!(_nextTick >> FIXP_SHIFT)) {
+diff --git a/audio/decoders/flac.cpp b/audio/decoders/flac.cpp
+index 984b2a9d..2afebedd 100644
+--- a/audio/decoders/flac.cpp
++++ b/audio/decoders/flac.cpp
+@@ -45,6 +45,10 @@ namespace Audio {
+ 
+ static const uint MAX_OUTPUT_CHANNELS = 2;
+ 
++// E011 (patch 0002), the speedrun bridge's silent audio (SPEEDRUN_SILENT_AUDIO): a stream with a known length returns
++// zeros instead of decoding, with the decoder's sample counts per call and its end of data (readBuffer, below).
++bool g_speedrunSilentFLAC = false;
++
+ 
+ class FLACStream : public SeekableAudioStream {
+ protected:
+@@ -86,6 +90,9 @@ protected:
+ 	typedef void (*PFCONVERTBUFFERS)(SampleType*, const FLAC__int32*[], uint, const uint, const uint8);
+ 	PFCONVERTBUFFERS _methodConvertBuffers;
+ 
++	bool _silent = false;           // E011: no decoding (g_speedrunSilentFLAC)
++	FLAC__uint64 _silentPos = 0;    // the next sample pair, as the decoder's position
++
+ 
+ public:
+ 	FLACStream(Common::SeekableReadStream *inStream, bool dispose);
+@@ -176,6 +183,7 @@ FLACStream::FLACStream(Common::SeekableReadStream *inStream, bool dispose)
+ 		if (processUntilEndOfMetadata() && _streaminfo.channels > 0) {
+ 			_lastSample = _streaminfo.total_samples + 1;
+ 			_length = Timestamp(0, _lastSample - 1, getRate());
++			_silent = g_speedrunSilentFLAC && _streaminfo.total_samples > 0;
+ 			return; // no error occurred
+ 		}
+ 	}
+@@ -209,6 +217,13 @@ inline bool FLACStream::processUntilEndOfMetadata() {
+ 
+ bool FLACStream::seekAbsolute(FLAC__uint64 sample) {
+ 	assert(_decoder != nullptr);
++	if (_silent) {
++		if (sample >= _streaminfo.total_samples)
++			return false; // FLAC__stream_decoder_seek_absolute refuses a sample past the last one
++		_silentPos = sample;
++		_lastSampleWritten = (_lastSample != 0 && sample >= _lastSample);
++		return true;
++	}
+ 	const bool result = (0 != ::FLAC__stream_decoder_seek_absolute(_decoder, sample));
+ 	if (result) {
+ 		_lastSampleWritten = (_lastSample != 0 && sample >= _lastSample); // only set if we are SURE
+@@ -237,6 +252,22 @@ int FLACStream::readBuffer(int16 *buffer, const int numSamples) {
+ 	assert(_outBuffer == nullptr);
+ 	assert(_requestedSamples == 0);
+ 
++	if (_silent) {
++		// The decoding path's counts: a call gets min(asked, left); the end of data is set by the first call that asks
++		// for more than is left (the decoder meets the end of the stream only when it looks for another frame).
++		const FLAC__uint64 total = _streaminfo.total_samples;
++		const FLAC__uint64 left = _silentPos < total ? total - _silentPos : 0;
++		const FLAC__uint64 want = (FLAC__uint64)numSamples / numChannels;
++		if (_lastSampleWritten)
++			return 0;
++		const FLAC__uint64 n = MIN(want, left);
++		memset(buffer, 0, (size_t)(n * numChannels) * sizeof(buffer[0]));
++		_silentPos += n;
++		if (want > left)
++			_lastSampleWritten = true;
++		return (int)(n * numChannels);
++	}
++
+ 	_outBuffer = buffer;
+ 	_requestedSamples = numSamples;
+ 
+diff --git a/engines/scumm/module.mk b/engines/scumm/module.mk
+index 7551ef95..0bfbb238 100644
+--- a/engines/scumm/module.mk
++++ b/engines/scumm/module.mk
+@@ -108,7 +108,8 @@ MODULE_OBJS += \
+ 	speedrun/speedrun_plan.o \
+ 	speedrun/speedrun_plan_parser.o \
+ 	speedrun/speedrun_skips.o \
+-	speedrun/speedrun_state.o
++	speedrun/speedrun_state.o \
++	speedrun/speedrun_wire.o
+ 
+ ifdef USE_IMGUI
+ MODULE_OBJS += \
+diff --git a/engines/scumm/scumm.cpp b/engines/scumm/scumm.cpp
+index 9a19d373..76ad6193 100644
+--- a/engines/scumm/scumm.cpp
++++ b/engines/scumm/scumm.cpp
+@@ -2936,7 +2936,8 @@ void ScummEngine::waitForTimer(int quarterFrames, bool freezeMacGui) {
+ 
+ 	while (!shouldQuit()) {
+ 		_sound->updateCD(); // Loop CD Audio if needed
+-		parseEvents();
++		if (!(_speedrun && _speedrun->leanNoEvents())) // E011: SPEEDRUN_NO_EVENTS (the bridge injects all input)
++			parseEvents();
+ 
+ 		updateScreenShakeEffect();
+ 
+@@ -2948,7 +2949,8 @@ void ScummEngine::waitForTimer(int quarterFrames, bool freezeMacGui) {
+ 		if (_macGui && !freezeMacGui)
+ 			_macGui->updateWindowManager();
+ 
+-		_system->updateScreen();
++		if (!(_speedrun && _speedrun->leanNoPresent())) // E011: SPEEDRUN_NO_PRESENT (no backend present)
++			_system->updateScreen();
+ 		cur = _system->getMillis();
+ 
+ #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
+diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+index 0a89310f..649d0250 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -53,6 +53,18 @@ static const char kBridgeMarker[] = "speedrun-bridge v3";
+ 
+ static const char kTraceName[] = "trace.jsonl";
+ 
++} // End of namespace Scumm
++
++// E011 (patch 0002), the lean switches: engines/engine.cpp's splash flag (set: no splash wait), audio/chip.cpp's and
++// audio/decoders/flac.cpp's silent audio.
++extern bool splash;
++namespace Audio {
++extern bool g_speedrunSilentChip;
++extern bool g_speedrunSilentFLAC;
++}
++
++namespace Scumm {
++
+ // The live bridge, for the error handler (a plain function pointer).
+ static SpeedrunBridge *g_speedrunBridge = nullptr;
+ 
+@@ -96,6 +108,12 @@ SpeedrunBridge *SpeedrunBridge::create(ScummEngine *vm) {
+ 	// never shares an open file's read offset with its parent.
+ 	Audio::SeekableAudioStream::_loadStreamFilesInMemory = true;
+ 	bridge->readEnv();
++	if (bridge->_leanNoSplash)
++		splash = true; // engines/engine.cpp: no splash screen and its 0.6 s wait at the first initGraphics()
++	if (bridge->_leanSilent) {
++		Audio::g_speedrunSilentChip = true;
++		Audio::g_speedrunSilentFLAC = true;
++	}
+ 
+ 	// Replace the engine's default error handler first: it attaches the GUI
+ 	// debugger, which blocks forever under SDL's dummy video driver.
+@@ -172,12 +190,31 @@ void SpeedrunBridge::readEnv() {
+ 		// Observation only: the state dump gains fields, nothing else changes.
+ 		{"SPEEDRUN_DUMP_LOCALS", &SpeedrunBridge::_dumpLocals},
+ 		{"SPEEDRUN_DUMP_EXACT", &SpeedrunBridge::_dumpExact},
++		// E011 (patch 0002), the lean switches: only what no game state reads changes (speedrun_bridge.h).
++		{"SPEEDRUN_NO_SPLASH", &SpeedrunBridge::_leanNoSplash},
++		{"SPEEDRUN_NO_PRESENT", &SpeedrunBridge::_leanNoPresent},
++		{"SPEEDRUN_NO_EVENTS", &SpeedrunBridge::_leanNoEvents},
++		{"SPEEDRUN_SILENT_AUDIO", &SpeedrunBridge::_leanSilent},
+ 	};
+ 	for (const auto &var : kBoolVars) {
+ 		const char *value = envValue(var.name);
+ 		if (value && !Common::parseBool(value, this->*var.flag) && _envError.empty())
+ 			_envError = Common::String::format("invalid %s '%s'", var.name, value);
+ 	}
++	// SPEEDRUN_LEAN=1: all four lean switches.
++	bool lean = false;
++	const char *leanAll = envValue("SPEEDRUN_LEAN");
++	if (leanAll && !Common::parseBool(leanAll, lean) && _envError.empty())
++		_envError = Common::String::format("invalid SPEEDRUN_LEAN '%s'", leanAll);
++	if (lean)
++		_leanNoSplash = _leanNoPresent = _leanNoEvents = _leanSilent = true;
++	// E011 (patch 0002): SPEEDRUN_WIRE=bin, the control socket's binary channel (speedrun_wire.cpp); json, the
++	// default, is the JSON lines protocol (speedrun_control.cpp).
++	const char *wire = envValue("SPEEDRUN_WIRE");
++	if (wire && !strcmp(wire, "bin"))
++		_wireBin = true;
++	else if (wire && strcmp(wire, "json") && _envError.empty())
++		_envError = Common::String::format("invalid SPEEDRUN_WIRE '%s': expected json or bin", wire);
+ 
+ 	const char *stepTimeout = envValue("SPEEDRUN_STEP_TIMEOUT");
+ 	if (stepTimeout && !parseUint64(stepTimeout, _stepTimeout) && _envError.empty())
+@@ -746,7 +783,10 @@ bool SpeedrunBridge::endTrace(const char *reason, const char *errorCode, const c
+ 	writeRecord(end);
+ 	if (!_branchChild)
+ 		_trace.close();
+-	controlEnd(end);
++	if (_wireBin)
++		wireEnd(reason); // E011: the binary channel's End
++	else
++		controlEnd(end);
+ 	if (_frameLog)
+ 		_frameFile.close();
+ 
+diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+index d43d4757..1a5e6e0a 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -24,6 +24,8 @@
+ 
+ #include "common/scummsys.h"
+ #include "common/array.h"
++#include "common/endian.h"
++#include "common/util.h"
+ #include "common/keyboard.h"
+ #include "common/str.h"
+ 
+@@ -104,6 +106,121 @@ struct SpeedrunInput {
+ 
+ /** Parse SPEEDRUN_INPUTS (JSONL, one event per line). In speedrun_inputs.cpp. */
+ bool parseSpeedrunInputs(const Common::String &text, Common::Array<SpeedrunInput> &out, Common::String &error);
++/** A C8 key name ("esc", "space", "enter" or one printable character) as the key it presses; false if none. */
++bool speedrunKeyName(const Common::String &name, Common::KeyState &out);
++
++/**
++ * E011 (patch 0002): a growable byte buffer for the binary channel's messages and the F2 state block
++ * (speedrun_wire.cpp; experiments/E011-speed/engine/WIRE.md). Little-endian writers.
++ */
++class SpeedrunBytes {
++public:
++	SpeedrunBytes() {}
++	~SpeedrunBytes() { free(_data); }
++	SpeedrunBytes(const SpeedrunBytes &) = delete;
++	SpeedrunBytes &operator=(const SpeedrunBytes &) = delete;
++	void clear() { _size = 0; }
++	uint32 size() const { return _size; }
++	const byte *data() const { return _data; }
++	byte *data() { return _data; }
++	/** @p n more bytes at the end, not initialised: where they start. */
++	byte *grow(uint32 n) {
++		if (_size + n > _cap) {
++			uint32 cap = _cap ? _cap : 256;
++			while (cap < _size + n)
++				cap *= 2;
++			_data = (byte *)realloc(_data, cap);
++			_cap = cap;
++		}
++		byte *at = _data + _size;
++		_size += n;
++		return at;
++	}
++	void truncate(uint32 n) { if (n < _size) _size = n; }
++	void put(const void *p, uint32 n) { if (n) memcpy(grow(n), p, n); }
++	void u8(uint8 v) { *grow(1) = v; }
++	void b(bool v) { u8(v ? 1 : 0); }
++	void u32(uint32 v) { WRITE_LE_UINT32(grow(4), v); }
++	void i32(int32 v) { u32((uint32)v); }
++	void u64(uint64 v) { WRITE_LE_UINT64(grow(8), v); }
++	void i64(int64 v) { u64((uint64)v); }
++	void str(const char *s, uint32 n) { u32(n); put(s, n); }
++	void str(const char *s) { str(s, (uint32)strlen(s)); }
++	void setU32(uint32 at, uint32 v) { WRITE_LE_UINT32(_data + at, v); }
++	void swap(SpeedrunBytes &o) {
++		SWAP(_data, o._data);
++		SWAP(_size, o._size);
++		SWAP(_cap, o._cap);
++	}
++	/** Drop the first @p n bytes. */
++	void consume(uint32 n) {
++		if (n >= _size) {
++			_size = 0;
++			return;
++		}
++		memmove(_data, _data + n, _size - n);
++		_size -= n;
++	}
++
++private:
++	byte *_data = nullptr;
++	uint32 _size = 0, _cap = 0;
++};
++
++/** E011 (patch 0002): little-endian readers over one binary message's payload; any read past its end clears ok. */
++class SpeedrunReader {
++public:
++	SpeedrunReader(const byte *p, uint32 n) : _p(p), _end(p + n) {}
++	bool ok() const { return _ok; }
++	bool done() const { return _ok && _p == _end; }
++	uint8 u8() { return need(1) ? *_p++ : 0; }
++	bool b() {
++		const uint8 v = u8();
++		if (v > 1)
++			_ok = false;
++		return v == 1;
++	}
++	uint32 u32() {
++		if (!need(4))
++			return 0;
++		const uint32 v = READ_LE_UINT32(_p);
++		_p += 4;
++		return v;
++	}
++	int32 i32() { return (int32)u32(); }
++	uint64 u64() {
++		if (!need(8))
++			return 0;
++		const uint64 v = READ_LE_UINT64(_p);
++		_p += 8;
++		return v;
++	}
++	int64 i64() { return (int64)u64(); }
++	/** A u32 count no greater than the bytes left divided by @p minItem (a malformed count fails here). */
++	uint32 count(uint32 minItem) {
++		const uint32 n = u32();
++		if (_ok && minItem && (uint64)n * minItem > (uint64)(_end - _p))
++			_ok = false;
++		return _ok ? n : 0;
++	}
++	Common::String str() {
++		const uint32 n = count(1);
++		if (!_ok)
++			return Common::String();
++		Common::String s((const char *)_p, n);
++		_p += n;
++		return s;
++	}
++
++private:
++	bool need(uint32 n) {
++		if (!_ok || (uint32)(_end - _p) < n)
++			_ok = false;
++		return _ok;
++	}
++	const byte *_p, *_end;
++	bool _ok = true;
++};
+ 
+ /**
+  * Parse a plan (JSONL, one step per line; blank lines are skipped) with the
+@@ -191,6 +308,15 @@ public:
+ 	 * shown for its real-time length. Only wall-clock pacing changes, never ticks.
+ 	 */
+ 	bool skipWaits() const { return _skipWaits || (_fastBoot && !_segmentStarted); }
++	/**
++	 * E011 (patch 0002), the lean switches: SPEEDRUN_LEAN=1 turns on all four, and each can be set alone
++	 * (SPEEDRUN_NO_SPLASH, SPEEDRUN_NO_PRESENT, SPEEDRUN_NO_EVENTS, SPEEDRUN_SILENT_AUDIO). Each changes only what no
++	 * game state reads: the start-up splash wait, the backend's presentation of the screen in waitForTimer(), the
++	 * backend's event poll there (the bridge injects all input), and the synthesized samples (the OPL chip and the CD
++	 * track's FLAC stream give zeros with the same counts and timing). Off, the engine runs as before.
++	 */
++	bool leanNoPresent() const { return _leanNoPresent; }
++	bool leanNoEvents() const { return _leanNoEvents; }
+ 	/**
+ 	 * First statement of waitForTimer(): every wait the engine makes, the
+ 	 * main loop's 4 * delta and the room-change effects' (dissolve, iris,
+@@ -309,7 +435,9 @@ private:
+ 	Common::String verbJson(int slot, bool rendered) const;
+ 	/** Ego's inventory in display order (findInventory() is 1-based). */
+ 	Common::Array<int> egoInventory() const;
+-	Common::String stateJson() const;
++	Common::String stateJson() const { return stateJson(_dumpExact); }
++	/** E011: the dump with the "exact" object if @p exact (the binary channel's StateJson asks for it). */
++	Common::String stateJson(bool exact) const;
+ 	// The state dump's fields that facts_of reads, with owners, states and classes for the objects ``objects`` only
+ 	// and no room objects or inventory (the "state" command with "objects": window-search.md section 9.7); off unless
+ 	// a state command asks for it
+@@ -574,6 +702,49 @@ private:
+ 	uint64 _runsDropped = 0;
+ 	Common::Array<Common::String> _explainLog;
+ 	uint64 _explainDropped = 0;
++
++	// E011 (patch 0002): the lean switches (leanNoPresent()) and the binary channel (SPEEDRUN_WIRE=bin,
++	// speedrun_wire.cpp; experiments/E011-speed/engine/WIRE.md). Off by default: JSON lines as before.
++	bool _leanNoSplash = false;     // SPEEDRUN_NO_SPLASH
++	bool _leanNoPresent = false;    // SPEEDRUN_NO_PRESENT
++	bool _leanNoEvents = false;     // SPEEDRUN_NO_EVENTS
++	bool _leanSilent = false;       // SPEEDRUN_SILENT_AUDIO
++	bool _wireBin = false;          // SPEEDRUN_WIRE=bin
++	SpeedrunBytes _wireIn;          // bytes received and not yet consumed
++	SpeedrunBytes _wireOut;         // the message being written
++	SpeedrunBytes _wireLast;        // the last F2 block sent on this connection: a StepReply's delta base
++	SpeedrunBytes _wireNew;         // the F2 block being written
++	bool _wireStep = false;         // the current run is a Step: its stop replies with a StepReply
++	bool _wireStepRuns = false, _wireStepExplain = false;
++	// The runs and explain entries as values (the binary channel), with the JSON text's int casts
++	struct RunRow {
++		int64 v[14]; // frame, after, seq, depth, slot, where, number, room, code0, code1, status, frozen, delay, ops
++	};
++	struct ExplainRow {
++		byte kind;   // 0 begin, 1 opcode, 2 read, 3 write, 4 end (fmi-core Explain's variants)
++		int64 v[8];  // the entry's fields after its kind, as the JSON array has them
++	};
++	Common::Array<RunRow> _runRows;
++	Common::Array<ExplainRow> _explainRows;
++	void wireSendAll(const byte *p, uint32 n);
++	void wireBegin(uint8 type);
++	void wireFlush();
++	/** One whole message: false if the controller closed the connection. */
++	bool wireRead(uint8 &type, uint32 &len);
++	void wireHello();
++	void wireLoop(const char *reason);
++	void wireEnd(const char *reason);
++	void wireStatus(SpeedrunBytes &o, const char *reason, bool ended) const;
++	void wireObs(SpeedrunBytes &o, const Common::Array<int> *objects, bool names, bool exact) const;
++	void wireExact(SpeedrunBytes &o) const;
++	void wireBlock(SpeedrunBytes &o) const;
++	/** The F2 block now, full or as a delta from the last one sent (kind byte first); it becomes the last one. */
++	void wireBlockOrDelta(SpeedrunBytes &o);
++	void wireRuns(SpeedrunBytes &o);
++	void wireExplainLog(SpeedrunBytes &o);
++	bool wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const;
++	void logExplainRow(byte kind, int64 a, int64 b, int64 c, int64 d = 0, int64 e = 0, int64 f = 0, int64 g = 0,
++	                   int64 h = 0);
+ };
+ 
+ } // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
+index 6fcf1a35..deaabdb6 100644
+--- a/engines/scumm/speedrun/speedrun_control.cpp
++++ b/engines/scumm/speedrun/speedrun_control.cpp
+@@ -93,6 +93,13 @@ bool SpeedrunBridge::controlConnect() {
+ 		return false;
+ 	}
+ 	_controlBuf.clear();
++	if (_wireBin) {
++		// E011: the binary channel (speedrun_wire.cpp). A new connection has received nothing and sent no block.
++		_wireIn.clear();
++		_wireLast.clear();
++		wireHello();
++		return true;
++	}
+ 	JsonObject hello;
+ 	hello.add("hello", (int)getpid()).add("parent", _branchChild ? (int)getppid() : 0)
+ 	     .add("frame", _frames).add("tick", _ticks);
+@@ -238,6 +245,10 @@ void SpeedrunBridge::controlAtDecisionPoint() {
+ }
+ 
+ void SpeedrunBridge::controlLoop(const char *reason) {
++	if (_wireBin) {
++		wireLoop(reason); // E011: the binary channel (speedrun_wire.cpp)
++		return;
++	}
+ 	_stopFrame = 0;
+ 	_stopMaxFrame = 0;
+ 	_stopOnControl = false;
+diff --git a/engines/scumm/speedrun/speedrun_explain.cpp b/engines/scumm/speedrun/speedrun_explain.cpp
+index ad605e36..793383e7 100644
+--- a/engines/scumm/speedrun/speedrun_explain.cpp
++++ b/engines/scumm/speedrun/speedrun_explain.cpp
+@@ -79,7 +79,9 @@ void SpeedrunBridge::onRunBegin() {
+ 	}
+ 	_runStack.push_back(r);
+ 	_explainNow = r.explain;
+-	if (r.explain) {
++	if (r.explain && _wireBin) {
++		logExplainRow(0, (int)r.seq, (int)r.frame, r.after ? 1 : 0, r.slot, r.where, r.number, r.room, (int)r.code0);
++	} else if (r.explain) {
+ 		logExplain(JsonArray().addRaw("\"b\"").add((int)r.seq).add((int)r.frame).add(r.after ? 1 : 0).add(r.slot)
+ 		           .add(r.where).add(r.number).add(r.room).add((int)r.code0).str());
+ 	}
+@@ -104,7 +106,18 @@ void SpeedrunBridge::onRunEnd() {
+ 			delay = ss.delay;
+ 		}
+ 	}
+-	if (_segment) {
++	if (_segment && _wireBin) {
++		// E011: the same row as values, with the JSON text's int casts (speedrun_wire.cpp sends them)
++		if (_runRows.size() < kMaxRuns) {
++			RunRow row;
++			const int64 v[14] = {(int)r.frame, r.after ? 1 : 0, (int)r.seq, r.depth, r.slot, r.where, r.number, r.room,
++			                     (int)r.code0, (int)code1, status, frozen, delay, (int)r.ops};
++			memcpy(row.v, v, sizeof(v));
++			_runRows.push_back(row);
++		} else {
++			_runsDropped++;
++		}
++	} else if (_segment) {
+ 		if (_runLog.size() < kMaxRuns) {
+ 			_runLog.push_back(JsonArray().add((int)r.frame).add(r.after ? 1 : 0).add((int)r.seq).add(r.depth)
+ 			                  .add(r.slot).add(r.where).add(r.number).add(r.room).add((int)r.code0).add((int)code1)
+@@ -113,7 +126,9 @@ void SpeedrunBridge::onRunEnd() {
+ 			_runsDropped++;
+ 		}
+ 	}
+-	if (r.explain)
++	if (r.explain && _wireBin)
++		logExplainRow(4, (int)r.seq, (int)code1, status, frozen, delay);
++	else if (r.explain)
+ 		logExplain(JsonArray().addRaw("\"e\"").add((int)r.seq).add((int)code1).add(status).add(frozen).add(delay).str());
+ 	_explainNow = !_runStack.empty() && _runStack.back().explain;
+ }
+@@ -131,19 +146,41 @@ void SpeedrunBridge::onOpcode(byte opcode) {
+ 	// fetchScriptByte() has moved past the opcode.
+ 	const int64 offs = (int64)(e._scriptPointer - e._scriptOrgPointer) - 1;
+ 	const int64 code = r.start >= 0 ? offs - r.start : -1;
+-	logExplain(JsonArray().addRaw("\"o\"").add((int)r.seq).add((int)code).add((int)opcode).str());
++	if (_wireBin)
++		logExplainRow(1, (int)r.seq, (int)code, (int)opcode);
++	else
++		logExplain(JsonArray().addRaw("\"o\"").add((int)r.seq).add((int)code).add((int)opcode).str());
+ }
+ 
+ void SpeedrunBridge::onReadVar(uint var, int value) {
+ 	if (!_explainNow || _runStack.empty())
+ 		return;
+-	logExplain(JsonArray().addRaw("\"r\"").add((int)_runStack.back().seq).add((int)var).add(value).str());
++	if (_wireBin)
++		logExplainRow(2, (int)_runStack.back().seq, (int)var, value);
++	else
++		logExplain(JsonArray().addRaw("\"r\"").add((int)_runStack.back().seq).add((int)var).add(value).str());
+ }
+ 
+ void SpeedrunBridge::onWriteVar(uint var, int value) {
+ 	if (!_explainNow || _runStack.empty())
+ 		return;
+-	logExplain(JsonArray().addRaw("\"w\"").add((int)_runStack.back().seq).add((int)var).add(value).str());
++	if (_wireBin)
++		logExplainRow(3, (int)_runStack.back().seq, (int)var, value);
++	else
++		logExplain(JsonArray().addRaw("\"w\"").add((int)_runStack.back().seq).add((int)var).add(value).str());
++}
++
++void SpeedrunBridge::logExplainRow(byte kind, int64 a, int64 b, int64 c, int64 d, int64 e, int64 f, int64 g,
++                                   int64 h) {
++	if (_explainRows.size() >= kMaxExplain) {
++		_explainDropped++;
++		return;
++	}
++	ExplainRow row;
++	row.kind = kind;
++	const int64 v[8] = {a, b, c, d, e, f, g, h};
++	memcpy(row.v, v, sizeof(v));
++	_explainRows.push_back(row);
+ }
+ 
+ void SpeedrunBridge::logExplain(const Common::String &entry) {
+diff --git a/engines/scumm/speedrun/speedrun_inputs.cpp b/engines/scumm/speedrun/speedrun_inputs.cpp
+index fc240cda..28b00252 100644
+--- a/engines/scumm/speedrun/speedrun_inputs.cpp
++++ b/engines/scumm/speedrun/speedrun_inputs.cpp
+@@ -36,7 +36,7 @@ namespace Scumm {
+ // input.cpp's MouseButtonStatus, which is local to that file.
+ enum { kMsDown = 1, kMsClicked = 2 };
+ 
+-static bool parseKeyName(const Common::String &name, Common::KeyState &out) {
++bool speedrunKeyName(const Common::String &name, Common::KeyState &out) {
+ 	// The keys a MI1 run uses: Esc (cutscene skip, and the logo skip), '.'
+ 	// (text skip), space (pause), Enter, and single printable characters
+ 	// (verb shortcuts, dialogue digits).
+@@ -135,7 +135,7 @@ bool parseSpeedrunInputs(const Common::String &text, Common::Array<SpeedrunInput
+ 			} else if (obj.contains("key") && obj.getVal("key")->isString()) {
+ 				in.kind = SpeedrunInput::kKey;
+ 				in.keyName = obj.getVal("key")->asString();
+-				ok = parseKeyName(in.keyName, in.key);
++				ok = speedrunKeyName(in.keyName, in.key);
+ 			} else {
+ 				ok = false;
+ 			}
+diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
+index 8f0f384c..f56248d2 100644
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -474,7 +474,7 @@ Common::String SpeedrunBridge::verbJson(int slot, bool rendered) const {
+ 
+ #pragma mark - State dump (C7)
+ 
+-Common::String SpeedrunBridge::stateJson() const {
++Common::String SpeedrunBridge::stateJson(bool exact) const {
+ 	ScummEngine &e = *_vm;
+ 	const int ego = e._scummVars[e.VAR_EGO];
+ 	const Actor *egoActor = (ego > 0 && ego < e._numActors) ? e._actors[ego] : nullptr;
+@@ -627,9 +627,9 @@ Common::String SpeedrunBridge::stateJson() const {
+ 		actors.addRaw(o.str());
+ 	}
+ 	s.addRaw("actors", actors.str());
+-	// With SPEEDRUN_DUMP_EXACT: what the fork-exactness check compares beyond
+-	// the fields above (exactJson()).
+-	if (_dumpExact)
++	// With SPEEDRUN_DUMP_EXACT (or @p exact): what the fork-exactness check
++	// compares beyond the fields above (exactJson()).
++	if (exact)
+ 		s.addRaw("exact", exactJson());
+ 	return s.str();
+ }
+diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
+new file mode 100644
+index 00000000..b352a151
+--- /dev/null
++++ b/engines/scumm/speedrun/speedrun_wire.cpp
+@@ -0,0 +1,1295 @@
++/* ScummVM - Graphic Adventure Engine
++ *
++ * ScummVM is the legal property of its developers, whose names
++ * are too numerous to list here. Please refer to the COPYRIGHT
++ * file distributed with this source distribution.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++// E011 (patch 0002): the control socket's binary channel F1 (SPEEDRUN_WIRE=bin) and the state block F2
++// (experiments/E011-speed/plan.md "Binary formats"; experiments/E011-speed/engine/WIRE.md is the reference).
++//
++// The commands are those of the JSON protocol (speedrun_control.cpp), one message each way, with the same checks and
++// the same effects; only the encoding differs. Framing: u32 payload length, u8 type, the payload. A payload holds
++// fmi-core's types in declaration order: integers at their width, little-endian; bool u8 0/1; Option u8 0 or 1 then
++// the value; Vec and String a u32 count then the items (UTF-8 bytes); an enum a u8 variant index then its fields.
++//
++// Two additions over the JSON protocol: State (the F2 block: what facts_of reads, as flat arrays) and Step (run N
++// frames, then reply with the stop status, the F2 block or its delta from the last one sent on this connection, and
++// the runs and explain entries recorded meanwhile, in one message).
++//
++// Observation only, as the JSON dumps: the encoders read engine members and call the const members the JSON dumps
++// call. Without names, the binary dumps call fewer of them (no getObjOrActorName, no verb text).
++
++#define FORBIDDEN_SYMBOL_ALLOW_ALL
++
++#include <errno.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <unistd.h>
++
++#include "common/config-manager.h"
++#include "common/system.h"
++#include "backends/audiocd/audiocd.h"
++
++#include "scumm/actor.h"
++#include "scumm/object.h"
++#include "scumm/resource.h"
++#include "scumm/scumm.h"
++#include "scumm/sound.h"
++#include "scumm/verbs.h"
++#include "scumm/speedrun/speedrun_bridge.h"
++
++namespace Scumm {
++
++namespace {
++
++// Controller to engine
++enum : uint8 {
++	kWRun = 0x81,
++	kWInputs = 0x82,
++	kWFork = 0x83,
++	kWForkEach = 0x84,
++	kWObs = 0x85,
++	kWState = 0x86,
++	kWHolds = 0x87,
++	kWAt = 0x88,
++	kWSetRng = 0x89,
++	kWSegment = 0x8A,
++	kWRuns = 0x8B,
++	kWExplain = 0x8C,
++	kWExplainLog = 0x8D,
++	kWStateJson = 0x8E,
++	kWQuit = 0x8F,
++	kWStep = 0x90
++};
++
++// Engine to controller
++enum : uint8 {
++	kRHello = 0x01,
++	kRStop = 0x02,
++	kREnd = 0x03,
++	kRForked = 0x04,
++	kRObs = 0x05,
++	kRState = 0x06,
++	kRHolds = 0x07,
++	kRAt = 0x08,
++	kRRuns = 0x09,
++	kRExplain = 0x0A,
++	kROk = 0x0B,
++	kRError = 0x0C,
++	kRJson = 0x0D,
++	kRStepReply = 0x0E
++};
++
++const uint32 kBlockMagic = 0x31534D46; // "FMS1"
++const uint32 kBlockVersion = 1;
++const uint32 kMaxMessage = 1u << 26;    // a payload over 64 MB is refused (the controller is broken)
++const int kMaxActor = 12;               // speedrun_conditions.cpp
++
++// A game text (names) as the JSON dump's string decodes: bytes 0x7F and up are U+007F..U+00FF (jsonString's \u00XX),
++// written as UTF-8.
++void putText(SpeedrunBytes &o, const byte *s) {
++	const uint32 at = o.size();
++	o.u32(0);
++	uint32 n = 0;
++	for (; s && *s; ++s) {
++		const byte c = *s;
++		if (c < 0x80) {
++			o.u8(c);
++			n++;
++		} else {
++			o.u8(0xC0 | (c >> 6));
++			o.u8(0x80 | (c & 0x3F));
++			n += 2;
++		}
++	}
++	o.setU32(at, n);
++}
++
++// The byte runs where @p cur differs from @p old: u32 new length, u32 chunk count, then (u32 offset, u32 length,
++// bytes) per chunk. Bytes past the old length always form a chunk. The receiver takes the old block cut or padded to
++// the new length and writes the chunks over it.
++void putDelta(SpeedrunBytes &o, const SpeedrunBytes &old, const SpeedrunBytes &cur) {
++	const uint32 n = cur.size(), m = MIN(old.size(), n);
++	const byte *a = old.data(), *b = cur.data();
++	o.u32(n);
++	const uint32 countAt = o.size();
++	o.u32(0);
++	uint32 chunks = 0, i = 0;
++	while (i < m) {
++		// equal 8-byte words first
++		while (i + 8 <= m && READ_UINT64(a + i) == READ_UINT64(b + i))
++			i += 8;
++		if (i >= m)
++			break;
++		if (a[i] == b[i]) {
++			i++;
++			continue;
++		}
++		const uint32 start = i;
++		uint32 last = i;
++		for (i++; i < m; i++) {
++			if (a[i] != b[i])
++				last = i;
++			else if (i - last > 16)
++				break;
++		}
++		o.u32(start);
++		o.u32(last + 1 - start);
++		o.put(b + start, last + 1 - start);
++		chunks++;
++		i = last + 1;
++	}
++	if (n > m) {
++		o.u32(m);
++		o.u32(n - m);
++		o.put(b + m, n - m);
++		chunks++;
++	}
++	o.setU32(countAt, chunks);
++}
++
++} // End of anonymous namespace
++
++#pragma mark - Framing
++
++void SpeedrunBridge::wireSendAll(const byte *p, uint32 left) {
++	while (left > 0) {
++		const ssize_t n = send(_controlFd, p, left, MSG_NOSIGNAL);
++		if (n < 0) {
++			if (errno == EINTR)
++				continue;
++			_exit(3); // the controller is gone: nothing left to report to
++		}
++		p += n;
++		left -= (uint32)n;
++	}
++}
++
++void SpeedrunBridge::wireBegin(uint8 type) {
++	_wireOut.clear();
++	_wireOut.u32(0);
++	_wireOut.u8(type);
++}
++
++void SpeedrunBridge::wireFlush() {
++	if (_controlFd < 0)
++		return;
++	_wireOut.setU32(0, _wireOut.size() - 5);
++	wireSendAll(_wireOut.data(), _wireOut.size());
++}
++
++bool SpeedrunBridge::wireRead(uint8 &type, uint32 &len) {
++	// The message starts at _wireIn's first byte; the caller consumes it (5 + len bytes) when done with it.
++	uint32 need = 5;
++	for (;;) {
++		if (_wireIn.size() >= 5) {
++			len = READ_LE_UINT32(_wireIn.data());
++			if (len > kMaxMessage)
++				return false;
++			need = 5 + len;
++			if (_wireIn.size() >= need) {
++				type = _wireIn.data()[4];
++				return true;
++			}
++		}
++		const uint32 at = _wireIn.size();
++		const uint32 chunk = MAX<uint32>(need - at, 65536);
++		byte *dst = _wireIn.grow(chunk);
++		const ssize_t n = recv(_controlFd, dst, chunk, 0);
++		if (n < 0 && errno == EINTR) {
++			_wireIn.truncate(at);
++			continue;
++		}
++		if (n <= 0)
++			return false;
++		_wireIn.truncate(at + (uint32)n);
++	}
++}
++
++void SpeedrunBridge::wireHello() {
++	wireBegin(kRHello);
++	_wireOut.u32((uint32)getpid());
++	_wireOut.u32(_branchChild ? (uint32)getppid() : 0);
++	_wireOut.u64(_frames);
++	_wireOut.u64(_ticks);
++	wireFlush();
++}
++
++void SpeedrunBridge::wireEnd(const char *reason) {
++	if (_controlFd < 0)
++		return;
++	wireBegin(kREnd);
++	wireStatus(_wireOut, reason, true);
++	wireFlush();
++	if (_branchChild)
++		_exit(0); // a branch never runs the engine's shutdown (SDL state belongs to the root)
++}
++
++#pragma mark - Encoders
++
++void SpeedrunBridge::wireStatus(SpeedrunBytes &o, const char *reason, bool ended) const {
++	// fmi-core Status, field for field as controlStatus() writes them. An end carries the end record's frame, tick,
++	// qf and room, and the children a fork_each made before it (so the controller can quit them); the rest is left
++	// at its default (the JSON "end" reply has none of it).
++	const ScummEngine &e = *_vm;
++	o.str(reason);
++	o.b(ended);
++	o.u64(_frames);
++	o.u64(_ticks);
++	o.u64(_quarterFrames);
++	if (ended) {
++		o.u64(0);                        // qf0
++		o.i32((int)e._currentRoom);      // room
++		for (int i = 0; i < 4; i++)
++			o.i32(0);                    // up, cur, cs, v19
++		o.b(false);                      // seg
++		o.u64(0);                        // tick0
++		o.u64(0);                        // rng
++		for (int i = 0; i < 5; i++)
++			o.u8(0);                     // idle, blk, ego, mv, box
++		for (int i = 0; i < 3; i++)
++			o.i32(0);                    // cam, xstart, room_w
++		o.u32(_forkEachForks.size() / 2);
++		for (uint i = 0; i + 1 < _forkEachForks.size(); i += 2) {
++			o.u64((uint64)(int64)(int)_forkEachForks[i]);
++			o.u32((uint32)(int)_forkEachForks[i + 1]);
++		}
++		return;
++	}
++	o.u64(_qf0);
++	o.i32((int)e._currentRoom);
++	o.i32((int)e._userPut);
++	o.i32((int)e._cursor.state);
++	o.i32((int)e.vm.cutSceneStackPointer);
++	o.i32((int)e._scummVars[e.VAR_TIMER_NEXT]);
++	o.b(_segmentStarted);
++	o.u64(_tick0);
++	o.u64((uint64)e._rnd.getSeed());
++	if (_lastIdle.kind != kNotIdle) {
++		o.u8(1);
++		o.str(_lastIdle.kind == kIdleSentence ? "sentence" : "dialog");
++		o.u8(0);
++	} else {
++		o.u8(0);
++		o.u8(1);
++		o.str(_lastIdle.blocker ? _lastIdle.blocker : "?");
++	}
++	const int ego = e._scummVars[e.VAR_EGO];
++	if (ego > 0 && ego < e._numActors && e._actors[ego]->isInCurrentRoom()) {
++		const Actor *a = e._actors[ego];
++		o.u8(1);
++		o.i32(a->getRealPos().x);
++		o.i32(a->getRealPos().y);
++		o.u8(1);
++		o.i32((int)a->_moving);
++		o.u8(1);
++		o.i32((int)a->_walkbox);
++	} else {
++		o.u8(0);
++		o.u8(0);
++		o.u8(0);
++	}
++	o.i32((int)e.camera._cur.x);
++	o.i32((int)e._virtscr[kMainVirtScreen].xstart);
++	o.i32((int)e._roomWidth);
++	o.u32(_forkEachForks.size() / 2);
++	for (uint i = 0; i + 1 < _forkEachForks.size(); i += 2) {
++		o.u64((uint64)(int64)(int)_forkEachForks[i]); // the JSON array's int
++		o.u32((uint32)(int)_forkEachForks[i + 1]);
++	}
++}
++
++void SpeedrunBridge::wireObs(SpeedrunBytes &o, const Common::Array<int> *objects, bool names, bool exact) const {
++	// fmi-core Obs: stateJson() (objects null) or stateLiteJson(*objects), field for field in Obs's order. Names only
++	// with @p names; the exact object with @p exact on a full dump.
++	ScummEngine &e = *_vm;
++	const int ego = e._scummVars[e.VAR_EGO];
++	const Actor *egoActor = (ego > 0 && ego < e._numActors) ? e._actors[ego] : nullptr;
++	o.u64(_ticks);
++	o.u64(_frames);
++	o.i32((int)e._currentRoom);
++	o.u8(1);
++	o.i32(ego);
++	if (egoActor) {
++		o.u8(1);
++		o.i32(egoActor->getRealPos().x);
++		o.i32(egoActor->getRealPos().y);
++	} else {
++		o.u8(0);
++	}
++	if (ConfMan.hasKey("random_seed")) {
++		o.u8(1);
++		o.i64((int64)ConfMan.getInt("random_seed"));
++	} else {
++		o.u8(0);
++	}
++	o.i32(e._bootParam);
++	o.u32(e._numVariables);
++	for (int i = 0; i < e._numVariables; i++)
++		o.i32(e._scummVars[i]);
++	{
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (int b = 0; b < e._numBitVariables; b++) {
++			if (e._bitVars[b >> 3] & (1 << (b & 7))) {
++				o.u32(b);
++				n++;
++			}
++		}
++		o.setU32(at, n);
++	}
++	if (objects) {
++		o.u8(0); // no inventory in a lite dump
++	} else {
++		const Common::Array<int> items = egoInventory();
++		o.u8(1);
++		o.u32(items.size());
++		for (uint i = 0; i < items.size(); i++)
++			o.i32(items[i]);
++	}
++	// owners, states, classes: every object, or the asked ones in their order (stateLiteJson's loop)
++	Common::Array<int> all;
++	if (!objects) {
++		for (int obj = 1; obj < e._numGlobalObjects; obj++)
++			all.push_back(obj);
++	}
++	const Common::Array<int> &objs = objects ? *objects : all;
++	uint32 valid = 0;
++	for (uint k = 0; k < objs.size(); k++)
++		valid += (objs[k] >= 1 && objs[k] < e._numGlobalObjects) ? 1 : 0;
++	o.u32(valid);
++	for (uint k = 0; k < objs.size(); k++) {
++		const int obj = objs[k];
++		if (obj >= 1 && obj < e._numGlobalObjects) {
++			o.u32(obj);
++			o.i32((int)e._objectOwnerTable[obj]);
++		}
++	}
++	o.u32(valid);
++	for (uint k = 0; k < objs.size(); k++) {
++		const int obj = objs[k];
++		if (obj >= 1 && obj < e._numGlobalObjects) {
++			o.u32(obj);
++			o.i32((int)e._objectStateTable[obj]);
++		}
++	}
++	{
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (uint k = 0; k < objs.size(); k++) {
++			const int obj = objs[k];
++			if (obj < 1 || obj >= e._numGlobalObjects || !e._classData[obj])
++				continue;
++			o.u32(obj);
++			const uint32 bits = e._classData[obj];
++			uint32 c = 0;
++			for (int bit = 0; bit < 32; bit++)
++				c += (bits & (1u << bit)) ? 1 : 0;
++			o.u32(c);
++			for (int bit = 0; bit < 32; bit++) {
++				if (bits & (1u << bit))
++					o.u32(bit + 1);
++			}
++			n++;
++		}
++		o.setU32(at, n);
++	}
++	if (objects) {
++		o.u8(0); // no room objects in a lite dump
++	} else {
++		o.u8(1);
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (int i = 1; i < e._numLocalObjects; i++) {
++			const ObjectData &od = e._objs[i];
++			if (!od.obj_nr)
++				continue;
++			o.i32((int)od.obj_nr);
++			o.i32((int)od.state);
++			o.i32((int)od.parent);
++			o.i32((int)od.x_pos);
++			o.i32((int)od.y_pos);
++			o.i32((int)od.width);
++			o.i32((int)od.height);
++			o.i32(od.walk_x);
++			o.i32(od.walk_y);
++			if (names) {
++				o.u8(1);
++				// withoutAt(): the name with '@' padding dropped
++				Common::String t;
++				for (const byte *s = e.getObjOrActorName(od.obj_nr); s && *s; ++s) {
++					if (*s != '@')
++						t += (char)*s;
++				}
++				putText(o, (const byte *)t.c_str());
++			} else {
++				o.u8(0);
++			}
++			n++;
++		}
++		o.setU32(at, n);
++	}
++	{
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (int slot = 1; slot < e._numVerbs; slot++) {
++			if (!verbVisible(slot))
++				continue;
++			const VerbSlot &v = e._verbs[slot];
++			o.i32(slot);
++			o.i32((int)v.verbid);
++			o.i32((int)v.curmode);
++			o.i32((int)v.saveid);
++			o.i32((int)v.type);
++			o.i32((int)v.key);
++			o.i32((int)v.curRect.left);
++			o.i32((int)v.curRect.top);
++			if (names) {
++				Common::String text; // "" for image verbs (verbJson)
++				verbText(slot, true, text);
++				o.u8(1);
++				putText(o, (const byte *)text.c_str());
++			} else {
++				o.u8(0);
++			}
++			n++;
++		}
++		o.setU32(at, n);
++	}
++	{
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
++			const ScriptSlot &ss = e.vm.slot[i];
++			if (ss.status == ssDead)
++				continue;
++			o.i32(i);
++			o.i32((int)ss.number);
++			o.i32((int)ss.where);
++			o.i32((int)ss.status);
++			o.u64((uint64)ss.offs);
++			o.i64(scriptCode(i, ss.offs));
++			o.i32((int)ss.freezeCount);
++			o.i32((int)ss.delay);
++			o.i32((int)ss.cutsceneOverride);
++			if (_dumpLocals) {
++				o.u8(1);
++				o.u32(NUM_SCRIPT_LOCAL);
++				for (int k = 0; k < NUM_SCRIPT_LOCAL; k++)
++					o.i32((int)e.vm.localvar[i][k]);
++				o.u8(1);
++				o.b(ss.freezeResistant);
++				o.u8(1);
++				o.b(ss.recursive);
++			} else {
++				o.u8(0);
++				o.u8(0);
++				o.u8(0);
++			}
++			n++;
++		}
++		o.setU32(at, n);
++	}
++	{
++		const int depth = e.vm.cutSceneStackPointer;
++		o.i32(depth);
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (int level = 0; level <= depth && level < kMaxCutsceneNum; level++) {
++			const uint32 ptr = e.vm.cutScenePtr[level];
++			const int slot = e.vm.cutSceneScript[level];
++			o.i32(level);
++			if (_dumpLocals) {
++				o.u8(1);
++				o.i32((int)e.vm.cutSceneData[level]);
++			} else {
++				o.u8(0);
++			}
++			if (!ptr || slot >= NUM_SCRIPT_SLOT) {
++				o.u8(0);
++			} else {
++				const ScriptSlot &ss = e.vm.slot[slot];
++				o.u8(1);
++				o.i32(slot);
++				o.i32((int)ss.number);
++				o.i32((int)ss.where);
++				o.i32((int)ss.status);
++				o.u64((uint64)ptr);
++				o.i64(scriptCode(slot, ptr));
++				o.b(overrideStale(level));
++			}
++			n++;
++		}
++		o.setU32(at, n);
++	}
++	{
++		const uint32 at = o.size();
++		o.u32(0);
++		uint32 n = 0;
++		for (int i = 1; i < e._numActors; i++) {
++			const Actor *a = e._actors[i];
++			if (!a || !a->isInCurrentRoom() || !a->_visible)
++				continue;
++			o.i32(i);
++			o.i32((int)a->getRealPos().x);
++			o.i32((int)a->getRealPos().y);
++			o.i32((int)a->getElevation());
++			o.i32((int)a->_moving);
++			n++;
++		}
++		o.setU32(at, n);
++	}
++	if (exact && !objects) {
++		o.u8(1);
++		wireExact(o);
++	} else {
++		o.u8(0);
++	}
++}
++
++namespace {
++
++// fmi-core ExactVal: Int 0, Bool 1, Text 2, List 3, Map 4, Null 5. Map and the top object are (key, value) pairs.
++void xKey(SpeedrunBytes &o, const char *k) {
++	o.str(k);
++}
++void xInt(SpeedrunBytes &o, int64 v) {
++	o.u8(0);
++	o.i64(v);
++}
++void xBool(SpeedrunBytes &o, bool v) {
++	o.u8(1);
++	o.b(v);
++}
++void xText(SpeedrunBytes &o, const Common::String &s) {
++	o.u8(2);
++	o.str(s.c_str(), s.size());
++}
++void xInts(SpeedrunBytes &o, const int *v, uint32 n) {
++	o.u8(3);
++	o.u32(n);
++	for (uint32 i = 0; i < n; i++)
++		xInt(o, v[i]);
++}
++
++} // End of anonymous namespace
++
++void SpeedrunBridge::wireExact(SpeedrunBytes &o) const {
++	// exactJson(), field for field and in its order, with the JSON text's types (its int casts, %.17g text, the
++	// screens' digest as hex text).
++	const ScummEngine &e = *_vm;
++	const uint32 at = o.size();
++	o.u32(0);
++	uint32 n = 0;
++	xKey(o, "rng"), xInt(o, (int64)(uint64)e._rnd.getSeed()), n++;
++	xKey(o, "qf"), xInt(o, (int64)_quarterFrames), n++;
++	xKey(o, "qf0"), xInt(o, (int64)_qf0), n++;
++	xKey(o, "tick0"), xInt(o, (int64)_tick0), n++;
++	xKey(o, "seg"), xBool(o, _segmentStarted), n++;
++	xKey(o, "input"), xInt(o, (int64)(uint)_inputIndex), n++;
++	{
++		const int v[2] = {(int)_rawMouseX, (int)_rawMouseY};
++		xKey(o, "raw_mouse"), xInts(o, v, 2), n++;
++	}
++	{
++		const int v[2] = {(int)e._mouse.x, (int)e._mouse.y};
++		xKey(o, "mouse"), xInts(o, v, 2), n++;
++	}
++	{
++		const int v[2] = {(int)e._virtualMouse.x, (int)e._virtualMouse.y};
++		xKey(o, "vmouse"), xInts(o, v, 2), n++;
++	}
++	{
++		const int v[3] = {(int)e._leftBtnPressed, (int)e._rightBtnPressed, (int)e._mouseAndKeyboardStat};
++		xKey(o, "buttons"), xInts(o, v, 3), n++;
++	}
++	xKey(o, "audio_pumped"), xInt(o, (int64)_audioPumped), n++;
++	xKey(o, "audio_pending"), xInt(o, (int64)_audioPending), n++;
++	xKey(o, "audio_owed"), xText(o, Common::String::format("%.17g", _audioOwed)), n++;
++	const Sound *snd = e._sound;
++	if (snd) {
++		if (snd->_soundCD) {
++			const SoundCD *cd = snd->_soundCD;
++			const AudioCDManager::Status st = g_system->getAudioCDManager()->getStatus();
++			xKey(o, "cd");
++			o.u8(4);
++			o.u32(6);
++			xKey(o, "timer"), xInt(o, (int64)(uint64)cd->_cdMusicTimer);
++			xKey(o, "timer_mod"), xInt(o, (int64)(uint64)cd->_cdMusicTimerMod);
++			xKey(o, "music_timer"), xInt(o, (int64)cd->getMusicTimer());
++			xKey(o, "sound"), xInt(o, (int64)(int)cd->_currentCDSound);
++			xKey(o, "poll"), xInt(o, (int64)snd->pollCD());
++			const int v[7] = {(int)st.playing, st.track, st.start, st.duration, st.numLoops, st.volume, st.balance};
++			xKey(o, "status"), xInts(o, v, 7);
++			n++;
++		}
++		xKey(o, "speech_timer"), xInt(o, (int64)(uint64)snd->_speechTimerMod), n++;
++		xKey(o, "sounds");
++		{
++			o.u8(3);
++			const uint32 at2 = o.size();
++			o.u32(0);
++			uint32 k = 0;
++			for (int s = 1; s < e._numSounds; s++) {
++				const int status = snd->isSoundRunning(s);
++				if (status) {
++					const int v[2] = {s, status};
++					xInts(o, v, 2);
++					k++;
++				}
++			}
++			o.setU32(at2, k);
++		}
++		n++;
++		xKey(o, "sound_queue");
++		{
++			o.u8(3);
++			const uint32 at2 = o.size();
++			o.u32(0);
++			uint32 k = 0;
++			for (int i = 0; i < snd->_soundQueuePos && i < (int)ARRAYSIZE(snd->_soundQueue); i++) {
++				const int v[2] = {(int)snd->_soundQueue[i].sound, (int)snd->_soundQueue[i].offset};
++				xInts(o, v, 2);
++				k++;
++			}
++			o.setU32(at2, k);
++		}
++		n++;
++		xKey(o, "midi_queue");
++		{
++			o.u8(3);
++			const uint32 at2 = o.size();
++			o.u32(0);
++			uint32 k = 0;
++			for (int i = 0; i < snd->_midiQueuePos && i < (int)ARRAYSIZE(snd->_midiQueue); i++) {
++				xInt(o, (int)snd->_midiQueue[i]);
++				k++;
++			}
++			o.setU32(at2, k);
++		}
++		n++;
++	}
++	{
++		const CameraData &cam = e.camera;
++		const int v[13] = {(int)cam._cur.x, (int)cam._cur.y, (int)cam._dest.x, (int)cam._dest.y, (int)cam._accel.x,
++		                   (int)cam._accel.y, (int)cam._last.x, (int)cam._last.y, (int)cam._leftTrigger,
++		                   (int)cam._rightTrigger, (int)cam._follows, (int)cam._mode, (int)cam._movingToActor};
++		xKey(o, "camera"), xInts(o, v, 13), n++;
++	}
++	{
++		// The screens' digest: exactJson()'s text, taken from it so the two never differ.
++		const Common::String j = exactJson();
++		const char *p = strstr(j.c_str(), "\"screens\":\"");
++		Common::String hex;
++		if (p) {
++			p += strlen("\"screens\":\"");
++			const char *q = strchr(p, '"');
++			if (q)
++				hex = Common::String(p, q - p);
++		}
++		xKey(o, "screens"), xText(o, hex), n++;
++	}
++	o.setU32(at, n);
++}
++
++void SpeedrunBridge::wireBlock(SpeedrunBytes &o) const {
++	// F2, the state block (plan.md "Binary formats"): what facts_of reads, as flat arrays.
++	const ScummEngine &e = *_vm;
++	o.u32(kBlockMagic);
++	o.u32(kBlockVersion);
++	o.u64(_frames);
++	o.u64(_ticks);
++	o.u64((uint64)e._rnd.getSeed());
++	o.i32((int)e._currentRoom);
++	o.i32(e._scummVars[e.VAR_EGO]);
++	const int depth = e.vm.cutSceneStackPointer;
++	o.i32(depth);
++	o.u32(e._numVariables);
++	for (int i = 0; i < e._numVariables; i++)
++		o.i32(e._scummVars[i]);
++	o.u32(e._numBitVariables);
++	o.put(e._bitVars, (e._numBitVariables + 7) / 8);
++	const int nObj = e._numGlobalObjects;
++	o.u32(nObj);
++	o.put(e._objectOwnerTable, nObj);
++	o.put(e._objectStateTable, nObj);
++	for (int i = 0; i < nObj; i++)
++		o.u32(e._classData[i]);
++	const uint32 at = o.size();
++	o.u32(0);
++	uint32 n = 0;
++	for (int i = 0; i < NUM_SCRIPT_SLOT; i++) {
++		const ScriptSlot &ss = e.vm.slot[i];
++		if (ss.status == ssDead)
++			continue;
++		o.i32(i);
++		o.i32((int)ss.number);
++		o.i32((int)ss.where);
++		o.i32((int)ss.status);
++		o.i64(scriptCode(i, ss.offs));
++		o.i32((int)ss.freezeCount);
++		n++;
++	}
++	o.setU32(at, n);
++	// the top level's override: the last level the dump lists (levels 0..depth, below kMaxCutsceneNum)
++	const int level = MAX<int>(0, MIN<int>(depth, (int)kMaxCutsceneNum - 1));
++	const uint32 ptr = e.vm.cutScenePtr[level];
++	const int slot = (int)e.vm.cutSceneScript[level];
++	if (!ptr || slot >= NUM_SCRIPT_SLOT) {
++		o.u8(0);
++	} else {
++		const ScriptSlot &ss = e.vm.slot[slot];
++		o.u8(1);
++		o.i32((int)ss.where);
++		o.i32((int)ss.number);
++		o.i64(scriptCode(slot, ptr));
++		o.b(overrideStale(level));
++	}
++	const uint32 at2 = o.size();
++	o.u32(0);
++	uint32 nv = 0;
++	for (int s = 1; s < e._numVerbs; s++) {
++		if (verbVisible(s)) {
++			o.i32((int)e._verbs[s].verbid);
++			nv++;
++		}
++	}
++	o.setU32(at2, nv);
++}
++
++void SpeedrunBridge::wireBlockOrDelta(SpeedrunBytes &o) {
++	_wireNew.clear();
++	wireBlock(_wireNew);
++	if (_wireLast.size() > 0) {
++		const uint32 at = o.size();
++		o.u8(1);
++		putDelta(o, _wireLast, _wireNew);
++		if (o.size() - at - 1 > _wireNew.size() + 4) {
++			o.truncate(at); // the delta is larger: send the block whole
++			o.u8(0);
++			o.str((const char *)_wireNew.data(), _wireNew.size());
++		}
++	} else {
++		o.u8(0);
++		o.str((const char *)_wireNew.data(), _wireNew.size());
++	}
++	_wireLast.swap(_wireNew);
++}
++
++void SpeedrunBridge::wireRuns(SpeedrunBytes &o) {
++	// fmi-core RunsReply; clears the buffer, as runsJson()
++	o.u32(_runRows.size());
++	for (uint i = 0; i < _runRows.size(); i++) {
++		const int64 *v = _runRows[i].v;
++		o.u64((uint64)v[0]);  // frame
++		o.b(v[1] != 0);       // after
++		o.u64((uint64)v[2]);  // seq
++		for (int k = 3; k < 8; k++)
++			o.i32((int32)v[k]); // depth, slot, where, number, room
++		o.i64(v[8]);          // code0
++		o.i64(v[9]);          // code1
++		for (int k = 10; k < 13; k++)
++			o.i32((int32)v[k]); // status, frozen, delay
++		o.u64((uint64)v[13]); // ops
++	}
++	o.u64(_runsDropped);
++	o.u64(_slotViolations);
++	o.u64(_frames);
++	_runRows.clear();
++	_runsDropped = 0;
++}
++
++void SpeedrunBridge::wireExplainLog(SpeedrunBytes &o) {
++	// fmi-core ExplainReply; clears the log, as explainJson()
++	o.u32(_explainRows.size());
++	for (uint i = 0; i < _explainRows.size(); i++) {
++		const ExplainRow &r = _explainRows[i];
++		const int64 *v = r.v;
++		o.u8(r.kind);
++		switch (r.kind) {
++		case 0: // Begin {seq, frame, after, slot, where, number, room, code0}
++			o.u64((uint64)v[0]);
++			o.u64((uint64)v[1]);
++			o.b(v[2] != 0);
++			for (int k = 3; k < 7; k++)
++				o.i32((int32)v[k]);
++			o.i64(v[7]);
++			break;
++		case 1: // Op {seq, code, opcode}
++			o.u64((uint64)v[0]);
++			o.i64(v[1]);
++			o.u8((uint8)v[2]);
++			break;
++		case 2: // Read {seq, var, value}
++		case 3: // Write
++			o.u64((uint64)v[0]);
++			o.u32((uint32)v[1]);
++			o.i32((int32)v[2]);
++			break;
++		default: // End {seq, code1, status, frozen, delay}
++			o.u64((uint64)v[0]);
++			o.i64(v[1]);
++			o.i32((int32)v[2]);
++			o.i32((int32)v[3]);
++			o.i32((int32)v[4]);
++			break;
++		}
++	}
++	o.u64(_explainDropped);
++	o.u64(_slotViolations);
++	_explainRows.clear();
++	_explainDropped = 0;
++}
++
++#pragma mark - Decoders
++
++bool SpeedrunBridge::wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const {
++	// fmi-core Vec<Cond>, checked as parseCondition() checks its JSON forms
++	out.clear();
++	const uint32 n = in.count(15);
++	for (uint32 i = 0; i < n && in.ok(); i++) {
++		SpeedrunCondition c;
++		const uint8 kind = in.u8();
++		c.subject = in.i32();
++		const uint8 op = in.u8();
++		c.value = in.i32();
++		const uint32 nv = in.count(4);
++		for (uint32 k = 0; k < nv && in.ok(); k++)
++			c.values.push_back(in.i32());
++		c.negate = in.b();
++		if (!in.ok())
++			break;
++		if (kind > SpeedrunCondition::kScript || op > SpeedrunCondition::kIn) {
++			error = Common::String::format("condition %u: unknown kind or op", i);
++			return false;
++		}
++		c.kind = (SpeedrunCondition::Kind)kind;
++		c.op = (SpeedrunCondition::Op)op;
++		const bool compare = c.kind == SpeedrunCondition::kVar || c.kind == SpeedrunCondition::kBit ||
++		                     c.kind == SpeedrunCondition::kOwner || c.kind == SpeedrunCondition::kState ||
++		                     c.kind == SpeedrunCondition::kActorRoom || c.kind == SpeedrunCondition::kActorMoving;
++		const bool actorPos = c.kind == SpeedrunCondition::kActorX || c.kind == SpeedrunCondition::kActorY;
++		bool ok = true;
++		if (c.op == SpeedrunCondition::kIn)
++			ok = compare && !c.values.empty();
++		else if (!c.values.empty())
++			ok = false;
++		if (ok && c.op != SpeedrunCondition::kEq && !compare && !actorPos)
++			ok = c.op == SpeedrunCondition::kIn;
++		if (ok && c.op == SpeedrunCondition::kEq &&
++		    (c.kind == SpeedrunCondition::kActorRoom || c.kind == SpeedrunCondition::kActorMoving) &&
++		    (c.subject < 1 || c.subject > kMaxActor))
++			ok = false;
++		if (ok && actorPos && (c.subject < 1 || c.subject > kMaxActor || c.op == SpeedrunCondition::kIn))
++			ok = false;
++		if (ok && c.kind == SpeedrunCondition::kClass && (c.op != SpeedrunCondition::kEq || c.value < 1 || c.value > 32))
++			ok = false;
++		if (!ok) {
++			error = Common::String::format("condition %u: not a form the JSON protocol takes", i);
++			return false;
++		}
++		out.push_back(c);
++	}
++	if (!in.ok()) {
++		error = "bad conditions";
++		return false;
++	}
++	return true;
++}
++
++#pragma mark - The loop
++
++void SpeedrunBridge::wireLoop(const char *reason) {
++	_stopFrame = 0;
++	_stopMaxFrame = 0;
++	_stopOnControl = false;
++	_stopOnIdle = false;
++	_stopOnMenu = false;
++	_stopUntil.clear();
++	_stopUntilAny.clear();
++	wireBegin(_wireStep ? kRStepReply : kRStop);
++	wireStatus(_wireOut, reason, false);
++	if (_wireStep) {
++		wireBlockOrDelta(_wireOut);
++		if (_wireStepRuns) {
++			_wireOut.u8(1);
++			wireRuns(_wireOut);
++		} else {
++			_wireOut.u8(0);
++		}
++		if (_wireStepExplain) {
++			_wireOut.u8(1);
++			wireExplainLog(_wireOut);
++		} else {
++			_wireOut.u8(0);
++		}
++		_wireStep = false;
++	}
++	wireFlush();
++
++	for (;;) {
++		uint8 type = 0;
++		uint32 len = 0;
++		if (!wireRead(type, len))
++			_exit(0); // controller closed the connection
++		// the payload is copied: a reply may need _wireIn's space
++		SpeedrunBytes payload;
++		payload.put(_wireIn.data() + 5, len);
++		_wireIn.consume(5 + len);
++		SpeedrunReader in(payload.data(), payload.size());
++		Common::String error;
++		bool resume = false;
++
++		switch (type) {
++		case kWRun: {
++			// fmi-core RunSpec: frame, max_frame, until, until_any, control, idle, menu
++			if (in.u8())
++				_stopFrame = in.u64();
++			if (in.u8())
++				_stopMaxFrame = in.u64();
++			if (!wireConditions(in, _stopUntil, error))
++				error = "until: " + error;
++			const uint32 groups = error.empty() ? in.count(4) : 0;
++			for (uint32 g = 0; g < groups && error.empty(); g++) {
++				SpeedrunConditions conds;
++				if (!wireConditions(in, conds, error))
++					error = "until_any: " + error;
++				else
++					_stopUntilAny.push_back(conds);
++			}
++			_stopOnControl = in.b();
++			_stopOnIdle = in.b();
++			_stopOnMenu = in.b();
++			if (error.empty() && !in.done())
++				error = "run: bad payload";
++			if (error.empty() && !_stopFrame && !_stopMaxFrame && !_stopOnControl && !_stopOnIdle && !_stopOnMenu &&
++			    _stopUntil.empty() && _stopUntilAny.empty())
++				error = "run needs frame, max_frame, control, idle, until or until_any";
++			if (error.empty() && _stopFrame && _stopFrame <= _frames)
++				error = Common::String::format("frame %llu is not after the current frame %llu",
++				                               (unsigned long long)_stopFrame, (unsigned long long)_frames);
++			if (!error.empty()) {
++				_stopFrame = _stopMaxFrame = 0;
++				_stopOnControl = _stopOnIdle = _stopOnMenu = false;
++				_stopUntil.clear();
++				_stopUntilAny.clear();
++			}
++			resume = error.empty();
++			break;
++		}
++		case kWStep: {
++			const uint32 frames = in.u32();
++			_wireStepRuns = in.b();
++			_wireStepExplain = in.b();
++			if (!in.done())
++				error = "step: bad payload";
++			else if (frames < 1)
++				error = "step needs at least one frame";
++			if (error.empty()) {
++				_stopFrame = _frames + frames;
++				_wireStep = true;
++				resume = true;
++			}
++			break;
++		}
++		case kWForkEach: {
++			const uint32 n = in.u32();
++			if (!in.done() || n < 1 || n > 64)
++				error = "fork_each needs a number of frames in 1..64";
++			else
++				_forkEachLeft = n;
++			resume = error.empty();
++			break;
++		}
++		case kWInputs: {
++			// fmi-core Vec<Event>: frame, then Input (Click 0, RClick 1, Move 2, Key 3, Skips 4), checked as
++			// parseSpeedrunInputs() and the "inputs" command check theirs
++			Common::Array<SpeedrunInput> parsed;
++			const uint32 n = in.count(9);
++			uint64 lastFrame = 0;
++			for (uint32 i = 0; i < n && in.ok() && error.empty(); i++) {
++				SpeedrunInput ev;
++				ev.frame = in.u64();
++				const uint8 kind = in.u8();
++				bool ok = ev.frame > 0;
++				switch (kind) {
++				case 0:
++				case 1:
++				case 2:
++					ev.kind = kind == 0 ? SpeedrunInput::kClick : kind == 1 ? SpeedrunInput::kRightClick : SpeedrunInput::kMove;
++					ev.x = in.i32();
++					ev.y = in.i32();
++					ok = ok && ev.x >= 0 && ev.y >= 0 && ev.x < 0x10000 && ev.y < 0x10000;
++					break;
++				case 3:
++					ev.kind = SpeedrunInput::kKey;
++					ev.keyName = in.str();
++					ok = ok && speedrunKeyName(ev.keyName, ev.key);
++					break;
++				case 4: {
++					ev.kind = SpeedrunInput::kSkips;
++					ev.skipText = in.b();
++					ev.skipCutscenes = in.b();
++					if (in.u8()) {
++						const uint32 ns = in.count(4);
++						for (uint32 k = 0; k < ns && in.ok(); k++)
++							ev.spare.push_back(in.i32());
++					}
++					break;
++				}
++				default:
++					ok = false;
++					break;
++				}
++				if (!in.ok())
++					break;
++				if (!ok)
++					error = Common::String::format("events: event %u: expected frame > 0, and a click/rclick/move in "
++					                               "range, a key name or skips", i);
++				else if (ev.frame < lastFrame)
++					error = Common::String::format("events: event %u: frame %llu comes before frame %llu", i,
++					                               (unsigned long long)ev.frame, (unsigned long long)lastFrame);
++				lastFrame = ev.frame;
++				parsed.push_back(ev);
++			}
++			if (error.empty() && !in.done())
++				error = "inputs: bad payload";
++			if (error.empty()) {
++				const uint64 last = _inputs.empty() ? 0 : _inputs.back().frame;
++				for (const SpeedrunInput &ev : parsed) {
++					if (ev.frame <= _frames || ev.frame < last) {
++						error = Common::String::format("event frame %llu must be after frame %llu and not before %llu",
++						                               (unsigned long long)ev.frame, (unsigned long long)_frames,
++						                               (unsigned long long)last);
++						break;
++					}
++				}
++			}
++			if (error.empty()) {
++				for (const SpeedrunInput &ev : parsed)
++					_inputs.push_back(ev);
++				wireBegin(kROk);
++				wireFlush();
++			}
++			break;
++		}
++		case kWFork: {
++			if (!in.done()) {
++				error = "fork: bad payload";
++				break;
++			}
++			// as the JSON "fork": the data file is closed so that each process reopens its own
++			_vm->closeRoom();
++			const pid_t pid = fork();
++			if (pid < 0) {
++				error = Common::String::format("fork failed: %s", strerror(errno));
++			} else if (pid == 0) {
++				_branchChild = true;
++				close(_controlFd);
++				_controlFd = -1;
++				_trace.close();
++				if (_frameLog)
++					_frameFile.close();
++				_frameLog = false;
++				if (!controlConnect())
++					_exit(4);
++				wireBegin(kRStop);
++				wireStatus(_wireOut, "forked", false);
++				wireFlush();
++			} else {
++				wireBegin(kRForked);
++				_wireOut.u32((uint32)pid);
++				wireFlush();
++			}
++			break;
++		}
++		case kWObs:
++		case kWStateJson: {
++			// fmi-core ObsReq: objects (Option<Vec<u32>>), names, exact
++			Common::Array<int> objects;
++			bool lite = false;
++			if (in.u8()) {
++				lite = true;
++				const uint32 n = in.count(4);
++				for (uint32 i = 0; i < n && in.ok(); i++)
++					objects.push_back((int)in.u32());
++			}
++			const bool names = in.b();
++			const bool exact = in.b();
++			if (!in.done()) {
++				error = "obs: bad payload";
++				break;
++			}
++			if (type == kWObs) {
++				wireBegin(kRObs);
++				wireObs(_wireOut, lite ? &objects : nullptr, names, exact);
++			} else {
++				wireBegin(kRJson);
++				const Common::String j = lite ? stateLiteJson(objects) : stateJson(_dumpExact || exact);
++				_wireOut.str(j.c_str(), j.size());
++			}
++			wireFlush();
++			break;
++		}
++		case kWState: {
++			if (!in.done()) {
++				error = "state: bad payload";
++				break;
++			}
++			_wireNew.clear();
++			wireBlock(_wireNew);
++			wireBegin(kRState);
++			_wireOut.put(_wireNew.data(), _wireNew.size());
++			_wireLast.swap(_wireNew);
++			wireFlush();
++			break;
++		}
++		case kWHolds: {
++			SpeedrunConditions conds;
++			if (!wireConditions(in, conds, error) || !in.done()) {
++				error = "holds: " + (error.empty() ? Common::String("bad payload") : error);
++				break;
++			}
++			wireBegin(kRHolds);
++			_wireOut.b(allHold(conds));
++			wireFlush();
++			break;
++		}
++		case kWAt: {
++			const int x = in.i32(), y = in.i32();
++			if (!in.done()) {
++				error = "at needs integer x and y";
++				break;
++			}
++			VirtScreen *vs = _vm->findVirtScreen(y);
++			wireBegin(kRAt);
++			_wireOut.i32(x);
++			_wireOut.i32(y);
++			_wireOut.i32(vs ? (int)vs->number : -1);
++			if (vs && vs->number == kMainVirtScreen) {
++				const int virtX = x + vs->xstart, virtY = y - vs->topline;
++				_wireOut.u8(1);
++				_wireOut.i32(virtX);
++				_wireOut.i32(virtY);
++				_wireOut.i32(_vm->findObject(virtX, virtY));
++				_wireOut.i32(_vm->getActorFromPos(virtX, virtY));
++			} else {
++				_wireOut.u8(0);
++			}
++			_wireOut.i32(_vm->findVerbAtPos(x, y));
++			wireFlush();
++			break;
++		}
++		case kWSetRng: {
++			const uint32 state = in.u32();
++			if (!in.done() || state == 0) {
++				error = "set_rng needs a state in 1..2^32-1";
++				break;
++			}
++			_vm->_rnd.setSeed(state);
++			writeRecord(record("rng_set").add("state", (uint64)_vm->_rnd.getSeed()));
++			wireBegin(kROk);
++			wireFlush();
++			break;
++		}
++		case kWSegment: {
++			const bool on = in.b();
++			if (!in.done()) {
++				error = "segment: bad payload";
++				break;
++			}
++			_segment = on;
++			wireBegin(kROk);
++			wireFlush();
++			break;
++		}
++		case kWRuns: {
++			if (!in.done()) {
++				error = "runs: bad payload";
++				break;
++			}
++			wireBegin(kRRuns);
++			wireRuns(_wireOut);
++			wireFlush();
++			break;
++		}
++		case kWExplain: {
++			// Option<ExplainArm>: None disarms, as {"off": true}
++			if (!in.u8()) {
++				if (!in.done()) {
++					error = "explain: bad payload";
++					break;
++				}
++				_explainArmed = false;
++				_explainUnits.clear();
++			} else {
++				const uint64 from = in.u64(), to = in.u64();
++				Common::Array<int32> units;
++				const uint32 n = in.count(8);
++				for (uint32 i = 0; i < n && in.ok(); i++) {
++					units.push_back(in.i32());
++					units.push_back(in.i32());
++				}
++				if (!in.done() || to < from || from > (uint64)0x7FFFFFFFFFFFFFFFLL) {
++					error = "explain needs integer frames from <= to";
++					break;
++				}
++				_explainFrom = from;
++				_explainTo = to;
++				_explainUnits = units;
++				_explainArmed = true;
++			}
++			wireBegin(kROk);
++			wireFlush();
++			break;
++		}
++		case kWExplainLog: {
++			if (!in.done()) {
++				error = "explain_log: bad payload";
++				break;
++			}
++			wireBegin(kRExplain);
++			wireExplainLog(_wireOut);
++			wireFlush();
++			break;
++		}
++		case kWQuit:
++			_exit(0);
++			break;
++		default:
++			error = Common::String::format("unknown message type 0x%02x", (uint)type);
++			break;
++		}
++		if (!error.empty()) {
++			wireBegin(kRError);
++			_wireOut.str(error.c_str(), error.size());
++			wireFlush();
++			continue;
++		}
++		if (resume)
++			return;
++	}
++}
++
++} // End of namespace Scumm
