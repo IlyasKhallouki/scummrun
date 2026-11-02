@@ -975,12 +975,18 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
             let size = |i: usize| -> u64 { sets(i).map(|(_, s)| s.len() as u64).sum() };
             let count = |i: usize| -> usize { sets(i).count() };
             ix.sort_by_key(|&i| (t.acts.meta[i].cost, count(i), std::cmp::Reverse(size(i)), i));
+            // a bit per fact (mod 64): an action whose facts are not among another's cannot dominate it, so the
+            // walk runs only where the bits allow (the same first dominator in `keep`'s order)
+            let bits: FxMap<usize, u64> = ix.iter().map(|&i| (i, sets(i).fold(0u64, |b, (f, _)| b | 1 << (f % 64)))).collect();
             let mut keep: Vec<usize> = Vec::new();
             for &i in &ix {
                 let (pa, pb) = pspan[&i];
                 let pi = &parena[pa..pb];
+                let bi = bits[&i];
                 let by = keep.iter().copied().find(|&k| {
-                    t.acts.meta[k].cost <= t.acts.meta[i].cost && pre_within(&parena[pspan[&k].0..pspan[&k].1], pi)
+                    t.acts.meta[k].cost <= t.acts.meta[i].cost
+                        && bits[&k] & !bi == 0
+                        && pre_within(&parena[pspan[&k].0..pspan[&k].1], pi)
                 });
                 match by {
                     Some(k) => {
