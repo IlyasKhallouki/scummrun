@@ -480,8 +480,13 @@ pub struct Builder<'g> {
     pub(crate) reach_out: Vec<crate::reach::Held>,
     /// the switch --reach: the job being run, as reach.rs keys it (`job_key`)
     pub(crate) cur_job_key: Option<Arc<str>>,
-    /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs)
+    /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs); the switch --memo: in every
+    /// job that runs
     pub(crate) memo_log: Option<crate::memo::RunLog>,
+    /// the switch --memo (experiments/E011-speed/memo.md): the store's root folder; None off
+    pub memo_dir: Option<std::path::PathBuf>,
+    /// the switch --memo: each consulted key's kind, domain and constant start in this table (`Builder::key_info`)
+    pub(crate) memo_infos: FxHashMap<String, (u8, Option<Domain>, Option<i64>)>,
 }
 
 /// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
@@ -534,6 +539,7 @@ impl<'g> Builder<'g> {
             self.table = t.clone();
             self.fact_info.clear();
             self.ego_cache = None;
+            self.memo_infos.clear();
         }
         if self.table.args_vals != *args_vals {
             self.table.args_vals.clone_from(args_vals);
@@ -658,6 +664,8 @@ impl<'g> Builder<'g> {
             reach_out: Vec::new(),
             cur_job_key: None,
             memo_log: None,
+            memo_dir: None,
+            memo_infos: FxHashMap::default(),
         }
     }
 
@@ -1414,6 +1422,9 @@ impl<'g> Builder<'g> {
             if let Some(memo) = self.table.memo.clone() {
                 return self.run_job_memo(&memo, m, job);
             }
+            if let Some(cm) = self.table.cross.clone() {
+                return self.run_job_cross(&cm, m, job);
+            }
         }
         self.run_job_real(m, job)
     }
@@ -1943,6 +1954,10 @@ impl<'g> Builder<'g> {
         if let Val::Unk(u) = v {
             if u.class != UClass::Unknown {
                 let src = u.what.clone();
+                if let Some(l) = &mut self.memo_log {
+                    // its kind (and a constant's start) is read here (memo.md, item 4)
+                    l.touched.insert(src.clone());
+                }
                 let s: Option<Label> = if self.fact_info(&src).0 == Kind::Const {
                     Some(Label::Int(self.table.start.get0(&src)))
                 } else {
@@ -2070,6 +2085,9 @@ impl<'g> Builder<'g> {
         if self.switches.shared_runs && self.table.shared.is_none() {
             self.table.shared = Some(Arc::new(crate::shared::SharedRuns::default()));
         }
+        if let Some(root) = self.memo_dir.clone() {
+            self.open_memo(&root);
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -2077,6 +2095,10 @@ impl<'g> Builder<'g> {
                 }
             }
             self.read_once(m, start_events, skip, &mut sink);
+            if let Some(cm) = &self.table.cross {
+                // the runs this pass stored join the index: the next pass may take them (memo.md)
+                cm.index_own();
+            }
             self.counts.set(format!("pass {}: records", n + 1), self.n_records as i64);
             if self.out_of_domain.is_empty() || n == passes - 1 {
                 break;
@@ -2094,6 +2116,10 @@ impl<'g> Builder<'g> {
         self.counts.set("records", self.n_records as i64);
         if let Some(memo) = &self.table.memo {
             memo.clear();
+        }
+        if let Some(cm) = &self.table.cross {
+            let n = cm.finish().unwrap_or_else(|e| panic!("--memo: the store file: {e}"));
+            eprintln!("[memo] {} runs stored in {}", n, cm.dir.display());
         }
         if self.switches.due_first {
             crate::due::apply(self);
@@ -2126,6 +2152,7 @@ impl<'g> Builder<'g> {
         self.folded.clear();
         self.ego_cache = None;
         self.fact_info.clear();
+        self.memo_infos.clear();
         self.n_records = 0;
         self.args_set.clear();
     }

@@ -96,6 +96,8 @@ pub struct FactTable {
     pub reach: Option<std::sync::Arc<crate::reach::Reached>>,
     /// the switch pass2_reuse: pass 1's runs (memo.rs); None off
     pub memo: Option<std::sync::Arc<crate::memo::RunMemo>>,
+    /// the switch --memo: the job memo across readings (memo.rs `CrossMemo`, experiments/E011-speed/memo.md); None off
+    pub cross: Option<std::sync::Arc<crate::memo::CrossMemo>>,
     /// the switch shared_runs: the batch's runs of clicks that differ only in their verb (shared.rs); None off
     pub shared: Option<std::sync::Arc<crate::shared::SharedRuns>>,
     /// fix round 1, F1c (the switch input_settled, the Builder's): what the reading read from the scripts for it
@@ -248,6 +250,7 @@ impl FactTable {
             wait_both: false,
             reach: None,
             memo: None,
+            cross: None,
             shared: None,
             settled: None,
             refined: BTreeSet::new(),

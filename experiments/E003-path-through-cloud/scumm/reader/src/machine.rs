@@ -164,7 +164,12 @@ pub(crate) fn pkey_of(s: &str) -> PKey {
     PKey::F(s.parse().unwrap_or_else(|_| panic!("a precondition key the machine half cannot hold: {s}")))
 }
 
-/// `pkey_str` as a shared text (`key_rc`).
+/// A precondition key's text (`pkey_of` reads it back).
+pub fn pkey_text(k: PKey) -> String {
+    pkey_rc(k).to_string()
+}
+
+/// A precondition key's text, shared (`key_rc`).
 fn pkey_rc(k: PKey) -> Rc<str> {
     match k {
         PKey::F(f) => key_rc(f),
@@ -2472,7 +2477,7 @@ impl RunMachine for Reader<'_> {
         self.m.step_limit = if cx.table.step_limit == 0 { scumm_machine::machine::STEP_LIMIT } else { cx.table.step_limit };
         {
             let s = st_mut(&mut self.m);
-            s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing());
+            s.track = cx.table.memo.as_ref().is_some_and(|m| !m.reusing()) || cx.table.cross.is_some();
             s.touched.clear();
             s.queries.clear();
         }
