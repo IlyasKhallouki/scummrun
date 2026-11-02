@@ -436,3 +436,50 @@ fn idle_rule_on_changes_is_idle_rule_facts_maps_in_the_same_order() {
     assert_eq!(r["first_return"], json!({"bit:9": 2}));
     assert_eq!(r, step::idle_rule_facts(&start, frames));
 }
+
+#[test]
+fn reuse_of_one_diff_is_reusable_and_its_detail() {
+    let text = |f: &fmi_core::Facts| -> fmi_explore::archive::FactMap { f.iter().map(|(k, v)| (k.text(), *v)).collect() };
+    for seed in 1..40 {
+        let (start, frames) = lcg_frames(seed, 50, 25);
+        let s = text(&start);
+        let e = text(&frames.last().unwrap().1);
+        let mut keys: HashSet<String> = s.keys().filter(|k| k.len() % 3 == 0).cloned().collect();
+        keys.insert("at:script:1:2".into());
+        let extra: HashSet<String> = s.keys().filter(|k| k.len() % 3 == 1).cloned().collect();
+        let d = step::diff(&s, &e);
+        let (ok, det) = step::reuse_of(&d, |k| keys.contains(k));
+        assert_eq!((ok, det.clone()), (step::reusable(&s, &keys, &e).0, step::reusable_detail(&s, &keys, &e)));
+        assert_eq!(fmi_explore::pyjson::dumps_default(&det), fmi_explore::pyjson::dumps_default(&step::reusable_detail(&s, &keys, &e)));
+        let mut k2 = keys.clone();
+        k2.extend(extra.iter().cloned());
+        let (ok2, det2) = step::reuse_of(&d, |k| keys.contains(k) || extra.contains(k));
+        assert_eq!((ok2, det2), (step::reusable(&s, &k2, &e).0, step::reusable_detail(&s, &k2, &e)));
+    }
+}
+
+#[test]
+fn fact_map_of_is_the_ordered_facts_map() {
+    // dumps made from recorded checkpoints (the doubles' inverse of facts_of)
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mut n = 0;
+    for p in [format!("{home}/.cache/fast-mi-e009/off/step-a/jobs/ta/job.json")] {
+        let Ok(j) = fmi_explore::files::read_json(&std::path::PathBuf::from(p)) else { continue };
+        let facts = fmi_explore::start::facts_of_json(&j["entry"]["checkpoint"][1]);
+        let obs = fmi_explore::doubles::obs_from_facts(&facts);
+        assert_eq!(step::fact_map_of(&obs), fact_map(&step::facts_of_ordered(&obs)));
+        n += 1;
+    }
+    let dir = std::path::PathBuf::from("/var/tmp/fast-mi/e011-bench-data/b0/entries");
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten().take(40) {
+            let Ok(doc) = fmi_explore::files::read_gz(&e.path()) else { continue };
+            for c in doc["checkpoints"].as_array().cloned().unwrap_or_default() {
+                let obs = fmi_explore::doubles::obs_from_facts(&fmi_explore::start::facts_of_json(&c[1]));
+                assert_eq!(step::fact_map_of(&obs), fact_map(&step::facts_of_ordered(&obs)));
+                n += 1;
+            }
+        }
+    }
+    eprintln!("fact_map_of: {n} dumps");
+}

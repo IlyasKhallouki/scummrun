@@ -283,6 +283,26 @@ pub fn reusable_detail(start: &FactMap, task_keys: &HashSet<String>, entry: &Fac
            "first": bad.iter().take(12).map(|k| json!([k, d[*k].0, d[*k].1])).collect::<Vec<_>>()})
 }
 
+/// `reusable` and `reusable_detail` from one diff of the reading's start facts and the entry's facts (`d`, as `diff`
+/// gives it), the task facts being those `in_task` holds: (reusable, the detail).
+pub fn reuse_of(d: &BTreeMap<String, (i64, i64)>, in_task: impl Fn(&str) -> bool) -> (bool, Value) {
+    let bad: Vec<&String> = d.keys().filter(|k| !in_task(k) && !is_slot(k)).collect();
+    let detail = json!({"differ": d.len(), "task": d.keys().filter(|k| in_task(k)).count(),
+           "slots": d.keys().filter(|k| !in_task(k) && is_slot(k)).count(), "other": bad.len(),
+           "first": bad.iter().take(12).map(|k| json!([k, d[*k].0, d[*k].1])).collect::<Vec<_>>()});
+    (bad.is_empty(), detail)
+}
+
+/// `fact_map(&facts_of_ordered(s))` made from fmi-core's `facts_of`: the same keys and values, with no JSON between.
+pub fn fact_map_of(s: &fmi_core::Obs) -> FactMap {
+    let f = fmi_core::facts_of(s);
+    let mut m = FactMap::with_capacity(f.len());
+    for &(k, v) in f.iter() {
+        m.insert(k.text(), v);
+    }
+    m
+}
+
 /// E009 fix a: a key is idle when its value comes back to a value it had before (the entry's value included).
 /// {"returns": sorted idle keys, "first_return": {k: offset}, "changes": {k: n}} (dict orders as Python builds them).
 pub fn idle_rule<'a, I>(start: &FactMap, frames: I) -> Value
@@ -401,24 +421,73 @@ pub fn start_rows_of(doc: &Value) -> Option<PathBuf> {
 
 /// The job's readings of its scope whose files exist, newest first (reading.json's mtime, then the job's order).
 pub fn cached_readings(job: &Value) -> Vec<PathBuf> {
+    cached_readings_with(job, false)
+}
+
+/// What `cached_readings` reads of a reading.json: its scope's rooms (sorted), its packed file's name and the start
+/// rows' file it names.
+#[derive(Clone)]
+struct HeadFields {
+    rooms: Vec<i64>,
+    packed: String,
+    rows: Option<PathBuf>,
+}
+
+/// at most this many files' fields kept (warm.rs's bound)
+const MEMO_KEEP: usize = 64;
+
+type FileMemo<T> = std::sync::Mutex<HashMap<PathBuf, (Vec<u8>, T)>>;
+
+fn heads_memo() -> &'static FileMemo<HeadFields> {
+    static C: std::sync::OnceLock<FileMemo<HeadFields>> = std::sync::OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// A memo by a file's content: the value kept for `p` when its bytes are those read now, else `make` of them.
+fn by_content<T: Clone>(memo: &FileMemo<T>, p: &Path, bytes: Vec<u8>, make: impl FnOnce(&[u8]) -> Option<T>) -> Option<T> {
+    if let Some((b, v)) = memo.lock().unwrap().get(p) {
+        if *b == bytes {
+            return Some(v.clone());
+        }
+    }
+    let v = make(&bytes)?;
+    let mut m = memo.lock().unwrap();
+    if m.len() >= MEMO_KEEP {
+        if let Some(k) = m.keys().next().cloned() {
+            m.remove(&k);
+        }
+    }
+    m.insert(p.to_path_buf(), (bytes, v.clone()));
+    Some(v)
+}
+
+fn head_fields_of(bytes: &[u8]) -> Option<HeadFields> {
+    let doc = pyjson::loads(std::str::from_utf8(bytes).ok()?).ok()?;
+    let mut rooms: Vec<i64> = doc.get("scope").and_then(|s| s.get("rooms")).and_then(|r| r.as_array())
+        .map(|a| a.iter().filter_map(|x| as_i64(Some(x))).collect()).unwrap_or_default();
+    rooms.sort();
+    Some(HeadFields { rooms, packed: doc.get("packed").and_then(|x| x.as_str()).unwrap_or("reading.tc").to_string(), rows: start_rows_of(&doc) })
+}
+
+/// `cached_readings`; with `memo` (E011 round 2, FMI_TRY_MEMO) a reading.json is read and compared with the bytes
+/// it had when its fields were taken, and parsed again only when they differ.
+pub fn cached_readings_with(job: &Value, memo: bool) -> Vec<PathBuf> {
     let mut scope: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| as_i64(Some(x))).collect()).unwrap_or_default();
     scope.sort();
     let mut out: Vec<(i128, usize, PathBuf)> = Vec::new();
     for (i, r) in job.get("readings").and_then(|r| r.as_array()).cloned().unwrap_or_default().iter().enumerate() {
         let p = PathBuf::from(r["path"].as_str().unwrap_or(""));
-        let Ok(text) = std::fs::read_to_string(&p) else { continue };
-        let Ok(doc) = pyjson::loads(&text) else { continue };
-        let mut rooms: Vec<i64> = doc.get("scope").and_then(|s| s.get("rooms")).and_then(|r| r.as_array())
-            .map(|a| a.iter().filter_map(|x| as_i64(Some(x))).collect()).unwrap_or_default();
-        rooms.sort();
-        if rooms != scope {
+        let Ok(bytes) = std::fs::read(&p) else { continue };
+        let fields = if memo { by_content(heads_memo(), &p, bytes, head_fields_of) } else { head_fields_of(&bytes) };
+        let Some(h) = fields else { continue };
+        if h.rooms != scope {
             continue;
         }
-        let packed = p.parent().unwrap_or(Path::new("")).join(doc.get("packed").and_then(|x| x.as_str()).unwrap_or("reading.tc"));
+        let packed = p.parent().unwrap_or(Path::new("")).join(&h.packed);
         if !packed.exists() || !packed.with_extension("reached").exists() {
             continue;
         }
-        if let Some(rows) = start_rows_of(&doc) {
+        if let Some(rows) = &h.rows {
             if !rows.exists() {
                 continue;
             }
@@ -449,6 +518,40 @@ pub fn root_facts_of(job: &Value, job_dir: &Path) -> Option<FactMap> {
             let id = e.get("id")?;
             let doc = files::read_gz(&arch.join("entries").join(format!("{}.json.gz", files::py_str(Some(id))))).ok()?;
             return doc["checkpoints"].as_array()?.last().map(|c| fact_map(&c[1]));
+        }
+    }
+    None
+}
+
+fn roots_memo() -> &'static FileMemo<std::sync::Arc<FactMap>> {
+    static C: std::sync::OnceLock<FileMemo<std::sync::Arc<FactMap>>> = std::sync::OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// `root_facts_of`, the root entry file's facts kept per its content (E011 round 2, FMI_TRY_MEMO): the file is read
+/// and compared with the bytes it had, and decompressed and parsed again only when they differ.
+pub fn root_facts_of_memo(job: &Value, job_dir: &Path) -> Option<std::sync::Arc<FactMap>> {
+    if let Some(r) = job.get("root_facts").filter(|r| !r.is_null()) {
+        return Some(std::sync::Arc::new(fact_map(r)));
+    }
+    if files::truthy(job["entry"].get("root")) {
+        return Some(std::sync::Arc::new(fact_map(&job["entry"]["checkpoint"][1])));
+    }
+    let jd = std::fs::canonicalize(job_dir).ok()?;
+    let arch = jd.parent()?.parent()?;
+    let text = std::fs::read_to_string(arch.join("entries.jsonl")).ok()?;
+    for ln in files::py_splitlines(&text) {
+        let e = pyjson::loads(ln).ok()?;
+        if e.get("parent").map(|p| p.is_null()).unwrap_or(false) {
+            let id = e.get("id")?;
+            let p = arch.join("entries").join(format!("{}.json.gz", files::py_str(Some(id))));
+            let bytes = std::fs::read(&p).ok()?;
+            return by_content(roots_memo(), &p, bytes, |b| {
+                let mut s = String::new();
+                std::io::Read::read_to_string(&mut flate2::read::MultiGzDecoder::new(b), &mut s).ok()?;
+                let doc = pyjson::loads(&s).ok()?;
+                doc["checkpoints"].as_array()?.last().map(|c| std::sync::Arc::new(fact_map(&c[1])))
+            });
         }
     }
     None

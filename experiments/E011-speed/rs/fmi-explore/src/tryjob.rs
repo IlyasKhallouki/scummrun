@@ -304,8 +304,75 @@ fn task_keys(rd: &dyn ReadingSource) -> HashSet<String> {
     rd.domains().0.iter().map(|(k, _)| k.text()).collect()
 }
 
+/// What the reading choice reads of a reading, made once per reading in the process (FMI_TRY_MEMO; a reading's files
+/// never change once made, and it is keyed as warm.rs keys reading.json: its folder and its packed file's sha1): its
+/// start facts and its task facts' keys, as texts.
+struct ReadingMemo {
+    start: crate::archive::FactMap,
+    keys: HashSet<String>,
+}
+
+fn reading_memo(rd: &dyn ReadingSource) -> Arc<ReadingMemo> {
+    type Memo = Mutex<std::collections::HashMap<(PathBuf, [u8; 20]), Arc<ReadingMemo>>>;
+    static C: std::sync::OnceLock<Memo> = std::sync::OnceLock::new();
+    let id = (rd.dir().to_path_buf(), rd.id());
+    if let Some(m) = C.get_or_init(Default::default).lock().unwrap().get(&id) {
+        return m.clone();
+    }
+    let m = Arc::new(ReadingMemo { start: crate::archive::fact_map(&doc_of(rd)["start"]["facts"]), keys: task_keys(rd) });
+    let mut c = C.get_or_init(Default::default).lock().unwrap();
+    if c.len() >= 64 {
+        if let Some(k) = c.keys().next().cloned() {
+            c.remove(&k);
+        }
+    }
+    c.insert(id, m.clone());
+    m
+}
+
+/// The reading choice's outcome: the reading or None, why, the candidates checked.
+type Choice = (Option<Arc<dyn ReadingSource>>, String, Vec<Value>);
+
 /// Step 2 on the cached readings (step.py `choose_reading`): (the reading or None, why, the candidates checked).
-fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<(Option<Arc<dyn ReadingSource>>, String, Vec<Value>), String> {
+fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<Choice, String> {
+    if !switch("FMI_TRY_MEMO") {
+        return choose_reading_r1(r, job, facts);
+    }
+    let cands = step::cached_readings_with(job, true);
+    if cands.is_empty() {
+        return Ok((None, "no cached reading".into(), vec![]));
+    }
+    let mut checked = Vec::new();
+    for p in cands {
+        let rd = machine::port(|| r.readings.open(&p))?;
+        let m = reading_memo(&*rd);
+        // one diff of the start facts and the entry's, read for the task keys and for them with E009's
+        let d = step::diff(&m.start, facts);
+        let (mut ok, det) = step::reuse_of(&d, |k| m.keys.contains(k));
+        let mut row = json!({"path": p.to_string_lossy(), "reusable": ok});
+        for (k, v) in det.as_object().unwrap() {
+            row[k] = v.clone();
+        }
+        if !ok && job.get("reuse").and_then(|x| x.as_str()) == Some("e009") {
+            let extra = machine::port(|| r.readings.reuse_keys(&*rd))?;
+            let (ok2, det2) = step::reuse_of(&d, |k| m.keys.contains(k) || extra.contains(k));
+            ok = ok2;
+            row["reusable"] = json!(ok);
+            row["reuse_keys"] = json!(extra.len());
+            row["e009"] = det2;
+        }
+        let e009 = row.get("e009").is_some();
+        checked.push(row);
+        if ok {
+            return Ok((Some(rd), if e009 { "reused (e009 keys)".into() } else { "reused".into() }, checked));
+        }
+    }
+    let first = checked[0].get("e009").cloned().unwrap_or_else(|| checked[0].clone());
+    Ok((None, format!("differs on {} keys", first["other"]), checked))
+}
+
+/// The reading choice as round 1 made it (FMI_TRY_MEMO=0).
+fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<Choice, String> {
     let cands = step::cached_readings(job);
     if cands.is_empty() {
         return Ok((None, "no cached reading".into(), vec![]));
@@ -495,7 +562,11 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
     let held = job.get("held").and_then(|h| h.as_array()).unwrap_or(&empty);
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
-    let ts = step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?;
+    let ts = if switch("FMI_TRY_MEMO") {
+        step::targets(&reached, &guide, facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
+    } else {
+        step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?
+    };
     // job.json's "forced_targets" [[K, V], ...] (the benchmark's tries, several in one process), else `--targets`
     let from_job: Option<Vec<(String, i64)>> = job.get("forced_targets").and_then(|f| f.as_array()).map(|a| {
         a.iter().filter_map(|p| Some((p.get(0)?.as_str()?.to_string(), p.get(1)?.as_i64()?))).collect()
@@ -557,8 +628,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         }
         let state = machine::port(|| root.obs(&ObsReq::default())).map_err(|e| Err(format!("EngineError: {e}")))?;
         let status = root.status().clone();
-        let facts_v = step::facts_of_ordered(&state);
-        let facts = crate::archive::fact_map(&facts_v);
+        let facts = if switch("FMI_TRY_MEMO") { step::fact_map_of(&state) } else { crate::archive::fact_map(&step::facts_of_ordered(&state)) };
         let idle_frames = files::as_i64(job.get("idle_frames")).unwrap_or(0);
         if idle_frames != 0 && !files::truthy(job.get("idle_measured")) {
             log.say(&format!("idle: {idle_frames} frames with no input from frame {}", status.frame));

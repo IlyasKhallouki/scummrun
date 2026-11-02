@@ -79,7 +79,10 @@ pub fn step_check(path: &Path) -> Res<CheckReport> {
                 let ts = step::targets(&reached_cache[&rp], &guides[&gp], &facts, root.as_ref(), held, tried, &goal, rot)?;
                 add_s(&mut rep.seconds, &kind, t.elapsed().as_secs_f64());
                 let got = Value::Array(ts.iter().map(|x| x.json()).collect());
-                let root_ok = root.is_some() == c["root_facts"].as_bool().unwrap_or(false);
+                // the try's memo of the root's facts (E011 round 2): the same facts, the same targets
+                let root_m = step::root_facts_of_memo(&job, jd);
+                let ts_m = step::targets(&reached_cache[&rp], &guides[&gp], &facts, root_m.as_deref(), held, tried, &goal, rot)?;
+                let root_ok = root.is_some() == c["root_facts"].as_bool().unwrap_or(false) && root.as_ref() == root_m.as_deref() && ts_m == ts;
                 (got == c["out"] && root_ok, format!("{} on {}: {} targets, reference {}", jd.display(), rp,
                                                       ts.len(), c["out"].as_array().map(|a| a.len()).unwrap_or(0)))
             }
@@ -94,7 +97,9 @@ pub fn step_check(path: &Path) -> Res<CheckReport> {
                 let (ok, nb) = step::reusable(&start, &keys, &facts);
                 let det = step::reusable_detail(&start, &keys, &facts);
                 add_s(&mut rep.seconds, &kind, t.elapsed().as_secs_f64());
-                (json!([ok, nb]) == c["out"] && det == c["detail"], format!("{} vs {}", c["reading"], c["job_dir"]))
+                // the try's one diff (E011 round 2)
+                let (ok1, det1) = step::reuse_of(&step::diff(&start, &facts), |k| keys.contains(k));
+                (json!([ok, nb]) == c["out"] && det == c["detail"] && ok1 == ok && det1 == c["detail"], format!("{} vs {}", c["reading"], c["job_dir"]))
             }
             "idle_rule" => {
                 let e = read_gz(Path::new(c["entry_file"].as_str().unwrap_or("")))?;
