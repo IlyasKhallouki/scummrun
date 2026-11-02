@@ -207,6 +207,30 @@ impl PJ {
 
 }
 
+/// A string as Python's ensure_ascii encoder writes it (scumm_ir::json::write_str).
+pub fn write_str(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\x08' => out.push_str("\\b"),
+            '\x0c' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ' '..='~' => out.push(c),
+            c => {
+                let mut buf = [0u16; 2];
+                for u in c.encode_utf16(&mut buf) {
+                    let _ = write!(out, "\\u{:04x}", u);
+                }
+            }
+        }
+    }
+    out.push('"');
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,28 +268,4 @@ mod tests {
             "{\n \"a\": [\n  1,\n  2\n ],\n \"b\": {},\n \"c\": [],\n \"d\": {\n  \"x\": null,\n  \"y\": \"\\u00e9\\\"\\n\"\n }\n}\n"
         );
     }
-}
-
-/// A string as Python's ensure_ascii encoder writes it (scumm_ir::json::write_str).
-pub fn write_str(s: &str, out: &mut String) {
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            '\x08' => out.push_str("\\b"),
-            '\x0c' => out.push_str("\\f"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            ' '..='~' => out.push(c),
-            c => {
-                let mut buf = [0u16; 2];
-                for u in c.encode_utf16(&mut buf) {
-                    let _ = write!(out, "\\u{:04x}", u);
-                }
-            }
-        }
-    }
-    out.push('"');
 }

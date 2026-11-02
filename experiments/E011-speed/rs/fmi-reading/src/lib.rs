@@ -353,7 +353,14 @@ impl ReadingSource for Reading {
         let ln = self.checked_line(i, &raw);
         // a key of the line as the action's precondition holds it (the last set of that key, as the dict keeps it):
         // matched by text against the packed file's fact names, so no key text is made again
-        let in_pre = |k: &str| raw.pre.iter().rev().find(|x| self.packed.s(self.packed.fact_sid[x.0 as usize]) == k);
+        let mut by_text: Vec<(&str, usize)> =
+            raw.pre.iter().enumerate().map(|(j, x)| (self.packed.s(self.packed.fact_sid[x.0 as usize]), j)).collect();
+        by_text.sort_unstable();
+        let in_pre = |k: &str| {
+            // the last entry of that text (sorted by (text, place))
+            let p = by_text.partition_point(|x| x.0 <= k);
+            (p > 0 && by_text[p - 1].0 == k).then(|| &raw.pre[by_text[p - 1].1])
+        };
         let rec_pre = ln
             .pre_keys
             .iter()

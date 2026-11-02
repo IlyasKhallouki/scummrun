@@ -230,6 +230,16 @@ fn main() {
                 .compact_text()
             );
         }
+        "loop-record" => {
+            // record(i) over every Nth action, R times (for a profiler)
+            let rd = Reading::open(Path::new(&args[1])).expect("the reading");
+            let reps: usize = arg(&args, "--reps").map_or(20, |n| n.parse().unwrap());
+            for _ in 0..reps {
+                for i in (0..rd.n_actions()).step_by(every as usize) {
+                    std::hint::black_box(rd.record(i));
+                }
+            }
+        }
         "bench" => {
             let dir = PathBuf::from(&args[1]);
             let reps: usize = arg(&args, "--reps").map_or(5, |n| n.parse().unwrap());
