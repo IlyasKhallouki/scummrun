@@ -373,6 +373,17 @@ pub fn fx<T: std::hash::Hash>(t: &T) -> u64 {
 pub struct Store {
     map: Rc<FxHashMap<Fact, Val>>,
     sum: u64,
+    /// the places of the `at:` and `esc:` keys held, per slot (false: `at:`, true: `esc:`): what a prefix of a
+    /// slot's places lists without going through every key (`Machine::prefixed`)
+    places: Rc<FxHashMap<(bool, Slot), Vec<i32>>>,
+}
+
+fn place_of(k: Fact) -> Option<((bool, Slot), i32)> {
+    match k {
+        Fact::At(s, w) => Some(((false, s), w)),
+        Fact::Esc(s, w) => Some(((true, s), w)),
+        _ => None,
+    }
 }
 
 impl Store {
@@ -402,10 +413,21 @@ impl Store {
         if self.map.get(&k) == Some(&v) {
             return; // the same entry: nothing changes (a shared map stays shared)
         }
-        if let Some(old) = Rc::make_mut(&mut self.map).insert(k, v) {
-            self.sum = self.sum.wrapping_sub(fx(&(k, old)));
+        match Rc::make_mut(&mut self.map).insert(k, v) {
+            Some(old) => self.sum = self.sum.wrapping_sub(fx(&(k, old))),
+            None => {
+                if let Some((slot, w)) = place_of(k) {
+                    Rc::make_mut(&mut self.places).entry(slot).or_default().push(w);
+                }
+            }
         }
         self.sum = self.sum.wrapping_add(fx(&(k, v)));
+    }
+
+    /// The places of the `at:` (`esc` false) or `esc:` keys of slot `s` the store holds, in no order.
+    #[inline]
+    pub fn places(&self, esc: bool, s: Slot) -> &[i32] {
+        self.places.get(&(esc, s)).map_or(&[], |v| v.as_slice())
     }
 
     /// Every (key, value), in no order.
@@ -438,6 +460,14 @@ impl Store {
         }
         let old = Rc::make_mut(&mut self.map).remove(k)?;
         self.sum = self.sum.wrapping_sub(fx(&(*k, old)));
+        if let Some((slot, w)) = place_of(*k) {
+            let ps = Rc::make_mut(&mut self.places);
+            let v = ps.get_mut(&slot).expect("a held place");
+            v.swap_remove(v.iter().position(|&x| x == w).expect("a held place"));
+            if v.is_empty() {
+                ps.remove(&slot);
+            }
+        }
         Some(old)
     }
 }

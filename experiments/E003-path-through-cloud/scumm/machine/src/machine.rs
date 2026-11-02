@@ -1160,7 +1160,12 @@ impl<'g> Machine<'g> {
     /// The keys with a prefix the oracle or the path's store holds, deduplicated.
     fn prefixed(&self, p: &Path, o: &FactOracle, pre: Prefix) -> Vec<Fact> {
         let mut keys: Vec<Fact> = self.okeys(o, pre);
-        keys.extend(p.writes.keys().copied().filter(|&k| pre.matches(k)));
+        match pre {
+            // a slot's places: the store lists them (`Store::places`)
+            Prefix::At(s) => keys.extend(p.writes.places(false, s).iter().map(|&w| Fact::At(s, w))),
+            Prefix::Esc(s) => keys.extend(p.writes.places(true, s).iter().map(|&w| Fact::Esc(s, w))),
+            _ => keys.extend(p.writes.keys().copied().filter(|&k| pre.matches(k))),
+        }
         keys.sort_unstable();
         keys.dedup();
         keys
