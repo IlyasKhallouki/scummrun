@@ -7,7 +7,7 @@
 //!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
 //!   fmi explore verify ARCHIVE [--entry ID]
 //!   fmi explore status ARCHIVE
-//!   fmi try JOB_DIR... | - [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
+//!   fmi try JOB_DIR... | - | @FILE [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
 //!
 //! `--search gbfs --tail` are the fast settings (the Rust search; at a replan the last plan's valid suffix first);
 //! without them the planner is called as the reference calls it.
@@ -43,7 +43,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
        fmi explore verify ARCHIVE [--entry ID]
        fmi explore status ARCHIVE
-       fmi try JOB_DIR... | - [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
+       fmi try JOB_DIR... | - | @FILE [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
        fmi check replay JOB_DIR --out DIR [--domains DIR]
@@ -167,9 +167,9 @@ fn cmd_try(argv: &[String]) -> i32 {
     };
     fmi_explore::machine::nice10();
     // several JOB_DIRs: the tries one after the other in this process, its ports warm from try to try (the
-    // benchmark's warm regime); "-": the job folders read from stdin, one per line, each answered on stdout with
+    // benchmark's warm regime); "-" or "@FILE": the job folders read from stdin or FILE, one per line, each answered on stdout with
     // "done JOB_DIR EXIT" once its try has ended (a driver interleaves other work between the tries)
-    if a.pos.len() > 1 || a.pos[0] == "-" {
+    if a.pos.len() > 1 || a.pos[0] == "-" || a.pos[0].starts_with('@') {
         let mut code = 0;
         let mut one = |jd: &str| -> i32 {
             let c = try_one(&PathBuf::from(jd), &a, &w);
@@ -178,9 +178,20 @@ fn cmd_try(argv: &[String]) -> i32 {
             }
             c
         };
-        if a.pos[0] == "-" {
+        if a.pos[0] == "-" || a.pos[0].starts_with('@') {
             use std::io::{BufRead, Write};
-            for line in std::io::stdin().lock().lines() {
+            // "@PATH": the job folders from that file (a FIFO a driver writes to), else stdin
+            let input: Box<dyn BufRead> = match a.pos[0].strip_prefix('@') {
+                Some(p) => match std::fs::File::open(p) {
+                    Ok(f) => Box::new(std::io::BufReader::new(f)),
+                    Err(e) => {
+                        eprintln!("fmi try: {p}: {e}");
+                        return 1;
+                    }
+                },
+                None => Box::new(std::io::stdin().lock()),
+            };
+            for line in input.lines() {
                 let Ok(line) = line else { break };
                 let jd = line.trim();
                 if jd.is_empty() {
