@@ -37,6 +37,34 @@ where the integrator wires the engine, reading, planner and play ports; in round
 
 G10, G11 and G12 need the other components and run at integration.
 
+### A dry run of test (a) with the real ports
+
+Before integration, `fmi try` ran test (a)'s job (rooms 28, 33, 41 from the root, to owner:566 = 1) in a local tree
+that merges the six component branches, with thin adapters in `wire.rs`: returns from fmi-engine's pool (lean build),
+readings by readio's reader-scope, fmi-plan's planner, fmi-play's strict window search. That tree is not on this
+branch.
+
+| settings | outcome | against the reference try (E009, off/step-a ta) |
+|---|---|---|
+| strict windows, `FdLamaFirstCosts` | stop goal, frames 2728 to 3216 (488), qf 11712, 2 replans, 36 inputs, 8 entries | the same numbers; the 36 inputs equal; the 3 plans have the same lengths and frames; both refinement turns the same; the 8 new entries equal the reference's as JSON |
+| strict windows, `Gbfs` | stop "no plan (the planner proved none)" at frame 3174 (446 frames), 3 replans, 29 inputs, 7 entries | another route: plans 0 and 1 have 28 and 13 steps (FD: 30 and 14). The play deviates at 3171 (state:316 = 1 refutes a record's precondition, class semantics). At 3174 the window is empty (class split, on a position). The reach extension adds 6 values (room = 0 among them), and the planner proves no plan. |
+| strict windows, `Gbfs`, `--tail` | the same stop, frame and entries; plan 2 is the old tail (11 steps) | |
+
+So G10's first clause holds on this dry run, and its `Gbfs` clause does not: with `Gbfs`, test (a) does not reach
+the goal. A return here is a fork of the kept root, whose stop is "forked", not an idle stop. Such a return is held to
+the root's checkpoint (facts, tick, random state, actors) and not to a boot's idle-stop checks.
+
+Test (a) with `FdLamaFirstCosts`, before (the reference) and after (`fmi try`, one cold process, load 4-6):
+
+| part | before | after |
+|---|---:|---:|
+| the try, wall | 548.9 s | 101.8 s |
+| return | 3.8 CPU s | 0.38 s wall (a fork of the kept root) |
+| read (fresh reading of the scope) | 55.3 s wall, 130.1 CPU s | 14.0 s wall, 45.6 CPU s |
+| plan (3 plans, cold planner) | 139.9 CPU s | 13.4 CPU s (71 s wall, FD's first plan 50 s) |
+| play (4 windows, 501 children) | 398.8 CPU s | 21.5 CPU s |
+| the try's own time outside the ports | | 41.8 ms (the first try of a process: the guide and the reached values are read here) |
+
 ## Measures
 
 Laptop, nice 10. The load average was 1.5 to 12 (other builders' heavy steps); each line gives it.
@@ -86,4 +114,7 @@ harness 3.4 ms (3 input keys, 1 ms each, mostly sha1 over 100 KB), the entries 3
 - **Loop tests.** test_explore.py's and test_e009.py's loop tests are not cargo tests. Their scenarios run as G9's
   differential runs against explore.py.
 - **Engine-dependent paths.** `fmi explore init` and `verify`, and `fmi try` and `explore run` on real tries, need the
-  integrator's wire.rs. In round 1 they ran on doubles only, so `explore init` and `verify` have not run on an engine.
+  integrator's wire.rs. On this branch they run on doubles only. `fmi try` ran on the real ports in the dry run
+  above; `explore init` and `verify` have not run on an engine.
+- **A pooled return's checks.** A return that is a fork of a kept root is not checked for an idle stop of kind
+  sentence (start.py's boot checks), since a fork stops as "forked". It is held to the root's checkpoint instead.
