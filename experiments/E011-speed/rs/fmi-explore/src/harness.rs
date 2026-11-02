@@ -244,7 +244,12 @@ impl<'a> Harness<'a> {
             tail: None,
             time_limit_s: self.cfg.plan_time_s,
         };
-        let res = match self.planners.lock().unwrap().get(&*self.reading).and_then(|p| p.plan(&req)) {
+        // the planners' lock is held for the request only (an extension below plans again)
+        let planned = {
+            let mut g = self.planners.lock().unwrap();
+            g.get(&*self.reading).and_then(|p| p.plan(&req))
+        };
+        let res = match planned {
             Ok(r) => r,
             Err(e) => {
                 let (msg, choice) = match &e {
