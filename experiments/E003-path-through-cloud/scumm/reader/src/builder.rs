@@ -1588,10 +1588,19 @@ impl<'g> Builder<'g> {
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
                 continue;
             }
-            if self.table.reach.is_some() && !self.reach_path(job, p) {
-                continue;
+            // --reach: the path's precondition as its record will have it, made once (`reach_path`, `record_with`)
+            let mut placed: Option<Pre> = None;
+            if self.table.reach.is_some() {
+                match self.reach_path(job, p) {
+                    Some(pre) => placed = Some(pre),
+                    None => continue,
+                }
             }
-            let rec = if havoc { Some(self.havoc_record(&job.kind, &job.label, p, &job.what)) } else { self.record(&job.kind, &job.label, p, &job.what) };
+            let rec = if havoc {
+                Some(self.havoc_record(&job.kind, &job.label, p, &job.what))
+            } else {
+                self.record_with(&job.kind, &job.label, p, &job.what, placed)
+            };
             let Some(mut rec) = rec else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
                 continue;
@@ -1692,14 +1701,26 @@ impl<'g> Builder<'g> {
 
     /// `Builder.record`: the record of one path, or None when it changes nothing.
     pub fn record(&mut self, kind: &str, label: &str, p: &PathOut, what: &What) -> Option<Record> {
-        let mut pre = Pre::new();
-        for (k, s) in &p.pre {
-            if let Some(dom) = self.table.domain(k) {
-                if *s != dom.values || (k.starts_with("args:") && self.table.reach.is_some()) {
-                    pre.insert(k.clone(), s.clone());
+        self.record_with(kind, label, p, what, None)
+    }
+
+    /// `record`, with the path's precondition already made and placed (`positions`) when given (`reach_path` makes
+    /// it under --reach: the same keys and sets as here, and `positions` leaves a placed precondition as it is).
+    pub(crate) fn record_with(&mut self, kind: &str, label: &str, p: &PathOut, what: &What, placed: Option<Pre>) -> Option<Record> {
+        let pre = match placed {
+            Some(pre) => pre,
+            None => {
+                let mut pre = Pre::new();
+                for (k, s) in &p.pre {
+                    if let Some(dom) = self.table.domain(k) {
+                        if *s != dom.values || (k.starts_with("args:") && self.table.reach.is_some()) {
+                            pre.insert(k.clone(), s.clone());
+                        }
+                    }
                 }
+                pre
             }
-        }
+        };
         let mut effects: Vec<(String, Eff)> = Vec::new();
         for (k, v) in &p.writes {
             if let Some(e) = self.effect(k, v, p) {

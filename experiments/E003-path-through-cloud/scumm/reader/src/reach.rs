@@ -324,9 +324,9 @@ impl Builder<'_> {
         }
     }
 
-    /// Stage 1 of a path's end: the path's precondition as its record will have it; false: it does not meet the
-    /// reached values, and is held on the first set that fails, so no record is made of it.
-    pub(crate) fn reach_path(&mut self, job: &Job, p: &PathOut) -> bool {
+    /// Stage 1 of a path's end: the path's precondition as its record will have it (placed), or None: it does not
+    /// meet the reached values, and is held on the first set that fails, so no record is made of it.
+    pub(crate) fn reach_path(&mut self, job: &Job, p: &PathOut) -> Option<Pre> {
         let reach = self.reach_arc();
         let mut pre = Pre::new();
         for (k, s) in &p.pre {
@@ -338,10 +338,10 @@ impl Builder<'_> {
         }
         let (pre, _) = self.positions(pre, Vec::new());
         match reach.first_unmet(&self.table, pre.iter(), self.memo_log.as_mut()) {
-            None => true,
+            None => Some(pre),
             Some((key, set)) => {
                 self.reach_hold_path(job, p, key, set);
-                false
+                None
             }
         }
     }
