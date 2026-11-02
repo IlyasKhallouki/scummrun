@@ -333,3 +333,106 @@ fn start_row_text_is_start_rows_json() {
     assert_eq!(a, b);
     assert_eq!(fmi_core::facts_of(&obs), facts);
 }
+
+// --- E011 round 2: the idle rule on the facts' changes ------------------------------------------------------------
+
+/// A deterministic sequence of facts maps (an LCG): keys appear, go, and change among a few values, most frames
+/// changing a few keys of many, as an idle entry's frames do.
+fn lcg_frames(seed: u64, n_keys: u64, frames: usize) -> (fmi_core::Facts, Vec<(i64, fmi_core::Facts)>) {
+    let mut x = seed;
+    let mut next = move || {
+        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x >> 33
+    };
+    let key = |n: u64| match n % 5 {
+        0 => fmi_core::Key::var(n),
+        1 => fmi_core::Key::bit(n),
+        2 => fmi_core::Key::owner(n),
+        3 => fmi_core::Key::state(n),
+        _ => fmi_core::Key::class(n, 1 + n % 7),
+    };
+    let mut cur: Vec<(fmi_core::Key, i64)> = (0..n_keys).filter(|n| n % 3 != 0).map(|n| (key(n), (n % 4) as i64)).collect();
+    let start = fmi_core::Facts::from_pairs(cur.clone());
+    let mut out = Vec::new();
+    for i in 1..=frames {
+        for _ in 0..(next() % 6) {
+            let n = next() % n_keys;
+            let v = (next() % 4) as i64 - 1;
+            match cur.iter().position(|p| p.0 == key(n)) {
+                Some(p) if next() % 5 == 0 => {
+                    cur.remove(p);
+                }
+                Some(p) => cur[p].1 = v,
+                None => cur.push((key(n), v)),
+            }
+        }
+        out.push((i as i64, fmi_core::Facts::from_pairs(cur.clone())));
+    }
+    (start, out)
+}
+
+fn idle_by_changes(start: &fmi_core::Facts, frames: &[(i64, fmi_core::Facts)]) -> Value {
+    let mut rule = step::IdleRule::new();
+    let mut prev = start.clone();
+    let mut ch = Vec::new();
+    for (off, f) in frames {
+        ch.clear();
+        step::diff_into(&prev, f, &mut ch);
+        rule.frame(*off, &ch);
+        prev = f.clone();
+    }
+    rule.result()
+}
+
+#[test]
+fn diff_into_is_facts_diff() {
+    for seed in 1..40 {
+        let (start, frames) = lcg_frames(seed, 60, 30);
+        let mut prev = start;
+        for (_, f) in frames {
+            let mut ch = Vec::new();
+            step::diff_into(&prev, &f, &mut ch);
+            assert_eq!(ch, prev.diff(&f));
+            let mut back = Vec::new();
+            step::diff_into(&f, &prev, &mut back);
+            assert_eq!(back, f.diff(&prev));
+            prev = f;
+        }
+    }
+    let e = fmi_core::Facts::new();
+    let (start, _) = lcg_frames(3, 20, 0);
+    let mut ch = Vec::new();
+    step::diff_into(&e, &start, &mut ch);
+    assert_eq!(ch, e.diff(&start));
+    ch.clear();
+    step::diff_into(&start, &e, &mut ch);
+    assert_eq!(ch, start.diff(&e));
+}
+
+#[test]
+fn idle_rule_on_changes_is_idle_rule_facts_maps_in_the_same_order() {
+    for seed in 1..60 {
+        let (start, frames) = lcg_frames(seed, 40 + seed % 30, 200);
+        let a = step::idle_rule_facts(&start, frames.clone());
+        let b = idle_by_changes(&start, &frames);
+        assert_eq!(fmi_explore::pyjson::dumps_default(&a), fmi_explore::pyjson::dumps_default(&b), "seed {seed}");
+    }
+    // the two cases of test_e009.py
+    let f = |v: Value| fmi_explore::start::facts_of_json(&v);
+    let start = f(json!({"var:100": 5, "room": 33, "var:2": 0, "state:316": 0}));
+    let frames = vec![
+        (1, f(json!({"var:100": 6, "room": 33, "var:2": 1, "state:316": 0}))),
+        (2, f(json!({"var:100": 7, "room": 28, "var:2": 2, "state:316": 1}))),
+        (3, f(json!({"var:100": 5, "room": 28, "var:2": 3, "state:316": 1}))),
+        (4, f(json!({"var:100": 6, "room": 28, "var:2": 3, "state:316": 0}))),
+    ];
+    let r = idle_by_changes(&start, &frames);
+    assert_eq!(r["returns"], json!(["state:316", "var:100"]));
+    assert_eq!(r, step::idle_rule_facts(&start, frames));
+    let start = f(json!({"var:1": 0}));
+    let frames = vec![(1, f(json!({"var:1": 0, "bit:9": 1}))), (2, f(json!({"var:1": 0})))];
+    let r = idle_by_changes(&start, &frames);
+    assert_eq!(r["returns"], json!(["bit:9"]));
+    assert_eq!(r["first_return"], json!({"bit:9": 2}));
+    assert_eq!(r, step::idle_rule_facts(&start, frames));
+}

@@ -106,8 +106,21 @@ pub fn step_check(path: &Path) -> Res<CheckReport> {
                 let r = step::idle_rule(&start, frames);
                 add_s(&mut rep.seconds, &kind, t.elapsed().as_secs_f64());
                 let o = &c["out"];
-                (r["returns"] == o["returns"] && same_map(&r["first_return"], &o["first_return"]) && same_map(&r["changes"], &o["changes"]),
-                 format!("{}", c["entry_file"]))
+                let same = |r: &Value| r["returns"] == o["returns"] && same_map(&r["first_return"], &o["first_return"]) && same_map(&r["changes"], &o["changes"]);
+                // the try's rule (E011 round 2): fed each frame's changes of the packed facts; and round 1's on them whole
+                let t = Instant::now();
+                let fs: Vec<fmi_core::Facts> = cps.iter().map(|x| crate::start::facts_of_json(&x[1])).collect();
+                let mut rule = step::IdleRule::new();
+                let mut ch = Vec::new();
+                for (j, f) in fs.iter().enumerate().skip(1) {
+                    ch.clear();
+                    step::diff_into(&fs[j - 1], f, &mut ch);
+                    rule.frame(cps[j][0].as_i64().unwrap_or(0) - f0, &ch);
+                }
+                let by_changes = rule.result();
+                add_s(&mut rep.seconds, "idle_rule (changes)", t.elapsed().as_secs_f64());
+                let whole = step::idle_rule_facts(&fs[0], fs[1..].iter().enumerate().map(|(j, f)| (cps[j + 1][0].as_i64().unwrap_or(0) - f0, f.clone())));
+                (same(&r) && same(&by_changes) && same(&whole) && by_changes == whole, format!("{}", c["entry_file"]))
             }
             k => (false, format!("unknown kind {k}")),
         };

@@ -161,8 +161,83 @@ fn boot_entry(r: &Resident, entry: &Value, out_dir: &Path) -> Result<(Box<dyn En
     Ok((b, ret))
 }
 
-/// E009 fix a: a fork of the returned engine run `frames` frames with no input, the facts taken at each.
+/// An E011 switch of this crate: on unless its variable is "0" (off: round 1's code).
+fn switch(name: &str) -> bool {
+    std::env::var(name).map(|v| v != "0").unwrap_or(true)
+}
+
+/// The next idle frame (`frame`, one after this stop) and the facts' changes to it, appended to `out`. With the
+/// feature `step_changes` (fmi-core's `Engine::step_changes`, IFACE e011-r2-own in COORD.md) the engine gives them in
+/// one call, from Step's delta. Without it, today's calls: a run and the facts (the engine port's), and their diff
+/// from the facts of the frame before, kept in `prev` (this try's own work).
+#[cfg(not(feature = "step_changes"))]
+fn idle_frame(b: &mut Box<dyn Engine>, frame: u64, prev: &mut Option<Facts>, out: &mut Vec<(Key, Val, Val)>) -> fmi_core::EResult<Status> {
+    if prev.is_none() {
+        *prev = Some(machine::port(|| b.facts())?);
+    }
+    let st = machine::port(|| b.run(&RunSpec { frame: Some(frame), ..Default::default() }))?;
+    let f = machine::port(|| b.facts())?;
+    step::diff_into(prev.as_ref().unwrap(), &f, out);
+    *prev = Some(f);
+    Ok(st)
+}
+
+#[cfg(feature = "step_changes")]
+fn idle_frame(b: &mut Box<dyn Engine>, frame: u64, _prev: &mut Option<Facts>, out: &mut Vec<(Key, Val, Val)>) -> fmi_core::EResult<Status> {
+    let n = frame.checked_sub(b.status().frame).filter(|&n| n >= 1).unwrap_or(1) as u32;
+    let (st, ch) = machine::port(|| b.step_changes(n))?;
+    out.extend_from_slice(&ch);
+    Ok(st)
+}
+
+/// E009 fix a, evaluated as the frames come (FMI_IDLE_CHANGES, on by default): a fork of the returned engine run
+/// `frames` frames with no input, each frame's changes given to the idle rule; no frame's whole facts are kept. The
+/// same frames and the same rule as `measure_idle_whole`: a run to a frame with no other stop condition stops at that
+/// frame or ends (the bridge's Run), so each frame here is the one the run to `f0 + i` stops at, and is checked so.
 fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
+    if !switch("FMI_IDLE_CHANGES") {
+        return measure_idle_whole(root, frames);
+    }
+    let t = Instant::now();
+    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let f0 = b.status().frame;
+    let mut rule = step::IdleRule::new();
+    let mut prev: Option<Facts> = None;
+    let mut ch: Vec<(Key, Val, Val)> = Vec::with_capacity(64);
+    let mut err = None;
+    for i in 1..=frames {
+        ch.clear();
+        match idle_frame(&mut b, f0 + i, &mut prev, &mut ch) {
+            Ok(st) if st.frame == f0 + i => rule.frame(i as i64, &ch),
+            Ok(st) => {
+                err = Some(format!("the idle run stopped at frame {} ({}), not {}", st.frame, st.reason, f0 + i));
+                break;
+            }
+            Err(e) => {
+                err = Some(format!("EngineError: {e}"));
+                break;
+            }
+        }
+    }
+    drop(prev);
+    let frame_end = b.status().frame;
+    let cpu = b.cpu_s();
+    machine::port(|| b.quit());
+    if let Some(e) = err {
+        return Err(e);
+    }
+    let mut out = rule.result();
+    out["frame_end"] = json!(frame_end);
+    out["cpu_s"] = json!(pyjson::round(cpu, 1));
+    out["frames"] = json!(frames);
+    out["frame0"] = json!(f0);
+    out["seconds"] = json!(pyjson::round(t.elapsed().as_secs_f64(), 1));
+    Ok(out)
+}
+
+/// E009 fix a as round 1 ran it: a fork of the returned engine run `frames` frames with no input, the facts taken at
+/// each, the rule run over them all at the end.
+fn measure_idle_whole(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
     let t = Instant::now();
     let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;

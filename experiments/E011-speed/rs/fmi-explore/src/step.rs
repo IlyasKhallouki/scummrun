@@ -608,6 +608,103 @@ where
     json!({"returns": returns, "first_return": Value::Object(fr), "changes": Value::Object(chm)})
 }
 
+/// E009 fix a's rule evaluated frame by frame on the facts' changes, with no whole facts map kept: each frame gives
+/// (key, old, new) for every key whose value differs from the frame before (absent 0, in `Key` order, as
+/// `Facts::diff` gives them). A key's value at the entry is its `old` at its first change, as it holds that value until
+/// then. The same result as `idle_rule_facts` on the frames' whole facts, its maps in the same orders.
+#[derive(Default)]
+pub struct IdleRule {
+    ix: HashMap<fmi_core::Key, usize>,
+    /// the keys in the order of their first change
+    keys: Vec<IdleKey>,
+    /// (index into `keys`, offset) in the order of the first returns
+    first: Vec<(usize, i64)>,
+}
+
+struct IdleKey {
+    key: fmi_core::Key,
+    changes: i64,
+    /// the values the key has had, its value at the entry first
+    seen: Vec<fmi_core::Val>,
+    returned: bool,
+}
+
+impl IdleRule {
+    pub fn new() -> IdleRule {
+        IdleRule::default()
+    }
+
+    /// The frame at `off` (1 for the first frame after the entry) and its changes.
+    pub fn frame(&mut self, off: i64, changes: &[(fmi_core::Key, fmi_core::Val, fmi_core::Val)]) {
+        for &(k, old, new) in changes {
+            let i = match self.ix.get(&k) {
+                Some(&i) => i,
+                None => {
+                    self.ix.insert(k, self.keys.len());
+                    self.keys.push(IdleKey { key: k, changes: 0, seen: vec![old], returned: false });
+                    self.keys.len() - 1
+                }
+            };
+            let e = &mut self.keys[i];
+            e.changes += 1;
+            if e.seen.contains(&new) {
+                if !e.returned {
+                    e.returned = true;
+                    self.first.push((i, off));
+                }
+            } else {
+                e.seen.push(new);
+            }
+        }
+    }
+
+    /// {"returns": sorted idle keys, "first_return": {k: offset}, "changes": {k: n}}, as `idle_rule_facts`.
+    pub fn result(&self) -> Value {
+        let mut returns: Vec<String> = self.first.iter().map(|&(i, _)| self.keys[i].key.text()).collect();
+        returns.sort();
+        let mut fr = Map::new();
+        for &(i, o) in &self.first {
+            fr.insert(self.keys[i].key.text(), json!(o));
+        }
+        let mut chm = Map::new();
+        for e in &self.keys {
+            chm.insert(e.key.text(), json!(e.changes));
+        }
+        json!({"returns": returns, "first_return": Value::Object(fr), "changes": Value::Object(chm)})
+    }
+}
+
+/// `Facts::diff` (key, old, new for every key whose value differs, absent 0, in `Key` order) appended to `out`, with
+/// a fast path over the run of equal pairs two frames' facts mostly are.
+pub fn diff_into(a: &fmi_core::Facts, b: &fmi_core::Facts, out: &mut Vec<(fmi_core::Key, fmi_core::Val, fmi_core::Val)>) {
+    let (a, b) = (&a.0, &b.0);
+    let (mut i, mut j) = (0, 0);
+    loop {
+        // equal pairs give nothing
+        while i < a.len() && j < b.len() && a[i] == b[j] {
+            i += 1;
+            j += 1;
+        }
+        if i >= a.len() && j >= b.len() {
+            return;
+        }
+        let (k, x, y) = if j >= b.len() || (i < a.len() && a[i].0 < b[j].0) {
+            i += 1;
+            (a[i - 1].0, a[i - 1].1, 0)
+        } else if i >= a.len() || b[j].0 < a[i].0 {
+            j += 1;
+            (b[j - 1].0, 0, b[j - 1].1)
+        } else {
+            i += 1;
+            j += 1;
+            (a[i - 1].0, a[i - 1].1, b[j - 1].1)
+        };
+        if x != y {
+            out.push((k, x, y));
+        }
+    }
+}
+
 /// facts.py `facts_of` as an ordered JSON object, keys in the order facts.py inserts them (the start row's file).
 pub fn facts_of_ordered(s: &fmi_core::Obs) -> Value {
     use fmi_core::{CLOCKS, ENCD, EXCD, WIO_FLOBJECT, WIO_GLOBAL, WIO_INVENTORY, WIO_LOCAL, WIO_ROOM};
