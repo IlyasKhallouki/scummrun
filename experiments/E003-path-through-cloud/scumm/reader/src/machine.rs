@@ -2421,7 +2421,7 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
         })
         .collect();
     let n = p.notes.len();
-    let notes = p.notes.iter().skip(n.saturating_sub(5)).map(tri_py).collect();
+    let notes = p.notes.iter_from(n.saturating_sub(5)).map(tri_py).collect();
     PathOut {
         end,
         sym,
