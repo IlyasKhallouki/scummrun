@@ -365,6 +365,50 @@ the job's entry:
   frames, plan memory 3G; the reader's 60-minute and 8 GB watchdogs), and the guard's 3 GB and the disk's 8 GB floors are
   the machine's: engineering watchdogs, reported where they fire, not decisions of this experiment.
 
+## Amendment (2026-11-02, before stage 1)
+
+Step 0's numbers, from the merged branch (e008 at c09053a: guide.py at 842b555, step.py at 6d4360d, explore.py at
+60f1b65, no conflict, no existing file edited). Files: `results/step0.txt`.
+
+| guide | \|R\| atoms / keys | depth histogram | the goal's writers | wide map | seconds |
+|---|---|---|---|---|---|
+| door (state:316 = 1) | 1,162 / 805 | 0:1 1:3 2:52 3:586 4:487 5:33 | local:28:200, 205, 206, 207, 208, 209 | 1,187 / 817 | 16.2 |
+| kitchen (owner:566 = 1) | 1,162 / 805 | 0:1 1:24 2:608 3:493 4:36 | global:1, 107, 122; local:36:201; local:41:213, 214; obj:566 | 1,187 / 817 | 15.9 |
+| Part I (owner:901, 902, 903 = 1) | 1,164 / 805 | 0:3 1:15 2:605 3:497 4:38 5:4 6:2 | global:1 and local:83:200 each (902 also global:104) | 1,189 / 817 | 14.6 |
+
+- The door's writers include room 28's locals 205 and 209, and room = 28 is at depth 1: that stop rule does not fire.
+  The kitchen has room = 41 at depth 1 (with 19, 36 and 83). In each direct map 383 atoms of R have no writer.
+- Recall, for evaluation only: of the 99 Part I key facts, 86 have their key in R and 83 their value or (key, any).
+- Against the prediction: the door's \|R\| of 20 to 300 and the kitchen's of 30 to 400 are missed (1,162 each); depth
+  at most 8 holds (5); under 60 s holds (16 s). Part I: \|R\| (1,164) and keys (805) inside their ranges, the depth of 10
+  to 30 missed (6), the wide map's 2 to 10 times missed (1.02 times), recall inside (86), under 5 min (15 s).
+- Why R saturates (the guide's measurement): of the 1,487 atoms that some test or start need names, about 1,162 are in
+  R for every goal; the goals differ only in depth. A global's start needs are the union over every unit that starts
+  it (global 17, started from 129 places, has 442 start-need atoms), and a looping dispatcher (global 56) puts every
+  test on the way to every write. A control-dependence reading of "the tests on the way", measured only, gives 961.
+  The method stays as written; the guide only orders.
+- What follows for stage 1 from the method as written: a cell's key holds about 800 keys, so cells come close to one
+  per distinct fact state, and tier 1 is ordered among about 600 atoms at depth 2 and 3.
+
+Off checks on the merged branch: `reader-port read kitchen --packed` writes sha1 279b7a24 (72,258 compared, 0
+differences); E003's test_replay_part1, test_window, test_strict, test_refine and test_reach_extend: 108 passed, 1
+skipped (no READER_PICKLE); E008's tests: 58 passed and 3 skipped without the engine, the 3 engine tests passed (676 s).
+step.py's engine test (a), the first job from the root on (28, 33, 41) with owner:566 = 1, is E007's kitchen run: the
+goal from the plan's records at 3216, 488 frames, 11,712 qf, 2 replans, 36 inputs, 501 children, 8 entries; (b), a job
+from (a)'s entry at 3165, and the two-link chain verified from boot: 0 differences at 10 checkpoints.
+
+Smoke, `explore.py run` with the real step (the kitchen guide, allowed rooms 28, 33, 41, b = 1): from the root the
+scope is ring(33) cut to those rooms, (28, 33), since room 41 is not in room 33's ring, so the loop's first job cannot
+be test (a). The return was the same; a fresh reading of 38,874 records (124 s wall, 102.5 CPU s, 238 MB); 26 targets,
+all tier 1, depth 2 first (five bits before room = 28). The first probe, bit:118 = 1, ended on the planner's 600 s
+limit (walk's `run.sh`, E006's) with no plan, after 645 s; the second, bit:348 = 1, planned in 22 s and was played: it
+held at a plan's start at 3073, 345 frames, 5 replans, one refinement (var 194). 11 entries, 10 new cells, 55 new
+atoms; 967 CPU s (plan 706, read 217, play 42); peak 409 MB. `explore.py verify --entry 11` from the archive's files:
+0 differences, 345 frames, 8,280 qf, 33 inputs. A target with no plan costs up to the planner's limit, and a job tries
+its targets in turn until one plans.
+
+The predictions above stand as written.
+
 ## Sources
 
 - Ecoffet, Huizinga, Lehman, Stanley, Clune, "Go-Explore: a New Approach for Hard-Exploration Problems" (2019,
