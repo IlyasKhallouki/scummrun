@@ -91,6 +91,15 @@ pub struct Br<'a> {
     pub first_before: Option<(u64, Arc<Obs>)>,
     pub watch_first: bool,
     pub hits: [u64; 4], // state asked, state kept, at asked, at kept
+    /// this thread's CPU ns in the engine calls: run, obs, at, and the stone trials' fork and quit
+    pub cpu: [u64; 4],
+}
+
+/// This thread's CPU time, ns.
+pub fn thread_ns() -> u64 {
+    let mut t = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut t) };
+    t.tv_sec as u64 * 1_000_000_000 + t.tv_nsec as u64
 }
 
 impl<'a> Br<'a> {
@@ -105,6 +114,7 @@ impl<'a> Br<'a> {
             first_before: None,
             watch_first: false,
             hits: [0; 4],
+            cpu: [0; 4],
         }
     }
     pub fn frame(&self) -> u64 {
@@ -118,7 +128,9 @@ impl<'a> Br<'a> {
             self.hits[1] += 1;
             return Ok(s.clone());
         }
+        let t = thread_ns();
         let s = Arc::new(self.e.obs(&ObsReq::default())?);
+        self.cpu[1] += thread_ns() - t;
         self.hits[0] += 1;
         self.state = Some(s.clone());
         Ok(s)
@@ -128,7 +140,9 @@ impl<'a> Br<'a> {
             self.hits[3] += 1;
             return Ok(a.clone());
         }
+        let t = thread_ns();
         let a = self.e.at(x, y)?;
+        self.cpu[2] += thread_ns() - t;
         self.hits[2] += 1;
         self.at.insert((x, y), a.clone());
         Ok(a)
@@ -172,7 +186,10 @@ impl<'a> Br<'a> {
     }
     fn raw_run(&mut self, spec: &RunSpec) -> EResult<Status> {
         self.invalidate();
-        self.e.run(spec)
+        let t = thread_ns();
+        let r = self.e.run(spec);
+        self.cpu[0] += thread_ns() - t;
+        r
     }
     fn on(&mut self) -> EResult<()> {
         if self.obs.is_some() {
@@ -807,7 +824,9 @@ impl Executor {
         if self.stone_fork {
             for o in &stones {
                 let t_trial = std::time::Instant::now();
+                let c0 = thread_ns();
                 let mut child = b.e.fork()?;
+                b.cpu[3] += thread_ns() - c0;
                 self.stone_trials += 1;
                 let mut frames = None;
                 {
@@ -839,6 +858,9 @@ impl Executor {
                     })();
                     self.stone_frames += tb.frame().saturating_sub(b.frame());
                     self.stone_at += tb.hits[2];
+                    for (a, x) in b.cpu.iter_mut().zip(tb.cpu) {
+                        *a += x;
+                    }
                     match r {
                         Ok(()) | Err(PlayErr::Route(_)) => {}
                         Err(PlayErr::Engine(e)) => {
@@ -849,7 +871,9 @@ impl Executor {
                     }
                 }
                 self.stone_cpu += child.cpu_s();
+                let c0 = thread_ns();
                 child.quit();
+                b.cpu[3] += thread_ns() - c0;
                 self.stone_ns += t_trial.elapsed().as_nanos() as u64;
                 if let Some(fr) = frames {
                     let m = Move {

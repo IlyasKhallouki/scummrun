@@ -129,6 +129,14 @@ impl Config {
     }
 }
 
+/// This process's CPU seconds (user and system, every thread).
+pub fn process_cpu_s() -> f64 {
+    let mut u: libc::rusage = unsafe { std::mem::zeroed() };
+    unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut u) };
+    let t = |v: libc::timeval| v.tv_sec as f64 + v.tv_usec as f64 / 1e6;
+    t(u.ru_utime) + t(u.ru_stime)
+}
+
 /// FMI_CHECK_VIEW=1: every view read from a dump is checked against the view of its facts_of.
 pub fn check_views() -> bool {
     static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -496,6 +504,10 @@ pub struct Prof {
     pub fork_ns: AtomicU64,
     /// stone trials: count, wall, frames, hit tests
     pub stone: [AtomicU64; 4],
+    /// the input code's thread CPU ns: all, in run, in obs, in at, in the stone trials' fork and quit
+    pub play_cpu: [AtomicU64; 5],
+    /// a child's whole thread CPU ns
+    pub child_cpu: AtomicU64,
 }
 
 pub const PROF_PARTS: [&str; 7] = [
@@ -522,6 +534,24 @@ impl Prof {
         for (a, h) in self.play_hits.iter().zip(hits) {
             a.fetch_add(h, Ordering::Relaxed);
         }
+    }
+    fn play_cpu(&self, all: u64, parts: [u64; 4]) {
+        self.play_cpu[0].fetch_add(all, Ordering::Relaxed);
+        for (a, x) in self.play_cpu[1..].iter().zip(parts) {
+            a.fetch_add(x, Ordering::Relaxed);
+        }
+    }
+    pub fn cpu_line(&self) -> String {
+        let g = |a: &AtomicU64| a.load(Ordering::Relaxed) as f64 / 1e9;
+        format!(
+            "thread CPU s: children {:.2}; input code {:.2} (engine calls: run {:.2}, obs {:.2}, at {:.2}, fork+quit {:.2})",
+            g(&self.child_cpu),
+            g(&self.play_cpu[0]),
+            g(&self.play_cpu[1]),
+            g(&self.play_cpu[2]),
+            g(&self.play_cpu[3]),
+            g(&self.play_cpu[4])
+        )
     }
     fn stones(&self, n: u64, ns: u64, frames: u64, at: u64) {
         for (a, x) in self.stone.iter().zip([n, ns, frames, at]) {
@@ -1052,7 +1082,14 @@ fn err_why(e: &EngineError) -> Py {
 }
 
 /// window.Search._child_strict for one child forked at `ch.g` (`c`: its index in fork order).
-pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child) -> Child {
+pub fn child_strict<'a>(w: &W<'a>, c: usize, cb: Box<dyn Engine>, ch: Child) -> Child {
+    let t = executor::thread_ns();
+    let out = child_strict_(w, c, cb, ch);
+    w.prof.child_cpu.fetch_add(executor::thread_ns() - t, Ordering::Relaxed);
+    out
+}
+
+fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child) -> Child {
     let mut snap: Option<Box<dyn Engine>> = None;
     let out = (|| -> Result<(), EngineError> {
         let first_i = w.first.unwrap();
@@ -1089,10 +1126,11 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
             if observe_play {
                 br.obs = Some(&mut obsv);
             }
-            let (t0, f0) = (Instant::now(), br.frame());
+            let (t0, f0, c0) = (Instant::now(), br.frame(), executor::thread_ns());
             play_res = executor::play_input(&mut ex, &mut br, w.inp.as_ref().unwrap(), &w.name);
             first_before = br.first_before.take();
             w.prof.play(t0.elapsed(), br.frame().saturating_sub(f0), br.hits);
+            w.prof.play_cpu(executor::thread_ns() - c0, br.cpu);
         }
         ch.stone_trials += ex.stone_trials;
         w.prof
@@ -1753,6 +1791,7 @@ impl Search {
     ) -> Result<WinRes, String> {
         let cfg = self.cfg.clone();
         let t0 = Instant::now();
+        let (cpu_self0, cpu_parent0) = (process_cpu_s(), parent.cpu_s());
         let first_i = members[0];
         let first = &recs[first_i];
         let has_input = first.kind == Kind::Input;
@@ -2584,7 +2623,17 @@ impl Search {
         );
         parent.explain(None).map_err(|e| e.to_string())?;
         self.say(&format!("  window {}: {}", k + 1, w.prof.line()));
+        self.say(&format!(
+            "  window {}: CPU s: this process {:.2}, the parent engine {:.2}, the children's engines {:.2} ({} children); wall {:.2} s",
+            k + 1,
+            process_cpu_s() - cpu_self0,
+            parent.cpu_s() - cpu_parent0,
+            children.iter().map(|c| c.cpu_s).sum::<f64>(),
+            children.len(),
+            t0.elapsed().as_secs_f64()
+        ));
         self.say(&format!("  window {}: {}", k + 1, w.prof.play_line()));
+        self.say(&format!("  window {}: {}", k + 1, w.prof.cpu_line()));
         if let Some(hc) = &self.hit_cache {
             self.say(&format!("  window {}: {}", k + 1, hc.line()));
         }
