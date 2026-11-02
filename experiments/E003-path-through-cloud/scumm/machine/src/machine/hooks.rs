@@ -390,6 +390,10 @@ impl<'g> Machine<'g> {
     pub fn h_stop_script(&mut self, p: &mut Path, o: &FactOracle, n: i32, cite: &S, head: &str) -> R<()> {
         self.stop_script(p, o, n, cite, head)
     }
+    /// `prefixed`: the keys of a prefix, the oracle's and the path's, sorted, each once
+    pub fn h_prefixed(&self, p: &Path, o: &FactOracle, pre: Prefix) -> Vec<Fact> {
+        self.prefixed(p, o, pre)
+    }
     /// `_live_slots`
     pub fn h_live_slots(&mut self, p: &mut Path, o: &FactOracle) -> R<Vec<(Slot, Option<Fact>, Val)>> {
         self.live_slots(p, o)

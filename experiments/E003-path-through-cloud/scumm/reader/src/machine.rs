@@ -893,6 +893,50 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Va
     })
 }
 
+/// `clear_base`'s test of an `at:`/`esc:` key, read lazily: whether `read_fact` gives a value other than 0, worked out as
+/// it would (its order of tests, its `info` lookups, which the memo logs), but without the unknown its lazy read makes
+/// (any unknown is not 0; making it only numbers it). None: a step value, read for real.
+fn cleared_nonzero(m: &mut Machine<'_>, p: &Path, k: Fact) -> Option<bool> {
+    debug_assert!(matches!(k, Fact::At(..) | Fact::Esc(..)) && st(m).lazy > 0 && st(m).step_key != Some(k));
+    if let Some(&v) = p.writes.get(&k) {
+        if is_step(m, v) {
+            return None;
+        }
+        return Some(v != Val::Int(0));
+    }
+    match k {
+        Fact::At(s @ (Slot::Entry | Slot::Exit), _) => {
+            if let Some(&v) = p.writes.get(&Fact::At(s, MARK)) {
+                return Some(v != Val::Int(0));
+            }
+        }
+        Fact::Esc(s @ (Slot::Entry | Slot::Exit), _) => {
+            if let Some(&v) = p.writes.get(&Fact::Esc(s, MARK)) {
+                return Some(v != Val::Int(0));
+            }
+        }
+        _ => {}
+    }
+    if let Some(s) = sx(p).pre.get(&PKey::F(k)) {
+        let one = (s.len() == 1).then(|| s[0]);
+        info(m, k);
+        // one value: `value`, an int or a collapsed value's unknown; more: `lazy_of`'s unknown
+        return Some(!matches!(one, Some(Label::Int(n)) if n as i32 == 0));
+    }
+    if let Some(&v) = st(m).pins.get(&k) {
+        return Some(v != Val::Int(0));
+    }
+    let i = info(m, k);
+    Some(match i.kind {
+        Kind::Const => i.start as i32 != 0,
+        Kind::Fact => {
+            let d = i.dom.as_ref().unwrap();
+            d.values.len() != 1 || !matches!(d.values[0], Label::Int(n) if n as i32 == 0)
+        }
+        Kind::NonFact => true,
+    })
+}
+
 /// F9 (switch actor_rooms): an actor's room the reading does not know (crate::table::NOT_KNOWN, a lazy set holding it, or
 /// the room of an actor whose room is no fact) reads as getActorRoom's non-fact, named as `Reader.getter` names it
 /// with the switch off, so the frame's non-fact tests are remembered as before (`memo_ident`).
@@ -1184,7 +1228,19 @@ impl Hooks for ReaderHooks {
                     }
                     m.h_write(p, mk, Val::Int(0));
                 }
-                None => lazily(m, |m| m.clear_base(p, o, pre))?,
+                None => lazily(m, |m| -> R<()> {
+                    // `clear_base`, each key's lazy read tested for 0 without the unknown it would make
+                    for k in m.h_prefixed(p, o, pre) {
+                        let nonzero = match cleared_nonzero(m, p, k) {
+                            Some(nz) => nz,
+                            None => m.read(p, k, o)? != Val::Int(0),
+                        };
+                        if nonzero {
+                            m.h_write(p, k, Val::Int(0));
+                        }
+                    }
+                    Ok(())
+                })?,
             }
         })
     }
