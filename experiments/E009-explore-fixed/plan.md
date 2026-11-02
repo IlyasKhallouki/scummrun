@@ -238,3 +238,12 @@ tables, or measured from the engine by code.
 - **Effect on the results.** A job's own result does not depend on b. The order of selection does: with more jobs
   running, more entries are busy when the next one is chosen. Results report b per job range (1 to 15 at b = 2, the
   rest at b = 10).
+
+## Amendment 2026-11-02, during the kitchen's stage 1: a 30-vCPU VM, b = 24, no heavy lock
+
+- The VM stopped at 11:54 with the b = 10 run going (no stop by this experiment's code; the archive's files kept on
+  its disk). It was started again as n2-custom-30-122880 (30 vCPUs, 120 GB; the project's CPU quota is 32 in all
+  regions) and the kitchen resumed from its files at 12:15 with b = 24.
+- On that machine `E008_HEAVY_LOCK=none`: jobs whose scope has 5 rooms or more run side by side instead of one at a
+  time. The lock guards the laptop's memory; 120 GB holds 24 jobs (about 1.5 to 2 GB each). Nothing else changes.
+- How many jobs run at once is also bounded by the selectable cells, since a busy cell is not selected again.
