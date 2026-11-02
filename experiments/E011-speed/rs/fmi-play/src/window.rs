@@ -129,6 +129,12 @@ impl Config {
     }
 }
 
+/// FMI_CHECK_VIEW=1: every view read from a dump is checked against the view of its facts_of.
+pub fn check_views() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_CHECK_VIEW").is_ok_and(|v| v == "1"))
+}
+
 /// window.delta_lo_of
 pub fn delta_lo_of(dmax: Option<i64>) -> i64 {
     match dmax {
@@ -475,11 +481,18 @@ pub struct W<'a> {
     pub prof: Prof,
 }
 
-/// Where an observed child frame's wall goes (summed over the window's children).
+/// Where an observed child frame's wall goes (summed over the window's children), and the input code's.
 #[derive(Default)]
 pub struct Prof {
     pub frames: AtomicU64,
     pub ns: [AtomicU64; 7],
+    pub plays: AtomicU64,
+    pub play_ns: AtomicU64,
+    pub play_frames: AtomicU64,
+    /// state asked, state kept, at asked, at kept
+    pub play_hits: [AtomicU64; 4],
+    pub forks: AtomicU64,
+    pub fork_ns: AtomicU64,
 }
 
 pub const PROF_PARTS: [&str; 7] = [
@@ -498,6 +511,36 @@ impl Prof {
         for (a, x) in self.ns.iter().zip(d) {
             a.fetch_add(x.as_nanos() as u64, Ordering::Relaxed);
         }
+    }
+    fn play(&self, d: std::time::Duration, frames: u64, hits: [u64; 4]) {
+        self.plays.fetch_add(1, Ordering::Relaxed);
+        self.play_ns.fetch_add(d.as_nanos() as u64, Ordering::Relaxed);
+        self.play_frames.fetch_add(frames, Ordering::Relaxed);
+        for (a, h) in self.play_hits.iter().zip(hits) {
+            a.fetch_add(h, Ordering::Relaxed);
+        }
+    }
+    fn fork(&self, d: std::time::Duration) {
+        self.forks.fetch_add(1, Ordering::Relaxed);
+        self.fork_ns.fetch_add(d.as_nanos() as u64, Ordering::Relaxed);
+    }
+    pub fn play_line(&self) -> String {
+        let n = self.plays.load(Ordering::Relaxed).max(1) as f64;
+        let fr = self.play_frames.load(Ordering::Relaxed);
+        let h: Vec<u64> = self.play_hits.iter().map(|a| a.load(Ordering::Relaxed)).collect();
+        format!(
+            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms",
+            self.plays.load(Ordering::Relaxed),
+            self.play_ns.load(Ordering::Relaxed) as f64 / n / 1e6,
+            fr as f64 / n,
+            self.play_ns.load(Ordering::Relaxed) as f64 / (fr.max(1) as f64) / 1e6,
+            h[0],
+            h[1],
+            h[2],
+            h[3],
+            self.forks.load(Ordering::Relaxed),
+            self.fork_ns.load(Ordering::Relaxed) as f64 / (self.forks.load(Ordering::Relaxed).max(1) as f64) / 1e6
+        )
     }
     pub fn line(&self) -> String {
         let n = self.frames.load(Ordering::Relaxed).max(1) as f64;
@@ -527,8 +570,16 @@ pub trait ChildOracle: Sync {
 }
 
 impl<'a> W<'a> {
-    pub fn sview(&self, obs: &Facts, s: &Obs) -> Result<View, String> {
-        let mut v = self.fv.view(obs);
+    /// the window's view of a dump: FastView's values and ArgsView's lists (window_strict's `sview`)
+    pub fn sview(&self, s: &Obs) -> Result<View, String> {
+        let mut v = self.fv.view_obs(s);
+        if check_views() {
+            let r = self.fv.view(&facts_of(s));
+            assert_eq!(
+                v, r,
+                "FMI_CHECK_VIEW: the dump's view differs from the view of facts_of"
+            );
+        }
         self.av.apply(s, &mut v)?;
         Ok(v)
     }
@@ -555,7 +606,7 @@ impl<'a, 'w> FrameObs for Obsv<'a, 'w> {
         let ents = e.explain_log()?;
         self.log.kept.add_entries(&strict::ents_of(&ents.entries));
         let f = e.status().frame;
-        let v = match self.w.sview(&facts_of(s), s) {
+        let v = match self.w.sview(s) {
             Ok(v) => v,
             Err(m) => {
                 self.err = Some(m.clone());
@@ -1025,8 +1076,10 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
             if observe_play {
                 br.obs = Some(&mut obsv);
             }
+            let (t0, f0) = (Instant::now(), br.frame());
             play_res = executor::play_input(&mut ex, &mut br, w.inp.as_ref().unwrap(), &w.name);
             first_before = br.first_before.take();
+            w.prof.play(t0.elapsed(), br.frame().saturating_sub(f0), br.hits);
         }
         ch.stone_trials += ex.stone_trials;
         ch.cpu_s += ex.stone_cpu;
@@ -1115,7 +1168,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
             log.kept.add_entries(&strict::ents_of(&cb.explain_log()?.entries));
             if full {
                 let s = Arc::new(cb.obs(&ObsReq::default())?);
-                let v = w.sview(&facts_of(&s), &s).map_err(EngineError::Bridge)?;
+                let v = w.sview(&s).map_err(EngineError::Bridge)?;
                 frames_seen.insert(cb.status().frame, (Arc::new(v), s));
             }
             Ok(())
@@ -1127,7 +1180,9 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
         }
         let st_issue = cb.status().clone();
         let d_issue = frames_seen[&s_issue].1.clone();
+        let tf = Instant::now();
         snap = Some(cb.fork()?);
+        w.prof.fork(tf.elapsed());
         match cb.run(&RunSpec {
             frame: Some(s_issue + 1),
             ..Default::default()
@@ -1157,7 +1212,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
         let (mut v0, mut d0) = (ch.at_fork.clone(), ch.d0.clone());
         if let Some((fbf, fbd)) = &first_before {
             if *fbf != ch.g {
-                let v = Arc::new(w.sview(&facts_of(fbd), fbd).map_err(EngineError::Bridge)?);
+                let v = Arc::new(w.sview(fbd).map_err(EngineError::Bridge)?);
                 v0 = v.clone();
                 d0 = Some(fbd.clone());
                 frames_seen.entry(*fbf).or_insert_with(|| (v, fbd.clone()));
@@ -1227,7 +1282,6 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                 let (v, d) = &cr.frames_seen[&(s_issue + 1)];
                 ((**v).clone(), d.clone())
             };
-            let mut obs = facts_of(&s);
             let mut m = Matcher::new(w.recs, &w.tracked, &w.needed, Some(first_i), &cr.ch.done, &w.issued);
             m.plan_pending = w.plan_pending.clone();
             let mut ended_engine = false;
@@ -1423,8 +1477,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                 let t4 = Instant::now();
                 s = Arc::new(cb.obs(&req)?);
                 let t5 = Instant::now();
-                obs = facts_of(&s);
-                now = w.sview(&obs, &s).map_err(EngineError::Bridge)?;
+                now = w.sview(&s).map_err(EngineError::Bridge)?;
                 let t6 = Instant::now();
                 let nf = f + 1;
                 let r_new = strict::by_frame(&strict::runs_of(&rows.runs))
@@ -1501,7 +1554,6 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                     cb.runs()?;
                     cb.explain_log()?;
                     s = Arc::new(cb.obs(&ObsReq::default())?);
-                    obs = facts_of(&s);
                 }
                 cr.ch.end = Some(cb.status().frame);
                 cr.ch.q_end = Some(cb.status().qf);
@@ -1509,8 +1561,8 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
             if cr.ch.is_end_point() {
                 if w.cfg.lite {
                     s = Arc::new(cb.obs(&ObsReq::default())?);
-                    obs = facts_of(&s);
                 }
+                let obs = facts_of(&s);
                 cr.ch.checkpoints = vec![
                     replay::checkpoint(s_issue, facts_of(&d_issue), &d_issue, &st_issue),
                     replay::checkpoint(cb.status().frame, obs.clone(), &s, cb.status()),
@@ -1955,8 +2007,7 @@ impl Search {
         let mut ptrack = self.strack.clone();
         let mut plog = BranchLog::new(cfg.split_wait);
         let s0 = Arc::new(parent.obs(&ObsReq::default()).map_err(|e| e.to_string())?);
-        let obs0 = facts_of(&s0);
-        let now0 = w.sview(&obs0, &s0)?;
+        let now0 = w.sview(&s0)?;
         let mut pfr = PFrame {
             st: parent.status().clone(),
             s: s0.clone(),
@@ -2205,8 +2256,7 @@ impl Search {
                     let r_ = strict::by_frame(&strict::runs_of(&rows.runs))
                         .remove(&(g + 1))
                         .unwrap_or_default();
-                    let obs = facts_of(&s);
-                    let nowv = w.sview(&obs, &s)?;
+                    let nowv = w.sview(&s)?;
                     let vs = ptrack.verdicts(sp, code, &r_, &prev_view, &nowv, Some(&prev_dump), &mut plog);
                     for (run_, v_) in vs {
                         ptrack.apply(sp, recs, rd, g + 1, &run_, &v_, &nowv, Some(&s));
@@ -2518,6 +2568,7 @@ impl Search {
         );
         parent.explain(None).map_err(|e| e.to_string())?;
         self.say(&format!("  window {}: {}", k + 1, w.prof.line()));
+        self.say(&format!("  window {}: {}", k + 1, w.prof.play_line()));
         let best = best_i.map(|b| children.swap_remove(b));
         let parent_matched = ptrack.matched.iter().map(|(i, v)| (*i, (v.0, v.1))).collect();
         Ok(WinRes {

@@ -555,6 +555,65 @@ impl<'r> FastView<'r> {
         self.plain.len() + self.pos.len()
     }
 
+    /// `view(&facts_of(s))` read from the dump directly: each key's value where facts_of would put it, with no map
+    /// of every fact built (the hot path: a child's observed frame).
+    pub fn view_obs(&self, s: &Obs) -> View {
+        let sf = slot_facts(s);
+        let sfv = |k: Key| -> Option<Val> { sf.binary_search_by_key(&k, |p| p.0).ok().map(|i| sf[i].1) };
+        let get = |k: Key| -> Option<Val> {
+            let a = k.a();
+            match k.kind() {
+                K_VAR => {
+                    if CLOCKS.contains(&(a as usize)) {
+                        None
+                    } else {
+                        s.vars.get(a as usize).map(|&v| v as Val)
+                    }
+                }
+                K_BIT => s.bits_set.binary_search(&(a as u32)).ok().map(|_| 1),
+                K_OWNER => pair(&s.owners, a as u32),
+                K_STATE => pair(&s.states, a as u32),
+                K_CLASS => s
+                    .classes
+                    .iter()
+                    .find(|c| c.0 as u64 == a)
+                    .and_then(|c| c.1.contains(&(k.b() as u32)).then_some(1)),
+                K_ROOM => Some(s.room as Val),
+                K_EGO => s.ego.map(|e| e as Val),
+                K_CUTSCENE => Some(s.cutscene.depth as Val),
+                K_VERB => s.verbs.iter().any(|v| v.id as u64 == a).then_some(1),
+                K_SCRIPT | K_LOCAL | K_OBJSCRIPT | K_AT | K_FROZEN | K_ESC => sfv(k),
+                _ => None,
+            }
+        };
+        let mut out = View::with_capacity(self.n_keys() + 8);
+        for &(k, dom) in &self.plain {
+            out.setv(k, dom.label(get(k).unwrap_or(0)));
+        }
+        for p in &self.pos {
+            let mut v = NOWHERE;
+            if let Some(c) = &p.cands {
+                if let Some(&(_, w)) = c.iter().find(|(key, _)| sfv(*key) == Some(1)) {
+                    v = w;
+                }
+            }
+            if v == NOWHERE && self.elsewhere.contains(&p.k) {
+                let lo = Key::pack(p.at, p.unit.0, p.unit.1, 0);
+                let hi = Key::pack(p.at, p.unit.0, p.unit.1, (1 << 24) - 1);
+                let st = sf.partition_point(|x| x.0 < lo);
+                if sf[st..]
+                    .iter()
+                    .take_while(|x| x.0 <= hi)
+                    .any(|x| x.1 == 1 && !p.ws.contains(&(x.0.b() as Val)))
+                {
+                    v = ELSEWHERE;
+                }
+            }
+            out.setv(p.k, p.dom.label(v));
+        }
+        out
+    }
+
     pub fn view(&self, obs: &Facts) -> View {
         let mut out = View::with_capacity(self.n_keys() + 8);
         for &(k, dom) in &self.plain {
@@ -825,4 +884,48 @@ impl<'a> ArgsView<'a> {
         }
         Ok(())
     }
+}
+
+/// (object, value) lists of a dump (owners, states), in object order: the value, or None.
+#[inline]
+fn pair(v: &[(u32, i32)], o: u32) -> Option<Val> {
+    match v.binary_search_by_key(&o, |p| p.0) {
+        Ok(i) => Some(v[i].1 as Val),
+        Err(_) => v.iter().find(|p| p.0 == o).map(|p| p.1 as Val), // (a dump not in object order)
+    }
+}
+
+/// facts_of's facts of the live slots and the top override (script:, local:, objscript:, at:, frozen:, esc:),
+/// sorted by key.
+pub fn slot_facts(s: &Obs) -> Vec<(Key, Val)> {
+    let mut f: Vec<(Key, Val)> = Vec::with_capacity(s.slots.len() * 3 + 1);
+    for sl in &s.slots {
+        let room_code = sl.number == ENCD || sl.number == EXCD;
+        match sl.where_ {
+            WIO_GLOBAL => f.push((Key::pack(K_SCRIPT, 0, sl.number as u64, 0), 1)),
+            WIO_LOCAL => f.push((Key::pack(K_LOCAL, 0, sl.number as u64, 0), 1)),
+            WIO_INVENTORY | WIO_ROOM | WIO_FLOBJECT if !room_code => {
+                f.push((Key::pack(K_OBJSCRIPT, 0, sl.number as u64, 0), 1))
+            }
+            _ => {}
+        }
+        if let Some((u, a)) = unit_of(sl.where_, sl.number) {
+            if sl.code >= 0 {
+                f.push((Key::pack(K_AT, u, a, sl.code as u64), 1));
+            }
+            if sl.frozen > 0 {
+                f.push((Key::pack(K_FROZEN, u, a, 0), 1));
+            }
+        }
+    }
+    if let Some(top) = s.cutscene.levels.last().and_then(|l| l.override_.as_ref()) {
+        if !top.stale && top.code >= 0 {
+            if let Some((u, a)) = unit_of(top.where_, top.number) {
+                f.push((Key::pack(K_ESC, u, a, top.code as u64), 1));
+            }
+        }
+    }
+    f.sort_unstable_by_key(|p| p.0);
+    f.dedup_by_key(|p| p.0);
+    f
 }
