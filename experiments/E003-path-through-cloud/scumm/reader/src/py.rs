@@ -335,10 +335,28 @@ impl PyCounter {
         self.0.clear();
         self.1.clear();
     }
-    /// `Counter.update(other)`: `other`'s keys in its order, new ones appended (also those with 0).
+    /// `Counter.update(other)`: `other`'s keys in its order, new ones appended (also those with 0). Each key's text
+    /// is taken from `other`'s index, not made again.
     pub fn update(&mut self, other: &PyCounter) {
-        for (k, v) in &other.0 {
-            self.add(k.clone(), *v);
+        if other.1.len() != other.0.len() {
+            // an index not made by `add` (a counter built as a value): the texts are made
+            for (k, v) in &other.0 {
+                self.add(k.clone(), *v);
+            }
+            return;
+        }
+        let mut texts: Vec<&str> = vec![""; other.0.len()];
+        for (t, &i) in &other.1 {
+            texts[i] = t;
+        }
+        for ((k, v), t) in other.0.iter().zip(texts) {
+            match self.1.get(t) {
+                Some(&i) => self.0[i].1 += *v,
+                None => {
+                    self.1.insert(t.to_string(), self.0.len());
+                    self.0.push((k.clone(), *v));
+                }
+            }
         }
     }
     pub fn py(&self) -> Py {
