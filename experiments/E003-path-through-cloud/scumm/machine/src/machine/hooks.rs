@@ -32,6 +32,13 @@ pub trait Hooks {
     fn okeys(&self, _m: &Machine<'_>, o: &FactOracle, pre: Prefix) -> Vec<Fact> {
         o.keys(pre).to_vec()
     }
+    /// `okeys`, sorted and each once (a hook may keep them so)
+    fn okeys_sorted(&self, m: &Machine<'_>, o: &FactOracle, pre: Prefix) -> Vec<Fact> {
+        let mut keys = self.okeys(m, o, pre);
+        keys.sort_unstable();
+        keys.dedup();
+        keys
+    }
     fn val(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
         m.val_base(p, o, e, x)
     }
@@ -140,6 +147,19 @@ impl<'g> Machine<'g> {
         match self.hooks {
             Some(h) => h.okeys(self, o, pre),
             None => o.keys(pre).to_vec(),
+        }
+    }
+    /// `okeys`, sorted and each once.
+    #[inline]
+    pub fn okeys_sorted(&self, o: &FactOracle, pre: Prefix) -> Vec<Fact> {
+        match self.hooks {
+            Some(h) => h.okeys_sorted(self, o, pre),
+            None => {
+                let mut keys = o.keys(pre).to_vec();
+                keys.sort_unstable();
+                keys.dedup();
+                keys
+            }
         }
     }
     #[inline]

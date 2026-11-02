@@ -352,8 +352,9 @@ struct St {
     table: Option<FactTable>,
     scope: Option<Scope>,
     info: FxHashMap<Fact, Rc<Info>>,
-    /// the universe's slot keys by prefix, in its order (`SymOracle.keys`)
+    /// the universe's slot keys by prefix, in its order (`SymOracle.keys`), and sorted, each once
     uni: FxHashMap<Prefix, Vec<Fact>>,
+    uni_sorted: FxHashMap<Prefix, Vec<Fact>>,
     uni_set: FxHashSet<Fact>,
     /// `{game.resource(r) for r in scope.rooms}`
     scope_rooms: Vec<Option<i32>>,
@@ -975,6 +976,18 @@ impl Hooks for ReaderHooks {
         let s = st(m);
         let mut out = s.uni.get(&pre).cloned().unwrap_or_default();
         out.extend(s.pin_extra.iter().copied().filter(|&k| pre.matches(k)));
+        out
+    }
+
+    /// `okeys` sorted, each once: the universe's part kept sorted (`St.uni_sorted`), the pins' put in place.
+    fn okeys_sorted(&self, m: &Machine<'_>, _o: &FactOracle, pre: Prefix) -> Vec<Fact> {
+        let s = st(m);
+        let mut out = s.uni_sorted.get(&pre).cloned().unwrap_or_default();
+        for k in s.pin_extra.iter().copied().filter(|&k| pre.matches(k)) {
+            if let Err(i) = out.binary_search(&k) {
+                out.insert(i, k);
+            }
+        }
         out
     }
 
@@ -2364,6 +2377,16 @@ impl<'g> Reader<'g> {
                     s.uni.entry(pre).or_default().push(f);
                 }
             }
+            s.uni_sorted = s
+                .uni
+                .iter()
+                .map(|(pre, keys)| {
+                    let mut k = keys.clone();
+                    k.sort_unstable();
+                    k.dedup();
+                    (*pre, k)
+                })
+                .collect();
             s.scope_rooms = scope.rooms.iter().map(|&r| game.resource(r)).collect();
             s.scope = Some(scope);
         }
