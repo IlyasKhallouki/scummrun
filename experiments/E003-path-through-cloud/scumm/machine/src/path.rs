@@ -840,7 +840,7 @@ pub struct Path {
     // --- golden.py's trace bookkeeping
     pub tid: Option<u32>,
     /// what a hook adds to a path (reader.py's `SymPath` fields); None without hooks. Forks copy it
-    pub ext: Option<Box<dyn PathExt>>,
+    pub ext: Option<Rc<dyn PathExt>>,
 }
 
 /// The fields a hook adds to a path (reader.py's `SymPath` subclass of `model.Path`): cloned with the path.

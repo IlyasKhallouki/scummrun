@@ -418,7 +418,12 @@ fn sx(p: &Path) -> &SymX {
 }
 
 fn sx_mut(p: &mut Path) -> &mut SymX {
-    p.ext.as_deref_mut().expect("a SymPath").as_any_mut().downcast_mut::<SymX>().unwrap()
+    // the path's own fields, copied first where its clones still share them
+    let e = p.ext.as_mut().expect("a SymPath");
+    if Rc::get_mut(e).is_none() {
+        *e = Rc::from(e.clone_box());
+    }
+    Rc::get_mut(e).unwrap().as_any_mut().downcast_mut::<SymX>().unwrap()
 }
 
 fn count(m: &mut Machine<'_>, what: &str) {
@@ -889,7 +894,7 @@ impl Hooks for ReaderHooks {
     fn advance(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> Vec<Path> {
         if p.ext.is_none() {
             // `Reader._drive`'s `_to_sym`: the first path of a run_sentence (whose call is no join)
-            p.ext = Some(sym_path(st(m)));
+            p.ext = Some(Rc::from(sym_path(st(m))));
         }
         let snap = p.clone();
         let op = if sx(p).nf.is_empty() { None } else { op_at(m, p) };
@@ -1548,7 +1553,7 @@ fn sym_path(s: &St) -> Box<dyn PathExt> {
 /// `Reader._go`'s first path: the call, a SymPath.
 fn first_path(m: &mut Machine<'_>, call: Call) -> Path {
     let mut p = Path::new(vec![Entry::Call(call)]);
-    p.ext = Some(sym_path(st(m)));
+    p.ext = Some(Rc::from(sym_path(st(m))));
     p
 }
 
