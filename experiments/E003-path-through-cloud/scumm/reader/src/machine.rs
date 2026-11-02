@@ -414,6 +414,8 @@ struct St {
     /// the held branches of this run so far: a fork reached again on another path holds the same branch, which is
     /// kept once, where it was first held (the waits are a set: `add_wait`, reach.rs)
     held_seen: FxHashSet<crate::reach::Held>,
+    /// `lazy_of`'s unknowns of this run, by the hash of key and values
+    lazy_made: FxHashMap<u64, Vec<(Rc<str>, Vec<Label>, Val)>>,
     /// the switch pass2_reuse, in pass 1: log what the run consults (memo.rs)
     track: bool,
     touched: FxHashSet<Fact>,
@@ -630,6 +632,25 @@ fn value(m: &mut Machine<'_>, i: &Info, l: Label) -> Val {
 fn lazy_of(m: &mut Machine<'_>, i: &Info, labels: Option<&[Label]>) -> Val {
     let d = i.dom.as_ref().unwrap();
     let labels = labels.unwrap_or(&d.values);
+    // the run's unknown of these values, made once in the run (`St::lazy_made`: the same key and values give the
+    // same unknown, as interning it again would)
+    let h = {
+        use std::hash::Hash;
+        let mut h = FxHasher::default();
+        i.key.hash(&mut h);
+        labels.hash(&mut h);
+        h.finish()
+    };
+    if let Some(e) = st(m).lazy_made.get(&h).and_then(|v| v.iter().find(|e| *e.0 == *i.key && e.1 == labels)) {
+        return e.2;
+    }
+    let v = lazy_new(m, i, labels);
+    st_mut(m).lazy_made.entry(h).or_default().push((i.key.clone(), labels.to_vec(), v));
+    v
+}
+
+fn lazy_new(m: &mut Machine<'_>, i: &Info, labels: &[Label]) -> Val {
+    let d = i.dom.as_ref().unwrap();
     let vals: Vec<i32> = labels
         .iter()
         .map(|&l| match l {
@@ -2588,6 +2609,7 @@ impl Reader<'_> {
             s.pin_extra = extra.into_iter().map(|e| e.1).collect();
             s.seed = Rc::new(seed);
             s.first_fork = None;
+            s.lazy_made.clear(); // a new run: new unknowns
             s.rd = RdCounts::default();
             s.lazy = 0;
             s.step_key = None;
