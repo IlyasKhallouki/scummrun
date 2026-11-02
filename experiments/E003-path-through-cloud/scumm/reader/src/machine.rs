@@ -105,6 +105,10 @@ fn saved_of(f: Fact) -> Option<(i32, i32)> {
 
 /// The key's facts.py (or reader.py) string.
 pub fn key_str(f: Fact) -> String {
+    key_rc(f).to_string()
+}
+
+fn key_text(f: Fact) -> String {
     match f {
         Fact::At(s, MARK) => format!("at:{s}:*"),
         Fact::Esc(s, MARK) => format!("esc:{s}:*"),
@@ -113,6 +117,24 @@ pub fn key_str(f: Fact) -> String {
             None => f.to_string(),
         },
     }
+}
+
+thread_local! {
+    /// `key_text` of each fact this thread named: the text is a function of the fact, made once
+    static KEY_TEXTS: std::cell::RefCell<FxHashMap<Fact, Rc<str>>> = Default::default();
+}
+
+/// `key_str` as a shared text, made once per fact and thread.
+pub fn key_rc(f: Fact) -> Rc<str> {
+    KEY_TEXTS.with(|m| {
+        let mut m = m.borrow_mut();
+        if let Some(t) = m.get(&f) {
+            return t.clone();
+        }
+        let t: Rc<str> = key_text(f).into();
+        m.insert(f, t.clone());
+        t
+    })
 }
 
 /// model.py `family`.
@@ -142,11 +164,19 @@ pub(crate) fn pkey_of(s: &str) -> PKey {
     PKey::F(s.parse().unwrap_or_else(|_| panic!("a precondition key the machine half cannot hold: {s}")))
 }
 
-fn pkey_str(k: PKey) -> String {
+/// `pkey_str` as a shared text (`key_rc`).
+fn pkey_rc(k: PKey) -> Rc<str> {
     match k {
-        PKey::F(f) => key_str(f),
-        PKey::Args(s) => format!("args:{s}"),
+        PKey::F(f) => key_rc(f),
+        PKey::Args(s) => format!("args:{s}").into(),
     }
+}
+
+/// A map keyed by texts, from (text, value) pairs whose texts are distinct: sorted by text before the map is built
+/// from them (the map's own sort then finds them in order), the texts made Strings only then.
+fn by_text<V, W>(mut items: Vec<(Rc<str>, V)>, f: impl Fn(V) -> W) -> BTreeMap<String, W> {
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+    items.into_iter().map(|(k, v)| (k.to_string(), f(v))).collect()
 }
 
 /// A Python reason string as the machine's `Reason`.
@@ -2126,8 +2156,8 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
-    let pre: Pre = x.pre.iter().map(|(k, v)| (pkey_str(*k), v.clone())).collect();
-    let writes: BTreeMap<String, RVal> = p.writes.iter().map(|(&k, &v)| (key_str(k), rval(run, v))).collect();
+    let pre: Pre = by_text(x.pre.iter().map(|(k, v)| (pkey_rc(*k), v)).collect(), |v| v.clone());
+    let writes: BTreeMap<String, RVal> = by_text(p.writes.iter().map(|(&k, &v)| (key_rc(k), v)).collect(), |v| rval(run, v));
     let kept: BTreeMap<String, Kept> = x
         .kept
         .iter()
