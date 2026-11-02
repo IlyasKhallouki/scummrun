@@ -81,6 +81,8 @@ enum Edit {
     Same,
     Drop,
     New(OAct),
+    /// the action's new words, as `Actions::push` writes them (`View::words_keeping`)
+    Words(Vec<u32>),
 }
 
 /// The task with each action kept, dropped or replaced by `f`; true when something changed.
@@ -110,6 +112,14 @@ fn rebuild(t: Task, mut f: impl FnMut(&Facts, usize, View) -> Edit) -> (Task, bo
             Edit::Drop => {
                 changed = true;
                 false
+            }
+            Edit::Words(nw) => {
+                changed = true;
+                let len = nw.len();
+                assert!(w + len <= end, "a reduction made an action longer ({} words, was {})", len, end - start);
+                acts.words[w..w + len].copy_from_slice(&nw);
+                w += len;
+                true
             }
             Edit::New(a) => {
                 changed = true;
@@ -300,9 +310,7 @@ pub fn red_b(t: Task, c: &mut Counts) -> (Task, bool) {
                 return Edit::Same;
             }
             dropped += n as u64;
-            let mut a = v.to_owned();
-            a.eff.retain(|e| read[e.fact as usize] || e.kind == K_BAD);
-            Edit::New(a)
+            Edit::Words(v.words_keeping(|_, e| read[e.fact as usize] || e.kind == K_BAD))
         });
         t = nt;
         add(c, "(b) effects on facts nothing reads, left out", dropped);
@@ -603,7 +611,11 @@ fn red_d_core(t: &Task, st: &[u32], c: &mut Counts) -> DOut {
 /// condition fact needed whole; this one is finer and keeps no more.
 pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
     let nf = t.facts.len();
+    let t0 = std::time::Instant::now();
     let Needed { ncount, kept, rounds, .. } = needed(&t);
+    if std::env::var_os("TASKCORE_PROFILE").is_some() {
+        eprintln!("profile e: needed {:.3} s, {} rounds", t0.elapsed().as_secs_f64(), rounds);
+    }
     let whole = (0..nf).filter(|&f| ncount[f] > 0 && ncount[f] == t.facts.size(f as u32)).count();
     let needed: u64 = ncount.iter().map(|&x| x as u64).sum();
     let (mut da, mut de) = (0u64, 0u64);
@@ -617,9 +629,7 @@ pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
             return Edit::Same;
         }
         de += k as u64;
-        let mut a = v.to_owned();
-        a.eff.retain(|e| e.kind == K_BAD || ncount[e.fact as usize] > 0);
-        Edit::New(a)
+        Edit::Words(v.words_keeping(|_, e| e.kind == K_BAD || ncount[e.fact as usize] > 0))
     });
     add(c, "(e) actions that write no needed value, left out", da);
     add(c, "(e) effects on facts with no needed value, left out", de);
