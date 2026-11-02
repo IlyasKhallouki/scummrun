@@ -44,6 +44,16 @@ readings and their loading, and the readers of the harness's reach extensions an
 harness's Python outside the window search, taskcore, Fast Downward, and the probes); ``total``: the four parts;
 ``rusage_total``: getrusage over the whole job once every engine and server has ended.
 
+**E009's switches** (experiments/E009-explore-fixed/plan.md; each absent from job.json means E008's behaviour):
+
+* ``idle_frames`` L (fix a): after the return, unless ``idle_measured``, a fork of the returned engine runs L frames
+  with no input; a key is idle when its value comes back to one it had before in those frames, the entry's value
+  included (``idle_rule``). result.json ``idle``. The fork is quit before the reading; the job plays as before.
+* ``rotation`` {"cell": [[k, v, n], ...], "all": [...]} (fix b): the targets are ordered by (tried in the entry's
+  cell, tried in all, depth, then E008's order), ``targets(..., rotation=...)``.
+* ``reuse`` "e009" (fix c): a cached reading refused by E008's rule is checked again with the keys K of
+  ``reuse_keys`` (non-facts of the reading whose start value no site of the reader reads) allowed to differ too.
+
 Seed 1 only (plan.md); any other seed is refused. C2: this file names no game number; the numbers come from the job.
 """
 
@@ -189,6 +199,55 @@ def reusable_detail(reading_doc: dict, task_fact_keys, entry_facts: dict) -> dic
     return {"differ": len(d), "task": sum(1 for k in d if k in keys),
             "slots": sum(1 for k in d if k not in keys and k.startswith(SLOT_PREFIXES)), "other": len(bad),
             "first": [[k, *d[k]] for k in bad[:12]]}
+
+
+# --- E009 fix a: idle keys -------------------------------------------------------------------------------------------
+
+def idle_rule(start: dict, frames) -> dict:
+    """plan.md (a): ``frames`` the facts at each frame after the entry ([(offset, facts)], in order). A key is idle when
+    its value comes back to a value it had before (the entry's value included). {"returns": sorted idle keys,
+    "first_return": {k: offset}, "changes": {k: n}}."""
+    seen: dict = {}
+    first: dict = {}
+    changes: dict = {}
+    prev = dict(start)
+    for off, fa in frames:
+        for k in set(fa) | set(prev):
+            v = fa.get(k, 0)
+            if v == prev.get(k, 0):
+                continue
+            changes[k] = changes.get(k, 0) + 1
+            s = seen.setdefault(k, {start.get(k, 0)})
+            if v in s and k not in first:
+                first[k] = off
+            s.add(v)
+        prev = fa
+    return {"returns": sorted(first), "first_return": first, "changes": changes}
+
+
+def measure_idle(ctl, root, frames: int) -> dict:
+    """Fix a: a fork of the returned engine run ``frames`` frames with no input, the facts taken at each; idle_rule's
+    result with the frames, the seconds, the fork's CPU and the frame it ended at. The fork is quit."""
+    t = time.monotonic()
+    b = ctl.fork(root)
+    try:
+        f0 = b.frame
+        start = facts_of(b.state())
+
+        def seq():
+            for i in range(1, frames + 1):
+                b.run(frame=f0 + i)
+                yield i, facts_of(b.state())
+        out = idle_rule(start, seq())
+        out["frame_end"] = b.frame
+        out["cpu_s"] = round(WS.cpu_of(b.pid), 1)
+    finally:
+        try:
+            b.quit()
+        except OSError:
+            pass
+    out.update(frames=frames, frame0=f0, seconds=round(time.monotonic() - t, 1))
+    return out
 
 
 def entries_from(entry_frame: int, inputs: list, checkpoints: list) -> list:
@@ -577,6 +636,13 @@ def run_job(job_dir) -> dict:
             raise ReturnDiffers(f"the return to entry {entry.get('id')} differs from its checkpoint: {ret['differ']}")
         state, status = root.state(), dict(root.status)
         facts = facts_of(state)
+        if job.get("idle_frames") and not job.get("idle_measured"):  # E009 fix a
+            say(f"idle: {job['idle_frames']} frames with no input from frame {root.frame}")
+            c0 = _cpu()
+            out["idle"] = measure_idle(ctl, root, int(job["idle_frames"]))
+            cpu["idle"] = _cpu() - c0 + out["idle"]["cpu_s"]
+            say(f"idle keys: {out['idle']['returns'][:12]} ({len(out['idle']['returns'])}), "
+                f"{out['idle']['seconds']} s")
         # 2. reading
         c0 = _cpu()
         t = time.monotonic()
