@@ -553,6 +553,20 @@ impl BinEngine {
         Ok(&self.last)
     }
 
+    /// The Obs reply's payload, not decoded (`wire::R::obs` decodes it).
+    pub fn obs_raw(&mut self, req: &ObsReq) -> EResult<Vec<u8>> {
+        let mut w = W::msg(wire::C_OBS);
+        w.obs_req(req);
+        self.send(w.finish())?;
+        self.expect(wire::R_OBS)
+    }
+
+    /// The F2 block asked anew (one State round trip), whatever is cached.
+    pub fn block_fresh(&mut self) -> EResult<&[u8]> {
+        self.last_now = false;
+        self.block()
+    }
+
     pub fn hello_status(&self) -> &Status {
         &self.status
     }

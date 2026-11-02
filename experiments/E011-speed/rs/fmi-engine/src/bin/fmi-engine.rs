@@ -651,14 +651,22 @@ fn bench(o: &Opts) -> Res<()> {
     );
     let c = Clock::new(q.pid());
     let reps = 50u64;
-    for _ in 0..reps {
+    let s0 = fmi_engine::sys::self_cpu_s();
+    for _ in 0..20 * reps {
         q.obs(&ObsReq::default()).map_err(e2s)?;
     }
-    let (w, cpu) = c.per(reps);
+    let (w, cpu) = c.per(20 * reps);
+    let own = (fmi_engine::sys::self_cpu_s() - s0) * 1e3 / (20 * reps) as f64;
     put(
         "full binary Obs alone",
-        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
+        format!("{w:.3} ms wall, {cpu:.3} ms engine CPU, {own:.3} ms driver CPU"),
     );
+    let c = Clock::new(q.pid());
+    for _ in 0..20 * reps {
+        q.block_fresh().map_err(e2s)?;
+    }
+    let (w, cpu) = c.per(20 * reps);
+    put("State (the F2 block) alone", format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"));
     let c = Clock::new(q.pid());
     for _ in 0..reps {
         q.state_json(&ObsReq::default()).map_err(e2s)?;
@@ -684,11 +692,14 @@ fn bench(o: &Opts) -> Res<()> {
         format!("{w:.3} ms wall, {cpu:.3} ms engine CPU"),
     );
     let c = Clock::new(q.pid());
-    for _ in 0..reps {
+    for _ in 0..20 * reps {
         q.holds(&[]).map_err(e2s)?;
     }
-    let (w, _) = c.per(reps);
-    put("round trip (Holds, no condition)", format!("{:.1} us wall", w * 1e3));
+    let (w, cpu) = c.per(20 * reps);
+    put(
+        "round trip (Holds, no condition)",
+        format!("{:.1} us wall, {:.1} us engine CPU", w * 1e3, cpu * 1e3),
+    );
 
     // (d) fork + quit; fork + facts + quit
     let c = Clock::new(q.pid());
