@@ -113,13 +113,13 @@ pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<Str
     out
 }
 
-/// start.py's checks of a boot from the root (replay_part1.boot's row["checks"]), those the bridge's state shows.
+/// start.py's checks of a boot from the root (replay_part1.boot's row["checks"]), those the bridge's state shows. The
+/// stop's own checks (an idle stop of kind sentence) hold for a boot run to the idle stop; a return that is a fork of
+/// a kept root, or a boot run to the root's frame, stops otherwise, and its state is held to the root's checkpoint
+/// (facts, tick, random state, actors) instead.
 fn boot_checks(st: &Status, obs: &Obs) -> Vec<String> {
     let mut out = Vec::new();
-    if st.reason != "idle" {
-        out.push(format!("stop {}, not idle", files::py_repr(&json!(st.reason))));
-    }
-    if st.idle.as_deref() != Some("sentence") {
+    if st.reason == "idle" && st.idle.as_deref() != Some("sentence") {
         out.push(format!("idle kind {}, not sentence", files::py_repr(&json!(st.idle))));
     }
     if obs.seed != Some(1) {
