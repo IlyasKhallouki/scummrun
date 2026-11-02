@@ -1091,7 +1091,7 @@ impl Ff {
 
 // --- the lazy search --------------------------------------------------------------------------------------------------
 
-/// The search's answer, as FD's exit codes read in plan_fd ("plan" 0, "incomplete" 12, "time" 23).
+/// The search's answer, as FD's exit codes read in plan_fd ("plan" 0, "unsolvable" 11, "time" 23).
 #[derive(Clone, Debug, Default)]
 pub struct Outcome {
     pub status: String,
@@ -1238,7 +1238,9 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
         // fetch_next_state
         let k = match (sizes[0] > 0, sizes[1] > 0) {
             (false, false) => {
-                out.status = "incomplete".into();
+                // get_finished_search_status: the alternation is safe (its h list is: h_FF is safe), so an empty open
+                // list proves no plan exists (FD's exit code 11)
+                out.status = "unsolvable".into();
                 break;
             }
             (true, false) => 0,
