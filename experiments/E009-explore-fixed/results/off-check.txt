@@ -1,0 +1,17 @@
+# E009 off check (plan.md "Off check and tests"), branch e009 at 9a7d981, 2026-11-02
+# step.py engine test (a) with every E009 switch off (job.json as E008's), then its goal entry verified from boot;
+# then test_e009.py's engine test (the idle measurement from the boot). Log: ~/.cache/fast-mi-e009/logs/off-a.log
+[a] job ta from entry 0: ok True, error None, CLI wall 554.4 s, job wall 548.9 s
+  return: same True, boot 11.52 s
+  reading: fresh True, why 'no cached reading', scope [28, 33, 41], records 41877, actions 40773, read wall 55.3 s, read CPU 99.6 s, reader peak 253 MB, files 30.5 s, load 0.37 s; candidates []
+  targets {'0': 1, '1': 0, '2': 0}, first [['owner:566', 1, 0, 0]]; probes [(['owner:566', 1], 'plan', 443.4)]
+  attempt: target ['owner:566', 1], stop 'goal', reached True, from the plan True, frames 488 (2728 -> 3216), qf 11712 (65284 -> 76996), replans 2, refinements [{'plan': 0, 'frame': 2798, 'class': None, 'added': [], 'why_not': 'no cause', 'seconds': None, 'cpu_s': None}, {'plan': 1, 'frame': 3204, 'class': 'split', 'added': [], 'why_not': 'a split on no variable the reading holds no fact of', 'seconds': None, 'cpu_s': None}], extensions [], inputs 36, 443.4 s
+  window search: 4 windows, 502 children, engine CPU {'child': 135.03, 'snapshot': 0.22, 'stone trial': 67.45, 'the last engine': 0.02}, Python CPU 196.07
+  new entries 8: [(2776, 'checkpoint'), (2796, 'checkpoint'), (2797, 'checkpoint'), (2798, 'checkpoint'), (3165, 'checkpoint'), (3204, 'checkpoint'), (3206, 'checkpoint'), (3216, 'end')]; readings made []
+  CPU s {'return': 3.8, 'read': 130.1, 'plan': 139.9, 'play': 398.8, 'total': 672.6, 'rusage_total': 472.1}; peak RSS MB {'python': 394, 'children': 392}
+CHECK (a): 0 goal True 2728 3216 488 11712 2 36 502 8
+CHECK verify (a) from boot: 0 differences at 9 checkpoints, 36 inputs, final {'owner:566': 1} 4.0 s
+off_a exit 0
+1 passed, 21 deselected in 17.56s
+idle engine test exit 0
+GUARD: rc 0 wall 592.0 s low 0 min MemAvailable 3173504 kB
