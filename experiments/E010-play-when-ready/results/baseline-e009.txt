@@ -1,0 +1,24 @@
+# E010 baseline: E009's kitchen jobs on the VM (log.jsonl as copied to the laptop, 15 committed jobs) and door
+kitchen jobs 15: job wall median 23.6 s, least 11.7 s, most 388.5 s, sum 1399.7 s; first start to last end 1089.9 s
+  j00000 entry 0 scope [28, 33, 35, 38]: wall 388.5 s, attempt 303.3 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 415.6, 'plan': 170.5, 'play': 30.4, 'idle': 6.9, 'total': 625.3, 'rusage_total': 612.3}
+  j00001 entry 4 scope [33, 38, 83, 85, 96]: wall 21.8 s, attempt 6.0 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 2.0, 'read': 13.4, 'plan': 3.8, 'play': 0.0, 'idle': 8.0, 'total': 27.2, 'rusage_total': 24.6}
+  j00002 entry 3 scope [33, 38, 83, 85, 96]: wall 22.2 s, attempt 7.0 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 2.0, 'read': 15.2, 'plan': 4.2, 'play': 0.1, 'idle': 7.5, 'total': 29.0, 'rusage_total': 26.5}
+  j00003 entry 2 scope [33, 38, 83, 85, 96]: wall 23.6 s, attempt 7.4 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 2.0, 'read': 16.1, 'plan': 4.1, 'play': 0.4, 'idle': 7.8, 'total': 30.4, 'rusage_total': 27.6}
+  j00004 entry 6 scope [33, 38, 83, 85, 96]: wall 19.6 s, attempt 7.1 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 2.0, 'read': 7.3, 'plan': 4.4, 'play': 0.1, 'idle': 8.0, 'total': 21.8, 'rusage_total': 19.0}
+  j00005 entry 3 scope [33, 38, 83, 85, 96]: wall 11.7 s, attempt 7.2 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 2.0, 'read': 7.6, 'plan': 4.3, 'play': 0.1, 'total': 14.0, 'rusage_total': 14.1}
+  j00006 entry 1 scope [28, 33, 35, 38]: wall 143.9 s, attempt 130.8 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 81.7, 'plan': 89.7, 'play': 5.2, 'idle': 8.2, 'total': 186.7, 'rusage_total': 183.4}
+  j00007 entry 15 scope [33, 38, 83, 85, 96]: wall 18.9 s, attempt 9.2 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 2.0, 'read': 5.6, 'plan': 4.9, 'play': 1.9, 'idle': 7.0, 'total': 21.4, 'rusage_total': 18.4}
+  j00008 entry 14 scope [28, 33, 35, 38]: wall 143.9 s, attempt 133.7 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 85.6, 'plan': 90.7, 'play': 5.8, 'idle': 7.2, 'total': 191.2, 'rusage_total': 188.0}
+  j00009 entry 1 scope [28, 33, 35, 38]: wall 137.5 s, attempt 134.5 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 84.6, 'plan': 91.9, 'play': 6.3, 'total': 184.7, 'rusage_total': 183.8}
+  j00010 entry 21 scope [33, 38, 83, 85, 96]: wall 19.1 s, attempt 9.2 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 5.3, 'plan': 4.9, 'play': 2.1, 'idle': 7.2, 'total': 21.4, 'rusage_total': 18.4}
+  j00011 entry 20 scope [28, 33, 35, 38]: wall 143.9 s, attempt 134.0 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 91.9, 'plan': 89.6, 'play': 6.2, 'idle': 6.9, 'total': 196.5, 'rusage_total': 193.2}
+  j00012 entry 14 scope [28, 33, 35, 38]: wall 137.8 s, attempt 134.8 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 92.0, 'plan': 90.3, 'play': 6.1, 'total': 190.3, 'rusage_total': 189.5}
+  j00013 entry 31 scope [33, 38, 83, 85, 96]: wall 19.6 s, attempt 9.6 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 5.7, 'plan': 5.1, 'play': 2.2, 'idle': 7.3, 'total': 22.2, 'rusage_total': 19.1}
+  j00014 entry 30 scope [28, 33, 35, 38]: wall 147.7 s, attempt 137.4 s, stop "refinement: Lemma R's premise R0: the last pass wrote values", cpu {'return': 1.9, 'read': 85.8, 'plan': 94.3, 'play': 5.6, 'idle': 7.2, 'total': 194.8, 'rusage_total': 191.7}
+door: 1 job, wall 364.9 s, attempt 278.8 s, frames 401, cpu {'return': 1.8, 'read': 327.2, 'plan': 178.3, 'play': 34.6, 'idle': 7.3, 'total': 549.2, 'rusage_total': 536.6}
+laptop, E009 off check: [a] job ta from entry 0: ok True, error None, CLI wall 554.4 s, job wall 548.9 s
+laptop, E009 off check: CHECK (a): 0 goal True 2728 3216 488 11712 2 36 502 8
+laptop, E009 off check: CHECK verify (a) from boot: 0 differences at 9 checkpoints, 36 inputs, final {'owner:566': 1} 4.0 s
+VM, E009 off check: [a] job ta from entry 0: ok True, error None, CLI wall 195.8 s, job wall 195.0 s
+VM, E009 off check: CHECK (a): 0 goal True 2728 3216 488 11712 2 36 501 8
+VM, E009 off check: CHECK verify (a) from boot: 0 differences at 9 checkpoints, 36 inputs, final {'owner:566': 1} 2.9 s

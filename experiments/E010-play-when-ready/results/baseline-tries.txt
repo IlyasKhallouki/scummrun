@@ -1,0 +1,77 @@
+# E010 baseline: children forked before the chosen one in the strict windows recorded (E006-E009), 2026-11-02
+# python3 measure/tries_before_best.py fast-mi-e008/archives fast-mi-e008/step-tests fast-mi-e009/off fast-mi-e007/out fast-mi-e006/out fast-mi-e009/archives/door fast-mi-e008-check (from ~/.cache)
+61 distinct windows with an end point
+children before the chosen one: max 293 ; windows with any: 5
+   (293, 293, Counter({'spent': 281, 'mismatch': 12}), 'deviation', 'walk_to(316)[202]#1038', 2798)
+   (49, 49, Counter({'interface': 49}), 'deviation', 'sentence(10,489)#78', 2768)
+   (33, 43, Counter({'spent': 24, 'mismatch': 9}), 'deviation', 'walk_to(316)[202]#107', 3073)
+   (20, 20, Counter({'spent': 18, 'refuted': 2}), 'deviation', 'walk_to(428)#64', 2776)
+   (19, 19, Counter({'spent': 18, 'refuted': 1}), 'success', 'sentence(2,428)#44', 2775)
+   (0, 0, Counter(), 'deviation', 'sentence(2,428)#44', 2728)
+   (0, 0, Counter(), 'deviation', 'walk_to(428)#92', 2796)
+   (0, 0, Counter(), 'deviation', 'walk_to(426)#20', 2728)
+   (0, 0, Counter(), 'deviation', 'sentence(10,489)#219', 2848)
+   (0, 0, Counter(), 'deviation', 'sentence(10,489)#56', 2850)
+   (0, 0, Counter(), 'deviation', 'sentence(10,489)#56', 2852)
+   (0, 0, Counter(), 'deviation', 'sentence(10,489)#56', 2854)
+
+# the first child that issued its input against the chosen one (every record, not deduplicated)
+172 files
+   181  best is the first issued
+     1  best later: first mismatch -> best deviation
+     8  best later: first refuted -> best deviation
+     1  best later: first refuted -> best success
+     7  best later: first spent -> best deviation
+   160  first issued: deviation
+     9  first issued: goal
+     4  first issued: mismatch
+    51  first issued: refuted
+    12  first issued: spent
+    12  first issued: success
+    50  no best
+   248  windows
+best later than the first issued child: (frames after it, issued children before it, first's outcome, best's)
+   (19, 19, 'refuted', 'success', 'run', 'sentence(2,428)#44')
+   (20, 20, 'refuted', 'deviation', 'fast-mi-e006/out/E003-part1/bar-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split/windows.jsonl', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'fast-mi-e006/out/E003-part1/kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split/windows.jsonl', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'fast-mi-e007/out/E003-part1/kitchen-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine/windows.jsonl', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'fast-mi-e007/out/E003-part1/kitchen-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split/windows.jsonl', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'fast-mi-e007/out/E003-part1/kitchen-refine-a58d1f7/windows.jsonl', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'run', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'run', 'walk_to(428)#64')
+   (20, 20, 'refuted', 'deviation', 'run', 'walk_to(428)#64')
+   (41, 33, 'mismatch', 'deviation', 'run', 'walk_to(316)[202]#107')
+   (293, 293, 'spent', 'deviation', 'fast-mi-e006/out/E003-part1/kitchen-pass-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split/windows.jsonl', 'walk_to(316)[202]#1038')
+   (293, 293, 'spent', 'deviation', 'fast-mi-e007/out/E003-part1/kitchen-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split-refine/windows.jsonl', 'walk_to(316)[202]#1038')
+   (293, 293, 'spent', 'deviation', 'fast-mi-e007/out/E003-part1/kitchen-off-seed1-serve-lama-first-costs-caps-reachx-uar-stones-window-strict-cache-ahead7-lite-split/windows.jsonl', 'walk_to(316)[202]#1038')
+   (293, 293, 'spent', 'deviation', 'fast-mi-e007/out/E003-part1/kitchen-refine-a58d1f7/windows.jsonl', 'walk_to(316)[202]#1038')
+   (293, 293, 'spent', 'deviation', 'run', 'walk_to(316)[202]#1038')
+
+# the chosen child's fork frame against the frame the model's window opened
+   197 best early=False
+     1 best early=True
+   196 best forked at/after open
+     2 best forked before open
+    41 no best; open None
+     9 no best; open set
+   248 windows
+best.g - start, open - start, first child g - start, outcome, forks (first 60):
+   (0, 0, 0, 'deviation', 68)
+
+# empty windows against windows with an end point
+empty 50 windows; forks 15438 wall s 549.6 child frames 48383
+  end reasons [('a needed record refuted in the parent', 41), ('3600 frames', 4), ('goal in the parent, not from the plan', 3), ("the input's precondition closed in the parent after its wind", 2)]
+   (3600, 137.14, 10800, 3600, '3600 frames', {'spent': 3600})
+   (3600, 137.1, 10800, 3600, '3600 frames', {'spent': 3600})
+   (3600, 124.04, 10953, 3600, '3600 frames', {'refuted': 1, 'spent': 3599})
+   (3600, 101.74, 10800, 3600, '3600 frames', {'spent': 3600})
+   (331, 18.89, 1646, 331, 'goal in the parent, not from the plan', {'goal, not from the plan': 4, 'mismatch': 327})
+   (331, 13.84, 1646, 331, 'goal in the parent, not from the plan', {'goal, not from the plan': 4, 'mismatch': 327})
+with an end point 198 windows; forks 5707 wall s 2404.2 child frames 360532
+  end reasons [('stop: Q(g) + b reached the best deviation', 99), ("the input's precondition closed in the parent after its wind", 76), ('stop: Q(g) + b reached the best success', 21), ('a needed record refuted in the parent', 2)]
+   (405, 390.1, 39938, 405, 'stop: Q(g) + b reached the best deviation', {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284})
+   (405, 261.42, 39938, 405, 'stop: Q(g) + b reached the best deviation', {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284})
+   (405, 234.77, 39938, 405, 'stop: Q(g) + b reached the best deviation', {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284})
+   (405, 184.14, 39938, 405, 'stop: Q(g) + b reached the best deviation', {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284})
+   (405, 177.05, 39938, 405, 'stop: Q(g) + b reached the best deviation', {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284})
+   (405, 136.93, 39938, 405, 'stop: Q(g) + b reached the best deviation', {'deviation': 1, 'mismatch': 12, 'pruned': 108, 'spent': 284})

@@ -1,0 +1,9 @@
+# E010 baseline: what a frame costs the window search's branches, from the boot (seed 1), on the laptop, 2026-11-02
+# measure/frame_costs.py OUT 300 (FAST_MI_SCUMMVM_BIN svm-w3b's build), times in ms
+a parent frame, observed (ms): 10.4
+b parent frame, fork_each 7 (ms): 13.9
+c bare frame (ms): 0.9
+c frame + state dump (ms): 5.5
+c frame in 50-frame commands (ms): 0.8
+d fork + quit (ms): 2.3
+d fork + state + quit (ms): 6.7
