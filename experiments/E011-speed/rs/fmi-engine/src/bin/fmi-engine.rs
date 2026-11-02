@@ -339,11 +339,18 @@ fn walk(o: &Opts) -> Res<()> {
         let sf = a.facts().map_err(e2s)?;
         // the State block of an exact copy (a fork: its connection has no delta base) must be the Step's
         let mut c = a.fork_bin().map_err(e2s)?;
-        let fresh = c.block().map_err(e2s)?.to_vec();
+        let fresh = c.block_fresh().map_err(e2s)?.to_vec();
         Box::new(c).quit();
         if fresh != stepped {
             bad.push(format!(
                 "frame {}: the Step's block differs from a State block",
+                from + i + 1
+            ));
+        }
+        // the facts followed through the deltas equal the facts built whole from the block
+        if sf != fmi_engine::block::Block::parse(&stepped)?.facts() {
+            bad.push(format!(
+                "frame {}: the facts followed through the delta differ",
                 from + i + 1
             ));
         }
@@ -364,7 +371,9 @@ fn walk(o: &Opts) -> Res<()> {
     }
     println!(
         "{{\"frames\": {n}, \"from\": {from}, \"steps_checked\": {deltas}, \"runs\": {runs}, \"explain_entries\": {entries}, \
-         \"differences\": {}}}",
+         \"facts_followed\": {}, \"facts_built\": {}, \"differences\": {}}}",
+        a.facts_counts.0,
+        a.facts_counts.1,
         bad.len()
     );
     for x in bad.iter().take(10) {

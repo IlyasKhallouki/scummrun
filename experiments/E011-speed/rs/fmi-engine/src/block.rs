@@ -170,6 +170,14 @@ impl<'a> Block<'a> {
 
     /// `facts_of` of the dump this block was taken with (the same `Facts`, pair for pair).
     pub fn facts(&self) -> Facts {
+        let mut f = self.prefix();
+        self.push_tail(&mut f);
+        debug_assert!(f.windows(2).all(|w| w[0].0 < w[1].0));
+        Facts(f)
+    }
+
+    /// The facts before the tail: vars, bits, owners, states, classes (`Key` order).
+    fn prefix(&self) -> Vec<(Key, Val)> {
         let n_objs = self.n_objs();
         let set_bits: usize = self.bits.iter().map(|b| b.count_ones() as usize).sum();
         let classes: usize = self
@@ -217,6 +225,11 @@ impl<'a> Block<'a> {
                 c &= c - 1;
             }
         }
+        f
+    }
+
+    /// The tail: room, ego, the slot keys, the cutscene depth, the override, the verbs (`Key` order).
+    fn push_tail(&self, f: &mut Vec<(Key, Val)>) {
         f.push((Key::pack(K_ROOM, 0, 0, 0), self.room as Val));
         f.push((Key::pack(K_EGO, 0, 0, 0), self.ego as Val));
         // the slot keys: kinds 8 to 12 in order, each list sorted and without repeats (value 1)
@@ -255,14 +268,142 @@ impl<'a> Block<'a> {
         verbs.sort_unstable();
         verbs.dedup();
         f.extend(verbs.iter().map(|&k| (k, 1)));
-        debug_assert!(f.windows(2).all(|w| w[0].0 < w[1].0));
-        Facts(f)
     }
 }
 
+/// The byte layout of a block's fixed regions (offsets into it).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Layout {
+    n_vars: usize,
+    n_bits: u32,
+    n_objs: usize,
+    bits: usize,
+    owner: usize,
+    state: usize,
+    class: usize,
+    end: usize,
+}
+
+/// The layout of a block (None if it is not one).
+pub fn layout(b: &[u8]) -> Option<Layout> {
+    if b.len() < 48 || rd32(b, 0) != MAGIC {
+        return None;
+    }
+    let n_vars = rd32(b, 44) as usize;
+    let nb_at = 48 + 4 * n_vars;
+    if b.len() < nb_at + 4 {
+        return None;
+    }
+    let n_bits = rd32(b, nb_at);
+    let bits = nb_at + 4;
+    let no_at = bits + (n_bits as usize).div_ceil(8);
+    if b.len() < no_at + 4 {
+        return None;
+    }
+    let n_objs = rd32(b, no_at) as usize;
+    let owner = no_at + 4;
+    let state = owner + n_objs;
+    let class = state + n_objs;
+    let end = class + 4 * n_objs;
+    if b.len() < end {
+        return None;
+    }
+    Some(Layout {
+        n_vars,
+        n_bits,
+        n_objs,
+        bits,
+        owner,
+        state,
+        class,
+        end,
+    })
+}
+
+/// Brings `facts` (those of a block of layout `old`) to those of `new`, given the byte ranges (offset, length) where
+/// `new` was written over that block (a delta's chunks): var, owner and state values in place, the tail (room, ego,
+/// slots, cutscene, override, verbs) rebuilt. False when it cannot (the layout differs, or a bit, class or count
+/// changed): the caller then builds the facts whole. Equal to `Block::parse(new).facts()` whenever it returns true.
+pub fn update_facts(facts: &mut Facts, old: Option<Layout>, new: &[u8], ranges: &[(usize, usize)]) -> bool {
+    let (Some(lo), Some(ln)) = (old, layout(new)) else {
+        return false;
+    };
+    if lo != ln {
+        return false;
+    }
+    let l = ln;
+    let clocks: u64 = CLOCKS.iter().fold(0, |m, &c| m | (1u64 << c));
+    let skipped_below = |n: usize| (clocks & ((1u64 << n.min(63)) - 1)).count_ones() as usize;
+    let n_var_facts = l.n_vars - CLOCKS.iter().filter(|&&c| c < l.n_vars).count();
+    let set_bits: usize = new[l.bits..l.owner - 4].iter().map(|b| b.count_ones() as usize).sum();
+    let owners_at = n_var_facts + set_bits;
+    let states_at = owners_at + l.n_objs.saturating_sub(1);
+    let classes: usize = new[l.class..l.end]
+        .chunks_exact(4)
+        .skip(1)
+        .map(|c| rd32(c, 0).count_ones() as usize)
+        .sum();
+    let prefix = states_at + l.n_objs.saturating_sub(1) + classes;
+    if facts.0.len() < prefix {
+        return false;
+    }
+    let mut tail = false;
+    for &(off, len) in ranges {
+        let end = off + len;
+        if off < 48 && end > 32 {
+            tail = true; // room, ego, depth (the frame, tick and rng before them are no facts)
+        }
+        if off < 48 + 4 * l.n_vars && end > 44 {
+            // the var count or values
+            if off < 48 {
+                return false;
+            }
+            let first = (off - 48) / 4;
+            let last = ((end - 48).div_ceil(4)).min(l.n_vars);
+            for n in first..last {
+                if n < 64 && clocks & (1u64 << n) != 0 {
+                    continue;
+                }
+                let v = rd32(new, 48 + 4 * n) as i32 as Val;
+                facts.0[n - skipped_below(n)].1 = v;
+            }
+        }
+        if off < l.owner && end > l.bits - 4 {
+            return false; // a bit or the counts
+        }
+        if off < l.class && end > l.owner {
+            let first = off.max(l.owner);
+            for (i, &v) in new[first..end.min(l.class)].iter().enumerate().map(|(k, v)| (first + k, v)) {
+                let (at, o) = if i < l.state {
+                    (owners_at, i - l.owner)
+                } else {
+                    (states_at, i - l.state)
+                };
+                if o >= 1 {
+                    facts.0[at + o - 1].1 = v as Val;
+                }
+            }
+        }
+        if off < l.end && end > l.class {
+            return false; // a class
+        }
+        if end > l.end {
+            tail = true;
+        }
+    }
+    if tail {
+        let Ok(b) = Block::parse(new) else { return false };
+        facts.0.truncate(prefix);
+        b.push_tail(&mut facts.0);
+    }
+    true
+}
+
 /// A StepReply's block field: kind 0 is a whole block (u32 length, bytes); kind 1 a delta from `last` (u32 new length,
-/// u32 chunk count, then u32 offset, u32 length and the bytes per chunk). `last` becomes the new block.
-pub fn apply(last: &mut Vec<u8>, r: &mut crate::wire::R) -> Result<(), String> {
+/// u32 chunk count, then u32 offset, u32 length and the bytes per chunk). `last` becomes the new block; `ranges` gets
+/// the delta's chunks. True for a delta, false for a whole block.
+pub fn apply(last: &mut Vec<u8>, r: &mut crate::wire::R, ranges: &mut Vec<(usize, usize)>) -> Result<bool, String> {
+    ranges.clear();
     match r.u8()? {
         0 => {
             let b = r.bytes()?;
@@ -282,11 +423,13 @@ pub fn apply(last: &mut Vec<u8>, r: &mut crate::wire::R) -> Result<(), String> {
                 let bytes = r.rest().get(..len).ok_or("delta chunk past the payload")?;
                 last[off..off + len].copy_from_slice(bytes);
                 r.pos += len;
+                ranges.push((off, len));
             }
+            return Ok(true);
         }
         v => return Err(format!("block kind {v}")),
     }
-    Ok(())
+    Ok(false)
 }
 
 #[cfg(test)]
@@ -440,6 +583,87 @@ mod tests {
         assert_eq!(b.facts(), facts_of(&obs));
     }
 
+    /// The byte ranges where two blocks differ, as the engine's delta writes them (length changes as one tail chunk).
+    fn ranges_of(old: &[u8], new: &[u8]) -> Vec<(usize, usize)> {
+        let m = old.len().min(new.len());
+        let mut v: Vec<(usize, usize)> = (0..m).filter(|&i| old[i] != new[i]).map(|i| (i, 1)).collect();
+        if new.len() > m {
+            v.push((m, new.len() - m));
+        }
+        v
+    }
+
+    #[test]
+    fn facts_follow_a_delta() {
+        let s0 = [SlotRow {
+            slot: 0,
+            number: 202,
+            where_: WIO_LOCAL,
+            status: 2,
+            code: 21,
+            frozen: 0,
+        }];
+        let s1 = [
+            s0[0],
+            SlotRow {
+                slot: 1,
+                number: 7,
+                where_: WIO_GLOBAL,
+                status: 2,
+                code: 4,
+                frozen: 1,
+            },
+        ];
+        let vars: Vec<i32> = (0..60).collect();
+        let base = block(&vars, &[0b1001_0000, 0, 1], 5, &s0, None, &[9]);
+        let mut v2 = vars.clone();
+        v2[3] = -5;
+        v2[12] = 99; // a clock: no fact
+        v2[59] = 1 << 20;
+        let cases: Vec<(Vec<u8>, bool)> = vec![
+            (block(&v2, &[0b1001_0000, 0, 1], 5, &s0, None, &[9]), true),
+            (block(&vars, &[0b1001_0000, 0, 1], 5, &s1, None, &[9, 3]), true),
+            (
+                block(
+                    &vars,
+                    &[0b1001_0000, 0, 1],
+                    5,
+                    &s0,
+                    Some(Top {
+                        where_: WIO_LOCAL,
+                        number: 202,
+                        code: 3,
+                        stale: false,
+                    }),
+                    &[],
+                ),
+                true,
+            ),
+            (block(&vars, &[0b1001_0001, 0, 1], 5, &s0, None, &[9]), false),
+        ];
+        for (new, ok) in cases {
+            let mut f = Block::parse(&base).unwrap().facts();
+            let r = ranges_of(&base, &new);
+            assert_eq!(update_facts(&mut f, layout(&base), &new, &r), ok);
+            if ok {
+                assert_eq!(f, Block::parse(&new).unwrap().facts());
+            }
+        }
+        // an owner and a state, written into the base block's bytes
+        let l = layout(&base).unwrap();
+        let mut new = base.clone();
+        new[l.owner + 3] = 7;
+        new[l.state + 4] = 9;
+        let mut f = Block::parse(&base).unwrap().facts();
+        assert!(update_facts(&mut f, Some(l), &new, &ranges_of(&base, &new)));
+        assert_eq!(f, Block::parse(&new).unwrap().facts());
+        // a class
+        let mut new = base.clone();
+        new[l.class + 4 * 3] = 1;
+        let mut f = Block::parse(&base).unwrap().facts();
+        assert!(!update_facts(&mut f, Some(l), &new, &ranges_of(&base, &new)));
+    }
+
     #[test]
     fn delta_round_trip() {
         let old = vec![1u8, 2, 3, 4, 5];
@@ -454,7 +678,9 @@ mod tests {
         msg.extend_from_slice(&[6, 7]);
         let mut last = old.clone();
         let mut r = crate::wire::R::new(&msg);
-        apply(&mut last, &mut r).unwrap();
+        let mut ranges = Vec::new();
+        assert!(apply(&mut last, &mut r, &mut ranges).unwrap());
+        assert_eq!(ranges, vec![(1, 1), (5, 2)]);
         assert_eq!(last, vec![1, 9, 3, 4, 5, 6, 7]);
         assert!(r.done().is_ok());
     }

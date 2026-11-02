@@ -413,8 +413,12 @@ pub struct BinEngine {
     last: Vec<u8>,
     /// `last` is the state at the current stop
     last_now: bool,
-    /// the facts at the current stop, once computed
-    facts_now: Option<Facts>,
+    /// the facts of `last`, once computed (kept up to date through Step's deltas)
+    last_facts: Option<Facts>,
+    /// a Step's delta chunks (scratch)
+    ranges: Vec<(usize, usize)>,
+    /// how the facts were had: (followed a delta, built whole)
+    pub facts_counts: (u64, u64),
     proc_: Option<Child>,
     done: bool,
 }
@@ -435,7 +439,9 @@ impl BinEngine {
             status,
             last: Vec::new(),
             last_now: false,
-            facts_now: None,
+            last_facts: None,
+            ranges: Vec::new(),
+            facts_counts: (0, 0),
             proc_: None,
             done: false,
         }
@@ -509,7 +515,6 @@ impl BinEngine {
 
     fn moved(&mut self) {
         self.last_now = false;
-        self.facts_now = None;
     }
 
     /// Runs `frames` frames and replies, in one round trip, with the stop status, the state (kept here: `facts`,
@@ -524,7 +529,20 @@ impl BinEngine {
         let p = self.expect(wire::R_STEP_REPLY)?;
         let mut r = R::new(&p);
         let status = r.status().map_err(bad)?;
-        block::apply(&mut self.last, &mut r).map_err(bad)?;
+        let old = block::layout(&self.last);
+        let mut ranges = std::mem::take(&mut self.ranges);
+        let delta = block::apply(&mut self.last, &mut r, &mut ranges).map_err(bad)?;
+        // the facts follow the delta when they were known; otherwise they are built on the next facts()
+        let kept = match (&mut self.last_facts, delta) {
+            (Some(f), true) => block::update_facts(f, old, &self.last, &ranges),
+            _ => false,
+        };
+        if kept {
+            self.facts_counts.0 += 1;
+        } else {
+            self.last_facts = None;
+        }
+        self.ranges = ranges;
         let runs = if r.tag().map_err(bad)? {
             Some(r.runs_reply().map_err(bad)?)
         } else {
@@ -548,6 +566,7 @@ impl BinEngine {
             let p = self.expect(wire::R_STATE)?;
             Block::parse(&p).map_err(bad)?;
             self.last = p;
+            self.last_facts = None;
             self.last_now = true;
         }
         Ok(&self.last)
@@ -651,12 +670,12 @@ impl Engine for BinEngine {
     }
 
     fn facts(&mut self) -> EResult<Facts> {
-        if self.facts_now.is_none() || !self.last_now {
-            self.block()?;
-            let f = Block::parse(&self.last).map_err(bad)?.facts();
-            self.facts_now = Some(f);
+        self.block()?;
+        if self.last_facts.is_none() {
+            self.last_facts = Some(Block::parse(&self.last).map_err(bad)?.facts());
+            self.facts_counts.1 += 1;
         }
-        Ok(self.facts_now.clone().unwrap())
+        Ok(self.last_facts.clone().unwrap())
     }
 
     fn holds(&mut self, conds: &[Cond]) -> EResult<bool> {
@@ -764,7 +783,11 @@ impl BinEngine {
         r.done().map_err(bad)?;
         let mut c = self.child_of(pid)?;
         if self.last_now {
-            c.facts_now = self.facts_now.clone();
+            // the child stands where this one stands: the same block and facts. Its connection has sent no block,
+            // so its first block comes whole and `last` is only a cache there, never a delta's base.
+            c.last = self.last.clone();
+            c.last_facts = self.last_facts.clone();
+            c.last_now = true;
         }
         Ok(c)
     }
