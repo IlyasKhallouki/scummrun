@@ -9,6 +9,10 @@
 //!       stop or a control stop) against Run then Obs, and one a RunObs with the room's dump (`run_room`) against Run,
 //!       Obs and `room_cut`. Every 10th command AtMany over a grid of screen points must
 //!       equal one At per point. Prints the screen layouts (Status.screen) met on the way.
+//!   play-wire split OUT ARCHIVE IDX FROM N [--lean]
+//!       stops change nothing: at starts every 37 frames from FROM to FROM + N, a run of 1, 2, 7, 40 and 120 frames in
+//!       one command against one-frame commands (each with the room's dump), on two forks; the exact dumps, runs and
+//!       explain entries at the end must be equal.
 //!   play-wire bench OUT ARCHIVE IDX FROM N [--lean]
 //!       the observed frame by StepObs against the four commands (wall per frame, the engine's CPU, this process's
 //!       CPU), and AtMany against At for batches of 5, 20 and 80 points.
@@ -478,12 +482,77 @@ fn frames(a: &Args) -> Res<()> {
     Ok(())
 }
 
+/// Stops are transparent: from forks of one engine, N frames in one command against N one-frame commands (each with
+/// the room's dump, as a stone trial runs), every exact dump at the end equal; at several starts and lengths.
+fn split(a: &Args) -> Res<()> {
+    let h = Host::new(HostCfg::from_env()).map_err(e2s)?;
+    let (mut x, y) = two(a, &h)?;
+    Box::new(y).quit();
+    let exact = ObsReq {
+        objects: None,
+        names: true,
+        exact: true,
+    };
+    let (mut bad, mut cases) = (0, 0);
+    let mut start = a.from;
+    while start < a.from + a.n {
+        for len in [1u64, 2, 7, 40, 120] {
+            let mut p = x.fork_bin().map_err(e2s)?;
+            let mut q = x.fork_bin().map_err(e2s)?;
+            let f0 = p.status().frame;
+            p.run(&RunSpec {
+                frame: Some(f0 + len),
+                ..Default::default()
+            })
+            .map_err(e2s)?;
+            for i in 0..len {
+                q.run_room(&RunSpec {
+                    frame: Some(f0 + i + 1),
+                    ..Default::default()
+                })
+                .map_err(e2s)?;
+            }
+            let (jp, jq) = (p.state_json(&exact).map_err(e2s)?, q.state_json(&exact).map_err(e2s)?);
+            let (rp, rq) = (p.runs().map_err(e2s)?, q.runs().map_err(e2s)?);
+            let (ep, eq) = (p.explain_log().map_err(e2s)?, q.explain_log().map_err(e2s)?);
+            cases += 1;
+            if jp != jq || rp != rq || ep != eq || p.status().frame != q.status().frame {
+                bad += 1;
+                eprintln!(
+                    "split: from {f0}, {len} frames: one command and {len} commands differ (dump {}, runs {}, explain {})",
+                    jp == jq,
+                    rp == rq,
+                    ep == eq
+                );
+            }
+            Box::new(p).quit();
+            Box::new(q).quit();
+        }
+        // on to the next start
+        let f = x.status().frame + 37;
+        x.run(&RunSpec {
+            frame: Some(f),
+            ..Default::default()
+        })
+        .map_err(e2s)?;
+        start = f;
+    }
+    println!("{{\"cases\": {cases}, \"differences\": {bad}}}");
+    Box::new(x).quit();
+    if bad == 0 {
+        Ok(())
+    } else {
+        Err("differences".into())
+    }
+}
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let r = match (a.get(1).map(String::as_str), args(&a[2.min(a.len())..])) {
         (Some("check"), Ok(x)) => check(&x),
         (Some("bench"), Ok(x)) => bench(&x),
         (Some("frames"), Ok(x)) => frames(&x),
+        (Some("split"), Ok(x)) => split(&x),
         (_, Err(e)) => Err(e),
         _ => Err("usage: play-wire check|bench OUT ARCHIVE IDX FROM N [--lean]".into()),
     };
