@@ -48,6 +48,14 @@ of its segment, so a chain's #r needs no entry file.
   that added a pair no earlier entry held, as many committed jobs as there were selectable cells right after it, none
   adding one); the same entry failing twice with the same error; a return that differs (stops at once, the running
   jobs are killed and are run again on a later resume).
+* **E009's switches** (experiments/E009-explore-fixed/plan.md "Method"; ``init`` keeps them in stage.json ``e009``,
+  absent means E008's behaviour): ``idle_frames`` (fix a: each job measures its entry's idle keys; the archive's idle
+  set I, their union less the goal's keys, is left out of the cell key's guide keys and of the held atoms, every row
+  is keyed again from its file when I grows, and a cell offers its least (tick, id) entry that is not exhausted);
+  ``rotate`` (fix b: job.json ``rotation``, the times each target was tried from the entry's cell and in all, from
+  the log's ``job_tried``); ``evict_by_size`` (fix c: the evict level is the floor plus twice the largest reading
+  registered); ``reuse_nonfacts`` (fix c: job.json ``reuse`` "e009"); ``stop_jobs`` N (fix d: no job starts once N
+  have started; the stop "prediction bound"). Stagnation counts only atoms of keys outside I.
 * **Verify** plays the goal entry's movie from boot in a fresh engine (``replay.verify`` with
   ``replay_part1.config(1, ...)``, every checkpoint of the chain), then boots the movie to the goal frame
   (``replay.boot``) to read the run clock: frames, qf and seconds (qf / the release's timer_hz, as cmd_run) from the
@@ -343,22 +351,28 @@ class Archive:
         self.logs: list = []
         self.busy: dict = {}  # job -> (entry id, cell)
         self._chain_r: dict = {}
+        self.e009 = dict(self.stage.get("e009") or {})  # E009's switches (module docstring)
+        self.idle_frames = int(self.e009.get("idle_frames") or 0)
+        self.idle: set = set()  # I: the keys measured idle at some entry, less the goal's (fix a)
+        self.idle_measured: set = set()  # the entries a job measured
 
     # --- making and opening
 
     @classmethod
     def create(cls, root: Path, stage: str, goal: dict, guide: Path, allowed, workers: int = 2,
-               root_info: dict | None = None) -> "Archive":
+               root_info: dict | None = None, e009: dict | None = None) -> "Archive":
         root = Path(root)
         if (root / "stage.json").exists():
             raise SystemExit(f"{root}: an archive is already there")
         load_guide(guide)
         for d in ("entries", "jobs", "readings"):
             (root / d).mkdir(parents=True, exist_ok=True)
-        write_json(root / "stage.json", {
-            "stage": stage, "seed": SEED, "goal": {k: sorted(v) for k, v in goal.items()},
-            "guide": str(Path(guide).resolve()), "allowed_rooms": sorted(int(r) for r in allowed), "workers": workers,
-            "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "root": root_info or {}})
+        doc = {"stage": stage, "seed": SEED, "goal": {k: sorted(v) for k, v in goal.items()},
+               "guide": str(Path(guide).resolve()), "allowed_rooms": sorted(int(r) for r in allowed), "workers": workers,
+               "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "root": root_info or {}}
+        if e009:
+            doc["e009"] = dict(e009)
+        write_json(root / "stage.json", doc)
         for f in ("entries.jsonl", "log.jsonl", "readings.jsonl"):
             (root / f).touch()
         return cls.open(root)
@@ -409,6 +423,12 @@ class Archive:
         self.readings = [x for x in readings if x.get("job") is None or x["job"] in committed]
         if len(self.readings) != len(readings) or not clean:
             rewrite_jsonl(r / "readings.jsonl", self.readings)
+        if self.idle_frames:
+            for x in self.logs:
+                if x.get("outcome") in COMMITTED and x.get("idle"):
+                    self.idle |= set(x["idle"].get("keys") or ()) - set(self.goal)
+                    self.idle_measured.add(x["idle"].get("entry"))
+            self.rekey()
 
     # --- entries
 
@@ -422,7 +442,7 @@ class Archive:
         ego = facts.get("ego")
         owned = sorted(int(k[6:]) for k, v in facts.items()
                        if k.startswith("owner:") and ego is not None and v == ego)
-        return [facts.get("room"), owned, [[k, facts.get(k, 0)] for k in self.cell_keys]]
+        return [facts.get("room"), owned, [[k, facts.get(k, 0)] for k in self.cell_keys if k not in self.idle]]
 
     @staticmethod
     def cell_id(key: list) -> str:
@@ -433,6 +453,8 @@ class Archive:
         root = self.root_facts if self.root_facts is not None else facts
         out = []
         for k, vals in self.atoms.items():
+            if k in self.idle:
+                continue
             v = facts.get(k, 0)
             if v in vals or (None in vals and v != root.get(k, 0)):
                 out.append([k, v])
@@ -531,6 +553,83 @@ class Archive:
         t = self.rows[i]["tick"]
         return (t if t is not None else float("inf"), i)
 
+    # --- E009 fix a: the idle set, and the rows keyed again when it grows
+
+    def merge_idle(self, entry: int, keys) -> list:
+        """A job's measurement at ``entry``: its idle keys join I (less the goal's keys); when I grows every row is
+        keyed again (``rekey``). Returns the keys new to I."""
+        self.idle_measured.add(entry)
+        new = sorted(set(keys) - set(self.goal) - self.idle)
+        if new:
+            self.idle |= set(new)
+            self.rekey()
+        return new
+
+    def rekey(self) -> None:
+        """Every row's cell, held atoms, segment atoms and #r computed again from its entry file under the current I
+        (entries.jsonl keeps the values of the time the row was added); the cells, least holders and n rebuilt
+        (``_recount``)."""
+        rows, self.rows, self.cellmap, self.held_by, self._chain_r = self.rows, [], {}, {}, {}
+        for row in rows:
+            e = self.entry(row["id"])
+            facts = e["checkpoints"][-1][1]
+            if row["parent"] is None:
+                self.root_facts = facts
+            key = self.cell_key(facts)
+            seg = sorted({tuple(p) for c in e["checkpoints"] for p in self.held(c[1])})
+            new = dict(row, cell=self.cell_id(key), held=self.held(facts), seg_held=[list(p) for p in seg])
+            new["r_path"] = len(self.chain_r(row["parent"]) | set(seg))
+            self._place(new, key)
+        self._recount()
+
+    def _recount(self) -> None:
+        """n, tried and exhausted of the current cells from the committed log lines, in order: a job on an entry of
+        a cell sets its n to 0 when it added a new cell or representative, else adds 1."""
+        for x in self.logs:
+            if x.get("outcome") not in COMMITTED or x.get("entry") is None or x["entry"] >= len(self.rows):
+                continue
+            c = self.cellmap[self.rows[x["entry"]]["cell"]]
+            if x["outcome"] != "return differs":
+                c["n"] = 0 if (x.get("new_cells") or x.get("new_reps")) else c["n"] + 1
+            if x.get("tried") is not None:
+                c["tried"][str(x["entry"])] = x["tried"]
+            if x.get("exhausted") and x["entry"] not in c["exhausted"]:
+                c["exhausted"].append(x["entry"])
+
+    def candidate(self, cell: str) -> int | None:
+        """The entry a cell offers for selection: its representative unless exhausted (E008); with fix a its least
+        (tick, id) entry that is not exhausted, so no entry is left out (plan.md (a))."""
+        c = self.cellmap[cell]
+        if not self.idle_frames:
+            return None if c["rep"] in c["exhausted"] else c["rep"]
+        return next((i for i in sorted(c["entries"], key=self._order) if i not in c["exhausted"]), None)
+
+    def rotation(self, i: int) -> dict:
+        """Fix b: {"cell": [[k, v, n], ...], "all": [...]}, the times each target was tried by a committed job (the
+        log's ``job_tried``) from an entry of ``i``'s cell, and in all."""
+        cell = self.rows[i]["cell"]
+        cc: dict = {}
+        aa: dict = {}
+        for x in self.logs:
+            if x.get("outcome") not in COMMITTED or x.get("entry") is None or x["entry"] >= len(self.rows):
+                continue
+            here = self.rows[x["entry"]]["cell"] == cell
+            for t in x.get("job_tried") or ():
+                k = (t[0], t[1])
+                aa[k] = aa.get(k, 0) + 1
+                if here:
+                    cc[k] = cc.get(k, 0) + 1
+
+        def rows(d):
+            return [[k, v, n] for (k, v), n in sorted(d.items(), key=lambda kv: canonical(list(kv[0])))]
+        return {"cell": rows(cc), "all": rows(aa)}
+
+    def evict_level_gb(self, floor_gb: float) -> float:
+        """Fix c: the floor plus twice the largest reading registered (a job can register a fresh reading and a
+        refinement); the floor before any reading."""
+        big = max((x.get("bytes") or 0 for x in self.readings), default=0)
+        return floor_gb + 2 * big / GIB
+
     # --- cells and the order
 
     def cells(self) -> dict:
@@ -550,8 +649,8 @@ class Archive:
         return (row["g"], 0 if i in fav else 1, self.cellmap[row["cell"]]["n"], -row["r_path"], t, i)
 
     def selectable(self, cell: str) -> bool:
-        c = self.cellmap[cell]
-        return c["rep"] not in c["exhausted"] and self.rows[c["rep"]]["room"] in self.allowed
+        i = self.candidate(cell)
+        return i is not None and self.rows[i]["room"] in self.allowed
 
     def n_selectable(self) -> int:
         return sum(1 for c in self.cellmap if self.selectable(c))
@@ -561,8 +660,9 @@ class Archive:
         busy_ids = {e for e, _ in self.busy.values()}
         busy_cells = {c for _, c in self.busy.values()} | {self.rows[e]["cell"] for e in busy_ids}
         fav = self.favoured()
-        cands = [c["rep"] for cid, c in self.cellmap.items()
+        cands = [self.candidate(cid) for cid, c in self.cellmap.items()
                  if cid not in busy_cells and c["rep"] not in busy_ids and self.selectable(cid)]
+        cands = [i for i in cands if i not in busy_ids]
         return sorted(cands, key=lambda i: self.sel_key(i, fav))[:b]
 
     def goal_entries(self) -> list:
@@ -572,7 +672,8 @@ class Archive:
         """After the last committed job that added a pair no earlier entry held, as many committed jobs as there were
         selectable cells right after it (1 at the start, the root's cell), none adding one."""
         done = [x for x in self.logs if x.get("outcome") in COMMITTED]
-        last = max((k for k, x in enumerate(done) if x.get("new_r")), default=None)
+        last = max((k for k, x in enumerate(done) if [p for p in x.get("new_r") or () if p[0] not in self.idle]),
+                   default=None)
         frontier = 1 if last is None else max(1, done[last].get("selectable", 1))
         since = len(done) - (0 if last is None else last + 1)
         return since >= frontier
@@ -667,7 +768,19 @@ class Archive:
                 "readings": [{"path": x["path"], "start_entry": x["start_entry"]} for x in self.readings_for(scope)],
                 "reading_dir": str(self.root / "readings" / f"{rooms}-{job}"),
                 "threads": int(os.environ.get("E008_THREADS") or THREADS),
-                "workers": int(os.environ.get("E008_WINDOW_WORKERS") or WINDOW_WORKERS)}
+                "workers": int(os.environ.get("E008_WINDOW_WORKERS") or WINDOW_WORKERS),
+                **self.job_e009(i)}
+
+    def job_e009(self, i: int) -> dict:
+        """job.json's E009 switches for entry ``i`` (module docstring); {} with every switch off."""
+        out: dict = {}
+        if self.idle_frames:
+            out.update(idle_frames=self.idle_frames, idle_measured=i in self.idle_measured)
+        if self.e009.get("rotate"):
+            out["rotation"] = self.rotation(i)
+        if self.e009.get("reuse_nonfacts"):
+            out["reuse"] = "e009"
+        return out
 
     def prepare_job(self, i: int) -> Path:
         """jobs/JOB/job.json for representative ``i``, and select.json (its selection key, for log.jsonl)."""
@@ -689,6 +802,12 @@ class Archive:
         name, e = job["job"], job["entry"]["id"]
         if name in self.committed_jobs():
             raise ValueError(f"{name} is committed already")
+        idle_line = None
+        if self.idle_frames and res.get("idle") and (res.get("return") or {}).get("same"):
+            new_idle = self.merge_idle(e, res["idle"].get("returns") or ())
+            idle_line = {"entry": e, "keys": [k for k in res["idle"].get("returns") or () if k not in self.goal],
+                         "new": new_idle, "size": len(self.idle), "frames": res["idle"].get("frames"),
+                         "seconds": res["idle"].get("seconds")}
         cell = self.rows[e]["cell"]
         sel = read_json(job_dir / "select.json") if (job_dir / "select.json").exists() else {}
         line = {"job": name, "entry": e, "cell": cell, "key": sel.get("key"), "scope": job["scope"]}
@@ -751,6 +870,8 @@ class Archive:
                                                 "qf_end", "replans", "refinements", "extensions", "seconds")}
             if att else None,
             "cpu_s": res.get("cpu_s"), "peak_rss_mb": res.get("peak_rss_mb"), "wall_s": res.get("wall_s")})
+        if self.e009:
+            line.update(job_tried=res.get("tried") or [], idle=idle_line)
         line.update(extra or {})
         self.logs.append(line)
         append_jsonl(self.root / "log.jsonl", [line])
@@ -851,6 +972,7 @@ class Archive:
             "cpu_s": cpu, "peak_rss_mb": peak,
             "driver_peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
             "disk_bytes": dir_bytes(self.root), "goal_entries": self.goal_entries(),
+            "e009": self.e009 or None, "idle": sorted(self.idle) if self.idle_frames else None,
             "summary": read_json(self.root / "summary.json") if (self.root / "summary.json").exists() else None}
         vs = sorted(self.root.glob("verify-*.json"), key=lambda p: int(p.stem.split("-")[1]))
         target = self.goal_entries()[0] if self.goal_entries() else None
@@ -1065,6 +1187,8 @@ def run(root: Path, workers: int, step_cmd: list | None = None, do_verify: bool 
         else:
             restart.append(j)
     stop, detail, stopping = None, None, False
+    stop_jobs = int(a.e009.get("stop_jobs") or 0)  # fix d: the prediction's falsifier
+    bound = False
 
     def can_start() -> bool:
         if free() < m["floor_gb"] * GIB:
@@ -1120,11 +1244,15 @@ def run(root: Path, workers: int, step_cmd: list | None = None, do_verify: bool 
             restart = []
         floor = False
         if not stopping and not a.stagnant():
-            if free() < m["evict_gb"] * GIB:
-                gone = a.evict(free, set().union(*(j.in_use() for j in running)))
+            level = a.evict_level_gb(m["floor_gb"]) if a.e009.get("evict_by_size") else m["evict_gb"]
+            if free() < level * GIB:
+                gone = a.evict(free, set().union(*(j.in_use() for j in running)), level_gb=level)
                 if gone:
-                    say(f"evicted {len(gone)} readings")
+                    say(f"evicted {len(gone)} readings (level {level:.2f} GB)")
             while len(running) < workers:
+                if stop_jobs and len(a.job_names()) >= stop_jobs:
+                    bound = True
+                    break
                 if free() < m["floor_gb"] * GIB:
                     floor = True
                     break
@@ -1141,6 +1269,8 @@ def run(root: Path, workers: int, step_cmd: list | None = None, do_verify: bool 
                 say(f"{j.name}: entry {j.entry} (room {a.rows[j.entry]['room']}), scope {j.scope}, key "
                     f"{read_json(d / 'select.json')['key']}")
         if not running:
+            if stop is None and bound and not a.goal_entries():
+                stop, detail = "prediction bound", {"jobs": len(a.job_names()), "stop_jobs": stop_jobs}
             if stop is None:
                 if not a.select(1):
                     stop = "exhausted"
@@ -1197,10 +1327,14 @@ def cmd_init(args) -> None:
     say(f"{root}: booting the root")
     cp, info = boot_root(root / "root")
     allowed = parse_allowed(args.allowed, guide, info["room"])
-    a = Archive.create(root, args.stage, goal, Path(args.guide), allowed, args.workers, info)
+    e009 = {k: v for k, v in (("idle_frames", args.idle_frames), ("rotate", args.rotate),
+                              ("evict_by_size", args.evict_by_size), ("reuse_nonfacts", args.reuse_nonfacts),
+                              ("stop_jobs", args.stop_jobs)) if v}
+    a = Archive.create(root, args.stage, goal, Path(args.guide), allowed, args.workers, info, e009 or None)
     a.add(None, cp[0], info["tick"], [], [cp], None, "boot")
     a.write_cells()
-    say(f"{root}: root at frame {cp[0]} (room {info['room']}, qf {info['qf']}); allowed rooms {allowed}")
+    say(f"{root}: root at frame {cp[0]} (room {info['room']}, qf {info['qf']}); allowed rooms {allowed}"
+        + (f"; E009 {e009}" if e009 else ""))
 
 
 def report_lines(rep: dict) -> list:
@@ -1232,6 +1366,11 @@ def main(argv=None) -> None:
     p.add_argument("--guide", required=True)
     p.add_argument("--allowed", required=True)
     p.add_argument("--workers", type=int, default=2)
+    p.add_argument("--idle-frames", type=int, default=0, help="E009 fix a: measure idle keys over L frames")
+    p.add_argument("--rotate", action="store_true", help="E009 fix b: target rotation")
+    p.add_argument("--evict-by-size", action="store_true", help="E009 fix c: evict level from the reading sizes")
+    p.add_argument("--reuse-nonfacts", action="store_true", help="E009 fix c: reuse on the keys K")
+    p.add_argument("--stop-jobs", type=int, default=0, help="E009 fix d: the prediction's falsifier, in jobs")
     p = sub.add_parser("run")
     p.add_argument("archive")
     p.add_argument("--workers", type=int, default=2)
