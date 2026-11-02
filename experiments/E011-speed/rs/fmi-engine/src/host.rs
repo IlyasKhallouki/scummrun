@@ -807,18 +807,12 @@ impl Engine for BinEngine {
 
     /// One RunObs message (patch 0004): the run and the dump at its stop.
     fn run_obs(&mut self, spec: &RunSpec, req: &ObsReq) -> EResult<(Status, Obs)> {
-        let mut w = W::msg(wire::C_RUN_OBS);
-        w.run_spec(spec);
-        w.obs_req(req);
-        self.send(w.finish())?;
-        self.moved();
-        let p = self.expect(wire::R_RUN_OBS_REPLY)?;
-        let mut r = R::new(&p);
-        let st = r.status().map_err(bad)?;
-        let o = r.obs().map_err(bad)?;
-        r.done().map_err(bad)?;
-        self.status = st.clone();
-        Ok((st, o))
+        self.run_obs_msg(spec, req, false)
+    }
+
+    /// One RunObs message asking the room's dump (patch 0004).
+    fn run_room(&mut self, spec: &RunSpec) -> EResult<(Status, Obs)> {
+        self.run_obs_msg(spec, &ObsReq::default(), true)
     }
 
     /// One AtMany message (patch 0004).
@@ -849,6 +843,23 @@ impl Engine for BinEngine {
 }
 
 impl BinEngine {
+    /// RunObs: the run, then the dump at its stop (`room`: the room's dump, fmi_core::room_cut's).
+    fn run_obs_msg(&mut self, spec: &RunSpec, req: &ObsReq, room: bool) -> EResult<(Status, Obs)> {
+        let mut w = W::msg(wire::C_RUN_OBS);
+        w.run_spec(spec);
+        w.obs_req(req);
+        w.b(room);
+        self.send(w.finish())?;
+        self.moved();
+        let p = self.expect(wire::R_RUN_OBS_REPLY)?;
+        let mut r = R::new(&p);
+        let st = r.status().map_err(bad)?;
+        let o = r.obs().map_err(bad)?;
+        r.done().map_err(bad)?;
+        self.status = st.clone();
+        Ok((st, o))
+    }
+
     /// `fork` as a `BinEngine`: the child stops where this one is, with this stop's facts already known.
     pub fn fork_bin(&mut self) -> EResult<BinEngine> {
         self.send(W::msg(wire::C_FORK).finish())?;

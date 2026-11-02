@@ -873,11 +873,37 @@ pub trait Engine: Send {
         let o = self.obs(req)?;
         Ok((st, o))
     }
+    /// A run and the room's dump at its stop in one command: the full dump cut by `room_cut` (what the input code
+    /// reads). The default makes the two calls and cuts.
+    fn run_room(&mut self, spec: &RunSpec) -> EResult<(Status, Obs)> {
+        let (st, mut o) = self.run_obs(spec, &ObsReq::default())?;
+        room_cut(&mut o);
+        Ok((st, o))
+    }
     /// `at` at each point, in order, at the current stop (the hit tests read and change nothing). The default makes
     /// one call per point.
     fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
         pts.iter().map(|&(x, y)| self.at(x, y)).collect()
     }
+}
+
+/// The room's dump made from a full dump: the owners, states and classes of the objects the room's object list
+/// names only (in the full dump's object order), and no exact object; every other field as it is.
+pub fn room_cut(o: &mut Obs) {
+    let mut ids: Vec<u32> = o
+        .room_objects
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .map(|r| r.id as u32)
+        .collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let keep = |x: &u32| ids.binary_search(x).is_ok();
+    o.owners.retain(|p| keep(&p.0));
+    o.states.retain(|p| keep(&p.0));
+    o.classes.retain(|p| keep(&p.0));
+    o.exact = None;
 }
 
 /// How an engine starts (replay_part1.config): seed 1, the input movie from boot, the bridge's settings.
