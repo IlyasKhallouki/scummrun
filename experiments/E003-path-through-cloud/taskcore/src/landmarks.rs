@@ -1,0 +1,1122 @@
+//! Fast Downward's landmark graph for lama-first (E011 route): `lm_reasonable_orders_hps(lm_rhw())` on the SAS task
+//! held in memory (search.rs `SasTask`), rule for rule as release 26.6.0 makes it
+//! (third_party/downward/src/search/landmarks/), so that lama.rs's landmark count is Fast Downward's.
+//!
+//! What is Fast Downward's here, and must stay so:
+//!
+//! * **The order of discovery** (landmark_factory_rpg_sasp.cc). The goal atoms first, in the goal's order; then a
+//!   FIFO of open landmarks: each one not true at the start gets the relaxed reachability without its atoms, then (1)
+//!   its shared preconditions (in the iteration order of their `utils::HashSet<FactPair>`, stdhash.rs) as atomic
+//!   landmarks ordered greedy-necessary before it, (2) the critical predecessor values of its variable in the domain
+//!   transition graph (atomic landmarks only) ordered naturally before it, (3) its disjunctive preconditions (per
+//!   disjunction class, the map's order; at most 4 atoms, none true at the start) unless they overlap a landmark. A new
+//!   atomic landmark replaces a disjunctive one holding its atom (the disjunctive one's parents become natural
+//!   parents). The order matters: whether an atom is already an atomic landmark decides what is skipped, so every
+//!   set and map whose iteration order reaches the graph is libstdc++'s (stdhash.rs).
+//! * **The forward orderings**: an atom unreachable without a landmark, and not achievable together with it, is ordered
+//!   naturally after it when it is an atomic landmark at the end.
+//! * **The ids**: the surviving landmarks in the order they were made.
+//! * **The achievers** (landmark_factory_relaxation.cc): possible achievers are the operators with an effect on one of
+//!   the atoms, first achievers those that can reach it in the relaxed task without its atoms; only their least
+//!   cost under the adapted costs is kept (all landmark_sum reads).
+//! * **The reasonable orderings** (landmark_factory_reasonable_orders_hps.cc): a goal landmark gets every other
+//!   non-disjunctive landmark that interferes with it; another landmark the interfering ancestors of the other
+//!   parents of its greedy-necessary children. With no mutex groups (taskcore writes none) two atoms are mutex when
+//!   they are values of one variable.
+//!
+//! Where the order does not reach the graph (the parents and children maps keyed by node pointers, the forward
+//! orderings, the domain transition graphs, the reachability fixpoints) plain Rust containers are used. The relaxed
+//! reachability is the same fixpoint as Fast Downward's (exploration.cc) computed per operator rather than per
+//! effect; achievable-together and the forward orderings are tested only against the atoms that end up atomic
+//! landmarks. `dump` prints the graph as Fast Downward's debug dump does (the differential test).
+
+use crate::search::SasTask;
+use crate::stdhash::{Fact, StdMap, StdSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::time::Instant;
+
+/// landmark_graph.h `OrderingType` (larger is stronger)
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+pub enum OrderingType {
+    Reasonable = 0,
+    Natural = 1,
+    GreedyNecessary = 2,
+    Necessary = 3,
+}
+
+/// landmark.h `LandmarkType` (lm_rhw makes no conjunctive landmarks)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LmType {
+    Disjunctive,
+    Atomic,
+}
+
+/// A landmark node; parents and children by node index (the arena's, not the id).
+#[derive(Clone, Debug)]
+pub struct Node {
+    pub atoms: Vec<Fact>,
+    pub kind: LmType,
+    pub goal: bool,
+    pub alive: bool,
+    pub parents: BTreeMap<u32, OrderingType>,
+    pub children: BTreeMap<u32, OrderingType>,
+}
+
+/// The finished graph: landmarks by id, each with its orderings by id and its achievers' least costs.
+#[derive(Clone, Debug, Default)]
+pub struct Graph {
+    pub atoms: Vec<Vec<Fact>>,
+    pub disjunctive: Vec<bool>,
+    pub goal: Vec<bool>,
+    /// per id: (child id, type), by child id
+    pub children: Vec<Vec<(u32, OrderingType)>>,
+    /// per id: (parent id, type), by parent id
+    pub parents: Vec<Vec<(u32, OrderingType)>>,
+    /// least adapted cost of a first achiever (i64::MAX: none)
+    pub min_first: Vec<i64>,
+    /// least adapted cost of a possible achiever (i64::MAX: none)
+    pub min_possible: Vec<i64>,
+    pub n_disjunctive: usize,
+    pub n_orderings: usize,
+    pub stats: Stats,
+}
+
+/// Counts and seconds of the graph's making.
+#[derive(Clone, Debug, Default)]
+pub struct Stats {
+    pub explorations: u64,
+    pub rhw_s: f64,
+    pub achievers_s: f64,
+    pub hps_s: f64,
+    pub setup_s: f64,
+}
+
+// --- the task as the landmark code reads it ---------------------------------------------------------------------
+
+/// The task's operators as Fast Downward's root task gives them, with flat proposition numbers.
+struct Tv<'a> {
+    t: &'a SasTask,
+    prop_off: Vec<u32>,
+    n_props: usize,
+    /// operators_providing_effect[var][value], flat by proposition: operator per effect, in operator then effect order
+    prov_off: Vec<u32>,
+    prov: Vec<u32>,
+}
+
+impl<'a> Tv<'a> {
+    fn new(t: &'a SasTask) -> Tv<'a> {
+        let mut prop_off = Vec::with_capacity(t.sizes.len() + 1);
+        let mut n = 0u32;
+        for &s in &t.sizes {
+            prop_off.push(n);
+            n += s;
+        }
+        prop_off.push(n);
+        let n_props = n as usize;
+        let mut cnt = vec![0u32; n_props + 1];
+        for o in 0..t.n_ops() {
+            for e in t.effs(o) {
+                cnt[(prop_off[e.var as usize] + e.post) as usize + 1] += 1;
+            }
+        }
+        for i in 0..n_props {
+            cnt[i + 1] += cnt[i];
+        }
+        let mut fill = cnt.clone();
+        let mut prov = vec![0u32; cnt[n_props] as usize];
+        for o in 0..t.n_ops() {
+            for e in t.effs(o) {
+                let p = (prop_off[e.var as usize] + e.post) as usize;
+                prov[fill[p] as usize] = o as u32;
+                fill[p] += 1;
+            }
+        }
+        Tv { t, prop_off, n_props, prov_off: cnt, prov }
+    }
+    #[inline]
+    fn prop(&self, f: Fact) -> usize {
+        (self.prop_off[f.0 as usize] + f.1) as usize
+    }
+    /// get_operators_including_effect
+    #[inline]
+    fn providing(&self, f: Fact) -> &[u32] {
+        let p = self.prop(f);
+        &self.prov[self.prov_off[p] as usize..self.prov_off[p + 1] as usize]
+    }
+    #[inline]
+    fn init(&self, var: u32) -> u32 {
+        self.t.init[var as usize]
+    }
+    #[inline]
+    fn size(&self, var: u32) -> u32 {
+        self.t.sizes[var as usize]
+    }
+}
+
+// --- the relaxed reachability (exploration.cc) -------------------------------------------------------------------
+
+/// Relaxed reachability from the start with some atoms excluded: per operator, its distinct precondition atoms and its
+/// effects (each with its distinct condition atoms). The same fixpoint as Fast Downward's unary operators: a unary
+/// operator (operator, effect) fires when the operator's preconditions and the effect's conditions are reached, unless
+/// its effect atom is excluded or the operator has an unconditional effect on an excluded atom.
+struct Reach {
+    op_pre_n: Vec<u32>,
+    /// per proposition: operators with it among their (distinct) preconditions
+    pre_of_off: Vec<u32>,
+    pre_of: Vec<u32>,
+    /// per effect (global, operator by operator): its distinct condition count, its atom, its operator
+    eff_cond_n: Vec<u32>,
+    eff_prop: Vec<u32>,
+    eff_op: Vec<u32>,
+    eff_uncond: Vec<bool>,
+    op_eff_off: Vec<u32>,
+    cond_of_off: Vec<u32>,
+    cond_of: Vec<u32>,
+    // working state
+    reached: Vec<bool>,
+    excluded: Vec<bool>,
+    op_excluded: Vec<bool>,
+    op_unsat: Vec<u32>,
+    op_fired: Vec<bool>,
+    eff_unsat: Vec<u32>,
+    queue: Vec<u32>,
+    pub runs: u64,
+}
+
+fn csr(n: usize, pairs: &[(u32, u32)]) -> (Vec<u32>, Vec<u32>) {
+    let mut off = vec![0u32; n + 1];
+    for &(k, _) in pairs {
+        off[k as usize + 1] += 1;
+    }
+    for i in 0..n {
+        off[i + 1] += off[i];
+    }
+    let mut fill = off.clone();
+    let mut out = vec![0u32; pairs.len()];
+    for &(k, v) in pairs {
+        out[fill[k as usize] as usize] = v;
+        fill[k as usize] += 1;
+    }
+    (off, out)
+}
+
+impl Reach {
+    fn new(tv: &Tv) -> Reach {
+        let t = tv.t;
+        let n_ops = t.n_ops();
+        let mut op_pre_n = vec![0u32; n_ops];
+        let mut pre_pairs: Vec<(u32, u32)> = Vec::new();
+        let mut eff_cond_n = Vec::with_capacity(t.effs.len());
+        let mut eff_prop = Vec::with_capacity(t.effs.len());
+        let mut eff_op = Vec::with_capacity(t.effs.len());
+        let mut eff_uncond = Vec::with_capacity(t.effs.len());
+        let mut op_eff_off = Vec::with_capacity(n_ops + 1);
+        op_eff_off.push(0u32);
+        let mut cond_pairs: Vec<(u32, u32)> = Vec::new();
+        let mut buf: Vec<u32> = Vec::new();
+        for (o, npre) in op_pre_n.iter_mut().enumerate() {
+            buf.clear();
+            buf.extend(t.pre(o).iter().map(|&f| tv.prop(f) as u32));
+            buf.sort_unstable();
+            buf.dedup();
+            *npre = buf.len() as u32;
+            for &p in &buf {
+                pre_pairs.push((p, o as u32));
+            }
+            for e in t.effs(o) {
+                let ei = eff_prop.len() as u32;
+                buf.clear();
+                buf.extend(t.conds(e).iter().map(|&f| tv.prop(f) as u32));
+                buf.sort_unstable();
+                buf.dedup();
+                eff_cond_n.push(buf.len() as u32);
+                for &p in &buf {
+                    cond_pairs.push((p, ei));
+                }
+                eff_prop.push(tv.prop((e.var, e.post)) as u32);
+                eff_op.push(o as u32);
+                eff_uncond.push(e.c0 == e.c1);
+            }
+            op_eff_off.push(eff_prop.len() as u32);
+        }
+        let (pre_of_off, pre_of) = csr(tv.n_props, &pre_pairs);
+        let (cond_of_off, cond_of) = csr(tv.n_props, &cond_pairs);
+        let ne = eff_prop.len();
+        Reach {
+            op_pre_n,
+            pre_of_off,
+            pre_of,
+            eff_cond_n,
+            eff_prop,
+            eff_op,
+            eff_uncond,
+            op_eff_off,
+            cond_of_off,
+            cond_of,
+            reached: vec![false; tv.n_props],
+            excluded: vec![false; tv.n_props],
+            op_excluded: vec![false; n_ops],
+            op_unsat: vec![0; n_ops],
+            op_fired: vec![false; n_ops],
+            eff_unsat: vec![0; ne],
+            queue: Vec::new(),
+            runs: 0,
+        }
+    }
+
+    #[inline]
+    fn reach(&mut self, p: u32) {
+        if !self.reached[p as usize] {
+            self.reached[p as usize] = true;
+            self.queue.push(p);
+        }
+    }
+
+    #[inline]
+    fn fire(&mut self, o: usize) {
+        self.op_fired[o] = true;
+        for e in self.op_eff_off[o] as usize..self.op_eff_off[o + 1] as usize {
+            if self.eff_unsat[e] == 0 && !self.excluded[self.eff_prop[e] as usize] {
+                self.reach(self.eff_prop[e]);
+            }
+        }
+    }
+
+    /// compute_relaxed_reachability(excluded, false): reached per flat proposition (in `self.reached`).
+    fn compute(&mut self, tv: &Tv, excluded: &[Fact]) -> &[bool] {
+        self.runs += 1;
+        let t = tv.t;
+        self.reached.iter_mut().for_each(|r| *r = false);
+        for &f in excluded {
+            self.excluded[tv.prop(f)] = true;
+        }
+        // get_excluded_operators: an unconditional effect on an excluded atom
+        self.op_excluded.iter_mut().for_each(|x| *x = false);
+        for &f in excluded {
+            let p = tv.prop(f) as u32;
+            for &o in tv.providing(f) {
+                let o = o as usize;
+                if self.op_excluded[o] {
+                    continue;
+                }
+                for e in self.op_eff_off[o] as usize..self.op_eff_off[o + 1] as usize {
+                    if self.eff_uncond[e] && self.eff_prop[e] == p {
+                        self.op_excluded[o] = true;
+                        break;
+                    }
+                }
+            }
+        }
+        self.op_unsat.copy_from_slice(&self.op_pre_n);
+        self.eff_unsat.copy_from_slice(&self.eff_cond_n);
+        self.op_fired.iter_mut().for_each(|x| *x = false);
+        self.queue.clear();
+        for v in 0..t.sizes.len() {
+            let p = (tv.prop_off[v] + t.init[v]) as usize;
+            if !self.excluded[p] {
+                self.reach(p as u32);
+            }
+        }
+        for o in 0..t.n_ops() {
+            if self.op_pre_n[o] == 0 && !self.op_excluded[o] {
+                self.fire(o);
+            }
+        }
+        let mut qi = 0;
+        while qi < self.queue.len() {
+            let p = self.queue[qi] as usize;
+            qi += 1;
+            for i in self.pre_of_off[p] as usize..self.pre_of_off[p + 1] as usize {
+                let o = self.pre_of[i] as usize;
+                if self.op_excluded[o] {
+                    continue;
+                }
+                self.op_unsat[o] -= 1;
+                if self.op_unsat[o] == 0 {
+                    self.fire(o);
+                }
+            }
+            for i in self.cond_of_off[p] as usize..self.cond_of_off[p + 1] as usize {
+                let e = self.cond_of[i] as usize;
+                self.eff_unsat[e] -= 1;
+                if self.eff_unsat[e] == 0 {
+                    let o = self.eff_op[e] as usize;
+                    if self.op_fired[o] && !self.op_excluded[o] && !self.excluded[self.eff_prop[e] as usize] {
+                        self.reach(self.eff_prop[e]);
+                    }
+                }
+            }
+        }
+        for &f in excluded {
+            self.excluded[tv.prop(f)] = false;
+        }
+        &self.reached
+    }
+}
+
+/// util.cc `possibly_reaches_landmark`: the operator's preconditions reached, and an effect on one of the atoms with
+/// its conditions reached.
+fn possibly_reaches(tv: &Tv, reached: &[bool], o: usize, atoms: &[Fact]) -> bool {
+    let t = tv.t;
+    if !t.pre(o).iter().all(|&f| reached[tv.prop(f)]) {
+        return false;
+    }
+    t.effs(o).iter().any(|e| atoms.contains(&(e.var, e.post)) && t.conds(e).iter().all(|&f| reached[tv.prop(f)]))
+}
+
+// --- lm_rhw (landmark_factory_rpg_sasp.cc) ------------------------------------------------------------------------
+
+/// The graph while it is made: nodes in an arena (creation order), the atom maps of landmark_graph.cc.
+struct Builder<'a> {
+    tv: &'a Tv<'a>,
+    nodes: Vec<Node>,
+    atomic: HashMap<Fact, u32>,
+    disj: HashMap<Fact, u32>,
+    open: VecDeque<u32>,
+    /// per processed node: the propositions reached without it (the forward orderings, tested at the end)
+    forward: HashMap<u32, Vec<u64>>,
+    classes: Vec<i32>,
+    /// domain transition graphs, made on first use: per variable, per value its successors, and the values every value
+    /// reaches (effects with no condition on the variable)
+    dtg: HashMap<u32, (Vec<Vec<u32>>, Vec<u32>)>,
+}
+
+impl<'a> Builder<'a> {
+    fn add_node(&mut self, atoms: Vec<Fact>, kind: LmType, goal: bool) -> u32 {
+        let id = self.nodes.len() as u32;
+        match kind {
+            LmType::Disjunctive => {
+                for &a in &atoms {
+                    self.disj.insert(a, id);
+                }
+            }
+            LmType::Atomic => {
+                self.atomic.insert(atoms[0], id);
+            }
+        }
+        self.nodes.push(Node { atoms, kind, goal, alive: true, parents: BTreeMap::new(), children: BTreeMap::new() });
+        id
+    }
+
+    /// landmark_factory.cc `add_or_replace_ordering_if_stronger`
+    fn add_or_replace(&mut self, from: u32, to: u32, ty: OrderingType) {
+        let old = self.nodes[from as usize].children.get(&to).copied();
+        match old {
+            Some(o) if o >= ty => {}
+            _ => {
+                self.nodes[from as usize].children.insert(to, ty);
+                self.nodes[to as usize].parents.insert(from, ty);
+            }
+        }
+    }
+
+    /// landmark_graph.cc `remove_node` (with `remove_node_occurrences`)
+    fn remove_node(&mut self, n: u32) {
+        let parents: Vec<u32> = self.nodes[n as usize].parents.keys().copied().collect();
+        for p in parents {
+            self.nodes[p as usize].children.remove(&n);
+        }
+        let children: Vec<u32> = self.nodes[n as usize].children.keys().copied().collect();
+        for c in children {
+            self.nodes[c as usize].parents.remove(&n);
+        }
+        match self.nodes[n as usize].kind {
+            LmType::Disjunctive => {
+                for a in self.nodes[n as usize].atoms.clone() {
+                    self.disj.remove(&a);
+                }
+            }
+            LmType::Atomic => {
+                let a = self.nodes[n as usize].atoms[0];
+                self.atomic.remove(&a);
+            }
+        }
+        let node = &mut self.nodes[n as usize];
+        node.alive = false;
+        node.parents.clear();
+        node.children.clear();
+    }
+
+    fn is_true_in_init(&self, n: u32) -> bool {
+        let node = &self.nodes[n as usize];
+        let tr = |f: &Fact| self.tv.init(f.0) == f.1;
+        match node.kind {
+            LmType::Disjunctive => node.atoms.iter().any(tr),
+            LmType::Atomic => node.atoms.iter().all(tr),
+        }
+    }
+
+    /// remove_disjunctive_landmark_and_rewire_orderings
+    fn remove_disjunctive_and_rewire(&mut self, atomic_node: u32) {
+        let atom = self.nodes[atomic_node as usize].atoms[0];
+        let d = self.disj[&atom];
+        // remove_occurrences_of_landmark_node
+        if let Some(i) = self.open.iter().position(|&x| x == d) {
+            self.open.remove(i);
+        }
+        self.forward.remove(&d);
+        let parents: Vec<u32> = self.nodes[d as usize].parents.keys().copied().collect();
+        self.remove_node(d);
+        for p in parents {
+            self.add_or_replace(p, atomic_node, OrderingType::Natural);
+        }
+    }
+
+    /// add_atomic_landmark_and_ordering (use_orders on)
+    fn add_atomic(&mut self, atom: Fact, node: u32, ty: OrderingType) {
+        if let Some(&a) = self.atomic.get(&atom) {
+            self.add_or_replace(a, node, ty);
+            return;
+        }
+        let a = self.add_node(vec![atom], LmType::Atomic, false);
+        self.open.push_back(a);
+        self.add_or_replace(a, node, ty);
+        if self.disj.contains_key(&atom) {
+            self.remove_disjunctive_and_rewire(a);
+        }
+    }
+
+    /// deal_with_overlapping_landmarks: true when an overlapping landmark exists already
+    fn overlapping(&mut self, atoms: &StdSet<Fact>, node: u32, ty: OrderingType) -> bool {
+        if atoms.iter().any(|a| self.atomic.contains_key(&a)) {
+            return true;
+        }
+        if atoms.iter().any(|a| self.disj.contains_key(&a)) {
+            // contains_superset_disjunctive_landmark: every atom in one disjunctive landmark
+            let mut same: Option<u32> = None;
+            let mut superset = true;
+            for a in atoms.iter() {
+                match self.disj.get(&a) {
+                    None => {
+                        superset = false;
+                        break;
+                    }
+                    Some(&d) => {
+                        if same.is_some_and(|s| s != d) {
+                            superset = false;
+                            break;
+                        }
+                        same = Some(d);
+                    }
+                }
+            }
+            if superset {
+                let other = self.disj[&atoms.first().expect("a non-empty set")];
+                self.add_or_replace(other, node, ty);
+            }
+            return true;
+        }
+        false
+    }
+
+    /// add_disjunctive_landmark_and_ordering
+    fn add_disjunctive(&mut self, atoms: &StdSet<Fact>, node: u32, ty: OrderingType) {
+        if !self.overlapping(atoms, node, ty) {
+            let d = self.add_node(atoms.to_vec(), LmType::Disjunctive, false);
+            self.open.push_back(d);
+            self.add_or_replace(d, node, ty);
+        }
+    }
+
+    /// approximate_preconditions_to_achieve_landmark: (1) the operator's preconditions, (2) the start's value of a
+    /// binary variable the operator writes but does not read, where the landmark has another value of it, (3) the
+    /// conditions shared by all effects that achieve the landmark.
+    fn approx_preconditions(&self, atoms: &[Fact], o: usize) -> StdSet<Fact> {
+        let t = self.tv.t;
+        let mut result = StdSet::new();
+        let mut pre_vars: Vec<u32> = Vec::new();
+        for &f in t.pre(o) {
+            result.insert(f);
+            pre_vars.push(f.0);
+        }
+        // add_binary_variable_conditions
+        for e in t.effs(o) {
+            let var = e.var;
+            if !pre_vars.contains(&var) && self.tv.size(var) == 2 {
+                for &a in atoms {
+                    if a.0 == var && self.tv.init(var) != a.1 {
+                        result.insert((var, self.tv.init(var)));
+                        break;
+                    }
+                }
+            }
+        }
+        // add_effect_conditions
+        let mut inter: StdSet<Fact> = StdSet::new();
+        let mut init = true;
+        for e in t.effs(o) {
+            if !atoms.contains(&(e.var, e.post)) {
+                continue;
+            }
+            if e.c0 == e.c1 {
+                return result;
+            }
+            let ec = StdSet::from_iter_std(t.conds(e).iter().copied());
+            if init {
+                inter = ec;
+                init = false;
+            } else {
+                inter = inter.intersection(&ec);
+            }
+            if inter.is_empty() {
+                break;
+            }
+        }
+        for f in inter.iter() {
+            result.insert(f);
+        }
+        result
+    }
+
+    /// compute_shared_preconditions
+    fn shared_preconditions(&self, atoms: &[Fact], reached: &[bool]) -> StdSet<Fact> {
+        let mut shared: StdSet<Fact> = StdSet::new();
+        let mut init = true;
+        for &a in atoms {
+            for &o in self.tv.providing(a) {
+                let o = o as usize;
+                if possibly_reaches(self.tv, reached, o, atoms) {
+                    let pre = self.approx_preconditions(atoms, o);
+                    if init {
+                        shared = pre;
+                        init = false;
+                    } else {
+                        shared = shared.intersection(&pre);
+                    }
+                    if shared.is_empty() {
+                        return shared;
+                    }
+                }
+            }
+        }
+        shared
+    }
+
+    /// compute_disjunctive_preconditions (with get_disjunctive_preconditions)
+    fn disjunctive_preconditions(&self, atoms: &[Fact], reached: &[bool]) -> Vec<StdSet<Fact>> {
+        // get_operators_achieving_landmark: an unordered_set<int> of the achievers, as a vector in its order
+        let mut ids: StdSet<i32> = StdSet::new();
+        for &a in atoms {
+            for &o in self.tv.providing(a) {
+                ids.insert(o as i32);
+            }
+        }
+        let mut num_ops = 0usize;
+        let mut by_class: StdMap<i32, Vec<Fact>> = StdMap::new();
+        let mut used: HashMap<i32, BTreeSet<u32>> = HashMap::new();
+        for o in ids.iter() {
+            let o = o as usize;
+            if possibly_reaches(self.tv, reached, o, atoms) {
+                num_ops += 1;
+                let pre = self.approx_preconditions(atoms, o);
+                // extend_disjunction_class_lookups
+                for f in pre.iter() {
+                    let class = self.classes[self.tv.prop(f)];
+                    if class == -1 {
+                        continue;
+                    }
+                    if !self.atomic.contains_key(&f) {
+                        by_class.entry(class).push(f);
+                        used.entry(class).or_default().insert(o as u32);
+                    }
+                }
+            }
+        }
+        let mut out = Vec::new();
+        for (class, fs) in by_class.iter() {
+            if used[&class].len() == num_ops {
+                let set = StdSet::from_iter_std(fs.iter().copied());
+                if set.len() > 1 {
+                    out.push(set);
+                }
+            }
+        }
+        out
+    }
+
+    /// The domain transition graph of `var` (DomainTransitionGraphCollection, compute_successors): per value the
+    /// values an effect moves it to, and the values an effect with no condition on `var` sets from any value.
+    fn dtg(&mut self, var: u32) -> &(Vec<Vec<u32>>, Vec<u32>) {
+        if !self.dtg.contains_key(&var) {
+            let t = self.tv.t;
+            let size = self.tv.size(var) as usize;
+            let mut succ: Vec<Vec<u32>> = vec![Vec::new(); size];
+            let mut any: Vec<u32> = Vec::new();
+            let mut seen_ops: Vec<u32> = Vec::new();
+            for val in 0..size as u32 {
+                seen_ops.extend_from_slice(self.tv.providing((var, val)));
+            }
+            seen_ops.sort_unstable();
+            seen_ops.dedup();
+            for o in seen_ops {
+                let o = o as usize;
+                // build_conditions_map: the last precondition on a variable wins
+                let pre = t.pre(o).iter().rev().find(|f| f.0 == var).map(|f| f.1 as i64).unwrap_or(-1);
+                for e in t.effs(o) {
+                    if e.var != var {
+                        continue;
+                    }
+                    let post = e.post;
+                    let ec = t.conds(e).iter().rev().find(|f| f.0 == var).map(|f| f.1 as i64).unwrap_or(-1);
+                    if pre != -1 {
+                        if ec != -1 && ec != pre {
+                            continue;
+                        }
+                        if pre as u32 != post {
+                            succ[pre as usize].push(post);
+                        }
+                    } else if ec != -1 {
+                        if ec as u32 != post {
+                            succ[ec as usize].push(post);
+                        }
+                    } else {
+                        any.push(post);
+                    }
+                }
+            }
+            for s in &mut succ {
+                s.sort_unstable();
+                s.dedup();
+            }
+            any.sort_unstable();
+            any.dedup();
+            self.dtg.insert(var, (succ, any));
+        }
+        &self.dtg[&var]
+    }
+
+    /// value_critical_to_reach_landmark
+    fn critical(dtg: &(Vec<Vec<u32>>, Vec<u32>), init: u32, lm: u32, excluded: u32, reached: &[bool]) -> bool {
+        if excluded == init {
+            return true;
+        }
+        let n = reached.len();
+        let mut closed = vec![false; n];
+        let mut open: VecDeque<u32> = VecDeque::new();
+        open.push_back(init);
+        closed[init as usize] = true;
+        while let Some(v) = open.pop_front() {
+            for &s in dtg.0[v as usize].iter().chain(dtg.1.iter()) {
+                if s == lm {
+                    return false;
+                }
+                if !reached[s as usize] || s == excluded {
+                    continue;
+                }
+                if !closed[s as usize] {
+                    closed[s as usize] = true;
+                    open.push_back(s);
+                }
+            }
+        }
+        true
+    }
+
+    /// approximate_lookahead_orderings (the forward orderings kept as the reached set, module docstring)
+    fn lookahead(&mut self, node: u32, reached: &[bool]) {
+        let mut bits = vec![0u64; reached.len().div_ceil(64)];
+        for (p, &r) in reached.iter().enumerate() {
+            if r {
+                bits[p / 64] |= 1 << (p % 64);
+            }
+        }
+        self.forward.insert(node, bits);
+        if self.nodes[node as usize].kind != LmType::Atomic {
+            return;
+        }
+        let (var, val) = self.nodes[node as usize].atoms[0];
+        let init = self.tv.init(var);
+        let off = self.tv.prop_off[var as usize] as usize;
+        let size = self.tv.size(var) as usize;
+        let rv: Vec<bool> = reached[off..off + size].to_vec();
+        let dtg = self.dtg(var).clone();
+        let mut crit = Vec::new();
+        for value in 0..size as u32 {
+            if rv[value as usize] && Self::critical(&dtg, init, val, value, &rv) {
+                crit.push(value);
+            }
+        }
+        for value in crit {
+            self.add_atomic((var, value), node, OrderingType::Natural);
+        }
+    }
+
+    /// generate_backchaining_landmarks
+    fn backchain(&mut self, reach: &mut Reach, deadline: Option<Instant>) -> Result<(), String> {
+        while let Some(node) = self.open.pop_front() {
+            if deadline.is_some_and(|d| Instant::now() > d) {
+                return Err("time".into());
+            }
+            if self.is_true_in_init(node) {
+                continue;
+            }
+            let atoms = self.nodes[node as usize].atoms.clone();
+            let reached = reach.compute(self.tv, &atoms).to_vec();
+            // generate_shared_precondition_landmarks
+            let shared = self.shared_preconditions(&atoms, &reached);
+            for f in shared.iter() {
+                self.add_atomic(f, node, OrderingType::GreedyNecessary);
+            }
+            if !self.nodes[node as usize].alive {
+                return Err(format!("landmark {:?} removed while it was being processed", atoms));
+            }
+            self.lookahead(node, &reached);
+            // generate_disjunctive_precondition_landmarks
+            for set in self.disjunctive_preconditions(&atoms, &reached) {
+                if set.len() < 5 && set.iter().all(|f| self.tv.init(f.0) != f.1) {
+                    self.add_disjunctive(&set, node, OrderingType::GreedyNecessary);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// add_landmark_forward_orderings: an atom not reached without a landmark and not achievable together with it
+    /// (atom_and_landmark_achievable_together), when it is an atomic landmark, is ordered naturally after it.
+    fn forward_orderings(&mut self) {
+        let atomic: Vec<(Fact, u32)> = {
+            let mut v: Vec<(Fact, u32)> = self.atomic.iter().map(|(&f, &n)| (f, n)).collect();
+            v.sort_unstable();
+            v
+        };
+        let n_ops = self.tv.t.n_ops();
+        let mut mark = vec![false; n_ops];
+        for n in 0..self.nodes.len() as u32 {
+            if !self.nodes[n as usize].alive {
+                continue;
+            }
+            let Some(bits) = self.forward.get(&n) else { continue };
+            let bits = bits.clone();
+            let atoms = self.nodes[n as usize].atoms.clone();
+            let mut marked: Vec<u32> = Vec::new();
+            for &a in &atoms {
+                for &o in self.tv.providing(a) {
+                    if !mark[o as usize] {
+                        mark[o as usize] = true;
+                        marked.push(o);
+                    }
+                }
+            }
+            for &(f, n2) in &atomic {
+                let p = self.tv.prop(f);
+                if bits[p / 64] >> (p % 64) & 1 == 1 {
+                    continue;
+                }
+                let together = atoms.contains(&f) || self.tv.providing(f).iter().any(|&o| mark[o as usize]);
+                if !together {
+                    self.add_or_replace(n, n2, OrderingType::Natural);
+                }
+            }
+            for o in marked {
+                mark[o as usize] = false;
+            }
+        }
+        self.forward.clear();
+    }
+}
+
+/// build_disjunction_classes from the atoms' predicates (`pred[var]`: the predicate of every value of the variable,
+/// as taskcore names them; "" for none): the classes number the predicates in order of first appearance.
+fn disjunction_classes(tv: &Tv, pred: &[String]) -> Vec<i32> {
+    let mut index: HashMap<&str, i32> = HashMap::new();
+    let mut classes = vec![-1i32; tv.n_props];
+    for v in 0..tv.t.sizes.len() {
+        for x in 0..tv.size(v as u32) {
+            let p = pred[v].as_str();
+            let c = if p.is_empty() {
+                -1
+            } else {
+                let n = index.len() as i32;
+                *index.entry(p).or_insert(n)
+            };
+            classes[(tv.prop_off[v] + x) as usize] = c;
+        }
+    }
+    classes
+}
+
+/// The predicate taskcore writes for every value of a variable named `key` (sas.rs `atom_kind`: the alphanumerics of
+/// the key's first part, "fact" when none), which is what Fast Downward reads from "Atom kind(key=value)".
+pub fn predicate_of_key(key: &str) -> String {
+    let head = key.split(':').next().unwrap_or("");
+    let k: String = head.chars().filter(|c| c.is_alphanumeric()).collect();
+    if k.is_empty() {
+        "fact".to_string()
+    } else {
+        k
+    }
+}
+
+// --- the reasonable orderings (landmark_factory_reasonable_orders_hps.cc) ----------------------------------------
+
+/// get_effects_on_other_variables(op, var): unconditional effects on other variables and effects that always happen.
+fn effects_on_other_variables(t: &SasTask, o: usize, var_id: u32) -> Vec<Fact> {
+    // compute_effect_conditions_by_variable
+    let mut nogood: BTreeSet<u32> = BTreeSet::new();
+    let mut by_var: BTreeMap<u32, (u32, BTreeSet<Fact>)> = BTreeMap::new();
+    for e in t.effs(o) {
+        let conds = t.conds(e);
+        if conds.is_empty() || nogood.contains(&e.var) {
+            continue;
+        }
+        if let Some(x) = by_var.get_mut(&e.var) {
+            if x.0 != e.post {
+                nogood.insert(e.var);
+                continue;
+            }
+            x.1.extend(conds.iter().copied());
+        } else {
+            by_var.insert(e.var, (e.post, conds.iter().copied().collect()));
+        }
+    }
+    for v in &nogood {
+        by_var.remove(v);
+    }
+    // get_effects_that_always_happen (effect_always_happens)
+    let mut always: BTreeSet<Fact> = BTreeSet::new();
+    for (&var, (value, conds)) in &by_var {
+        let mut by_cvar: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
+        for &(cv, cx) in conds {
+            by_cvar.entry(cv).or_default().insert(cx);
+        }
+        let domain = t.sizes[var as usize] as usize;
+        let mut happens = true;
+        for (cv, values) in by_cvar.iter_mut() {
+            if *cv == var {
+                values.insert(*value);
+            }
+            if values.len() < domain {
+                happens = false;
+                break;
+            }
+        }
+        if happens {
+            always.insert((var, *value));
+        }
+    }
+    let mut next: Vec<Fact> = Vec::new();
+    for e in t.effs(o) {
+        let f = (e.var, e.post);
+        if (e.c0 == e.c1 && f.0 != var_id) || always.contains(&f) {
+            next.push(f);
+        }
+    }
+    next.sort_unstable();
+    next.dedup();
+    next
+}
+
+struct Hps<'a> {
+    tv: &'a Tv<'a>,
+    shared: HashMap<Fact, Vec<Fact>>,
+}
+
+impl Hps<'_> {
+    /// get_shared_effects_of_achievers (cached per atom)
+    fn shared_effects(&mut self, atom: Fact) -> &[Fact] {
+        if !self.shared.contains_key(&atom) {
+            let mut shared: Vec<Fact> = Vec::new();
+            let mut init = true;
+            for &o in self.tv.providing(atom) {
+                let eff = effects_on_other_variables(self.tv.t, o as usize, atom.0);
+                if init {
+                    shared = eff;
+                    init = false;
+                } else {
+                    shared.retain(|f| eff.binary_search(f).is_ok());
+                }
+                if shared.is_empty() {
+                    break;
+                }
+            }
+            self.shared.insert(atom, shared);
+        }
+        &self.shared[&atom]
+    }
+
+    /// interferes(landmark_a, landmark_b) for atomic landmarks a and b
+    fn interferes(&mut self, a: Fact, b: Fact) -> bool {
+        if a == b {
+            return false;
+        }
+        // 1. mutex: values of one variable
+        if a.0 == b.0 {
+            return true;
+        }
+        // 2. a shared effect E of a's achievers, E mutex with b
+        self.shared_effects(a).iter().any(|&e| e != a && e != b && e.0 == b.0 && e.1 != b.1)
+    }
+}
+
+/// The landmark graph (module docstring) of `t` with the adapted costs `adj`; `pred[var]` the predicate of the
+/// variable's atoms.
+pub fn build(t: &SasTask, adj: &[i32], pred: &[String], deadline: Option<Instant>) -> Result<Graph, String> {
+    let t0 = Instant::now();
+    let tv = Tv::new(t);
+    let mut reach = Reach::new(&tv);
+    let classes = disjunction_classes(&tv, pred);
+    let setup_s = t0.elapsed().as_secs_f64();
+    let t1 = Instant::now();
+    let mut b = Builder {
+        tv: &tv,
+        nodes: Vec::new(),
+        atomic: HashMap::new(),
+        disj: HashMap::new(),
+        open: VecDeque::new(),
+        forward: HashMap::new(),
+        classes,
+        dtg: HashMap::new(),
+    };
+    // generate_goal_landmarks
+    for &g in &t.goal {
+        let n = b.add_node(vec![g], LmType::Atomic, true);
+        b.open.push_back(n);
+    }
+    b.backchain(&mut reach, deadline)?;
+    b.forward_orderings();
+    let rhw_s = t1.elapsed().as_secs_f64();
+    // set_landmark_ids: the surviving nodes in the order they were made
+    let t2 = Instant::now();
+    let alive: Vec<u32> = (0..b.nodes.len() as u32).filter(|&n| b.nodes[n as usize].alive).collect();
+    let mut id_of = vec![u32::MAX; b.nodes.len()];
+    for (i, &n) in alive.iter().enumerate() {
+        id_of[n as usize] = i as u32;
+    }
+    // calc_achievers: least adapted costs of the possible and the first achievers
+    let mut min_first = Vec::with_capacity(alive.len());
+    let mut min_possible = Vec::with_capacity(alive.len());
+    for &n in &alive {
+        if deadline.is_some_and(|d| Instant::now() > d) {
+            return Err("time".into());
+        }
+        let atoms = b.nodes[n as usize].atoms.clone();
+        let mut possible: Vec<u32> = atoms.iter().flat_map(|&a| tv.providing(a).iter().copied()).collect();
+        possible.sort_unstable();
+        possible.dedup();
+        let reached = reach.compute(&tv, &atoms);
+        let mut mf = i64::MAX;
+        let mut mp = i64::MAX;
+        for &o in &possible {
+            let c = adj[o as usize] as i64;
+            mp = mp.min(c);
+            if c < mf && possibly_reaches(&tv, reached, o as usize, &atoms) {
+                mf = c;
+            }
+        }
+        min_first.push(mf);
+        min_possible.push(mp);
+    }
+    let achievers_s = t2.elapsed().as_secs_f64();
+    // approximate_reasonable_orderings
+    let t3 = Instant::now();
+    let mut hps = Hps { tv: &tv, shared: HashMap::new() };
+    for &n in &alive {
+        if b.nodes[n as usize].kind == LmType::Disjunctive {
+            continue;
+        }
+        let atom = b.nodes[n as usize].atoms[0];
+        let candidates: Vec<u32> = if b.nodes[n as usize].goal {
+            alive.clone()
+        } else {
+            // collect_reasonable_ordering_candidates
+            let mut set: BTreeSet<u32> = BTreeSet::new();
+            let kids: Vec<(u32, OrderingType)> = b.nodes[n as usize].children.iter().map(|(&c, &ty)| (c, ty)).collect();
+            for (child, ty) in kids {
+                if ty < OrderingType::GreedyNecessary {
+                    continue;
+                }
+                for (&parent, &pty) in &b.nodes[child as usize].parents {
+                    if b.nodes[parent as usize].kind == LmType::Disjunctive {
+                        continue;
+                    }
+                    if pty >= OrderingType::Natural && parent != n {
+                        set.insert(parent);
+                        // collect_ancestors
+                        let mut stack = vec![parent];
+                        while let Some(x) = stack.pop() {
+                            for (&p, &ty2) in &b.nodes[x as usize].parents {
+                                if ty2 >= OrderingType::Natural && set.insert(p) {
+                                    stack.push(p);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            set.into_iter().collect()
+        };
+        for other in candidates {
+            if other == n || b.nodes[other as usize].kind == LmType::Disjunctive {
+                continue;
+            }
+            let oa = b.nodes[other as usize].atoms[0];
+            if hps.interferes(oa, atom) {
+                b.add_or_replace(other, n, OrderingType::Reasonable);
+            }
+        }
+    }
+    let hps_s = t3.elapsed().as_secs_f64();
+    let mut g = Graph {
+        min_first,
+        min_possible,
+        stats: Stats { explorations: reach.runs, rhw_s, achievers_s, hps_s, setup_s },
+        ..Default::default()
+    };
+    for &n in &alive {
+        let node = &b.nodes[n as usize];
+        g.atoms.push(node.atoms.clone());
+        g.disjunctive.push(node.kind == LmType::Disjunctive);
+        g.goal.push(node.goal);
+        let mut ch: Vec<(u32, OrderingType)> = node.children.iter().map(|(&c, &ty)| (id_of[c as usize], ty)).collect();
+        ch.sort_unstable();
+        let mut pa: Vec<(u32, OrderingType)> = node.parents.iter().map(|(&p, &ty)| (id_of[p as usize], ty)).collect();
+        pa.sort_unstable();
+        g.n_orderings += ch.len();
+        g.children.push(ch);
+        g.parents.push(pa);
+        if node.kind == LmType::Disjunctive {
+            g.n_disjunctive += 1;
+        }
+    }
+    Ok(g)
+}
+
+impl Graph {
+    pub fn len(&self) -> usize {
+        self.atoms.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.atoms.is_empty()
+    }
+
+    /// Fast Downward's debug dump of the graph (util.cc `dump_landmark_graph`), the orderings of each node by child id
+    /// (Fast Downward prints them in its pointer map's order): `name(var, value)` gives an atom's name.
+    pub fn dump(&self, init: &[u32], name: &dyn Fn(u32, u32) -> String) -> String {
+        let mut s = String::from("digraph G {\n");
+        for id in 0..self.len() {
+            let delim = if self.disjunctive[id] { " | " } else { " & " };
+            let label: Vec<String> = self.atoms[id].iter().map(|&(v, x)| name(v, x)).collect();
+            s.push_str(&format!("  lm{} [label=\"{}\"", id, label.join(delim)));
+            let tr = |f: &Fact| init[f.0 as usize] == f.1;
+            let holds = if self.disjunctive[id] { self.atoms[id].iter().any(tr) } else { self.atoms[id].iter().all(tr) };
+            if holds {
+                s.push_str(", style=bold");
+            }
+            if self.goal[id] {
+                s.push_str(", style=filled");
+            }
+            s.push_str("];\n");
+            for &(c, ty) in &self.children[id] {
+                let lab = match ty {
+                    OrderingType::Necessary => "\"nec\"",
+                    OrderingType::GreedyNecessary => "\"gn\"",
+                    OrderingType::Natural => "\"n\"",
+                    OrderingType::Reasonable => "\"r\", style=dashed",
+                };
+                s.push_str(&format!("      lm{} -> lm{} [label={}];\n", id, c, lab));
+            }
+        }
+        s.push_str("}\n");
+        s
+    }
+}
