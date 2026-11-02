@@ -5,8 +5,9 @@
 //!       two engines booted from the entry's movie to FROM; then N frames, each played on one engine by StepObs
 //!       (`step_observe`) and on the other by Run, Runs, ExplainLog and Obs (the four commands it stands for), the
 //!       dump alternating full, full with names and the exact object, and lite. At every frame the Status, the runs,
-//!       the explain entries and the dump must be equal. Every third command is instead a RunObs (`run_obs`, a frame
-//!       stop or a control stop) against Run then Obs. Every 10th command AtMany over a grid of screen points must
+//!       the explain entries and the dump must be equal. Two commands in four are instead a RunObs (`run_obs`, a frame
+//!       stop or a control stop) against Run then Obs, and one a RunObs with the room's dump (`run_room`) against Run,
+//!       Obs and `room_cut`. Every 10th command AtMany over a grid of screen points must
 //!       equal one At per point. Prints the screen layouts (Status.screen) met on the way.
 //!   play-wire bench OUT ARCHIVE IDX FROM N [--lean]
 //!       the observed frame by StepObs against the four commands (wall per frame, the engine's CPU, this process's
@@ -171,18 +172,35 @@ fn check(a: &Args) -> Res<()> {
     ];
     let pts = grid();
     let (mut bad, mut runs, mut ents, mut ats, mut runobs) = (Vec::<String>::new(), 0usize, 0usize, 0usize, 0usize);
+    let mut rooms = 0usize;
     let mut screens: Vec<(Option<(i32, i32, bool)>, u64, u64)> = Vec::new();
     let mut i = 0u64;
     while x.status().frame < a.from + a.n {
         let f = x.status().frame + 1;
-        let req = &reqs[(i / 3) as usize % reqs.len()];
+        let req = &reqs[(i / 4) as usize % reqs.len()];
         let (p, q);
-        if i % 3 == 0 {
+        if i % 4 == 0 {
             p = x.step_observe(f, req).map_err(e2s)?;
             q = four(&mut y, f, req).map_err(e2s)?;
+        } else if i % 4 == 3 {
+            // RunObs with the room's dump against Run, then Obs and room_cut
+            let spec = RunSpec {
+                frame: Some(f),
+                ..Default::default()
+            };
+            let (s1, o1) = x.run_room(&spec).map_err(e2s)?;
+            let s2 = y.run(&spec).map_err(e2s)?;
+            let mut o2 = y.obs(&ObsReq::default()).map_err(e2s)?;
+            fmi_core::room_cut(&mut o2);
+            if o1.inventory.is_none() || o1.room_objects.is_none() || o1.owners.len() > 200 {
+                bad.push(format!("frame {f}: the room's dump lacks the inventory or the room's objects, or holds every object"));
+            }
+            p = (s1, RunsReply::default(), ExplainReply::default(), o1);
+            q = (s2, RunsReply::default(), ExplainReply::default(), o2);
+            rooms += 1;
         } else {
             // RunObs against Run then Obs: a frame stop, or the control stop within three frames
-            let spec = if i % 3 == 1 {
+            let spec = if i % 4 == 1 {
                 RunSpec {
                     frame: Some(f),
                     ..Default::default()
@@ -263,7 +281,7 @@ fn check(a: &Args) -> Res<()> {
         bad.push("the final exact dumps differ".into());
     }
     println!(
-        "{{\"frames\": {}, \"from\": {}, \"runs\": {runs}, \"explain_entries\": {ents}, \"hit_tests\": {ats}, \"run_obs\": {runobs}, \"commands\": {i}, \"differences\": {}}}",
+        "{{\"frames\": {}, \"from\": {}, \"runs\": {runs}, \"explain_entries\": {ents}, \"hit_tests\": {ats}, \"run_obs\": {runobs}, \"run_room\": {rooms}, \"commands\": {i}, \"differences\": {}}}",
         a.n,
         a.from,
         bad.len()
@@ -438,6 +456,23 @@ fn frames(a: &Args) -> Res<()> {
             );
             Box::new(k).quit();
         }
+    }
+    // the booted engine itself (no fork: no copy-on-write faults), plain frames
+    for _ in 0..2 {
+        let (c0, t0, f0) = (x.cpu_s(), Instant::now(), x.status().frame);
+        for i in 0..a.n {
+            x.run(&RunSpec {
+                frame: Some(f0 + i + 1),
+                ..Default::default()
+            })
+            .map_err(e2s)?;
+        }
+        println!(
+            "unforked engine, plain: {} frames, {:.4} ms engine CPU a frame, {:.4} ms wall a frame",
+            a.n,
+            (x.cpu_s() - c0) * 1e3 / a.n as f64,
+            t0.elapsed().as_secs_f64() * 1e3 / a.n as f64
+        );
     }
     Box::new(x).quit();
     Ok(())
