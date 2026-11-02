@@ -6,6 +6,9 @@ usage: python dump_reading.py dump DIR [--every N] --out FILE   PackedTask._acti
                                                                 answers, line by line
        python dump_reading.py reuse DIR RUST_KEYS               step.reuse_keys_of on the reading's scope and start
                                                                 against fmi-reading reuse-keys' answer
+       python dump_reading.py reusable DIR ROWS RUST [--e009]   step.reusable and reusable_detail of the reading for
+                                                                ROWS' seed 1 (E009's K with --e009) against
+                                                                fmi-reading reusable's answer (RUST, its JSON)
 
 The reading is loaded with packed_reading.load_reading. Exit 0 when the check holds (dump always 0).
 """
@@ -60,9 +63,11 @@ def canonical(task, i: int) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=("dump", "names", "reuse"))
+    ap.add_argument("cmd", choices=("dump", "names", "reuse", "reusable"))
     ap.add_argument("dir", type=Path)
     ap.add_argument("rust", type=Path, nargs="?")
+    ap.add_argument("rust2", type=Path, nargs="?")
+    ap.add_argument("--e009", action="store_true")
     ap.add_argument("--every", type=int, default=1)
     ap.add_argument("--out", type=Path)
     a = ap.parse_args()
@@ -92,6 +97,19 @@ def main() -> None:
         print(json.dumps({"names": n, "differ": bad, "first": first, "python_by_name_s": round(setup, 1)}))
         sys.exit(0 if n > 0 and bad == 0 else 1)
     import step
+    if a.cmd == "reusable":
+        facts = next(r for r in map(json.loads, a.rust.read_text().splitlines()) if r["seed"] == 1)["facts"]
+        keys = set(rd.task.facts)
+        extra = step.reuse_keys(rd) if a.e009 else set()
+        keys |= extra
+        ok, n = step.reusable(rd.doc, keys, facts)
+        d = step.reusable_detail(rd.doc, keys, facts)
+        want = {"ok": ok, "n": n, "differ": d["differ"], "task": d["task"], "slots": d["slots"], "other": d["other"],
+                "first": d["first"], "reuse_keys": len(extra)}
+        got = json.loads(a.rust2.read_text())
+        same = {k: want[k] == got[k] for k in want}
+        print(json.dumps({"same": same, "python": want}))
+        sys.exit(0 if all(same.values()) else 1)
     t = time.monotonic()
     k = step.reuse_keys_of(rd.doc["scope"]["rooms"], rd.doc["start"]["facts"])
     s = time.monotonic() - t

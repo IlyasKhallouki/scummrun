@@ -6,6 +6,8 @@
 //!                                                         has with by_name's answer
 //!        fmi-reading reuse-keys DIR                      E009's K of the reading (reuse_keys_of on its scope and
 //!                                                         start), as JSON, with the seconds
+//!        fmi-reading reusable DIR ROWS [--e009]          step.py's reusable and reusable_detail of the reading for
+//!                                                         the start row of seed 1 in ROWS (with E009's K: --e009)
 //!        fmi-reading idx DIR                             reading.idx built from the files, against the one there
 //!        fmi-reading bench DIR [--every N] [--reps R]    open, action, record, by_name: seconds and microseconds
 //!        fmi-reading key ROWS ROOMS GOAL [--reader BIN] [--fact-vars N,..] [--reach-also F ...]
@@ -166,6 +168,41 @@ fn main() {
                 ("keys_of_s", PJ::Float((s * 1000.0).round() / 1000.0)),
             ]);
             println!("{}", out.compact_text());
+        }
+        "reusable" => {
+            let rd = Reading::open(Path::new(&args[1])).expect("the reading");
+            let text = std::fs::read_to_string(&args[2]).expect("the rows");
+            let row: serde_json::Value =
+                text.lines().map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap()).find(|v| v["seed"] == 1).expect("seed 1");
+            let entry = fmi_core::Facts::from_pairs(
+                row["facts"].as_object().unwrap().iter().map(|(k, v)| (fmi_core::Key::parse(k), v.as_i64().unwrap())).collect(),
+            );
+            let t = Instant::now();
+            let extra: std::collections::BTreeSet<fmi_core::Key> = if args.iter().any(|a| a == "--e009") {
+                let g = ReuseGame::load(&scumm_ir::default_root()).expect("the game");
+                g.reuse_keys(&rd).expect("reuse keys").iter().map(|k| fmi_core::Key::parse(k)).collect()
+            } else {
+                Default::default()
+            };
+            let keys = fmi_reading::reuse::task_keys(&rd, &extra);
+            let (ok, n) = fmi_reading::reuse::reusable(rd.start(), &keys, &entry);
+            let d = fmi_reading::reuse::reusable_detail(rd.start(), &keys, &entry);
+            let s = t.elapsed().as_secs_f64();
+            println!(
+                "{}",
+                PJ::obj(vec![
+                    ("ok", PJ::Bool(ok)),
+                    ("n", PJ::Int(n as i64)),
+                    ("differ", PJ::Int(d.differ as i64)),
+                    ("task", PJ::Int(d.task as i64)),
+                    ("slots", PJ::Int(d.slots as i64)),
+                    ("other", PJ::Int(d.other as i64)),
+                    ("first", PJ::List(d.first.iter().map(|(k, a, b)| PJ::List(vec![PJ::str(k.clone()), val(*a), val(*b)])).collect())),
+                    ("reuse_keys", PJ::Int(extra.len() as i64)),
+                    ("s", PJ::Float((s * 1000.0).round() / 1000.0)),
+                ])
+                .compact_text()
+            );
         }
         "idx" => {
             let dir = PathBuf::from(&args[1]);
