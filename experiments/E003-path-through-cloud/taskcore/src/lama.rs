@@ -427,8 +427,21 @@ pub fn lama_first_costs(t: &SasTask, pred: &[String], deadline: Option<Instant>)
     let graph_s = t0.elapsed().as_secs_f64();
     let t1 = Instant::now();
     let mut ff = Ff::new(t, &adj);
+    let ff_s = t1.elapsed().as_secs_f64();
     let succ = Succ::new(t);
     let relax_s = t1.elapsed().as_secs_f64();
+    if std::env::var_os("TASKCORE_PROFILE").is_some() {
+        eprintln!(
+            "profile lama: graph {:.4} s (setup {:.4} rhw {:.4} achievers {:.4} hps {:.4}), h_FF's relaxed task {:.4} s, successor trie {:.4} s",
+            graph_s,
+            g.stats.setup_s,
+            g.stats.rhw_s,
+            g.stats.achievers_s,
+            g.stats.hps_s,
+            ff_s,
+            relax_s - ff_s
+        );
+    }
     let t2 = Instant::now();
     let mut lm = LmSum::new(&g);
     let mut out = search_with(t, &mut ff, &mut lm, &succ, deadline);
