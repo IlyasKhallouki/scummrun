@@ -427,6 +427,19 @@ impl RecordStream {
 
     /// Records as made, `first` the index of the first.
     pub fn records(&mut self, first: usize, recs: &[Record], table: &FactTable) -> io::Result<()> {
+        self.records_with(first, recs, table, &mut |_| {})
+    }
+
+    /// `records`, calling `written(j)` for each record `recs[j]` written as an action, in order (a record folded
+    /// into an earlier one is not written; E011's reading files, reader-scope `--out-dir`, give each written action
+    /// its line).
+    pub fn records_with(
+        &mut self,
+        first: usize,
+        recs: &[Record],
+        table: &FactTable,
+        written: &mut dyn FnMut(usize),
+    ) -> io::Result<()> {
         let w = self.w.as_mut().unwrap();
         let none = BTreeSet::new();
         for r in recs {
@@ -461,13 +474,25 @@ impl RecordStream {
             let (pre, effects) = record_action(table, r, &mut counts);
             w.action((first + j) as u32, &r.label, &r.kind, r.end_text(), &cont(r), cost.unwrap_or(1), &pre, &effects, &lab)?;
             self.written.push((parts, counts.get(STEP_ROOM) as u32));
+            written(j);
         }
         Ok(())
     }
 
     /// The tables and the footer; then the fold and the values of lists folded since their records were written.
     /// Returns the file's info and the records folded (as build_task's `folded`).
-    pub fn finish(mut self, b: &mut Builder, goal: &[(String, Labels)], starts: &[(String, Facts)]) -> io::Result<(WriterInfo, usize)> {
+    pub fn finish(self, b: &mut Builder, goal: &[(String, Labels)], starts: &[(String, Facts)]) -> io::Result<(WriterInfo, usize)> {
+        self.finish_keep(b, goal, starts).map(|(info, folded, _)| (info, folded))
+    }
+
+    /// `finish`, with which of the written actions the file keeps (false: folded at the end into an earlier one by
+    /// the rewrite of the folded lists), one per action written, in order.
+    pub fn finish_keep(
+        mut self,
+        b: &mut Builder,
+        goal: &[(String, Labels)],
+        starts: &[(String, Facts)],
+    ) -> io::Result<(WriterInfo, usize, Vec<bool>)> {
         let mut w = self.w.take().unwrap();
         let zero = w.s("0");
         let mut seen: FxHashSet<[u8; 16]> = FxHashSet::default();
@@ -486,7 +511,7 @@ impl RecordStream {
         if steps > 0 {
             b.counts.add(STEP_ROOM, steps as i64);
         }
-        Ok((info, self.folded_written + dropped))
+        Ok((info, self.folded_written + dropped, keep))
     }
 }
 

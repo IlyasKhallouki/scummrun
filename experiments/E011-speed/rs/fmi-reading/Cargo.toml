@@ -1,0 +1,19 @@
+[package]
+name = "fmi-reading"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011 readio: a reading's files as fmi_core::ReadingSource (mapped files and reading.idx), the exact reading cache, the reuse rules of E008 and E009"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
+scumm-reader = { path = "../../../E003-path-through-cloud/scumm/reader" }
+libc = "0.2"
+serde_json = "1"
+sha1_smol = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "fmi-reading"
+path = "src/bin/fmi_reading.rs"
