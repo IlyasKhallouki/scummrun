@@ -111,7 +111,11 @@ impl Pool {
     /// The nearest kept ancestor whose movie is a prefix of the entry's.
     fn ancestor(&self, spec: &EntrySpec) -> Option<u64> {
         let mut at = spec.parent;
+        let mut seen = std::collections::HashSet::from([spec.id]);
         while let Some(a) = at {
+            if !seen.insert(a) {
+                return None; // a cycle in the parents: no ancestor
+            }
             let s = self.specs.get(&a)?;
             if self.kept.contains_key(&a) && s.frame <= spec.frame {
                 let mine: Vec<&Event> = spec.events.iter().filter(|e| e.frame <= s.frame).collect();

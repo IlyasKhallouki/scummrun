@@ -462,7 +462,8 @@ fn pool_cmd(o: &Opts) -> Res<()> {
             again.push(check(&mut pool, e, "kept", &mut bad)?);
         }
     }
-    // evict all but the least recently used one standing (the root is made first, so it goes first; keep it)
+    // evict all but the root (used last), so that every other entry is made again from it
+    Box::new(pool.ret(ents[0].id).map_err(e2s)?).quit();
     while pool.n_kept() > 1 {
         pool.evict_one();
     }
