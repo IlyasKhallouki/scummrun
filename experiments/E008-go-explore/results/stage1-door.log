@@ -1,0 +1,55 @@
+E008 stage 1, door: archive from the boot, goal {'state:316': [1]}, allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96], b = 2, guide door.json; created 2026-11-02T00:40:30; env {'FAST_MI_SCUMMVM_BIN': '~/.cache/fast-mi/svm-w3b/build/scummvm/scummvm', 'DOWNWARD_DIR': '~/projects/fast-mi/third_party/downward', 'TASKCORE_BIN': '~/.cache/fast-mi-walk/target/release/taskcore', 'READER_SCOPE_BIN': '~/.cache/fast-mi-e008/target-scumm/release/reader-scope'}
+root: {'frame': 2728, 'tick': 16321, 'qf': 65284, 'room': 33, 'boot_s': 2.8, 'stop': {'stop': 'idle', 'frame': 2728, 'tick': 16321, 'room': 33, 'idle': 'sentence', 'rng': 3182679328, 'up': 1, 'cs': 0, 'ego': [346, 133]}}
+
+== the run (stage1.sh: init, explore.py run, verify, report)
+00:40:25 MemAvailable 15071492 kB
+[00:40:25] ~/.cache/fast-mi-e008/archives/door: booting the root
+[00:40:30] ~/.cache/fast-mi-e008/archives/door: root at frame 2728 (room 33, qf 65284); allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+[00:40:30] j00000: entry 0 (room 33), scope [28, 33, 35, 38], key [1, 0, 0, -95, 16321, 0]
+[00:48:47] j00000: entry 0 ok; 5 entries, 5 new cells, 34 new atoms; archive 6 entries, 6 cells
+[00:48:47] goal entry 5: verifying its movie from boot
+[00:48:52] stop: goal {'entry': 5}
+run exit 0
+{"entry": 5, "same": true, "goal": true, "frames": 401, "qf": 9624, "seconds": 40.101310569678645, "inputs": 28, "segments": 1}
+differences: 0; final {'state:316': 1}
+verify exit 0
+report exit 0
+stage door: goal {'state:316': [1]}, allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+jobs {'committed': 1, 'ok': 1, 'errors': 0, 'guard_kills': 0, 'exhausted': 0}
+entries 6, cells 6 (6 selectable), R atoms held 129
+readings {'registered': 2, 'fresh': 1, 'reused': 0, 'by_kind': {'fresh': 1, 'refine': 1}, 'scopes': {'28-33-35-38': 1}, 'records': 235579, 'read_cpu_s': 312.5, 'read_wall_s': 93.1, 'peak_rss_mb': 516, 'bytes': 727489380, 'evicted': 0}
+targets by tier {'0': 1, '1': 54, '2': 0}, probes {'plan': 1}, attempts 1, refinements 3
+CPU s {'return': 2.2, 'read': 654.7, 'plan': 197.7, 'play': 35.3, 'total': 889.9, 'rusage_total': 878.9}, peak MB {'python': 1149, 'children': 1149}, driver 23.7 MB, disk 728.3 MB
+goal chain {'entry': 5, 'chain': [0, 5], 'frames': 401, 'inputs': 28, 'goal_from_the_plan': False, 'stop': "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"}
+verified entry 5: same True, goal True, 401 frames, 9624 qf, 40.10 s from the root, 28 inputs, 1 segments
+stop goal {'entry': 5}
+
+== per job (log.jsonl, result.json)
+j00000 entry 0 (frame 2728) key [1, 0, 0, -95, 16321, 0] scope [28, 33, 35, 38]: ok 
+  return same True, boot 2.84 s
+  reading fresh True (no cached reading): 235579 records, 234401 actions, read wall 93.1 s, read CPU 312.5 s, peak 516 MB, files 54.2 s
+  targets {'0': 1, '1': 54, '2': 0}; first [['state:316', 1, 0, 0], ['room', 28, 1, 1], ['bit:412', 1, 1, 2], ['state:428', 1, 1, 2], ['state:570', 1, 1, 2], ['bit:108', 1, 1, 3], ['bit:109', 1, 1, 3], ['bit:110', 1, 1, 3]]
+  probes [(['state:316', 1], 'plan', 341.2)]
+  played ['state:316', 1] (tier 0, depth 0): stop "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"
+    reached True, from the plan False, frames 401 (2728 -> 3129), qf 65284 -> 74908, replans 2, inputs 28, checkpoints 6
+    refinements [(0, 2796, 'split', [103], 116.34, 286.33), (1, 2798, None, [], None, None), (2, 3129, None, [], None, None)]
+    extensions []
+    window search: 3 windows, 403 children, 4515 child frames, outcomes {'deviation': 5, 'duplicate': 6, 'pruned': 61, 'goal, not from the plan': 4, 'mismatch': 327}, engine CPU {'child': 12.2, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 23.09
+  readings made [('refine', [28, 33, 35, 38])]
+  entries [1, 2, 3, 4, 5] (frames [2776, 2796, 2797, 2798, 3129]), new cells 5, new reps 0, new atoms 34, n 0, selectable after 6, goal entries [5]
+  CPU s {'return': 2.2, 'read': 654.7, 'plan': 197.7, 'play': 35.3, 'total': 889.9, 'rusage_total': 878.9}; peak RSS MB {'python': 1149, 'children': 1149}; job wall 493.8 s; driver wall 496.3 s; wait4 {'cpu_s': 882.9, 'maxrss_mb': 1149.1}; GUARD: rc 0 wall 496.0 s low 0 min MemAvailable 13352332 kB
+
+== explore.py report
+stage door: goal {'state:316': [1]}, allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+jobs {'committed': 1, 'ok': 1, 'errors': 0, 'guard_kills': 0, 'exhausted': 0}
+entries 6, cells 6 (6 selectable), R atoms held 129
+readings {'registered': 2, 'fresh': 1, 'reused': 0, 'by_kind': {'fresh': 1, 'refine': 1}, 'scopes': {'28-33-35-38': 1}, 'records': 235579, 'read_cpu_s': 312.5, 'read_wall_s': 93.1, 'peak_rss_mb': 516, 'bytes': 727489380, 'evicted': 0}
+targets by tier {'0': 1, '1': 54, '2': 0}, probes {'plan': 1}, attempts 1, refinements 3
+CPU s {'return': 2.2, 'read': 654.7, 'plan': 197.7, 'play': 35.3, 'total': 889.9, 'rusage_total': 878.9}, peak MB {'python': 1149, 'children': 1149}, driver 23.7 MB, disk 728.3 MB
+goal chain {'entry': 5, 'chain': [0, 5], 'frames': 401, 'inputs': 28, 'goal_from_the_plan': False, 'stop': "goal, not from the plan: it held in the idling engine at frame 3129 with none of the plan's goal records matched; cause: goal writer  at 3129: wrote state:316: a unit the plan does not name wrote the goal's fact; local:209 [0033] drawObject; local 1 = 339; local 0 = 339 (unknown); class split"}
+verified entry 5: same True, goal True, 401 frames, 9624 qf, 40.10 s from the root, 28 inputs, 1 segments
+stop goal {'entry': 5}
+
+== verify-5.json: entry 5, chain [0, 5], segments 1, frame 3129, 401 frames, qf 9624 (65284 -> 74908), 40.10 s from the root, 28 inputs, goal True, same True; checkpoints 6, differences 0, final {'state:316': 1}
+
+== summary.json: {'stop': 'goal', 'detail': {'entry': 5}, 'jobs': 1, 'entries': 6, 'cells': 6, 'goal_entries': [5], 'time': '2026-11-02T00:48:47', 'verify': {'entry': 5, 'same': True, 'goal': True, 'frames': 401, 'qf': 9624, 'seconds': 40.101310569678645, 'inputs': 28, 'segments': 1}}

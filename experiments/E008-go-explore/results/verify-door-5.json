@@ -1,0 +1,28 @@
+{
+ "entry": 5,
+ "chain": [
+  0,
+  5
+ ],
+ "segments": 1,
+ "frame": 3129,
+ "frames": 401,
+ "qf": 9624,
+ "qf_end": 74908,
+ "qf_root": 65284,
+ "seconds": 40.101310569678645,
+ "tick_end": 18727,
+ "inputs": 28,
+ "goal": true,
+ "same": true,
+ "verify": {
+  "checkpoints": 6,
+  "differ": [],
+  "inputs": 28,
+  "final": {
+   "state:316": 1
+  },
+  "same": true,
+  "seconds": 2.3
+ }
+}
