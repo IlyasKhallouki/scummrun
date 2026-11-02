@@ -1,0 +1,724 @@
+//! taskcore's command line (main.rs calls `main`): the planner's task (E003 step 4) as flat integer arrays, the fork
+//! fold, exact reductions, and Fast Downward's SAS file. See README.md.
+//!
+//! usage:
+//!   taskcore sas    --task F.tc [--start NAME | --start-file F] [--bans F] [--fold strict|every|off]
+//!                   [--reduce all|none|a,b,..] [--product-limit N] [--encoding model|task] --out F.sas
+//!                   [--stats F.json] [--check-fold N] [--ops F.jsonl] [--start-check input|needed]
+//!                   [--cost-caps F] [--pick-windows on|off]
+//!   taskcore decode (the same options) --plan sas_plan --out steps.json
+//!   taskcore validate (the same options) --names plan.txt --out result.json
+//!   taskcore info   --task F.tc
+//!   taskcore serve  --task F.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
+//!                   (then one `sas` request per line on stdin: serve.rs)
+//!   --goal K=V[|V..][,K=V..]: the goal instead of the file's (sas, decode, validate, serve)
+//!   --pick-windows on: each guess through a pick variable chosen in a window just before the operator that reads it
+//!                      (sas, decode, serve; README "Pick windows"; off by default)
+
+use crate::fold::FoldMode;
+use crate::model::*;
+use crate::reduce::Enabled;
+use crate::{bans, fold, packed, reduce, sas, serve};
+use std::fmt::Write as _;
+use std::io::BufWriter;
+use std::path::PathBuf;
+use std::time::Instant;
+
+#[derive(Clone)]
+pub struct Args {
+    pub names: Option<PathBuf>,
+    pub cmd: String,
+    pub task: PathBuf,
+    pub start: Option<String>,
+    pub fold: FoldMode,
+    pub reduce: Enabled,
+    pub limit: u128,
+    pub out: Option<PathBuf>,
+    pub stats: Option<PathBuf>,
+    pub plan: Option<PathBuf>,
+    pub check_fold: usize,
+    pub kept: Option<PathBuf>,
+    pub model: bool,
+    pub start_file: Option<PathBuf>,
+    pub reached: Option<PathBuf>,
+    pub bans: Option<PathBuf>,
+    pub ops: Option<PathBuf>,
+    pub needed_check: bool,
+    pub goal: Option<String>,
+    pub cost_caps: Option<PathBuf>,
+    pub pick_windows: bool,
+}
+
+pub fn parse() -> Result<Args, String> {
+    let mut it = std::env::args().skip(1);
+    let cmd = it.next().ok_or("usage: taskcore sas|decode|info|serve --task F.tc ...")?;
+    let mut a = Args {
+        names: None,
+        cmd,
+        task: PathBuf::new(),
+        start: None,
+        fold: FoldMode::Strict,
+        reduce: Enabled::parse("all")?,
+        limit: 64,
+        out: None,
+        stats: None,
+        plan: None,
+        check_fold: 0,
+        kept: None,
+        model: true,
+        start_file: None,
+        reached: None,
+        bans: None,
+        ops: None,
+        needed_check: false,
+        goal: None,
+        cost_caps: None,
+        pick_windows: false,
+    };
+    parse_opts(&mut a, it)?;
+    check_args(&a)?;
+    Ok(a)
+}
+
+/// The options in `it` into `a`; the option names given, in order.
+pub fn parse_opts(a: &mut Args, mut it: impl Iterator<Item = String>) -> Result<Vec<String>, String> {
+    let mut given = Vec::new();
+    while let Some(k) = it.next() {
+        let v = it.next().ok_or(format!("{} needs a value", k))?;
+        match k.as_str() {
+            "--task" => a.task = v.into(),
+            "--start" => a.start = Some(v),
+            "--fold" => {
+                a.fold = match v.as_str() {
+                    "strict" => FoldMode::Strict,
+                    "every" => FoldMode::Every,
+                    "off" | "none" => FoldMode::Off,
+                    _ => return Err(format!("--fold {}: strict, every or off", v)),
+                }
+            }
+            "--reduce" => a.reduce = Enabled::parse(&v)?,
+            "--product-limit" => a.limit = v.parse().map_err(|e| format!("--product-limit: {}", e))?,
+            "--out" => a.out = Some(v.into()),
+            "--stats" => a.stats = Some(v.into()),
+            "--plan" => a.plan = Some(v.into()),
+            "--check-fold" => a.check_fold = v.parse().map_err(|e| format!("--check-fold: {}", e))?,
+            "--kept" => a.kept = Some(v.into()),
+            "--names" => a.names = Some(v.into()),
+            "--start-file" => a.start_file = Some(v.into()),
+            "--reached" => a.reached = Some(v.into()),
+            "--bans" => a.bans = Some(v.into()),
+            "--ops" => a.ops = Some(v.into()),
+            "--goal" => a.goal = Some(v),
+            "--cost-caps" => a.cost_caps = Some(v.into()),
+            "--start-check" => {
+                a.needed_check = match v.as_str() {
+                    "input" => false,
+                    "needed" => true,
+                    _ => return Err(format!("--start-check {}: input or needed", v)),
+                }
+            }
+            "--encoding" => {
+                a.model = match v.as_str() {
+                    "model" => true,
+                    "task" => false,
+                    _ => return Err(format!("--encoding {}: model or task", v)),
+                }
+            }
+            "--pick-windows" => {
+                a.pick_windows = match v.as_str() {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err(format!("--pick-windows {}: on or off", v)),
+                }
+            }
+            _ => return Err(format!("unknown option {}", k)),
+        }
+        given.push(k);
+    }
+    Ok(given)
+}
+
+pub fn check_args(a: &Args) -> Result<(), String> {
+    if a.start.is_some() && a.start_file.is_some() {
+        return Err("--start and --start-file: give one".into());
+    }
+    if a.needed_check && !a.reduce.e {
+        return Err("--start-check needed needs reduction (e)".into());
+    }
+    if a.pick_windows && !a.model {
+        // with task.py's metric 0 Fast Downward would count each begin and pick of a window as 1
+        return Err("--pick-windows on needs --encoding model".into());
+    }
+    Ok(())
+}
+
+/// `--goal K=V[|V..][,K=V..]`: per fact its values, by their text, in the order given (each set sorted, as the
+/// file's are).
+pub fn parse_goal(t: &Task, spec: &str) -> Result<Vec<(u32, Vec<u32>)>, String> {
+    let mut goal: Vec<(u32, Vec<u32>)> = Vec::new();
+    for part in spec.split(',').filter(|p| !p.is_empty()) {
+        let (k, vs) = part.split_once('=').ok_or(format!("--goal {}: KEY=VALUE", part))?;
+        let f = (0..t.facts.len() as u32).find(|&f| t.key(f) == k).ok_or(format!("--goal: no fact {}", k))?;
+        let mut vals = Vec::new();
+        for v in vs.split('|') {
+            let x = t
+                .strs
+                .find(v)
+                .and_then(|s| t.facts.dom(f).iter().position(|&y| y == s))
+                .ok_or(format!("--goal: {} has no value {}", k, v))?;
+            vals.push(x as u32);
+        }
+        vals.sort_unstable();
+        vals.dedup();
+        if goal.iter().any(|(g, _)| *g == f) {
+            return Err(format!("--goal: {} given twice", k));
+        }
+        goal.push((f, vals));
+    }
+    Ok(goal)
+}
+
+/// A tiny JSON writer for the stats.
+pub struct J(pub String);
+
+impl J {
+    pub fn new() -> J {
+        J("{".into())
+    }
+    fn sep(&mut self) {
+        if !self.0.ends_with('{') {
+            self.0.push_str(", ");
+        }
+    }
+    pub fn n(&mut self, k: &str, v: impl std::fmt::Display) -> &mut Self {
+        self.sep();
+        let _ = write!(self.0, "{}: {}", esc(k), v);
+        self
+    }
+    pub fn f(&mut self, k: &str, v: f64) -> &mut Self {
+        self.sep();
+        let _ = write!(self.0, "{}: {:.4}", esc(k), v);
+        self
+    }
+    pub fn s(&mut self, k: &str, v: &str) -> &mut Self {
+        self.sep();
+        let _ = write!(self.0, "{}: {}", esc(k), esc(v));
+        self
+    }
+    pub fn raw(&mut self, k: &str, v: &str) -> &mut Self {
+        self.sep();
+        let _ = write!(self.0, "{}: {}", esc(k), v);
+        self
+    }
+    pub fn done(&mut self) -> String {
+        self.0.push('}');
+        std::mem::take(&mut self.0)
+    }
+}
+
+pub fn esc(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for ch in s.chars() {
+        match ch {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            '\n' => o.push_str("\\n"),
+            c if (c as u32) < 0x20 => {
+                let _ = write!(o, "\\u{:04x}", c as u32);
+            }
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+pub fn counts_json(c: &reduce::Counts) -> String {
+    let mut j = J::new();
+    for (k, v) in c {
+        j.n(k, v);
+    }
+    j.done()
+}
+
+pub fn sas_json(c: &sas::SasCounts) -> String {
+    let mut j = J::new();
+    j.n("actions", c.actions)
+        .n("operators", c.operators)
+        .n("action_operators", c.action_ops)
+        .n("pick_operators", c.pick_ops)
+        .n("goal_operators", c.goal_ops)
+        .n("effects", c.effects)
+        .n("conditional_effects", c.cond_effects)
+        .n("variables", c.variables)
+        .n("values", c.values)
+        .n("pick_variables", c.pick_vars)
+        .n("variants", c.variants)
+        .n("max_variants", c.max_variants)
+        .n("dead_actions", c.dead_actions)
+        .n("empty_variants", c.empty_variants)
+        .n("pick_actions", c.pick_actions)
+        .n("noop_effects", c.noop_effects)
+        .n("goal_resets", c.goal_resets)
+        .n("bytes", c.bytes);
+    if c.window_mode {
+        j.n("pick_windows", c.windows).n("window_pick_operators", c.window_pick_ops);
+    }
+    j.done()
+}
+
+pub struct Prepared {
+    pub names: Vec<String>, // the input actions' names (label#rec), by input index
+    pub task: Task,
+    pub start: usize,
+    pub stats: J,
+    pub replaced: Vec<(u32, u32)>,
+    pub needed: Vec<String>, // with --ops or --start-check needed: the facts (e) needs on the banned task, before the fold
+}
+
+pub fn prepare(a: &Args) -> Result<Prepared, String> {
+    let t0 = Instant::now();
+    let loaded = packed::load(&a.task)?;
+    let mut t = loaded.task;
+    if let Some(g) = &a.goal {
+        t.goal = parse_goal(&t, g)?;
+    }
+    let names: Vec<String> = if a.names.is_some() { (0..t.acts.len()).map(|i| t.name(i)).collect() } else { Vec::new() };
+    let mut st = J::new();
+    st.s("task", &a.task.display().to_string())
+        .n("file_bytes", loaded.file_bytes)
+        .n("input_actions", t.acts.len())
+        .n("input_effects", t.acts.n_effects())
+        .n("facts", t.facts.len())
+        .n("add_effects_expanded", loaded.add_effects)
+        .f("seconds_load", t0.elapsed().as_secs_f64())
+        .n("rss_after_load", peak_rss());
+    let mut replaced = Vec::new();
+    // the harness's cost caps (bans.rs): first, so the bans' pieces, the fold and the reductions see the capped costs
+    if let Some(path) = &a.cost_caps {
+        let caps = bans::read_caps(path)?;
+        let lowered = bans::apply_caps(&mut t, &caps);
+        let mut j = J::new();
+        j.n("caps", caps.len()).n("actions_lowered", lowered);
+        st.raw("cost_caps", &j.done());
+    }
+    // a start given as a file, and the bans (bans.rs): before the start check, so that it and everything after it
+    // read the banned task as their input
+    let mut named = None;
+    if let Some(path) = &a.start_file {
+        let (vals, keys) = bans::read_start(&t, path)?;
+        let name = t.strs.intern(&format!("file:{}", path.display()));
+        t.starts.push((name, vals));
+        named = Some(keys);
+    }
+    if let Some(path) = &a.bans {
+        let t1 = Instant::now();
+        let list = bans::read_bans(path)?;
+        let mut bc = bans::BanCounts::default();
+        t = bans::apply(t, &list, named.as_ref(), &mut bc)?;
+        let mut j = J::new();
+        j.n("bans", bc.bans)
+            .n("not_applied", bc.not_applied)
+            .n("actions_hit", bc.actions_hit)
+            .n("pieces", bc.pieces)
+            .n("actions_after", bc.actions_after)
+            .f("seconds", t1.elapsed().as_secs_f64());
+        st.raw("bans", &j.done());
+    }
+    let start = match &a.start {
+        Some(name) => t.start_index(name).ok_or(format!("no start named {}", name))?,
+        None if a.start_file.is_some() => t.starts.len() - 1,
+        None => 0,
+    };
+    st.s("start", t.strs.get(t.starts.get(start).ok_or("the file has no start")?.0));
+    // a reading made with the reader's switch --reach covers only what its start reaches: a start holding another
+    // value needs the reading extended, and no task comes out of this one (bans::reached_misses)
+    if let Some(path) = bans::reached_file(a.reached.as_deref(), &a.task) {
+        let m = bans::reached_misses(&t, &t.starts[start].1, &path)?;
+        if !m.is_empty() {
+            eprintln!("taskcore: the start holds {} values the reading did not reach: {:?}; extend the reading (reader-scope --reach-also)", m.len(), &m[..m.len().min(20)]);
+            std::process::exit(7);
+        }
+    }
+    // a start value outside a domain the input's file uses: task.py raises OutOfDomain; so does taskcore, before the
+    // fold and the reductions can hide the fact (sas::start_misses). With --start-check needed, only on those of
+    // these facts that (e) needs, before or after the first fold (below)
+    let input_misses = sas::start_misses(&t, &t.starts[start].1, a.limit)?;
+    if !a.needed_check && !input_misses.is_empty() {
+        let m = &input_misses;
+        return Err(format!("{} facts out of their domains: {:?}", m.len(), &m[..m.len().min(10)]));
+    }
+    // the facts (e) needs on the banned task (reduce::needed: from the goal back; it reads no start): the operator
+    // table's "needed", and with --start-check needed half of the check (needed only where the input check stops)
+    let needed_of = |t: &Task| -> Vec<String> {
+        let nd = reduce::needed(t);
+        (0..t.facts.len() as u32).filter(|&f| nd.ncount[f as usize] > 0).map(|f| t.key(f).to_string()).collect()
+    };
+    let t_needed = Instant::now();
+    let check = a.needed_check && !input_misses.is_empty();
+    let needed = if check || a.ops.is_some() { needed_of(&t) } else { Vec::new() };
+    let mut seconds_needed = t_needed.elapsed().as_secs_f64();
+    st.s("fold", &format!("{:?}", a.fold)).s("reduce", &format!("{:?}", a.reduce)).n("product_limit", a.limit);
+    st.s("encoding", if a.model { "model" } else { "task" });
+    // the fold, then the reductions to their fixpoint; then the fold again (after (d) has cut unreachable values,
+    // groups with a hole may cover their box, and overlapping paths may be disjoint), and the reductions again
+    let passes = if a.fold != FoldMode::Off && a.reduce.any() { 2 } else { 1 };
+    let mut c = reduce::Counts::new();
+    for pass in 0..passes {
+        let tag = if pass == 0 { "" } else { "_second" };
+        if a.fold != FoldMode::Off {
+            let t1 = Instant::now();
+            let keep = if a.check_fold > 0 { Some(t.clone()) } else { None };
+            let (nt, fc, map) = fold::fold(t, a.fold);
+            t = nt;
+            st.f(&format!("seconds_fold{}", tag), t1.elapsed().as_secs_f64());
+            let mut j = J::new();
+            j.n("groups", fc.groups)
+                .n("paths_in_groups", fc.grouped)
+                .n("subgroups", fc.subgroups)
+                .n("paths_folded", fc.folded_paths)
+                .n("folded_actions", fc.folded_actions)
+                .n("subgroups_with_a_hole_left_unfolded", fc.holes)
+                .n("subgroups_past_128_bits_left_unfolded", fc.overflow)
+                .n("subgroups_past_pre_limit_left_unfolded", fc.pre_limit)
+                .n("dead_conditional_effects", fc.dead_effects);
+            if fc.double_writes > 0 {
+                j.n("subgroups_writing_a_fact_twice_left_unfolded", fc.double_writes);
+            }
+            j.n("actions_after", t.acts.len()).n("effects_after", t.acts.n_effects());
+            st.raw(&format!("fold_counts{}", tag), &j.done());
+            if let Some(orig) = keep {
+                let t2 = Instant::now();
+                let cc = fold::check(&orig, &t, &map, a.check_fold, 0x5eed);
+                let mut j = J::new();
+                j.n("folds", cc.folds)
+                    .n("paths", cc.paths)
+                    .n("states", cc.states)
+                    .n("folded_does_not_apply", cc.folded_does_not_apply)
+                    .n("another_path_applies", cc.another_path_applies)
+                    .n("writes_differ", cc.writes_differ)
+                    .n("conflicting_writes", cc.conflicting_writes)
+                    .n("union_box_states", cc.union_box_states)
+                    .n("union_box_not_exactly_one_path", cc.union_box_not_one_path)
+                    .n("mismatches", cc.mismatches())
+                    .f("seconds", t2.elapsed().as_secs_f64());
+                st.raw(&format!("fold_check{}", tag), &j.done());
+            }
+            if pass == 1 && fc.folded_actions == 0 {
+                break;
+            }
+        }
+        if pass == 0 && a.needed_check {
+            // --start-check needed: of the facts the input check stops on, only those (e) needs before or after the
+            // first fold stop the run. A fact (e) does not need is in no precondition of an action that writes a
+            // needed value and in no condition of such an action's effects on needed facts; (e) drops everything
+            // else that names it (its effects, the actions that write no needed value), and the reductions after it
+            // never need a value the input did not, so the reduced file never names it and its start value is never
+            // read. Before the fold too: a fold whose union on a fact is its whole domain makes the fact unread, and
+            // a value outside the domain is in no path's box. The writer stops if the file names such a fact anyway
+            // (sas::pass2)
+            let t1 = Instant::now();
+            let mut j = J::new();
+            j.s("on", "the facts the input check stops on that (e) needs, before or after the first fold")
+                .n("facts_the_input_check_stops_on", input_misses.len());
+            if check {
+                let after = if a.fold != FoldMode::Off { needed_of(&t) } else { needed.clone() };
+                let need: std::collections::HashSet<&str> = needed.iter().chain(after.iter()).map(|k| k.as_str()).collect();
+                let misses: Vec<&String> = input_misses.iter().filter(|k| need.contains(k.as_str())).collect();
+                if !misses.is_empty() {
+                    return Err(format!("{} facts out of their domains: {:?}", misses.len(), &misses[..misses.len().min(10)]));
+                }
+                j.n("needed_facts_before_the_fold", needed.len()).n("needed_facts_after_the_fold", after.len());
+            }
+            seconds_needed += t1.elapsed().as_secs_f64();
+            j.f("seconds", seconds_needed);
+            st.raw("start_check", &j.done());
+        }
+        if a.reduce.any() {
+            let t1 = Instant::now();
+            t = reduce::run(t, a.reduce, start, &mut c, &mut replaced)?;
+            st.f(&format!("seconds_reduce{}", tag), t1.elapsed().as_secs_f64());
+            st.n(&format!("actions_after_reduce{}", tag), t.acts.len());
+        }
+    }
+    if a.reduce.any() {
+        st.raw("reduce_counts", &counts_json(&c));
+        let sample: Vec<String> = replaced.iter().take(20).map(|(i, k)| format!("[{}, {}]", i, k)).collect();
+        st.raw("replaced_sample", &format!("[{}]", sample.join(", ")));
+        st.n("replaced", replaced.len());
+    }
+    st.n("actions", t.acts.len()).n("effects", t.acts.n_effects()).n("rss_after_reduce", peak_rss());
+    Ok(Prepared { names, task: t, start, stats: st, replaced, needed })
+}
+
+/// The `sas` command's outputs from a prepared task: the SAS file, the operator table, the stats and the kept list.
+pub fn write_out(a: &Args, mut p: Prepared, t0: Instant) -> Result<(), String> {
+    let out = a.out.clone().ok_or("--out is needed")?;
+    let t1 = Instant::now();
+    let mut x = sas::Expander::new(&p.task, a.limit);
+    x.model = a.model;
+    x.windows = a.pick_windows;
+    let plan = sas::pass1(&mut x)?;
+    let s1 = t1.elapsed().as_secs_f64();
+    let t2 = Instant::now();
+    let f = std::fs::File::create(&out).map_err(|e| format!("{}: {}", out.display(), e))?;
+    let bytes = sas::pass2(&mut x, &plan, &p.task.starts[p.start].1, BufWriter::with_capacity(4 << 20, f))?;
+    let s2 = t2.elapsed().as_secs_f64();
+    if let Some(path) = &a.ops {
+        let t3 = Instant::now();
+        let f = std::fs::File::create(path).map_err(|e| format!("{}: {}", path.display(), e))?;
+        sas::write_ops(&mut x, &plan, &p.needed, BufWriter::with_capacity(1 << 20, f))?;
+        p.stats.f("seconds_ops", t3.elapsed().as_secs_f64());
+    }
+    let mut c = plan.counts.clone();
+    c.bytes = bytes;
+    p.stats
+        .f("seconds_pass1", s1)
+        .f("seconds_pass2", s2)
+        .f("seconds_total", t0.elapsed().as_secs_f64())
+        .raw("sas", &sas_json(&c))
+        .n("peak_rss", peak_rss());
+    if let Some(path) = &a.kept {
+        // the input actions each reduced action stands for, and the ones (f) replaced: (dropped, by)
+        let mut o = String::from("{\"actions\": [");
+        for i in 0..p.task.acts.len() {
+            if i > 0 {
+                o.push_str(", ");
+            }
+            let m: Vec<String> = p.task.acts.members(i).iter().map(|x| x.to_string()).collect();
+            let _ = write!(o, "[{}]", m.join(", "));
+        }
+        o.push_str("], \"replaced\": [");
+        let r: Vec<String> = p.replaced.iter().map(|(x, y)| format!("[{}, {}]", x, y)).collect();
+        o.push_str(&r.join(", "));
+        o.push_str("]}\n");
+        std::fs::write(path, o).map_err(|e| e.to_string())?;
+    }
+    let js = p.stats.done();
+    match &a.stats {
+        Some(path) => std::fs::write(path, js + "\n").map_err(|e| e.to_string())?,
+        None => println!("{}", js),
+    }
+    Ok(())
+}
+
+pub fn run() -> Result<(), String> {
+    let a = parse()?;
+    let t0 = Instant::now();
+    match a.cmd.as_str() {
+        "info" => {
+            let l = packed::load(&a.task)?;
+            let t = &l.task;
+            println!(
+                "{}: {} actions, {} effects, {} facts, {} values, goal {} facts, starts {:?}",
+                a.task.display(),
+                t.acts.len(),
+                t.acts.n_effects(),
+                t.facts.len(),
+                t.facts.total_values(),
+                t.goal.len(),
+                t.starts.iter().map(|(n, _)| t.strs.get(*n)).collect::<Vec<_>>()
+            );
+            Ok(())
+        }
+        "sas" => {
+            let p = prepare(&a)?;
+            write_out(&a, p, t0)
+        }
+        "serve" => serve::run(&a),
+        "dump" => {
+            // the reduced task as text, one JSON line per action and one per fact (the check of the reader's switch
+            // --reach, experiments/E004-fast-exact/reach_check.py): no state, no writer
+            let mut p = prepare(&a)?;
+            let t = &p.task;
+            let text = |f: u32, vals: &[u32]| -> String {
+                let d = t.facts.dom(f);
+                let v: Vec<String> = vals.iter().map(|&x| esc(t.strs.get(d[x as usize]))).collect();
+                format!("[{}]", v.join(","))
+            };
+            let f = std::fs::File::create(a.out.as_ref().ok_or("--out is needed")?).map_err(|e| e.to_string())?;
+            let mut o = std::io::BufWriter::new(f);
+            use std::io::Write as _;
+            for k in 0..t.facts.len() as u32 {
+                let all: Vec<u32> = (0..t.facts.size(k)).collect();
+                let st = t.starts[p.start].1[k as usize];
+                let st = if st == NONE { "null".to_string() } else { esc(t.strs.get(t.facts.dom(k)[st as usize])) };
+                writeln!(o, "{{\"fact\":{},\"values\":{},\"start\":{}}}", esc(t.key(k)), text(k, &all), st).map_err(|e| e.to_string())?;
+            }
+            for i in 0..t.acts.len() {
+                let v = t.acts.view(i);
+                let m = t.acts.meta[i];
+                let sets = |it: &mut dyn Iterator<Item = (u32, &[u32])>| -> String {
+                    let s: Vec<String> = it.map(|(f, vs)| format!("[{},{}]", esc(t.key(f)), text(f, vs))).collect();
+                    format!("[{}]", s.join(","))
+                };
+                let effs: Vec<String> = v
+                    .effs()
+                    .map(|e| {
+                        let vals = if e.kind == K_BAD { "[]".to_string() } else { text(e.fact, e.vals) };
+                        format!("[{},{},{},{}]", esc(t.key(e.fact)), e.kind, vals, sets(&mut e.when()))
+                    })
+                    .collect();
+                writeln!(
+                    o,
+                    "{{\"label\":{},\"kind\":{},\"end\":{},\"cont\":{},\"cost\":{},\"rec\":{},\"pre\":{},\"eff\":[{}]}}",
+                    esc(t.strs.get(m.label)),
+                    esc(t.strs.get(m.kind)),
+                    esc(t.strs.get(m.end)),
+                    esc(t.strs.get(m.cont)),
+                    m.cost,
+                    m.rec,
+                    sets(&mut v.pre()),
+                    effs.join(",")
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            drop(o);
+            if let Some(path) = &a.stats {
+                std::fs::write(path, p.stats.done() + "\n").map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        }
+        "decode" => {
+            let p = prepare(&a)?;
+            let plan_text = std::fs::read_to_string(a.plan.as_ref().ok_or("--plan is needed")?).map_err(|e| e.to_string())?;
+            let mut ops = Vec::new();
+            for line in plan_text.lines() {
+                let l = line.trim();
+                if let Some(rest) = l.strip_prefix('(') {
+                    let name = rest.trim_end_matches(')').split_whitespace().next().unwrap_or("");
+                    let num: u64 = name.trim_start_matches('a').parse().map_err(|_| format!("plan line {:?}", l))?;
+                    ops.push(num);
+                }
+            }
+            let t = &p.task;
+            let mut x = sas::Expander::new(t, a.limit);
+            x.model = a.model;
+            x.windows = a.pick_windows;
+            let plan = sas::pass1(&mut x)?;
+            let mut x = sas::Expander::new(t, a.limit);
+            x.model = a.model;
+            x.windows = a.pick_windows;
+            let steps = sas::decode(&mut x, &ops)?;
+            let key = |f: u32| esc(t.key(f));
+            let val = |f: u32, v: u32| esc(t.strs.get(t.facts.dom(f)[v as usize]));
+            let mut out = String::from("{\"steps\": [");
+            for (i, s) in steps.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                let mem: Vec<String> = t.acts.members(s.action).iter().map(|m| m.to_string()).collect();
+                let ch: Vec<String> = s.chosen.iter().map(|&(f, v)| format!("[{}, {}]", key(f), val(f, v))).collect();
+                let gu: Vec<String> = s.guessed.iter().map(|&(f, v)| format!("[{}, {}]", key(f), val(f, v))).collect();
+                let pk: Vec<String> = s
+                    .picked
+                    .iter()
+                    .map(|(f, vals, u)| {
+                        let vs: Vec<String> = vals.iter().map(|&v| val(*f, v)).collect();
+                        format!("[{}, [{}], {}]", key(*f), vs.join(", "), val(*f, *u))
+                    })
+                    .collect();
+                let _ = write!(
+                    out,
+                    "{{\"op\": \"a{}\", \"action\": {}, \"name\": {}, \"members\": [{}], \"chosen\": [{}], \"guessed\": [{}], \"picked\": [{}]}}",
+                    s.op,
+                    s.action,
+                    esc(&t.name(s.action)),
+                    mem.join(", "),
+                    ch.join(", "),
+                    gu.join(", "),
+                    pk.join(", ")
+                );
+            }
+            let facts: Vec<String> = plan.vars.iter().filter(|&&v| v < t.facts.len() as u32).map(|&v| key(v)).collect();
+            let _ = write!(out, "], \"facts\": [{}], \"operators\": {}}}", facts.join(", "), plan.n_ops);
+            let path = a.out.clone().ok_or("--out is needed")?;
+            std::fs::write(&path, out + "\n").map_err(|e| e.to_string())?;
+            Ok(())
+        }
+        "validate" => {
+            // run a plan given as input action names (label#rec, one per line) on the reduced task: each step is the
+            // reduced action that holds that input action (or, if (f) dropped it, the one that replaced it); its
+            // precondition must hold; a guessed write that fires leaves its fact unknown, and reading an unknown
+            // value fails; at the end the goal must hold
+            let p = prepare(&a)?;
+            let t = &p.task;
+            let text = std::fs::read_to_string(a.names.as_ref().ok_or("--names is needed")?).map_err(|e| e.to_string())?;
+            let by_name: std::collections::HashMap<&str, u32> = p.names.iter().enumerate().map(|(i, n)| (n.as_str(), i as u32)).collect();
+            let mut holder: std::collections::HashMap<u32, usize> = Default::default();
+            for i in 0..t.acts.len() {
+                for &m in t.acts.members(i) {
+                    holder.insert(m, i);
+                }
+            }
+            let replaced: std::collections::HashMap<u32, u32> = p.replaced.iter().copied().collect();
+            let mut state: Vec<u32> = t.starts[p.start].1.clone();
+            let mut out = Vec::new();
+            let mut ok = true;
+            let mut guesses = Vec::new();
+            for (n, name) in text.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).enumerate() {
+                let Some(&id) = by_name.get(name) else {
+                    out.push(format!("{}: not an input action", esc(name)));
+                    ok = false;
+                    break;
+                };
+                let mut id2 = id;
+                while !holder.contains_key(&id2) {
+                    match replaced.get(&id2) {
+                        Some(&b) => id2 = b,
+                        None => break,
+                    }
+                }
+                let Some(&i) = holder.get(&id2) else {
+                    out.push(format!("{}: dropped", esc(name)));
+                    ok = false;
+                    break;
+                };
+                let v = t.acts.view(i);
+                if !v.pre().all(|(f, s)| state[f as usize] != NONE && contains(s, state[f as usize])) {
+                    out.push(format!("{}: its precondition does not hold (step {})", esc(name), n + 1));
+                    ok = false;
+                    break;
+                }
+                let mut new = state.clone();
+                for e in v.effs() {
+                    if !e.when().all(|(f, s)| state[f as usize] != NONE && contains(s, state[f as usize])) {
+                        if e.when().any(|(f, _)| state[f as usize] == NONE) {
+                            new[e.fact as usize] = NONE;
+                        }
+                        continue;
+                    }
+                    if e.kind == K_SET {
+                        new[e.fact as usize] = e.vals[0];
+                    } else {
+                        new[e.fact as usize] = NONE;
+                        guesses.push(format!("[{}, {}]", n + 1, esc(t.key(e.fact))));
+                    }
+                }
+                state = new;
+                let how = if id2 != id { format!("replaced by {}", esc(&p.names[id2 as usize])) } else if t.acts.members(i).len() > 1 { format!("in {}", esc(&t.name(i))) } else { "kept".to_string() };
+                out.push(format!("{}: {}", esc(name), how.trim_matches('"')));
+            }
+            let goal = ok && t.goal.iter().all(|(f, vals)| state[*f as usize] != NONE && contains(vals, state[*f as usize]));
+            let js = format!(
+                "{{\"steps\": [{}], \"ok\": {}, \"goal\": {}, \"guesses_fired\": [{}]}}\n",
+                out.iter().map(|s| format!("\"{}\"", s.replace('"', ""))).collect::<Vec<_>>().join(", "),
+                ok,
+                goal,
+                guesses.join(", ")
+            );
+            std::fs::write(a.out.as_ref().ok_or("--out is needed")?, js).map_err(|e| e.to_string())?;
+            Ok(())
+        }
+        c => Err(format!("unknown command {}", c)),
+    }
+}
+
+/// The command line (main.rs): `run`, its error on stderr and exit code 2.
+pub fn main() {
+    if let Err(e) = run() {
+        eprintln!("taskcore: {}", e);
+        std::process::exit(2);
+    }
+}
