@@ -297,6 +297,7 @@ def test_readings_evict_least_recently_used_and_the_floor(tmp_path):
         (d / "reading.json").write_text("{}")
         (d / "big.bin").write_bytes(b"x" * 1000)
         (d / "start.txt").write_text("room\t33\n")
+        (d / "start.jsonl").write_text("{}\n")
         paths.append(d / "reading.json")
         a.register_reading([28, 33], d / "reading.json", 0, None, used=used)
     assert [x["path"] for x in a.readings_for([33, 28])] == [str(p) for p in reversed(paths)]
@@ -312,6 +313,7 @@ def test_readings_evict_least_recently_used_and_the_floor(tmp_path):
     # r1 (used 1) is in use, so r2 (used 2) then r0 (used 3) go; then the space is enough
     assert out == [str(paths[2]), str(paths[0])]
     assert not paths[2].exists() and (paths[2].parent / "start.txt").exists() and paths[1].exists()
+    assert (paths[2].parent / "start.jsonl").exists() and not (paths[2].parent / "big.bin").exists()
     assert [x["path"] for x in a.readings_for([28, 33])] == [str(paths[3]), str(paths[1])]
     b = X.Archive.open(a.root)
     assert [x["path"] for x in b.readings_for([28, 33])] == [str(paths[3]), str(paths[1])]

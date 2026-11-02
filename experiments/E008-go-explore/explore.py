@@ -611,8 +611,9 @@ class Archive:
 
     def evict(self, free_fn, in_use=(), level_gb: float | None = None) -> list:
         """Deletes readings least recently used first, never one in ``in_use``, while ``free_fn()`` is under the
-        evict level (E008_EVICT_GB). A reading's files go; start.txt files stay (other readings' --reach-also may
-        name them). Returns the paths evicted."""
+        evict level (E008_EVICT_GB). A reading's files go; its start files stay (START_FILES: other readings'
+        --reach-also may name start.txt, and a refinement's or reach extension's reading names its start.jsonl as
+        its start rows). Returns the paths evicted."""
         level = (machine()["evict_gb"] if level_gb is None else level_gb) * GIB
         in_use = {str(p) for p in in_use}
         out = []
@@ -883,9 +884,14 @@ def _count(xs) -> dict:
     return out
 
 
+START_FILES = ("start.txt", "start.jsonl")  # what an eviction keeps (_evict_dir)
+
+
 def _evict_dir(d: Path, keep: list) -> None:
-    """A reading's files under ``d``, except start.txt files and the dirs of other live readings (``keep``, inside
-    ``d``); nothing when another live reading shares ``d``."""
+    """A reading's files under ``d``, except its start files (START_FILES: start.txt, which other readings'
+    ``--reach-also`` may name, and start.jsonl, which the readings a refinement or a reach extension made from it name
+    as their start rows) and the dirs of other live readings (``keep``, inside ``d``); nothing when another live
+    reading shares ``d``."""
     if d in keep:
         return
     for p, dirs, files in os.walk(d, topdown=False):
@@ -893,7 +899,7 @@ def _evict_dir(d: Path, keep: list) -> None:
         if any(pp == q or q in pp.parents for q in keep):
             continue
         for f in files:
-            if f != "start.txt":
+            if f not in START_FILES:
                 try:
                     os.unlink(os.path.join(p, f))
                 except OSError:
