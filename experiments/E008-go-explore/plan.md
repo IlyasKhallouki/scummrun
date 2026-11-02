@@ -409,6 +409,17 @@ its targets in turn until one plans.
 
 The predictions above stand as written.
 
+## Amendment (2026-11-02, before the kitchen's resume)
+
+The kitchen's run was stopped by hand at 01:04:43 with 15 jobs committed (the two running jobs killed, uncommitted). A
+hand stop is none of the stop rules above, and its stated reason, that var 100 makes each idle frame of room 38's
+dialog a new cell without end, was refuted by the check in the lab note (var 100 takes 233 values; the dialog
+trajectory's cells repeat from frame 2902). The run is resumed from its archive's files (`explore.py run ARCHIVE
+--workers 2`, which runs the two uncommitted jobs again in place) with the same code (explore.py, step.py and guide.py
+as merged at c09053a), the same guide, the same allowed rooms and b = 2 under the 7 GB rule, until one of the stop
+rules above fires, then verify. The method, the predictions and the threshold are unchanged; the results below are
+corrected after the resume.
+
 ## Results (2026-11-02, written after the runs)
 
 Code on branch e008 at c09053a (the three components merged with no conflict; no existing file edited, no fix needed
