@@ -1087,16 +1087,18 @@ fn main() {
             "lists": n_lists,
             "records": lines.n_records,
             "sink_s": (lines.sink_s * 100.0).round() / 100.0,
+            "sink_cpu_s": (lines.sink_cpu_s * 100.0).round() / 100.0,
             "tc_s": (tc_s * 100.0).round() / 100.0,
             "finish_s": (files_s * 100.0).round() / 100.0,
         });
         write_json(&report_path, &r);
         eprintln!(
-            "[{name}] reading files in {}: {} actions, {} lists; {:.2} s in the sink, {:.2} s reading the packed file, {:.2} s at the end",
+            "[{name}] reading files in {}: {} actions, {} lists; {:.2} s in the sink ({:.2} CPU s), {:.2} s reading the packed file, {:.2} s at the end",
             dir.display(),
             tc.words.len(),
             n_lists,
             lines.sink_s,
+            lines.sink_cpu_s,
             tc_s,
             files_s
         );

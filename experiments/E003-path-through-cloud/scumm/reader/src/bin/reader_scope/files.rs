@@ -55,8 +55,9 @@ pub struct Files {
     seen: FxHashSet<(String, i64, i64)>,
     /// records of the pass so far (the golden stream's records)
     pub n_records: usize,
-    /// seconds in `batch` (the sink's thread)
+    /// seconds in `batch` (the sink's thread): wall, and the thread's CPU
     pub busy: f64,
+    pub busy_cpu: f64,
     line: String,
 }
 
@@ -163,18 +164,32 @@ pub fn action_line(out: &mut String, i: usize, rec: usize, r: &Record) {
     out.push_str("]}\n");
 }
 
-/// packed_reading.py `lists_of(next_events, effects, flags)` of one record: (its (name, w, sig), its line).
-pub fn list_lines(r: &Record, flags: bool) -> Vec<((String, i64, i64), String)> {
-    let mut out = Vec::new();
+/// packed_reading.py `lists_of(next_events, effects, flags)` of one record, less the lists `seen` holds (each
+/// (name, w, sig) once, as `_ListWriter` writes them): (its (name, w, sig), its line) for each new one, which goes
+/// into `seen`.
+pub fn list_lines(
+    r: &Record,
+    flags: bool,
+    seen: &mut FxHashSet<(String, i64, i64)>,
+    out: &mut Vec<((String, i64, i64), String)>,
+) {
+    let mut key = String::new();
     for e in &r.next_events {
         if e.sig == 0 || e.abort {
             continue;
         }
-        let key = format!("args:{}", e.name);
+        key.clear();
+        key.push_str("args:");
+        key.push_str(&e.name);
         match r.effect(&key) {
             Some(Eff::Set(Label::Int(v))) if *v == e.sig => {}
             _ => continue,
         }
+        let k = (e.name.clone(), e.w, e.sig);
+        if seen.contains(&k) {
+            continue;
+        }
+        seen.insert(k.clone());
         let mut locals: Vec<&(i64, Val)> = e.locals.iter().collect();
         locals.sort_by_key(|x| x.0);
         let mut ln = PJ::obj(vec![
@@ -195,9 +210,16 @@ pub fn list_lines(r: &Record, flags: bool) -> Vec<((String, i64, i64), String)> 
                 ]),
             );
         }
-        out.push(((e.name.clone(), e.w, e.sig), ln.compact_text()));
+        out.push((k, ln.compact_text()));
     }
-    out
+}
+
+/// CPU seconds of the calling thread so far (/proc/thread-self/schedstat: its run time in ns); 0 where unknown.
+pub fn thread_cpu() -> f64 {
+    std::fs::read_to_string("/proc/thread-self/schedstat")
+        .ok()
+        .and_then(|t| t.split_whitespace().next().and_then(|x| x.parse::<u64>().ok()))
+        .map_or(0.0, |ns| ns as f64 / 1e9)
 }
 
 fn sha1_hex(d: &[u8; 20]) -> String {
@@ -228,6 +250,7 @@ impl Files {
             seen: FxHashSet::default(),
             n_records: 0,
             busy: 0.0,
+            busy_cpu: 0.0,
             line: String::with_capacity(4096),
         })
     }
@@ -248,14 +271,10 @@ impl Files {
     /// wrote as actions (`RecordStream::records_with`), in order.
     pub fn batch(&mut self, first: usize, recs: &[Record], written: &[usize]) -> io::Result<()> {
         let t = Instant::now();
+        let c = thread_cpu();
         for r in recs {
-            if r.next_events.is_empty() {
-                continue;
-            }
-            for (k, line) in list_lines(r, self.flags) {
-                if self.seen.insert(k.clone()) {
-                    self.lists.push((k, line));
-                }
+            if !r.next_events.is_empty() {
+                list_lines(r, self.flags, &mut self.seen, &mut self.lists);
             }
         }
         for &j in written {
@@ -268,6 +287,7 @@ impl Files {
         }
         self.n_records += recs.len();
         self.busy += t.elapsed().as_secs_f64();
+        self.busy_cpu += thread_cpu() - c;
         Ok(())
     }
 
@@ -314,7 +334,7 @@ impl Files {
         }
         std::fs::write(self.dir.join(LISTS), text.as_bytes())?;
         let sha_lists = sha1_smol::Sha1::from(text.as_bytes()).digest().bytes();
-        Ok(Lines { n_records: self.n_records, action_off, list_off, sha_actions, sha_lists, sink_s: self.busy })
+        Ok(Lines { n_records: self.n_records, action_off, list_off, sha_actions, sha_lists, sink_s: self.busy, sink_cpu_s: self.busy_cpu })
     }
 }
 
@@ -357,6 +377,7 @@ pub struct Lines {
     pub sha_actions: [u8; 20],
     pub sha_lists: [u8; 20],
     pub sink_s: f64,
+    pub sink_cpu_s: f64,
 }
 
 /// What the packed file holds that the head and the index need (one streaming pass, which also gives its sha1).
