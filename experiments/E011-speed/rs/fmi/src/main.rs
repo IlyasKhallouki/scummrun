@@ -4,6 +4,7 @@
 //!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify]
 //!   fmi explore status ARCHIVE
 //!   fmi fake-step run JOB_DIR          (fake_step.py, for the driver's tests)
+//!   fmi check step FIXTURES.jsonl      (step.py's targets, reusable and idle_rule against the reference's outputs)
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process.
@@ -22,7 +23,8 @@ fn usage() -> ! {
 
 const USAGE: &str = "usage: fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify]
        fmi explore status ARCHIVE
-       fmi fake-step run JOB_DIR";
+       fmi fake-step run JOB_DIR
+       fmi check step FIXTURES.jsonl";
 
 struct Args {
     pos: Vec<String>,
@@ -97,6 +99,7 @@ fn main() {
         ("explore", Some("run")) => cmd_run(&argv[2..]),
         ("explore", Some("status")) => cmd_status(&argv[2..]),
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
+        ("check", Some("step")) => cmd_check_step(&argv[2..]),
         _ => usage(),
     };
     std::process::exit(code)
@@ -173,6 +176,28 @@ fn cmd_fake(argv: &[String]) -> i32 {
         Ok(rc) => rc,
         Err(e) => {
             eprintln!("fake step: {e}");
+            1
+        }
+    }
+}
+
+fn cmd_check_step(argv: &[String]) -> i32 {
+    let Some(p) = argv.first() else { usage() };
+    match fmi_explore::check::step_check(&PathBuf::from(p)) {
+        Ok(r) => {
+            for (k, n, bad) in &r.by_kind {
+                let s = r.seconds.iter().find(|x| x.0 == *k).map(|x| x.1).unwrap_or(0.0);
+                println!("{k}: {n} cases, {bad} differ; {:.3} ms a case in Rust", 1000.0 * s / (*n).max(1) as f64);
+            }
+            for b in &r.first_bad {
+                println!("  {b}");
+            }
+            let bad: usize = r.by_kind.iter().map(|x| x.2).sum();
+            println!("step check: {} cases, {bad} differ", r.cases);
+            (bad > 0) as i32
+        }
+        Err(e) => {
+            eprintln!("fmi check step: {e}");
             1
         }
     }
