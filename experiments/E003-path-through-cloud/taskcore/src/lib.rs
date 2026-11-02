@@ -6,6 +6,7 @@
 //! modules are the binary's, moved, and `cli` is the old main.rs.
 
 pub mod bans;
+pub mod cache;
 pub mod cli;
 pub mod decode;
 pub mod fold;
