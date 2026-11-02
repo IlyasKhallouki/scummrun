@@ -21,22 +21,7 @@ sha1_smol = "1"
 
 [dev-dependencies]
 
-[profile.release]
-codegen-units = 1
-lto = "thin"
-debug = 1
-
-[profile.dev.package."*"]
-opt-level = 2
-
 [[bin]]
 name = "play-fixture"
 path = "src/bin/play_fixture.rs"
 required-features = ["json-double"]
-
-# for iterating: release code without LTO
-[profile.fast]
-inherits = "release"
-lto = false
-codegen-units = 16
-incremental = true

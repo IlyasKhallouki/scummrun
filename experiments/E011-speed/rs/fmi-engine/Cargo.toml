@@ -7,8 +7,3 @@ description = "E011: the engine's Rust driver over the binary channel F1 (experi
 
 [dependencies]
 fmi-core = { path = "../fmi-core" }
-
-[profile.release]
-opt-level = 3
-codegen-units = 4
-debug = false

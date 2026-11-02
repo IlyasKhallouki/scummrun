@@ -13,9 +13,3 @@ taskcore = { path = "../../../E003-path-through-cloud/taskcore" }
 default = ["file-reading"]
 # the test double of the reading port (ReadingSource over a reading's files), until readio's fmi-reading is wired in
 file-reading = []
-
-[profile.release]
-opt-level = 3
-codegen-units = 4
-lto = "thin"
-debug = false
