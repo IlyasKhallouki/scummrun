@@ -11,7 +11,8 @@ b-fast. For each try, wall and CPU seconds by part, from the try's own result.js
 * read: wall, the fresh reading's ``reading.wall_s`` (a reused one's ``load_s``) plus the refinements' and reach
   extensions' ``seconds``; CPU, Python's ``cpu_s.read`` (the reader, the reading's Python side and its loading, the
   refinements' readers), Rust's ``reading.read_cpu_s`` of a fresh reading plus ``cpu_s.read`` (the refinements');
-* play: wall, the window records' ``wall_s``; CPU ``cpu_s.play``;
+* play: wall, the window records' ``wall_s`` (run.json); CPU ``cpu_s.play`` (Python: the window search's engines and
+  Python; fmi records none: its play CPU is in the rest);
 * plan: wall, the attempts' ``seconds`` less play and the refinements' and extensions'; CPU ``cpu_s.plan``;
 * the try: wall ``wall_s``; CPU from times.jsonl (the step's process tree) where measured, else ``rusage_total``;
 * rest: the try less the five parts.
@@ -44,9 +45,12 @@ def parts(d: Path, cpu_tree: float | None) -> dict | None:
     rd = r.get("reading") or {}
     sub = list(a.get("refinements") or ()) + list(a.get("extensions") or ())
     sub_w = sum(x.get("seconds") or 0.0 for x in sub)
-    win = []
-    for w in sorted(d.glob("run/a*/windows.jsonl")):
-        win += load_jsonl(w)
+    win = []  # the window records (run.json's "windows"; Python also writes them to windows.jsonl)
+    for w in sorted(d.glob("run/a*/run.json")):
+        try:
+            win += json.loads(w.read_text()).get("windows") or []
+        except ValueError:
+            pass
     play_w = sum(x.get("wall_s") or 0.0 for x in win)
     att_w = sum(p.get("seconds") or 0.0 for p in r.get("probes") or ())
     read_w = (rd.get("wall_s") or 0.0 if rd.get("fresh") else rd.get("load_s") or 0.0) + sub_w
