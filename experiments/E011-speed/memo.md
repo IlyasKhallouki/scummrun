@@ -116,7 +116,9 @@ did not widen (condition 3), which is pass2-reuse.md's case.
 - A reading indexes the runs of every finished file of its folder by a hash of job and guides, and reads a run's
   bytes when its job comes; candidates are compared byte for byte. Whether a consulted key reads the same is asked
   once per file, key and pass. Its own runs join the index between passes.
-- Space: a reading writes no store when the store's disk is under 8 GB free plus twice its folder's largest file.
+- Space, by E009's level: when the store's disk has less than 8 GB free plus twice the largest store file, a reading
+  first deletes the files of the other folders, oldest first (a reading that opens a file renews its time), and
+  writes no file of its own if that is not enough.
 
 ## The check
 
