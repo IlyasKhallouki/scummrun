@@ -67,82 +67,92 @@ impl<'g> Machine<'g> {
     /// installed at pre; where the path's store differs from pre on VAR_VERB_SCRIPT, VAR_USERPUT or the verb's
     /// `verb:` fact, the difference goes into `Path.input_drift`. Switch input_after_turns reads VAR_USERPUT and
     /// VAR_VERB_SCRIPT from the store instead.
-    pub(super) fn eng_input(&mut self, p: &mut Path, ci: usize, o: &FactOracle, area: i32, val: i32, button: i32) -> Vec<Path> {
-        p.owner = None;
-        p.timed = false;
-        let mut drift = Vec::new();
-        for k in [Fact::Var(VAR_VERB_SCRIPT), Fact::Var(VAR_USERPUT), Fact::Verb(val)] {
-            let now = self.read(p, k, o);
-            let before = self.oget(o, k);
-            if now != before {
-                drift.push((k, before, now));
-            }
-        }
-        p.input_drift = drift;
-        let (_, cite) = Self::head_cite(p, ci);
-        let mut more = Vec::new();
-        let n = if self.switches.input_after_turns {
-            // switch (off by default): checkExecVerbs' own reads, on the path's store (verbs.cpp:590, script.cpp:1482)
-            let up = self.read(p, Fact::Var(VAR_USERPUT), o);
-            let dropped = "_userPut <= 0 after the turns: the click is dropped (verbs.cpp:590)";
-            match self.v.decide(&[up], |y| y[0] <= 0) {
-                Dec::Unk(off) => {
-                    let mut q = p.fork();
-                    let why = rc(&self.show(off));
-                    let cond = rc("_userPut <= 0: the click is dropped");
-                    p.assumptions.push(Assumption {
-                        cite: cite.clone(),
-                        cond: cond.clone(),
-                        side: Side::Bool(false),
-                        why: why.clone(),
-                    });
-                    q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(true), why });
-                    self.note(&mut q, cite.clone(), "checkExecVerbs", dropped);
-                    more.push(q);
+    pub(super) fn eng_input(
+        &mut self,
+        p: &mut Path,
+        ci: usize,
+        o: &FactOracle,
+        area: i32,
+        val: i32,
+        button: i32,
+    ) -> R<Vec<Path>> {
+        Ok({
+            p.owner = None;
+            p.timed = false;
+            let mut drift = Vec::new();
+            for k in [Fact::Var(VAR_VERB_SCRIPT), Fact::Var(VAR_USERPUT), Fact::Verb(val)] {
+                let now = self.read(p, k, o)?;
+                let before = self.oget(o, k);
+                if now != before {
+                    drift.push((k, before, now));
                 }
-                Dec::Bool(true) => {
-                    self.note(p, cite.clone(), "checkExecVerbs", dropped);
-                    self.ev_input(p, area, val, button);
-                    return Vec::new();
+            }
+            p.input_drift = drift;
+            let (_, cite) = Self::head_cite(p, ci);
+            let mut more = Vec::new();
+            let n = if self.switches.input_after_turns {
+                // switch (off by default): checkExecVerbs' own reads, on the path's store (verbs.cpp:590, script.cpp:1482)
+                let up = self.read(p, Fact::Var(VAR_USERPUT), o)?;
+                let dropped = "_userPut <= 0 after the turns: the click is dropped (verbs.cpp:590)";
+                match self.v.decide(&[up], |y| y[0] <= 0) {
+                    Dec::Unk(off) => {
+                        let mut q = p.fork();
+                        let why = rc(&self.show(off));
+                        let cond = rc("_userPut <= 0: the click is dropped");
+                        p.assumptions.push(Assumption {
+                            cite: cite.clone(),
+                            cond: cond.clone(),
+                            side: Side::Bool(false),
+                            why: why.clone(),
+                        });
+                        q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(true), why });
+                        self.note(&mut q, cite.clone(), "checkExecVerbs", dropped);
+                        more.push(q);
+                    }
+                    Dec::Bool(true) => {
+                        self.note(p, cite.clone(), "checkExecVerbs", dropped);
+                        self.ev_input(p, area, val, button);
+                        return Ok(Vec::new());
+                    }
+                    Dec::Bool(false) => {}
                 }
-                Dec::Bool(false) => {}
+                if self.read(p, Fact::Verb(val), o)? != Val::Int(1) {
+                    let w = format!(
+                        "verb {val} may not be shown after the turns: findVerbAtPos would not find it (not modelled)"
+                    );
+                    self.note(p, cite.clone(), "checkExecVerbs", &w);
+                }
+                self.read(p, Fact::Var(VAR_VERB_SCRIPT), o)?
+            } else {
+                self.oget(o, Fact::Var(VAR_VERB_SCRIPT))
+            };
+            match n {
+                Val::Unk(_) => {
+                    let w = format!("input script {}", self.show(n));
+                    p.unknown_writes.push((rc("runInputScript"), cite, rc(&w)));
+                }
+                Val::Int(0) => {
+                    // if (verbScript) runScript(...) (script.cpp:1509-1510)
+                    self.note(p, cite, "runInputScript", "VAR_VERB_SCRIPT is 0: no input script runs");
+                }
+                Val::Int(n) => {
+                    let args = vec![(0, Val::Int(area)), (1, Val::Int(val)), (2, Val::Int(button))];
+                    let step = Step::Script { n, resistant: Some(false), recursive: Some(false), args };
+                    let cid = self.cid();
+                    p.stack.push(Entry::Call(Call {
+                        head: rc("runInputScript"),
+                        cite: rc("script.cpp:1478-1511"),
+                        steps: vec![step].into(),
+                        caller: None,
+                        active: false,
+                        i: 0,
+                        cid,
+                    }));
+                }
             }
-            if self.read(p, Fact::Verb(val), o) != Val::Int(1) {
-                let w = format!(
-                    "verb {val} may not be shown after the turns: findVerbAtPos would not find it (not modelled)"
-                );
-                self.note(p, cite.clone(), "checkExecVerbs", &w);
-            }
-            self.read(p, Fact::Var(VAR_VERB_SCRIPT), o)
-        } else {
-            self.oget(o, Fact::Var(VAR_VERB_SCRIPT))
-        };
-        match n {
-            Val::Unk(_) => {
-                let w = format!("input script {}", self.show(n));
-                p.unknown_writes.push((rc("runInputScript"), cite, rc(&w)));
-            }
-            Val::Int(0) => {
-                // if (verbScript) runScript(...) (script.cpp:1509-1510)
-                self.note(p, cite, "runInputScript", "VAR_VERB_SCRIPT is 0: no input script runs");
-            }
-            Val::Int(n) => {
-                let args = vec![(0, Val::Int(area)), (1, Val::Int(val)), (2, Val::Int(button))];
-                let step = Step::Script { n, resistant: Some(false), recursive: Some(false), args };
-                let cid = self.cid();
-                p.stack.push(Entry::Call(Call {
-                    head: rc("runInputScript"),
-                    cite: rc("script.cpp:1478-1511"),
-                    steps: vec![step].into(),
-                    caller: None,
-                    active: false,
-                    i: 0,
-                    cid,
-                }));
-            }
-        }
-        self.ev_input(p, area, val, button);
-        more
+            self.ev_input(p, area, val, button);
+            more
+        })
     }
 
     /// golden.py's input event, after `_eng_input` returned, on the path it was called with.

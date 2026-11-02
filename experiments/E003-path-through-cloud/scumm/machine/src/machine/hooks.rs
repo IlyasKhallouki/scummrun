@@ -13,15 +13,16 @@ use super::*;
 #[allow(clippy::too_many_arguments)]
 pub trait Hooks {
     fn advance(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> Vec<Path> {
-        m.advance_base(p, o)
+        // a machine with no hook that forks: no read forks
+        m.advance_base(p, o).unwrap_or_else(|_| unreachable!("a fork with no hook that forks"))
     }
-    fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
-        m.read_base(p, k, o)
+    fn read(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
+        Ok(m.read_base(p, k, o))
     }
     /// Fix round 1 (no model.py method): a read that must not fork, for a rule that decides only on a value it
     /// already has (F9's actorFollowCamera). A machine's read never forks, so the default is `read`; the reader
     /// reads lazily (the fact's values as a set).
-    fn read_soft(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+    fn read_soft(&self, m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
         m.read(p, k, o)
     }
     /// `oracle.get(k)`
@@ -39,35 +40,49 @@ pub trait Hooks {
         keys.dedup();
         keys
     }
-    fn val(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
+    fn val(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> R<Val> {
         m.val_base(p, o, e, x)
     }
-    fn test(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> Dec {
+    fn test(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> R<Dec> {
         m.test_base(p, o, c, x)
     }
-    fn getter(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
+    fn getter(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> R<Val> {
         m.getter_base(p, o, name, args, x)
     }
-    fn owned_by(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, owner: i32) -> Result<Vec<i32>, (Fact, Val)> {
+    fn owned_by(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        owner: i32,
+    ) -> R<Result<Vec<i32>, (Fact, Val)>> {
         m.owned_by_base(p, o, owner)
     }
-    fn find_inventory(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> Val {
+    fn find_inventory(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> R<Val> {
         m.find_inventory_base(p, o, args, x)
     }
-    fn clear(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, pre: Prefix) {
+    fn clear(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, pre: Prefix) -> R<()> {
         m.clear_base(p, o, pre)
     }
     fn arith_at(&self, m: &mut Machine<'_>, p: &mut Path, op: Op, a: Val, b: Val, x: Option<X>) -> Val {
         m.arith_at_base(p, op, a, b, x)
     }
-    fn jump(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> Vec<Path> {
+    fn jump(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        x: X,
+        cond: Option<ExprId>,
+        idx: Option<u32>,
+    ) -> R<Vec<Path>> {
         m.jump_base(p, o, x, cond, idx)
     }
-    fn wait(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
+    fn wait(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
         m.wait_base(p, o, x, name)
     }
     /// model.py's `_op_<name>` for every op the step runs a rule for
-    fn op(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
+    fn op(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
         m.op_base(p, o, x, st)
     }
     fn join(&self, m: &Machine<'_>, p: &Path, o: &FactOracle) -> Option<Sig> {
@@ -77,7 +92,7 @@ pub trait Hooks {
         m.merge_base(o, group, sig)
     }
     /// model.py's `_eng_<step>` for every call step
-    fn eng(&self, m: &mut Machine<'_>, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> Vec<Path> {
+    fn eng(&self, m: &mut Machine<'_>, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> R<Vec<Path>> {
         m.eng_base(p, ci, step, o)
     }
     fn eng_script(
@@ -90,22 +105,38 @@ pub trait Hooks {
         resistant: Option<bool>,
         recursive: Option<bool>,
         args: &[(i32, Val)],
-    ) {
+    ) -> R<()> {
         m.eng_script_base(p, ci, o, n, resistant, recursive, args)
     }
-    fn finish(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
+    fn finish(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        how: &'static str,
+        at: S,
+        resume: Option<i32>,
+    ) -> R<()> {
         m.finish_base(p, o, how, at, resume)
     }
-    fn count(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Slot) -> Option<(i32, bool)> {
+    fn count(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Slot) -> R<Option<(i32, bool)>> {
         m.count_base(p, o, name)
     }
-    fn set_freeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, name: Slot, n: Option<(i32, bool)>, why: &str) {
+    fn set_freeze(
+        &self,
+        m: &mut Machine<'_>,
+        p: &mut Path,
+        o: &FactOracle,
+        name: Slot,
+        n: Option<(i32, bool)>,
+        why: &str,
+    ) -> R<()> {
         m.set_freeze_base(p, o, name, n, why)
     }
-    fn freeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, flag: i32, x: X) {
+    fn freeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, flag: i32, x: X) -> R<()> {
         m.freeze_base(p, o, flag, x)
     }
-    fn unfreeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) {
+    fn unfreeze(&self, m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> R<()> {
         m.unfreeze_base(p, o)
     }
 }
@@ -118,21 +149,21 @@ impl<'g> Machine<'g> {
     pub fn advance(&mut self, p: &mut Path, o: &FactOracle) -> Vec<Path> {
         match self.hooks {
             Some(h) => h.advance(self, p, o),
-            None => self.advance_base(p, o),
+            None => self.advance_base(p, o).unwrap_or_else(|_| unreachable!("a fork with no hook that forks")),
         }
     }
     #[inline]
-    pub fn read(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+    pub fn read(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
         match self.hooks {
             Some(h) => h.read(self, p, k, o),
-            None => self.read_base(p, k, o),
+            None => Ok(self.read_base(p, k, o)),
         }
     }
     #[inline]
-    pub fn read_soft(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> Val {
+    pub fn read_soft(&mut self, p: &mut Path, k: Fact, o: &FactOracle) -> R<Val> {
         match self.hooks {
             Some(h) => h.read_soft(self, p, k, o),
-            None => self.read_base(p, k, o),
+            None => Ok(self.read_base(p, k, o)),
         }
     }
     #[inline]
@@ -163,42 +194,42 @@ impl<'g> Machine<'g> {
         }
     }
     #[inline]
-    pub fn val(&mut self, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
+    pub fn val(&mut self, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> R<Val> {
         match self.hooks {
             Some(h) => h.val(self, p, o, e, x),
             None => self.val_base(p, o, e, x),
         }
     }
     #[inline]
-    pub fn test(&mut self, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> Dec {
+    pub fn test(&mut self, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> R<Dec> {
         match self.hooks {
             Some(h) => h.test(self, p, o, c, x),
             None => self.test_base(p, o, c, x),
         }
     }
     #[inline]
-    pub fn getter(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
+    pub fn getter(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> R<Val> {
         match self.hooks {
             Some(h) => h.getter(self, p, o, name, args, x),
             None => self.getter_base(p, o, name, args, x),
         }
     }
     #[inline]
-    pub fn owned_by(&mut self, p: &mut Path, o: &FactOracle, owner: i32) -> Result<Vec<i32>, (Fact, Val)> {
+    pub fn owned_by(&mut self, p: &mut Path, o: &FactOracle, owner: i32) -> R<Result<Vec<i32>, (Fact, Val)>> {
         match self.hooks {
             Some(h) => h.owned_by(self, p, o, owner),
             None => self.owned_by_base(p, o, owner),
         }
     }
     #[inline]
-    pub fn find_inventory(&mut self, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> Val {
+    pub fn find_inventory(&mut self, p: &mut Path, o: &FactOracle, args: Span, x: Option<X>) -> R<Val> {
         match self.hooks {
             Some(h) => h.find_inventory(self, p, o, args, x),
             None => self.find_inventory_base(p, o, args, x),
         }
     }
     #[inline]
-    pub fn clear(&mut self, p: &mut Path, o: &FactOracle, pre: Prefix) {
+    pub fn clear(&mut self, p: &mut Path, o: &FactOracle, pre: Prefix) -> R<()> {
         match self.hooks {
             Some(h) => h.clear(self, p, o, pre),
             None => self.clear_base(p, o, pre),
@@ -212,21 +243,21 @@ impl<'g> Machine<'g> {
         }
     }
     #[inline]
-    pub fn jump(&mut self, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> Vec<Path> {
+    pub fn jump(&mut self, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> R<Vec<Path>> {
         match self.hooks {
             Some(h) => h.jump(self, p, o, x, cond, idx),
             None => self.jump_base(p, o, x, cond, idx),
         }
     }
     #[inline]
-    pub fn wait(&mut self, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
+    pub fn wait(&mut self, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
         match self.hooks {
             Some(h) => h.wait(self, p, o, x, name),
             None => self.wait_base(p, o, x, name),
         }
     }
     #[inline]
-    pub fn op(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
+    pub fn op(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
         match self.hooks {
             Some(h) => h.op(self, p, o, x, st),
             None => self.op_base(p, o, x, st),
@@ -247,7 +278,7 @@ impl<'g> Machine<'g> {
         }
     }
     #[inline]
-    pub fn eng(&mut self, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> Vec<Path> {
+    pub fn eng(&mut self, p: &mut Path, ci: usize, step: &Step, o: &FactOracle) -> R<Vec<Path>> {
         match self.hooks {
             Some(h) => h.eng(self, p, ci, step, o),
             None => self.eng_base(p, ci, step, o),
@@ -263,42 +294,42 @@ impl<'g> Machine<'g> {
         resistant: Option<bool>,
         recursive: Option<bool>,
         args: &[(i32, Val)],
-    ) {
+    ) -> R<()> {
         match self.hooks {
             Some(h) => h.eng_script(self, p, ci, o, n, resistant, recursive, args),
             None => self.eng_script_base(p, ci, o, n, resistant, recursive, args),
         }
     }
     #[inline]
-    pub fn finish(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
+    pub fn finish(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) -> R<()> {
         match self.hooks {
             Some(h) => h.finish(self, p, o, how, at, resume),
             None => self.finish_base(p, o, how, at, resume),
         }
     }
     #[inline]
-    pub fn count(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> Option<(i32, bool)> {
+    pub fn count(&mut self, p: &mut Path, o: &FactOracle, name: Slot) -> R<Option<(i32, bool)>> {
         match self.hooks {
             Some(h) => h.count(self, p, o, name),
             None => self.count_base(p, o, name),
         }
     }
     #[inline]
-    pub fn set_freeze(&mut self, p: &mut Path, o: &FactOracle, name: Slot, n: Option<(i32, bool)>, why: &str) {
+    pub fn set_freeze(&mut self, p: &mut Path, o: &FactOracle, name: Slot, n: Option<(i32, bool)>, why: &str) -> R<()> {
         match self.hooks {
             Some(h) => h.set_freeze(self, p, o, name, n, why),
             None => self.set_freeze_base(p, o, name, n, why),
         }
     }
     #[inline]
-    pub fn freeze(&mut self, p: &mut Path, o: &FactOracle, flag: i32, x: X) {
+    pub fn freeze(&mut self, p: &mut Path, o: &FactOracle, flag: i32, x: X) -> R<()> {
         match self.hooks {
             Some(h) => h.freeze(self, p, o, flag, x),
             None => self.freeze_base(p, o, flag, x),
         }
     }
     #[inline]
-    pub fn unfreeze(&mut self, p: &mut Path, o: &FactOracle) {
+    pub fn unfreeze(&mut self, p: &mut Path, o: &FactOracle) -> R<()> {
         match self.hooks {
             Some(h) => h.unfreeze(self, p, o),
             None => self.unfreeze_base(p, o),
@@ -331,7 +362,7 @@ impl<'g> Machine<'g> {
         self.note(p, cite, head, what)
     }
     /// `_done`
-    pub fn h_done(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
+    pub fn h_done(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) -> R<()> {
         self.done(p, o, how, at, resume)
     }
     /// `Game.resource` with its unknowns
@@ -356,11 +387,11 @@ impl<'g> Machine<'g> {
         self.push_frame(p, ci, unit, pc, locals, owned, recursive, resistant, key, args_known, nested)
     }
     /// `_stop_script`
-    pub fn h_stop_script(&mut self, p: &mut Path, o: &FactOracle, n: i32, cite: &S, head: &str) {
+    pub fn h_stop_script(&mut self, p: &mut Path, o: &FactOracle, n: i32, cite: &S, head: &str) -> R<()> {
         self.stop_script(p, o, n, cite, head)
     }
     /// `_live_slots`
-    pub fn h_live_slots(&mut self, p: &mut Path, o: &FactOracle) -> Vec<(Slot, Option<Fact>, Val)> {
+    pub fn h_live_slots(&mut self, p: &mut Path, o: &FactOracle) -> R<Vec<(Slot, Option<Fact>, Val)>> {
         self.live_slots(p, o)
     }
     /// A new `Call.cid` (a call the hook makes).

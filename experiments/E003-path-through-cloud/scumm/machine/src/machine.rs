@@ -22,6 +22,22 @@ mod rooms;
 mod settle;
 
 pub use dialog::{LEFT_CLICK, VERB_CLICK_AREA};
+
+/// A read that forks (reader.py's `Fork`): what the hook that read gives (its payload), handed back up to the step it
+/// interrupts as a value, not a panic. The machine itself never forks; only a hook's `read` does.
+pub struct Fork(pub Box<dyn std::any::Any>);
+
+/// A result that a fork can interrupt.
+pub type R<T> = std::result::Result<T, Fork>;
+
+/// The value of what no fork can interrupt: a read outside a step, where no caller takes a fork (a fork there was a
+/// panic that nothing caught before, and is one now).
+pub fn no_fork<T>(r: R<T>) -> T {
+    match r {
+        Ok(t) => t,
+        Err(_) => panic!("a read forked outside a step"),
+    }
+}
 pub use hooks::Hooks;
 pub use settle::ROUND;
 
@@ -307,7 +323,8 @@ impl<'g> Machine<'g> {
             44 => (0, SCREEN_WIDTH - 1),
             45 => (0, SCREEN_HEIGHT - 1),
             20 => {
-                let mut ws: Vec<i32> = rooms.unwrap_or(&[]).iter().filter_map(|r| g.room_width.get(r).copied()).collect();
+                let mut ws: Vec<i32> =
+                    rooms.unwrap_or(&[]).iter().filter_map(|r| g.room_width.get(r).copied()).collect();
                 if ws.is_empty() {
                     ws = g.room_width.values().copied().collect();
                 }
@@ -510,22 +527,29 @@ impl<'g> Machine<'g> {
 
     /// Row 0: object `obj`'s own entry for `verb` (model.py `run_entry`).
     pub fn run_entry(&mut self, o: &FactOracle, obj: i32, verb: i32, locals: Option<Vec<(i32, Val)>>) -> Run {
-        let Some(idx) = self.game.entry(obj, verb) else {
-            let why = if self.game.id(UnitKey::Obj(obj)).is_none() {
-                "no code".to_string()
-            } else {
-                format!("no entry for verb {verb} or 255")
+        no_fork(self.run_entry_r(o, obj, verb, locals))
+    }
+
+    fn run_entry_r(&mut self, o: &FactOracle, obj: i32, verb: i32, locals: Option<Vec<(i32, Val)>>) -> R<Run> {
+        Ok({
+            let Some(idx) = self.game.entry(obj, verb) else {
+                let why = if self.game.id(UnitKey::Obj(obj)).is_none() {
+                    "no code".to_string()
+                } else {
+                    format!("no entry for verb {verb} or 255")
+                };
+                let r =
+                    Run { start: format!("object {obj}: {why}"), unit: Some(UnitKey::Obj(obj)), ..Default::default() };
+                return Ok(self.finish_run(r));
             };
-            let r = Run { start: format!("object {obj}: {why}"), unit: Some(UnitKey::Obj(obj)), ..Default::default() };
-            return self.finish_run(r);
-        };
-        let owner = self.oget(o, Fact::Owner(obj));
-        let owned = match owner {
-            Val::Int(n) => Owned::Bool(n != OF_OWNER_ROOM),
-            Val::Unk(_) => Owned::Unk(owner),
-        };
-        // every v5 object slot runs without R (script_v5.cpp:2889, script.cpp:1432)
-        self.run(o, UnitKey::Obj(obj), idx, locals, owned, Some(false))
+            let owner = self.oget(o, Fact::Owner(obj));
+            let owned = match owner {
+                Val::Int(n) => Owned::Bool(n != OF_OWNER_ROOM),
+                Val::Unk(_) => Owned::Unk(owner),
+            };
+            // every v5 object slot runs without R (script_v5.cpp:2889, script.cpp:1432)
+            self.run_r(o, UnitKey::Obj(obj), idx, locals, owned, Some(false))?
+        })
     }
 
     /// Every path from instruction `pc` of `unit` (model.py `run`); `locals` None means unknown arguments.
@@ -538,24 +562,38 @@ impl<'g> Machine<'g> {
         owned: Owned,
         recursive: Option<bool>,
     ) -> Run {
-        self.pre.clear();
-        let g = self.game;
-        let uid = g.id(unit).unwrap_or_else(|| panic!("no unit {unit}"));
-        let mut f = Frame::new(uid, Some(pc), locals.is_some(), owned, recursive);
-        if let Some(ls) = locals {
-            f.locals = Locals::from_vec(ls);
-        }
-        f.sid = 1;
-        let mut first = Path::new(vec![Entry::Frame(f)]);
-        first.next_sid = 2;
-        if self.calls {
-            // the unit is the first frame of a stack, and its old wait points go (it runs from pc now)
-            first.depth = 1;
-            self.clear(&mut first, o, Prefix::At(Game::unit_name(unit)));
-        }
-        let u = g.unit(uid);
-        let start = if pc < u.ins_len { g.cite(uid, pc) } else { format!("{}: past the end", g.syms.str(u.file)) };
-        self.drive(o, first, start, Some(unit))
+        no_fork(self.run_r(o, unit, pc, locals, owned, recursive))
+    }
+
+    fn run_r(
+        &mut self,
+        o: &FactOracle,
+        unit: UnitKey,
+        pc: u32,
+        locals: Option<Vec<(i32, Val)>>,
+        owned: Owned,
+        recursive: Option<bool>,
+    ) -> R<Run> {
+        Ok({
+            self.pre.clear();
+            let g = self.game;
+            let uid = g.id(unit).unwrap_or_else(|| panic!("no unit {unit}"));
+            let mut f = Frame::new(uid, Some(pc), locals.is_some(), owned, recursive);
+            if let Some(ls) = locals {
+                f.locals = Locals::from_vec(ls);
+            }
+            f.sid = 1;
+            let mut first = Path::new(vec![Entry::Frame(f)]);
+            first.next_sid = 2;
+            if self.calls {
+                // the unit is the first frame of a stack, and its old wait points go (it runs from pc now)
+                first.depth = 1;
+                self.clear(&mut first, o, Prefix::At(Game::unit_name(unit)))?;
+            }
+            let u = g.unit(uid);
+            let start = if pc < u.ins_len { g.cite(uid, pc) } else { format!("{}: past the end", g.syms.str(u.file)) };
+            self.drive(o, first, start, Some(unit))
+        })
     }
 
     // --- the run ------------------------------------------------------------------------------------------
@@ -711,15 +749,17 @@ impl<'g> Machine<'g> {
         t.ev(p, "fork", vec![("children", J::Arr(kids)), ("assume", assume), ("where", wh)]);
     }
 
-    pub fn advance_base(&mut self, p: &mut Path, o: &FactOracle) -> Vec<Path> {
-        match p.stack.last() {
-            None => {
-                self.halt(p, "end", rc("nothing left to run"));
-                Vec::new()
+    pub fn advance_base(&mut self, p: &mut Path, o: &FactOracle) -> R<Vec<Path>> {
+        Ok({
+            match p.stack.last() {
+                None => {
+                    self.halt(p, "end", rc("nothing left to run"));
+                    Vec::new()
+                }
+                Some(Entry::Call(_)) => self.call_step(p, o)?,
+                Some(Entry::Frame(_)) => self.step(p, o)?,
             }
-            Some(Entry::Call(_)) => self.call_step(p, o),
-            Some(Entry::Frame(_)) => self.step(p, o),
-        }
+        })
     }
 
     // --- reading ------------------------------------------------------------------------------------------
@@ -766,87 +806,91 @@ impl<'g> Machine<'g> {
         }
     }
 
-    pub fn val_base(&mut self, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> Val {
-        let g = self.game;
-        match g.ast.expr(e) {
-            Expr::Const(v) => Val::Int(v),
-            Expr::Var(n) => self.read(p, Fact::Var(n), o),
-            Expr::Bit(n) => self.read(p, Fact::Bit(n), o),
-            Expr::Local(n) => self.local(p, n),
-            Expr::Index { kind, base, offset } => {
-                let ov = self.val(p, o, offset, x);
-                match ov {
-                    Val::Unk(_) => {
-                        let w = format!("index of {} ({})", self.show_e(e), self.show(ov));
-                        self.v.mk(Reason::Work, w)
-                    }
-                    Val::Int(k) => {
-                        let n = key_num(base as i64 + k as i64);
-                        match kind {
-                            RefKind::Local => self.local(p, n),
-                            RefKind::Var => self.read(p, Fact::Var(n), o),
-                            RefKind::Bit => self.read(p, Fact::Bit(n), o),
+    pub fn val_base(&mut self, p: &mut Path, o: &FactOracle, e: ExprId, x: Option<X>) -> R<Val> {
+        Ok({
+            let g = self.game;
+            match g.ast.expr(e) {
+                Expr::Const(v) => Val::Int(v),
+                Expr::Var(n) => self.read(p, Fact::Var(n), o)?,
+                Expr::Bit(n) => self.read(p, Fact::Bit(n), o)?,
+                Expr::Local(n) => self.local(p, n),
+                Expr::Index { kind, base, offset } => {
+                    let ov = self.val(p, o, offset, x)?;
+                    match ov {
+                        Val::Unk(_) => {
+                            let w = format!("index of {} ({})", self.show_e(e), self.show(ov));
+                            self.v.mk(Reason::Work, w)
+                        }
+                        Val::Int(k) => {
+                            let n = key_num(base as i64 + k as i64);
+                            match kind {
+                                RefKind::Local => self.local(p, n),
+                                RefKind::Var => self.read(p, Fact::Var(n), o)?,
+                                RefKind::Bit => self.read(p, Fact::Bit(n), o)?,
+                            }
                         }
                     }
                 }
+                Expr::BinOp { op, a, b } => {
+                    let va = self.val(p, o, a, x)?;
+                    let vb = self.val(p, o, b, x)?;
+                    self.arith_at(p, op.into(), va, vb, x)
+                }
+                Expr::Neg(a) => match self.val(p, o, a, x)? {
+                    Val::Int(v) => Val::Int(wrap32(-(v as i64))),
+                    u if self.v.wide && self.v.range(u).is_some() => self.v.arith(Op::Sub, Val::Int(0), u),
+                    u => u,
+                },
+                Expr::Getter { name, args } => self.getter(p, o, name, args, x)?,
+                Expr::Embed(st) => {
+                    // an opcode inside an expression: it writes var 0, its value is var 0
+                    self.assign(p, o, st, x)?;
+                    self.val(p, o, st.lhs, x)?
+                }
+                Expr::Str(_) | Expr::Concat(_) | Expr::List(_) => self.v.mk(Reason::Work, "text"),
+                Expr::Flag(_) | Expr::Cmp { .. } | Expr::Not(_) | Expr::Truth(_) => {
+                    let w = self.show_e(e);
+                    self.v.mk(Reason::Work, w)
+                }
             }
-            Expr::BinOp { op, a, b } => {
-                let va = self.val(p, o, a, x);
-                let vb = self.val(p, o, b, x);
-                self.arith_at(p, op.into(), va, vb, x)
-            }
-            Expr::Neg(a) => match self.val(p, o, a, x) {
-                Val::Int(v) => Val::Int(wrap32(-(v as i64))),
-                u if self.v.wide && self.v.range(u).is_some() => self.v.arith(Op::Sub, Val::Int(0), u),
-                u => u,
-            },
-            Expr::Getter { name, args } => self.getter(p, o, name, args, x),
-            Expr::Embed(st) => {
-                // an opcode inside an expression: it writes var 0, its value is var 0
-                self.assign(p, o, st, x);
-                self.val(p, o, st.lhs, x)
-            }
-            Expr::Str(_) | Expr::Concat(_) | Expr::List(_) => self.v.mk(Reason::Work, "text"),
-            Expr::Flag(_) | Expr::Cmp { .. } | Expr::Not(_) | Expr::Truth(_) => {
-                let w = self.show_e(e);
-                self.v.mk(Reason::Work, w)
-            }
-        }
+        })
     }
 
     /// A printed condition (model.py `test`): comparisons cast to int16, the zero tests do not.
-    pub fn test_base(&mut self, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> Dec {
-        use scumm_ir::CmpOp::*;
-        let g = self.game;
-        match g.ast.expr(c) {
-            Expr::Cmp { op, a, b } => {
-                let va = self.val(p, o, a, x);
-                let vb = self.val(p, o, b, x);
-                self.v.decide(&[va, vb], |v| {
-                    let (y, z) = (i16w(v[0]), i16w(v[1]));
-                    match op {
-                        Eq => y == z,
-                        Ne => y != z,
-                        Lt => y < z,
-                        Le => y <= z,
-                        Gt => y > z,
-                        Ge => y >= z,
-                    }
-                })
+    pub fn test_base(&mut self, p: &mut Path, o: &FactOracle, c: ExprId, x: Option<X>) -> R<Dec> {
+        Ok({
+            use scumm_ir::CmpOp::*;
+            let g = self.game;
+            match g.ast.expr(c) {
+                Expr::Cmp { op, a, b } => {
+                    let va = self.val(p, o, a, x)?;
+                    let vb = self.val(p, o, b, x)?;
+                    self.v.decide(&[va, vb], |v| {
+                        let (y, z) = (i16w(v[0]), i16w(v[1]));
+                        match op {
+                            Eq => y == z,
+                            Ne => y != z,
+                            Lt => y < z,
+                            Le => y <= z,
+                            Gt => y > z,
+                            Ge => y >= z,
+                        }
+                    })
+                }
+                Expr::Not(a) => {
+                    let v = self.val(p, o, a, x)?;
+                    self.v.decide(&[v], |v| v[0] == 0)
+                }
+                Expr::Truth(a) => {
+                    let v = self.val(p, o, a, x)?;
+                    self.v.decide(&[v], |v| v[0] != 0)
+                }
+                _ => {
+                    let w = format!("condition {}", py_repr(&g.ast, &g.syms, c));
+                    Dec::Unk(self.v.mk(Reason::Work, w))
+                }
             }
-            Expr::Not(a) => {
-                let v = self.val(p, o, a, x);
-                self.v.decide(&[v], |v| v[0] == 0)
-            }
-            Expr::Truth(a) => {
-                let v = self.val(p, o, a, x);
-                self.v.decide(&[v], |v| v[0] != 0)
-            }
-            _ => {
-                let w = format!("condition {}", py_repr(&g.ast, &g.syms, c));
-                Dec::Unk(self.v.mk(Reason::Work, w))
-            }
-        }
+        })
     }
 
     /// The room resource a room number loads (model.py `Game.resource`, with its unknowns).
@@ -861,274 +905,292 @@ impl<'g> Machine<'g> {
     }
 
     /// whereIsObject (model.py `where`).
-    fn where_(&mut self, p: &mut Path, o: &FactOracle, obj: i32) -> Where {
-        let owner = self.read(p, Fact::Owner(obj), o);
-        match owner {
-            Val::Unk(_) => Where::Unk(owner),
-            Val::Int(ow) if ow != OF_OWNER_ROOM => {
-                if ow != 0 {
-                    Where::Inventory
-                } else {
-                    Where::Nowhere
+    fn where_(&mut self, p: &mut Path, o: &FactOracle, obj: i32) -> R<Where> {
+        Ok({
+            let owner = self.read(p, Fact::Owner(obj), o)?;
+            match owner {
+                Val::Unk(_) => Where::Unk(owner),
+                Val::Int(ow) if ow != OF_OWNER_ROOM => {
+                    if ow != 0 {
+                        Where::Inventory
+                    } else {
+                        Where::Nowhere
+                    }
                 }
-            }
-            Val::Int(_) => {
-                let room = self.read(p, Fact::Room, o);
-                match self.resource(room) {
-                    u @ Val::Unk(_) => Where::Unk(u),
-                    Val::Int(r) => {
-                        if self.game.object_room.get(&obj) == Some(&r) {
-                            Where::Room
-                        } else {
-                            Where::Nowhere
+                Val::Int(_) => {
+                    let room = self.read(p, Fact::Room, o)?;
+                    match self.resource(room) {
+                        u @ Val::Unk(_) => Where::Unk(u),
+                        Val::Int(r) => {
+                            if self.game.object_room.get(&obj) == Some(&r) {
+                                Where::Room
+                            } else {
+                                Where::Nowhere
+                            }
                         }
                     }
                 }
             }
-        }
+        })
     }
 
-    pub fn getter_base(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> Val {
-        let g = self.game;
-        if name == known::FIND_INVENTORY && self.calls {
-            return self.find_inventory(p, o, args, x);
-        }
-        match getter_kind(name) {
-            Some(GetterKind::Fact) => {}
-            // F9 (switch actor_rooms): getActorRoom reads the actor's room fact (actor_rooms.rs)
-            Some(GetterKind::NonFact(_)) if name == known::GET_ACTOR_ROOM && self.switches.actor_rooms => {}
-            Some(GetterKind::NonFact(r)) => {
-                if self.switches.value_sets {
-                    if let Some(v) = self.getter_set(p, o, name) {
-                        return v;
+    pub fn getter_base(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, x: Option<X>) -> R<Val> {
+        Ok({
+            let g = self.game;
+            if name == known::FIND_INVENTORY && self.calls {
+                return Ok(self.find_inventory(p, o, args, x)?);
+            }
+            match getter_kind(name) {
+                Some(GetterKind::Fact) => {}
+                // F9 (switch actor_rooms): getActorRoom reads the actor's room fact (actor_rooms.rs)
+                Some(GetterKind::NonFact(_)) if name == known::GET_ACTOR_ROOM && self.switches.actor_rooms => {}
+                Some(GetterKind::NonFact(r)) => {
+                    if self.switches.value_sets {
+                        if let Some(v) = self.getter_set(p, o, name)? {
+                            return Ok(v);
+                        }
+                    }
+                    return Ok(self.getter_unknown(r, name));
+                }
+                None => return Ok(self.getter_unknown(Reason::Work, name)),
+            }
+            let mut vals = Vec::new();
+            for &a in g.ast.kids(args) {
+                if !matches!(g.ast.expr(a), Expr::List(_)) {
+                    vals.push(self.val(p, o, a, x)?);
+                }
+            }
+            if let Some(&bad) = vals.iter().find(|&&v| self.v.is_plain(v)) {
+                if name == known::GET_ACTOR_ROOM {
+                    // F9: the room of an actor not known is getActorRoom's non-fact, as with the switch off (the actor's
+                    // unknown would say nothing of the room); with value_sets an actor's range reads the same way
+                    return Ok(self.getter_unknown(Reason::Actor, name));
+                }
+                if self.v.range(bad).is_some() {
+                    // F12: a range is no fact getter's value: the getter on it is not known
+                    let what = format!("{} of {}", self.sym(name), self.v.unk(bad).unwrap().what);
+                    return Ok(self.v.mk(Reason::Work, what));
+                }
+                return Ok(bad);
+            }
+            if let Some(&s0) = vals.iter().find(|v| v.is_unknown()) {
+                // value sets: the getter on each combination
+                let s0 = self.v.unk(s0).unwrap().clone();
+                let what = format!("{} of {}", self.sym(name), s0.what);
+                let mut combos: Vec<Vec<i32>> = vec![Vec::new()];
+                for &v in &vals {
+                    let vs = self.v.values_of(v).unwrap();
+                    combos =
+                        combos.iter().flat_map(|c| vs.iter().map(move |&y| [c.as_slice(), &[y]].concat())).collect();
+                    if combos.len() > MAX_VALUES {
+                        self.v.cap("getter");
+                        return Ok(self.v.mk(s0.reason, what));
                     }
                 }
-                return self.getter_unknown(r, name);
-            }
-            None => return self.getter_unknown(Reason::Work, name),
-        }
-        let mut vals = Vec::new();
-        for &a in g.ast.kids(args) {
-            if !matches!(g.ast.expr(a), Expr::List(_)) {
-                vals.push(self.val(p, o, a, x));
-            }
-        }
-        if let Some(&bad) = vals.iter().find(|&&v| self.v.is_plain(v)) {
-            if name == known::GET_ACTOR_ROOM {
-                // F9: the room of an actor not known is getActorRoom's non-fact, as with the switch off (the actor's
-                // unknown would say nothing of the room); with value_sets an actor's range reads the same way
-                return self.getter_unknown(Reason::Actor, name);
-            }
-            if self.v.range(bad).is_some() {
-                // F12: a range is no fact getter's value: the getter on it is not known
-                let what = format!("{} of {}", self.sym(name), self.v.unk(bad).unwrap().what);
-                return self.v.mk(Reason::Work, what);
-            }
-            return bad;
-        }
-        if let Some(&s0) = vals.iter().find(|v| v.is_unknown()) {
-            // value sets: the getter on each combination
-            let s0 = self.v.unk(s0).unwrap().clone();
-            let what = format!("{} of {}", self.sym(name), s0.what);
-            let mut combos: Vec<Vec<i32>> = vec![Vec::new()];
-            for &v in &vals {
-                let vs = self.v.values_of(v).unwrap();
-                combos = combos.iter().flat_map(|c| vs.iter().map(move |&y| [c.as_slice(), &[y]].concat())).collect();
-                if combos.len() > MAX_VALUES {
-                    self.v.cap("getter");
-                    return self.v.mk(s0.reason, what);
+                let mut out: Vec<Val> = Vec::new();
+                for c in combos {
+                    let cv: Vec<Val> = c.into_iter().map(Val::Int).collect();
+                    let r = self.getter_on(p, o, name, args, &cv, x)?;
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
                 }
-            }
-            let mut out: Vec<Val> = Vec::new();
-            for c in combos {
-                let cv: Vec<Val> = c.into_iter().map(Val::Int).collect();
-                let r = self.getter_on(p, o, name, args, &cv, x);
-                if !out.contains(&r) {
-                    out.push(r);
+                // quirk kept apart: model.py takes the first unknown of a set (hash order); this takes the first
+                // in combination order (PORT-NOTES.md)
+                if let Some(&bad) = out.iter().find(|v| v.is_unknown()) {
+                    return Ok(bad);
                 }
+                let ints = out.iter().map(|v| v.int().unwrap()).collect();
+                return Ok(self.v.one_of(ints, s0.reason, what));
             }
-            // quirk kept apart: model.py takes the first unknown of a set (hash order); this takes the first
-            // in combination order (PORT-NOTES.md)
-            if let Some(&bad) = out.iter().find(|v| v.is_unknown()) {
-                return bad;
-            }
-            let ints = out.iter().map(|v| v.int().unwrap()).collect();
-            return self.v.one_of(ints, s0.reason, what);
-        }
-        self.getter_on(p, o, name, args, &vals, x)
+            self.getter_on(p, o, name, args, &vals, x)?
+        })
     }
 
     /// F12: findObject's value, 0 or an object (the reader's scope, else the room's: object.cpp:557-597), and
     /// actorFromPos's, 0 or an actor (actor.cpp:2115-2147, _numActors); None: the room is not known.
-    fn getter_set(&mut self, p: &mut Path, o: &FactOracle, name: Sym) -> Option<Val> {
-        let g = self.game;
-        let mut vals: Vec<i32> = vec![0];
-        match name {
-            known::FIND_OBJECT => match &self.find_objects {
-                Some(objs) => vals.extend(objs.iter().copied()),
-                None => {
-                    let room = self.read(p, Fact::Room, o);
-                    let Val::Int(res) = self.resource(room) else { return None };
-                    let mut objs: Vec<i32> = g.object_room.iter().filter(|e| *e.1 == res).map(|e| *e.0).collect();
-                    objs.sort_unstable();
-                    vals.extend(objs);
-                }
-            },
-            known::ACTOR_FROM_POS => vals.extend(1..NUM_ACTORS),
-            _ => return None,
-        }
-        Some(self.v.mk_set(Reason::Position, self.sym(name), vals))
+    fn getter_set(&mut self, p: &mut Path, o: &FactOracle, name: Sym) -> R<Option<Val>> {
+        Ok({
+            let g = self.game;
+            let mut vals: Vec<i32> = vec![0];
+            match name {
+                known::FIND_OBJECT => match &self.find_objects {
+                    Some(objs) => vals.extend(objs.iter().copied()),
+                    None => {
+                        let room = self.read(p, Fact::Room, o)?;
+                        let Val::Int(res) = self.resource(room) else { return Ok(None) };
+                        let mut objs: Vec<i32> = g.object_room.iter().filter(|e| *e.1 == res).map(|e| *e.0).collect();
+                        objs.sort_unstable();
+                        vals.extend(objs);
+                    }
+                },
+                known::ACTOR_FROM_POS => vals.extend(1..NUM_ACTORS),
+                _ => return Ok(None),
+            }
+            Some(self.v.mk_set(Reason::Position, self.sym(name), vals))
+        })
     }
 
     /// The objects whose owner fact is `owner` (model.py `_owned_by`), or the first owner fact, in key
     /// order, whose value is not known, with that value.
-    pub fn owned_by_base(&mut self, p: &mut Path, o: &FactOracle, owner: i32) -> Result<Vec<i32>, (Fact, Val)> {
-        let obj_of = |k: Fact| match k {
-            Fact::Owner(n) => n,
-            _ => unreachable!(),
-        };
-        if !o.tracks("owner") {
-            let mut keys: Vec<Fact> = o.keys(Prefix::Owner).to_vec();
-            keys.extend(p.writes.keys().copied().filter(|&k| Prefix::Owner.matches(k)));
-            keys.sort_unstable();
-            keys.dedup();
-            sort_str(&mut keys);
-            let mut owned = Vec::new();
-            for k in keys {
-                let v = self.read(p, k, o);
+    pub fn owned_by_base(&mut self, p: &mut Path, o: &FactOracle, owner: i32) -> R<Result<Vec<i32>, (Fact, Val)>> {
+        Ok({
+            let obj_of = |k: Fact| match k {
+                Fact::Owner(n) => n,
+                _ => unreachable!(),
+            };
+            if !o.tracks("owner") {
+                let mut keys: Vec<Fact> = o.keys(Prefix::Owner).to_vec();
+                keys.extend(p.writes.keys().copied().filter(|&k| Prefix::Owner.matches(k)));
+                keys.sort_unstable();
+                keys.dedup();
+                sort_str(&mut keys);
+                let mut owned = Vec::new();
+                for k in keys {
+                    let v = self.read(p, k, o)?;
+                    match v {
+                        Val::Unk(_) => return Ok(Err((k, v))),
+                        Val::Int(n) => {
+                            if n == owner {
+                                owned.push(obj_of(k));
+                            }
+                        }
+                    }
+                }
+                return Ok(Ok(owned));
+            }
+            let mut written: Vec<Fact> = p.writes.keys().copied().filter(|&k| Prefix::Owner.matches(k)).collect();
+            sort_str(&mut written);
+            let mut objs: std::collections::BTreeSet<i32> =
+                o.owned().get(&owner).map(|v| v.iter().copied().collect()).unwrap_or_default();
+            for k in written {
+                let v = self.read(p, k, o)?;
                 match v {
-                    Val::Unk(_) => return Err((k, v)),
+                    Val::Unk(_) => return Ok(Err((k, v))),
                     Val::Int(n) => {
                         if n == owner {
-                            owned.push(obj_of(k));
+                            objs.insert(obj_of(k));
+                        } else {
+                            objs.remove(&obj_of(k));
                         }
                     }
                 }
             }
-            return Ok(owned);
-        }
-        let mut written: Vec<Fact> = p.writes.keys().copied().filter(|&k| Prefix::Owner.matches(k)).collect();
-        sort_str(&mut written);
-        let mut objs: std::collections::BTreeSet<i32> =
-            o.owned().get(&owner).map(|v| v.iter().copied().collect()).unwrap_or_default();
-        for k in written {
-            let v = self.read(p, k, o);
-            match v {
-                Val::Unk(_) => return Err((k, v)),
-                Val::Int(n) => {
-                    if n == owner {
-                        objs.insert(obj_of(k));
-                    } else {
-                        objs.remove(&obj_of(k));
-                    }
-                }
-            }
-        }
-        Ok(objs.into_iter().collect())
+            Ok(objs.into_iter().collect())
+        })
     }
 
     /// A fact getter on known argument values (model.py `_getter_on`).
-    fn getter_on(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, vals: &[Val], x: Option<X>) -> Val {
-        let g = self.game;
-        let int = |v: Val| v.int().expect("a known argument");
-        match name {
-            known::GET_OBJECT_OWNER => self.read(p, Fact::Owner(int(vals[0])), o),
-            known::GET_OBJECT_STATE => self.read(p, Fact::State(int(vals[0])), o),
-            known::GET_ACTOR_ROOM => self.actor_room(p, o, int(vals[0])),
-            known::IS_SCRIPT_RUNNING => {
-                let n = int(vals[0]);
-                if n == 0 {
-                    Val::Int(0)
-                } else {
-                    self.read(p, g.script_key(n), o)
+    fn getter_on(&mut self, p: &mut Path, o: &FactOracle, name: Sym, args: Span, vals: &[Val], x: Option<X>) -> R<Val> {
+        Ok({
+            let g = self.game;
+            let int = |v: Val| v.int().expect("a known argument");
+            match name {
+                known::GET_OBJECT_OWNER => self.read(p, Fact::Owner(int(vals[0])), o)?,
+                known::GET_OBJECT_STATE => self.read(p, Fact::State(int(vals[0])), o)?,
+                known::GET_ACTOR_ROOM => self.actor_room(p, o, int(vals[0]))?,
+                known::IS_SCRIPT_RUNNING => {
+                    let n = int(vals[0]);
+                    if n == 0 {
+                        Val::Int(0)
+                    } else {
+                        self.read(p, g.script_key(n), o)?
+                    }
                 }
-            }
-            known::CLASS_OF_IS => {
-                let obj = int(vals[0]);
-                let Expr::List(items) = g.ast.expr(g.ast.kids(args)[1]) else {
-                    panic!("classOfIs without a class list")
-                };
-                let mut unknown: Option<Val> = None;
-                for &c in g.ast.kids(items) {
-                    let cv = self.val(p, o, c, x);
-                    match cv {
-                        Val::Unk(_) => unknown = Some(cv),
-                        Val::Int(n) if n & 0x7F == 0 => unknown = Some(self.v.mk(Reason::Work, "class 0")),
-                        Val::Int(n) => {
-                            let has = self.read(p, Fact::Class(obj, n & 0x7F), o);
-                            match has {
-                                Val::Unk(_) => unknown = Some(has),
-                                Val::Int(h) => {
-                                    if (h != 0) != (n & 0x80 != 0) {
-                                        return Val::Int(0); // one class that does not match decides
+                known::CLASS_OF_IS => {
+                    let obj = int(vals[0]);
+                    let Expr::List(items) = g.ast.expr(g.ast.kids(args)[1]) else {
+                        panic!("classOfIs without a class list")
+                    };
+                    let mut unknown: Option<Val> = None;
+                    for &c in g.ast.kids(items) {
+                        let cv = self.val(p, o, c, x)?;
+                        match cv {
+                            Val::Unk(_) => unknown = Some(cv),
+                            Val::Int(n) if n & 0x7F == 0 => unknown = Some(self.v.mk(Reason::Work, "class 0")),
+                            Val::Int(n) => {
+                                let has = self.read(p, Fact::Class(obj, n & 0x7F), o)?;
+                                match has {
+                                    Val::Unk(_) => unknown = Some(has),
+                                    Val::Int(h) => {
+                                        if (h != 0) != (n & 0x80 != 0) {
+                                            return Ok(Val::Int(0)); // one class that does not match decides
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    unknown.unwrap_or(Val::Int(1))
                 }
-                unknown.unwrap_or(Val::Int(1))
-            }
-            known::GET_INVENTORY_COUNT => match self.owned_by(p, o, int(vals[0])) {
-                Err((_, v)) => v,
-                Ok(owned) => {
-                    let c = self.cite_of(x);
-                    self.note(p, c, "getInventoryCount", "counted from owner facts; the engine counts its inventory list");
-                    Val::Int(owned.len() as i32)
-                }
-            },
-            known::GET_VERB_ENTRY_POINT => {
-                assert_eq!(vals.len(), 2, "getVerbEntryPoint takes two values");
-                let (obj, verb) = (int(vals[0]), int(vals[1]));
-                let w = self.where_(p, o, obj);
-                if let Where::Unk(u) = w {
-                    return u;
-                }
-                let idx = g.entry(obj, verb);
-                match idx {
-                    Some(idx) if w != Where::Nowhere => {
-                        let base = *g.verb_offset.get(&obj).unwrap_or_else(|| panic!("no verb offset for {obj}"));
-                        let u = g.id(UnitKey::Obj(obj)).unwrap();
-                        Val::Int(base + g.ins(u)[idx as usize].offset)
+                known::GET_INVENTORY_COUNT => match self.owned_by(p, o, int(vals[0]))? {
+                    Err((_, v)) => v,
+                    Ok(owned) => {
+                        let c = self.cite_of(x);
+                        self.note(
+                            p,
+                            c,
+                            "getInventoryCount",
+                            "counted from owner facts; the engine counts its inventory list",
+                        );
+                        Val::Int(owned.len() as i32)
                     }
-                    _ => Val::Int(0),
+                },
+                known::GET_VERB_ENTRY_POINT => {
+                    assert_eq!(vals.len(), 2, "getVerbEntryPoint takes two values");
+                    let (obj, verb) = (int(vals[0]), int(vals[1]));
+                    let w = self.where_(p, o, obj)?;
+                    if let Where::Unk(u) = w {
+                        return Ok(u);
+                    }
+                    let idx = g.entry(obj, verb);
+                    match idx {
+                        Some(idx) if w != Where::Nowhere => {
+                            let base = *g.verb_offset.get(&obj).unwrap_or_else(|| panic!("no verb offset for {obj}"));
+                            let u = g.id(UnitKey::Obj(obj)).unwrap();
+                            Val::Int(base + g.ins(u)[idx as usize].offset)
+                        }
+                        _ => Val::Int(0),
+                    }
                 }
+                _ => self.v.mk(Reason::Work, self.sym(name)),
             }
-            _ => self.v.mk(Reason::Work, self.sym(name)),
-        }
+        })
     }
 
     // --- writing ------------------------------------------------------------------------------------------
 
     /// getResultPos resolves the target before the value (model.py `target`).
-    fn target(&mut self, p: &mut Path, o: &FactOracle, lhs: ExprId, x: Option<X>) -> Target {
-        let g = self.game;
-        match g.ast.expr(lhs) {
-            Expr::Var(n) => Target::Fact(Fact::Var(n)),
-            Expr::Bit(n) => Target::Fact(Fact::Bit(n)),
-            Expr::Local(n) => Target::Local(n),
-            Expr::Index { kind, base, offset } => {
-                let ov = self.val(p, o, offset, x);
-                match ov {
-                    Val::Unk(_) => {
-                        let w = format!("index of {} ({})", self.show_e(lhs), self.show(ov));
-                        Target::Unk(self.v.mk(Reason::Work, w))
-                    }
-                    Val::Int(k) => {
-                        let n = key_num(base as i64 + k as i64);
-                        match kind {
-                            RefKind::Local => Target::Local(n),
-                            RefKind::Var => Target::Fact(Fact::Var(n)),
-                            RefKind::Bit => Target::Fact(Fact::Bit(n)),
+    fn target(&mut self, p: &mut Path, o: &FactOracle, lhs: ExprId, x: Option<X>) -> R<Target> {
+        Ok({
+            let g = self.game;
+            match g.ast.expr(lhs) {
+                Expr::Var(n) => Target::Fact(Fact::Var(n)),
+                Expr::Bit(n) => Target::Fact(Fact::Bit(n)),
+                Expr::Local(n) => Target::Local(n),
+                Expr::Index { kind, base, offset } => {
+                    let ov = self.val(p, o, offset, x)?;
+                    match ov {
+                        Val::Unk(_) => {
+                            let w = format!("index of {} ({})", self.show_e(lhs), self.show(ov));
+                            Target::Unk(self.v.mk(Reason::Work, w))
+                        }
+                        Val::Int(k) => {
+                            let n = key_num(base as i64 + k as i64);
+                            match kind {
+                                RefKind::Local => Target::Local(n),
+                                RefKind::Var => Target::Fact(Fact::Var(n)),
+                                RefKind::Bit => Target::Fact(Fact::Bit(n)),
+                            }
                         }
                     }
                 }
+                _ => {
+                    let w = format!("target {}", py_repr(&g.ast, &g.syms, lhs));
+                    Target::Unk(self.v.mk(Reason::Work, w))
+                }
             }
-            _ => {
-                let w = format!("target {}", py_repr(&g.ast, &g.syms, lhs));
-                Target::Unk(self.v.mk(Reason::Work, w))
-            }
-        }
+        })
     }
 
     fn put(&mut self, p: &mut Path, t: Target, v: Val, x: Option<X>, head: &str) {
@@ -1177,40 +1239,46 @@ impl<'g> Machine<'g> {
 
     /// Every fact with this prefix that is not 0 goes to 0 (model.py `clear`; FactOracle always lists,
     /// so its note never happens). The order of the keys changes nothing observable.
-    pub fn clear_base(&mut self, p: &mut Path, o: &FactOracle, pre: Prefix) {
-        for k in self.prefixed(p, o, pre) {
-            if self.read(p, k, o) != Val::Int(0) {
-                self.write(p, k, Val::Int(0));
+    pub fn clear_base(&mut self, p: &mut Path, o: &FactOracle, pre: Prefix) -> R<()> {
+        Ok({
+            for k in self.prefixed(p, o, pre) {
+                if self.read(p, k, o)? != Val::Int(0) {
+                    self.write(p, k, Val::Int(0));
+                }
             }
-        }
+        })
     }
 
     /// A slot stops (model.py `stopped`).
-    fn stopped(&mut self, p: &mut Path, o: &FactOracle, key: Fact) {
-        self.write(p, key, Val::Int(0));
-        let name = slot_name(key);
-        self.clear(p, o, Prefix::At(name));
-        self.clear(p, o, Prefix::Esc(name));
-        if self.calls {
-            self.set_freeze(p, o, name, Some((0, true)), "");
-        }
-        p.pop_slot(name);
+    fn stopped(&mut self, p: &mut Path, o: &FactOracle, key: Fact) -> R<()> {
+        Ok({
+            self.write(p, key, Val::Int(0));
+            let name = slot_name(key);
+            self.clear(p, o, Prefix::At(name))?;
+            self.clear(p, o, Prefix::Esc(name))?;
+            if self.calls {
+                self.set_freeze(p, o, name, Some((0, true)), "")?;
+            }
+            p.pop_slot(name);
+        })
     }
 
-    fn assign(&mut self, p: &mut Path, o: &FactOracle, a: AssignSt, x: Option<X>) {
-        let g = self.game;
-        let t = self.target(p, o, a.lhs, x);
-        let mut v = self.val(p, o, a.rhs, x);
-        if let Some(op) = a.op.arith() {
-            let old = match t {
-                Target::Unk(u) => u,
-                _ => self.val(p, o, a.lhs, x),
-            };
-            v = self.arith_at(p, op.into(), old, v, x);
-        }
-        // the statement's head names an unknown write only: made then
-        let head = if let Target::Unk(_) = t { ir_head(&g.ast, &g.syms, &Stmt::Assign(a)) } else { String::new() };
-        self.put(p, t, v, x, &head);
+    fn assign(&mut self, p: &mut Path, o: &FactOracle, a: AssignSt, x: Option<X>) -> R<()> {
+        Ok({
+            let g = self.game;
+            let t = self.target(p, o, a.lhs, x)?;
+            let mut v = self.val(p, o, a.rhs, x)?;
+            if let Some(op) = a.op.arith() {
+                let old = match t {
+                    Target::Unk(u) => u,
+                    _ => self.val(p, o, a.lhs, x)?,
+                };
+                v = self.arith_at(p, op.into(), old, v, x);
+            }
+            // the statement's head names an unknown write only: made then
+            let head = if let Target::Unk(_) = t { ir_head(&g.ast, &g.syms, &Stmt::Assign(a)) } else { String::new() };
+            self.put(p, t, v, x, &head);
+        })
     }
 
     /// `_arith` in a path: with calls on, a division by a known 0 is the engine's error() (o5_divide and
@@ -1225,43 +1293,50 @@ impl<'g> Machine<'g> {
 
     // --- row 0's starts: recorded, not run ------------------------------------------------------------------
 
-    fn may_stop(&mut self, p: &mut Path, o: &FactOracle, key: Fact, head: &str) {
-        let name = slot_name(key);
-        for pre in [Prefix::At(name), Prefix::Esc(name)] {
-            for k in self.prefixed(p, o, pre) {
-                if self.read(p, k, o) != Val::Int(0) {
-                    let u = self.v.mk(Reason::Work, format!("{name} restarted by {head}; the new instance is not run"));
-                    self.write(p, k, u);
+    fn may_stop(&mut self, p: &mut Path, o: &FactOracle, key: Fact, head: &str) -> R<()> {
+        Ok({
+            let name = slot_name(key);
+            for pre in [Prefix::At(name), Prefix::Esc(name)] {
+                for k in self.prefixed(p, o, pre) {
+                    if self.read(p, k, o)? != Val::Int(0) {
+                        let u =
+                            self.v.mk(Reason::Work, format!("{name} restarted by {head}; the new instance is not run"));
+                        self.write(p, k, u);
+                    }
                 }
             }
-        }
+        })
     }
 
-    fn started(&mut self, p: &mut Path, o: &FactOracle, key: Fact, recursive: Option<bool>, head: &str) {
-        if recursive != Some(true) {
-            self.may_stop(p, o, key, head);
-        }
-        self.write(p, key, Val::Int(1));
-    }
-
-    fn hook(&mut self, p: &mut Path, o: &FactOracle, var: i32, x: X, head: &str) {
-        let n = self.read(p, Fact::Var(var), o);
-        match n {
-            Val::Unk(_) => {
-                let c = self.cite(x);
-                let w = format!("hook in var {var}: {}", self.show(n));
-                p.unknown_writes.push((rc(head), c, w.into()));
+    fn started(&mut self, p: &mut Path, o: &FactOracle, key: Fact, recursive: Option<bool>, head: &str) -> R<()> {
+        Ok({
+            if recursive != Some(true) {
+                self.may_stop(p, o, key, head)?;
             }
-            Val::Int(0) => {}
-            Val::Int(n) => {
-                let key = self.game.script_key(n);
-                self.started(p, o, key, Some(false), head);
-                if self.is_self(p, key) {
+            self.write(p, key, Val::Int(1));
+        })
+    }
+
+    fn hook(&mut self, p: &mut Path, o: &FactOracle, var: i32, x: X, head: &str) -> R<()> {
+        Ok({
+            let n = self.read(p, Fact::Var(var), o)?;
+            match n {
+                Val::Unk(_) => {
                     let c = self.cite(x);
-                    self.end(p, o, "end", rc(&format!("{c} (hook restarts the running script)")), false, None);
+                    let w = format!("hook in var {var}: {}", self.show(n));
+                    p.unknown_writes.push((rc(head), c, w.into()));
+                }
+                Val::Int(0) => {}
+                Val::Int(n) => {
+                    let key = self.game.script_key(n);
+                    self.started(p, o, key, Some(false), head)?;
+                    if self.is_self(p, key) {
+                        let c = self.cite(x);
+                        self.end(p, o, "end", rc(&format!("{c} (hook restarts the running script)")), false, None)?;
+                    }
                 }
             }
-        }
+        })
     }
 
     // --- one step -----------------------------------------------------------------------------------------
@@ -1278,7 +1353,12 @@ impl<'g> Machine<'g> {
             p.end_at = Some(rc(&format!("{cite}: {what}")));
         }
         if self.trace.is_some() {
-            let kw = vec![("what", enc::s(what)), ("cite", enc::s(&cite)), ("detail", enc::s(detail)), ("fatal", J::Bool(fatal))];
+            let kw = vec![
+                ("what", enc::s(what)),
+                ("cite", enc::s(&cite)),
+                ("detail", enc::s(detail)),
+                ("fatal", J::Bool(fatal)),
+            ];
             self.ev(p, "error", kw);
         }
     }
@@ -1297,170 +1377,200 @@ impl<'g> Machine<'g> {
     }
 
     /// Row 0: end a path (model.py `_end`).
-    fn end(&mut self, p: &mut Path, o: &FactOracle, reason: &'static str, at: S, lifecycle: bool, resume: Option<i32>) {
-        p.end = Some(reason);
-        p.end_at = Some(at.clone());
-        if lifecycle && matches!(reason, "yield" | "end" | "room") {
-            let unit = self.unit_key(p.frame().expect("a frame").unit);
-            let (key, name) = (self.game.lifecycle_key(unit), Game::unit_name(unit));
-            self.clear(p, o, Prefix::At(name));
-            if reason == "yield" {
-                if let Some(k) = key {
-                    self.write(p, k, Val::Int(1));
-                }
-                match resume {
-                    None => {
-                        let w = format!("{at}: the resume offset is past the code; at: not predicted");
-                        self.note(p, rc(""), "yield", &w);
+    fn end(
+        &mut self,
+        p: &mut Path,
+        o: &FactOracle,
+        reason: &'static str,
+        at: S,
+        lifecycle: bool,
+        resume: Option<i32>,
+    ) -> R<()> {
+        Ok({
+            p.end = Some(reason);
+            p.end_at = Some(at.clone());
+            if lifecycle && matches!(reason, "yield" | "end" | "room") {
+                let unit = self.unit_key(p.frame().expect("a frame").unit);
+                let (key, name) = (self.game.lifecycle_key(unit), Game::unit_name(unit));
+                self.clear(p, o, Prefix::At(name))?;
+                if reason == "yield" {
+                    if let Some(k) = key {
+                        self.write(p, k, Val::Int(1));
                     }
-                    Some(r) => self.write(p, Fact::At(name, r), Val::Int(1)),
+                    match resume {
+                        None => {
+                            let w = format!("{at}: the resume offset is past the code; at: not predicted");
+                            self.note(p, rc(""), "yield", &w);
+                        }
+                        Some(r) => self.write(p, Fact::At(name, r), Val::Int(1)),
+                    }
+                } else {
+                    if let Some(k) = key {
+                        self.write(p, k, Val::Int(0));
+                    }
+                    self.clear(p, o, Prefix::Esc(name))?;
                 }
-            } else {
-                if let Some(k) = key {
-                    self.write(p, k, Val::Int(0));
-                }
-                self.clear(p, o, Prefix::Esc(name));
             }
-        }
-        if self.trace.is_some() {
-            let r = resume.map_or(J::Null, |r| J::Int(r as i64));
-            self.ev(p, "end", vec![("reason", enc::s(reason)), ("at", enc::s(&at)), ("resume", r)]);
-        }
+            if self.trace.is_some() {
+                let r = resume.map_or(J::Null, |r| J::Int(r as i64));
+                self.ev(p, "end", vec![("reason", enc::s(reason)), ("at", enc::s(&at)), ("resume", r)]);
+            }
+        })
     }
 
     /// The running frame's turn ends: row 0 ends the path, calls pops the frame (model.py `_done`).
-    fn done(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) {
-        if self.calls {
-            self.finish(p, o, how, at, resume);
-        } else {
-            self.end(p, o, how, at, true, resume);
-        }
+    fn done(&mut self, p: &mut Path, o: &FactOracle, how: &'static str, at: S, resume: Option<i32>) -> R<()> {
+        Ok({
+            if self.calls {
+                self.finish(p, o, how, at, resume)?;
+            } else {
+                self.end(p, o, how, at, true, resume)?;
+            }
+        })
     }
 
     /// Runs one instruction of the running frame; returns the paths it forked off (model.py `_step`).
-    fn step(&mut self, p: &mut Path, o: &FactOracle) -> Vec<Path> {
-        let g = self.game;
-        let (uid, pc, sid) = {
-            let f = p.frame().expect("a frame");
-            (f.unit, f.pc, f.sid)
-        };
-        let u = g.unit(uid);
-        let idx = match pc {
-            Some(i) if i < u.ins_len => i,
-            _ => {
-                let at = format!("{}: end of code", g.syms.str(u.file));
-                self.done(p, o, "end", rc(&at), None);
-                return Vec::new();
-            }
-        };
-        let x = X { u: uid, i: idx };
-        let ins = &g.ins(uid)[idx as usize];
-        p.steps += 1;
-        let Some(st) = ins.st else {
-            let c = self.cite(x);
-            p.unmodelled.push((rc("unparsed"), c.clone(), rc(g.text(ins))));
-            self.end(p, o, "unmodelled", c, false, None);
-            return Vec::new();
-        };
-        p.frame_mut().unwrap().pc = ins.next;
-        let mut more = Vec::new();
-        match st {
-            Stmt::Jump { cond, .. } => return self.jump(p, o, x, cond, Some(idx)),
-            Stmt::Assign(a) => self.assign(p, o, a, Some(x)),
-            Stmt::Start { .. } => more = self.start(p, o, x, st),
-            Stmt::Op { name, .. } => {
-                let eff = effect(name);
-                match eff {
-                    Effect::Yield => {
-                        // after breakHere or a delay the slot resumes at the next instruction (facts.py at:)
-                        let resume = ins.next.filter(|&j| j < u.ins_len).map(|j| g.ins(uid)[j as usize].offset);
-                        let c = self.cite(x);
-                        self.done(p, o, "yield", c, resume);
-                    }
-                    Effect::Wait => more = self.wait(p, o, x, name),
-                    Effect::Unmodelled(why) => {
-                        let c = self.cite(x);
-                        p.unmodelled.push((rc(self.sym(name)), c.clone(), rc(why)));
-                        self.end(p, o, "unmodelled", c, false, None);
-                    }
-                    Effect::Write | Effect::End | Effect::Deferred => more = self.op(p, o, x, st),
-                    // F9 (switch actor_rooms): putActorInRoom writes the actor's room (actor_rooms.rs)
-                    Effect::None if name == known::PUT_ACTOR_IN_ROOM && self.switches.actor_rooms => {
-                        more = self.op(p, o, x, st)
-                    }
-                    Effect::None => {}
+    fn step(&mut self, p: &mut Path, o: &FactOracle) -> R<Vec<Path>> {
+        Ok({
+            let g = self.game;
+            let (uid, pc, sid) = {
+                let f = p.frame().expect("a frame");
+                (f.unit, f.pc, f.sid)
+            };
+            let u = g.unit(uid);
+            let idx = match pc {
+                Some(i) if i < u.ins_len => i,
+                _ => {
+                    let at = format!("{}: end of code", g.syms.str(u.file));
+                    self.done(p, o, "end", rc(&at), None)?;
+                    return Ok(Vec::new());
                 }
-                if eff == Effect::End {
-                    let c = self.cite(x);
-                    let calls = self.calls;
-                    let goes = |q: &Path| if calls { q.running(sid) } else { q.end.is_none() };
-                    if goes(p) {
-                        self.done(p, o, "end", c.clone(), None);
+            };
+            let x = X { u: uid, i: idx };
+            let ins = &g.ins(uid)[idx as usize];
+            p.steps += 1;
+            let Some(st) = ins.st else {
+                let c = self.cite(x);
+                p.unmodelled.push((rc("unparsed"), c.clone(), rc(g.text(ins))));
+                self.end(p, o, "unmodelled", c, false, None)?;
+                return Ok(Vec::new());
+            };
+            p.frame_mut().unwrap().pc = ins.next;
+            let mut more = Vec::new();
+            match st {
+                Stmt::Jump { cond, .. } => return Ok(self.jump(p, o, x, cond, Some(idx))?),
+                Stmt::Assign(a) => self.assign(p, o, a, Some(x))?,
+                Stmt::Start { .. } => more = self.start(p, o, x, st)?,
+                Stmt::Op { name, .. } => {
+                    let eff = effect(name);
+                    match eff {
+                        Effect::Yield => {
+                            // after breakHere or a delay the slot resumes at the next instruction (facts.py at:)
+                            let resume = ins.next.filter(|&j| j < u.ins_len).map(|j| g.ins(uid)[j as usize].offset);
+                            let c = self.cite(x);
+                            self.done(p, o, "yield", c, resume)?;
+                        }
+                        Effect::Wait => more = self.wait(p, o, x, name)?,
+                        Effect::Unmodelled(why) => {
+                            let c = self.cite(x);
+                            p.unmodelled.push((rc(self.sym(name)), c.clone(), rc(why)));
+                            self.end(p, o, "unmodelled", c, false, None)?;
+                        }
+                        Effect::Write | Effect::End | Effect::Deferred => more = self.op(p, o, x, st)?,
+                        // F9 (switch actor_rooms): putActorInRoom writes the actor's room (actor_rooms.rs)
+                        Effect::None if name == known::PUT_ACTOR_IN_ROOM && self.switches.actor_rooms => {
+                            more = self.op(p, o, x, st)?
+                        }
+                        Effect::None => {}
                     }
-                    for q in more.iter_mut() {
-                        if goes(q) {
-                            self.done(q, o, "end", c.clone(), None);
+                    if eff == Effect::End {
+                        let c = self.cite(x);
+                        let calls = self.calls;
+                        let goes = |q: &Path| if calls { q.running(sid) } else { q.end.is_none() };
+                        if goes(p) {
+                            self.done(p, o, "end", c.clone(), None)?;
+                        }
+                        for q in more.iter_mut() {
+                            if goes(q) {
+                                self.done(q, o, "end", c.clone(), None)?;
+                            }
                         }
                     }
                 }
             }
-        }
-        if self.calls {
-            // an op that stopped its own slot ends its turn (stopScript and the like)
-            self.finish_killed(p, o, sid, x);
-            for q in more.iter_mut() {
-                self.finish_killed(q, o, sid, x);
+            if self.calls {
+                // an op that stopped its own slot ends its turn (stopScript and the like)
+                self.finish_killed(p, o, sid, x)?;
+                for q in more.iter_mut() {
+                    self.finish_killed(q, o, sid, x)?;
+                }
             }
-        }
-        more
+            more
+        })
     }
 
     /// `_step`'s last test (calls): the frame `sid`, still running, was killed by its own op.
-    fn finish_killed(&mut self, q: &mut Path, o: &FactOracle, sid: u32, x: X) {
-        if !q.running(sid) {
-            return;
-        }
-        let Some(Entry::Frame(f)) = q.stack.last() else { unreachable!() };
-        if let Some(how) = f.killed {
-            let c = self.cite(x);
-            self.finish(q, o, how, c, None);
-        }
+    fn finish_killed(&mut self, q: &mut Path, o: &FactOracle, sid: u32, x: X) -> R<()> {
+        Ok({
+            if !q.running(sid) {
+                return Ok(());
+            }
+            let Some(Entry::Frame(f)) = q.stack.last() else { unreachable!() };
+            if let Some(how) = f.killed {
+                let c = self.cite(x);
+                self.finish(q, o, how, c, None)?;
+            }
+        })
     }
 
-    pub fn jump_base(&mut self, p: &mut Path, o: &FactOracle, x: X, cond: Option<ExprId>, idx: Option<u32>) -> Vec<Path> {
-        let g = self.game;
-        let ins = &g.ins(x.u)[x.i as usize];
-        let Some(cond) = cond else {
-            p.frame_mut().unwrap().pc = ins.target;
-            return Vec::new();
-        };
-        let c = self.test(p, o, cond, Some(x));
-        if let (Dec::Unk(u), Some(idx)) = (c, idx) {
-            if p.round != 0 || p.timed {
-                if let Some(q) = self.time_jump(p, x, cond, idx, u) {
-                    return q;
+    pub fn jump_base(
+        &mut self,
+        p: &mut Path,
+        o: &FactOracle,
+        x: X,
+        cond: Option<ExprId>,
+        idx: Option<u32>,
+    ) -> R<Vec<Path>> {
+        Ok({
+            let g = self.game;
+            let ins = &g.ins(x.u)[x.i as usize];
+            let Some(cond) = cond else {
+                p.frame_mut().unwrap().pc = ins.target;
+                return Ok(Vec::new());
+            };
+            let c = self.test(p, o, cond, Some(x))?;
+            if let (Dec::Unk(u), Some(idx)) = (c, idx) {
+                if p.round != 0 || p.timed {
+                    if let Some(q) = self.time_jump(p, x, cond, idx, u) {
+                        return Ok(q);
+                    }
                 }
             }
-        }
-        match c {
-            // o5 jumps when the condition is false
-            Dec::Bool(b) => {
-                p.frame_mut().unwrap().pc = if b { ins.next } else { ins.target };
-                Vec::new()
-            }
-            Dec::Unk(u) => {
-                let mut q = p.fork();
-                let (cite, cond_s, why) = (self.cite(x), self.cond_text(cond), self.v.show_rc(u));
-                p.assumptions.push(Assumption { cite: cite.clone(), cond: cond_s.clone(), side: Side::Bool(true), why: why.clone() });
-                q.assumptions.push(Assumption { cite, cond: cond_s, side: Side::Bool(false), why });
-                p.frame_mut().unwrap().pc = ins.next;
-                q.frame_mut().unwrap().pc = ins.target;
-                if self.switches.value_sets {
-                    self.narrow(p, &mut q, cond, u);
+            match c {
+                // o5 jumps when the condition is false
+                Dec::Bool(b) => {
+                    p.frame_mut().unwrap().pc = if b { ins.next } else { ins.target };
+                    Vec::new()
                 }
-                vec![q]
+                Dec::Unk(u) => {
+                    let mut q = p.fork();
+                    let (cite, cond_s, why) = (self.cite(x), self.cond_text(cond), self.v.show_rc(u));
+                    p.assumptions.push(Assumption {
+                        cite: cite.clone(),
+                        cond: cond_s.clone(),
+                        side: Side::Bool(true),
+                        why: why.clone(),
+                    });
+                    q.assumptions.push(Assumption { cite, cond: cond_s, side: Side::Bool(false), why });
+                    p.frame_mut().unwrap().pc = ins.next;
+                    q.frame_mut().unwrap().pc = ins.target;
+                    if self.switches.value_sets {
+                        self.narrow(p, &mut q, cond, u);
+                    }
+                    vec![q]
+                }
             }
-        }
+        })
     }
 
     /// F12: a fork on a test of a variable or local that holds a range or a value set (against a constant, or a
@@ -1574,805 +1684,864 @@ impl<'g> Machine<'g> {
 
     /// o5_wait: blocked or not, a fork (model.py `_wait`); in a settle round or turn, a wait for an actor, a
     /// message or the camera blocks now, and WaitForSentence tests the queue and the sentence slot.
-    pub fn wait_base(&mut self, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> Vec<Path> {
-        let g = self.game;
-        let (reason, what) = waits(name);
-        let ins = &g.ins(x.u)[x.i as usize];
-        if p.round != 0 || p.timed {
-            if name != known::WAIT_FOR_SENTENCE {
-                let c = self.cite(x);
-                self.done(p, o, "yield", c, Some(ins.offset));
-                return Vec::new();
-            }
-            if let Dec::Bool(busy) = self.sentence_busy(p, o) {
-                if busy {
+    pub fn wait_base(&mut self, p: &mut Path, o: &FactOracle, x: X, name: Sym) -> R<Vec<Path>> {
+        Ok({
+            let g = self.game;
+            let (reason, what) = waits(name);
+            let ins = &g.ins(x.u)[x.i as usize];
+            if p.round != 0 || p.timed {
+                if name != known::WAIT_FOR_SENTENCE {
                     let c = self.cite(x);
-                    self.done(p, o, "yield", c, Some(ins.offset));
+                    self.done(p, o, "yield", c, Some(ins.offset))?;
+                    return Ok(Vec::new());
                 }
-                return Vec::new();
+                if let Dec::Bool(busy) = self.sentence_busy(p, o)? {
+                    if busy {
+                        let c = self.cite(x);
+                        self.done(p, o, "yield", c, Some(ins.offset))?;
+                    }
+                    return Ok(Vec::new());
+                }
             }
-        }
-        let mut q = p.fork();
-        let cond = rc(&format!("{} blocks", scumm_ir::py::strip(g.text(ins))));
-        let why = rc(&format!("?({}: {what})", reason.as_str()));
-        let cite = self.cite(x);
-        p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
-        q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
-        self.done(p, o, "yield", cite, Some(ins.offset));
-        vec![q]
+            let mut q = p.fork();
+            let cond = rc(&format!("{} blocks", scumm_ir::py::strip(g.text(ins))));
+            let why = rc(&format!("?({}: {what})", reason.as_str()));
+            let cite = self.cite(x);
+            p.assumptions.push(Assumption {
+                cite: cite.clone(),
+                cond: cond.clone(),
+                side: Side::Bool(true),
+                why: why.clone(),
+            });
+            q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+            self.done(p, o, "yield", cite, Some(ins.offset))?;
+            vec![q]
+        })
     }
 
     // --- starts ---------------------------------------------------------------------------------------------
 
-    fn start(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
-        let g = self.game;
-        let Stmt::Start { name, script, obj, recursive, freeze, args } = st else { unreachable!() };
-        let head = self.sym(name);
-        if self.calls {
-            // getWordVararg: the call site's arguments become the callee's locals, evaluated first
-            let mut locals: Args = Vec::new();
-            for (i, &a) in g.ast.kids(args).iter().enumerate() {
-                let v = self.val(p, o, a, Some(x));
-                locals.push((i as i32, v));
+    fn start(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
+        Ok({
+            let g = self.game;
+            let Stmt::Start { name, script, obj, recursive, freeze, args } = st else { unreachable!() };
+            let head = self.sym(name);
+            if self.calls {
+                // getWordVararg: the call site's arguments become the callee's locals, evaluated first
+                let mut locals: Args = Vec::new();
+                for (i, &a) in g.ast.kids(args).iter().enumerate() {
+                    let v = self.val(p, o, a, Some(x))?;
+                    locals.push((i as i32, v));
+                }
+                let c = self.cite(x);
+                if name == known::START_OBJECT {
+                    let ob = self.val(p, o, obj.expect("startObject's object"), Some(x))?;
+                    let verb = self.val(p, o, script, Some(x))?;
+                    let (Val::Int(ob), Val::Int(verb)) = (ob, verb) else {
+                        let w = format!("objscript of {} for verb {}", self.show(ob), self.show(verb));
+                        p.unknown_writes.push((rc(head), c, w.into()));
+                        return Ok(Vec::new());
+                    };
+                    self.push_call(p, rc(head), c, vec![Step::Object { obj: ob, verb, args: locals }], true);
+                    return Ok(Vec::new());
+                }
+                let n = self.val(p, o, script, Some(x))?;
+                let Val::Int(n) = n else {
+                    let w = format!("script {}", self.show(n));
+                    p.unknown_writes.push((rc(head), c, w.into()));
+                    return Ok(Vec::new());
+                };
+                if name == known::CHAIN_SCRIPT {
+                    // the running slot dies first and _currentScript is 0xFF, then runScript(N) with that slot's
+                    // F and R (script_v5.cpp:843-850): N takes its place under the same caller
+                    let fi = p.top_frame_index().expect("a frame");
+                    let f = p.frame_at(fi);
+                    f.killed = Some("chained");
+                    let (unit, resistant, rec) = (f.unit, f.resistant, f.recursive);
+                    self.gone(p, o, unit)?;
+                    let step = Step::Script { n, resistant, recursive: rec, args: locals };
+                    self.push_call(p, rc(head), c, vec![step], false);
+                    return Ok(Vec::new());
+                }
+                let step = Step::Script { n, resistant: Some(freeze), recursive: Some(recursive), args: locals };
+                self.push_call(p, rc(head), c, vec![step], true);
+                return Ok(Vec::new());
             }
-            let c = self.cite(x);
             if name == known::START_OBJECT {
-                let ob = self.val(p, o, obj.expect("startObject's object"), Some(x));
-                let verb = self.val(p, o, script, Some(x));
+                let ob = self.val(p, o, obj.expect("startObject's object"), Some(x))?;
+                let verb = self.val(p, o, script, Some(x))?;
                 let (Val::Int(ob), Val::Int(verb)) = (ob, verb) else {
+                    let c = self.cite(x);
                     let w = format!("objscript of {} for verb {}", self.show(ob), self.show(verb));
                     p.unknown_writes.push((rc(head), c, w.into()));
-                    return Vec::new();
+                    return Ok(Vec::new());
                 };
-                self.push_call(p, rc(head), c, vec![Step::Object { obj: ob, verb, args: locals }], true);
-                return Vec::new();
-            }
-            let n = self.val(p, o, script, Some(x));
-            let Val::Int(n) = n else {
-                let w = format!("script {}", self.show(n));
-                p.unknown_writes.push((rc(head), c, w.into()));
-                return Vec::new();
-            };
-            if name == known::CHAIN_SCRIPT {
-                // the running slot dies first and _currentScript is 0xFF, then runScript(N) with that slot's
-                // F and R (script_v5.cpp:843-850): N takes its place under the same caller
-                let fi = p.top_frame_index().expect("a frame");
-                let f = p.frame_at(fi);
-                f.killed = Some("chained");
-                let (unit, resistant, rec) = (f.unit, f.resistant, f.recursive);
-                self.gone(p, o, unit);
-                let step = Step::Script { n, resistant, recursive: rec, args: locals };
-                self.push_call(p, rc(head), c, vec![step], false);
-                return Vec::new();
-            }
-            let step = Step::Script { n, resistant: Some(freeze), recursive: Some(recursive), args: locals };
-            self.push_call(p, rc(head), c, vec![step], true);
-            return Vec::new();
-        }
-        if name == known::START_OBJECT {
-            let ob = self.val(p, o, obj.expect("startObject's object"), Some(x));
-            let verb = self.val(p, o, script, Some(x));
-            let (Val::Int(ob), Val::Int(verb)) = (ob, verb) else {
-                let c = self.cite(x);
-                let w = format!("objscript of {} for verb {}", self.show(ob), self.show(verb));
-                p.unknown_writes.push((rc(head), c, w.into()));
-                return Vec::new();
-            };
-            // runObjectScript(O, verb, 0, 0), never with R: it stops O's scripts first, then starts a new
-            // instance when O is in the room or inventory and has an entry for the verb
-            let key = Fact::ObjScript(ob);
-            match self.where_(p, o, ob) {
-                Where::Unk(w) => {
-                    self.may_stop(p, o, key, head);
-                    self.write(p, key, w);
+                // runObjectScript(O, verb, 0, 0), never with R: it stops O's scripts first, then starts a new
+                // instance when O is in the room or inventory and has an entry for the verb
+                let key = Fact::ObjScript(ob);
+                match self.where_(p, o, ob)? {
+                    Where::Unk(w) => {
+                        self.may_stop(p, o, key, head)?;
+                        self.write(p, key, w);
+                    }
+                    w if w != Where::Nowhere && g.entry(ob, verb).is_some() => {
+                        self.started(p, o, key, Some(false), head)?
+                    }
+                    _ => self.stopped(p, o, key)?,
                 }
-                w if w != Where::Nowhere && g.entry(ob, verb).is_some() => self.started(p, o, key, Some(false), head),
-                _ => self.stopped(p, o, key),
+                if self.is_self(p, key) {
+                    let c = self.cite(x);
+                    let at = format!("{c} (startObject stops the running object's scripts)");
+                    self.end(p, o, "end", rc(&at), false, None)?;
+                }
+                return Ok(Vec::new());
             }
-            if self.is_self(p, key) {
+            let n = self.val(p, o, script, Some(x))?;
+            let n = match n {
+                Val::Unk(_) => {
+                    let c = self.cite(x);
+                    let w = format!("script {}", self.show(n));
+                    p.unknown_writes.push((rc(head), c, w.into()));
+                    return Ok(Vec::new());
+                }
+                Val::Int(0) => return Ok(Vec::new()), // runScript(0) does nothing (script.cpp:62-63)
+                Val::Int(n) => n,
+            };
+            let key = g.script_key(n);
+            if name == known::CHAIN_SCRIPT {
+                // the running slot dies first, then runScript with the slot's own R flag (script_v5.cpp:834-851)
+                let rec = p.frame().unwrap().recursive;
+                self.started(p, o, key, rec, head)?;
+                let lifecycle = !self.is_self(p, key);
                 let c = self.cite(x);
-                let at = format!("{c} (startObject stops the running object's scripts)");
-                self.end(p, o, "end", rc(&at), false, None);
+                self.end(p, o, "end", c, lifecycle, None)?;
+                return Ok(Vec::new());
             }
-            return Vec::new();
-        }
-        let n = self.val(p, o, script, Some(x));
-        let n = match n {
-            Val::Unk(_) => {
+            self.started(p, o, key, Some(recursive), head)?;
+            if !recursive && self.is_self(p, key) {
                 let c = self.cite(x);
-                let w = format!("script {}", self.show(n));
-                p.unknown_writes.push((rc(head), c, w.into()));
-                return Vec::new();
+                self.end(p, o, "end", rc(&format!("{c} (the start stops the running script)")), false, None)?;
             }
-            Val::Int(0) => return Vec::new(), // runScript(0) does nothing (script.cpp:62-63)
-            Val::Int(n) => n,
-        };
-        let key = g.script_key(n);
-        if name == known::CHAIN_SCRIPT {
-            // the running slot dies first, then runScript with the slot's own R flag (script_v5.cpp:834-851)
-            let rec = p.frame().unwrap().recursive;
-            self.started(p, o, key, rec, head);
-            let lifecycle = !self.is_self(p, key);
-            let c = self.cite(x);
-            self.end(p, o, "end", c, lifecycle, None);
-            return Vec::new();
-        }
-        self.started(p, o, key, Some(recursive), head);
-        if !recursive && self.is_self(p, key) {
-            let c = self.cite(x);
-            self.end(p, o, "end", rc(&format!("{c} (the start stops the running script)")), false, None);
-        }
-        Vec::new()
+            Vec::new()
+        })
     }
 
     // --- op rules (model.py HEADS has the cites) -------------------------------------------------------------
 
-    pub fn op_base(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> Vec<Path> {
-        let g = self.game;
-        let Stmt::Op { name, args, subops, flags } = st else { unreachable!() };
-        let args = g.ast.kids(args);
-        let cite = self.cite(x);
-        let int0 = Val::Int(0);
-        match name {
-            known::STOP_OBJECT_CODE => {} // the "end" effect ends the turn
-            known::STOP_SCRIPT => {
-                let n = self.val(p, o, args[0], Some(x));
-                match n {
-                    Val::Unk(_) => {
-                        let w = format!("script {}", self.show(n));
-                        p.unknown_writes.push((rc("stopScript"), cite, w.into()));
-                    }
-                    Val::Int(0) => self.done(p, o, "end", cite, None), // stopObjectCode (script_v5.cpp:3035-3036)
-                    Val::Int(n) if self.calls => self.stop_script(p, o, n, &cite, "stopScript"),
-                    Val::Int(n) => {
-                        let key = g.script_key(n);
-                        self.stopped(p, o, key);
-                        if self.is_self(p, key) {
-                            self.end(p, o, "end", cite, false, None);
-                        }
-                    }
-                }
-            }
-            known::STOP_OBJECT_SCRIPT => {
-                let ob = self.val(p, o, args[0], Some(x));
-                let Val::Int(ob) = ob else {
-                    let w = format!("objscript {}", self.show(ob));
-                    p.unknown_writes.push((rc("stopObjectScript"), cite, w.into()));
-                    return Vec::new();
-                };
-                if self.calls {
-                    self.kill_object(p, o, ob, &cite, "stopObjectScript");
-                    return Vec::new();
-                }
-                self.stopped(p, o, Fact::ObjScript(ob));
-                if self.is_self(p, Fact::ObjScript(ob)) {
-                    self.end(p, o, "end", cite, false, None);
-                }
-            }
-            known::DO_SENTENCE => {
-                if g.ast.flags(flags).contains(&known::STOP) {
-                    // stops VAR_SENTENCE_SCRIPT (script_v5.cpp:1004-1008)
-                    if p.settle {
-                        // it also empties the sentence queue (_sentenceNum = 0, script_v5.cpp:1005)
-                        p.queue.clear();
-                    }
-                    if p.settle && p.round == 0 {
-                        // and clearClickedStatus wipes the frame's key or click (read by row 5's Esc key)
-                        p.cleared = Some(true);
-                    }
-                    let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o);
+    pub fn op_base(&mut self, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
+        Ok({
+            let g = self.game;
+            let Stmt::Op { name, args, subops, flags } = st else { unreachable!() };
+            let args = g.ast.kids(args);
+            let cite = self.cite(x);
+            let int0 = Val::Int(0);
+            match name {
+                known::STOP_OBJECT_CODE => {} // the "end" effect ends the turn
+                known::STOP_SCRIPT => {
+                    let n = self.val(p, o, args[0], Some(x))?;
                     match n {
                         Val::Unk(_) => {
-                            let w = format!("sentence script {}", self.show(n));
-                            p.unknown_writes.push((rc("doSentence"), cite, w.into()));
+                            let w = format!("script {}", self.show(n));
+                            p.unknown_writes.push((rc("stopScript"), cite, w.into()));
                         }
-                        Val::Int(0) => {}
-                        Val::Int(n) if self.calls => self.stop_script(p, o, n, &cite, "doSentence"),
+                        Val::Int(0) => self.done(p, o, "end", cite, None)?, // stopObjectCode (script_v5.cpp:3035-3036)
+                        Val::Int(n) if self.calls => self.stop_script(p, o, n, &cite, "stopScript")?,
                         Val::Int(n) => {
                             let key = g.script_key(n);
-                            self.stopped(p, o, key);
+                            self.stopped(p, o, key)?;
                             if self.is_self(p, key) {
-                                self.end(p, o, "end", cite, false, None);
+                                self.end(p, o, "end", cite, false, None)?;
                             }
                         }
                     }
-                    return Vec::new();
                 }
-                if p.settle {
-                    // doSentence (script.cpp:1145-1172) pushes (verb, A, B) with freeze count 0; v5 drops no
-                    // duplicate. checkAndRunSentenceScript pops the top at the end of a later frame
-                    let mut vals = Vec::with_capacity(args.len());
-                    for &a in args {
-                        vals.push(self.val(p, o, a, Some(x)));
+                known::STOP_OBJECT_SCRIPT => {
+                    let ob = self.val(p, o, args[0], Some(x))?;
+                    let Val::Int(ob) = ob else {
+                        let w = format!("objscript {}", self.show(ob));
+                        p.unknown_writes.push((rc("stopObjectScript"), cite, w.into()));
+                        return Ok(Vec::new());
+                    };
+                    if self.calls {
+                        self.kill_object(p, o, ob, &cite, "stopObjectScript")?;
+                        return Ok(Vec::new());
                     }
-                    match vals.as_slice() {
-                        &[Val::Int(v), Val::Int(a), Val::Int(b)] => {
-                            p.queue.push((v, a, b, 0));
-                            self.note(p, cite, "doSentence", "sentence queued; settle runs it at a round's end");
-                        }
-                        _ => {
-                            let strs: Vec<String> = vals.iter().map(|&v| self.show(v)).collect();
-                            let refs: Vec<&str> = strs.iter().map(|s| s.as_str()).collect();
-                            let w = format!("sentence {}", scumm_ir::py::repr_list(&refs));
-                            p.unknown_writes.push((rc("doSentence"), cite.clone(), w.into()));
-                            self.note(p, cite, "doSentence", "a sentence with an unknown verb or object is not queued");
-                        }
+                    self.stopped(p, o, Fact::ObjScript(ob))?;
+                    if self.is_self(p, Fact::ObjScript(ob)) {
+                        self.end(p, o, "end", cite, false, None)?;
                     }
-                    return Vec::new();
                 }
-                self.note(
+                known::DO_SENTENCE => {
+                    if g.ast.flags(flags).contains(&known::STOP) {
+                        // stops VAR_SENTENCE_SCRIPT (script_v5.cpp:1004-1008)
+                        if p.settle {
+                            // it also empties the sentence queue (_sentenceNum = 0, script_v5.cpp:1005)
+                            p.queue.clear();
+                        }
+                        if p.settle && p.round == 0 {
+                            // and clearClickedStatus wipes the frame's key or click (read by row 5's Esc key)
+                            p.cleared = Some(true);
+                        }
+                        let n = self.read(p, Fact::Var(VAR_SENTENCE_SCRIPT), o)?;
+                        match n {
+                            Val::Unk(_) => {
+                                let w = format!("sentence script {}", self.show(n));
+                                p.unknown_writes.push((rc("doSentence"), cite, w.into()));
+                            }
+                            Val::Int(0) => {}
+                            Val::Int(n) if self.calls => self.stop_script(p, o, n, &cite, "doSentence")?,
+                            Val::Int(n) => {
+                                let key = g.script_key(n);
+                                self.stopped(p, o, key)?;
+                                if self.is_self(p, key) {
+                                    self.end(p, o, "end", cite, false, None)?;
+                                }
+                            }
+                        }
+                        return Ok(Vec::new());
+                    }
+                    if p.settle {
+                        // doSentence (script.cpp:1145-1172) pushes (verb, A, B) with freeze count 0; v5 drops no
+                        // duplicate. checkAndRunSentenceScript pops the top at the end of a later frame
+                        let mut vals = Vec::with_capacity(args.len());
+                        for &a in args {
+                            vals.push(self.val(p, o, a, Some(x))?);
+                        }
+                        match vals.as_slice() {
+                            &[Val::Int(v), Val::Int(a), Val::Int(b)] => {
+                                p.queue.push((v, a, b, 0));
+                                self.note(p, cite, "doSentence", "sentence queued; settle runs it at a round's end");
+                            }
+                            _ => {
+                                let strs: Vec<String> = vals.iter().map(|&v| self.show(v)).collect();
+                                let refs: Vec<&str> = strs.iter().map(|s| s.as_str()).collect();
+                                let w = format!("sentence {}", scumm_ir::py::repr_list(&refs));
+                                p.unknown_writes.push((rc("doSentence"), cite.clone(), w.into()));
+                                self.note(
+                                    p,
+                                    cite,
+                                    "doSentence",
+                                    "a sentence with an unknown verb or object is not queued",
+                                );
+                            }
+                        }
+                        return Ok(Vec::new());
+                    }
+                    self.note(
                     p,
                     cite,
                     "doSentence",
                     "sentence queued; VAR_SENTENCE_SCRIPT runs it at the end of a later frame (not run at this row)",
                 );
-            }
-            known::SET_STATE => {
-                let ob = self.val(p, o, args[0], Some(x));
-                let s = self.val(p, o, args[1], Some(x));
-                assert_eq!(args.len(), 2, "setState takes two values");
-                let t = match ob {
-                    Val::Int(n) => Target::Fact(Fact::State(n)),
-                    Val::Unk(_) => {
-                        let w = format!("object {}", self.show(ob));
-                        Target::Unk(self.v.mk(Reason::Work, w))
-                    }
-                };
-                self.put(p, t, s, Some(x), "setState");
-            }
-            known::SET_CLASS => {
-                let ob = self.val(p, o, args[0], Some(x));
-                let Expr::List(items) = g.ast.expr(args[1]) else { panic!("setClass without a class list") };
-                for &c in g.ast.kids(items) {
-                    let cv = self.val(p, o, c, Some(x));
-                    match (ob, cv) {
-                        (Val::Int(ob), Val::Int(cv)) => {
-                            if cv == 0 {
-                                // class 0 clears all class data (script_v5.cpp:679-681), classes 1-32
-                                for k in 1..=32 {
-                                    self.write(p, Fact::Class(ob, k), int0);
+                }
+                known::SET_STATE => {
+                    let ob = self.val(p, o, args[0], Some(x))?;
+                    let s = self.val(p, o, args[1], Some(x))?;
+                    assert_eq!(args.len(), 2, "setState takes two values");
+                    let t = match ob {
+                        Val::Int(n) => Target::Fact(Fact::State(n)),
+                        Val::Unk(_) => {
+                            let w = format!("object {}", self.show(ob));
+                            Target::Unk(self.v.mk(Reason::Work, w))
+                        }
+                    };
+                    self.put(p, t, s, Some(x), "setState");
+                }
+                known::SET_CLASS => {
+                    let ob = self.val(p, o, args[0], Some(x))?;
+                    let Expr::List(items) = g.ast.expr(args[1]) else { panic!("setClass without a class list") };
+                    for &c in g.ast.kids(items) {
+                        let cv = self.val(p, o, c, Some(x))?;
+                        match (ob, cv) {
+                            (Val::Int(ob), Val::Int(cv)) => {
+                                if cv == 0 {
+                                    // class 0 clears all class data (script_v5.cpp:679-681), classes 1-32
+                                    for k in 1..=32 {
+                                        self.write(p, Fact::Class(ob, k), int0);
+                                    }
+                                } else {
+                                    self.write(p, Fact::Class(ob, cv & 0x7F), Val::Int((cv & 0x80 != 0) as i32));
                                 }
-                            } else {
-                                self.write(p, Fact::Class(ob, cv & 0x7F), Val::Int((cv & 0x80 != 0) as i32));
                             }
-                        }
-                        _ => {
-                            let w = format!("class {} of {}", self.show(cv), self.show(ob));
-                            p.unknown_writes.push((rc("setClass"), cite.clone(), w.into()));
+                            _ => {
+                                let w = format!("class {} of {}", self.show(cv), self.show(ob));
+                                p.unknown_writes.push((rc("setClass"), cite.clone(), w.into()));
+                            }
                         }
                     }
                 }
-            }
-            known::SET_OWNER_OF => return self.op_set_owner_of(p, o, x, args),
-            known::PICKUP_OBJECT => {
-                let ob = self.val(p, o, args[0], Some(x));
-                match ob {
-                    Val::Unk(_) => {
+                known::SET_OWNER_OF => return Ok(self.op_set_owner_of(p, o, x, args)?),
+                known::PICKUP_OBJECT => {
+                    let ob = self.val(p, o, args[0], Some(x))?;
+                    match ob {
+                        Val::Unk(_) => {
+                            let w = format!("object {}", self.show(ob));
+                            p.unknown_writes.push((rc("pickupObject"), cite, w.into()));
+                        }
+                        Val::Int(ob) => {
+                            let ego = self.read(p, Fact::Var(VAR_EGO), o)?;
+                            self.write(p, Fact::Owner(ob), ego);
+                            self.write(p, Fact::Class(ob, CLASS_UNTOUCHABLE), Val::Int(1));
+                            self.write(p, Fact::State(ob), Val::Int(1));
+                        }
+                    }
+                    self.inventory_hook(p, o, x, 1, "pickupObject")?; // runInventoryScript(1), script_v5.cpp:2033
+                }
+                known::PRINT => {
+                    // decodeParseString prints a Text sub-op in slot 3 for actor 252: a message box whose key
+                    // press goes to VAR_KEYPRESS, var 0
+                    if !g.ast.subs(subops).iter().any(|s| s.name == known::TEXT) {
+                        return Ok(Vec::new());
+                    }
+                    let actor = self.val(p, o, args[0], Some(x))?;
+                    match actor {
+                        Val::Unk(_) => {
+                            let w =
+                                format!("actor {}: if {MESSAGE_BOX_ACTOR}, var 0 gets the key press", self.show(actor));
+                            self.note(p, cite, "print", &w);
+                        }
+                        Val::Int(MESSAGE_BOX_ACTOR) => {
+                            let u = self.v.mk(Reason::Key, "message box");
+                            self.write(p, Fact::Var(VAR_KEYPRESS), u);
+                        }
+                        Val::Int(_) => {}
+                    }
+                }
+                known::SET_OBJECT_NAME => self.inventory_hook(p, o, x, 0, "setObjectName")?,
+                known::DRAW_OBJECT if self.switches.draw_clears => {
+                    return Ok(self.draw_object_f5(p, o, x, args, subops)?)
+                }
+                known::PUT_ACTOR_IN_ROOM => return Ok(self.put_actor_in_room(p, o, x, args)?),
+                known::DRAW_OBJECT => {
+                    let ob = self.val(p, o, args[0], Some(x))?;
+                    let mut state = Val::Int(1);
+                    for s in g.ast.subs(subops) {
+                        if s.name == known::SET_IMAGE {
+                            state = self.val(p, o, g.ast.kids(s.args)[0], Some(x))?;
+                        }
+                    }
+                    let Val::Int(ob) = ob else {
                         let w = format!("object {}", self.show(ob));
-                        p.unknown_writes.push((rc("pickupObject"), cite, w.into()));
-                    }
-                    Val::Int(ob) => {
-                        let ego = self.read(p, Fact::Var(VAR_EGO), o);
-                        self.write(p, Fact::Owner(ob), ego);
-                        self.write(p, Fact::Class(ob, CLASS_UNTOUCHABLE), Val::Int(1));
-                        self.write(p, Fact::State(ob), Val::Int(1));
-                    }
-                }
-                self.inventory_hook(p, o, x, 1, "pickupObject"); // runInventoryScript(1), script_v5.cpp:2033
-            }
-            known::PRINT => {
-                // decodeParseString prints a Text sub-op in slot 3 for actor 252: a message box whose key
-                // press goes to VAR_KEYPRESS, var 0
-                if !g.ast.subs(subops).iter().any(|s| s.name == known::TEXT) {
-                    return Vec::new();
-                }
-                let actor = self.val(p, o, args[0], Some(x));
-                match actor {
-                    Val::Unk(_) => {
-                        let w = format!("actor {}: if {MESSAGE_BOX_ACTOR}, var 0 gets the key press", self.show(actor));
-                        self.note(p, cite, "print", &w);
-                    }
-                    Val::Int(MESSAGE_BOX_ACTOR) => {
-                        let u = self.v.mk(Reason::Key, "message box");
-                        self.write(p, Fact::Var(VAR_KEYPRESS), u);
-                    }
-                    Val::Int(_) => {}
-                }
-            }
-            known::SET_OBJECT_NAME => self.inventory_hook(p, o, x, 0, "setObjectName"),
-            known::DRAW_OBJECT if self.switches.draw_clears => return self.draw_object_f5(p, o, x, args, subops),
-            known::PUT_ACTOR_IN_ROOM => return self.put_actor_in_room(p, o, x, args),
-            known::DRAW_OBJECT => {
-                let ob = self.val(p, o, args[0], Some(x));
-                let mut state = Val::Int(1);
-                for s in g.ast.subs(subops) {
-                    if s.name == known::SET_IMAGE {
-                        state = self.val(p, o, g.ast.kids(s.args)[0], Some(x));
-                    }
-                }
-                let Val::Int(ob) = ob else {
-                    let w = format!("object {}", self.show(ob));
-                    p.unknown_writes.push((rc("drawObject"), cite, w.into()));
-                    return Vec::new();
-                };
-                let room = self.read(p, Fact::Room, o);
-                match self.resource(room) {
-                    res @ Val::Unk(_) => {
-                        let u = self.v.mk(Reason::Work, format!("room {}", self.show(res)));
-                        self.write(p, Fact::State(ob), u);
-                    }
-                    Val::Int(res) => {
-                        if g.object_room.get(&ob) == Some(&res) {
-                            // getObjectIndex finds only the room's objects
-                            self.write(p, Fact::State(ob), state);
-                            self.note(p, cite, "drawObject", "objects with the same position and size go to state 0 (not modelled)");
-                        }
-                    }
-                }
-            }
-            known::VERB_OPS => {
-                let v = self.val(p, o, args[0], Some(x));
-                let Val::Int(v) = v else {
-                    let w = format!("verb {}", self.show(v));
-                    p.unknown_writes.push((rc("VerbOps"), cite, w.into()));
-                    return Vec::new();
-                };
-                let key = Fact::Verb(v);
-                let now = self.read(p, key, o);
-                // a shown verb has a saveid-0 slot; a hidden one may have none
-                let (mut shown, mut slot, mut changed) = (now, now == Val::Int(1), false);
-                for s in g.ast.subs(subops) {
-                    match s.name {
-                        known::NEW => (shown, slot, changed) = (int0, true, true),
-                        known::ON => {
-                            shown = if slot {
-                                Val::Int(1)
-                            } else {
-                                self.v.mk(Reason::Verb, format!("verb {v}: no shown slot, may have a hidden one"))
-                            };
-                            changed = true;
-                        }
-                        known::OFF | known::DIM | known::DELETE => {
-                            (shown, changed) = (int0, true);
-                            slot = slot && s.name != known::DELETE;
-                        }
-                        _ => {}
-                    }
-                }
-                if changed && (shown.is_unknown() || shown != now) {
-                    self.write(p, key, shown);
-                }
-            }
-            known::SAVE_VERBS | known::RESTORE_VERBS => {
-                let a = self.val(p, o, args[0], Some(x));
-                let b = self.val(p, o, args[1], Some(x));
-                let c = self.val(p, o, args[2], Some(x));
-                assert_eq!(args.len(), 3, "saveVerbs and restoreVerbs take three values");
-                let head = self.sym(name);
-                let (Val::Int(a), Val::Int(b)) = (a, b) else {
-                    let w = format!("verbs {}..{}", self.show(a), self.show(b));
-                    p.unknown_writes.push((rc(head), cite, w.into()));
-                    return Vec::new();
-                };
-                for v in a..=b {
-                    if name == known::SAVE_VERBS {
-                        if self.read(p, Fact::Verb(v), o) != int0 {
-                            self.write(p, Fact::Verb(v), int0);
-                        }
-                    } else {
-                        let u = self.v.mk(Reason::Verb, format!("verb {v} restored from save id {}", self.show(c)));
-                        self.write(p, Fact::Verb(v), u);
-                    }
-                }
-            }
-            known::SET_VAR_RANGE => {
-                // getResultPos, then setResult and _resultVarNumber++ per value: the next variable, bit or local
-                let t = self.target(p, o, args[0], Some(x));
-                let Expr::List(items) = g.ast.expr(args[2]) else { panic!("setVarRange without a value list") };
-                for (k, &e) in g.ast.kids(items).iter().enumerate() {
-                    let v = self.val(p, o, e, Some(x));
-                    let k = k as i64;
-                    let tk = match t {
-                        Target::Unk(_) => t,
-                        Target::Local(n) => Target::Local(key_num(n as i64 + k)),
-                        Target::Fact(Fact::Var(n)) => Target::Fact(Fact::Var(key_num(n as i64 + k))),
-                        Target::Fact(Fact::Bit(n)) => Target::Fact(Fact::Bit(key_num(n as i64 + k))),
-                        Target::Fact(f) => unreachable!("setVarRange to {f}"),
+                        p.unknown_writes.push((rc("drawObject"), cite, w.into()));
+                        return Ok(Vec::new());
                     };
-                    self.put(p, tk, v, Some(x), "setVarRange");
-                }
-            }
-            known::LOAD_ROOM => {
-                let room = self.val(p, o, args[0], Some(x));
-                if self.calls {
-                    // o5_loadRoom: startScene(room, nullptr, 0) (script_v5.cpp:1849-1850)
-                    let steps = self.scene_steps(room, None);
-                    self.push_call(p, rc("loadRoom"), cite, steps, true);
-                    return Vec::new();
-                }
-                self.room_change(p, o, room, x, "loadRoom");
-            }
-            known::LOAD_ROOM_WITH_EGO => {
-                let obj = self.val(p, o, args[0], Some(x));
-                let room = self.val(p, o, args[1], Some(x));
-                self.ego_room(p, o, x, room); // F9 (switch actor_rooms), actor_rooms.rs
-                if self.calls {
-                    // o5_loadRoomWithEgo (script_v5.cpp:1857-1902): VAR_WALKTO_OBJ = obj, startScene(room, ego,
-                    // obj), VAR_WALKTO_OBJ = 0 (room_change), then setCameraFollows(ego): a possible setCameraAt
-                    // (the scroll hook) and the inventory hook (camera.cpp:62-86)
-                    let mut steps = if self.rooms {
-                        let mut s = vec![Step::Write(Fact::Var(VAR_WALKTO_OBJ), obj)];
-                        s.extend(self.scene_steps(room, Some(obj)));
-                        s.push(Step::Write(Fact::Var(VAR_WALKTO_OBJ), int0));
-                        s
-                    } else {
-                        self.scene_steps(room, None)
-                    };
-                    steps.push(Step::ScrollNote);
-                    steps.push(Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, int0)] });
-                    self.push_call(p, rc("loadRoomWithEgo"), cite, steps, true);
-                    return Vec::new();
-                }
-                self.room_change(p, o, room, x, "loadRoomWithEgo");
-                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "loadRoomWithEgo");
-                if p.end.is_none() {
-                    self.note(p, cite, "loadRoomWithEgo", "the scroll hook may run (camera position, not a fact)");
-                }
-            }
-            known::ACTOR_FOLLOW_CAMERA => {
-                let a = self.val(p, o, args[0], Some(x));
-                let what = format!("room of actor {}", self.show(a));
-                // F9 (switch actor_rooms): the actor's room against the current room (camera.cpp:68-70), and the room
-                // a change goes to (actor_rooms.rs). With the switch off, an actor not known, or a room not known (a
-                // plain unknown: not held, or the reader's non-fact), model.py's fork on a non-fact
-                let (inroom, aroom) = match a {
-                    Val::Int(n) if self.switches.actor_rooms => {
-                        if !(0..NUM_ACTORS).contains(&n) {
-                            let d = format!("actorFollowCamera: actor {n} is no actor (derefActor's error(), actor.cpp:2281-2293)");
-                            self.error(p, "no such actor", cite, &d, true);
-                            return Vec::new();
+                    let room = self.read(p, Fact::Room, o)?;
+                    match self.resource(room) {
+                        res @ Val::Unk(_) => {
+                            let u = self.v.mk(Reason::Work, format!("room {}", self.show(res)));
+                            self.write(p, Fact::State(ob), u);
                         }
-                        // decided only on rooms the path already has: these reads never fork (`read_soft`; a
-                        // reader would fork on every pair of the actor's rooms and the current room's), and the
-                        // current room is read only when the actor's is known
-                        let r = self.read_soft(p, Fact::ActorRoom(n), o);
-                        match r {
-                            Val::Int(_) => {
-                                let cur = self.read_soft(p, Fact::Room, o);
-                                (Some(self.v.decide(&[r, cur], |v| v[0] == v[1])), Some(r))
+                        Val::Int(res) => {
+                            if g.object_room.get(&ob) == Some(&res) {
+                                // getObjectIndex finds only the room's objects
+                                self.write(p, Fact::State(ob), state);
+                                self.note(
+                                    p,
+                                    cite,
+                                    "drawObject",
+                                    "objects with the same position and size go to state 0 (not modelled)",
+                                );
                             }
-                            Val::Unk(_) if self.v.is_plain(r) => (None, None),
-                            Val::Unk(_) => (Some(Dec::Unk(r)), Some(r)),
                         }
                     }
-                    _ => (None, None),
-                };
-                // the sides: in the current room (no room change), elsewhere (the room change)
-                let (stay, go) = match inroom {
-                    Some(Dec::Bool(true)) => (true, None),
-                    Some(Dec::Bool(false)) => (false, None),
-                    _ => {
-                        let mut q = p.fork();
-                        let why = match inroom {
-                            Some(Dec::Unk(u)) => rc(&self.show(u)),
-                            _ => rc(&format!("?(actor state: {what})")),
-                        };
-                        let cond = rc(&format!("actor {} in the current room", self.show_e(args[0])));
-                        p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
-                        q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
-                        (true, Some(q))
+                }
+                known::VERB_OPS => {
+                    let v = self.val(p, o, args[0], Some(x))?;
+                    let Val::Int(v) = v else {
+                        let w = format!("verb {}", self.show(v));
+                        p.unknown_writes.push((rc("VerbOps"), cite, w.into()));
+                        return Ok(Vec::new());
+                    };
+                    let key = Fact::Verb(v);
+                    let now = self.read(p, key, o)?;
+                    // a shown verb has a saveid-0 slot; a hidden one may have none
+                    let (mut shown, mut slot, mut changed) = (now, now == Val::Int(1), false);
+                    for s in g.ast.subs(subops) {
+                        match s.name {
+                            known::NEW => (shown, slot, changed) = (int0, true, true),
+                            known::ON => {
+                                shown = if slot {
+                                    Val::Int(1)
+                                } else {
+                                    self.v.mk(Reason::Verb, format!("verb {v}: no shown slot, may have a hidden one"))
+                                };
+                                changed = true;
+                            }
+                            known::OFF | known::DIM | known::DELETE => {
+                                (shown, changed) = (int0, true);
+                                slot = slot && s.name != known::DELETE;
+                            }
+                            _ => {}
+                        }
                     }
-                };
-                if self.calls {
-                    // actorFollowCamera (camera.cpp:201-212): setCameraFollows (camera.cpp:62-86) changes the room
-                    // when the actor is elsewhere and then always calls setCameraAt, so the scroll hook runs
-                    // (camera.cpp:69-74, 52-55); it may call setCameraAt again (a position: a note), runs the
-                    // inventory hook; a second inventory hook run when the followed actor changed is a note
-                    let tail = [
-                        Step::ScrollNote,
-                        Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, int0)] },
-                        Step::Note(rc(SECOND_INVENTORY_HOOK)),
-                    ];
-                    let change = |m: &mut Self, q: &mut Path| {
-                        let r = match aroom {
-                            Some(r) => r,
-                            None => m.v.mk(Reason::Actor, what.clone()),
+                    if changed && (shown.is_unknown() || shown != now) {
+                        self.write(p, key, shown);
+                    }
+                }
+                known::SAVE_VERBS | known::RESTORE_VERBS => {
+                    let a = self.val(p, o, args[0], Some(x))?;
+                    let b = self.val(p, o, args[1], Some(x))?;
+                    let c = self.val(p, o, args[2], Some(x))?;
+                    assert_eq!(args.len(), 3, "saveVerbs and restoreVerbs take three values");
+                    let head = self.sym(name);
+                    let (Val::Int(a), Val::Int(b)) = (a, b) else {
+                        let w = format!("verbs {}..{}", self.show(a), self.show(b));
+                        p.unknown_writes.push((rc(head), cite, w.into()));
+                        return Ok(Vec::new());
+                    };
+                    for v in a..=b {
+                        if name == known::SAVE_VERBS {
+                            if self.read(p, Fact::Verb(v), o)? != int0 {
+                                self.write(p, Fact::Verb(v), int0);
+                            }
+                        } else {
+                            let u = self.v.mk(Reason::Verb, format!("verb {v} restored from save id {}", self.show(c)));
+                            self.write(p, Fact::Verb(v), u);
+                        }
+                    }
+                }
+                known::SET_VAR_RANGE => {
+                    // getResultPos, then setResult and _resultVarNumber++ per value: the next variable, bit or local
+                    let t = self.target(p, o, args[0], Some(x))?;
+                    let Expr::List(items) = g.ast.expr(args[2]) else { panic!("setVarRange without a value list") };
+                    for (k, &e) in g.ast.kids(items).iter().enumerate() {
+                        let v = self.val(p, o, e, Some(x))?;
+                        let k = k as i64;
+                        let tk = match t {
+                            Target::Unk(_) => t,
+                            Target::Local(n) => Target::Local(key_num(n as i64 + k)),
+                            Target::Fact(Fact::Var(n)) => Target::Fact(Fact::Var(key_num(n as i64 + k))),
+                            Target::Fact(Fact::Bit(n)) => Target::Fact(Fact::Bit(key_num(n as i64 + k))),
+                            Target::Fact(f) => unreachable!("setVarRange to {f}"),
                         };
-                        let mut steps = m.scene_steps(r, None);
-                        steps.push(Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() });
-                        steps.extend(tail.iter().cloned());
-                        m.push_call(q, rc("actorFollowCamera"), cite.clone(), steps, true);
+                        self.put(p, tk, v, Some(x), "setVarRange");
+                    }
+                }
+                known::LOAD_ROOM => {
+                    let room = self.val(p, o, args[0], Some(x))?;
+                    if self.calls {
+                        // o5_loadRoom: startScene(room, nullptr, 0) (script_v5.cpp:1849-1850)
+                        let steps = self.scene_steps(room, None);
+                        self.push_call(p, rc("loadRoom"), cite, steps, true);
+                        return Ok(Vec::new());
+                    }
+                    self.room_change(p, o, room, x, "loadRoom")?;
+                }
+                known::LOAD_ROOM_WITH_EGO => {
+                    let obj = self.val(p, o, args[0], Some(x))?;
+                    let room = self.val(p, o, args[1], Some(x))?;
+                    self.ego_room(p, o, x, room)?; // F9 (switch actor_rooms), actor_rooms.rs
+                    if self.calls {
+                        // o5_loadRoomWithEgo (script_v5.cpp:1857-1902): VAR_WALKTO_OBJ = obj, startScene(room, ego,
+                        // obj), VAR_WALKTO_OBJ = 0 (room_change), then setCameraFollows(ego): a possible setCameraAt
+                        // (the scroll hook) and the inventory hook (camera.cpp:62-86)
+                        let mut steps = if self.rooms {
+                            let mut s = vec![Step::Write(Fact::Var(VAR_WALKTO_OBJ), obj)];
+                            s.extend(self.scene_steps(room, Some(obj)));
+                            s.push(Step::Write(Fact::Var(VAR_WALKTO_OBJ), int0));
+                            s
+                        } else {
+                            self.scene_steps(room, None)
+                        };
+                        steps.push(Step::ScrollNote);
+                        steps.push(Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, int0)] });
+                        self.push_call(p, rc("loadRoomWithEgo"), cite, steps, true);
+                        return Ok(Vec::new());
+                    }
+                    self.room_change(p, o, room, x, "loadRoomWithEgo")?;
+                    self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "loadRoomWithEgo")?;
+                    if p.end.is_none() {
+                        self.note(p, cite, "loadRoomWithEgo", "the scroll hook may run (camera position, not a fact)");
+                    }
+                }
+                known::ACTOR_FOLLOW_CAMERA => {
+                    let a = self.val(p, o, args[0], Some(x))?;
+                    let what = format!("room of actor {}", self.show(a));
+                    // F9 (switch actor_rooms): the actor's room against the current room (camera.cpp:68-70), and the room
+                    // a change goes to (actor_rooms.rs). With the switch off, an actor not known, or a room not known (a
+                    // plain unknown: not held, or the reader's non-fact), model.py's fork on a non-fact
+                    let (inroom, aroom) = match a {
+                        Val::Int(n) if self.switches.actor_rooms => {
+                            if !(0..NUM_ACTORS).contains(&n) {
+                                let d = format!("actorFollowCamera: actor {n} is no actor (derefActor's error(), actor.cpp:2281-2293)");
+                                self.error(p, "no such actor", cite, &d, true);
+                                return Ok(Vec::new());
+                            }
+                            // decided only on rooms the path already has: these reads never fork (`read_soft`; a
+                            // reader would fork on every pair of the actor's rooms and the current room's), and the
+                            // current room is read only when the actor's is known
+                            let r = self.read_soft(p, Fact::ActorRoom(n), o)?;
+                            match r {
+                                Val::Int(_) => {
+                                    let cur = self.read_soft(p, Fact::Room, o)?;
+                                    (Some(self.v.decide(&[r, cur], |v| v[0] == v[1])), Some(r))
+                                }
+                                Val::Unk(_) if self.v.is_plain(r) => (None, None),
+                                Val::Unk(_) => (Some(Dec::Unk(r)), Some(r)),
+                            }
+                        }
+                        _ => (None, None),
+                    };
+                    // the sides: in the current room (no room change), elsewhere (the room change)
+                    let (stay, go) = match inroom {
+                        Some(Dec::Bool(true)) => (true, None),
+                        Some(Dec::Bool(false)) => (false, None),
+                        _ => {
+                            let mut q = p.fork();
+                            let why = match inroom {
+                                Some(Dec::Unk(u)) => rc(&self.show(u)),
+                                _ => rc(&format!("?(actor state: {what})")),
+                            };
+                            let cond = rc(&format!("actor {} in the current room", self.show_e(args[0])));
+                            p.assumptions.push(Assumption {
+                                cite: cite.clone(),
+                                cond: cond.clone(),
+                                side: Side::Bool(true),
+                                why: why.clone(),
+                            });
+                            q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+                            (true, Some(q))
+                        }
+                    };
+                    if self.calls {
+                        // actorFollowCamera (camera.cpp:201-212): setCameraFollows (camera.cpp:62-86) changes the room
+                        // when the actor is elsewhere and then always calls setCameraAt, so the scroll hook runs
+                        // (camera.cpp:69-74, 52-55); it may call setCameraAt again (a position: a note), runs the
+                        // inventory hook; a second inventory hook run when the followed actor changed is a note
+                        let tail = [
+                            Step::ScrollNote,
+                            Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, int0)] },
+                            Step::Note(rc(SECOND_INVENTORY_HOOK)),
+                        ];
+                        let change = |m: &mut Self, q: &mut Path| {
+                            let r = match aroom {
+                                Some(r) => r,
+                                None => m.v.mk(Reason::Actor, what.clone()),
+                            };
+                            let mut steps = m.scene_steps(r, None);
+                            steps.push(Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() });
+                            steps.extend(tail.iter().cloned());
+                            m.push_call(q, rc("actorFollowCamera"), cite.clone(), steps, true);
+                        };
+                        if !stay {
+                            change(self, p);
+                            return Ok(Vec::new());
+                        }
+                        self.push_call(p, rc("actorFollowCamera"), cite.clone(), tail.to_vec(), true);
+                        return Ok(match go {
+                            Some(mut q) => {
+                                change(self, &mut q);
+                                vec![q]
+                            }
+                            None => Vec::new(),
+                        });
+                    }
+                    // setCameraFollows runs the inventory hook last, also after a room change (camera.cpp:61-86)
+                    let change = |m: &mut Self, q: &mut Path| -> R<()> {
+                        m.hook(q, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera")?;
+                        if q.end.is_none() {
+                            let r = match aroom {
+                                Some(r) => r,
+                                None => m.v.mk(Reason::Actor, what.clone()),
+                            };
+                            m.room_change(q, o, r, x, "actorFollowCamera")?;
+                        }
+                        Ok(())
                     };
                     if !stay {
-                        change(self, p);
-                        return Vec::new();
+                        change(self, p)?;
+                        return Ok(Vec::new());
                     }
-                    self.push_call(p, rc("actorFollowCamera"), cite.clone(), tail.to_vec(), true);
-                    return match go {
+                    self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera")?;
+                    return Ok(match go {
                         Some(mut q) => {
-                            change(self, &mut q);
+                            change(self, &mut q)?;
                             vec![q]
                         }
                         None => Vec::new(),
-                    };
+                    });
                 }
-                // setCameraFollows runs the inventory hook last, also after a room change (camera.cpp:61-86)
-                let change = |m: &mut Self, q: &mut Path| {
-                    m.hook(q, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
-                    if q.end.is_none() {
-                        let r = match aroom {
-                            Some(r) => r,
-                            None => m.v.mk(Reason::Actor, what.clone()),
-                        };
-                        m.room_change(q, o, r, x, "actorFollowCamera");
+                known::SET_CAMERA_AT => {
+                    if self.calls {
+                        // setCameraAt runs the scroll hook with no arguments (camera.cpp:52-55)
+                        let steps = vec![Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() }];
+                        self.push_call(p, rc("setCameraAt"), cite, steps, true);
+                        return Ok(Vec::new());
                     }
-                };
-                if !stay {
-                    change(self, p);
-                    return Vec::new();
+                    self.hook(p, o, VAR_SCROLL_SCRIPT, x, "setCameraAt")?;
                 }
-                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "actorFollowCamera");
-                return match go {
-                    Some(mut q) => {
-                        change(self, &mut q);
-                        vec![q]
-                    }
-                    None => Vec::new(),
-                };
-            }
-            known::SET_CAMERA_AT => {
-                if self.calls {
-                    // setCameraAt runs the scroll hook with no arguments (camera.cpp:52-55)
-                    let steps = vec![Step::Hook { var: VAR_SCROLL_SCRIPT, args: Vec::new() }];
-                    self.push_call(p, rc("setCameraAt"), cite, steps, true);
-                    return Vec::new();
-                }
-                self.hook(p, o, VAR_SCROLL_SCRIPT, x, "setCameraAt");
-            }
-            known::FREEZE_SCRIPTS => {
-                // o5_freezeScripts (script_v5.cpp:1252-1259): a flag not 0 freezes, 0 unfreezes (calls only; row 0
-                // has no freeze counts)
-                if self.calls {
-                    let flag = self.val(p, o, args[0], Some(x));
-                    match flag {
-                        Val::Unk(_) => {
-                            let w = format!("flag {}", self.show(flag));
-                            p.unknown_writes.push((rc("freezeScripts"), cite, w.into()));
+                known::FREEZE_SCRIPTS => {
+                    // o5_freezeScripts (script_v5.cpp:1252-1259): a flag not 0 freezes, 0 unfreezes (calls only; row 0
+                    // has no freeze counts)
+                    if self.calls {
+                        let flag = self.val(p, o, args[0], Some(x))?;
+                        match flag {
+                            Val::Unk(_) => {
+                                let w = format!("flag {}", self.show(flag));
+                                p.unknown_writes.push((rc("freezeScripts"), cite, w.into()));
+                            }
+                            Val::Int(0) => self.unfreeze(p, o)?,
+                            Val::Int(f) => self.freeze(p, o, f, x)?,
                         }
-                        Val::Int(0) => self.unfreeze(p, o),
-                        Val::Int(f) => self.freeze(p, o, f, x),
                     }
                 }
-            }
-            known::CUTSCENE => {
-                let c = self.read(p, Fact::Cutscene, o);
-                let c = self.v.arith(Op::Add, c, Val::Int(1));
-                self.write(p, Fact::Cutscene, c);
-                self.clear(p, o, Prefix::EscAll); // the new level has no override (script.cpp:1641-1642)
-                if self.calls {
-                    // beginCutscene (script.cpp:1632-1648): the slot's cutsceneOverride + 1, the level keeps
-                    // args[0], and the start hook runs with the cutscene's list while vm.cutSceneScriptIndex is
-                    // this slot
-                    let mut vals: Args = Vec::new();
-                    if let Some(&a0) = args.first() {
-                        if let Expr::List(items) = g.ast.expr(a0) {
-                            for (i, &e) in g.ast.kids(items).iter().enumerate() {
-                                let v = self.val(p, o, e, Some(x));
-                                vals.push((i as i32, v));
+                known::CUTSCENE => {
+                    let c = self.read(p, Fact::Cutscene, o)?;
+                    let c = self.v.arith(Op::Add, c, Val::Int(1));
+                    self.write(p, Fact::Cutscene, c);
+                    self.clear(p, o, Prefix::EscAll)?; // the new level has no override (script.cpp:1641-1642)
+                    if self.calls {
+                        // beginCutscene (script.cpp:1632-1648): the slot's cutsceneOverride + 1, the level keeps
+                        // args[0], and the start hook runs with the cutscene's list while vm.cutSceneScriptIndex is
+                        // this slot
+                        let mut vals: Args = Vec::new();
+                        if let Some(&a0) = args.first() {
+                            if let Expr::List(items) = g.ast.expr(a0) {
+                                for (i, &e) in g.ast.kids(items).iter().enumerate() {
+                                    let v = self.val(p, o, e, Some(x))?;
+                                    vals.push((i as i32, v));
+                                }
+                            }
+                        }
+                        let fi = p.top_frame_index().expect("a frame");
+                        let f = p.frame_at(fi);
+                        f.override_ += 1;
+                        let sid = f.sid;
+                        p.cut_data.push(vals.first().map_or(int0, |a| a.1));
+                        let steps = vec![
+                            Step::CutIndex(Some(sid)),
+                            Step::Hook { var: VAR_CUTSCENE_START_SCRIPT, args: vals },
+                            Step::CutIndex(None),
+                        ];
+                        self.push_call(p, rc("cutscene"), cite, steps, true);
+                        return Ok(Vec::new());
+                    }
+                    self.hook(p, o, VAR_CUTSCENE_START_SCRIPT, x, "cutscene")?;
+                }
+                known::END_CUTSCENE => {
+                    let depth = self.read(p, Fact::Cutscene, o)?;
+                    // `armed` reads the esc: facts only with calls on (model.py's `self.calls and ...`). model.py
+                    // walks a Python set there (hash order) and stops at the first 1. With no read log (settle's
+                    // owner) the order changes nothing; in a settle turn the keys read go into the turn's read log,
+                    // and which ones rests on the set order: the port reads them in key order (PORT-NOTES.md, "Kept
+                    // apart"; orderdeps.py counts the cases)
+                    let mut armed = false;
+                    if self.calls {
+                        let mut keys = self.prefixed(p, o, Prefix::EscAll);
+                        if p.owner.is_some() {
+                            sort_str(&mut keys);
+                        }
+                        for k in keys {
+                            if self.read(p, k, o)? == Val::Int(1) {
+                                armed = true;
+                                break;
                             }
                         }
                     }
-                    let fi = p.top_frame_index().expect("a frame");
-                    let f = p.frame_at(fi);
-                    f.override_ += 1;
-                    let sid = f.sid;
-                    p.cut_data.push(vals.first().map_or(int0, |a| a.1));
-                    let steps = vec![
-                        Step::CutIndex(Some(sid)),
-                        Step::Hook { var: VAR_CUTSCENE_START_SCRIPT, args: vals },
-                        Step::CutIndex(None),
-                    ];
-                    self.push_call(p, rc("cutscene"), cite, steps, true);
-                    return Vec::new();
-                }
-                self.hook(p, o, VAR_CUTSCENE_START_SCRIPT, x, "cutscene");
-            }
-            known::END_CUTSCENE => {
-                let depth = self.read(p, Fact::Cutscene, o);
-                // `armed` reads the esc: facts only with calls on (model.py's `self.calls and ...`). model.py
-                // walks a Python set there (hash order) and stops at the first 1. With no read log (settle's
-                // owner) the order changes nothing; in a settle turn the keys read go into the turn's read log,
-                // and which ones rests on the set order: the port reads them in key order (PORT-NOTES.md, "Kept
-                // apart"; orderdeps.py counts the cases)
-                let mut armed = false;
-                if self.calls {
-                    let mut keys = self.prefixed(p, o, Prefix::EscAll);
-                    if p.owner.is_some() {
-                        sort_str(&mut keys);
-                    }
-                    for k in keys {
-                        if self.read(p, k, o) == Val::Int(1) {
-                            armed = true;
-                            break;
+                    self.write(p, Fact::Var(VAR_OVERRIDE), int0);
+                    let d = self.v.arith(Op::Sub, depth, Val::Int(1));
+                    self.write(p, Fact::Cutscene, d);
+                    self.clear(p, o, Prefix::EscAll)?;
+                    self.note(
+                        p,
+                        cite.clone(),
+                        "endCutscene",
+                        "an override armed on the level below may show again (not a fact)",
+                    );
+                    if self.calls {
+                        // endCutscene (script.cpp:1650-1687): the end hook gets the closed level's cutSceneData, known
+                        // only for a level this path opened; a stack already at 0 is the engine's error()
+                        let fi = p.top_frame_index().expect("a frame");
+                        let f = p.frame_at(fi);
+                        // script.cpp:1654-1664
+                        f.override_ = 0.max(f.override_ - 1 - (armed && f.override_ > 1) as i32);
+                        if depth == int0 {
+                            self.error(
+                                p,
+                                "cutscene stack underflow",
+                                cite,
+                                "endCutscene's error() (script.cpp:1668-1681)",
+                                true,
+                            );
+                            return Ok(Vec::new());
                         }
-                    }
-                }
-                self.write(p, Fact::Var(VAR_OVERRIDE), int0);
-                let d = self.v.arith(Op::Sub, depth, Val::Int(1));
-                self.write(p, Fact::Cutscene, d);
-                self.clear(p, o, Prefix::EscAll);
-                self.note(p, cite.clone(), "endCutscene", "an override armed on the level below may show again (not a fact)");
-                if self.calls {
-                    // endCutscene (script.cpp:1650-1687): the end hook gets the closed level's cutSceneData, known
-                    // only for a level this path opened; a stack already at 0 is the engine's error()
-                    let fi = p.top_frame_index().expect("a frame");
-                    let f = p.frame_at(fi);
-                    // script.cpp:1654-1664
-                    f.override_ = 0.max(f.override_ - 1 - (armed && f.override_ > 1) as i32);
-                    if depth == int0 {
-                        self.error(p, "cutscene stack underflow", cite, "endCutscene's error() (script.cpp:1668-1681)", true);
-                        return Vec::new();
-                    }
-                    let data = match p.cut_data.pop() {
-                        Some(d) => d,
-                        None => self.v.mk(Reason::CutData, "the data of a cutscene opened before the move"),
-                    };
-                    let steps = vec![Step::Hook { var: VAR_CUTSCENE_END_SCRIPT, args: vec![(0, data)] }];
-                    self.push_call(p, rc("endCutscene"), cite, steps, true);
-                    return Vec::new();
-                }
-                self.hook(p, o, VAR_CUTSCENE_END_SCRIPT, x, "endCutscene");
-            }
-            known::BEGIN_OVERRIDE => {
-                self.write(p, Fact::Var(VAR_OVERRIDE), int0);
-                self.clear(p, o, Prefix::EscAll); // one override per level: this one replaces it
-                match g.ins(x.u)[x.i as usize].esc {
-                    Some(e) => {
-                        // Esc resumes at the jump after beginOverride (ir.py esc)
-                        let unit = p.frame().unwrap().unit;
-                        let off = g.ins(unit)[e as usize].offset;
-                        let name = Game::unit_name(self.unit_key(unit));
-                        self.write(p, Fact::Esc(name, off), Val::Int(1));
-                    }
-                    None => self.note(p, cite, "beginOverride", "no jump after it (ir.py); esc: not predicted"),
-                }
-            }
-            known::END_OVERRIDE => {
-                self.write(p, Fact::Var(VAR_OVERRIDE), int0);
-                self.clear(p, o, Prefix::EscAll);
-            }
-            known::USERPUT_ON => self.write(p, Fact::Var(VAR_USERPUT), Val::Int(1)),
-            known::USERPUT_OFF => self.write(p, Fact::Var(VAR_USERPUT), int0),
-            known::CURSOR_SHOW => self.write(p, Fact::Var(VAR_CURSORSTATE), Val::Int(1)),
-            known::CURSOR_HIDE => self.write(p, Fact::Var(VAR_CURSORSTATE), int0),
-            known::USERPUT_SOFT_ON | known::USERPUT_SOFT_OFF | known::CURSOR_SOFT_ON | known::CURSOR_SOFT_OFF => {
-                let var = if matches!(name, known::USERPUT_SOFT_ON | known::USERPUT_SOFT_OFF) {
-                    VAR_USERPUT
-                } else {
-                    VAR_CURSORSTATE
-                };
-                let op = if matches!(name, known::USERPUT_SOFT_ON | known::CURSOR_SOFT_ON) { Op::Add } else { Op::Sub };
-                let now = self.read(p, Fact::Var(var), o);
-                let v = self.v.arith(op, now, Val::Int(1));
-                self.write(p, Fact::Var(var), v);
-            }
-            known::ROOM_SCROLL => {
-                let room = self.read(p, Fact::Room, o);
-                let res = self.resource(room);
-                let width = res.int().and_then(|r| g.room_width.get(&r).copied());
-                for (var, &e) in [VAR_CAMERA_MIN_X, VAR_CAMERA_MAX_X].iter().zip(args) {
-                    let mut v = self.val(p, o, e, Some(x));
-                    if let Val::Int(n) = v {
-                        let n = n.max(SCREEN_WIDTH / 2);
-                        v = match width {
-                            None => self.v.mk(Reason::Work, format!("width of room {}", self.show(res))),
-                            Some(w) => Val::Int(n.min(w - SCREEN_WIDTH / 2)),
+                        let data = match p.cut_data.pop() {
+                            Some(d) => d,
+                            None => self.v.mk(Reason::CutData, "the data of a cutscene opened before the move"),
                         };
+                        let steps = vec![Step::Hook { var: VAR_CUTSCENE_END_SCRIPT, args: vec![(0, data)] }];
+                        self.push_call(p, rc("endCutscene"), cite, steps, true);
+                        return Ok(Vec::new());
                     }
-                    self.write(p, Fact::Var(*var), v);
+                    self.hook(p, o, VAR_CUTSCENE_END_SCRIPT, x, "endCutscene")?;
                 }
+                known::BEGIN_OVERRIDE => {
+                    self.write(p, Fact::Var(VAR_OVERRIDE), int0);
+                    self.clear(p, o, Prefix::EscAll)?; // one override per level: this one replaces it
+                    match g.ins(x.u)[x.i as usize].esc {
+                        Some(e) => {
+                            // Esc resumes at the jump after beginOverride (ir.py esc)
+                            let unit = p.frame().unwrap().unit;
+                            let off = g.ins(unit)[e as usize].offset;
+                            let name = Game::unit_name(self.unit_key(unit));
+                            self.write(p, Fact::Esc(name, off), Val::Int(1));
+                        }
+                        None => self.note(p, cite, "beginOverride", "no jump after it (ir.py); esc: not predicted"),
+                    }
+                }
+                known::END_OVERRIDE => {
+                    self.write(p, Fact::Var(VAR_OVERRIDE), int0);
+                    self.clear(p, o, Prefix::EscAll)?;
+                }
+                known::USERPUT_ON => self.write(p, Fact::Var(VAR_USERPUT), Val::Int(1)),
+                known::USERPUT_OFF => self.write(p, Fact::Var(VAR_USERPUT), int0),
+                known::CURSOR_SHOW => self.write(p, Fact::Var(VAR_CURSORSTATE), Val::Int(1)),
+                known::CURSOR_HIDE => self.write(p, Fact::Var(VAR_CURSORSTATE), int0),
+                known::USERPUT_SOFT_ON | known::USERPUT_SOFT_OFF | known::CURSOR_SOFT_ON | known::CURSOR_SOFT_OFF => {
+                    let var = if matches!(name, known::USERPUT_SOFT_ON | known::USERPUT_SOFT_OFF) {
+                        VAR_USERPUT
+                    } else {
+                        VAR_CURSORSTATE
+                    };
+                    let op =
+                        if matches!(name, known::USERPUT_SOFT_ON | known::CURSOR_SOFT_ON) { Op::Add } else { Op::Sub };
+                    let now = self.read(p, Fact::Var(var), o)?;
+                    let v = self.v.arith(op, now, Val::Int(1));
+                    self.write(p, Fact::Var(var), v);
+                }
+                known::ROOM_SCROLL => {
+                    let room = self.read(p, Fact::Room, o)?;
+                    let res = self.resource(room);
+                    let width = res.int().and_then(|r| g.room_width.get(&r).copied());
+                    for (var, &e) in [VAR_CAMERA_MIN_X, VAR_CAMERA_MAX_X].iter().zip(args) {
+                        let mut v = self.val(p, o, e, Some(x))?;
+                        if let Val::Int(n) = v {
+                            let n = n.max(SCREEN_WIDTH / 2);
+                            v = match width {
+                                None => self.v.mk(Reason::Work, format!("width of room {}", self.show(res))),
+                                Some(w) => Val::Int(n.min(w - SCREEN_WIDTH / 2)),
+                            };
+                        }
+                        self.write(p, Fact::Var(*var), v);
+                    }
+                }
+                _ => unreachable!("no op rule for {}", self.sym(name)),
             }
-            _ => unreachable!("no op rule for {}", self.sym(name)),
-        }
-        Vec::new()
+            Vec::new()
+        })
     }
 
     /// The inventory hook: row 0 records the start, calls runs it with Local[0] = `arg`.
-    fn inventory_hook(&mut self, p: &mut Path, o: &FactOracle, x: X, arg: i32, head: &str) {
-        if self.calls {
-            let c = self.cite(x);
-            let steps = vec![Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, Val::Int(arg))] }];
-            self.push_call(p, rc(head), c, steps, true);
-        } else {
-            self.hook(p, o, VAR_INVENTORY_SCRIPT, x, head);
-        }
+    fn inventory_hook(&mut self, p: &mut Path, o: &FactOracle, x: X, arg: i32, head: &str) -> R<()> {
+        Ok({
+            if self.calls {
+                let c = self.cite(x);
+                let steps = vec![Step::Hook { var: VAR_INVENTORY_SCRIPT, args: vec![(0, Val::Int(arg))] }];
+                self.push_call(p, rc(head), c, steps, true);
+            } else {
+                self.hook(p, o, VAR_INVENTORY_SCRIPT, x, head)?;
+            }
+        })
     }
 
-    fn op_set_owner_of(&mut self, p: &mut Path, o: &FactOracle, x: X, args: &[ExprId]) -> Vec<Path> {
-        let ob = self.val(p, o, args[0], Some(x));
-        let owner = self.val(p, o, args[1], Some(x));
-        assert_eq!(args.len(), 2, "setOwnerOf takes two values");
-        let cite = self.cite(x);
-        let Val::Int(ob) = ob else {
-            let w = format!("owner of {}", self.show(ob));
-            p.unknown_writes.push((rc("setOwnerOf"), cite, w.into()));
-            self.inventory_hook(p, o, x, 0, "setOwnerOf");
-            return Vec::new();
-        };
-        let key = Fact::ObjScript(ob);
-        if self.calls {
-            let mut more = Vec::new();
+    fn op_set_owner_of(&mut self, p: &mut Path, o: &FactOracle, x: X, args: &[ExprId]) -> R<Vec<Path>> {
+        Ok({
+            let ob = self.val(p, o, args[0], Some(x))?;
+            let owner = self.val(p, o, args[1], Some(x))?;
+            assert_eq!(args.len(), 2, "setOwnerOf takes two values");
+            let cite = self.cite(x);
+            let Val::Int(ob) = ob else {
+                let w = format!("owner of {}", self.show(ob));
+                p.unknown_writes.push((rc("setOwnerOf"), cite, w.into()));
+                self.inventory_hook(p, o, x, 0, "setOwnerOf")?;
+                return Ok(Vec::new());
+            };
+            let key = Fact::ObjScript(ob);
+            if self.calls {
+                let mut more = Vec::new();
+                if owner == Val::Int(0) {
+                    // clearOwnerOf stops the object's scripts (object.cpp:183-184)
+                    self.kill_object(p, o, ob, &cite, "setOwnerOf")?;
+                } else if owner.is_unknown() {
+                    let ou = self.game.id(UnitKey::Obj(ob));
+                    if p.frames().any(|f| Some(f.unit) == ou) {
+                        let mut q = p.fork();
+                        let cond = rc(&format!("owner {} != 0", self.show_e(args[1])));
+                        let why = rc(&self.show(owner));
+                        p.assumptions.push(Assumption {
+                            cite: cite.clone(),
+                            cond: cond.clone(),
+                            side: Side::Bool(true),
+                            why: why.clone(),
+                        });
+                        q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
+                        self.kill_object(&mut q, o, ob, &cite, "setOwnerOf")?;
+                        q.writes.insert(Fact::Owner(ob), Val::Int(0));
+                        self.inventory_hook(&mut q, o, x, 0, "setOwnerOf")?;
+                        more.push(q);
+                    }
+                    if self.read(p, key, o)? != Val::Int(0) {
+                        self.write(p, key, owner);
+                    }
+                }
+                self.write(p, Fact::Owner(ob), owner);
+                self.inventory_hook(p, o, x, 0, "setOwnerOf")?;
+                return Ok(more);
+            }
             if owner == Val::Int(0) {
-                // clearOwnerOf stops the object's scripts (object.cpp:183-184)
-                self.kill_object(p, o, ob, &cite, "setOwnerOf");
+                self.stopped(p, o, key)?; // clearOwnerOf stops the object's scripts (object.cpp:183-184)
             } else if owner.is_unknown() {
-                let ou = self.game.id(UnitKey::Obj(ob));
-                if p.frames().any(|f| Some(f.unit) == ou) {
+                self.write(p, key, owner);
+            }
+            self.write(p, Fact::Owner(ob), owner);
+            self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "setOwnerOf")?;
+            if p.end.is_none() && self.is_self(p, key) {
+                if owner == Val::Int(0) {
+                    let at = format!("{cite} (setOwnerOf 0 stops the running object)");
+                    self.end(p, o, "end", rc(&at), false, None)?;
+                } else if owner.is_unknown() {
                     let mut q = p.fork();
                     let cond = rc(&format!("owner {} != 0", self.show_e(args[1])));
                     let why = rc(&self.show(owner));
-                    p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
+                    p.assumptions.push(Assumption {
+                        cite: cite.clone(),
+                        cond: cond.clone(),
+                        side: Side::Bool(true),
+                        why: why.clone(),
+                    });
                     q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
-                    self.kill_object(&mut q, o, ob, &cite, "setOwnerOf");
-                    q.writes.insert(Fact::Owner(ob), Val::Int(0));
-                    self.inventory_hook(&mut q, o, x, 0, "setOwnerOf");
-                    more.push(q);
-                }
-                if self.read(p, key, o) != Val::Int(0) {
-                    self.write(p, key, owner);
+                    q.writes.insert(key, Val::Int(0));
+                    self.end(&mut q, o, "end", cite, false, None)?;
+                    return Ok(vec![q]);
                 }
             }
-            self.write(p, Fact::Owner(ob), owner);
-            self.inventory_hook(p, o, x, 0, "setOwnerOf");
-            return more;
-        }
-        if owner == Val::Int(0) {
-            self.stopped(p, o, key); // clearOwnerOf stops the object's scripts (object.cpp:183-184)
-        } else if owner.is_unknown() {
-            self.write(p, key, owner);
-        }
-        self.write(p, Fact::Owner(ob), owner);
-        self.hook(p, o, VAR_INVENTORY_SCRIPT, x, "setOwnerOf");
-        if p.end.is_none() && self.is_self(p, key) {
-            if owner == Val::Int(0) {
-                let at = format!("{cite} (setOwnerOf 0 stops the running object)");
-                self.end(p, o, "end", rc(&at), false, None);
-            } else if owner.is_unknown() {
-                let mut q = p.fork();
-                let cond = rc(&format!("owner {} != 0", self.show_e(args[1])));
-                let why = rc(&self.show(owner));
-                p.assumptions.push(Assumption { cite: cite.clone(), cond: cond.clone(), side: Side::Bool(true), why: why.clone() });
-                q.assumptions.push(Assumption { cite: cite.clone(), cond, side: Side::Bool(false), why });
-                q.writes.insert(key, Val::Int(0));
-                self.end(&mut q, o, "end", cite, false, None);
-                return vec![q];
-            }
-        }
-        Vec::new()
+            Vec::new()
+        })
     }
 
     /// Row 0: a room change (model.py `_room_change`).
-    fn room_change(&mut self, p: &mut Path, o: &FactOracle, room: Val, x: X, head: &str) {
-        self.write(p, Fact::Room, room);
-        let cite = self.cite(x);
-        self.note(
+    fn room_change(&mut self, p: &mut Path, o: &FactOracle, room: Val, x: X, head: &str) -> R<()> {
+        Ok({
+            self.write(p, Fact::Room, room);
+            let cite = self.cite(x);
+            self.note(
             p,
             cite.clone(),
             head,
             "the room change's kills of other slots and its exit and entry scripts are not run (feature room_change)",
         );
-        let f = p.frame().expect("a frame");
-        let (key, owned) = (self.unit_key(f.unit), f.owned);
-        match (key, owned) {
-            (UnitKey::Entry(_) | UnitKey::Exit(_) | UnitKey::Local(..), _) | (UnitKey::Obj(_), Owned::Bool(false)) => {
-                self.end(p, o, "room", cite, true, None)
+            let f = p.frame().expect("a frame");
+            let (key, owned) = (self.unit_key(f.unit), f.owned);
+            match (key, owned) {
+                (UnitKey::Entry(_) | UnitKey::Exit(_) | UnitKey::Local(..), _)
+                | (UnitKey::Obj(_), Owned::Bool(false)) => self.end(p, o, "room", cite, true, None)?,
+                (UnitKey::Obj(_), Owned::Unk(u)) => {
+                    let w = format!("slot kind unknown ({}); taken as surviving the room change", self.show(u));
+                    self.note(p, cite, head, &w);
+                }
+                _ => {}
             }
-            (UnitKey::Obj(_), Owned::Unk(u)) => {
-                let w = format!("slot kind unknown ({}); taken as surviving the room change", self.show(u));
-                self.note(p, cite, head, &w);
-            }
-            _ => {}
-        }
+        })
     }
 }
 
