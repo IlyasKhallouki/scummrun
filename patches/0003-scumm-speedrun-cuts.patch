@@ -1,0 +1,619 @@
+diff --git a/audio/rate.cpp b/audio/rate.cpp
+index 4638f827..62022b46 100644
+--- a/audio/rate.cpp
++++ b/audio/rate.cpp
+@@ -38,6 +38,11 @@
+ 
+ namespace Audio {
+ 
++// E011 (patch 0003), the speedrun bridge's count-only mixer (SPEEDRUN_COUNT_MIXER): convert() keeps every read of its
++// stream, every count and every member update, and writes no sample into the output buffer. No engine code reads a
++// mixed sample (experiments/E011-speed/engine/CUTS.md, section 1).
++bool g_speedrunCountMixer = false;
++
+ /**
+  * The default fractional type in frac.h (with 16 fractional bits) limits
+  * the rate conversion code to 65536Hz audio: we need to able to handle
+@@ -84,6 +89,11 @@ private:
+ 	int simpleConvert(AudioStream &input, st_sample_t *outBuffer, st_size_t numSamples, st_volume_t vol_l, st_volume_t vol_r);
+ 	int interpolateConvert(AudioStream &input, st_sample_t *outBuffer, st_size_t numSamples, st_volume_t vol_l, st_volume_t vol_r);
+ 
++	// E011 (patch 0003): the three conversions above without the samples (g_speedrunCountMixer)
++	int copyCount(AudioStream &input, st_size_t numSamples);
++	int simpleCount(AudioStream &input, st_size_t numSamples);
++	int interpolateCount(AudioStream &input, st_size_t numSamples);
++
+ 	// keep a single printConvertType shared across all RateConverter_Impl specializations.
+ 	// PrintContext must be trivially destructible: it lives in a function-scope static and
+ 	// is torn down after the OSystem (and its memory pool that backs Common::String) is gone.
+@@ -301,6 +311,147 @@ int RateConverter_Impl<inStereo, outStereo, reverseStereo>::interpolateConvert(A
+ 	return (outBuffer - outStart) / (outStereo ? 2 : 1);
+ }
+ 
++// E011 (patch 0003), the count-only mixer: copyConvert(), simpleConvert() and interpolateConvert() as they read their
++// stream and move their members, without the samples they would add into the output buffer. Each returns what its
++// conversion returns and leaves every member as it would (CUTS.md, section 1).
++template<bool inStereo, bool outStereo, bool reverseStereo>
++int RateConverter_Impl<inStereo, outStereo, reverseStereo>::copyCount(AudioStream &input, st_size_t numSamples) {
++	PRINT_OUTPUT_RATE;
++
++	const int step = inStereo ? 2 : 1;
++	st_size_t done = 0;
++
++	while (done < numSamples) {
++		// Check if we have to refill the buffer
++		if (_bufferSize == 0) {
++			_bufferPos = _buffer;
++			_bufferSize = input.readBuffer(_buffer, ARRAYSIZE(_buffer));
++
++			if (_bufferSize <= 0)
++				return done;
++		}
++
++		// copyConvert's loop takes one input frame per output frame and tests _bufferSize == 0 again only at the
++		// next output: k outputs before that test can succeed (all that are left when _bufferSize never reaches 0).
++		st_size_t k = numSamples - done;
++		if (_bufferSize > 0 && _bufferSize % step == 0 && (st_size_t)(_bufferSize / step) < k)
++			k = _bufferSize / step;
++		_bufferPos += k * step;
++		_bufferSize -= (int)(k * step);
++		done += k;
++	}
++
++	return done;
++}
++
++template<bool inStereo, bool outStereo, bool reverseStereo>
++int RateConverter_Impl<inStereo, outStereo, reverseStereo>::simpleCount(AudioStream &input, st_size_t numSamples) {
++	PRINT_OUTPUT_RATE;
++
++	// How much to increment _outPos by
++	frac_t outPos_inc = _inRate / _outRate;
++
++	const int step = inStereo ? 2 : 1;
++	st_size_t done = 0;
++
++	while (done < numSamples) {
++		// simpleConvert's output takes n = max(_outPos, 0) + 1 turns of its do-while, each one input frame, the
++		// last of them the frame it reads, and leaves _outPos at min(_outPos, 0) - 1 + outPos_inc. A turn refills
++		// only when it starts at _bufferSize == 0: an output whose n frames are all in the cache takes them at once.
++		if (_bufferSize > 0 && _bufferSize % step == 0) {
++			const frac_t n = (_outPos >= 0 ? _outPos : 0) + 1;
++			if (_bufferSize >= n * step) {
++				_bufferSize -= n * step;
++				_bufferPos += n * step;
++				_outPos = (_outPos >= 0 ? 0 : _outPos) - 1 + outPos_inc;
++				done++;
++				// From here every output takes outPos_inc frames (_outPos is outPos_inc - 1 >= 0): k at once.
++				if (_outPos == outPos_inc - 1 && outPos_inc > 0) {
++					st_size_t k = (st_size_t)(_bufferSize / (outPos_inc * step));
++					if (k > numSamples - done)
++						k = numSamples - done;
++					_bufferSize -= (int)(k * outPos_inc * step);
++					_bufferPos += k * outPos_inc * step;
++					done += k;
++				}
++				continue;
++			}
++		}
++
++		// Read enough input samples so that _outPos >= 0
++		do {
++			// Check if we have to refill the buffer
++			if (_bufferSize == 0) {
++				_bufferPos = _buffer;
++				_bufferSize = input.readBuffer(_buffer, ARRAYSIZE(_buffer));
++
++				if (_bufferSize <= 0)
++					return done;
++			}
++
++			_bufferSize -= (inStereo ? 2 : 1);
++			_outPos--;
++
++			if (_outPos >= 0) {
++				_bufferPos += (inStereo ? 2 : 1);
++			}
++		} while (_outPos >= 0);
++
++		// the input frame simpleConvert reads
++		_bufferPos += (inStereo ? 2 : 1);
++
++		// Increment output position
++		_outPos += outPos_inc;
++
++		done++;
++	}
++	return done;
++}
++
++template<bool inStereo, bool outStereo, bool reverseStereo>
++int RateConverter_Impl<inStereo, outStereo, reverseStereo>::interpolateCount(AudioStream &input, st_size_t numSamples) {
++	PRINT_OUTPUT_RATE;
++
++	// How much to increment _outPosFrac by
++	frac_t outPos_inc = (_inRate << FRAC_BITS_LOW) / _outRate;
++
++	st_size_t done = 0;
++
++	while (done < numSamples) {
++		// Read enough input samples so that _outPosFrac < 0
++		while ((frac_t)FRAC_ONE_LOW <= _outPosFrac) {
++			// Check if we have to refill the buffer
++			if (_bufferSize == 0) {
++				_bufferPos = _buffer;
++				_bufferSize = input.readBuffer(_buffer, ARRAYSIZE(_buffer));
++
++				if (_bufferSize <= 0)
++					return done;
++			}
++
++			_bufferSize -= (inStereo ? 2 : 1);
++			_inLastL = _inCurL;
++			_inCurL = *_bufferPos++;
++
++			if (inStereo) {
++				_inLastR = _inCurR;
++				_inCurR = *_bufferPos++;
++			}
++
++			_outPosFrac -= FRAC_ONE_LOW;
++		}
++
++		// Loop as long as the _outPos trails behind, and as long as there is
++		// still space in the output buffer.
++		while (_outPosFrac < (frac_t)FRAC_ONE_LOW && done < numSamples) {
++			// Increment output position
++			_outPosFrac += outPos_inc;
++			done++;
++		}
++	}
++	return done;
++}
++
+ template<bool inStereo, bool outStereo, bool reverseStereo>
+ RateConverter_Impl<inStereo, outStereo, reverseStereo>::RateConverter_Impl(st_rate_t inputRate, st_rate_t outputRate) :
+ 	_inRate(inputRate),
+@@ -318,6 +469,16 @@ template<bool inStereo, bool outStereo, bool reverseStereo>
+ int RateConverter_Impl<inStereo, outStereo, reverseStereo>::convert(AudioStream &input, st_sample_t *outBuffer, st_size_t numSamples, st_volume_t volL, st_volume_t volR) {
+ 	assert(input.isStereo() == inStereo);
+ 
++	if (g_speedrunCountMixer) {
++		// E011 (patch 0003): the same choice of conversion, counted only
++		if (_inRate == _outRate)
++			return copyCount(input, numSamples);
++		else if ((_inRate % _outRate) == 0 && (_inRate < 65536))
++			return simpleCount(input, numSamples);
++		else
++			return interpolateCount(input, numSamples);
++	}
++
+ 	if (_inRate == _outRate) {
+ 		return copyConvert(input, outBuffer, numSamples, volL, volR);
+ 	} else {
+diff --git a/engines/scumm/costume.cpp b/engines/scumm/costume.cpp
+index aab00a03..fc6f96d3 100644
+--- a/engines/scumm/costume.cpp
++++ b/engines/scumm/costume.cpp
+@@ -23,6 +23,7 @@
+ #include "scumm/scumm.h"
+ #include "scumm/actor.h"
+ #include "scumm/costume.h"
++#include "scumm/speedrun/speedrun_cuts.h"
+ #include "scumm/sound.h"
+ #include "scumm/util.h"
+ 
+@@ -135,7 +136,7 @@ byte ClassicCostumeRenderer::paintCelByleRLE(int xMoveCur, int yMoveCur) {
+ 		byleRLEDecode_ami(compData);
+ 	else if (pcEngCost)
+ 		byleRLEDecode_PCEngine(compData);
+-	else
++	else if (!g_speedrunNoPixels) // E011 (patch 0003), SPEEDRUN_NO_PIXELS: the draw flag and rectangles are set above
+ 		byleRLEDecode(compData);
+ 
+ 	return drawFlag;
+diff --git a/engines/scumm/gfx.cpp b/engines/scumm/gfx.cpp
+index bf85f13c..b84231a3 100644
+--- a/engines/scumm/gfx.cpp
++++ b/engines/scumm/gfx.cpp
+@@ -29,6 +29,7 @@
+ #include "scumm/scumm_v0.h"
+ #include "scumm/scumm_v5.h"
+ #include "scumm/scumm_v6.h"
++#include "scumm/speedrun/speedrun_cuts.h"
+ #include "scumm/usage_bits.h"
+ #include "scumm/he/wiz_he.h"
+ #include "scumm/util.h"
+@@ -53,6 +54,8 @@ extern "C" void asmDrawStripToScreen(int height, int width, const uint32 *src32,
+ 
+ namespace Scumm {
+ 
++bool g_speedrunNoPixels = false; // E011 (patch 0003): speedrun/speedrun_cuts.h
++
+ static void blit(byte *dst, int dstPitch, const byte *src, int srcPitch, int w, int h, uint8 bitDepth);
+ static void fill(byte *dst, int dstPitch, uint16 color, int w, int h, uint8 bitDepth);
+ #ifndef USE_ARM_GFX_ASM
+@@ -665,6 +668,10 @@ void ScummEngine::drawStripToScreen(VirtScreen *vs, int x, int width, int top, i
+ 	if (width <= 0 || height <= 0)
+ 		return;
+ 
++	// E011 (patch 0003), SPEEDRUN_NO_PIXELS: no text compositing and no copy to the backend's screen
++	if (g_speedrunNoPixels)
++		return;
++
+ 	if (_macScreen && _game.version <= 3) {
+ 		mac_drawStripToScreen(vs, top, x, y, width, height);
+ 		return;
+@@ -2393,7 +2400,7 @@ void Gdi::drawBitmap(const byte *ptr, VirtScreen *vs, int x, const int y, const
+ 		if (_vm->_game.version == 8 || _vm->_game.heversion >= 60)
+ 			transpStrip = true;
+ 
+-		if (vs->hasTwoBuffers) {
++		if (vs->hasTwoBuffers && !g_speedrunNoPixels) { // E011 (patch 0003): no copy with SPEEDRUN_NO_PIXELS
+ 			byte *frontBuf = (byte *)vs->getBasePtr(x * 8, y);
+ 			if (lightsOn)
+ 				copy8Col(frontBuf, vs->pitch, dstPtr, height, vs->format.bytesPerPixel);
+@@ -2951,7 +2958,7 @@ void Gdi::resetBackground(int top, int bottom, int strip) {
+ 	backbuff_ptr = (byte *)vs->getBasePtr((strip + vs->xstart/8) * 8, top);
+ 
+ 	numLinesToProcess = bottom - top;
+-	if (numLinesToProcess) {
++	if (numLinesToProcess && !g_speedrunNoPixels) { // E011 (patch 0003): no copy with SPEEDRUN_NO_PIXELS
+ 		if (_vm->isLightOn()) {
+ 			copy8Col(backbuff_ptr, vs->pitch, bgbak_ptr, numLinesToProcess, vs->format.bytesPerPixel);
+ 		} else {
+@@ -2962,9 +2969,13 @@ void Gdi::resetBackground(int top, int bottom, int strip) {
+ 
+ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLinesToProcess) {
+ 	assert(numLinesToProcess);
++	// E011 (patch 0003), SPEEDRUN_NO_PIXELS: no decoder runs; the code byte, the decoder settings below and the
++	// transparency flag returned (which depends on the code byte alone) are as before
++	const bool draw = !g_speedrunNoPixels;
+ 
+ 	if (_vm->_game.features & GF_16COLOR) {
+-		drawStripEGA(dst, dstPitch, src, numLinesToProcess);
++		if (draw)
++			drawStripEGA(dst, dstPitch, src, numLinesToProcess);
+ 		return false;
+ 	}
+ 
+@@ -2980,38 +2991,46 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 
+ 	switch (code) {
+ 	case BMCOMP_RAW256:
+-		drawStripRaw(dst, dstPitch, src, numLinesToProcess, false);
++		if (draw)
++			drawStripRaw(dst, dstPitch, src, numLinesToProcess, false);
+ 		break;
+ 
+ 	case BMCOMP_TOWNS_2:
+-		unkDecode8(dst, dstPitch, src, numLinesToProcess);       /* Ender - Zak256/Indy256 */
++		if (draw)
++			unkDecode8(dst, dstPitch, src, numLinesToProcess);       /* Ender - Zak256/Indy256 */
+ 		break;
+ 
+ 	case BMCOMP_TOWNS_3:
+-		unkDecode9(dst, dstPitch, src, numLinesToProcess);       /* Ender - Zak256/Indy256 */
++		if (draw)
++			unkDecode9(dst, dstPitch, src, numLinesToProcess);       /* Ender - Zak256/Indy256 */
+ 		break;
+ 
+ 	case BMCOMP_TOWNS_4:
+-		unkDecode10(dst, dstPitch, src, numLinesToProcess);      /* Ender - Zak256/Indy256 */
++		if (draw)
++			unkDecode10(dst, dstPitch, src, numLinesToProcess);      /* Ender - Zak256/Indy256 */
+ 		break;
+ 
+ 	case BMCOMP_TOWNS_7:
+-		unkDecode11(dst, dstPitch, src, numLinesToProcess);      /* Ender - Zak256/Indy256 */
++		if (draw)
++			unkDecode11(dst, dstPitch, src, numLinesToProcess);      /* Ender - Zak256/Indy256 */
+ 		break;
+ 
+ 	case BMCOMP_TRLE8BIT:
+ 		// Used in 3DO versions of HE games
+ 		transpStrip = true;
+-		drawStrip3DO(dst, dstPitch, src, numLinesToProcess, true);
++		if (draw)
++			drawStrip3DO(dst, dstPitch, src, numLinesToProcess, true);
+ 		break;
+ 
+ 	case BMCOMP_RLE8BIT:
+-		drawStrip3DO(dst, dstPitch, src, numLinesToProcess, false);
++		if (draw)
++			drawStrip3DO(dst, dstPitch, src, numLinesToProcess, false);
+ 		break;
+ 
+ 	case BMCOMP_PIX32:
+ 		// Used in Amiga version of Monkey Island 1
+-		drawStripEGA(dst, dstPitch, src, numLinesToProcess);
++		if (draw)
++			drawStripEGA(dst, dstPitch, src, numLinesToProcess);
+ 		break;
+ 
+ 	case BMCOMP_ZIGZAG_V4:
+@@ -3019,7 +3038,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_ZIGZAG_V6:
+ 	case BMCOMP_ZIGZAG_V7:
+ 	case BMCOMP_ZIGZAG_V8:
+-		drawStripBasicV(dst, dstPitch, src, numLinesToProcess, false);
++		if (draw)
++			drawStripBasicV(dst, dstPitch, src, numLinesToProcess, false);
+ 		break;
+ 
+ 	case BMCOMP_ZIGZAG_H4:
+@@ -3027,7 +3047,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_ZIGZAG_H6:
+ 	case BMCOMP_ZIGZAG_H7:
+ 	case BMCOMP_ZIGZAG_H8:
+-		drawStripBasicH(dst, dstPitch, src, numLinesToProcess, false);
++		if (draw)
++			drawStripBasicH(dst, dstPitch, src, numLinesToProcess, false);
+ 		break;
+ 
+ 	case BMCOMP_ZIGZAG_VT4:
+@@ -3036,7 +3057,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_ZIGZAG_VT7:
+ 	case BMCOMP_ZIGZAG_VT8:
+ 		transpStrip = true;
+-		drawStripBasicV(dst, dstPitch, src, numLinesToProcess, true);
++		if (draw)
++			drawStripBasicV(dst, dstPitch, src, numLinesToProcess, true);
+ 		break;
+ 
+ 	case BMCOMP_ZIGZAG_HT4:
+@@ -3045,7 +3067,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_ZIGZAG_HT7:
+ 	case BMCOMP_ZIGZAG_HT8:
+ 		transpStrip = true;
+-		drawStripBasicH(dst, dstPitch, src, numLinesToProcess, true);
++		if (draw)
++			drawStripBasicH(dst, dstPitch, src, numLinesToProcess, true);
+ 		break;
+ 
+ 	case BMCOMP_MAJMIN_H4:
+@@ -3058,7 +3081,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_RMAJMIN_H6:
+ 	case BMCOMP_RMAJMIN_H7:
+ 	case BMCOMP_RMAJMIN_H8:
+-		drawStripComplex(dst, dstPitch, src, numLinesToProcess, false);
++		if (draw)
++			drawStripComplex(dst, dstPitch, src, numLinesToProcess, false);
+ 		break;
+ 
+ 	case BMCOMP_MAJMIN_HT4:
+@@ -3072,7 +3096,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_RMAJMIN_HT7:
+ 	case BMCOMP_RMAJMIN_HT8:
+ 		transpStrip = true;
+-		drawStripComplex(dst, dstPitch, src, numLinesToProcess, true);
++		if (draw)
++			drawStripComplex(dst, dstPitch, src, numLinesToProcess, true);
+ 		break;
+ 
+ 	case BMCOMP_NMAJMIN_H4:
+@@ -3080,7 +3105,8 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_NMAJMIN_H6:
+ 	case BMCOMP_NMAJMIN_H7:
+ 	case BMCOMP_NMAJMIN_H8:
+-		drawStripHE(dst, dstPitch, src, 8, numLinesToProcess, false);
++		if (draw)
++			drawStripHE(dst, dstPitch, src, 8, numLinesToProcess, false);
+ 		break;
+ 
+ 	case BMCOMP_CUSTOM_RU_TR: // Triggered by Russian water
+@@ -3090,11 +3116,13 @@ bool Gdi::decompressBitmap(byte *dst, int dstPitch, const byte *src, int numLine
+ 	case BMCOMP_NMAJMIN_HT7:
+ 	case BMCOMP_NMAJMIN_HT8:
+ 		transpStrip = true;
+-		drawStripHE(dst, dstPitch, src, 8, numLinesToProcess, true);
++		if (draw)
++			drawStripHE(dst, dstPitch, src, 8, numLinesToProcess, true);
+ 		break;
+ 
+ 	case BMCOMP_TPIX256:
+-		drawStripRaw(dst, dstPitch, src, numLinesToProcess, true);
++		if (draw)
++			drawStripRaw(dst, dstPitch, src, numLinesToProcess, true);
+ 		break;
+ 
+ 	default:
+diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+index 649d0250..101469f8 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -41,6 +41,7 @@
+ #include "scumm/scumm.h"
+ #include "scumm/sound.h"
+ #include "scumm/speedrun/speedrun_bridge.h"
++#include "scumm/speedrun/speedrun_cuts.h"
+ 
+ namespace Scumm {
+ 
+@@ -61,6 +62,7 @@ extern bool splash;
+ namespace Audio {
+ extern bool g_speedrunSilentChip;
+ extern bool g_speedrunSilentFLAC;
++extern bool g_speedrunCountMixer; // E011 (patch 0003): audio/rate.cpp
+ }
+ 
+ namespace Scumm {
+@@ -114,6 +116,12 @@ SpeedrunBridge *SpeedrunBridge::create(ScummEngine *vm) {
+ 		Audio::g_speedrunSilentChip = true;
+ 		Audio::g_speedrunSilentFLAC = true;
+ 	}
++	// E011 (patch 0003): the count-only mixer (audio/rate.cpp) and no pixel output (gfx.h); never with a bad
++	// environment, which validateEnv() reports before the first frame
++	if (bridge->_envError.empty()) {
++		Audio::g_speedrunCountMixer = bridge->_cutCountMixer;
++		g_speedrunNoPixels = bridge->_cutNoPixels;
++	}
+ 
+ 	// Replace the engine's default error handler first: it attaches the GUI
+ 	// debugger, which blocks forever under SDL's dummy video driver.
+@@ -195,6 +203,10 @@ void SpeedrunBridge::readEnv() {
+ 		{"SPEEDRUN_NO_PRESENT", &SpeedrunBridge::_leanNoPresent},
+ 		{"SPEEDRUN_NO_EVENTS", &SpeedrunBridge::_leanNoEvents},
+ 		{"SPEEDRUN_SILENT_AUDIO", &SpeedrunBridge::_leanSilent},
++		// E011 (patch 0003), two more cuts (CUTS.md) and the pixel-free exact dump (observation only).
++		{"SPEEDRUN_COUNT_MIXER", &SpeedrunBridge::_cutCountMixer},
++		{"SPEEDRUN_NO_PIXELS", &SpeedrunBridge::_cutNoPixels},
++		{"SPEEDRUN_DUMP_NOPIXELS", &SpeedrunBridge::_dumpNoPixels},
+ 	};
+ 	for (const auto &var : kBoolVars) {
+ 		const char *value = envValue(var.name);
+@@ -208,6 +220,18 @@ void SpeedrunBridge::readEnv() {
+ 		_envError = Common::String::format("invalid SPEEDRUN_LEAN '%s'", leanAll);
+ 	if (lean)
+ 		_leanNoSplash = _leanNoPresent = _leanNoEvents = _leanSilent = true;
++	// E011 (patch 0003): SPEEDRUN_CUTS=1, both cuts. Undrawn screens have no digest worth comparing, so no pixels
++	// means the pixel-free exact dump. The video capture reads the mixed samples and the backend's screen: refused.
++	bool cuts = false;
++	const char *cutsAll = envValue("SPEEDRUN_CUTS");
++	if (cutsAll && !Common::parseBool(cutsAll, cuts) && _envError.empty())
++		_envError = Common::String::format("invalid SPEEDRUN_CUTS '%s'", cutsAll);
++	if (cuts)
++		_cutCountMixer = _cutNoPixels = true;
++	if (_cutNoPixels)
++		_dumpNoPixels = true;
++	if ((_cutCountMixer || _cutNoPixels) && !_videoPrefix.empty() && _envError.empty())
++		_envError = "SPEEDRUN_VIDEO cannot be used with SPEEDRUN_COUNT_MIXER or SPEEDRUN_NO_PIXELS";
+ 	// E011 (patch 0002): SPEEDRUN_WIRE=bin, the control socket's binary channel (speedrun_wire.cpp); json, the
+ 	// default, is the JSON lines protocol (speedrun_control.cpp).
+ 	const char *wire = envValue("SPEEDRUN_WIRE");
+diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+index 1a5e6e0a..e661aca6 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -436,6 +436,9 @@ private:
+ 	/** Ego's inventory in display order (findInventory() is 1-based). */
+ 	Common::Array<int> egoInventory() const;
+ 	Common::String stateJson() const { return stateJson(_dumpExact); }
++	/** E011 (patch 0003): the exact object's screen digest and its key (speedrun_state.cpp). */
++	Common::String screensDigest() const;
++	const char *screensKey() const;
+ 	/** E011: the dump with the "exact" object if @p exact (the binary channel's StateJson asks for it). */
+ 	Common::String stateJson(bool exact) const;
+ 	// The state dump's fields that facts_of reads, with owners, states and classes for the objects ``objects`` only
+@@ -709,6 +712,11 @@ private:
+ 	bool _leanNoPresent = false;    // SPEEDRUN_NO_PRESENT
+ 	bool _leanNoEvents = false;     // SPEEDRUN_NO_EVENTS
+ 	bool _leanSilent = false;       // SPEEDRUN_SILENT_AUDIO
++	// E011 (patch 0003): two more cuts of what no game state reads (experiments/E011-speed/engine/CUTS.md), off by
++	// default, both on with SPEEDRUN_CUTS=1; and the pixel-free exact dump (on whenever _cutNoPixels is).
++	bool _cutCountMixer = false;    // SPEEDRUN_COUNT_MIXER: the rate converter counts and writes no sample
++	bool _cutNoPixels = false;      // SPEEDRUN_NO_PIXELS: no costume or strip decoding, no copies of finished pixels
++	bool _dumpNoPixels = false;     // SPEEDRUN_DUMP_NOPIXELS: the exact object's "screens_np" instead of "screens"
+ 	bool _wireBin = false;          // SPEEDRUN_WIRE=bin
+ 	SpeedrunBytes _wireIn;          // bytes received and not yet consumed
+ 	SpeedrunBytes _wireOut;         // the message being written
+diff --git a/engines/scumm/speedrun/speedrun_cuts.h b/engines/scumm/speedrun/speedrun_cuts.h
+new file mode 100644
+index 00000000..9dce19f3
+--- /dev/null
++++ b/engines/scumm/speedrun/speedrun_cuts.h
+@@ -0,0 +1,37 @@
++/* ScummVM - Graphic Adventure Engine
++ *
++ * ScummVM is the legal property of its developers, whose names
++ * are too numerous to list here. Please refer to the COPYRIGHT
++ * file distributed with this source distribution.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#ifndef SCUMM_SPEEDRUN_CUTS_H
++#define SCUMM_SPEEDRUN_CUTS_H
++
++namespace Scumm {
++
++/**
++ * E011 (patch 0003), the speedrun bridge's SPEEDRUN_NO_PIXELS (set by SpeedrunBridge::create, defined in gfx.cpp):
++ * the costume and strip decoders and the copies of finished pixels are skipped; everything the game state takes from
++ * drawing (rectangles, dirty bounds, gfx usage bits, masks, draw flags) is computed as before
++ * (experiments/E011-speed/engine/CUTS.md, section 2).
++ */
++extern bool g_speedrunNoPixels;
++
++} // End of namespace Scumm
++
++#endif
+diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
+index f56248d2..83b66506 100644
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -841,11 +841,26 @@ Common::String SpeedrunBridge::exactJson() const {
+ 	                              .add((int)cam._movingToActor).str());
+ 	// The four virtual screens (front and back buffers, size and scroll) and
+ 	// the palette: what is drawn, costume frames included.
++	x.add(screensKey(), screensDigest());
++	return x.str();
++}
++
++const char *SpeedrunBridge::screensKey() const {
++	// E011 (patch 0003): the pixel-free exact dump names its digest apart, so it is never compared with a full one.
++	return _dumpNoPixels ? "screens_np" : "screens";
++}
++
++Common::String SpeedrunBridge::screensDigest() const {
++	// FNV-1a 64 over each virtual screen's header, its front and back pixels and then the palette; with
++	// SPEEDRUN_DUMP_NOPIXELS (E011, patch 0003) the same without the pixels (CUTS.md, section 3).
++	const ScummEngine &e = *_vm;
+ 	uint64 h = 14695981039346656037ULL; // FNV-1a 64 offset basis
+ 	for (int i = 0; i < 4; i++) {
+ 		const VirtScreen &vs = e._virtscr[i];
+ 		const int32 header[5] = {vs.w, vs.h, vs.pitch, vs.xstart, vs.topline};
+ 		fnv64(h, (const byte *)header, sizeof(header));
++		if (_dumpNoPixels)
++			continue;
+ 		const uint32 size = (vs.h > 0 && vs.pitch > 0) ? (uint32)vs.pitch * (uint32)vs.h : 0;
+ 		const byte *front = vs.getPixels(-(int)vs.xstart, 0); // the buffer's start
+ 		const byte *back = vs.getBackPixels(-(int)vs.xstart, 0);
+@@ -855,8 +870,7 @@ Common::String SpeedrunBridge::exactJson() const {
+ 			fnv64(h, back, size);
+ 	}
+ 	fnv64(h, e._currentPalette, sizeof(e._currentPalette));
+-	x.add("screens", Common::String::format("%016llx", (unsigned long long)h));
+-	return x.str();
++	return Common::String::format("%016llx", (unsigned long long)h);
+ }
+ 
+ #pragma mark - Object dump (C6)
+diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
+index 6b16ebc9..2406f886 100644
+--- a/engines/scumm/speedrun/speedrun_wire.cpp
++++ b/engines/scumm/speedrun/speedrun_wire.cpp
+@@ -700,19 +700,8 @@ void SpeedrunBridge::wireExact(SpeedrunBytes &o) const {
+ 		                   (int)cam._rightTrigger, (int)cam._follows, (int)cam._mode, (int)cam._movingToActor};
+ 		xKey(o, "camera"), xInts(o, v, 13), n++;
+ 	}
+-	{
+-		// The screens' digest: exactJson()'s text, taken from it so the two never differ.
+-		const Common::String j = exactJson();
+-		const char *p = strstr(j.c_str(), "\"screens\":\"");
+-		Common::String hex;
+-		if (p) {
+-			p += strlen("\"screens\":\"");
+-			const char *q = strchr(p, '"');
+-			if (q)
+-				hex = Common::String(p, q - p);
+-		}
+-		xKey(o, "screens"), xText(o, hex), n++;
+-	}
++	// The screens' digest, as exactJson() writes it (E011, patch 0003: screensDigest(); "screens_np" when pixel-free).
++	xKey(o, screensKey()), xText(o, screensDigest()), n++;
+ 	o.setU32(at, n);
+ }
+ 
