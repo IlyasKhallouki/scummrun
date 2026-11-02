@@ -90,6 +90,13 @@ setup() {
     for f in $LIB/*.so*; do
         if readelf -d $f 2>/dev/null | grep -q RUNPATH; then patchelf --set-rpath $LIB $f; fi
     done
+    # reader-scope finds the repository four levels above the crate it was built from (FAST_MI_ROOT unset):
+    # wt-e008-step on the laptop, whose data, build and game link to the main checkout's, the same files as the
+    # worktree's, and whose E003 results equal the worktree's (diff -r)
+    local R=/var/tmp/fast-mi/wt-e008-step
+    mkdir -p $R/experiments/E003-path-through-cloud/scumm/ir
+    for d in data build game; do ln -sfn $WT/$d $R/$d; done
+    rsync -a $WT/experiments/E003-path-through-cloud/results $R/experiments/E003-path-through-cloud/
     local a b t; t=$(mktemp -d)
     objcopy -O binary --only-section=.text $SVM.laptop $t/a; objcopy -O binary --only-section=.text $SVM $t/b
     a=$(sha1sum < $t/a | cut -c1-12); b=$(sha1sum < $t/b | cut -c1-12); rm -rf $t
