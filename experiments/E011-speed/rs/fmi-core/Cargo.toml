@@ -1,0 +1,8 @@
+[package]
+name = "fmi-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the types and ports every E011 crate shares (experiments/E011-speed/plan.md, Appendix A)"
+
+[dependencies]
