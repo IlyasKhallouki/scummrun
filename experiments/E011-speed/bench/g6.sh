@@ -14,6 +14,8 @@ here=$(cd "$(dirname "$0")" && pwd)
 PY=$here/../../../.venv/bin/python
 BIN=$FMI_READER_SCOPE
 IN=$HOME/.cache/fast-mi-e011/profile-reader/inputs
+ROWS38=$HOME/.cache/fast-mi-e011/profile-planner/readings/r38/start.jsonl  # = IN/ring38-j00091.jsonl, the path readio's reference names
+ROWS33=$HOME/.cache/fast-mi-e011/profile-planner/readings/r33/start.jsonl  # = IN/ring33-j00089.jsonl
 RIO=$HOME/.cache/fast-mi-e011/readio
 CMP=$WT11/experiments/E011-speed/rs/fmi-reading/ref/cmp_reading.py
 OUT=$1; mkdir -p $OUT
@@ -43,7 +45,8 @@ files() { # TAG REFDIR|SHA1FILE: the four files against readio's reference
   local d=$OUT/$1
   if [ -d "$2" ]; then
     $PY $CMP $2 $d > $d/cmp.json; local rc=$?
-    echo "$1 files vs reading_from_golden (cmp_reading.py): $([ $rc = 0 ] && echo pass || { bad=1; echo FAIL; })"
+    [ $rc = 0 ] || bad=1
+    echo "$1 files vs reading_from_golden (cmp_reading.py): $([ $rc = 0 ] && echo pass || echo FAIL)"
   else
     local ok=pass
     for f in reading.tc reading.actions.jsonl reading.lists.jsonl reading.reached; do
@@ -63,14 +66,15 @@ TIMEFORMAT="%R %U %S"
   $READER_PORT_E011 read kitchen --packed $d/kitchen.tc ; } 2> $d/time
 s=$(sha1sum < $d/kitchen.tc | cut -c1-8)
 grep -iE "compared|differ" $d/guard.log | tail -3
-echo "kitchen packed $s (want 279b7a24): $([ "$s" = 279b7a24 ] && echo pass || { bad=1; echo FAIL; }); wall/user/sys $(cat $d/time)"
+[ "$s" = 279b7a24 ] || bad=1
+echo "kitchen packed $s (want 279b7a24): $([ "$s" = 279b7a24 ] && echo pass || echo FAIL); wall/user/sys $(cat $d/time)"
 
 echo "[$(date +%T)] memo off"
-read1 r38 33,38,83,85,96 $IN/ring38-j00091.jsonl "00dbb753 f8caa72f fb177a89 90b3d43a"
+read1 r38 33,38,83,85,96 $ROWS38 "00dbb753 f8caa72f fb177a89 90b3d43a"
 files r38 $RIO/ref/r38; drop r38
 read1 r33 28,33,35,38 $IN/ring33-j00089.jsonl "a1ed4f5c d4dbc9fe 59faac2f 9b0c87b7"
 files r33 $RIO/r33-files.sha1; drop r33
-read1 ref89 28,33,35,38 $IN/ring33-j00089.jsonl "397fb6f1 95f02638 494c1368 ab30e2ef" $REF89
+read1 ref89 28,33,35,38 $ROWS33 "397fb6f1 95f02638 494c1368 ab30e2ef" $REF89
 files ref89 $RIO/ref/ref89; drop ref89
 
 echo "[$(date +%T)] memo on"
