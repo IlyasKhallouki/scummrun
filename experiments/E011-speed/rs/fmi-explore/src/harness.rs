@@ -125,7 +125,7 @@ impl<'a> Harness<'a> {
         if (cfg.reach_extend || cfg.refine) && rereads.is_none() {
             return Err("the reach extension and the refinement read the scope again: they need the reader".into());
         }
-        let head: Value = pyjson::loads(reading.head()).unwrap_or(Value::Null);
+        let head = crate::warm::head(&*reading);
         let b = Points::of(reading.domains(), head.get("live_locals").filter(|v| !v.is_null()).cloned());
         Ok(Harness {
             unobserved: start::unobserved(cfg.unobserved_actor_rooms),
@@ -390,7 +390,7 @@ impl<'a> Harness<'a> {
 
     /// Harness._swap: the task of a reading made again (the packed file, the points, the tracked facts).
     fn swap(&mut self, new: Arc<dyn ReadingSource>) {
-        let head: Value = pyjson::loads(new.head()).unwrap_or(Value::Null);
+        let head = crate::warm::head(&*new);
         self.b = Points::of(new.domains(), head.get("live_locals").filter(|v| !v.is_null()).cloned());
         self.reading = new;
         let rd = self.reading.clone();
@@ -455,7 +455,7 @@ impl<'a> Harness<'a> {
         for n in &new {
             ev.insert(n.to_string(), json!(self.ps.obs.get(Key::var(*n as u64)).unwrap_or(0)));
         }
-        let head: Value = pyjson::loads(self.reading.head()).unwrap_or(Value::Null);
+        let head = crate::warm::head(&*self.reading);
         let folded = files::as_i64(head.get("folded")).unwrap_or(0);
         turn["added"] = json!(new);
         turn["engine_values"] = Value::Object(ev);
@@ -477,7 +477,7 @@ impl<'a> Harness<'a> {
             }
         };
         let cpu = rr.cpu_s() - cpu0;
-        let doc: Value = pyjson::loads(reading.head()).unwrap_or(Value::Null);
+        let doc = crate::warm::head(&*reading);
         let rep: Vec<Value> = doc.get("fact_vars_report").and_then(|r| r.as_array()).cloned().unwrap_or_default();
         let rep_of = |n: i64| rep.iter().find(|x| x.get("var").and_then(|v| v.as_i64()) == Some(n)).cloned().unwrap_or(json!({}));
         let rs = doc.get("reader_scope").cloned().unwrap_or(json!({}));

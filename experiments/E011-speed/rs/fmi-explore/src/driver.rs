@@ -225,7 +225,9 @@ impl Job {
                         let c0 = machine::thread_cpu_s();
                         let _lock = heavy.map(|p| HeavyLock::take(&p));
                         let rc = step.run(&dir, &log2, &cancel2);
-                        (rc, machine::thread_cpu_s() - c0)
+                        let out = (rc, machine::thread_cpu_s() - c0);
+                        wake();
+                        out
                     })
                     .map_err(|e| format!("a job thread: {e}"))?;
                 self.pid = Some(std::process::id() as i32);
@@ -409,6 +411,30 @@ impl Job {
     }
 }
 
+fn waker() -> &'static (Mutex<u64>, std::sync::Condvar) {
+    static W: std::sync::OnceLock<(Mutex<u64>, std::sync::Condvar)> = std::sync::OnceLock::new();
+    W.get_or_init(|| (Mutex::new(0), std::sync::Condvar::new()))
+}
+
+/// An in-process job has ended: the driver's wait ends at once (it polls the processes' jobs every poll_s).
+fn wake() {
+    let (m, c) = waker();
+    *m.lock().unwrap() += 1;
+    c.notify_all();
+}
+
+/// The driver's wait between its looks: poll_s, or until an in-process job ends.
+fn wait(poll_s: f64, seen: &mut u64) {
+    let (m, c) = waker();
+    let g = m.lock().unwrap();
+    if *g != *seen {
+        *seen = *g;
+        return;
+    }
+    let (g, _) = c.wait_timeout(g, Duration::from_secs_f64(poll_s)).unwrap();
+    *seen = *g;
+}
+
 /// `flock` on the heavy lock for an in-process job of a heavy scope, held until dropped.
 pub struct HeavyLock {
     _f: Option<fs::File>,
@@ -506,6 +532,7 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
     let mut bound = false;
     let commit_finished = files::truthy(a.e010.get("commit_finished"));
     let in_process = matches!(mode, StepMode::InProcess(_));
+    let mut woken = 0u64;
 
     let can_start = |running: &Vec<Job>, restart: &Vec<String>| -> bool {
         if free() < m.floor_gb * GIB {
@@ -688,7 +715,7 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
             stats.own_by_job.push(own.max(t_ingest));
         }
         if !committed {
-            std::thread::sleep(Duration::from_secs_f64(m.poll_s));
+            wait(m.poll_s, &mut woken);
         }
     }
     let mut summary = json!({"stop": stop, "detail": detail, "jobs": a.committed_jobs().len(), "entries": a.rows.len(),

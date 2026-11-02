@@ -3,7 +3,7 @@
 //! `dir_bytes`; and the small Python value rules the reference leans on (truthiness, `str()` of a value).
 
 use crate::pyjson::{self, Opts};
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use serde_json::Value;
@@ -51,7 +51,8 @@ pub fn tmp_of(path: &Path, suffix: &str) -> PathBuf {
 pub fn read_gz(p: &Path) -> Res<Value> {
     let f = fs::File::open(p).map_err(|e| python_os_error(p, e))?;
     let mut s = String::new();
-    GzDecoder::new(f).read_to_string(&mut s).map_err(|e| io_err(p, e))?;
+    // every member of the file (a try's entry files are several gzip members: gzip.open reads them as one text)
+    MultiGzDecoder::new(f).read_to_string(&mut s).map_err(|e| io_err(p, e))?;
     pyjson::loads(&s).map_err(|e| format!("{}: {e}", p.display()))
 }
 
@@ -83,6 +84,29 @@ pub fn write_gz_text(p: &Path, text: &str) -> Res<()> {
         let mut g = GzEncoder::new(f, Compression::new(1));
         g.write_all(text.as_bytes()).map_err(|e| io_err(&tmp, e))?;
         g.finish().map_err(|e| io_err(&tmp, e))?;
+    }
+    fs::rename(&tmp, p).map_err(|e| io_err(p, e))
+}
+
+/// One gzip member of a text (the fast level).
+pub fn gz_member(text: &str) -> Vec<u8> {
+    let mut g = GzEncoder::new(Vec::with_capacity(text.len() / 4 + 64), Compression::new(1));
+    let _ = g.write_all(text.as_bytes());
+    g.finish().unwrap_or_default()
+}
+
+/// A gzip file made of members already compressed (written atomically): it reads back as their texts joined.
+pub fn write_gz_members(p: &Path, members: &[&[u8]]) -> Res<()> {
+    if let Some(d) = p.parent() {
+        fs::create_dir_all(d).map_err(|e| io_err(d, e))?;
+    }
+    let tmp = tmp_of(p, ".tmp");
+    {
+        let mut f = std::io::BufWriter::with_capacity(1 << 20, fs::File::create(&tmp).map_err(|e| io_err(&tmp, e))?);
+        for m in members {
+            f.write_all(m).map_err(|e| io_err(&tmp, e))?;
+        }
+        f.flush().map_err(|e| io_err(&tmp, e))?;
     }
     fs::rename(&tmp, p).map_err(|e| io_err(p, e))
 }

@@ -24,4 +24,5 @@ pub mod pyjson;
 pub mod start;
 pub mod step;
 pub mod tryjob;
+pub mod warm;
 pub mod wiring;

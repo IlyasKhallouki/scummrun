@@ -4,7 +4,6 @@
 
 use crate::files;
 use crate::ports::{ReadReq, Readings};
-use crate::pyjson;
 use crate::start::start_file_text;
 use fmi_core::ReadingSource;
 use serde_json::Value;
@@ -108,7 +107,7 @@ impl Wiring {
     /// refiner on the reading (the extender adds the reading's own reach_also files to the starts).
     pub fn new(readings: Arc<dyn Readings>, rd: &dyn ReadingSource, run_dir: &Path, threads: u32, cancel: Arc<AtomicBool>)
                -> Result<Wiring, String> {
-        let doc: Value = pyjson::loads(rd.head()).map_err(|e| format!("reading.json: {e}"))?;
+        let doc: Value = (*crate::warm::head(rd)).clone();
         if !files::truthy(doc.get("reach")) {
             return Err("--reach-extend needs a reading made with --reach".into());
         }

@@ -183,19 +183,29 @@ pub fn checkpoint_text(c: &fmi_core::Checkpoint) -> String {
     s
 }
 
-/// An attempt's checkpoints, shared by the entries it gives (each entry holds a prefix), with their texts.
+/// An attempt's checkpoints, shared by the entries it gives (each entry holds a prefix), with their texts and those
+/// texts compressed once: an entry file is gzip members joined (its head, the checkpoints' members, the tail), which
+/// gzip.open reads as one text, so the try's files and the archive's share every checkpoint's compression.
+#[derive(Debug)]
 pub struct SharedCps {
     pub cps: Vec<fmi_core::Checkpoint>,
     pub texts: Vec<String>,
+    /// member j: the text of checkpoint j, after a comma for j > 0 (its place in every entry's list)
+    pub members: Vec<Vec<u8>>,
 }
 
 impl SharedCps {
     pub fn new(cps: Vec<fmi_core::Checkpoint>) -> SharedCps {
-        let texts = std::thread::scope(|sc| {
-            let hs: Vec<_> = cps.iter().map(|c| sc.spawn(move || checkpoint_text(c))).collect();
+        let both: Vec<(String, Vec<u8>)> = std::thread::scope(|sc| {
+            let hs: Vec<_> = cps.iter().enumerate().map(|(j, c)| sc.spawn(move || {
+                let t = checkpoint_text(c);
+                let m = if j == 0 { files::gz_member(&t) } else { files::gz_member(&format!(",{t}")) };
+                (t, m)
+            })).collect();
             hs.into_iter().map(|h| h.join().unwrap()).collect()
         });
-        SharedCps { cps, texts }
+        let (texts, members) = both.into_iter().unzip();
+        SharedCps { cps, texts, members }
     }
     /// The checkpoint as a JSON value (its text parsed), for an entry's last checkpoint.
     pub fn value(&self, j: usize) -> Value {
@@ -214,6 +224,30 @@ pub struct NewEntry {
 }
 
 impl NewEntry {
+    /// The head of the entry file's text, up to the checkpoints' list.
+    fn head_text(&self, id: Option<usize>) -> String {
+        let mut text = String::with_capacity(256);
+        text.push_str(&format!("{{\"id\":{},\"parent\":{},\"frame\":{},\"tick\":{},\"events\":",
+                               id.map(|i| i.to_string()).unwrap_or("null".into()), self.parent, self.frame,
+                               self.tick.map(|t| t.to_string()).unwrap_or("null".into())));
+        crate::pyjson::write_compact_slice(&mut text, &self.events);
+        text.push_str(",\"checkpoints\":[");
+        text
+    }
+
+    /// The entry file as gzip members (its head with this id, the shared checkpoints' members, the tail), written.
+    pub fn write(&self, p: &Path, id: Option<usize>) -> Res<()> {
+        let head = files::gz_member(&self.head_text(id));
+        let tail = files::gz_member("]}");
+        let mut ms: Vec<&[u8]> = Vec::with_capacity(self.n + 2);
+        ms.push(&head);
+        for m in &self.shared.members[..self.n] {
+            ms.push(m);
+        }
+        ms.push(&tail);
+        files::write_gz_members(p, &ms)
+    }
+
     /// The entry file's compact text with this id (null: the try's new/K.json.gz).
     pub fn text(&self, id: Option<usize>) -> String {
         let total: usize = self.shared.texts[..self.n].iter().map(|t| t.len() + 1).sum();
@@ -410,7 +444,24 @@ impl Row {
 #[derive(Debug)]
 pub struct EntryInfo {
     pub events: Value,
-    pub last_cp: Value,
+    last_cp: std::cell::OnceCell<Value>,
+    /// a try's entry: its last checkpoint's text, parsed when first asked for
+    last_text: Option<(std::sync::Arc<SharedCps>, usize)>,
+}
+
+impl EntryInfo {
+    pub fn of(events: Value, last_cp: Value) -> EntryInfo {
+        let c = std::cell::OnceCell::new();
+        let _ = c.set(last_cp);
+        EntryInfo { events, last_cp: c, last_text: None }
+    }
+    /// The entry's last checkpoint, [frame, facts, extra].
+    pub fn last_cp(&self) -> &Value {
+        self.last_cp.get_or_init(|| match &self.last_text {
+            Some((sh, j)) => sh.value(*j),
+            None => Value::Null,
+        })
+    }
 }
 
 /// A reading of readings.jsonl.
@@ -728,13 +779,13 @@ impl Archive {
         }
         let doc = self.entry(i)?;
         let last_cp = doc["checkpoints"].as_array().and_then(|a| a.last()).cloned().ok_or(format!("entry {i}: no checkpoint"))?;
-        let info = Rc::new(EntryInfo { events: doc["events"].clone(), last_cp });
+        let info = Rc::new(EntryInfo::of(doc["events"].clone(), last_cp));
         self.entries.borrow_mut().insert(i, info.clone());
         Ok(info)
     }
 
     pub fn facts(&self, i: usize) -> Res<FactMap> {
-        Ok(fact_map(&self.info(i)?.last_cp[1]))
+        Ok(fact_map(&self.info(i)?.last_cp()[1]))
     }
 
     fn goal_keys(&self) -> HashSet<&str> {
@@ -920,7 +971,7 @@ impl Archive {
             Some(p) => p.push(row.to_json()),
             None => files::append_jsonl(&self.root.join("entries.jsonl"), &[row.to_json()])?,
         }
-        let info = Rc::new(EntryInfo { events: Value::Array(events.to_vec()), last_cp: cps.last().unwrap().clone() });
+        let info = Rc::new(EntryInfo::of(Value::Array(events.to_vec()), cps.last().unwrap().clone()));
         self.entries.borrow_mut().insert(i, info);
         self.last_place = self.place(row, Some(key));
         Ok(i)
@@ -979,17 +1030,14 @@ impl Archive {
             goal: g == 0,
             seg_held: seg.into_iter().collect(),
         };
-        let text = ne.text(Some(i));
-        let path = self.root.join("entries").join(format!("{i}.json.gz"));
-        match self.pending_files.as_mut() {
-            Some(pf) => pf.push((path, text)),
-            None => files::write_gz_text(&path, &text)?,
-        }
+        // the file from the attempt's compressed checkpoints (no text made, nothing compressed but its head)
+        ne.write(&self.root.join("entries").join(format!("{i}.json.gz")), Some(i))?;
         match self.pending_rows.as_mut() {
             Some(pr) => pr.push(row.to_json()),
             None => files::append_jsonl(&self.root.join("entries.jsonl"), &[row.to_json()])?,
         }
-        let info = Rc::new(EntryInfo { events: Value::Array(ne.events.clone()), last_cp: ne.shared.value(ne.n - 1) });
+        let info = Rc::new(EntryInfo { events: Value::Array(ne.events.clone()), last_cp: std::cell::OnceCell::new(),
+                                       last_text: Some((ne.shared.clone(), ne.n - 1)) });
         self.entries.borrow_mut().insert(i, info);
         self.last_place = self.place(row, Some(key));
         Ok(i)
@@ -1408,7 +1456,7 @@ impl Archive {
         let mut doc = json!({
             "job": job, "seed": SEED, "stage": self.stage["stage"], "goal": self.goal_json, "guide": self.stage["guide"],
             "entry": {"id": i, "root": row.parent.is_none(), "frame": row.frame, "events": self.movie(i)?,
-                      "checkpoint": info.last_cp},
+                      "checkpoint": info.last_cp()},
             "scope": scope, "tried": cell.tried_of(&i.to_string()).cloned().unwrap_or_else(|| json!([])),
             "held": held.iter().map(|(k, v)| json!([k, v])).collect::<Vec<_>>(),
             "readings": readings,

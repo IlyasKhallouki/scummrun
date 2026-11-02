@@ -195,8 +195,8 @@ fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String
     Ok(out)
 }
 
-fn doc_of(rd: &dyn ReadingSource) -> Value {
-    pyjson::loads(rd.head()).unwrap_or(Value::Null)
+fn doc_of(rd: &dyn ReadingSource) -> Arc<Value> {
+    crate::warm::head(rd)
 }
 
 fn reading_path(rd: &dyn ReadingSource) -> PathBuf {
@@ -376,11 +376,11 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let res = h.run();
     let tb = Instant::now();
     let pb = machine::port_s();
-    let checkpoints = h.ps.checkpoints.clone();
+    let checkpoints = std::mem::take(&mut h.ps.checkpoints);
     let inputs = res["inputs"].as_array().cloned().unwrap_or_default();
     let (ps, last) = h.into_parts();
     machine::port(|| ps.engine.quit());
-    let packed = last.dir().join(pyjson::loads(last.head()).ok().and_then(|d| d.get("packed").and_then(|p| p.as_str()).map(|s| s.to_string())).unwrap_or("reading.tc".into()));
+    let packed = last.dir().join(crate::warm::head(&*last).get("packed").and_then(|p| p.as_str()).unwrap_or("reading.tc"));
     let tc = Instant::now();
     let _ = std::fs::write(adir.join("run.json"), pyjson::dumps_default(&res) + "\n");
     if std::env::var("FMI_TRY_PROFILE").is_ok() {
@@ -405,8 +405,8 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
 /// The targets, or the ones forced (`--targets`), as step.targets gives them.
 fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path, facts: &crate::archive::FactMap,
               goal: &[(String, Vec<i64>)]) -> Res<Vec<Target>> {
-    let guide = read_json(Path::new(job["guide"].as_str().unwrap_or("")))?;
-    let reached = step::read_reached_text(rd.reached());
+    let guide = crate::warm::guide(Path::new(job["guide"].as_str().unwrap_or("")))?;
+    let reached = crate::warm::reached(rd);
     let empty = vec![];
     let held = job.get("held").and_then(|h| h.as_array()).unwrap_or(&empty);
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
@@ -585,7 +585,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             let errs: Vec<String> = std::thread::scope(|sc| {
                 let hs: Vec<_> = ents.iter().enumerate().map(|(i, e)| {
                     let p = new_dir.join(format!("{i}.json.gz"));
-                    sc.spawn(move || files::write_gz_text(&p, &e.text(None)))
+                    sc.spawn(move || e.write(&p, None))
                 }).collect();
                 hs.into_iter().filter_map(|h| h.join().ok().and_then(|r| r.err())).collect()
             });

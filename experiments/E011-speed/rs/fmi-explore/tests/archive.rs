@@ -67,7 +67,7 @@ fn over(base: &Value, facts: &[(&str, Value)]) -> Value {
 /// An entry ``df`` frames after ``parent`` whose facts are the parent's with ``facts`` over them.
 pub fn child(a: &mut Archive, parent: usize, df: i64, tick: i64, job: Option<&str>, facts: &[(&str, Value)]) -> usize {
     let f0 = a.rows[parent].frame;
-    let base = a.info(parent).unwrap().last_cp[1].clone();
+    let base = a.info(parent).unwrap().last_cp()[1].clone();
     let f = over(&base, facts);
     a.add(Some(parent), f0 + df, Some(tick), &[json!({"frame": f0 + df, "click": [1, 1]})], &[cp(f0 + df, f, tick)], job, "checkpoint").unwrap()
 }
@@ -79,7 +79,7 @@ pub fn job_with(a: &Archive, entry: usize, news: &[(i64, i64, Vec<(&str, Value)>
     let d = a.prepare_job(entry).unwrap();
     let job = files::read_json(&d.join("job.json")).unwrap();
     let f0 = a.rows[entry].frame;
-    let base = a.info(entry).unwrap().last_cp[1].clone();
+    let base = a.info(entry).unwrap().last_cp()[1].clone();
     let mut new = Vec::new();
     for (k, (df, tick, ov)) in news.iter().enumerate() {
         let f = over(&base, ov);
