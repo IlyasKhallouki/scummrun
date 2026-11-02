@@ -410,6 +410,14 @@ impl Board {
             Some(s[..n].iter().filter_map(|x| x.done.and_then(|d| d)).min())
         })
     }
+    /// `best_before` without waiting: None while a child forked before could still change it.
+    fn best_before_now(&self, n: usize, bound: u64) -> Option<Option<(u64, bool, u64)>> {
+        let s = self.st.lock().unwrap();
+        if s[..n].iter().any(|x| x.done.is_none() && x.q_cur <= bound) {
+            return None;
+        }
+        Some(s[..n].iter().filter_map(|x| x.done.and_then(|d| d)).min())
+    }
     fn cancel(&self, c: usize) {
         self.st.lock().unwrap()[c].cancel = true;
     }
@@ -464,6 +472,48 @@ pub struct W<'a> {
     pub ready_failed_firsts: Mutex<FxHashSet<u64>>,
     /// the test oracle: per child, recorded answers to its reads of the best (test 2)
     pub oracle: Option<&'a dyn ChildOracle>,
+    pub prof: Prof,
+}
+
+/// Where an observed child frame's wall goes (summed over the window's children).
+#[derive(Default)]
+pub struct Prof {
+    pub frames: AtomicU64,
+    pub ns: [AtomicU64; 7],
+}
+
+pub const PROF_PARTS: [&str; 7] = [
+    "run",
+    "runs",
+    "explain_log",
+    "add_entries",
+    "state",
+    "facts+view",
+    "match",
+];
+
+impl Prof {
+    fn add(&self, d: &[std::time::Duration; 7]) {
+        self.frames.fetch_add(1, Ordering::Relaxed);
+        for (a, x) in self.ns.iter().zip(d) {
+            a.fetch_add(x.as_nanos() as u64, Ordering::Relaxed);
+        }
+    }
+    pub fn line(&self) -> String {
+        let n = self.frames.load(Ordering::Relaxed).max(1) as f64;
+        let parts: Vec<String> = PROF_PARTS
+            .iter()
+            .zip(&self.ns)
+            .map(|(p, a)| format!("{p} {:.3}", a.load(Ordering::Relaxed) as f64 / n / 1e6))
+            .collect();
+        let tot: u64 = self.ns.iter().map(|a| a.load(Ordering::Relaxed)).sum();
+        format!(
+            "{} observed child frames, {:.3} ms each ({})",
+            self.frames.load(Ordering::Relaxed),
+            tot as f64 / n / 1e6,
+            parts.join(", ")
+        )
+    }
 }
 
 /// Recorded answers to a child's reads of the window's shared state (fmi-play's differential test 2).
@@ -943,7 +993,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
     let mut snap: Option<Box<dyn Engine>> = None;
     let out = (|| -> Result<(), EngineError> {
         let first_i = w.first.unwrap();
-        if w.ready && w.board.cancelled(c) {
+        if w.board.cancelled(c) {
             ch.outcome = "cancelled".into();
             return Ok(());
         }
@@ -1030,7 +1080,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
             ch.outcome = "duplicate".into();
             return Ok(());
         }
-        if w.ready && w.board.cancelled(c) {
+        if w.board.cancelled(c) {
             ch.outcome = "cancelled".into();
             return Ok(());
         }
@@ -1185,7 +1235,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                 let st = cb.status().clone();
                 let f = st.frame;
                 cr.ch.frames = f - cr.ch.g;
-                if w.ready && w.board.cancelled(c) {
+                if w.board.cancelled(c) {
                     cr.ch.outcome = "cancelled".into();
                     break;
                 }
@@ -1341,6 +1391,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                     }
                     break;
                 }
+                let t0 = Instant::now();
                 match cb.run(&RunSpec {
                     frame: Some(f + 1),
                     ..Default::default()
@@ -1354,8 +1405,12 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                     Err(e) => return Err(e),
                 }
                 w.board.progress(c, cb.status().qf);
+                let t1 = Instant::now();
                 let rows = cb.runs()?;
-                cr.log.kept.add_entries(&strict::ents_of(&cb.explain_log()?.entries));
+                let t2 = Instant::now();
+                let ents = cb.explain_log()?;
+                let t3 = Instant::now();
+                cr.log.kept.add_entries(&strict::ents_of(&ents.entries));
                 let req = if w.cfg.lite {
                     ObsReq {
                         objects: Some(w.lite_objects.clone()),
@@ -1365,9 +1420,12 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                 } else {
                     ObsReq::default()
                 };
+                let t4 = Instant::now();
                 s = Arc::new(cb.obs(&req)?);
+                let t5 = Instant::now();
                 obs = facts_of(&s);
                 now = w.sview(&obs, &s).map_err(EngineError::Bridge)?;
+                let t6 = Instant::now();
                 let nf = f + 1;
                 let r_new = strict::by_frame(&strict::runs_of(&rows.runs))
                     .remove(&nf)
@@ -1380,6 +1438,9 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                 cr.rk.retain(|&x, _| x + 2 >= f);
                 cr.log.kept.frame(nf, r_new, Some(s.clone()), Some(nowa));
                 cr.frame_step(nf);
+                let t7 = Instant::now();
+                w.prof
+                    .add(&[t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5, t7 - t6]);
             }
             let _ = ended_engine;
             cr.ch.end = Some(cb.status().frame);
@@ -1405,7 +1466,7 @@ pub fn child_strict<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Ch
                     if click_gate(cb.status()) {
                         break;
                     }
-                    if w.ready && w.board.cancelled(c) {
+                    if w.board.cancelled(c) {
                         cr.ch.outcome = "cancelled".into();
                         break;
                     }
@@ -1550,6 +1611,50 @@ impl Ready {
     fn may_fork(&self, g: u64) -> bool {
         self.chosen.is_none() && !self.stopped && self.next.is_none_or(|n| g >= n)
     }
+}
+
+/// A frame where section 9.3's stop is still open: the parent goes on past it, and the window ends there if the
+/// children forked before it give the stop (the parent's record as it stood there is kept to go back to).
+struct StopCand {
+    g: u64,
+    qf: u64,
+    n: usize,
+    status: Status,
+    lens: (usize, usize, usize, usize),
+    splits: u64,
+    gate_shut: u64,
+    open: J,
+}
+
+/// The first open stop frame the children decide (in frame order); `wait`: wait until each is decided.
+fn resolve_stops(
+    board: &Board,
+    cands: &mut VecDeque<StopCand>,
+    b_qf: u64,
+    b_dev_qf: u64,
+    wait: bool,
+) -> Option<(StopCand, bool)> {
+    while let Some(c) = cands.front() {
+        let bound = c.qf + b_qf;
+        let got = if wait {
+            Some(board.best_before(c.n, bound))
+        } else {
+            board.best_before_now(c.n, bound)
+        };
+        let Some(best) = got else { return None };
+        let c = cands.pop_front().unwrap();
+        if let Some((bq, bdev, _)) = best {
+            if strict_stop(bq, bdev, c.qf, b_qf, b_dev_qf) {
+                cands.clear();
+                return Some((c, bdev));
+            }
+        }
+    }
+    None
+}
+
+fn r_ok<T>(r: &Result<T, String>) -> bool {
+    r.is_ok()
 }
 
 /// The parent's frame: the window's facts at it.
@@ -1787,6 +1892,7 @@ impl Search {
             ready: cfg.ready && has_input,
             ready_failed_firsts: Mutex::new(FxHashSet::default()),
             oracle: self.oracle,
+            prof: Prof::default(),
         };
         let mut rec = J::Obj(vec![]);
         let rr = |rec: &mut J, k: &str, v: J| rec.set(k, v);
@@ -1883,6 +1989,8 @@ impl Search {
             parallel_from: None,
         };
         let pool = Pool::new(cfg.workers.max(1));
+        let mut cands: VecDeque<StopCand> = VecDeque::new();
+        let mut stop_at: Option<(StopCand, bool)> = None;
         let wref = &w;
         let res: Result<(), String> = std::thread::scope(|scope| {
             let results: Arc<Mutex<Vec<(usize, Child)>>> = Arc::new(Mutex::new(Vec::new()));
@@ -1907,6 +2015,12 @@ impl Search {
             };
             let out = (|| -> Result<(), String> {
                 loop {
+                    if !cands.is_empty() {
+                        if let Some(s) = resolve_stops(&w.board, &mut cands, b_qf, b_dev_qf, false) {
+                            stop_at = Some(s);
+                            break;
+                        }
+                    }
                     let st = pfr.st.clone();
                     let g = st.frame;
                     let now = pfr.now.clone();
@@ -1975,23 +2089,37 @@ impl Search {
                         prev = now.clone();
                         if !w.ready {
                             let n = children.len();
-                            let forced = w.oracle.and_then(|o| o.parent_stop(g));
-                            let best = match forced {
+                            match w.oracle.and_then(|o| o.parent_stop(g)) {
                                 // (the test oracle: the recorded run's stop; the kind from the children here)
                                 Some(true) => {
-                                    collect(&mut children);
-                                    Some(w.board.best_before(n, u64::MAX - 1).unwrap_or((0, false, 0)))
-                                }
-                                Some(false) => None,
-                                None => w.board.best_before(n, st.qf + b_qf),
-                            };
-                            if let Some((bq, bdev, _)) = best {
-                                if forced == Some(true) || strict_stop(bq, bdev, st.qf, b_qf, b_dev_qf) {
+                                    let (_, bdev, _) = w.board.best_before(n, u64::MAX - 1).unwrap_or((0, false, 0));
                                     end_reason = format!(
                                         "stop: Q(g) + b reached the best {}",
                                         if bdev { "deviation" } else { "success" }
                                     );
                                     break;
+                                }
+                                Some(false) => {}
+                                None => {
+                                    cands.push_back(StopCand {
+                                        g,
+                                        qf: st.qf,
+                                        n,
+                                        status: st.clone(),
+                                        lens: (
+                                            ptrack.matched.len(),
+                                            ptrack.refuted.len(),
+                                            ptrack.choices.len(),
+                                            ptrack.outside.len(),
+                                        ),
+                                        splits: plog.splits(),
+                                        gate_shut,
+                                        open: rec.get("open").cloned().unwrap_or(J::Null),
+                                    });
+                                    if let Some(s) = resolve_stops(&w.board, &mut cands, b_qf, b_dev_qf, false) {
+                                        stop_at = Some(s);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -2022,8 +2150,12 @@ impl Search {
                             turn = gate && ready.may_fork(g);
                         }
                         if turn {
-                            while pool.running() + pool.queued() >= cfg.workers + 2 {
+                            while pool.running() + pool.queued() >= cfg.workers + 2 && stop_at.is_none() {
                                 std::thread::sleep(std::time::Duration::from_micros(100));
+                                stop_at = resolve_stops(&w.board, &mut cands, b_qf, b_dev_qf, false);
+                            }
+                            if stop_at.is_some() {
+                                break;
                             }
                             while mem_available_kb() < cfg.mem_floor_kb {
                                 if pool.running() + pool.queued() == 0 {
@@ -2091,6 +2223,16 @@ impl Search {
                 }
                 Ok(())
             })();
+            if r_ok(&out) && stop_at.is_none() && !cands.is_empty() {
+                stop_at = resolve_stops(&w.board, &mut cands, b_qf, b_dev_qf, true);
+            }
+            if let Some((c, _)) = &stop_at {
+                for (i, &gc) in child_g.iter().enumerate() {
+                    if gc >= c.g {
+                        w.board.cancel(i);
+                    }
+                }
+            }
             pool.close();
             // the workers end when the queue is empty (the scope joins them)
             let r = out;
@@ -2102,6 +2244,35 @@ impl Search {
         });
         res?;
         let mut children: Vec<Child> = children.into_iter().map(|c| c.expect("every child returns")).collect();
+        let mut pend = parent.status().clone();
+        if let Some((c, bdev)) = stop_at {
+            // section 9.3's stop at an earlier frame than the parent reached: the window ends there
+            end_reason = format!(
+                "stop: Q(g) + b reached the best {}",
+                if bdev { "deviation" } else { "success" }
+            );
+            for ch in children.iter_mut().filter(|ch| ch.g >= c.g) {
+                for e in [ch.snapshot.take(), ch.live.take()].into_iter().flatten() {
+                    e.quit();
+                }
+            }
+            children.retain(|ch| ch.g < c.g);
+            ptrack.matched.truncate(c.lens.0);
+            ptrack.refuted.truncate(c.lens.1);
+            ptrack.choices.truncate(c.lens.2);
+            ptrack.outside.truncate(c.lens.3);
+            if let Some(p) = plog.parter.as_mut() {
+                p.splits = c.splits;
+            }
+            gate_shut = c.gate_shut;
+            rec.set("open", c.open.clone());
+            if let J::Obj(o) = &mut rec {
+                o.retain(|x| x.0 != "end_change");
+            }
+            parent_fail = None;
+            delta_violation = None;
+            pend = c.status.clone();
+        }
         // the window's choice
         let best_i: Option<usize> = if w.ready {
             self.resolve_final(&w, &mut ready, &mut children)
@@ -2215,7 +2386,6 @@ impl Search {
             idx.sort_by_key(|&i| std::cmp::Reverse(failures[i].1));
             idx.into_iter().take(8).map(|i| failures[i].clone()).collect::<Vec<_>>()
         };
-        let pend = parent.status().clone();
         rec.set("end", J::Int(pend.frame as i64));
         rec.set("end_qf", J::Int(pend.qf as i64));
         rec.set("end_reason", J::Str(end_reason.clone()));
@@ -2347,6 +2517,7 @@ impl Search {
             self.outside(rd, &ptrack, best_ref, if has_input { Some(first_i) } else { None }, &by),
         );
         parent.explain(None).map_err(|e| e.to_string())?;
+        self.say(&format!("  window {}: {}", k + 1, w.prof.line()));
         let best = best_i.map(|b| children.swap_remove(b));
         let parent_matched = ptrack.matched.iter().map(|(i, v)| (*i, (v.0, v.1))).collect();
         Ok(WinRes {
