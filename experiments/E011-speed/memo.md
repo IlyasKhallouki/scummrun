@@ -105,16 +105,18 @@ did not widen (condition 3), which is pass2-reuse.md's case.
 
 ## The store
 
-- `DIR/<key>/`, one folder per whole-reading key: sha256 over the reader binary's bytes, the game index
-  (`data/scripts-dos-cd/index.json`) and a canonical text of item 3. Readings of the same scope and switches from
-  any entry share a folder.
+- `DIR/<key>/`, one folder per whole-reading key: the sha1 of a canonical text of item 3, which starts with the sha1
+  of the reader binary's bytes and of the game index (`data/scripts-dos-cd/index.json`). The text is kept as
+  `inputs.txt` in the folder. Readings of the same scope and switches from any entry share a folder.
 - Each reading appends the runs it made (not those it took) to its own file in the folder, written while it
-  reads, and renamed into place when the reading ends; an unfinished reading leaves no file. A run stores the job
-  and guides as bytes, the consulted keys as text with kind, domain and constant start, the list answers, the reach
-  questions, and its output. Keys are text, so a store is valid across processes.
-- A reading opens every finished file of its folder, mapped, and indexes the runs by a hash of job and guides;
-  candidates are compared byte for byte. Its own runs join the index between passes.
-- Space: a reading writes no store when `/home` is under 8 GB free plus twice its folder's largest file.
+  reads, and renamed into place (`*.runs`) when the reading ends; an unfinished reading leaves no such file. A run
+  stores the job and guides as bytes, the numbers of its consulted keys, the list answers, the reach questions, and
+  its output, deflated. Each file holds a table of its consulted keys (text, kind, domain, constant start), each
+  once. Keys are text, so a store is valid across processes.
+- A reading indexes the runs of every finished file of its folder by a hash of job and guides, and reads a run's
+  bytes when its job comes; candidates are compared byte for byte. Whether a consulted key reads the same is asked
+  once per file, key and pass. Its own runs join the index between passes.
+- Space: a reading writes no store when the store's disk is under 8 GB free plus twice its folder's largest file.
 
 ## The check
 
