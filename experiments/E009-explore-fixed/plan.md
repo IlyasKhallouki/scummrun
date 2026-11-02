@@ -205,3 +205,25 @@ tables, or measured from the engine by code.
   harness's stop and B1's cause, a reading stopped by a watchdog), and stop. E009 adds no further idea.
 - The harness's, the window search's and the reader's limits are E006's, and the guard's 3 GB and the disk's 8 GB
   floors are the machine's: engineering watchdogs, reported where they fire.
+
+## Amendment 2026-11-02, before stage 1: stage 1 runs on the cloud VM
+
+- **Why.** /home's free space fell under the laptop's 8 GB floor from other writers (6.8 GB at 10:20, 2.5 GB at 10:28
+  UTC; E009's own files are 0.1 GB), and what E009 may delete (E008's kitchen and smoke readings and run folders,
+  0.09 GB) cannot raise it to the floor. On the laptop no job starts, and fix (c)'s level (floor + 2 × the largest
+  reading) could keep no reading. Stage 1 runs on the VM (`scripts/cloud.py`, one start), the one place it can run now.
+- **The same files at the same paths** (`vm_stage1.sh`): the worktree at e009's head with its links resolved, the game
+  files, the Python environment and its interpreter, Fast Downward's release build, taskcore and reader-scope as built
+  on the laptop. ScummVM is svm-w3b's binary with its ELF interpreter and library path set (patchelf) to the laptop's
+  loader and the libraries it loads, copied next to it (the VM's C library is older than the one it was built
+  against); its code section is checked byte for byte against the laptop's.
+- **Off check on the VM first.** step.py's engine test (a) must give the laptop's line (`CHECK (a): 0 goal True 2728
+  3216 488 11712 2 36 502 8`, verify 0 differences) and the idle engine test var 100 alone; if not, stop and find why
+  before stage 1.
+- **Machine settings** through E008's environment (`machine()`): the 8 GB disk floor on the VM's disk, the guard's 3 GB
+  and the 7 GB rule for the second job unchanged, b = 2 per stage as planned. Each stage takes its own heavy lock
+  (`E008_HEAVY_LOCK`): the two stages share no file, so they run at the same time, each as it would run alone. The
+  kitchen starts first, then the door.
+- **Records.** Each archive's log.jsonl is copied to the laptop's `~/.cache/fast-mi-e009/archives/<stage>/` every two
+  minutes. At the end the archives come back without readings and run folders, and each goal entry (or the deepest
+  chain) is verified from boot on the VM and again on the laptop. CPU seconds are the VM's (n2 cores), reported as such.
