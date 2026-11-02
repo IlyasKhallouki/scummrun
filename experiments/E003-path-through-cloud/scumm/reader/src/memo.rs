@@ -341,6 +341,48 @@ fn free_bytes(dir: &std::path::Path) -> Option<u64> {
     String::from_utf8(out.stdout).ok()?.lines().nth(1)?.trim().parse().ok()
 }
 
+/// Makes room on the store's disk, by E009's level (memo.md, "The store"): while it has less than its floor plus twice
+/// the largest store file (`largest`, the largest under `root` once they are listed), the files of the other folders
+/// under `root` go, the oldest first (a reading that opens a file renews its time). The folder `keep` (this reading's,
+/// whose files it holds open) is left. Returns the largest file size seen.
+fn evict(root: &std::path::Path, keep: &std::path::Path, largest: u64) -> u64 {
+    match free_bytes(root) {
+        Some(free) => evict_from(root, keep, largest, free, FLOOR_BYTES),
+        None => largest,
+    }
+}
+
+/// `evict` with the disk's free bytes and floor given.
+fn evict_from(root: &std::path::Path, keep: &std::path::Path, largest: u64, mut free: u64, floor: u64) -> u64 {
+    let mut all: Vec<(std::time::SystemTime, u64, std::path::PathBuf)> = Vec::new();
+    for d in std::fs::read_dir(root).into_iter().flatten().flatten() {
+        let d = d.path();
+        if d == keep || !d.is_dir() {
+            continue;
+        }
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.extension().is_some_and(|x| x == "runs") {
+                if let Ok(m) = e.metadata() {
+                    all.push((m.modified().unwrap_or(std::time::UNIX_EPOCH), m.len(), p));
+                }
+            }
+        }
+    }
+    let largest = all.iter().map(|f| f.1).max().unwrap_or(0).max(largest);
+    all.sort();
+    for (_, len, p) in all {
+        if free >= floor + 2 * largest {
+            break;
+        }
+        if std::fs::remove_file(&p).is_ok() {
+            eprintln!("[memo] {}: evicted ({} MB), the disk under its floor", p.display(), len >> 20);
+            free += len;
+        }
+    }
+    largest
+}
+
 /// The disk's floor under the store (memo.md, "The store"): 8 GB.
 pub const FLOOR_BYTES: u64 = 8 << 30;
 
@@ -371,9 +413,12 @@ impl CrossMemo {
                 runs += 1;
             }
             let same = infos.iter().map(|_| AtomicU8::new(0)).collect();
+            // the file is in use: its time is renewed, so that eviction takes the stores no reading uses first
+            f.set_modified(std::time::SystemTime::now()).ok();
             files.push((f, FileInfos { infos, same }));
         }
         let opened_files = files.len();
+        let largest = evict(root, &dir, largest);
         let no_write = match free_bytes(&dir) {
             Some(f) if f < FLOOR_BYTES + 2 * largest => {
                 Some(format!("{} GB free, under the floor of 8 GB plus twice the largest file ({} MB)", f >> 30, largest >> 20))
@@ -907,6 +952,34 @@ mod tests {
         assert!(cm.take(&key, &mut |_| true, &mut |_, _| Ok(())).is_some());
         assert_eq!(cm.stats.taken.load(Ordering::Relaxed), 1);
         cm.finish().unwrap();
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// Under the floor, the other folders' files go oldest first, until the floor plus twice the largest file is
+    /// free; the reading's own folder is left.
+    #[test]
+    fn eviction_takes_the_oldest_files_of_other_folders() {
+        let root = std::env::temp_dir().join(format!("memo-evict-{}", std::process::id()));
+        std::fs::remove_dir_all(&root).ok();
+        let at = |s: u64| std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000 + s);
+        let file = |dir: &str, name: &str, t: u64| {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+            let p = root.join(dir).join(name);
+            let f = std::fs::File::create(&p).unwrap();
+            f.set_len(1000).unwrap();
+            f.set_modified(at(t)).unwrap();
+            p
+        };
+        let own = file("k", "0.runs", 0);
+        let old = file("a", "0.runs", 1);
+        let new = file("b", "0.runs", 3);
+        let mid = file("a", "1.runs", 2);
+        // 1500 free, floor 0: 2000 wanted, one file of 1000 is enough
+        assert_eq!(evict_from(&root, &root.join("k"), 0, 1500, 0), 1000);
+        assert!(own.exists() && !old.exists() && mid.exists() && new.exists());
+        // 0 free: every file of the other folders goes, the own folder's stays
+        evict_from(&root, &root.join("k"), 0, 0, 10_000);
+        assert!(own.exists() && !mid.exists() && !new.exists());
         std::fs::remove_dir_all(&root).ok();
     }
 }
