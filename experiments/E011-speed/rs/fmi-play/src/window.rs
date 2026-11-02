@@ -2120,6 +2120,7 @@ impl Search {
             cancelled: 0,
             parallel_from: None,
         };
+        let t_setup = t0.elapsed();
         let pool = Pool::new(cfg.workers.max(1));
         let mut cands: VecDeque<StopCand> = VecDeque::new();
         let mut stop_at: Option<(StopCand, bool)> = None;
@@ -2388,6 +2389,7 @@ impl Search {
             r
         });
         res?;
+        let t_children = t0.elapsed();
         let mut children: Vec<Child> = children.into_iter().map(|c| c.expect("every child returns")).collect();
         let mut pend = parent.status().clone();
         if let Some((c, bdev)) = stop_at {
@@ -2662,6 +2664,13 @@ impl Search {
             self.outside(rd, &ptrack, best_ref, if has_input { Some(first_i) } else { None }, &by),
         );
         parent.explain(None).map_err(|e| e.to_string())?;
+        self.say(&format!(
+            "  window {}: phases: setup {:.1} ms, parent and children {:.1} ms, records {:.1} ms",
+            k + 1,
+            t_setup.as_secs_f64() * 1e3,
+            (t_children - t_setup).as_secs_f64() * 1e3,
+            (t0.elapsed() - t_children).as_secs_f64() * 1e3
+        ));
         self.say(&format!("  window {}: {}", k + 1, w.prof.line()));
         self.say(&format!(
             "  window {}: CPU s: this process {:.2}, the parent engine {:.2}, the children's engines {:.2} ({} children); wall {:.2} s",
