@@ -3,11 +3,12 @@
 //!
 //! **The check** is taskcore `validate`'s rule on the input task under the request's bans (the task the harness plays:
 //! the reading's actions, cut by the bans as replay.py `ban_pieces` cuts them), in plan_fd's terms (predict.rs), from
-//! `start_state(start)`: for each step, its candidates are the pieces of its own input action when the reading has an
-//! action of that name (`label#rec`, less "~ban:..."), else every path of its label (the name less "fold:", "+N",
-//! "~ban:..." and "#rec": a refinement renumbers records, and a fold or a ban renames a path); of those whose
-//! precondition holds for certain (`holds` with every fact held: a set read on an unknown value fails) exactly one must
-//! hold, and it is the step;
+//! `start_state(start)`: each step is a path whose precondition holds for certain (`holds` with every fact held: a set
+//! read on an unknown value fails): the piece of its own input action (`label#rec`, less "~ban:...") that holds when
+//! there is one (the pieces of one action are disjoint), else one of the other paths of its label (the name less
+//! "fold:", "+N", "~ban:..." and "#rec": a refinement renumbers records, a fold or a ban renames a path, and the
+//! planner can take another record of the same label), each tried in the reading's order until the rest of the tail
+//! checks (a depth-first walk, at most 10,000 step visits);
 //! its effects apply with no guessed value (a write of several values, or under a condition on an unknown value,
 //! makes the fact unknown); after the last step every goal set holds for certain. Otherwise the tail is refused, with
 //! the first reason.
@@ -17,10 +18,11 @@
 //! shortest suffix that checks.
 //!
 //! **Sound.** Each accepted step's path applies in the state the steps before it lead to, whatever values the guessed
-//! writes take (no set reads an unknown value), and in that state no other path of its label applies; the goal holds
-//! in the end state whatever those values are. So the tail is a plan of the input task from the start: the plan the
-//! harness plays is a sequence of these paths. It need not be the plan the search would return; where the search
-//! would return it (82 of 97 recorded replans returned the old tail), the paths are the same.
+//! writes take (no set reads an unknown value), and the goal holds in the end state whatever those values are. So the
+//! tail is a plan of the input task from the start, a sequence of its paths, as a searched plan is (where paths of one
+//! label overlap, they differ only on replay checks, which the harness reads when it plays a step, as for any plan).
+//! It need not be the plan the search would return; where the search returned the old tail (82 of 97 recorded
+//! replans, by names with the records' numbers left out), it is checked to be the same steps.
 
 use crate::predict::{self, State, UNKNOWN};
 use fmi_core::{Action, Domains, Facts, Key, Val, NONE};
@@ -94,47 +96,87 @@ pub fn check(
     goal: &[(Key, Vec<Val>)],
     cands: &mut dyn FnMut(&str) -> Result<Vec<Action>, String>,
 ) -> Result<Accepted, String> {
-    let mut state = predict::start_state(facts, start);
-    let mut paths = Vec::with_capacity(names.len());
-    for (i, n) in names.iter().enumerate() {
-        let label = label_of_name(n);
-        let all = cands(label)?;
-        // the step's own input action when this reading has it (the same record: its pieces are disjoint); else the
-        // label's paths (a refinement renumbered the records), of which exactly one must hold
+    // each step's candidates, in order: its own input action's pieces, then the other paths of its label
+    let mut steps: Vec<(Vec<Action>, Vec<Action>)> = Vec::with_capacity(names.len());
+    for n in names {
+        let all = cands(label_of_name(n))?;
         let base = n.strip_prefix("fold:").map_or(n.as_str(), |_| "");
         let base = base.split("~ban:").next().unwrap_or("");
-        let own: Vec<Action> =
-            all.iter().filter(|p| !base.is_empty() && p.name.split("~ban:").next() == Some(base)).cloned().collect();
-        let cs = if own.is_empty() { all } else { own };
-        let hold: Vec<usize> =
-            (0..cs.len()).filter(|&j| predict::holds(facts, &cs[j].pre, &state, None) == Some(true)).collect();
-        if hold.len() != 1 {
-            if std::env::var_os("TASKCORE_TAIL_DEBUG").is_some() && i == 0 {
-                for p in cs.iter().take(3) {
-                    let miss: Vec<String> = p
-                        .pre
-                        .iter()
-                        .filter(|(k, vs)| predict::meets(facts, *k, vs, &state) != Some(true))
-                        .map(|(k, vs)| format!("{}={} not in {:?}", k.text(), state.get(k).copied().unwrap_or(NONE), vs))
-                        .collect();
-                    eprintln!("  {}: {:?}", p.name, miss);
+        let (own, other): (Vec<Action>, Vec<Action>) =
+            all.into_iter().partition(|p| !base.is_empty() && p.name.split("~ban:").next() == Some(base));
+        steps.push((own, other));
+    }
+    let state = predict::start_state(facts, start);
+    let mut paths = Vec::with_capacity(names.len());
+    let mut budget = 10_000u32;
+    let mut why = String::new();
+    match walk(facts, names, goal, &steps, 0, &state, &mut paths, &mut budget, &mut why)? {
+        Some(end) => Ok(Accepted { skipped: 0, paths, end }),
+        None => Err(why),
+    }
+}
+
+/// The steps from `i` on, from `state` (module docstring): a step's own input action when one of its pieces holds,
+/// else each of its label's other paths that holds, in the reading's order, the first that leads to the goal; at most
+/// `budget` step visits in all.
+#[allow(clippy::too_many_arguments)]
+fn walk(
+    facts: &Domains,
+    names: &[String],
+    goal: &[(Key, Vec<Val>)],
+    steps: &[(Vec<Action>, Vec<Action>)],
+    i: usize,
+    state: &State,
+    paths: &mut Vec<Action>,
+    budget: &mut u32,
+    why: &mut String,
+) -> Result<Option<State>, String> {
+    if i == steps.len() {
+        for (k, vs) in goal {
+            let d = facts.get(*k).ok_or(format!("the goal's fact {} is not the task's", k.text()))?;
+            let v = state.get(k).copied().unwrap_or(NONE);
+            let labs: Vec<Val> = vs.iter().map(|&x| predict::label(d, x)).collect();
+            if v == UNKNOWN || !labs.contains(&v) {
+                if why.is_empty() {
+                    *why = format!("the goal {} does not hold after the tail", k.text());
                 }
+                return Ok(None);
             }
-            return Err(format!("step {} ({}): {} of the {} paths of its label hold", i + 1, n, hold.len(), cs.len()));
         }
-        let p = cs[hold[0]].clone();
-        state = predict::apply_step(facts, &p, &[], &state).map_err(|e| format!("step {}: {:?}", i + 1, e))?;
-        paths.push(p);
+        return Ok(Some(state.clone()));
     }
-    for (k, vs) in goal {
-        let d = facts.get(*k).ok_or(format!("the goal's fact {} is not the task's", k.text()))?;
-        let v = state.get(k).copied().unwrap_or(NONE);
-        let labs: Vec<Val> = vs.iter().map(|&x| predict::label(d, x)).collect();
-        if v == UNKNOWN || !labs.contains(&v) {
-            return Err(format!("the goal {} does not hold after the tail", k.text()));
+    if *budget == 0 {
+        return Ok(None);
+    }
+    *budget -= 1;
+    let (own, other) = &steps[i];
+    let holds = |p: &Action| predict::holds(facts, &p.pre, state, None) == Some(true);
+    let own_hold: Vec<&Action> = own.iter().filter(|p| holds(p)).collect();
+    // the pieces of one input action are disjoint: at most one holds
+    let tries: Vec<&Action> = if own_hold.len() == 1 { own_hold } else { other.iter().filter(|p| holds(p)).collect() };
+    if tries.is_empty() && why.is_empty() {
+        *why = format!("step {} ({}): none of its label's {} paths holds", i + 1, names[i], own.len() + other.len());
+        if std::env::var_os("TASKCORE_TAIL_DEBUG").is_some() {
+            for p in own.iter().chain(other).take(3) {
+                let miss: Vec<String> = p
+                    .pre
+                    .iter()
+                    .filter(|(k, vs)| predict::meets(facts, *k, vs, state) != Some(true))
+                    .map(|(k, vs)| format!("{}={} not in {:?}", k.text(), state.get(k).copied().unwrap_or(NONE), vs))
+                    .collect();
+                eprintln!("  {}: {:?}", p.name, miss);
+            }
         }
     }
-    Ok(Accepted { skipped: 0, paths, end: state })
+    for p in tries {
+        let next = predict::apply_step(facts, p, &[], state).map_err(|e| format!("step {}: {:?}", i + 1, e))?;
+        paths.push(p.clone());
+        if let Some(end) = walk(facts, names, goal, steps, i + 1, &next, paths, budget, why)? {
+            return Ok(Some(end));
+        }
+        paths.pop();
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
