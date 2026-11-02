@@ -21,7 +21,7 @@ OUT=$1; mkdir -p $OUT
 bad=0
 heavy() { flock /var/tmp/fast-mi/heavy.lock "$@"; }
 check() { # LABEL LOG: the log's DIFF/MISSING lines fail
-  if grep -qE "^(DIFF|MISSING)|differ" $2; then bad=1; echo "$1: FAIL"; grep -E "^(DIFF|MISSING)|differ" $2 | head -5
+  if grep -qE "^(DIFF|MISSING)|different [1-9]" $2; then bad=1; echo "$1: FAIL"; grep -E "^(DIFF|MISSING)|different [1-9]" $2 | head -5
   else echo "$1: pass ($(grep -c '^same' $2) same)"; fi
 }
 p38=$J/j00091/run/a00/plans/plan-000; p33=$J/j00089/run/a00/plans/plan-000
