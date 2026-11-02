@@ -17,6 +17,8 @@ taskcore info   --task kitchen.tc
 taskcore dump   (same options) --out F   (the reduced task as JSON lines: facts and values, actions)
 taskcore serve  --task kitchen.tc [--fold ..] [--reduce ..] [--product-limit N] [--encoding ..] [--goal K=V,..]
                 (then one `sas` request per line on stdin: replanning without reloading, below)
+taskcore search --sas task.sas [--plan sas_plan]   (the Rust search on a SAS file: below, "The library")
+taskcore warm   --task kitchen.tc [--keep N]       (serve's requests through the warm task, + --plan F, --steps F)
 ```
 
 `--goal K=V[|V..][,K=V..]` (sas, decode, validate, serve) plans to that goal instead of the file's: per fact its
@@ -38,6 +40,26 @@ Sources: `model.rs` (the arrays), `packed.rs` (reading the file), `sas.rs` (the 
 `write_sas`, rule for rule; the two encodings; the start check; the operator table), `fold.rs` (the fork fold and
 its check), `reduce.rs` (reductions (a)-(f); each has its soundness argument in its doc comment), `bans.rs` (the
 start file and the bans).
+
+## The library and E011's planner
+
+taskcore is also a library (`src/lib.rs`; main.rs calls `cli::main`, the old main.rs): the command line's files are
+the same bytes as before. E011's planner port (`experiments/E011-speed/rs/fmi-plan`) uses it in one process:
+
+- `warm.rs`: one packed file loaded once (from its bytes); per (bans, goal, caps) what `serve` keeps (the banned view,
+  the needed facts, the fold, the first round up to (d)), for up to four of them; caps keyed by the actions they
+  lower. A request is `serve`'s steps on values, to `sas`'s reduced task (`taskcore warm` writes `sas`'s files from
+  it, byte for byte, the test).
+- `search.rs`: the SAS task built in memory in one expansion (`build`: pass 1's head and pass 2's operators), and
+  Fast Downward's `lazy_greedy([hff], preferred=[hff], reopen_closed=false)` with plusone costs, rule for rule
+  (successor order, relaxed task and `simplify`, `AdaptiveQueue`, alternation with boost 1000): the same plan file
+  (`taskcore search --sas F --plan P` on a SAS file, the test).
+- `decode.rs`: a plan's operators read back to the reduced actions' variants, the plan's rows only (plan_fd
+  `decode_ops`'s steps, with no operator table).
+- `predict.rs`: plan_fd's `predict`, `apply_step`, `either` and the cut to the needed facts, and replay.py's ban
+  pieces, on fmi-core's types.
+- `cache.rs`: the plan cache (E011's F4, "FMPL" v1) and sha1, sha256.
+- `tail.rs`: the previous plan's remaining steps checked as a plan of the input task from the new start.
 
 ## The replay harness's options
 
