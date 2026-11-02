@@ -517,7 +517,12 @@ impl Warm {
             let base = kept.task.as_ref().expect("built");
             let t1 = Instant::now();
             let (mut nt, ch) = if cfg.reduce.d {
-                reduce::red_d_from(base, Some((0, vals.clone())), start, &mut c)
+                let td = Instant::now();
+                let r = reduce::red_d_from(base, Some((0, vals.clone())), start, &mut c);
+                if std::env::var_os("TASKCORE_PROFILE").is_some() {
+                    eprintln!("profile d (kept task) {:.3} s, {} actions", td.elapsed().as_secs_f64(), r.0.acts.len());
+                }
+                r
             } else {
                 let mut tt = base.clone();
                 tt.starts.push((0, vals.clone()));
@@ -538,6 +543,9 @@ impl Warm {
         if passes == 2 {
             let t1 = Instant::now();
             let (nt, fc, _) = fold::fold(t, cfg.fold);
+            if std::env::var_os("TASKCORE_PROFILE").is_some() {
+                eprintln!("profile fold (second) {:.3} s, {} folded", t1.elapsed().as_secs_f64(), fc.folded_actions);
+            }
             t = nt;
             st.f("seconds_fold_second", t1.elapsed().as_secs_f64());
             st.raw("fold_counts_second", &fold_json(&fc, &t.acts));
