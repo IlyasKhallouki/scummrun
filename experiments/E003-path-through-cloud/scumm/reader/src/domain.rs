@@ -2,7 +2,6 @@
 //! values past the compared constants collapse into them.
 
 use crate::py::Py;
-use std::collections::BTreeSet;
 
 /// A domain value: an int, or a collapsed `BELOW` / `ABOVE`. The derived order is the domain's (BELOW, ints
 /// ascending, ABOVE), as domains.py's tuple holds them.
@@ -118,18 +117,24 @@ impl Cmp {
 impl Domain {
     /// `Domain.of(ints, low, high)`: the domain of `ints` with values outside [low, high] collapsed.
     pub fn of(ints: impl IntoIterator<Item = i64>, low: Option<i64>, high: Option<i64>) -> Domain {
-        let mut set = BTreeSet::new();
-        for n in ints {
-            let l = if low.is_some_and(|lo| n < lo) {
-                Label::Below
-            } else if high.is_some_and(|hi| n > hi) {
-                Label::Above
-            } else {
-                Label::Int(n)
-            };
-            set.insert(l);
+        // the labels sorted and distinct, as a set of them iterates (Label's order); a run already in order (a
+        // BTreeSet<i64> gives one) is kept as it is
+        let mut values: Vec<Label> = ints
+            .into_iter()
+            .map(|n| {
+                if low.is_some_and(|lo| n < lo) {
+                    Label::Below
+                } else if high.is_some_and(|hi| n > hi) {
+                    Label::Above
+                } else {
+                    Label::Int(n)
+                }
+            })
+            .collect();
+        if !values.windows(2).all(|w| w[0] < w[1]) {
+            values.sort_unstable();
+            values.dedup();
         }
-        let values: Vec<Label> = set.into_iter().collect();
         let below = values.first() == Some(&Label::Below);
         let above = values.last() == Some(&Label::Above);
         Domain { values, low: if below { low } else { None }, high: if above { high } else { None } }
