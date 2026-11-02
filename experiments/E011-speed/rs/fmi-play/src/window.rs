@@ -2927,6 +2927,63 @@ impl Search {
         d
     }
 
+    /// The window search for step.py's WindowConfig: `workers`, fork-each (7, or 0), `ready`, δ_lo from the reading's
+    /// frame costs' dmax. Any other setting is refused by name (`Config::check`).
+    pub fn for_step(workers: usize, fork_each: u32, ready: bool, dmax: Option<i64>) -> Result<Search, String> {
+        let mut cfg = if ready {
+            Config::e010_ready(delta_lo_of(dmax))
+        } else {
+            Config::e009(delta_lo_of(dmax))
+        };
+        cfg.workers = workers;
+        cfg.fork_each = fork_each;
+        Search::new(cfg)
+    }
+
+    /// window.Search.summary (its keys; the CPU of this process's search where the reference has Python's)
+    pub fn summary(&self) -> J {
+        let ws = &self.windows;
+        let sum = |k: &str| -> i64 { ws.iter().map(|w| w.i(k).unwrap_or(0)).sum() };
+        let mut outcomes: Vec<(String, i64)> = Vec::new();
+        for w in ws {
+            for (k, v) in w.get("outcomes").map(J::obj).unwrap_or(&[]) {
+                match outcomes.iter_mut().find(|x| x.0 == *k) {
+                    Some(x) => x.1 += v.int().unwrap_or(0),
+                    None => outcomes.push((k.clone(), v.int().unwrap_or(0))),
+                }
+            }
+        }
+        let mut outside = Vec::new();
+        for w in ws {
+            for o in w.a("outside_domain") {
+                let mut o = o.clone();
+                o.set("plan", w.get("plan").cloned().unwrap_or(J::Null));
+                o.set("macro", w.get("macro").cloned().unwrap_or(J::Null));
+                outside.push(o);
+            }
+        }
+        crate::jobj! {
+            "windows" => ws.len(),
+            "children" => sum("forks"),
+            "child_frames" => sum("child_frames"),
+            "outcomes" => J::Obj(outcomes.into_iter().map(|(k, v)| (k, J::Int(v))).collect()),
+            "engine_cpu_s" => crate::jobj! {"child" => J::Float((self.cpu_child * 100.0).round() / 100.0)},
+            "python_cpu_s" => J::Float(0.0),
+            "forks" => crate::jobj! {"stone trial" => self.stone_trials},
+            "early_successes" => sum("early_successes"),
+            "bound_violations" => ws.iter().map(|w| w.a("bound_violations").len() as i64).sum::<i64>(),
+            "goal_from_the_plan" => self.goal_credited,
+            "unplanned_goals" => J::Arr(self.unplanned_goals.clone()),
+            "memory_kb" => J::Obj(vec![]),
+            "deviations" => J::Arr(self.deviations.clone()),
+            "config" => self.cfg.j(),
+            "causes" => J::Arr(self.causes.clone()),
+            "python_cpu_by_part_s" => J::Obj(vec![]),
+            "empty_windows" => J::Arr(self.empty_keys.iter().map(|(k, n)| J::Arr(vec![k.clone(), J::Int(*n as i64)])).collect()),
+            "outside_domain" => J::Arr(outside),
+        }
+    }
+
     pub fn game(&mut self) -> Result<Arc<scumm_ir::Game>, String> {
         if self.game.is_none() {
             let root = scumm_ir::default_root();

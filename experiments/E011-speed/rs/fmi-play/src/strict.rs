@@ -1802,3 +1802,26 @@ pub fn plain(c: Option<&J>) -> J {
 
 #[allow(dead_code)]
 fn _unused(_: &B1, _: &pyj::J) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cites() {
+        assert_eq!(
+            cite_unit("global/script-002.txt:170 [02E0]"),
+            Some((Unit(U_SCRIPT, 2), 0x2E0))
+        );
+        assert_eq!(
+            cite_unit("room-033-x/local-215.txt:12 [0010]"),
+            Some((Unit(U_LOCAL, 215), 0x10))
+        );
+        assert_eq!(cite_unit("room-033-x/entry.txt:3 [0003]"), Some((Unit(U_ENTRY, 0), 3)));
+        assert_eq!(
+            cite_unit("room-033-x/obj-0428-door.txt:5 [001A]"),
+            Some((Unit(U_OBJ, 428), 0x1A))
+        );
+        assert_eq!(cite_unit("a/b/local-1.txt:1 [0000]"), None);
+    }
+}

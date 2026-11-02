@@ -867,3 +867,48 @@ pub fn event_of(j: &J) -> Option<Event> {
     };
     Some(Event { frame, what })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn conditions_split_as_python() {
+        assert_eq!(split_cmp("Var[103] == Local[2]"), Some(("Var[103]", "==", "Local[2]")));
+        assert_eq!(split_cmp("a <= b"), Some(("a", "<=", "b")));
+        assert_eq!(split_cmp("VAR_RESULT"), None);
+        assert_eq!(what_of("?(not a fact: var:103)"), "var:103");
+        assert_eq!(why_reason("?(position: getActorX(1))"), "position");
+        let c = Check::of(
+            &crate::pyj::parse(r#"["x.txt:1 [0000]", "VAR_RESULT > 5", true, "?(position: getActorX(VAR_EGO))"]"#)
+                .unwrap(),
+        );
+        assert_eq!(check_getter(&c), Some(("getActorX".into(), "VAR_EGO".into())));
+    }
+
+    #[test]
+    fn checks_on_a_dump() {
+        let c = Check::of(
+            &crate::pyj::parse(
+                r#"["global/script-002.txt:8 [0000]", "Var[103] == Local[2]", true, "?(not a fact: var:103)"]"#,
+            )
+            .unwrap(),
+        );
+        let mut s = Obs {
+            vars: vec![0; 200],
+            ..Default::default()
+        };
+        s.vars[VAR_SENTENCE_SCRIPT] = 2;
+        s.vars[103] = 428;
+        let src = crate::pyj::parse(r#"["sentence", 2, 426, 428]"#).unwrap();
+        let r = CheckRec {
+            kind: "sentence",
+            src: src.arr(),
+        };
+        assert_eq!(eval_check(&c, &r, &s), Some(true));
+        s.vars[103] = 7;
+        assert_eq!(eval_check(&c, &r, &s), Some(false));
+        s.vars[VAR_SENTENCE_SCRIPT] = 3; // another script's code: Var[] not checked
+        assert_eq!(eval_check(&c, &r, &s), None);
+    }
+}

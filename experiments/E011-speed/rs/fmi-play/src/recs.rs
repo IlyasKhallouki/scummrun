@@ -581,3 +581,34 @@ pub fn click_gate(st: &Status) -> bool {
 pub fn path_shows(pos_exps: &[Vec<(Key, Expect)>], now: &View) -> bool {
     pos_exps.iter().any(|pe| pe.iter().all(|(k, x)| x.holds(now.get(*k))))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn event_labels() {
+        assert_eq!(
+            event_of_label("event(script:2@736#d897055c2f2e)"),
+            Some((Unit(U_SCRIPT, 2), 736))
+        );
+        assert_eq!(
+            event_of_label("event(local:215@16#45fc)"),
+            Some((Unit(U_LOCAL, 215), 16))
+        );
+        assert_eq!(event_of_label("event(entry@-1"), Some((Unit(U_ENTRY, 0), -1)));
+        assert_eq!(event_of_label("sentence(2,428)"), None);
+    }
+
+    #[test]
+    fn stops_and_rules() {
+        assert!(strict_stop(100, false, 76, 24, 24));
+        assert!(!strict_stop(100, false, 75, 24, 24));
+        assert!(!strict_stop(100, true, 76, 24, 24)); // a deviation needs Q(g) + b > c_d
+        assert!(strict_stop(100, true, 77, 24, 24));
+        let mut e = EndRule::default();
+        assert!(!e.closed(true, true));
+        assert!(e.open);
+        assert!(e.closed(true, false));
+    }
+}
