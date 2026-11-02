@@ -709,3 +709,106 @@ pub fn target_holds_in<F: crate::archive::FactLook + ?Sized>(t: &Target, goal: &
         TV::Text(_) => false,
     }
 }
+
+/// json.dumps(start_row(...)) (default separators), the facts written straight from the dump in facts.py's order.
+pub fn start_row_text(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) -> Res<String> {
+    let mut head = start_row_head(seed, state, status)?;
+    let mut s = crate::pyjson::dumps_default(&head);
+    // the head's text ends with "}": the facts go before it
+    s.pop();
+    s.push_str(", \"facts\": ");
+    write_facts_ordered(&mut s, state);
+    s.push('}');
+    head.as_object_mut().map(|m| m.clear());
+    Ok(s)
+}
+
+fn start_row_head(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) -> Res<Value> {
+    let mut v = start_row(seed, state, &fmi_core::Status { ..status.clone() })?;
+    v.as_object_mut().unwrap().remove("facts");
+    Ok(v)
+}
+
+/// facts_of's map as JSON text (default separators), keys in facts.py's order; a key set twice keeps its first place
+/// (Python's dict).
+fn write_facts_ordered(s: &mut String, st: &fmi_core::Obs) {
+    use fmi_core::{CLOCKS, ENCD, EXCD, WIO_FLOBJECT, WIO_GLOBAL, WIO_INVENTORY, WIO_LOCAL, WIO_ROOM};
+    // the slots' and the verbs' keys may repeat (two slots of one unit): the order of first insertion, the last value
+    let mut order: Vec<String> = Vec::with_capacity(st.vars.len() + 4096);
+    let mut vals: HashMap<String, i64> = HashMap::new();
+    let mut put = |k: String, v: i64, order: &mut Vec<String>| {
+        if vals.insert(k.clone(), v).is_none() {
+            order.push(k);
+        }
+    };
+    let mut b = itoa::Buffer::new();
+    s.push('{');
+    let mut first = true;
+    // the vars, bits, owners, states and classes cannot repeat: written as they come
+    let emit = |s: &mut String, k: &str, v: i64, first: &mut bool| {
+        if !*first {
+            s.push_str(", ");
+        }
+        *first = false;
+        s.push('"');
+        s.push_str(k);
+        s.push_str("\": ");
+        s.push_str(itoa::Buffer::new().format(v));
+    };
+    for (n, &v) in st.vars.iter().enumerate() {
+        if !CLOCKS.contains(&n) {
+            let k = format!("var:{}", b.format(n));
+            emit(s, &k, v as i64, &mut first);
+        }
+    }
+    for n in &st.bits_set {
+        emit(s, &format!("bit:{n}"), 1, &mut first);
+    }
+    for (o, v) in &st.owners {
+        emit(s, &format!("owner:{o}"), *v as i64, &mut first);
+    }
+    for (o, v) in &st.states {
+        emit(s, &format!("state:{o}"), *v as i64, &mut first);
+    }
+    for (o, cs) in &st.classes {
+        for c in cs {
+            emit(s, &format!("class:{o}:{c}"), 1, &mut first);
+        }
+    }
+    put("room".into(), st.room as i64, &mut order);
+    if let Some(e) = st.ego {
+        put("ego".into(), e as i64, &mut order);
+    }
+    for sl in &st.slots {
+        if sl.where_ == WIO_GLOBAL {
+            put(format!("script:{}", sl.number), 1, &mut order);
+        } else if sl.where_ == WIO_LOCAL {
+            put(format!("local:{}", sl.number), 1, &mut order);
+        } else if [WIO_INVENTORY, WIO_ROOM, WIO_FLOBJECT].contains(&sl.where_) && sl.number != ENCD && sl.number != EXCD {
+            put(format!("objscript:{}", sl.number), 1, &mut order);
+        }
+        if let Some(u) = crate::start::unit_name(sl.where_, sl.number) {
+            if sl.code >= 0 {
+                put(format!("at:{u}:{}", sl.code), 1, &mut order);
+            }
+            if sl.frozen > 0 {
+                put(format!("frozen:{u}"), 1, &mut order);
+            }
+        }
+    }
+    put("cutscene".into(), st.cutscene.depth as i64, &mut order);
+    if let Some(top) = st.cutscene.levels.last().and_then(|l| l.override_.as_ref()) {
+        if !top.stale && top.code >= 0 {
+            if let Some(u) = crate::start::unit_name(top.where_, top.number) {
+                put(format!("esc:{u}:{}", top.code), 1, &mut order);
+            }
+        }
+    }
+    for v in &st.verbs {
+        put(format!("verb:{}", v.id), 1, &mut order);
+    }
+    for k in &order {
+        emit(s, k, vals[k], &mut first);
+    }
+    s.push('}');
+}

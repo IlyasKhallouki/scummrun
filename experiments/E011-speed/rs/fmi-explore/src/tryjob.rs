@@ -272,7 +272,7 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
     }
     std::fs::create_dir_all(&rdir).map_err(|e| files::io_err(&rdir, e))?;
     let rows = rdir.join("start.jsonl");
-    std::fs::write(&rows, pyjson::dumps_default(&step::start_row(step::SEED, state, status)?) + "\n").map_err(|e| files::io_err(&rows, e))?;
+    std::fs::write(&rows, step::start_row_text(step::SEED, state, status)? + "\n").map_err(|e| files::io_err(&rows, e))?;
     let name = rdir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let mut scope: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default();
     scope.sort();

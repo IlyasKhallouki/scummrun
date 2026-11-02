@@ -406,34 +406,54 @@ pub fn start_file_text(start: &[(String, i64)]) -> String {
 
 /// Harness._same_input's key: sha1 of json.dumps([frame, len(bans), sorted((k, str(v)))]) [:16].
 pub fn input_key(frame: u64, n_bans: usize, start: &Facts) -> String {
-    // json.dumps([frame, n, [[k, str(v)], ...]]) with the pairs sorted (keys are unique: by the key's text)
-    let mut kv: Vec<(std::rc::Rc<str>, Val)> = start.0.iter().map(|(k, v)| (key_text(*k), *v)).collect();
-    kv.sort_unstable_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
-    let mut s = String::with_capacity(kv.len() * 28 + 32);
-    let mut nb = itoa::Buffer::new();
-    s.push('[');
-    s.push_str(nb.format(frame));
-    s.push_str(", ");
-    s.push_str(nb.format(n_bans));
-    s.push_str(", [");
-    for (i, (k, v)) in kv.iter().enumerate() {
-        if i > 0 {
-            s.push_str(", ");
-        }
-        s.push('[');
-        pyjson::write_str(&mut s, k);
-        s.push_str(", \"");
-        match *v {
-            BELOW => s.push_str("below"),
-            ABOVE => s.push_str("above"),
-            NONE => s.push_str("None"),
-            n => s.push_str(nb.format(n)),
-        }
-        s.push_str("\"]");
+    // json.dumps([frame, n, [[k, str(v)], ...]]) with the pairs sorted (keys are unique: by the key's text). The
+    // keys' text order and each pair's `["key", "` are kept from the last call while the key set is the same (the
+    // engine's facts and the task's keys change little from plan to plan)
+    thread_local! {
+        static LAST: std::cell::RefCell<(Vec<Key>, Vec<usize>, Vec<String>)> = const { std::cell::RefCell::new((Vec::new(), Vec::new(), Vec::new())) };
     }
-    s.push_str("]]");
-    let h = sha1_smol::Sha1::from(s.as_bytes()).digest().to_string();
-    h[..16].to_string()
+    LAST.with(|l| {
+        let mut l = l.borrow_mut();
+        let same = l.0.len() == start.0.len() && l.0.iter().zip(start.0.iter()).all(|(a, b)| *a == b.0);
+        if !same {
+            let keys: Vec<Key> = start.0.iter().map(|(k, _)| *k).collect();
+            let texts: Vec<std::rc::Rc<str>> = keys.iter().map(|k| key_text(*k)).collect();
+            let mut order: Vec<usize> = (0..keys.len()).collect();
+            order.sort_unstable_by(|&a, &b| texts[a].as_bytes().cmp(texts[b].as_bytes()));
+            let prefixes: Vec<String> = order.iter().map(|&i| {
+                let mut p = String::with_capacity(texts[i].len() + 6);
+                p.push('[');
+                pyjson::write_str(&mut p, &texts[i]);
+                p.push_str(", \"");
+                p
+            }).collect();
+            *l = (keys, order, prefixes);
+        }
+        let (_, order, prefixes) = &*l;
+        let mut s = String::with_capacity(order.len() * 28 + 32);
+        let mut nb = itoa::Buffer::new();
+        s.push('[');
+        s.push_str(nb.format(frame));
+        s.push_str(", ");
+        s.push_str(nb.format(n_bans));
+        s.push_str(", [");
+        for (j, &i) in order.iter().enumerate() {
+            if j > 0 {
+                s.push_str(", ");
+            }
+            s.push_str(&prefixes[j]);
+            match start.0[i].1 {
+                BELOW => s.push_str("below"),
+                ABOVE => s.push_str("above"),
+                NONE => s.push_str("None"),
+                n => s.push_str(nb.format(n)),
+            }
+            s.push_str("\"]");
+        }
+        s.push_str("]]");
+        let h = sha1_smol::Sha1::from(s.as_bytes()).digest().to_string();
+        h[..16].to_string()
+    })
 }
 
 /// export_records.write_start's text: one line per fact of the domains, sorted by key text, its start value's label

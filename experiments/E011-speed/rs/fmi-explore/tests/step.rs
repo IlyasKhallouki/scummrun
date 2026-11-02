@@ -318,3 +318,18 @@ fn targets_with_rotation_are_e008s_targets_reordered() {
     assert_eq!((turned.last().unwrap().k.as_str(), &turned.last().unwrap().v), ("owner:566", &TV::Int(1)));
     assert!(!turned.iter().any(|x| x.k == "room" && x.v == TV::Int(41)));
 }
+
+#[test]
+fn start_row_text_is_start_rows_json() {
+    // a dump made from a recorded checkpoint (the doubles' inverse of facts_of), its row written both ways
+    let home = std::env::var("HOME").unwrap_or_default();
+    let Ok(j) = fmi_explore::files::read_json(&std::path::PathBuf::from(format!("{home}/.cache/fast-mi-e009/off/step-a/jobs/ta/job.json"))) else { return };
+    let facts = fmi_explore::start::facts_of_json(&j["entry"]["checkpoint"][1]);
+    let mut obs = fmi_explore::doubles::obs_from_facts(&facts);
+    obs.ego_pos = Some((346, 133));
+    let st = fmi_core::Status { reason: "idle".into(), frame: 2728, tick: 16321, qf: 65284, room: 33, idle: Some("sentence".into()), ego: Some((346, 133)), ..Default::default() };
+    let a = step::start_row_text(1, &obs, &st).unwrap();
+    let b = fmi_explore::pyjson::dumps_default(&step::start_row(1, &obs, &st).unwrap());
+    assert_eq!(a, b);
+    assert_eq!(fmi_core::facts_of(&obs), facts);
+}
