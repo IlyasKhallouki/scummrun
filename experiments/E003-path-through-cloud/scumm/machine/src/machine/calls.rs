@@ -289,7 +289,21 @@ impl<'g> Machine<'g> {
             }
             writes.push((k, me.v.join_values(&vals)));
         };
-        {
+        if group[1..].iter().all(|g| g.writes.shares_base(&base.writes)) {
+            // every store of one base (`Store`): a key no path changed since it has the base's value in every path,
+            // which the first holds; only the changed keys some path holds can differ, and those are joined
+            let mut seen: rustc_hash::FxHashSet<Fact> = Default::default();
+            for (j, gj) in group.iter().enumerate() {
+                if j > 0 && same_as[j].is_some() {
+                    continue; // its changes are an earlier path's
+                }
+                for &k in gj.writes.changed() {
+                    if seen.insert(k) && group.iter().any(|g| g.writes.contains_key(&k)) {
+                        join_key(self, k, &mut writes);
+                    }
+                }
+            }
+        } else {
             for (j, gj) in group.iter().enumerate() {
                 if j > 0 && same_as[j].is_some() {
                     continue; // its keys are an earlier path's
