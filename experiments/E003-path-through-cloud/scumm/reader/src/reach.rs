@@ -301,9 +301,13 @@ impl ReachState {
 
 /// A job's identity under --reach: the whole job. Its label is not one: a room's local scripts, entry and exit code
 /// are named alike in every room (`local:N`, `entry`, `exit`), and `Event::label` leaves out the unit, so two rooms'
-/// events can share a label.
+/// events can share a label. The job's bytes (wire.rs: equal jobs, equal bytes; unequal jobs, unequal bytes), one
+/// char per byte: a text that names the job as its Debug text did, made without formatting it.
 pub fn job_key(job: &Job) -> String {
-    format!("{job:?}")
+    use crate::wire::Wire;
+    let mut b = Vec::with_capacity(512);
+    job.put(&mut b);
+    b.iter().map(|&x| x as char).collect()
 }
 
 impl Builder<'_> {
