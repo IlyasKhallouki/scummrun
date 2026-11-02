@@ -7,7 +7,7 @@
 //!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
 //!   fmi explore verify ARCHIVE [--entry ID]
 //!   fmi explore status ARCHIVE
-//!   fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
+//!   fmi try JOB_DIR... | - [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
 //!
 //! `--search gbfs --tail` are the fast settings (the Rust search; at a replan the last plan's valid suffix first);
 //! without them the planner is called as the reference calls it.
@@ -20,8 +20,10 @@
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
 //! run_job, fmi-explore's tryjob) inside this process, its ports warm from job to job (wire.rs).
 //! `try` is step.py's `run JOB_DIR`: one try from a job.json; `--targets` forces the targets, in order (the benchmark).
+//! With several JOB_DIRs (or "-": one per line on stdin) the tries run one after the other in this process, warm.
 
 mod wire;
+mod wire_real;
 
 use fmi_explore::driver::{self, DriverStats, JobLog, StepMode};
 use fmi_explore::fake::FakeStep;
@@ -41,7 +43,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
        fmi explore verify ARCHIVE [--entry ID]
        fmi explore status ARCHIVE
-       fmi try JOB_DIR [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
+       fmi try JOB_DIR... | - [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
        fmi check replay JOB_DIR --out DIR [--domains DIR]
@@ -153,7 +155,9 @@ fn wire_opts(a: &Args) -> Result<wire::WireOpts, String> {
 
 fn cmd_try(argv: &[String]) -> i32 {
     let a = Args::parse(argv, &["targets", "search", "doubles", "repeat"]);
-    let Some(jd) = a.pos.first() else { usage() };
+    if a.pos.is_empty() {
+        usage()
+    }
     let w = match wire_opts(&a).and_then(|o| wire::wire(&o)) {
         Ok(w) => w,
         Err(e) => {
@@ -162,7 +166,42 @@ fn cmd_try(argv: &[String]) -> i32 {
         }
     };
     fmi_explore::machine::nice10();
-    let jd = PathBuf::from(jd);
+    // several JOB_DIRs: the tries one after the other in this process, its ports warm from try to try (the
+    // benchmark's warm regime); "-": the job folders read from stdin, one per line, each answered on stdout with
+    // "done JOB_DIR EXIT" once its try has ended (a driver interleaves other work between the tries)
+    if a.pos.len() > 1 || a.pos[0] == "-" {
+        let mut code = 0;
+        let mut one = |jd: &str| -> i32 {
+            let c = try_one(&PathBuf::from(jd), &a, &w);
+            if c != 0 {
+                code = c;
+            }
+            c
+        };
+        if a.pos[0] == "-" {
+            use std::io::{BufRead, Write};
+            for line in std::io::stdin().lock().lines() {
+                let Ok(line) = line else { break };
+                let jd = line.trim();
+                if jd.is_empty() {
+                    continue;
+                }
+                let c = one(jd);
+                println!("done {jd} {c}");
+                let _ = std::io::stdout().flush();
+            }
+        } else {
+            for jd in &a.pos {
+                one(jd);
+            }
+        }
+        return code;
+    }
+    try_one(&PathBuf::from(&a.pos[0]), &a, &w)
+}
+
+fn try_one(jd: &std::path::Path, a: &Args, w: &wire::Wired) -> i32 {
+    let jd = jd.to_path_buf();
     let log = match JobLog::append(&jd.join("log")) {
         Ok(l) => l,
         Err(e) => {

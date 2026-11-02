@@ -415,7 +415,11 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
     let ts = step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?;
-    if let Some(forced) = &r.forced_targets {
+    // job.json's "forced_targets" [[K, V], ...] (the benchmark's tries, several in one process), else `--targets`
+    let from_job: Option<Vec<(String, i64)>> = job.get("forced_targets").and_then(|f| f.as_array()).map(|a| {
+        a.iter().filter_map(|p| Some((p.get(0)?.as_str()?.to_string(), p.get(1)?.as_i64()?))).collect()
+    });
+    if let Some(forced) = from_job.as_ref().or(r.forced_targets.as_ref()) {
         // the benchmark's: the log's targets in its order, each with its tier and depth as targets gives them
         let mut out = Vec::new();
         for (k, v) in forced {
