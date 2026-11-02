@@ -251,14 +251,31 @@ impl<'g> Machine<'g> {
         // unknowns a join makes are interned by value), so this goes through the first path's keys, then each
         // other path's keys that no path before it holds. A key whose values all equal the first path's keeps
         // the value the first path has.
+        //
+        // Paths whose stores share one map (`Store::same_map`) hold the same values: a later one takes an earlier
+        // one's value, and adds no key. The oracle's value of a key is asked once per key (at the first path that
+        // lacks it): within the merge the same question gets the same answer, and asking again changes nothing.
         let mut writes: Vec<(Fact, Val)> = Vec::new();
         let mut vals = Vec::with_capacity(group.len());
+        let same_as: Vec<Option<usize>> =
+            (0..group.len()).map(|i| (0..i).find(|&j| group[j].writes.same_map(&group[i].writes))).collect();
         let mut join_key = |me: &mut Self, k: Fact, writes: &mut Vec<(Fact, Val)>| {
             vals.clear();
-            for gp in &group {
-                let v = match gp.writes.get(&k) {
-                    Some(&v) => v,
-                    None => me.oget(o, k),
+            let mut oracle: Option<Val> = None;
+            for (i, gp) in group.iter().enumerate() {
+                let v = match same_as[i] {
+                    Some(j) => vals[j],
+                    None => match gp.writes.get(&k) {
+                        Some(&v) => v,
+                        None => match oracle {
+                            Some(v) => v,
+                            None => {
+                                let v = me.oget(o, k);
+                                oracle = Some(v);
+                                v
+                            }
+                        },
+                    },
                 };
                 vals.push(v);
             }
@@ -269,8 +286,14 @@ impl<'g> Machine<'g> {
         };
         {
             for (j, gj) in group.iter().enumerate() {
+                if j > 0 && same_as[j].is_some() {
+                    continue; // its keys are an earlier path's
+                }
                 for &k in gj.writes.keys() {
-                    if j > 0 && (base.writes.contains_key(&k) || group[1..j].iter().any(|gp| gp.writes.contains_key(&k))) {
+                    if j > 0
+                        && (base.writes.contains_key(&k)
+                            || group[1..j].iter().zip(&same_as[1..j]).any(|(gp, s)| s.is_none() && gp.writes.contains_key(&k)))
+                    {
                         continue; // done with an earlier path's keys
                     }
                     join_key(self, k, &mut writes);
