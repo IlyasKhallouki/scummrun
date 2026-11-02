@@ -79,8 +79,8 @@ pub fn write_gz_text(p: &Path, text: &str) -> Res<()> {
     let tmp = tmp_of(p, ".tmp");
     {
         let f = fs::File::create(&tmp).map_err(|e| io_err(&tmp, e))?;
-        // Python's gzip default level is 9
-        let mut g = GzEncoder::new(f, Compression::new(9));
+        // any level reads back the same (Python's default is 9; the bytes differ by their mtime anyway): the fast one
+        let mut g = GzEncoder::new(f, Compression::new(1));
         g.write_all(text.as_bytes()).map_err(|e| io_err(&tmp, e))?;
         g.finish().map_err(|e| io_err(&tmp, e))?;
     }

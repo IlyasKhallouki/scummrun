@@ -8,10 +8,11 @@ description = "E011: the explorer (explore.py), its tries (step.py), the guide (
 [dependencies]
 fmi-core = { path = "../fmi-core" }
 scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 flate2 = "1"
 sha1_smol = "1"
 libc = "0.2"
+itoa = "1"
 
 [profile.release]
 codegen-units = 1

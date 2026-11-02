@@ -39,6 +39,18 @@ pub fn dumps(v: &Value, o: Opts) -> String {
     s
 }
 
+/// A list's compact text (`separators=(",", ":")`) from a slice of values, appended.
+pub fn write_compact_slice(s: &mut String, items: &[Value]) {
+    s.push('[');
+    for (i, x) in items.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        write_value(s, x, Opts::COMPACT, 0);
+    }
+    s.push(']');
+}
+
 /// `json.dumps(v)`.
 pub fn dumps_default(v: &Value) -> String {
     dumps(v, Opts::DEFAULT)
@@ -129,9 +141,9 @@ fn write_value(s: &mut String, v: &Value, o: Opts, level: usize) {
 
 fn write_number(s: &mut String, n: &Number) {
     if let Some(i) = n.as_i64() {
-        let _ = write!(s, "{i}");
+        s.push_str(itoa::Buffer::new().format(i));
     } else if let Some(u) = n.as_u64() {
-        let _ = write!(s, "{u}");
+        s.push_str(itoa::Buffer::new().format(u));
     } else if let Some(f) = n.as_f64() {
         s.push_str(&float_repr(f));
     }
@@ -193,6 +205,12 @@ pub fn float_repr(f: f64) -> String {
 /// A string as `json.dumps` writes it with `ensure_ascii=True`.
 pub fn write_str(s: &mut String, t: &str) {
     s.push('"');
+    // the common case: printable ASCII with nothing to escape, copied whole
+    if t.bytes().all(|b| (0x20..=0x7e).contains(&b) && b != b'"' && b != b'\\') {
+        s.push_str(t);
+        s.push('"');
+        return;
+    }
     for c in t.chars() {
         match c {
             '"' => s.push_str("\\\""),
