@@ -140,6 +140,10 @@ impl ReadSpec {
                 continue;
             }
             let facts = v["facts"].as_object().ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "no facts"))?;
+            // sorted here: in a build where serde_json's preserve_order is on (the fmi binary), a Map iterates in
+            // the file's order
+            let mut facts: Vec<(&String, &serde_json::Value)> = facts.iter().collect();
+            facts.sort_by(|a, b| a.0.cmp(b.0));
             let mut out = String::new();
             for (k, x) in facts {
                 let _ = writeln!(out, "{k}\t{x}");
