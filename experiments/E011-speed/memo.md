@@ -129,3 +129,38 @@ Byte for byte, with and without the switch, on the same inputs:
 - each also against itself (a store from the same inputs).
 
 The packed file, the golden body and counters, and the reached file have the same sha1 with the switch on and off.
+
+## Results
+
+Ring(33) readings on E009's inputs (profile-reader's: rows j00089, j00119 and boot; refinements [103, 194] with
+j00000's and j00089's starts), E009's command with the golden stream, 3 worker threads, on the laptop under the
+heavy lock, one reading at a time (load 4-10). E009's binary (built from 2a3cf8a1) against e011-readcore's
+(c797edc), the old and new reading back to back. Instructions and cycles are perf's (user space, all threads); the
+CPU time follows the load, the instruction counts do not.
+
+| reading | E009's binary | readcore, no store | readcore, `--memo` |
+|---|---|---|---|
+| fresh j00089, instructions | 708.7 G | 382.4 G (54%) | 152.9 G from boot's store (22%) |
+| fresh j00089, CPU / wall | 263.0 s / 70.8 s | 174.4 s / 45.4 s | 63.0 s / 15.9 s (22%) |
+| fresh j00119, CPU / wall | 246.8 s / 66.5 s | | 60.6 s / 15.5 s from boot's store (23%) |
+| fresh j00089 without the golden stream, CPU / wall | 192.2 s / 60.3 s | 113.3 s / 34.3 s | 30.3 s / 12.4 s (20%) |
+| refinement j00089, instructions | 289.7 G | 141.4 G (49%) | 95.9 G from j00000's store |
+| refinement j00089, job-seconds / wall | 106.5 s / 44.3 s | 35.6 s / 15.6 s | 16.6 s (16%) / 10.5 s |
+
+The packed file, the golden body, the Builder's line and the reached file have the same sha1 in every column. With
+the branch's last commit (466a035) they are again E009's on every reading with the golden stream, with and without
+the store, and on the j00000 refinement with the store against E009's binary's reading of it.
+
+- **Taken and run.** The refinement j00089 from j00000's store took 31,136 runs and ran 3,190, each because a key
+  it consulted reads otherwise from j00089's start. j00000's own reading took 11,249
+  runs from its first pass (pass2-reuse.md's case) and ran 24,197. The fresh j00089 and j00119 readings took all
+  39,515 runs from boot's store; boot's own reading took 16,673 from its first pass. j00000's reading again, from the
+  store then holding its own, j00089's, boot's and j00119's files, took all 35,446 runs (7.4 s wall, 34.1 s with
+  E009's binary). No run was refused for a list or a reach answer.
+- **What a taken reading spends.** With every run taken, the jobs' part is 13 job-seconds (finding, reading,
+  inflating and decoding the stored runs); the reading's 14.3 s of wall are the stream: the sink thread is busy
+  12.1 s of them (golden lines and the packed file), and the reading's thread merges and streams the outputs for
+  10.4 s. Without the golden stream the sink is busy 7.5 s of 10.9 s.
+- **Store and memory.** A fresh ring(33) reading stores 22,842 runs in 445 MB, the j00000 refinement 24,197 in
+  201 MB. A reading taking from boot's store peaks at 973-1,014 MB, against 526-554 MB for E009's binary; without
+  the store readcore's reading peaks at 616-642 MB.
