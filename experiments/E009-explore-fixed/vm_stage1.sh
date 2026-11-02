@@ -144,7 +144,8 @@ start() {  # NAME GOAL STOP_JOBS, detached from the ssh session
 resume() {  # NAME WORKERS: run a stopped archive on from its files, then verify and report
     vm_env
     local name=$1 w=$2
-    export E008_HEAVY_LOCK=/var/tmp/fast-mi/heavy-$name.lock
+    # HEAVY_LOCK=none (from the caller's environment) runs 5-room jobs side by side on a machine with the memory
+    export E008_HEAVY_LOCK=${HEAVY_LOCK:-/var/tmp/fast-mi/heavy-$name.lock}
     cd $WT/experiments/E008-go-explore
     nice -n 10 $PY -u explore.py run $E/archives/$name --workers $w
     echo "run exit $?"

@@ -1056,7 +1056,7 @@ class Job:
 
     def command(self, step_cmd: list, m: dict) -> list:
         cmd = [m["guard"], str(self.dir / "log")] + step_cmd + ["run", str(self.dir)]
-        if len(self.scope) >= HEAVY_ROOMS:
+        if len(self.scope) >= HEAVY_ROOMS and m["heavy_lock"] != "none":  # "none": a machine whose memory holds them
             cmd = ["flock", m["heavy_lock"]] + cmd
         return cmd
 
