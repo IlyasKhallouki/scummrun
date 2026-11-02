@@ -11,3 +11,4 @@ pub mod fake;
 pub mod files;
 pub mod machine;
 pub mod pyjson;
+pub mod step;
