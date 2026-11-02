@@ -764,6 +764,49 @@ pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32
     Needed { ncount, kept, rounds }
 }
 
+/// A precondition laid out as [fact, n, values..]* (sorted by fact, then values), read as (fact, values).
+struct PreSets<'a> {
+    w: &'a [u32],
+}
+
+impl<'a> Iterator for PreSets<'a> {
+    type Item = (u32, &'a [u32]);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.w.is_empty() {
+            return None;
+        }
+        let (f, n) = (self.w[0], self.w[1] as usize);
+        let s = &self.w[2..2 + n];
+        self.w = &self.w[2 + n..];
+        Some((f, s))
+    }
+}
+
+/// (f)'s dominance test: every set of `k` has a set of `i` on its fact (the first, in order) within it. Both are laid
+/// out sorted by fact, so one walk replaces a search per set (the same answer as the first match of a search).
+fn pre_within(k: &[u32], i: &[u32]) -> bool {
+    let mut it = PreSets { w: i }.peekable();
+    for (f, sk) in (PreSets { w: k }) {
+        // the first set of `i` on `f`
+        while let Some(&(g, _)) = it.peek() {
+            if g < f {
+                it.next();
+            } else {
+                break;
+            }
+        }
+        match it.peek() {
+            Some(&(g, si)) if g == f => {
+                if !is_subset(si, sk) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
 /// `sig_hash`'s buffers, kept from action to action.
 #[derive(Default)]
 struct SigScratch {
@@ -899,27 +942,40 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
                 continue;
             }
             let mut ix: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
-            let pres: FxMap<usize, Vec<(u32, Vec<u32>)>> = ix
-                .iter()
-                .map(|&i| {
-                    let mut p: Vec<(u32, Vec<u32>)> = t.acts.view(i).pre().map(|(f, s)| (f, s.to_vec())).collect();
-                    p.sort();
-                    (i, p)
-                })
-                .collect();
-            let size = |i: usize| -> u64 { pres[&i].iter().map(|(_, s)| s.len() as u64).sum() };
-            ix.sort_by_key(|&i| (t.acts.meta[i].cost, pres[&i].len(), std::cmp::Reverse(size(i)), i));
+            // each member's precondition sorted (by fact, then values), in one arena: pre_at[i] its sets
+            let mut parena: Vec<u32> = Vec::new();
+            let mut pspan: FxMap<usize, (usize, usize)> = FxMap::default();
+            let mut tmp: Vec<(u32, &[u32])> = Vec::new();
+            for &i in &ix {
+                tmp.clear();
+                tmp.extend(t.acts.view(i).pre());
+                tmp.sort();
+                let a = parena.len();
+                for &(f, s) in &tmp {
+                    parena.push(f);
+                    parena.push(s.len() as u32);
+                    parena.extend_from_slice(s);
+                }
+                pspan.insert(i, (a, parena.len()));
+            }
+            let sets = |i: usize| -> PreSets<'_> {
+                let (a, b) = pspan[&i];
+                PreSets { w: &parena[a..b] }
+            };
+            let size = |i: usize| -> u64 { sets(i).map(|(_, s)| s.len() as u64).sum() };
+            let count = |i: usize| -> usize { sets(i).count() };
+            ix.sort_by_key(|&i| (t.acts.meta[i].cost, count(i), std::cmp::Reverse(size(i)), i));
             let mut keep: Vec<usize> = Vec::new();
             for &i in &ix {
-                let pi = &pres[&i];
+                let (pa, pb) = pspan[&i];
+                let pi = &parena[pa..pb];
                 let by = keep.iter().copied().find(|&k| {
-                    t.acts.meta[k].cost <= t.acts.meta[i].cost
-                        && pres[&k].iter().all(|(f, sk)| pi.iter().find(|(g, _)| g == f).map_or(false, |(_, si)| is_subset(si, sk)))
+                    t.acts.meta[k].cost <= t.acts.meta[i].cost && pre_within(&parena[pspan[&k].0..pspan[&k].1], pi)
                 });
                 match by {
                     Some(k) => {
                         drop[i] = true;
-                        if pres[&k] == *pi && t.acts.meta[k].cost == t.acts.meta[i].cost {
+                        if parena[pspan[&k].0..pspan[&k].1] == *pi && t.acts.meta[k].cost == t.acts.meta[i].cost {
                             dup += 1;
                         } else {
                             dom += 1;
