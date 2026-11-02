@@ -326,7 +326,11 @@ impl<'g> Machine<'g> {
             let locals = self.join_locals(&frames);
             slot_locals.push((locals, frames.iter().all(|f| f.args_known)));
         }
-        let same = group[1..].iter().all(|gp| gp.writes == base.writes && slots_eq(&gp.slots, &base.slots));
+        // every store equal to the first's: no key was joined (each key some path holds, the first holds with the
+        // same value in every path, so the others' keys are among the first's), and no path holds fewer keys
+        let same_writes = writes.is_empty() && group[1..].iter().all(|gp| gp.writes.len() == base.writes.len());
+        debug_assert_eq!(same_writes, group[1..].iter().all(|gp| gp.writes == base.writes));
+        let same = same_writes && group[1..].iter().all(|gp| slots_eq(&gp.slots, &base.slots));
         let cut_data: Vec<Val> = (0..base.cut_data.len())
             .map(|i| {
                 let vs: Vec<Val> = group.iter().map(|gp| gp.cut_data[i]).collect();
