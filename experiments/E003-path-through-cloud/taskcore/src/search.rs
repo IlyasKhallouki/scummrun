@@ -90,7 +90,7 @@ impl SasTask {
     pub fn is_goal(&self, s: &[u32]) -> bool {
         self.goal.iter().all(|&(v, x)| s[v as usize] == x)
     }
-    fn push_op(&mut self, pre: &[(u32, u32)], effs: &[(Vec<(u32, u32)>, u32, u32)], cost: u32) {
+    fn push_op(&mut self, pre: &[(u32, u32)], effs: &[EffSpec], cost: u32) {
         self.pre.extend_from_slice(pre);
         self.pre_off.push(self.pre.len() as u32);
         for (c, var, post) in effs {
@@ -206,6 +206,9 @@ pub fn parse_sas(text: &str) -> Result<SasTask, String> {
     Ok(t)
 }
 
+/// An operator's effect as `SasTask::push_op` takes it: (conditions, variable, value).
+pub type EffSpec = (Vec<(u32, u32)>, u32, u32);
+
 /// What an operator of `from_task` stands for: a variant of a reduced action, a pick operator, a goal operator.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OpOf {
@@ -251,7 +254,7 @@ pub fn from_task(x: &mut Expander, plan: &Plan, start: &[u32]) -> Result<(SasTas
     let metric = plan.metric;
     let fd_cost = |c: u32| if metric { c } else { 1 };
     let mut of = Vec::with_capacity(plan.n_ops as usize);
-    let mut effs: Vec<(Vec<(u32, u32)>, u32, u32)> = Vec::new();
+    let mut effs: Vec<EffSpec> = Vec::new();
     let mut pre: Vec<(u32, u32)> = Vec::new();
     for ai in 0..t.acts.len() {
         let mut k = 0u32;
@@ -1214,7 +1217,7 @@ pub fn lazy_greedy_with(t: &SasTask, ff: &mut Ff, order: &[u32], deadline: Optio
                         out.status = "plan".into();
                         break;
                     }
-                    if cur_pred.is_some() && best.map_or(true, |b| h < b) {
+                    if cur_pred.is_some() && best.is_none_or(|b| h < b) {
                         best = Some(h);
                         prio[1] -= 1000; // boost_preferred: the preferred-only list
                     }

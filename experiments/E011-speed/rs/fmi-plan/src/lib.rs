@@ -102,6 +102,9 @@ pub struct Timing {
     pub kept: String,
 }
 
+/// Cost caps as taskcore reads them: (label prefix, frames).
+type Caps = Vec<(String, u32)>;
+
 /// One reading's planner (module docstring).
 pub struct WarmPlanner {
     host: Host,
@@ -111,7 +114,7 @@ pub struct WarmPlanner {
     raw: Raw,
     by_label: Option<HashMap<u32, Vec<u32>>>,
     memo: HashMap<[u8; 32], PlanResult>,
-    lowered_memo: HashMap<Vec<(String, u32)>, Vec<(u32, u32)>>,
+    lowered_memo: HashMap<Caps, Vec<(u32, u32)>>,
     /// the reading's facts sorted by their key texts (the start file's order): (text, index in `domains`)
     sorted_facts: Vec<(String, usize)>,
     n_fd: u64,
@@ -634,7 +637,7 @@ pub fn run_fd(downward: &Path, dir: &Path, sas: &Path, limit_s: u64) -> Result<(
         _ => "error",
     };
     let log = std::fs::read_to_string(&log_path).unwrap_or_default();
-    let cost = log.lines().filter_map(|l| l.split("Plan cost: ").nth(1)).last().and_then(|c| c.trim().parse().ok());
+    let cost = log.lines().rev().find_map(|l| l.split("Plan cost: ").nth(1)).and_then(|c| c.trim().parse().ok());
     if status != "plan" {
         return Ok((status.into(), vec![], None));
     }

@@ -17,6 +17,9 @@ use crate::sas::{Expander, Variant};
 use crate::search::OpOf;
 use std::collections::HashMap;
 
+/// A guessed value with its conditions: (fact, value, [(fact, values)]).
+pub type DGuess = (u32, u32, Vec<(u32, Vec<u32>)>);
+
 /// One step: `decode_ops`'s dict, with facts and values as the reduced task's ids.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DStep {
@@ -26,11 +29,11 @@ pub struct DStep {
     pub members: Vec<u32>,
     pub chosen: Vec<(u32, u32)>,
     /// (fact, value, its conditions (fact, values))
-    pub guessed: Vec<(u32, u32, Vec<(u32, Vec<u32>)>)>,
+    pub guessed: Vec<DGuess>,
 }
 
 /// The variant `k` of action `ai`: (chosen, guessed with conditions); and the action's picked guesses.
-fn variant(x: &mut Expander, ai: usize, k: u32) -> Result<(Vec<(u32, u32)>, Vec<(u32, u32, Vec<(u32, Vec<u32>)>)>, crate::sas::Picked), String> {
+fn variant(x: &mut Expander, ai: usize, k: u32) -> Result<(Vec<(u32, u32)>, Vec<DGuess>, crate::sas::Picked), String> {
     let mut n = 0u32;
     let mut got = None;
     let picked = x.expand(ai, &mut |v: &Variant| {

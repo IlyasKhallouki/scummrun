@@ -17,6 +17,12 @@ pub const OUTSIDE: Val = i64::MIN + 3;
 /// A predicted state: plan_fd's dict, key -> value (`NONE` where the dict holds None; a key it lacks is absent).
 pub type State = HashMap<Key, Val>;
 
+/// A guessed value with its conditions: plan_fd's `(key, value, ((key, values), ...))`.
+pub type Guess = (Key, Val, Vec<(Key, Vec<Val>)>);
+
+/// What `predict` returns: each step's path, the state after the last step, the choices (step -> its paths).
+pub type Predicted = (Vec<Action>, State, Vec<(u32, Vec<Action>)>);
+
 /// One decoded step as `predict` reads it (decode_ops's dict): the reduced action's name, its members (input
 /// actions), its operator, its guessed values with their conditions.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -25,7 +31,7 @@ pub struct Step {
     pub name: String,
     pub members: Vec<u32>,
     pub chosen: Vec<(Key, Val)>,
-    pub guessed: Vec<(Key, Val, Vec<(Key, Vec<Val>)>)>,
+    pub guessed: Vec<Guess>,
 }
 
 /// plan_fd.PathChoice and the other errors `predict` raises (a ValueError for a file that is not the task's).
@@ -104,7 +110,7 @@ pub fn holds(facts: &Domains, pre: &[(Key, Vec<Val>)], state: &State, held: Opti
 }
 
 /// plan_fd `_guess`
-fn guess(key: Key, vals: &[Val], guessed: &[(Key, Val, Vec<(Key, Vec<Val>)>)], state: &State) -> Val {
+fn guess(key: Key, vals: &[Val], guessed: &[Guess], state: &State) -> Val {
     let mut got: Vec<Val> = Vec::new();
     for (k, v, w) in guessed {
         if *k == key && vals.contains(v) && w.iter().all(|(c, s)| s.contains(&get(state, *c))) && !got.contains(v) {
@@ -123,7 +129,7 @@ fn dom_of(facts: &Domains, k: Key) -> Result<&Domain, PredictError> {
 }
 
 /// plan_fd `apply_step`: `state` after action `a` with the plan's guessed values.
-pub fn apply_step(facts: &Domains, a: &Action, guessed: &[(Key, Val, Vec<(Key, Vec<Val>)>)], state: &State) -> Result<State, PredictError> {
+pub fn apply_step(facts: &Domains, a: &Action, guessed: &[Guess], state: &State) -> Result<State, PredictError> {
     let mut new = state.clone();
     for e in &a.effects {
         let met: Vec<Option<bool>> = e.when.iter().map(|(c, s)| meets(facts, *c, s, state)).collect();
@@ -250,7 +256,7 @@ pub fn predict(
     start: &Facts,
     held: &std::collections::HashSet<Key>,
     engine_choice: bool,
-) -> Result<(Vec<Action>, State, Vec<(u32, Vec<Action>)>), PredictError> {
+) -> Result<Predicted, PredictError> {
     let mut state = start_state(facts, start);
     let mut out = Vec::with_capacity(steps.len());
     let mut choices = Vec::new();
