@@ -112,6 +112,8 @@ pub struct WarmPlanner {
     by_label: Option<HashMap<u32, Vec<u32>>>,
     memo: HashMap<[u8; 32], PlanResult>,
     lowered_memo: HashMap<Vec<(String, u32)>, Vec<(u32, u32)>>,
+    /// the reading's facts sorted by their key texts (the start file's order): (text, index in `domains`)
+    sorted_facts: Vec<(String, usize)>,
     n_fd: u64,
     pub last: Timing,
 }
@@ -178,10 +180,14 @@ impl WarmPlanner {
         let w = warm::Warm::new(reading.packed(), &path.display().to_string(), reached, cfg).map_err(tc_err)?;
         let t = w.task();
         let raw = Raw::new(&path, reading.packed(), &t.strs.list, &t.facts.key).map_err(tc_err)?;
+        let domains = reading.domains().clone();
+        let mut sorted_facts: Vec<(String, usize)> = domains.0.iter().enumerate().map(|(i, (k, _))| (k.text(), i)).collect();
+        sorted_facts.sort();
         Ok(WarmPlanner {
             host: host.clone(),
             id: reading.id(),
-            domains: reading.domains().clone(),
+            sorted_facts,
+            domains,
             raw,
             warm: w,
             by_label: None,
@@ -194,10 +200,13 @@ impl WarmPlanner {
 
     /// The start file's lines of a start (export_records `write_start`), sorted by key.
     pub fn start_lines(&self, start: &Facts) -> Vec<(String, String)> {
-        let mut v: Vec<(String, String)> =
-            self.domains.0.iter().map(|(k, d)| (k.text(), label_text(d, start.val(*k)))).collect();
-        v.sort();
-        v
+        self.sorted_facts
+            .iter()
+            .map(|(t, i)| {
+                let (k, d) = &self.domains.0[*i];
+                (t.clone(), label_text(d, start.val(*k)))
+            })
+            .collect()
     }
 
     fn bans_of(bans: &[Ban]) -> Vec<taskcore::bans::Ban> {
