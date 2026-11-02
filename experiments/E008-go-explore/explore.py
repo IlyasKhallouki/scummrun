@@ -368,8 +368,8 @@ class Archive:
         for d in ("entries", "jobs", "readings"):
             (root / d).mkdir(parents=True, exist_ok=True)
         doc = {"stage": stage, "seed": SEED, "goal": {k: sorted(v) for k, v in goal.items()},
-               "guide": str(Path(guide).resolve()), "allowed_rooms": sorted(int(r) for r in allowed), "workers": workers,
-               "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "root": root_info or {}}
+               "guide": str(Path(guide).resolve()), "allowed_rooms": sorted(int(r) for r in allowed),
+               "workers": workers, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "root": root_info or {}}
         if e009:
             doc["e009"] = dict(e009)
         write_json(root / "stage.json", doc)

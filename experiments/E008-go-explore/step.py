@@ -219,7 +219,7 @@ def reusable_detail(reading_doc: dict, task_fact_keys, entry_facts: dict) -> dic
             "first": [[k, *d[k]] for k in bad[:12]]}
 
 
-# --- E009 fix c: the keys a reading's start value provably does not enter (plan.md (c)) ---------------------------------
+# --- E009 fix c: the keys a reading's start value provably does not enter (plan.md (c)) -------------------------------
 
 REUSE_KEYS_FILE = "reuse-keys.json"  # next to reading.json: K of the reading, computed once
 # domains.build's reason for a counter left with no domain by the closure (it looks at other variables' domains, so

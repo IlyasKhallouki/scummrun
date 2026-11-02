@@ -146,7 +146,7 @@ def test_choose_reading_e009_reuses_on_k_and_refuses_other_keys(tmp_path, monkey
     assert rd is None and why == "differs on 1 keys" and checked[0]["e009"]["first"] == [["var:229", 1, 2]]
 
 
-# --- run_job with the switches -----------------------------------------------------------------------------------------
+# --- run_job with the switches ---------------------------------------------------------------------------------------
 
 def test_run_job_measures_idle_and_passes_the_rotation(tmp_path, monkeypatch):
     from test_step import stub_job
