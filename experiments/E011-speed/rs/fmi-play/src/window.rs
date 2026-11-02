@@ -502,8 +502,8 @@ pub struct Prof {
     pub play_hits: [AtomicU64; 4],
     pub forks: AtomicU64,
     pub fork_ns: AtomicU64,
-    /// stone trials: count, wall, frames, hit tests
-    pub stone: [AtomicU64; 4],
+    /// stone trials: count, wall, frames, hit tests, kept as the branch
+    pub stone: [AtomicU64; 5],
     /// the input code's thread CPU ns: all, in run, in obs, in at, in the stone trials' fork and quit
     pub play_cpu: [AtomicU64; 5],
     /// a child's whole thread CPU ns
@@ -553,8 +553,8 @@ impl Prof {
             g(&self.play_cpu[4])
         )
     }
-    fn stones(&self, n: u64, ns: u64, frames: u64, at: u64) {
-        for (a, x) in self.stone.iter().zip([n, ns, frames, at]) {
+    fn stones(&self, n: u64, ns: u64, frames: u64, at: u64, kept: u64) {
+        for (a, x) in self.stone.iter().zip([n, ns, frames, at, kept]) {
             a.fetch_add(x, Ordering::Relaxed);
         }
     }
@@ -567,7 +567,7 @@ impl Prof {
         let fr = self.play_frames.load(Ordering::Relaxed);
         let h: Vec<u64> = self.play_hits.iter().map(|a| a.load(Ordering::Relaxed)).collect();
         format!(
-            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms; stone trials {} in {:.2} s, {} frames, {} hit tests",
+            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms; stone trials {} in {:.2} s, {} frames, {} hit tests, {} kept",
             self.plays.load(Ordering::Relaxed),
             self.play_ns.load(Ordering::Relaxed) as f64 / n / 1e6,
             fr as f64 / n,
@@ -581,7 +581,8 @@ impl Prof {
             self.stone[0].load(Ordering::Relaxed),
             self.stone[1].load(Ordering::Relaxed) as f64 / 1e9,
             self.stone[2].load(Ordering::Relaxed),
-            self.stone[3].load(Ordering::Relaxed)
+            self.stone[3].load(Ordering::Relaxed),
+            self.stone[4].load(Ordering::Relaxed)
         )
     }
     pub fn line(&self) -> String {
@@ -1122,7 +1123,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         let play_res;
         let first_before;
         {
-            let mut br = Br::new(&mut *cb, if w.cfg.cache { ch.d0.clone() } else { None });
+            let mut br = Br::new(&mut cb, if w.cfg.cache { ch.d0.clone() } else { None });
             br.watch_first = true;
             br.hc = w.hit_cache;
             br.fuse = true;
@@ -1137,7 +1138,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         }
         ch.stone_trials += ex.stone_trials;
         w.prof
-            .stones(ex.stone_trials as u64, ex.stone_ns, ex.stone_frames, ex.stone_at);
+            .stones(ex.stone_trials as u64, ex.stone_ns, ex.stone_frames, ex.stone_at, ex.stats_kept as u64);
         ch.cpu_s += ex.stone_cpu;
         w.board.progress(c, cb.status().qf);
         if let Some(m) = obsv.err.take() {
@@ -1194,7 +1195,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
             return Ok(());
         }
         {
-            let mut br = Br::new(&mut *cb, None);
+            let mut br = Br::new(&mut cb, None);
             if observe_play {
                 br.obs = Some(&mut obsv);
             }

@@ -82,7 +82,7 @@ pub fn is_end(e: &EngineError) -> bool {
 /// observer after each (window._Stepper, when `obs` is set), and the frame and dump before the first input event
 /// it schedules (window._FirstWatched).
 pub struct Br<'a> {
-    pub e: &'a mut dyn Engine,
+    pub e: &'a mut Box<dyn Engine>,
     state: Option<Arc<Obs>>,
     at: FxHashMap<(i32, i32), At>,
     /// the hit tests' object answers across frames and branches (`HitCache`), and this frame's layout in it (None:
@@ -113,7 +113,7 @@ pub fn thread_ns() -> u64 {
 }
 
 impl<'a> Br<'a> {
-    pub fn new(e: &'a mut dyn Engine, seed: Option<Arc<Obs>>) -> Br<'a> {
+    pub fn new(e: &'a mut Box<dyn Engine>, seed: Option<Arc<Obs>>) -> Br<'a> {
         Br {
             e,
             state: seed,
@@ -277,7 +277,7 @@ impl<'a> Br<'a> {
         if self.obs.is_some() {
             let s = self.full()?;
             let o = self.obs.as_mut().unwrap();
-            o.on_frame(&mut *self.e, &s, None)?;
+            o.on_frame(&mut **self.e, &s, None)?;
         }
         Ok(())
     }
@@ -302,7 +302,7 @@ impl<'a> Br<'a> {
         self.hits[0] += 1;
         self.state = Some(s.clone());
         let ob = self.obs.as_mut().unwrap();
-        ob.on_frame(&mut *self.e, &s, Some((rows, ents)))?;
+        ob.on_frame(&mut **self.e, &s, Some((rows, ents)))?;
         Ok(st)
     }
     /// window._Stepper.run when an observer is set, else one command.
@@ -390,6 +390,8 @@ pub struct Executor {
     pub stone_ns: u64,
     pub stone_frames: u64,
     pub stone_at: u64,
+    /// the stone trials kept as the branch (`stone_keep`)
+    pub stats_kept: u32,
 }
 
 impl Executor {
@@ -404,6 +406,7 @@ impl Executor {
             stone_ns: 0,
             stone_frames: 0,
             stone_at: 0,
+            stats_kept: 0,
         }
     }
 
@@ -958,6 +961,8 @@ impl Executor {
         }
         stones.sort_by_key(|o| (o.walk.0 - gx).abs()); // (a stable sort, as Python's sorted)
         if self.stone_fork {
+            // a trial that finds the object is kept as the branch (`stone_keep`) where no observer reads the frames
+            let keep = stone_keep() && b.obs.is_none();
             for o in &stones {
                 let t_trial = std::time::Instant::now();
                 let c0 = thread_ns();
@@ -965,10 +970,14 @@ impl Executor {
                 b.cpu[3] += thread_ns() - c0;
                 self.stone_trials += 1;
                 let mut frames = None;
+                let mut kept: Option<(Arc<Obs>, bool, Option<(u64, Arc<Obs>)>, Vec<Event>)> = None;
                 {
-                    let mut tb = Br::new(&mut *child, None);
+                    let mut tb = Br::new(&mut child, None);
                     tb.hc = b.hc;
                     tb.fuse = b.fuse;
+                    // the branch takes its dump before its first input event during the move it would play: the
+                    // trial takes it where the branch would
+                    tb.watch_first = keep && b.watch_first && b.first_before.is_none();
                     let mut trial = Executor::new(false);
                     let m = Move {
                         name: format!("{}: via {}", mv.name, o.id),
@@ -1006,6 +1015,36 @@ impl Executor {
                             return Err(PlayErr::Engine(e));
                         }
                     }
+                    if keep && frames.is_some() {
+                        let st = tb.state()?;
+                        kept = Some((st, tb.partial, tb.first_before.take(), trial.movie.clone()));
+                    }
+                }
+                if let Some((st, partial, first, movie)) = kept {
+                    // The trial played this move and ran to the frame where the object shows: what the branch is
+                    // about to do from the same state (the fork is exact), with the same commands (the same input
+                    // code; its stone forks are not reached, as the trial needed none), except that the branch's last
+                    // run is one command where the trial ran frame by frame, which ends in the same state (stops
+                    // change nothing: play-wire split). So the trial's engine becomes the branch.
+                    self.stats_kept += 1;
+                    std::mem::swap(b.e, &mut child);
+                    b.invalidate();
+                    b.state = Some(st);
+                    b.partial = partial;
+                    if first.is_some() {
+                        b.first_before = first;
+                    }
+                    self.movie.extend(movie);
+                    self.stone_cpu += child.cpu_s();
+                    let c0 = thread_ns();
+                    child.quit();
+                    b.cpu[3] += thread_ns() - c0;
+                    self.stone_ns += t_trial.elapsed().as_nanos() as u64;
+                    let state = b.state()?;
+                    if !self.object_points(b, obj, &state)?.is_empty() {
+                        return Ok(state);
+                    }
+                    continue;
                 }
                 self.stone_cpu += child.cpu_s();
                 let c0 = thread_ns();
@@ -1162,6 +1201,13 @@ pub const FLOOR_CHUNK: usize = 10;
 pub fn batch() -> bool {
     static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *C.get_or_init(|| std::env::var("FMI_PLAY_BATCH").map_or(true, |v| v != "0"))
+}
+
+/// FMI_STONE_KEEP=0: a stone trial that finds the object is quit and its move played again on the branch, as in
+/// round 1. On by default: the branch takes the trial's engine, which is where the move played again would end.
+pub fn stone_keep() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_STONE_KEEP").map_or(true, |v| v != "0"))
 }
 
 /// FMI_CHECK_HITS=1: every hit the cache answers is asked of the engine too and compared.
