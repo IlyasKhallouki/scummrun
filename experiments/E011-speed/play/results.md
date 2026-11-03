@@ -133,3 +133,92 @@ hit tests); fmi-play's own logic in the input code is about 2 s. The hit cache (
 - The hit cache is off by default (its proof needs the screen geometry, IFACE 3).
 - Commit ec98c96's message gives the parent's change as "217 s -> 148 s"; the measured window 2 walls through the
   double were 570.6 s with the parent waiting and 148.4 s with the parent going on.
+
+## Round 2 (2026-11-03): one round trip per observed frame, the input code's runs with their dump, the hit cache on
+
+Round 1's results/README.md item 4 ("What binds"): the observed child frame in four round trips, 227,624 hit tests in
+test (a)'s third window, the hit cache off for want of the screen layout. Branch e011-r2-play.
+
+### What was built
+
+- **Patch 0004** (`patches/0004-scumm-speedrun-play.patch`, on top of 0001 and 0002; engine/WIRE.md's last section):
+  StepObs (a run to a frame answered with what Runs, ExplainLog and Obs answer there), RunObs (a run answered with
+  its stop's dump, the full one or the room's: owners, states and classes of the room's objects only), AtMany (several
+  hit tests), and the screen layout (initScreens' b and h, the forced banner screen) as the binary Status's last
+  field. Built in `/var/tmp/fast-mi/svm-e011-play`. It is 0004, not a change to 0002, because round 2's engine
+  component took 0003 (COORD.md).
+- **fmi-core** (IFACE in COORD.md): provided `Engine::step_observe`, `run_obs`, `run_room` and `at_many`, whose
+  defaults are the old calls, `room_cut`, and `Status::screen`. fmi-engine's BinEngine sends each as one message.
+- **fmi-play**, each behind a switch whose off is round 1's behaviour:
+  - `FMI_PLAY_BATCH` (on unless 0): a child's and the parent's observed frame, and a child's first frame after its
+    input, by StepObs; an observer's frame steps by StepObs; the input code's runs by RunObs with the room's dump (the
+    full dump only where it is read: the dump before the first input event, an observer's frame); the input code's
+    candidate points (floor_point ten at a time, object_points, actor_points, the stepping stones, click_verb, the
+    parent's gate for a dialog line) by AtMany.
+  - `FMI_HIT_CACHE` (on unless 0): the hit cache keyed by the screen layout too, which closes HITCACHE.md's gap; a
+    batch's object answers at a covered layout enter it.
+  - `FMI_STONE_KEEP` (on unless 0): a stone trial that finds the object becomes the branch instead of being quit and
+    played again (the argument is in the commit and in `executor.rs`; play-wire split checks its premise).
+  - The reading's source and event indexes built on up to four threads; each window's phases timed in its progress.
+- **fmi-checks' play-wire**: `check` (the new messages against the commands they stand for), `split` (a run in one
+  command against one-frame commands), `bench`, `frames`.
+
+### Gates
+
+| gate | result |
+|---|---|
+| play-wire check, kitchen chain from 2728 (488 frames) and door chain from 1500 (1,629) | 0 differences: every status, run, explain entry and dump of StepObs, RunObs and RunObs with the room's dump equal to the commands they stand for; AtMany equal to one At per point (96,288 and 250,750 points); the screen layout (0, 200, false) until 2637 and (0, 144, false) from 2638 on the door chain |
+| play-wire split (premise of the stone keep) | 290 runs of 1, 2, 7, 40 and 120 frames from starts 37 frames apart on both chains: one command and one-frame commands end in equal exact dumps, runs and explain entries |
+| play's tests on the lean build through fmi-engine (play-lean, release and fast builds) | records 0 differences; test 2: 501 of 501 children equal; test 3: the 3 plans 0 differences, the same children (2728, 2796, 3091, 3204), every window record equal to a recorded Python run's ("fields no recorded run has: []" for all 4 windows); test 4: the same 4 children |
+| FMI_CHECK_HITS=1 | ready 236,870 and strict 328,573 cached answers, each the engine's |
+| G4 (engine/check.sh g4, patch 0004's build, this branch's fmi-engine) | 400 Step frames from 2728, 0 differences |
+| G2, G3 (the same build) | door 37 dumps and kitchen 40 dumps, each lean switch alone and all, the Python reference and fmi-engine: 0 differ |
+| G1 (fork_exact.py on the same build) | 6,002 C/P comparisons and 28,500 load-child comparisons, 0 differ; the control (one RNG bit) differs at 236 |
+| G10's FD clauses (play/r2g10.sh: fmi try on test (a), cold, this branch's fmi, engine and tool) | fd-strict `CHECK (a): 0 goal True 2728 3216 488 11712 2 36 501 8`; fd-ready the same route (321 tries); every new entry (8 and 8) verified from boot, 0 differences |
+
+### Measurements
+
+The laptop ran six other builders throughout (load average 7 to 20); the walls below move with it, so before and
+after were interleaved run by run (play/r2ab.sh) and the CPU is given too. Before: round 1's play-lean on round 1's
+engine (svm-e011); after: this branch's play-lean on patch 0004's engine. Test (a)'s windows, play-lean ready, three
+workers.
+
+| measure | before | after | target |
+|---|---:|---:|---:|
+| third window, ready, wall (3 rounds, load 11-18) | 11.30, 17.55, 11.82 s | 7.25, 6.67, 5.96 s | ≤ 5 s |
+| the same, a single run at load 7 | 15.2 s (round 1, load 8) | 5.13 s | |
+| third window, ready, CPU: this process / the children's engines | 11.2-13.5 / 16.1-19.6 s | 3.8-4.2 / 8.4-8.9 s | |
+| third window, strict, wall (2 rounds) | 30.99, 28.24 s | 8.66, 26.92 s (a load spike: 1.47 ms an observed frame) | |
+| third window, strict, CPU: this process / children's engines | 18.4-19.1 / 26.1-26.9 s | 5.1-7.1 / 11.4-12.9 s | |
+| hit tests asked of the engine in the third window | 227,624 | 35 (229,104 from the frame's answers and the hit cache) | |
+| an observed child frame, in the third window (load 11-18) | 0.51-0.71 ms | 0.42-0.51 ms | ≤ 0.2 ms |
+| an observed child frame alone (play-wire bench, 400 frames from 2798) | 0.29 ms (load 4), 0.40 (load 15) | 0.22 ms (load 4), 0.28 (load 15) | |
+| a window whose first try succeeds: window 3 | 0.01-0.02 s | 0.01-0.02 s | ≤ 50 ms |
+| the same: window 0 (the first window of the reading) | 0.10-0.16 s | 0.06-0.11 s: the reading's one-time indexes 30-76 ms, the window itself 26-39 ms | ≤ 50 ms |
+
+Where the third window's time goes now:
+
+- Sampled with eu-stack during a ready run (195 samples): 91% of the children's threads' samples wait for an engine's
+  reply, 62% inside the input code's runs (the approach and the stone trial, a frame at a time) and 19% in observed
+  frames; fmi-play's own work is the rest.
+- A frame in this stretch of the game (from 2798, lean build) costs 0.23-0.33 ms of engine CPU at load 10-15, in
+  one-frame and in 50-frame commands alike, forked or not (play-wire frames). An observed frame adds 0.03-0.07 ms of
+  engine CPU (explain on every unit, the dump) and its round trip. So the observed child frame's floor here is the
+  frame itself, above the 0.2 ms target at this load; the engine component's Step measured 0.063-0.10 ms elsewhere at
+  lower load.
+- Each child of the third window now runs about 104 engine frames (74 of input code, the stone trial's now among
+  them, and 30 observed) where round 1 ran about 144, and forks twice (its own fork and the snapshot at its input).
+  296 children x 104 frames x 0.23-0.33 ms over three workers is 2.4-3.4 s of engine frames alone.
+
+### Deviations
+
+- The third window is 5.13 s at load 7 and 6.0-7.3 s at load 11-18 against the 5 s target; the observed child frame
+  0.42-0.51 ms in the window (0.22 ms alone at load 4) against 0.2 ms. Both are now bound by the engine's frames in
+  this part of the game (the children's threads wait for the engine 91% of the time), which round 2's engine
+  component works on.
+- Window 0 is 60-110 ms with the reading's one-time source index (built at the first click window of a reading); the
+  window itself is 26-39 ms.
+- The engine change is patch 0004, not 0002 (the item's text), to stay clear of round 2's engine component (0003).
+  engine/build.sh is unchanged: a tree is built with 0004 applied after 0001 and 0002.
+- fmi-core gained more than the two asked methods: `run_obs`, `run_room` and `room_cut` (the input code's run and
+  dump in one command), all provided with the old calls as defaults.
