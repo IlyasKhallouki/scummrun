@@ -107,7 +107,8 @@ pub fn boot_root(r: &mut dyn Returns, out_dir: &Path) -> Res<(Value, Value)> {
     let facts = step::facts_of_ordered(&s);
     let checks: Vec<String> = {
         let mut c = Vec::new();
-        if st.reason != "idle" {
+        // a pool's return is a fork of the kept boot, whose stop reads "forked" with the idle stop's other fields
+        if st.reason != "idle" && !(st.reason == "forked" && st.idle.as_deref() == Some("sentence")) {
             c.push(format!("stop {}, not idle", files::py_repr(&json!(st.reason))));
         }
         if st.idle.as_deref() != Some("sentence") {
