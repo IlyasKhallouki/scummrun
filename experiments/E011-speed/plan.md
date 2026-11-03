@@ -2520,3 +2520,47 @@ from the room-28 entries those were targets that reach the planner's limit, each
   values) take most of the tries.
 - The goal's request from frame 3443 did not plan within 180 s, where the same goal planned in 8-15 s from frame 3204
   in E006-E008; whether it needs the cook's timer from there, or more time, is open.
+
+## Amendment 2026-11-03, after round 2: the no-plan proofs merged into round 2, and what is measured
+
+Written after the merge built and its cargo tests passed, before any gate or measurement ran on it.
+
+- **What.** Branch e011-r2 (736f306) gets e011-deadtarget (aacf668) and e011 (0bde069, the kitchen check's result).
+  The proofs run on the reduced task before every search arm, the Rust lama-first-costs included. "Everything on" is
+  env-r2.sh's ON2 with `FMI_PLAN_DEAD=1` and `FMI_PLAN_DEEPEN=120`; "everything off" is OFF2 with both off.
+- **Gates run again,** the ones the two branches touch:
+  - G7 with everything off, and with the fast forms in every check mode and the proofs on;
+  - G10 with everything on (the Rust lama-first-costs: strict, ready, ready with the old tail) and everything off
+    (Fast Downward's binary: strict, ready);
+  - G11 on B3's sequences below: the reference settings with everything off and with everything on, the fast
+    settings with everything on; every new entry verified from boot;
+  - the amendment's gates 1-5 on the merged build. Gates 1-3 replay the recorded requests with everything on (the fast
+    forms; the Rust lama-first-costs for Fast Downward's groups). Gate 4: G9 with both switches off, serve38 and
+    serve33 the same with the proofs on and off, and the cargo tests. Gate 5: deepen_check.py.
+- **What is measured.**
+  1. **B3,** warm, with the job memo off (as round 2's amendment). The fast settings run three resident processes,
+     interleaved try by try:
+     - round 1: r1/fmi with Gbfs;
+     - round 2 alone: round 2's fmi as built from 736f306, copied to target-e011-r2/r2, with ON2;
+     - the merged build with everything on.
+
+     Reported for each: the per-try median, max, mean and sum over the 15 tries, ring(33) and ring(38). The reference
+     settings run the merged build with everything on and with everything off, interleaved, for G11.
+  2. **The check's two bit:118 = 1 requests,** end to end. `fmi try` runs on copies of the check's tries 15 and 16 with
+     the target forced, as in the amendment's end-to-end check. Each try is cold, in its own process, with the check's
+     limit of 180 s (FMI_PLAN_TIME), in three forms:
+     - round 1: r1/fmi with `--search fd`, Fast Downward's binary, the check's settings;
+     - round 2 alone: ON2 with `--search fd --tail`;
+     - the merged build with everything on.
+
+     The tries alternate one by one, each under the heavy lock. The refinement reading is B0's j00000 refine-01. It has
+     the check's start file (same sha1) and the same records and actions, and the check's copy was evicted.
+- **Prediction.**
+  - Every gate passes with everything off and on.
+  - **B3 fast.** The merged build's tries equal round 2's in everything: no request in the 15 tries is dead or takes
+    120 s.
+    - Its median is within 0.5 s of round 2's.
+    - Each ring(33) try is 0.4-1.5 s slower than round 2's, from the proofs at about 0.4 s for each searched request.
+    - Its sum is 1-5% above round 2's.
+  - **bit:118.** The merged build ends each try in 15-25 s. Round 1 and round 2 alone take 185-200 s each: the 180 s
+    limit plus the reductions.
