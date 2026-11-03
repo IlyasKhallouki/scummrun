@@ -701,3 +701,38 @@ pub fn parse_with_predicates(text: &str) -> Result<Parsed, String> {
     }
     Ok((t, pred, names))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// two variables: door (0/1), room (1/2); open the door in room 1, walk through it; goal room 2 (search.rs's
+    /// tiny task)
+    const TINY: &str = "begin_version\n3\nend_version\nbegin_metric\n0\nend_metric\n2\nbegin_variable\ndoor\n-1\n2\nAtom d(0)\nAtom d(1)\nend_variable\nbegin_variable\nroom\n-1\n2\nAtom r(1)\nAtom r(2)\nend_variable\n0\nbegin_state\n0\n0\nend_state\nbegin_goal\n1\n1 1\nend_goal\n2\nbegin_operator\na0\n1\n1 0\n1\n0 0 -1 1\n1\nend_operator\nbegin_operator\na1\n2\n0 1\n1 0\n1\n0 1 -1 1\n1\nend_operator\n0\n";
+
+    #[test]
+    fn tiny_task_graph_and_plan() {
+        let (t, pred, _) = parse_with_predicates(TINY).unwrap();
+        assert_eq!(pred, vec!["d".to_string(), "r".to_string()]);
+        let g = landmarks::build(&t, &search::plusone(&t), &pred, None).unwrap();
+        // Fast Downward's graph of this task (its debug dump): the goal r(2); a1's preconditions r(1) and d(1), then
+        // a0's d(0), all greedy-necessary
+        assert_eq!(g.atoms, vec![vec![(1, 1)], vec![(1, 0)], vec![(0, 1)], vec![(0, 0)]]);
+        assert!(g.goal[0] && !g.goal[1]);
+        let gn = OrderingType::GreedyNecessary;
+        assert_eq!(g.children, vec![vec![], vec![(0, gn), (2, gn)], vec![(0, gn)], vec![(2, gn)]]);
+        let o = lama_first_costs(&t, &pred, None);
+        assert_eq!(o.status, "plan");
+        assert_eq!(o.plan, vec![0, 1]);
+        assert_eq!(search::plan_text(&t, &o.plan), "(a0)\n(a1)\n; cost = 2 (unit cost)\n");
+    }
+
+    #[test]
+    fn unreachable_goal_is_unsolvable() {
+        // without a0 the door never opens: the first achiever of d(1) needs d(1) itself, so landmark_sum's dead end
+        let text = TINY.replace("2\nbegin_operator\na0\n1\n1 0\n1\n0 0 -1 1\n1\nend_operator\nbegin_operator\na1", "1\nbegin_operator\na0");
+        let (t, pred, _) = parse_with_predicates(&text).unwrap();
+        let o = lama_first_costs(&t, &pred, None);
+        assert_eq!(o.status, "unsolvable");
+    }
+}
