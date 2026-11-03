@@ -92,7 +92,9 @@ On end's engine, with FMI_BOXES off and on at the 13 entries. Dialog entries ask
   later. The 8 kept entries are the same and all verify from boot with 0 differences.
 - **Why few floor points:** 72 boxes are walkable, and 32 of them have a candidate point on screen where the hit test
   answers no object and no actor. The others lie off screen in the wide rooms, or under room objects.
-- **The switch stays off.** On these entries the walk clicks reach nothing that the verb and target clicks do not.
+- **In short:** on these entries the walk clicks reach nothing that the verb and target clicks do not, and they cost
+  17% more step time. FMI_BOXES is off by default, like every E012 switch; whether a run turns it on is the run's
+  setting (the plan's kitchen rerun turns every E012 switch on).
 
 ## For try
 
