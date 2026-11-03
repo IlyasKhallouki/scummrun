@@ -90,6 +90,65 @@ fn pair_bit(f: u32, v: u32) -> usize {
     ((h ^ (h >> 29)) % (64 * VB_WORDS as u64)) as usize
 }
 
+/// The effects' ranges in an action's words, sorted as `sig_layout` sorts their layouts and without repeats, when every
+/// effect's conditions are in `sig_layout`'s order already (its layout is then its own words): None otherwise.
+fn sig_ranges(w: &[u32], out: &mut Vec<(u32, u32)>) -> Option<()> {
+    out.clear();
+    let mut p = 0usize;
+    let npre = w[p] as usize;
+    p += 1;
+    for _ in 0..npre {
+        p += 2 + w[p + 1] as usize;
+    }
+    let neff = w[p] as usize;
+    p += 1;
+    let mut sorted = true;
+    for _ in 0..neff {
+        let a = p;
+        let k = w[p + 2] as usize;
+        p += 3 + k;
+        let nw = w[p] as usize;
+        p += 1;
+        let mut last: Option<(usize, usize)> = None;
+        for _ in 0..nw {
+            let c = (p, p + 2 + w[p + 1] as usize);
+            if let Some(l) = last {
+                let key = |r: (usize, usize)| (w[r.0], &w[r.0 + 2..r.1]);
+                if key(l) > key(c) {
+                    return None;
+                }
+            }
+            last = Some(c);
+            p = c.1;
+        }
+        if let Some(&(pa, pb)) = out.last() {
+            if w[pa as usize..pb as usize] >= w[a..p] {
+                sorted = false;
+            }
+        }
+        out.push((a as u32, p as u32));
+    }
+    if !sorted {
+        out.sort_unstable_by(|x, y| w[x.0 as usize..x.1 as usize].cmp(&w[y.0 as usize..y.1 as usize]));
+        out.dedup_by(|x, y| w[x.0 as usize..x.1 as usize] == w[y.0 as usize..y.1 as usize]);
+    }
+    Some(())
+}
+
+/// `sig_hash`, the same number: the hash of the sorted effects' words in turn (`sig_ranges`), else `sig_hash`.
+fn sig_hash_fast(v: View, s: &mut SigScratch, r: &mut Vec<(u32, u32)>) -> u64 {
+    if sig_ranges(v.w, r).is_none() {
+        return sig_hash(v, s);
+    }
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &(a, b) in r.iter() {
+        for &x in &v.w[a as usize..b as usize] {
+            h = (h.rotate_left(5) ^ x as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+        }
+    }
+    h
+}
+
 /// `red_f` with the same result (module docstring): the same groups, keep orders, first dominators, pairs and counts.
 pub fn red_f_fast(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, memo: &mut Memo) -> (Task, bool) {
     let n = t.acts.len();
@@ -98,35 +157,71 @@ pub fn red_f_fast(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, memo:
         memo.skipped = u64::MAX;
         return (t, false);
     }
+    let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
+    let k0 = crate::perf::now();
     let mut pairs: Vec<(usize, usize)> = Vec::new();
     let mut by_hash: FxMap<u64, Vec<usize>> = FxMap::default();
     let mut scratch = SigScratch::default();
+    let mut rs: Vec<(u32, u32)> = Vec::new();
     for i in 0..n {
-        let h = sig_hash(t.acts.view(i), &mut scratch);
+        let h = sig_hash_fast(t.acts.view(i), &mut scratch, &mut rs);
         by_hash.entry(h).or_default().push(i);
     }
     let mut drop = vec![false; n];
     let (mut dup, mut dom) = (0u64, 0u64);
     let mut groups: Vec<Vec<usize>> = by_hash.into_values().filter(|g| g.len() > 1).collect();
     groups.sort();
+    let k1 = crate::perf::now();
     let mut arena: Vec<u32> = Vec::new();
-    let mut spans: Vec<(usize, usize)> = Vec::new();
-    let (mut skipped, mut checked) = (0u64, 0u64);
+    let mut spans: Vec<(usize, usize, bool)> = Vec::new();
+    let (mut skipped, mut checked, mut walks) = (0u64, 0u64, 0u64);
     let mut parena: Vec<u32> = Vec::new();
     let mut members: Vec<Member> = Vec::new();
     let mut tmp: Vec<(u32, &[u32])> = Vec::new();
     let mut fl: Vec<u32> = Vec::new();
     let mut fact_lists: FxMap<Vec<u32>, u32> = FxMap::default();
-    let mut slot: FxMap<usize, usize> = FxMap::default();
+    // every member a survivor of the last pass, in the same order: nothing to drop there (module docstring)
+    let clean = |ix: &[usize]| -> bool {
+        if !memo.valid {
+            return false;
+        }
+        let mut last: Option<u32> = None;
+        ix.iter().all(|&i| match memo.survivor(&t, i) {
+            Some(j) if last.is_none_or(|l| j > l) => {
+                last = Some(j);
+                true
+            }
+            _ => false,
+        })
+    };
     for hg in groups {
+        if clean(&hg) {
+            skipped += 1;
+            continue;
+        }
+        // each member's signature: its effect words when laid out already, else laid out in the arena
         arena.clear();
         spans.clear();
         for &i in &hg {
+            let v = t.acts.view(i);
             let a = arena.len();
-            sig_into(t.acts.view(i), &mut scratch, &mut arena);
-            spans.push((a, arena.len()));
+            if sig_ranges(v.w, &mut rs).is_some() {
+                for &(x, y) in &rs {
+                    arena.extend_from_slice(&v.w[x as usize..y as usize]);
+                }
+            } else {
+                sig_into(v, &mut scratch, &mut arena);
+            }
+            spans.push((a, arena.len(), false));
         }
-        let sigs = |y: usize| &arena[spans[y].0..spans[y].1];
+        let sigs = |y: usize| -> &[u32] {
+            let (a, b, in_place) = spans[y];
+            if in_place {
+                &t.acts.words[a..b]
+            } else {
+                &arena[a..b]
+            }
+        };
         let mut done = vec![false; hg.len()];
         for x in 0..hg.len() {
             if done[x] {
@@ -139,32 +234,23 @@ pub fn red_f_fast(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, memo:
             if g.len() < 2 {
                 continue;
             }
-            let mut ix: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
-            // every member a survivor of the last pass, in the same order: nothing to drop
-            if memo.valid {
-                let mut last: Option<u32> = None;
-                let clean = ix.iter().all(|&i| match memo.survivor(&t, i) {
-                    Some(j) if last.is_none_or(|l| j > l) => {
-                        last = Some(j);
-                        true
-                    }
-                    _ => false,
-                });
-                if clean {
-                    skipped += 1;
-                    continue;
-                }
+            let ixs: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
+            if clean(&ixs) {
+                skipped += 1;
+                continue;
             }
             checked += 1;
-            // each member's precondition sorted (by fact, then values), in one arena, with its filters
+            // each member's precondition sorted (by fact, then values), in one arena, with its filters; members are
+            // numbered by their place in `ixs`
             parena.clear();
             members.clear();
             fact_lists.clear();
-            slot.clear();
-            for &i in &ix {
+            for &i in &ixs {
                 tmp.clear();
                 tmp.extend(t.acts.view(i).pre());
-                tmp.sort();
+                if !tmp.windows(2).all(|w| w[0] <= w[1]) {
+                    tmp.sort();
+                }
                 let a = parena.len();
                 let mut size = 0u64;
                 let mut bits = 0u64;
@@ -185,43 +271,50 @@ pub fn red_f_fast(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, memo:
                 let dupf = fl.windows(2).any(|w| w[0] == w[1]);
                 let next = fact_lists.len() as u32;
                 let facts = *fact_lists.entry(fl.clone()).or_insert(next);
-                slot.insert(i, members.len());
                 members.push(Member { span: (a, parena.len()), count: tmp.len(), size, bits, facts, dup: dupf, vb });
             }
-            let mem = |i: usize| &members[slot[&i]];
-            ix.sort_by_key(|&i| (t.acts.meta[i].cost, mem(i).count, std::cmp::Reverse(mem(i).size), i));
+            let mut order: Vec<usize> = (0..ixs.len()).collect();
+            order.sort_by_key(|&m| (t.acts.meta[ixs[m]].cost, members[m].count, std::cmp::Reverse(members[m].size), ixs[m]));
             let mut keep: Vec<usize> = Vec::new();
-            for &i in &ix {
-                let mi = mem(i);
-                let pi = &parena[mi.span.0..mi.span.1];
-                let by = keep.iter().copied().find(|&k| {
-                    let mk = mem(k);
-                    if t.acts.meta[k].cost > t.acts.meta[i].cost || mk.bits & !mi.bits != 0 {
+            for &mi in &order {
+                let i = ixs[mi];
+                let a = &members[mi];
+                let pi = &parena[a.span.0..a.span.1];
+                let ci = t.acts.meta[i].cost;
+                let by = keep.iter().copied().find(|&mk| {
+                    let b = &members[mk];
+                    if t.acts.meta[ixs[mk]].cost > ci || b.bits & !a.bits != 0 {
                         return false;
                     }
-                    if mk.facts == mi.facts && !mk.dup && !mi.dup && (0..VB_WORDS).any(|w| mi.vb[w] & !mk.vb[w] != 0) {
+                    if b.facts == a.facts && !b.dup && !a.dup && (0..VB_WORDS).any(|w| a.vb[w] & !b.vb[w] != 0) {
                         return false;
                     }
-                    pre_within(&parena[mk.span.0..mk.span.1], pi)
+                    walks += 1;
+                    pre_within(&parena[b.span.0..b.span.1], pi)
                 });
                 match by {
-                    Some(k) => {
+                    Some(mk) => {
+                        let k = ixs[mk];
                         drop[i] = true;
-                        let mk = mem(k);
-                        if parena[mk.span.0..mk.span.1] == *pi && t.acts.meta[k].cost == t.acts.meta[i].cost {
+                        let b = &members[mk];
+                        if parena[b.span.0..b.span.1] == *pi && t.acts.meta[k].cost == ci {
                             dup += 1;
                         } else {
                             dom += 1;
                         }
                         pairs.push((i, k));
                     }
-                    None => keep.push(i),
+                    None => keep.push(mi),
                 }
             }
         }
     }
     memo.skipped = skipped;
     memo.checked = checked;
+    if prof {
+        let (h, r) = ((k1.0 - k0.0) / 1_000_000, (crate::perf::now().0 - k1.0) / 1_000_000);
+        eprintln!("profile f fast: hash {} M instructions, groups {} M; groups left out {}, checked {}, walks {}", h, r, skipped, checked, walks);
+    }
     for &(i, k) in &pairs {
         let to = t.acts.members(k)[0];
         replaced.extend(t.acts.members(i).iter().map(|&m| (m, to)));
@@ -622,13 +715,31 @@ pub fn red_d_from_fast(t: &Task, push: Option<(u32, Vec<u32>)>, start: usize, c:
 /// value ranges read from a table instead of decoded from the words on every visit, and each effect's rule (i) and
 /// rule (ii) loops run once: after a loop has run, every value it sets is needed for good, so running it again sets
 /// nothing (no value, no count, no clock: the rest of the sweep sees the same state).
-#[allow(unused_assignments)]
 pub fn needed_fast(acts: &Actions, facts: &Facts, goal: &[(u32, Vec<u32>)]) -> Needed {
+    needed_words(&acts.words, &acts.off, facts, goal)
+}
+
+/// `needed_src` on any source (the banned view), the same result: `needed_fast` on its actions' words laid out in one
+/// array (the source itself when it is an `Actions` in all but name).
+pub fn needed_fast_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32>)]) -> Needed {
+    let n = src.n();
+    let mut words = Vec::new();
+    let mut off = Vec::with_capacity(n + 1);
+    off.push(0);
+    for i in 0..n {
+        words.extend_from_slice(src.view(i).w);
+        off.push(words.len());
+    }
+    needed_words(&words, &off, facts, goal)
+}
+
+#[allow(unused_assignments)]
+fn needed_words(w: &[u32], woff: &[usize], facts: &Facts, goal: &[(u32, Vec<u32>)]) -> Needed {
     let nf = facts.len();
     let base: Vec<usize> = (0..nf as u32).map(|f| facts.base(f)).collect();
     let mut need = vec![false; facts.total_values()];
     let mut ncount = vec![0u32; nf];
-    let n = acts.len();
+    let n = woff.len() - 1;
     let mut kept = vec![false; n];
     #[allow(unused_assignments)]
     let mut ch = false;
@@ -653,7 +764,6 @@ pub fn needed_fast(acts: &Actions, facts: &Facts, goal: &[(u32, Vec<u32>)]) -> N
         }
     }
     // the tables: per action its written facts (sorted, unique), its precondition's facts, its effects
-    let w = &acts.words;
     let mut wf_off = vec![0usize; n + 1];
     let mut wf: Vec<u32> = Vec::new();
     let mut pf_off = vec![0usize; n + 1];
@@ -669,7 +779,7 @@ pub fn needed_fast(acts: &Actions, facts: &Facts, goal: &[(u32, Vec<u32>)]) -> N
     let mut ps: Vec<(u32, u32, u32)> = Vec::new();
     let mut fs: Vec<u32> = Vec::new();
     for i in 0..n {
-        let mut p = acts.off[i];
+        let mut p = woff[i];
         let npre = w[p] as usize;
         p += 1;
         for _ in 0..npre {
