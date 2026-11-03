@@ -12,7 +12,8 @@
 #              then resident's RS1 (G6's readings in one fmi process with FMI_READER_LIB=1)
 #   g7         E011 G7 off (the plan's reference forms) and on (the fast forms in every check mode, the proofs on)
 #   g8         E011 G8 (fmi-reading's consumer)
-#   g9         E011 G9 with everything off (OFF3, E12OFF) and on (ON3, E12ON)
+#   g9         E011 G9 with everything off (OFF3, E12OFF) and as round 2 ran it on (ON2 and the proofs, E12OFF), then
+#              the deepening's check
 #   g10        E011 G10: play's fixture tests (play-lean) off and on; test (a) with `fmi try`: the Rust lama-first-costs
 #              (strict, ready, fast) with every E012 switch off and on, Fast Downward's binary (strict, ready) off
 #   end        end's hooks and boxes at the kitchen check's entries (fmi-engine-end)
@@ -81,8 +82,12 @@ for st in "$@"; do
     d=$O/g9; mkdir -p $d
     env $OFF3 $E12OFF $X/bench/g9.sh $d/off > $d/off.log 2>&1
     log "G9 off exit $?: $(grep -E 'pass|FAIL' $d/off.log | tr '\n' ' ' | cut -c1-400)"
-    env $ON3 $E12ON $X/bench/g9.sh $d/on > $d/on.log 2>&1
-    log "G9 on exit $?: $(grep -E 'pass|FAIL' $d/on.log | tr '\n' ' ' | cut -c1-400)";;
+    # round 2's "on": ON2 with the proofs (the deepening changes job.json; its check is deepen_check.py); with E012's
+    # switches on G9 is no reference comparison (selection over T changes the cells by design)
+    env $ON2 FMI_PLAN_DEAD=1 $E12OFF $X/bench/g9.sh $d/on2 > $d/on2.log 2>&1
+    log "G9 ON2 and the proofs, E012 off, exit $?: $(grep -E 'pass|FAIL' $d/on2.log | tr '\n' ' ' | cut -c1-400)"
+    (cd $WT && nice -n 10 .venv/bin/python $X/deadtarget/deepen_check.py --fmi $FMI_BIN --out $d/deepen > $d/deepen.log 2>&1)
+    log "dead gate 5 deepen_check exit $?: $(tail -3 $d/deepen.log | tr '\n' ' ')";;
   g10)
     d=$O/g10; mkdir -p $d
     env $ON3 $E12OFF $X/bench/g10play.sh $d/play-off > $d/play-off.log 2>&1
@@ -119,13 +124,15 @@ for st in "$@"; do
     log "targets T2 exit $?: $(grep -iE 'pass|fail' $d/t2.md | head -6 | tr '\n' '|' | cut -c1-400)";;
   afford)
     d=$O/afford; mkdir -p $d
-    source /var/tmp/fast-mi/scratchpad/afford/env.sh # ARCH, TESTED, PROBE (afford's inputs, read only)
-    source $ENV
-    export AFF=$E12T/checks/release/afford-check FMI_ENGINE_BIN=$E12_ENGINE_BIN FMI_ENGINE_CUTS=1 SPEEDRUN_REPORT_RESTART=1
-    $E12/afford/gates.sh $d/gates > $d/gates.log 2>&1
-    log "afford gates exit $?: $(cat $d/gates.log | tr '\n' '|' | cut -c1-300)"
-    $E12/afford/boxes.sh $d/boxes > $d/boxes.log 2>&1
-    log "afford boxes exit $?: $(cat $d/boxes.log | tr '\n' '|' | cut -c1-300)";;
+    # in a subshell: afford's env file sets O (its own output folder) besides its inputs
+    ( source /var/tmp/fast-mi/scratchpad/afford/env.sh # ARCH, TESTED, PROBE (afford's inputs, read only)
+      source $ENV
+      export AFF=$E12T/checks/release/afford-check FMI_ENGINE_BIN=$E12_ENGINE_BIN FMI_ENGINE_CUTS=1 SPEEDRUN_REPORT_RESTART=1
+      $E12/afford/gates.sh $d/gates > $d/gates.log 2>&1
+      echo "afford gates exit $?" >> $d/gates.log
+      $E12/afford/boxes.sh $d/boxes > $d/boxes.log 2>&1
+      echo "afford boxes exit $?" >> $d/boxes.log )
+    log "afford: $(tail -1 $d/gates.log); $(tail -1 $d/boxes.log)";;
   *) log "unknown stage $st";;
   esac
 done
