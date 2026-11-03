@@ -337,6 +337,7 @@ pub fn build(x: &mut Expander, start: &[u32]) -> Result<(Plan, SasTask, Vec<OpOf
     let mut st = SasTask { pre_off: vec![0], eff_off: vec![0], ..Default::default() };
     let mut of = Vec::new();
     let mut costs_raw: Vec<u32> = Vec::new();
+    let kb0 = crate::perf::now();
     for ai in 0..t.acts.len() {
         let mut k = 0u32;
         x.expand(ai, &mut |v: &sas::Variant| {
@@ -373,6 +374,9 @@ pub fn build(x: &mut Expander, start: &[u32]) -> Result<(Plan, SasTask, Vec<OpOf
             k += 1;
             Ok(())
         })?;
+    }
+    if std::env::var_os("TASKCORE_PROFILE").is_some() {
+        eprintln!("profile build: the actions' variants {:.0} M instructions, {} operators", crate::perf::since(kb0).0, n_ops);
     }
     let action_ops = n_ops;
     let mut pick_ops = 0;
