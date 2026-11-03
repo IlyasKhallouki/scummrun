@@ -58,7 +58,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi check try-parts SEQ... [--json OUT]
        fmi check wait ARCHIVE --entries I,J,.. (--reading READING.json | --read-scope R,R,.. --read-dir DIR) --out DIR
                 [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
-       fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
+       fmi guide map --goal K=V[,K=V] | part1 | end=1 --out GUIDE.json [--wide] [--seed 1] [--start-boot]
        fmi guide stats GUIDE.json [--key KEY.json]
        fmi read FILE";
 
@@ -559,7 +559,9 @@ fn cmd_guide_map(argv: &[String]) -> i32 {
     let e003 = root.join("experiments").join("E003-path-through-cloud");
     let run = || -> Result<String, String> {
         let goal = fmi_explore::guide::parse_goal(goal, &e003)?;
-        let start = fmi_explore::guide::start_row(&e003, seed)?;
+        // E014: --start-boot, the start facts of the game's own boot (its first idle stop, the engine host from the
+        // environment: FMI_GAME_ID's game), not MI's start row
+        let start = if a.flag("start-boot") { start_of_boot(seed)? } else { fmi_explore::guide::start_row(&e003, seed)? };
         let game = fmi_explore::guide::load_game(&root)?;
         if std::env::var("FMI_GUIDE_PROFILE").is_ok() {
             eprintln!("Game::load and the start row: {:.3} s", t0.elapsed().as_secs_f64());
@@ -578,6 +580,20 @@ fn cmd_guide_map(argv: &[String]) -> i32 {
             1
         }
     }
+}
+
+/// E014: the facts at the game's first idle stop from boot (seed `seed`, the lean switches), as the guide's start row.
+fn start_of_boot(seed: i64) -> Result<std::collections::HashMap<String, i64>, String> {
+    use fmi_core::{BootCfg, EngineHost, ObsReq};
+    let host = fmi_engine::Host::from_env().map_err(|e| format!("the engine host: {e}"))?;
+    let out = std::env::temp_dir().join(format!("fmi-guide-boot-{}", std::process::id()));
+    let mut b = host
+        .boot(&BootCfg { seed: seed as u32, events: vec![], frame: None, dump_locals: false, lean: true, out_dir: out.clone() })
+        .map_err(|e| format!("the boot: {e}"))?;
+    let o = b.obs(&ObsReq::default()).map_err(|e| format!("the boot: {e}"))?;
+    b.quit();
+    let _ = std::fs::remove_dir_all(&out);
+    Ok(fmi_core::facts_of(&o).iter().map(|(k, v)| (k.text(), *v)).collect())
 }
 
 fn cmd_guide_stats(argv: &[String]) -> i32 {

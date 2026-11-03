@@ -26,6 +26,15 @@ pub const MAX_FRAME: u64 = 200_000;
 /// replay_part1.ANY_SEED: never used
 pub const ANY_SEED: u32 = 836_557_856;
 
+/// E014's switch `FMI_GAME_ID` (experiments/E014-fate-demo): another game's ScummVM game id; its files are in
+/// `FMI_GAME_DIR`. Unset: MI's DOS CD release (`TARGET`, `GAMEID`, the root's game/dos-cd), as before. Set, every
+/// engine also gets a save folder of its own, made empty at its boot (`HostCfg::own_saves`): a game's scripts may
+/// write and read files there (SCUMM v5's roomOps 9, 13, 14), and a shared folder would carry one run's files into
+/// another's boot.
+pub fn game_id_env() -> Option<String> {
+    std::env::var("FMI_GAME_ID").ok().filter(|v| !v.is_empty())
+}
+
 /// Where the engine and the game are, and the per-command timeout.
 #[derive(Clone, Debug)]
 pub struct HostCfg {
@@ -35,6 +44,11 @@ pub struct HostCfg {
     pub root: PathBuf,
     /// the game's files (releases.game_dir of dos-cd)
     pub game_dir: PathBuf,
+    /// the ScummVM target (the ini's section) and game id (E014: FMI_GAME_ID's; else MI's)
+    pub target: String,
+    pub gameid: String,
+    /// E014: every engine's save folder is its own (OUT/saves, made empty at the boot), not the root's shared one
+    pub own_saves: bool,
     pub timeout: Duration,
     /// more bridge settings for every engine (the checks: SPEEDRUN_DUMP_EXACT, one lean switch alone)
     pub extra_env: Vec<(String, String)>,
@@ -71,7 +85,13 @@ impl HostCfg {
                 .canonicalize()
                 .unwrap_or_default()
         });
-        let game = root.join("game").join("dos-cd");
+        let (target, gameid, game, own_saves) = match game_id_env() {
+            Some(id) => {
+                let dir = std::env::var_os("FMI_GAME_DIR").map(PathBuf::from).expect("FMI_GAME_DIR: the files of FMI_GAME_ID's game");
+                (id.clone(), id, dir, true)
+            }
+            None => (TARGET.to_string(), GAMEID.to_string(), root.join("game").join("dos-cd"), false),
+        };
         let game_dir = game.canonicalize().unwrap_or(game);
         let mut extra_env = Vec::new();
         if std::env::var("FMI_ENGINE_CUTS").is_ok_and(|v| v == "1") {
@@ -80,19 +100,38 @@ impl HostCfg {
         if report_restart() {
             extra_env.push(("SPEEDRUN_REPORT_RESTART".to_string(), "1".to_string()));
         }
+        // E014: the decision point without verb ids (SPEEDRUN_IDLE=handler) and the end's site (SPEEDRUN_END_SITE=1),
+        // passed to every engine when set in this process's environment (an engine with the E014 patch)
+        for k in ["SPEEDRUN_IDLE", "SPEEDRUN_END_SITE"] {
+            if let Some(v) = std::env::var(k).ok().filter(|v| !v.is_empty()) {
+                extra_env.push((k.to_string(), v));
+            }
+        }
         HostCfg {
             bin,
             root,
             game_dir,
+            target,
+            gameid,
+            own_saves,
             timeout: Duration::from_secs(600),
             extra_env,
         }
     }
 
+    /// The save folder of an engine whose out folder is `out`: its own (E014), else the root's shared one.
+    pub fn saves(&self, out: &Path) -> PathBuf {
+        if self.own_saves {
+            out.join("saves")
+        } else {
+            self.root.join("out/scummvm/saves")
+        }
+    }
+
     /// engine.py `_ini_text` (the run's scummvm.ini), plus `joystick_num=-1` when lean (no joystick scan at start).
-    pub fn ini_text(&self, lean: bool) -> String {
+    /// `saves`: the save folder (`HostCfg::saves`).
+    pub fn ini_text(&self, lean: bool, saves: &Path) -> String {
         let mut s = String::from("[scummvm]\n");
-        let saves = self.root.join("out/scummvm/saves");
         for (k, v) in [
             ("savepath", saves.display().to_string()),
             ("autosave_period", "0".into()),
@@ -117,9 +156,9 @@ impl HostCfg {
         if lean {
             s.push_str("joystick_num=-1\n");
         }
-        s.push_str(&format!("\n[{TARGET}]\n"));
+        s.push_str(&format!("\n[{}]\n", self.target));
         for (k, v) in [
-            ("gameid", GAMEID.to_string()),
+            ("gameid", self.gameid.clone()),
             ("engineid", "scumm".into()),
             ("path", self.game_dir.display().to_string()),
             ("platform", PLATFORM.into()),
@@ -319,16 +358,21 @@ impl Host {
         let h = &*self.cfg;
         let family = Arc::new(Family::new(h.timeout).map_err(io_err)?);
         let out = &cfg.out_dir;
+        let saves = h.saves(out);
+        if h.own_saves {
+            // E014: an empty save folder at every boot
+            let _ = std::fs::remove_dir_all(&saves);
+        }
         for d in [
             out.clone(),
-            h.root.join("out/scummvm/saves"),
+            saves.clone(),
             out.join("xdg/data"),
             out.join("xdg/cache"),
         ] {
             std::fs::create_dir_all(&d).map_err(io_err)?;
         }
         let ini = out.join("scummvm.ini");
-        std::fs::write(&ini, h.ini_text(cfg.lean)).map_err(io_err)?;
+        std::fs::write(&ini, h.ini_text(cfg.lean, &saves)).map_err(io_err)?;
         let events: Vec<&Event> = cfg
             .events
             .iter()
@@ -338,11 +382,11 @@ impl Host {
         sorted.sort_by_key(|e| e.frame); // stable, as write_events
         let mut cmd = Command::new(&h.bin);
         cmd.arg(format!("--config={}", ini.display()))
-            .arg(format!("--savepath={}", h.root.join("out/scummvm/saves").display()))
+            .arg(format!("--savepath={}", saves.display()))
             .arg(format!("--boot-param={BOOT_PARAM}"))
             .arg("--disable-sdl-audio")
             .arg(format!("--random-seed={}", cfg.seed))
-            .arg(TARGET);
+            .arg(&h.target);
         for (k, _) in std::env::vars_os() {
             if k.to_string_lossy().starts_with("SPEEDRUN_") {
                 cmd.env_remove(k);

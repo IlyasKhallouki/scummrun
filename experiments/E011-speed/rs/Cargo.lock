@@ -116,6 +116,8 @@ dependencies = [
  "fmi-engine",
  "fmi-explore",
  "fmi-play",
+ "scumm-ir",
+ "scumm-machine",
  "serde_json",
 ]
 
