@@ -722,6 +722,35 @@ pub struct At {
     pub verb_slot: i32,
 }
 
+/// E012 (patch 0005): the end reasons that are the game's own end (E012 plan.md, method (5)): the scripts' quit
+/// (SO_QUIT; the bridge reports "quit" when the engine shuts down), `restart()` and `pauseGame()` (both reported only
+/// with SPEEDRUN_REPORT_RESTART=1). An End's Status carries one of them in `reason`.
+pub const GAME_ENDS: [&str; 3] = ["quit", "restart", "pause"];
+
+/// Whether an end reason is the game's own end (`GAME_ENDS`).
+pub fn is_game_end(reason: &str) -> bool {
+    GAME_ENDS.contains(&reason)
+}
+
+/// E012 (patch 0005): one walk box of the current room as the engine holds it (boxes.cpp `getBoxCoordinates`,
+/// `getBoxFlags`): the corners in room coordinates and the flags (0x08 x flip, 0x10 y flip, 0x20 player only or
+/// ignore scale, 0x40 locked, 0x80 invisible).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct WalkBox {
+    pub ul: (i32, i32),
+    pub ur: (i32, i32),
+    pub lr: (i32, i32),
+    pub ll: (i32, i32),
+    pub flags: u8,
+}
+
+/// E012 (patch 0005): the Boxes reply, the current room and its walk boxes 0..count-1.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Boxes {
+    pub room: i32,
+    pub boxes: Vec<WalkBox>,
+}
+
 /// One slot run (speedrun_explain.cpp, the "runs" reply's rows), field for field.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct Run {
@@ -884,6 +913,11 @@ pub trait Engine: Send {
     /// one call per point.
     fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
         pts.iter().map(|&(x, y)| self.at(x, y)).collect()
+    }
+    /// E012 (patch 0005): the current room's walk boxes at this stop (the Boxes command reads and changes nothing).
+    /// Default: an error, for an engine without the command.
+    fn boxes(&mut self) -> EResult<Boxes> {
+        Err(EngineError::Bridge("boxes: this engine has no Boxes command".into()))
     }
     /// Runs `frames` frames with no new input (a run to the frame `frames` after this stop) and returns the stop's
     /// status and the facts' changes from this stop to it: (key, old, new) for every key whose value differs, absent
