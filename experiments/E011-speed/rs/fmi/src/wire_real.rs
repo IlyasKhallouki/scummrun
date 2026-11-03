@@ -282,10 +282,28 @@ impl WindowPlayer for PlayAdapter {
 #[derive(Default)]
 pub struct PlayHost {
     kept: Arc<PlayKept>,
+    /// E012's delay fork: the game's draws (component tested's `DrawGame`), loaded once in the process when the fork
+    /// is on (None: the game did not load; the fork reads the checks' reasons alone)
+    draws: std::sync::OnceLock<Option<Arc<fmi_reading::draws::DrawGame>>>,
+}
+
+impl PlayHost {
+    /// tested's `draws` as the window search reads a record's draws (delay's `DrawsOf`): check, range and share.
+    fn draws_of(&self) -> Option<fmi_play::delay::DrawsOf> {
+        let g = self.draws.get_or_init(|| fmi_reading::draws::DrawGame::load(&fmi_explore::guide::default_root()).ok().map(Arc::new)).clone()?;
+        Some(Arc::new(move |rd: &dyn ReadingSource, i: u32| {
+            fmi_reading::draws::draws(rd, i, Some(&g)).into_iter().map(|d| Draw { check: d.check, range: d.range, share: d.share }).collect()
+        }))
+    }
 }
 
 impl PlayerHost for PlayHost {
     fn player(&self, cfg: &WindowCfg) -> Box<dyn WindowPlayer> {
+        self.player_with(cfg, &PlayExtras::default())
+    }
+    /// The window search, with E012's delay fork's settings when it is on (FMI_DELAY_FORK=1, read by the search):
+    /// tested's draws, the try's T keys and novelty.
+    fn player_with(&self, cfg: &WindowCfg, x: &PlayExtras) -> Box<dyn WindowPlayer> {
         let dmax = cfg.frame_costs.get("dmax").and_then(|d| d.as_i64());
         let mut s = fmi_play::Search::for_step(cfg.workers as usize, cfg.fork_each, cfg.ready, dmax).expect("the window search's config");
         if play_keep() {
@@ -295,6 +313,11 @@ impl PlayerHost for PlayHost {
                     s.reading = Some(d.clone());
                 }
             }
+        }
+        if s.delay_on {
+            s.draws_of = self.draws_of();
+            s.novel_of = x.novel_of.clone();
+            s.tested_keys = x.tested_keys.as_ref().map(|k| Arc::new(k.iter().copied().collect()));
         }
         Box::new(PlayAdapter { p: fmi_play::StrictPlayer { search: s }, notes: 0, kept: self.kept.clone() })
     }
