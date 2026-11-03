@@ -172,14 +172,24 @@ impl FactStore {
         i
     }
 
-    /// Row i's facts (rows come in id order, row 0 the root; a row given again replaces its facts, the root's only
-    /// before any other row).
+    /// Row i's facts as pairs (`put_each`).
     pub fn put(&mut self, i: usize, pairs: &[(String, i64)]) {
+        self.put_each(i, &|f: &mut dyn FnMut(&str, i64)| {
+            for (k, v) in pairs {
+                f(k, *v);
+            }
+        });
+    }
+
+    /// Row i's facts, given as every (key, value) pair through `each` (rows come in id order, row 0 the root; a row
+    /// given again replaces its facts, the root's only before any other row).
+    pub fn put_each(&mut self, i: usize, each: &dyn Fn(&mut dyn FnMut(&str, i64))) {
         if i == 0 {
             self.root.iter_mut().for_each(|v| *v = 0);
-            for (k, v) in pairs {
-                let id = self.intern(k);
-                self.root[id as usize] = *v;
+            let mut got: Vec<(u32, i64)> = Vec::new();
+            each(&mut |k, v| got.push((self.intern(k), v)));
+            for (id, v) in got {
+                self.root[id as usize] = v;
             }
             if self.rows.is_empty() {
                 self.rows.push(Vec::new());
@@ -190,15 +200,15 @@ impl FactStore {
         }
         let mut seen = vec![false; self.names.len()];
         let mut diff: Vec<(u32, i64)> = Vec::new();
-        for (k, v) in pairs {
+        each(&mut |k, v| {
             let id = self.intern(k);
             if (id as usize) < seen.len() {
                 seen[id as usize] = true;
             }
-            if *v != self.root[id as usize] {
-                diff.push((id, *v));
+            if v != self.root[id as usize] {
+                diff.push((id, v));
             }
-        }
+        });
         for (id, s) in seen.iter().enumerate() {
             if !s && self.root[id] != 0 {
                 diff.push((id as u32, 0));
@@ -288,6 +298,12 @@ pub struct Progress {
     /// T, in the order its atoms came
     pub t: Vec<TAtom>,
     t_ix: HashMap<TAtom, u32>,
+    /// per atom: its text, and whether its key is a script-control key
+    texts: Vec<String>,
+    control: Vec<bool>,
+    /// T's keys, each with its atoms' ids, in the order the keys came
+    keys: Vec<(String, Vec<u32>)>,
+    key_ix: HashMap<String, usize>,
     pub store: FactStore,
     /// per row: the ids of T's atoms its last facts hold, ascending
     pub held: Vec<Vec<u32>>,
@@ -313,7 +329,17 @@ impl Progress {
         let mut new = Vec::new();
         for a in atoms {
             if !self.t_ix.contains_key(a) {
-                self.t_ix.insert(a.clone(), self.t.len() as u32);
+                let id = self.t.len() as u32;
+                self.t_ix.insert(a.clone(), id);
+                self.texts.push(a.text());
+                self.control.push(a.control());
+                match self.key_ix.get(&a.key) {
+                    Some(&k) => self.keys[k].1.push(id),
+                    None => {
+                        self.key_ix.insert(a.key.clone(), self.keys.len());
+                        self.keys.push((a.key.clone(), vec![id]));
+                    }
+                }
                 self.t.push(a.clone());
                 new.push(a.clone());
             }
@@ -327,23 +353,26 @@ impl Progress {
 
     /// The ids of T's atoms a state holds, ascending.
     pub fn held_of<F: FactLook + ?Sized>(&self, f: &F) -> Vec<u32> {
-        let mut by_key: HashMap<&str, i64> = HashMap::new();
         let mut out = Vec::new();
-        for (j, a) in self.t.iter().enumerate() {
-            let v = *by_key.entry(a.key.as_str()).or_insert_with(|| f.look(&a.key).unwrap_or(0));
-            if a.holds(v) {
-                out.push(j as u32);
-            }
+        for (k, ids) in &self.keys {
+            let v = f.look(k).unwrap_or(0);
+            out.extend(ids.iter().copied().filter(|&j| self.t[j as usize].holds(v)));
         }
+        out.sort_unstable();
         out
+    }
+
+    /// An atom's text.
+    pub fn text(&self, j: u32) -> &str {
+        &self.texts[j as usize]
     }
 
     /// The texts of the atoms a cell keys on (the control keys' left out), sorted.
     pub fn cell_atoms<F: FactLook + ?Sized>(&self, f: &F) -> Vec<String> {
-        let mut out: Vec<String> =
-            self.held_of(f).into_iter().map(|j| &self.t[j as usize]).filter(|a| !a.control()).map(|a| a.text()).collect();
-        out.sort();
-        out
+        let mut out: Vec<&str> =
+            self.held_of(f).into_iter().filter(|&j| !self.control[j as usize]).map(|j| self.texts[j as usize].as_str()).collect();
+        out.sort_unstable();
+        out.into_iter().map(|t| t.to_string()).collect()
     }
 
     /// Forget every row's derived state (a rekey makes it again).
@@ -475,11 +504,14 @@ impl Novel {
     }
 }
 
-/// job.json's "novelty" from the progress state and the live rows.
+/// job.json's "novelty" from the progress state and the live rows. A key whose live values are only 0 is left out:
+/// `Seen` reads an absent key as 0 in every entry, the same.
 pub fn novelty_json(p: &Progress, live: &[usize]) -> Value {
     let mut seen = Map::new();
     for (k, vs) in p.store.seen(live) {
-        seen.insert(k, json!(vs));
+        if vs != [0] {
+            seen.insert(k, json!(vs));
+        }
     }
     json!({"t": atoms_json(&p.t), "rooms": p.rooms.keys().collect::<Vec<_>>(), "seen": Value::Object(seen)})
 }
