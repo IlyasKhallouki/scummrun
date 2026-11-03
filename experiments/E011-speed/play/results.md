@@ -174,7 +174,8 @@ test (a)'s third window, the hit cache off for want of the screen layout. Branch
 | G4 (engine/check.sh g4, patch 0004's build, this branch's fmi-engine) | 400 Step frames from 2728, 0 differences |
 | G2, G3 (the same build) | door 37 dumps and kitchen 40 dumps, each lean switch alone and all, the Python reference and fmi-engine: 0 differ |
 | G1 (fork_exact.py on the same build) | 6,002 C/P comparisons and 28,500 load-child comparisons, 0 differ; the control (one RNG bit) differs at 236 |
-| G10's FD clauses (play/r2g10.sh: fmi try on test (a), cold, this branch's fmi, engine and tool) | fd-strict `CHECK (a): 0 goal True 2728 3216 488 11712 2 36 501 8`; fd-ready the same route (321 tries); every new entry (8 and 8) verified from boot, 0 differences |
+| G10's FD clauses (play/r2g10.sh: fmi try on test (a), cold, this branch's fmi, engine and tool; at 50ca209 and again at 49eee57) | fd-strict `CHECK (a): 0 goal True 2728 3216 488 11712 2 36 501 8`; fd-ready the same route (321 tries); every new entry (8 and 8) verified from boot, 0 differences, both times |
+| play's tests through the JSON double on svm-w3b (play-fixture, where the provided methods' defaults run) | records equal; test 2: 501 of 501; test 3: the same children, 0 differences, every window record equal to a recorded run's; test 4: the same 4 children |
 
 ### Measurements
 
