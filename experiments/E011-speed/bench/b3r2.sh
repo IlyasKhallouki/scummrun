@@ -10,6 +10,10 @@
 #   r1     round 1's fmi, reader-scope and engine (env-r2.sh's R1_*);
 #   r2     round 2's binaries with every round-2 switch on (ON2);
 #   r2off  round 2's binaries with every round-2 switch off (OFF2: round 1's behaviour).
+# With e011-deadtarget merged (E011_ENV=env-r2d.sh: FMI_BIN the merged build, R2_FMI_BIN round 2's own fmi):
+#   r2     round 2's own fmi (R2_FMI_BIN when set) with ON2;
+#   d      the merged build with everything on (ON3: ON2, FMI_PLAN_DEAD=1, FMI_PLAN_DEEPEN=120);
+#   doff   the merged build with everything off (OFF3).
 # Each try holds the heavy lock while it runs; each process runs under the guard at nice 10. Per try a line in
 # OUT/times.jsonl: wall, CPU of the resident process's tree (tree_cpu.sh before and after), the load. G12's watcher
 # samples /proc every second for the whole run.
@@ -43,9 +47,11 @@ env_of() { # SEQ
     r1) echo "FMI_READER_SCOPE=$R1_READER_SCOPE FMI_ENGINE_BIN=$R1_ENGINE_BIN $OFF2";;
     r2) echo "$ON2";;
     r2off) echo "$OFF2";;
+    d) echo "$ON3";;
+    doff) echo "$OFF3";;
   esac
 }
-bin_of() { case $1 in r1) echo $R1_FMI_BIN;; *) echo $FMI_BIN;; esac; }
+bin_of() { case $1 in r1) echo $R1_FMI_BIN;; r2) echo ${R2_FMI_BIN:-$FMI_BIN};; *) echo $FMI_BIN;; esac; }
 now() { date +%s.%N; }
 calc() { awk "BEGIN { printf \"%.3f\", $1 }"; }
 mkdir -p $OUT
