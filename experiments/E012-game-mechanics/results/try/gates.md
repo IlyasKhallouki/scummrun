@@ -1,8 +1,9 @@
 # E012 component try: gates G0 and G-on, and the try's cost
 
-Branch e012-try (73477f2 for the code; end, tested, targets, afford, archive, delay and wait merged unchanged). Laptop,
-seed 1, nice 10, each sequence one resident `fmi` under the heavy lock and the guard. Runs: `try/gates.sh`. Data:
-`~/.cache/fast-mi-e012/try` (results and entries; the readings were removed after each gate).
+Branch e012-try: try's code at 73477f2, the components merged unchanged (end, tested, targets, afford, archive,
+delay and wait; their final heads at a78e992, binary b77d35f69bcf). Laptop, seed 1, nice 10, each sequence one
+resident `fmi` under the heavy lock and the guard. Runs: `try/gates.sh`. Data: `~/.cache/fast-mi-e012/try` (results
+and entries; the readings were removed after each gate).
 
 ## G0: every E012 switch off
 
@@ -14,8 +15,9 @@ B3's 15 tries from round 2's job folders, round 2's switches (ON2), every E012 s
 | fast (`--search fd --tail`, ready) | round 2's `b3f/r2-fast` | 8b773a03aeeb (before the novelty fix) | 15 of 15 | 187.1 s |
 | fast, no reading cache | round 2's `b3f/r2-fast` | 73ff54e0eefe | 15 of 15 | 308.9 s |
 | reference (`--search fd`, strict) | round 2's `b3/r2-ref` | 73ff54e0eefe | 15 of 15 | 201.3 s |
+| fast, no reading cache, the merged head | round 2's `b3f/r2-fast` | b77d35f69bcf | 15 of 15 | 381.1 s |
 
-Files: `g0-off-fast.json` (fast, no cache), `g0-off-ref.json`.
+Files: `g0-off-fast.json` (fast, no cache, the merged head), `g0-off-ref.json`.
 
 ## G-on: every E012 switch on
 
@@ -28,9 +30,10 @@ the try's entry's and the new entry's).
 |---|---|---:|---:|---|
 | with the reading cache | 8b773a03aeeb | 76 | 76 | attempt 43 (28 checkpoint, 15 end), wait 18, afford 15, delay 0 |
 | no reading cache | 73ff54e0eefe | 76 | 76 | the same |
+| no reading cache, the merged head | b77d35f69bcf | 76 | 76 | the same |
 
-File: `gon-verify.json` (no cache). The attempts are the off sequence's in every try (stop, target, frames, inputs,
-refinements, entries); the extra entries come after them.
+File: `gon-verify.json` (the merged head). The attempts are the off sequence's in every try (stop, target, frames,
+inputs, refinements, entries); the extra entries come after them.
 
 What each mechanism did in the 15 tries:
 
@@ -74,3 +77,6 @@ reads), back to back at load 3.0-3.2. Table per try: `tries-off-on.md`.
 The first G-on run, with the reading cache, took 271 s against G0's 187 s: its refinements were made again because
 the cache stored nothing under its disk floor at that moment (E011 round 2's amendment on the memo measured the same
 effect), not because of E012's steps.
+
+The merged head's pair ran 70 minutes later, off at load 3.4-4.0 (381.1 s) and on at load 2.9-3.3 (309.9 s): the wall
+of these tries is set by the load (the reads are 90% of it), so the back-to-back pair above is the comparison.
