@@ -95,16 +95,23 @@ pub fn checkpoint_of_json(j: &J) -> Res<Checkpoint> {
 }
 
 /// Entry `idx` of the archive at `arch`.
+///
+/// A job's new entries (a step's `new/<i>.json.gz`, id null) name their parent in the archive the job ran on, not in
+/// their own directory. Those whose parent is that archive's root (0, which has no events) hold their movie from
+/// boot, so their chain is themselves: they are read with no parent. Any other such parent is outside the directory,
+/// and an error.
 pub fn entry(arch: &Path, idx: u64) -> Res<Entry> {
     let j = json::parse(&gunzip(&arch.join("entries").join(format!("{idx}.json.gz")))?)?;
+    let mut parent = j.get("parent").filter(|p| !p.is_null()).map(J::int).transpose()?.map(|p| p as u64);
+    if j.get("id").is_some_and(J::is_null) {
+        match parent {
+            Some(0) | None => parent = None,
+            Some(p) => return Err(format!("entry {idx}: a job's new entry whose parent {p} is not this directory's")),
+        }
+    }
     Ok(Entry {
         id: idx,
-        parent: j
-            .get("parent")
-            .filter(|p| !p.is_null())
-            .map(J::int)
-            .transpose()?
-            .map(|p| p as u64),
+        parent,
         frame: j.at("frame")?.int()? as u64,
         events: j.at("events")?.arr()?.iter().map(event_of).collect::<Res<_>>()?,
         checkpoints: j

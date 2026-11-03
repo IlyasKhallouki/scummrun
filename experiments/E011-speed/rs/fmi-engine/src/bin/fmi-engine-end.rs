@@ -438,20 +438,20 @@ fn unreach(o: &Opts) -> Res<()> {
     let mut bad = 0;
     for a in 0..o.pos.len() - 1 {
         let rs: Vec<_> = rows.iter().filter(|r| r.0 == a).collect();
-        let (mut same_off, mut same_on, mut equal, mut hook_ends) = (0, 0, 0, 0);
+        let (mut same_off, mut same_on, mut equal, mut hook_ends, mut unreadable) = (0, 0, 0, 0, 0);
         for r in &rs {
             let hook = matches!(r.8.as_deref(), Some("restart") | Some("pause"));
             writeln!(
                 f,
-                "{{\"archive\": {:?}, \"id\": {}, \"frame\": {}, \"checkpoints\": {}, \"off\": {:?}, \"on\": {:?}, \
-                 \"on_end\": {:?}, \"seconds\": {:.3}}}",
-                r.1.display().to_string(),
+                "{{\"archive\": {}, \"id\": {}, \"frame\": {}, \"checkpoints\": {}, \"off\": {}, \"on\": {}, \
+                 \"on_end\": {}, \"seconds\": {:.3}}}",
+                json::quote(&r.1.display().to_string()),
                 r.2,
                 r.3,
                 r.4,
-                r.5,
-                r.7,
-                r.8,
+                json::quote(&r.5),
+                json::quote(&r.7),
+                r.8.as_deref().map(json::quote).unwrap_or_else(|| "null".into()),
                 r.9
             )
             .map_err(e2s)?;
@@ -459,13 +459,15 @@ fn unreach(o: &Opts) -> Res<()> {
             same_on += (r.7 == "same") as usize;
             equal += (r.5 == r.7) as usize;
             hook_ends += hook as usize;
+            unreadable += r.5.starts_with("unreadable") as usize;
         }
-        let ok = equal == rs.len() && hook_ends == 0;
+        // every entry read, the same result with the switch off and on, and no run ended by a hook
+        let ok = unreadable == 0 && equal == rs.len() && hook_ends == 0;
         bad += (!ok) as usize;
         println!(
-            "{{\"archive\": {:?}, \"entries\": {}, \"same_off\": {same_off}, \"same_on\": {same_on}, \
-             \"equal_off_on\": {equal}, \"restart_or_pause_ends\": {hook_ends}, \"ok\": {ok}}}",
-            o.pos[a + 1],
+            "{{\"archive\": {}, \"entries\": {}, \"unreadable\": {unreadable}, \"same_off\": {same_off}, \
+             \"same_on\": {same_on}, \"equal_off_on\": {equal}, \"restart_or_pause_ends\": {hook_ends}, \"ok\": {ok}}}",
+            json::quote(&o.pos[a + 1]),
             rs.len()
         );
     }
