@@ -57,6 +57,12 @@ pub trait FactLook {
 /// E012: a facts map's every (key, value) pair, for the progress store (the maps the archive adds rows from).
 pub trait FactPairs {
     fn pairs(&self) -> Vec<(String, i64)>;
+    /// every pair through `f`, with no key text made where the map holds one
+    fn each(&self, f: &mut dyn FnMut(&str, i64)) {
+        for (k, v) in self.pairs() {
+            f(&k, v);
+        }
+    }
 }
 
 impl FactLook for FactMap {
@@ -87,6 +93,11 @@ impl FactPairs for Map<String, Value> {
     fn pairs(&self) -> Vec<(String, i64)> {
         self.iter().map(|(k, x)| (k.clone(), as_i64(Some(x)).unwrap_or(NOT_INT))).collect()
     }
+    fn each(&self, f: &mut dyn FnMut(&str, i64)) {
+        for (k, x) in self {
+            f(k, as_i64(Some(x)).unwrap_or(NOT_INT));
+        }
+    }
 }
 
 impl FactLook for fmi_core::Facts {
@@ -108,6 +119,14 @@ impl FactPairs for fmi_core::Facts {
                 (s, if *v == fmi_core::NONE || *v == fmi_core::BELOW || *v == fmi_core::ABOVE { NOT_INT } else { *v })
             })
             .collect()
+    }
+    fn each(&self, f: &mut dyn FnMut(&str, i64)) {
+        let mut s = String::with_capacity(32);
+        for (k, v) in &self.0 {
+            s.clear();
+            write_key(&mut s, *k);
+            f(&s, if *v == fmi_core::NONE || *v == fmi_core::BELOW || *v == fmi_core::ABOVE { NOT_INT } else { *v });
+        }
     }
 }
 
@@ -1020,7 +1039,7 @@ impl Archive {
             self.root_facts = Some(fact_map(&cps.last().unwrap()[1]));
         }
         if let Some(p) = self.progress.as_mut() {
-            p.store.put(i, &last.pairs());
+            p.store.put_each(i, &|f: &mut dyn FnMut(&str, i64)| last.each(f));
         }
         let key = self.cell_key(last);
         let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
@@ -1107,7 +1126,7 @@ impl Archive {
         }
         let last = &cps.last().unwrap().facts;
         if let Some(p) = self.progress.as_mut() {
-            p.store.put(i, &last.pairs());
+            p.store.put_each(i, &|f: &mut dyn FnMut(&str, i64)| last.each(f));
         }
         let key = self.cell_key(last);
         let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
@@ -1236,7 +1255,7 @@ impl Archive {
             }
             let facts = last;
             if let Some(p) = self.progress.as_mut() {
-                p.store.put(row.id, &facts.pairs());
+                p.store.put_each(row.id, &|f: &mut dyn FnMut(&str, i64)| facts.each(f));
             }
             let key = self.cell_key(facts);
             let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
@@ -1383,7 +1402,7 @@ impl Archive {
                 .and_then(|n| n.as_array())
                 .map(|a| a.iter().filter_map(|v| v.as_u64().map(|v| v as usize)).filter(|&i| i < self.rows.len()).collect())
                 .unwrap_or_default();
-            let mut t: Vec<String> = first.iter().filter(|(_, i)| ids.contains(i)).map(|(a, _)| p.t[*a as usize].text()).collect();
+            let mut t: Vec<String> = first.iter().filter(|(_, i)| ids.contains(i)).map(|(a, _)| p.text(*a).to_string()).collect();
             t.sort();
             let mut rooms: Vec<i64> = room_first.iter().filter(|(_, i)| ids.contains(i)).map(|(r, _)| *r).collect();
             rooms.sort();
@@ -1959,7 +1978,7 @@ impl Archive {
                     rs.insert(r);
                 }
             }
-            new_t = ts.into_iter().map(|a| p.t[a as usize].text()).collect();
+            new_t = ts.into_iter().map(|a| p.text(a).to_string()).collect();
             new_t.sort();
             new_rooms = rs.into_iter().collect();
         }
