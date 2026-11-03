@@ -392,6 +392,37 @@ pub fn reach_start(start: &Facts) -> Vec<(String, i64)> {
     v.into_iter().map(|(k, x)| (k.to_string(), x)).collect()
 }
 
+/// `start_file_text(&reach_start(start))` written from the keys' texts in place: their order (by text) is kept from the
+/// last call while the key set is the same (the engine's facts change little from start to start).
+pub fn reach_start_text(start: &Facts) -> String {
+    thread_local! {
+        static LAST: std::cell::RefCell<(Vec<Key>, Vec<(usize, std::rc::Rc<str>)>)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+    }
+    LAST.with(|l| {
+        let mut l = l.borrow_mut();
+        let same = l.0.len() == start.0.len() && l.0.iter().zip(start.0.iter()).all(|(a, b)| *a == b.0);
+        if !same {
+            let keys: Vec<Key> = start.0.iter().map(|(k, _)| *k).collect();
+            let mut v: Vec<(usize, std::rc::Rc<str>)> = start.0.iter().enumerate().map(|(i, (k, _))| (i, key_text(*k)))
+                .filter(|(_, t)| !t.contains('\t') && !t.contains('\n')).collect();
+            v.sort_unstable_by(|a, b| a.1.as_bytes().cmp(b.1.as_bytes()));
+            *l = (keys, v);
+        }
+        let mut s = String::with_capacity(l.1.len() * 24);
+        let mut b = itoa::Buffer::new();
+        for (i, t) in &l.1 {
+            let x = start.0[*i].1;
+            if is_int(x) {
+                s.push_str(t);
+                s.push('\t');
+                s.push_str(b.format(x));
+                s.push('\n');
+            }
+        }
+        s
+    })
+}
+
 /// The text of a start file of `reach_start` (replay_part1's reach_extender and refiner).
 pub fn start_file_text(start: &[(String, i64)]) -> String {
     let mut s = String::new();

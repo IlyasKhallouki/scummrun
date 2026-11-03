@@ -558,3 +558,26 @@ fn same_facts_is_an_empty_diff_and_finds_recorded_equal_checkpoints() {
     }
     assert!(n > 10);
 }
+
+#[test]
+fn reach_start_text_is_the_start_file_of_reach_start() {
+    for seed in 1..30 {
+        let (start, frames) = lcg_frames(seed, 70, 12);
+        for f in std::iter::once(&start).chain(frames.iter().map(|x| &x.1)) {
+            assert_eq!(fmi_explore::start::reach_start_text(f), fmi_explore::start::start_file_text(&fmi_explore::start::reach_start(f)));
+        }
+    }
+    // values that are no ints, and the recorded entries' facts
+    let f = fmi_explore::start::facts_of_json(&json!({"var:1": 5, "var:2": "below", "pos:local:3": null, "room": 33}));
+    assert_eq!(fmi_explore::start::reach_start_text(&f), "room\t33\nvar:1\t5\n");
+    let dir = std::path::PathBuf::from("/var/tmp/fast-mi/e011-bench-data/b0/entries");
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten().take(20) {
+            let Ok(doc) = fmi_explore::files::read_gz(&e.path()) else { continue };
+            for c in doc["checkpoints"].as_array().cloned().unwrap_or_default() {
+                let f = fmi_explore::start::facts_of_json(&c[1]);
+                assert_eq!(fmi_explore::start::reach_start_text(&f), fmi_explore::start::start_file_text(&fmi_explore::start::reach_start(&f)));
+            }
+        }
+    }
+}

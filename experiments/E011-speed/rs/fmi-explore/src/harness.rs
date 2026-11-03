@@ -48,10 +48,11 @@ pub struct HarnessCfg {
 
 /// The reader for the reach extension and the refinement (replay_part1's reach_extender and refiner).
 pub trait Rereads {
-    /// The reading's scope read again from every start so far and this one (reader-scope --reach-also).
-    fn extend(&mut self, start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String>;
+    /// The reading's scope read again from every start so far and this one (reader-scope --reach-also); the start as
+    /// its file's text (`start::reach_start_text`).
+    fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String>;
     /// The scope read again with the variables `new` made facts too, from every start so far and this one.
-    fn refine(&mut self, new: &[i64], start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String>;
+    fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String>;
     /// CPU seconds of the readers so far (the extension's and refinement's records)
     fn cpu_s(&self) -> f64;
 }
@@ -377,7 +378,7 @@ impl<'a> Harness<'a> {
         let actions_before = self.reading.n_actions();
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let rs_ = start::reach_start(&start_f);
+        let rs_ = start::reach_start_text(&start_f);
         let new = match crate::machine::port(|| rr.extend(&rs_)) {
             Ok(r) => r,
             Err(e) => {
@@ -475,7 +476,7 @@ impl<'a> Harness<'a> {
         self.planners.lock().unwrap().close(&old_id); // the old reading's planner: its memory, while the reader reads
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let rs_ = start::reach_start(&st);
+        let rs_ = start::reach_start_text(&st);
         let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
             Ok(r) => r,
             Err(e) => {

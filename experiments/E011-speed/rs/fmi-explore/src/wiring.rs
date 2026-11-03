@@ -4,7 +4,6 @@
 
 use crate::files;
 use crate::ports::{ReadReq, Readings};
-use crate::start::start_file_text;
 use fmi_core::ReadingSource;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -161,23 +160,24 @@ impl Wiring {
         self.readings.open(&path)
     }
 
-    /// replay_part1.reach_extender's `extend`: the start as a file, then the scope read again from every start so far.
-    pub fn extend(&mut self, start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    /// replay_part1.reach_extender's `extend`: the start as a file (its text `start::reach_start_text`), then the scope
+    /// read again from every start so far.
+    pub fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         let n = self.starts.len() + 1;
         let d = self.run_dir.join(format!("reach-{n:02}"));
         let f = d.join("start.txt");
-        crate::start::write_text(&f, &start_file_text(start))?;
+        crate::start::write_text(&f, start)?;
         self.starts.push(f);
         let req = self.req(&format!("reach-{n:02}"), &d, false);
         self.read(&req)
     }
 
     /// replay_part1.refiner's `refine`: the scope read again with the new variables made facts, streamed.
-    pub fn refine(&mut self, new: &[i64], start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    pub fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         self.refines += 1;
         let d = self.run_dir.join(format!("refine-{:02}", self.refines));
         let f = d.join("start.txt");
-        crate::start::write_text(&f, &start_file_text(start))?;
+        crate::start::write_text(&f, start)?;
         self.starts.push(f);
         for n in new {
             if !self.facts.contains(n) {
@@ -194,10 +194,10 @@ impl Wiring {
 }
 
 impl crate::harness::Rereads for Wiring {
-    fn extend(&mut self, start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::extend(self, start)
     }
-    fn refine(&mut self, new: &[i64], start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::refine(self, new, start)
     }
     fn cpu_s(&self) -> f64 {
