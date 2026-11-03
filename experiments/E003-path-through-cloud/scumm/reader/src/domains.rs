@@ -496,7 +496,7 @@ fn bump(c: &mut Vec<(String, i64)>, k: String) {
 
 /// The room numbers of the game data (index.json's "rooms"), for domains.py's widened `room`.
 pub fn meta_rooms(root: &std::path::Path) -> Vec<i32> {
-    let p = root.join("data").join("scripts-dos-cd").join("index.json");
+    let p = scumm_ir::game_index(root); // E014: FMI_GAME_SCRIPTS's index when set
     let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&p).expect("index.json")).expect("index.json");
     let mut out: Vec<i32> = v["rooms"].as_object().expect("rooms").keys().map(|k| k.parse().expect("room")).collect();
     out.sort_unstable();

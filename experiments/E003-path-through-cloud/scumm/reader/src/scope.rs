@@ -368,7 +368,29 @@ pub fn made_verbs(game: &Game) -> BTreeMap<i32, BTreeSet<String>> {
         }
     }
     made.retain(|_, n| n.contains("New"));
+    if verbs_var_on() {
+        // E014 (FMI_VERBS_VAR_ON=1): a VerbOps whose verb operand is not a constant and that turns a verb On (a loop
+        // over verb numbers, `VerbOps(Local[1],[On()])`) may turn any made verb On: each one counts as turned On
+        let var_on = game.ins.iter().any(|x| match x.st {
+            Some(Stmt::Op { name: known::VERB_OPS, args, subops, .. }) => {
+                ast.constant(ast.kids(args)[0]).is_none() && ast.subs(subops).iter().any(|s| s.name == known::ON)
+            }
+            _ => false,
+        });
+        if var_on {
+            for n in made.values_mut() {
+                n.insert("On".to_string());
+            }
+        }
+    }
     made
+}
+
+/// E014's switch `FMI_VERBS_VAR_ON=1`: `made_verbs` counts a verb as turned On when some script turns verbs On by a
+/// variable operand (a game that shows its verbs in a loop over their numbers, not one by one by constant as MI does).
+/// Unset: On only by a constant operand, as before.
+pub fn verbs_var_on() -> bool {
+    std::env::var("FMI_VERBS_VAR_ON").is_ok_and(|v| v == "1")
 }
 
 /// The verbs some object's event table names.

@@ -114,6 +114,8 @@ pub struct WaitOut {
     pub view_misses: Vec<(u64, String, Val, Val)>,
     /// wall seconds by part: the fork, the entry's dump, the frames, the stops' dumps, the quit
     pub parts: Vec<(&'static str, f64)>,
+    /// E014: the end's frame and tick when the run ended in the wait (the engine's end status)
+    pub end_at: Option<(u64, u64)>,
 }
 
 impl WaitOut {
@@ -401,6 +403,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
     // (tick, var 19, frame) at the frame before: the next frame's tick advance is var 19 there, at least 1
     let mut prev = (o0.tick, o0.vars.get(VAR_TIMER_NEXT).copied().unwrap_or(0), f0);
     let mut end = None;
+    let mut end_at: Option<(u64, u64)> = None;
     let mut bad_frame: Option<String> = None;
     let mut view_points = if cfg.view_check { Some(tv.points.clone()) } else { None };
     let s_entry = t0.elapsed().as_secs_f64();
@@ -484,6 +487,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
             }
             Err(EngineError::Ended(s)) => {
                 end = Some(WaitEnd::Ended(s.reason.clone()));
+                end_at = Some((s.frame, s.tick));
                 break;
             }
             Err(e) => return Err(eng(e)),
@@ -523,6 +527,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
         view_checked,
         view_misses,
         parts: vec![("entry", s_entry), ("frames", s_frames), ("stops", s_stops)],
+        end_at,
     })
 }
 

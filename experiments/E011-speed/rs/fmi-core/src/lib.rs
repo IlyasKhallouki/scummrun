@@ -727,9 +727,43 @@ pub struct At {
 /// with SPEEDRUN_REPORT_RESTART=1). An End's Status carries one of them in `reason`.
 pub const GAME_ENDS: [&str; 3] = ["quit", "restart", "pause"];
 
-/// Whether an end reason is the game's own end (`GAME_ENDS`).
+/// Whether an end reason is the game's own end (`GAME_ENDS`). E014: with SPEEDRUN_END_SITE the engine names the
+/// script site after the reason ("restart@3:206:62:0AEF"); the reason is the part before '@'. Without the switch no
+/// reason holds '@'.
 pub fn is_game_end(reason: &str) -> bool {
-    GAME_ENDS.contains(&reason)
+    GAME_ENDS.contains(&end_base(reason))
+}
+
+/// E014: an end reason without its script site ("restart@SITE" -> "restart").
+pub fn end_base(reason: &str) -> &str {
+    reason.split('@').next().unwrap_or(reason)
+}
+
+/// E014 (patch 0006-e014, SPEEDRUN_END_SITE): the facts of a run that ended at a script's restart or quit, as an end
+/// entry's checkpoint holds them: `end` = 1, `end:kind` = systemOps' sub-op (1 restart, 3 quit), `end:where`,
+/// `end:number`, `end:room` (-1 for a global) and `end:offset` (the opcode's offset in its script). None for any other
+/// end (a quit or restart with no script site, a pause, an error).
+pub fn end_facts(reason: &str) -> Option<Facts> {
+    let (base, site) = reason.split_once('@')?;
+    let kind = match base {
+        "restart" => 1,
+        "quit" => 3,
+        _ => return None,
+    };
+    let parts: Vec<&str> = site.split(':').collect();
+    if parts.len() != 4 {
+        return None;
+    }
+    let (w, n, r) = (parts[0].parse::<Val>().ok()?, parts[1].parse::<Val>().ok()?, parts[2].parse::<Val>().ok()?);
+    let off = Val::from_str_radix(parts[3], 16).ok()?;
+    Some(Facts::from_pairs(vec![
+        (Key::parse("end"), 1),
+        (Key::parse("end:kind"), kind),
+        (Key::parse("end:where"), w),
+        (Key::parse("end:number"), n),
+        (Key::parse("end:room"), r),
+        (Key::parse("end:offset"), off),
+    ]))
 }
 
 /// E012 (patch 0005): one walk box of the current room as the engine holds it (boxes.cpp `getBoxCoordinates`,

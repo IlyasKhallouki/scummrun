@@ -100,6 +100,8 @@ pub struct Waited {
     pub end: String,
     /// the engine's end reason and frame when the run ended in the wait
     pub ended: Option<(String, u64)>,
+    /// E014: the end's frame and tick (the engine's end status) when the run ended in the wait
+    pub ended_at: Option<(u64, u64)>,
     pub is_static: bool,
     /// the last due frame read (absolute; frame0 when no slot was paused)
     pub due: u64,
@@ -238,6 +240,27 @@ pub fn game_end_of_stop(stop: Option<&str>) -> Option<String> {
 /// A dead move (plan.md 5): its run ended in the game's own end; it has no entry. result.json "dead".
 pub fn dead_json(reason: &str, frame: u64, events: &[Value], how: &str) -> Value {
     json!({"reason": reason, "frame": frame, "events": events, "how": how})
+}
+
+/// E014's switch `FMI_GOAL_END` (experiments/E014-fate-demo plan.md (d)): the stage goal `end=1` is the game's own
+/// end reached through a script (a restart or quit that a script's systemOps made, named by the engine with
+/// SPEEDRUN_END_SITE=1). On, a move whose run ends there is also an entry (`end_extra`), whose one checkpoint holds
+/// `fmi_core::end_facts` (`end` = 1 and the site): the goal entry. Off (the default), as E012: a dead move only.
+pub fn goal_end() -> bool {
+    std::env::var("FMI_GOAL_END").is_ok_and(|v| v == "1")
+}
+
+/// E014: the end entry of a move whose run ended at a script's restart or quit (`goal_end`): its events after the
+/// try's entry and one checkpoint at the end's frame and tick, with the end's facts. None when the switch is off or
+/// the end has no script site.
+pub fn end_extra(reason: &str, frame: u64, tick: u64, events: Vec<Value>, prefix_cps: &[Checkpoint]) -> Option<Extra> {
+    if !goal_end() {
+        return None;
+    }
+    let facts = fmi_core::end_facts(reason)?;
+    let mut cps: Vec<Checkpoint> = prefix_cps.iter().filter(|c| c.frame < frame).cloned().collect();
+    cps.push(Checkpoint { frame, facts, tick, rng: 0, actors: vec![] });
+    Some(Extra { how: "end", events, cps, novel: vec!["end".into()] })
 }
 
 /// An entry the try commits besides its attempt's: its events after the try's entry (absolute frames) and its
@@ -413,6 +436,10 @@ pub fn afford_step(e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nov: &Try
         let mut evs = prefix_events.to_vec();
         evs.extend(tr.events.iter().map(events::event_json));
         out.dead.push(dead_json(&tr.reason, tr.frame, &evs, "afford"));
+        // E014 (FMI_GOAL_END): a trial that ends the game through a script is also the goal's entry
+        if let Some(x) = end_extra(&tr.reason, tr.frame, tr.tick, evs, prefix_cps) {
+            out.kept.push(x);
+        }
     }
     out.cpu_s += r.engine_cpu_s;
     let mut rec = r.json();
@@ -426,6 +453,66 @@ pub fn afford_step(e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nov: &Try
     rec["step_seconds"] = json!(t0.elapsed().as_secs_f64());
     out.record = rec;
     Ok(out)
+}
+
+
+/// E014's switches `FMI_NOVEL_VERBS=1` and `FMI_NOVEL_GUIDE=1`: more atoms for T, the atoms the wait stops on and the
+/// try's novelty is over, from the game's own mechanics, where the reading tests few (a reading that models few inputs,
+/// e.g. a dialog's lines at the start, or one read short):
+///
+/// - verbs: `verb:V = 1` for every verb of the reading's scope (its sentence and dialog verbs, read from the scripts'
+///   VerbOps) and every verb the entry shows: a state that shows an input slot no entry showed offers inputs no entry
+///   offered (plan.md 4 enumerates inputs from the visible verb slots);
+/// - guide: the guide's atoms of one value (the regression from the goal's sites: values tested on the way to it), and
+///   `= 1` for each bit the guide names with any value.
+///
+/// Each is added once, after the reading's own atoms. Returns the number added. Unset: T is the reading's, as before.
+pub fn novelty_extra(flat: &mut Vec<(Key, Vec<Val>)>, job: &Value, scope: &Value, entry: &Facts) -> usize {
+    let on = |k: &str| std::env::var(k).is_ok_and(|v| v == "1");
+    let mut have: HashSet<(Key, Vec<Val>)> = flat.iter().cloned().collect();
+    let n0 = flat.len();
+    let mut push = |flat: &mut Vec<(Key, Vec<Val>)>, k: Key, v: Val| {
+        let a = (k, vec![v]);
+        if have.insert(a.clone()) {
+            flat.push(a);
+        }
+    };
+    if on("FMI_NOVEL_VERBS") {
+        let mut vs: BTreeSet<i64> = BTreeSet::new();
+        for f in ["verbs", "dialog_verbs"] {
+            if let Some(a) = scope.get(f).and_then(|x| x.as_array()) {
+                vs.extend(a.iter().filter_map(|x| x.as_i64()));
+            }
+        }
+        for &(k, v) in entry.iter() {
+            if v != 0 {
+                if let Some(n) = k.text().strip_prefix("verb:").and_then(|n| n.parse::<i64>().ok()) {
+                    vs.insert(n);
+                }
+            }
+        }
+        for v in vs {
+            push(flat, Key::parse(&format!("verb:{v}")), 1);
+        }
+    }
+    if on("FMI_NOVEL_GUIDE") {
+        if let Some(g) = job.get("guide").and_then(|g| g.as_str()).and_then(|p| std::fs::read_to_string(p).ok()) {
+            if let Ok(g) = serde_json::from_str::<Value>(&g) {
+                for a in g.get("atoms").and_then(|x| x.as_array()).into_iter().flatten() {
+                    let Some(k) = a.get(0).and_then(|x| x.as_str()) else { continue };
+                    if k == "room" {
+                        continue; // rooms are novel by themselves
+                    }
+                    match a.get(1).and_then(|x| x.as_i64()) {
+                        Some(v) => push(flat, Key::parse(k), v),
+                        None if k.starts_with("bit:") => push(flat, Key::parse(k), 1),
+                        None => {}
+                    }
+                }
+            }
+        }
+    }
+    flat.len() - n0
 }
 
 #[cfg(test)]
@@ -555,6 +642,7 @@ impl WaitPort for RealWait {
             v
         });
         Ok(Waited {
+            ended_at: w.end_at,
             frame0: w.frame0,
             stops: w.stops.iter().map(|s| Stop { frame: s.frame, checkpoint: s.checkpoint.clone(), room: s.room }).collect(),
             end: w.end.text(),

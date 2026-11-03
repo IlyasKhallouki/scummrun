@@ -676,3 +676,186 @@ points go beyond them and are marked as such.
     the same from the archive opened again at that commit (with free's kind rule, the same kind sequence).
   - C3 at K1's end; before it, a driver run with a scripted step on a generated archive: the stalls.json the driver
     wrote equals `fmi explore stalls`'s over the same files, with `FMI_STALLS` unset nothing is written.
+
+## Amendment 2026-11-03 (2): E014 merged, one code path for both games, the interactive demo after the kitchen
+
+Written and committed before any further code or run of E013. The sections above stay as written: their predictions
+are not edited, and their planned measures are the ones scored. Where this amendment changes a setting, the change is
+reported with the result.
+
+### What was merged
+
+e014 (head dfacf42) into e013 (merge 31e2d25). Each piece is general and behind a switch that is off by default:
+
+- the mechanic inventory (fmi-checks `inventory`);
+- the extraction from a game's settings (`scripts/dump-scripts.sh`; unset, Monkey Island's extraction byte for byte);
+- engine patch `0006-e014-scumm-speedrun-handler.patch`: the decision point without verb ids (`SPEEDRUN_IDLE=handler`)
+  and the end's script site (`SPEEDRUN_END_SITE=1`);
+- the host and the reader for another game id (`FMI_GAME_ID`, `FMI_GAME_DIR`, `FMI_GAME_SCRIPTS`);
+- the game's own end as a goal (`FMI_GOAL_END=1`, goal `end = 1`, `fmi guide map --goal end=1 --start-boot`);
+- the reader and explorer switches of E014's assumptions table, rows 9-18 (`FMI_READ_EVENTS`, `FMI_EGO_VALUES`,
+  `FMI_MERGE_DEDUP`, `FMI_READ_CUT`, `FMI_STAG_SWEEP`, `FMI_VERBS_VAR_ON`, `FMI_NOVEL_VERBS`, `FMI_NOVEL_GUIDE`).
+
+### (a) Component `input` is met by E014's patch 0006
+
+**What 0006-e014 gives.** Its rule (`SPEEDRUN_IDLE=handler`) is A's decision point without verb ids:
+
+- the gate is open, the handler (`VAR_VERB_SCRIPT`) is set and not running, and the old rule's other blockers hold;
+- the kind is always "sentence", and there is no menu stop.
+
+So at every decision point the affordance step enumerates E012's sentence set: each verb slot alone (the whole dialog
+set), each verb then each target, each target alone, and each walk box. That set contains both old kinds' sets, so it
+is A's enumeration without kinds. The offer's points already come from the engine's own hit test (`AtMany`), so the
+report's boxes are not needed for it. `FMI_INPUT` is not built.
+
+**The paused e013-input work.**
+
+- The fmi-core types: `~/.cache/fast-mi-e013/paused/e013-input-wip.patch` (273 lines).
+- The engine side, uncommitted in `/var/tmp/fast-mi/svm-e013-input` (15 files, +1,294 lines over patch 0005). It is
+  copied to `~/.cache/fast-mi-e013/paused/e013-input-engine-wip.patch` (sha1 ac8dcc7d).
+- It holds the input report (`Input` 0x96), the input log (`InputLog` 0x97), the digest (`Digest` 0x98) and the
+  engine rule with its chain tracking (`SPEEDRUN_IDLE=engine`). It builds; no gate has run on it.
+
+**Still needed from it.** Both parts are general: they read only the engine's structures and name no game number.
+
+1. **The input log** (`SPEEDRUN_INPUT=1`): what became of each injected input (`dropped: gate`, `zone` or `handler`;
+   `ignored`; `taken`), with the handler run's reads and writes. B's causes on a route error and its trial verdicts
+   come from it. 0006-e014 records nothing of an input's path, so `refuse` cannot be built without the log.
+2. **The digest:** B's wait reuse (trials with equal states share one wait), and gate B4.
+
+These two go into patch `0007-scumm-speedrun-input.patch`, on top of 0001-0005 and 0006-e014, taken from the paused
+engine work. The fmi-core and fmi-engine side gets `InputRecord`, `Verdict`, `Touch`, `InputLog`, `Digest`,
+`Engine::input_log` and `Engine::digest`. `SPEEDRUN_IDLE` keeps 0006-e014's parsing. Refuse's M1 runs on 0007's
+engine.
+
+**Not needed now.**
+
+- the input report (verb boxes, zones, the chain);
+- `FMI_INPUT`;
+- the engine rule and the old rule's shadow.
+
+**Needed only if A3 fails: the engine rule's chain clause.** The handler rule keeps the old rule's blockers and drops
+its dialog exception. So on Monkey Island the handler rule blocks two kinds of dialog frame where the old rule gave a
+dialog decision point:
+
+- a dialog shown while another script's talker speaks (clause (i));
+- a dialog shown while a parked sentence or object script is live (clause (ii)).
+
+A3 is run on the handler rule before K1 (below). If it shows the handler rule missing decision points where the old
+kind was right, the engine rule's clause 3 is ported from the paused work into 0007 as `SPEEDRUN_IDLE=engine`. Clause
+3 says that only the player's chain blocks, and parked units do not. The port needs a dated amendment before its code.
+Under rule (2) below, the rule chosen is on for both games.
+
+**A's gates now.**
+
+- **A1:** as written, for 0006-e014 and 0007.
+- **A2:** not run. The report is not built.
+- **A3:** on `SPEEDRUN_IDLE=handler`. The same movies as written are replayed twice, once with the switch unset and
+  once with `handler`, stopping at every frame and reading the status's idle kind or blocker. The rule only reads, so
+  the two replays' checkpoints must be equal. The gate: at every frame where the old rule was idle and its
+  enumeration's inputs were taken (E012's kept outcomes, or B's verdicts once 0007 exists), the handler rule is idle
+  too. Frames where only one rule is idle are reported with the blocker.
+- **A4:** with `SPEEDRUN_IDLE=handler` and the sentence enumeration, in place of `FMI_INPUT=1`.
+- **A5:** from the input log's writes.
+
+### (b) The PI's rules for this work
+
+The PI, 2026-11-03:
+
+1. **No manual porting per game.** Every mechanism comes from the engine's or the scripts' own mechanics, never from
+   numbers, names or rules read by hand from a game (D9).
+2. **One code path for both games.** A fix counts only if it is switched on for Monkey Island too and Monkey Island's
+   checks still pass with it on: every entry verifies from boot, and the kitchen is still reached.
+3. **A mechanic only the demo uses** is recorded in E014's assumptions table
+   (`experiments/E014-fate-demo/results/assumptions.md`), not ported.
+4. **Everything that runs is Rust**, with C++ only in the engine patches. Python is only the frozen reference. There
+   is no LLM in the running system.
+
+**What follows for E013.**
+
+- **"Every switch on" is one set for both games:**
+  - E012's switches, as in its kitchen rerun;
+  - E013's: `SPEEDRUN_INPUT=1 FMI_REFUSE=1 FMI_STALLS=1 FMI_FREE=0.25 FMI_FREE_SHIFT=1`;
+  - E014's mechanisms: `SPEEDRUN_IDLE=handler` (or `engine`, per (a)), `SPEEDRUN_END_SITE=1`, `FMI_GOAL_END=1`,
+    `FMI_READ_EVENTS=1` and play/env.sh's `E14P` (`FMI_EGO_VALUES=1 FMI_MERGE_DEDUP=1 FMI_READ_CUT=1
+    FMI_STAG_SWEEP=1 FMI_VERBS_VAR_ON=1 FMI_NOVEL_VERBS=1 FMI_NOVEL_GUIDE=1`).
+- **Only the game and its goal differ between the runs.** They are the run's inputs, not mechanisms:
+  - the game's files and extraction (`FMI_GAME_ID`, `FMI_GAME_DIR`, `FMI_GAME_SCRIPTS`: unset for Monkey Island,
+    play/env.sh's for the demo);
+  - the stage, the goal (`owner:566 = 1`; `end = 1`) and its guide;
+  - the rooms (E012's ten; the files').
+
+  With Monkey Island's goal, a run that ends at a script's restart or quit gives an end entry, never a goal entry. K1
+  reports any such entry.
+- **refuse, stall and free are built to rule (2).** None adds a path for one game only. A break that only one game
+  shows is a row of the assumptions table.
+- **Gates added:**
+  - **G0** (everything off) runs on the merged build with patches 0001-0005, 0006-e014 and 0007. It is G0 as written
+    plus E014's checks of Monkey Island: the kitchen golden reading (packed sha1 279b7a24) and the cargo tests.
+  - **G-on** runs with the whole set above on. On E012's B3 15 tries, every new entry verifies from boot with 0
+    differences. The kitchen golden reading is made again with E014's reader switches on and reported: equal, or its
+    differences named.
+  - **K1** is rule (2)'s check that the kitchen is still reached.
+- **Order of the builders.** Each component branch merges e013's head before its next code. 0007 comes first, and
+  `refuse` needs it. `stall` and `free` go on from their paused work and do not need 0007.
+
+### (c) The runs: K1, then the interactive demo, then K2
+
+**K1.** Its settings change from "Runs" in two ways:
+
+- `SPEEDRUN_IDLE=handler` replaces `engine`, and `FMI_INPUT` is dropped;
+- E014's mechanism switches are on.
+
+Its predictions above stand and are scored as written. Added for what is new:
+
+| | predicted |
+|---|---|
+| A3 on the handler rule | the two rules agree (idle or not) on at least 95% of the chain's 15,688 frames; the handler rule is idle at 26-29 of the frames of E012's 29 dialog offers (those it misses are under another script's talker); the gate passes: 65% |
+| the kitchen golden reading with E014's reader switches on | differs from 279b7a24 (`FMI_MERGE_DEDUP` drops repeated list entries): 70%; `FMI_READ_CUT` cuts no run in the kitchen's scopes |
+| K1, end entries | 0 |
+
+**F, the interactive demo again,** after K1 and with no demo-specific code. It runs on the build and engine that K1
+ran, unchanged.
+
+- **Settings:** E014 amendment (2)'s run:
+  - a new archive `/var/tmp/fast-mi/e013-archives/play`;
+  - stage `play`, goal `end = 1`, the guide from `fmi guide map --goal end=1 --start-boot`;
+  - the rooms from the files, b = 2;
+  - E009's switches, play when ready, commit as finished;
+  - the falsifier at 80 committed tries, seed 1;
+  - ON3 and the set of (b), with play/env.sh's game settings.
+- **Reported:** E013's per-run list ("Runs"), plus E014's:
+  - how far each stage of the chain got;
+  - the assumptions table's new rows;
+  - the best chain.
+- **Predictions** (before any code or run of F):
+
+| | predicted |
+|---|---|
+| how F stops | the falsifier at 80 committed tries: 55%; E009's stagnation before it: 35%; the goal: 10% |
+| tries | 25-80 committed tries (E014's scratch archives: at most 7 each) |
+| rooms entered, of the 11 in the files | 2-5, most likely 3, counting the root's room 49 (every entry of E014's scratch archives was in room 49) |
+| the end | not reached (reached and verified from boot with the system's own inputs: 10%) |
+| free tries | 25-45% of the tries; at least 30% of them keep a novel entry |
+| the stall table's top causes | 1. interface, no yield (taken trials that keep nothing): 25-50% of the seconds; 2. model-blind or no plan (the reading's cut runs leave the model few targets; E014: every planned attempt went to var:52 = 0): 15-35%; 3. refused input (Monkey Island's executor profile fails on this game's sentences, and B ends those windows): 5-20%; productive 10-35%; the rest row at most 1% |
+| longest stretch with no new atom or room | 5-20 committed tries |
+| new rows of the assumptions table | 1-4, each recorded and not fixed during F |
+
+- **Stop rule:**
+  - F stops at the goal, at E009's stop rules (stagnation over T and rooms, an exhausted archive) or at the
+    falsifier, 80 committed tries. It runs once.
+  - A goal entry is verified from boot on the lean engine. A goal chain with no player input is reported as the game
+    playing itself, not as reached.
+  - Exactness comes first, as in the stop rule above.
+  - A break F meets is recorded as a row of the assumptions table and is not applied to F.
+  - A fix for it comes only by a new dated amendment, and it counts only under rule (2).
+  - When F stops, it is written up and scored against these predictions and E014's success threshold. E014's plan
+    gets its result section.
+
+**K2** runs after F, as written.
+
+### (d) Part I stays on hold until the demo is finished
+
+The demo is finished when F's write-up is done and the PI decides what follows. Until then P does not run. P's
+dated amendment with the projection is still written before it. E013's success threshold is scored as written: while
+P has not run, the result is at most "partly".

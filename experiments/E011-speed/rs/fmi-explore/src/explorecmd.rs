@@ -92,6 +92,13 @@ pub fn parse_allowed(text: &str, guide: &Value, start_room: i64, game: Option<&G
     if text == "files" {
         let mut v: Vec<i64> = guide["rooms"]["reached"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x.as_i64()).collect();
         v.sort();
+        // E014 (FMI_GAME_SCRIPTS): another game's files may not hold every room its scripts load (a demo's); the rooms
+        // are cut to those the files hold (the extraction's index.json "rooms")
+        if scumm_ir::game::game_scripts_env().is_some() {
+            let idx = files::read_json(&scumm_ir::game_index(&crate::guide::default_root()))?;
+            let have: BTreeSet<i64> = idx["rooms"].as_object().map(|m| m.keys().filter_map(|k| k.parse().ok()).collect()).unwrap_or_default();
+            v.retain(|r| have.contains(r));
+        }
         return Ok(v);
     }
     let s: BTreeSet<i64> = text.split(',').filter(|x| !x.trim().is_empty()).filter_map(|x| x.trim().parse().ok()).collect();
@@ -117,7 +124,9 @@ pub fn boot_root(r: &mut dyn Returns, out_dir: &Path) -> Res<(Value, Value)> {
         if s.seed != Some(SEED) {
             c.push(format!("dump seed {}", s.seed.map(|x| x.to_string()).unwrap_or("None".into())));
         }
-        if s.boot_param != 0 {
+        // E014: another game's engine may set its own boot param (ScummVM's copy-protection skip for some game ids,
+        // scumm.cpp); the host still passes 0, and the root records what the engine holds
+        if s.boot_param != 0 && !crate::tryjob::other_game() {
             c.push(format!("dump boot_param {}", s.boot_param));
         }
         c
@@ -229,8 +238,30 @@ impl HostVerifier {
             }
         }
         let mut differ = Vec::new();
+        let mut end_fin: Option<Map<String, Value>> = None;
         for cp in cps {
             let frame = cp[0].as_u64().unwrap_or(0);
+            // E014 (FMI_GOAL_END): an end entry's last checkpoint holds the end's facts: the run must end there, at
+            // that frame and tick, with the same reason and script site
+            if cp.get(1).and_then(|f| f.get("end")).is_some() {
+                match b.run(&RunSpec { frame: Some(frame), ..Default::default() }) {
+                    Err(fmi_core::EngineError::Ended(st)) => {
+                        let got = fmi_core::end_facts(&st.reason);
+                        let got_json: Map<String, Value> =
+                            got.as_ref().map(|f| f.iter().map(|(k, v)| (k.text(), json!(v))).collect()).unwrap_or_default();
+                        let want_json = cp[1].as_object().cloned().unwrap_or_default();
+                        let want_tick = cp.get(2).and_then(|x| x.get("tick")).and_then(|t| t.as_u64());
+                        if st.frame != frame || got_json != want_json || Some(st.tick) != want_tick {
+                            differ.push(json!({"frame": frame, "error": format!("ended {} at frame {} tick {}", st.reason, st.frame, st.tick)}));
+                        }
+                        out["end"] = json!({"reason": st.reason, "frame": st.frame, "tick": st.tick, "qf": st.qf});
+                        end_fin = Some(got_json);
+                    }
+                    Ok(st) => differ.push(json!({"frame": frame, "error": format!("no end: stopped at {}", st.frame)})),
+                    Err(e) => differ.push(json!({"frame": frame, "error": format!("stopped at {e}")})),
+                }
+                break;
+            }
             let run = if b.status().frame < frame { b.run(&RunSpec { frame: Some(frame), ..Default::default() }) } else { Ok(b.status().clone()) };
             let st = match run {
                 Ok(s) => s,
@@ -254,7 +285,13 @@ impl HostVerifier {
                 differ.push(Value::Object(m));
             }
         }
-        if !cps.is_empty() {
+        if let Some(f) = end_fin {
+            let mut fin = Map::new();
+            for k in goal_keys {
+                fin.insert(k.clone(), f.get(k).cloned().unwrap_or(json!(0)));
+            }
+            out["final"] = Value::Object(fin);
+        } else if !cps.is_empty() {
             let s = b.obs(&ObsReq::default()).map_err(|e| format!("verify: {e}"))?;
             let f = facts_of(&s);
             let mut fin = Map::new();
@@ -281,11 +318,18 @@ impl Verifier for HostVerifier {
         let mut ver = self.replay_verify(&movie, &cps, &goal_keys, &out_dir)?;
         ver["seconds"] = json!(pyjson::round(t.elapsed().as_secs_f64(), 1));
         let frame = a.rows[i].frame as u64;
-        let evs: Vec<fmi_core::Event> = movie.iter().filter_map(events::event_of).filter(|e| e.frame <= frame).collect();
-        let b = self.host.boot(&BootCfg { seed: 1, events: evs, frame: Some(frame), dump_locals: false, lean: self.lean,
-                                          out_dir: out_dir.join("clock") }).map_err(|e| format!("verify clock: {e}"))?;
-        let (qf, tick) = (b.status().qf, b.status().tick);
-        b.quit();
+        // E014: an end entry's clock is its end's (the run ends there: no boot can stop at that frame)
+        let (qf, tick) = match ver.get("end") {
+            Some(e) => (e["qf"].as_u64().unwrap_or(0), e["tick"].as_u64().unwrap_or(0)),
+            None => {
+                let evs: Vec<fmi_core::Event> = movie.iter().filter_map(events::event_of).filter(|e| e.frame <= frame).collect();
+                let b = self.host.boot(&BootCfg { seed: 1, events: evs, frame: Some(frame), dump_locals: false, lean: self.lean,
+                                                  out_dir: out_dir.join("clock") }).map_err(|e| format!("verify clock: {e}"))?;
+                let r = (b.status().qf, b.status().tick);
+                b.quit();
+                r
+            }
+        };
         let root = a.stage.get("root").cloned().unwrap_or(json!({}));
         let dq = files::as_i64(root.get("qf")).map(|r| qf as i64 - r);
         let chain = a.chain(i);

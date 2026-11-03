@@ -10,6 +10,8 @@ fmi-core = { path = "../fmi-core" }
 fmi-engine = { path = "../fmi-engine" }
 fmi-play = { path = "../fmi-play", features = ["json-double"] }
 fmi-explore = { path = "../fmi-explore" }
+scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
+scumm-machine = { path = "../../../E003-path-through-cloud/scumm/machine" }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [[bin]]
@@ -31,3 +33,11 @@ path = "src/bin/delay_check.rs"
 [[bin]]
 name = "kitchen-report"
 path = "src/bin/kitchen_report.rs"
+
+[[bin]]
+name = "inventory"
+path = "src/bin/inventory.rs"
+
+[[bin]]
+name = "probe"
+path = "src/bin/probe.rs"

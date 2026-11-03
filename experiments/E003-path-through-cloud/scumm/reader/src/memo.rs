@@ -1061,7 +1061,7 @@ impl Builder<'_> {
             let root = scumm_ir::default_root();
             (
                 file_sha1(&exe).expect("the reader's binary"),
-                file_sha1(&root.join("data").join("scripts-dos-cd").join("index.json")).expect("the game index"),
+                file_sha1(&scumm_ir::game_index(&root)).expect("the game index"), // E014: FMI_GAME_SCRIPTS's
             )
         });
         writeln!(t, "reader {exe_sha}").unwrap();

@@ -827,6 +827,12 @@ impl Builder<'_> {
         // the inputs run first and the start's events after them, as `read_once` has it: an event's precondition on
         // `args:<unit>` depends on the lists known when it is made
         self.reach_state.as_mut().unwrap().todo = events;
+        // E014's switch FMI_READ_EVENTS=1: with no input job (a scope whose scripts give the player no input the reader
+        // models), the rounds start from the start's events, as `read_once` runs them without the switch; off, no
+        // round runs and the reading is empty
+        if jobs.is_empty() && std::env::var("FMI_READ_EVENTS").is_ok_and(|v| v == "1") {
+            jobs = self.reach_batch(&reach, skip);
+        }
         self.reach_rounds(m, jobs, skip, sink);
         let (rounds, waits, left) = {
             let st = self.reach_state.as_ref().unwrap();

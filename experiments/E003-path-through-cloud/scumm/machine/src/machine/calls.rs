@@ -15,6 +15,16 @@ pub(super) enum RoomSlot {
     Unk(Val),
 }
 
+/// E014's switch `FMI_MERGE_DEDUP=1`: every merge adds a branch's list entries only when the merged path does not
+/// hold them already, as a settle merge does (`add_branch_new`). A path's lists then hold each entry once. Without it,
+/// a loop whose exit test reads unknowns forks and merges at its head each turn, and a group that holds paths of
+/// older forks brings back their whole shared lists: the lists grow by a factor each turn, past any memory (a
+/// game's inventory loop over `getInventoryCount` of a VAR_EGO with two values). Unset: model.py's rule, as before.
+fn merge_dedup() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_MERGE_DEDUP").is_ok_and(|v| v == "1"))
+}
+
 /// The sets of entries a settle merge's lists hold (model.py `_merge`'s `have`).
 #[derive(Default)]
 struct Seen {
@@ -420,7 +430,7 @@ impl<'g> Machine<'g> {
         let mut seen = Seen::default();
         for gp in &rest {
             // each branch's own additions: what follows the history it shares with the first
-            if settle {
+            if settle || merge_dedup() {
                 q.assumptions.add_branch_new(&b_assumptions, &gp.assumptions, &mut seen.assumptions);
                 q.unmodelled.add_branch_new(&b_unmodelled, &gp.unmodelled, &mut seen.unmodelled);
                 q.notes.add_branch_new(&b_notes, &gp.notes, &mut seen.notes);

@@ -195,9 +195,10 @@ pub fn file_sha1(path: &Path) -> io::Result<String> {
     Ok(sha1_smol::Sha1::from(std::fs::read(path)?).digest().to_string())
 }
 
-/// The game data's index under the repository root (the reader's data/scripts-dos-cd/index.json).
+/// The game data's index under the repository root (the reader's data/scripts-dos-cd/index.json; E014: the one
+/// `FMI_GAME_SCRIPTS` names, when set).
 pub fn game_index(root: &Path) -> PathBuf {
-    root.join("data").join("scripts-dos-cd").join("index.json")
+    scumm_ir::game_index(root)
 }
 
 /// Bytes free for an unprivileged user on the file system holding `path` (statvfs).
