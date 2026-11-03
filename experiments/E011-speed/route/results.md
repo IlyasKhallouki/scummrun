@@ -52,7 +52,7 @@ The port changes no result in two places, each argued in the code:
 |---|---|---|
 | stdhash | 300 random scripts (inserts, erases, copies, intersections, constructions from vectors with repeats; sets up to 10,273 buckets) on libstdc++'s containers (`stdhash_ref.cc`) and on stdhash.rs | the same bytes in all 300 |
 | G7, the lama clause | Fast Downward's lama-first-costs (its search binary, the landmark dump on) against `lama search` on taskcore's SAS files (`lama_same.sh`): the landmark graph (nodes in id order with their atoms in order, orderings with their types), the plan file, expanded / evaluated / generated | equal on 30 requests: serve38 6, serve33 7, test (a) 5 (two more start outside the reading: taskcore refuses them for both), ring(38) other goals 12 (2 of them unsolvable: both prove it at the start) |
-| G7, PlanResult | `fmi-plan seq --search lama` against plan_fd.plan_taskcore's results (the plan component's `compare.py`) | serve38: all 6 the same (see below for serve33) |
+| G7, PlanResult | `fmi-plan seq --search lama` against plan_fd.plan_taskcore's results (the plan component's `compare.py`: status, cost, steps, paths, actions, choices, facts) | serve38: all 6 the same; serve33: all 7 the same |
 | G10 | test (a) with `fmi try --search fd` and `FMI_PLAN_LAMA=rust` (`g10.sh`), cold, the reading made fresh | strict: `CHECK (a): 0 goal True 2728 3216 488 11712 2 36` (501 children, 8 entries); ready: the same line (320 children); ready with the old tail (the fast settings): the same line (319 children); in all three every new entry (8) verifies from boot in a fresh lean engine with 0 differences |
 | G11 | B3's warm sequence (one fmi process, E009's 15 kitchen tries in log order, kept entries, warm planners, reading cache, memo and plan store empty at the start; `b3lama.sh`) with the fast settings (play when ready, the old tail first, `--search fd`, `FMI_PLAN_LAMA=rust`), each try against B0's (bench/cmp_tries.py) | 15 tries: the stop class B0's in 15, everything (target, frames, replans, refinements, inputs, the new entries' frames, ticks, events and checkpoints) B0's in 15; the 43 new entries verify from boot in a fresh lean engine, 0 differences. Round 1's fast settings (Gbfs) played another route in 3 |
 
@@ -92,6 +92,8 @@ search, the check, the decode):
 | serve38, with r2-plan's fast switch (scratch merge; 10 rounds, mean) | 0.853 s for the 6 | 0.968 s | 1.04-1.21 per request (means), 1.135 the sequence |
 | test (a)'s 5 requests (2 rounds, least) | a0 65.4, a1 6.4, a2 5.2, g1 6.4, g2 8.0 s | 61.6, 4.75, 3.04, 4.06, 7.02 s | 0.94, 0.74, 0.58, 0.63, 0.88 |
 | serve33 (2 rounds, least; an earlier build of the graph) | 16.5, 7.3, 6.9, 6.5, 17.7, 16.4, 14.0 s | 17.2, 8.4, 7.9, 8.6, 17.4, 16.0, 10.5 s | 1.04, 1.15, 1.14, 1.34, 0.98, 0.98, 0.75 |
+| B3's ring(33) requests on j00000's refined reading (j00006, j00008, j00009, j00011; 1 round) | 11.7, 11.4, 18.0, 14.8 s; 21, 31, 31, 21 evaluated | 12.7, 11.3, 9.8, 10.2 s; 21, 27, 27, 21 | 1.08, 0.99, 0.54, 0.69 |
+| the same with r2-plan's fast switch (scratch merge; 1 round) | 7.96, 8.07, 7.96, 7.84 s | 8.93, 8.09, 7.47, 7.53 s | 1.12, 1.00, 0.94, 0.96 |
 
 The two searches evaluate as many states on serve33, lama more on ring(38) (11 against 8 on three requests) and fewer
 on test (a)'s second and fourth requests (20 against 40). lama's own fixed work per request is the landmark graph and
