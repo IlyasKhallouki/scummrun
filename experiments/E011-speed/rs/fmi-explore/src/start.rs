@@ -502,6 +502,30 @@ pub fn text_order(doms: &Domains) -> Vec<(std::rc::Rc<str>, Key)> {
     keys
 }
 
+/// A reading's domain keys in their text order, shared.
+pub type TextOrder = std::rc::Rc<Vec<(std::rc::Rc<str>, Key)>>;
+
+/// `text_order` of a reading's domains, kept for the last readings seen on this thread (by the packed file's sha1, of
+/// which the domains are a function), so the attempts of later tries on a reading do not sort its keys again.
+pub fn text_order_of(id: [u8; 20], doms: &Domains) -> TextOrder {
+    thread_local! {
+        static KEPT: std::cell::RefCell<Vec<([u8; 20], TextOrder)>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    KEPT.with(|k| {
+        let mut k = k.borrow_mut();
+        if let Some(i) = k.iter().position(|(x, _)| *x == id) {
+            let e = k.remove(i);
+            k.push(e);
+        } else {
+            if k.len() >= 8 {
+                k.remove(0);
+            }
+            k.push((id, std::rc::Rc::new(text_order(doms))));
+        }
+        k.last().unwrap().1.clone()
+    })
+}
+
 /// `start_text` with the keys' order made already.
 pub fn start_text_in(order: &[(std::rc::Rc<str>, Key)], doms: &Domains, start: &Facts) -> String {
     let mut s = String::with_capacity(order.len() * 28);

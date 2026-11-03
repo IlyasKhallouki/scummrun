@@ -121,7 +121,7 @@ pub struct Harness<'a> {
     predicted: Vec<&'static str>,
     progress: &'a dyn Fn(&str),
     /// the reading's domain keys in their text order (the start files'), and the reading's id
-    order: Option<([u8; 20], Vec<(std::rc::Rc<str>, Key)>)>,
+    order: Option<([u8; 20], start::TextOrder)>,
 }
 
 impl<'a> Harness<'a> {
@@ -252,7 +252,7 @@ impl<'a> Harness<'a> {
             self.plans.last_mut().unwrap().insert("cost_caps".into(), json!(big));
         }
         if self.order.as_ref().map(|o| o.0 != rd.id()).unwrap_or(true) {
-            self.order = Some((rd.id(), crate::machine::section("text_order", || start::text_order(doms))));
+            self.order = Some((rd.id(), crate::machine::section("text_order", || start::text_order_of(rd.id(), doms))));
         }
         crate::machine::section("start.txt", || {
             let _ = start::write_text(&pdir.join("start.txt"), &start::start_text_in(&self.order.as_ref().unwrap().1, doms, &start_f));
