@@ -84,8 +84,8 @@ pub fn goal_text_of(goal: &Value) -> Result<String, String> {
 /// files and fact variables they share, and the reader.
 pub struct Wiring {
     pub readings: Arc<dyn Readings>,
-    /// the attempt's first reading's reading.json (its switches)
-    pub doc: Value,
+    /// the attempt's first reading's reading.json (its switches), as warm.rs keeps it
+    pub doc: Arc<Value>,
     pub run_dir: PathBuf,
     pub threads: u32,
     pub starts: Vec<PathBuf>,
@@ -106,7 +106,7 @@ impl Wiring {
     /// refiner on the reading (the extender adds the reading's own reach_also files to the starts).
     pub fn new(readings: Arc<dyn Readings>, rd: &dyn ReadingSource, run_dir: &Path, threads: u32, cancel: Arc<AtomicBool>)
                -> Result<Wiring, String> {
-        let doc: Value = (*crate::warm::head(rd)).clone();
+        let doc = crate::warm::head(rd);
         if !files::truthy(doc.get("reach")) {
             return Err("--reach-extend needs a reading made with --reach".into());
         }
