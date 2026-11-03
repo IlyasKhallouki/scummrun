@@ -48,10 +48,11 @@ pub struct HarnessCfg {
 
 /// The reader for the reach extension and the refinement (replay_part1's reach_extender and refiner).
 pub trait Rereads {
-    /// The reading's scope read again from every start so far and this one (reader-scope --reach-also).
-    fn extend(&mut self, start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String>;
+    /// The reading's scope read again from every start so far and this one (reader-scope --reach-also); the start as
+    /// its file's text (`start::reach_start_text`).
+    fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String>;
     /// The scope read again with the variables `new` made facts too, from every start so far and this one.
-    fn refine(&mut self, new: &[i64], start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String>;
+    fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String>;
     /// CPU seconds of the readers so far (the extension's and refinement's records)
     fn cpu_s(&self) -> f64;
 }
@@ -81,6 +82,12 @@ impl PlannerCache {
     pub fn close_all(&mut self) {
         self.kept.clear();
     }
+}
+
+/// Whether the refinement keeps the old reading's planner (FMI_PLANNER_KEEP, on; 0 closes it as round 1 did).
+fn planner_keep() -> bool {
+    std::env::var("FMI_PLANNER_KEEP").map(|v| v != "0").unwrap_or(true)
+        && crate::machine::mem_available_gb() >= crate::machine::Machine::from_env().mem_second_gb
 }
 
 /// The run stopped by an engine error (replay.Stop / ControlError): its reason.
@@ -114,7 +121,7 @@ pub struct Harness<'a> {
     predicted: Vec<&'static str>,
     progress: &'a dyn Fn(&str),
     /// the reading's domain keys in their text order (the start files'), and the reading's id
-    order: Option<([u8; 20], Vec<(std::rc::Rc<str>, Key)>)>,
+    order: Option<([u8; 20], start::TextOrder)>,
 }
 
 impl<'a> Harness<'a> {
@@ -245,7 +252,7 @@ impl<'a> Harness<'a> {
             self.plans.last_mut().unwrap().insert("cost_caps".into(), json!(big));
         }
         if self.order.as_ref().map(|o| o.0 != rd.id()).unwrap_or(true) {
-            self.order = Some((rd.id(), crate::machine::section("text_order", || start::text_order(doms))));
+            self.order = Some((rd.id(), crate::machine::section("text_order", || start::text_order_of(rd.id(), doms))));
         }
         crate::machine::section("start.txt", || {
             let _ = start::write_text(&pdir.join("start.txt"), &start::start_text_in(&self.order.as_ref().unwrap().1, doms, &start_f));
@@ -377,7 +384,7 @@ impl<'a> Harness<'a> {
         let actions_before = self.reading.n_actions();
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let rs_ = start::reach_start(&start_f);
+        let rs_ = start::reach_start_text(&start_f);
         let new = match crate::machine::port(|| rr.extend(&rs_)) {
             Ok(r) => r,
             Err(e) => {
@@ -472,10 +479,15 @@ impl<'a> Harness<'a> {
         turn["operators_before"] = self.plans.last().and_then(|p| p.get("operators")).cloned().unwrap_or(Value::Null);
         (self.progress)(&format!("refinement at frame {}: var {:?} made facts", self.ps.engine.status().frame, new));
         let old_id = self.reading.id();
-        self.planners.lock().unwrap().close(&old_id); // the old reading's planner: its memory, while the reader reads
+        // the old reading's planner: its memory, while the reader reads (plan_fd.close_servers). Kept (FMI_PLANNER_KEEP,
+        // on) while MemAvailable holds the explorer's level for a second heavy job (E008_MEM_SECOND_GB): a planner is a
+        // function of its reading, so the next request on that reading finds it warm instead of building it again
+        if !planner_keep() {
+            self.planners.lock().unwrap().close(&old_id);
+        }
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let rs_ = start::reach_start(&st);
+        let rs_ = start::reach_start_text(&st);
         let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
             Ok(r) => r,
             Err(e) => {
@@ -666,6 +678,11 @@ impl<'a> Harness<'a> {
 
     pub fn into_parts(self) -> (PlayState, Arc<dyn ReadingSource>) {
         (self.ps, self.reading)
+    }
+
+    /// `into_parts` with the window search's player, whose end the caller decides (`PlayerHost::done`).
+    pub fn into_all(self) -> (PlayState, Arc<dyn ReadingSource>, Box<dyn WindowPlayer>) {
+        (self.ps, self.reading, self.player)
     }
 }
 

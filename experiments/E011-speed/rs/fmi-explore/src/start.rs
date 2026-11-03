@@ -392,6 +392,39 @@ pub fn reach_start(start: &Facts) -> Vec<(String, i64)> {
     v.into_iter().map(|(k, x)| (k.to_string(), x)).collect()
 }
 
+/// `start_file_text(&reach_start(start))` written from the keys' texts in place: their order (by text) is kept from the
+/// last call while the key set is the same (the engine's facts change little from start to start).
+pub fn reach_start_text(start: &Facts) -> String {
+    /// the last call's keys, and (index, text) of those written, by text
+    type Order = (Vec<Key>, Vec<(usize, std::rc::Rc<str>)>);
+    thread_local! {
+        static LAST: std::cell::RefCell<Order> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+    }
+    LAST.with(|l| {
+        let mut l = l.borrow_mut();
+        let same = l.0.len() == start.0.len() && l.0.iter().zip(start.0.iter()).all(|(a, b)| *a == b.0);
+        if !same {
+            let keys: Vec<Key> = start.0.iter().map(|(k, _)| *k).collect();
+            let mut v: Vec<(usize, std::rc::Rc<str>)> = start.0.iter().enumerate().map(|(i, (k, _))| (i, key_text(*k)))
+                .filter(|(_, t)| !t.contains('\t') && !t.contains('\n')).collect();
+            v.sort_unstable_by(|a, b| a.1.as_bytes().cmp(b.1.as_bytes()));
+            *l = (keys, v);
+        }
+        let mut s = String::with_capacity(l.1.len() * 24);
+        let mut b = itoa::Buffer::new();
+        for (i, t) in &l.1 {
+            let x = start.0[*i].1;
+            if is_int(x) {
+                s.push_str(t);
+                s.push('\t');
+                s.push_str(b.format(x));
+                s.push('\n');
+            }
+        }
+        s
+    })
+}
+
 /// The text of a start file of `reach_start` (replay_part1's reach_extender and refiner).
 pub fn start_file_text(start: &[(String, i64)]) -> String {
     let mut s = String::new();
@@ -467,6 +500,30 @@ pub fn text_order(doms: &Domains) -> Vec<(std::rc::Rc<str>, Key)> {
     let mut keys: Vec<(std::rc::Rc<str>, Key)> = doms.0.iter().map(|(k, _)| (key_text(*k), *k)).collect();
     keys.sort();
     keys
+}
+
+/// A reading's domain keys in their text order, shared.
+pub type TextOrder = std::rc::Rc<Vec<(std::rc::Rc<str>, Key)>>;
+
+/// `text_order` of a reading's domains, kept for the last readings seen on this thread (by the packed file's sha1, of
+/// which the domains are a function), so the attempts of later tries on a reading do not sort its keys again.
+pub fn text_order_of(id: [u8; 20], doms: &Domains) -> TextOrder {
+    thread_local! {
+        static KEPT: std::cell::RefCell<Vec<([u8; 20], TextOrder)>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    KEPT.with(|k| {
+        let mut k = k.borrow_mut();
+        if let Some(i) = k.iter().position(|(x, _)| *x == id) {
+            let e = k.remove(i);
+            k.push(e);
+        } else {
+            if k.len() >= 8 {
+                k.remove(0);
+            }
+            k.push((id, std::rc::Rc::new(text_order(doms))));
+        }
+        k.last().unwrap().1.clone()
+    })
 }
 
 /// `start_text` with the keys' order made already.

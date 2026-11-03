@@ -16,9 +16,28 @@ type Reached = Arc<Vec<(String, Vec<i64>)>>;
 /// in reading.json, a fresh reading of the same scope from another entry)
 type RKey = (PathBuf, [u8; 20]);
 
-fn heads() -> &'static Mutex<HashMap<RKey, Arc<Value>>> {
-    static C: OnceLock<Mutex<HashMap<RKey, Arc<Value>>>> = OnceLock::new();
+/// a reading.json's key here (E011 round 2): its packed file's sha1, its length and a hash of its text; the text is
+/// kept with its parse and compared whole, so equal texts share a parse whatever folder holds them (a reading cache
+/// hit's files are linked into each request's folder)
+type HKey = ([u8; 20], usize, u64);
+
+fn heads() -> &'static Mutex<HashMap<HKey, (Arc<str>, Arc<Value>)>> {
+    static C: OnceLock<Mutex<HashMap<HKey, (Arc<str>, Arc<Value>)>>> = OnceLock::new();
     C.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// FNV-1a over 8-byte words (the head's key; equality is checked on the text itself)
+fn text_hash(t: &str) -> u64 {
+    let b = t.as_bytes();
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut it = b.chunks_exact(8);
+    for c in &mut it {
+        h = (h ^ u64::from_le_bytes(c.try_into().unwrap())).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    for &x in it.remainder() {
+        h = (h ^ x as u64).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
 }
 
 fn reacheds() -> &'static Mutex<HashMap<RKey, Reached>> {
@@ -42,16 +61,19 @@ fn bound<K: Clone + std::hash::Hash + Eq, V>(h: &mut HashMap<K, V>) {
     }
 }
 
-/// A reading's reading.json, parsed once per reading (a reading's files never change once made).
+/// A reading's reading.json, parsed once per text (a reading's files never change once made).
 pub fn head(rd: &dyn ReadingSource) -> Arc<Value> {
-    let id = (rd.dir().to_path_buf(), rd.id());
-    if let Some(v) = heads().lock().unwrap().get(&id) {
-        return v.clone();
+    let t = rd.head();
+    let id = (rd.id(), t.len(), text_hash(t));
+    if let Some((k, v)) = heads().lock().unwrap().get(&id) {
+        if **k == *t {
+            return v.clone();
+        }
     }
-    let v = Arc::new(pyjson::loads(rd.head()).unwrap_or(Value::Null));
+    let v = Arc::new(pyjson::loads(t).unwrap_or(Value::Null));
     let mut h = heads().lock().unwrap();
     bound(&mut h);
-    h.insert(id, v.clone());
+    h.insert(id, (Arc::from(t), v.clone()));
     v
 }
 
