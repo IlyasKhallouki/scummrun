@@ -1060,58 +1060,76 @@ pub fn predicate_of_key(key: &str) -> String {
 
 // --- the reasonable orderings (landmark_factory_reasonable_orders_hps.cc) ----------------------------------------
 
-/// get_effects_on_other_variables(op, var): unconditional effects on other variables and effects that always happen.
-fn effects_on_other_variables(t: &SasTask, o: usize, var_id: u32) -> Vec<Fact> {
-    // compute_effect_conditions_by_variable
-    let mut nogood: BTreeSet<u32> = BTreeSet::new();
-    let mut by_var: BTreeMap<u32, (u32, BTreeSet<Fact>)> = BTreeMap::new();
-    for e in t.effs(o) {
-        let conds = t.conds(e);
-        if conds.is_empty() || nogood.contains(&e.var) {
-            continue;
-        }
-        if let Some(x) = by_var.get_mut(&e.var) {
-            if x.0 != e.post {
-                nogood.insert(e.var);
-                continue;
-            }
-            x.1.extend(conds.iter().copied());
+/// An operator's effects as get_effects_on_other_variables reads them: its unconditional effect atoms and the atoms its
+/// conditional effects always reach (get_effects_that_always_happen), each sorted and distinct.
+fn effect_classes(t: &SasTask, o: usize) -> (Vec<Fact>, Vec<Fact>) {
+    let mut unc: Vec<Fact> = Vec::new();
+    // compute_effect_conditions_by_variable: the conditional effects by variable (a variable written with two values
+    // by conditional effects is left out), their conditions together
+    let mut ce: Vec<(u32, u32, u32)> = Vec::new();
+    for (i, e) in t.effs(o).iter().enumerate() {
+        if e.c0 == e.c1 {
+            unc.push((e.var, e.post));
         } else {
-            by_var.insert(e.var, (e.post, conds.iter().copied().collect()));
+            ce.push((e.var, e.post, i as u32));
         }
     }
-    for v in &nogood {
-        by_var.remove(v);
-    }
-    // get_effects_that_always_happen (effect_always_happens)
-    let mut always: BTreeSet<Fact> = BTreeSet::new();
-    for (&var, (value, conds)) in &by_var {
-        let mut by_cvar: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
-        for &(cv, cx) in conds {
-            by_cvar.entry(cv).or_default().insert(cx);
+    unc.sort_unstable();
+    unc.dedup();
+    ce.sort_unstable();
+    let effs = t.effs(o);
+    let mut always: Vec<Fact> = Vec::new();
+    let mut conds: Vec<(u32, u32)> = Vec::new();
+    let mut i = 0;
+    while i < ce.len() {
+        let var = ce[i].0;
+        let mut j = i;
+        while j < ce.len() && ce[j].0 == var {
+            j += 1;
         }
-        let domain = t.sizes[var as usize] as usize;
-        let mut happens = true;
-        for (cv, values) in by_cvar.iter_mut() {
-            if *cv == var {
-                values.insert(*value);
+        let value = ce[i].1;
+        if ce[i..j].iter().all(|x| x.1 == value) {
+            // effect_always_happens: every condition variable (with the effect's value when it is the effect's
+            // variable) takes as many values as the effect variable's domain
+            conds.clear();
+            for x in &ce[i..j] {
+                conds.extend_from_slice(t.conds(&effs[x.2 as usize]));
             }
-            if values.len() < domain {
-                happens = false;
-                break;
+            conds.sort_unstable();
+            conds.dedup();
+            let domain = t.sizes[var as usize] as usize;
+            let mut happens = true;
+            let mut k = 0;
+            while k < conds.len() {
+                let cv = conds[k].0;
+                let mut l = k;
+                while l < conds.len() && conds[l].0 == cv {
+                    l += 1;
+                }
+                let mut n = l - k;
+                if cv == var && !conds[k..l].iter().any(|c| c.1 == value) {
+                    n += 1;
+                }
+                if n < domain {
+                    happens = false;
+                    break;
+                }
+                k = l;
+            }
+            if happens {
+                always.push((var, value));
             }
         }
-        if happens {
-            always.insert((var, *value));
-        }
+        i = j;
     }
-    let mut next: Vec<Fact> = Vec::new();
-    for e in t.effs(o) {
-        let f = (e.var, e.post);
-        if (e.c0 == e.c1 && f.0 != var_id) || always.contains(&f) {
-            next.push(f);
-        }
-    }
+    (unc, always)
+}
+
+/// get_effects_on_other_variables(op, var): unconditional effects on other variables and effects that always happen,
+/// from the operator's `effect_classes`, sorted and distinct.
+fn effects_on_other_variables(classes: &(Vec<Fact>, Vec<Fact>), var_id: u32) -> Vec<Fact> {
+    let mut next: Vec<Fact> = classes.0.iter().copied().filter(|f| f.0 != var_id).collect();
+    next.extend_from_slice(&classes.1);
     next.sort_unstable();
     next.dedup();
     next
@@ -1120,6 +1138,7 @@ fn effects_on_other_variables(t: &SasTask, o: usize, var_id: u32) -> Vec<Fact> {
 struct Hps<'a> {
     tv: &'a Tv<'a>,
     shared: HashMap<Fact, Vec<Fact>>,
+    classes: HashMap<u32, (Vec<Fact>, Vec<Fact>)>,
 }
 
 impl Hps<'_> {
@@ -1129,7 +1148,9 @@ impl Hps<'_> {
             let mut shared: Vec<Fact> = Vec::new();
             let mut init = true;
             for &o in self.tv.providing(atom) {
-                let eff = effects_on_other_variables(self.tv.t, o as usize, atom.0);
+                let t = self.tv.t;
+                let classes = self.classes.entry(o).or_insert_with(|| effect_classes(t, o as usize));
+                let eff = effects_on_other_variables(classes, atom.0);
                 if init {
                     shared = eff;
                     init = false;
@@ -1275,7 +1296,7 @@ pub fn build(t: &SasTask, adj: &[i32], pred: &[String], deadline: Option<Instant
     let achievers_s = t2.elapsed().as_secs_f64();
     // approximate_reasonable_orderings
     let t3 = Instant::now();
-    let mut hps = Hps { tv: &tv, shared: HashMap::new() };
+    let mut hps = Hps { tv: &tv, shared: HashMap::new(), classes: HashMap::new() };
     for &n in &alive {
         if b.nodes[n as usize].kind == LmType::Disjunctive {
             continue;
