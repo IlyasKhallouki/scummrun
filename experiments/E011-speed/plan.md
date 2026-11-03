@@ -2314,3 +2314,54 @@ Written after a first start of round 2's B3 was stopped (two tries in), before i
      shares the laptop and runs each job under guard.sh (driver.rs, a process per job), whose last line is
      `python3 -c "print(round(...))"` for its wall time; the round-1 watcher, rooted at every process named fmi, logged
      seven such processes in the stopped start. None of them was under a process of the benchmark.
+
+## Results, round 2 (2026-11-03, written after the runs)
+
+Branch e011-r2: origin/e011 9bbd44a with the six round-2 branches merged (engine b80bf2a, play 71c370c, read 15414f1,
+plan 661fcb2, route 621e519, own 735faec), then the integration commits: e011-r2-own's interface request
+(`Engine::step_changes`) next to e011-r2-play's new methods in fmi-core and fmi-engine (the only conflicts, both sides
+kept), FMI_PLAY_KEEP, FMI_READER_PREP (reader-scope's --prep), the Rust lama-first-costs with the watched h_FF under
+FMI_PLAN_FAST, the engine built with patches 0001-0004, and the bench scripts. e011-r2-read's reader inside the fmi
+process is not on its branch (uncommitted in its worktree), so fmi still runs reader-scope as a child. Numbers and
+tables: `results/round2/` (README.md, gates.md, tries-*.md). Lab note: `notes/log/2026-11-03-e011-round2.md`. Laptop,
+seed 1, nice 10; the kitchen check (round 1's binaries) and another experiment shared the laptop.
+
+**Gates.** G1-G12 pass with every round-2 switch off and every one on (results/round2/gates.md). G10 now passes in
+full: with the Rust lama-first-costs, `fmi try` on test (a) prints `CHECK (a): 0 goal True 2728 3216 488 11712 2 36` in
+strict, ready and ready-with-the-old-tail modes, and its entries verify from boot with 0 differences. G11: the 15 tries
+equal B0's in everything under the reference settings (round 2 with the switches off and on) and under the fast
+settings (round 2); 129 new entries verify from boot. Two gate details: G6's reading.json at 6 threads differs from the
+reference only in its recorded thread count; G12 is rooted at the benchmark's processes (amendment above).
+
+**B3** (warm, the job memo off in every sequence, round 1's and round 2's binaries interleaved try by try at load
+1.9-5.1; wall per try):
+
+| settings | binaries | median, 15 | ring(33), 7 | ring(38), 8 | mean | max | sum |
+|---|---|---:|---:|---:|---:|---:|---:|
+| reference | round 1 | 6.3 s | 43.5 s | 2.75 s | 28.3 s | 158.0 s | 424.5 s |
+| reference | round 2 | 4.8 s | 5.9 s | 1.25 s | 13.3 s | 128.2 s | 199.2 s |
+| fast | round 1 (Gbfs) | 4.9 s | 17.6 s | 1.75 s | 17.7 s | 114.9 s | 264.9 s |
+| fast | round 2 (the Rust lama-first-costs) | 4.9 s | 6.1 s | 1.3 s | 12.9 s | 121.0 s | 193.1 s |
+
+By part, round 2's fast sequence (median / max per try): return 0.00 / 0.09 s, idle 0.10 / 0.10 s, read 0.05 / 105.8 s,
+plan 0.29 / 14.8 s, play 0.02 / 0.35 s; round 1's in the same run: 0.01 / 0.33, 0.20 / 0.40, 0.19 / 94.5, 0.71 / 19.3,
+0.02 / 0.52. The read is 74% of round 2's sum and the plan 25%. The planner's ring(33) request on the plan component's
+fixed sequence: another start 3.0-3.2 s (round 1: 7.0-7.6 s with Gbfs, 19.9-22.7 s with Fast Downward), another goal
+4.4 s (11.5 s, 26.6 s), of which the per-start reductions are 2.0-3.4 s. A fresh ring(33) reading: 35.0-36.3 s with
+round 1's reader, 36.4-40.8 s with round 2's. Test (a)'s third window, ready: 4.5 s (17.1 s with the switches off).
+The try's own time: 13-14 ms (80-113 ms). The door chain from boot on the engine with both cuts: 0.12 s.
+
+**Against the prediction.** The prediction's answer said a ring(33) try would come down to 3-10 s only with round 2's
+per-start reductions and the resident reader. It came to 6.1 s (fast) and 5.9 s (reference) with the per-start
+reductions' fast forms and the Rust lama-first-costs, without the resident reader. The 15 tries' median, predicted at
+0.5-2 s, stays at 4.9 s: it is a fresh ring(38) reading, which round 2 did not change.
+
+**Threshold.** "Yes" fails on the warm median: 4.9 s against 1 s. The ring(33) median (6.1 s against 10 s), the route
+replay and every gate now pass; the kitchen clause is the kitchen check's, which runs on round 1's binaries (the
+amendments above). So the answer stays "partly", now with all its gates.
+
+**Stop rule.** Round 2 gained 27% of the fast warm sum (264.9 s to 193.1 s) and 53% of the reference sum against round
+1's binaries on the same load, more than 10%, so the rounds do not stop by that rule. The next round goes to the
+reading (74%): the first try's fresh ring(33) reading and two refinements (106 s), a refinement from another entry
+(21 s without the memo), and the fresh ring(38) readings (4.4-4.8 s each), which set the median. Then the planner's
+per-start reductions (25%).
