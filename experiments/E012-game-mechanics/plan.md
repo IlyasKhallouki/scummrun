@@ -505,7 +505,8 @@ components that share them.
 
 ## Amendment 2026-11-03, component `targets`: one target per key in detail, and how T2 is run
 
-Written after the component's first code (branch e012-targets, cf364b4 and 67ac2ae, unit tests only), before T2 ran.
+Written after the component's first code (branch e012-targets, cf364b4, 67ac2ae and 03d4b83, unit tests only),
+before T2 ran.
 It fills in what section 3 leaves open; nothing in section 3 changes.
 
 - **The group.** For each reached key of a guide kind, the values left after `targets`' own exclusions (the entry's
