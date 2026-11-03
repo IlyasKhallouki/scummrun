@@ -889,3 +889,13 @@ this adds what the merge and free's posted record bring.
   every entry verifies from boot; and the run's stalls.json equals stall-report's table over the same files (C3's
   check on a real run). Reported, not a gate: the table over E014's scratch archives on the interactive demo (read
   only), each try's rows summing to its wall.
+
+## Amendment 2026-11-03, component `stall` (3): free's record as committed
+
+Written before the code it changes. free replaced the record shape it had posted (COORD.md, 20:15Z; e013-free ea0e920),
+after amendment (2) above was written from the earlier one. In result.json "free", "points" is now the list of offer
+points {"where": entry | stop | kept, "frame", "level", "seconds" (the point's offers without its delays), "record"
+(its affordance record, with B's "verdict_s" once merged), "delays"}; "n_points" is their count; "seconds" is the whole
+free step, and "delays" {"seconds"} the delays'. The rows are amendment (2)'s, read from "points", "where" and "record"
+in place of "at", "at" and "step". free's own end entries (`FMI_GOAL_END=1`) are of how "end" with a dead move of how
+"free": by amendment (2)'s rule they are the free step's.
