@@ -51,7 +51,7 @@ All 16 first tries, played again, give their recorded message.
 ## Gates
 
 **A1, patch 0007 inert** (`refuse/a1.sh`). E011's G2, G3 and G4 pass with `SPEEDRUN_INPUT` off and on: 0
-differences against svm-w3b, and 0 in G4's 400-frame walk. G1 with it on: see `a1-g1.txt`. The cargo tests
+differences against svm-w3b, and 0 in G4's 400-frame walk. G1 (fork exactness under load, 7 load children, 3,000 frames) with it on: 6,002 frame comparisons and 919,997 load-child comparisons, 0 differ; the trace equal; the flipped-RNG control differs at its first frame (`a1.txt`). The cargo tests
 `fmi-engine --test input` also pass:
 - the replies' decoding;
 - the log's paths at the kitchen root;

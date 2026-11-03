@@ -1,0 +1,22 @@
+[21:16:59] A1 off g2 exit 0: [21:16:58] g2-door lean=all6: {"dumps": 37, "start_s": 0.206, "run_s": 0.142, "frames": 3129, "ms_per_frame": 0.0452} | but pixels vs svm-w3b: 37 vs 37 dumps compared, 0 differ | screens_np: 37 vs 37 dumps compared, 0 differ [21:16:59] g2-door fmi-engine (bin, all six): {"dumps": 37, "frames": 3129, "start_s": 0.076, "run_s": 0.160, "engine_cpu_s": 0.31, "g4_difference
+[21:17:42] A1 off g3 exit 0: [21:17:41] g3-kitchen lean=all6: {"dumps": 40, "start_s": 0.207, "run_s": 0.14, "frames": 3216, "ms_per_frame": 0.0434} | but pixels vs svm-w3b: 40 vs 40 dumps compared, 0 differ | screens_np: 40 vs 40 dumps compared, 0 differ [21:17:42] g3-kitchen fmi-engine (bin, all six): {"dumps": 40, "frames": 3216, "start_s": 0.070, "run_s": 0.131, "engine_cpu_s": 0.26, "g4_diffe
+[21:17:44] A1 off g4 exit 0: [21:17:42] g4: walk 400 frames from 2728 (kitchen movie), all six {"frames": 400, "from": 2728, "steps_checked": 400, "runs": 1200, "explain_entries": 17600, "facts_followed": 399, "facts_built": 1, "differences": 0} [21:17:44] g4 exit 0 
+[21:18:25] A1 on g2 exit 0: [21:18:24] g2-door lean=all6: {"dumps": 37, "start_s": 0.201, "run_s": 0.175, "frames": 3129, "ms_per_frame": 0.0561} | but pixels vs svm-w3b: 37 vs 37 dumps compared, 0 differ | screens_np: 37 vs 37 dumps compared, 0 differ [21:18:25] g2-door fmi-engine (bin, all six): {"dumps": 37, "frames": 3129, "start_s": 0.072, "run_s": 0.106, "engine_cpu_s": 0.22, "g4_differences
+[21:19:03] A1 on g3 exit 0: [21:19:02] g3-kitchen lean=all6: {"dumps": 40, "start_s": 0.134, "run_s": 0.113, "frames": 3216, "ms_per_frame": 0.0351} | but pixels vs svm-w3b: 40 vs 40 dumps compared, 0 differ | screens_np: 40 vs 40 dumps compared, 0 differ [21:19:03] g3-kitchen fmi-engine (bin, all six): {"dumps": 40, "frames": 3216, "start_s": 0.081, "run_s": 0.122, "engine_cpu_s": 0.24, "g4_diffe
+[21:19:05] A1 on g4 exit 0: [21:19:03] g4: walk 400 frames from 2728 (kitchen movie), all six {"frames": 400, "from": 2728, "steps_checked": 400, "runs": 1200, "explain_entries": 17600, "facts_followed": 399, "facts_built": 1, "differences": 0} [21:19:05] g4 exit 0 
+G1 on: [22:10:49] g1: fork_exact.py run on the new build, all six
+G1 on: A0: fork exactness under load. Build /var/tmp/fast-mi/wt-e013-refuse/experiments/E011-speed/engine/svm-lean.sh (sha1 cde495c40702), seed 1, run B's inputs from boot; fork at frame 235, 3000 frames to frame 3235; dumps with SPEEDRUN_DUMP_LOCALS and SPEEDRUN_DUMP_EXACT; 7 load children; 8 CPUs
+G1 on: span: 22 room changes (first at frame 462), 357 frames with a cutscene open, 13 CD track starts (12 playing, first at frame 579)
+G1 on: reference F: 12.7 s; per-frame run command {'n': 3000, 'median': 0.207, 'p90': 0.361, 'min': 0.094, 'max': 14.45} ms
+G1 on: walk: 3542.4 s; per frame (C and P run) {'n': 3000, 'median': 7.669, 'p90': 17.404, 'min': 0.316, 'max': 44.538} ms; stopped early: None
+G1 on: C and P against F: 6002 frame comparisons (status and dump), 0 differ
+G1 on: load children against F: 881872 children, 919997 chunks, 919997 comparisons, 0 differ
+G1 on: P's trace.jsonl equals F's: True ({'F': '3c4fdad27400', 'P': '3c4fdad27400'})
+G1 on: fork ms: {'n': 883073, 'median': 3.107, 'p90': 7.655, 'min': 0.697, 'max': 194.069}
+G1 on: child frames per second (load children, run commands only): {'n': 86747, 'median': 11401.592, 'p90': 20672.647, 'min': 228.997, 'max': 76224.972}
+G1 on: load average (1 min) during the walk: {'n': 60, 'median': 5.32, 'p90': 6.18, 'min': 3.05, 'max': 7.01}; MemAvailable MB: {'n': 60, 'median': 11430.172, 'p90': 11532.332, 'min': 11039.762, 'max': 11561.957}
+G1 on: control: a child of P at frame 235 with its RNG state's low bit flipped, 3000 frames against F with no load. First frame that differs: status 236, dump without its exact object 236, exact object 236. Frames that differ: {'status': 3000, 'dump': 3000, 'exact': 3000}
+G1 on:   control differs at frame 236: status .rng: 2189388206 != 577465519
+G1 on:   control differs at frame 236: dump .vars[100]: 31 != 191
+G1 on:   control differs at frame 236: exact .rng: 2189388206 != 577465519
+G1 on: [23:10:20] g1 exit 0
