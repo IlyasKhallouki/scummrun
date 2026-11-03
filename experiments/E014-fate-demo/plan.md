@@ -255,3 +255,17 @@ named. **No:** the explorer cannot run (no root, no reading or no try completes)
 not explained. The stop rule is the plan's: exactness first; breaks fixed or written up before the run; the run stops
 at the goal, at E009's stop rules or at 80 committed tries, runs once, and a fix found during it is recorded and not
 applied to it; MI first; watchdogs as E012's.
+
+## Result so far on the interactive demo (2026-11-03): stopped, the explorer stalls; E013 next
+
+Stopped by the PI's session at 19:05, not by a stop rule: no goal is claimed. The assumptions table has rows up to
+18; each fix is behind its own switch (the game named from the extraction's settings, several values of VAR_EGO in a
+scope, the merge adding a branch's list entries once, the read cut's modes, sentence verbs turned on by a variable
+operand, E012's stagnation counted from the selectable cells, T with the interface's and the guide's atoms).
+
+What bound it, from the last archive (`p6`): 7 tries, 4 of them with nothing new; every attempt that planned went to
+the same target (var:52 = 0); 2 to 4 selectable cells. The explorer found no plannable progress, and the work had
+moved into the reader's internals to make the model see more. That is the case E013 addresses without a game's own
+code: a standing model-free share (the interface's inputs, waits and delays, from cells chosen by novelty) and stall
+accounting. So E014 continues after E013, on E013's build, with one more rule: a fix counts only if it is switched on
+for Monkey Island too and Monkey Island's checks still pass; a mechanic only this demo uses is recorded, not ported.
