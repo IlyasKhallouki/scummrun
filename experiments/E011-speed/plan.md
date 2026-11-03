@@ -2357,3 +2357,44 @@ mod tests {
      - an entry with deferred targets is not exhausted;
      - a resumed archive keeps the counts.
   6. Report the check's bit:118 requests: what proves them dead and how long it takes.
+
+## Results of the amendment "targets with no plan made cheap" (2026-11-03, written after the runs)
+
+Branch e011-deadtarget. Tables and lists: `results/deadtarget.md`. Laptop, seed 1, nice 10, at load 3-15.
+
+- **What it does now.** With `FMI_PLAN_DEAD=1`, the check's bit:118 = 1 request ends in 18-19 s as a proven no-plan
+  ("no plan (the planner proved none)"), against 187-191 s with the 180 s limit and 607-612 s with 600 s. With
+  `FMI_PLAN_DEEPEN=120`, a dead target that no proof catches costs 120 s plus the reductions in its first round, and
+  comes back with 240 s, 480 s, ... only once its entry has no other target left. Both switches are off by default.
+- **What proves bit:118.** h^2: the goal fact is outside the pair fixpoint. Each of its 8,712 writers needs a pair of
+  facts no reachable state holds (bit:386 = 0 with var:252 = 1, bit:387 = 0 with var:253 = 1, and nine more of that
+  kind). h^1 reaches it. Tries 15 and 16 give the same task.
+- **Gates.**
+  - Gate 1: 41 distinct recorded requests were rebuilt (103 records: the check 25, B0 16, B3 60, E008 2), plus E008's
+    serve38 and serve33; 319 recorded plans had their reading evicted or gone. No proof claims no plan where a plan
+    is recorded, and each of the 40 requests with a plan returns the recorded plan of every record (101). serve38 and
+    serve33 give the same bytes with the proofs on and off.
+  - Gate 2: the states of all 53 found plans are inside the h^2 rows.
+  - Gate 3: the fast h^2 equals the plain one on those 53 tasks and on 20,000 random tasks.
+  - Gate 4: with both switches off, G9 passes (18 scenarios × 2 modes, 0 differing).
+  - Gate 5: deepen_check passes.
+  - Gate 6: above.
+- **Fraction proven dead.** Over every target at entries 36 and 26 (89 each), h^1 proves none and h^2 proves one at
+  each (bit:118 = 1). Over the check's 24 rebuildable distinct requests, h^2 proves the same one. On the profile's
+  ring(38) survey, h^2 proves 2 of the 3 targets that ran out of time (var:52 = -1 stays open).
+- **Cost.** h^2 stops once the goal is in its rows. On ring(33) requests with a plan the proofs take a median of
+  0.38 s (max 1.4 s), against 13.8 s of reductions; on ring(38), 0.01 s. The dead one takes 4.5 s. The whole fixpoint
+  takes 2.6-7.3 s on ring(33).
+- **L0.** The 26 found plans with Fast Downward's search on the warm path took a median of 37.3 s of search, p90
+  111.6 s and max 119.8 s, so L0 = 120 s.
+- **Against the prediction.**
+  - Gate: yes.
+  - bit:118 proven dead by h^2 in under 30 s: yes (18.4-19.1 s).
+  - h^2 cost on ring(33), predicted 3-10 s: the whole fixpoint took 2.6-7.3 s. With the early stop (added after the
+    prediction), requests with a plan pay 0.4 s.
+  - ring(38) under 0.1 s: yes.
+  - 1-10 dead per entry and none by h^1: 1 per entry, none by h^1.
+  - L0 in 30-60 s: no. It is 120 s, because the check's requests on the refinement reading take 89-120 s of Fast
+    Downward's search at this load.
+- **Interaction.** A try that only defers targets makes no new reached values, so it counts toward E008's stagnation
+  stop. The stop rules are unchanged.
