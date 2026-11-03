@@ -4,7 +4,9 @@
 //! first one that matches the plan's branch (success, or the goal from the plan's records). A try's delay k is its
 //! first input frame minus the first issuing try's. Deviations are not taken while k < K(p); when no try with k < K
 //! can still match, the branch is refuted at this entry: the first deviation is taken (E010's choice), or the window
-//! ends empty. The other tries' end states are reported as candidate entries, by a digest of their facts.
+//! ends empty. With no K (a draw with no share and no range, amendment (2)) the fork changes no choice: the first end
+//! point is taken, as E010 takes it. The other tries' end states are reported as candidate entries, by a digest of
+//! their facts.
 //!
 //! Also: the random calls per frame, counted exactly from one Status `rng` to the next (ScummVM's RandomSource:
 //! xorshift32 13/21/11 per call, `common/random.cpp`).
@@ -346,8 +348,14 @@ impl Fork {
             self.chosen = Some(k);
             return Take::Choose;
         }
-        if outcome == "deviation" && self.fallback.is_none() {
-            self.fallback = Some(c);
+        if outcome == "deviation" {
+            if self.fallback.is_none() {
+                self.fallback = Some(c);
+            }
+            // amendment (2): with no K the fork changes no choice, the first end point is chosen as E010 chooses it
+            if self.k_max().is_none() {
+                return Take::Choose;
+            }
         }
         Take::Next
     }
@@ -672,6 +680,166 @@ mod tests {
         }
         println!("R2: {}", if all_ok { "PASS" } else { "FAIL" });
         assert!(all_ok);
+    }
+
+    /// A reading port that only names itself (window_draws reads it through `DrawsOf` alone).
+    struct NoReading(std::path::PathBuf, Domains, Facts);
+
+    impl ReadingSource for NoReading {
+        fn id(&self) -> [u8; 20] {
+            [0; 20]
+        }
+        fn dir(&self) -> &std::path::Path {
+            &self.0
+        }
+        fn head(&self) -> &str {
+            ""
+        }
+        fn packed(&self) -> &[u8] {
+            &[]
+        }
+        fn n_actions(&self) -> u32 {
+            0
+        }
+        fn action_line(&self, _: u32) -> &str {
+            ""
+        }
+        fn by_name(&self, _: &str) -> Option<u32> {
+            None
+        }
+        fn n_lists(&self) -> u32 {
+            0
+        }
+        fn list_line(&self, _: u32) -> &str {
+            ""
+        }
+        fn reached(&self) -> &str {
+            ""
+        }
+        fn domains(&self) -> &Domains {
+            &self.1
+        }
+        fn goal(&self) -> &[(Key, Vec<Val>)] {
+            &[]
+        }
+        fn start(&self) -> &Facts {
+            &self.2
+        }
+        fn action(&self, _: u32) -> Action {
+            unreachable!()
+        }
+        fn record(&self, _: u32) -> Record {
+            unreachable!()
+        }
+    }
+
+    fn check(why: &str, side: bool) -> Check {
+        Check {
+            cite: "room-028-bar/local-209.txt:11 [0010]".into(),
+            cond: "VAR_RESULT == 1".into(),
+            side: Some(side),
+            why: why.into(),
+            j: J::Null,
+        }
+    }
+
+    /// A record with one path per (action index, checks).
+    fn mrec(name: &str, paths: Vec<(u32, Vec<Check>)>) -> MRec {
+        let acts: Vec<Arc<Action>> = paths
+            .iter()
+            .map(|(w, _)| {
+                Arc::new(Action {
+                    name: name.into(),
+                    pre: vec![],
+                    effects: vec![],
+                    what: *w,
+                    cost: 1,
+                })
+            })
+            .collect();
+        let recs: Vec<Arc<crate::reading::Rec>> = paths
+            .into_iter()
+            .map(|(w, checks)| {
+                Arc::new(crate::reading::Rec {
+                    i: w,
+                    kind: "event".into(),
+                    label: name.into(),
+                    pre: vec![],
+                    effects: vec![],
+                    checks,
+                    src: vec![],
+                    src_text: String::new(),
+                    engine_pre: vec![],
+                })
+            })
+            .collect();
+        MRec {
+            i: 0,
+            name: name.into(),
+            step: PlanStep {
+                op: String::new(),
+                action: 0,
+                name: name.into(),
+                chosen: vec![],
+                guessed: vec![],
+            },
+            paths: acts,
+            whats: recs,
+            kind: crate::recs::Kind::Event,
+            reads: Default::default(),
+            writes: Default::default(),
+            unit: None,
+            wait: None,
+            cost: 1,
+            exps: vec![],
+            pres: vec![],
+            before: crate::val::View::new(),
+            preds: vec![],
+            macro_: 0,
+            done: false,
+            done_frame: None,
+            path: 0,
+            checked: None,
+        }
+    }
+
+    #[test]
+    fn window_draws_trigger_and_p() {
+        let rs = NoReading(std::path::PathBuf::new(), Domains::default(), Facts::new());
+        let draw = "?(random draw: ((getRandomNr) * ...) + ...)";
+        let pos = "?(position: getDist(8, 1))";
+        let recs = vec![
+            mrec("sentence(2,428)", vec![(10, vec![check(pos, true)])]),
+            mrec("event(local:209@56)", vec![(20, vec![check(pos, false), check(draw, true)])]),
+            mrec("event(local:208@41)", vec![(30, vec![check(draw, true), check(draw, false)]), (31, vec![check(draw, true)])]),
+        ];
+        // no draw among the members: no fork
+        assert_eq!(window_draws(&recs, &[0], &rs, None), None);
+        // the reader's reasons alone: the draws, no p, no K
+        let w = window_draws(&recs, &[0, 1], &rs, None).unwrap();
+        assert_eq!((w.rows.len(), w.p, w.k_max), (1, None, None));
+        assert_eq!(w.rows[0].arr()[1], J::Int(1));
+        // tested's draws: action 20 one in 4; 30 two draws (1/2 and 1/3); 31 one in 5. p = 1/4 · max(1/6, 1/5)
+        let f: DrawsOf = Arc::new(|_: &dyn ReadingSource, what: u32| match what {
+            20 => vec![Draw { check: 1, range: Some((0, 3)), share: None }],
+            30 => vec![
+                Draw { check: 0, range: Some((0, 1)), share: Some(0.5) },
+                Draw { check: 1, range: Some((0, 2)), share: None },
+            ],
+            31 => vec![Draw { check: 0, range: Some((0, 4)), share: None }],
+            _ => vec![],
+        });
+        let w = window_draws(&recs, &[0, 1, 2], &rs, Some(&f)).unwrap();
+        assert_eq!(w.rows.len(), 4);
+        assert!((w.p.unwrap() - 0.25 * 0.2).abs() < 1e-12);
+        assert_eq!(w.k_max, k_max(0.05));
+        // a path with no draw: the record does not depend on one
+        let g: DrawsOf = Arc::new(|_: &dyn ReadingSource, what: u32| match what {
+            30 => vec![Draw { check: 0, range: None, share: None }],
+            _ => vec![],
+        });
+        let w = window_draws(&recs, &[2], &rs, Some(&g)).unwrap();
+        assert_eq!((w.p, w.k_max), (Some(1.0), Some(1)));
     }
 
     #[test]

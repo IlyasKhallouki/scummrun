@@ -1,0 +1,58 @@
+window 0: sentence(2,428)#44 at 2728: K Some(7), first Some(2736), chosen k Some(0) (least matching Some(0)), refuted false, 1 tries [("success", 1)], 0 candidates; end: ready: the first end point in the order of tries; 1 children, wall 0.05 s; R3 pass
+   rng per parent frame: {"frames": 1, "calls": 1, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 1]]}
+window 1: walk_to(428)#64 at 2776: K Some(7), first Some(2777), chosen k None (least matching None), refuted true, 7 tries [("refuted", 1), ("spent", 6)], 1 candidates; end: delay fork: the plan's branch refuted, no try matched it within K frames; 7 children, wall 0.03 s; R3 pass
+   rng per parent frame: {"frames": 7, "calls": 7, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 7]]}
+   R1 attempt: 27 inputs, 3 checkpoints: 0 differences (3 checkpoints, 0.13 s)
+   R1 candidate plan 0 window 1 k 0 (refuted, frame 2796, 28 inputs): 0 differences (1 checkpoints, 0.11 s)
+DELAY p = 0.5000 (K Some(7)): plans ["replan"]; plan 1: the engine is at 2783, the capture's plan starts at 2798 (the route left the capture's); 2 windows, 1 candidates; R1 pass (2 verified from boot, 0 differ); R3 pass; play 0.4 s, verify 0.2 s
+window 0: sentence(2,428)#44 at 2728: K Some(17), first Some(2736), chosen k Some(0) (least matching Some(0)), refuted false, 1 tries [("success", 1)], 0 candidates; end: ready: the first end point in the order of tries; 1 children, wall 0.05 s; R3 pass
+   rng per parent frame: {"frames": 1, "calls": 1, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 1]]}
+window 1: walk_to(428)#64 at 2776: K Some(17), first Some(2777), chosen k None (least matching None), refuted true, 17 tries [("refuted", 1), ("spent", 16)], 1 candidates; end: delay fork: the plan's branch refuted, no try matched it within K frames; 17 children, wall 0.06 s; R3 pass
+   rng per parent frame: {"frames": 17, "calls": 17, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 17]]}
+   R1 attempt: 27 inputs, 3 checkpoints: 0 differences (3 checkpoints, 0.11 s)
+   R1 candidate plan 0 window 1 k 0 (refuted, frame 2796, 28 inputs): 0 differences (1 checkpoints, 0.11 s)
+DELAY p = 0.2500 (K Some(17)): plans ["replan"]; plan 1: the engine is at 2793, the capture's plan starts at 2798 (the route left the capture's); 2 windows, 1 candidates; R1 pass (2 verified from boot, 0 differ); R3 pass; play 0.4 s, verify 0.2 s
+window 0: sentence(2,428)#44 at 2728: K Some(95), first Some(2736), chosen k Some(0) (least matching Some(0)), refuted false, 1 tries [("success", 1)], 0 candidates; end: ready: the first end point in the order of tries; 1 children, wall 0.05 s; R3 pass
+   rng per parent frame: {"frames": 1, "calls": 1, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 1]]}
+window 1: walk_to(428)#64 at 2776: K Some(95), first Some(2777), chosen k None (least matching None), refuted true, 95 tries [("refuted", 2), ("spent", 18), ("deviation", 75)], 9 candidates; end: ready: the first end point in the order of tries; 95 children, wall 0.53 s; R3 pass
+   rng per parent frame: {"frames": 95, "calls": 95, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 95]]}
+window 2: walk_to(316)[202]#1038 at 2798: K Some(95), first Some(2800), chosen k None (least matching None), refuted true, 95 tries [("spent", 95)], 3 candidates; end: delay fork: the plan's branch refuted, no try matched it within K frames; 96 children, wall 1.08 s; R3 pass
+   rng per parent frame: {"frames": 96, "calls": 222, "least": 2, "most": 4, "unknown": 0, "hist": [[2, 81], [4, 15]]}
+   R1 attempt: 28 inputs, 5 checkpoints: 0 differences (5 checkpoints, 0.13 s)
+   R1 candidate plan 0 window 1 k 0 (refuted, frame 2796, 28 inputs): 0 differences (1 checkpoints, 0.11 s)
+   R1 candidate plan 0 window 1 k 19 (refuted, frame 2797, 28 inputs): 0 differences (1 checkpoints, 0.11 s)
+   R1 candidate plan 0 window 1 k 22 (deviation, frame 2800, 28 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 0 window 1 k 24 (deviation, frame 2802, 28 inputs): 0 differences (1 checkpoints, 0.14 s)
+   R1 candidate plan 0 window 1 k 30 (deviation, frame 2808, 28 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 0 window 1 k 31 (deviation, frame 2809, 28 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 0 window 1 k 34 (deviation, frame 2812, 28 inputs): 0 differences (1 checkpoints, 0.11 s)
+   R1 candidate plan 0 window 1 k 45 (deviation, frame 2823, 28 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 0 window 1 k 47 (deviation, frame 2825, 28 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 1 window 0 k 0 (spent, frame 2904, 34 inputs): 0 differences (1 checkpoints, 0.15 s)
+   R1 candidate plan 1 window 0 k 1 (spent, frame 2905, 34 inputs): 0 differences (1 checkpoints, 0.14 s)
+   R1 candidate plan 1 window 0 k 2 (spent, frame 2906, 34 inputs): 0 differences (1 checkpoints, 0.12 s)
+DELAY p = 0.0476 (K Some(95)): plans ["replan", "replan"]; plan 2: the engine is at 2894, the capture's plan starts at 3204 (the route left the capture's); 3 windows, 12 candidates; R1 pass (13 verified from boot, 0 differ); R3 pass; play 2.1 s, verify 1.7 s
+window 0: sentence(2,428)#44 at 2728: K None, first Some(2736), chosen k Some(0) (least matching Some(0)), refuted false, 1 tries [("success", 1)], 0 candidates; end: ready: the first end point in the order of tries; 1 children, wall 0.06 s; R3 pass
+   rng per parent frame: {"frames": 1, "calls": 1, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 1]]}
+window 1: walk_to(428)#64 at 2776: K None, first Some(2777), chosen k None (least matching None), refuted false, 21 tries [("refuted", 2), ("spent", 18), ("deviation", 1)], 2 candidates; end: ready: the first end point in the order of tries; 23 children, wall 0.14 s; R3 pass
+   rng per parent frame: {"frames": 23, "calls": 23, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 23]]}
+window 2: walk_to(316)[202]#1038 at 2798: K None, first Some(2800), chosen k None (least matching None), refuted false, 294 tries [("spent", 281), ("mismatch", 12), ("deviation", 1)], 11 candidates; end: ready: the first end point in the order of tries; 296 children, wall 3.56 s; R3 pass
+   rng per parent frame: {"frames": 296, "calls": 684, "least": 2, "most": 4, "unknown": 0, "hist": [[2, 250], [4, 46]]}
+window 3: sentence(9,566)#15899 at 3204: K None, first Some(3205), chosen k Some(0) (least matching Some(0)), refuted false, 1 tries [("goal", 1)], 0 candidates; end: ready: the first end point in the order of tries; 1 children, wall 0.01 s; R3 pass
+   rng per parent frame: {"frames": 1, "calls": 1, "least": 1, "most": 1, "unknown": 0, "hist": [[1, 1]]}
+   R1 attempt: 36 inputs, 8 checkpoints: 0 differences (8 checkpoints, 0.17 s)
+   R1 candidate plan 0 window 1 k 0 (refuted, frame 2796, 28 inputs): 0 differences (1 checkpoints, 0.14 s)
+   R1 candidate plan 0 window 1 k 19 (refuted, frame 2797, 28 inputs): 0 differences (1 checkpoints, 0.13 s)
+   R1 candidate plan 1 window 0 k 0 (spent, frame 2904, 34 inputs): 0 differences (1 checkpoints, 0.14 s)
+   R1 candidate plan 1 window 0 k 1 (spent, frame 2905, 34 inputs): 0 differences (1 checkpoints, 0.14 s)
+   R1 candidate plan 1 window 0 k 2 (spent, frame 2906, 34 inputs): 0 differences (1 checkpoints, 0.13 s)
+   R1 candidate plan 1 window 0 k 195 (spent, frame 3099, 34 inputs): 0 differences (1 checkpoints, 0.15 s)
+   R1 candidate plan 1 window 0 k 225 (spent, frame 3129, 34 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 1 window 0 k 257 (mismatch, frame 3154, 34 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 1 window 0 k 258 (mismatch, frame 3155, 34 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 1 window 0 k 259 (mismatch, frame 3156, 34 inputs): 0 differences (1 checkpoints, 0.11 s)
+   R1 candidate plan 1 window 0 k 269 (spent, frame 3166, 34 inputs): 0 differences (1 checkpoints, 0.12 s)
+   R1 candidate plan 1 window 0 k 273 (spent, frame 3170, 34 inputs): 0 differences (1 checkpoints, 0.11 s)
+   R1 candidate plan 1 window 0 k 280 (spent, frame 3177, 34 inputs): 0 differences (1 checkpoints, 0.11 s)
+DELAY p = 0.0000 (K None): plans ["replan", "replan", "goal"]; 4 windows, 13 candidates; R1 pass (14 verified from boot, 0 differ); R3 pass; play 4.2 s, verify 1.9 s
+DELAY-CHECK: PASS
