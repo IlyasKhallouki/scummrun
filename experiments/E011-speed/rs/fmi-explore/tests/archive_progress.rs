@@ -557,6 +557,34 @@ fn the_order_equals_a_brute_force_over_a_generated_archive() {
         fired += a.stagnant() as usize;
     }
     assert!(a.rows.len() > 30, "{} rows", a.rows.len());
+    // job.json's novelty against a brute force over the live rows' facts, on every row's state and on states moved off
+    let jd = a.prepare_job(a.select(1)[0]).unwrap();
+    let nv = Novel::of_job(&files::read_json(&jd.join("job.json")).unwrap(), None).unwrap();
+    let t_all = a.progress.as_ref().unwrap().t.clone();
+    let live: Vec<FactMap> = a.live_rows().into_iter().map(|i| facts_of(&a, i)).collect();
+    let val = |f: &FactMap, k: &str| f.get(k).copied().unwrap_or(0);
+    let mut checked = 0;
+    for i in 0..a.rows.len() {
+        for shift in 0..3i64 {
+            let mut f = facts_of(&a, i);
+            if shift > 0 {
+                let k = keys[(i + shift as usize) % keys.len()];
+                f.insert(k.to_string(), val(&f, k) + shift);
+            }
+            let mut want: Vec<String> = t_all
+                .iter()
+                .filter(|x| x.holds(val(&f, &x.key)) && !live.iter().any(|g| x.holds(val(g, &x.key))))
+                .map(|x| x.text())
+                .collect();
+            let room = val(&f, "room");
+            if !live.iter().any(|g| val(g, "room") == room) {
+                want.push(format!("room={room}"));
+            }
+            assert_eq!(nv.novel(&f), want, "row {i} shift {shift}");
+            checked += 1;
+        }
+    }
+    assert!(checked > 90);
     let b = Archive::open(&a.root).unwrap();
     assert_eq!(b.select(1000), a.select(1000));
     assert_eq!(b.cells_json(), a.cells_json());
