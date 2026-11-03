@@ -8,7 +8,10 @@
 //! * the event keys and the keys in all by the amendment's rule (an object event's slot is `objscript:O`): 46 and 97;
 //!   the plan's probe kept an object event's own slot key, and with those keys added back its 49 and 100 come out;
 //! * `Tested::of` (any ReadingSource) equals `Tested::of_reading` (the preconditions decoded alone);
+//! * T made again from the records equals it;
 //! * every draw check's site resolved from the game agrees with the reader's own text of the check.
+//!
+//! Every test but `t1` holds for any reading, so `FMI_T1_READING` may name another (`cargo test -- --skip t1`).
 
 use fmi_core::{Key, ReadingSource};
 use fmi_reading::tested::{draws, own_unit_key, source_of, DrawGame, Source, Tested};
@@ -69,6 +72,53 @@ fn of_equals_of_reading() {
     }
 }
 
+/// T made again from each action's `record(i).pre` (the port of PackedTask._action that G8 checked against the
+/// Python reference) and `source`, with the own-unit rule written out here.
+#[test]
+fn atoms_from_the_records() {
+    let Some(rd) = reading() else { return };
+    let t = Tested::of_reading(&rd);
+    let mut atoms: BTreeSet<(Key, Vec<i64>)> = BTreeSet::new();
+    let (mut inputs, mut events): (BTreeSet<Key>, BTreeSet<Key>) = (BTreeSet::new(), BTreeSet::new());
+    for i in 0..rd.n_actions() {
+        let r = rd.record(i);
+        let src = source_of(&r.source);
+        for (k, vs) in r.pre {
+            match src {
+                Source::Event { unit, .. } => {
+                    let own = match k.kind() {
+                        fmi_core::K_LOCAL => unit == (fmi_core::U_LOCAL, k.a()),
+                        fmi_core::K_SCRIPT => unit == (fmi_core::U_SCRIPT, k.a()),
+                        fmi_core::K_OBJSCRIPT => unit == (fmi_core::U_OBJ, k.a()),
+                        fmi_core::K_POS
+                        | fmi_core::K_ESCPOS
+                        | fmi_core::K_ARGS
+                        | fmi_core::K_FROZEN
+                        | fmi_core::K_AT
+                        | fmi_core::K_ESC => (k.unit(), k.a()) == unit,
+                        _ => false,
+                    };
+                    if own {
+                        continue;
+                    }
+                    events.insert(k);
+                }
+                _ => {
+                    inputs.insert(k);
+                }
+            }
+            atoms.insert((k, vs));
+        }
+    }
+    for (k, vs) in rd.goal() {
+        atoms.insert((*k, vs.clone()));
+    }
+    let flat: BTreeSet<(Key, Vec<i64>)> = t.flat().into_iter().collect();
+    assert_eq!(flat, atoms);
+    assert_eq!(t.inputs, inputs.into_iter().collect::<Vec<_>>());
+    assert_eq!(t.events, events.into_iter().collect::<Vec<_>>());
+}
+
 #[test]
 fn draw_sites_agree_with_the_reader() {
     let Some(rd) = reading() else { return };
@@ -86,5 +136,6 @@ fn draw_sites_agree_with_the_reader() {
         }
         assert_eq!(draws(&rd, i, None).len(), ds.len());
     }
-    assert_eq!((actions, checks), (8_201, 8_207));
+    let c = Tested::of_reading(&rd).counts;
+    assert_eq!((actions, checks), (c.draw_actions, c.checks.get("random draw").copied().unwrap_or(0)));
 }
