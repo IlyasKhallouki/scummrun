@@ -61,21 +61,26 @@ lama-first-costs the fast settings reach the kitchen on the reference's route.
 
 ## Bench
 
-**The landmark graph** (CPU of `landmarks::build`, the least of 3; Fast Downward's "Landmark graph generation time"
-from its log on the same SAS file):
+**The landmark graph** (CPU of `landmarks::build`, the least of 3 at load 4-6, and its user-space instructions; Fast
+Downward's "Landmark graph generation time" from its log on the same SAS file, at load 10-20):
 
 | task | landmarks (disjunctive) | orderings | Fast Downward | Rust | instructions |
 |---|---:|---:|---:|---:|---:|
-| ring(38) j00091, bit:108=1 | 14 (1) | 24 | 0.32 s | 0.022 s | 63 M |
-| ring(33) j00089, bit:108=1 | 16 (1) | 29 | 16.06 s | 0.35 s | 957 M |
-| test (a), request 1 | 34 (1) | 138 | 8.66 s | 0.09 s | 536 M |
-| test (a), request 2 | 28 (1) | 77 | 7.83 s | 0.14 s | 815 M |
-| test (a), request 3 | 16 (0) | 36 | 6.89 s | 0.08 s | 458 M |
+| ring(38) j00091, bit:108=1 | 14 (1) | 24 | 0.32 s | 0.008 s | 62 M |
+| ring(33) j00089, bit:108=1 | 16 (1) | 29 | 16.06 s | 0.13 s | 933 M |
+| test (a), request 1 | 34 (1) | 138 | 8.66 s | 0.076 s | 516 M |
+| test (a), request 2 | 28 (1) | 77 | 7.83 s | 0.107 s | 794 M |
+| test (a), request 3 | 16 (0) | 36 | 6.89 s | 0.058 s | 437 M |
+
+Of ring(33)'s 933 M instructions: the reachability's tables about 600 M (2.6 M effects of 97,547 operators, 1.0 M
+conditional), the 6 explorations about 150 M, the providers 80 M.
 
 **A whole search on a SAS file** (`lama search`, after the file is read; Fast Downward's total from its log includes its
 own parse): test (a)'s first request, 30 steps, 2,474 evaluated: Fast Downward 65.5 s (search 54.3 s); Rust 84 s of CPU
-with today's h_FF (search.rs `Ff`, FD's loop transcribed: 34 ms an evaluation), 9.3 s with r2-plan's h_FF by watched
-preconditions (a scratch merge of e011-r2-plan, never pushed: 3.6 ms an evaluation), the same plan and counts.
+with today's h_FF (search.rs `Ff`, FD's loop transcribed: 34 ms an evaluation, load 15-20), 7.56 s of CPU (21.8 G
+instructions) with r2-plan's h_FF by watched preconditions (a scratch merge of e011-r2-plan, never pushed; load 6:
+the graph 0.11 s, h_FF's relaxed task and the trie 0.25 s, the search 7.42 s of which h_FF 7.30 s, 2.95 ms an
+evaluation), the same plan and counts. Gbfs on the same file and h_FF: 7.17 s (25.6 G instructions), 2,431 evaluated.
 
 **Through fmi-plan, the Rust lama against the Rust Gbfs on the same requests** (one fmi-plan process per round, the
 plan cache off, rounds interleaved; CPU of the whole request: the warm request's reductions, the in-memory task, the
@@ -99,7 +104,7 @@ are a scan of every operator per expansion, lama's a walk of the trie.
 |---|---|---|
 | plans byte for byte Fast Downward lama-first-costs' on serve38, serve33 and test (a)'s requests | 30 requests equal, with the graph and the counts | yes |
 | CPU at most 1.2x Gbfs's on the same requests | ring(38) 1.04-1.21 (mean 1.135) with the fast switch; test (a) 0.58-0.94; serve33 0.75-1.34 (least of 2, an earlier build, the reductions' noise dominates: lama's search part adds 0.3-0.5 s to 6-17 s) | on the sequences yes; per request not everywhere |
-| test (a)'s first request at most 5 s | the search 84 s of CPU with today's h_FF, 9.3 s with r2-plan's watched h_FF (2,474 evaluations at 3.6 ms; the graph 0.09 s, the trie 0.03 s, the search's own work 0.13 s) | no: h_FF binds (r2-plan's item); at 3 ms an evaluation the search alone takes 7.4 s |
+| test (a)'s first request at most 5 s | the search 84 s of CPU with today's h_FF; 7.56 s with r2-plan's watched h_FF (2,474 evaluations at 2.95 ms = 7.30 s; the graph 0.11 s, the relaxed task and the trie 0.25 s, the search's own work 0.12 s), before the request's reductions | no: h_FF binds (r2-plan's item) |
 
 The floor of this search is Fast Downward's number of h_FF evaluations (fixed: the plans must be its plans) times the
-cost of one exact h_FF, plus the graph. lama's own parts on test (a)'s first request: 0.25 s of 9.3 s.
+cost of one exact h_FF, plus the graph. lama's own parts on test (a)'s first request: 0.25 s of 7.56 s.
