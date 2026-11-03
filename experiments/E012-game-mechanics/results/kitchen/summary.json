@@ -1,0 +1,23 @@
+{
+ "stop": "goal",
+ "detail": {
+  "entry": 150
+ },
+ "jobs": 53,
+ "entries": 151,
+ "cells": 70,
+ "goal_entries": [
+  150
+ ],
+ "time": "2026-11-03T15:03:35",
+ "verify": {
+  "entry": 150,
+  "same": true,
+  "goal": true,
+  "frames": 15688,
+  "qf": 376512,
+  "seconds": 1568.8512723618917,
+  "inputs": 85,
+  "segments": 8
+ }
+}
