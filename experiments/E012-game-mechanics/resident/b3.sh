@@ -2,8 +2,9 @@
 # E012 resident, end to end: B3's 15 tries in E011 round 2's fast settings (play when ready, the old tail first, the
 # Rust lama-first-costs, every round-2 switch on), warm in one resident fmi, each try under the heavy lock; then each
 # try against B0's (E011's cmp_tries.py). After delay's b3.sh.
-#   b3.sh OUT off|on|on-system   on: FMI_READER_LIB=1 (the reading in fmi's process, the job memo resident);
-#                                on-system: with FMI_READER_ALLOC=system (the plan's amendment "the allocator")
+#   b3.sh OUT off|on|on-system|on-mimalloc   on: FMI_READER_LIB=1 (the reading in fmi's process, the job memo
+#                                resident, the allocator by phase); on-system, on-mimalloc: FMI_READER_ALLOC=system or
+#                                mimalloc throughout (the plan's amendments "the allocator" and "the allocator by phase")
 # The binaries: this branch's build (RESIDENT_TARGET, default /var/tmp/fast-mi/target-e012-resident); the engine:
 # round 2's (patches 0001-0004, read only).
 set -u
@@ -20,7 +21,8 @@ export TMPDIR=$1/tmp E008_DISK_PATH=$1 E008_FLOOR_GB=5
 mkdir -p $TMPDIR
 ON2="FMI_ENGINE_CUTS=1 FMI_PLAY_BATCH=1 FMI_HIT_CACHE=1 FMI_STONE_KEEP=1 FMI_PLAN_FAST=1 FMI_PLAN_LAMA=rust FMI_READER_PREP=1 FMI_IDLE_CHANGES=1 FMI_PLAYER_DONE=1 FMI_TRY_MEMO=1 FMI_PLANNER_KEEP=1 FMI_PLAY_KEEP=1"
 case $SEQ in off) SW="";; on) SW="FMI_READER_LIB=1";; on-system) SW="FMI_READER_LIB=1 FMI_READER_ALLOC=system";;
-  *) echo "off, on or on-system"; exit 2;; esac
+  on-mimalloc) SW="FMI_READER_LIB=1 FMI_READER_ALLOC=mimalloc";;
+  *) echo "off, on, on-system or on-mimalloc"; exit 2;; esac
 [ -f $OUT/jobs/j00014/job.json ] || $PY $here/../../E011-speed/bench/prep_after.py $B0 $OUT --settings fast > /dev/null || exit 1
 rm -rf $OUT/rcache $OUT/plans $OUT/pool
 FIFO=$OUT/jobs.fifo; rm -f $FIFO; mkfifo $FIFO
