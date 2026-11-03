@@ -58,6 +58,8 @@ pub struct Host {
     pub dead: bool,
     /// h^2's watchdog, seconds: past it the proof is open and the search runs
     pub dead_s: u64,
+    /// the proofs' measure (fmi-plan seq --proof-only): no search after an open proof (status "open")
+    pub proof_only: bool,
 }
 
 impl Host {
@@ -80,6 +82,7 @@ impl Host {
             work: std::env::temp_dir().join("fmi-plan"),
             dead: std::env::var("FMI_PLAN_DEAD").map(|v| v == "1").unwrap_or(false),
             dead_s: std::env::var("FMI_PLAN_DEAD_S").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0).unwrap_or(60),
+            proof_only: false,
         }
     }
 }
@@ -470,7 +473,7 @@ impl WarmPlanner {
         let mut kept_h2 = None;
         if self.host.dead {
             let td = Instant::now();
-            let (p, h2) = taskcore::dead::prove_keep(&st, Some(td + Duration::from_secs(self.host.dead_s.max(1))));
+            let (p, h2) = taskcore::dead::prove_keep(&st, Some(td + Duration::from_secs(self.host.dead_s.max(1))), dead_check);
             if dead_check {
                 kept_h2 = h2;
             }
@@ -487,14 +490,15 @@ impl WarmPlanner {
                 })
                 .collect();
             let pj = format!(
-                "{{\"proof\": \"{}\", \"miss\": [{}], \"seconds\": {:.3}, \"h1_s\": {:.3}, \"h2_s\": {:.3}, \"h2_passes\": {}, \"h2_done\": {}}}",
+                "{{\"proof\": \"{}\", \"miss\": [{}], \"seconds\": {:.3}, \"h1_s\": {:.3}, \"h2_s\": {:.3}, \"h2_passes\": {}, \"h2_done\": {}, \"h2_goal_in\": {}}}",
                 self.last.proof,
                 miss.join(", "),
                 self.last.dead,
                 p.h1_s,
                 p.h2_s,
                 p.h2_passes,
-                p.h2_done
+                p.h2_done,
+                p.h2_goal_in
             );
             if p.dead.is_some() {
                 let mut stats = red.stats;
@@ -508,6 +512,10 @@ impl WarmPlanner {
                 stats.s("kept", red.kept);
                 stats.raw("dead", &pj);
                 return Ok(PlanResult { status: "unsolvable".into(), source: "proof".into(), stats: stats.done(), ..Default::default() });
+            }
+            if self.host.proof_only {
+                // the measure: the reductions and the proofs, no search
+                return Ok(PlanResult { status: "open".into(), source: "proof".into(), stats: format!("{{\"dead\": {}}}", pj), ..Default::default() });
             }
             proof_json = Some(pj);
         }

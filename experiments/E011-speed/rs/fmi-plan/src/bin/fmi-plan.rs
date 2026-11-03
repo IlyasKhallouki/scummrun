@@ -9,7 +9,8 @@
 //!   `label<TAB>key<TAB>value...`; tail: one step name per line; goal: `K=V[|V],..`); "-" for none
 //!   The result of request NAME goes to DIR/NAME.json; one JSON line of seconds per request on stdout.
 //!   --tail-only 1: only the old tail's check (no search): status "plan" (source "tail") or "no tail".
-//!   --dead on|off: the no-plan proofs before the search (default: FMI_PLAN_DEAD); --time S: the search's limit (600).
+//!   --dead on|off: the no-plan proofs before the search (default: FMI_PLAN_DEAD); --time S: the search's limit (600);
+//!   --proof-only 1: the reductions and the proofs only (status "open" when they prove nothing).
 
 use fmi_core::{val_text, Action, Ban, EffVal, Facts, Key, PlanRequest, PlanResult, Planner, Search, Val};
 use fmi_plan::double::FileReading;
@@ -178,6 +179,10 @@ fn run() -> Result<(), String> {
         Some("off") => host.dead = false,
         Some(x) => return Err(format!("--dead {}: on or off", x)),
         None => {}
+    }
+    if opt.contains_key("--proof-only") {
+        host.dead = true;
+        host.proof_only = true;
     }
     let time_limit_s: u64 = match opt.get("--time") {
         Some(t) => t.parse().map_err(|e| format!("--time: {}", e))?,
