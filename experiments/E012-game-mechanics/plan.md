@@ -778,3 +778,70 @@ Written before the component's code. It fills in what sections 5 and 6 leave ope
     - where stagnation would have fired;
     - the novel atoms per room;
     - the cost of the recount and of job.json's novelty.
+
+## Amendment 2026-11-03, component `try`: the order of a try in detail, and how G0 and G-on are run
+
+Written before try's code is committed. It fills in what "How a try runs" leaves open; nothing there changes.
+
+- **Where.** fmi-explore's `tryjob.rs` runs the order; a new module `mech.rs` holds the switches, the ports, the try's
+  novelty, the commit of the extra entries, the dead moves and the triggers. fmi wires the ports: T from fmi-reading's
+  `tested` (fmi-explore does not depend on fmi-reading), and the wait. `ports.rs` gains `PlayExtras` (T's keys and
+  the try's novelty for the delay fork) and a provided `PlayerHost::player_with`, whose default is `player`.
+- **No switch of its own.** Each step runs under its component's switch (`FMI_WAIT`, `FMI_TARGET_PER_KEY`,
+  `FMI_DELAY_FORK`, `FMI_AFFORD`, `FMI_SELECT=progress`; end's are read where they act). With every switch off the try
+  computes no T and writes no new field: it is round 2's.
+- **The order,** with some switch on:
+  1. Return and reading, as round 2.
+  2. T is `Tested::of(reading)`, flattened, made once per reading in the process. With `FMI_SELECT=progress`,
+     result.json "tested" holds it as the archive's atoms.
+  3. **Wait** (`FMI_WAIT`) on the entry's engine, after the reading. It replaces E009's idle measurement. When the job
+     asks for that measurement, the wait's first frames feed the idle rule and its record is result.json "idle" as
+     before. A stop that holds a novel atom (below) becomes an entry: no events, the stop's checkpoint.
+  4. **Targets.** With `FMI_TARGET_PER_KEY`, the T tier is `Tested::has`.
+  5. **Attempts** as round 2. With `FMI_DELAY_FORK`, the window search gets T's keys and the try's novelty.
+  6. **The goal again.** The tier-0 attempt from the entry may end with status "unsolvable" or "incomplete" (a proof,
+     or a finished search, with no plan) or be deferred by deepening. If the wait has stops, the goal is then attempted
+     from each stop in frame order, before the next target, once per try.
+     - The engine at a stop is a fork of the entry's, run with no input to the stop's frame. It is held to the stop's
+       checkpoint; a difference is an error of the try.
+     - If such an attempt plays, it is the try's played attempt. Its entries come from its checkpoints, as any
+       attempt's. Its target is not recorded twice in "tried", and its probe carries "from_stop".
+  7. **The played attempt's** entries, as round 2. Then:
+     - the delay fork's candidates in its window records, each kept when novel;
+     - a dead move when its run ended in the game's end (stop "engine: engine ended: R" with `is_game_end(R)`): the
+       inputs after its last checkpoint.
+  8. **Affordance step** (`FMI_AFFORD`). Its triggers are the played attempt's stop being Lemma R's R0 or "the same
+     empty window", or no attempt playing (every target dead, deferred or at its limit, or no target).
+     - It runs on the attempt's engine at its end, or on the entry's engine. The kept entries continue the attempt's
+       inputs and checkpoints up to that frame.
+     - The horizon is W, plus, with the wait on, the frames from the offer to the last due frame there.
+     - With the wait on, each trial goes on through the wait's stops (afford's `then`).
+     - An input whose movie equals one of job.json's dead moves for the entry is not tried.
+     - A kept outcome is an entry: the prefix and the clicks, the prefix's checkpoints and the kept one. A trial that
+       ends in the game's end is a dead move.
+  9. **Commit.** The extra entries follow the attempt's in result.json "new", with "how" "wait", "delay" or "afford"
+     and their novel atoms. result.json "dead" lists the dead moves. "e012" is the record: T's counts, the wait, the
+     goal again, the delay fork, the affordance steps, the entries kept by kind, the dead moves and the switches. The
+     CPU record gains "wait" and "afford".
+- **Novelty.** The archive's: job.json's "novelty" with this try's T (`Novel::of_job`). A job without it (made with
+  `FMI_SELECT` off, or B0's) takes the entry's own state as the archive. On top, IW(1) within the try: an atom that an
+  entry the try keeps holds is not novel again in this try. Entries are counted in this order: the wait's stops, the
+  attempt's checkpoints, the delay candidates, the affordance outcomes.
+- **Exhausted** (plan.md 5). Round 2's rule, and with any switch on also: no extra entry is kept, the wait (when on) is
+  static, and the affordance step (when on) offered no input.
+- **Not here.** The due frame as a planned event's window (plan.md 1, last bullet) belongs to fmi-play's window search
+  (delay's `window.rs`).
+- **Gates as run.**
+  - **G0.** B3's 15 tries from round 2's job folders, one resident fmi per sequence, with every E012 switch unset and
+    round 2's switches as round 2 ran them: the fast settings (`b3f/r2-fast`, ON2) and the reference settings
+    (`b3/r2-ref`). Compared to round 2's outputs as `cmp_tries.py` compares, with `fmi check tries` (Rust): per try
+    the attempt's stop, target, frames, replans, inputs and refinements, and every new entry (frame, tick, how,
+    events, every checkpoint's facts).
+  - **G-on.** The same 15 tries in the fast settings with ON3 and every E012 switch on (`FMI_WAIT=1`,
+    `FMI_TARGET_PER_KEY=1`, `FMI_DELAY_FORK=1`, `FMI_AFFORD=1`, `FMI_SELECT=progress`, `SPEEDRUN_REPORT_RESTART=1`,
+    `FMI_BOXES=1`), on end's engine (patches 0001-0005). Every new entry is verified from boot in a fresh lean
+    engine (fmi-engine's `replay::verify`: the entry's movie, its checkpoints and the try's entry's), with
+    `fmi check verify-new`.
+  - **Measured,** off against on: per try the wall and CPU by part (return, read, wait, plan, play, afford), and the
+    mechanisms' counts (stops and kept, goal-again requests, delay windows and candidates, affordance steps with
+    trials and kept, dead moves).
