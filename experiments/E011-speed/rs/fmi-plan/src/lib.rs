@@ -471,15 +471,21 @@ impl WarmPlanner {
             }
             Search::FdLamaFirstCosts if self.host.rust_lama => {
                 let o = taskcore::lama::lama_first_costs(&st, &taskcore::lama::predicates_of(&st), deadline);
-                if let Some(e) = o.status.strip_prefix("error: ") {
-                    return Err(tc_err(format!("lama: {}", e)));
+                if o.status.starts_with("error: ") {
+                    // a graph the port does not make (lama.rs refuses rather than guess): Fast Downward's binary
+                    eprintln!("fmi-plan: the Rust lama-first-costs: {}; Fast Downward's binary instead", o.status);
+                    let ts = Instant::now();
+                    let r = self.fd(&mut x, &plan, start_vals, req.time_limit_s)?;
+                    self.last.search = ts.elapsed().as_secs_f64();
+                    r
+                } else {
+                    self.last.relax = o.graph_s + o.relax_s;
+                    self.last.search = o.search_s;
+                    self.last.expanded = o.expanded;
+                    self.last.evaluated = o.evaluated;
+                    let cost = if o.status == "plan" { Some(o.cost) } else { None };
+                    (o.status, o.plan, cost)
                 }
-                self.last.relax = o.graph_s + o.relax_s;
-                self.last.search = o.search_s;
-                self.last.expanded = o.expanded;
-                self.last.evaluated = o.evaluated;
-                let cost = if o.status == "plan" { Some(o.cost) } else { None };
-                (o.status, o.plan, cost)
             }
             Search::FdLamaFirstCosts => {
                 let ts = Instant::now();
