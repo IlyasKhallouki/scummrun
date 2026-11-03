@@ -179,3 +179,79 @@ is claimed. What E014 built is general and stays (each behind its switch): the m
 another SCUMM v5 game, engine patch 0006's decision point without verb ids, the host and the reader for another game
 id, the game's own end as a goal, and the reader with no modelled input. The next game for this question is an
 interactive release.
+
+## Amendment 2026-11-03 (2): the interactive demo
+
+Written and committed before any run of the bridge, the harness or the explorer on this game, and before any code
+it changes.
+
+### Why the game changes
+
+The talkie demo plays itself to its restart with no input (the result above), so its end says nothing about finishing
+a game. The PI, 2026-11-03, wants the system to finish a second game end to end before Part I resumes, asked "What if
+we move to another game and it's another set of problems?", and that onboarding a game should not be manual work.
+E014 goes on, on the interactive release.
+
+### The game
+
+"Indiana Jones and the Fate of Atlantis, Interactive Demonstration v2" (ScummVM id `atlantis`, Demo/DOS/English,
+SCUMM v5). Its files are read only at `/var/tmp/fast-mi/games/fate-play-demo` (PLAYFATE.000, PLAYFATE.001). Its
+extraction: `scripts/dump-scripts.sh` with `SCUMMRP_GAME=atlantis INDEX_NAME=PLAYFATE.000 RELEASE=fate-play-demo
+OUT_ROOT=/var/tmp/fast-mi/e014-root GAME_DIR=/var/tmp/fast-mi/games/fate-play-demo`, in
+`/var/tmp/fast-mi/e014-root/data/scripts-fate-play-demo`: 11 rooms in the files, 93 global scripts, 78 local, 224
+objects (66 with verb code, 227 verb entry points), 417 files, 0 errors. Nothing extracted is committed: no file, no
+text, no object name; units are named by room, object and script numbers.
+
+### Its inventory (`results/inventory/fate-play-demo/`, README section "The second game")
+
+- Against MI it adds: `soundKludge` (275 statements in 39 units), `saveString`/`loadString` (1, 2), `saveLoad` (2 in
+  1 unit), `setRoomShadow` (3), `debug` (1), all without a rule in the machine (a path ends there, "unmodelled");
+  `getActorScale` (9, an unknown value); `drawObject` with `setImage` (13, modelled).
+- The IR parses every statement (the talkie demo's speech codes do not occur).
+- End sites: two `systemOps` restarts, global script 57 at 0D0E and object 582's verb code at 0067; no quit. The
+  guide regresses from these sites by itself (`fmi guide map --goal end=1 --start-boot`), as for the talkie demo.
+- For the record only, never an input: the PI's session read that the object's site is in a walk-to handler under a
+  test of the object's state, and that global 57's site follows an endless loop.
+
+### What runs, in order
+
+1. **The table first.** `results/assumptions.md` holds the assumptions table of method (c): the rows the talkie demo
+   fixed (from E014's commits), then a row for each break on this game, in the order met. The extraction's file
+   headers and index title name MI when `GAME_TITLE` is unset: that is this game's first row.
+2. **Breaks.** `demo/env.sh` (or a sibling `play/env.sh`) points at this game. The boot through the bridge with
+   E014's switches (`SPEEDRUN_IDLE=handler`, the game id, the end as the stage goal), the guide, then scratch
+   archives of 1-5 tries with every E012 switch on, ON3 and E14ON. Each break is fixed generally, behind a switch
+   where it touches shared code, gets its row, and the next scratch starts. A break that needs a new model is a
+   blocker (method (c)).
+3. **The run** (method (e) with this game): once the boot, a reading and one try complete with no open break, one
+   run from a new archive `/var/tmp/fast-mi/e014-archives/play`, stage `play`, goal `end = 1`, the rooms from the
+   files, b = 2, E009's switches, play when ready, commit as finished, the falsifier at 80 committed tries, seed 1.
+4. **Verify** the goal entry from boot on the lean engine, and on svm-w3b through `explore.py verify` if the frozen
+   reference runs this game without a change (else stated).
+5. **Not a finish:** a goal entry whose chain holds no player input (only boot and waits) is reported as the game
+   playing itself, not as reached.
+
+### Prediction for this game (before any run or code)
+
+| | predicted |
+|---|---|
+| the extraction | the header and the index title are its only break; re-extracted with the game named from its settings, every script body is byte for byte the same |
+| first boot (handler rule) | the decision point holds from boot within 3,000 frames |
+| the reader | reads the 11 rooms; `soundKludge` ends paths as unmodelled where it is met, and needs a rule (1-3 reader rules in all) |
+| the executor | MI's hand-read profile (selected-verb variable, walk verb, inventory slots) fails on this game's plans, so the window searches run empty and the affordance step carries the exploration |
+| new rows of the table on this game | 3-8; 2-6 fixed behind switches; 0-2 blockers |
+| the end | reached by the system's own inputs and verified from boot: 25%. If reached: in 10-80 tries, median try 10-90 s, 50-400 entries, under 3 h of try wall |
+| if not reached | partly: the explorer enters 4-11 of the 11 rooms within 80 tries, with the blockers named |
+| the game plays itself to an end site with no player input | 5% |
+| svm-w3b | the Python reference cannot run this game without a change; the verify is on the lean engine only |
+| MI's gates with every switch unset | unchanged |
+
+### Success threshold and stop rule
+
+As the plan's. **Yes:** the game's own end (an end site of (d)) reached from the boot by the explorer with the system's
+own inputs, no step by hand, and its goal entry verified from boot with 0 differences. **Partly:** the explorer runs on
+this game and makes progress (entries past the root: a new room or a new tested atom), and the blockers to the end are
+named. **No:** the explorer cannot run (no root, no reading or no try completes), or an exactness check fails and is
+not explained. The stop rule is the plan's: exactness first; breaks fixed or written up before the run; the run stops
+at the goal, at E009's stop rules or at 80 committed tries, runs once, and a fix found during it is recorded and not
+applied to it; MI first; watchdogs as E012's.
