@@ -687,7 +687,7 @@ pub fn try_all(
             if comp && st.frame < r.end {
                 // the third click: over every target the hit test finds at this stop
                 let o = b.obs(&ObsReq::default())?;
-                let of2 = offer(&mut b, &o)?;
+                let of2 = offer_with(&mut b, &o, false)?;
                 for t in &of2.targets {
                     let tf = Instant::now();
                     let mut c = b.fork()?;
