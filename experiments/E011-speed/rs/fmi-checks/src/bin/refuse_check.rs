@@ -481,11 +481,50 @@ fn b1(a: &[String]) -> Res<()> {
     std::fs::write(out.join("b1.jsonl"), text).map_err(e2s)?;
     let text: String = bound.iter().map(|l| format!("{l}\n")).collect();
     std::fs::write(out.join("b1-bound.jsonl"), text).map_err(e2s)?;
+    // every recorded bound window, one by one: the rerun's windows of the same attempt, plan and window (at the
+    // recorded start when the attempt got there, else where it did after an earlier window B ended)
+    let mut by_slot: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for (j, at, w) in windows_of(&rerun) {
+        by_slot.entry(format!("{j}/{at}/{}/{}", w["plan"], w["macro"])).or_default().push(w);
+    }
+    let mut all_bound = Vec::new();
+    for (j, at, r) in windows_of(&rec_dir) {
+        if !bound_interface(&r) {
+            continue;
+        }
+        let first_g = r["children"][0][0].as_u64().unwrap_or(0);
+        let there: Vec<Value> = by_slot
+            .get(&format!("{j}/{at}/{}/{}", r["plan"], r["macro"]))
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .map(|w| {
+                let rf = &w["refuse"];
+                let g0 = rf["tries"][0]["g"].as_u64().unwrap_or(0);
+                json!({"start": w["start"], "same_start": w["start"] == r["start"], "end": w["end"], "end_reason": w["end_reason"],
+                       "forks": w["forks"], "skipped_frames": rf["skipped_frames"],
+                       "causes": rf["tries"].as_array().map(|t| t.iter().map(|x| x["cause"].clone()).collect::<Vec<_>>()),
+                       "ended_within_10": rf["end"]["frame"].as_u64().is_some_and(|f| f <= g0 + 10)})
+            })
+            .collect();
+        all_bound.push(json!({"job": j, "att": at, "plan": r["plan"], "macro": r["macro"], "input": r["input"],
+                              "recorded": {"start": r["start"], "first_try": first_g, "end": r["end"], "forks": r["forks"]},
+                              "rerun": there}));
+    }
+    let text: String = all_bound.iter().map(|l| format!("{l}\n")).collect();
+    std::fs::write(out.join("b1-bound-all.jsonl"), text).map_err(e2s)?;
+    let reached = all_bound.iter().filter(|b| b["rerun"].as_array().is_some_and(|a| !a.is_empty())).count();
+    let ended10 = all_bound
+        .iter()
+        .filter(|b| b["rerun"].as_array().is_some_and(|a| !a.is_empty() && a.iter().all(|w| w["ended_within_10"] == json!(true))))
+        .count();
     let s = json!({"windows_matched": matched, "same_choice_and_end": same_choice, "windows_with_refused_tries": b_windows,
                    "ended_by_b": b_ended, "ended_by_b_where_recorded_chose_an_end_point": ended_on_end_point,
                    "recorded_tries_in_skips": skipped_tries, "refused_with_the_same_message": skipped_same,
                    "other": skipped_other, "bound_windows": bound.len(),
-                   "bound_ended_within_10_frames": bound.iter().filter(|b| b["ended_within_10"] == json!(true)).count()});
+                   "bound_ended_within_10_frames": bound.iter().filter(|b| b["ended_within_10"] == json!(true)).count(),
+                   "recorded_bound_windows": all_bound.len(), "recorded_bound_with_a_rerun_window": reached,
+                   "recorded_bound_whose_rerun_windows_ended_within_10_frames": ended10});
     std::fs::write(out.join("b1-summary.json"), serde_json::to_string_pretty(&s).map_err(e2s)? + "\n").map_err(e2s)?;
     println!("{}", serde_json::to_string_pretty(&s).map_err(e2s)?);
     if skipped_other == 0 && ended_on_end_point == 0 {
