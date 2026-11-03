@@ -1442,7 +1442,8 @@ from there.
 - **Dead marks:** 0.
 - **Targets:** var:103 was attempted at most once per try, and no try's last target was a refined key's value (E011:
   29 of 65). One request reached a limit, deepening's first 120 s (E011: 10 at 180 s).
-- **Calls per frame:** 0-13 by room, and 1-4 in room 28 (2 in 3,219 of its 3,866 frames). Room 29 had 11 frames with no call, which M1 had not seen.
+- **Calls per frame:** 0-13 by room, and 1-4 in room 28 (2 in 3,219 of its 3,866 frames). Room 29 had 11 frames with
+  no call, which M1 had not seen.
 
 **The wall against E011's check** (tries' wall):
 
