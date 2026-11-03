@@ -3,7 +3,8 @@
 //! * `free_check same A B`: D2. Two archives of the same driver run (E012's smoke, b = 1) made by two builds: the same
 //!   jobs, and for each its job.json, select.json and result.json, then entries.jsonl, every entry's file, cells.json
 //!   and log.jsonl, the same but for the timing fields (keys named for seconds, CPU, memory, wall clock or a process)
-//!   and the paths under each run's own folder (written as <RUN>). Prints each difference; exit 1 when any.
+//!   and the paths under each run's own folder (written as <RUN>), and the bytes of a probe's dropped folders (their
+//!   reports hold timings). Prints each difference; exit 1 when any.
 //! * `free_check report A`: D3. Per free try: its entry and frame, offer points, trials (by verdict when the trials
 //!   carry one), waits run and reused, delays, kept by level, dead moves, its wall and the free step's seconds; per run
 //!   the kinds and the free entries. JSON lines on stdout after a table.
@@ -21,13 +22,18 @@ fn timing_key(k: &str) -> bool {
     TIMING.contains(&k) || k.ends_with("_s") || k.ends_with("_seconds") || k.ends_with("_mb") || k.starts_with("cpu")
 }
 
-/// The value with its timing keys left out and the run's folder written as <RUN> in every string.
+/// The value with its timing keys left out and the run's folder written as <RUN> in every string. A probe's
+/// "dropped" ([[folder, bytes freed]]) keeps its folders only: the bytes count the dropped readings' reports and logs
+/// (reader-scope.err, refine-NN.json, reading.json, cache.json), whose text holds their timings, loads and memory.
 fn norm(v: &Value, run: &str) -> Value {
     match v {
         Value::Object(m) => {
             let mut o = Map::new();
             for (k, x) in m {
-                if !timing_key(k) {
+                if k == "dropped" {
+                    let names: Vec<Value> = x.as_array().map(|a| a.iter().map(|d| d.get(0).cloned().unwrap_or(Value::Null)).collect()).unwrap_or_default();
+                    o.insert(k.clone(), Value::Array(names));
+                } else if !timing_key(k) {
                     o.insert(k.clone(), norm(x, run));
                 }
             }
