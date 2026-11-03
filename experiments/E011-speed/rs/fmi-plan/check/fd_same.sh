@@ -4,6 +4,7 @@
 # files byte for byte, and FD's expanded / evaluated / generated counts.
 #
 # usage: fd_same.sh TASKCORE TC START CAPS OUT LIMIT_S TARGET...    (one SAS file per target, K=V)
+#   FD_SAME_HFF=watch: the Rust search with h_FF by watched preconditions (taskcore search --hff watch)
 set -u
 TCB=$1; TC=$2; START=$3; CAPS=$4; OUT=$5; LIM=$6; shift 6
 DW=${DOWNWARD_DIR:-/home/ilyask/projects/fast-mi/third_party/downward}/builds/release/bin/downward
@@ -17,7 +18,7 @@ for g in "$@"; do
   if [ $? != 0 ]; then echo "$g: taskcore sas: $(head -c 200 "$d/sas.err")"; continue; fi
   n=$((n+1))
   ( cd "$d" && timeout "$LIM" "$DW" --search "$FF_LAZY" --internal-plan-file sas_plan < task.sas > fd.log 2>&1 ); fdrc=$?
-  timeout "$LIM" "$TCB" search --sas "$d/task.sas" --plan "$d/rust_plan" > "$d/rust.json" 2> "$d/rust.err"; rrc=$?
+  timeout "$LIM" "$TCB" search --sas "$d/task.sas" --plan "$d/rust_plan" ${FD_SAME_HFF:+--hff $FD_SAME_HFF} > "$d/rust.json" 2> "$d/rust.err"; rrc=$?
   fdc=$(grep -E "^\[t=.*\] (Expanded|Evaluated|Generated) [0-9]+ state" "$d/fd.log" | sed -E 's/.*\] (\w+) ([0-9]+) .*/\2/' | tr '\n' ' ')
   rc=$(python3 -c "import json;d=json.load(open('$d/rust.json'));print(d['expanded'],d['evaluated'],d['generated'],'')" 2>/dev/null)
   if [ -f "$d/sas_plan" ] && [ -f "$d/rust_plan" ] && cmp -s "$d/sas_plan" "$d/rust_plan" && [ "$fdc" = "$rc" ]; then
