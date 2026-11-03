@@ -1,0 +1,10 @@
+{
+  "windows": 16,
+  "by_route_and_last_verdict": {
+    "object 382 never came on screen (no floor path, no stepping stone) | last input: taken": 4,
+    "verb key did not select verb 10 | last input: dropped: gate": 12
+  },
+  "same_as_recorded": 16,
+  "parent_gate_open_at_last_input": 16,
+  "with_inputs": 16
+}
