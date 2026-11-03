@@ -774,3 +774,58 @@ ran, unchanged.
 The demo is finished when F's write-up is done and the PI decides what follows. Until then P does not run. P's
 dated amendment with the projection is still written before it. E013's success threshold is scored as written: while
 P has not run, the result is at most "partly".
+
+## Amendment 2026-11-03 (3): how B reads a try, after M1
+
+Written after M1 (refuse's first step) and before any code of B. The sections above stay as written: no prediction is
+edited, no row of B's table is changed, and the planned measures are the ones scored.
+
+### M1 (`results/refuse/m1.jsonl`, `m1-summary.json`; `refuse-check m1` on the E012 kitchen archive, patch 0007)
+
+- The 16 bound windows' first tries, played again with the input log, each give their recorded message.
+- **The 12 "verb key" windows.** In all 12 the key was dropped at the gate. In all 12 the parent's gate was open at
+  the key's frame: the try's own approach click (taken: it started a walk) led to a closed gate before the key.
+  M1's prediction (the key does not reach the handler as a click on the verb) holds, by the first of its three ways.
+- **The 4 "never came on screen" windows.** Each issued 3-4 approach clicks, all taken (walks). M1's prediction that
+  they give no engine input fails.
+
+### How B reads a failed try
+
+1. **The kind of failure** comes from the executor. Either it could not form the plan's input (an approach, a point,
+   an object, an actor, a verb or an arrow not found: the table's last row), or a check after an input it issued
+   failed. In the second case the row is chosen by the log record of the checked input.
+2. **A drop at the gate.** It is E010's case, where B does nothing, when the parent's gate is shut at that frame. When
+   the parent's gate is open there, the gate was shut by the try's own earlier inputs. The try is then read as
+   "taken, and the executor's check after it failed", over all of its records: the union of their reads.
+3. **A change** is the parent's value at a frame against its value at the refused try's fork frame. Both are the
+   parent's, with no input. So an input register that the try's own click set is never compared with the parent's.
+4. **The values watched.**
+   - A record's reads map to the parent's dump and status:
+     - variables, bits, owners, states and classes to themselves;
+     - an actor read to that actor's entry in the dump;
+     - the object or actor at a point to the room objects, the actors and the camera;
+     - a random draw to the RNG state;
+     - a script query to the live slots;
+     - the gate and the cursor to the status.
+   - "The input report" (not built, amendment (2)) is read as the status's gate, cursor, cutscene, room and screen
+     layout, and the dump's verb slots. VAR_VERB_SCRIPT is a read of every record.
+   - The executor's check names its own fields. The verb-key check names the profile's selected-verb variable and the
+     verb slots. Its other checks, and every input it could not form, name the dump's interface part: the room
+     objects' boxes and states, the actors, the camera, the verbs and the inventory.
+5. **One try at a time.** With `FMI_REFUSE=1` a ready window runs its tries one at a time. E010 runs up to its workers
+   in parallel after the first failure. This way each try's cause is known before the parent forks again. The kept
+   fork is the parent at the last refused try's fork frame. When the window's frames end with no change since that
+   try, the window ends there, with "refused input: <cause>".
+6. **What patch 0007 does not log:** the reads of scripts other than the handler's run in its call (a walk's arrival,
+   a cutscene). They enter only through the watched parts of the dump. B1 shows a read that is missing.
+
+### A deviation already in patch 0007
+
+Patch 0007 (committed before this amendment) decides "ignored" as "changed nothing outside its own locals", not
+"wrote nothing" (plan.md A.2):
+
+- a write of the value already held counts as no write;
+- a random draw counts as a change;
+- a slot the run started that is still alive counts as a change.
+
+This is reported with the results.
