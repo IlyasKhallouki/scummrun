@@ -23,12 +23,12 @@ Branch e012-afford. Method: plan.md section 4 and the two amendments "component 
 | A1 | kept entries verify from boot | 8 kept at the 13 entries. 8 of 8 verified from boot in a fresh lean engine, with 0 differences. The check is fmi-engine's `replay::verify` (E011 G11's): from the hello, through the root's, the entry's and the kept checkpoint |
 | A2 | at 205: two outcomes, the line that returns control at +26 | M4's form (600 frames): 4 trials, 2 outcomes. Line 4 (verb 123) is idle in a sentence at +26. Trials, their order and outcomes equal the probe's `afford.tsv` name for name |
 | A2 | at 203: M4's 8 outcomes with the fixed horizon | M4's form (400 frames): 18 verbs and 12 targets hit, 246 trials, 8 outcomes, equal to the probe name for name. At 4 also equal: 4 trials, 1 outcome |
-| A3 | ≤ 20 ms per trial on round 2's engine | The try's form at 203 (270 trials). CPU per trial (the forks' and the control's engine CPU and the step's own): 3.7-4.0 ms over 5 steps. Wall per trial: 5.95-12.3 ms in the 18 steps at load 6-8; 15.3-19.0 ms in 7 steps at load 9.6-11; one step at load 9.6 took 22.7 ms. At the 13 entries in one run at load 6-7: 3.4-11.5 ms |
+| A3 | ≤ 20 ms per trial on round 2's engine | The try's form at 203 (270 trials). CPU per trial (the forks' and the control's engine CPU and the step's own): 3.7-4.0 ms over 5 steps. Wall per trial: 5.95-22.7 ms over the 33 steps measured, at load 5.7-11; 32 of the 33 under 20 ms. At the 13 entries in one run at load 6-7: 3.4-11.5 ms |
 
 A1 and A2 pass, with no fix round of the component's code; A2 passed again with FMI_BOXES off on end's engine. A3
-passes on the step's own cost: its CPU is 3.7-4.0 ms per trial. Its wall is under 20 ms in 30 of the 31 steps measured
-at 203. The one above, 22.7 ms, ran at load 9.6, when the wall per trial was four times its CPU: the shared laptop's
-other work (the other E012 components' builds and gates) was taking the CPUs.
+passes on the step's own cost: its CPU is 3.7-4.0 ms per trial. Its wall is under 20 ms in 32 of the 33 steps measured
+at 203. The one above, 22.7 ms, ran at load 9.6. At that load the wall per trial is about four times the CPU: the
+shared laptop's other work (the other E012 components' builds and gates) was taking the CPUs.
 
 ## The step at the probe's entries (the try's form)
 
@@ -77,8 +77,7 @@ composing.
 - **Per step**, against plan.md's prediction:
   - a dialog: 0.02-0.05 s (predicted at most 0.5 s);
   - a sentence idle: 0.5-2.9 s (predicted 1-5 s);
-  - per trial: 3.7-4.0 ms of CPU. The wall was 3.4-12.3 ms at load 6-8 and 15.3-22.7 ms at load 9.6-11 (predicted
-    3-20 ms).
+  - per trial: 3.7-4.0 ms of CPU, and 3.4-22.7 ms of wall at load 5.7-11 (predicted 3-20 ms).
 
 ## Walk boxes (FMI_BOXES), measured first
 
