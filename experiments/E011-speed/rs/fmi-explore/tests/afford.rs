@@ -26,6 +26,8 @@ struct Toy {
     room_at: Option<(u64, i32)>,
     end_at: Option<u64>,
     dialog: bool,
+    /// Boxes commands answered
+    boxes_asked: std::sync::Arc<std::sync::atomic::AtomicU32>,
 }
 
 fn toy(frame: u64, dialog: bool) -> Toy {
@@ -45,6 +47,7 @@ fn toy(frame: u64, dialog: bool) -> Toy {
         room_at: None,
         end_at: None,
         dialog,
+        boxes_asked: Default::default(),
     };
     t.st.idle = t.idle();
     t
@@ -116,7 +119,16 @@ impl Toy {
             }
             return;
         }
-        let Some((_, _, obj, actor)) = a.main else { return };
+        let Some((vx, vy, obj, actor)) = a.main else { return };
+        if obj == 0 && actor == 0 {
+            // a floor click: a walk; ending in box 1 (y 100..140, x < 100) leaves by an exit 5 frames later
+            self.busy = 4;
+            if vx < 100 && (100..140).contains(&vy) {
+                self.room_at = Some((f + 5, 9));
+                self.busy = 7;
+            }
+            return;
+        }
         if obj == 0 && actor == 1 {
             self.run_(SENTENCE_SCRIPT);
             self.vars[40] += 1;
@@ -269,6 +281,21 @@ impl Engine for Toy {
         0.0
     }
     fn quit(self: Box<Self>) {}
+    fn boxes(&mut self) -> EResult<Boxes> {
+        self.boxes_asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let b = |x0, y0, x1, y1, flags| WalkBox { ul: (x0, y0), ur: (x1, y0), lr: (x1, y1), ll: (x0, y1), flags };
+        Ok(Boxes {
+            room: self.st.room,
+            boxes: vec![
+                b(0, 0, 0, 0, 0),           // box 0: never a walk's end in v5
+                b(0, 100, 100, 140, 0),     // the floor, by the exit
+                b(200, 100, 300, 140, 0x40), // locked
+                b(120, 100, 180, 140, 0x80), // invisible
+                b(40, 30, 80, 70, 0x08),    // under object 100 at its centre: a later point is the floor
+                b(400, 100, 450, 140, 0),   // off screen
+            ],
+        })
+    }
 }
 
 fn boxed(t: Toy) -> Box<dyn Engine> {
@@ -460,4 +487,41 @@ fn pair_novelty() {
     assert_eq!(n.novel(&f(2, 4)), vec!["room=4", "var:7=2"]);
     // an absent key reads 0
     assert_eq!(n.novel(&Facts::from_pairs(vec![(Key::pack(K_ROOM, 0, 0, 0), 3)])), vec!["var:7=0"]);
+}
+
+#[test]
+fn walk_boxes() {
+    // the engine's walkable rule and the candidate points
+    assert!(afford::walkable(0x00) && afford::walkable(0x08) && afford::walkable(0x20));
+    assert!(!afford::walkable(0x40) && !afford::walkable(0x80) && !afford::walkable(0xC0));
+    let w = WalkBox { ul: (40, 30), ur: (80, 30), lr: (80, 70), ll: (40, 70), flags: 0 };
+    assert_eq!(afford::box_points(&w), vec![(60, 50), (50, 40), (70, 40), (70, 60), (50, 60)]);
+    // switch off: no Boxes command, M4's inputs
+    let t = toy(100, false);
+    let asked = t.boxes_asked.clone();
+    let mut e = boxed(t);
+    let o = e.obs(&ObsReq::default()).unwrap();
+    let off = afford::offer_with(&mut e, &o, false).unwrap();
+    assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert!(off.walks.is_empty() && off.boxes.is_none());
+    // on: boxes 1 and 4 (2 locked, 3 invisible, 5 off screen, 0 never); box 4's centre and first halfway point lie on
+    // object 100, its second is the floor
+    let on = afford::offer_with(&mut e, &o, true).unwrap();
+    assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(on.boxes, Some((6, 3)));
+    assert_eq!(on.walks.iter().map(|p| (p.x, p.y, p.hit)).collect::<Vec<_>>(), vec![(50, 120, Hit::Walk(1)), (70, 40, Hit::Walk(4))]);
+    let inp_off = afford::inputs_of(&off);
+    let inp_on = afford::inputs_of(&on);
+    assert_eq!(names(&inp_on[..inp_off.len()]), names(&inp_off));
+    assert_eq!(names(&inp_on[inp_off.len()..]), vec!["w1", "w4"]);
+    // not in a dialog
+    let mut d = boxed(toy(100, true));
+    let od = d.obs(&ObsReq::default()).unwrap();
+    assert!(afford::offer_with(&mut d, &od, true).unwrap().walks.is_empty());
+    // the walk to box 1 leaves the room: kept
+    let nov = novelty();
+    let out = afford::try_all(&mut e, &on, &inp_on, &[], &nov, &AffordCfg::default(), None).unwrap();
+    let w1 = out.kept.iter().find(|k| k.name == "w1").expect("w1 kept");
+    assert_eq!(w1.novel, vec!["room=9".to_string()]);
+    assert_eq!(w1.events, vec![Event { frame: 101, what: Input::Click(50, 120) }]);
 }
