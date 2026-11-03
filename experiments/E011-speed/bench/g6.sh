@@ -8,6 +8,8 @@
 #   * memo on: the refinement j00089 twice from an empty store (stores, then takes), the fresh ring(33) j00089 into a
 #     second store, then j00119 from it: each the same sha1s.
 # usage: g6.sh OUT
+#   G6_ARGS: more reader-scope switches (round 2: --prep); G6_THREADS: the readings' threads (3); G6_NOGOLDEN=1: no
+#   --golden (the files fmi reads, as fmi asks them; the golden body and builder line are then not compared)
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
@@ -20,22 +22,27 @@ ROWS33=$HOME/.cache/fast-mi-e011/profile-planner/readings/r33/start.jsonl  # = I
 RIO=$HOME/.cache/fast-mi-e011/readio
 CMP=$WT11/experiments/E011-speed/rs/fmi-reading/ref/cmp_reading.py
 OUT=$1; mkdir -p $OUT
+XARGS=${G6_ARGS:-}; THREADS=${G6_THREADS:-3}; NOGOLD=${G6_NOGOLDEN:-0}
 M=$OUT/memo-a; M2=$OUT/memo-b; rm -rf $M $M2
 REF89="--fact-vars 103,194 --reach-also $IN/ref-j00089/refine-01.start.txt --reach-also $IN/ref-j00089/refine-02.start.txt"
 bad=0
 read1() { # TAG ROOMS ROWS WANT [reader-scope args]: one reading, its sums against WANT (packed body builder reached)
   local tag=$1 rooms=$2 rows=$3 want=$4; shift 4
   local d=$OUT/$tag; rm -rf $d; mkdir -p $d
+  local gold="--golden $d/$tag.golden.jsonl.gz"
+  [ $NOGOLD = 1 ] && { gold=""; want="$(echo $want | awk '{print $1, "-", "-", $4}')"; }
   TIMEFORMAT="%R %U %S"
   { time flock /var/tmp/fast-mi/heavy.lock $HOME/.cache/fast-mi-e007/guard.sh $d/guard.log \
     $BIN --rooms $rooms --start-seed 1 --domain-goals none --goal owner:566=1 \
-    --name $tag --threads 3 --out $d --out-dir $d --golden $d/$tag.golden.jsonl.gz --elsewhere --live-locals \
+    --name $tag --threads $THREADS --out $d --out-dir $d $gold --elsewhere --live-locals \
     --split-limit --switches value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost --reach --frame-costs \
-    --start-rows $rows "$@" ; } 2> $d/time
+    --start-rows $rows "$@" $XARGS ; } 2> $d/time
   local p b t r
   p=$(sha1sum < $d/reading.tc | cut -c1-8); r=$(sha1sum < $d/reading.reached | cut -c1-8)
-  b=$(zcat $d/$tag.golden.jsonl.gz | sed '1d;$d' | sha1sum | cut -c1-8)
-  t=$(zcat $d/$tag.golden.jsonl.gz | tail -1 | sha1sum | cut -c1-8)
+  if [ $NOGOLD = 1 ]; then b=-; t=-; else
+    b=$(zcat $d/$tag.golden.jsonl.gz | sed '1d;$d' | sha1sum | cut -c1-8)
+    t=$(zcat $d/$tag.golden.jsonl.gz | tail -1 | sha1sum | cut -c1-8)
+  fi
   local got="$p $b $t $r" ok=pass
   [ "$got" = "$want" ] || { ok=FAIL; bad=1; }
   local memo; memo=$($PY -c "import json,sys; r=json.load(open('$d/$tag.json')); m=r.get('memo'); print('peak %s MB, ' % r.get('peak_rss_mb') + ('memo taken %s stored %s' % (m.get('taken'), m.get('stored')) if m else 'memo off'))")
