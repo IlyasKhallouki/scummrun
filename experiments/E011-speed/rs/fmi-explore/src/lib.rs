@@ -8,6 +8,8 @@
 //!   the window search; `start`: the harness's start rules; `wiring`: replay_part1's reach extender and refiner;
 //!   `ports`: the ports beyond fmi-core's (IFACE); `guide`: guide.py; `check`: the differential checks.
 //! * `afford`: E012's affordance step (the interface's own inputs, tried in forks; FMI_AFFORD).
+//! * `mech`: E012's try: the mechanisms' switches and ports, the try's novelty, the entries it commits besides its
+//!   attempt's, the dead moves and the affordance step's triggers (tryjob.rs runs them in the plan's order).
 
 pub mod afford;
 pub mod archive;
@@ -21,6 +23,7 @@ pub mod files;
 pub mod guide;
 pub mod harness;
 pub mod machine;
+pub mod mech;
 pub mod ports;
 pub mod progress;
 pub mod pyjson;
