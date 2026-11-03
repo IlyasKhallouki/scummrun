@@ -1240,19 +1240,38 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         let tf = Instant::now();
         snap = Some(cb.fork()?);
         w.prof.fork(tf.elapsed());
-        match cb.run(&RunSpec {
-            frame: Some(s_issue + 1),
-            ..Default::default()
-        }) {
-            Ok(_) => {}
-            Err(EngineError::Ended(st)) => {
-                ch.set("ended", Some(Py::s(st.reason.clone())));
-                return Ok(());
+        if executor::batch() {
+            // the issue's frame and its observation in one StepObs (the run, then observe's runs, explain and dump)
+            match cb.step_observe(s_issue + 1, &ObsReq::default()) {
+                Ok((_, rows, ents, o)) => {
+                    w.board.progress(c, cb.status().qf);
+                    rows_all.extend(strict::runs_of(&rows.runs));
+                    log.kept.add_entries(&strict::ents_of(&ents.entries));
+                    let s = Arc::new(o);
+                    let v = w.sview(&s).map_err(EngineError::Bridge)?;
+                    frames_seen.insert(cb.status().frame, (Arc::new(v), s));
+                }
+                Err(EngineError::Ended(st)) => {
+                    ch.set("ended", Some(Py::s(st.reason.clone())));
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
             }
-            Err(e) => return Err(e),
+        } else {
+            match cb.run(&RunSpec {
+                frame: Some(s_issue + 1),
+                ..Default::default()
+            }) {
+                Ok(_) => {}
+                Err(EngineError::Ended(st)) => {
+                    ch.set("ended", Some(Py::s(st.reason.clone())));
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            }
+            w.board.progress(c, cb.status().qf);
+            observe(&mut cb, &mut log, &mut rows_all, &mut frames_seen, true)?;
         }
-        w.board.progress(c, cb.status().qf);
-        observe(&mut cb, &mut log, &mut rows_all, &mut frames_seen, true)?;
         let mut rk = strict::by_frame(&rows_all);
         let at_fork = ch.at_fork.clone();
         if let Some(d0) = &ch.d0 {
