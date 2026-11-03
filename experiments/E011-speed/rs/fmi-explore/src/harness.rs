@@ -84,6 +84,12 @@ impl PlannerCache {
     }
 }
 
+/// Whether the refinement keeps the old reading's planner (FMI_PLANNER_KEEP, on; 0 closes it as round 1 did).
+fn planner_keep() -> bool {
+    std::env::var("FMI_PLANNER_KEEP").map(|v| v != "0").unwrap_or(true)
+        && crate::machine::mem_available_gb() >= crate::machine::Machine::from_env().mem_second_gb
+}
+
 /// The run stopped by an engine error (replay.Stop / ControlError): its reason.
 fn engine_stop(e: &EngineError) -> String {
     match e {
@@ -473,7 +479,12 @@ impl<'a> Harness<'a> {
         turn["operators_before"] = self.plans.last().and_then(|p| p.get("operators")).cloned().unwrap_or(Value::Null);
         (self.progress)(&format!("refinement at frame {}: var {:?} made facts", self.ps.engine.status().frame, new));
         let old_id = self.reading.id();
-        self.planners.lock().unwrap().close(&old_id); // the old reading's planner: its memory, while the reader reads
+        // the old reading's planner: its memory, while the reader reads (plan_fd.close_servers). Kept (FMI_PLANNER_KEEP,
+        // on) while MemAvailable holds the explorer's level for a second heavy job (E008_MEM_SECOND_GB): a planner is a
+        // function of its reading, so the next request on that reading finds it warm instead of building it again
+        if !planner_keep() {
+            self.planners.lock().unwrap().close(&old_id);
+        }
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
         let rs_ = start::reach_start_text(&st);
