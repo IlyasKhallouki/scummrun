@@ -194,6 +194,16 @@ fn j2v(j: &fmi_play::pyj::J) -> Value {
 pub struct PlayAdapter {
     p: fmi_play::StrictPlayer,
     notes: usize,
+    kept: Arc<PlayKept>,
+}
+
+/// What one attempt's window search leaves the next (FMI_PLAY_KEEP, on; 0 frees them with the search): the game's IR
+/// (Game.load of the game files, which never change in a run) and the last reading's derived data with the setting
+/// it was made with (the search makes it again when the reading's id or the setting differs).
+#[derive(Default)]
+pub struct PlayKept {
+    game: Mutex<Option<Arc<scumm_ir::Game>>>,
+    reading: Mutex<Option<(bool, Arc<fmi_play::reading::ReadingData>)>>,
 }
 
 impl Drop for PlayAdapter {
@@ -201,7 +211,20 @@ impl Drop for PlayAdapter {
         if let Some(r) = self.p.search.root.take() {
             r.quit();
         }
+        if play_keep() {
+            if let Some(g) = self.p.search.game.take() {
+                *self.kept.game.lock().unwrap() = Some(g);
+            }
+            if let Some(d) = self.p.search.reading.take() {
+                let old = self.kept.reading.lock().unwrap().replace((self.p.search.cfg.unobserved_actor_rooms, d));
+                drop(old);
+            }
+        }
     }
+}
+
+fn play_keep() -> bool {
+    std::env::var("FMI_PLAY_KEEP").map(|v| v != "0").unwrap_or(true)
 }
 
 impl Player for PlayAdapter {
@@ -250,12 +273,23 @@ impl WindowPlayer for PlayAdapter {
     }
 }
 
-pub struct PlayHost;
+#[derive(Default)]
+pub struct PlayHost {
+    kept: Arc<PlayKept>,
+}
 
 impl PlayerHost for PlayHost {
     fn player(&self, cfg: &WindowCfg) -> Box<dyn WindowPlayer> {
         let dmax = cfg.frame_costs.get("dmax").and_then(|d| d.as_i64());
-        let s = fmi_play::Search::for_step(cfg.workers as usize, cfg.fork_each, cfg.ready, dmax).expect("the window search's config");
-        Box::new(PlayAdapter { p: fmi_play::StrictPlayer { search: s }, notes: 0 })
+        let mut s = fmi_play::Search::for_step(cfg.workers as usize, cfg.fork_each, cfg.ready, dmax).expect("the window search's config");
+        if play_keep() {
+            s.game = self.kept.game.lock().unwrap().clone();
+            if let Some((flag, d)) = self.kept.reading.lock().unwrap().as_ref() {
+                if *flag == s.cfg.unobserved_actor_rooms {
+                    s.reading = Some(d.clone());
+                }
+            }
+        }
+        Box::new(PlayAdapter { p: fmi_play::StrictPlayer { search: s }, notes: 0, kept: self.kept.clone() })
     }
 }
