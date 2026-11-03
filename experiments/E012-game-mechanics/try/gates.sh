@@ -27,7 +27,7 @@ OUT=$2; R=$OUT/$1${TRY_SUFFIX:-}
 # TRY_NO_CACHE=1: no reading cache (a run's refinements are made again whatever the disk's level, so that two runs
 # compare by their code, not by the cache's floor)
 RCACHE=$R/rcache; [ "${TRY_NO_CACHE:-0}" = 1 ] && RCACHE=
-rm -rf $R; mkdir -p $R/jobs $R/tmp
+rm -rf "${R:?}"; mkdir -p $R/jobs $R/tmp
 jobs=()
 if [ $SRC = g10 ]; then
   # E011 G10, test (a): E009's job "ta" from the root, in the fast settings (ready, the old tail first)
@@ -56,7 +56,7 @@ t1=$(date +%s.%N)
 flock -u 9; exec 9>&-
 echo "{\"rc\": $rc, \"wall_s\": $(awk "BEGIN{print $t1 - $t0}"), \"end\": \"$(date -Is)\", \"load\": \"$(cut -d' ' -f1-3 /proc/loadavg)\"}" >> $R/run.json
 tail -2 $R/fmi.log
-rm -rf $R/rcache $R/tmp $R/pool
+rm -rf "${R:?}/rcache" "${R:?}/tmp" "${R:?}/pool"
 case $1 in
   g10-*) jq -c '.attempt | {stop, goal_from_the_plan, frame0, frame_end, frames, qf, replans, inputs}' $R/jobs/ta/result.json | tee $R/g10.txt
     echo "new $(jq '.new | length' $R/jobs/ta/result.json); round 2: goal True 2728 3216 488 11712 2 36, 8 new" | tee -a $R/g10.txt
@@ -64,3 +64,7 @@ case $1 in
   off-*) $FMI check tries $SRC $R --json $R/g0.json | tee $R/g0.txt;;
   on-*) env $SW $FMI check verify-new $R --out $R-verify --threads 2 | tee $R/verify.txt;;
 esac
+# the readings go (the gates read only results and entries): the try's readings and the attempts' made readings
+rm -rf "${R:?}/readings"
+for d in "${R:?}"/jobs/*/run/a*/*/; do [ -f "$d/reading.json" ] && rm -rf "${d:?}"; done
+true
