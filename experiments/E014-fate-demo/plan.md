@@ -166,3 +166,16 @@ question is "no".
   got, the blockers and the best chain.
 - **Watchdogs** are E012's: the harness's, the window search's and the reader's limits, the guard's 3 GB and the disk
   floors. They are engineering, reported where they fire.
+
+## Result so far (2026-11-03): this demo plays itself; stopped
+
+The explorer's archive `a5` reached the stage goal `end = 1` in its first try with no player input: boot (frame 199,
+room 4), two waits (frames 617 and 642, room 62), then the game's own restart at frame 1,911, at room 62's local
+script 206, offset 0x0AEF. That script is a cutscene from its first statement and ends with `systemOps(1)`
+(restart). Room 62's local script 214 starts it directly after starting the music and two other scripts, with no
+input on the way. So this release, the 1993 talkie demo, is a self-running showcase: its end is reached by waiting,
+and it cannot test finishing a game. The run was stopped here by the PI's session, not by a stop rule; no "reached"
+is claimed. What E014 built is general and stays (each behind its switch): the mechanic inventory, the extraction for
+another SCUMM v5 game, engine patch 0006's decision point without verb ids, the host and the reader for another game
+id, the game's own end as a goal, and the reader with no modelled input. The next game for this question is an
+interactive release.
