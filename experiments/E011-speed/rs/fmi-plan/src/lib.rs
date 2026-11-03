@@ -464,9 +464,16 @@ impl WarmPlanner {
         self.last.operators = st.n_ops();
         // the no-plan proofs before the search (plan.md, amendment "targets with no plan made cheap")
         let mut proof_json = None;
+        // FMI_PLAN_DEAD_CHECK set (the gate): a found plan's states are checked against the h^2 rows, and the rows
+        // against the plain fixpoint
+        let dead_check = std::env::var_os("FMI_PLAN_DEAD_CHECK").is_some();
+        let mut kept_h2 = None;
         if self.host.dead {
             let td = Instant::now();
-            let p = taskcore::dead::prove(&st, Some(td + Duration::from_secs(self.host.dead_s.max(1))));
+            let (p, h2) = taskcore::dead::prove_keep(&st, Some(td + Duration::from_secs(self.host.dead_s.max(1))));
+            if dead_check {
+                kept_h2 = h2;
+            }
             self.last.dead = td.elapsed().as_secs_f64();
             self.last.proof = p.dead.unwrap_or("open").to_string();
             let nf = t.facts.len() as u32;
@@ -556,6 +563,14 @@ impl WarmPlanner {
         // every returned plan is a plan of the SAS task from its start
         let tc = Instant::now();
         search::check_plan(&st, &ops).map_err(|e| tc_err(format!("the plan does not check: {}", e)))?;
+        if let Some(h) = &kept_h2 {
+            h.check_path(&st, &ops).map_err(|e| tc_err(format!("dead check: {}", e)))?;
+            let r = taskcore::dead::H2::run_reference(&st, None);
+            if r.rows != h.rows {
+                return Err(tc_err("dead check: the fast h^2 differs from the plain one".into()));
+            }
+            eprintln!("dead check: the plan's {} states are inside h^2, and h^2 equals the plain fixpoint", ops.len() + 1);
+        }
         self.last.check = tc.elapsed().as_secs_f64();
         // read back: the plan's rows only
         let td = Instant::now();

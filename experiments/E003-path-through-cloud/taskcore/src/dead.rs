@@ -34,6 +34,11 @@ pub struct Proof {
 
 /// h^1, then h^2 when h^1 proves nothing (module docstring); `h2_deadline` is h^2's watchdog.
 pub fn prove(t: &SasTask, h2_deadline: Option<Instant>) -> Proof {
+    prove_keep(t, h2_deadline).0
+}
+
+/// `prove`, with the h^2 fixpoint when it ran (the checks: a plan's states against its rows, the plain fixpoint).
+pub fn prove_keep(t: &SasTask, h2_deadline: Option<Instant>) -> (Proof, Option<H2>) {
     let mut p = Proof::default();
     let t0 = Instant::now();
     let fx = FactIdx::new(t);
@@ -42,7 +47,7 @@ pub fn prove(t: &SasTask, h2_deadline: Option<Instant>) -> Proof {
     if let Some(&(v, x)) = t.goal.iter().find(|&&(v, x)| !r1[fx.id(v, x) as usize]) {
         p.dead = Some("h1");
         p.miss = vec![(v, x)];
-        return p;
+        return (p, None);
     }
     let h = H2::run(t, h2_deadline);
     p.h2_s = h.seconds;
@@ -53,7 +58,7 @@ pub fn prove(t: &SasTask, h2_deadline: Option<Instant>) -> Proof {
         let of = |f: u32| (fx.var_of[f as usize], f - fx.off[fx.var_of[f as usize] as usize]);
         p.miss = if a == b { vec![of(a)] } else { vec![of(a), of(b)] };
     }
-    p
+    (p, Some(h))
 }
 
 /// Facts (variable, value) numbered by variable then value.
