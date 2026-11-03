@@ -7,18 +7,20 @@
 #          E014 switch (E14ON); it stops on E009's stop rules, the goal or the falsifier; at a goal stop the driver
 #          verifies the goal entry from boot in a fresh lean engine. A second `run` resumes from the archive's files.
 # The run is under the guard at nice 10; the driver takes the heavy lock itself for each job of a heavy scope.
-# usage: ENV=demo/env.sh run.sh guide|init|run      (D_ARCH, D_RUN, D_OUT, STOP_JOBS override the defaults)
+# usage: ENV=demo/env.sh run.sh guide|init|run      (D_ARCH, D_RUN, D_OUT, STOP_JOBS override the defaults; STAGE,
+#        default demo, names the stage and the guide: play/env.sh sets it for the interactive demo)
 set -u
 source "${ENV:?an env file (demo/env.sh)}"
+STAGE=${STAGE:-demo}
 GUARD=$HOME/.cache/fast-mi-e007/guard.sh
 mkdir -p $D_OUT $D_RUN/tmp $(dirname $D_ARCH)
 SW="$ON3 $E12ON $E14ON FMI_ENGINE_BIN=$E14_ENGINE_BIN FMI_MEMO= FMI_READING_CACHE=$D_RUN/rcache FMI_PLAN_CACHE=$D_RUN/plans FMI_POOL_DIR=$D_RUN/pool TMPDIR=$D_RUN/tmp E008_DISK_PATH=/var/tmp E008_FLOOR_GB=5"
 case ${1:?guide, init or run} in
   guide)
-    env $SW nice -n 10 $FMI_BIN guide map --goal end=1 --start-boot --out $D_OUT/guide-demo.json | tee $D_OUT/guide.log;;
+    env $SW nice -n 10 $FMI_BIN guide map --goal end=1 --start-boot --out $D_OUT/guide-$STAGE.json | tee $D_OUT/guide.log;;
   init)
     [ -e $D_ARCH ] && { echo "$D_ARCH exists"; exit 2; }
-    env $SW nice -n 10 $FMI_BIN explore init $D_ARCH --stage demo --goal end=1 --guide $D_OUT/guide-demo.json \
+    env $SW nice -n 10 $FMI_BIN explore init $D_ARCH --stage $STAGE --goal end=1 --guide $D_OUT/guide-$STAGE.json \
       --allowed files --workers 2 --idle-frames 1600 --rotate --evict-by-size --reuse-nonfacts \
       --stop-jobs ${STOP_JOBS:-80} --ready --commit-as-finished > $D_OUT/init.log 2>&1 || { cat $D_OUT/init.log; exit 1; }
     cat $D_OUT/init.log;;
