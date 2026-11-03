@@ -502,3 +502,96 @@ components that share them.
   E012 adds no idea beyond its components.
 - **Watchdogs.** The harness's, the window search's and the reader's limits are E006's. The guard's 3 GB and the disk
   floors are the machine's. All are engineering watchdogs, reported where they fire.
+
+## Amendment 2026-11-03, the `wait` component (branch e012-wait): its interface, before its code
+
+- **Where the plan's words are made exact** (ScummVM's `scumm.cpp` 2821 and 3110-3134, `script.cpp` 1535):
+  1. **Δ.** The engine's frame delta is var 19 (VAR_TIMER_NEXT) at the stop, at least 1. A paused delay goes down by
+     at most 15 in a frame. Only a slot whose status is exactly ssPaused (1) is lowered; a frozen one has 0x80 set.
+  2. **Due frame.** In SCUMM v5 the woken slot runs before the frame's decision point (`runAllScripts` comes before
+     `checkExecVerbs`). So a slot paused with delay D at the stop of frame f runs in frame f + floor(D / Δ) + 1, and
+     its effect is in that frame's state.
+  3. **H re-read at each stop.** The stop's own due frames replace the earlier ones: a slot that is no longer paused
+     has no due frame. The wait ends at max(last stop, last due frame) + W.
+  4. **Truth.** An atom (key, values) holds when the harness's view of the key is in its values: `start::view`
+     (replay.view), pos: and escpos: from the at: and esc: facts, every value labelled by its domain. Unobserved keys
+     (args:, saved:, actorroom:) are never stops.
+- **What the wait gives the try.**
+  - Each stop carries its checkpoint (facts, tick, rng, actors, as the harness makes them), so the try can make it an
+    entry. The wait itself makes and keeps no entry: novelty is the try's and the archive's.
+  - With `idle_frames` > 0, E009's idle rule runs on the wait's first `idle_frames` frames. Those are the idle
+    measurement's frames and changes, so its record is the idle measurement's.
+- **Engineering watchdog.** A wait's frames have a watchdog (`FMI_WAIT_MAX_FRAMES`). Where it fires, the wait's end is
+  `Watchdog`, and it is reported.
+- **Split with the other components.**
+  - `due` goes into fmi-core, so that fmi-play's window search (`delay`'s window.rs) can give a paused slot's planned
+    event its due frame. This branch does not change the window search.
+  - The wait's place in the try (after the reading, in place of the idle measurement) is the `try` component's
+    (tryjob.rs).
+  - This branch adds `fmi_explore::wait` and `fmi check wait`, which runs W1-W4.
+  - Until `tested` lands, the check computes T as section 1 defines it, from the reading's records: the union of the
+    preconditions' atoms, less each event's atoms on its own unit, plus the goal's. At integration `Tested::of`
+    replaces it.
+- **The gates' inputs.**
+  - Entries 203, 205 and 225 of the kitchen archive (room 28): T from the kept reading 28-33-41-j00065.
+  - Entry 4 (room 38): T from a fresh reading of its job's scope (33, 38, 83, 85, 96) from its state, since that
+    reading is evicted.
+  - The entries are rebuilt from boot from the read-only archive, as the plan's measurements were.
+
+### Appendix A additions: `fmi-core`, the wait
+
+Added at the end of fmi-core's `lib.rs` (the constants and functions) and to the `Engine` trait after `step_changes`
+(the provided method).
+
+```rust
+// --- E012: time passing (plan.md section 1, the wait component) ---------------------------------------------------
+
+/// A slot's status while it waits out a delay (script.h ssPaused); a frozen slot has 0x80 set on top of it.
+pub const SS_PAUSED: i32 = 1;
+/// VAR_TIMER_NEXT (var 19 in SCUMM v5): the ticks the engine's next frame lasts.
+pub const VAR_TIMER_NEXT: usize = 19;
+/// The most a paused slot's delay goes down in one frame (scumm.cpp scummLoop: `if (delta > 15) delta = 15;`).
+pub const DELAY_STEP_MAX: i64 = 15;
+
+/// The ticks the next frame takes off every paused slot's delay: the stop's var 19 (the main loop's delta is
+/// VAR_TIMER_NEXT, at least 1), at most DELAY_STEP_MAX (scummLoop's cap before decreaseScriptDelay). None when the
+/// dump has no var 19.
+pub fn delay_step(o: &Obs) -> Option<i64> {
+    let v = *o.vars.get(VAR_TIMER_NEXT)? as i64;
+    Some(v.clamp(1, DELAY_STEP_MAX))
+}
+
+/// The frame in which the dump's slot `slot` runs again, by the engine's own rule (script.cpp decreaseScriptDelay):
+/// each frame lowers the delay of every slot whose status is exactly SS_PAUSED (not a frozen one) by the frame's
+/// delta, and the slot runs in the frame its delay goes below 0, before that frame's decision point (v5:
+/// runAllScripts before checkExecVerbs). So the stop's frame + floor(delay / delta) + 1. None for a slot not in the
+/// dump or not paused. Exact while var 19 keeps its value.
+pub fn due(o: &Obs, slot: i32) -> Option<u64> {
+    let s = o.slots.iter().find(|s| s.slot == slot)?;
+    if s.status != SS_PAUSED {
+        return None;
+    }
+    let d = delay_step(o)?;
+    Some(o.frame + (i64::from(s.delay.max(0)) / d) as u64 + 1)
+}
+```
+
+```rust
+    /// The wait move's run (E012, plan.md section 1): frames with no new input from this stop, one at a time. After
+    /// each, `each` gets its status and the facts' changes from the frame before (as `step_changes(1)` gives them)
+    /// and returns true to stop there. At most `frames` frames. Returns the last status and the frames run. Default:
+    /// one `step_changes(1)` per frame; a provider may run the same frames in fewer round trips.
+    fn wait(&mut self, frames: u64, each: &mut dyn FnMut(&Status, &[(Key, Val, Val)]) -> bool) -> EResult<(Status, u64)> {
+        let mut st = self.status().clone();
+        let mut n = 0;
+        while n < frames {
+            let (s, ch) = self.step_changes(1)?;
+            n += 1;
+            st = s;
+            if each(&st, &ch) {
+                break;
+            }
+        }
+        Ok((st, n))
+    }
+```
