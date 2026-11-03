@@ -1,0 +1,3845 @@
+{
+ "tested": {
+  "actions": {
+   "event": 23781,
+   "sentence": 15712,
+   "verb": 168
+  },
+  "input_keys": 60,
+  "event_keys": 46,
+  "keys": 97,
+  "pre_keys_not_held": 0,
+  "atoms": 154,
+  "observed_keys": 96,
+  "seconds": 0.6,
+  "reading": "/var/tmp/fast-mi/e012-wait/readings/28-33-41-j00065/reading.json"
+ },
+ "entries": [
+  {
+   "entry": 203,
+   "frame": 3393,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.15
+   },
+   "wait": {
+    "frame0": 3393,
+    "frames": 2079,
+    "end": "horizon",
+    "seconds": 0.18,
+    "cpu_s": 0.11,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      5
+     ],
+     [
+      9,
+      10
+     ],
+     [
+      10,
+      461
+     ]
+    ],
+    "horizon": 479,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3395,
+      "off": 2,
+      "room": 28,
+      "tick": 20323,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        3
+       ],
+       [
+        9,
+        8
+       ],
+       [
+        10,
+        459
+       ]
+      ]
+     },
+     {
+      "frame": 3398,
+      "off": 5,
+      "room": 28,
+      "tick": 20341,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        10,
+        456
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 461,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        18
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.001
+     ],
+     [
+      "entry",
+      0.0007
+     ],
+     [
+      "frames",
+      0.1758
+     ],
+     [
+      "stops",
+      0.0009
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      26,
+      5
+     ],
+     [
+      "local:207",
+      54,
+      10
+     ],
+     [
+      "local:211",
+      2760,
+      461
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.141,
+     "frames_median_s": 0.14,
+     "us_per_frame": 67.2
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.178,
+      0.171,
+      0.162,
+      0.146,
+      0.148,
+      0.148,
+      0.154,
+      0.129,
+      0.114,
+      0.125
+     ],
+     "median_s": 0.148,
+     "max_s": 0.178,
+     "min_s": 0.114
+    }
+   }
+  },
+  {
+   "entry": 205,
+   "frame": 3443,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.12
+   },
+   "wait": {
+    "frame0": 3443,
+    "frames": 2016,
+    "end": "horizon",
+    "seconds": 0.116,
+    "cpu_s": 0.07,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      2
+     ],
+     [
+      9,
+      21
+     ],
+     [
+      10,
+      411
+     ]
+    ],
+    "horizon": 416,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3445,
+      "off": 2,
+      "room": 28,
+      "tick": 20623,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        19
+       ],
+       [
+        10,
+        409
+       ]
+      ]
+     },
+     {
+      "frame": 3450,
+      "off": 7,
+      "room": 28,
+      "tick": 20653,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        14
+       ],
+       [
+        10,
+        404
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 411,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0007
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1142
+     ],
+     [
+      "stops",
+      0.0004
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      9,
+      2
+     ],
+     [
+      "local:207",
+      120,
+      21
+     ],
+     [
+      "local:211",
+      2460,
+      411
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.128,
+     "frames_median_s": 0.127,
+     "us_per_frame": 63.0
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.12,
+      0.121,
+      0.12,
+      0.122,
+      0.125,
+      0.133,
+      0.139,
+      0.158,
+      0.159,
+      0.148
+     ],
+     "median_s": 0.133,
+     "max_s": 0.159,
+     "min_s": 0.12
+    }
+   }
+  },
+  {
+   "entry": 225,
+   "frame": 3530,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.14
+   },
+   "wait": {
+    "frame0": 3530,
+    "frames": 1929,
+    "end": "horizon",
+    "seconds": 0.095,
+    "cpu_s": 0.06,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      2
+     ],
+     [
+      9,
+      9
+     ],
+     [
+      10,
+      324
+     ]
+    ],
+    "horizon": 329,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3532,
+      "off": 2,
+      "room": 28,
+      "tick": 21145,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        7
+       ],
+       [
+        10,
+        322
+       ]
+      ]
+     },
+     {
+      "frame": 3543,
+      "off": 13,
+      "room": 28,
+      "tick": 21211,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        17
+       ],
+       [
+        10,
+        311
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 324,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0008
+     ],
+     [
+      "entry",
+      0.0004
+     ],
+     [
+      "frames",
+      0.0933
+     ],
+     [
+      "stops",
+      0.0005
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      10,
+      2
+     ],
+     [
+      "local:207",
+      48,
+      9
+     ],
+     [
+      "local:211",
+      1938,
+      324
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.105,
+     "frames_median_s": 0.104,
+     "us_per_frame": 53.8
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.111,
+      0.118,
+      0.156,
+      0.115,
+      0.121,
+      0.144,
+      0.113,
+      0.129,
+      0.107,
+      0.123
+     ],
+     "median_s": 0.121,
+     "max_s": 0.156,
+     "min_s": 0.107
+    }
+   }
+  },
+  {
+   "entry": 204,
+   "frame": 3395,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.12
+   },
+   "wait": {
+    "frame0": 3395,
+    "frames": 2064,
+    "end": "horizon",
+    "seconds": 0.126,
+    "cpu_s": 0.08,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      3
+     ],
+     [
+      9,
+      8
+     ],
+     [
+      10,
+      459
+     ]
+    ],
+    "horizon": 464,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3396,
+      "off": 1,
+      "room": 28,
+      "tick": 20329,
+      "atoms": [
+       [
+        "script:2",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "script:2",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        7
+       ],
+       [
+        10,
+        458
+       ]
+      ]
+     },
+     {
+      "frame": 3398,
+      "off": 3,
+      "room": 28,
+      "tick": 20341,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        10,
+        456
+       ]
+      ]
+     },
+     {
+      "frame": 3422,
+      "off": 27,
+      "room": 28,
+      "tick": 20485,
+      "atoms": [
+       [
+        "var:32",
+        [
+         14
+        ],
+        true
+       ],
+       [
+        "var:32",
+        [
+         202
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        true
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        false
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        false
+       ],
+       [
+        "script:23",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:2",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:3",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:4",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:5",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:6",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:7",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:8",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:9",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:10",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "pos:script:23",
+        [
+         409
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        9,
+        2
+       ],
+       [
+        10,
+        432
+       ]
+      ]
+     },
+     {
+      "frame": 3439,
+      "off": 44,
+      "room": 28,
+      "tick": 20587,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        4
+       ],
+       [
+        10,
+        415
+       ]
+      ]
+     },
+     {
+      "frame": 3443,
+      "off": 48,
+      "room": 28,
+      "tick": 20611,
+      "atoms": [
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        21
+       ],
+       [
+        10,
+        411
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 459,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0008
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1237
+     ],
+     [
+      "stops",
+      0.0012
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      14,
+      3
+     ],
+     [
+      "local:207",
+      42,
+      8
+     ],
+     [
+      "local:211",
+      2748,
+      459
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.129,
+     "frames_median_s": 0.128,
+     "us_per_frame": 61.9
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.132,
+      0.148,
+      0.134,
+      0.143,
+      0.149,
+      0.151,
+      0.117,
+      0.149,
+      0.118,
+      0.133
+     ],
+     "median_s": 0.143,
+     "max_s": 0.151,
+     "min_s": 0.117
+    }
+   }
+  },
+  {
+   "entry": 206,
+   "frame": 3444,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.15
+   },
+   "wait": {
+    "frame0": 3444,
+    "frames": 2015,
+    "end": "horizon",
+    "seconds": 0.17,
+    "cpu_s": 0.11,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      1
+     ],
+     [
+      9,
+      20
+     ],
+     [
+      10,
+      410
+     ]
+    ],
+    "horizon": 415,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3445,
+      "off": 1,
+      "room": 28,
+      "tick": 20623,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        19
+       ],
+       [
+        10,
+        409
+       ]
+      ]
+     },
+     {
+      "frame": 3450,
+      "off": 6,
+      "room": 28,
+      "tick": 20653,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        14
+       ],
+       [
+        10,
+        404
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 410,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0008
+     ],
+     [
+      "entry",
+      0.0004
+     ],
+     [
+      "frames",
+      0.1673
+     ],
+     [
+      "stops",
+      0.0008
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      3,
+      1
+     ],
+     [
+      "local:207",
+      114,
+      20
+     ],
+     [
+      "local:211",
+      2454,
+      410
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.121,
+     "frames_median_s": 0.12,
+     "us_per_frame": 59.8
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.134,
+      0.158,
+      0.162,
+      0.151,
+      0.161,
+      0.14,
+      0.15,
+      0.122,
+      0.115,
+      0.117
+     ],
+     "median_s": 0.15,
+     "max_s": 0.162,
+     "min_s": 0.115
+    }
+   }
+  },
+  {
+   "entry": 207,
+   "frame": 3444,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.14
+   },
+   "wait": {
+    "frame0": 3444,
+    "frames": 2015,
+    "end": "horizon",
+    "seconds": 0.144,
+    "cpu_s": 0.09,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      1
+     ],
+     [
+      9,
+      20
+     ],
+     [
+      10,
+      410
+     ]
+    ],
+    "horizon": 415,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3445,
+      "off": 1,
+      "room": 28,
+      "tick": 20623,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        19
+       ],
+       [
+        10,
+        409
+       ]
+      ]
+     },
+     {
+      "frame": 3450,
+      "off": 6,
+      "room": 28,
+      "tick": 20653,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        14
+       ],
+       [
+        10,
+        404
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 410,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0009
+     ],
+     [
+      "entry",
+      0.0004
+     ],
+     [
+      "frames",
+      0.1418
+     ],
+     [
+      "stops",
+      0.0007
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      3,
+      1
+     ],
+     [
+      "local:207",
+      114,
+      20
+     ],
+     [
+      "local:211",
+      2454,
+      410
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.102,
+     "frames_median_s": 0.101,
+     "us_per_frame": 50.2
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.133,
+      0.139,
+      0.146,
+      0.132,
+      0.149,
+      0.143,
+      0.153,
+      0.141,
+      0.108,
+      0.134
+     ],
+     "median_s": 0.141,
+     "max_s": 0.153,
+     "min_s": 0.108
+    }
+   }
+  },
+  {
+   "entry": 208,
+   "frame": 3396,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.12
+   },
+   "wait": {
+    "frame0": 3396,
+    "frames": 2063,
+    "end": "horizon",
+    "seconds": 0.111,
+    "cpu_s": 0.07,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      2
+     ],
+     [
+      9,
+      7
+     ],
+     [
+      10,
+      458
+     ]
+    ],
+    "horizon": 463,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3398,
+      "off": 2,
+      "room": 28,
+      "tick": 20341,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        10,
+        456
+       ]
+      ]
+     },
+     {
+      "frame": 3422,
+      "off": 26,
+      "room": 28,
+      "tick": 20485,
+      "atoms": [
+       [
+        "var:32",
+        [
+         14
+        ],
+        true
+       ],
+       [
+        "var:32",
+        [
+         202
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        true
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        false
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        false
+       ],
+       [
+        "script:2",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "script:2",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "script:23",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:2",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:3",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:4",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:5",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:6",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:7",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:8",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:9",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:10",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "pos:script:23",
+        [
+         409
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        9,
+        2
+       ],
+       [
+        10,
+        432
+       ]
+      ]
+     },
+     {
+      "frame": 3439,
+      "off": 43,
+      "room": 28,
+      "tick": 20587,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        4
+       ],
+       [
+        10,
+        415
+       ]
+      ]
+     },
+     {
+      "frame": 3443,
+      "off": 47,
+      "room": 28,
+      "tick": 20611,
+      "atoms": [
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        21
+       ],
+       [
+        10,
+        411
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 458,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0008
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1082
+     ],
+     [
+      "stops",
+      0.0008
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      8,
+      2
+     ],
+     [
+      "local:207",
+      36,
+      7
+     ],
+     [
+      "local:211",
+      2742,
+      458
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.153,
+     "frames_median_s": 0.152,
+     "us_per_frame": 73.8
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.117,
+      0.129,
+      0.115,
+      0.121,
+      0.127,
+      0.146,
+      0.124,
+      0.142,
+      0.131,
+      0.149
+     ],
+     "median_s": 0.129,
+     "max_s": 0.149,
+     "min_s": 0.115
+    }
+   }
+  },
+  {
+   "entry": 209,
+   "frame": 3422,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.17
+   },
+   "wait": {
+    "frame0": 3422,
+    "frames": 2037,
+    "end": "horizon",
+    "seconds": 0.162,
+    "cpu_s": 0.1,
+    "delta": 6,
+    "dues0": [
+     [
+      9,
+      2
+     ],
+     [
+      10,
+      432
+     ]
+    ],
+    "horizon": 437,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3423,
+      "off": 1,
+      "room": 28,
+      "tick": 20491,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        9,
+        1
+       ],
+       [
+        10,
+        431
+       ]
+      ]
+     },
+     {
+      "frame": 3439,
+      "off": 17,
+      "room": 28,
+      "tick": 20587,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        4
+       ],
+       [
+        10,
+        415
+       ]
+      ]
+     },
+     {
+      "frame": 3443,
+      "off": 21,
+      "room": 28,
+      "tick": 20611,
+      "atoms": [
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        21
+       ],
+       [
+        10,
+        411
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 432,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0009
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1596
+     ],
+     [
+      "stops",
+      0.0008
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:207",
+      6,
+      2
+     ],
+     [
+      "local:211",
+      2586,
+      432
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.135,
+     "frames_median_s": 0.134,
+     "us_per_frame": 65.9
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.167,
+      0.151,
+      0.147,
+      0.152,
+      0.163,
+      0.241,
+      0.166,
+      0.165,
+      0.163,
+      0.184
+     ],
+     "median_s": 0.165,
+     "max_s": 0.241,
+     "min_s": 0.147
+    }
+   }
+  },
+  {
+   "entry": 220,
+   "frame": 3396,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.15
+   },
+   "wait": {
+    "frame0": 3396,
+    "frames": 2063,
+    "end": "horizon",
+    "seconds": 0.186,
+    "cpu_s": 0.12,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      2
+     ],
+     [
+      9,
+      7
+     ],
+     [
+      10,
+      458
+     ]
+    ],
+    "horizon": 463,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3398,
+      "off": 2,
+      "room": 28,
+      "tick": 20341,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        10,
+        456
+       ]
+      ]
+     },
+     {
+      "frame": 3422,
+      "off": 26,
+      "room": 28,
+      "tick": 20485,
+      "atoms": [
+       [
+        "var:32",
+        [
+         14
+        ],
+        true
+       ],
+       [
+        "var:32",
+        [
+         202
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        true
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        false
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        false
+       ],
+       [
+        "script:2",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "script:2",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "script:23",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:2",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:3",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:4",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:5",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:6",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:7",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:8",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:9",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "verb:10",
+        [
+         1
+        ],
+        false
+       ],
+       [
+        "pos:script:23",
+        [
+         409
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        9,
+        2
+       ],
+       [
+        10,
+        432
+       ]
+      ]
+     },
+     {
+      "frame": 3439,
+      "off": 43,
+      "room": 28,
+      "tick": 20587,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        4
+       ],
+       [
+        10,
+        415
+       ]
+      ]
+     },
+     {
+      "frame": 3443,
+      "off": 47,
+      "room": 28,
+      "tick": 20611,
+      "atoms": [
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        21
+       ],
+       [
+        10,
+        411
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 458,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0011
+     ],
+     [
+      "entry",
+      0.0005
+     ],
+     [
+      "frames",
+      0.1824
+     ],
+     [
+      "stops",
+      0.001
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      8,
+      2
+     ],
+     [
+      "local:207",
+      36,
+      7
+     ],
+     [
+      "local:211",
+      2742,
+      458
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.113,
+     "frames_median_s": 0.112,
+     "us_per_frame": 54.2
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.182,
+      0.166,
+      0.203,
+      0.173,
+      0.168,
+      0.163,
+      0.171,
+      0.177,
+      0.189,
+      0.171
+     ],
+     "median_s": 0.173,
+     "max_s": 0.203,
+     "min_s": 0.163
+    }
+   }
+  },
+  {
+   "entry": 221,
+   "frame": 3422,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.14
+   },
+   "wait": {
+    "frame0": 3422,
+    "frames": 2037,
+    "end": "horizon",
+    "seconds": 0.135,
+    "cpu_s": 0.08,
+    "delta": 6,
+    "dues0": [
+     [
+      9,
+      2
+     ],
+     [
+      10,
+      432
+     ]
+    ],
+    "horizon": 437,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3423,
+      "off": 1,
+      "room": 28,
+      "tick": 20491,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        9,
+        1
+       ],
+       [
+        10,
+        431
+       ]
+      ]
+     },
+     {
+      "frame": 3439,
+      "off": 17,
+      "room": 28,
+      "tick": 20587,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        4
+       ],
+       [
+        10,
+        415
+       ]
+      ]
+     },
+     {
+      "frame": 3443,
+      "off": 21,
+      "room": 28,
+      "tick": 20611,
+      "atoms": [
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        21
+       ],
+       [
+        10,
+        411
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 432,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0009
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1325
+     ],
+     [
+      "stops",
+      0.0007
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:207",
+      6,
+      2
+     ],
+     [
+      "local:211",
+      2586,
+      432
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.155,
+     "frames_median_s": 0.154,
+     "us_per_frame": 75.8
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.139,
+      0.153,
+      0.152,
+      0.132,
+      0.151,
+      0.168,
+      0.099,
+      0.159,
+      0.126,
+      0.179
+     ],
+     "median_s": 0.152,
+     "max_s": 0.179,
+     "min_s": 0.099
+    }
+   }
+  },
+  {
+   "entry": 222,
+   "frame": 3432,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.14
+   },
+   "wait": {
+    "frame0": 3432,
+    "frames": 2027,
+    "end": "horizon",
+    "seconds": 0.109,
+    "cpu_s": 0.06,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      7
+     ],
+     [
+      9,
+      11
+     ],
+     [
+      10,
+      422
+     ]
+    ],
+    "horizon": 427,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3438,
+      "off": 6,
+      "room": 28,
+      "tick": 20581,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        1
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        10,
+        416
+       ]
+      ]
+     },
+     {
+      "frame": 3439,
+      "off": 7,
+      "room": 28,
+      "tick": 20587,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        4
+       ],
+       [
+        10,
+        415
+       ]
+      ]
+     },
+     {
+      "frame": 3443,
+      "off": 11,
+      "room": 28,
+      "tick": 20611,
+      "atoms": [
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        21
+       ],
+       [
+        10,
+        411
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 422,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0009
+     ],
+     [
+      "entry",
+      0.0005
+     ],
+     [
+      "frames",
+      0.1065
+     ],
+     [
+      "stops",
+      0.0006
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      41,
+      7
+     ],
+     [
+      "local:207",
+      60,
+      11
+     ],
+     [
+      "local:211",
+      2526,
+      422
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.122,
+     "frames_median_s": 0.121,
+     "us_per_frame": 59.9
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.113,
+      0.134,
+      0.145,
+      0.122,
+      0.124,
+      0.115,
+      0.161,
+      0.131,
+      0.131,
+      0.15
+     ],
+     "median_s": 0.131,
+     "max_s": 0.161,
+     "min_s": 0.113
+    }
+   }
+  },
+  {
+   "entry": 223,
+   "frame": 3444,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.13
+   },
+   "wait": {
+    "frame0": 3444,
+    "frames": 2015,
+    "end": "horizon",
+    "seconds": 0.136,
+    "cpu_s": 0.09,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      1
+     ],
+     [
+      9,
+      20
+     ],
+     [
+      10,
+      410
+     ]
+    ],
+    "horizon": 415,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3445,
+      "off": 1,
+      "room": 28,
+      "tick": 20623,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        19
+       ],
+       [
+        10,
+        409
+       ]
+      ]
+     },
+     {
+      "frame": 3450,
+      "off": 6,
+      "room": 28,
+      "tick": 20653,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        14
+       ],
+       [
+        10,
+        404
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 410,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.001
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1335
+     ],
+     [
+      "stops",
+      0.0005
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      3,
+      1
+     ],
+     [
+      "local:207",
+      114,
+      20
+     ],
+     [
+      "local:211",
+      2454,
+      410
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.148,
+     "frames_median_s": 0.147,
+     "us_per_frame": 73.1
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.123,
+      0.132,
+      0.131,
+      0.116,
+      0.159,
+      0.129,
+      0.141,
+      0.121,
+      0.118,
+      0.111
+     ],
+     "median_s": 0.129,
+     "max_s": 0.159,
+     "min_s": 0.111
+    }
+   }
+  },
+  {
+   "entry": 224,
+   "frame": 3445,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.15
+   },
+   "wait": {
+    "frame0": 3445,
+    "frames": 2014,
+    "end": "horizon",
+    "seconds": 0.12,
+    "cpu_s": 0.08,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      5
+     ],
+     [
+      9,
+      19
+     ],
+     [
+      10,
+      409
+     ]
+    ],
+    "horizon": 414,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3448,
+      "off": 3,
+      "room": 28,
+      "tick": 20641,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        16
+       ],
+       [
+        10,
+        406
+       ]
+      ]
+     },
+     {
+      "frame": 3450,
+      "off": 5,
+      "room": 28,
+      "tick": 20653,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        14
+       ],
+       [
+        10,
+        404
+       ]
+      ]
+     },
+     {
+      "frame": 3530,
+      "off": 85,
+      "room": 28,
+      "tick": 21133,
+      "atoms": [
+       [
+        "var:52",
+        [
+         "below",
+         -1,
+         0
+        ],
+        false
+       ],
+       [
+        "var:52",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "var:53",
+        [
+         1,
+         2,
+         "above"
+        ],
+        true
+       ],
+       [
+        "verb:120",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:121",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:122",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "verb:123",
+        [
+         1
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        9
+       ],
+       [
+        10,
+        324
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 409,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0009
+     ],
+     [
+      "entry",
+      0.0003
+     ],
+     [
+      "frames",
+      0.1179
+     ],
+     [
+      "stops",
+      0.0006
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      26,
+      5
+     ],
+     [
+      "local:207",
+      108,
+      19
+     ],
+     [
+      "local:211",
+      2448,
+      409
+     ]
+    ],
+    "floor": {
+     "n": 10,
+     "median_s": 0.104,
+     "frames_median_s": 0.103,
+     "us_per_frame": 51.4
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.13,
+      0.108,
+      0.131,
+      0.164,
+      0.165,
+      0.145,
+      0.134,
+      0.12,
+      0.119,
+      0.118
+     ],
+     "median_s": 0.131,
+     "max_s": 0.165,
+     "min_s": 0.108
+    }
+   }
+  }
+ ]
+}

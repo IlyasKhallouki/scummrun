@@ -1,0 +1,92 @@
+{
+ "tested": {
+  "actions": {
+   "event": 2829,
+   "sentence": 6100,
+   "verb": 357
+  },
+  "input_keys": 43,
+  "event_keys": 27,
+  "keys": 66,
+  "pre_keys_not_held": 0,
+  "atoms": 97,
+  "observed_keys": 66,
+  "seconds": 0.09,
+  "reading": "/var/tmp/fast-mi/e012-wait/readings/33-38-83-85-96-e4/reading.json"
+ },
+ "entries": [
+  {
+   "entry": 4,
+   "frame": 2862,
+   "room": 38,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.1
+   },
+   "wait": {
+    "frame0": 2862,
+    "frames": 1600,
+    "end": "static",
+    "seconds": 0.068,
+    "cpu_s": 0.04,
+    "delta": 6,
+    "dues0": [],
+    "horizon": 0,
+    "atoms": 97,
+    "observed": 97,
+    "stops": [],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0009
+     ],
+     [
+      "entry",
+      0.0005
+     ],
+     [
+      "frames",
+      0.0648
+     ],
+     [
+      "stops",
+      0.0
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_misses_first": [],
+    "dues0_units": [],
+    "floor": {
+     "n": 10,
+     "median_s": 0.087,
+     "frames_median_s": 0.086,
+     "us_per_frame": 53.9
+    },
+    "repeat": {
+     "n": 10,
+     "all_s": [
+      0.061,
+      0.066,
+      0.065,
+      0.074,
+      0.072,
+      0.076,
+      0.078,
+      0.086,
+      0.107,
+      0.107
+     ],
+     "median_s": 0.076,
+     "max_s": 0.107,
+     "min_s": 0.061
+    }
+   }
+  }
+ ]
+}

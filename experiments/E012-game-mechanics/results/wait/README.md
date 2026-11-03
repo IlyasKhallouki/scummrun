@@ -6,7 +6,8 @@ The kitchen archive of E011's check (`/var/tmp/fast-mi/e011-archives/kitchen`) i
 boot from its movie, and its return equals its checkpoint (14 of 14).
 
 Records: `room28.json` (entries 203, 205, 225), `room28b.json` (the other ten room-28 entries), `e4.json` (entry 4),
-`w4-28.json` and `w4-38.json` (W4's timing), `load.txt` (the load at each group's start and end).
+`w4-28.json` and `w4-38.json` (W4's timing under the heavy lock), `w4b-28.json` and `w4b-38.json` (W4's timing again at
+a lower load), `load.txt` (the load at each group's start and end).
 
 ## T
 
@@ -110,8 +111,8 @@ times. The floor is what the engine's frames cost; the idle measurement that the
 **Summary.** Over the 154 waits: median 0.221 s, p90 0.289 s, max 0.353 s.
 
 - 13 of 154 are over 0.3 s, 9 of them at entry 203, where the floor alone took 0.310 s at the time.
-- The wait's own work (the view of T, the truths, the idle rule, the stops' dumps and checkpoints) is the difference
-  from the floor: 0.00-0.03 s per wait.
+- The wait's own work (the view of T, the truths, the idle rule, the stops' dumps and checkpoints) is about the
+  difference from the floor: 0.00-0.04 s between the medians. The two are timed one after the other, not interleaved.
 - The cost is the engine's frames: one Step round trip per frame, 91-149 µs per frame at this load.
 
 **In the try,** the wait replaces the idle measurement of 1,600 frames and runs those same frames. So what it adds to a
@@ -122,10 +123,36 @@ try is its frames past 1,600, plus its own work:
 
 The fork's engine CPU was 50-91 µs per frame (cpu_s in `w4-*.json`). The wall was 1.3-1.6 times that.
 
-**W4 as stated (≤ 0.3 s per wait) does not hold for every wait at load 7.5.** It holds for the median of 13 of 14
-entries. What binds is the floor, which no work on the wait's side removes. At round 2's B3 load (1.9-5.1), the idle
-measurement of 1,600 frames took 0.10 s, about 62 µs per frame. At that rate the room-28 waits come to 0.13 s plus
-their own work.
+**Again at load 1.6-2.2** (`w4b-*.json`): the same run, 30 minutes later, without the lock (the check is under 1 GB).
+
+| entry | frames | stops | median of 10 | max of 11 | floor, median | floor per frame | waits over 0.3 s |
+|---|---|---|---|---|---|---|---|
+| 203 | 2079 | 3 | 0.148 s | 0.180 s | 0.140 s | 67 µs | 0 |
+| 205 | 2016 | 3 | 0.133 s | 0.159 s | 0.127 s | 63 µs | 0 |
+| 225 | 1929 | 3 | 0.121 s | 0.156 s | 0.104 s | 54 µs | 0 |
+| 204 | 2064 | 6 | 0.143 s | 0.151 s | 0.128 s | 62 µs | 0 |
+| 206 | 2015 | 3 | 0.150 s | 0.170 s | 0.120 s | 60 µs | 0 |
+| 207 | 2015 | 3 | 0.141 s | 0.153 s | 0.101 s | 50 µs | 0 |
+| 208 | 2063 | 5 | 0.129 s | 0.149 s | 0.152 s | 74 µs | 0 |
+| 209 | 2037 | 4 | 0.165 s | 0.241 s | 0.134 s | 66 µs | 0 |
+| 220 | 2063 | 5 | 0.173 s | 0.203 s | 0.112 s | 54 µs | 0 |
+| 221 | 2037 | 4 | 0.152 s | 0.179 s | 0.154 s | 76 µs | 0 |
+| 222 | 2027 | 4 | 0.131 s | 0.161 s | 0.121 s | 60 µs | 0 |
+| 223 | 2015 | 3 | 0.129 s | 0.159 s | 0.147 s | 73 µs | 0 |
+| 224 | 2014 | 4 | 0.131 s | 0.165 s | 0.103 s | 51 µs | 0 |
+| 4 | 1600 | 0 | 0.076 s | 0.107 s | 0.086 s | 54 µs | 0 |
+
+Over the 154 waits: median 0.134 s, p90 0.168 s, max 0.241 s, 0 over 0.3 s. The floor, 50-76 µs per frame, is the rate of
+round 2's idle measurement in B3 (about 62 µs per frame at load 1.9-5.1).
+
+The medians differ from the floor's by -0.02 to +0.06 s.
+
+**W4.**
+
+- At load 1.6-2.2 it holds: 154 of 154 waits are at most 0.3 s (max 0.241 s).
+- At load 7.4-7.7, 13 of 154 are over (max 0.353 s). 9 of them are at entry 203, where the engine's frames alone took
+  0.310 s by median.
+- The load sets W4, through the engine's per-frame Step. The wait's own work on top is a few hundredths of a second.
 
 The checked runs of the other groups (`room28`, `room28b`, `e4`; view check on) took 0.32-0.77 s for the first wait. Their
 five repeats without checks took 0.15-0.29 s by median, at load 5.8-6.8.
