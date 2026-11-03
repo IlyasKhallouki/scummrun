@@ -12,7 +12,7 @@
 //!   when no `--memo` folder is given), `--memo-units-set` (memo.md's amendment of 2026-11-03; `FMI_READER_UNITS_SET=0`
 //!   leaves it out) and `--prep` (`FMI_READER_PREP=0` leaves it out);
 //! * [`ReaderAlloc`]: the process's allocator, mimalloc (reader-scope's own) with the switch on, the system allocator
-//!   with it off, chosen at the process's first allocation.
+//!   with it off or with `FMI_READER_ALLOC=system`, chosen at the process's first allocation.
 
 use scumm_reader::memo::MemStore;
 use scumm_reader::run::{run, Ctl, Log, Resident};
@@ -160,11 +160,15 @@ fn mimalloc_on() -> bool {
 #[cold]
 fn choose() -> bool {
     // getenv allocates nothing; the process's first allocation comes before any other thread
-    // SAFETY: a NUL-terminated name; the value, if any, is a NUL-terminated string the C library owns
-    let on = unsafe {
-        let p = libc::getenv(c"FMI_READER_LIB".as_ptr());
-        !p.is_null() && std::ffi::CStr::from_ptr(p).to_bytes() == b"1"
+    let env = |name: &std::ffi::CStr| -> Option<&'static [u8]> {
+        // SAFETY: a NUL-terminated name; the value, if any, is a NUL-terminated string the C library owns and keeps
+        unsafe {
+            let p = libc::getenv(name.as_ptr());
+            (!p.is_null()).then(|| std::ffi::CStr::from_ptr(p).to_bytes())
+        }
     };
+    // the switch on, unless FMI_READER_ALLOC=system keeps the system's (E012 plan.md, resident, "the allocator")
+    let on = env(c"FMI_READER_LIB") == Some(b"1") && env(c"FMI_READER_ALLOC") != Some(b"system");
     CHOICE.store(if on { 2 } else { 1 }, Ordering::Relaxed);
     on
 }
