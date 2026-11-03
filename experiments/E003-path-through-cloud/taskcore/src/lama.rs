@@ -276,67 +276,67 @@ pub struct Succ {
 
 impl Succ {
     pub fn new(t: &SasTask) -> Succ {
-        let order = search::successor_order(t);
-        let lists: Vec<Vec<(u32, u32)>> = (0..t.n_ops())
-            .map(|o| {
-                let mut p = t.pre(o).to_vec();
-                p.sort_unstable();
-                p
-            })
-            .collect();
-        // build recursively over ranges of `order` sharing a prefix of length d; a node's groups: (variable,
-        // (value, child) by value)
-        type Groups = Vec<(u32, Vec<(u32, u32)>)>;
-        struct B<'a> {
-            lists: &'a [Vec<(u32, u32)>],
-            nodes_ops: Vec<Vec<u32>>,
-            nodes_groups: Vec<Groups>,
+        // the operators' sorted precondition lists in one buffer, the operators sorted by them, then by number
+        // (search.rs `successor_order`)
+        let n = t.n_ops();
+        let mut off: Vec<u32> = Vec::with_capacity(n + 1);
+        off.push(0);
+        let mut flat: Vec<(u32, u32)> = Vec::with_capacity(t.pre.len());
+        for o in 0..n {
+            let a = flat.len();
+            flat.extend_from_slice(t.pre(o));
+            flat[a..].sort_unstable();
+            off.push(flat.len() as u32);
         }
-        impl B<'_> {
-            fn node(&mut self, ops: &[u32], d: usize) -> u32 {
-                let id = self.nodes_ops.len() as u32;
-                self.nodes_ops.push(Vec::new());
-                self.nodes_groups.push(Vec::new());
-                let mut i = 0;
-                let mut own = Vec::new();
-                while i < ops.len() && self.lists[ops[i] as usize].len() == d {
-                    own.push(ops[i]);
-                    i += 1;
-                }
-                self.nodes_ops[id as usize] = own;
-                let mut groups: Groups = Vec::new();
-                while i < ops.len() {
-                    let key = self.lists[ops[i] as usize][d];
-                    let mut j = i;
-                    while j < ops.len() && self.lists[ops[j] as usize][d] == key {
-                        j += 1;
-                    }
-                    let child = self.node(&ops[i..j], d + 1);
-                    if groups.last().is_none_or(|g| g.0 != key.0) {
-                        groups.push((key.0, Vec::new()));
-                    }
-                    groups.last_mut().unwrap().1.push((key.1, child));
-                    i = j;
-                }
-                self.nodes_groups[id as usize] = groups;
-                id
-            }
-        }
-        let mut b = B { lists: &lists, nodes_ops: Vec::new(), nodes_groups: Vec::new() };
-        b.node(&order, 0);
+        let list = |o: u32| &flat[off[o as usize] as usize..off[o as usize + 1] as usize];
+        let mut order: Vec<u32> = (0..n as u32).collect();
+        order.sort_unstable_by(|&a, &b| list(a).cmp(list(b)).then(a.cmp(&b)));
         let mut s = Succ {
             ops_off: vec![0],
-            ops: Vec::new(),
+            ops: Vec::with_capacity(n),
             grp_off: vec![0],
             grp_var: Vec::new(),
             grp_lo: Vec::new(),
             grp_kids_off: vec![0],
             grp_kids: Vec::new(),
         };
-        for (own, groups) in b.nodes_ops.iter().zip(&b.nodes_groups) {
-            s.ops.extend_from_slice(own);
+        // the trie, node by node in creation order (a node's children get numbers when it is made): a work list of
+        // (node, range of `order`, depth); children of a node are its ranges sharing the next (var, value)
+        struct Work {
+            node: u32,
+            lo: usize,
+            hi: usize,
+            d: usize,
+        }
+        let mut nodes_made = 1u32;
+        let mut work: VecDeque<Work> = VecDeque::new();
+        work.push_back(Work { node: 0, lo: 0, hi: n, d: 0 });
+        let mut groups: Vec<(u32, Vec<(u32, u32)>)> = Vec::new();
+        while let Some(w) = work.pop_front() {
+            debug_assert_eq!(w.node as usize, s.ops_off.len() - 1);
+            let mut i = w.lo;
+            while i < w.hi && list(order[i]).len() == w.d {
+                s.ops.push(order[i]);
+                i += 1;
+            }
             s.ops_off.push(s.ops.len() as u32);
-            for (var, kids) in groups {
+            groups.clear();
+            while i < w.hi {
+                let key = list(order[i])[w.d];
+                let mut j = i;
+                while j < w.hi && list(order[j])[w.d] == key {
+                    j += 1;
+                }
+                let child = nodes_made;
+                nodes_made += 1;
+                work.push_back(Work { node: child, lo: i, hi: j, d: w.d + 1 });
+                if groups.last().is_none_or(|g| g.0 != key.0) {
+                    groups.push((key.0, Vec::new()));
+                }
+                groups.last_mut().unwrap().1.push((key.1, child));
+                i = j;
+            }
+            for (var, kids) in &groups {
                 let lo = kids.first().unwrap().0;
                 let hi = kids.last().unwrap().0;
                 let base = s.grp_kids.len();
