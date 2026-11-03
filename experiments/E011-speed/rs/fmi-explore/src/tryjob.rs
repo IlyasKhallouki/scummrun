@@ -343,7 +343,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let cfg = HarnessCfg {
         replan_limit: step::REPLAN_LIMIT,
         time_limit_s: step::TIME_LIMIT,
-        plan_time_s: step::PLAN_TIME,
+        plan_time_s: step::plan_time(),
         search: r.search,
         cost_caps: true,
         cost_dmax: frame_costs.get("dmax").and_then(|d| d.as_i64()),

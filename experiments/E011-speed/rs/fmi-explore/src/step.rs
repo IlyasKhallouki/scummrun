@@ -20,6 +20,10 @@ pub const SWITCHES: &str = "value_sets,draw_clears,actor_rooms,input_settled,wai
 pub const REPLAN_LIMIT: u32 = 30;
 pub const TIME_LIMIT: f64 = 86400.0;
 pub const PLAN_TIME: u64 = 600;
+/// The planner's limit per request: PLAN_TIME, or FMI_PLAN_TIME seconds when set (E011's kitchen check amendment)
+pub fn plan_time() -> u64 {
+    std::env::var("FMI_PLAN_TIME").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0).unwrap_or(PLAN_TIME)
+}
 pub const PLAN_MEMORY: &str = "3G";
 pub const FORK_EACH: u32 = 7;
 /// the first plan's status on which a cached reading is read fresh
