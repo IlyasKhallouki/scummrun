@@ -13,7 +13,7 @@ set -u
 source "${ENV:?an env file}"
 OUT=$1; shift
 ARCH=/var/tmp/fast-mi/e011-archives/kitchen
-DATA=/var/tmp/fast-mi/e012-wait
+DATA=${WAIT_DATA:-/var/tmp/fast-mi/e012-wait} # WAIT_DATA: another data folder (the integration's)
 GUARD=$HOME/.cache/fast-mi-e007/guard.sh
 mkdir -p $OUT
 R28=$DATA/readings/28-33-41-j00065
