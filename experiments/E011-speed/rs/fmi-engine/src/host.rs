@@ -42,10 +42,25 @@ pub struct HostCfg {
 
 pub const DEFAULT_BIN: &str = "/var/tmp/fast-mi/svm-e011/build/scummvm/scummvm";
 
+/// E012's switch `SPEEDRUN_REPORT_RESTART` (component end): "1" in this process's environment passes it to every
+/// engine (`HostCfg::from_env`). Off by default.
+pub fn report_restart() -> bool {
+    std::env::var("SPEEDRUN_REPORT_RESTART").is_ok_and(|v| v == "1")
+}
+
+/// E012's switch `FMI_BOXES` (component end): "1" lets the walk-box affordances ask `Engine::boxes`. Off by default,
+/// and then nothing sends the Boxes command.
+pub fn boxes_on() -> bool {
+    std::env::var("FMI_BOXES").is_ok_and(|v| v == "1")
+}
+
 impl HostCfg {
     /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd;
     /// FMI_ENGINE_CUTS=1: every engine also gets SPEEDRUN_CUTS=1, round 2's count-only mixer and no pixel output
     /// (patch 0003, engine/CUTS.md; FMI_ENGINE_BIN must then be a build with patch 0003).
+    /// E012: SPEEDRUN_REPORT_RESTART=1 in this process's environment: every engine gets it too (patch 0005: a
+    /// restart or a pause ends the run as "restart" or "pause"; FMI_ENGINE_BIN must then be a build with patch 0005).
+    /// `spawn` drops every inherited SPEEDRUN_ variable, so this is the only way it reaches an engine.
     pub fn from_env() -> HostCfg {
         let bin = std::env::var_os("FMI_ENGINE_BIN")
             .map(PathBuf::from)
@@ -61,6 +76,9 @@ impl HostCfg {
         let mut extra_env = Vec::new();
         if std::env::var("FMI_ENGINE_CUTS").is_ok_and(|v| v == "1") {
             extra_env.push(("SPEEDRUN_CUTS".to_string(), "1".to_string()));
+        }
+        if report_restart() {
+            extra_env.push(("SPEEDRUN_REPORT_RESTART".to_string(), "1".to_string()));
         }
         HostCfg {
             bin,
@@ -618,6 +636,16 @@ impl BinEngine {
         &self.status
     }
 
+    /// The JSON "boxes" reply's text at the current stop (patch 0005's BoxesJson; the Boxes gate's other side).
+    pub fn boxes_json(&mut self) -> EResult<String> {
+        self.send(W::msg(wire::C_BOXES_JSON).finish())?;
+        let p = self.expect(wire::R_JSON)?;
+        let mut r = R::new(&p);
+        let s = r.str().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(s)
+    }
+
     fn shutdown(&mut self) {
         if self.done {
             return;
@@ -852,6 +880,16 @@ impl Engine for BinEngine {
         }
         r.done().map_err(bad)?;
         Ok(v)
+    }
+
+    /// One Boxes message (patch 0005, E012's component end).
+    fn boxes(&mut self) -> EResult<Boxes> {
+        self.send(W::msg(wire::C_BOXES).finish())?;
+        let p = self.expect(wire::R_BOXES)?;
+        let mut r = R::new(&p);
+        let b = r.boxes().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(b)
     }
 
     /// One Step, its delta read into the facts' changes (block::changes) with no whole facts built (IFACE e011-r2-own).

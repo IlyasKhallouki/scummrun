@@ -502,3 +502,72 @@ components that share them.
   E012 adds no idea beyond its components.
 - **Watchdogs.** The harness's, the window search's and the reader's limits are E006's. The guard's 3 GB and the disk
   floors are the machine's. All are engineering watchdogs, reported where they fire.
+
+## Amendment 2026-11-03, component `end`: the pause hook's place, a test trigger, and the interface
+
+Written before patch 0005's code.
+
+- **Measured** (round 2's engine `svm-e011-r2int`, lean, seed 1):
+  - The key "space", which the bridge injects like any key, at the kitchen archive's entry 0 (room 33, frame 2728,
+    sentence idle) reaches `pauseGame()` through the engine's pause key (`input.cpp:1416`). The run then makes no
+    reply within the command's 15 s timeout: the pause dialog waits for a backend event that the bridge never sends.
+    The key "x" at the same frame runs 200 frames in 0.03 s.
+  - In this game's scripts (statistics only): SO_PAUSE at 0 sites; SO_RESTART at 9 sites, all in the global script
+    that `VAR_POST_SAVELOAD_SCRIPT` names (it runs after the original save menu, which these runs never open); SO_QUIT
+    at 2 sites, in two global scripts of one room (the research above counted 1).
+  - No input the bridge can inject reaches `restart()`: the restart key (F8, `VAR_RESTART_KEY`) is not an injectable
+    key, and the original GUI is off.
+  - The recorded movies hold the keys "o", "p" and "t" only (the E008 and E011 kitchen archives and B0's).
+- **What changes.**
+  1. The pause hook is at the start of `pauseGame()`, which SO_PAUSE calls, instead of at SO_PAUSE alone. The engine's
+     pause key then ends the run as "pause" too, where today it blocks the run until the command's timeout.
+  2. A test trigger, `SPEEDRUN_TEST_RESTART=<frame>`: the bridge calls `restart()` at the start of that frame, where
+     the engine's restart key calls it from `processKeyboard()`. The restart hook's tests need it, since no input
+     reaches `restart()` here. Unset, nothing changes, and no run sets it.
+  3. `Boxes` is a binary command (0x94, reply 0x12) and a JSON one (`{"cmd": "boxes"}`). A second binary command,
+     `BoxesJson` (0x95, reply `Json`), returns the JSON command's text, as `StateJson` does for the dump. The gate
+     compares the two, and the corners and flags with the room's BOXD block read from the game files.
+  4. With `SPEEDRUN_REPORT_RESTART=1` in `fmi`'s environment, every engine it starts gets it (as `FMI_ENGINE_CUTS`
+     passes `SPEEDRUN_CUTS`). `FMI_BOXES=1` is the switch the walk-box affordances read; off, nothing sends `Boxes`.
+- **Interface,** added to `fmi-core` (E011 Appendix A) byte for byte. After `struct At`:
+
+  ```rust
+  /// E012 (patch 0005): the end reasons that are the game's own end (E012 plan.md, method (5)): the scripts' quit
+  /// (SO_QUIT; the bridge reports "quit" when the engine shuts down), `restart()` and `pauseGame()` (both reported only
+  /// with SPEEDRUN_REPORT_RESTART=1). An End's Status carries one of them in `reason`.
+  pub const GAME_ENDS: [&str; 3] = ["quit", "restart", "pause"];
+
+  /// Whether an end reason is the game's own end (`GAME_ENDS`).
+  pub fn is_game_end(reason: &str) -> bool {
+      GAME_ENDS.contains(&reason)
+  }
+
+  /// E012 (patch 0005): one walk box of the current room as the engine holds it (boxes.cpp `getBoxCoordinates`,
+  /// `getBoxFlags`): the corners in room coordinates and the flags (0x08 x flip, 0x10 y flip, 0x20 player only or
+  /// ignore scale, 0x40 locked, 0x80 invisible).
+  #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+  pub struct WalkBox {
+      pub ul: (i32, i32),
+      pub ur: (i32, i32),
+      pub lr: (i32, i32),
+      pub ll: (i32, i32),
+      pub flags: u8,
+  }
+
+  /// E012 (patch 0005): the Boxes reply, the current room and its walk boxes 0..count-1.
+  #[derive(Clone, PartialEq, Eq, Debug, Default)]
+  pub struct Boxes {
+      pub room: i32,
+      pub boxes: Vec<WalkBox>,
+  }
+  ```
+
+  In `trait Engine`, after `at_many`:
+
+  ```rust
+      /// E012 (patch 0005): the current room's walk boxes at this stop (the Boxes command reads and changes nothing).
+      /// Default: an error, for an engine without the command.
+      fn boxes(&mut self) -> EResult<Boxes> {
+          Err(EngineError::Bridge("boxes: this engine has no Boxes command".into()))
+      }
+  ```
