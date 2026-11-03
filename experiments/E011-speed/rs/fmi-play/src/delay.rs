@@ -467,6 +467,115 @@ impl Log {
     }
 }
 
+// --- gate R2: the successive outputs are uniform ---------------------------------------------------------------------
+
+/// ln Γ(x) for x > 0 (Lanczos, g = 7, 9 terms).
+fn ln_gamma(x: f64) -> f64 {
+    const C: [f64; 9] = [
+        0.999_999_999_999_809_9,
+        676.520_368_121_885_1,
+        -1_259.139_216_722_402_8,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
+        12.507_343_278_686_905,
+        -0.138_571_095_265_720_12,
+        9.984_369_578_019_572e-6,
+        1.505_632_735_149_311_6e-7,
+    ];
+    if x < 0.5 {
+        let pi = std::f64::consts::PI;
+        return (pi / (pi * x).sin()).ln() - ln_gamma(1.0 - x);
+    }
+    let x = x - 1.0;
+    let mut a = C[0];
+    let t = x + 7.5;
+    for (i, c) in C.iter().enumerate().skip(1) {
+        a += c / (x + i as f64);
+    }
+    0.5 * (2.0 * std::f64::consts::PI).ln() + (x + 0.5) * t.ln() - t + a.ln()
+}
+
+/// The regularized upper incomplete gamma Q(a, x) (series below a + 1, continued fraction above).
+fn gamma_q(a: f64, x: f64) -> f64 {
+    if x <= 0.0 {
+        return 1.0;
+    }
+    let gln = ln_gamma(a);
+    if x < a + 1.0 {
+        let (mut ap, mut sum) = (a, 1.0 / a);
+        let mut del = sum;
+        for _ in 0..10_000 {
+            ap += 1.0;
+            del *= x / ap;
+            sum += del;
+            if del.abs() < sum.abs() * 1e-15 {
+                break;
+            }
+        }
+        1.0 - sum * (-x + a * x.ln() - gln).exp()
+    } else {
+        let tiny = 1e-300;
+        let mut b = x + 1.0 - a;
+        let mut c = 1.0 / tiny;
+        let mut d = 1.0 / b;
+        let mut h = d;
+        for i in 1..10_000 {
+            let an = -(i as f64) * (i as f64 - a);
+            b += 2.0;
+            d = an * d + b;
+            if d.abs() < tiny {
+                d = tiny;
+            }
+            c = b + an / c;
+            if c.abs() < tiny {
+                c = tiny;
+            }
+            d = 1.0 / d;
+            let del = d * c;
+            h *= del;
+            if (del - 1.0).abs() < 1e-15 {
+                break;
+            }
+        }
+        (-x + a * x.ln() - gln).exp() * h
+    }
+}
+
+/// The p-value of Pearson's χ² of `counts` against the uniform distribution over them.
+pub fn chi2_uniform_p(counts: &[u64]) -> (f64, f64) {
+    let n: u64 = counts.iter().sum();
+    let k = counts.len();
+    if k < 2 || n == 0 {
+        return (0.0, 1.0);
+    }
+    let e = n as f64 / k as f64;
+    let chi2: f64 = counts.iter().map(|&c| (c as f64 - e).powi(2) / e).sum();
+    (chi2, gamma_q((k - 1) as f64 / 2.0, chi2 / 2.0))
+}
+
+/// Gate R2 at one call stride: from `s0`, `samples` outputs taken every `stride` calls; for each n in 1..=n_max the
+/// χ² p-value of the outputs `(s · 0xDEADBF03) mod n` (getRandomNumber(n − 1)) against the uniform.
+pub fn r2(s0: u32, samples: usize, stride: u32, n_max: u32) -> Vec<(u32, f64, f64)> {
+    let mut outs: Vec<u32> = Vec::with_capacity(samples);
+    let mut s = s0;
+    for _ in 0..samples {
+        for _ in 0..stride {
+            s = rng_step(s);
+        }
+        outs.push(s.wrapping_mul(0xDEAD_BF03));
+    }
+    (1..=n_max)
+        .map(|n| {
+            let mut counts = vec![0u64; n as usize];
+            for &x in &outs {
+                counts[(x % n) as usize] += 1;
+            }
+            let (c, p) = chi2_uniform_p(&counts);
+            (n, c, p)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -512,6 +621,57 @@ mod tests {
         assert_eq!(draw_p(&Draw { check: 0, range: Some((0, 3)), share: None }), Some(0.25));
         assert_eq!(draw_p(&Draw { check: 0, range: Some((0, 3)), share: Some(0.75) }), Some(0.75));
         assert_eq!(draw_p(&Draw { check: 0, range: None, share: None }), None);
+    }
+
+    #[test]
+    fn chi2_tails() {
+        // the χ² distribution's 5% and 1% points (tables): (df, x, upper tail)
+        for (df, x, q) in [
+            (1usize, 3.841_459, 0.05),
+            (1, 6.634_897, 0.01),
+            (2, 5.991_465, 0.05),
+            (10, 23.209_25, 0.01),
+            (30, 50.892_2, 0.01),
+            (50, 67.504_8, 0.05),
+            (100, 124.342_1, 0.05),
+        ] {
+            let p = gamma_q(df as f64 / 2.0, x / 2.0);
+            assert!((p - q).abs() < 2e-4, "df {df}: {p} for {q}");
+        }
+        assert!((ln_gamma(5.0) - 24f64.ln()).abs() < 1e-12);
+        assert_eq!(chi2_uniform_p(&[10, 10, 10]).0, 0.0);
+    }
+
+    /// Gate R2 (computational): the outputs at successive calls from the root's state are uniform for every range.
+    #[test]
+    fn r2_uniform_stride_1() {
+        let rows = r2(RNG_ROOT, 100_000, 1, 233);
+        let fam = 0.01 / 232.0;
+        let worst = rows.iter().skip(1).map(|r| r.2).fold(1.0, f64::min);
+        assert!(worst >= fam, "least p {worst} under the family's {fam}");
+    }
+
+    /// Gate R2 in full: strides 1-10 (M1's calls per frame), printed (cargo test --release -- --ignored r2_table
+    /// --nocapture).
+    #[test]
+    #[ignore]
+    fn r2_table() {
+        let fam = 0.01 / 232.0;
+        let mut all_ok = true;
+        for stride in 1..=10u32 {
+            let rows = r2(RNG_ROOT, 100_000, stride, 233);
+            let nt = &rows[1..];
+            let below = nt.iter().filter(|r| r.2 < 0.01).count();
+            let (wn, _, wp) = nt.iter().copied().fold((0, 0.0, 1.0), |a, r| if r.2 < a.2 { r } else { a });
+            let ok = wp >= fam;
+            all_ok &= ok;
+            println!(
+                "R2 stride {stride}: n = 2..233, {below} of 232 under 1% (expected 2.3), least p {wp:.5} at n = {wn}; family (Bonferroni 1%): {}",
+                if ok { "pass" } else { "FAIL" }
+            );
+        }
+        println!("R2: {}", if all_ok { "PASS" } else { "FAIL" });
+        assert!(all_ok);
     }
 
     #[test]
