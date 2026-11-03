@@ -78,5 +78,5 @@ The first G-on run, with the reading cache, took 271 s against G0's 187 s: its r
 the cache stored nothing under its disk floor at that moment (E011 round 2's amendment on the memo measured the same
 effect), not because of E012's steps.
 
-The merged head's pair ran 70 minutes later, off at load 3.4-4.0 (381.1 s) and on at load 2.9-3.3 (309.9 s): the wall
-of these tries is set by the load (the reads are 90% of it), so the back-to-back pair above is the comparison.
+The merged head's pair ran 20 minutes later, off at load 3.4-4.0 (381.1 s) and on at load 2.9-3.3 (309.9 s): the wall
+of these tries is set by the load (the reads are 92% of the parts' CPU), so the back-to-back pair above is the comparison.
