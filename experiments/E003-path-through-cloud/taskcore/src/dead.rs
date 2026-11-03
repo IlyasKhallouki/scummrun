@@ -695,9 +695,10 @@ impl H2 {
     }
 }
 
-/// `taskcore dead FILE.sas [--reference] [--plan FILE]`: the proofs on a SAS file (Fast Downward's translator
-/// output of the shape taskcore writes); one JSON line. `--reference`: also the plain h^2, compared row for row.
-/// `--plan FILE`: a plan of the task (`sas_plan`), each of its states checked against the h^2 rows.
+/// `taskcore dead FILE.sas [--reference] [--plan FILE] [--explain]`: the proofs on a SAS file (Fast Downward's
+/// translator output of the shape taskcore writes); one JSON line. `--reference`: also the plain h^2, compared row for
+/// row. `--plan FILE`: a plan of the task (`sas_plan`), each of its states checked against the h^2 rows. `--explain`:
+/// for a goal h^2 proves dead, each writer's first pair outside the fixpoint (variable=value index), counted.
 pub fn dead_cmd(args: &[String]) -> Result<(), String> {
     let path = args.first().ok_or("usage: taskcore dead FILE.sas [--reference] [--plan FILE]")?;
     let t0 = Instant::now();
@@ -729,6 +730,37 @@ pub fn dead_cmd(args: &[String]) -> Result<(), String> {
     if args.iter().any(|a| a == "--reference") {
         let r = H2::run_reference(&t, None);
         out += &format!(", \"reference_s\": {:.3}, \"reference_passes\": {}, \"rows_equal\": {}", r.seconds, r.passes, r.rows == h.rows);
+    }
+    if args.iter().any(|a| a == "--explain") && miss.is_some() {
+        // for each effect that writes a goal fact outside the fixpoint: the first pair of its operator's preconditions
+        // and its conditions outside the fixpoint (or a fact outside it), counted
+        let name = |f: u32| {
+            let v = fx.var_of[f as usize];
+            format!("{}={}", t.names[v as usize], f - fx.off[v as usize])
+        };
+        let goal: Vec<u32> = t.goal.iter().map(|&(v, x)| fx.id(v, x)).filter(|&g| !h.reached(g)).collect();
+        let mut why: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
+        let mut n_eff = 0;
+        for o in 0..t.n_ops() {
+            for e in t.effs(o) {
+                if !goal.contains(&fx.id(e.var, e.post)) {
+                    continue;
+                }
+                n_eff += 1;
+                let mut b: Vec<u32> = t.pre(o).iter().chain(t.conds(e)).map(|&(v, x)| fx.id(v, x)).collect();
+                b.sort_unstable();
+                b.dedup();
+                let w = b
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, &x)| b[i..].iter().find(|&&y| !h.pair(x, y)).map(|&y| (x, y)))
+                    .map(|(x, y)| if x == y { format!("{} unreachable", name(x)) } else { format!("{} with {}", name(x), name(y)) })
+                    .unwrap_or_else(|| "none (?)".into());
+                *why.entry(w).or_default() += 1;
+            }
+        }
+        let parts: Vec<String> = why.iter().map(|(k, n)| format!("{:?}: {}", k, n)).collect();
+        out += &format!(", \"explain\": {{\"effects\": {}, \"first_pair_outside\": {{{}}}}}", n_eff, parts.join(", "));
     }
     if let Some(i) = args.iter().position(|a| a == "--plan") {
         let p = args.get(i + 1).ok_or("--plan FILE")?;
