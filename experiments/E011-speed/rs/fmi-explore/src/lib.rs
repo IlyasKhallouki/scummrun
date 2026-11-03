@@ -10,6 +10,7 @@
 //! * `afford`: E012's affordance step (the interface's own inputs, tried in forks; FMI_AFFORD).
 //! * `mech`: E012's try: the mechanisms' switches and ports, the try's novelty, the entries it commits besides its
 //!   attempt's, the dead moves and the affordance step's triggers (tryjob.rs runs them in the plan's order).
+//! * `wait`: E012's wait move (plan.md section 1); `waitcheck`: its gates (`fmi check wait`).
 
 pub mod afford;
 pub mod archive;
@@ -30,5 +31,7 @@ pub mod pyjson;
 pub mod start;
 pub mod step;
 pub mod tryjob;
+pub mod wait;
+pub mod waitcheck;
 pub mod warm;
 pub mod wiring;

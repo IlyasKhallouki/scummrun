@@ -930,6 +930,23 @@ pub trait Engine: Send {
         let after = self.facts()?;
         Ok((st, before.diff(&after)))
     }
+    /// The wait move's run (E012, plan.md section 1): frames with no new input from this stop, one at a time. After
+    /// each, `each` gets its status and the facts' changes from the frame before (as `step_changes(1)` gives them)
+    /// and returns true to stop there. At most `frames` frames. Returns the last status and the frames run. Default:
+    /// one `step_changes(1)` per frame; a provider may run the same frames in fewer round trips.
+    fn wait(&mut self, frames: u64, each: &mut dyn FnMut(&Status, &[(Key, Val, Val)]) -> bool) -> EResult<(Status, u64)> {
+        let mut st = self.status().clone();
+        let mut n = 0;
+        while n < frames {
+            let (s, ch) = self.step_changes(1)?;
+            n += 1;
+            st = s;
+            if each(&st, &ch) {
+                break;
+            }
+        }
+        Ok((st, n))
+    }
 }
 
 /// The room's dump made from a full dump: the owners, states and classes of the objects the room's object list
@@ -1216,6 +1233,37 @@ pub struct Draw {
     pub check: usize,
     pub range: Option<(i32, i32)>,
     pub share: Option<f64>,
+}
+
+// --- E012: time passing (plan.md section 1, the wait component) ---------------------------------------------------
+
+/// A slot's status while it waits out a delay (script.h ssPaused); a frozen slot has 0x80 set on top of it.
+pub const SS_PAUSED: i32 = 1;
+/// VAR_TIMER_NEXT (var 19 in SCUMM v5): the ticks the engine's next frame lasts.
+pub const VAR_TIMER_NEXT: usize = 19;
+/// The most a paused slot's delay goes down in one frame (scumm.cpp scummLoop: `if (delta > 15) delta = 15;`).
+pub const DELAY_STEP_MAX: i64 = 15;
+
+/// The ticks the next frame takes off every paused slot's delay: the stop's var 19 (the main loop's delta is
+/// VAR_TIMER_NEXT, at least 1), at most DELAY_STEP_MAX (scummLoop's cap before decreaseScriptDelay). None when the
+/// dump has no var 19.
+pub fn delay_step(o: &Obs) -> Option<i64> {
+    let v = *o.vars.get(VAR_TIMER_NEXT)? as i64;
+    Some(v.clamp(1, DELAY_STEP_MAX))
+}
+
+/// The frame in which the dump's slot `slot` runs again, by the engine's own rule (script.cpp decreaseScriptDelay):
+/// each frame lowers the delay of every slot whose status is exactly SS_PAUSED (not a frozen one) by the frame's
+/// delta, and the slot runs in the frame its delay goes below 0, before that frame's decision point (v5:
+/// runAllScripts before checkExecVerbs). So the stop's frame + floor(delay / delta) + 1. None for a slot not in the
+/// dump or not paused. Exact while var 19 keeps its value.
+pub fn due(o: &Obs, slot: i32) -> Option<u64> {
+    let s = o.slots.iter().find(|s| s.slot == slot)?;
+    if s.status != SS_PAUSED {
+        return None;
+    }
+    let d = delay_step(o)?;
+    Some(o.frame + (i64::from(s.delay.max(0)) / d) as u64 + 1)
 }
 
 #[cfg(test)]
