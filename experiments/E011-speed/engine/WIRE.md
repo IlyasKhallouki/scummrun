@@ -172,3 +172,48 @@ The lean switches are bridge settings, all off by default:
 `fmi-engine`'s launcher also writes `joystick_num=-1` into the ini when lean. The Python reference keeps its ini.
 `svm-lean.sh` sets the switches for the Python reference's runs, whose launcher drops the caller's SPEEDRUN_*
 variables.
+
+## Patch 0004 (round 2, play): StepObs, RunObs, AtMany and the screen layout
+
+`patches/0004-scumm-speedrun-play.patch` applies on top of 0001 and 0002 (it touches only `speedrun_wire.cpp` and the
+wire members of `speedrun_bridge.h`). It adds three messages each way and one field to the binary status, for the
+window search (fmi-play): an observed child frame in one round trip instead of four, the input code's run and dump in
+one, its hit tests in one, and the screen layout the hit cache needs (`experiments/E011-speed/play/HITCACHE.md`).
+JSON is unchanged.
+
+| type | message | payload | reply |
+|---|---|---|---|
+| 0x91 | StepObs | u64 frame, `ObsReq` | StepObsReply (0x0F) or End |
+| 0x92 | AtMany | `Vec<(i32, i32)>` | AtMany (0x10) |
+| 0x93 | RunObs | `RunSpec`, `ObsReq`, bool room | RunObsReply (0x11) or End |
+
+| type | message | payload |
+|---|---|---|
+| 0x0F | StepObsReply | `Status`, `RunsReply`, `ExplainReply`, `Obs` |
+| 0x10 | AtMany | `Vec<At>`, one per point, in order |
+| 0x11 | RunObsReply | `Status`, `Obs` |
+
+- **StepObs** is Run with only the frame stop (`frame` must be after the current frame: Run's error text otherwise). At
+  that stop the engine answers, in one message, what Runs, ExplainLog and Obs(`ObsReq`) would answer there, in that
+  order; the runs and explain buffers are cleared, as those commands clear them. fmi-core: `Engine::step_observe`.
+- **RunObs** is Run (the same checks and stops) whose stop answers with the status and what Obs(`ObsReq`) would answer
+  there. The runs and explain buffers are left as they are. fmi-core: `Engine::run_obs`.
+  - With `room` set, the dump is *the room's dump*: the full dump (no exact object) whose owners, states and classes
+    hold only the objects the room's object table lists (`_objs[1.._numLocalObjects)` with an object number), in
+    object order. It is the lite dump of those objects plus the inventory and the room's objects, made by the same
+    encoder, so each field equals the full dump's; fmi-core's `room_cut` makes it from a full dump.
+    fmi-core: `Engine::run_room`. (The window search's input code reads only the room, the verbs, the variables, the
+    inventory, the actors, the room's objects and their classes.)
+- **AtMany** answers what At would answer for each point at this stop. A hit test reads the engine and changes
+  nothing (`findVirtScreen`, `findObject`, `getActorFromPos`, `findVerbAtPos`), so the order does not matter. fmi-core:
+  `Engine::at_many`.
+- **The screen layout.** `Status` gains a last field, `screen: Option<(i32, i32, bool)>`, and every Status the binary
+  channel sends (Stop, StepReply, StepObsReply, RunObsReply) carries `Some((_screenB, _screenH,
+  _forceBannerVirtScreen))`: initScreens' b and h, and the forced banner screen. An End carries None. In a v5 DOS game
+  the virtual screens' toplines and heights are set only by `initScreens(b, h)` (gfx.cpp; `initBGBuffers` resizes the
+  main screen only for v7 and up), and `findVirtScreen` reads those and `_forceBannerVirtScreen` only.
+
+Checked by `fmi-checks`' `play-wire check` (two engines in lockstep on the kitchen chain from 2728 and the door chain
+from 1500, every command answered equal to the commands it stands for: StepObs against Run, Runs, ExplainLog and Obs;
+RunObs against Run and Obs; RunObs with the room's dump against Run, Obs and `room_cut`; AtMany equal to one At per
+point over a grid of screen points) and by play's tests 2-4 through fmi-engine.

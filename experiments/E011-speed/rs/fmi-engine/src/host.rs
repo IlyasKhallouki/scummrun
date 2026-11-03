@@ -484,7 +484,12 @@ impl BinEngine {
             if self.rbuf.len() < need {
                 self.rbuf.resize(need.next_power_of_two(), 0);
             }
-            let n = self.stream.read(&mut self.rbuf[self.rlen..]).map_err(io_err)?;
+            let n = match self.stream.read(&mut self.rbuf[self.rlen..]) {
+                Ok(n) => n,
+                // a signal (a debugger's or a profiler's stop) interrupted the read: read again
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(io_err(e)),
+            };
             if n == 0 {
                 return Err(EngineError::Io(std::io::Error::new(
                     std::io::ErrorKind::UnexpectedEof,
@@ -787,9 +792,80 @@ impl Engine for BinEngine {
     fn quit(mut self: Box<Self>) {
         self.shutdown();
     }
+
+    /// One StepObs message (patch 0004): the run to `frame` and the stop's runs, explain entries and dump.
+    fn step_observe(&mut self, frame: u64, req: &ObsReq) -> EResult<(Status, RunsReply, ExplainReply, Obs)> {
+        let mut w = W::msg(wire::C_STEP_OBS);
+        w.u64(frame);
+        w.obs_req(req);
+        self.send(w.finish())?;
+        self.moved();
+        let p = self.expect(wire::R_STEP_OBS_REPLY)?;
+        let mut r = R::new(&p);
+        let st = r.status().map_err(bad)?;
+        let runs = r.runs_reply().map_err(bad)?;
+        let ents = r.explain_reply().map_err(bad)?;
+        let o = r.obs().map_err(bad)?;
+        r.done().map_err(bad)?;
+        self.status = st.clone();
+        Ok((st, runs, ents, o))
+    }
+
+    /// One RunObs message (patch 0004): the run and the dump at its stop.
+    fn run_obs(&mut self, spec: &RunSpec, req: &ObsReq) -> EResult<(Status, Obs)> {
+        self.run_obs_msg(spec, req, false)
+    }
+
+    /// One RunObs message asking the room's dump (patch 0004).
+    fn run_room(&mut self, spec: &RunSpec) -> EResult<(Status, Obs)> {
+        self.run_obs_msg(spec, &ObsReq::default(), true)
+    }
+
+    /// One AtMany message (patch 0004).
+    fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
+        if pts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut w = W::msg(wire::C_AT_MANY);
+        w.u32(pts.len() as u32);
+        for &(x, y) in pts {
+            w.i32(x);
+            w.i32(y);
+        }
+        self.send(w.finish())?;
+        let p = self.expect(wire::R_AT_MANY)?;
+        let mut r = R::new(&p);
+        let n = r.count(17).map_err(bad)?;
+        if n != pts.len() {
+            return Err(bad(format!("at_many: {n} replies for {} points", pts.len())));
+        }
+        let mut v = Vec::with_capacity(n);
+        for _ in 0..n {
+            v.push(r.at().map_err(bad)?);
+        }
+        r.done().map_err(bad)?;
+        Ok(v)
+    }
 }
 
 impl BinEngine {
+    /// RunObs: the run, then the dump at its stop (`room`: the room's dump, fmi_core::room_cut's).
+    fn run_obs_msg(&mut self, spec: &RunSpec, req: &ObsReq, room: bool) -> EResult<(Status, Obs)> {
+        let mut w = W::msg(wire::C_RUN_OBS);
+        w.run_spec(spec);
+        w.obs_req(req);
+        w.b(room);
+        self.send(w.finish())?;
+        self.moved();
+        let p = self.expect(wire::R_RUN_OBS_REPLY)?;
+        let mut r = R::new(&p);
+        let st = r.status().map_err(bad)?;
+        let o = r.obs().map_err(bad)?;
+        r.done().map_err(bad)?;
+        self.status = st.clone();
+        Ok((st, o))
+    }
+
     /// `fork` as a `BinEngine`: the child stops where this one is, with this stop's facts already known.
     pub fn fork_bin(&mut self) -> EResult<BinEngine> {
         self.send(W::msg(wire::C_FORK).finish())?;

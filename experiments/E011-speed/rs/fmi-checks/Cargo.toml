@@ -13,3 +13,7 @@ fmi-play = { path = "../fmi-play", features = ["json-double"] }
 [[bin]]
 name = "play-lean"
 path = "src/bin/play_lean.rs"
+
+[[bin]]
+name = "play-wire"
+path = "src/bin/play_wire.rs"

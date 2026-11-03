@@ -407,50 +407,66 @@ impl<'r> PlayReading<'r> {
         b
     }
 
-    /// window.source_index: the reading's actions by their input (the action line's source, as JSON text).
+    /// window.source_index: the reading's actions by their input (the action line's source, as JSON text). The
+    /// lines are parsed on a few threads, and their keys are entered in line order, as one pass enters them.
     pub fn by_source(&self) -> &FxHashMap<String, Vec<u32>> {
         self.by_source.get_or_init(|| {
+            let keyed = par_lines(self.src.n_actions(), |i| {
+                let (n, src) = source_of_line(self.src.action_line(i))?;
+                let j = pyj::parse(src).ok()?;
+                Some((pyj::dumps(&j), n))
+            });
             let mut out: FxHashMap<String, Vec<u32>> = FxHashMap::default();
-            for i in 0..self.src.n_actions() {
-                if let Some((n, src)) = source_of_line(self.src.action_line(i)) {
-                    if let Ok(j) = pyj::parse(src) {
-                        out.entry(pyj::dumps(&j)).or_default().push(n);
-                    }
-                }
+            for (k, n) in keyed {
+                out.entry(k).or_default().push(n);
             }
             out
         })
     }
 
-    /// strict.Reading's `events` {(unit, w): [action]} and `by_unit` {unit: [action]}.
+    /// strict.Reading's `events` {(unit, w): [action]} and `by_unit` {unit: [action]} (the lines parsed as in
+    /// `by_source`, entered in line order).
     pub fn events(&self) -> &(FxHashMap<(Unit, i64), Vec<u32>>, FxHashMap<Unit, Vec<u32>>) {
         self.events.get_or_init(|| {
-            let mut ev: FxHashMap<(Unit, i64), Vec<u32>> = FxHashMap::default();
-            let mut bu: FxHashMap<Unit, Vec<u32>> = FxHashMap::default();
-            for i in 0..self.src.n_actions() {
-                let Some((n, src)) = source_of_line(self.src.action_line(i)) else {
-                    continue;
-                };
+            let keyed = par_lines(self.src.n_actions(), |i| {
+                let (n, src) = source_of_line(self.src.action_line(i))?;
                 if !src.starts_with("[\"event\"") {
-                    continue;
+                    return None;
                 }
-                let Ok(j) = pyj::parse(src) else { continue };
+                let j = pyj::parse(src).ok()?;
                 let a = j.arr();
                 if a.len() > 4 && a[4].truthy() {
-                    continue;
+                    return None;
                 }
-                let (Some(u), Some(w)) = (
-                    a.get(1).and_then(J::str).and_then(Unit::parse),
-                    a.get(2).and_then(J::int),
-                ) else {
-                    continue;
-                };
+                let u = a.get(1).and_then(J::str).and_then(Unit::parse)?;
+                let w = a.get(2).and_then(J::int)?;
+                Some((u, w, n))
+            });
+            let mut ev: FxHashMap<(Unit, i64), Vec<u32>> = FxHashMap::default();
+            let mut bu: FxHashMap<Unit, Vec<u32>> = FxHashMap::default();
+            for (u, w, n) in keyed {
                 ev.entry((u, w)).or_default().push(n);
                 bu.entry(u).or_default().push(n);
             }
             (ev, bu)
         })
     }
+}
+
+/// `f` on the lines 0..n, on up to four threads in contiguous chunks; the results in line order.
+fn par_lines<T: Send>(n: u32, f: impl Fn(u32) -> Option<T> + Sync) -> Vec<T> {
+    let k = std::thread::available_parallelism().map_or(1, |p| p.get()).min(4) as u32;
+    if k <= 1 || n < 4096 {
+        return (0..n).filter_map(&f).collect();
+    }
+    let step = n.div_ceil(k);
+    let f = &f;
+    std::thread::scope(|sc| {
+        let parts: Vec<_> = (0..k)
+            .map(|c| sc.spawn(move || (c * step..((c + 1) * step).min(n)).filter_map(f).collect::<Vec<T>>()))
+            .collect();
+        parts.into_iter().flat_map(|h| h.join().expect("a line-index thread")).collect()
+    })
 }
 
 /// window._SOURCE on an action line: (its "i", its "source" list's text), the line's head as the reference writes it.

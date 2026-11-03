@@ -130,6 +130,15 @@ pub fn verb_point(verb: i64, state: &Obs, at: &mut dyn FnMut(i32, i32) -> EResul
     Ok(None)
 }
 
+/// The points `verb_point` tests for `verb`, in its order (none unless the verb is listed once).
+pub fn verb_candidates(verb: i64, state: &Obs) -> Vec<(i32, i32)> {
+    let mine: Vec<&Verb> = state.verbs.iter().filter(|v| v.id as i64 == verb).collect();
+    if mine.len() != 1 {
+        return vec![];
+    }
+    VERB_OFFSETS.iter().map(|(dx, dy)| (mine[0].x + dx, mine[0].y + dy)).collect()
+}
+
 /// The Executor's Move as replay.to_move makes it: a click (verb on A, and B) or a key.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Move {

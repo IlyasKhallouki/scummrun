@@ -502,8 +502,8 @@ pub struct Prof {
     pub play_hits: [AtomicU64; 4],
     pub forks: AtomicU64,
     pub fork_ns: AtomicU64,
-    /// stone trials: count, wall, frames, hit tests
-    pub stone: [AtomicU64; 4],
+    /// stone trials: count, wall, frames, hit tests, kept as the branch
+    pub stone: [AtomicU64; 5],
     /// the input code's thread CPU ns: all, in run, in obs, in at, in the stone trials' fork and quit
     pub play_cpu: [AtomicU64; 5],
     /// a child's whole thread CPU ns
@@ -553,8 +553,8 @@ impl Prof {
             g(&self.play_cpu[4])
         )
     }
-    fn stones(&self, n: u64, ns: u64, frames: u64, at: u64) {
-        for (a, x) in self.stone.iter().zip([n, ns, frames, at]) {
+    fn stones(&self, n: u64, ns: u64, frames: u64, at: u64, kept: u64) {
+        for (a, x) in self.stone.iter().zip([n, ns, frames, at, kept]) {
             a.fetch_add(x, Ordering::Relaxed);
         }
     }
@@ -567,7 +567,7 @@ impl Prof {
         let fr = self.play_frames.load(Ordering::Relaxed);
         let h: Vec<u64> = self.play_hits.iter().map(|a| a.load(Ordering::Relaxed)).collect();
         format!(
-            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms; stone trials {} in {:.2} s, {} frames, {} hit tests",
+            "input code: {} children, {:.1} ms and {:.1} frames each ({:.3} ms a frame), {} dumps asked and {} kept, {} hit tests asked and {} kept; snapshots {} at {:.3} ms; stone trials {} in {:.2} s, {} frames, {} hit tests, {} kept",
             self.plays.load(Ordering::Relaxed),
             self.play_ns.load(Ordering::Relaxed) as f64 / n / 1e6,
             fr as f64 / n,
@@ -581,7 +581,8 @@ impl Prof {
             self.stone[0].load(Ordering::Relaxed),
             self.stone[1].load(Ordering::Relaxed) as f64 / 1e9,
             self.stone[2].load(Ordering::Relaxed),
-            self.stone[3].load(Ordering::Relaxed)
+            self.stone[3].load(Ordering::Relaxed),
+            self.stone[4].load(Ordering::Relaxed)
         )
     }
     pub fn line(&self) -> String {
@@ -642,10 +643,12 @@ struct Obsv<'a, 'w> {
 }
 
 impl<'a, 'w> FrameObs for Obsv<'a, 'w> {
-    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>) -> EResult<()> {
-        let rows = e.runs()?;
+    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>, got: Option<(RunsReply, ExplainReply)>) -> EResult<()> {
+        let (rows, ents) = match got {
+            Some(x) => x,
+            None => (e.runs()?, e.explain_log()?),
+        };
         self.rows_all.extend(strict::runs_of(&rows.runs));
-        let ents = e.explain_log()?;
         self.log.kept.add_entries(&strict::ents_of(&ents.entries));
         let f = e.status().frame;
         let v = match self.w.sview(s) {
@@ -1120,9 +1123,10 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         let play_res;
         let first_before;
         {
-            let mut br = Br::new(&mut *cb, if w.cfg.cache { ch.d0.clone() } else { None });
+            let mut br = Br::new(&mut cb, if w.cfg.cache { ch.d0.clone() } else { None });
             br.watch_first = true;
             br.hc = w.hit_cache;
+            br.fuse = true;
             if observe_play {
                 br.obs = Some(&mut obsv);
             }
@@ -1134,7 +1138,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         }
         ch.stone_trials += ex.stone_trials;
         w.prof
-            .stones(ex.stone_trials as u64, ex.stone_ns, ex.stone_frames, ex.stone_at);
+            .stones(ex.stone_trials as u64, ex.stone_ns, ex.stone_frames, ex.stone_at, ex.stats_kept as u64);
         ch.cpu_s += ex.stone_cpu;
         w.board.progress(c, cb.status().qf);
         if let Some(m) = obsv.err.take() {
@@ -1191,7 +1195,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
             return Ok(());
         }
         {
-            let mut br = Br::new(&mut *cb, None);
+            let mut br = Br::new(&mut cb, None);
             if observe_play {
                 br.obs = Some(&mut obsv);
             }
@@ -1236,19 +1240,38 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         let tf = Instant::now();
         snap = Some(cb.fork()?);
         w.prof.fork(tf.elapsed());
-        match cb.run(&RunSpec {
-            frame: Some(s_issue + 1),
-            ..Default::default()
-        }) {
-            Ok(_) => {}
-            Err(EngineError::Ended(st)) => {
-                ch.set("ended", Some(Py::s(st.reason.clone())));
-                return Ok(());
+        if executor::batch() {
+            // the issue's frame and its observation in one StepObs (the run, then observe's runs, explain and dump)
+            match cb.step_observe(s_issue + 1, &ObsReq::default()) {
+                Ok((_, rows, ents, o)) => {
+                    w.board.progress(c, cb.status().qf);
+                    rows_all.extend(strict::runs_of(&rows.runs));
+                    log.kept.add_entries(&strict::ents_of(&ents.entries));
+                    let s = Arc::new(o);
+                    let v = w.sview(&s).map_err(EngineError::Bridge)?;
+                    frames_seen.insert(cb.status().frame, (Arc::new(v), s));
+                }
+                Err(EngineError::Ended(st)) => {
+                    ch.set("ended", Some(Py::s(st.reason.clone())));
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
             }
-            Err(e) => return Err(e),
+        } else {
+            match cb.run(&RunSpec {
+                frame: Some(s_issue + 1),
+                ..Default::default()
+            }) {
+                Ok(_) => {}
+                Err(EngineError::Ended(st)) => {
+                    ch.set("ended", Some(Py::s(st.reason.clone())));
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            }
+            w.board.progress(c, cb.status().qf);
+            observe(&mut cb, &mut log, &mut rows_all, &mut frames_seen, true)?;
         }
-        w.board.progress(c, cb.status().qf);
-        observe(&mut cb, &mut log, &mut rows_all, &mut frames_seen, true)?;
         let mut rk = strict::by_frame(&rows_all);
         let at_fork = ch.at_fork.clone();
         if let Some(d0) = &ch.d0 {
@@ -1498,26 +1521,6 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
                     }
                     break;
                 }
-                let t0 = Instant::now();
-                match cb.run(&RunSpec {
-                    frame: Some(f + 1),
-                    ..Default::default()
-                }) {
-                    Ok(_) => {}
-                    Err(EngineError::Ended(st)) => {
-                        cr.ch.set("ended", Some(Py::s(st.reason.clone())));
-                        ended_engine = true;
-                        break;
-                    }
-                    Err(e) => return Err(e),
-                }
-                w.board.progress(c, cb.status().qf);
-                let t1 = Instant::now();
-                let rows = cb.runs()?;
-                let t2 = Instant::now();
-                let ents = cb.explain_log()?;
-                let t3 = Instant::now();
-                cr.log.kept.add_entries(&strict::ents_of(&ents.entries));
                 let req = if w.cfg.lite {
                     ObsReq {
                         objects: Some(w.lite_objects.clone()),
@@ -1527,9 +1530,52 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
                 } else {
                     ObsReq::default()
                 };
-                let t4 = Instant::now();
-                s = Arc::new(cb.obs(&req)?);
-                let t5 = Instant::now();
+                let t0 = Instant::now();
+                let (rows, t1, t2, t3, t4, t5);
+                if executor::batch() {
+                    // one command: the frame, its runs, its explain entries and the dump (patch 0004's StepObs)
+                    match cb.step_observe(f + 1, &req) {
+                        Ok((_, r_, e_, o_)) => {
+                            w.board.progress(c, cb.status().qf);
+                            t1 = Instant::now();
+                            rows = r_;
+                            cr.log.kept.add_entries(&strict::ents_of(&e_.entries));
+                            (t2, t3) = (t1, t1);
+                            t4 = Instant::now();
+                            s = Arc::new(o_);
+                            t5 = t4;
+                        }
+                        Err(EngineError::Ended(st)) => {
+                            cr.ch.set("ended", Some(Py::s(st.reason.clone())));
+                            ended_engine = true;
+                            break;
+                        }
+                        Err(e) => return Err(e),
+                    }
+                } else {
+                    match cb.run(&RunSpec {
+                        frame: Some(f + 1),
+                        ..Default::default()
+                    }) {
+                        Ok(_) => {}
+                        Err(EngineError::Ended(st)) => {
+                            cr.ch.set("ended", Some(Py::s(st.reason.clone())));
+                            ended_engine = true;
+                            break;
+                        }
+                        Err(e) => return Err(e),
+                    }
+                    w.board.progress(c, cb.status().qf);
+                    t1 = Instant::now();
+                    rows = cb.runs()?;
+                    t2 = Instant::now();
+                    let ents = cb.explain_log()?;
+                    t3 = Instant::now();
+                    cr.log.kept.add_entries(&strict::ents_of(&ents.entries));
+                    t4 = Instant::now();
+                    s = Arc::new(cb.obs(&req)?);
+                    t5 = Instant::now();
+                }
                 now = w.sview(&s).map_err(EngineError::Bridge)?;
                 let t6 = Instant::now();
                 let nf = f + 1;
@@ -2094,6 +2140,7 @@ impl Search {
             cancelled: 0,
             parallel_from: None,
         };
+        let t_setup = t0.elapsed();
         let pool = Pool::new(cfg.workers.max(1));
         let mut cands: VecDeque<StopCand> = VecDeque::new();
         let mut stop_at: Option<(StopCand, bool)> = None;
@@ -2291,23 +2338,37 @@ impl Search {
                             gate_shut += 1;
                         }
                     }
-                    // the parent's next frame
-                    match parent.run(&RunSpec {
-                        frame: Some(g + 1),
-                        ..Default::default()
-                    }) {
-                        Ok(_) => {}
-                        Err(EngineError::Ended(st)) => {
-                            end_reason = format!("engine ended: {}", st.reason);
-                            break;
+                    // the parent's next frame (one command when batching: patch 0004's StepObs)
+                    let (rows, s) = if executor::batch() {
+                        match parent.step_observe(g + 1, &ObsReq::default()) {
+                            Ok((_, rows, ents, o)) => {
+                                plog.kept.add_entries(&strict::ents_of(&ents.entries));
+                                (rows, Arc::new(o))
+                            }
+                            Err(EngineError::Ended(st)) => {
+                                end_reason = format!("engine ended: {}", st.reason);
+                                break;
+                            }
+                            Err(e) => return Err(e.to_string()),
                         }
-                        Err(e) => return Err(e.to_string()),
-                    }
-                    let rows = parent.runs().map_err(|e| e.to_string())?;
-                    plog.kept.add_entries(&strict::ents_of(
-                        &parent.explain_log().map_err(|e| e.to_string())?.entries,
-                    ));
-                    let s = Arc::new(parent.obs(&ObsReq::default()).map_err(|e| e.to_string())?);
+                    } else {
+                        match parent.run(&RunSpec {
+                            frame: Some(g + 1),
+                            ..Default::default()
+                        }) {
+                            Ok(_) => {}
+                            Err(EngineError::Ended(st)) => {
+                                end_reason = format!("engine ended: {}", st.reason);
+                                break;
+                            }
+                            Err(e) => return Err(e.to_string()),
+                        }
+                        let rows = parent.runs().map_err(|e| e.to_string())?;
+                        plog.kept.add_entries(&strict::ents_of(
+                            &parent.explain_log().map_err(|e| e.to_string())?.entries,
+                        ));
+                        (rows, Arc::new(parent.obs(&ObsReq::default()).map_err(|e| e.to_string())?))
+                    };
                     let r_ = strict::by_frame(&strict::runs_of(&rows.runs))
                         .remove(&(g + 1))
                         .unwrap_or_default();
@@ -2348,6 +2409,7 @@ impl Search {
             r
         });
         res?;
+        let t_children = t0.elapsed();
         let mut children: Vec<Child> = children.into_iter().map(|c| c.expect("every child returns")).collect();
         let mut pend = parent.status().clone();
         if let Some((c, bdev)) = stop_at {
@@ -2622,6 +2684,13 @@ impl Search {
             self.outside(rd, &ptrack, best_ref, if has_input { Some(first_i) } else { None }, &by),
         );
         parent.explain(None).map_err(|e| e.to_string())?;
+        self.say(&format!(
+            "  window {}: phases: setup {:.1} ms, parent and children {:.1} ms, records {:.1} ms",
+            k + 1,
+            t_setup.as_secs_f64() * 1e3,
+            (t_children - t_setup).as_secs_f64() * 1e3,
+            (t0.elapsed() - t_children).as_secs_f64() * 1e3
+        ));
         self.say(&format!("  window {}: {}", k + 1, w.prof.line()));
         self.say(&format!(
             "  window {}: CPU s: this process {:.2}, the parent engine {:.2}, the children's engines {:.2} ({} children); wall {:.2} s",
@@ -2726,8 +2795,19 @@ impl Search {
             return Ok(false);
         }
         if inp.kind == "line" {
-            let mut at = |x: i32, y: i32| parent.at(x, y);
-            return Ok(replay::verb_point(inp.verb.unwrap_or(0), s, &mut at)?.is_some());
+            let verb = inp.verb.unwrap_or(0);
+            // the verb's points asked in one AtMany when batching (the same answers at this stop)
+            let pts = if executor::batch() {
+                replay::verb_candidates(verb, s)
+            } else {
+                vec![]
+            };
+            let got: Vec<((i32, i32), At)> = pts.iter().copied().zip(parent.at_many(&pts)?).collect();
+            let mut at = |x: i32, y: i32| match got.iter().find(|g| g.0 == (x, y)) {
+                Some(g) => Ok(g.1.clone()),
+                None => parent.at(x, y),
+            };
+            return Ok(replay::verb_point(verb, s, &mut at)?.is_some());
         }
         Ok(st.cs == 0 && st.room != 0 && (executor::DOS_CD.verbless_rooms.contains(&st.room) || !s.verbs.is_empty()))
     }
@@ -2948,8 +3028,9 @@ impl Search {
             movie: vec![],
             root: None,
             windows_path: None,
-            // off by default: the screen layout is not in the cache's key yet (play/HITCACHE.md, "The gap")
-            hit_cache: if std::env::var("FMI_HIT_CACHE").is_ok_and(|v| v == "1") {
+            // on unless FMI_HIT_CACHE=0 (play/HITCACHE.md); it answers only at stops whose status reports the screen
+            // layout (patch 0004), so over the JSON protocol every hit test is still asked
+            hit_cache: if std::env::var("FMI_HIT_CACHE").map_or(true, |v| v != "0") {
                 Some(Arc::new(executor::HitCache::default()))
             } else {
                 None

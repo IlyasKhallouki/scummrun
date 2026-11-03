@@ -67,7 +67,9 @@ fn route<T>(s: String) -> PResult<T> {
 
 /// What a child observes after each frame its input code runs (window._Stepper's `on_frame`).
 pub trait FrameObs {
-    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>) -> EResult<()>;
+    /// `got`: the frame's runs and explain entries when the step already read them (StepObs), else None and the
+    /// observer asks for them
+    fn on_frame(&mut self, e: &mut dyn Engine, s: &Arc<Obs>, got: Option<(RunsReply, ExplainReply)>) -> EResult<()>;
 }
 
 /// `"end" in st`: the run ended where a stop was expected.
@@ -80,7 +82,7 @@ pub fn is_end(e: &EngineError) -> bool {
 /// observer after each (window._Stepper, when `obs` is set), and the frame and dump before the first input event
 /// it schedules (window._FirstWatched).
 pub struct Br<'a> {
-    pub e: &'a mut dyn Engine,
+    pub e: &'a mut Box<dyn Engine>,
     state: Option<Arc<Obs>>,
     at: FxHashMap<(i32, i32), At>,
     /// the hit tests' object answers across frames and branches (`HitCache`), and this frame's layout in it (None:
@@ -91,6 +93,14 @@ pub struct Br<'a> {
     pub first_before: Option<(u64, Arc<Obs>)>,
     pub watch_first: bool,
     pub hits: [u64; 4], // state asked, state kept, at asked, at kept
+    /// the AtMany commands sent (`prefetch`)
+    pub batches: u64,
+    /// the input code reads the state after almost every run: with batching each run brings the dump at its stop
+    /// (RunObs), kept as this stop's state: the room's dump (`fmi_core::room_cut`: what the input code reads), or the
+    /// full dump when an observer is set
+    pub fuse: bool,
+    /// `state` holds the room's dump, not the full one (`full` asks the full one)
+    partial: bool,
     /// this thread's CPU ns in the engine calls: run, obs, at, and the stone trials' fork and quit
     pub cpu: [u64; 4],
 }
@@ -103,7 +113,7 @@ pub fn thread_ns() -> u64 {
 }
 
 impl<'a> Br<'a> {
-    pub fn new(e: &'a mut dyn Engine, seed: Option<Arc<Obs>>) -> Br<'a> {
+    pub fn new(e: &'a mut Box<dyn Engine>, seed: Option<Arc<Obs>>) -> Br<'a> {
         Br {
             e,
             state: seed,
@@ -114,6 +124,9 @@ impl<'a> Br<'a> {
             first_before: None,
             watch_first: false,
             hits: [0; 4],
+            batches: 0,
+            fuse: false,
+            partial: false,
             cpu: [0; 4],
         }
     }
@@ -123,16 +136,29 @@ impl<'a> Br<'a> {
     pub fn status(&self) -> &Status {
         self.e.status()
     }
+    /// This stop's dump for the input code: the room's dump or the full one (the input code reads the room, the
+    /// verbs, the variables, the inventory, the actors, the room's objects and their classes, which both hold alike).
     pub fn state(&mut self) -> EResult<Arc<Obs>> {
         if let Some(s) = &self.state {
             self.hits[1] += 1;
             return Ok(s.clone());
+        }
+        self.full()
+    }
+    /// This stop's full dump.
+    pub fn full(&mut self) -> EResult<Arc<Obs>> {
+        if let Some(s) = &self.state {
+            if !self.partial {
+                self.hits[1] += 1;
+                return Ok(s.clone());
+            }
         }
         let t = thread_ns();
         let s = Arc::new(self.e.obs(&ObsReq::default())?);
         self.cpu[1] += thread_ns() - t;
         self.hits[0] += 1;
         self.state = Some(s.clone());
+        self.partial = false;
         Ok(s)
     }
     pub fn at(&mut self, x: i32, y: i32) -> EResult<At> {
@@ -149,8 +175,58 @@ impl<'a> Br<'a> {
     }
     fn invalidate(&mut self) {
         self.state = None;
+        self.partial = false;
         self.at.clear();
         self.layout = None;
+    }
+    /// This stop's layout in the hit cache (None: no cache, or a layout it does not cover).
+    fn layout_id(&mut self) -> EResult<Option<u32>> {
+        let Some(hc) = self.hc else {
+            return Ok(None);
+        };
+        if self.layout.is_none() {
+            let s = self.state()?;
+            self.layout = Some(hc.layout_of(&s, self.e.status()));
+        }
+        Ok(self.layout.unwrap())
+    }
+    /// The hit tests at `pts` asked in one AtMany when batching is on (`batch`), so that the `at` and `at_obj` calls
+    /// that follow at this stop read them from this frame's answers. With `obj_only` a point the hit cache answers
+    /// is left out. The hit tests read the engine and change nothing, so asking a point early, or a point the calls
+    /// then never read, changes no answer.
+    pub fn prefetch(&mut self, pts: &[(i32, i32)], obj_only: bool) -> EResult<()> {
+        if !batch() || pts.len() < 2 {
+            return Ok(());
+        }
+        let lid = if obj_only { self.layout_id()? } else { None };
+        let mut need: Vec<(i32, i32)> = Vec::with_capacity(pts.len());
+        for &p in pts {
+            if self.at.contains_key(&p) || need.contains(&p) {
+                continue;
+            }
+            if let (Some(hc), Some(l)) = (self.hc, lid) {
+                if hc.has(l, p.0, p.1) {
+                    continue;
+                }
+            }
+            need.push(p);
+        }
+        if need.len() < 2 {
+            return Ok(());
+        }
+        let t = thread_ns();
+        let r = self.e.at_many(&need)?;
+        self.cpu[2] += thread_ns() - t;
+        self.hits[2] += need.len() as u64;
+        self.batches += 1;
+        for (p, a) in need.into_iter().zip(r) {
+            // an object answer at a covered layout holds at every stop with that layout (HitCache)
+            if let (Some(hc), Some(l)) = (self.hc, lid) {
+                hc.put(l, p.0, p.1, a.main.map(|m| m.2));
+            }
+            self.at.insert(p, a);
+        }
+        Ok(())
     }
     /// The object a click at screen (x, y) hits now (`at(x, y)`'s "obj", None off the main virtual screen), through
     /// the hit cache when one is set (its argument: `HitCache`).
@@ -158,11 +234,7 @@ impl<'a> Br<'a> {
         let Some(hc) = self.hc else {
             return Ok(self.at(x, y)?.main.map(|m| m.2));
         };
-        if self.layout.is_none() {
-            let s = self.state()?;
-            self.layout = Some(hc.layout_of(&s, self.e.status()));
-        }
-        let Some(lid) = self.layout.unwrap() else {
+        let Some(lid) = self.layout_id()? else {
             return Ok(self.at(x, y)?.main.map(|m| m.2));
         };
         if let Some(v) = hc.get(lid, x, y) {
@@ -179,7 +251,7 @@ impl<'a> Br<'a> {
     }
     pub fn inputs(&mut self, events: &[Event]) -> EResult<()> {
         if self.watch_first && self.first_before.is_none() && !events.is_empty() && events.iter().any(is_input) {
-            let s = self.state()?;
+            let s = self.full()?;
             self.first_before = Some((self.frame(), s));
         }
         self.e.inputs(events)
@@ -187,17 +259,55 @@ impl<'a> Br<'a> {
     fn raw_run(&mut self, spec: &RunSpec) -> EResult<Status> {
         self.invalidate();
         let t = thread_ns();
+        if self.fuse && batch() {
+            let room = self.obs.is_none();
+            let r = if room {
+                self.e.run_room(spec)
+            } else {
+                self.e.run_obs(spec, &ObsReq::default())
+            };
+            self.cpu[0] += thread_ns() - t;
+            let (st, o) = r?;
+            self.hits[0] += 1;
+            self.state = Some(Arc::new(o));
+            self.partial = room;
+            return Ok(st);
+        }
         let r = self.e.run(spec);
         self.cpu[0] += thread_ns() - t;
         r
     }
     fn on(&mut self) -> EResult<()> {
         if self.obs.is_some() {
-            let s = self.state()?;
+            let s = self.full()?;
             let o = self.obs.as_mut().unwrap();
-            o.on_frame(&mut *self.e, &s)?;
+            o.on_frame(&mut **self.e, &s, None)?;
         }
         Ok(())
+    }
+    /// One frame and its observation (window._Stepper's step with an observer): with batching one StepObs (the run,
+    /// the runs, the explain entries and the full dump), else the run and then `on`.
+    fn step_on(&mut self) -> EResult<Status> {
+        let f = self.frame() + 1;
+        if !batch() {
+            let st = self.raw_run(&RunSpec {
+                frame: Some(f),
+                ..Default::default()
+            })?;
+            self.on()?;
+            return Ok(st);
+        }
+        self.invalidate();
+        let t = thread_ns();
+        let r = self.e.step_observe(f, &ObsReq::default());
+        self.cpu[0] += thread_ns() - t;
+        let (st, rows, ents, o) = r?;
+        let s = Arc::new(o);
+        self.hits[0] += 1;
+        self.state = Some(s.clone());
+        let ob = self.obs.as_mut().unwrap();
+        ob.on_frame(&mut **self.e, &s, Some((rows, ents)))?;
+        Ok(st)
     }
     /// window._Stepper.run when an observer is set, else one command.
     pub fn run(&mut self, spec: &RunSpec) -> EResult<Status> {
@@ -228,11 +338,7 @@ impl<'a> Br<'a> {
                 }
                 let mut st = self.status().clone();
                 while self.frame() < fr {
-                    st = self.raw_run(&RunSpec {
-                        frame: Some(self.frame() + 1),
-                        ..Default::default()
-                    })?;
-                    self.on()?;
+                    st = self.step_on()?;
                 }
                 return Ok(st);
             }
@@ -288,6 +394,8 @@ pub struct Executor {
     pub stone_ns: u64,
     pub stone_frames: u64,
     pub stone_at: u64,
+    /// the stone trials kept as the branch (`stone_keep`)
+    pub stats_kept: u32,
 }
 
 impl Executor {
@@ -302,6 +410,7 @@ impl Executor {
             stone_ns: 0,
             stone_frames: 0,
             stone_at: 0,
+            stats_kept: 0,
         }
     }
 
@@ -373,17 +482,44 @@ impl Executor {
         };
         let xs = self.xstart(b);
         let lag = xs - b.status().xstart;
+        let mh = self.main_h(b);
+        let pts: Vec<(i32, i32)> = [20, 35, 10, 50, 5, 1, 0]
+            .into_iter()
+            .map(|dy| (a.x - xs, a.y - a.elevation - dy))
+            .filter(|p| 0 <= p.0 && p.0 < SCREEN_W && 0 <= p.1 && p.1 < mh)
+            .collect();
+        b.prefetch(&pts.iter().map(|p| (p.0 + lag, p.1)).collect::<Vec<_>>(), false)?;
         let mut hits = Vec::new();
-        for dy in [20, 35, 10, 50, 5, 1, 0] {
-            let p = (a.x - xs, a.y - a.elevation - dy);
-            if 0 <= p.0 && p.0 < SCREEN_W && 0 <= p.1 && p.1 < self.main_h(b) {
-                let at = b.at(p.0 + lag, p.1)?;
-                if at.main.map(|m| m.3 as i64) == Some(actor) {
-                    hits.push(p);
-                }
+        for p in pts {
+            let at = b.at(p.0 + lag, p.1)?;
+            if at.main.map(|m| m.3 as i64) == Some(actor) {
+                hits.push(p);
             }
         }
         Ok(hits)
+    }
+
+    /// object_points' screen points for a room object's box (empty when the box is off screen), and the lag to add
+    /// for the hit test.
+    fn object_cands(&self, b: &Br, bx: &RoomObject) -> (Vec<(i32, i32)>, i32) {
+        let xs = self.xstart(b);
+        let lag = xs - b.status().xstart;
+        let (x0, x1) = ((bx.x - xs).max(0), (bx.x + bx.w - xs).min(SCREEN_W) - 1);
+        let (y0, y1) = (bx.y.max(0), (bx.y + bx.h).min(self.main_h(b)) - 1);
+        if x0 > x1 || y0 > y1 {
+            return (vec![], lag);
+        }
+        let fl = |a: i32, c: i32| (a + c).div_euclid(2);
+        (
+            vec![
+                (fl(x0, x1), fl(y0, y1)),
+                (x0, fl(y0, y1)),
+                (x1, fl(y0, y1)),
+                (fl(x0, x1), y0),
+                (fl(x0, x1), y1),
+            ],
+            lag,
+        )
     }
 
     pub fn object_points(&self, b: &mut Br, obj: i64, state: &Obs) -> PResult<Vec<(i32, i32)>> {
@@ -395,21 +531,11 @@ impl Executor {
                 Ok(vec![])
             };
         };
-        let xs = self.xstart(b);
-        let lag = xs - b.status().xstart;
-        let (x0, x1) = ((bx.x - xs).max(0), (bx.x + bx.w - xs).min(SCREEN_W) - 1);
-        let (y0, y1) = (bx.y.max(0), (bx.y + bx.h).min(self.main_h(b)) - 1);
-        if x0 > x1 || y0 > y1 {
+        let (cands, lag) = self.object_cands(b, bx);
+        if cands.is_empty() {
             return Ok(vec![]);
         }
-        let fl = |a: i32, c: i32| (a + c).div_euclid(2);
-        let cands = [
-            (fl(x0, x1), fl(y0, y1)),
-            (x0, fl(y0, y1)),
-            (x1, fl(y0, y1)),
-            (fl(x0, x1), y0),
-            (fl(x0, x1), y1),
-        ];
+        b.prefetch(&cands.iter().map(|p| (p.0 + lag, p.1)).collect::<Vec<_>>(), true)?;
         let mut hits = Vec::new();
         for p in cands {
             if !hits.contains(&p) && b.at_obj(p.0 + lag, p.1)?.map(|o| o as i64) == Some(obj) {
@@ -721,14 +847,23 @@ impl Executor {
     fn floor_point(&self, b: &mut Br, x: i32, y: i32, goal: Option<i64>) -> PResult<(i32, i32)> {
         let lag = self.xstart(b) - b.status().xstart;
         let step = if x > SCREEN_W / 2 { -1 } else { 1 };
+        let mh = self.main_h(b);
+        let mut pts = Vec::with_capacity(80);
         for dx in (0..64).step_by(4) {
             for dy in [0, -4, 4, -8, 8] {
                 let (px, py) = (x + step * dx, y + dy);
-                if 0 <= px && px < SCREEN_W && 0 <= py && py < self.main_h(b) {
-                    let hit = b.at_obj(px + lag, py)?.map(|o| o as i64).unwrap_or(0);
-                    if hit == 0 || Some(hit) == goal {
-                        return Ok((px, py));
-                    }
+                if 0 <= px && px < SCREEN_W && 0 <= py && py < mh {
+                    pts.push((px, py));
+                }
+            }
+        }
+        // asked FLOOR_CHUNK points at a time (in order), so a point found early asks few more
+        for chunk in pts.chunks(FLOOR_CHUNK) {
+            b.prefetch(&chunk.iter().map(|p| (p.0 + lag, p.1)).collect::<Vec<_>>(), true)?;
+            for &(px, py) in chunk {
+                let hit = b.at_obj(px + lag, py)?.map(|o| o as i64).unwrap_or(0);
+                if hit == 0 || Some(hit) == goal {
+                    return Ok((px, py));
                 }
             }
         }
@@ -811,6 +946,14 @@ impl Executor {
             return route(format!("{}: no actor 1 in the dump", mv.name)); // (Python: StopIteration)
         };
         let gx = bx.walk.0;
+        let mut pre = Vec::new();
+        for o in state.room_objects.as_deref().unwrap_or(&[]) {
+            if o.id as i64 != obj && (o.walk.0 - gx).abs() < (ego.x - gx).abs() {
+                let (c, lag) = self.object_cands(b, o);
+                pre.extend(c.into_iter().map(|p| (p.0 + lag, p.1)));
+            }
+        }
+        b.prefetch(&pre, true)?;
         let mut stones: Vec<RoomObject> = Vec::new();
         for o in state.room_objects.as_deref().unwrap_or(&[]) {
             if o.id as i64 != obj
@@ -822,6 +965,8 @@ impl Executor {
         }
         stones.sort_by_key(|o| (o.walk.0 - gx).abs()); // (a stable sort, as Python's sorted)
         if self.stone_fork {
+            // a trial that finds the object is kept as the branch (`stone_keep`) where no observer reads the frames
+            let keep = stone_keep() && b.obs.is_none();
             for o in &stones {
                 let t_trial = std::time::Instant::now();
                 let c0 = thread_ns();
@@ -829,9 +974,14 @@ impl Executor {
                 b.cpu[3] += thread_ns() - c0;
                 self.stone_trials += 1;
                 let mut frames = None;
+                let mut kept: Option<(Arc<Obs>, bool, Option<(u64, Arc<Obs>)>, Vec<Event>)> = None;
                 {
-                    let mut tb = Br::new(&mut *child, None);
+                    let mut tb = Br::new(&mut child, None);
                     tb.hc = b.hc;
+                    tb.fuse = b.fuse;
+                    // the branch takes its dump before its first input event during the move it would play: the
+                    // trial takes it where the branch would
+                    tb.watch_first = keep && b.watch_first && b.first_before.is_none();
                     let mut trial = Executor::new(false);
                     let m = Move {
                         name: format!("{}: via {}", mv.name, o.id),
@@ -869,6 +1019,36 @@ impl Executor {
                             return Err(PlayErr::Engine(e));
                         }
                     }
+                    if keep && frames.is_some() {
+                        let st = tb.state()?;
+                        kept = Some((st, tb.partial, tb.first_before.take(), trial.movie.clone()));
+                    }
+                }
+                if let Some((st, partial, first, movie)) = kept {
+                    // The trial played this move and ran to the frame where the object shows: what the branch is
+                    // about to do from the same state (the fork is exact), with the same commands (the same input
+                    // code; its stone forks are not reached, as the trial needed none), except that the branch's last
+                    // run is one command where the trial ran frame by frame, which ends in the same state (stops
+                    // change nothing: play-wire split). So the trial's engine becomes the branch.
+                    self.stats_kept += 1;
+                    std::mem::swap(b.e, &mut child);
+                    b.invalidate();
+                    b.state = Some(st);
+                    b.partial = partial;
+                    if first.is_some() {
+                        b.first_before = first;
+                    }
+                    self.movie.extend(movie);
+                    self.stone_cpu += child.cpu_s();
+                    let c0 = thread_ns();
+                    child.quit();
+                    b.cpu[3] += thread_ns() - c0;
+                    self.stone_ns += t_trial.elapsed().as_nanos() as u64;
+                    let state = b.state()?;
+                    if !self.object_points(b, obj, &state)?.is_empty() {
+                        return Ok(state);
+                    }
+                    continue;
                 }
                 self.stone_cpu += child.cpu_s();
                 let c0 = thread_ns();
@@ -989,6 +1169,7 @@ fn click_verb(ex: &mut Executor, b: &mut Br, verb: i64, name: &str) -> PResult<(
     let p = loop {
         let p = if b.status().up > 0 {
             let s = b.state()?;
+            b.prefetch(&crate::replay::verb_candidates(verb, &s), false)?;
             let mut at = |x: i32, y: i32| b.at(x, y);
             verb_point(verb, &s, &mut at)?
         } else {
@@ -1014,6 +1195,25 @@ fn click_verb(ex: &mut Executor, b: &mut Br, verb: i64, name: &str) -> PResult<(
     advance(ex, b)
 }
 
+/// The input code's hit tests are asked FLOOR_CHUNK at a time by `floor_point` (a batch of up to about 20 costs
+/// about two single hit tests on the lean build: play-wire bench).
+pub const FLOOR_CHUNK: usize = 10;
+
+/// FMI_PLAY_BATCH=0: every engine query is its own command, as in round 1 (an observed frame as run, runs,
+/// explain_log and obs; one `at` per hit test). On by default: `Engine::step_observe` and `Engine::at_many` give
+/// what those commands give at the same stop.
+pub fn batch() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_PLAY_BATCH").map_or(true, |v| v != "0"))
+}
+
+/// FMI_STONE_KEEP=0: a stone trial that finds the object is quit and its move played again on the branch, as in
+/// round 1. On by default: the branch takes the trial's engine, which is where the move played again would end.
+pub fn stone_keep() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_STONE_KEEP").map_or(true, |v| v != "0"))
+}
+
 /// FMI_CHECK_HITS=1: every hit the cache answers is asked of the engine too and compared.
 pub fn check_hits() -> bool {
     static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -1029,10 +1229,11 @@ pub fn check_hits() -> bool {
 /// returns its obj_nr when the point is inside. The state dump lists the table's entries with an obj_nr in table
 /// order (id, x, y, w, h, parent) and every object's classes. So when every listed entry's parent is 0, the answer
 /// at a point is the first listed entry, not untouchable, whose box holds the point: it depends only on the room,
-/// the main screen's xstart (the screen layout and topline are fixed in a v5 game) and the listed (id, x, y, w, h,
-/// untouchable). The cache keys a layout by exactly these, compared whole, and only for such tables; a table with a
-/// parent is asked of the engine every time. Off by default (`FMI_HIT_CACHE=1`): the screen layout (initScreens'
-/// b and h, the forced banner screen) can change during play and is not in the key yet (HITCACHE.md, "The gap").
+/// the main screen's xstart, the screen layout (initScreens' b and h and the forced banner screen, which give the
+/// virtual screen of y and the main screen's topline) and the listed (id, x, y, w, h, untouchable). The cache keys a
+/// layout by exactly these, compared whole, and only for such tables, at a stop whose status reports the screen
+/// layout (`Status::screen`, patch 0004); a table with a parent, or a stop without the screen layout, is asked of
+/// the engine every time. On unless FMI_HIT_CACHE=0 (window::Search::new).
 #[derive(Default)]
 pub struct HitCache {
     layouts: std::sync::Mutex<FxHashMap<Layout, u32>>,
@@ -1046,12 +1247,14 @@ pub struct HitCache {
 struct Layout {
     room: i32,
     xstart: i32,
+    screen: (i32, i32, bool),
     objs: Vec<(i32, i32, i32, i32, i32, bool)>,
 }
 
 impl HitCache {
     fn layout_of(&self, s: &Obs, st: &Status) -> Option<u32> {
         let ros = s.room_objects.as_deref()?;
+        let screen = st.screen?;
         if ros.iter().any(|o| o.parent != 0) {
             self.uncovered.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return None;
@@ -1066,6 +1269,7 @@ impl HitCache {
         let l = Layout {
             room: s.room,
             xstart: st.xstart,
+            screen,
             objs,
         };
         let mut m = self.layouts.lock().unwrap();
@@ -1078,6 +1282,10 @@ impl HitCache {
             self.kept.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
         v
+    }
+    /// whether the cache holds the answer (not counted)
+    fn has(&self, lid: u32, x: i32, y: i32) -> bool {
+        self.hits.lock().unwrap().contains_key(&(lid, x, y))
     }
     fn put(&self, lid: u32, x: i32, y: i32, v: Option<i32>) {
         self.asked.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
