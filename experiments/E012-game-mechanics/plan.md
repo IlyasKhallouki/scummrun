@@ -608,3 +608,34 @@ Written before the component's code.
     joint share of such checks combines them.
 - **Measured with T1:** how many draw checks get a range and a share, on 28-33-41-j00065 and on the other kept
   readings, and the time of `Tested::of`.
+
+## Amendment 2026-11-03, component `targets`: one target per key in detail, and how T2 is run
+
+Written after the component's first code (branch e012-targets, cf364b4, 67ac2ae and 03d4b83, unit tests only),
+before T2 ran. It fills in what section 3 leaves open; nothing in section 3 changes.
+
+- **The group.** For each reached key of a guide kind, the values left after `targets`' own exclusions (the entry's
+  value, tier 0's atom, the values tried from this entry, and for an any-value atom the root's value) split in two:
+  a value the guide names (its atom (k, v) is in R) stays its own target; the others, whose only atom is (k, any),
+  form one target, the key at any of them (`TV::Values`, sorted). A group of one value stays an int target, the same
+  request as before. So the targets' (key, value) pairs are E008's, grouped.
+- **Tier and depth of a group.** Tier 1 when one of its values is not held by the archive, else 2; the depth is the
+  any-value atom's (every value of the group has it).
+- **Records.** A group is tried, deferred and counted as `[k, [v, ...]]` in the try's result, job.json and the log;
+  the archive keeps these records as they are. A tried list leaves out each of its values from later targets of the
+  same entry, so a value reached only later is a target again.
+- **Order.** Tier 0 first, also under E009's rotation (section 3's order); then the targets whose key is in T; then
+  E008's order or E009's rotation. In the rotation a target's counts are the records of its key that cover one of
+  its values (an int record its value, a list each of its values); on int targets alone this is E009's count.
+- **T in the try.** `targets_per_key` takes T as a predicate on the key; the try passes `Tested::of(&reading)`'s keys.
+  Until the try does, the switch gives the groups with no T tier.
+- **Forced targets** (the benchmark's `--targets`) stay single values; a forced value inside a group gets the group's
+  tier and depth.
+- **T2, how.** The 19 readings the 65 tries used were evicted from the archive. They are made again from the start
+  files kept in the archive, with round 1's reader-scope (the kitchen check's) and the arguments the try and the
+  harness gave it (fresh readings; the reach and refine readings with their reach-also start files and fact
+  variables, followed through the attempts' records). A reading made again must have the log's record and action
+  counts. Then, for each try: with the switch off the targets must equal the log's (by tier, their number, the first
+  20), and with it on the targets must have the same (key, value) pairs, with at most one value list per key; var:103
+  must give at most one target per try. Reported per try: targets off and on, the keys grouped, the groups that hold
+  both held and unheld values.

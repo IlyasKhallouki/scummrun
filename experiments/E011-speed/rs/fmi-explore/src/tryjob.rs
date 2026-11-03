@@ -538,16 +538,12 @@ struct Attempt {
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
            adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
            cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
-    let (hgoal, text): (Vec<(Key, Vec<Val>)>, String) = if tg.tier == 0 {
-        (goal.iter().map(|(k, vs)| (Key::parse(k), vs.clone())).collect(), step::goal_text(goal)?)
-    } else {
-        let v = match &tg.v {
-            TV::Int(n) => *n,
-            TV::Text(_) => return Err("a tier 1 or 2 target with a text value".into()),
-        };
-        (vec![(Key::parse(&tg.k), vec![v])], tg.text())
-    };
-    let _ = text;
+    // the harness's goal (step::target_goal: E012's one target per key gives the key a value list); tier 0's goal has
+    // reader-scope's form
+    if tg.tier == 0 {
+        step::goal_text(goal)?;
+    }
+    let hgoal: Vec<(Key, Vec<Val>)> = step::target_goal(tg, goal)?;
     let doc = doc_of(&**rd);
     let frame_costs = files::or(doc.get("frame_costs"), &json!({})).clone();
     std::fs::create_dir_all(adir).map_err(|e| files::io_err(adir, e))?;
@@ -650,7 +646,11 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
     let held = job.get("held").and_then(|h| h.as_array()).unwrap_or(&empty);
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
-    let ts = if switch("FMI_TRY_MEMO") {
+    let ts = if step::per_key() {
+        // E012's one target per key (plan.md section 3); the T tier once the try gives it the reading's tested keys
+        step::targets_per_key(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal,
+                              rot, None)?
+    } else if switch("FMI_TRY_MEMO") {
         step::targets_with(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
     } else {
         step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?
@@ -663,7 +663,9 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
         // the benchmark's: the log's targets in its order, each with its tier and depth as targets gives them
         let mut out = Vec::new();
         for (k, v) in forced {
-            let t = ts.iter().find(|t| t.k == *k && t.v == TV::Int(*v)).cloned()
+            // (a value list of E012's one target per key gives a forced value of it its tier and depth)
+            let t = ts.iter().find(|t| t.k == *k && t.v.ints().contains(v))
+                .map(|t| Target { k: k.clone(), v: TV::Int(*v), tier: t.tier, depth: t.depth })
                 .unwrap_or(Target { k: k.clone(), v: TV::Int(*v), tier: if goal.len() == 1 && goal[0].0 == *k { 0 } else { 1 }, depth: 0 });
             out.push(t);
         }
