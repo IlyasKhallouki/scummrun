@@ -504,14 +504,9 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
     a.stage["workers"] = json!(workers);
     a.stage["env"] = plan_env();
     write_json(&a.root.join("stage.json"), &a.stage, Some(1))?;
-    // E013 (FMI_STALLS=1): the stall table from the archive's files, then one try more after each commit (stall.rs)
-    let mut stalls = if crate::stall::on() {
-        let s = crate::stall::Live::open(&a)?;
-        s.stalls.write()?;
-        Some(s)
-    } else {
-        None
-    };
+    // E013 (FMI_STALLS=1, or FMI_FREE_SHIFT=1 for free's port): the stall table from the archive's files, then one try
+    // more after each commit (stall.rs); stalls.json and its line only with FMI_STALLS=1
+    let mut stalls = if crate::stall::on() || crate::stall::shift_on() { Some(crate::stall::Live::open(&a)?) } else { None };
     let free = || machine::disk_free(&m.disk_path);
     for name in a.job_names() {
         // a dir the driver made but did not finish writing: its selection is made again
@@ -617,7 +612,10 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 line["new_r"].as_array().map(|x| x.len()).unwrap_or(0), a.rows.len(), a.cells.len()
             ));
             if let Some(s) = stalls.as_mut() {
-                say(&s.commit(&a, &line)?);
+                s.commit(&a, &line)?;
+                if s.write {
+                    say(&s.stalls.line());
+                }
             }
             if line["outcome"] == "return differs" {
                 stop = Some("return differs".into());

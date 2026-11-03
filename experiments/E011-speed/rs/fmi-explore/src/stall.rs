@@ -654,6 +654,11 @@ impl Stalls {
         self.cells = cells;
     }
 
+    /// The table as it stood after the first k commits (the cells as they are now): the reports' replay.
+    pub fn upto(&self, k: usize) -> Stalls {
+        Stalls { root: self.root.clone(), tries: self.tries[..k.min(self.tries.len())].to_vec(), atoms: self.atoms.clone(), cells: self.cells.clone() }
+    }
+
     /// A log line: a committed one becomes the table's next try (its job's files read here); others are left out.
     pub fn push(&mut self, line: &Value, entries: &dyn Entries) -> Res<()> {
         let outcome = line["outcome"].as_str().unwrap_or("");
@@ -936,22 +941,30 @@ pub fn free_cell(s: &Stalls, cell: &str) -> bool {
     s.free_cell(cell)
 }
 
-/// The driver's live table: opened from the archive, then one try per commit.
+/// The driver's live table: opened from the archive, then one try per commit. It writes stalls.json with
+/// `FMI_STALLS=1`; with `FMI_FREE_SHIFT=1` alone it is kept for free's port (`share`, `free_cell`) and writes nothing.
 pub struct Live {
     pub stalls: Stalls,
+    pub write: bool,
 }
 
 impl Live {
     pub fn open(a: &Archive) -> Res<Live> {
-        Ok(Live { stalls: Stalls::of_open(a)? })
+        let l = Live { stalls: Stalls::of_open(a)?, write: on() };
+        if l.write {
+            l.stalls.write()?;
+        }
+        Ok(l)
     }
 
-    /// After `a.ingest` gave `line`: the try's rows, the cells as the commit left them, stalls.json, and the line.
-    pub fn commit(&mut self, a: &Archive, line: &Value) -> Res<String> {
+    /// After `a.ingest` gave `line`: the try's rows, the cells as the commit left them, and stalls.json.
+    pub fn commit(&mut self, a: &Archive, line: &Value) -> Res<()> {
         self.stalls.push(line, a)?;
         self.stalls.set_cells(cells_of_archive(a));
-        self.stalls.write()?;
-        Ok(self.stalls.line())
+        if self.write {
+            self.stalls.write()?;
+        }
+        Ok(())
     }
 }
 
