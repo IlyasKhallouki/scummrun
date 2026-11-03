@@ -821,7 +821,8 @@ impl<'a> Builder<'a> {
         }
         let mut num_ops = 0usize;
         let mut by_class: StdMap<i32, Vec<Fact>> = StdMap::new();
-        let mut used: HashMap<i32, BTreeSet<u32>> = HashMap::new();
+        // per class: how many operators gave it an atom (used_operators' sizes), and the last of them
+        let mut used: HashMap<i32, (usize, u32)> = HashMap::new();
         let mut pre = std::mem::take(&mut sc.pre);
         for o in ids.iter() {
             let o = o as usize;
@@ -836,7 +837,10 @@ impl<'a> Builder<'a> {
                     }
                     if !self.atomic.contains_key(&f) {
                         by_class.entry(class).push(f);
-                        used.entry(class).or_default().insert(o as u32);
+                        let u = used.entry(class).or_insert((0, u32::MAX));
+                        if u.1 != o as u32 {
+                            *u = (u.0 + 1, o as u32);
+                        }
                     }
                 }
             }
@@ -844,7 +848,7 @@ impl<'a> Builder<'a> {
         sc.pre = pre;
         let mut out = Vec::new();
         for (class, fs) in by_class.iter() {
-            if used[&class].len() == num_ops {
+            if used[&class].0 == num_ops {
                 let set = StdSet::from_iter_std(fs.iter().copied());
                 if set.len() > 1 {
                     out.push(set);
