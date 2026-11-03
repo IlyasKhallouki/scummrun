@@ -27,12 +27,24 @@ fn ego_values_switch() -> bool {
     std::env::var("FMI_EGO_VALUES").is_ok_and(|v| v == "1")
 }
 
-/// E014's switch `FMI_READ_CUT=1`: under split_limit, a run past the path limit with no fact left to split on, or with
-/// paths the step limit ended, is read short (the paths it finished make its records; the cut ones are dropped and
-/// counted) in place of stopping the reading. Unset: the reading stops there, as before.
-fn read_cut_switch() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("FMI_READ_CUT").is_ok_and(|v| v == "1"))
+/// E014's switch `FMI_READ_CUT`: under split_limit, a run past the path limit with no fact left to split on, or with
+/// paths the step limit ended, is read short in place of stopping the reading, its cut paths dropped and counted.
+/// `1`: such a run gives no record (the machine hands over none of its paths, as for a run split_limit splits);
+/// `paths`: the paths it finished make its records (slower: on the interactive demo's room 49 alone the reading ran
+/// past 10 minutes against 30 s, its finished paths starting events that meet the same loop again). Unset: the reading
+/// stops there, as before.
+pub(crate) fn read_cut_switch() -> bool {
+    read_cut_mode() != 0
+}
+
+/// `FMI_READ_CUT`'s mode: 0 unset, 1 the run gives no record, 2 (`paths`) its finished paths make records.
+pub(crate) fn read_cut_mode() -> u8 {
+    static ON: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| match std::env::var("FMI_READ_CUT").as_deref() {
+        Ok("1") => 1,
+        Ok("paths") => 2,
+        _ => 0,
+    })
 }
 
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
@@ -1665,9 +1677,9 @@ impl<'g> Builder<'g> {
                 return self.run_split(m, job, pins, pre, budget, run.first_fork.clone(), run.limit);
             }
             if run.limit != 0 {
-                // E014 (FMI_READ_CUT=1): no fact left to split on and no larger limit to read it with: the run's
-                // records are made from the paths it finished, and the paths the limit ended are dropped (DROP_ENDS),
-                // counted, as reader.py's rule does; the reading goes on, short of those paths
+                // E014 (FMI_READ_CUT): no fact left to split on and no larger limit to read it with: the run is read
+                // short (mode 1: no record; mode `paths`: its finished paths make its records, and the paths the limit
+                // ended are dropped, DROP_ENDS), counted; the reading goes on
                 self.counts.inc("FMI_READ_CUT: runs past the path limit with no fact left to split on, read short");
             }
             // scumm-machine's step limit ends a path "limit" too; in a run the path limit cut nothing (limit 0)
