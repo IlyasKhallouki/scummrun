@@ -220,6 +220,10 @@ impl<'a> Br<'a> {
         self.hits[2] += need.len() as u64;
         self.batches += 1;
         for (p, a) in need.into_iter().zip(r) {
+            // an object answer at a covered layout holds at every stop with that layout (HitCache)
+            if let (Some(hc), Some(l)) = (self.hc, lid) {
+                hc.put(l, p.0, p.1, a.main.map(|m| m.2));
+            }
             self.at.insert(p, a);
         }
         Ok(())
