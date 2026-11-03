@@ -522,3 +522,43 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 }
+
+/// The wait component's `wait` (fmi_explore::wait) as the try reads it: its stops and end, its horizon's last due frame,
+/// E009's idle record from its first frames (with the wait's seconds and CPU when the record has none), its record.
+pub struct RealWait;
+
+impl WaitPort for RealWait {
+    fn wait(&self, root: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], rd: &dyn ReadingSource, idle_frames: u64)
+            -> Result<Waited, String> {
+        let cfg = crate::wait::WaitCfg { idle_frames, ..Default::default() };
+        let w = crate::wait::wait(root, atoms, rd, &cfg)?;
+        let ended = match &w.end {
+            crate::wait::WaitEnd::Ended(r) => Some((r.clone(), w.frame0 + w.frames)),
+            _ => None,
+        };
+        let idle = w.idle.clone().map(|mut v| {
+            if v.get("seconds").is_none() {
+                v["seconds"] = json!(crate::pyjson::round(w.seconds, 1));
+            }
+            if v.get("cpu_s").is_none() {
+                v["cpu_s"] = json!(crate::pyjson::round(w.cpu_s, 1));
+            }
+            v
+        });
+        Ok(Waited {
+            frame0: w.frame0,
+            stops: w.stops.iter().map(|s| Stop { frame: s.frame, checkpoint: s.checkpoint.clone(), room: s.room }).collect(),
+            end: w.end.text(),
+            ended,
+            is_static: w.is_static(),
+            due: w.horizon,
+            idle,
+            record: w.json(atoms),
+            cpu_s: w.cpu_s,
+            seconds: w.seconds,
+        })
+    }
+    fn last_due(&self, o: &Obs) -> Option<u64> {
+        crate::wait::dues_of(o).iter().map(|d| d.1).max()
+    }
+}

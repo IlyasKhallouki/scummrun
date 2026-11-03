@@ -323,9 +323,9 @@ impl PlayerHost for PlayHost {
     }
 }
 
-/// E012's ports outside fmi-explore (fmi_explore::mech::Mech): T from fmi-reading's `tested`.
+/// E012's ports of the try (fmi_explore::mech::Mech): T from fmi-reading's `tested`, and the wait component's wait.
 pub fn mech() -> fmi_explore::mech::Mech {
-    fmi_explore::mech::Mech { tested: Some(Arc::new(RealTested::default())), wait: None }
+    fmi_explore::mech::Mech { tested: Some(Arc::new(RealTested::default())), wait: Some(Arc::new(fmi_explore::mech::RealWait)) }
 }
 
 /// T of a reading (component tested, `Tested::of`), made once per reading in the process (a reading's files never
