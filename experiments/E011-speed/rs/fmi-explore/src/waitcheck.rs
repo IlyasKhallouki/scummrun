@@ -236,7 +236,8 @@ fn idle_whole(root: &mut Box<dyn Engine>, frames: u64) -> Res<Value> {
 
 /// replay.verify on a fresh lean engine: the movie's events from boot, each checkpoint's frame in turn (the boot
 /// stops at the first one), each compared (`compare_checkpoint`). The differences, as replay.verify lists them.
-/// (`HostVerifier::replay_verify` runs to the first checkpoint's frame after booting to it, which the bridge refuses.)
+/// (`HostVerifier::replay_verify` does the same since E012's integration; before, it ran to the first checkpoint's frame
+/// after booting to it, which the bridge refuses, and never scheduled the later events.)
 pub fn verify_from_boot(host: &Arc<dyn EngineHost>, movie: &[Value], cps: &[Value], out_dir: &Path) -> Res<Vec<Value>> {
     let evs: Vec<fmi_core::Event> = movie.iter().filter_map(events::event_of).collect();
     let first = cps.first().and_then(|c| c[0].as_u64());

@@ -217,12 +217,22 @@ impl HostVerifier {
         let evs: Vec<fmi_core::Event> = movie.iter().filter_map(events::event_of).collect();
         let mut out = json!({"checkpoints": cps.len(), "differ": [], "inputs": movie.iter().filter(|e| events::is_input(e)).count()});
         let first = cps.first().and_then(|c| c[0].as_u64());
-        let mut b = self.host.boot(&BootCfg { seed: 1, events: evs, frame: first, dump_locals: false, lean: self.lean, out_dir: out_dir.to_path_buf() })
+        // every host's boot replays only the events up to its frame; the rest are scheduled at that stop, and the
+        // first checkpoint is compared where the boot stopped (the bridge refuses a run to the current frame)
+        let mut b = self.host.boot(&BootCfg { seed: 1, events: evs.clone(), frame: first, dump_locals: false, lean: self.lean, out_dir: out_dir.to_path_buf() })
             .map_err(|e| format!("verify: {e}"))?;
+        if let Some(f) = first {
+            let mut rest: Vec<fmi_core::Event> = evs.into_iter().filter(|e| e.frame > f).collect();
+            rest.sort_by_key(|e| e.frame);
+            if !rest.is_empty() {
+                b.inputs(&rest).map_err(|e| format!("verify: {e}"))?;
+            }
+        }
         let mut differ = Vec::new();
         for cp in cps {
             let frame = cp[0].as_u64().unwrap_or(0);
-            let st = match b.run(&RunSpec { frame: Some(frame), ..Default::default() }) {
+            let run = if b.status().frame < frame { b.run(&RunSpec { frame: Some(frame), ..Default::default() }) } else { Ok(b.status().clone()) };
+            let st = match run {
                 Ok(s) => s,
                 Err(e) => {
                     differ.push(json!({"frame": frame, "error": format!("stopped at {e}")}));
