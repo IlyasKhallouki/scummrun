@@ -9,6 +9,7 @@
 //!   (`idx::build`, written next to it).
 //! * [`cache`]: the exact reading cache (plan.md, readio item 3).
 //! * [`reuse`]: step.py's `reusable` (E008) and `reuse_keys_of` / `reuse_keys` (E009's K).
+//! * [`draws`]: E012's checks of a reading's actions on a random draw, with the draw's range and share.
 
 pub mod cache;
 pub mod idx;
@@ -17,6 +18,7 @@ pub mod mmap;
 pub mod pyjson;
 pub mod reuse;
 pub mod tc;
+pub mod draws;
 
 use fmi_core::{val_text, Action, Domain, Domains, EffVal, Effect, Facts, Key, ReadingSource, RecEff, Record, Val};
 use fmi_core::{ABOVE, BELOW};
