@@ -55,6 +55,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi check tries A_SEQ B_SEQ [--json OUT]
        fmi check verify-new SEQ --out DIR [--threads N]
        fmi check try-report SEQ...
+       fmi check try-parts SEQ... [--json OUT]
        fmi check wait ARCHIVE --entries I,J,.. (--reading READING.json | --read-scope R,R,.. --read-dir DIR) --out DIR
                 [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
@@ -144,6 +145,7 @@ fn main() {
         ("check", Some("tries")) => cmd_check_tries(&argv[2..]),
         ("check", Some("verify-new")) => cmd_check_verify_new(&argv[2..]),
         ("check", Some("try-report")) => cmd_check_try_report(&argv[2..]),
+        ("check", Some("try-parts")) => cmd_check_try_parts(&argv[2..]),
         ("check", Some("wait")) => cmd_check_wait(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
@@ -628,6 +630,29 @@ fn cmd_check_verify_new(argv: &[String]) -> i32 {
         Ok(false) => 1,
         Err(e) => {
             eprintln!("fmi check verify-new: {e}");
+            2
+        }
+    }
+}
+
+/// E012 integration's measurement: `fmi check try-parts SEQ... [--json OUT]`, the wall by part (trycheck.rs).
+fn cmd_check_try_parts(argv: &[String]) -> i32 {
+    let mut seqs = Vec::new();
+    let mut out = None;
+    let mut i = 0;
+    while i < argv.len() {
+        if argv[i] == "--json" && i + 1 < argv.len() {
+            out = Some(PathBuf::from(&argv[i + 1]));
+            i += 2;
+        } else {
+            seqs.push(PathBuf::from(&argv[i]));
+            i += 1;
+        }
+    }
+    match trycheck::cmd_parts(&seqs, out.as_deref()) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("fmi check try-parts: {e}");
             2
         }
     }

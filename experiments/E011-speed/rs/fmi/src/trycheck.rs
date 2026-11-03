@@ -10,6 +10,9 @@
 //!       the movie from boot (the try's entry's events, then the new entry's), against the root's checkpoints
 //!       (SEQ/entries/0.json.gz), the try's entry's checkpoint and the new entry's checkpoints. Exit 0 when none
 //!       differs.
+//!   fmi check try-parts SEQ... [--json OUT]
+//!       E012 integration's measurement: each try's wall by part (E011's report.py rules, with T, the wait and the
+//!       affordance step as parts of their own), the sums and the medians.
 
 use fmi_core::{BootCfg, Checkpoint, Event, Key};
 use fmi_explore::files::{self, read_gz, read_json};
@@ -255,6 +258,117 @@ pub fn cmd_report(seqs: &[PathBuf]) -> Result<(), String> {
         println!("| sum | | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | | | {}/{} | {}/{}/{} | {} steps, {}/{} | {} |",
                  sums[0], sums[1], sums[2], sums[3], sums[4], sums[5], sums[6], counts[0], counts[1], counts[2], counts[3], counts[4],
                  counts[5], counts[6], counts[7], counts[8]);
+    }
+    Ok(())
+}
+
+/// The wall of one try by part, by E011's report.py rules (B5), with E012's steps as parts of their own:
+/// return `return.boot_s`; read the fresh reading's `reading.wall_s` (a reused one's `load_s`) plus the refinements' and
+/// extensions' `seconds`; T `e012.t.seconds`; idle `idle.seconds`, or with the wait on `e012.wait.seconds` (the wait
+/// replaces the idle measurement); play the window records' `wall_s` (run/a*/run.json); plan the probes' `seconds` less
+/// play and the refinements'; afford the affordance steps' `step_seconds`; rest the try's `wall_s` less the parts.
+pub const PARTS: [&str; 8] = ["return", "read", "T", "idle/wait", "plan", "play", "afford", "rest"];
+
+fn wall_parts(d: &Path, r: &Value) -> [f64; 9] {
+    let a = &r["attempt"];
+    let rd = &r["reading"];
+    let sub: f64 = ["refinements", "extensions"]
+        .iter()
+        .flat_map(|k| a[*k].as_array().cloned().unwrap_or_default())
+        .map(|x| f64_of(&x["seconds"]))
+        .sum();
+    let mut play = 0.0;
+    if let Ok(rs) = std::fs::read_dir(d.join("run")) {
+        let mut ps: Vec<PathBuf> = rs.flatten().map(|e| e.path().join("run.json")).filter(|p| p.exists()).collect();
+        ps.sort();
+        for p in ps {
+            if let Ok(v) = read_json(&p) {
+                play += v["windows"].as_array().map(|w| w.iter().map(|x| f64_of(&x["wall_s"])).sum::<f64>()).unwrap_or(0.0);
+            }
+        }
+    }
+    let probes: f64 = r["probes"].as_array().map(|p| p.iter().map(|x| f64_of(&x["seconds"])).sum()).unwrap_or(0.0);
+    let read = if rd["fresh"].as_bool().unwrap_or(false) { f64_of(&rd["wall_s"]) } else { f64_of(&rd["load_s"]) } + sub;
+    let e = &r["e012"];
+    let idle = if e["wait"].is_object() { f64_of(&e["wait"]["seconds"]) } else { f64_of(&r["idle"]["seconds"]) };
+    let afford: f64 = e["afford"].as_array().map(|a| a.iter().map(|x| f64_of(&x["step_seconds"])).sum()).unwrap_or(0.0);
+    let t = f64_of(&e["t"]["seconds"]);
+    let plan = (probes - play - sub).max(0.0);
+    let ret = f64_of(&r["return"]["boot_s"]);
+    let wall = f64_of(&r["wall_s"]);
+    let rest = (wall - (ret + read + t + idle + plan + play + afford)).max(0.0);
+    [ret, read, t, idle, plan, play, afford, rest, wall]
+}
+
+fn median_of(v: &[f64]) -> f64 {
+    let mut s = v.to_vec();
+    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    match s.len() {
+        0 => f64::NAN,
+        n if n % 2 == 1 => s[n / 2],
+        n => (s[n / 2 - 1] + s[n / 2]) / 2.0,
+    }
+}
+
+/// `fmi check try-parts SEQ... [--json OUT]`: per sequence, each try's wall by part (`wall_parts`), then the sums and
+/// the medians over the tries, the ring(33) tries (a 4-room scope) and the ring(38) tries (5 rooms).
+pub fn cmd_parts(seqs: &[PathBuf], json_out: Option<&Path>) -> Result<(), String> {
+    let mut all = serde_json::Map::new();
+    for seq in seqs {
+        println!("\n### {}\n", seq.display());
+        println!("| try | entry | scope | wall s | {} |", PARTS.join(" | "));
+        println!("|---|---|---:|---:|{}", "---:|".repeat(PARTS.len()));
+        let mut rows: Vec<(usize, [f64; 9])> = Vec::new();
+        let mut js = Vec::new();
+        for d in job_dirs(seq) {
+            let r = read_json(&d.join("result.json"))?;
+            let p = wall_parts(&d, &r);
+            let scope = r["reading"]["scope"].as_array().map(|a| a.len()).unwrap_or(0);
+            println!("| {} | {} | {} | {:.2} | {} |", d.file_name().unwrap().to_string_lossy(), r["entry"], scope, p[8],
+                     p[..8].iter().map(|x| format!("{x:.2}")).collect::<Vec<_>>().join(" | "));
+            let mut m = serde_json::Map::new();
+            m.insert("job".into(), json!(d.file_name().unwrap().to_string_lossy()));
+            m.insert("scope".into(), json!(scope));
+            m.insert("wall".into(), json!(p[8]));
+            for (k, v) in PARTS.iter().zip(p.iter()) {
+                m.insert((*k).into(), json!(v));
+            }
+            js.push(Value::Object(m));
+            rows.push((scope, p));
+        }
+        let col = |i: usize, f: &dyn Fn(usize) -> bool| -> Vec<f64> { rows.iter().filter(|r| f(r.0)).map(|r| r.1[i]).collect() };
+        let sum: Vec<f64> = (0..9).map(|i| col(i, &|_| true).iter().sum()).collect();
+        println!("| sum | | | {:.2} | {} |", sum[8], sum[..8].iter().map(|x| format!("{x:.2}")).collect::<Vec<_>>().join(" | "));
+        let mut stats = serde_json::Map::new();
+        for (name, f) in [("all", &(|_| true) as &dyn Fn(usize) -> bool), ("ring33", &|s| s == 4), ("ring38", &|s| s == 5)] {
+            let med: Vec<f64> = (0..9).map(|i| median_of(&col(i, f))).collect();
+            let n = col(8, f).len();
+            println!("| median, {name} ({n}) | | | {:.2} | {} |", med[8], med[..8].iter().map(|x| format!("{x:.2}")).collect::<Vec<_>>().join(" | "));
+            let mut m = serde_json::Map::new();
+            m.insert("n".into(), json!(n));
+            m.insert("wall".into(), json!(med[8]));
+            for (k, v) in PARTS.iter().zip(med.iter()) {
+                m.insert((*k).into(), json!(v));
+            }
+            stats.insert(format!("median_{name}"), Value::Object(m));
+        }
+        let w = col(8, &|_| true);
+        let mean = if w.is_empty() { f64::NAN } else { sum[8] / w.len() as f64 };
+        let max = w.iter().cloned().fold(f64::NAN, f64::max);
+        println!("\nwall: sum {:.1} s, mean {:.2} s, max {:.1} s", sum[8], mean, max);
+        let mut sm = serde_json::Map::new();
+        sm.insert("wall".into(), json!(sum[8]));
+        for (k, v) in PARTS.iter().zip(sum.iter()) {
+            sm.insert((*k).into(), json!(v));
+        }
+        stats.insert("sum".into(), Value::Object(sm));
+        stats.insert("mean".into(), json!(mean));
+        stats.insert("max".into(), json!(max));
+        stats.insert("tries".into(), Value::Array(js));
+        all.insert(seq.display().to_string(), Value::Object(stats));
+    }
+    if let Some(p) = json_out {
+        files::write_json(p, &Value::Object(all), Some(1))?;
     }
     Ok(())
 }
