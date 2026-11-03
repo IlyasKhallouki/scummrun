@@ -41,7 +41,7 @@ fn vals_of(j: &J) -> Vec<Val> {
     v
 }
 
-fn conds_of(j: &J) -> Vec<(Key, Vec<Val>)> {
+pub(crate) fn conds_of(j: &J) -> Vec<(Key, Vec<Val>)> {
     j.arr()
         .iter()
         .map(|p| {
@@ -120,7 +120,7 @@ pub fn plan_result(p: &J) -> PlanResult {
     }
 }
 
-fn view_of(j: &J) -> View {
+pub(crate) fn view_of(j: &J) -> View {
     let mut v = View::new();
     for p in j.arr() {
         let a = p.arr();
@@ -137,11 +137,11 @@ fn view_of(j: &J) -> View {
 pub struct Fx {
     pub host: Box<dyn EngineHost>,
     pub lean: bool,
-    dir: PathBuf,
-    plans: Vec<J>,
+    pub(crate) dir: PathBuf,
+    pub(crate) plans: Vec<J>,
     windows: Vec<J>,
     children: Vec<J>,
-    reading: FileReading,
+    pub(crate) reading: FileReading,
 }
 
 pub fn load(dir: &Path, host: Box<dyn EngineHost>, lean: bool) -> Fx {
@@ -168,7 +168,7 @@ pub fn load(dir: &Path, host: Box<dyn EngineHost>, lean: bool) -> Fx {
     }
 }
 
-fn unobserved() -> Prefixes {
+pub(crate) fn unobserved() -> Prefixes {
     Prefixes::of(&["args:", "saved:", "actorroom:"])
 }
 
@@ -378,7 +378,7 @@ fn cmd_recs(fx: &Fx) -> bool {
 
 // --- the engine ------------------------------------------------------------------------------------------------------
 
-fn boot(fx: &Fx, movie: &J, frame: u64, tag: &str) -> Box<dyn Engine> {
+pub(crate) fn boot(fx: &Fx, movie: &J, frame: u64, tag: &str) -> Box<dyn Engine> {
     let events: Vec<Event> = movie.arr().iter().filter_map(event_of).collect();
     let out = fx.dir.join("rust").join(tag);
     let _ = std::fs::remove_dir_all(&out);

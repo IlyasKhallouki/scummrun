@@ -35,6 +35,8 @@ pub mod window;
 #[cfg(feature = "json-double")]
 pub mod file_reading;
 #[cfg(feature = "json-double")]
+pub mod delay_check;
+#[cfg(feature = "json-double")]
 pub mod fixture;
 #[cfg(feature = "json-double")]
 pub mod json_engine;
