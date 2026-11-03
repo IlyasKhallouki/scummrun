@@ -53,7 +53,7 @@ impl Table {
     fn expected(&self) -> (Option<u64>, Option<u64>) {
         let gs: Vec<u64> = (self.g0..self.g0 + self.frames).filter(|&g| self.gated[self.at(g)]).collect();
         let Some(f0) = gs.iter().find_map(|&g| self.issue(g)) else { return (None, None) };
-        let kk = delay::k_max(self.p).unwrap();
+        let kk = delay::k_max(self.p).unwrap_or(u64::MAX);
         let mut lands: Vec<u64> = gs.iter().filter_map(|&g| self.issue(g)).collect();
         lands.sort();
         lands.dedup();
@@ -212,8 +212,38 @@ fn play(t: &Table, gen: &mut Gen) -> Run {
 
 const FAILS: [&str; 4] = ["mismatch", "refuted", "spent", "deviation"];
 
+/// Amendment (2): with no K, the first end point among the landing frames (E010's choice); the record's k only for a
+/// matching try.
+fn check_unbounded(t: &Table, gen: &mut Gen) -> Result<(), String> {
+    let gs: Vec<u64> = (t.g0..t.g0 + t.frames).filter(|&g| t.gated[t.at(g)]).collect();
+    let mut lands: Vec<u64> = gs.iter().filter_map(|&g| t.issue(g)).collect();
+    lands.sort();
+    lands.dedup();
+    let f0 = lands.first().copied();
+    let end = lands
+        .iter()
+        .copied()
+        .find(|&f| matches!(t.outcome[t.at(f)], "success" | "goal" | "deviation"));
+    let r = play(t, gen);
+    let got = r.chosen_child.and_then(|c| r.children[c].first);
+    if got != end {
+        return Err(format!("chosen first {got:?}, the first end point {end:?}"));
+    }
+    let want_k = end
+        .filter(|&f| matches!(t.outcome[t.at(f)], "success" | "goal"))
+        .map(|f| f - f0.unwrap());
+    let rec_k = r.record.get("chosen").and_then(J::int).map(|x| x as u64);
+    if rec_k != want_k || r.record.get("k_max") != Some(&J::Null) {
+        return Err(format!("record chosen {rec_k:?} k_max {:?}, want {want_k:?}", r.record.get("k_max")));
+    }
+    Ok(())
+}
+
 /// Checks one table; returns a description of the difference, if any.
 fn check(t: &Table, gen: &mut Gen) -> Result<(), String> {
+    if delay::k_max(t.p).is_none() {
+        return check_unbounded(t, gen);
+    }
     let (f0, want) = t.expected();
     let r = play(t, gen);
     let got = r.record.get("chosen").and_then(J::int).map(|x| x as u64);
@@ -330,4 +360,42 @@ fn r3_random_tables() {
     }
     eprintln!("R3 random tables: {chosen} chosen, {refuted} with no match within K, {no_try} with no try");
     assert!(chosen > 200 && refuted > 200, "{chosen} {refuted}");
+}
+
+#[test]
+fn r3_unbounded_tables() {
+    // amendment (2): draws with no share and no range (no K): the first end point, as E010 chooses
+    let mut gen = Gen(0x3C6E_F372_FE94_F82B);
+    let mut dev = 0;
+    for i in 0..1000 {
+        let frames = 30 + gen.below(150);
+        let n = frames as usize + 80;
+        let p_end = 1 + gen.below(15);
+        let gated: Vec<bool> = (0..n).map(|_| gen.chance(3, 4)).collect();
+        let issuable: Vec<bool> = (0..n).map(|_| gen.chance(2, 3)).collect();
+        let outcome: Vec<&'static str> = (0..n)
+            .map(|_| {
+                if gen.below(100) < p_end {
+                    ["success", "goal", "deviation"][gen.below(3) as usize]
+                } else {
+                    FAILS[gen.below(3) as usize]
+                }
+            })
+            .collect();
+        let t = Table {
+            g0: 7000,
+            frames,
+            gated,
+            issuable,
+            outcome,
+            p: 0.0,
+            workers: 1 + gen.below(3) as usize,
+        };
+        if let Err(e) = check(&t, &mut gen) {
+            panic!("table {i}: {e}");
+        }
+        let r = play(&t, &mut gen);
+        dev += r.chosen_child.is_some_and(|c| r.children[c].outcome == "deviation") as u32;
+    }
+    assert!(dev > 50, "{dev}");
 }

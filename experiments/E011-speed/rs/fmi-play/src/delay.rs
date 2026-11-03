@@ -4,7 +4,9 @@
 //! first one that matches the plan's branch (success, or the goal from the plan's records). A try's delay k is its
 //! first input frame minus the first issuing try's. Deviations are not taken while k < K(p); when no try with k < K
 //! can still match, the branch is refuted at this entry: the first deviation is taken (E010's choice), or the window
-//! ends empty. The other tries' end states are reported as candidate entries, by a digest of their facts.
+//! ends empty. With no K (a draw with no share and no range, amendment (2)) the fork changes no choice: the first end
+//! point is taken, as E010 takes it. The other tries' end states are reported as candidate entries, by a digest of
+//! their facts.
 //!
 //! Also: the random calls per frame, counted exactly from one Status `rng` to the next (ScummVM's RandomSource:
 //! xorshift32 13/21/11 per call, `common/random.cpp`).
@@ -346,8 +348,14 @@ impl Fork {
             self.chosen = Some(k);
             return Take::Choose;
         }
-        if outcome == "deviation" && self.fallback.is_none() {
-            self.fallback = Some(c);
+        if outcome == "deviation" {
+            if self.fallback.is_none() {
+                self.fallback = Some(c);
+            }
+            // amendment (2): with no K the fork changes no choice, the first end point is chosen as E010 chooses it
+            if self.k_max().is_none() {
+                return Take::Choose;
+            }
         }
         Take::Next
     }
