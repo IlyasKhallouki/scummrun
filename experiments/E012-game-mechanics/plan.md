@@ -1227,3 +1227,130 @@ Written after the merges and before any gate or measurement on the merged build.
   - The 15 tries' wall sum, with everything on, is 0.80-0.95 of d's in the same run. The reading in process saves
     15-25 s (resident's B3: 173.1 s against round 2's 193.1 s). The E012 steps add 8-15 s: T 3.7 s, the waits 1.1 s,
     the affordance steps 5.1 s in try's measurement.
+
+## Results of the integration (2026-11-03, written after the runs)
+
+Branch e012: origin/e011 (928f437), e012-try (58cfaef: end, tested, targets, afford, archive, delay and wait at their
+final heads, and the try) and e012-resident (9395b0d) merged, then the fix of `HostVerifier::replay_verify` and a
+report command (`fmi check try-parts`). The merge needed no code change between components: the conflicts were plan.md
+and one doc line. Built into `/var/tmp/fast-mi/target-e012`; the engine is end's `svm-e012-end`. Numbers and tables:
+`results/integration/README.md`. Laptop, seed 1, nice 10, heavy steps under the heavy lock and the guard; no other
+experiment ran on the laptop.
+
+**The fix.** On E009's door archive, entry 5, round 2's fmi verify reports a difference at the first checkpoint and the
+goal not held. The fixed one gives E008's `explore.py verify` record: 6 checkpoints, 0 differences, 28 inputs,
+state:316 = 1, the same frames, qf and tick.
+
+**Gates.**
+
+- **G0 holds.** With every E012 switch off, B3's 15 tries equal round 2's in everything: in the fast settings, against
+  round 2 run beside them, round 2's published `r2-fast` and B0 (15 of 15 each); in the reference settings, against
+  `r2-ref` and B0 (15 of 15 each).
+- **G-on holds.** With every E012 switch on (`FMI_READER_LIB` included), every attempt of the 15 tries is the same as
+  with them off. The layer adds 33 entries: wait 18, afford 15, delay 0. All 76 new entries verify from boot with 0
+  differences.
+- **E011's gates on the merged build:**
+  - G11: every new entry of the off sequences verifies from boot (43 of 43, fast and reference);
+  - G12: no python process in an fmi tree;
+  - G2-G4 with `SPEEDRUN_REPORT_RESTART` off and on: 0 differences;
+  - G5: the line `CHECK (a): 0 goal True 2728 3216 488 11712 2 36`, 8 entries, verify 0 differences, off and on, but
+    with 503 children (below);
+  - G6: the kitchen golden; ring(38), ring(33) and the refinement with --prep, the memo off and both memo pairs; RS1;
+  - G7 off and on, G8;
+  - G9 with the switches as round 2 ran it, and the deepening's check;
+  - G10: play's fixtures; `fmi try` on test (a) with every E012 switch off and on, round 2's line and every entry
+    verified;
+  - the cargo tests: 141 in rs/, fmi-play's 17 and R2's table, fmi-engine's 16 with the engine tests, scumm-reader's
+    memo tests.
+  - G1 (fork_exact.py, 7 load children, the switch off): 6,002 comparisons and 594,383 load comparisons, 0 differ;
+    P's trace = F's. With the switch on it is end's run on the same engine binary.
+- **The components' gates, on the merged build:**
+  - end's hooks (14 cases) and Boxes (6 rooms);
+  - T1;
+  - W1 (50 of 50 stops), W2 (the door at due(local 211) in 13 of 13 room-28 entries), W3, W4 (140 waits, median 0.109
+    s, max 0.210 s);
+  - R1 (31 runs), R2, R3;
+  - T2 (65 of 65, the component's table);
+  - A1 (8 of 8), A2, A3 (6.5-7.9 ms of wall per trial), the walk boxes;
+  - S1;
+  - RS1.
+
+  end's `unreach` and archive's S2 were not run again: the same engine binary, code and inputs.
+
+**Two gates read differently than E011 recorded them.**
+
+- **G5's children.** The Python reference's strict window search runs children in a thread pool and stops when Q(g)
+  + b reaches the best result so far, so how many children are in flight at the stop depends on timing. On end's
+  engine window 1 issued two more children than round 2's runs: frames 2798 and 2799, deviations after the best. Every
+  child present in both runs has the same outcome, frames and qf; each window's best, the route and the line are the
+  same. E011 recorded "501 or 502"; these runs gave 503. A third run on end's engine, with the laptop quieter, gave
+  502.
+- **G9 with the layer on** is not a reference gate. `FMI_SELECT=progress` changes the cells by design. The recorded
+  tries' replay through doubles has no reading to compute T from, and the try refuses to run half wired. Stagnation
+  over T stops the fake-step driver before its kill-and-resume scenario's kill. With ON3 the deepening changes job.json,
+  as round 2 found; its G9 "on" was ON2 with the proofs.
+
+**The 15 tries with everything on, against round 2** (two resident processes alternating try by try, the heavy lock
+held across, the reading cache on and the job memo off as in round 2's B3; wall seconds). The amendment took the
+measurement from the three-process run that gave G0 and G-on. That run is reported below; this two-process run was
+added after it, because there the planner's keep rule, not the code, set the merged build's planning.
+
+| | round 2 | E012, everything on |
+|---|---:|---:|
+| sum, 15 tries | 191.8 | 183.8 |
+| median, 15 | 4.4 | 3.2 |
+| median, ring(33), 7 | 6.1 | 7.0 |
+| median, ring(38), 8 | 1.35 | 0.95 |
+| read | 140.3 | 117.1 |
+| T | | 4.1 |
+| idle measurement / wait | 1.20 | 1.14 |
+| plan | 48.5 | 54.4 |
+| play | 1.42 | 1.54 |
+| affordance steps | | 4.97 |
+| return and rest | 0.45 | 0.55 |
+
+- **The reading** in fmi's process saves 23.2 s. The four fresh ring(38) readings take 0.5-3.1 s instead of 1.9-4.7 s,
+  and j00006's refinement from another entry takes 7.5 s instead of 19.7 s.
+- **The layer's own steps** add 9.1 s. T is 1.8-2.1 s per ring(33) reading. The affordance step is 0.26-0.72 s per
+  try. The wait costs what the idle measurement it replaces did.
+- **The planning** is 5.9 s longer for the same requests and plans: 2.8 s in j00000, 1.0 s in j00006, 0.2-0.6 s in
+  each later ring(33) try. Not attributed.
+- **With three resident processes** (the run that gave G0 and G-on), the merged build planned j00011 in 11.2 s and
+  j00014 in 9.6 s, against 5.7 s and 6.7 s with the switches off. j00012 took 2.5 s instead of 0.07 s.
+  - The harness keeps a reading's planner across a refinement only while MemAvailable is at least E008_MEM_SECOND_GB
+    (7 GB), and that is the only path that closes one.
+  - MemAvailable was 7.1-8.5 GB at the ends of the ring(33) tries, and the merged process was up to 0.4 GB larger
+    than the one with the switches off (0.8 GB larger than round 2's in the two-process run): the resident store and
+    T.
+  - With two processes (8.9-11.9 GB), j00012 planned in 0.01 s.
+- **What the mechanisms did.**
+  - All 15 attempts stop on Lemma R's R0 in a dialog, so the affordance step ran 15 times: 4 lines each, 1 kept.
+  - The waits were static at 6 entries and stopped twice at the other 9.
+  - No delay fork triggered: no window checks a draw in rooms 33 and 38, which draw once per frame.
+  - No dead move. No goal again: the goal is no target of these tries.
+
+**The driver with every switch on** (`integrate/smoke.sh`, 4 jobs; not the kitchen rerun). `fmi explore run` from the
+root with the kitchen check's settings, b = 2, the fast settings and every switch, ran the paths no gate runs end to end
+in 168 s:
+
+- job.json carried the archive's novelty, and T grew from the goal's atom to 559, then 576 atoms.
+- Each try read it and returned its T in result.json.
+- The archive ingested 13 new entries (checkpoint 4, end 4, afford 5) into 8 cells over T. The waits were static at
+  all 4 entries.
+- The fixed `fmi explore verify` verified all 13 from boot with 0 differences.
+
+**Against the prediction.**
+
+- Hit:
+  - G0 (15 of 15 in both settings) and G-on (76 of 76);
+  - the reading's saving: 23.2 s, predicted 15-25 s;
+  - the layer's steps: 9.1 s, predicted 8-15 s.
+- Missed:
+  - The sum is 0.96 of round 2's, predicted 0.80-0.95. The planning's 5.9 s was not in the prediction.
+  - G5's children were 503 in two runs, outside E011's recorded 501-502, and 502 in a third (above).
+  - "No fix round beyond the one above" held for the product's code. Two of the integration's own scripts needed one
+    each: the smoke run held the heavy lock its driver takes, and the afford stage's environment file reset the
+    output folder of the stage after it.
+
+**Not in the merged build.** The due-frame window of section 1 (a paused slot's planned event gets its due frame in
+the window search): no component built it. The kitchen rerun's window search is E010's, with the delay fork.
