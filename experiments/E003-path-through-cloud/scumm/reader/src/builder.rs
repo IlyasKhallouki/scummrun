@@ -1513,21 +1513,24 @@ impl<'g> Builder<'g> {
         sig
     }
 
-    /// The slot keys of a unit the oracle lists (`SymOracle.keys(prefix)`): the scope's universe, then the last
-    /// run's pins that the universe lacks, sorted. The universe's part is worked out once per prefix (the scope
-    /// does not change).
-    fn oracle_keys(&self, prefix: &str) -> Vec<String> {
+    /// The slot keys of a unit the oracle lists (`SymOracle.keys(prefix)`), each handed to `f`: the scope's universe,
+    /// then the last run's pins that the universe lacks, sorted. The universe's part is worked out once per prefix
+    /// (the scope does not change).
+    fn oracle_keys_each(&self, prefix: &str, f: &mut dyn FnMut(&String)) {
         let mut cache = self.uni_keys.borrow_mut();
         let (uni, by_prefix) = &mut *cache;
         if uni.is_empty() {
             uni.extend(self.scope.universe.iter().cloned());
         }
-        let mut out: Vec<String> = by_prefix
-            .entry(prefix.to_string())
-            .or_insert_with(|| self.scope.universe.iter().filter(|k| k.starts_with(prefix)).cloned().collect())
-            .clone();
-        out.extend(self.last_pins.keys().filter(|k| k.starts_with(prefix) && !uni.contains(*k)).cloned());
-        out
+        if !by_prefix.contains_key(prefix) {
+            by_prefix.insert(prefix.to_string(), self.scope.universe.iter().filter(|k| k.starts_with(prefix)).cloned().collect());
+        }
+        for k in &by_prefix[prefix] {
+            f(k);
+        }
+        for k in self.last_pins.keys().filter(|k| k.starts_with(prefix) && !uni.contains(*k)) {
+            f(k);
+        }
     }
 
     /// `Builder.event_pins`.
@@ -1537,8 +1540,8 @@ impl<'g> Builder<'g> {
         if let Some(key) = self.game.lifecycle_key(ev.unit) {
             ok = self.pin(&mut pins, &mut pre, &key.to_string(), &[Label::Int(1)]);
         }
-        let exit_key = format!("var:{VAR_CUTSCENEEXIT_KEY}");
         if ev.abort {
+            let exit_key = format!("var:{VAR_CUTSCENEEXIT_KEY}");
             ok = ok && self.pin(&mut pins, &mut pre, &format!("esc:{}:{}", ev.name, ev.w), &[Label::Int(1)]);
             let dom = self.domain(&exit_key);
             if self.kind(&exit_key) == Kind::Const {
@@ -1548,14 +1551,15 @@ impl<'g> Builder<'g> {
                 ok = ok && self.pin(&mut pins, &mut pre, &exit_key, &vals);
             }
         } else {
-            ok = ok && self.pin(&mut pins, &mut pre, &format!("at:{}:{}", ev.name, ev.w), &[Label::Int(1)]);
+            let prefix = format!("at:{}:", ev.name);
+            let own = format!("{prefix}{}", ev.w);
+            ok = ok && self.pin(&mut pins, &mut pre, &own, &[Label::Int(1)]);
             ok = ok && self.pin(&mut pins, &mut pre, &format!("frozen:{}", ev.name), &[Label::Int(0)]);
-            let own = format!("at:{}:{}", ev.name, ev.w);
-            for k in self.oracle_keys(&format!("at:{}:", ev.name)) {
-                if k != own {
-                    pins.insert(k, Val::Int(0));
+            self.oracle_keys_each(&prefix, &mut |k: &String| {
+                if *k != own {
+                    pins.insert(k.clone(), Val::Int(0));
                 }
-            }
+            });
         }
         ok = ok && self.pin(&mut pins, &mut pre, &format!("args:{}", ev.name), &[Label::Int(ev.sig)]);
         if let UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) = ev.unit {
@@ -2491,15 +2495,17 @@ impl<'g> Builder<'g> {
         *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
         let mut tp = 0.0;
         for ev0 in todo.iter() {
-            let ev = self.limit(ev0);
-            if ev.sig == 0 && ev0.sig != 0 {
-                self.reach_folded(&ev.name);
+            // `limit`, the event made only when it is not done already
+            let folds = self.limit_folds(ev0);
+            if folds {
+                self.reach_folded(&ev0.name);
             }
-            let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
+            let k = (ev0.name.clone(), ev0.unit, ev0.w, if folds { 0 } else { ev0.sig }, ev0.abort);
             if self.events_done.contains(&k) {
                 continue;
             }
             self.events_done.insert(k);
+            let ev = if folds { ev0.unknown_locals(false) } else { ev0.clone() };
             if skip.is_some_and(|f| f(&ev)) {
                 self.counts.inc("events left out by the caller");
                 continue;
@@ -2641,23 +2647,36 @@ impl<'g> Builder<'g> {
     /// place, so the switch folds a wait point's lists only where their lists of all locals pass SIG_LIMIT too
     /// (PORT-NOTES.md, "Live locals", point 6).
     pub fn limit(&mut self, ev: &Event) -> Event {
+        if self.limit_folds(ev) {
+            ev.unknown_locals(false)
+        } else {
+            ev.clone()
+        }
+    }
+
+    /// `limit`'s decision, with its side effects: true when the event's list is folded (`limit` gives
+    /// `unknown_locals(false)`), false when it stays as it is.
+    fn limit_folds(&mut self, ev: &Event) -> bool {
         if ev.sig == 0 {
-            return ev.clone();
+            return false;
         }
         let key = if self.table.live_locals.is_some() { flag_free(ev) } else { ev.sig };
-        let seen = self.sig_seen.entry((ev.name.clone(), ev.w)).or_default();
+        let seen = match self.sig_seen.get_mut(&(ev.name.clone(), ev.w)) {
+            Some(s) => s,
+            None => self.sig_seen.entry((ev.name.clone(), ev.w)).or_default(),
+        };
         if seen.contains(&key) {
-            return ev.clone();
+            return false;
         }
         if !self.folded.contains(&ev.sig) && seen.len() < self.sig_limit {
             seen.push(key);
-            return ev.clone();
+            return false;
         }
         if !self.folded.contains(&ev.sig) {
             self.folded.insert(ev.sig);
             self.counts.inc("lists of locals past SIG_LIMIT (taken as unknown)");
         }
-        ev.unknown_locals(false)
+        true
     }
 
     /// `Builder._run_jobs`: the event jobs' lists of locals registered first, the records' after. Each job's
