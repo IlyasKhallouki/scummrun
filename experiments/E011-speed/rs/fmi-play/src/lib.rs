@@ -22,6 +22,7 @@
 
 pub mod check;
 pub mod code;
+pub mod delay;
 pub mod executor;
 pub mod pyj;
 pub mod reading;
@@ -33,6 +34,8 @@ pub mod window;
 
 #[cfg(feature = "json-double")]
 pub mod file_reading;
+#[cfg(feature = "json-double")]
+pub mod delay_check;
 #[cfg(feature = "json-double")]
 pub mod fixture;
 #[cfg(feature = "json-double")]

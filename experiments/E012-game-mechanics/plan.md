@@ -845,3 +845,89 @@ Written before try's code is committed. It fills in what "How a try runs" leaves
   - **Measured,** off against on: per try the wall and CPU by part (return, read, wait, plan, play, afford), and the
     mechanisms' counts (stops and kept, goal-again requests, delay windows and candidates, affordance steps with
     trials and kept, dead moves).
+
+## Amendment 2026-11-03, component `delay`: the fork's rules in the ready search, its bound, its record and the interface
+
+Written before the delay fork's code.
+
+- **Measured** (statistics of readings at hand, not inputs of the system):
+  - Draw checks are on events only. Test (a)'s reading 28-33-41-ta: 8,201 of its 40,773 actions, events of room 28's
+    locals 208-210. Ring(38)'s 33-38-83-85-96 (B3's j00001): 165 of 9,286, events of room 85's local 202. Ring(33)'s
+    28-33-35-38 (B3's j00000): 6,471 of 234,401, events of rooms 28 and 35 and of script 47. No sentence, walk or verb
+    click checks a draw there.
+  - A draw check's reason names the draw but not its range (`?(random draw: ((getRandomNr) * ...) + ...)`): the range
+    and the share need the script, which is `tested`'s `draws`.
+  - No window of B3's 15 tries (b-lama-strict's records) has a member that checks a draw.
+- **Where it acts.** Only in E010's play when ready (`ready`), in a window with an input. The strict search without
+  ready already forks every frame and keeps the least Q.
+- **Trigger.** A record of the window's members (the input's own record and the records after it up to the window's
+  end, any of each one's paths) has a check whose reason is "random draw". The window's draws are listed in its record.
+- **p and K.**
+  - Per draw: its share; else 1/(hi − lo + 1) from its range; else unknown.
+  - Per path, the product over its draws (independent draws); per record, the largest over its paths (a path with no
+    draw gives 1); per window, the product over its records.
+  - K = ceil(ln 0.01 / ln(1 − p)), with a 10⁻⁹ tolerance on the ratio (p = 0.9 gives 2), and K = 1 for p = 1.
+  - When some draw has neither share nor range, K is not computed: the record says `"k_max": null`, the fork keeps
+    its rules below, and the ready search's own bound (294 failed tries) is the only one.
+- **The tries.** k = the try's first input frame minus that of the window's first try that issued an input. Tries
+  that issued no input, duplicates and cancelled tries get no k.
+  - A try that ends in success or the goal from the plan's records **matches the plan's branch**: the first in fork
+    order is chosen.
+  - A deviation is not chosen while k < K: it is kept as an outcome and the next try is forked at the frame E010 gives
+    a failed try.
+  - A try with k ≥ K (forked in parallel before the bound was known) is not counted.
+- **Refuted.** When every try left would have k ≥ K and none matched:
+  - the first deviation among the tries is chosen, which is E010's choice (the first end point), and the harness
+    replans from the observed state;
+  - with no deviation, the window ends at once ("delay fork: the plan's branch refuted ..."), an empty window: the
+    harness replans with the window's cause.
+- **Record.** The window record's `"delay"` (only with `FMI_DELAY_FORK=1`):
+  - every window: `"rng"`, the random calls per frame over the parent's frames, counted exactly by stepping xorshift32
+    from one Status `rng` to the next (frames, calls, least, most, histogram);
+  - a triggered window: `"draws"` (record, check, cite, side, range, share), `"p"`, `"k_max"`, `"first"`, `"chosen"`
+    (k or null), `"outcomes"` ([k, digest, novel, outcome] per try with a k), `"refuted"`, `"candidates"`.
+- **Outcome digest and candidates.**
+  - A try's end state: its last checkpoint when it is an end point; otherwise, when it issued its input, a full dump
+    taken where it stopped (one more observation per try of a triggered window).
+  - The digest is a hash of the end state's facts on the tested keys (`Search.tested_keys`, given by the try; unset:
+    the window's own keys, those of its tracked records, the goal and the room).
+  - A candidate is a try other than the chosen one, with an end state, whose digest differs from the chosen try's and
+    from every earlier candidate's, and whose novelty is not false (`Search.novel_of`, given by the try: archive
+    novelty over T and rooms; unset: null). It carries its inputs (the attempt's movie up to the window, then its own
+    events, absolute frames) and its end checkpoint. The try commits it as an entry (A0, Lemma C, verified from boot
+    like any entry).
+- **Draws from `tested`.** `Search.draws_of`, given by the try or the integration from `tested`'s `draws`; unset: the
+  checks whose reason is "random draw", with no range and no share.
+- **Per try** (`Search.summary()`'s `"delay"`): windows triggered, tries with a k, chosen k's, refutations,
+  candidates, and the calls per frame over every window's parent frames.
+- **Gates, as run.**
+  - R2: from state 3182679328, the outputs `(s · 0xDEADBF03) mod n` over 100,000 successive calls, for n = 1..233
+    (every range 0..max of M6 has n = max + 1 ≤ 233), at call strides 1-10 (M1's calls per frame). χ² per n at 1%,
+    and the family of 232 non-trivial n per stride at 1% (Bonferroni). The gate is the family test.
+  - R3: the fixture of forced branches is the window search's own resolution of tries (fork order, parallel tries,
+    duplicates, tries without an input, deviations, tries past K) with each try's outcome set by a table; over
+    every table up to 6 tries and 2,000 random longer ones, the record's chosen k equals the least k < K whose try
+    matches, or null and refuted. Also on the engine, below.
+  - R1: test (a)'s three plans played on round 2's lean engine in ready mode with the fork on every input window
+    (`Search.delay_force_p`, a test setting no run sets, p = 1/2, 1/4 and 1/21). Every candidate and the attempt's
+    checkpoints verify from boot with 0 differences, and each record's chosen k is the least k with a matching try.
+  - G0 for this switch: with `FMI_DELAY_FORK` unset, test (a)'s play fixtures (strict and ready) and B3's 15 tries
+    in the fast settings give round 2's records; with it set, B3's tries give the same records but the new
+    `"delay"` field.
+- **Interface,** added to `fmi-core` (E011 Appendix A) byte for byte, at the end of the play section:
+
+  ```rust
+  /// A random draw one of a record's checks reads (E012 `tested`, `draws(&Reading, action)`): the check's index in the
+  /// record's checks (the reading line's "checks"), the draw's range of values when interval arithmetic over the
+  /// script gives it, and the share of that range on the record's side of the check (the planned outcome's p).
+  #[derive(Clone, PartialEq, Debug)]
+  pub struct Draw {
+      pub check: usize,
+      pub range: Option<(i32, i32)>,
+      pub share: Option<f64>,
+  }
+  ```
+- **Prediction.** R1-R3 pass. With the switch on, no window of B3's tries is triggered and the calls per frame are 1
+  in rooms 33 and 38 and 2-6 in room 28 (M1). On test (a) with the fork forced, k = 0 is chosen in windows 1, 2 and 4
+  (their first try succeeds); window 3 (293 failed tries before the chosen one in the strict search) is refuted for
+  every p tried and its harness replans.

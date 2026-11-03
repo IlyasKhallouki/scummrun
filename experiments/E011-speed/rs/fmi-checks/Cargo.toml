@@ -23,3 +23,7 @@ path = "src/bin/play_wire.rs"
 [[bin]]
 name = "afford-check"
 path = "src/bin/afford_check.rs"
+
+[[bin]]
+name = "delay-check"
+path = "src/bin/delay_check.rs"
