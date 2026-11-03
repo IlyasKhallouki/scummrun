@@ -120,6 +120,13 @@ pub fn same_facts(want: &Value, got: &Facts) -> bool {
     matched == m.len()
 }
 
+/// E014 (FMI_GAME_ID): the engines run another game than MI's DOS CD release. Its engine may set its own boot param
+/// (ScummVM's copy-protection skip for some game ids, scumm.cpp); the host still passes 0, so the boot checks accept
+/// what the engine holds.
+pub fn other_game() -> bool {
+    std::env::var("FMI_GAME_ID").is_ok_and(|v| !v.is_empty())
+}
+
 /// replay.compare_checkpoint: the differences between a checkpoint and the engine's state and status.
 pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<String, Value> {
     let mut out = Map::new();
@@ -160,7 +167,7 @@ fn boot_checks(st: &Status, obs: &Obs) -> Vec<String> {
     if obs.seed != Some(1) {
         out.push(format!("dump seed {}", obs.seed.map(|s| s.to_string()).unwrap_or("None".into())));
     }
-    if obs.boot_param != 0 {
+    if obs.boot_param != 0 && !other_game() {
         out.push(format!("dump boot_param {}", obs.boot_param));
     }
     let dbg = obs.vars.get(39).copied().unwrap_or(0);
@@ -823,6 +830,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             if let Some((reason, frame)) = &w.ended {
                 if fmi_core::is_game_end(reason) {
                     dead.push(mech::dead_json(reason, *frame, &[], "wait"));
+                    // E014 (FMI_GOAL_END): the wait that ends the game through a script is also the goal's entry
+                    if let Some(x) = w.ended_at.and_then(|(f, t)| mech::end_extra(reason, f, t, vec![], &[])) {
+                        extras.push(x);
+                    }
                 }
             }
             let mut rec = w.record.clone();
@@ -1040,6 +1051,14 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 if let Some(reason) = mech::game_end_of_stop(att_stop.as_deref()) {
                     let evs: Vec<Value> = att.inputs.iter().filter(|e| files::as_i64(e.get("frame")).unwrap_or(0) > last_cp).cloned().collect();
                     dead.push(mech::dead_json(&reason, att.res["frame_end"].as_u64().unwrap_or(0), &evs, "attempt"));
+                    // E014 (FMI_GOAL_END): an attempt that ends the game through a script is also the goal's entry,
+                    // its inputs from the try's entry on (the harness's end status: frame_end, tick_end)
+                    if let (Some(f), Some(t)) = (att.res["frame_end"].as_u64(), att.res["tick_end"].as_u64()) {
+                        let all: Vec<Value> = att.inputs.iter().filter(|e| files::as_i64(e.get("frame")).map(|x| x > entry_frame_u as i64 && x <= f as i64).unwrap_or(false)).cloned().collect();
+                        if let Some(x) = mech::end_extra(&reason, f, t, all, &[]) {
+                            extras.push(x);
+                        }
+                    }
                 }
             }
             // E012, 6 (FMI_AFFORD): the interface's own inputs where the model could not act (R0, the same empty window)

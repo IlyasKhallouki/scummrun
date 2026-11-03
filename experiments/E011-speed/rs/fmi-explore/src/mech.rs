@@ -100,6 +100,8 @@ pub struct Waited {
     pub end: String,
     /// the engine's end reason and frame when the run ended in the wait
     pub ended: Option<(String, u64)>,
+    /// E014: the end's frame and tick (the engine's end status) when the run ended in the wait
+    pub ended_at: Option<(u64, u64)>,
     pub is_static: bool,
     /// the last due frame read (absolute; frame0 when no slot was paused)
     pub due: u64,
@@ -238,6 +240,27 @@ pub fn game_end_of_stop(stop: Option<&str>) -> Option<String> {
 /// A dead move (plan.md 5): its run ended in the game's own end; it has no entry. result.json "dead".
 pub fn dead_json(reason: &str, frame: u64, events: &[Value], how: &str) -> Value {
     json!({"reason": reason, "frame": frame, "events": events, "how": how})
+}
+
+/// E014's switch `FMI_GOAL_END` (experiments/E014-fate-demo plan.md (d)): the stage goal `end=1` is the game's own
+/// end reached through a script (a restart or quit that a script's systemOps made, named by the engine with
+/// SPEEDRUN_END_SITE=1). On, a move whose run ends there is also an entry (`end_extra`), whose one checkpoint holds
+/// `fmi_core::end_facts` (`end` = 1 and the site): the goal entry. Off (the default), as E012: a dead move only.
+pub fn goal_end() -> bool {
+    std::env::var("FMI_GOAL_END").is_ok_and(|v| v == "1")
+}
+
+/// E014: the end entry of a move whose run ended at a script's restart or quit (`goal_end`): its events after the
+/// try's entry and one checkpoint at the end's frame and tick, with the end's facts. None when the switch is off or
+/// the end has no script site.
+pub fn end_extra(reason: &str, frame: u64, tick: u64, events: Vec<Value>, prefix_cps: &[Checkpoint]) -> Option<Extra> {
+    if !goal_end() {
+        return None;
+    }
+    let facts = fmi_core::end_facts(reason)?;
+    let mut cps: Vec<Checkpoint> = prefix_cps.iter().filter(|c| c.frame < frame).cloned().collect();
+    cps.push(Checkpoint { frame, facts, tick, rng: 0, actors: vec![] });
+    Some(Extra { how: "end", events, cps, novel: vec!["end".into()] })
 }
 
 /// An entry the try commits besides its attempt's: its events after the try's entry (absolute frames) and its
@@ -413,6 +436,10 @@ pub fn afford_step(e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nov: &Try
         let mut evs = prefix_events.to_vec();
         evs.extend(tr.events.iter().map(events::event_json));
         out.dead.push(dead_json(&tr.reason, tr.frame, &evs, "afford"));
+        // E014 (FMI_GOAL_END): a trial that ends the game through a script is also the goal's entry
+        if let Some(x) = end_extra(&tr.reason, tr.frame, tr.tick, evs, prefix_cps) {
+            out.kept.push(x);
+        }
     }
     out.cpu_s += r.engine_cpu_s;
     let mut rec = r.json();
@@ -555,6 +582,7 @@ impl WaitPort for RealWait {
             v
         });
         Ok(Waited {
+            ended_at: w.end_at,
             frame0: w.frame0,
             stops: w.stops.iter().map(|s| Stop { frame: s.frame, checkpoint: s.checkpoint.clone(), room: s.room }).collect(),
             end: w.end.text(),
