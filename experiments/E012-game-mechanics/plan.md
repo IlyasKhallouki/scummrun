@@ -570,3 +570,20 @@ Written before the component's code. This is E011's round 3 item for the reading
   The floor: 4-12 s. fmi's peak memory during the readings: at most 3 GB.
 - Any further change to the taken path (for example outputs kept decoded in memory) waits for a dated amendment with
   these measurements.
+
+### Amendment 2026-11-03 (resident, after RS1 and the keys, before the measure): the second entry
+
+- **Measured.** RS1 passes (`results/resident/README.md`). The keys step read ring(33) from entries 0, 191 and 189
+  in one process with the units in their order: entry 191's key differs from entry 0's in the `units` line alone, and
+  entry 189's key is entry 0's. But entry 191's reading (j00057's start, script 2 running) has 0 records, as the
+  check's own reading of it had (log.jsonl: 0 records, 0.6 s): its start reaches no job, so it measures nothing.
+  Entry 189's reading took 39,115 of its 39,515 runs from entry 0's.
+- **What changes.**
+  - The measure's second entry is entry 189 (j00059): a fresh ring(33) reading from another entry with 235,568
+    records, whose key is entry 0's without the units as a set.
+  - RS2's units part runs on the check's other scope with readings of both orders, (28, 33, 41): j00061's start
+    (entry 205, dialog, script 159) and then j00062's (entry 204, scripts 159 and 23), both 40,765 records in the
+    check. The keys step is repeated on them (the units in their order); if their keys differ in the `units` line
+    alone, the pair is read again with the switch on (the second takes runs) and by reader-scope (the files the same).
+    The pair is also measured before and after as the measure's second case.
+  - Nothing else changes.
