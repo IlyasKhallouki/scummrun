@@ -150,6 +150,10 @@ impl Builder<'_> {
 /// domain and, for a constant, its start value.
 pub type Info = (String, u8, Option<crate::domain::Domain>, Option<i64>);
 
+/// A question a run asked about the reached values (memo.md, item 6), as a store file holds it once: the fact, the
+/// set, whether it asked about the round before. A run names its questions by number, each with its answer.
+pub type QInfo = (String, Labels, bool);
+
 /// Why a stored run was not taken (counted).
 #[derive(Copy, Clone, Debug)]
 pub enum Miss {
@@ -163,9 +167,13 @@ pub type Out = (Vec<Record>, Deltas, Pins);
 
 const FILE_MAGIC: &[u8; 4] = b"FMRM";
 const INDEX_MAGIC: &[u8; 4] = b"FMRI";
-const VERSION: u32 = 3;
+/// 4: the reach questions in a table of the file's (as the consulted keys), a run naming them by number
+const VERSION: u32 = 4;
+/// A file in memory holds its runs in chunks of about this size (a run is never split).
+const CHUNK: usize = 8 << 20;
 
-/// One stored run: where its bytes are.
+/// One stored run: where its bytes are. In a file in memory, `off` is the chunk's number (high 32 bits) and the
+/// place in it.
 #[derive(Copy, Clone)]
 struct Loc {
     file: u32,
@@ -173,45 +181,160 @@ struct Loc {
     len: u32,
 }
 
-/// One store file's consulted keys (each distinct `Info` once; runs name them by number), and whether each reads the
-/// same in this pass's table: 0 not asked yet, 1 yes, 2 no. The answers are the same for every worker (they hold the
-/// pass's table; `args:` keys are not among them), and are forgotten between passes.
-struct FileInfos {
-    infos: Vec<Info>,
-    same: Vec<AtomicU8>,
+/// A store file's runs' bytes in memory (a resident store, [`MemStore`]): chunks the writer appends to and publishes
+/// when one is full or when it flushes.
+#[derive(Default)]
+pub struct MemBytes {
+    chunks: RwLock<Vec<Arc<[u8]>>>,
 }
 
-impl FileInfos {
-    fn push(&mut self, i: Info) {
-        self.infos.push(i);
-        self.same.push(AtomicU8::new(0));
+impl MemBytes {
+    fn chunk(&self, off: u64) -> Arc<[u8]> {
+        self.chunks.read().unwrap()[(off >> 32) as usize].clone()
+    }
+    fn bytes(&self) -> u64 {
+        self.chunks.read().unwrap().iter().map(|c| c.len() as u64).sum()
     }
 }
 
-/// A run on its way to the writer: its hash, its consulted keys, and the rest of its bytes (key, lists, questions,
-/// output).
+/// Where a store file's bytes are: a finished file on disk, or memory.
+enum Blob {
+    Disk(std::fs::File),
+    Mem(Arc<MemBytes>),
+}
+
+impl Blob {
+    /// `f` on the bytes of the run at `l` (read into `buf` from a file on disk).
+    fn with<R>(&self, l: &Loc, buf: &mut Vec<u8>, f: impl FnOnce(&[u8]) -> R) -> R {
+        use std::os::unix::fs::FileExt;
+        match self {
+            Blob::Disk(file) => {
+                buf.resize(l.len as usize, 0);
+                file.read_exact_at(buf, l.off).expect("the memo store: a run's bytes");
+                f(buf)
+            }
+            Blob::Mem(m) => {
+                let c = m.chunk(l.off);
+                let at = (l.off & 0xFFFF_FFFF) as usize;
+                f(&c[at..at + l.len as usize])
+            }
+        }
+    }
+}
+
+/// One store file as a reading uses it: its bytes; its consulted keys (each distinct `Info` once; runs name them by
+/// number) and whether each reads the same in this pass's table (0 not asked yet, 1 yes, 2 no; the same for every
+/// worker, which holds the pass's table, `args:` keys not among them; forgotten between passes); its reach questions
+/// and each one's answer for the reached values as they are now (`Reached::version` << 2 | 1 + answer; 0 not asked):
+/// the reached values change only between batches, and a new version forgets every answer.
+struct FileState {
+    blob: Blob,
+    infos: Arc<Vec<Info>>,
+    same: Vec<AtomicU8>,
+    queries: Arc<Vec<QInfo>>,
+    answers: Vec<AtomicU64>,
+}
+
+impl FileState {
+    fn new(blob: Blob, infos: Arc<Vec<Info>>, queries: Arc<Vec<QInfo>>) -> FileState {
+        let same = infos.iter().map(|_| AtomicU8::new(0)).collect();
+        let answers = queries.iter().map(|_| AtomicU64::new(0)).collect();
+        FileState { blob, infos, same, queries, answers }
+    }
+    /// The keys and questions numbered since the last flush (this reading's own file).
+    fn extend(&mut self, infos: Vec<Info>, queries: Vec<QInfo>) {
+        self.same.extend(infos.iter().map(|_| AtomicU8::new(0)));
+        Arc::make_mut(&mut self.infos).extend(infos);
+        self.answers.extend(queries.iter().map(|_| AtomicU64::new(0)));
+        Arc::make_mut(&mut self.queries).extend(queries);
+    }
+}
+
+/// A run on its way to the writer: its hash, its consulted keys, its list answers, its questions with their answers,
+/// and its output.
 struct WRun {
     hash: u64,
     key: Vec<u8>,
     infos: Vec<Info>,
-    /// the list answers and reach questions
-    rest: Vec<u8>,
+    sigs: Vec<(i64, bool)>,
+    queries: Vec<Query>,
     /// the output, before deflate
     out: Vec<u8>,
 }
 
+/// What the writer added since its last flush: the runs (hash, place, length), the keys and the questions numbered.
+type Flushed = (Vec<(u64, u64, u32)>, Vec<Info>, Vec<QInfo>);
+
 enum WMsg {
     Run(Box<WRun>),
-    /// the runs written and the keys numbered since the last flush, once they are on disk
-    Flush(std::sync::mpsc::SyncSender<(Vec<(u64, u64, u32)>, Vec<Info>)>),
+    /// the runs written and the keys and questions numbered since the last flush, once they can be read
+    Flush(std::sync::mpsc::SyncSender<Flushed>),
+}
+
+/// Where the writer writes: a file on disk (`at` its length), or memory.
+enum WOut {
+    File(std::io::BufWriter<std::fs::File>, u64),
+    Mem(Vec<u8>, Arc<MemBytes>),
+}
+
+impl WOut {
+    /// Appends a run's bytes; returns its place.
+    fn put(&mut self, b: &[u8]) -> std::io::Result<u64> {
+        use std::io::Write;
+        match self {
+            WOut::File(f, at) => {
+                f.write_all(b)?;
+                let off = *at;
+                *at += b.len() as u64;
+                Ok(off)
+            }
+            WOut::Mem(cur, m) => {
+                if !cur.is_empty() && cur.len() + b.len() > CHUNK {
+                    Self::publish(cur, m);
+                }
+                let off = ((m.chunks.read().unwrap().len() as u64) << 32) | cur.len() as u64;
+                cur.extend_from_slice(b);
+                Ok(off)
+            }
+        }
+    }
+    fn publish(cur: &mut Vec<u8>, m: &MemBytes) {
+        let c: Arc<[u8]> = Arc::from(std::mem::take(cur).into_boxed_slice());
+        m.chunks.write().unwrap().push(c);
+        *cur = Vec::with_capacity(CHUNK);
+    }
+    /// What was written can be read.
+    fn flush(&mut self) -> std::io::Result<()> {
+        use std::io::Write;
+        match self {
+            WOut::File(f, _) => f.flush(),
+            WOut::Mem(cur, m) => {
+                if !cur.is_empty() {
+                    Self::publish(cur, m);
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 struct Writer {
     tx: std::sync::mpsc::SyncSender<WMsg>,
-    handle: std::thread::JoinHandle<std::io::Result<usize>>,
-    tmp: std::path::PathBuf,
+    handle: std::thread::JoinHandle<std::io::Result<WEnd>>,
+    /// the file being written (on disk), renamed into place at the end
+    tmp: Option<std::path::PathBuf>,
+    /// a file in memory: its bytes
+    mem: Option<Arc<MemBytes>>,
     /// the file's place in `files` once opened for reading
     file: Option<u32>,
+}
+
+/// The writer's end: its runs, and (a file in memory) what the store keeps of it.
+struct WEnd {
+    runs: usize,
+    ix: Vec<(u64, u64, u32)>,
+    infos: Vec<Info>,
+    queries: Vec<QInfo>,
 }
 
 /// The counts a reading reports (memo.md, the check).
@@ -232,19 +355,141 @@ pub struct CrossStats {
     /// nanoseconds the workers spent looking runs up and taking them, and encoding the runs they stored
     pub lookup_ns: AtomicU64,
     pub store_ns: AtomicU64,
+    /// reach questions answered, and of them answered from the file's answers for the reached values as they are
+    pub questions: AtomicU64,
+    pub questions_known: AtomicU64,
+}
+
+/// A store file in memory, finished (a resident store, [`MemStore`]): its bytes, its runs' index, its keys' and
+/// questions' tables.
+pub struct MemFile {
+    bytes: Arc<MemBytes>,
+    ix: Vec<(u64, u64, u32)>,
+    infos: Arc<Vec<Info>>,
+    queries: Arc<Vec<QInfo>>,
+    size: u64,
+}
+
+/// The job memo's store kept in a process from reading to reading (E011 round 2: fmi's readings run in its own
+/// process): the finished files of each whole-reading key in memory, up to `cap` bytes in all; past it the oldest go
+/// to the disk store (`spill`, the store's folder per key, as finished files that readings of any process find), or,
+/// with no disk store or no room on its disk, are dropped. Readings that hold a file keep it until they end.
+pub struct MemStore {
+    folders: Mutex<Vec<(String, Arc<MemFile>)>>,
+    pub cap: u64,
+    pub spill: Option<std::path::PathBuf>,
+    /// files spilled to the disk store, and dropped
+    pub spilled: AtomicU64,
+    pub dropped: AtomicU64,
+}
+
+impl MemStore {
+    pub fn new(cap: u64, spill: Option<std::path::PathBuf>) -> MemStore {
+        MemStore { folders: Mutex::new(Vec::new()), cap, spill, spilled: AtomicU64::new(0), dropped: AtomicU64::new(0) }
+    }
+
+    /// The bytes held in memory.
+    pub fn bytes(&self) -> u64 {
+        self.folders.lock().unwrap().iter().map(|f| f.1.size).sum()
+    }
+
+    fn files_of(&self, key: &str) -> Vec<Arc<MemFile>> {
+        self.folders.lock().unwrap().iter().filter(|f| f.0 == key).map(|f| f.1.clone()).collect()
+    }
+
+    /// A reading's finished file joins the store; then the oldest files go past the cap.
+    fn add(&self, key: &str, f: MemFile) {
+        let mut out = Vec::new();
+        {
+            let mut g = self.folders.lock().unwrap();
+            g.push((key.to_string(), Arc::new(f)));
+            let mut total: u64 = g.iter().map(|f| f.1.size).sum();
+            while total > self.cap && g.len() > 1 {
+                let (k, f) = g.remove(0);
+                total -= f.size;
+                out.push((k, f));
+            }
+        }
+        for (k, f) in out {
+            match self.spill.as_ref().map(|d| spill(d, &k, &f)) {
+                Some(Ok(true)) => self.spilled.fetch_add(1, Ordering::Relaxed),
+                Some(Err(e)) => {
+                    eprintln!("[memo] a file in memory could not go to the disk store: {e}");
+                    self.dropped.fetch_add(1, Ordering::Relaxed)
+                }
+                _ => self.dropped.fetch_add(1, Ordering::Relaxed),
+            };
+        }
+    }
+}
+
+/// A file in memory written to the disk store `root/<key>/` as a finished file (the format `read_footer` reads),
+/// unless the disk is under its floor plus twice the file. Returns whether it was written.
+fn spill(root: &std::path::Path, key: &str, f: &MemFile) -> std::io::Result<bool> {
+    use crate::wire::Wire;
+    use std::io::Write;
+    let dir = root.join(key);
+    std::fs::create_dir_all(&dir)?;
+    match free_bytes(&dir) {
+        Some(free) if free >= floor_bytes() + 2 * f.size => {}
+        _ => return Ok(false),
+    }
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let tmp = dir.join(format!("{stamp}-{}.tmp", std::process::id()));
+    let mut out = std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(&tmp)?);
+    out.write_all(FILE_MAGIC)?;
+    out.write_all(&VERSION.to_le_bytes())?;
+    let chunks = f.bytes.chunks.read().unwrap().clone();
+    let mut starts = Vec::with_capacity(chunks.len());
+    let mut at = 8u64;
+    for c in &chunks {
+        starts.push(at);
+        out.write_all(c)?;
+        at += c.len() as u64;
+    }
+    let ix: Vec<(u64, u64, u32)> = f.ix.iter().map(|&(h, off, len)| (h, starts[(off >> 32) as usize] + (off & 0xFFFF_FFFF), len)).collect();
+    let mut tb = Vec::new();
+    f.infos.as_ref().clone().put(&mut tb);
+    let infos_at = at;
+    let queries_at = infos_at + tb.len() as u64;
+    f.queries.as_ref().clone().put(&mut tb);
+    let index_at = infos_at + tb.len() as u64;
+    out.write_all(&tb)?;
+    write_tail(&mut out, &ix, infos_at, queries_at, index_at)?;
+    out.flush()?;
+    out.into_inner().map_err(|e| e.into_error())?.sync_all()?;
+    std::fs::rename(&tmp, tmp.with_extension("runs"))?;
+    Ok(true)
+}
+
+/// A file's end: the runs' index, the run count, the three places and the magic.
+fn write_tail(out: &mut impl std::io::Write, ix: &[(u64, u64, u32)], infos_at: u64, queries_at: u64, index_at: u64) -> std::io::Result<()> {
+    for (h, off, len) in ix {
+        out.write_all(&h.to_le_bytes())?;
+        out.write_all(&off.to_le_bytes())?;
+        out.write_all(&len.to_le_bytes())?;
+    }
+    out.write_all(&(ix.len() as u64).to_le_bytes())?;
+    out.write_all(&infos_at.to_le_bytes())?;
+    out.write_all(&queries_at.to_le_bytes())?;
+    out.write_all(&index_at.to_le_bytes())?;
+    out.write_all(INDEX_MAGIC)
 }
 
 /// The job memo across readings: the stored runs of every reading of the same whole-reading inputs (memo.md, "The
-/// store"), and this reading's file of the runs it makes.
+/// store"), on disk and (a resident store) in memory, and this reading's file of the runs it makes.
 pub struct CrossMemo {
     pub dir: std::path::PathBuf,
-    files: RwLock<Vec<(std::fs::File, FileInfos)>>,
+    key: String,
+    files: RwLock<Vec<FileState>>,
     index: RwLock<FxHashMap<u64, Vec<Loc>>>,
     writer: Mutex<Option<Writer>>,
+    mem: Option<Arc<MemStore>>,
     pub stats: CrossStats,
-    /// the finished files found when the reading opened the store, and their runs
+    /// the finished files found when the reading opened the store, and their runs (of them in memory)
     pub opened_files: usize,
     pub opened_runs: usize,
+    pub opened_mem_files: usize,
     /// why this reading writes no file (no room on the disk), if it writes none
     pub no_write: Option<String>,
 }
@@ -257,14 +502,15 @@ pub fn key_hash(b: &[u8]) -> u64 {
     h.finish()
 }
 
-/// A finished file's runs (hash, offset, length) and its keys' table. A file ends with its keys' table, its runs'
-/// index, the run count, the two places and the magic.
-fn read_footer(f: &std::fs::File) -> std::io::Result<(Vec<(u64, u64, u32)>, Vec<Info>)> {
+/// A finished file's runs (hash, offset, length), its keys' and its questions' tables. A file ends with its keys'
+/// table, its questions' table, its runs' index, the run count, the three places and the magic.
+fn read_footer(f: &std::fs::File) -> std::io::Result<Flushed> {
     use crate::wire::{Rd, Wire};
     use std::os::unix::fs::FileExt;
+    const TAIL: u64 = 36;
     let len = f.metadata()?.len();
     let bad = || std::io::Error::new(std::io::ErrorKind::InvalidData, "not a finished memo file");
-    if len < 8 + 28 {
+    if len < 8 + TAIL {
         return Err(bad());
     }
     let mut head = [0u8; 8];
@@ -272,33 +518,36 @@ fn read_footer(f: &std::fs::File) -> std::io::Result<(Vec<(u64, u64, u32)>, Vec<
     if &head[..4] != FILE_MAGIC || u32::from_le_bytes(head[4..8].try_into().unwrap()) != VERSION {
         return Err(bad());
     }
-    let mut tail = [0u8; 28];
-    f.read_exact_at(&mut tail, len - 28)?;
-    if &tail[24..] != INDEX_MAGIC {
+    let mut tail = [0u8; TAIL as usize];
+    f.read_exact_at(&mut tail, len - TAIL)?;
+    if &tail[32..] != INDEX_MAGIC {
         return Err(bad());
     }
     let n = u64::from_le_bytes(tail[0..8].try_into().unwrap()) as usize;
     let infos_at = u64::from_le_bytes(tail[8..16].try_into().unwrap());
-    let index_at = u64::from_le_bytes(tail[16..24].try_into().unwrap());
-    if infos_at > index_at || index_at.checked_add(n as u64 * 20).is_none_or(|e| e != len - 28) {
+    let queries_at = u64::from_le_bytes(tail[16..24].try_into().unwrap());
+    let index_at = u64::from_le_bytes(tail[24..32].try_into().unwrap());
+    if infos_at > queries_at || queries_at > index_at || index_at.checked_add(n as u64 * 20).is_none_or(|e| e != len - TAIL) {
         return Err(bad());
     }
-    let mut buf = vec![0u8; (len - 28 - infos_at) as usize];
+    let mut buf = vec![0u8; (len - TAIL - infos_at) as usize];
     f.read_exact_at(&mut buf, infos_at)?;
-    let split = (index_at - infos_at) as usize;
-    let infos: Vec<Info> = {
-        let mut r = Rd::new(&buf[..split]);
-        let v = Vec::take(&mut r);
-        if !r.at_end() {
-            return Err(bad());
-        }
-        v
-    };
-    let ix = buf[split..]
+    let (q, x) = ((queries_at - infos_at) as usize, (index_at - infos_at) as usize);
+    let mut r = Rd::new(&buf[..q]);
+    let infos: Vec<Info> = Vec::take(&mut r);
+    if !r.at_end() {
+        return Err(bad());
+    }
+    let mut r = Rd::new(&buf[q..x]);
+    let queries: Vec<QInfo> = Vec::take(&mut r);
+    if !r.at_end() {
+        return Err(bad());
+    }
+    let ix = buf[x..]
         .chunks_exact(20)
         .map(|c| (u64::from_le_bytes(c[0..8].try_into().unwrap()), u64::from_le_bytes(c[8..16].try_into().unwrap()), u32::from_le_bytes(c[16..20].try_into().unwrap())))
         .collect();
-    Ok((ix, infos))
+    Ok((ix, infos, queries))
 }
 
 thread_local! {
@@ -347,7 +596,7 @@ fn free_bytes(dir: &std::path::Path) -> Option<u64> {
 /// whose files it holds open) is left. Returns the largest file size seen.
 fn evict(root: &std::path::Path, keep: &std::path::Path, largest: u64) -> u64 {
     match free_bytes(root) {
-        Some(free) => evict_from(root, keep, largest, free, FLOOR_BYTES),
+        Some(free) => evict_from(root, keep, largest, free, floor_bytes()),
         None => largest,
     }
 }
@@ -386,45 +635,72 @@ fn evict_from(root: &std::path::Path, keep: &std::path::Path, largest: u64, mut 
 /// The disk's floor under the store (memo.md, "The store"): 8 GB.
 pub const FLOOR_BYTES: u64 = 8 << 30;
 
+/// The floor for a store on another disk than /home (READER_MEMO_FLOOR_GB, default `FLOOR_BYTES`).
+pub fn floor_bytes() -> u64 {
+    std::env::var("READER_MEMO_FLOOR_GB").ok().and_then(|g| g.parse::<f64>().ok()).map_or(FLOOR_BYTES, |g| (g * (1u64 << 30) as f64) as u64)
+}
+
 impl CrossMemo {
-    /// Opens the store folder `root/<key>`: indexes every finished file in it, and starts this reading's own file
-    /// unless the disk is under its floor plus twice the folder's largest file.
-    pub fn open(root: &std::path::Path, key: &str) -> std::io::Result<CrossMemo> {
-        let dir = root.join(key);
-        std::fs::create_dir_all(&dir)?;
-        let mut names: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)?
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.extension().is_some_and(|x| x == "runs"))
-            .collect();
-        names.sort();
-        let mut files = Vec::new();
+    /// Opens the store for the whole-reading key `key`: the finished files of `root/<key>` on disk (`root` None: no
+    /// disk store) and those `mem` holds in memory. This reading's own file goes to memory when `mem` is given, else
+    /// to the disk folder unless the disk is under its floor plus twice the folder's largest file.
+    pub fn open(root: Option<&std::path::Path>, mem: Option<Arc<MemStore>>, key: &str) -> std::io::Result<CrossMemo> {
+        let dir = root.map_or_else(|| std::path::PathBuf::from(format!("memory:{key}")), |r| r.join(key));
+        let mut files: Vec<FileState> = Vec::new();
         let mut index: FxHashMap<u64, Vec<Loc>> = FxHashMap::default();
         let (mut runs, mut largest) = (0usize, 0u64);
-        for p in &names {
-            let f = std::fs::File::open(p)?;
-            let Ok((ix, infos)) = read_footer(&f) else {
-                eprintln!("[memo] {}: not a finished memo file of this version, left out", p.display());
-                continue;
-            };
-            largest = largest.max(f.metadata()?.len());
-            let fi = files.len() as u32;
-            for (h, off, len) in ix {
-                index.entry(h).or_default().push(Loc { file: fi, off, len });
-                runs += 1;
+        if let Some(root) = root {
+            std::fs::create_dir_all(&dir)?;
+            let mut names: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)?
+                .filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.extension().is_some_and(|x| x == "runs"))
+                .collect();
+            names.sort();
+            for p in &names {
+                let f = std::fs::File::open(p)?;
+                let Ok((ix, infos, queries)) = read_footer(&f) else {
+                    eprintln!("[memo] {}: not a finished memo file of this version, left out", p.display());
+                    continue;
+                };
+                largest = largest.max(f.metadata()?.len());
+                let fi = files.len() as u32;
+                for (h, off, len) in ix {
+                    index.entry(h).or_default().push(Loc { file: fi, off, len });
+                    runs += 1;
+                }
+                // the file is in use: its time is renewed, so that eviction takes the stores no reading uses first
+                f.set_modified(std::time::SystemTime::now()).ok();
+                files.push(FileState::new(Blob::Disk(f), Arc::new(infos), Arc::new(queries)));
             }
-            let same = infos.iter().map(|_| AtomicU8::new(0)).collect();
-            // the file is in use: its time is renewed, so that eviction takes the stores no reading uses first
-            f.set_modified(std::time::SystemTime::now()).ok();
-            files.push((f, FileInfos { infos, same }));
+            if mem.is_none() {
+                largest = evict(root, &dir, largest);
+            }
+        }
+        let disk_files = files.len();
+        if let Some(m) = &mem {
+            for mf in m.files_of(key) {
+                let fi = files.len() as u32;
+                for &(h, off, len) in &mf.ix {
+                    index.entry(h).or_default().push(Loc { file: fi, off, len });
+                    runs += 1;
+                }
+                files.push(FileState::new(Blob::Mem(mf.bytes.clone()), mf.infos.clone(), mf.queries.clone()));
+            }
         }
         let opened_files = files.len();
-        let largest = evict(root, &dir, largest);
-        let no_write = match free_bytes(&dir) {
-            Some(f) if f < FLOOR_BYTES + 2 * largest => {
-                Some(format!("{} GB free, under the floor of 8 GB plus twice the largest file ({} MB)", f >> 30, largest >> 20))
-            }
-            None => Some("the free space is not known (df)".to_string()),
-            _ => None,
+        let no_write = match (&mem, root) {
+            (Some(_), _) => None,
+            (None, None) => Some("no store".to_string()),
+            (None, Some(_)) => match free_bytes(&dir) {
+                Some(f) if f < floor_bytes() + 2 * largest => Some(format!(
+                    "{} GB free, under the floor of {} GB plus twice the largest file ({} MB)",
+                    f >> 30,
+                    floor_bytes() >> 30,
+                    largest >> 20
+                )),
+                None => Some("the free space is not known (df)".to_string()),
+                _ => None,
+            },
         };
         let stats = CrossStats::default();
         let writer = match &no_write {
@@ -432,96 +708,129 @@ impl CrossMemo {
                 eprintln!("[memo] {}: this reading stores no runs: {why}", dir.display());
                 None
             }
-            None => Some(Self::start_writer(&dir, stats.stored_bytes.clone())?),
+            None => Some(Self::start_writer(if mem.is_some() { None } else { Some(&dir) }, stats.stored_bytes.clone())?),
         };
         Ok(CrossMemo {
             dir,
+            key: key.to_string(),
             files: RwLock::new(files),
             index: RwLock::new(index),
             writer: Mutex::new(writer),
+            mem,
             stats,
             opened_files,
             opened_runs: runs,
+            opened_mem_files: opened_files - disk_files,
             no_write,
         })
     }
 
-    fn start_writer(dir: &std::path::Path, written: Arc<AtomicU64>) -> std::io::Result<Writer> {
+    /// The writer's thread: to a new file in `dir`, or (None) to memory.
+    fn start_writer(dir: Option<&std::path::Path>, written: Arc<AtomicU64>) -> std::io::Result<Writer> {
         use crate::wire::{put_len, Wire};
         use std::io::Write;
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
-        let tmp = dir.join(format!("{stamp}-{}.tmp", std::process::id()));
-        let f = std::fs::File::create(&tmp)?;
+        let (out, tmp, mem) = match dir {
+            Some(dir) => {
+                let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+                let tmp = dir.join(format!("{stamp}-{}.tmp", std::process::id()));
+                let mut f = std::io::BufWriter::with_capacity(1 << 20, std::fs::File::create(&tmp)?);
+                f.write_all(FILE_MAGIC)?;
+                f.write_all(&VERSION.to_le_bytes())?;
+                (WOut::File(f, 8), Some(tmp), None)
+            }
+            None => {
+                let m = Arc::new(MemBytes::default());
+                (WOut::Mem(Vec::with_capacity(CHUNK), m.clone()), None, Some(m))
+            }
+        };
         let (tx, rx) = std::sync::mpsc::sync_channel::<WMsg>(4096);
         let handle = std::thread::Builder::new().name("memo-writer".into()).spawn(move || {
-            let mut out = std::io::BufWriter::with_capacity(1 << 20, f);
-            out.write_all(FILE_MAGIC)?;
-            out.write_all(&VERSION.to_le_bytes())?;
-            let mut at: u64 = 8;
+            let mut out = out;
             let mut ix: Vec<(u64, u64, u32)> = Vec::new();
-            // each distinct consulted key, numbered in the order first stored
+            // each distinct consulted key and question, numbered in the order first stored
             let mut ids: FxHashMap<Vec<u8>, u32> = FxHashMap::default();
             let mut infos: Vec<Info> = Vec::new();
-            let (mut ix_sent, mut infos_sent) = (0usize, 0usize);
+            let mut qids: FxHashMap<Vec<u8>, u32> = FxHashMap::default();
+            let mut qs: Vec<QInfo> = Vec::new();
+            let (mut ix_sent, mut infos_sent, mut qs_sent) = (0usize, 0usize, 0usize);
             let mut b: Vec<u8> = Vec::with_capacity(1 << 16);
+            let mut kb: Vec<u8> = Vec::with_capacity(256);
             for m in rx {
                 match m {
                     WMsg::Run(run) => {
-                        let WRun { hash, key, infos: run_infos, rest, out: raw } = *run;
+                        let WRun { hash, key, infos: run_infos, sigs, queries, out: raw } = *run;
                         b.clear();
                         hash.put(&mut b);
                         put_len(&mut b, key.len());
                         b.extend_from_slice(&key);
                         put_len(&mut b, run_infos.len());
                         for i in run_infos {
-                            let mut ib = Vec::new();
-                            i.put(&mut ib);
+                            kb.clear();
+                            i.put(&mut kb);
                             let n = ids.len() as u32;
-                            let id = *ids.entry(ib).or_insert_with(|| {
+                            let id = *ids.entry(kb.clone()).or_insert_with(|| {
                                 infos.push(i);
                                 n
                             });
                             id.put(&mut b);
                         }
-                        b.extend_from_slice(&rest);
+                        sigs.put(&mut b);
+                        put_len(&mut b, queries.len());
+                        for q in queries {
+                            let qi: QInfo = (q.key, q.set, q.before);
+                            kb.clear();
+                            qi.put(&mut kb);
+                            let n = qids.len() as u32;
+                            let id = *qids.entry(kb.clone()).or_insert_with(|| {
+                                qs.push(qi);
+                                n
+                            });
+                            id.put(&mut b);
+                            q.answer.put(&mut b);
+                        }
                         let z = deflate(&raw);
                         put_len(&mut b, raw.len());
                         put_len(&mut b, z.len());
                         b.extend_from_slice(&z);
                         written.fetch_add(b.len() as u64, Ordering::Relaxed);
-                        out.write_all(&b)?;
+                        let at = out.put(&b)?;
                         ix.push((hash, at, b.len() as u32));
-                        at += b.len() as u64;
                     }
                     WMsg::Flush(reply) => {
                         out.flush()?;
-                        reply.send((ix[ix_sent..].to_vec(), infos[infos_sent..].to_vec())).ok();
+                        reply.send((ix[ix_sent..].to_vec(), infos[infos_sent..].to_vec(), qs[qs_sent..].to_vec())).ok();
                         ix_sent = ix.len();
                         infos_sent = infos.len();
+                        qs_sent = qs.len();
                     }
                 }
             }
-            // the keys' table and the runs' index after the runs, then the count, the two places and the magic: a
-            // file is finished when it ends so
-            let infos_at = at;
-            let mut tb = Vec::new();
-            infos.put(&mut tb);
-            out.write_all(&tb)?;
-            let index_at = infos_at + tb.len() as u64;
-            for (h, off, len) in &ix {
-                out.write_all(&h.to_le_bytes())?;
-                out.write_all(&off.to_le_bytes())?;
-                out.write_all(&len.to_le_bytes())?;
+            let runs = ix.len();
+            match out {
+                WOut::File(mut f, at) => {
+                    // the keys' and questions' tables after the runs, then the index, the count, the places and the
+                    // magic: a file is finished when it ends so
+                    let infos_at = at;
+                    let mut tb = Vec::new();
+                    infos.put(&mut tb);
+                    let queries_at = infos_at + tb.len() as u64;
+                    qs.put(&mut tb);
+                    let index_at = infos_at + tb.len() as u64;
+                    f.write_all(&tb)?;
+                    write_tail(&mut f, &ix, infos_at, queries_at, index_at)?;
+                    f.flush()?;
+                    f.into_inner().map_err(|e| e.into_error())?.sync_all()?;
+                    Ok(WEnd { runs, ix: Vec::new(), infos: Vec::new(), queries: Vec::new() })
+                }
+                WOut::Mem(mut cur, m) => {
+                    if !cur.is_empty() {
+                        WOut::publish(&mut cur, &m);
+                    }
+                    Ok(WEnd { runs, ix, infos, queries: qs })
+                }
             }
-            out.write_all(&(ix.len() as u64).to_le_bytes())?;
-            out.write_all(&infos_at.to_le_bytes())?;
-            out.write_all(&index_at.to_le_bytes())?;
-            out.write_all(INDEX_MAGIC)?;
-            out.flush()?;
-            out.into_inner().map_err(|e| e.into_error())?.sync_all()?;
-            Ok(ix.len())
         })?;
-        Ok(Writer { tx, handle, tmp, file: None })
+        Ok(Writer { tx, handle, tmp, mem, file: None })
     }
 
     /// Whether this reading stores the runs it makes.
@@ -530,16 +839,18 @@ impl CrossMemo {
     }
 
     /// The stored run of these key bytes for which the conditions hold here (memo.md, conditions 2-5), decoded:
-    /// `info` tells whether a consulted key reads the same here (asked once per file and key in a pass), `rest`
-    /// checks the list answers and the reach questions. Candidates of the same hash are compared byte for byte.
+    /// `info` tells whether a consulted key reads the same here (asked once per file and key in a pass), `sigs`
+    /// checks the list answers, `ask` answers a reach question for the reached values as they are (version
+    /// `version`: asked once per file, question and version). Candidates of the same hash are compared byte for byte.
     pub fn take(
         &self,
         key: &[u8],
         info: &mut dyn FnMut(&Info) -> bool,
-        rest: &mut dyn FnMut(&[(i64, bool)], &[Query]) -> Result<(), Miss>,
+        sigs: &mut dyn FnMut(&[(i64, bool)]) -> bool,
+        version: u64,
+        ask: &mut dyn FnMut(&QInfo) -> bool,
     ) -> Option<Out> {
         use crate::wire::{take_len, Rd, Wire};
-        use std::os::unix::fs::FileExt;
         let h = key_hash(key);
         let locs: Vec<Loc> = match self.index.read().unwrap().get(&h) {
             Some(v) => v.clone(),
@@ -551,51 +862,81 @@ impl CrossMemo {
         let files = self.files.read().unwrap();
         let mut last: Option<Miss> = None;
         let mut buf = Vec::new();
-        'run: for l in locs {
-            let (f, fi) = &files[l.file as usize];
-            buf.resize(l.len as usize, 0);
-            f.read_exact_at(&mut buf, l.off).expect("the memo store: a run's bytes");
-            let mut r = Rd::new(&buf);
-            let _hash = u64::take(&mut r);
-            let n = take_len(&mut r);
-            if r.bytes(n) != key {
-                continue;
-            }
-            let n = take_len(&mut r);
-            for _ in 0..n {
-                let id = u32::take(&mut r) as usize;
-                let same = match fi.same[id].load(Ordering::Relaxed) {
-                    0 => {
-                        let ok = info(&fi.infos[id]);
-                        fi.same[id].store(if ok { 1 } else { 2 }, Ordering::Relaxed);
-                        ok
+        let (mut asked, mut known) = (0u64, 0u64);
+        for l in locs {
+            let fs = &files[l.file as usize];
+            let got = fs.blob.with(&l, &mut buf, |bytes| -> Result<Out, Option<Miss>> {
+                let mut r = Rd::new(bytes);
+                let _hash = u64::take(&mut r);
+                let n = take_len(&mut r);
+                if r.bytes(n) != key {
+                    return Err(None);
+                }
+                let n = take_len(&mut r);
+                for _ in 0..n {
+                    let id = u32::take(&mut r) as usize;
+                    let same = match fs.same[id].load(Ordering::Relaxed) {
+                        0 => {
+                            let ok = info(&fs.infos[id]);
+                            fs.same[id].store(if ok { 1 } else { 2 }, Ordering::Relaxed);
+                            ok
+                        }
+                        x => x == 1,
+                    };
+                    if !same {
+                        return Err(Some(Miss::Key));
                     }
-                    x => x == 1,
-                };
-                if !same {
-                    last = Some(Miss::Key);
-                    continue 'run;
+                }
+                let s: Vec<(i64, bool)> = Vec::take(&mut r);
+                if !sigs(&s) {
+                    return Err(Some(Miss::List));
+                }
+                let n = take_len(&mut r);
+                for _ in 0..n {
+                    let id = u32::take(&mut r) as usize;
+                    let answer = bool::take(&mut r);
+                    asked += 1;
+                    let a = fs.answers[id].load(Ordering::Relaxed);
+                    let now = if a != 0 && a >> 2 == version {
+                        known += 1;
+                        (a & 3) == 2
+                    } else {
+                        let x = ask(&fs.queries[id]);
+                        fs.answers[id].store((version << 2) | (1 + x as u64), Ordering::Relaxed);
+                        x
+                    };
+                    if now != answer {
+                        return Err(Some(Miss::Reached));
+                    }
+                }
+                let raw = take_len(&mut r);
+                let zn = take_len(&mut r);
+                let z = r.bytes(zn);
+                assert!(r.at_end(), "the memo store: bytes after a run");
+                let o = inflate(z, raw);
+                let mut r = Rd::new(&o);
+                let records = Vec::take(&mut r);
+                let deltas = Deltas::take(&mut r);
+                let pins = std::collections::BTreeMap::take(&mut r);
+                assert!(r.at_end(), "the memo store: bytes after a run's output");
+                Ok((records, deltas, pins))
+            });
+            match got {
+                Ok(out) => {
+                    self.stats.taken.fetch_add(1, Ordering::Relaxed);
+                    self.stats.questions.fetch_add(asked, Ordering::Relaxed);
+                    self.stats.questions_known.fetch_add(known, Ordering::Relaxed);
+                    return Some(out);
+                }
+                Err(m) => {
+                    if m.is_some() {
+                        last = m;
+                    }
                 }
             }
-            let sigs: Vec<(i64, bool)> = Vec::take(&mut r);
-            let queries: Vec<Query> = Vec::take(&mut r);
-            if let Err(m) = rest(&sigs, &queries) {
-                last = Some(m);
-                continue;
-            }
-            let raw = take_len(&mut r);
-            let zn = take_len(&mut r);
-            let z = r.bytes(zn);
-            assert!(r.at_end(), "the memo store: bytes after a run");
-            let o = inflate(z, raw);
-            let mut r = Rd::new(&o);
-            let records = Vec::take(&mut r);
-            let deltas = Deltas::take(&mut r);
-            let pins = std::collections::BTreeMap::take(&mut r);
-            assert!(r.at_end(), "the memo store: bytes after a run's output");
-            self.stats.taken.fetch_add(1, Ordering::Relaxed);
-            return Some((records, deltas, pins));
         }
+        self.stats.questions.fetch_add(asked, Ordering::Relaxed);
+        self.stats.questions_known.fetch_add(known, Ordering::Relaxed);
         let c = match last {
             None => &self.stats.ran_no_run,
             Some(Miss::Key) => &self.stats.ran_key_differs,
@@ -614,21 +955,18 @@ impl CrossMemo {
             Some(w) => w.tx.clone(),
             None => return,
         };
-        let mut rest = Vec::with_capacity(4096);
-        sigs.to_vec().put(&mut rest);
-        queries.to_vec().put(&mut rest);
-        let cond = rest.len();
         let mut o = Vec::with_capacity(4096);
         out.0.put(&mut o);
         out.1.put(&mut o);
         out.2.put(&mut o);
         let s = &self.stats;
         s.key_bytes.fetch_add(key.len() as u64, Ordering::Relaxed);
-        s.cond_bytes.fetch_add((cond + 4 * infos.len()) as u64, Ordering::Relaxed);
+        s.cond_bytes.fetch_add((16 * sigs.len() + 5 * queries.len() + 4 * infos.len()) as u64, Ordering::Relaxed);
         s.out_raw_bytes.fetch_add(o.len() as u64, Ordering::Relaxed);
         s.stored.fetch_add(1, Ordering::Relaxed);
         // the output is deflated on the writer's thread, off the workers'
-        tx.send(WMsg::Run(Box::new(WRun { hash: key_hash(&key), key, infos, rest, out: o }))).expect("the memo writer");
+        let run = WRun { hash: key_hash(&key), key, infos, sigs: sigs.to_vec(), queries: queries.to_vec(), out: o };
+        tx.send(WMsg::Run(Box::new(run))).expect("the memo writer");
     }
 
     /// Between passes: the runs this reading stored so far join the index (memo.md: pass 2 takes pass 1's runs), and
@@ -638,41 +976,50 @@ impl CrossMemo {
         if let Some(w) = wg.as_mut() {
             let (rtx, rrx) = std::sync::mpsc::sync_channel(1);
             w.tx.send(WMsg::Flush(rtx)).expect("the memo writer");
-            let (ix, new_infos) = rrx.recv().expect("the memo writer");
+            let (ix, new_infos, new_queries) = rrx.recv().expect("the memo writer");
             let mut files = self.files.write().unwrap();
             let fi = match w.file {
                 Some(fi) => fi,
                 None => {
-                    let f = std::fs::File::open(&w.tmp).expect("the memo store's own file");
-                    files.push((f, FileInfos { infos: Vec::new(), same: Vec::new() }));
+                    let blob = match (&w.tmp, &w.mem) {
+                        (Some(tmp), _) => Blob::Disk(std::fs::File::open(tmp).expect("the memo store's own file")),
+                        (None, Some(m)) => Blob::Mem(m.clone()),
+                        _ => unreachable!("a writer writes to a file or to memory"),
+                    };
+                    files.push(FileState::new(blob, Arc::new(Vec::new()), Arc::new(Vec::new())));
                     let fi = files.len() as u32 - 1;
                     w.file = Some(fi);
                     fi
                 }
             };
-            for i in new_infos {
-                files[fi as usize].1.push(i);
-            }
+            files[fi as usize].extend(new_infos, new_queries);
             let mut index = self.index.write().unwrap();
             for (h, off, len) in ix {
                 index.entry(h).or_default().push(Loc { file: fi, off, len });
             }
         }
-        for (_, fi) in self.files.read().unwrap().iter() {
-            for a in &fi.same {
+        for fs in self.files.read().unwrap().iter() {
+            for a in &fs.same {
                 a.store(0, Ordering::Relaxed);
             }
         }
     }
 
-    /// The reading is over: its file is finished and takes its place in the folder. Returns its runs.
+    /// The reading is over: its file is finished and takes its place in the folder, or in the resident store.
+    /// Returns its runs.
     pub fn finish(&self) -> std::io::Result<usize> {
         let Some(w) = self.writer.lock().unwrap().take() else { return Ok(0) };
         drop(w.tx);
-        let n = w.handle.join().expect("the memo writer")?;
-        let done = w.tmp.with_extension("runs");
-        std::fs::rename(&w.tmp, &done)?;
-        Ok(n)
+        let end = w.handle.join().expect("the memo writer")?;
+        match (w.tmp, w.mem, &self.mem) {
+            (Some(tmp), _, _) => std::fs::rename(&tmp, tmp.with_extension("runs"))?,
+            (None, Some(bytes), Some(store)) => {
+                let size = bytes.bytes() + end.ix.len() as u64 * 20;
+                store.add(&self.key, MemFile { bytes, ix: end.ix, infos: Arc::new(end.infos), queries: Arc::new(end.queries), size });
+            }
+            _ => unreachable!("a writer writes to a file or to memory"),
+        }
+        Ok(end.runs)
     }
 }
 
@@ -698,10 +1045,18 @@ impl Builder<'_> {
     pub fn memo_inputs(&self) -> String {
         use std::fmt::Write;
         let mut t = String::new();
-        let exe = std::env::current_exe().expect("the reader's binary");
-        let root = scumm_ir::default_root();
-        writeln!(t, "reader {}", file_sha1(&exe).expect("the reader's binary")).unwrap();
-        writeln!(t, "game {}", file_sha1(&root.join("data").join("scripts-dos-cd").join("index.json")).expect("the game index")).unwrap();
+        // the binary's and the game index's sha1, once per process (a resident process reads many times)
+        static SHAS: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
+        let (exe_sha, game_sha) = SHAS.get_or_init(|| {
+            let exe = std::env::current_exe().expect("the reader's binary");
+            let root = scumm_ir::default_root();
+            (
+                file_sha1(&exe).expect("the reader's binary"),
+                file_sha1(&root.join("data").join("scripts-dos-cd").join("index.json")).expect("the game index"),
+            )
+        });
+        writeln!(t, "reader {exe_sha}").unwrap();
+        writeln!(t, "game {game_sha}").unwrap();
         let s = &self.scope;
         let units: Vec<scumm_ir::UnitKey> = s.units.iter().map(|&u| self.game.unit(u).key).collect();
         writeln!(t, "rooms {:?}\nunits {units:?}\nobjects {:?}\nverbs {:?}\ndialog {:?}\nwalk {:?}", s.rooms, s.objects, s.verbs, s.dialog_verbs, s.walk_verb).unwrap();
@@ -745,7 +1100,7 @@ impl Builder<'_> {
 
     /// The switch `--memo DIR` (memo.md): opens the store for this reading's whole-reading inputs. Called by
     /// `read_all_into` once the table has the switches; refuses the settings the proof does not cover.
-    pub(crate) fn open_memo(&mut self, root: &std::path::Path) {
+    pub(crate) fn open_memo(&mut self, root: Option<&std::path::Path>) {
         let sw = &self.switches;
         let refuse = |what: &str| -> ! { panic!("--memo: not with {what} (experiments/E011-speed/memo.md covers E009's settings only)") };
         if !sw.reach {
@@ -770,12 +1125,15 @@ impl Builder<'_> {
         }
         let text = self.memo_inputs();
         let key = sha1_smol::Sha1::from(text.as_bytes()).digest().to_string();
-        let cm = CrossMemo::open(root, &key).unwrap_or_else(|e| panic!("--memo {}: {e}", root.display()));
-        let inputs = cm.dir.join("inputs.txt");
-        if !inputs.exists() {
-            std::fs::write(&inputs, &text).ok();
+        let cm = CrossMemo::open(root, self.memo_mem.clone(), &key)
+            .unwrap_or_else(|e| panic!("--memo {}: {e}", root.map_or_else(|| "(memory)".into(), |r| r.display().to_string())));
+        if root.is_some() {
+            let inputs = cm.dir.join("inputs.txt");
+            if !inputs.exists() {
+                std::fs::write(&inputs, &text).ok();
+            }
         }
-        eprintln!("[memo] {}: {} files, {} runs stored", cm.dir.display(), cm.opened_files, cm.opened_runs);
+        eprintln!("[memo] {}: {} files ({} in memory), {} runs stored", cm.dir.display(), cm.opened_files, cm.opened_mem_files, cm.opened_runs);
         self.table.cross = Some(Arc::new(cm));
     }
 
@@ -787,6 +1145,9 @@ impl Builder<'_> {
         Some(serde_json::json!({
             "dir": cm.dir.display().to_string(),
             "files_opened": cm.opened_files,
+            "files_opened_in_memory": cm.opened_mem_files,
+            "questions": n(&s.questions),
+            "questions_known": n(&s.questions_known),
             "runs_opened": cm.opened_runs,
             "no_write": cm.no_write,
             "taken": n(&s.taken),
@@ -829,18 +1190,9 @@ impl Builder<'_> {
         kind == i.1 && dom == i.2 && start == i.3
     }
 
-    /// memo.md, conditions 4 and 5, on this reading as the job starts.
-    fn rest_holds(&self, sigs: &[(i64, bool)], queries: &[Query]) -> Result<(), Miss> {
-        if sigs.iter().any(|(s, f)| self.folded.contains(s) != *f) {
-            return Err(Miss::List);
-        }
-        if !queries.is_empty() {
-            let ok = self.table.reach.as_ref().is_some_and(|r| r.answers_hold(&self.table, queries));
-            if !ok {
-                return Err(Miss::Reached);
-            }
-        }
-        Ok(())
+    /// memo.md, condition 4, on this reading as the job starts.
+    fn sigs_hold(&self, sigs: &[(i64, bool)]) -> bool {
+        sigs.iter().all(|(s, f)| self.folded.contains(s) == *f)
     }
 
     /// `run_job` on a worker's Builder with the switch `--memo`: a stored run whose conditions hold here is taken;
@@ -856,8 +1208,16 @@ impl Builder<'_> {
         job.put(&mut key);
         crate::wire::put_guides(guides.as_deref(), &mut key);
         let got = {
+            let reach = self.table.reach.clone();
+            let version = reach.as_ref().map_or(0, |r| r.version());
             let me = std::cell::RefCell::new(&mut *self);
-            cm.take(&key, &mut |i| me.borrow_mut().info_holds(i), &mut |sigs, qs| me.borrow().rest_holds(sigs, qs))
+            // memo.md, condition 5: a question asked again of the reached values as they are (the file keeps each
+            // answer for the version it was asked at)
+            let mut ask = |q: &QInfo| -> bool {
+                let m = me.borrow();
+                reach.as_ref().is_some_and(|r| r.meets_when(&m.table, &q.0, &q.1, q.2))
+            };
+            cm.take(&key, &mut |i| me.borrow_mut().info_holds(i), &mut |sigs| me.borrow().sigs_hold(sigs), version, &mut ask)
         };
         cm.stats.lookup_ns.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
         if let Some((records, deltas, pins)) = got {
@@ -922,36 +1282,88 @@ mod tests {
         (vec![rec], d, [("var:5".to_string(), Val::Int(1))].into_iter().collect())
     }
 
-    /// A run stored by one reading is taken by another when its consulted keys read the same, and not otherwise; a
-    /// run joins its own reading's index between passes.
-    #[test]
-    fn a_stored_run_is_taken_where_its_keys_read_the_same() {
-        let root = std::env::temp_dir().join(format!("memo-test-{}", std::process::id()));
+    fn q(answer: bool) -> Query {
+        Query { key: "var:9".into(), set: vec![Label::Int(1)], before: false, answer }
+    }
+
+    /// A run stored by one reading is taken by another when its consulted keys read the same, its lists are folded as
+    /// they were and its questions get the answers they got, and not otherwise; a run joins its own reading's index
+    /// between passes. On disk (`mem` None) and in a resident store.
+    fn taken_where_the_conditions_hold(mem: Option<Arc<MemStore>>) {
+        let root = std::env::temp_dir().join(format!("memo-test-{}-{}", std::process::id(), mem.is_some()));
         std::fs::remove_dir_all(&root).ok();
+        let disk = mem.is_none().then_some(root.as_path());
         let info: Info = ("var:7".into(), 1, Some(Domain::of([0, 1, 2], None, None)), None);
         let key = b"job and guides".to_vec();
+        let mut yes = |_: &QInfo| true;
         {
-            let cm = CrossMemo::open(&root, "k").unwrap();
+            let cm = CrossMemo::open(disk, mem.clone(), "k").unwrap();
             if !cm.writes() {
                 return; // no room on this disk: nothing to check
             }
-            cm.store(key.clone(), vec![info.clone()], &[(5, false)], &[], &out(3));
-            assert!(cm.take(&key, &mut |_| true, &mut |_, _| Ok(())).is_none(), "not indexed before the pass ends");
+            cm.store(key.clone(), vec![info.clone()], &[(5, false)], &[q(true)], &out(3));
+            assert!(cm.take(&key, &mut |_| true, &mut |_| true, 0, &mut |_| true).is_none(), "not indexed before the pass ends");
             cm.index_own();
-            let got = cm.take(&key, &mut |i| *i == info, &mut |s, _| if s == [(5, false)] { Ok(()) } else { Err(Miss::List) });
+            let got = cm.take(&key, &mut |i| *i == info, &mut |s| s == [(5, false)], 0, &mut |x| x.0 == "var:9" && x.2 == false);
             assert_eq!(got.as_ref().map(|o| (&o.0, &o.2)), Some((&out(3).0, &out(3).2)));
             assert_eq!(got.unwrap().1.args, out(3).1.args);
             assert_eq!(cm.finish().unwrap(), 1);
         }
-        let cm = CrossMemo::open(&root, "k").unwrap();
-        assert_eq!((cm.opened_files, cm.opened_runs), (1, 1));
-        assert!(cm.take(b"another job", &mut |_| true, &mut |_, _| Ok(())).is_none());
-        assert!(cm.take(&key, &mut |_| false, &mut |_, _| Ok(())).is_none(), "a key that reads otherwise");
+        let cm = CrossMemo::open(disk, mem.clone(), "k").unwrap();
+        assert_eq!((cm.opened_files, cm.opened_runs, cm.opened_mem_files), (1, 1, mem.is_some() as usize));
+        assert!(cm.take(b"another job", &mut |_| true, &mut |_| true, 1, &mut |_| true).is_none());
+        assert!(cm.take(&key, &mut |_| false, &mut |_| true, 1, &mut |_| true).is_none(), "a key that reads otherwise");
         cm.index_own(); // a new pass: the keys are asked again
-        assert!(cm.take(&key, &mut |_| true, &mut |_, _| Err(Miss::Reached)).is_none());
-        assert!(cm.take(&key, &mut |_| true, &mut |_, _| Ok(())).is_some());
-        assert_eq!(cm.stats.taken.load(Ordering::Relaxed), 1);
+        assert!(cm.take(&key, &mut |_| true, &mut |_| false, 1, &mut |_| true).is_none(), "a list folded otherwise");
+        assert!(cm.take(&key, &mut |_| true, &mut |_| true, 1, &mut |_| false).is_none(), "a question answered otherwise");
+        // the answer for version 1 is kept: asked again at version 1 it is not asked of the values
+        assert!(cm.take(&key, &mut |_| true, &mut |_| true, 1, &mut |_| panic!("asked again")).is_none());
+        assert!(cm.take(&key, &mut |_| true, &mut |_| true, 2, &mut yes).is_some(), "a new version asks again");
+        assert!(cm.take(&key, &mut |_| true, &mut |_| true, 2, &mut |_| panic!("asked again")).is_some());
+        assert_eq!(cm.stats.taken.load(Ordering::Relaxed), 2);
         cm.finish().unwrap();
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_stored_run_is_taken_where_its_conditions_hold_on_disk() {
+        taken_where_the_conditions_hold(None);
+    }
+
+    #[test]
+    fn a_stored_run_is_taken_where_its_conditions_hold_in_memory() {
+        taken_where_the_conditions_hold(Some(Arc::new(MemStore::new(1 << 30, None))));
+    }
+
+    /// Past its cap a resident store sends its oldest file to the disk store, where a reading of another process
+    /// (no resident store) finds it, with its runs at the same places.
+    #[test]
+    fn a_resident_store_spills_its_oldest_file() {
+        let root = std::env::temp_dir().join(format!("memo-spill-{}", std::process::id()));
+        std::fs::remove_dir_all(&root).ok();
+        let mem = Arc::new(MemStore::new(1, Some(root.clone())));
+        for (k, n) in [("a", 3), ("b", 4)] {
+            let cm = CrossMemo::open(None, Some(mem.clone()), k).unwrap();
+            for j in 0..50 {
+                cm.store(format!("job {j}").into_bytes(), vec![], &[], &[q(true)], &out(n + j));
+            }
+            assert_eq!(cm.finish().unwrap(), 50);
+        }
+        if mem.spilled.load(Ordering::Relaxed) == 0 {
+            assert_eq!(mem.dropped.load(Ordering::Relaxed), 1, "no room on this disk: the file went");
+            return;
+        }
+        // "a" went to disk, "b" stays in memory (the last file is kept whatever its size)
+        let cm = CrossMemo::open(Some(&root), None, "a").unwrap();
+        assert_eq!((cm.opened_files, cm.opened_runs), (1, 50));
+        for j in 0..50 {
+            let got = cm.take(format!("job {j}").as_bytes(), &mut |_| true, &mut |_| true, 0, &mut |_| true);
+            assert_eq!(got.map(|o| o.0), Some(out(3 + j).0));
+        }
+        let cm = CrossMemo::open(None, Some(mem.clone()), "b").unwrap();
+        assert_eq!((cm.opened_files, cm.opened_mem_files), (1, 1));
+        let cm = CrossMemo::open(None, Some(mem.clone()), "a").unwrap();
+        assert_eq!(cm.opened_files, 0, "spilled: no longer in memory");
         std::fs::remove_dir_all(&root).ok();
     }
 

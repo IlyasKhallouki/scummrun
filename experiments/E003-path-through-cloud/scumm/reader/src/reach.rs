@@ -90,6 +90,8 @@ struct Inner {
 #[derive(Default)]
 pub struct Reached {
     inner: RwLock<Inner>,
+    /// one more at every write (the job memo keeps a question's answer for a version, memo.rs)
+    version: std::sync::atomic::AtomicU64,
 }
 
 /// A fact's start value when the start file does not name it: what `Writer::close` writes for it (`get0`).
@@ -128,6 +130,25 @@ impl Reached {
             });
         }
         set.iter().any(|l| Self::has(i, table, key, *l, upto))
+    }
+
+    /// The values for writing; the version moves on.
+    fn w(&self) -> std::sync::RwLockWriteGuard<'_, Inner> {
+        let g = self.inner.write().unwrap();
+        self.version.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        g
+    }
+
+    /// The version of the values: it changes whenever they may have.
+    pub fn version(&self) -> u64 {
+        self.version.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// `meets_at` in the round being read (`before`: the round before), as `answers_hold` asks a question.
+    pub fn meets_when(&self, table: &FactTable, key: &str, set: &[Label], before: bool) -> bool {
+        let i = self.inner.read().unwrap();
+        let now = i.now as i64;
+        Self::meets_at(&i, table, key, set, if before { now - 1 } else { now })
     }
 
     /// Some value of `set` is reached in the round being read.
@@ -527,7 +548,7 @@ impl Builder<'_> {
     fn reach_commit(&mut self, reach: &Reached) {
         let mut new_keys: FxHashSet<String> = FxHashSet::default();
         {
-            let mut i = reach.inner.write().unwrap();
+            let mut i = reach.w();
             i.now += 1;
             i.guides.clear();
         }
@@ -538,7 +559,7 @@ impl Builder<'_> {
             }
             let mut woken: Vec<String> = Vec::new();
             {
-                let mut i = reach.inner.write().unwrap();
+                let mut i = reach.w();
                 let now = i.now;
                 for (k, l) in fresh {
                     if !i.vals.contains_key(&k) {
@@ -634,7 +655,7 @@ impl Builder<'_> {
             out.push(j);
             self.counts.inc("reach: reruns");
         }
-        reach.inner.write().unwrap().guides = map;
+        reach.w().guides = map;
         out
     }
 
@@ -686,7 +707,7 @@ impl Builder<'_> {
         sink: &mut Option<&mut dyn RecordSink>,
     ) {
         let reach = self.reach_arc();
-        *reach.inner.write().unwrap() = Inner::default();
+        *reach.w() = Inner::default();
         self.reach_state = Some(Box::default());
         // the start's values (and the dumped slots' lists, as the harness's start file has them) are in at round 0
         let starts = self.reach_starts.clone();
@@ -722,7 +743,7 @@ impl Builder<'_> {
             events.extend(dumped);
         }
         {
-            let mut i = reach.inner.write().unwrap();
+            let mut i = reach.w();
             for (n, k, l) in seeds {
                 if !i.vals.contains_key(&k) {
                     // the first start names this fact, or an earlier one holds its default value
@@ -827,7 +848,7 @@ mod tests {
         // a rerun's guides go to its own job only
         let r = Reached::default();
         let g: Guide = vec![(PKey::F("room".parse().unwrap()), vec![Label::Int(28)])];
-        r.inner.write().unwrap().guides.insert(job_key(&a), Arc::new(vec![g.clone()]));
+        r.w().guides.insert(job_key(&a), Arc::new(vec![g.clone()]));
         assert_eq!(r.guides_of(&job_key(&a)).as_deref(), Some(&vec![g]));
         assert!(r.guides_of(&job_key(&b)).is_none(), "room 35's job has none of room 28's guides");
         assert!(r.guides_of(&a.label).is_none(), "nothing is found by a label");

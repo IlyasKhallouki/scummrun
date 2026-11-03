@@ -151,12 +151,15 @@ macro_rules! log {
 pub struct Resident {
     pub root: PathBuf,
     pub game: scumm_ir::Game,
+    /// the job memo's store in memory (memo.rs `MemStore`): with `--memo DIR`, a reading takes runs from it and
+    /// stores its own in it, DIR being where its oldest files spill; None: the store is DIR alone
+    pub memo: Option<Arc<crate::memo::MemStore>>,
 }
 
 impl Resident {
     /// The game under `root` (scumm_ir::default_root() for the binary's).
     pub fn load(root: &Path) -> std::io::Result<Resident> {
-        Ok(Resident { root: root.to_path_buf(), game: scumm_ir::Game::load(root)? })
+        Ok(Resident { root: root.to_path_buf(), game: scumm_ir::Game::load(root)?, memo: None })
     }
 }
 
@@ -690,6 +693,9 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     b.switches.reach |= reach;
     b.switches.pass2_reuse |= pass2_reuse;
     b.memo_dir = arg(&args, "--memo").map(PathBuf::from);
+    if b.memo_dir.is_some() {
+        b.memo_mem = res.memo.clone();
+    }
     if step_limit != 0 {
         b.switches.step_limit = step_limit;
     }

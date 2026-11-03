@@ -491,6 +491,9 @@ pub struct Builder<'g> {
     pub(crate) memo_log: Option<crate::memo::RunLog>,
     /// the switch --memo (experiments/E011-speed/memo.md): the store's root folder; None off
     pub memo_dir: Option<std::path::PathBuf>,
+    /// the switch --memo in a resident process (run.rs `Resident`): the store kept in memory from reading to reading,
+    /// with `memo_dir` (if any) its disk store; None off
+    pub memo_mem: Option<Arc<crate::memo::MemStore>>,
     /// the switch --memo: each consulted key's kind, domain and constant start in this table (`Builder::key_info`)
     pub(crate) memo_infos: FxHashMap<String, (u8, Option<Domain>, Option<i64>)>,
 }
@@ -686,6 +689,7 @@ impl<'g> Builder<'g> {
             cur_job_key: None,
             memo_log: None,
             memo_dir: None,
+            memo_mem: None,
             memo_infos: FxHashMap::default(),
         }
     }
@@ -2197,8 +2201,9 @@ impl<'g> Builder<'g> {
         if self.switches.shared_runs && self.table.shared.is_none() {
             self.table.shared = Some(Arc::new(crate::shared::SharedRuns::default()));
         }
-        if let Some(root) = self.memo_dir.clone() {
-            self.open_memo(&root);
+        if self.memo_dir.is_some() || self.memo_mem.is_some() {
+            let root = self.memo_dir.clone();
+            self.open_memo(root.as_deref());
         }
         for n in 0..passes {
             if n > 0 {
