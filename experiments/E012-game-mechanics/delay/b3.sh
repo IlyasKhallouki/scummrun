@@ -1,7 +1,9 @@
 #!/bin/bash
 # E012 delay, G0 for FMI_DELAY_FORK (plan.md, amendment "component delay"): B3's 15 tries in E011 round 2's fast
 # settings (play when ready, the old tail first, the Rust lama-first-costs, every round-2 switch on), warm in one
-# resident fmi, each try under the heavy lock; then each try against B0's (E011's cmp_tries.py, run after the tries).
+# resident fmi; then each try against B0's (E011's cmp_tries.py, run after the tries). The ring(33) tries (scope
+# 28,33,35,38: its reading and warm planner above 1 GB) hold the heavy lock; the ring(38) ones (the resident process
+# under 0.3 GB after them, logged) do not.
 #   b3.sh OUT off|on      on: FMI_DELAY_FORK=1
 # The binaries: this branch's build (DELAY_T, default /var/tmp/fast-mi/target-e012-delay); the engine: round 2's
 # (patches 0001-0004, read only).
@@ -33,7 +35,8 @@ echo "[$(date +%T)] $SEQ: fmi pid $PID ($SW)"
 for k in $(seq 0 14); do
   j=$(printf "j%05d" $k); d=$OUT/jobs/$j
   rm -rf $d/run $d/new $d/result.json $d/log
-  exec 9>$LOCK; flock 9
+  heavy=$(jq -r '.scope | map(tostring) | join(",")' $d/job.json)
+  [ "$heavy" = "28,33,35,38" ] && { exec 9>$LOCK; flock 9; }
   t0=$(date +%s.%N)
   echo "$d" >&7
   until grep -q "^done $d " $OUT/fmi.log 2>/dev/null; do
@@ -41,8 +44,8 @@ for k in $(seq 0 14); do
     sleep 0.05
   done
   t1=$(date +%s.%N)
-  flock -u 9; exec 9>&-
-  echo "[$(date +%T)] $SEQ $j $(awk "BEGIN { printf \"%.1f\", $t1 - $t0 }") s, load $(cut -d' ' -f1 /proc/loadavg)"
+  [ "$heavy" = "28,33,35,38" ] && { flock -u 9; exec 9>&-; }
+  echo "[$(date +%T)] $SEQ $j ($heavy) $(awk "BEGIN { printf \"%.1f\", $t1 - $t0 }") s, load $(cut -d' ' -f1 /proc/loadavg), fmi RSS $(ps -o rss= -p $PID) kB"
   for fs in / /home; do
     df -B1G --output=avail $fs | tail -1 | awk -v f=$fs '$1 < 5 { print "STOP: " f " under 5 GB"; exit 1 }' || break 2
   done
