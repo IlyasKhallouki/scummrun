@@ -33,6 +33,7 @@ operators, 7,164 facts, on the refinement reading j00000/refine-01.
 | before, 180 s limit (the check, resumed) | 191 s, 187 s |
 | after, proofs on (proof-only replay) | 18.4 s: reductions and build 13.9 s, h^1 0.3 s, h^2 4.5 s |
 | after, proofs on (the gate's replay, check mode) | 19.1 s |
+| after, end to end: `fmi try` on try 15's job with the target forced, `FMI_PLAN_DEAD=1` | the attempt 15.6 s (the request 13.3 s, of it the proofs 3.2 s); the try 16.4 s; stop "no plan (the planner proved none)" |
 
 What proves it: h^2. The goal fact bit:118 = 1 itself is outside the pair fixpoint; h^1 reaches it. Each of the 8,712
 effects that write it needs, with its operator's preconditions and its conditions, a pair that h^2 shows no reachable

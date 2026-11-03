@@ -2363,7 +2363,8 @@ mod tests {
 Branch e011-deadtarget. Tables and lists: `results/deadtarget.md`. Laptop, seed 1, nice 10, at load 3-15.
 
 - **What it does now.** With `FMI_PLAN_DEAD=1`, the check's bit:118 = 1 request ends in 18-19 s as a proven no-plan
-  ("no plan (the planner proved none)"), against 187-191 s with the 180 s limit and 607-612 s with 600 s. With
+  ("no plan (the planner proved none)"), against 187-191 s with the 180 s limit and 607-612 s with 600 s. End to end,
+  `fmi try` on try 15's job with the target forced ends its attempt in 15.6 s with that stop. With
   `FMI_PLAN_DEEPEN=120`, a dead target that no proof catches costs 120 s plus the reductions in its first round, and
   comes back with 240 s, 480 s, ... only once its entry has no other target left. Both switches are off by default.
 - **What proves bit:118.** h^2: the goal fact is outside the pair fixpoint. Each of its 8,712 writers needs a pair of
