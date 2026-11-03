@@ -304,8 +304,8 @@ impl Reach {
     fn new(tv: &Tv) -> Reach {
         let t = tv.t;
         let n_ops = t.n_ops();
-        let mut psets = Sets::new(n_ops / 4);
-        let mut csets = Sets::new(4096);
+        let mut psets = Sets::new(n_ops / 2);
+        let mut csets = Sets::new(16384);
         let mut op_ps: Vec<u32> = Vec::with_capacity(n_ops);
         let mut unc_off = Vec::with_capacity(n_ops + 1);
         unc_off.push(0u32);
@@ -319,43 +319,77 @@ impl Reach {
         let mut cbuf: Vec<u32> = Vec::new();
         let mut ces: Vec<(u32, u32)> = Vec::new();
         let mut n_conds = 0usize;
+        let q0 = thread_cpu();
+        // marks of the operator's precondition atoms (1) and unconditional effect atoms (2), cleared after it
+        let mut mark = vec![0u8; tv.n_props];
+        let mut misses = 0u64;
         for o in 0..n_ops {
             pre.clear();
             pre.extend(t.pre(o).iter().map(|&f| tv.prop(f) as u32));
             sorted_unique(&mut pre, 0);
             op_ps.push(psets.intern(&pre));
+            for &p in &pre {
+                mark[p as usize] |= 1;
+            }
             let u0 = unc.len();
-            for e in t.effs(o) {
-                if e.c0 == e.c1 {
-                    unc.push(tv.prop((e.var, e.post)) as u32);
-                }
-            }
-            sorted_unique(&mut unc, u0);
-            unc_off.push(unc.len() as u32);
             ces.clear();
+            // effects in a row with the same conditions (one branch of the action) share their set
+            let mut last: (&[(u32, u32)], u32) = (&[], u32::MAX);
             for e in t.effs(o) {
+                let p = tv.prop((e.var, e.post));
                 if e.c0 == e.c1 {
+                    if mark[p] & 2 == 0 {
+                        mark[p] |= 2;
+                        unc.push(p as u32);
+                    }
                     continue;
                 }
-                let p = tv.prop((e.var, e.post)) as u32;
-                if unc[u0..].binary_search(&p).is_ok() {
-                    continue;
-                }
-                cbuf.clear();
-                cbuf.extend(t.conds(e).iter().map(|&f| tv.prop(f) as u32).filter(|c| pre.binary_search(c).is_err()));
-                sorted_unique(&mut cbuf, 0);
-                n_conds += cbuf.len();
-                ces.push((csets.intern(&cbuf), p));
+                let raw = t.conds(e);
+                let cs = if last.1 != u32::MAX && raw == last.0 {
+                    last.1
+                } else {
+                    cbuf.clear();
+                    let mut sorted = true;
+                    for &f in raw {
+                        let c = tv.prop(f) as u32;
+                        if mark[c as usize] & 1 == 0 {
+                            if cbuf.last().is_some_and(|&l| l >= c) {
+                                sorted = false;
+                            }
+                            cbuf.push(c);
+                        }
+                    }
+                    if !sorted {
+                        sorted_unique(&mut cbuf, 0);
+                    }
+                    let cs = csets.intern(&cbuf);
+                    misses += 1;
+                    last = (raw, cs);
+                    cs
+                };
+                ces.push((cs, p as u32));
             }
-            ces.sort_unstable();
-            ces.dedup();
+            unc[u0..].sort_unstable();
+            unc_off.push(unc.len() as u32);
+            // a conditional effect on an atom an unconditional effect reaches is left out; repeats are kept (they
+            // only repeat work)
             for &(cs, p) in &ces {
-                ce_set.push(cs);
-                ce_prop.push(p);
-                ce_op.push(o as u32);
+                if mark[p as usize] & 2 == 0 {
+                    n_conds += (csets.off[cs as usize + 1] - csets.off[cs as usize]) as usize;
+                    ce_set.push(cs);
+                    ce_prop.push(p);
+                    ce_op.push(o as u32);
+                }
+            }
+            for &p in &pre {
+                mark[p as usize] = 0;
+            }
+            for &p in &unc[u0..] {
+                mark[p as usize] = 0;
             }
             op_ce_off.push(ce_prop.len() as u32);
         }
+        let q1 = thread_cpu();
         // precondition sets: membership and operators
         let nps = psets.len();
         let ps_n: Vec<u32> = (0..nps as u32).map(|i| psets.get(i).len() as u32).collect();
@@ -381,6 +415,14 @@ impl Reach {
         let ce_pairs: Vec<(u32, u32)> = ce_set.iter().enumerate().map(|(e, &cs)| (cs, e as u32)).collect();
         let (cs_ce_off, cs_ce) = csr(ncs, &ce_pairs);
         let n_pre = psets.data.len();
+        if std::env::var_os("TASKCORE_PROFILE").is_some() {
+            eprintln!(
+                "profile landmarks (CPU s): reachability tables: per operator {:.4} ({} condition sets looked up), the lists {:.4}",
+                q1 - q0,
+                misses,
+                thread_cpu() - q1
+            );
+        }
         Reach {
             ps_n,
             ps_of_off,
@@ -1121,11 +1163,15 @@ impl Hps<'_> {
 /// variable's atoms.
 pub fn build(t: &SasTask, adj: &[i32], pred: &[String], deadline: Option<Instant>) -> Result<Graph, String> {
     let t0 = Instant::now();
+    let k0 = thread_cpu();
     let tv = Tv::new(t);
+    let k1 = thread_cpu();
     let mut reach = Reach::new(&tv);
+    let k2 = thread_cpu();
     let classes = disjunction_classes(&tv, pred);
     let setup_s = t0.elapsed().as_secs_f64();
     if std::env::var_os("TASKCORE_PROFILE").is_some() {
+        eprintln!("profile landmarks (CPU s): the providers {:.4}, the reachability's tables {:.4}", k1 - k0, k2 - k1);
         eprintln!(
             "profile landmarks: {} operators, {} effects, {} propositions; reach: {} precondition sets ({} atoms), {} unconditional atoms, {} conditional effects with {} conditions in {} condition sets ({} atoms); setup {:.4} s",
             t.n_ops(),
