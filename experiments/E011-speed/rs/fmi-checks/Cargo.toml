@@ -37,3 +37,7 @@ path = "src/bin/kitchen_report.rs"
 [[bin]]
 name = "inventory"
 path = "src/bin/inventory.rs"
+
+[[bin]]
+name = "probe"
+path = "src/bin/probe.rs"
