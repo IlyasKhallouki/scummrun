@@ -42,10 +42,24 @@ fn main() {
         std::fs::create_dir_all(&dir).expect("the reading's folder");
         let ctl = Ctl::new(Log::file(&dir.join("reader-scope.err")).expect("the log"), Arc::new(AtomicBool::new(false)));
         let epoch = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64());
+        // PERF_ONLY=NAME with PERF_CTL=CTL_FIFO,ACK_FIFO: perf record --control (started with -D -1) records that reading
+        // alone
+        let perf = std::env::var("PERF_ONLY").ok().filter(|n| Some(n.clone()) == get("--name")).and_then(|_| std::env::var("PERF_CTL").ok());
+        let ctl_perf = |cmd: &str| {
+            if let Some(p) = &perf {
+                let (ctl, ack) = p.split_once(',').expect("PERF_CTL=CTL,ACK");
+                std::fs::write(ctl, format!("{cmd}\n")).expect("perf's control fifo");
+                // perf answers "ack\n" and keeps its end open: one line, not to the end
+                let mut line = String::new();
+                let _ = std::io::BufRead::read_line(&mut std::io::BufReader::new(std::fs::File::open(ack).expect("perf's ack fifo")), &mut line);
+            }
+        };
+        ctl_perf("enable");
         println!("start {} at {:.3}", get("--name").unwrap_or_default(), epoch());
         let t = Instant::now();
         let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&a, &res, Some(&ctl), t)));
         let wall = t.elapsed().as_secs_f64();
+        ctl_perf("disable");
         println!("end {} at {:.3}", get("--name").unwrap_or_default(), epoch());
         let mem = res.memo.as_ref().map_or(0, |m| m.bytes());
         match r {
