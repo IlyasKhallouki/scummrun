@@ -143,11 +143,13 @@ pub fn goal_text(goal: &[(String, Vec<i64>)]) -> Res<String> {
     Ok(parts.join(","))
 }
 
-/// A target's value: an int, or tier 0's "K=V,K=V" for a goal of several keys.
+/// A target's value: an int, tier 0's "K=V,K=V" for a goal of several keys, or E012's one target per key (plan.md
+/// section 3): the key at any of these values, sorted, at least two (a list of one is that `Int`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TV {
     Int(i64),
     Text(String),
+    Values(Vec<i64>),
 }
 
 impl TV {
@@ -155,18 +157,30 @@ impl TV {
         match self {
             TV::Int(n) => json!(n),
             TV::Text(s) => json!(s),
+            TV::Values(vs) => json!(vs),
         }
     }
     pub fn of(v: &Value) -> Option<TV> {
         match v {
             Value::String(s) => Some(TV::Text(s.clone())),
+            Value::Array(a) => a.iter().map(|x| as_i64(Some(x))).collect::<Option<Vec<i64>>>().map(TV::Values),
             x => as_i64(Some(x)).map(TV::Int),
         }
     }
+    /// taskcore's `--goal` text of the value ("V" or "V|V|...")
     fn text(&self) -> String {
         match self {
             TV::Int(n) => n.to_string(),
             TV::Text(s) => s.clone(),
+            TV::Values(vs) => vs.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("|"),
+        }
+    }
+    /// The int values the target is reached at (none for tier 0's text).
+    pub fn ints(&self) -> &[i64] {
+        match self {
+            TV::Int(n) => std::slice::from_ref(n),
+            TV::Text(_) => &[],
+            TV::Values(vs) => vs,
         }
     }
 }
@@ -282,10 +296,177 @@ pub fn rotate(ts: Vec<Target>, rotation: &Value) -> Vec<Target> {
         let vk = match &t.v {
             TV::Int(n) => (0, *n, String::new()),
             TV::Text(s) => (1, 0, s.clone()),
+            // E012's value lists come in `rotate_per_key`; here after the rest, by their text
+            TV::Values(_) => (2, 0, t.v.text()),
         };
         (cell.get(&a).copied().unwrap_or(0), every.get(&a).copied().unwrap_or(0), t.depth, t.tier, t.k.clone(), vk)
     });
     ts
+}
+
+/// E012's switch for one target per key and the T tier (plan.md section 3): `FMI_TARGET_PER_KEY=1`. Off (unset or
+/// any other value): `targets_with`'s targets, as E008 and E009 made them.
+pub fn per_key() -> bool {
+    std::env::var("FMI_TARGET_PER_KEY").map(|v| v == "1").unwrap_or(false)
+}
+
+/// plan.md's T for the T tier: whether some action of the reading tests the key (`tested`'s `Tested::of`, its atoms'
+/// keys), by the key's text.
+pub type TestedKey<'a> = &'a dyn Fn(&str) -> bool;
+
+/// A tried or rotation record's value as the int values it covers: an int, or each int of a value list (E012's one
+/// target per key); none for tier 0's text.
+fn ints_of(v: &Value) -> Vec<i64> {
+    match v {
+        Value::Array(a) => a.iter().filter_map(|x| as_i64(Some(x))).collect(),
+        Value::String(_) => vec![],
+        x => as_i64(Some(x)).into_iter().collect(),
+    }
+}
+
+/// E012's targets (plan.md section 3, FMI_TARGET_PER_KEY): `targets_with`'s targets, with two changes.
+/// - **One target per key.** The reached values of a key that the guide does not name (their atom of R is the key's
+///   any-value atom (k, any), as for a variable a refinement made a fact) go into one target: the key at any of them
+///   (`TV::Values`, sorted; a single value stays `TV::Int`, the same target as before). A value the guide names
+///   stays its own target. Each value is left out as `targets_with` leaves it out: the entry's value, tier 0's atom,
+///   a value tried from this entry (a tried value list counts for each of its values), and, for the any-value atom,
+///   the root's value. The group's tier is 1 when one of its values is not held, else 2; its depth is the any-value
+///   atom's.
+/// - **The order.** Tier 0 first; then the targets whose key the reading tests (`tested`, plan.md's T), then the
+///   others; within each, E008's order (tier, depth, key, value), or with a rotation E009's (`rotate_per_key`).
+///   `tested` None: no T tier.
+///
+/// The targets' values are `targets_with`'s, grouped: the same (key, value) pairs, so no state is pruned (plan.md).
+#[allow(clippy::too_many_arguments)]
+pub fn targets_per_key<F: FactLook + ?Sized>(reached: &[(String, Vec<i64>)], atoms: &Atoms, entry_facts: &F,
+               root_facts: Option<&FactMap>, held: &[Value], tried: &[Value], goal: &[(String, Vec<i64>)],
+               rotation: Option<&Value>, tested: Option<TestedKey>) -> Res<Vec<Target>> {
+    let pair = |p: &Value| pair_key(p.get(0).and_then(|k| k.as_str()).unwrap_or(""), p.get(1).unwrap_or(&Value::Null));
+    let held_set: HashSet<String> = held.iter().map(pair).collect();
+    // each record as itself (tier 0's) and as each of its int values
+    let mut tried_set: HashSet<String> = tried.iter().map(pair).collect();
+    for p in tried {
+        if let (Some(k), Some(Value::Array(_))) = (p.get(0).and_then(|k| k.as_str()), p.get(1)) {
+            for v in ints_of(&p[1]) {
+                tried_set.insert(pair_key(k, &json!(v)));
+            }
+        }
+    }
+    let reached_map: HashMap<&str, &Vec<i64>> = reached.iter().map(|(k, v)| (k.as_str(), v)).collect();
+    let mut out = Vec::new();
+    let mut first: Option<(String, TV)> = None;
+    if !goal.is_empty() {
+        let all_reached = goal.iter().all(|(k, vs)| vs.iter().any(|v| reached_map.get(k.as_str()).map(|r| r.contains(v)).unwrap_or(false)));
+        let holds = goal.iter().all(|(k, vs)| vs.contains(&entry_facts.look(k).unwrap_or(0)));
+        if all_reached && !holds {
+            let f = goal_target(goal)?;
+            if !tried_set.contains(&pair_key(&f.0, &f.1.json())) {
+                out.push(Target { k: f.0.clone(), v: f.1.clone(), tier: 0, depth: 0 });
+            }
+            first = Some(f);
+        }
+    }
+    let mut rest = Vec::new();
+    for (k, vals) in reached {
+        if !guide_kind(k) {
+            continue;
+        }
+        let now = entry_facts.look(k).unwrap_or(0);
+        // the key's values with only its any-value atom: (value, held, depth)
+        let mut group: Vec<(i64, bool, i64)> = Vec::new();
+        for &v in vals {
+            if v == now || first.as_ref().map(|f| f.0 == *k && f.1 == TV::Int(v)).unwrap_or(false)
+                || tried_set.contains(&pair_key(k, &json!(v))) {
+                continue;
+            }
+            let Some(d) = depth_of(atoms, k, v) else { continue };
+            let concrete = atoms.contains_key(&(k.clone(), Some(v)));
+            if !concrete {
+                if let Some(r) = root_facts {
+                    if v == r.get(k).copied().unwrap_or(0) {
+                        continue;
+                    }
+                }
+            }
+            let is_held = !held_set.is_empty()
+                && (held_set.contains(&pair_key(k, &json!(v))) || (!concrete && held_set.contains(&pair_key(k, &Value::Null))));
+            if concrete {
+                rest.push(Target { k: k.clone(), v: TV::Int(v), tier: if is_held { 2 } else { 1 }, depth: d });
+            } else {
+                group.push((v, is_held, d));
+            }
+        }
+        if !group.is_empty() {
+            let tier = if group.iter().any(|g| !g.1) { 1 } else { 2 };
+            let depth = group.iter().map(|g| g.2).min().unwrap_or(0);
+            let mut vs: Vec<i64> = group.iter().map(|g| g.0).collect();
+            vs.sort_unstable();
+            vs.dedup();
+            let v = if vs.len() == 1 { TV::Int(vs[0]) } else { TV::Values(vs) };
+            rest.push(Target { k: k.clone(), v, tier, depth });
+        }
+    }
+    let untested = |t: &Target| tested.map(|f| !f(&t.k)).unwrap_or(false);
+    rest.sort_by(|a, b| (untested(a), a.tier, a.depth, &a.k, &a.v).cmp(&(untested(b), b.tier, b.depth, &b.k, &b.v)));
+    match rotation {
+        None => out.extend(rest),
+        Some(r) => out.extend(rotate_per_key(rest, r, tested)),
+    }
+    Ok(out)
+}
+
+/// E009 fix b with E012's targets (plan.md section 3): the T tier first (the targets whose key the reading tests, when
+/// `tested` is given), then `rotate`'s order (tried in the cell, tried in all, depth, tier, key, value). A target's
+/// counts are the records of its key that cover one of its values (an int record its value, a value list each of
+/// its values), so a value list counts every request that went for one of them; for an int target with no value list
+/// among the records, the counts are `rotate`'s.
+pub fn rotate_per_key(ts: Vec<Target>, rotation: &Value, tested: Option<TestedKey>) -> Vec<Target> {
+    type Recs = HashMap<String, Vec<(Value, Vec<i64>, i64)>>;
+    let recs = |name: &str| -> Recs {
+        let mut m: Recs = HashMap::new();
+        for r in rotation.get(name).and_then(|x| x.as_array()).cloned().unwrap_or_default() {
+            let k = r.get(0).and_then(|k| k.as_str()).unwrap_or("").to_string();
+            let v = r.get(1).cloned().unwrap_or(Value::Null);
+            let vs = ints_of(&v);
+            m.entry(k).or_default().push((v, vs, as_i64(r.get(2)).unwrap_or(0)));
+        }
+        m
+    };
+    let (cell, every) = (recs("cell"), recs("all"));
+    let count = |m: &Recs, t: &Target| -> i64 {
+        let Some(rs) = m.get(&t.k) else { return 0 };
+        match &t.v {
+            TV::Text(s) => rs.iter().filter(|r| r.0.as_str() == Some(s.as_str())).map(|r| r.2).sum(),
+            v => {
+                let mine = v.ints();
+                rs.iter().filter(|r| r.1.iter().any(|x| mine.contains(x))).map(|r| r.2).sum()
+            }
+        }
+    };
+    let mut ts = ts;
+    ts.sort_by_cached_key(|t| {
+        let vk = match &t.v {
+            TV::Int(n) => (0, vec![*n], String::new()),
+            TV::Text(s) => (1, vec![], s.clone()),
+            TV::Values(vs) => (2, vs.clone(), String::new()),
+        };
+        (tested.map(|f| !f(&t.k)).unwrap_or(false), count(&cell, t), count(&every, t), t.depth, t.tier, t.k.clone(), vk)
+    });
+    ts
+}
+
+/// The harness's goal for a target (step.py `attempt`): tier 0 the goal; else the key at the target's value or, for
+/// E012's one target per key, at any of its values (taskcore's `--goal K=V|V`).
+pub fn target_goal(t: &Target, goal: &[(String, Vec<i64>)]) -> Res<Vec<(fmi_core::Key, Vec<fmi_core::Val>)>> {
+    if t.tier == 0 {
+        return Ok(goal.iter().map(|(k, vs)| (fmi_core::Key::parse(k), vs.clone())).collect());
+    }
+    match &t.v {
+        TV::Int(n) => Ok(vec![(fmi_core::Key::parse(&t.k), vec![*n])]),
+        TV::Values(vs) if !vs.is_empty() => Ok(vec![(fmi_core::Key::parse(&t.k), vs.clone())]),
+        TV::Values(_) => Err("a target with an empty value list".into()),
+        TV::Text(_) => Err("a tier 1 or 2 target with a text value".into()),
+    }
 }
 
 /// facts.py `diff`: {key: (old, new)}, absent 0.
@@ -688,9 +869,10 @@ pub fn target_holds(t: &Target, goal: &[(String, Vec<i64>)], facts: &FactMap) ->
     if t.tier == 0 {
         return goal.iter().all(|(k, vs)| vs.contains(&facts.get(k).copied().unwrap_or(0)));
     }
-    match t.v {
-        TV::Int(v) => facts.get(&t.k).copied().unwrap_or(0) == v,
+    match &t.v {
+        TV::Int(v) => facts.get(&t.k).copied().unwrap_or(0) == *v,
         TV::Text(_) => false,
+        TV::Values(vs) => vs.contains(&facts.get(&t.k).copied().unwrap_or(0)),
     }
 }
 
@@ -998,9 +1180,10 @@ pub fn target_holds_in<F: crate::archive::FactLook + ?Sized>(t: &Target, goal: &
     if t.tier == 0 {
         return goal.iter().all(|(k, vs)| vs.contains(&get(k)));
     }
-    match t.v {
-        TV::Int(v) => get(&t.k) == v,
+    match &t.v {
+        TV::Int(v) => get(&t.k) == *v,
         TV::Text(_) => false,
+        TV::Values(vs) => vs.contains(&get(&t.k)),
     }
 }
 

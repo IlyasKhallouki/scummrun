@@ -538,16 +538,12 @@ struct Attempt {
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
            adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
            cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
-    let (hgoal, text): (Vec<(Key, Vec<Val>)>, String) = if tg.tier == 0 {
-        (goal.iter().map(|(k, vs)| (Key::parse(k), vs.clone())).collect(), step::goal_text(goal)?)
-    } else {
-        let v = match &tg.v {
-            TV::Int(n) => *n,
-            TV::Text(_) => return Err("a tier 1 or 2 target with a text value".into()),
-        };
-        (vec![(Key::parse(&tg.k), vec![v])], tg.text())
-    };
-    let _ = text;
+    // the harness's goal (step::target_goal: E012's one target per key gives the key a value list); tier 0's goal has
+    // reader-scope's form
+    if tg.tier == 0 {
+        step::goal_text(goal)?;
+    }
+    let hgoal: Vec<(Key, Vec<Val>)> = step::target_goal(tg, goal)?;
     let doc = doc_of(&**rd);
     let frame_costs = files::or(doc.get("frame_costs"), &json!({})).clone();
     std::fs::create_dir_all(adir).map_err(|e| files::io_err(adir, e))?;
