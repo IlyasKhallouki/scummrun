@@ -2272,3 +2272,31 @@ mod tests {
 - **What.** The check was stopped after 15 committed tries (two running, uncommitted) and resumed from its files with
   `FMI_PLAN_TIME=180`: above every found plan's time, so no plan the tries have found would have been lost. Nothing
   else changes.
+
+## Kitchen check, result (2026-11-03): stopped at 65 committed tries, the goal not reached
+
+The check ran from 01:54 to 04:03 on round 1's binaries with `--search fd` (amendment of 2026-11-03), resumed once at
+15 tries with `FMI_PLAN_TIME=180` (amendment above). It was stopped by hand at 04:03 with 65 tries committed and try
+j00065 running, for the measured reason below; no stop rule had fired (the falsifier was at 80).
+
+| | measured |
+|---|---|
+| tries | 65 committed, 0 errors; wall per try median 31.6 s, max 998 s; 1.69 h of try wall, 1,772 CPU s |
+| entries | 226; rooms 33, 38, 35, 29, 34 and 28 (6 of the 10 allowed); the latest frame 10,674 |
+| facts reached (owner, state, room) | owner:377 = 1, state:367 = 1, state:315 = 1, state:428 = 1, and the six rooms |
+| targets | the last target of 29 tries was a value of var:103 (the sentence's first object, a fact since the refinement); 33 tries ended on a var target, 23 on a bit |
+| the goal | a target once: j00061, tier 0, from a room-28 entry at frame 3443 on scope (28, 33, 41); the planner reached its 180 s limit with no plan |
+| planner limits reached | 10 requests, each 180-191 s with no plan; j00065 spent 8 attempts on such targets (bit:87, class:568:6 = 0, owner:567, owner:568, owner:578 = 0, var:197 = 1, 2, 3), 24 minutes |
+
+**Why it was stopped.** With targets in rotation, the goal, tried once, comes again only after the cell's other targets;
+from the room-28 entries those were targets that reach the planner's limit, each costing 3 minutes, so a try took about
+25 minutes and the 15 tries left to the falsifier about 6 hours, with no retry of the goal in sight.
+
+**What it shows.**
+- The explorer leaves the start rooms on its own: 6 of the 10 rooms, an object taken, two doors' states changed, the
+  bar reached, all by tries a few seconds to minutes long.
+- Two things bind, neither of them the per-try speed of round 1: targets with no plan cost the planner's whole limit
+  (round 2's no-plan proofs and deferred retries), and targets that are values of a refined variable (var:103's
+  values) take most of the tries.
+- The goal's request from frame 3443 did not plan within 180 s, where the same goal planned in 8-15 s from frame 3204
+  in E006-E008; whether it needs the cook's timer from there, or more time, is open.
