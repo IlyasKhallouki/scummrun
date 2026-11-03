@@ -1024,23 +1024,66 @@ impl<'g, 'c> WMap<'g, 'c> {
     }
 }
 
-/// Breadth first from the goal's atoms: {atom: depth}.
+/// E014 (plan.md (d)): the goal key of the game's own end, `end` = 1: a script's restart or quit (systemOps sub-ops 1
+/// and 3). It is no fact of the scripts, so it has no atom; its "writers" are the end sites (`end_sites`).
+pub const END_KEY: &str = "end";
+
+impl<'g, 'c> WMap<'g, 'c> {
+    /// E014: the end sites, (unit, instruction): every `systemOps(1)` (restart) and `systemOps(3)` (quit) statement.
+    pub fn end_sites(&self) -> Vec<(usize, u32)> {
+        let mut out = Vec::new();
+        for u in 0..self.c.g.script.units.len() {
+            for (i, x) in self.c.ins(u).iter().enumerate() {
+                if let Some(Stmt::Op { name, args, .. }) = x.st {
+                    if name == scumm_ir::known::SYSTEM_OPS {
+                        if let Some(&a0) = self.c.kids(args).first() {
+                            if matches!(self.c.konst(a0), Some(1) | Some(3)) {
+                                out.push((u, i as u32));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+}
+
+/// Breadth first from the goal's atoms: {atom: depth}. E014: the goal key `end` (END_KEY) starts from the end sites'
+/// needs at depth 1, as a fact's write sites' needs are its writers' (the regression goes on from them).
 pub fn regress(m: &mut WMap, goal: &[(String, Vec<i64>)]) -> Res<HashMap<Atom, i64>> {
     let mut depth: HashMap<Atom, i64> = HashMap::new();
+    let mut end_needs: Vec<Atom> = Vec::new();
     for (k, vs) in goal {
+        if k == END_KEY {
+            for (u, i) in m.end_sites() {
+                let t = m.tests(u, i);
+                end_needs.extend(t.iter().chain(m.start_needs[u].iter()).copied());
+            }
+            continue;
+        }
         let ak = AK::parse(k).ok_or(format!("goal key {k}"))?;
         for v in vs {
             depth.insert((ak, Some(*v as i32)), 0);
         }
     }
+    for a in end_needs {
+        depth.entry(a).or_insert(1);
+    }
     // a breadth-first level's depth does not depend on the order within the level (guide.py sorts each frontier,
     // which reaches only `parent`, not written): the frontier is sorted once per level, the needs are not
     // a write site's needs are the same whichever atom it writes: once a site is expanded every need has a depth,
     // so a site met again (at the same level or later) adds nothing and is skipped
-    let mut frontier: Vec<Atom> = depth.keys().copied().collect();
+    let mut frontier: Vec<Atom> = depth.iter().filter(|(_, &v)| v == 0).map(|(a, _)| *a).collect();
     frontier.sort_by_cached_key(atom_order);
     let mut d = 0;
     let mut expanded: HashSet<(usize, u32)> = HashSet::new();
+    // E014: with only the end goal there is no depth-0 atom; the regression starts at depth 1 from the end's needs
+    if frontier.is_empty() && !depth.is_empty() {
+        frontier = depth.keys().copied().collect();
+        frontier.sort_by_cached_key(atom_order);
+        d = 1;
+    }
     while !frontier.is_empty() {
         let mut nxt = Vec::new();
         for a in &frontier {
@@ -1059,6 +1102,11 @@ pub fn regress(m: &mut WMap, goal: &[(String, Vec<i64>)]) -> Res<HashMap<Atom, i
                     }
                 }
             }
+        }
+        if d == 0 {
+            // E014: the end's needs, preset at depth 1, join the first level a fact goal's regression reaches
+            let have: HashSet<Atom> = nxt.iter().copied().collect();
+            nxt.extend(depth.iter().filter(|(a, &v)| v == 1 && !have.contains(*a)).map(|(a, _)| *a).collect::<Vec<_>>());
         }
         nxt.sort_by_cached_key(atom_order);
         frontier = nxt;

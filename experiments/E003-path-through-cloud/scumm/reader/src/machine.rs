@@ -2912,8 +2912,9 @@ impl Reader<'_> {
         let (run, first_fork, rd) = self.run_full(cx, pins, pre, what);
         let game = self.m.game;
         let settled = st(&self.m).settled.clone();
-        // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths
-        let paths = if cx.table.split_limit && run.limit != 0 {
+        // the switch split_limit: the Builder splits a run the path limit cut and reads none of its paths (E014,
+        // FMI_READ_CUT=paths: it may read the run short, from these paths, when no split lifts it)
+        let paths = if cx.table.split_limit && run.limit != 0 && crate::builder::read_cut_mode() != 2 {
             Vec::new()
         } else {
             run.paths

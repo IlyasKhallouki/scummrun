@@ -388,6 +388,8 @@ pub struct Trial {
     pub novel: Vec<String>,
     pub kept: usize,
     pub seconds: f64,
+    /// E014: the tick at the stop or at the end
+    pub tick: u64,
 }
 
 /// A kept outcome: an entry to commit (its parent is the entry the step ran from).
@@ -583,6 +585,7 @@ impl Run1<'_> {
             novel: Vec::new(),
             kept: 0,
             seconds: 0.0,
+            tick: 0,
         };
         let tr0 = Instant::now();
         let ran = run_trial(b, last, self.end, self.cfg.fixed)?;
@@ -593,12 +596,14 @@ impl Run1<'_> {
                 tr.ended = true;
                 tr.reason = st.reason.clone();
                 tr.frame = st.frame;
+                tr.tick = st.tick;
                 tr.room = st.room;
                 self.worlds.push((st.frame, None));
                 None
             }
             Ran::Stopped(st, back) => {
                 tr.frame = st.frame;
+                tr.tick = st.tick;
                 tr.reason = st.reason.clone();
                 tr.idle = st.idle.clone();
                 tr.room = st.room;
