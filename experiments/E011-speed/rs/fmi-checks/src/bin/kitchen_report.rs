@@ -148,6 +148,7 @@ fn main() {
     let (mut d_windows, mut d_trig, mut d_ref, mut d_out, mut d_cand, mut d_kept, mut d_unb) = (0, 0, 0, 0, 0, 0, 0);
     let mut d_chosen: Vec<Value> = Vec::new();
     let mut af_by: BTreeMap<String, (usize, usize, usize, usize, usize, usize, f64)> = BTreeMap::new();
+    let mut af_phase: BTreeMap<String, f64> = BTreeMap::new();
     let mut af_secs: Vec<f64> = Vec::new();
     let mut af_rooms: BTreeMap<String, usize> = BTreeMap::new();
     let mut dead: Vec<Value> = Vec::new();
@@ -157,7 +158,7 @@ fn main() {
     let mut probe_status: BTreeMap<String, usize> = BTreeMap::new();
     let mut limits: Vec<Value> = Vec::new();
     let mut last_keys: BTreeMap<String, usize> = BTreeMap::new();
-    let (mut last_list, mut last_v103, mut max_v103) = (0usize, 0usize, 0usize);
+    let (mut last_list, mut last_v103, mut max_v103, mut last_refined) = (0usize, 0usize, 0usize, 0usize);
     let mut deferred_n = 0usize;
     // the calls per frame, by the try's entry room
     let mut rng: BTreeMap<i64, (u64, u64, u64, u64, BTreeMap<u64, u64>)> = BTreeMap::new();
@@ -250,6 +251,9 @@ fn main() {
             x.5 += u(&a["ended"]);
             x.6 += f(&a["step_seconds"]);
             af_secs.push(f(&a["step_seconds"]));
+            for (k, v) in a["phases_s"].as_object().cloned().unwrap_or_default() {
+                *af_phase.entry(k).or_default() += f(&v);
+            }
             for rm in a["rooms"].as_array().cloned().unwrap_or_default() {
                 inc(&mut af_rooms, rm[0].to_string(), rm[1].as_u64().unwrap_or(0) as usize);
             }
@@ -289,7 +293,7 @@ fn main() {
             if st == "time" {
                 limits.push(json!({"job": job, "target": pr["target"], "limit_s": pr["limit_s"], "seconds": pr["seconds"], "kind": "first plan at deepening's limit"}));
             }
-            if pr["stop"].as_str().map(|s| s.starts_with("planner timeout")).unwrap_or(false) {
+            if st != "time" && pr["stop"].as_str().map(|s| s.starts_with("planner timeout")).unwrap_or(false) {
                 limits.push(json!({"job": job, "target": pr["target"], "seconds": pr["seconds"], "kind": "a replan at the planner's limit"}));
             }
             if pr["target"][0].as_str() == Some("var:103") {
@@ -305,6 +309,11 @@ fn main() {
             }
             if last["target"][1].is_array() {
                 last_list += 1;
+            }
+            // a refined key: a variable the try's reading made a fact (reading.fact_vars)
+            let refined: Vec<String> = r["reading"]["fact_vars"].as_array().cloned().unwrap_or_default().iter().map(|v| format!("var:{v}")).collect();
+            if refined.contains(&k) {
+                last_refined += 1;
             }
             inc(&mut last_keys, k, 1);
         }
@@ -345,13 +354,14 @@ fn main() {
         println!("  - {k}: {} steps, {} trials, {} kept, {} third clicks, {} walk clicks, {} trials ended the run, {:.1} s", x.0, x.1, x.2, x.3, x.4, x.5, x.6);
     }
     println!("  - trials by room: {}", json!(af_rooms));
+    println!("  - wall by phase, s (fork, run: the inputs and runs; read: facts, novelty, dumps and the wait's stops after each trial): {}", json!(af_phase));
     println!("- dead moves: {} {}", dead.len(), json!(dead));
     println!("- entries kept by the layer: {}; every new entry by how: {}", json!(kept), json!(new_how));
     println!("\n## The planner and the targets\n");
     println!("- requests (probes) by first-plan status: {}", json!(probe_status));
     println!("- requests at a limit: {} {}", limits.len(), json!(limits));
     println!("- targets deferred: {deferred_n}");
-    println!("- the last target's key: {}; var:103 last in {last_v103} tries; a value list last in {last_list} tries; var:103 attempted at most {max_v103} times in a try", json!(last_keys));
+    println!("- the last target's key: {}; var:103 last in {last_v103} tries; a refined key (the reading's fact variables) last in {last_refined} tries; a value list last in {last_list} tries; var:103 attempted at most {max_v103} times in a try", json!(last_keys));
     println!("\n## Calls per frame (the window searches' parent frames, by the try's entry room)\n");
     println!("| room | frames | calls | least | most | histogram |\n|---:|---:|---:|---:|---:|---|");
     for (room, x) in &rng {
@@ -396,7 +406,7 @@ fn main() {
         let mut vers = Vec::new();
         if let Ok(rd) = std::fs::read_dir(&arch) {
             let mut ps: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| {
-                p.file_name().map(|n| n.to_string_lossy().starts_with("verify-") && n.to_string_lossy().ends_with(".json")).unwrap_or(false)
+                p.file_name().map(|n| n.to_string_lossy() == format!("verify-{g}.json")).unwrap_or(false)
             }).collect();
             ps.sort();
             for p in ps {
@@ -421,8 +431,8 @@ fn main() {
             "goal_again": goal_again,
             "delay": {"windows": d_windows, "triggered": d_trig, "chosen": d_chosen, "refuted": d_ref, "no_k": d_unb, "outcomes": d_out, "candidates": d_cand, "kept": d_kept},
             "afford": af_by.iter().map(|(k, x)| (k.clone(), json!({"steps": x.0, "trials": x.1, "kept": x.2, "third": x.3, "walks": x.4, "ended": x.5, "seconds": x.6}))).collect::<Map<_, _>>(),
-            "dead": dead, "kept": kept, "new_how": new_how, "probe_status": probe_status, "limits": limits, "deferred": deferred_n,
-            "last_target_keys": last_keys, "last_var103": last_v103, "last_list": last_list, "max_var103": max_v103,
+            "afford_phases": af_phase, "dead": dead, "kept": kept, "new_how": new_how, "probe_status": probe_status, "limits": limits, "deferred": deferred_n,
+            "last_target_keys": last_keys, "last_var103": last_v103, "last_refined": last_refined, "last_list": last_list, "max_var103": max_v103,
             "rng": rng.iter().map(|(k, x)| (k.to_string(), json!({"frames": x.0, "calls": x.1, "least": x.2, "most": x.3, "hist": x.4.iter().map(|(a, b)| json!([a, b])).collect::<Vec<_>>()}))).collect::<Map<_, _>>(),
             "rooms": rooms.iter().map(|(k, v)| (k.to_string(), v.clone())).collect::<Map<_, _>>(), "entries_by_how": hows_all,
             "t_first": t_sizes.first(), "t_last": t_sizes.last(), "goal": chain_out});
