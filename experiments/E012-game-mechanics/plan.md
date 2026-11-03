@@ -571,3 +571,40 @@ Written before patch 0005's code.
           Err(EngineError::Bridge("boxes: this engine has no Boxes command".into()))
       }
   ```
+
+## Amendment 2026-11-03, component `tested`: T exactly, and where a draw's range and share come from
+
+Written before the component's code.
+
+- **T, exactly.** For each action, its record's keys (the line's `pre_keys`) that its precondition holds, each with
+  the precondition's value set (`Record::pre`). An action is an event when its source is `event` (the Esc events
+  too), and an input otherwise (`sentence`, which holds the walks, and `verb`, which holds the dialog lines). An
+  event's own unit's keys are dropped: the slot (`local:N`, `script:N`, `objscript:O`), and the unit's `pos`,
+  `escpos`, `args`, `frozen`, `at` and `esc` keys. The goal's atoms are added. An atom is a (key, value set) pair;
+  the value sets hold the domain's `below` and `above` where the precondition does.
+- **Interface** (fmi-reading, `tested.rs`; no fmi-core addition: fmi-explore takes T as plain atoms and keys, which
+  the try passes it):
+  - `Tested::of(&dyn ReadingSource) -> Tested { atoms: Vec<(Key, Vec<Vec<Val>>)>, inputs: Vec<Key>, events:
+    Vec<Key>, goal: Vec<Key>, counts }`, with `flat()` (every atom as `(Key, Vec<Val>)`) and `keys()`;
+  - `draws(&dyn ReadingSource, action, Option<&DrawGame>) -> Vec<Draw { check, cite, cond, side, why, site, range:
+    Option<(i32, i32)>, share: Option<f64> }>`, one per check whose reason is a random draw.
+- **Why the game is a parameter.** A check names the draw but not its constants (`?(random draw: (getRandomNr) +
+  ...)`, the reader's `arith_at`), so range and share need the scripts. `DrawGame` is the game loaded once per process.
+  Without it, range and share are None.
+- **Range and share** (this replaces "by interval arithmetic, as `costs.rs` prices draws", which follows only the
+  straight code before the test and would leave the else-if chains on a draw unpriced):
+  - The check's cite gives the jump. Each `Local[n]` or `Var[n]` its test reads is followed back to the one assignment
+    that reaches it in the unit. A local is followed through yields (no other script writes it). A variable is
+    followed only through jumps and assignments to other targets. The search fails at the unit's start, an object's
+    verb entry, an Esc point, an op that writes the target in another way, or two reaching assignments.
+  - The test must then depend on exactly one `getRandomNr(n)`, whose `n` resolves to a constant the same way.
+    `range` is (0, n) (`o5_getRandomNr`, `common/random.cpp:62`).
+  - `share` is the fraction of the n + 1 values for which the test takes the check's side, each value run through the
+    resolved arithmetic as the reader's machine does it (int32 arithmetic, comparisons at int16). It is exact under
+    the uniformity that gate R2 checks.
+  - The resolved operand, printed the reader's way (`getRandomNr`, `(x) op ...`), must equal the check's own text.
+    Otherwise range and share are None.
+  - `share` is per check. Checks of one action on the same draw site carry the same `site`; a caller that wants the
+    joint share of such checks combines them.
+- **Measured with T1:** how many draw checks get a range and a share, on 28-33-41-j00065 and on the other kept
+  readings, and the time of `Tested::of`.
