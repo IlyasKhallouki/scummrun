@@ -10,7 +10,7 @@
 use crate::draws::check_why;
 pub use crate::draws::{check_parts, draws, is_draw, reason_of, Draw, DrawGame, Site, DRAW_WHY};
 use crate::Reading;
-use fmi_core::{Domain, Key, ReadingSource, Val, ABOVE, BELOW, K_ARGS, K_AT, K_ESC, K_ESCPOS, K_FROZEN, K_LOCAL};
+use fmi_core::{Domain, Key, ReadingSource, Val, K_ARGS, K_AT, K_ESC, K_ESCPOS, K_FROZEN, K_LOCAL};
 use fmi_core::{K_OBJSCRIPT, K_POS, K_SCRIPT, U_LOCAL, U_OBJ, U_SCRIPT};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -302,12 +302,13 @@ pub fn atom_holds(dom: Option<&Domain>, vs: &[Val], v: Val) -> bool {
         Some(d) => d.label(v),
         None => v,
     };
-    vs.contains(&l) || (l == BELOW && vs.contains(&BELOW)) || (l == ABOVE && vs.contains(&ABOVE))
+    vs.contains(&l)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fmi_core::{ABOVE, BELOW};
 
     #[test]
     fn own_unit() {
