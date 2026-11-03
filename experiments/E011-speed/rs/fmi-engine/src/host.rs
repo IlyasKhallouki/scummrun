@@ -433,6 +433,10 @@ pub struct BinEngine {
     last_facts: Option<Facts>,
     /// a Step's delta chunks (scratch)
     ranges: Vec<(usize, usize)>,
+    /// the last Step's block came as a delta (its chunks in `ranges`)
+    last_delta: bool,
+    /// the block before the last Step (step_changes's scratch)
+    prev: Vec<u8>,
     /// how the facts were had: (followed a delta, built whole)
     pub facts_counts: (u64, u64),
     proc_: Option<Child>,
@@ -457,6 +461,8 @@ impl BinEngine {
             last_now: false,
             last_facts: None,
             ranges: Vec::new(),
+            last_delta: false,
+            prev: Vec::new(),
             facts_counts: (0, 0),
             proc_: None,
             done: false,
@@ -553,6 +559,7 @@ impl BinEngine {
         let old = block::layout(&self.last);
         let mut ranges = std::mem::take(&mut self.ranges);
         let delta = block::apply(&mut self.last, &mut r, &mut ranges).map_err(bad)?;
+        self.last_delta = delta;
         // the facts follow the delta when they were known; otherwise they are built on the next facts()
         let kept = match (&mut self.last_facts, delta) {
             (Some(f), true) => block::update_facts(f, old, &self.last, &ranges),
@@ -845,6 +852,21 @@ impl Engine for BinEngine {
         }
         r.done().map_err(bad)?;
         Ok(v)
+    }
+
+    /// One Step, its delta read into the facts' changes (block::changes) with no whole facts built (IFACE e011-r2-own).
+    fn step_changes(&mut self, frames: u32) -> EResult<(Status, Vec<(Key, Val, Val)>)> {
+        // the base: this stop's block (a State round trip unless a Step brought it)
+        self.block()?;
+        let mut prev = std::mem::take(&mut self.prev);
+        prev.clear();
+        prev.extend_from_slice(&self.last);
+        let r = self.step(frames, false, false);
+        let out = r.and_then(|o| {
+            block::changes(&prev, &self.last, &self.ranges, self.last_delta).map(|c| (o.status, c)).map_err(bad)
+        });
+        self.prev = prev;
+        out
     }
 }
 

@@ -885,6 +885,17 @@ pub trait Engine: Send {
     fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
         pts.iter().map(|&(x, y)| self.at(x, y)).collect()
     }
+    /// Runs `frames` frames with no new input (a run to the frame `frames` after this stop) and returns the stop's
+    /// status and the facts' changes from this stop to it: (key, old, new) for every key whose value differs, absent
+    /// 0, in `Key` order (`Facts::diff` of the facts before and after). Default: today's calls; a provider that
+    /// follows Step's delta gives them in one round trip and with no whole facts map (IFACE e011-r2-own).
+    fn step_changes(&mut self, frames: u32) -> EResult<(Status, Vec<(Key, Val, Val)>)> {
+        let before = self.facts()?;
+        let to = self.status().frame + u64::from(frames);
+        let st = self.run(&RunSpec { frame: Some(to), ..Default::default() })?;
+        let after = self.facts()?;
+        Ok((st, before.diff(&after)))
+    }
 }
 
 /// The room's dump made from a full dump: the owners, states and classes of the objects the room's object list

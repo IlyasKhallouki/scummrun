@@ -96,3 +96,41 @@ fn errors_come_back_and_the_engine_goes_on() {
         }])
         .unwrap());
 }
+
+/// step_changes (one Step, its delta read into the facts' changes) gives, frame by frame, the status a run to the
+/// next frame gives and the diff of the facts before and after it (fmi-core's default), from boot frames with inputs.
+#[test]
+#[ignore]
+fn step_changes_are_a_runs_facts_diff() {
+    let host = Host::new(HostCfg::from_env()).unwrap();
+    for (f0, frames) in [(400u64, 1200u64), (2000, 1600)] {
+        let mut root = host.boot_bin(&cfg(&format!("sc{f0}"), Some(f0))).unwrap();
+        let mut a = root.fork_bin().unwrap();
+        let mut b = root.fork_bin().unwrap();
+        let clicks = [(f0 + 50, (160, 100)), (f0 + 300, (40, 120)), (f0 + 700, (300, 60))];
+        for (f, (x, y)) in clicks {
+            let ev = [Event { frame: f, what: Input::Click(x, y) }];
+            a.inputs(&ev).unwrap();
+            b.inputs(&ev).unwrap();
+        }
+        let (mut ta, mut tb, mut n_changes) = (0.0, 0.0, 0usize);
+        let mut prev = a.facts().unwrap();
+        for i in 1..=frames {
+            let t = std::time::Instant::now();
+            let sa = a.run(&RunSpec { frame: Some(f0 + i), ..Default::default() }).unwrap();
+            let fa = a.facts().unwrap();
+            let want = prev.diff(&fa);
+            ta += t.elapsed().as_secs_f64();
+            prev = fa;
+            let t = std::time::Instant::now();
+            let (sb, got) = b.step_changes(1).unwrap();
+            tb += t.elapsed().as_secs_f64();
+            assert_eq!(sb, sa, "frame {}", f0 + i);
+            assert_eq!(got, want, "frame {}", f0 + i);
+            n_changes += got.len();
+        }
+        eprintln!("from {f0}: {frames} frames, {n_changes} changes; run + facts + diff {:.1} us a frame, step_changes {:.1} us",
+                  ta / frames as f64 * 1e6, tb / frames as f64 * 1e6);
+        assert!(n_changes > 0);
+    }
+}

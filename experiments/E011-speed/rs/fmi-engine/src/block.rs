@@ -399,6 +399,88 @@ pub fn update_facts(facts: &mut Facts, old: Option<Layout>, new: &[u8], ranges: 
     true
 }
 
+/// The facts' changes from the block `old` to the block `new`: (key, old, new) for every key whose value differs,
+/// absent 0, in `Key` order, equal to `Facts::diff` of the two blocks' facts. `ranges` are the byte ranges where `new`
+/// was written over `old` (a delta's chunks, `delta` true; every other byte is equal in both): the vars, bits, owners,
+/// states and classes are read there alone, value by value; the tail (room, ego, cutscene, slots, override, verbs) is
+/// built for both blocks when a range reaches it. A whole block (`delta` false) or other counts: both blocks' facts.
+pub fn changes(old: &[u8], new: &[u8], ranges: &[(usize, usize)], delta: bool) -> Result<Vec<(Key, Val, Val)>, String> {
+    let whole = || -> Result<Vec<(Key, Val, Val)>, String> { Ok(Block::parse(old)?.facts().diff(&Block::parse(new)?.facts())) };
+    let (Some(lo), Some(l)) = (layout(old), layout(new)) else {
+        return whole();
+    };
+    if !delta || lo != l {
+        return whole();
+    }
+    let clocks: u64 = CLOCKS.iter().fold(0, |m, &c| m | (1u64 << c));
+    let (vs, ve, be) = (48, 48 + 4 * l.n_vars, l.owner - 4);
+    let mut out: Vec<(Key, Val, Val)> = Vec::new();
+    let mut tail = old.len() != new.len();
+    for &(off, len) in ranges {
+        let end = (off + len).min(new.len()).min(old.len());
+        if off < 44 && end > 32 {
+            tail = true; // room, ego, depth
+        }
+        if off < ve && end > vs {
+            for n in (off.max(vs) - vs) / 4..(end.min(ve) - vs).div_ceil(4) {
+                if n < 64 && clocks & (1u64 << n) != 0 {
+                    continue;
+                }
+                let (a, b) = (rd32(old, vs + 4 * n) as i32 as Val, rd32(new, vs + 4 * n) as i32 as Val);
+                if a != b {
+                    out.push((Key::var(n as u64), a, b));
+                }
+            }
+        }
+        if off < be && end > l.bits {
+            for i in off.max(l.bits)..end.min(be) {
+                let mut m = old[i] ^ new[i];
+                while m != 0 {
+                    let bit = m.trailing_zeros();
+                    let n = (i - l.bits) * 8 + bit as usize;
+                    if (n as u32) < l.n_bits {
+                        let a = ((old[i] >> bit) & 1) as Val;
+                        out.push((Key::bit(n as u64), a, 1 - a));
+                    }
+                    m &= m - 1;
+                }
+            }
+        }
+        if off < l.class && end > l.owner {
+            for i in off.max(l.owner)..end.min(l.class) {
+                if old[i] != new[i] {
+                    let (o, k): (usize, fn(u64) -> Key) = if i < l.state { (i - l.owner, Key::owner) } else { (i - l.state, Key::state) };
+                    if o >= 1 {
+                        out.push((k(o as u64), old[i] as Val, new[i] as Val));
+                    }
+                }
+            }
+        }
+        if off < l.end && end > l.class {
+            for o in ((off.max(l.class) - l.class) / 4).max(1)..(end.min(l.end) - l.class).div_ceil(4) {
+                let (a, b) = (rd32(old, l.class + 4 * o), rd32(new, l.class + 4 * o));
+                let mut m = a ^ b;
+                while m != 0 {
+                    let c = m.trailing_zeros();
+                    out.push((Key::class(o as u64, c as u64 + 1), ((a >> c) & 1) as Val, ((b >> c) & 1) as Val));
+                    m &= m - 1;
+                }
+            }
+        }
+        if off + len > l.end {
+            tail = true; // the slots, the override, the verbs
+        }
+    }
+    if tail {
+        let (mut a, mut b) = (Vec::new(), Vec::new());
+        Block::parse(old)?.push_tail(&mut a);
+        Block::parse(new)?.push_tail(&mut b);
+        out.extend(Facts(a).diff(&Facts(b)));
+    }
+    out.sort_unstable_by_key(|c| c.0);
+    Ok(out)
+}
+
 /// A StepReply's block field: kind 0 is a whole block (u32 length, bytes); kind 1 a delta from `last` (u32 new length,
 /// u32 chunk count, then u32 offset, u32 length and the bytes per chunk). `last` becomes the new block; `ranges` gets
 /// the delta's chunks. True for a delta, false for a whole block.
@@ -662,6 +744,83 @@ mod tests {
         new[l.class + 4 * 3] = 1;
         let mut f = Block::parse(&base).unwrap().facts();
         assert!(!update_facts(&mut f, Some(l), &new, &ranges_of(&base, &new)));
+    }
+
+    /// The engine's putDelta (patch 0002): chunks from the first differing byte to the last one with no run of more
+    /// than 16 equal bytes inside, the tail past the old length as a chunk.
+    fn put_delta(old: &[u8], new: &[u8]) -> Vec<(usize, usize)> {
+        let m = old.len().min(new.len());
+        let (mut v, mut i) = (Vec::new(), 0);
+        while i < m {
+            if old[i] == new[i] {
+                i += 1;
+                continue;
+            }
+            let (start, mut last) = (i, i);
+            i += 1;
+            while i < m {
+                if old[i] != new[i] {
+                    last = i;
+                } else if i - last > 16 {
+                    break;
+                }
+                i += 1;
+            }
+            v.push((start, last + 1 - start));
+            i = last + 1;
+        }
+        if new.len() > m {
+            v.push((m, new.len() - m));
+        }
+        v
+    }
+
+    #[test]
+    fn changes_are_the_facts_diff() {
+        let mut x = 7u64;
+        let mut rnd = move |n: u64| {
+            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (x >> 33) % n
+        };
+        let slot = |n: i32, w: i32, code: i64, frozen: i32| SlotRow { slot: n, number: n, where_: w, status: 2, code, frozen };
+        let s0 = vec![slot(202, WIO_LOCAL, 21, 0), slot(7, WIO_GLOBAL, 4, 0)];
+        let s1 = vec![slot(202, WIO_LOCAL, 22, 1), slot(7, WIO_GLOBAL, 4, 0), slot(30, WIO_ROOM, 9, 0)];
+        let top = Some(Top { where_: WIO_LOCAL, number: 202, code: 3, stale: false });
+        let vars: Vec<i32> = (0..80).map(|i| i * 5 - 9).collect();
+        let base = block(&vars, &[0b1001_0000, 0, 1, 0x40], 9, &s0, None, &[9, 2]);
+        let mut n_cases = 0;
+        for case in 0..400 {
+            let mut new = match case % 4 {
+                0 => base.clone(),
+                1 => block(&vars, &[0b1001_0000, 0, 1, 0x40], 9, &s1, None, &[9, 2]),
+                2 => block(&vars, &[0b1001_0000, 0, 1, 0x40], 9, &s0, top, &[3]),
+                _ => block(&vars, &[0b1001_0000, 0, 1, 0x40], 9, &s0, None, &[9, 2]),
+            };
+            let l = layout(&new).unwrap();
+            for _ in 0..rnd(9) {
+                // a byte of the header's room, ego or depth, a var, a bit, an owner or state, or a class
+                let i = match rnd(5) {
+                    0 => 32 + rnd(12) as usize,
+                    1 => 48 + rnd(4 * l.n_vars as u64) as usize,
+                    2 => l.bits + rnd((l.owner - 4 - l.bits) as u64) as usize,
+                    3 => l.owner + rnd((l.class - l.owner) as u64) as usize,
+                    _ => l.class + rnd((l.end - l.class) as u64) as usize,
+                };
+                new[i] ^= 1 << rnd(8);
+            }
+            let r = put_delta(&base, &new);
+            let want = Block::parse(&base).unwrap().facts().diff(&Block::parse(&new).unwrap().facts());
+            assert_eq!(changes(&base, &new, &r, true).unwrap(), want, "case {case}");
+            assert_eq!(changes(&base, &new, &[], false).unwrap(), want);
+            assert_eq!(changes(&new, &base, &put_delta(&new, &base), true).unwrap(),
+                       Block::parse(&new).unwrap().facts().diff(&Block::parse(&base).unwrap().facts()));
+            n_cases += !want.is_empty() as usize;
+        }
+        assert!(n_cases > 300);
+        // other counts: both blocks whole
+        let other = block(&vars[..70], &[0b1001_0000, 0, 1], 9, &s0, None, &[9, 2]);
+        assert_eq!(changes(&base, &other, &put_delta(&base, &other), true).unwrap(),
+                   Block::parse(&base).unwrap().facts().diff(&Block::parse(&other).unwrap().facts()));
     }
 
     #[test]
