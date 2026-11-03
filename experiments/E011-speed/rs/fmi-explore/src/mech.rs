@@ -149,7 +149,9 @@ impl TryNovel {
     /// The novel atoms' texts (T's order, then `room=R`) that no entry this try keeps holds.
     pub fn novel(&self, f: &Facts) -> Vec<String> {
         let kept = self.kept.lock().unwrap();
-        self.base.novel(f).into_iter().filter(|a| !kept.contains(a)).collect()
+        // each text once: T's atom on the room and the room's own novelty have the same text
+        let mut once: HashSet<String> = HashSet::new();
+        self.base.novel(f).into_iter().filter(|a| !kept.contains(a) && once.insert(a.clone())).collect()
     }
     /// An entry is kept that holds these atoms: they are novel no more in this try.
     pub fn keep(&self, atoms: &[String]) {
@@ -468,6 +470,13 @@ mod tests {
         assert_eq!(snap2(&door), Some(false));
         assert_eq!(snap2(&other_room), Some(true));
         let _ = K_ROOM;
+    }
+
+    #[test]
+    fn a_room_atom_of_t_is_one_text() {
+        let t = vec![TAtom::value("room", 41)];
+        let n = TryNovel::new(&json!({}), &t, &facts(&[("room", 28)]));
+        assert_eq!(n.novel(&facts(&[("room", 41)])), vec!["room=41".to_string()]);
     }
 
     #[test]
