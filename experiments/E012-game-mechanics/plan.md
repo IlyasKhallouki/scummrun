@@ -602,3 +602,23 @@ Written before the component's code. This is E011's round 3 item for the reading
   above). Measured with it: B3 with the switch on, and the kitchen pair (`after`). The switch's allocator becomes the
   system's if, with it, the ring(33) tries' planning is back within 20% of round 2's concurrent run and the kitchen
   pair's second reading is within 10% of mimalloc's; otherwise the one with the lower B3 sum. Nothing else changes.
+
+### Amendment 2026-11-03 (resident, after B3 with the system allocator, before the code it changes): the allocator by phase
+
+- **Measured.** `b3.sh on-system`: all 15 tries equal B0's. The ring(33) tries' planning is back at 5.4-6.0 s of
+  wall (4.6-5.2 CPU s), round 2's concurrent run's 5.5-7.2 s; the first try's 14.5 s (round 2: 14.8 s). But the
+  reading is slower with the system allocator: the first try's reading 162.3 s against 108.3 s, the kitchen pair's
+  second reading 23.1-23.9 s against 15.7 s (`after-system`, interleaved with `after 3`), its first 55.7-61.3 s
+  against 38.1 s; fmi's resident set 4.4 GB against 2.4 GB. By the previous amendment's rule the switch keeps
+  mimalloc (B3's sum 212.2 s against 234.3 s), and the planner stays twice as slow in it.
+- **What changes.** The allocator by phase, the switch's default (`FMI_READER_ALLOC=phase`; `mimalloc` and `system`
+  stay as measured): while a reading runs in the process (`InProc::read`), new blocks come from mimalloc, the
+  reader's own; at any other time from the system's, the planner's and the window search's own. A block is freed,
+  grown or shrunk by the allocator that made it: mimalloc's own test of its address ranges (`mi_is_in_heap_region`,
+  its page map) tells its blocks from the system's.
+- **Why it is sound.** No computation reads where its memory comes from; the outputs are the same with either
+  allocator (RS1, RS2 and B3, with mimalloc and with the system's). What remains is that every block goes back to its
+  maker: mimalloc's page map holds exactly the slices of the regions mimalloc reserved, and the system's blocks lie
+  in regions the system mapped, which no reservation of mimalloc's shares; before mimalloc's first block the map is
+  empty and answers no.
+- **Measured with it:** B3 with the switch on and the kitchen pair (`after`), as above; a unit test of the routing.
