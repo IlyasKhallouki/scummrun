@@ -85,6 +85,8 @@ fn script(d: &Path, n: usize, gain: bool) -> Value {
         1 => {
             news.push((2, vec![("var:5", json!(7))], "checkpoint"));
             news.push((9, vec![("var:5", json!(7))], "afford"));
+            // E014: a trial of the step ended the game through a script (an end entry, its dead move "afford")
+            news.push((11, vec![("var:5", json!(7))], "end+"));
             (json!("refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"),
              vec![w("walk_to(1)#2", "ready: the first end point in the order of tries", json!({"deviation": 1}), 0.2)],
              json!([{"why": "R0", "offer": {"idle": "dialog"}, "kept": 1, "step_seconds": 0.5}]))
@@ -107,14 +109,24 @@ fn script(d: &Path, n: usize, gain: bool) -> Value {
             news.push((5, vec![("var:5", json!(7))], "end"));
             (json!("goal"), vec![w("walk_to(1)#2", "ready: the first end point in the order of tries", json!({"goal": 1}), 0.3)], Value::Null)
         }
+        // a free try (component free's record), from n = 11 on: its entry new every other time
+        5 if n >= 11 => {
+            news.push((6, vec![("var:5", json!(7))], "free"));
+            if n % 12 == 11 {
+                news.push((8, vec![("var:9", json!(n + 1))], "free"));
+            }
+            (Value::Null, vec![], Value::Null)
+        }
         // no attempt: every request stops on the reach extension
         _ => (Value::Null, vec![], Value::Null),
     };
+    let free = k == 5 && n >= 11;
     if gain && k != 0 {
         news.insert(0, (1, vec![("var:9", json!(n + 1))], "wait"));
     }
     std::fs::create_dir_all(d.join("new")).unwrap();
     let mut new = Vec::new();
+    let mut dead: Vec<Value> = Vec::new();
     for (i, (df, fs, how)) in news.iter().enumerate() {
         let mut f = base.clone();
         for (key, v) in fs {
@@ -124,9 +136,16 @@ fn script(d: &Path, n: usize, gain: bool) -> Value {
         let doc = json!({"id": null, "parent": entry, "frame": fr, "tick": fr, "events": [{"frame": fr, "click": [2, 2]}],
                          "checkpoints": [cp(fr, f, fr)]});
         files::write_gz_default(&d.join("new").join(format!("{i}.json.gz")), &doc).unwrap();
-        new.push(json!({"file": format!("new/{i}.json.gz"), "frame": fr, "tick": fr, "how": how}));
+        if *how == "end+" {
+            new.push(json!({"file": format!("new/{i}.json.gz"), "frame": fr, "tick": fr, "how": "end", "novel": ["end"]}));
+            dead.push(json!({"reason": "restart@1:2", "frame": fr, "events": [{"frame": fr, "click": [2, 2]}], "how": "afford"}));
+        } else {
+            new.push(json!({"file": format!("new/{i}.json.gz"), "frame": fr, "tick": fr, "how": how}));
+        }
     }
-    let (probes, attempt) = if stop.is_null() {
+    let (probes, attempt) = if free {
+        (json!([]), Value::Null)
+    } else if stop.is_null() {
         let s = "reach extension: the start at frame 1 holds 1 values the extended reading did not reach either: x";
         (json!([{"target": ["bit:1", 1], "status": null, "stop": s, "seconds": 1.3, "attempt": "a00"},
                 {"target": ["bit:2", 1], "status": null, "stop": s, "seconds": 0.2, "attempt": "a01"}]), Value::Null)
@@ -147,8 +166,15 @@ fn script(d: &Path, n: usize, gain: bool) -> Value {
                      "reading": {"fresh": n == 0, "why": if n == 0 { "no cached reading" } else { "differs on 2 keys" }, "wall_s": 4.0, "load_s": 0.05},
                      "targets": {"by_tier": {"0": 0, "1": 2, "2": 0}, "first": []}, "probes": probes, "attempt": attempt,
                      "readings_made": [], "new": new, "tried": [], "exhausted": false,
-                     "tested": progress::atoms_json(&tested), "dead": [], "e012": e012,
+                     "tested": progress::atoms_json(&tested), "dead": dead, "e012": e012,
                      "cpu_s": {"total": 1.0}, "peak_rss_mb": {"python": 1.0, "children": 0.0}, "wall_s": 20.0 + n as f64});
+    let mut res = res;
+    if free {
+        res["kind"] = json!("free");
+        res["free"] = json!({"offers": 2, "points": 2, "trials": 30, "delays": {"counted": 2, "seconds": 0.6}, "seconds": 5.0,
+                             "at": [{"at": "entry", "frame": f0, "level": 1, "seconds": 3.0, "step": {"verdict_s": {"ignored": 0.5, "taken": 2.0}}},
+                                    {"at": "kept", "frame": f0 + 6, "level": 2, "seconds": 1.0, "step": {"ready": true}}]});
+    }
     files::write_json(&d.join("result.json"), &res, Some(1)).unwrap();
     res
 }
@@ -175,6 +201,7 @@ fn the_live_table_equals_the_table_from_the_files_after_every_commit() {
     let mut a = make(&t, None);
     let mut live = Stalls::of_open(&a).unwrap();
     let (mut kinds_live, mut kinds_files) = (Vec::new(), Vec::new());
+    let (port, port3) = (stall::ArchivePort::default(), stall::ArchivePort::default());
     for n in 0..30 {
         let e = a.select(1)[0];
         let d = a.prepare_job(e).unwrap();
@@ -196,6 +223,16 @@ fn the_live_table_equals_the_table_from_the_files_after_every_commit() {
         assert_eq!(live.free_cell(&cell), files.free_cell(&cell));
         assert_eq!(live.free_cells(), files.free_cells());
         kinds_live.push(kind(n + 1, stall::share(&live, 0.25), stall::free_cell(&live, &cell)));
+        // free's port over the open archive gives the same
+        for (p, ask) in [(&port, true), (&port3, n % 3 == 2)] {
+            if ask {
+                assert_eq!(p.share(&a, 0.25).unwrap(), live.share(0.25), "port, after commit {n}");
+                assert_eq!(p.share(&a, 1.0).unwrap(), live.share(1.0));
+                for c in a.rows.iter().map(|r| r.cell.clone()) {
+                    assert_eq!(p.free_cell(&a, &c).unwrap(), live.free_cell(&c), "port, cell {c} after commit {n}");
+                }
+            }
+        }
         // the archive opened again at this commit (a resume)
         let b = Archive::open(&a.root).unwrap();
         let reopened = Stalls::of_open(&b).unwrap();
@@ -203,6 +240,8 @@ fn the_live_table_equals_the_table_from_the_files_after_every_commit() {
         let cell_b = b.rows[b.select(1)[0]].cell.clone();
         assert_eq!(cell_b, cell);
         kinds_files.push(kind(n + 1, stall::share(&reopened, 0.25), stall::free_cell(&reopened, &cell_b)));
+        let pb = stall::ArchivePort::default();
+        assert_eq!((pb.share(&b, 0.25).unwrap(), pb.free_cell(&b, &cell_b).unwrap()), (live.share(0.25), live.free_cell(&cell)));
     }
     assert_eq!(kinds_live, kinds_files);
     // the cycle's classes are all in the table
@@ -220,6 +259,23 @@ fn the_live_table_equals_the_table_from_the_files_after_every_commit() {
     assert!(live.tries[0].gave && secs(0, Class::Productive) > 10.0);
     assert!(live.tries[2].gave && (secs(2, Class::Productive) - 7.5).abs() < 1e-9 && secs(2, Class::Refused) > 10.0);
     assert!(!live.tries[4].gave && secs(4, Class::ModelNoYield) > 10.0);
+    // the free tries: their kind, their rows by offer point, productive when a free entry was new
+    let frees: Vec<&stall::TryStall> = live.tries.iter().filter(|t| t.kind == "free").collect();
+    assert_eq!(frees.len(), 4);
+    for t in &frees {
+        let n: usize = t.job[1..].parse().unwrap();
+        assert_eq!(t.stop, "free");
+        assert_eq!(t.gave, n % 12 == 11, "{}", t.job);
+        let row = |o: &str| t.rows.iter().find(|x| x.0.phase == "free" && x.0.outcome == o).map(|x| (x.1, x.2));
+        let taken = if t.gave { Class::Productive } else { Class::InterfaceNoYield };
+        assert_eq!(row("entry, level 1: ignored"), Some((Class::Refused, 0.5)));
+        assert_eq!(row("entry, level 1: taken"), Some((taken, 2.0)));
+        assert_eq!(row("kept, level 2"), Some((taken, 1.0)));
+        assert_eq!(row("delays"), Some((taken, 0.6)));
+        assert!(row("other").map(|x| (x.1 - 0.4).abs() < 1e-9).unwrap_or(false));
+    }
+    // the dialog step's end entry is the step's: not new, the step stays "interface, no yield"
+    assert!(live.tries[1].rows.iter().any(|x| x.0.phase == "afford" && x.1 == Class::InterfaceNoYield));
     let (w, r) = live.totals();
     assert!((w - r).abs() < 1e-6);
 }

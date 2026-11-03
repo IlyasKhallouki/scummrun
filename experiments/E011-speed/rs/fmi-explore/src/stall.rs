@@ -984,19 +984,16 @@ pub fn free_cell(s: &Stalls, cell: &str) -> bool {
     s.free_cell(cell)
 }
 
-/// The driver's live table: opened from the archive, then one try per commit. It writes stalls.json with
-/// `FMI_STALLS=1`; with `FMI_FREE_SHIFT=1` alone it is kept for free's port (`share`, `free_cell`) and writes nothing.
+/// The driver's live table (`FMI_STALLS=1`): opened from the archive, then one try per commit, stalls.json written each
+/// time.
 pub struct Live {
     pub stalls: Stalls,
-    pub write: bool,
 }
 
 impl Live {
     pub fn open(a: &Archive) -> Res<Live> {
-        let l = Live { stalls: Stalls::of_open(a)?, write: on() };
-        if l.write {
-            l.stalls.write()?;
-        }
+        let l = Live { stalls: Stalls::of_open(a)? };
+        l.stalls.write()?;
         Ok(l)
     }
 
@@ -1004,10 +1001,44 @@ impl Live {
     pub fn commit(&mut self, a: &Archive, line: &Value) -> Res<()> {
         self.stalls.push(line, a)?;
         self.stalls.set_cells(cells_of_archive(a));
-        if self.write {
-            self.stalls.write()?;
+        self.stalls.write()
+    }
+}
+
+/// free's port (`free::Shift`, the stall amendment (2)): the two rules over the open archive, from a table kept over
+/// its log lines and caught up at each call with the live table's own push, so that it equals the table from the files
+/// at every commit, also after a reopen. The integration wires it: `impl free::Shift for stall::ArchivePort` and
+/// `free::set_shift(Box::new(stall::ArchivePort::default()))`.
+#[derive(Default)]
+pub struct ArchivePort {
+    /// the archive's root, the log lines pushed, the table
+    kept: std::sync::Mutex<Option<(PathBuf, usize, Stalls)>>,
+}
+
+impl ArchivePort {
+    fn with<T>(&self, a: &Archive, f: impl FnOnce(&Stalls) -> T) -> Res<T> {
+        let mut g = self.kept.lock().unwrap_or_else(|e| e.into_inner());
+        let fresh = !matches!(&*g, Some((root, n, _)) if *root == a.root && *n <= a.logs.len());
+        if fresh {
+            *g = Some((a.root.clone(), 0, Stalls::new(&a.root, &a.goal)));
         }
-        Ok(())
+        let (_, n, s) = g.as_mut().unwrap();
+        for l in &a.logs[*n..] {
+            s.push(l, a)?;
+        }
+        *n = a.logs.len();
+        s.set_cells(cells_of_archive(a));
+        Ok(f(s))
+    }
+
+    /// The free share now: ρ0, or with the shift on max(ρ0, min(2ρ0, 0.5)).
+    pub fn share(&self, a: &Archive, rho0: f64) -> Res<f64> {
+        self.with(a, |s| s.share(rho0))
+    }
+
+    /// The cell rule on `cell` now.
+    pub fn free_cell(&self, a: &Archive, cell: &str) -> Res<bool> {
+        self.with(a, |s| s.free_cell(cell))
     }
 }
 
