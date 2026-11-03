@@ -229,7 +229,13 @@ impl PJ {
             },
             Value::String(s) => PJ::Str(s.clone()),
             Value::Array(xs) => PJ::List(xs.iter().map(PJ::from_serde).collect()),
-            Value::Object(m) => PJ::Obj(m.iter().map(|(k, v)| (k.clone(), PJ::from_serde(v))).collect()),
+            // sorted, as serde_json writes the report's objects (a build with its preserve_order on, as the fmi
+            // binary's, iterates a Map in insertion order)
+            Value::Object(m) => {
+                let mut items: Vec<(String, PJ)> = m.iter().map(|(k, v)| (k.clone(), PJ::from_serde(v))).collect();
+                items.sort_by(|a, b| a.0.cmp(&b.0));
+                PJ::Obj(items)
+            }
         }
     }
 
