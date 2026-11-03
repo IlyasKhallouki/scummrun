@@ -484,7 +484,16 @@ impl WarmPlanner {
                 (o.status, o.plan, cost)
             }
             Search::FdLamaFirstCosts if self.host.rust_lama => {
-                let o = taskcore::lama::lama_first_costs(&st, &taskcore::lama::predicates_of(&st), deadline);
+                // with the fast switch, h_FF by watched preconditions (the same values and preferred operators, so
+                // the same plans; route/results.md)
+                let pred = taskcore::lama::predicates_of(&st);
+                let o = if self.host.fast {
+                    taskcore::lama::lama_first_costs_with(&st, &pred, deadline, |t, a| {
+                        search::Ff::with_mode(t, a, search::HffMode::Watch)
+                    })
+                } else {
+                    taskcore::lama::lama_first_costs(&st, &pred, deadline)
+                };
                 if o.status.starts_with("error: ") {
                     // a graph the port does not make (lama.rs refuses rather than guess): Fast Downward's binary
                     eprintln!("fmi-plan: the Rust lama-first-costs: {}; Fast Downward's binary instead", o.status);
