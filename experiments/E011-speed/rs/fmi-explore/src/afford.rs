@@ -1,0 +1,680 @@
+//! E012's affordance step (experiments/E012-game-mechanics/plan.md, section 4, "The interface's own inputs when the
+//! model cannot act"; component `afford`, switch FMI_AFFORD, off by default).
+//!
+//! At a frame where the model cannot act, the inputs the interface itself offers there, each tried in a fork of the
+//! engine, and the outcomes kept by IW(1) novelty:
+//!
+//! * **The offer** (`offer`): the visible verb slots (the dump lists the slots the engine's own hit and key tests see:
+//!   verbid set, saveid 0, curmode 1), the room's objects not of class 32 (`findObject` skips
+//!   kObjectClassUntouchable) and the actors in the room, each with a screen point at which the engine's hit test
+//!   answers that verb slot, object or actor. The candidate points of every slot, object and actor go to the engine in
+//!   one AtMany. No verb id, object id or game rule is named.
+//! * **The inputs** (`affordances`): in a dialog idle one click per verb slot; in a sentence idle each verb slot alone,
+//!   each target alone, and each verb then each target. In a trial, a third click over every target of the frame is
+//!   added when the second click left the game composing (`composing`).
+//! * **A trial** (`try_all`): a fork; the clicks two frames apart from the frame after the offer (M4's timing); then a
+//!   run until the bridge's idle rule holds again or the horizon passes. M4's form (`AffordCfg::fixed`) runs every
+//!   trial to a fixed horizon instead and takes its outcome against a no-input fork at the same frame.
+//! * **Kept**: a stop whose state holds an atom of T or a room no archive entry holds (`Novelty`, the archive's), and
+//!   none that a trial kept before it in this step. Each kept outcome is a real run: its movie is the entry's and the
+//!   trial's clicks, so it verifies from boot like any entry (A0). A trial that is not kept can be made again.
+//!
+//! Every trial's *outcome* (for the measurements, M4) is its state's world keys (the tested keys, the room, every
+//! owner and bit) against a no-input fork of the same entry at the same frame: the changes the inputs made there.
+
+use crate::events;
+use fmi_core::*;
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, HashSet};
+use std::time::Instant;
+
+/// The switch (plan.md, "Components"): the try runs the affordance step only with FMI_AFFORD=1.
+pub const SWITCH: &str = "FMI_AFFORD";
+
+pub fn on() -> bool {
+    std::env::var(SWITCH).is_ok_and(|v| v == "1")
+}
+
+/// SCUMM v5's screen (`_screenWidth`, `_screenHeight`): the hit test's coordinates.
+pub const SCREEN_W: i32 = 320;
+pub const SCREEN_H: i32 = 200;
+/// The engine's variables that name the input script and the sentence script (scumm/vars.cpp, setupScummVars: v5).
+pub const VAR_VERB_SCRIPT: usize = 32;
+pub const VAR_SENTENCE_SCRIPT: usize = 33;
+/// The trial's horizon when no wait gives one: E009's W, the measured length at which every idle set of 15 entries
+/// equalled its 3,200-frame set (plan.md, section 1).
+pub const W: u64 = 1600;
+
+/// Points tried for a verb slot, from its rectangle's top left (`curRect.left`, `top`), in order (M4).
+const VERB_DXY: [(i32, i32); 4] = [(2, 2), (4, 3), (1, 1), (0, 0)];
+/// Fractions (in quarters) of an object's on-screen box tried for its point, in order (M4).
+const GRID: [i32; 5] = [2, 1, 3, 0, 4];
+/// Heights over an actor's feet tried for its point, in order (M4).
+const ACTOR_DY: [i32; 4] = [-20, -30, -10, -40];
+
+/// What a click at a point hits, by the engine's hit test there.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+pub enum Hit {
+    Verb { slot: i32, id: i32 },
+    Object(i32),
+    Actor(i32),
+}
+
+impl Hit {
+    /// The probe's name of the hit (M4's afford.tsv): v<verb id>, t<object id>, t-<actor id>.
+    pub fn name(&self) -> String {
+        match *self {
+            Hit::Verb { id, .. } => format!("v{id}"),
+            Hit::Object(o) => format!("t{o}"),
+            Hit::Actor(a) => format!("t-{a}"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
+    pub hit: Hit,
+}
+
+/// The interface at a frame: the bridge's idle kind there, the visible verb slots and the hit targets, each with a
+/// point the engine's hit test confirms.
+#[derive(Clone, Debug, Default)]
+pub struct Offer {
+    pub frame: u64,
+    pub idle: Option<String>,
+    pub verbs: Vec<Point>,
+    pub targets: Vec<Point>,
+    /// what the dump listed: visible verb slots, room objects (all, and touchable with a box), actors in the room
+    pub n_verbs: usize,
+    pub n_objects: usize,
+    pub n_touchable: usize,
+    pub n_actors: usize,
+    /// the hit tests asked (one AtMany)
+    pub n_points: usize,
+}
+
+impl Offer {
+    pub fn json(&self) -> Value {
+        json!({"frame": self.frame, "idle": self.idle, "verbs": self.n_verbs, "verbs_hit": self.verbs.len(),
+               "objects": self.n_objects, "touchable": self.n_touchable, "actors": self.n_actors,
+               "targets_hit": self.targets.len(), "points": self.n_points})
+    }
+}
+
+/// One trial's clicks, in order: click k at the offer's frame + 1 + 2k (M4's timing).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Inputs {
+    pub clicks: Vec<Point>,
+}
+
+impl Inputs {
+    /// The probe's name (M4's afford.tsv): the hits' names joined, e.g. "v8t316".
+    pub fn name(&self) -> String {
+        self.clicks.iter().map(|p| p.hit.name()).collect()
+    }
+    /// The clicks as input events at absolute frames, from the frame `f0` of the offer.
+    pub fn events(&self, f0: u64) -> Vec<Event> {
+        self.clicks
+            .iter()
+            .enumerate()
+            .map(|(k, p)| Event { frame: f0 + 1 + 2 * k as u64, what: Input::Click(p.x, p.y) })
+            .collect()
+    }
+}
+
+/// The offer at the engine's stop, from its dump `o` (a full dump: verbs, room objects, classes, actors) and its
+/// status (the camera's xstart, the screen layout, the idle kind).
+pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
+    let st = e.status().clone();
+    let xs = st.xstart;
+    // the main screen's topline (patch 0004's layout in the status; 0 where the status has none)
+    let top = st.screen.map(|s| s.0).unwrap_or(0);
+    let untouchable: HashSet<u32> = o.classes.iter().filter(|(_, c)| c.contains(&32)).map(|(id, _)| *id).collect();
+    let mut cands: Vec<(Hit, Vec<(i32, i32)>)> = Vec::new();
+    for v in &o.verbs {
+        let pts = VERB_DXY.iter().map(|&(dx, dy)| (v.x + dx, v.y + dy)).collect();
+        cands.push((Hit::Verb { slot: v.slot, id: v.id }, pts));
+    }
+    let n_verbs = cands.len();
+    let ros = o.room_objects.as_deref().unwrap_or(&[]);
+    let mut n_touchable = 0;
+    for r in ros {
+        if untouchable.contains(&(r.id as u32)) || r.w <= 0 || r.h <= 0 {
+            continue;
+        }
+        n_touchable += 1;
+        let (x0, x1) = ((r.x - xs).max(0), (r.x + r.w - xs).min(SCREEN_W) - 1);
+        let (y0, y1) = ((r.y + top).max(0), (r.y + r.h + top).min(SCREEN_H) - 1);
+        if x0 > x1 || y0 > y1 {
+            continue;
+        }
+        let mut pts = Vec::with_capacity(25);
+        for fy in GRID {
+            for fx in GRID {
+                pts.push((x0 + (x1 - x0) * fx / 4, y0 + (y1 - y0) * fy / 4));
+            }
+        }
+        cands.push((Hit::Object(r.id), pts));
+    }
+    for a in &o.actors {
+        let pts = ACTOR_DY.iter().map(|&dy| (a.x - xs, a.y - a.elevation + dy + top)).collect();
+        cands.push((Hit::Actor(a.id), pts));
+    }
+    let mut all: Vec<(i32, i32)> = cands.iter().flat_map(|(_, p)| p.iter().copied()).collect();
+    all.sort_unstable();
+    all.dedup();
+    let ats = if all.is_empty() { Vec::new() } else { e.at_many(&all)? };
+    let at_of = |p: (i32, i32)| all.binary_search(&p).ok().map(|i| &ats[i]);
+    let mut out = Offer {
+        frame: st.frame,
+        idle: st.idle.clone(),
+        n_verbs,
+        n_objects: ros.len(),
+        n_touchable,
+        n_actors: o.actors.len(),
+        n_points: all.len(),
+        ..Default::default()
+    };
+    for (hit, pts) in cands {
+        let found = pts.into_iter().find(|&p| {
+            at_of(p).is_some_and(|a| match hit {
+                Hit::Verb { slot, .. } => a.verb_slot == slot,
+                Hit::Object(id) => a.main.map(|m| m.2) == Some(id),
+                Hit::Actor(id) => a.main.map(|m| m.3) == Some(id),
+            })
+        });
+        if let Some((x, y)) = found {
+            let p = Point { x, y, hit };
+            if matches!(hit, Hit::Verb { .. }) {
+                out.verbs.push(p);
+            } else {
+                out.targets.push(p);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// The inputs of an offer (plan.md, section 4, "Enumeration"): in a dialog idle each verb slot; in a sentence idle each
+/// verb slot alone, each verb then each target, each target alone (M4's order). None when the bridge is not idle.
+pub fn inputs_of(of: &Offer) -> Vec<Inputs> {
+    let one = |p: &Point| Inputs { clicks: vec![*p] };
+    match of.idle.as_deref() {
+        Some("dialog") => of.verbs.iter().map(one).collect(),
+        Some("sentence") => {
+            let mut v: Vec<Inputs> = of.verbs.iter().map(one).collect();
+            for a in &of.verbs {
+                for t in &of.targets {
+                    v.push(Inputs { clicks: vec![*a, *t] });
+                }
+            }
+            v.extend(of.targets.iter().map(one));
+            v
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// The engine at a frame where the interface can be read: None when `e` is idle already (the offer is made on `e`),
+/// else a fork of `e` run with no input to the bridge's first idle stop within `horizon` frames (Some(None): no idle
+/// stop within them, or the run ended). No input is given on the way, so the fork's movie is `e`'s.
+pub fn ready(e: &mut Box<dyn Engine>, horizon: u64) -> EResult<Option<Option<Box<dyn Engine>>>> {
+    if e.status().idle.is_some() {
+        return Ok(None);
+    }
+    let mut b = e.fork()?;
+    let end = b.status().frame + horizon;
+    match b.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {
+        Ok(st) if st.reason == "idle" => Ok(Some(Some(b))),
+        Ok(_) => {
+            b.quit();
+            Ok(Some(None))
+        }
+        Err(EngineError::Ended(_)) => Ok(Some(None)),
+        Err(x) => Err(x),
+    }
+}
+
+/// `affordances(engine, &Obs) -> Vec<Inputs>` (plan.md, "Components"): the offer at the engine's stop and its inputs.
+pub fn affordances(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Vec<Inputs>> {
+    Ok(inputs_of(&offer(e, o)?))
+}
+
+/// What the archive holds, as the step's novelty reads it (provider: the archive, its novelty over T and the rooms).
+pub trait Novelty {
+    /// The atoms of T and the room that this state holds and no archive entry holds, as texts (empty: not novel).
+    fn novel(&self, f: &Facts) -> Vec<String>;
+}
+
+/// Novelty over (key, value) pairs: of the given keys and the room, the pairs no state in `seen` holds. The stand-in
+/// the gate checks use for the archive's novelty over T's atoms.
+pub struct PairNovelty {
+    pub keys: HashSet<Key>,
+    pub seen: HashSet<(Key, Val)>,
+}
+
+impl PairNovelty {
+    pub fn new(keys: impl IntoIterator<Item = Key>) -> PairNovelty {
+        let mut keys: HashSet<Key> = keys.into_iter().collect();
+        keys.insert(Key::pack(K_ROOM, 0, 0, 0));
+        PairNovelty { keys, seen: HashSet::new() }
+    }
+    pub fn add(&mut self, f: &Facts) {
+        let ks: Vec<Key> = self.keys.iter().copied().collect();
+        for k in ks {
+            self.seen.insert((k, f.val(k)));
+        }
+    }
+}
+
+impl Novelty for PairNovelty {
+    fn novel(&self, f: &Facts) -> Vec<String> {
+        let mut out: Vec<String> =
+            self.keys.iter().map(|&k| (k, f.val(k))).filter(|p| !self.seen.contains(p)).map(|(k, v)| format!("{k}={v}")).collect();
+        out.sort();
+        out
+    }
+}
+
+/// More stops of a trial after its idle stop (the wait's stops, plan.md section 4 "then through the wait's stops"):
+/// given the trial's engine at its stop, the checkpoints of later frames of the same run. The engine may be forked,
+/// not moved.
+pub type Then<'a> = &'a dyn Fn(&mut Box<dyn Engine>) -> Result<Vec<Checkpoint>, String>;
+
+/// How the trials run.
+#[derive(Clone, Debug)]
+pub struct AffordCfg {
+    /// frames after the offer's frame: the trial's last stop (the wait's horizon when the wait gives one, else W)
+    pub horizon: u64,
+    /// M4's form: every trial to the offer's frame + horizon, its outcome against a no-input fork there
+    pub fixed: bool,
+    /// the third click over every target of the frame when a verb-then-target trial left the game composing
+    pub third: bool,
+}
+
+impl Default for AffordCfg {
+    fn default() -> Self {
+        AffordCfg { horizon: W, fixed: false, third: true }
+    }
+}
+
+/// One trial as run.
+#[derive(Clone, Debug)]
+pub struct Trial {
+    pub inputs: Inputs,
+    /// the clicks at absolute frames
+    pub events: Vec<Event>,
+    /// where the trial stopped, and why ("idle", "max_frame", "frame"); the end reason when the run ended
+    pub frame: u64,
+    pub reason: String,
+    pub ended: bool,
+    pub idle: Option<String>,
+    pub room: i32,
+    /// frames from the offer to the idle stop after the last click (None: no idle stop within the horizon)
+    pub back: Option<u64>,
+    /// the last click left the game composing (`composing`)
+    pub composing: bool,
+    /// the world keys' changes against no input at the same frame: (key, new value), in key order
+    pub outcome: Vec<(Key, Val)>,
+    /// the atoms the archive's novelty gave at the stop and the later stops, and whether a stop was kept
+    pub novel: Vec<String>,
+    pub kept: usize,
+    pub seconds: f64,
+}
+
+/// A kept outcome: an entry to commit (its parent is the entry the step ran from).
+#[derive(Clone, Debug)]
+pub struct Kept {
+    pub name: String,
+    /// the trial's clicks at absolute frames: the entry's movie continues with them
+    pub events: Vec<Event>,
+    pub checkpoint: Checkpoint,
+    /// the novel atoms it holds (those no earlier kept outcome of this step held)
+    pub novel: Vec<String>,
+    pub room: i32,
+}
+
+impl Kept {
+    /// The entry's events as the archive's files write them.
+    pub fn events_json(&self) -> Vec<Value> {
+        self.events.iter().map(events::event_json).collect()
+    }
+}
+
+/// The step's result.
+#[derive(Clone, Debug, Default)]
+pub struct AffordOut {
+    pub offer: Offer,
+    pub trials: Vec<Trial>,
+    pub kept: Vec<Kept>,
+    pub seconds: f64,
+    /// the engines' CPU (the trials' forks, the control) and this thread's
+    pub engine_cpu_s: f64,
+    /// wall seconds by phase: the forks, the inputs and runs, the reads (facts, runs, dumps, hit tests), the quits,
+    /// the no-input control
+    pub phases: [f64; 5],
+}
+
+impl AffordOut {
+    /// Distinct outcomes, each with its trials' names (BTreeMap: in outcome order).
+    pub fn outcomes(&self) -> BTreeMap<Vec<(Key, Val)>, Vec<String>> {
+        let mut m: BTreeMap<Vec<(Key, Val)>, Vec<String>> = BTreeMap::new();
+        for t in &self.trials {
+            m.entry(t.outcome.clone()).or_default().push(t.inputs.name());
+        }
+        m
+    }
+    /// Distinct outcomes on the world keys less the script-control keys (slot alive, position, arguments, freeze, the
+    /// override: they cycle with animation scripts, plan.md section 6).
+    pub fn outcomes_world(&self) -> usize {
+        let mut s: HashSet<Vec<(Key, Val)>> = HashSet::new();
+        for t in &self.trials {
+            s.insert(t.outcome.iter().filter(|(k, _)| !control_key(*k)).copied().collect());
+        }
+        s.len()
+    }
+    /// The step's record (counts and timings; no game text).
+    pub fn json(&self) -> Value {
+        let n = self.trials.len();
+        let mut rooms: BTreeMap<i32, usize> = BTreeMap::new();
+        for t in &self.trials {
+            *rooms.entry(t.room).or_default() += 1;
+        }
+        let mut backs: Vec<u64> = self.trials.iter().filter_map(|t| t.back).collect();
+        backs.sort_unstable();
+        json!({"offer": self.offer.json(), "trials": n, "third": self.trials.iter().filter(|t| t.inputs.clicks.len() == 3).count(),
+               "composing": self.trials.iter().filter(|t| t.composing).count(),
+               "ended": self.trials.iter().filter(|t| t.ended).count(), "outcomes": self.outcomes().len(),
+               "outcomes_world": self.outcomes_world(),
+               "kept": self.kept.len(), "rooms": rooms.iter().map(|(r, c)| json!([r, c])).collect::<Vec<_>>(),
+               "back_median": backs.get(backs.len() / 2), "seconds": self.seconds,
+               "ms_per_trial": if n > 0 { 1e3 * self.seconds / n as f64 } else { 0.0 }, "engine_cpu_s": self.engine_cpu_s,
+               "phases_s": {"fork": self.phases[0], "run": self.phases[1], "read": self.phases[2], "quit": self.phases[3],
+                            "control": self.phases[4]}})
+    }
+}
+
+/// A script-control key (plan.md, section 6): a slot alive, its position, its arguments, its freeze, the override.
+pub fn control_key(k: Key) -> bool {
+    matches!(k.kind(), K_SCRIPT | K_LOCAL | K_OBJSCRIPT | K_AT | K_FROZEN | K_POS | K_ESCPOS | K_ARGS | K_ESC)
+}
+
+/// The keys an outcome is read on: the tested keys, the room, every owner and every bit (M4's "world").
+fn world(tested: &HashSet<Key>, k: Key) -> bool {
+    tested.contains(&k) || matches!(k.kind(), K_ROOM | K_OWNER | K_BIT)
+}
+
+fn world_of(tested: &HashSet<Key>, f: &Facts) -> Facts {
+    Facts(f.iter().filter(|(k, _)| world(tested, *k)).copied().collect())
+}
+
+/// The changes from `control` to `trial` on the world keys: (key, new value), in key order.
+fn outcome_of(control: &Facts, trial: &Facts) -> Vec<(Key, Val)> {
+    control.diff(trial).into_iter().map(|(k, _, new)| (k, new)).collect()
+}
+
+/// The checkpoint of a stop (replay.Harness.checkpoint: frame, facts, tick, rng, the actors sorted).
+pub fn checkpoint_of(st: &Status, o: &Obs) -> Checkpoint {
+    let mut actors: Vec<(i32, i32, i32)> = o.actors.iter().map(|a| (a.id, a.x, a.y)).collect();
+    actors.sort_unstable();
+    Checkpoint { frame: st.frame, facts: facts_of(o), tick: st.tick, rng: st.rng, actors }
+}
+
+/// The trial's last click left the game composing: the bridge is idle in a sentence again, and of the units a click
+/// can start (the bridge's idle blockers: the input script, the sentence script, an object's verb script) only the
+/// input script ran from the click's frame on. `runs`: the trial's slot runs (segment on); `input` and `sentence`:
+/// the scripts VAR_VERB_SCRIPT and VAR_SENTENCE_SCRIPT named.
+pub fn composing(idle: Option<&str>, runs: &[Run], from: u64, input: &[i32], sentence: i32) -> bool {
+    if idle != Some("sentence") {
+        return false;
+    }
+    let after: Vec<&Run> = runs.iter().filter(|r| r.frame >= from).collect();
+    let ran_input = after.iter().any(|r| (r.where_ == WIO_GLOBAL || r.where_ == WIO_LOCAL) && input.contains(&r.number));
+    let ran_sentence = after.iter().any(|r| r.where_ == WIO_GLOBAL && r.number == sentence);
+    let ran_object = after.iter().any(|r| {
+        matches!(r.where_, WIO_ROOM | WIO_INVENTORY | WIO_FLOBJECT) && r.number != ENCD && r.number != EXCD
+    });
+    ran_input && !ran_sentence && !ran_object
+}
+
+/// How a trial's run went: stopped (its status and the idle stop's frame, if any), or ended (the end status).
+enum Ran {
+    Stopped(Status, Option<u64>),
+    Ended(Status),
+}
+
+/// A trial's engine after its clicks: run to the frame after the last click, then to the bridge's idle stop or the
+/// end frame `end`; in M4's form (`fixed`) then on to `end`.
+fn run_trial(b: &mut Box<dyn Engine>, last: u64, end: u64, fixed: bool) -> EResult<Ran> {
+    let go = |b: &mut Box<dyn Engine>, spec: RunSpec| -> EResult<Result<Status, Status>> {
+        match b.run(&spec) {
+            Ok(s) => Ok(Ok(s)),
+            Err(EngineError::Ended(s)) => Ok(Err(*s)),
+            Err(x) => Err(x),
+        }
+    };
+    let mut st = match go(b, RunSpec { frame: Some(last + 1), ..Default::default() })? {
+        Ok(s) => s,
+        Err(s) => return Ok(Ran::Ended(s)),
+    };
+    let mut back = None;
+    if st.frame < end {
+        st = match go(b, RunSpec { idle: true, max_frame: Some(end), ..Default::default() })? {
+            Ok(s) => s,
+            Err(s) => return Ok(Ran::Ended(s)),
+        };
+        if st.reason == "idle" {
+            back = Some(st.frame);
+        }
+    }
+    if fixed && st.frame < end {
+        st = match go(b, RunSpec { frame: Some(end), ..Default::default() })? {
+            Ok(s) => s,
+            Err(s) => return Ok(Ran::Ended(s)),
+        };
+    }
+    Ok(Ran::Stopped(st, back))
+}
+
+/// The step's running state: the record, the atoms kept so far in this step (IW(1) within the step), and each trial's
+/// world facts at its stop (for the outcomes, after the trials).
+struct Run1<'a> {
+    f0: u64,
+    end: u64,
+    cfg: &'a AffordCfg,
+    tested: HashSet<Key>,
+    novelty: &'a dyn Novelty,
+    then: Option<Then<'a>>,
+    out: AffordOut,
+    kept_atoms: HashSet<String>,
+    worlds: Vec<(u64, Option<Facts>)>,
+    cpu: f64,
+}
+
+impl Run1<'_> {
+    /// One trial on `b`, whose clicks `events` are scheduled: its run, its record, its world facts, and its stops kept
+    /// by novelty. Returns the trial's index and its stop's status and facts (None: the run ended).
+    fn trial(&mut self, b: &mut Box<dyn Engine>, inputs: Inputs, events: Vec<Event>) -> EResult<(usize, Option<(Status, Facts)>)> {
+        let tt = Instant::now();
+        let last = events.last().map(|x| x.frame).unwrap_or(self.f0);
+        let mut tr = Trial {
+            inputs,
+            events,
+            frame: 0,
+            reason: String::new(),
+            ended: false,
+            idle: None,
+            room: 0,
+            back: None,
+            composing: false,
+            outcome: Vec::new(),
+            novel: Vec::new(),
+            kept: 0,
+            seconds: 0.0,
+        };
+        let tr0 = Instant::now();
+        let ran = run_trial(b, last, self.end, self.cfg.fixed)?;
+        self.out.phases[1] += tr0.elapsed().as_secs_f64();
+        let tr1 = Instant::now();
+        let res = match ran {
+            Ran::Ended(st) => {
+                tr.ended = true;
+                tr.reason = st.reason.clone();
+                tr.frame = st.frame;
+                tr.room = st.room;
+                self.worlds.push((st.frame, None));
+                None
+            }
+            Ran::Stopped(st, back) => {
+                tr.frame = st.frame;
+                tr.reason = st.reason.clone();
+                tr.idle = st.idle.clone();
+                tr.room = st.room;
+                tr.back = back.map(|f| f - self.f0);
+                let f = b.facts()?;
+                self.worlds.push((st.frame, Some(world_of(&self.tested, &f))));
+                let mut stops: Vec<(Option<Checkpoint>, Facts)> = vec![(None, f.clone())];
+                if let (Some(th), false) = (self.then, self.cfg.fixed) {
+                    for c in th(b).map_err(EngineError::Bridge)? {
+                        let fc = c.facts.clone();
+                        stops.push((Some(c), fc));
+                    }
+                }
+                for (cp, fs) in stops {
+                    let nov: Vec<String> = self.novelty.novel(&fs).into_iter().filter(|a| !self.kept_atoms.contains(a)).collect();
+                    if nov.is_empty() {
+                        continue;
+                    }
+                    let cp = match cp {
+                        Some(c) => c,
+                        None => checkpoint_of(&st, &b.obs(&ObsReq::default())?),
+                    };
+                    self.kept_atoms.extend(nov.iter().cloned());
+                    tr.novel.extend(nov.iter().cloned());
+                    tr.kept += 1;
+                    let room = cp.facts.val(Key::pack(K_ROOM, 0, 0, 0)) as i32;
+                    self.out.kept.push(Kept { name: tr.inputs.name(), events: tr.events.clone(), checkpoint: cp, novel: nov, room });
+                }
+                Some((st, f))
+            }
+        };
+        self.out.phases[2] += tr1.elapsed().as_secs_f64();
+        tr.seconds = tt.elapsed().as_secs_f64();
+        self.out.trials.push(tr);
+        Ok((self.out.trials.len() - 1, res))
+    }
+}
+
+/// `try_all(engine, inputs, &Tested, archive) -> Vec<Kept>` (plan.md, "Components"): every input tried in a fork of
+/// `e`, which is stopped at the offer's frame; each trial's outcome; the stops kept by novelty. `tested`: T's keys
+/// (the outcomes' keys); `novelty`: the archive's; `then`: the stops after a trial's idle stop (the wait's).
+pub fn try_all(
+    e: &mut Box<dyn Engine>,
+    of: &Offer,
+    inputs: &[Inputs],
+    tested: &[Key],
+    novelty: &dyn Novelty,
+    cfg: &AffordCfg,
+    then: Option<Then<'_>>,
+) -> EResult<AffordOut> {
+    let t0 = Instant::now();
+    let f0 = e.status().frame;
+    let entry = e.facts()?;
+    let sentence = entry.val(Key::var(VAR_SENTENCE_SCRIPT as u64)) as i32;
+    let input0 = entry.val(Key::var(VAR_VERB_SCRIPT as u64)) as i32;
+    let mut r = Run1 {
+        f0,
+        end: f0 + cfg.horizon,
+        cfg,
+        tested: tested.iter().copied().collect(),
+        novelty,
+        then,
+        out: AffordOut { offer: of.clone(), ..Default::default() },
+        kept_atoms: HashSet::new(),
+        worlds: Vec::new(),
+        cpu: 0.0,
+    };
+    for inp in inputs {
+        let tf = Instant::now();
+        let mut b = e.fork()?;
+        r.out.phases[0] += tf.elapsed().as_secs_f64();
+        let evs = inp.events(f0);
+        let check = cfg.third && !cfg.fixed && inp.clicks.len() == 2;
+        let ti = Instant::now();
+        if check {
+            b.segment(true)?;
+            b.runs()?;
+        }
+        b.inputs(&evs)?;
+        r.out.phases[1] += ti.elapsed().as_secs_f64();
+        let last = evs.last().map(|x| x.frame).unwrap_or(f0);
+        let (i, res) = r.trial(&mut b, inp.clone(), evs.clone())?;
+        if let (true, Some((st, f))) = (check, res) {
+            let tr = Instant::now();
+            let runs = b.runs()?;
+            r.out.phases[2] += tr.elapsed().as_secs_f64();
+            let input = [input0, f.val(Key::var(VAR_VERB_SCRIPT as u64)) as i32];
+            let comp = composing(st.idle.as_deref(), &runs.runs, last, &input, sentence);
+            r.out.trials[i].composing = comp;
+            if comp && st.frame < r.end {
+                // the third click: over every target the hit test finds at this stop
+                let o = b.obs(&ObsReq::default())?;
+                let of2 = offer(&mut b, &o)?;
+                for t in &of2.targets {
+                    let tf = Instant::now();
+                    let mut c = b.fork()?;
+                    r.out.phases[0] += tf.elapsed().as_secs_f64();
+                    let mut evs3 = evs.clone();
+                    evs3.push(Event { frame: st.frame + 1, what: Input::Click(t.x, t.y) });
+                    let ti = Instant::now();
+                    c.inputs(&evs3[evs3.len() - 1..])?;
+                    r.out.phases[1] += ti.elapsed().as_secs_f64();
+                    let inp3 = Inputs { clicks: vec![inp.clicks[0], inp.clicks[1], *t] };
+                    r.trial(&mut c, inp3, evs3)?;
+                    r.cpu += c.cpu_s();
+                    let tq = Instant::now();
+                    c.quit();
+                    r.out.phases[3] += tq.elapsed().as_secs_f64();
+                }
+            }
+        }
+        r.cpu += b.cpu_s();
+        let tq = Instant::now();
+        b.quit();
+        r.out.phases[3] += tq.elapsed().as_secs_f64();
+    }
+    // the outcomes: each trial's world keys against a no-input fork at its stop frame (one fork, run through the frames)
+    let mut frames: Vec<u64> = r.worlds.iter().filter(|w| w.1.is_some()).map(|w| w.0).collect();
+    frames.sort_unstable();
+    frames.dedup();
+    let mut control: BTreeMap<u64, Facts> = BTreeMap::new();
+    let tc = Instant::now();
+    if !frames.is_empty() {
+        let mut c = e.fork()?;
+        for &fr in &frames {
+            if fr > c.status().frame {
+                match c.run(&RunSpec { frame: Some(fr), ..Default::default() }) {
+                    Ok(_) => {}
+                    Err(EngineError::Ended(_)) => break,
+                    Err(x) => return Err(x),
+                }
+            }
+            if c.status().frame == fr {
+                control.insert(fr, world_of(&r.tested, &c.facts()?));
+            }
+        }
+        r.cpu += c.cpu_s();
+        c.quit();
+    }
+    r.out.phases[4] += tc.elapsed().as_secs_f64();
+    for (t, (fr, w)) in r.out.trials.iter_mut().zip(r.worlds.iter()) {
+        if let (Some(w), Some(c)) = (w, control.get(fr)) {
+            t.outcome = outcome_of(c, w);
+        }
+    }
+    r.out.engine_cpu_s = r.cpu;
+    r.out.seconds = t0.elapsed().as_secs_f64();
+    Ok(r.out)
+}
