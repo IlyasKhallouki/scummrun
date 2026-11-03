@@ -2,7 +2,7 @@
 //! (`targets`, E009's `rotate`), the reuse rule (`reusable`, `reusable_detail`), E009's idle rule, the entries a
 //! played attempt gives (`entries_from`), the start row, the result's records, and the cached readings' order.
 
-use crate::archive::{fact_map, FactMap, NOT_INT};
+use crate::archive::{fact_map, FactLook, FactMap, NOT_INT};
 use crate::files::{self, as_i64, Res};
 use crate::pyjson::{self, canonical};
 use serde_json::{json, Map, Value};
@@ -172,9 +172,18 @@ fn pair_key(k: &str, v: &Value) -> String {
 
 /// Step 3: [(k, v, tier, depth)], tier 0 first, then by (depth, key, value) within a tier (step.py `targets`).
 #[allow(clippy::too_many_arguments)]
-pub fn targets(reached: &[(String, Vec<i64>)], guide: &Value, entry_facts: &FactMap, root_facts: Option<&FactMap>,
+pub fn targets<F: FactLook + ?Sized>(reached: &[(String, Vec<i64>)], guide: &Value, entry_facts: &F, root_facts: Option<&FactMap>,
                held: &[Value], tried: &[Value], goal: &[(String, Vec<i64>)], rotation: Option<&Value>) -> Res<Vec<Target>> {
-    let atoms = guide_atoms(guide);
+    targets_with(reached, &guide_atoms(guide), entry_facts, root_facts, held, tried, goal, rotation)
+}
+
+/// GUIDE.json's atoms as `guide_atoms` gives them.
+pub type Atoms = HashMap<(String, Option<i64>), i64>;
+
+/// `targets` on the guide's atoms made before (a try keeps them per guide).
+#[allow(clippy::too_many_arguments)]
+pub fn targets_with<F: FactLook + ?Sized>(reached: &[(String, Vec<i64>)], atoms: &Atoms, entry_facts: &F, root_facts: Option<&FactMap>,
+               held: &[Value], tried: &[Value], goal: &[(String, Vec<i64>)], rotation: Option<&Value>) -> Res<Vec<Target>> {
     let pair = |p: &Value| pair_key(p.get(0).and_then(|k| k.as_str()).unwrap_or(""), p.get(1).unwrap_or(&Value::Null));
     let held_set: HashSet<String> = held.iter().map(pair).collect();
     let tried_set: HashSet<String> = tried.iter().map(pair).collect();
@@ -183,7 +192,7 @@ pub fn targets(reached: &[(String, Vec<i64>)], guide: &Value, entry_facts: &Fact
     let mut first: Option<(String, TV)> = None;
     if !goal.is_empty() {
         let all_reached = goal.iter().all(|(k, vs)| vs.iter().any(|v| reached_map.get(k.as_str()).map(|r| r.contains(v)).unwrap_or(false)));
-        let holds = goal.iter().all(|(k, vs)| vs.contains(&entry_facts.get(k).copied().unwrap_or(0)));
+        let holds = goal.iter().all(|(k, vs)| vs.contains(&entry_facts.look(k).unwrap_or(0)));
         if all_reached && !holds {
             let f = goal_target(goal)?;
             if !tried_set.contains(&pair_key(&f.0, &f.1.json())) {
@@ -197,13 +206,13 @@ pub fn targets(reached: &[(String, Vec<i64>)], guide: &Value, entry_facts: &Fact
         if !guide_kind(k) {
             continue;
         }
-        let now = entry_facts.get(k).copied().unwrap_or(0);
+        let now = entry_facts.look(k).unwrap_or(0);
         for &v in vals {
             if v == now || first.as_ref().map(|f| f.0 == *k && f.1 == TV::Int(v)).unwrap_or(false)
-                || tried_set.contains(&pair_key(k, &json!(v))) {
+                || (!tried_set.is_empty() && tried_set.contains(&pair_key(k, &json!(v)))) {
                 continue;
             }
-            let Some(d) = depth_of(&atoms, k, v) else { continue };
+            let Some(d) = depth_of(atoms, k, v) else { continue };
             let concrete = atoms.contains_key(&(k.clone(), Some(v)));
             if !concrete {
                 if let Some(r) = root_facts {
@@ -212,7 +221,8 @@ pub fn targets(reached: &[(String, Vec<i64>)], guide: &Value, entry_facts: &Fact
                     }
                 }
             }
-            let is_held = held_set.contains(&pair_key(k, &json!(v))) || (!concrete && held_set.contains(&pair_key(k, &Value::Null)));
+            let is_held = !held_set.is_empty()
+                && (held_set.contains(&pair_key(k, &json!(v))) || (!concrete && held_set.contains(&pair_key(k, &Value::Null))));
             rest.push(Target { k: k.clone(), v: TV::Int(v), tier: if is_held { 2 } else { 1 }, depth: d });
         }
     }
@@ -905,6 +915,49 @@ pub fn entries_plan(entry_frame: i64, inputs: &[Value], frames: &[i64]) -> Res<V
         let events: Vec<Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
         (i + 1, events, if i == n - 1 { "end" } else { "checkpoint" })
     }).collect())
+}
+
+/// A facts.py map (JSON) as fmi-core's packed facts when the two read the same: every key its key's own text, every
+/// value an int; else None.
+pub fn packed_facts(v: &Value) -> Option<fmi_core::Facts> {
+    let m = v.as_object()?;
+    let mut pairs = Vec::with_capacity(m.len());
+    let mut t = String::with_capacity(48);
+    for (k, x) in m {
+        let n = x.as_i64()?;
+        let key = fmi_core::Key::parse(k);
+        t.clear();
+        crate::archive::write_key(&mut t, key);
+        if t != *k {
+            return None;
+        }
+        pairs.push((key, n));
+    }
+    Some(fmi_core::Facts::from_pairs(pairs))
+}
+
+/// The packed facts' changes as `diff` gives them on the text maps of the same facts.
+pub fn diff_packed(a: &fmi_core::Facts, b: &fmi_core::Facts) -> BTreeMap<String, (i64, i64)> {
+    let mut ch = Vec::new();
+    diff_into(a, b, &mut ch);
+    ch.into_iter().map(|(k, x, y)| (k.text(), (x, y))).collect()
+}
+
+/// A try's entry facts (fmi-core's packed facts) read by key text as the text map of them (`fact_map_of`) reads: a text
+/// that is not its key's own text is in no such map.
+pub struct PackedLook<'a>(pub &'a fmi_core::Facts);
+
+impl crate::archive::FactLook for PackedLook<'_> {
+    fn look(&self, k: &str) -> Option<i64> {
+        let key = fmi_core::Key::parse(k);
+        let v = self.0.get(key)?;
+        let mut t = String::with_capacity(k.len() + 8);
+        crate::archive::write_key(&mut t, key);
+        (t == k).then_some(v)
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        self.0.0.iter().filter(|(k, _)| k.kind() == fmi_core::K_OWNER).map(|(k, v)| (k.a() as i64, *v)).collect()
+    }
 }
 
 /// target_holds on any facts map.

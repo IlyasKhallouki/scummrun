@@ -82,7 +82,10 @@ pub fn step_check(path: &Path) -> Res<CheckReport> {
                 // the try's memo of the root's facts (E011 round 2): the same facts, the same targets
                 let root_m = step::root_facts_of_memo(&job, jd);
                 let ts_m = step::targets(&reached_cache[&rp], &guides[&gp], &facts, root_m.as_deref(), held, tried, &goal, rot)?;
-                let root_ok = root.is_some() == c["root_facts"].as_bool().unwrap_or(false) && root.as_ref() == root_m.as_deref() && ts_m == ts;
+                // and on the entry's packed facts read by text, the guide's atoms made before
+                let fp = crate::start::facts_of_json(&job["entry"]["checkpoint"][1]);
+                let ts_p = step::targets_with(&reached_cache[&rp], &step::guide_atoms(&guides[&gp]), &step::PackedLook(&fp), root_m.as_deref(), held, tried, &goal, rot)?;
+                let root_ok = root.is_some() == c["root_facts"].as_bool().unwrap_or(false) && root.as_ref() == root_m.as_deref() && ts_m == ts && ts_p == ts;
                 (got == c["out"] && root_ok, format!("{} on {}: {} targets, reference {}", jd.display(), rp,
                                                       ts.len(), c["out"].as_array().map(|a| a.len()).unwrap_or(0)))
             }
@@ -99,7 +102,12 @@ pub fn step_check(path: &Path) -> Res<CheckReport> {
                 add_s(&mut rep.seconds, &kind, t.elapsed().as_secs_f64());
                 // the try's one diff (E011 round 2)
                 let (ok1, det1) = step::reuse_of(&step::diff(&start, &facts), |k| keys.contains(k));
-                (json!([ok, nb]) == c["out"] && det == c["detail"] && ok1 == ok && det1 == c["detail"], format!("{} vs {}", c["reading"], c["job_dir"]))
+                // and on the packed facts when the start's are faithful (the entry's are a dump's: always)
+                let packed_ok = match step::packed_facts(&rd["start"]["facts"]) {
+                    Some(sp) => step::diff_packed(&sp, &crate::start::facts_of_json(&job["entry"]["checkpoint"][1])) == step::diff(&start, &facts),
+                    None => true,
+                };
+                (json!([ok, nb]) == c["out"] && det == c["detail"] && ok1 == ok && det1 == c["detail"] && packed_ok, format!("{} vs {}", c["reading"], c["job_dir"]))
             }
             "idle_rule" => {
                 let e = read_gz(Path::new(c["entry_file"].as_str().unwrap_or("")))?;

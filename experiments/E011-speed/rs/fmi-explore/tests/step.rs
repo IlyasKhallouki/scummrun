@@ -483,3 +483,78 @@ fn fact_map_of_is_the_ordered_facts_map() {
     }
     eprintln!("fact_map_of: {n} dumps");
 }
+
+#[test]
+fn packed_facts_of_readings_and_packed_look_read_as_the_text_map() {
+    use fmi_explore::archive::FactLook;
+    let mut n = 0;
+    for p in ["/var/tmp/fast-mi/e011-own-data/readings/33-38-83-85-96-j00002/reading.json",
+              "/var/tmp/fast-mi/e011-own-data/readings/r33/refine-01/reading.json"] {
+        let Ok(doc) = fmi_explore::files::read_json(std::path::Path::new(p)) else { continue };
+        let sj = &doc["start"]["facts"];
+        let packed = step::packed_facts(sj).expect("a reading's start facts are faithful");
+        assert_eq!(packed, fmi_explore::start::facts_of_json(sj));
+        let text = fact_map(sj);
+        let look = step::PackedLook(&packed);
+        for (k, v) in &text {
+            assert_eq!(look.look(k), Some(*v));
+        }
+        n += 1;
+    }
+    // a text that is not its key's own text, and an absent key, are in no text map
+    let f = fmi_explore::start::facts_of_json(&json!({"var:1": 5, "owner:7": 2}));
+    let look = step::PackedLook(&f);
+    assert_eq!(look.look("var:1"), Some(5));
+    assert_eq!(look.look("var:01"), None);
+    assert_eq!(look.look("var:2"), None);
+    assert_eq!(look.owners(), vec![(7, 2)]);
+    // a text fmi-core does not pack is a key of its own, with that text
+    let odd = step::packed_facts(&json!({"var:01": 1, "var:1": 2})).unwrap();
+    assert_eq!(step::PackedLook(&odd).look("var:01"), Some(1));
+    assert_eq!(step::PackedLook(&odd).look("var:1"), Some(2));
+    assert!(step::packed_facts(&json!({"var:1": "below"})).is_none());
+    eprintln!("packed start facts: {n} readings");
+}
+
+#[test]
+fn same_facts_is_an_empty_diff_and_finds_recorded_equal_checkpoints() {
+    use fmi_explore::tryjob::same_facts;
+    let dir = std::path::PathBuf::from("/var/tmp/fast-mi/e011-bench-data/b0/entries");
+    let Ok(rd) = std::fs::read_dir(&dir) else { return };
+    let mut n = 0;
+    for e in rd.flatten().take(30) {
+        let Ok(doc) = fmi_explore::files::read_gz(&e.path()) else { continue };
+        for c in doc["checkpoints"].as_array().cloned().unwrap_or_default() {
+            let want = &c[1];
+            let got = fmi_explore::start::facts_of_json(want);
+            assert!(same_facts(want, &got));
+            // a value changed, a key added, a key gone (non-zero and zero), a value not an int: never shown equal
+            let mut m = want.as_object().unwrap().clone();
+            let k0 = m.keys().next().unwrap().clone();
+            let mut cases = vec![];
+            let mut a = m.clone();
+            a.insert(k0.clone(), json!(a[&k0].as_i64().unwrap() + 1));
+            cases.push(a);
+            let mut b = m.clone();
+            b.insert("bit:9999".into(), json!(1));
+            cases.push(b);
+            let mut c0 = m.clone();
+            c0.insert("bit:9999".into(), json!(0));
+            cases.push(c0);
+            let mut d = m.clone();
+            d.insert(k0.clone(), json!("below"));
+            cases.push(d);
+            m.shift_remove(&k0);
+            cases.push(m);
+            for x in cases {
+                let xv = Value::Object(x);
+                let empty = fmi_explore::start::facts_of_json(&xv).diff(&got).is_empty();
+                if same_facts(&xv, &got) {
+                    assert!(empty);
+                }
+            }
+            n += 1;
+        }
+    }
+    assert!(n > 10);
+}

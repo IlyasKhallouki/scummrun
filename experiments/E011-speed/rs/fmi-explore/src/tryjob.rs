@@ -90,12 +90,41 @@ fn cpu_now() -> f64 {
     machine::thread_cpu_s()
 }
 
+/// The checkpoint's facts (a facts.py map, JSON) equal the state's, shown without parsing the checkpoint's keys: every
+/// key of `got` is in the checkpoint with its value as an int, or is absent from it and 0, and the checkpoint has no
+/// other key. Then `facts_of_json(want).diff(got)` is empty. False when that is not shown (the caller diffs them).
+pub fn same_facts(want: &Value, got: &Facts) -> bool {
+    let Some(m) = want.as_object() else { return false };
+    let mut t = String::with_capacity(48);
+    let mut matched = 0;
+    for &(k, v) in got.iter() {
+        t.clear();
+        crate::archive::write_key(&mut t, k);
+        match m.get(t.as_str()) {
+            Some(x) => {
+                if x.as_i64() != Some(v) {
+                    return false;
+                }
+                matched += 1;
+            }
+            None if v != 0 => return false,
+            None => {}
+        }
+    }
+    matched == m.len()
+}
+
 /// replay.compare_checkpoint: the differences between a checkpoint and the engine's state and status.
 pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<String, Value> {
     let mut out = Map::new();
-    let wf = start::facts_of_json(&want[1]);
     let got = facts_of(state);
-    let mut d: Vec<(String, Val, Val)> = wf.diff(&got).into_iter().map(|(k, a, b)| (k.text(), a, b)).collect();
+    // equal facts shown in one pass (FMI_TRY_MEMO), else the diff as round 1 made it
+    let mut d: Vec<(String, Val, Val)> = if switch("FMI_TRY_MEMO") && same_facts(&want[1], &got) {
+        Vec::new()
+    } else {
+        let wf = start::facts_of_json(&want[1]);
+        wf.diff(&got).into_iter().map(|(k, a, b)| (k.text(), a, b)).collect()
+    };
     if !d.is_empty() {
         d.sort_by(|a, b| a.0.cmp(&b.0));
         out.insert("facts".into(), json!(d.len()));
@@ -306,9 +335,11 @@ fn task_keys(rd: &dyn ReadingSource) -> HashSet<String> {
 
 /// What the reading choice reads of a reading, made once per reading in the process (FMI_TRY_MEMO; a reading's files
 /// never change once made, and it is keyed as warm.rs keys reading.json: its folder and its packed file's sha1): its
-/// start facts and its task facts' keys, as texts.
+/// start facts as texts and, when they map onto fmi-core's packed facts one to one (every key its key's own text,
+/// every value an int), packed; and its task facts' keys, as texts.
 struct ReadingMemo {
     start: crate::archive::FactMap,
+    packed: Option<Facts>,
     keys: HashSet<String>,
 }
 
@@ -319,7 +350,9 @@ fn reading_memo(rd: &dyn ReadingSource) -> Arc<ReadingMemo> {
     if let Some(m) = C.get_or_init(Default::default).lock().unwrap().get(&id) {
         return m.clone();
     }
-    let m = Arc::new(ReadingMemo { start: crate::archive::fact_map(&doc_of(rd)["start"]["facts"]), keys: task_keys(rd) });
+    let doc = doc_of(rd);
+    let sj = &doc["start"]["facts"];
+    let m = Arc::new(ReadingMemo { start: crate::archive::fact_map(sj), packed: step::packed_facts(sj), keys: task_keys(rd) });
     let mut c = C.get_or_init(Default::default).lock().unwrap();
     if c.len() >= 64 {
         if let Some(k) = c.keys().next().cloned() {
@@ -330,13 +363,44 @@ fn reading_memo(rd: &dyn ReadingSource) -> Arc<ReadingMemo> {
     m
 }
 
+/// The entry's facts as the try reads them: round 1's text map, or fmi-core's packed facts (FMI_TRY_MEMO), read by
+/// key text alike (`step::PackedLook`).
+pub enum EntryFacts {
+    Text(crate::archive::FactMap),
+    Packed(Facts),
+}
+
+impl crate::archive::FactLook for EntryFacts {
+    fn look(&self, k: &str) -> Option<i64> {
+        match self {
+            EntryFacts::Text(m) => m.look(k),
+            EntryFacts::Packed(f) => step::PackedLook(f).look(k),
+        }
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        match self {
+            EntryFacts::Text(m) => m.owners(),
+            EntryFacts::Packed(f) => step::PackedLook(f).owners(),
+        }
+    }
+}
+
+impl EntryFacts {
+    fn text_map(&self) -> std::borrow::Cow<'_, crate::archive::FactMap> {
+        match self {
+            EntryFacts::Text(m) => std::borrow::Cow::Borrowed(m),
+            EntryFacts::Packed(f) => std::borrow::Cow::Owned(f.iter().map(|(k, v)| (k.text(), *v)).collect()),
+        }
+    }
+}
+
 /// The reading choice's outcome: the reading or None, why, the candidates checked.
 type Choice = (Option<Arc<dyn ReadingSource>>, String, Vec<Value>);
 
 /// Step 2 on the cached readings (step.py `choose_reading`): (the reading or None, why, the candidates checked).
-fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<Choice, String> {
+fn choose_reading(r: &Resident, job: &Value, facts: &EntryFacts) -> Result<Choice, String> {
     if !switch("FMI_TRY_MEMO") {
-        return choose_reading_r1(r, job, facts);
+        return choose_reading_r1(r, job, &facts.text_map());
     }
     let cands = step::cached_readings_with(job, true);
     if cands.is_empty() {
@@ -346,8 +410,12 @@ fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) ->
     for p in cands {
         let rd = machine::port(|| r.readings.open(&p))?;
         let m = reading_memo(&*rd);
-        // one diff of the start facts and the entry's, read for the task keys and for them with E009's
-        let d = step::diff(&m.start, facts);
+        // one diff of the start facts and the entry's, read for the task keys and for them with E009's; on the packed
+        // facts when both are (the same differences, their keys' texts made for them alone)
+        let d = match (&m.packed, facts) {
+            (Some(sp), EntryFacts::Packed(ep)) => step::diff_packed(sp, ep),
+            _ => step::diff(&m.start, &facts.text_map()),
+        };
         let (mut ok, det) = step::reuse_of(&d, |k| m.keys.contains(k));
         let mut row = json!({"path": p.to_string_lossy(), "reusable": ok});
         for (k, v) in det.as_object().unwrap() {
@@ -553,8 +621,24 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     Ok(Attempt { res, packed, checkpoints, inputs, secs: t0.elapsed().as_secs_f64(), cpu: cpu_now() - cpu0 + wiring.cpu_s })
 }
 
+/// A guide's atoms (step::guide_atoms), kept for the last guide seen (warm.rs keeps the guide while its file is the
+/// same; the guide is held here with its atoms, so the same allocation is the same guide).
+fn guide_atoms(g: &Arc<Value>) -> Arc<step::Atoms> {
+    type Memo = Mutex<Option<(Arc<Value>, Arc<step::Atoms>)>>;
+    static C: std::sync::OnceLock<Memo> = std::sync::OnceLock::new();
+    let mut c = C.get_or_init(Default::default).lock().unwrap();
+    if let Some((k, a)) = c.as_ref() {
+        if Arc::ptr_eq(k, g) {
+            return a.clone();
+        }
+    }
+    let a = Arc::new(step::guide_atoms(g));
+    *c = Some((g.clone(), a.clone()));
+    a
+}
+
 /// The targets, or the ones forced (`--targets`), as step.targets gives them.
-fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path, facts: &crate::archive::FactMap,
+fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path, facts: &EntryFacts,
               goal: &[(String, Vec<i64>)]) -> Res<Vec<Target>> {
     let guide = crate::warm::guide(Path::new(job["guide"].as_str().unwrap_or("")))?;
     let reached = crate::warm::reached(rd);
@@ -563,7 +647,7 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
     let ts = if switch("FMI_TRY_MEMO") {
-        step::targets(&reached, &guide, facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
+        step::targets_with(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
     } else {
         step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?
     };
@@ -628,7 +712,11 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         }
         let state = machine::port(|| root.obs(&ObsReq::default())).map_err(|e| Err(format!("EngineError: {e}")))?;
         let status = root.status().clone();
-        let facts = if switch("FMI_TRY_MEMO") { step::fact_map_of(&state) } else { crate::archive::fact_map(&step::facts_of_ordered(&state)) };
+        let facts = if switch("FMI_TRY_MEMO") {
+            EntryFacts::Packed(facts_of(&state))
+        } else {
+            EntryFacts::Text(crate::archive::fact_map(&step::facts_of_ordered(&state)))
+        };
         let idle_frames = files::as_i64(job.get("idle_frames")).unwrap_or(0);
         if idle_frames != 0 && !files::truthy(job.get("idle_measured")) {
             log.say(&format!("idle: {idle_frames} frames with no input from frame {}", status.frame));
@@ -724,7 +812,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             let plan = step::entries_plan(entry_frame, &att.inputs, &frames).map_err(Err)?;
             let reached = match att.checkpoints.last() {
                 Some(c) => step::target_holds_in(&tg, &goal, &c.facts),
-                None => step::target_holds(&tg, &goal, &facts),
+                None => step::target_holds_in(&tg, &goal, &facts),
             };
             att.res["_checkpoints"] = json!(att.checkpoints.len());
             att.res["_reached"] = json!(reached);
