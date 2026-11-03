@@ -79,6 +79,8 @@ impl Prof {
             for (w, t, p) in &self.rows {
                 eprintln!("try profile: {w}: {:.2} ms, of which ports {:.2} ms", t * 1e3, p * 1e3);
             }
+            let own: f64 = self.rows.iter().map(|r| r.1 - r.2).sum();
+            eprintln!("try profile: own {:.2} ms", own * 1e3);
             for (w, t, n) in secs {
                 eprintln!("try profile:   section {w}: {:.2} ms in {n} calls", t * 1e3);
             }
@@ -90,12 +92,41 @@ fn cpu_now() -> f64 {
     machine::thread_cpu_s()
 }
 
+/// The checkpoint's facts (a facts.py map, JSON) equal the state's, shown without parsing the checkpoint's keys: every
+/// key of `got` is in the checkpoint with its value as an int, or is absent from it and 0, and the checkpoint has no
+/// other key. Then `facts_of_json(want).diff(got)` is empty. False when that is not shown (the caller diffs them).
+pub fn same_facts(want: &Value, got: &Facts) -> bool {
+    let Some(m) = want.as_object() else { return false };
+    let mut t = String::with_capacity(48);
+    let mut matched = 0;
+    for &(k, v) in got.iter() {
+        t.clear();
+        crate::archive::write_key(&mut t, k);
+        match m.get(t.as_str()) {
+            Some(x) => {
+                if x.as_i64() != Some(v) {
+                    return false;
+                }
+                matched += 1;
+            }
+            None if v != 0 => return false,
+            None => {}
+        }
+    }
+    matched == m.len()
+}
+
 /// replay.compare_checkpoint: the differences between a checkpoint and the engine's state and status.
 pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<String, Value> {
     let mut out = Map::new();
-    let wf = start::facts_of_json(&want[1]);
     let got = facts_of(state);
-    let mut d: Vec<(String, Val, Val)> = wf.diff(&got).into_iter().map(|(k, a, b)| (k.text(), a, b)).collect();
+    // equal facts shown in one pass (FMI_TRY_MEMO), else the diff as round 1 made it
+    let mut d: Vec<(String, Val, Val)> = if switch("FMI_TRY_MEMO") && same_facts(&want[1], &got) {
+        Vec::new()
+    } else {
+        let wf = start::facts_of_json(&want[1]);
+        wf.diff(&got).into_iter().map(|(k, a, b)| (k.text(), a, b)).collect()
+    };
     if !d.is_empty() {
         d.sort_by(|a, b| a.0.cmp(&b.0));
         out.insert("facts".into(), json!(d.len()));
@@ -161,8 +192,83 @@ fn boot_entry(r: &Resident, entry: &Value, out_dir: &Path) -> Result<(Box<dyn En
     Ok((b, ret))
 }
 
-/// E009 fix a: a fork of the returned engine run `frames` frames with no input, the facts taken at each.
+/// An E011 switch of this crate: on unless its variable is "0" (off: round 1's code).
+fn switch(name: &str) -> bool {
+    std::env::var(name).map(|v| v != "0").unwrap_or(true)
+}
+
+/// The next idle frame (`frame`, one after this stop) and the facts' changes to it, appended to `out`. With the
+/// feature `step_changes` (fmi-core's `Engine::step_changes`, IFACE e011-r2-own in COORD.md) the engine gives them in
+/// one call, from Step's delta. Without it, today's calls: a run and the facts (the engine port's), and their diff
+/// from the facts of the frame before, kept in `prev` (this try's own work).
+#[cfg(not(feature = "step_changes"))]
+fn idle_frame(b: &mut Box<dyn Engine>, frame: u64, prev: &mut Option<Facts>, out: &mut Vec<(Key, Val, Val)>) -> fmi_core::EResult<Status> {
+    if prev.is_none() {
+        *prev = Some(machine::port(|| b.facts())?);
+    }
+    let st = machine::port(|| b.run(&RunSpec { frame: Some(frame), ..Default::default() }))?;
+    let f = machine::port(|| b.facts())?;
+    step::diff_into(prev.as_ref().unwrap(), &f, out);
+    *prev = Some(f);
+    Ok(st)
+}
+
+#[cfg(feature = "step_changes")]
+fn idle_frame(b: &mut Box<dyn Engine>, frame: u64, _prev: &mut Option<Facts>, out: &mut Vec<(Key, Val, Val)>) -> fmi_core::EResult<Status> {
+    let n = frame.checked_sub(b.status().frame).filter(|&n| n >= 1).unwrap_or(1) as u32;
+    let (st, ch) = machine::port(|| b.step_changes(n))?;
+    out.extend_from_slice(&ch);
+    Ok(st)
+}
+
+/// E009 fix a, evaluated as the frames come (FMI_IDLE_CHANGES, on by default): a fork of the returned engine run
+/// `frames` frames with no input, each frame's changes given to the idle rule; no frame's whole facts are kept. The
+/// same frames and the same rule as `measure_idle_whole`: a run to a frame with no other stop condition stops at that
+/// frame or ends (the bridge's Run), so each frame here is the one the run to `f0 + i` stops at, and is checked so.
 fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
+    if !switch("FMI_IDLE_CHANGES") {
+        return measure_idle_whole(root, frames);
+    }
+    let t = Instant::now();
+    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let f0 = b.status().frame;
+    let mut rule = step::IdleRule::new();
+    let mut prev: Option<Facts> = None;
+    let mut ch: Vec<(Key, Val, Val)> = Vec::with_capacity(64);
+    let mut err = None;
+    for i in 1..=frames {
+        ch.clear();
+        match idle_frame(&mut b, f0 + i, &mut prev, &mut ch) {
+            Ok(st) if st.frame == f0 + i => rule.frame(i as i64, &ch),
+            Ok(st) => {
+                err = Some(format!("the idle run stopped at frame {} ({}), not {}", st.frame, st.reason, f0 + i));
+                break;
+            }
+            Err(e) => {
+                err = Some(format!("EngineError: {e}"));
+                break;
+            }
+        }
+    }
+    drop(prev);
+    let frame_end = b.status().frame;
+    let cpu = b.cpu_s();
+    machine::port(|| b.quit());
+    if let Some(e) = err {
+        return Err(e);
+    }
+    let mut out = rule.result();
+    out["frame_end"] = json!(frame_end);
+    out["cpu_s"] = json!(pyjson::round(cpu, 1));
+    out["frames"] = json!(frames);
+    out["frame0"] = json!(f0);
+    out["seconds"] = json!(pyjson::round(t.elapsed().as_secs_f64(), 1));
+    Ok(out)
+}
+
+/// E009 fix a as round 1 ran it: a fork of the returned engine run `frames` frames with no input, the facts taken at
+/// each, the rule run over them all at the end.
+fn measure_idle_whole(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
     let t = Instant::now();
     let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;
@@ -229,8 +335,114 @@ fn task_keys(rd: &dyn ReadingSource) -> HashSet<String> {
     rd.domains().0.iter().map(|(k, _)| k.text()).collect()
 }
 
+/// What the reading choice reads of a reading, made once per reading in the process (FMI_TRY_MEMO; a reading's files
+/// never change once made): its start facts as texts and, when they map onto fmi-core's packed facts one to one
+/// (every key its key's own text, every value an int), packed; and its task facts' keys, as texts.
+struct ReadingMemo {
+    start: crate::archive::FactMap,
+    packed: Option<Facts>,
+    keys: HashSet<String>,
+}
+
+fn reading_memo(rd: &dyn ReadingSource) -> Arc<ReadingMemo> {
+    // keyed by the packed file's sha1 and the reading.json warm.rs gives (one parse per text), which the memo holds
+    type Memo = Mutex<std::collections::HashMap<([u8; 20], usize), (Arc<Value>, Arc<ReadingMemo>)>>;
+    static C: std::sync::OnceLock<Memo> = std::sync::OnceLock::new();
+    let doc = doc_of(rd);
+    let id = (rd.id(), Arc::as_ptr(&doc) as usize);
+    if let Some((_, m)) = C.get_or_init(Default::default).lock().unwrap().get(&id) {
+        return m.clone();
+    }
+    let sj = &doc["start"]["facts"];
+    let m = Arc::new(ReadingMemo { start: crate::archive::fact_map(sj), packed: step::packed_facts(sj), keys: task_keys(rd) });
+    let mut c = C.get_or_init(Default::default).lock().unwrap();
+    if c.len() >= 64 {
+        if let Some(k) = c.keys().next().cloned() {
+            c.remove(&k);
+        }
+    }
+    c.insert(id, (doc.clone(), m.clone()));
+    m
+}
+
+/// The entry's facts as the try reads them: round 1's text map, or fmi-core's packed facts (FMI_TRY_MEMO), read by
+/// key text alike (`step::PackedLook`).
+pub enum EntryFacts {
+    Text(crate::archive::FactMap),
+    Packed(Facts),
+}
+
+impl crate::archive::FactLook for EntryFacts {
+    fn look(&self, k: &str) -> Option<i64> {
+        match self {
+            EntryFacts::Text(m) => m.look(k),
+            EntryFacts::Packed(f) => step::PackedLook(f).look(k),
+        }
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        match self {
+            EntryFacts::Text(m) => m.owners(),
+            EntryFacts::Packed(f) => step::PackedLook(f).owners(),
+        }
+    }
+}
+
+impl EntryFacts {
+    fn text_map(&self) -> std::borrow::Cow<'_, crate::archive::FactMap> {
+        match self {
+            EntryFacts::Text(m) => std::borrow::Cow::Borrowed(m),
+            EntryFacts::Packed(f) => std::borrow::Cow::Owned(f.iter().map(|(k, v)| (k.text(), *v)).collect()),
+        }
+    }
+}
+
+/// The reading choice's outcome: the reading or None, why, the candidates checked.
+type Choice = (Option<Arc<dyn ReadingSource>>, String, Vec<Value>);
+
 /// Step 2 on the cached readings (step.py `choose_reading`): (the reading or None, why, the candidates checked).
-fn choose_reading(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<(Option<Arc<dyn ReadingSource>>, String, Vec<Value>), String> {
+fn choose_reading(r: &Resident, job: &Value, facts: &EntryFacts) -> Result<Choice, String> {
+    if !switch("FMI_TRY_MEMO") {
+        return choose_reading_r1(r, job, &facts.text_map());
+    }
+    let cands = step::cached_readings_with(job, true);
+    if cands.is_empty() {
+        return Ok((None, "no cached reading".into(), vec![]));
+    }
+    let mut checked = Vec::new();
+    for p in cands {
+        let rd = machine::port(|| r.readings.open(&p))?;
+        let m = reading_memo(&*rd);
+        // one diff of the start facts and the entry's, read for the task keys and for them with E009's; on the packed
+        // facts when both are (the same differences, their keys' texts made for them alone)
+        let d = match (&m.packed, facts) {
+            (Some(sp), EntryFacts::Packed(ep)) => step::diff_packed(sp, ep),
+            _ => step::diff(&m.start, &facts.text_map()),
+        };
+        let (mut ok, det) = step::reuse_of(&d, |k| m.keys.contains(k));
+        let mut row = json!({"path": p.to_string_lossy(), "reusable": ok});
+        for (k, v) in det.as_object().unwrap() {
+            row[k] = v.clone();
+        }
+        if !ok && job.get("reuse").and_then(|x| x.as_str()) == Some("e009") {
+            let extra = machine::port(|| r.readings.reuse_keys(&*rd))?;
+            let (ok2, det2) = step::reuse_of(&d, |k| m.keys.contains(k) || extra.contains(k));
+            ok = ok2;
+            row["reusable"] = json!(ok);
+            row["reuse_keys"] = json!(extra.len());
+            row["e009"] = det2;
+        }
+        let e009 = row.get("e009").is_some();
+        checked.push(row);
+        if ok {
+            return Ok((Some(rd), if e009 { "reused (e009 keys)".into() } else { "reused".into() }, checked));
+        }
+    }
+    let first = checked[0].get("e009").cloned().unwrap_or_else(|| checked[0].clone());
+    Ok((None, format!("differs on {} keys", first["other"]), checked))
+}
+
+/// The reading choice as round 1 made it (FMI_TRY_MEMO=0).
+fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<Choice, String> {
     let cands = step::cached_readings(job);
     if cands.is_empty() {
         return Ok((None, "no cached reading".into(), vec![]));
@@ -324,7 +536,8 @@ struct Attempt {
 /// Step 4 for one target (step.py `attempt`): a fork of the returned engine and the harness with step.py's wiring.
 #[allow(clippy::too_many_arguments)]
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
-           adir: &Path, threads: u32, workers: u32, ready: bool, log: &JobLog, cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
+           adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
+           cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
     let (hgoal, text): (Vec<(Key, Vec<Val>)>, String) = if tg.tier == 0 {
         (goal.iter().map(|(k, vs)| (Key::parse(k), vs.clone())).collect(), step::goal_text(goal)?)
     } else {
@@ -344,6 +557,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
         replan_limit: step::REPLAN_LIMIT,
         time_limit_s: step::TIME_LIMIT,
         plan_time_s: step::plan_time(),
+        first_plan_time_s: first_limit,
         search: r.search,
         cost_caps: true,
         cost_dmax: frame_costs.get("dmax").and_then(|d| d.as_i64()),
@@ -381,13 +595,19 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let pb = machine::port_s();
     let checkpoints = std::mem::take(&mut h.ps.checkpoints);
     let inputs = res["inputs"].as_array().cloned().unwrap_or_default();
-    let (ps, last) = h.into_parts();
+    let (ps, last, player) = h.into_all();
     machine::port(|| ps.engine.quit());
+    // the window search's player: its reading data and game go off this thread (FMI_PLAYER_DONE), or here (round 1)
+    if switch("FMI_PLAYER_DONE") {
+        r.players.done(player);
+    } else {
+        drop(player);
+    }
     let packed = last.dir().join(crate::warm::head(&*last).get("packed").and_then(|p| p.as_str()).unwrap_or("reading.tc"));
     let tc = Instant::now();
     let _ = std::fs::write(adir.join("run.json"), pyjson::dumps_default(&res) + "\n");
     if std::env::var("FMI_TRY_PROFILE").is_ok() {
-        eprintln!("try profile:   harness run {:.2} ms (ports {:.2} ms), checkpoints {:.2} ms, run.json {:.2} ms",
+        eprintln!("try profile:   harness run {:.2} ms (ports {:.2} ms), its end (the player's) {:.2} ms, run.json {:.2} ms",
                   (tb - ta).as_secs_f64() * 1e3, (pb - pa) * 1e3, (tc - tb).as_secs_f64() * 1e3, tc.elapsed().as_secs_f64() * 1e3);
     }
     // the readings the harness made: their golden lines go
@@ -405,8 +625,24 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     Ok(Attempt { res, packed, checkpoints, inputs, secs: t0.elapsed().as_secs_f64(), cpu: cpu_now() - cpu0 + wiring.cpu_s })
 }
 
+/// A guide's atoms (step::guide_atoms), kept for the last guide seen (warm.rs keeps the guide while its file is the
+/// same; the guide is held here with its atoms, so the same allocation is the same guide).
+fn guide_atoms(g: &Arc<Value>) -> Arc<step::Atoms> {
+    type Memo = Mutex<Option<(Arc<Value>, Arc<step::Atoms>)>>;
+    static C: std::sync::OnceLock<Memo> = std::sync::OnceLock::new();
+    let mut c = C.get_or_init(Default::default).lock().unwrap();
+    if let Some((k, a)) = c.as_ref() {
+        if Arc::ptr_eq(k, g) {
+            return a.clone();
+        }
+    }
+    let a = Arc::new(step::guide_atoms(g));
+    *c = Some((g.clone(), a.clone()));
+    a
+}
+
 /// The targets, or the ones forced (`--targets`), as step.targets gives them.
-fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path, facts: &crate::archive::FactMap,
+fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path, facts: &EntryFacts,
               goal: &[(String, Vec<i64>)]) -> Res<Vec<Target>> {
     let guide = crate::warm::guide(Path::new(job["guide"].as_str().unwrap_or("")))?;
     let reached = crate::warm::reached(rd);
@@ -414,7 +650,11 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
     let held = job.get("held").and_then(|h| h.as_array()).unwrap_or(&empty);
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
-    let ts = step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?;
+    let ts = if switch("FMI_TRY_MEMO") {
+        step::targets_with(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
+    } else {
+        step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?
+    };
     // job.json's "forced_targets" [[K, V], ...] (the benchmark's tries, several in one process), else `--targets`
     let from_job: Option<Vec<(String, i64)>> = job.get("forced_targets").and_then(|f| f.as_array()).map(|a| {
         a.iter().filter_map(|p| Some((p.get(0)?.as_str()?.to_string(), p.get(1)?.as_i64()?))).collect()
@@ -476,8 +716,11 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         }
         let state = machine::port(|| root.obs(&ObsReq::default())).map_err(|e| Err(format!("EngineError: {e}")))?;
         let status = root.status().clone();
-        let facts_v = step::facts_of_ordered(&state);
-        let facts = crate::archive::fact_map(&facts_v);
+        let facts = if switch("FMI_TRY_MEMO") {
+            EntryFacts::Packed(facts_of(&state))
+        } else {
+            EntryFacts::Text(crate::archive::fact_map(&step::facts_of_ordered(&state)))
+        };
         let idle_frames = files::as_i64(job.get("idle_frames")).unwrap_or(0);
         if idle_frames != 0 && !files::truthy(job.get("idle_measured")) {
             log.say(&format!("idle: {idle_frames} frames with no input from frame {}", status.frame));
@@ -521,14 +764,21 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         let ready = files::truthy(job.get("ready"));
         let mut played: Option<(Target, Attempt)> = None;
         let mut fresh_again = false;
-        let mut queue: std::collections::VecDeque<Target> = ts.into_iter().collect();
+        // E011's deepening (step::deepen): the deferred targets last, each with its doubled limit
+        let deepen = step::deepen();
+        let deferred_in = if deepen.is_some() { step::deferred_of(&job) } else { Default::default() };
+        let mut queue: std::collections::VecDeque<(Target, u32)> = match deepen {
+            Some(_) => step::deepen_order(ts, &deferred_in).into_iter().collect(),
+            None => ts.into_iter().map(|t| (t, 0)).collect(),
+        };
         let mut n_att = 0;
-        while let Some(tg) = queue.pop_front() {
+        while let Some((tg, n_def)) = queue.pop_front() {
             if cancel.load(Ordering::SeqCst) {
                 return Err(Err("the guard's kill".into()));
             }
             let adir = run_dir.join(format!("a{n_att:02}"));
-            let att = attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, log, &cancel_arc).map_err(Err)?;
+            let first_limit = deepen.map(|l0| step::deepen_limit(l0, n_def));
+            let att = attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc).map_err(Err)?;
             prof.mark("attempt");
             n_att += 1;
             let status_ = step::first_plan_status(att.res["plans"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
@@ -545,9 +795,23 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             out["probes"].as_array_mut().unwrap().push(json!({"target": [tg.k, tg.v.json()], "tier": tg.tier, "depth": tg.depth,
                 "status": status_, "stop": att.res.get("stop"), "seconds": pyjson::round(att.secs, 1),
                 "attempt": format!("a{:02}", n_att - 1), "reading": reading_path(&*rd).to_string_lossy(), "dropped": dropped}));
+            if let Some(l) = first_limit {
+                let pr = out["probes"].as_array_mut().unwrap().last_mut().unwrap();
+                pr["limit_s"] = json!(l);
+                pr["deferred_before"] = json!(n_def);
+            }
             if status_.as_deref() == Some("plan") {
                 played = Some((tg, att));
                 break;
+            }
+            if deepen.is_some() && status_.as_deref() == Some("time") {
+                // the first plan ran into its limit: deferred, not tried (later tries retry it with twice the limit)
+                if out.get("deferred").is_none() {
+                    out["deferred"] = json!([]);
+                }
+                out["deferred"].as_array_mut().unwrap().push(json!([tg.k, tg.v.json(), n_def + 1]));
+                log.say(&format!("deferred {} ({} s limit, deferred {} times now)", tg.text(), first_limit.unwrap_or(0), n_def + 1));
+                continue;
             }
             out["tried"].as_array_mut().unwrap().push(json!([tg.k, tg.v.json()]));
             if status_.as_deref() == Some(step::NOT_A_PLAN_RETRY) && !files::truthy(out["reading"].get("fresh")) && !fresh_again {
@@ -562,7 +826,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"]["candidates"] = json!(checked);
                 cpu_add(&mut cpu, "read", cpu_now() - c0);
                 out["tried"].as_array_mut().unwrap().pop();
-                queue.push_front(tg);
+                queue.push_front((tg, n_def));
             }
         }
         prof.mark("probes");
@@ -573,7 +837,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             let plan = step::entries_plan(entry_frame, &att.inputs, &frames).map_err(Err)?;
             let reached = match att.checkpoints.last() {
                 Some(c) => step::target_holds_in(&tg, &goal, &c.facts),
-                None => step::target_holds(&tg, &goal, &facts),
+                None => step::target_holds_in(&tg, &goal, &facts),
             };
             att.res["_checkpoints"] = json!(att.checkpoints.len());
             att.res["_reached"] = json!(reached);
@@ -607,7 +871,9 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                              files::py_str(att.res.get("frames")), out["new"].as_array().unwrap().len()));
         }
         prof.mark("new entries");
-        out["exhausted"] = json!(played_none(&out));
+        // with deepening, an entry whose try deferred a target is not exhausted: the target comes back
+        let deferred_now = out.get("deferred").and_then(|d| d.as_array()).map(|d| !d.is_empty()).unwrap_or(false);
+        out["exhausted"] = json!(played_none(&out) && !deferred_now);
         out["ok"] = json!(true);
         Ok(())
     })();

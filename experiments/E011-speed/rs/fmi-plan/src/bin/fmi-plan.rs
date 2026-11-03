@@ -3,12 +3,15 @@
 //! seconds (the bench).
 //!
 //! usage:
-//!   fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd] [--dump DIR] [--cache DIR|none|off] [--keep N]
+//!   fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd|lama] [--dump DIR] [--cache DIR|none|off] [--keep N]
+//!   (lama: FdLamaFirstCosts by the Rust port, Host::rust_lama)
 //!   FILE: one request per line, `name<TAB>start.txt<TAB>caps.txt<TAB>goal[<TAB>bans.txt[<TAB>tail.txt]]`, as the
 //!   harness writes them (start: `key<TAB>value`, "" where the domain lacks it; caps: `prefix<TAB>frames`; bans:
 //!   `label<TAB>key<TAB>value...`; tail: one step name per line; goal: `K=V[|V],..`); "-" for none
 //!   The result of request NAME goes to DIR/NAME.json; one JSON line of seconds per request on stdout.
 //!   --tail-only 1: only the old tail's check (no search): status "plan" (source "tail") or "no tail".
+//!   --dead on|off: the no-plan proofs before the search (default: FMI_PLAN_DEAD); --time S: the search's limit (600);
+//!   --proof-only 1: the reductions and the proofs only (status "open" when they prove nothing).
 
 use fmi_core::{val_text, Action, Ban, EffVal, Facts, Key, PlanRequest, PlanResult, Planner, Search, Val};
 use fmi_plan::double::FileReading;
@@ -160,7 +163,7 @@ fn run() -> Result<(), String> {
         opt.insert(k.clone(), it.next().cloned().ok_or(format!("{} needs a value", k))?);
     }
     if cmd != "seq" {
-        return Err("usage: fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd] [--dump DIR] [--cache DIR|none]".into());
+        return Err("usage: fmi-plan seq --reading DIR --reqs FILE [--search gbfs|fd|lama] [--dump DIR] [--cache DIR|none]".into());
     }
     let mut host = Host::from_env();
     match opt.get("--cache").map(String::as_str) {
@@ -172,10 +175,29 @@ fn run() -> Result<(), String> {
     if let Some(k) = opt.get("--keep") {
         host.keep = k.parse().map_err(|e| format!("--keep: {}", e))?;
     }
+    match opt.get("--dead").map(String::as_str) {
+        Some("on") => host.dead = true,
+        Some("off") => host.dead = false,
+        Some(x) => return Err(format!("--dead {}: on or off", x)),
+        None => {}
+    }
+    if opt.contains_key("--proof-only") {
+        host.dead = true;
+        host.proof_only = true;
+    }
+    let time_limit_s: u64 = match opt.get("--time") {
+        Some(t) => t.parse().map_err(|e| format!("--time: {}", e))?,
+        None => 600,
+    };
     let search = match opt.get("--search").map(String::as_str).unwrap_or("gbfs") {
         "gbfs" => Search::Gbfs,
         "fd" => Search::FdLamaFirstCosts,
-        s => return Err(format!("--search {}: gbfs or fd", s)),
+        // FdLamaFirstCosts by the Rust port (Host::rust_lama, as FMI_PLAN_LAMA=rust)
+        "lama" => {
+            host.rust_lama = true;
+            Search::FdLamaFirstCosts
+        }
+        s => return Err(format!("--search {}: gbfs, fd or lama", s)),
     };
     let dump = opt.get("--dump").map(PathBuf::from);
     if let Some(d) = &dump {
@@ -221,8 +243,9 @@ fn run() -> Result<(), String> {
                 Some(p) => Some(read(p)?.lines().filter(|l| !l.is_empty()).map(String::from).collect()),
                 None => None,
             },
-            time_limit_s: 600,
+            time_limit_s,
         };
+        let k0 = taskcore::perf::now();
         let r = if opt.contains_key("--tail-only") {
             match planner.tail_only(&req) {
                 Ok(Some(r)) => Ok(r),
@@ -233,6 +256,7 @@ fn run() -> Result<(), String> {
             planner.plan(&req)
         };
         let tm = planner.last.clone();
+        let (minstr, mcyc) = taskcore::perf::since(k0);
         let (status, n, source, err) = match &r {
             Ok(r) => (r.status.clone(), r.steps.len(), r.source.clone(), String::new()),
             Err(e) => ("error".to_string(), 0, String::new(), format!("{:?}", e)),
@@ -246,7 +270,7 @@ fn run() -> Result<(), String> {
             _ => String::new(),
         };
         println!(
-            "{{\"name\": {}, \"status\": {}, \"source\": {}, \"steps\": {}, \"kept\": {}, \"total_s\": {:.4}, \"cpu_s\": {:.2}, \"key_s\": {:.4}, \"tail_s\": {:.4}, \"reduce_s\": {:.3}, \"build_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"check_s\": {:.4}, \"decode_s\": {:.4}, \"predict_s\": {:.4}, \"store_s\": {:.4}, \"operators\": {}, \"unary\": {}, \"expanded\": {}, \"evaluated\": {}, \"error\": {}{}}}",
+            "{{\"name\": {}, \"status\": {}, \"source\": {}, \"steps\": {}, \"kept\": {}, \"total_s\": {:.4}, \"cpu_s\": {:.2}, \"key_s\": {:.4}, \"tail_s\": {:.4}, \"reduce_s\": {:.3}, \"build_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"check_s\": {:.4}, \"decode_s\": {:.4}, \"predict_s\": {:.4}, \"store_s\": {:.4}, \"operators\": {}, \"unary\": {}, \"expanded\": {}, \"evaluated\": {}, \"minstr\": {:.0}, \"mcycles\": {:.0}, \"reduce_mi\": {:.0}, \"build_mi\": {:.0}, \"search_mi\": {:.0}, \"dead_s\": {:.3}, \"proof\": {}, \"error\": {}{}}}",
             esc(f[0]),
             esc(&status),
             esc(&source),
@@ -268,6 +292,13 @@ fn run() -> Result<(), String> {
             tm.unary,
             tm.expanded,
             tm.evaluated,
+            minstr,
+            mcyc,
+            tm.reduce_mi,
+            tm.build_mi,
+            tm.search_mi,
+            tm.dead,
+            esc(&tm.proof),
             esc(&err),
             tail_info
         );

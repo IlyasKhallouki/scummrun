@@ -43,7 +43,9 @@ pub struct HostCfg {
 pub const DEFAULT_BIN: &str = "/var/tmp/fast-mi/svm-e011/build/scummvm/scummvm";
 
 impl HostCfg {
-    /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd.
+    /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd;
+    /// FMI_ENGINE_CUTS=1: every engine also gets SPEEDRUN_CUTS=1, round 2's count-only mixer and no pixel output
+    /// (patch 0003, engine/CUTS.md; FMI_ENGINE_BIN must then be a build with patch 0003).
     pub fn from_env() -> HostCfg {
         let bin = std::env::var_os("FMI_ENGINE_BIN")
             .map(PathBuf::from)
@@ -56,12 +58,16 @@ impl HostCfg {
         });
         let game = root.join("game").join("dos-cd");
         let game_dir = game.canonicalize().unwrap_or(game);
+        let mut extra_env = Vec::new();
+        if std::env::var("FMI_ENGINE_CUTS").is_ok_and(|v| v == "1") {
+            extra_env.push(("SPEEDRUN_CUTS".to_string(), "1".to_string()));
+        }
         HostCfg {
             bin,
             root,
             game_dir,
             timeout: Duration::from_secs(600),
-            extra_env: Vec::new(),
+            extra_env,
         }
     }
 
@@ -427,6 +433,10 @@ pub struct BinEngine {
     last_facts: Option<Facts>,
     /// a Step's delta chunks (scratch)
     ranges: Vec<(usize, usize)>,
+    /// the last Step's block came as a delta (its chunks in `ranges`)
+    last_delta: bool,
+    /// the block before the last Step (step_changes's scratch)
+    prev: Vec<u8>,
     /// how the facts were had: (followed a delta, built whole)
     pub facts_counts: (u64, u64),
     proc_: Option<Child>,
@@ -451,6 +461,8 @@ impl BinEngine {
             last_now: false,
             last_facts: None,
             ranges: Vec::new(),
+            last_delta: false,
+            prev: Vec::new(),
             facts_counts: (0, 0),
             proc_: None,
             done: false,
@@ -478,7 +490,12 @@ impl BinEngine {
             if self.rbuf.len() < need {
                 self.rbuf.resize(need.next_power_of_two(), 0);
             }
-            let n = self.stream.read(&mut self.rbuf[self.rlen..]).map_err(io_err)?;
+            let n = match self.stream.read(&mut self.rbuf[self.rlen..]) {
+                Ok(n) => n,
+                // a signal (a debugger's or a profiler's stop) interrupted the read: read again
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(io_err(e)),
+            };
             if n == 0 {
                 return Err(EngineError::Io(std::io::Error::new(
                     std::io::ErrorKind::UnexpectedEof,
@@ -542,6 +559,7 @@ impl BinEngine {
         let old = block::layout(&self.last);
         let mut ranges = std::mem::take(&mut self.ranges);
         let delta = block::apply(&mut self.last, &mut r, &mut ranges).map_err(bad)?;
+        self.last_delta = delta;
         // the facts follow the delta when they were known; otherwise they are built on the next facts()
         let kept = match (&mut self.last_facts, delta) {
             (Some(f), true) => block::update_facts(f, old, &self.last, &ranges),
@@ -781,9 +799,95 @@ impl Engine for BinEngine {
     fn quit(mut self: Box<Self>) {
         self.shutdown();
     }
+
+    /// One StepObs message (patch 0004): the run to `frame` and the stop's runs, explain entries and dump.
+    fn step_observe(&mut self, frame: u64, req: &ObsReq) -> EResult<(Status, RunsReply, ExplainReply, Obs)> {
+        let mut w = W::msg(wire::C_STEP_OBS);
+        w.u64(frame);
+        w.obs_req(req);
+        self.send(w.finish())?;
+        self.moved();
+        let p = self.expect(wire::R_STEP_OBS_REPLY)?;
+        let mut r = R::new(&p);
+        let st = r.status().map_err(bad)?;
+        let runs = r.runs_reply().map_err(bad)?;
+        let ents = r.explain_reply().map_err(bad)?;
+        let o = r.obs().map_err(bad)?;
+        r.done().map_err(bad)?;
+        self.status = st.clone();
+        Ok((st, runs, ents, o))
+    }
+
+    /// One RunObs message (patch 0004): the run and the dump at its stop.
+    fn run_obs(&mut self, spec: &RunSpec, req: &ObsReq) -> EResult<(Status, Obs)> {
+        self.run_obs_msg(spec, req, false)
+    }
+
+    /// One RunObs message asking the room's dump (patch 0004).
+    fn run_room(&mut self, spec: &RunSpec) -> EResult<(Status, Obs)> {
+        self.run_obs_msg(spec, &ObsReq::default(), true)
+    }
+
+    /// One AtMany message (patch 0004).
+    fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
+        if pts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut w = W::msg(wire::C_AT_MANY);
+        w.u32(pts.len() as u32);
+        for &(x, y) in pts {
+            w.i32(x);
+            w.i32(y);
+        }
+        self.send(w.finish())?;
+        let p = self.expect(wire::R_AT_MANY)?;
+        let mut r = R::new(&p);
+        let n = r.count(17).map_err(bad)?;
+        if n != pts.len() {
+            return Err(bad(format!("at_many: {n} replies for {} points", pts.len())));
+        }
+        let mut v = Vec::with_capacity(n);
+        for _ in 0..n {
+            v.push(r.at().map_err(bad)?);
+        }
+        r.done().map_err(bad)?;
+        Ok(v)
+    }
+
+    /// One Step, its delta read into the facts' changes (block::changes) with no whole facts built (IFACE e011-r2-own).
+    fn step_changes(&mut self, frames: u32) -> EResult<(Status, Vec<(Key, Val, Val)>)> {
+        // the base: this stop's block (a State round trip unless a Step brought it)
+        self.block()?;
+        let mut prev = std::mem::take(&mut self.prev);
+        prev.clear();
+        prev.extend_from_slice(&self.last);
+        let r = self.step(frames, false, false);
+        let out = r.and_then(|o| {
+            block::changes(&prev, &self.last, &self.ranges, self.last_delta).map(|c| (o.status, c)).map_err(bad)
+        });
+        self.prev = prev;
+        out
+    }
 }
 
 impl BinEngine {
+    /// RunObs: the run, then the dump at its stop (`room`: the room's dump, fmi_core::room_cut's).
+    fn run_obs_msg(&mut self, spec: &RunSpec, req: &ObsReq, room: bool) -> EResult<(Status, Obs)> {
+        let mut w = W::msg(wire::C_RUN_OBS);
+        w.run_spec(spec);
+        w.obs_req(req);
+        w.b(room);
+        self.send(w.finish())?;
+        self.moved();
+        let p = self.expect(wire::R_RUN_OBS_REPLY)?;
+        let mut r = R::new(&p);
+        let st = r.status().map_err(bad)?;
+        let o = r.obs().map_err(bad)?;
+        r.done().map_err(bad)?;
+        self.status = st.clone();
+        Ok((st, o))
+    }
+
     /// `fork` as a `BinEngine`: the child stops where this one is, with this stop's facts already known.
     pub fn fork_bin(&mut self) -> EResult<BinEngine> {
         self.send(W::msg(wire::C_FORK).finish())?;

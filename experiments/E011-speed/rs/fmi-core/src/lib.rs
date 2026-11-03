@@ -706,6 +706,9 @@ pub struct Status {
     pub room_w: i32,
     /// fork_each: (frame, pid) of each child
     pub forks: Vec<(u64, u32)>,
+    /// the screen layout at the stop: initScreens' b and h and `_forceBannerVirtScreen` (the hit test's screens,
+    /// play/HITCACHE.md); reported by the binary channel with patch 0004, None otherwise (the JSON protocol, an end)
+    pub screen: Option<(i32, i32, bool)>,
 }
 
 /// The "at" reply: what a click at screen (x, y) would hit now.
@@ -851,6 +854,67 @@ pub trait Engine: Send {
     /// CPU seconds of this process so far (utime + stime)
     fn cpu_s(&self) -> f64;
     fn quit(self: Box<Self>);
+    /// An observed frame in one command: run to the decision point of `frame`, then what `runs`, `explain_log` and
+    /// `obs(req)` give at that stop (the window search's observed child frame). The default makes the four calls.
+    fn step_observe(&mut self, frame: u64, req: &ObsReq) -> EResult<(Status, RunsReply, ExplainReply, Obs)> {
+        let st = self.run(&RunSpec {
+            frame: Some(frame),
+            ..Default::default()
+        })?;
+        let runs = self.runs()?;
+        let ents = self.explain_log()?;
+        let o = self.obs(req)?;
+        Ok((st, runs, ents, o))
+    }
+    /// A run and the dump at its stop in one command (the input code's run when it reads the state next). The
+    /// default makes the two calls.
+    fn run_obs(&mut self, spec: &RunSpec, req: &ObsReq) -> EResult<(Status, Obs)> {
+        let st = self.run(spec)?;
+        let o = self.obs(req)?;
+        Ok((st, o))
+    }
+    /// A run and the room's dump at its stop in one command: the full dump cut by `room_cut` (what the input code
+    /// reads). The default makes the two calls and cuts.
+    fn run_room(&mut self, spec: &RunSpec) -> EResult<(Status, Obs)> {
+        let (st, mut o) = self.run_obs(spec, &ObsReq::default())?;
+        room_cut(&mut o);
+        Ok((st, o))
+    }
+    /// `at` at each point, in order, at the current stop (the hit tests read and change nothing). The default makes
+    /// one call per point.
+    fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
+        pts.iter().map(|&(x, y)| self.at(x, y)).collect()
+    }
+    /// Runs `frames` frames with no new input (a run to the frame `frames` after this stop) and returns the stop's
+    /// status and the facts' changes from this stop to it: (key, old, new) for every key whose value differs, absent
+    /// 0, in `Key` order (`Facts::diff` of the facts before and after). Default: today's calls; a provider that
+    /// follows Step's delta gives them in one round trip and with no whole facts map (IFACE e011-r2-own).
+    fn step_changes(&mut self, frames: u32) -> EResult<(Status, Vec<(Key, Val, Val)>)> {
+        let before = self.facts()?;
+        let to = self.status().frame + u64::from(frames);
+        let st = self.run(&RunSpec { frame: Some(to), ..Default::default() })?;
+        let after = self.facts()?;
+        Ok((st, before.diff(&after)))
+    }
+}
+
+/// The room's dump made from a full dump: the owners, states and classes of the objects the room's object list
+/// names only (in the full dump's object order), and no exact object; every other field as it is.
+pub fn room_cut(o: &mut Obs) {
+    let mut ids: Vec<u32> = o
+        .room_objects
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .map(|r| r.id as u32)
+        .collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let keep = |x: &u32| ids.binary_search(x).is_ok();
+    o.owners.retain(|p| keep(&p.0));
+    o.states.retain(|p| keep(&p.0));
+    o.classes.retain(|p| keep(&p.0));
+    o.exact = None;
 }
 
 /// How an engine starts (replay_part1.config): seed 1, the input movie from boot, the bridge's settings.

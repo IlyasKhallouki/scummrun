@@ -130,6 +130,12 @@ pub struct WindowCfg {
 /// Makes the window search of an attempt (provider: play).
 pub trait PlayerHost: Send + Sync {
     fn player(&self, cfg: &WindowCfg) -> Box<dyn WindowPlayer>;
+    /// The attempt's player when its attempt has ended (E011 round 2, FMI_PLAYER_DONE). Default: freed on a thread of
+    /// its own, off the try's path (the window search's reading data and game: 20-90 ms of frees). A provider may keep
+    /// what the next player can use.
+    fn done(&self, p: Box<dyn WindowPlayer>) {
+        std::thread::spawn(move || drop(p));
+    }
 }
 
 /// Adapts fmi-core's PlayCtx calls (kept here so the harness reads one trait).

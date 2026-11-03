@@ -40,6 +40,11 @@ struct Snap {
     args_vals: BTreeMap<String, BTreeSet<i64>>,
     folded: BTreeSet<i64>,
     sig_limit: usize,
+    /// the switch --prep: the reach part made here (reach.rs `reach_prep`), and the sink's part's function
+    prep_reach: bool,
+    prep_sink: Option<Arc<crate::builder::PrepFn>>,
+    /// the records stay with the worker (`Lite`)
+    prep_lite: bool,
 }
 
 enum PartState {
@@ -154,6 +159,8 @@ pub struct Pool<'a, 'g> {
     coarse: FxHashMap<String, (f64, u32)>,
     all: (f64, u64),
     pub stats: PoolStats,
+    /// a reading in another process's run (run.rs `Ctl`): set, the reading stops at its next look (a panic)
+    abort: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// The label up to its list of locals (`event(script:2@721#a2bf3d907238)` -> `event(script:2@721`), the kind first.
@@ -168,6 +175,18 @@ impl<'a, 'g> Pool<'a, 'g> {
     /// when jobs start, not what they read.
     pub fn set_max_waiting(&mut self, n: u64) {
         self.sh.max_waiting.store(n, Ordering::Relaxed);
+    }
+
+    /// The flag that stops the reading: the reading's thread looks at it while it waits for the workers (at least
+    /// every 100 ms) and stops by a panic when it is set. It changes nothing a reading that is not stopped writes.
+    pub fn set_abort(&mut self, abort: Arc<std::sync::atomic::AtomicBool>) {
+        self.abort = Some(abort);
+    }
+
+    fn check_abort(&self) {
+        if self.abort.as_ref().is_some_and(|a| a.load(Ordering::Relaxed)) {
+            panic!("the reading was stopped");
+        }
     }
 
     fn estimate(&self, job: &Job) -> f64 {
@@ -244,7 +263,19 @@ impl Machine for Pool<'_, '_> {
                 t
             }
         };
-        let snap = Arc::new(Snap { base, args_vals: b.table.args_vals.clone(), folded: b.folded.clone(), sig_limit: b.sig_limit });
+        let prep_reach = b.prep && b.table.reach.is_some() && b.reach_state.as_ref().is_some_and(|st| st.pairs_off());
+        let prep_sink = if b.prep { b.prep_sink.clone() } else { None };
+        // the records stay with the worker only when every reader of them takes its part from the worker
+        let prep_lite = b.prep_lite && prep_reach && prep_sink.is_some() && !b.keep_records && b.on_job.is_none();
+        let snap = Arc::new(Snap {
+            base,
+            args_vals: b.table.args_vals.clone(),
+            folded: b.folded.clone(),
+            sig_limit: b.sig_limit,
+            prep_reach,
+            prep_sink,
+            prep_lite,
+        });
         let order = self.order(jobs);
         self.sh.frontier.store(0, Ordering::Relaxed);
         {
@@ -275,14 +306,19 @@ impl Machine for Pool<'_, '_> {
                     if !ready.is_empty() {
                         break ready;
                     }
-                    q = self.sh.done.wait(q).unwrap();
+                    if self.abort.is_some() {
+                        self.check_abort();
+                        q = self.sh.done.wait_timeout(q, std::time::Duration::from_millis(100)).unwrap().0;
+                    } else {
+                        q = self.sh.done.wait(q).unwrap();
+                    }
                 }
             };
             let tm = Instant::now();
             let buffered = self.sh.buffered.load(Ordering::Relaxed);
             self.stats.max_buffered = self.stats.max_buffered.max(buffered);
             for o in ready {
-                self.sh.buffered.fetch_sub(o.records.len() as u64, Ordering::Relaxed);
+                self.sh.buffered.fetch_sub(o.n_records() as u64, Ordering::Relaxed);
                 let job = &jobs[next];
                 self.learn(job, o.secs);
                 longest = longest.max(o.secs);
@@ -299,7 +335,9 @@ impl Machine for Pool<'_, '_> {
                 b.merge_job(o.deltas, o.last_pins);
                 let t2 = Instant::now();
                 self.stats.merge_job_secs += (t2 - t1).as_secs_f64();
+                b.job_prep = o.prep;
                 each(b, next, o.records);
+                b.job_prep = None;
                 self.stats.each_secs += t2.elapsed().as_secs_f64();
                 next += 1;
                 self.sh.frontier.store(next as u64, Ordering::Relaxed);
@@ -548,14 +586,26 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                 let mut m = WorkerMachine { rd: &mut rd, sh, snap: &snap, parts: Vec::new() };
                 let records = b.run_job(&mut m, &jobs[i]);
                 trace_job(&jobs[i].label, t.elapsed().as_secs_f64(), records.len());
+                // the switch --prep: what the reading's thread and the sink work out of the records, worked out here
+                let mut records = records;
+                let prep = (snap.prep_reach || snap.prep_sink.is_some()).then(|| crate::builder::JobPrep {
+                    reach: snap.prep_reach.then(|| {
+                        let reach = b.table.reach.clone().expect("--prep: the reach part needs --reach");
+                        crate::reach::reach_prep(&b.table, &reach, &records)
+                    }),
+                    sink: snap.prep_sink.as_ref().map(|f| f(&records, &b.table)),
+                    // the records go here, where they were made
+                    lite: snap.prep_lite.then(|| crate::builder::Lite::of(&std::mem::take(&mut records))),
+                });
                 let out = JobOut {
                     records,
                     deltas: b.take_deltas(),
                     last_pins: std::mem::take(&mut b.last_pins),
                     secs: t.elapsed().as_secs_f64(),
+                    prep,
                 };
                 let mut q = sh.q.lock().unwrap();
-                sh.buffered.fetch_add(out.records.len() as u64, Ordering::Relaxed);
+                sh.buffered.fetch_add(out.n_records() as u64, Ordering::Relaxed);
                 q.results[i] = Some(out);
                 drop(q);
                 sh.done.notify_all();
@@ -610,6 +660,7 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
             coarse: FxHashMap::default(),
             all: (0.0, 0),
             stats: PoolStats::default(),
+            abort: None,
         };
         let r = panic::catch_unwind(AssertUnwindSafe(|| f(&mut pool)));
         {
@@ -624,8 +675,16 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
     })
 }
 
+/// CPU seconds of the calling thread so far (/proc/thread-self/schedstat: its run time in ns); 0 where unknown.
+pub fn thread_cpu() -> f64 {
+    std::fs::read_to_string("/proc/thread-self/schedstat")
+        .ok()
+        .and_then(|t| t.split_whitespace().next().and_then(|x| x.parse::<u64>().ok()))
+        .map_or(0.0, |ns| ns as f64 / 1e9)
+}
+
 enum SinkMsg {
-    Batch(usize, Vec<Record>, Option<Arc<FactTable>>),
+    Batch(usize, Vec<Record>, Option<Arc<FactTable>>, Option<Box<dyn std::any::Any + Send>>),
     Reset,
 }
 
@@ -636,7 +695,7 @@ enum SinkMsg {
 /// waits for the thread and gives `S` back.
 pub struct SinkThread<S: RecordSink + Send + 'static> {
     tx: Option<std::sync::mpsc::SyncSender<SinkMsg>>,
-    handle: Option<std::thread::JoinHandle<S>>,
+    handle: Option<std::thread::JoinHandle<(S, f64)>>,
     sent: Option<BTreeMap<String, crate::domain::Domain>>,
 }
 
@@ -650,25 +709,44 @@ impl<S: RecordSink + Send + 'static> SinkThread<S> {
                 let mut table: Option<Arc<FactTable>> = None;
                 for m in rx {
                     match m {
-                        SinkMsg::Batch(first, recs, t) => {
+                        SinkMsg::Batch(first, recs, t, prep) => {
                             if t.is_some() {
                                 table = t;
                             }
-                            sink.batch_owned(first, recs, table.as_ref().expect("a table"));
+                            let table = table.as_ref().expect("a table");
+                            match prep {
+                                Some(p) => sink.batch_prepared(first, recs, table, p),
+                                None => sink.batch_owned(first, recs, table),
+                            }
                         }
                         SinkMsg::Reset => sink.reset(),
                     }
                 }
-                sink
+                (sink, thread_cpu())
             })
             .expect("the sink thread");
         SinkThread { tx: Some(tx), handle: Some(handle), sent: None }
     }
 
     /// Waits for the records sent so far to be written, and gives the sink back.
-    pub fn finish(mut self) -> S {
+    pub fn finish(self) -> S {
+        self.finish_cpu().0
+    }
+
+    /// `finish`, with the sink thread's CPU seconds.
+    pub fn finish_cpu(mut self) -> (S, f64) {
         drop(self.tx.take());
         self.handle.take().unwrap().join().expect("the sink thread")
+    }
+
+    /// The table, when a pass widened a domain since it was last sent.
+    fn table_to_send(&mut self, table: &FactTable) -> Option<Arc<FactTable>> {
+        if self.sent.as_ref() != Some(&table.extra) {
+            self.sent = Some(table.extra.clone());
+            Some(Arc::new(table.clone()))
+        } else {
+            None
+        }
     }
 
     fn send(&self, m: SinkMsg) {
@@ -686,13 +764,12 @@ impl<S: RecordSink + Send + 'static> RecordSink for SinkThread<S> {
         self.batch_owned(first, recs.to_vec(), table)
     }
     fn batch_owned(&mut self, first: usize, recs: Vec<Record>, table: &FactTable) {
-        let t = if self.sent.as_ref() != Some(&table.extra) {
-            self.sent = Some(table.extra.clone());
-            Some(Arc::new(table.clone()))
-        } else {
-            None
-        };
-        self.send(SinkMsg::Batch(first, recs, t));
+        let t = self.table_to_send(table);
+        self.send(SinkMsg::Batch(first, recs, t, None));
+    }
+    fn batch_prepared(&mut self, first: usize, recs: Vec<Record>, table: &FactTable, prep: Box<dyn std::any::Any + Send>) {
+        let t = self.table_to_send(table);
+        self.send(SinkMsg::Batch(first, recs, t, Some(prep)));
     }
     fn reset(&mut self) {
         self.send(SinkMsg::Reset);

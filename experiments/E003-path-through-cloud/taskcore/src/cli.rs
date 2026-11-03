@@ -505,17 +505,20 @@ pub fn write_out(a: &Args, mut p: Prepared, t0: Instant) -> Result<(), String> {
     Ok(())
 }
 
-/// `taskcore search --sas F [--plan OUT]`: the Rust search (search.rs) on a SAS file: the plan file FD's
-/// `lazy_greedy([hff], preferred=[hff], reopen_closed=false)` with plusone costs writes, and a JSON line of numbers.
+/// `taskcore search --sas F [--plan OUT] [--hff fd|watch]`: the Rust search (search.rs) on a SAS file: the plan file
+/// FD's `lazy_greedy([hff], preferred=[hff], reopen_closed=false)` with plusone costs writes, and a JSON line of
+/// numbers. `--hff watch`: h_FF's exploration by watched preconditions (the same plan and counts).
 fn search_cmd(argv: &[String]) -> Result<(), String> {
     let mut sas_path = None;
     let mut plan_path = None;
+    let mut mode = crate::search::HffMode::Fd;
     let mut it = argv.iter();
     while let Some(k) = it.next() {
         let v = it.next().ok_or(format!("{} needs a value", k))?;
         match k.as_str() {
             "--sas" => sas_path = Some(v.clone()),
             "--plan" => plan_path = Some(v.clone()),
+            "--hff" => mode = crate::search::HffMode::parse(v)?,
             _ => return Err(format!("search: unknown option {}", k)),
         }
     }
@@ -527,7 +530,7 @@ fn search_cmd(argv: &[String]) -> Result<(), String> {
     let t = crate::search::parse_sas(&text).map_err(|e| format!("{}: {}", path, e))?;
     drop(text);
     let parse_s = t1.elapsed().as_secs_f64();
-    let o = crate::search::lazy_greedy(&t, None);
+    let o = crate::search::lazy_greedy_mode(&t, None, mode);
     let mut j = J::new();
     j.s("status", &o.status)
         .n("plan_length", o.plan.len())
@@ -544,6 +547,9 @@ fn search_cmd(argv: &[String]) -> Result<(), String> {
         .f("relax_s", o.relax_s)
         .f("search_s", o.search_s)
         .f("eval_s", o.eval_s);
+    if mode != crate::search::HffMode::Fd || std::env::var_os("TASKCORE_PROFILE").is_some() {
+        j.f("eval_cpu_s", o.eval_cpu_s).f("eval_minstr", o.eval_minstr).f("eval_mcycles", o.eval_mcyc).n("watch_builds", o.watch_builds);
+    }
     if o.status == "plan" {
         crate::search::check_plan(&t, &o.plan)?;
         if let Some(p) = &plan_path {
@@ -582,6 +588,7 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
         match k.as_str() {
             "--task" => task = Some(PathBuf::from(v)),
             "--keep" => cfg.keep = v.parse().map_err(|e| format!("--keep: {}", e))?,
+            "--fast" => cfg.fast = v == "1",
             _ => return Err(format!("warm: unknown option {}", k)),
         }
     }
@@ -666,7 +673,8 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
                 x.model = cfg.model;
                 let (_, st, of) = crate::search::build(&mut x, &red.task.starts[red.start].1)?;
                 let build_s = t1.elapsed().as_secs_f64();
-                let o = crate::search::lazy_greedy(&st, None);
+                let mode = if cfg.fast { crate::search::HffMode::Watch } else { crate::search::HffMode::Fd };
+                let o = crate::search::lazy_greedy_mode(&st, None, mode);
                 if o.status == "plan" {
                     crate::search::check_plan(&st, &o.plan)?;
                     std::fs::write(plan_path, crate::search::plan_text(&st, &o.plan)).map_err(|e| e.to_string())?;
@@ -736,6 +744,9 @@ pub fn run() -> Result<(), String> {
     }
     if argv.first().map(|s| s.as_str()) == Some("warm") {
         return warm_cmd(&argv[1..]);
+    }
+    if argv.first().map(|s| s.as_str()) == Some("dead") {
+        return crate::dead::dead_cmd(&argv[1..]);
     }
     let a = parse()?;
     let t0 = Instant::now();

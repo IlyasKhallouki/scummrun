@@ -2273,6 +2273,226 @@ mod tests {
   `FMI_PLAN_TIME=180`: above every found plan's time, so no plan the tries have found would have been lost. Nothing
   else changes.
 
+## Amendment 2026-11-03, round 2's integration: the fast settings' search, and what round 2 is measured against
+
+Written before round 2's benchmark ran (branch e011-r2: the six round-2 branches merged, then the integration's own
+commits).
+
+- **Why.** Round 2's route component (e011-r2-route) ported Fast Downward's lama-first-costs to Rust, with plans,
+  landmark graphs and counts byte for byte Fast Downward's on 30 requests. On its branch the fast settings with that
+  search reached the kitchen on test (a) and gave B0's tries in everything, where Gbfs (round 1's fast search) fails G10.
+- **What changes.**
+  1. The fast settings become: play when ready, the old tail first, and `Search::FdLamaFirstCosts` served by the Rust
+     port (`--search fd --tail`, `FMI_PLAN_LAMA=rust`). G10's third clause and G11's second are run with them. Gbfs
+     stays in the code; its G10 clause stays as round 1 left it.
+  2. Round 2's B3 is the warm regime (B3 (B)) of round 2's binaries against round 1's (e011 9bbd44a's `fmi`, round
+     1's reader-scope and engine build), interleaved try by try as B4 interleaves the reference: round 2's "before" is
+     round 1. The reference settings run three resident processes (round 1; round 2 with every round-2 switch off;
+     round 2 with every round-2 switch on), the fast settings two (round 1 with Gbfs; round 2 with every switch on and
+     the Rust lama-first-costs). The Python reference is not timed again: its times are round 1's B4.
+  3. "Switches off" and "on" in round 2's gates mean every round-2 switch at once (`env-r2.sh`'s OFF2 and ON2), on top
+     of each component's own checks of its switch alone where its script makes them.
+- Nothing else changes: the gates, the 15 tries, B0, the parts and the floors are as above.
+
+## Amendment 2026-11-03, during round 2's integration: B3 without the job memo, and G12's roots
+
+Written after a first start of round 2's B3 was stopped (two tries in), before it ran again.
+
+- **Measured.** During the integration / had 6-8.8 GB free (other experiments' folders on the same disk). The job
+  memo's store writes nothing while its disk is under 8 GB plus twice its largest file (memo.md, "The store"; round 1's
+  reader has that floor built in, round 2's reads it from READER_MEMO_FLOOR_GB). In the stopped start, round 1's
+  j00000 stored 22,842 runs and round 2's, ten minutes later, none: the memo was on in one sequence and off in the
+  other by the disk's level, not by the code. G6's memo clause for the fresh ring(33) pair stored and took nothing for
+  the same reason (its refinement pair did store and take).
+- **What changes.**
+  1. Round 2's B3 runs with the job memo off in every sequence (FMI_MEMO unset), so that both rounds read the same way
+     whatever the disk's level; the reading cache, kept entries, warm planners and plan store stay as B3 (B) has them,
+     with the reading cache's floor (E008_FLOOR_GB) at 5 GB, the disk rule of this run, in every sequence. The memo's
+     own gains are measured by G6's memo clauses, not by B3.
+  2. G6 runs again with READER_MEMO_FLOOR_GB=5 for round 2's reader, so that its memo clauses store and take.
+  3. G12's watcher counts as roots only the benchmark's resident fmi processes. The kitchen check's `fmi explore run`
+     shares the laptop and runs each job under guard.sh (driver.rs, a process per job), whose last line is
+     `python3 -c "print(round(...))"` for its wall time; the round-1 watcher, rooted at every process named fmi, logged
+     seven such processes in the stopped start. None of them was under a process of the benchmark.
+
+## Results, round 2 (2026-11-03, written after the runs)
+
+Branch e011-r2: origin/e011 9bbd44a with the six round-2 branches merged (engine b80bf2a, play 71c370c, read 15414f1,
+plan 661fcb2, route 621e519, own 735faec), then the integration commits: e011-r2-own's interface request
+(`Engine::step_changes`) next to e011-r2-play's new methods in fmi-core and fmi-engine (the only conflicts, both sides
+kept), FMI_PLAY_KEEP, FMI_READER_PREP (reader-scope's --prep), the Rust lama-first-costs with the watched h_FF under
+FMI_PLAN_FAST, the engine built with patches 0001-0004, and the bench scripts. e011-r2-read's reader inside the fmi
+process is not on its branch (uncommitted in its worktree), so fmi still runs reader-scope as a child. Numbers and
+tables: `results/round2/` (README.md, gates.md, tries-*.md). Lab note: `notes/log/2026-11-03-e011-round2.md`. Laptop,
+seed 1, nice 10; the kitchen check (round 1's binaries) and another experiment shared the laptop.
+
+**Gates.** G1-G12 pass with every round-2 switch off and every one on (results/round2/gates.md). G10 now passes in
+full: with the Rust lama-first-costs, `fmi try` on test (a) prints `CHECK (a): 0 goal True 2728 3216 488 11712 2 36` in
+strict, ready and ready-with-the-old-tail modes, and its entries verify from boot with 0 differences. G11: the 15 tries
+equal B0's in everything under the reference settings (round 2 with the switches off and on) and under the fast
+settings (round 2); 129 new entries verify from boot. Two gate details: G6's reading.json at 6 threads differs from the
+reference only in its recorded thread count; G12 is rooted at the benchmark's processes (amendment above).
+
+**B3** (warm, the job memo off in every sequence, round 1's and round 2's binaries interleaved try by try at load
+1.9-5.1; wall per try):
+
+| settings | binaries | median, 15 | ring(33), 7 | ring(38), 8 | mean | max | sum |
+|---|---|---:|---:|---:|---:|---:|---:|
+| reference | round 1 | 6.3 s | 43.5 s | 2.75 s | 28.3 s | 158.0 s | 424.5 s |
+| reference | round 2 | 4.8 s | 5.9 s | 1.25 s | 13.3 s | 128.2 s | 199.2 s |
+| fast | round 1 (Gbfs) | 4.9 s | 17.6 s | 1.75 s | 17.7 s | 114.9 s | 264.9 s |
+| fast | round 2 (the Rust lama-first-costs) | 4.9 s | 6.1 s | 1.3 s | 12.9 s | 121.0 s | 193.1 s |
+
+By part, round 2's fast sequence (median / max per try): return 0.00 / 0.09 s, idle 0.10 / 0.10 s, read 0.05 / 105.8 s,
+plan 0.29 / 14.8 s, play 0.02 / 0.35 s; round 1's in the same run: 0.01 / 0.33, 0.20 / 0.40, 0.19 / 94.5, 0.71 / 19.3,
+0.02 / 0.52. The read is 74% of round 2's sum and the plan 25%. The planner's ring(33) request on the plan component's
+fixed sequence: another start 3.0-3.2 s (round 1: 7.0-7.6 s with Gbfs, 19.9-22.7 s with Fast Downward), another goal
+4.4 s (11.5 s, 26.6 s), of which the per-start reductions are 2.0-3.4 s. A fresh ring(33) reading: 35.0-36.3 s with
+round 1's reader, 36.4-40.8 s with round 2's. Test (a)'s third window, ready: 4.5 s (17.1 s with the switches off).
+The try's own time: 13-14 ms (80-113 ms). The door chain from boot on the engine with both cuts: 0.12 s.
+
+**Against the prediction.** The prediction's answer said a ring(33) try would come down to 3-10 s only with round 2's
+per-start reductions and the resident reader. It came to 6.1 s (fast) and 5.9 s (reference) with the per-start
+reductions' fast forms and the Rust lama-first-costs, without the resident reader. The 15 tries' median, predicted at
+0.5-2 s, stays at 4.9 s: it is a fresh ring(38) reading, which round 2 did not change.
+
+**Threshold.** "Yes" fails on the warm median: 4.9 s against 1 s. The ring(33) median (6.1 s against 10 s), the route
+replay and every gate now pass; the kitchen clause is the kitchen check's, which runs on round 1's binaries (the
+amendments above). So the answer stays "partly", now with all its gates.
+
+**Stop rule.** Round 2 gained 27% of the fast warm sum (264.9 s to 193.1 s) and 53% of the reference sum against round
+1's binaries on the same load, more than 10%, so the rounds do not stop by that rule. The next round goes to the
+reading (74%): the first try's fresh ring(33) reading and two refinements (106 s), a refinement from another entry
+(21 s without the memo), and the fresh ring(38) readings (4.4-4.8 s each), which set the median. Then the planner's
+per-start reductions (25%).
+
+## Amendment 2026-11-03, during the kitchen check: targets with no plan made cheap
+
+- **Why.** In the check, target bit:118 = 1 from frames 2770 and 2771 (tries 15 and 16) made Fast Downward's
+  lama-first-costs search its whole limit and end with no plan: 607 s and 612 s, then 191 s and 187 s under the 180 s
+  limit. With targets in rotation, each such target costs a worker the whole limit. A found plan took at most 161 s
+  over the 260 recorded (median 18 s, p90 45 s, p99 74 s). The PI asked for targets with no plan to be cheap.
+- **Prior work** (each paper opened):
+  - h^m (Haslum and Geffner, AIPS 2000): reachability over sets of m facts; m = 2 gives the pairs no reachable state
+    holds (mutexes), polynomial in facts² × operators.
+  - Alcázar and Torralba (ICAPS 2015): h^2 mutexes on SAS+ as preprocessing, forward and in regression; the
+    computation took up to minutes on the largest IPC tasks.
+  - Hoffmann, Kissmann and Torralba (ECAI 2014): heuristics aimed at unsolvability only (∞ or 0); merge-and-shrink with
+    shrinking that keeps solvability; they cite projections tested for unsolvability (Bäckström, Jonsson and
+    Ståhlberg 2013).
+  - The Unsolvability IPC 2016: Fast Downward Aidos (Seipp, Pommerening, Sievers, Wehrle, Fawcett, Alkhazraji), the
+    winner, a portfolio of breadth-first search with dead-end pattern databases (Pommerening and Seipp), dead-end
+    potentials (an LP over features of up to two facts), resource detection, h^m, h^max, and h^2-mutex operator pruning
+    in every portfolio.
+  - Traps (Lipovetzky, Muise and Geffner, ICAPS 2016): k-DNF conditional invariants, compared against h^1 and h^2.
+  - Certificates of unsolvability (Eriksson, Röger and Helmert, ICAPS 2017).
+- **What fits our tasks.** A request's task is 10 k (ring(38)) to 155 k (ring(33)) operators, 460 to 7,200 facts,
+  with conditional effects (1.45 M of 3.8 M effects on ring(33)). taskcore's reductions already apply forward value
+  reachability (d) and backward relevance (e), so h^1 seldom proves more. h^2 is polynomial and needs no pattern
+  choice and no LP. Pattern databases, merge-and-shrink and potentials need a pattern or merge strategy and much more
+  code. A blind complete search is not cheap here: Fast Downward's blind A* on the 10 k-operator ring(38) task for
+  bit:118 = 1 ran 120 s without ending.
+- **Measured before this amendment** (exploration, the code below in its first form):
+  - h^2 proves bit:118 = 1 dead on both of the check's requests (j00015, j00016): the goal fact itself is outside the
+    fixpoint. On the profile's ring(38) target survey, where 3 of 33 targets ran the 30 s limit with no plan, h^2
+    proves bit:118 = 1 and var:53 = -1 dead and not var:52 = -1.
+  - h^2 takes 0.05 s on ring(38) and 6.2 s on ring(33) at load 10-12, with the same rows as the plain fixpoint.
+- **Method (1): sound no-plan proofs before the search.** Switch `FMI_PLAN_DEAD=1` (off: the old behaviour).
+  - In fmi-plan, after the reduced task is built in memory and before the search (Gbfs or Fast Downward):
+    1. h^1, relaxed reachability on the SAS task;
+    2. h^2, the pair fixpoint (taskcore `dead.rs`).
+  - A goal fact or pair outside the fixpoint is a proven no-plan: status "unsolvable" (the harness's "no plan (the
+    planner proved none)"), source "proof". Its stats name the method and the goal fact, with the seconds.
+  - Otherwise the search runs as before. The h^2 fixpoint has an engineering watchdog (`FMI_PLAN_DEAD_S`, 60 s): past
+    it, the proof is open and the search runs.
+- **Soundness.**
+  - h^1: every fact of a reachable state is in the fixpoint (induction on the path). An effect's fact is added once
+    its operator's preconditions and its own conditions are in.
+  - h^2: every pair of facts of a reachable state is in the fixpoint (induction on the path). For a step o from s to
+    s', a fact of s' was written by an effect that fired (its conditions and o's preconditions hold in s) or kept
+    from s (no fired effect writes its variable, so no unconditional effect does). Each case of a pair (both written,
+    one written and one kept, both kept) is a rule of the fixpoint whose premises are pairs of s. So a goal pair
+    outside the fixpoint is in no reachable state.
+  - Neither proof can claim no plan for a task with one. The fast fixpoint must equal the plain one row for row; that
+    is a test, not an argument.
+- **Method (2): iterative deepening on planning time.** Switch `FMI_PLAN_DEEPEN=L0` in seconds (unset: the old
+  behaviour).
+  - **The first limit.** L0 is the p90 of the found plans' search seconds on the warm Rust path (fmi-plan, warm
+    planner), measured on the recorded requests of the gate below, rounded up to 10 s.
+  - **Within a try.** A target deferred n times is planned with limit L0 · 2^n (n = 0: not deferred). This limit
+    applies to its plans until the attempt finds one; replans after that keep the old limit. The try's targets come in
+    their order, the deferred ones last, by n.
+  - **Deferral.** An attempt whose first plan ends on the limit ("time") defers its target (n + 1): it is not "tried"
+    and stays in the entry's targets for later tries. Each target is attempted at most once per try.
+  - **Exhaustion.** An entry is exhausted only when a try played nothing and deferred nothing. So a deferred target is
+    retried, with a doubled limit, only when its entry has no undeferred target left.
+  - **The archive.** It keeps the deferred targets per (cell, entry) as it keeps the tried ones: job.json "deferred",
+    the log line's "deferred". A resumed run reads them back.
+  - **Completeness.** No target is dropped for good by a limit. A target with a plan whose search takes t seconds is
+    found once L0 · 2^n ≥ t.
+- **Prediction** (before the code that uses it):
+  - The gate below passes: no recorded request with a plan is claimed dead, and every plan is the recorded one.
+  - The check's two bit:118 requests are proven dead by h^2, each in under 30 s of request wall at the check's load
+    (was 187-612 s).
+  - h^2 costs ring(33) requests 3-10 s each (load 5-12) and ring(38) requests under 0.1 s.
+  - Over every target at the check's entries 36 and 26 (89 each), h^2 proves 1-10 dead and h^1 proves none.
+  - L0 lands in 30-60 s, and a dead target that no proof catches costs L0 in its first round.
+- **Gate.**
+  1. Every recorded request with a plan that can be rebuilt is replayed with both switches on: E008's fixed tasks
+     (ring(38) j00091, ring(33) j00089, serve38, serve33), the benchmark's B0 (E009's) and B3 tries, and the check's
+     tries. For each: no proof claims no plan, and the planner returns the recorded plan.
+  2. Each found plan's states are inside the h^2 rows (`taskcore dead --plan`).
+  3. The fast h^2 equals the plain h^2 row for row on the gate's tasks.
+  4. With both switches off: fmi-plan's results are byte for byte the old ones on serve38 and serve33, and the
+     explorer passes G9 (fake steps against explore.py).
+  5. Deepening, on fake steps:
+     - a target that times out at L0 is deferred and retried at 2 · L0 only after the entry's undeferred targets;
+     - an entry with deferred targets is not exhausted;
+     - a resumed archive keeps the counts.
+  6. Report the check's bit:118 requests: what proves them dead and how long it takes.
+
+## Results of the amendment "targets with no plan made cheap" (2026-11-03, written after the runs)
+
+Branch e011-deadtarget. Tables and lists: `results/deadtarget.md`. Laptop, seed 1, nice 10, at load 3-15.
+
+- **What it does now.** With `FMI_PLAN_DEAD=1`, the check's bit:118 = 1 request ends in 18-19 s as a proven no-plan
+  ("no plan (the planner proved none)"), against 187-191 s with the 180 s limit and 607-612 s with 600 s. End to end,
+  `fmi try` on try 15's job with the target forced ends its attempt in 15.6 s with that stop. With
+  `FMI_PLAN_DEEPEN=120`, a dead target that no proof catches costs 120 s plus the reductions in its first round, and
+  comes back with 240 s, 480 s, ... only once its entry has no other target left. Both switches are off by default.
+- **What proves bit:118.** h^2: the goal fact is outside the pair fixpoint. Each of its 8,712 writers needs a pair of
+  facts no reachable state holds (bit:386 = 0 with var:252 = 1, bit:387 = 0 with var:253 = 1, and nine more of that
+  kind). h^1 reaches it. Tries 15 and 16 give the same task.
+- **Gates.**
+  - Gate 1: 41 distinct recorded requests were rebuilt (103 records: the check 25, B0 16, B3 60, E008 2), plus E008's
+    serve38 and serve33; 319 recorded plans had their reading evicted or gone. No proof claims no plan where a plan
+    is recorded, and each of the 40 requests with a plan returns the recorded plan of every record (101). serve38 and
+    serve33 give the same bytes with the proofs on and off.
+  - Gate 2: the states of all 53 found plans are inside the h^2 rows.
+  - Gate 3: the fast h^2 equals the plain one on those 53 tasks and on 20,000 random tasks.
+  - Gate 4: with both switches off, G9 passes (18 scenarios × 2 modes, 0 differing).
+  - Gate 5: deepen_check passes.
+  - Gate 6: above.
+- **Fraction proven dead.** Over every target at entries 36 and 26 (89 each), h^1 proves none and h^2 proves one at
+  each (bit:118 = 1). Over the check's 24 rebuildable distinct requests, h^2 proves the same one. On the profile's
+  ring(38) survey, h^2 proves 2 of the 3 targets that ran out of time (var:52 = -1 stays open).
+- **Cost.** h^2 stops once the goal is in its rows. On ring(33) requests with a plan the proofs take a median of
+  0.38 s (max 1.4 s), against 13.8 s of reductions; on ring(38), 0.01 s. The dead one takes 4.5 s. The whole fixpoint
+  takes 2.6-7.3 s on ring(33).
+- **L0.** The 26 found plans with Fast Downward's search on the warm path took a median of 37.3 s of search, p90
+  111.6 s and max 119.8 s, so L0 = 120 s.
+- **Against the prediction.**
+  - Gate: yes.
+  - bit:118 proven dead by h^2 in under 30 s: yes (18.4-19.1 s).
+  - h^2 cost on ring(33), predicted 3-10 s: the whole fixpoint took 2.6-7.3 s. With the early stop (added after the
+    prediction), requests with a plan pay 0.4 s.
+  - ring(38) under 0.1 s: yes.
+  - 1-10 dead per entry and none by h^1: 1 per entry, none by h^1.
+  - L0 in 30-60 s: no. It is 120 s, because the check's requests on the refinement reading take 89-120 s of Fast
+    Downward's search at this load.
+- **Interaction.** A try that only defers targets makes no new reached values, so it counts toward E008's stagnation
+  stop. The stop rules are unchanged.
+
 ## Kitchen check, result (2026-11-03): stopped at 65 committed tries, the goal not reached
 
 The check ran from 01:54 to 04:03 on round 1's binaries with `--search fd` (amendment of 2026-11-03), resumed once at
@@ -2300,3 +2520,47 @@ from the room-28 entries those were targets that reach the planner's limit, each
   values) take most of the tries.
 - The goal's request from frame 3443 did not plan within 180 s, where the same goal planned in 8-15 s from frame 3204
   in E006-E008; whether it needs the cook's timer from there, or more time, is open.
+
+## Amendment 2026-11-03, after round 2: the no-plan proofs merged into round 2, and what is measured
+
+Written after the merge built and its cargo tests passed, before any gate or measurement ran on it.
+
+- **What.** Branch e011-r2 (736f306) gets e011-deadtarget (aacf668) and e011 (0bde069, the kitchen check's result).
+  The proofs run on the reduced task before every search arm, the Rust lama-first-costs included. "Everything on" is
+  env-r2.sh's ON2 with `FMI_PLAN_DEAD=1` and `FMI_PLAN_DEEPEN=120`; "everything off" is OFF2 with both off.
+- **Gates run again,** the ones the two branches touch:
+  - G7 with everything off, and with the fast forms in every check mode and the proofs on;
+  - G10 with everything on (the Rust lama-first-costs: strict, ready, ready with the old tail) and everything off
+    (Fast Downward's binary: strict, ready);
+  - G11 on B3's sequences below: the reference settings with everything off and with everything on, the fast
+    settings with everything on; every new entry verified from boot;
+  - the amendment's gates 1-5 on the merged build. Gates 1-3 replay the recorded requests with everything on (the fast
+    forms; the Rust lama-first-costs for Fast Downward's groups). Gate 4: G9 with both switches off, serve38 and
+    serve33 the same with the proofs on and off, and the cargo tests. Gate 5: deepen_check.py.
+- **What is measured.**
+  1. **B3,** warm, with the job memo off (as round 2's amendment). The fast settings run three resident processes,
+     interleaved try by try:
+     - round 1: r1/fmi with Gbfs;
+     - round 2 alone: round 2's fmi as built from 736f306, copied to target-e011-r2/r2, with ON2;
+     - the merged build with everything on.
+
+     Reported for each: the per-try median, max, mean and sum over the 15 tries, ring(33) and ring(38). The reference
+     settings run the merged build with everything on and with everything off, interleaved, for G11.
+  2. **The check's two bit:118 = 1 requests,** end to end. `fmi try` runs on copies of the check's tries 15 and 16 with
+     the target forced, as in the amendment's end-to-end check. Each try is cold, in its own process, with the check's
+     limit of 180 s (FMI_PLAN_TIME), in three forms:
+     - round 1: r1/fmi with `--search fd`, Fast Downward's binary, the check's settings;
+     - round 2 alone: ON2 with `--search fd --tail`;
+     - the merged build with everything on.
+
+     The tries alternate one by one, each under the heavy lock. The refinement reading is B0's j00000 refine-01. It has
+     the check's start file (same sha1) and the same records and actions, and the check's copy was evicted.
+- **Prediction.**
+  - Every gate passes with everything off and on.
+  - **B3 fast.** The merged build's tries equal round 2's in everything: no request in the 15 tries is dead or takes
+    120 s.
+    - Its median is within 0.5 s of round 2's.
+    - Each ring(33) try is 0.4-1.5 s slower than round 2's, from the proofs at about 0.4 s for each searched request.
+    - Its sum is 1-5% above round 2's.
+  - **bit:118.** The merged build ends each try in 15-25 s. Round 1 and round 2 alone take 185-200 s each: the 180 s
+    limit plus the reductions.

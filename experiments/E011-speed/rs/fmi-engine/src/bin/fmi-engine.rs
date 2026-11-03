@@ -166,7 +166,7 @@ fn opts(args: &[String]) -> Opts {
 
 fn host(o: &Opts) -> Res<Host> {
     let mut cfg = HostCfg::from_env();
-    cfg.extra_env = o.env.clone();
+    cfg.extra_env.extend(o.env.iter().cloned());
     Host::new(cfg).map_err(e2s)
 }
 

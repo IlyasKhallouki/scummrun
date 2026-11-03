@@ -21,6 +21,8 @@
 use crate::model::*;
 use std::collections::BTreeMap;
 
+pub mod fast;
+
 pub type Counts = BTreeMap<String, u64>;
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -66,8 +68,19 @@ pub fn prof<F: FnOnce(Task) -> (Task, bool)>(name: &str, t: Task, f: F) -> (Task
         return f(t);
     }
     let t0 = std::time::Instant::now();
+    let k0 = crate::perf::now();
     let r = f(t);
-    eprintln!("profile {} {:.3} s, {} actions, {} words, changed {}", name, t0.elapsed().as_secs_f64(), r.0.acts.len(), r.0.acts.words.len(), r.1);
+    let (mi, mc) = crate::perf::since(k0);
+    eprintln!(
+        "profile {} {:.3} s, {:.0} M instructions, {:.0} M cycles, {} actions, {} words, changed {}",
+        name,
+        t0.elapsed().as_secs_f64(),
+        mi,
+        mc,
+        r.0.acts.len(),
+        r.0.acts.words.len(),
+        r.1
+    );
     r
 }
 

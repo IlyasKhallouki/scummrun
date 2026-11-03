@@ -4,7 +4,6 @@
 
 use crate::files;
 use crate::ports::{ReadReq, Readings};
-use crate::start::start_file_text;
 use fmi_core::ReadingSource;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -85,8 +84,8 @@ pub fn goal_text_of(goal: &Value) -> Result<String, String> {
 /// files and fact variables they share, and the reader.
 pub struct Wiring {
     pub readings: Arc<dyn Readings>,
-    /// the attempt's first reading's reading.json (its switches)
-    pub doc: Value,
+    /// the attempt's first reading's reading.json (its switches), as warm.rs keeps it
+    pub doc: Arc<Value>,
     pub run_dir: PathBuf,
     pub threads: u32,
     pub starts: Vec<PathBuf>,
@@ -107,7 +106,7 @@ impl Wiring {
     /// refiner on the reading (the extender adds the reading's own reach_also files to the starts).
     pub fn new(readings: Arc<dyn Readings>, rd: &dyn ReadingSource, run_dir: &Path, threads: u32, cancel: Arc<AtomicBool>)
                -> Result<Wiring, String> {
-        let doc: Value = (*crate::warm::head(rd)).clone();
+        let doc = crate::warm::head(rd);
         if !files::truthy(doc.get("reach")) {
             return Err("--reach-extend needs a reading made with --reach".into());
         }
@@ -161,23 +160,24 @@ impl Wiring {
         self.readings.open(&path)
     }
 
-    /// replay_part1.reach_extender's `extend`: the start as a file, then the scope read again from every start so far.
-    pub fn extend(&mut self, start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    /// replay_part1.reach_extender's `extend`: the start as a file (its text `start::reach_start_text`), then the scope
+    /// read again from every start so far.
+    pub fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         let n = self.starts.len() + 1;
         let d = self.run_dir.join(format!("reach-{n:02}"));
         let f = d.join("start.txt");
-        crate::start::write_text(&f, &start_file_text(start))?;
+        crate::start::write_text(&f, start)?;
         self.starts.push(f);
         let req = self.req(&format!("reach-{n:02}"), &d, false);
         self.read(&req)
     }
 
     /// replay_part1.refiner's `refine`: the scope read again with the new variables made facts, streamed.
-    pub fn refine(&mut self, new: &[i64], start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    pub fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         self.refines += 1;
         let d = self.run_dir.join(format!("refine-{:02}", self.refines));
         let f = d.join("start.txt");
-        crate::start::write_text(&f, &start_file_text(start))?;
+        crate::start::write_text(&f, start)?;
         self.starts.push(f);
         for n in new {
             if !self.facts.contains(n) {
@@ -194,10 +194,10 @@ impl Wiring {
 }
 
 impl crate::harness::Rereads for Wiring {
-    fn extend(&mut self, start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::extend(self, start)
     }
-    fn refine(&mut self, new: &[i64], start: &[(String, i64)]) -> Result<Arc<dyn ReadingSource>, String> {
+    fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::refine(self, new, start)
     }
     fn cpu_s(&self) -> f64 {

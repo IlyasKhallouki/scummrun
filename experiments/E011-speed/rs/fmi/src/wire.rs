@@ -70,7 +70,7 @@ fn real(o: &WireOpts) -> Result<Wired, String> {
             returns: Mutex::new(Box::new(PoolReturns::new(pool))),
             readings: Arc::new(RealReadings::new(reader, root)?),
             planners: Mutex::new(PlannerCache::new(Arc::new(fmi_plan::Host::from_env()))),
-            players: Arc::new(PlayHost),
+            players: Arc::new(PlayHost::default()),
             search: o.search,
             search_name: search_name(o.search).into(),
             forced_targets: o.forced_targets.clone(),

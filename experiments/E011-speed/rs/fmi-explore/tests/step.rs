@@ -333,3 +333,251 @@ fn start_row_text_is_start_rows_json() {
     assert_eq!(a, b);
     assert_eq!(fmi_core::facts_of(&obs), facts);
 }
+
+// --- E011 round 2: the idle rule on the facts' changes ------------------------------------------------------------
+
+/// A deterministic sequence of facts maps (an LCG): keys appear, go, and change among a few values, most frames
+/// changing a few keys of many, as an idle entry's frames do.
+fn lcg_frames(seed: u64, n_keys: u64, frames: usize) -> (fmi_core::Facts, Vec<(i64, fmi_core::Facts)>) {
+    let mut x = seed;
+    let mut next = move || {
+        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x >> 33
+    };
+    let key = |n: u64| match n % 5 {
+        0 => fmi_core::Key::var(n),
+        1 => fmi_core::Key::bit(n),
+        2 => fmi_core::Key::owner(n),
+        3 => fmi_core::Key::state(n),
+        _ => fmi_core::Key::class(n, 1 + n % 7),
+    };
+    let mut cur: Vec<(fmi_core::Key, i64)> = (0..n_keys).filter(|n| n % 3 != 0).map(|n| (key(n), (n % 4) as i64)).collect();
+    let start = fmi_core::Facts::from_pairs(cur.clone());
+    let mut out = Vec::new();
+    for i in 1..=frames {
+        for _ in 0..(next() % 6) {
+            let n = next() % n_keys;
+            let v = (next() % 4) as i64 - 1;
+            match cur.iter().position(|p| p.0 == key(n)) {
+                Some(p) if next() % 5 == 0 => {
+                    cur.remove(p);
+                }
+                Some(p) => cur[p].1 = v,
+                None => cur.push((key(n), v)),
+            }
+        }
+        out.push((i as i64, fmi_core::Facts::from_pairs(cur.clone())));
+    }
+    (start, out)
+}
+
+fn idle_by_changes(start: &fmi_core::Facts, frames: &[(i64, fmi_core::Facts)]) -> Value {
+    let mut rule = step::IdleRule::new();
+    let mut prev = start.clone();
+    let mut ch = Vec::new();
+    for (off, f) in frames {
+        ch.clear();
+        step::diff_into(&prev, f, &mut ch);
+        rule.frame(*off, &ch);
+        prev = f.clone();
+    }
+    rule.result()
+}
+
+#[test]
+fn diff_into_is_facts_diff() {
+    for seed in 1..40 {
+        let (start, frames) = lcg_frames(seed, 60, 30);
+        let mut prev = start;
+        for (_, f) in frames {
+            let mut ch = Vec::new();
+            step::diff_into(&prev, &f, &mut ch);
+            assert_eq!(ch, prev.diff(&f));
+            let mut back = Vec::new();
+            step::diff_into(&f, &prev, &mut back);
+            assert_eq!(back, f.diff(&prev));
+            prev = f;
+        }
+    }
+    let e = fmi_core::Facts::new();
+    let (start, _) = lcg_frames(3, 20, 0);
+    let mut ch = Vec::new();
+    step::diff_into(&e, &start, &mut ch);
+    assert_eq!(ch, e.diff(&start));
+    ch.clear();
+    step::diff_into(&start, &e, &mut ch);
+    assert_eq!(ch, start.diff(&e));
+}
+
+#[test]
+fn idle_rule_on_changes_is_idle_rule_facts_maps_in_the_same_order() {
+    for seed in 1..60 {
+        let (start, frames) = lcg_frames(seed, 40 + seed % 30, 200);
+        let a = step::idle_rule_facts(&start, frames.clone());
+        let b = idle_by_changes(&start, &frames);
+        assert_eq!(fmi_explore::pyjson::dumps_default(&a), fmi_explore::pyjson::dumps_default(&b), "seed {seed}");
+    }
+    // the two cases of test_e009.py
+    let f = |v: Value| fmi_explore::start::facts_of_json(&v);
+    let start = f(json!({"var:100": 5, "room": 33, "var:2": 0, "state:316": 0}));
+    let frames = vec![
+        (1, f(json!({"var:100": 6, "room": 33, "var:2": 1, "state:316": 0}))),
+        (2, f(json!({"var:100": 7, "room": 28, "var:2": 2, "state:316": 1}))),
+        (3, f(json!({"var:100": 5, "room": 28, "var:2": 3, "state:316": 1}))),
+        (4, f(json!({"var:100": 6, "room": 28, "var:2": 3, "state:316": 0}))),
+    ];
+    let r = idle_by_changes(&start, &frames);
+    assert_eq!(r["returns"], json!(["state:316", "var:100"]));
+    assert_eq!(r, step::idle_rule_facts(&start, frames));
+    let start = f(json!({"var:1": 0}));
+    let frames = vec![(1, f(json!({"var:1": 0, "bit:9": 1}))), (2, f(json!({"var:1": 0})))];
+    let r = idle_by_changes(&start, &frames);
+    assert_eq!(r["returns"], json!(["bit:9"]));
+    assert_eq!(r["first_return"], json!({"bit:9": 2}));
+    assert_eq!(r, step::idle_rule_facts(&start, frames));
+}
+
+#[test]
+fn reuse_of_one_diff_is_reusable_and_its_detail() {
+    let text = |f: &fmi_core::Facts| -> fmi_explore::archive::FactMap { f.iter().map(|(k, v)| (k.text(), *v)).collect() };
+    for seed in 1..40 {
+        let (start, frames) = lcg_frames(seed, 50, 25);
+        let s = text(&start);
+        let e = text(&frames.last().unwrap().1);
+        let mut keys: HashSet<String> = s.keys().filter(|k| k.len() % 3 == 0).cloned().collect();
+        keys.insert("at:script:1:2".into());
+        let extra: HashSet<String> = s.keys().filter(|k| k.len() % 3 == 1).cloned().collect();
+        let d = step::diff(&s, &e);
+        let (ok, det) = step::reuse_of(&d, |k| keys.contains(k));
+        assert_eq!((ok, det.clone()), (step::reusable(&s, &keys, &e).0, step::reusable_detail(&s, &keys, &e)));
+        assert_eq!(fmi_explore::pyjson::dumps_default(&det), fmi_explore::pyjson::dumps_default(&step::reusable_detail(&s, &keys, &e)));
+        let mut k2 = keys.clone();
+        k2.extend(extra.iter().cloned());
+        let (ok2, det2) = step::reuse_of(&d, |k| keys.contains(k) || extra.contains(k));
+        assert_eq!((ok2, det2), (step::reusable(&s, &k2, &e).0, step::reusable_detail(&s, &k2, &e)));
+    }
+}
+
+#[test]
+fn fact_map_of_is_the_ordered_facts_map() {
+    // dumps made from recorded checkpoints (the doubles' inverse of facts_of)
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mut n = 0;
+    for p in [format!("{home}/.cache/fast-mi-e009/off/step-a/jobs/ta/job.json")] {
+        let Ok(j) = fmi_explore::files::read_json(&std::path::PathBuf::from(p)) else { continue };
+        let facts = fmi_explore::start::facts_of_json(&j["entry"]["checkpoint"][1]);
+        let obs = fmi_explore::doubles::obs_from_facts(&facts);
+        assert_eq!(step::fact_map_of(&obs), fact_map(&step::facts_of_ordered(&obs)));
+        n += 1;
+    }
+    let dir = std::path::PathBuf::from("/var/tmp/fast-mi/e011-bench-data/b0/entries");
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten().take(40) {
+            let Ok(doc) = fmi_explore::files::read_gz(&e.path()) else { continue };
+            for c in doc["checkpoints"].as_array().cloned().unwrap_or_default() {
+                let obs = fmi_explore::doubles::obs_from_facts(&fmi_explore::start::facts_of_json(&c[1]));
+                assert_eq!(step::fact_map_of(&obs), fact_map(&step::facts_of_ordered(&obs)));
+                n += 1;
+            }
+        }
+    }
+    eprintln!("fact_map_of: {n} dumps");
+}
+
+#[test]
+fn packed_facts_of_readings_and_packed_look_read_as_the_text_map() {
+    use fmi_explore::archive::FactLook;
+    let mut n = 0;
+    for p in ["/var/tmp/fast-mi/e011-own-data/readings/33-38-83-85-96-j00002/reading.json",
+              "/var/tmp/fast-mi/e011-own-data/readings/r33/refine-01/reading.json"] {
+        let Ok(doc) = fmi_explore::files::read_json(std::path::Path::new(p)) else { continue };
+        let sj = &doc["start"]["facts"];
+        let packed = step::packed_facts(sj).expect("a reading's start facts are faithful");
+        assert_eq!(packed, fmi_explore::start::facts_of_json(sj));
+        let text = fact_map(sj);
+        let look = step::PackedLook(&packed);
+        for (k, v) in &text {
+            assert_eq!(look.look(k), Some(*v));
+        }
+        n += 1;
+    }
+    // a text that is not its key's own text, and an absent key, are in no text map
+    let f = fmi_explore::start::facts_of_json(&json!({"var:1": 5, "owner:7": 2}));
+    let look = step::PackedLook(&f);
+    assert_eq!(look.look("var:1"), Some(5));
+    assert_eq!(look.look("var:01"), None);
+    assert_eq!(look.look("var:2"), None);
+    assert_eq!(look.owners(), vec![(7, 2)]);
+    // a text fmi-core does not pack is a key of its own, with that text
+    let odd = step::packed_facts(&json!({"var:01": 1, "var:1": 2})).unwrap();
+    assert_eq!(step::PackedLook(&odd).look("var:01"), Some(1));
+    assert_eq!(step::PackedLook(&odd).look("var:1"), Some(2));
+    assert!(step::packed_facts(&json!({"var:1": "below"})).is_none());
+    eprintln!("packed start facts: {n} readings");
+}
+
+#[test]
+fn same_facts_is_an_empty_diff_and_finds_recorded_equal_checkpoints() {
+    use fmi_explore::tryjob::same_facts;
+    let dir = std::path::PathBuf::from("/var/tmp/fast-mi/e011-bench-data/b0/entries");
+    let Ok(rd) = std::fs::read_dir(&dir) else { return };
+    let mut n = 0;
+    for e in rd.flatten().take(30) {
+        let Ok(doc) = fmi_explore::files::read_gz(&e.path()) else { continue };
+        for c in doc["checkpoints"].as_array().cloned().unwrap_or_default() {
+            let want = &c[1];
+            let got = fmi_explore::start::facts_of_json(want);
+            assert!(same_facts(want, &got));
+            // a value changed, a key added, a key gone (non-zero and zero), a value not an int: never shown equal
+            let mut m = want.as_object().unwrap().clone();
+            let k0 = m.keys().next().unwrap().clone();
+            let mut cases = vec![];
+            let mut a = m.clone();
+            a.insert(k0.clone(), json!(a[&k0].as_i64().unwrap() + 1));
+            cases.push(a);
+            let mut b = m.clone();
+            b.insert("bit:9999".into(), json!(1));
+            cases.push(b);
+            let mut c0 = m.clone();
+            c0.insert("bit:9999".into(), json!(0));
+            cases.push(c0);
+            let mut d = m.clone();
+            d.insert(k0.clone(), json!("below"));
+            cases.push(d);
+            m.shift_remove(&k0);
+            cases.push(m);
+            for x in cases {
+                let xv = Value::Object(x);
+                let empty = fmi_explore::start::facts_of_json(&xv).diff(&got).is_empty();
+                if same_facts(&xv, &got) {
+                    assert!(empty);
+                }
+            }
+            n += 1;
+        }
+    }
+    assert!(n > 10);
+}
+
+#[test]
+fn reach_start_text_is_the_start_file_of_reach_start() {
+    for seed in 1..30 {
+        let (start, frames) = lcg_frames(seed, 70, 12);
+        for f in std::iter::once(&start).chain(frames.iter().map(|x| &x.1)) {
+            assert_eq!(fmi_explore::start::reach_start_text(f), fmi_explore::start::start_file_text(&fmi_explore::start::reach_start(f)));
+        }
+    }
+    // values that are no ints, and the recorded entries' facts
+    let f = fmi_explore::start::facts_of_json(&json!({"var:1": 5, "var:2": "below", "pos:local:3": null, "room": 33}));
+    assert_eq!(fmi_explore::start::reach_start_text(&f), "room\t33\nvar:1\t5\n");
+    let dir = std::path::PathBuf::from("/var/tmp/fast-mi/e011-bench-data/b0/entries");
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten().take(20) {
+            let Ok(doc) = fmi_explore::files::read_gz(&e.path()) else { continue };
+            for c in doc["checkpoints"].as_array().cloned().unwrap_or_default() {
+                let f = fmi_explore::start::facts_of_json(&c[1]);
+                assert_eq!(fmi_explore::start::reach_start_text(&f), fmi_explore::start::start_file_text(&fmi_explore::start::reach_start(&f)));
+            }
+        }
+    }
+}

@@ -8,10 +8,13 @@
 pub mod bans;
 pub mod cache;
 pub mod cli;
+pub mod dead;
 pub mod decode;
 pub mod fold;
 pub mod model;
 pub mod packed;
+pub mod par;
+pub mod perf;
 pub mod predict;
 pub mod reduce;
 pub mod sas;
@@ -19,3 +22,8 @@ pub mod search;
 pub mod serve;
 pub mod tail;
 pub mod warm;
+// E011 route: Fast Downward's lama-first-costs in Rust (lama.rs), its landmark graph (landmarks.rs) and the libstdc++
+// container order the landmark code depends on (stdhash.rs)
+pub mod lama;
+pub mod landmarks;
+pub mod stdhash;
