@@ -7,6 +7,10 @@
 //! FAKE_GUARD_ONCE (a marker file: the first job to find it absent creates it and ends as the guard's kill does);
 //! FAKE_NO_PROGRESS (a key: the target is that key at the entry's value plus 2); FAKE_IDLE_KEY (E009: a key the end
 //! entry raises by 1 in every job).
+//!
+//! E011's deepening (FMI_PLAN_DEEPEN, step::deepen; not fake_step.py's): FAKE_SLOW "k=v:s,..." gives a target's
+//! planning seconds ("inf": no plan). The candidates come in step::deepen_order with job.json's "deferred"; one whose
+//! seconds pass its limit L0 * 2^n is deferred (probe status "time"), and the first other one plays as before.
 
 use crate::driver::{JobLog, Step};
 use crate::files::{self, as_i64, read_json, Res};
@@ -135,8 +139,58 @@ pub fn fake(d: &Path, log: &JobLog) -> Res<i32> {
         write_json(&d.join("result.json"), &out)?;
         return Ok(0);
     }
-    let (tier, depth, k, v) = cands[0].clone();
-    out["probes"] = json!([{"target": [k, v], "status": "plan", "seconds": 0.0}]);
+    let mut chosen = cands[0].clone();
+    if let Some(l0) = crate::step::deepen() {
+        // the deepening's order and deferrals (module docstring)
+        let slow: std::collections::HashMap<String, f64> = env("FAKE_SLOW")
+            .map(|s| {
+                s.split(',')
+                    .filter_map(|p| {
+                        let (kv, t) = p.rsplit_once(':')?;
+                        Some((kv.to_string(), if t == "inf" { f64::INFINITY } else { t.parse().ok()? }))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let deferred_in = crate::step::deferred_of(&job);
+        let ts: Vec<crate::step::Target> = cands
+            .iter()
+            .map(|(t, dp, k, v)| crate::step::Target { k: k.clone(), v: crate::step::TV::Int(*v), tier: *t, depth: *dp })
+            .collect();
+        let mut probes = Vec::new();
+        let mut deferred = Vec::new();
+        let mut play = None;
+        for (tg, n) in crate::step::deepen_order(ts, &deferred_in) {
+            let v = match tg.v {
+                crate::step::TV::Int(v) => v,
+                _ => continue,
+            };
+            let limit = crate::step::deepen_limit(l0, n);
+            let secs = slow.get(&format!("{}={}", tg.k, v)).copied().unwrap_or(0.0);
+            if secs > limit as f64 {
+                probes.push(json!({"target": [tg.k, v], "status": "time", "seconds": limit, "limit_s": limit, "deferred_before": n}));
+                deferred.push(json!([tg.k, v, n + 1]));
+                continue;
+            }
+            probes.push(json!({"target": [tg.k, v], "status": "plan", "seconds": 0.0, "limit_s": limit, "deferred_before": n}));
+            play = Some((tg.tier, tg.depth, tg.k.clone(), v));
+            break;
+        }
+        out["probes"] = Value::Array(probes);
+        out["deferred"] = Value::Array(deferred.clone());
+        match play {
+            Some(c) => chosen = c,
+            None => {
+                out["exhausted"] = json!(deferred.is_empty());
+                write_json(&d.join("result.json"), &out)?;
+                log.line(&format!("{name}: entry {eid_s} deferred {} targets, none played", deferred.len()));
+                return Ok(0);
+            }
+        }
+    } else {
+        out["probes"] = json!([{"target": [chosen.2, chosen.3], "status": "plan", "seconds": 0.0}]);
+    }
+    let (tier, depth, k, v) = chosen;
     out["tried"] = json!([[k, v]]);
     let mut f1 = facts.clone();
     f1.insert("var:990".into(), json!(get0(&facts, "var:990") + 1));
