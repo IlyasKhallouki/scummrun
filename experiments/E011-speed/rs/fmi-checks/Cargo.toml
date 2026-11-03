@@ -27,3 +27,7 @@ path = "src/bin/afford_check.rs"
 [[bin]]
 name = "delay-check"
 path = "src/bin/delay_check.rs"
+
+[[bin]]
+name = "kitchen-report"
+path = "src/bin/kitchen_report.rs"
