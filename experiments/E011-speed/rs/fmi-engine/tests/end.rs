@@ -187,3 +187,30 @@ fn boxes_binary_equals_json() {
     }
     assert_eq!(e.boxes().unwrap(), b);
 }
+
+/// A job's new entries (id null) whose parent is the archive's root hold their movie from boot: read with no parent.
+#[test]
+fn job_entries_start_at_boot() {
+    let dir = std::env::temp_dir().join(format!("fmi-engine-end-job-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("entries")).unwrap();
+    let put = |i: u64, text: &str| {
+        let p = dir.join("entries").join(format!("{i}.json.gz"));
+        let mut c = std::process::Command::new("gzip")
+            .arg("-c")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::fs::File::create(&p).unwrap())
+            .spawn()
+            .unwrap();
+        use std::io::Write;
+        c.stdin.take().unwrap().write_all(text.as_bytes()).unwrap();
+        assert!(c.wait().unwrap().success());
+    };
+    put(0, r#"{"id": null, "parent": 0, "frame": 2776, "events": [{"frame": 2736, "click": [10, 20]}], "checkpoints": []}"#);
+    put(1, r#"{"id": null, "parent": 4, "frame": 2900, "events": [], "checkpoints": []}"#);
+    let e = archive::entry(&dir, 0).unwrap();
+    assert_eq!(e.parent, None);
+    let c = archive::chain_of(&dir, 0).unwrap();
+    assert_eq!(c.events.len(), 1);
+    assert!(archive::entry(&dir, 1).is_err());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
