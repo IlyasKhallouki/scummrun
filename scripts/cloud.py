@@ -2,7 +2,8 @@
 
 usage: python3 scripts/cloud.py status
        python3 scripts/cloud.py create --type n2-standard-8 --hours 1
-       python3 scripts/cloud.py start --type n2-standard-64 --hours 2
+       python3 scripts/cloud.py start --type n2-standard-64 --hours 2 [--standard]
+       python3 scripts/cloud.py price --type n2-custom-30-122880 [--standard]   (the hourly rate, nothing started)
        python3 scripts/cloud.py up --job NAME              (copy the inputs to the VM)
        python3 scripts/cloud.py sh --job NAME -- CMD...    (run CMD in the VM's repo copy)
        python3 scripts/cloud.py down --job NAME REMOTE_DIR (copy a VM folder to out/cloud/down/)
@@ -21,8 +22,9 @@ The cap holds in two places:
    run at its measured time. The disk is booked up front until its planned deletion, and a reserve covers
    the copies back.
 
-Prices are read live from Google's price list (Cloud Billing Catalog) at every start: Spot N2 cores and
-RAM, the Spot VM's external IP, and zonal balanced disk.
+Prices are read live from Google's price list (Cloud Billing Catalog) at every start: N2 cores and RAM
+(Spot or standard, predefined or custom shape, as the start asks), the VM's external IP, and zonal balanced
+disk. A start is Spot unless --standard is given; a standard VM is not preempted, at about 1.7 times the price.
 """
 
 import argparse
@@ -32,6 +34,7 @@ import math
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -58,10 +61,18 @@ UP = ["src", "scripts", "experiments", "data", "build/blocks-dos-cd", "runs/anyp
       "runs/anypercent/verify-b1", "pyproject.toml", "uv.lock", "README.md", "patches", "game/dos-cd"]
 
 COMPUTE = "6F81-5844-456A"
-SKU = {"core": "Spot Preemptible N2 Instance Core running in Americas",
-       "ram": "Spot Preemptible N2 Instance Ram running in Americas",
-       "ip": "External IP Charge on a Spot Preemptible VM",
-       "disk": "Balanced PD Capacity"}
+DISK_SKU = "Balanced PD Capacity"
+
+
+def skus(standard: bool, machine: str) -> dict:
+    """The price list's descriptions for a VM: Spot or standard, predefined or custom shape."""
+    custom = "custom" in machine
+    shape_ = "N2 Custom Instance" if custom else "N2 Instance"
+    pre = "" if standard else "Spot Preemptible "
+    return {"core": f"{pre}{shape_} Core running in Americas",
+            "ram": f"{pre}{shape_} Ram running in Americas",
+            "ip": "External IP Charge on a Standard VM" if standard else "External IP Charge on a Spot Preemptible VM",
+            "disk": DISK_SKU}
 
 
 def now() -> dt.datetime:
@@ -76,15 +87,23 @@ def gcloud(*args: str, check: bool = True, capture: bool = True) -> str:
     return r.stdout if capture else ""
 
 
-def prices() -> dict:
+def prices(standard: bool = False, machine: str = "") -> dict:
     """Live unit prices in USD: per core-hour, per GiB-hour of RAM, per IP-hour, per GiB-month of disk."""
+    SKU = skus(standard, machine)
     tok = subprocess.check_output(["gcloud", "auth", "print-access-token"], text=True).strip()
     url = f"https://cloudbilling.googleapis.com/v1/services/{COMPUTE}/skus?pageSize=5000&currencyCode=USD"
     found, page = {}, ""
     while True:
         req = urllib.request.Request(url + (f"&pageToken={page}" if page else ""),
                                      headers={"Authorization": f"Bearer {tok}"})
-        d = json.load(urllib.request.urlopen(req, timeout=60))
+        for attempt in range(8):  # the price list answers 429 when asked too often
+            try:
+                d = json.load(urllib.request.urlopen(req, timeout=60))
+                break
+            except urllib.error.HTTPError as e:
+                if e.code != 429 or attempt == 7:
+                    raise
+                time.sleep(15 * (attempt + 1))
         for s in d.get("skus", []):
             for k, desc in SKU.items():
                 if s["description"] == desc and {"us-central1", "global"} & set(s.get("serviceRegions", [])):
@@ -166,25 +185,37 @@ def until(hours: float) -> str:
     return (now() + dt.timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def open_run(rows: list[dict], machine: str, hours: float, rate: float) -> None:
+def model(a) -> str:
+    return "STANDARD" if getattr(a, "standard", False) else "SPOT"
+
+
+def open_run(rows: list[dict], machine: str, hours: float, rate: float, provisioning: str = "SPOT") -> None:
     rows.append({"kind": "run", "machine": machine, "hours": hours, "usd_per_hour": rate,
-                 "start": now().isoformat(), "end": None})
+                 "provisioning": provisioning, "start": now().isoformat(), "end": None})
+
+
+def price(a) -> None:
+    """The hourly rate a start would book, and what the ledger leaves; nothing is started."""
+    rows = reconcile(ledger())
+    rate = hourly(a.type, prices(a.standard, a.type))
+    left = max(STOP_AT - committed(rows), 0)
+    print(f"{a.type} {model(a)}: ${rate:.4f}/h; ${left:.2f} left under the stop, {left / rate:.1f} h")
 
 
 def create(a) -> None:
     rows = reconcile(ledger())
     if instance():
         sys.exit(f"{NAME} exists already")
-    p = prices()
+    p = prices(a.standard, a.type)
     rate = hourly(a.type, p)
     disk = DISK_GB * p["disk"] * DISK_DAYS * 24 / 730
     allow(rows, a.hours * rate + disk + EGRESS_RESERVE, f"create ({a.type}, {a.hours} h, disk for {DISK_DAYS} days)")
     rows.append({"kind": "disk", "gb": DISK_GB, "days": DISK_DAYS, "usd": disk, "start": now().isoformat()})
     rows.append({"kind": "reserve", "what": "copies back (egress)", "usd": EGRESS_RESERVE})
-    open_run(rows, a.type, a.hours, rate)
+    open_run(rows, a.type, a.hours, rate, model(a))
     write(rows)
     gcloud("compute", "instances", "create", NAME, f"--zone={ZONE}", f"--machine-type={a.type}",
-           "--provisioning-model=SPOT", "--instance-termination-action=STOP",
+           f"--provisioning-model={model(a)}", "--instance-termination-action=STOP",
            f"--termination-time={until(a.hours)}",
            f"--image-project={IMAGE[0]}", f"--image-family={IMAGE[1]}",
            f"--boot-disk-size={DISK_GB}GB", "--boot-disk-type=pd-balanced",
@@ -200,14 +231,14 @@ def start(a) -> None:
         sys.exit(f"{NAME} does not exist; use create")
     if vm["status"] not in ("TERMINATED", "STOPPED"):
         sys.exit(f"{NAME} is {vm['status']}; stop it first")
-    p = prices()
+    p = prices(a.standard, a.type)
     rate = hourly(a.type, p)
-    allow(rows, a.hours * rate, f"start ({a.type}, {a.hours} h)")
+    allow(rows, a.hours * rate, f"start ({a.type}, {model(a)}, {a.hours} h)")
     if vm["machineType"].rsplit("/", 1)[-1] != a.type:
         gcloud("compute", "instances", "set-machine-type", NAME, f"--zone={ZONE}", f"--machine-type={a.type}")
-    gcloud("compute", "instances", "set-scheduling", NAME, f"--zone={ZONE}",
+    gcloud("compute", "instances", "set-scheduling", NAME, f"--zone={ZONE}", f"--provisioning-model={model(a)}",
            "--instance-termination-action=STOP", f"--termination-time={until(a.hours)}")
-    open_run(rows, a.type, a.hours, rate)
+    open_run(rows, a.type, a.hours, rate, model(a))
     write(rows)
     r = subprocess.run(["gcloud", "compute", "instances", "start", NAME, f"--zone={ZONE}", f"--project={PROJECT}"])
     if r.returncode:
@@ -216,7 +247,7 @@ def start(a) -> None:
             rows[-1].update(end=now().isoformat(), actual_hours=0.0, failed=True)  # never ran: nothing billed
             write(rows)
         sys.exit(f"start failed ({r.returncode}); VM is {vm['status'] if vm else 'gone'}")
-    print(f"started {NAME} ({a.type}) at ${rate:.3f}/h; Google stops it at {until(a.hours)}")
+    print(f"started {NAME} ({a.type}, {model(a)}) at ${rate:.3f}/h; Google stops it at {until(a.hours)}")
 
 
 def stop(a) -> None:
@@ -358,7 +389,12 @@ def main() -> None:
         p = sub.add_parser(name)
         p.add_argument("--type", required=True)
         p.add_argument("--hours", type=float, required=True)
+        p.add_argument("--standard", action="store_true", help="a standard VM (not preempted), not Spot")
         p.set_defaults(fn=fn)
+    p = sub.add_parser("price")
+    p.add_argument("--type", required=True)
+    p.add_argument("--standard", action="store_true")
+    p.set_defaults(fn=price)
     for name, fn in (("status", status), ("delete", delete)):
         sub.add_parser(name).set_defaults(fn=fn)
     p = sub.add_parser("stop")
