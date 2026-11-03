@@ -493,16 +493,16 @@ pub fn account(t: &TryIn) -> Account {
         let taken = if step_new[s] { Class::Productive } else { Class::InterfaceNoYield };
         verdict_rows(&mut rows, "afford", &why, &whole, f64_of(&a["step_seconds"]), a["verdict_s"].as_object(), taken);
     }
-    // a free try's step (free's record, the stall amendment (2)): each offer point ("at"), the delays, the rest of it
+    // a free try's step (free's record, the stall amendments (2) and (3)): each offer point, the delays, the rest of it
     let fr = &r["free"];
     if fr.is_object() {
         let taken = if free_new { Class::Productive } else { Class::InterfaceNoYield };
         let mut used = 0.0;
-        for p in fr["at"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
+        for p in fr["points"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
             let s = f64_of(&p["seconds"]);
             used += s;
-            let label = format!("{}, level {}", numbers_n(p["at"].as_str().unwrap_or("?")), p["level"].as_i64().unwrap_or(1));
-            verdict_rows(&mut rows, "free", &label, &label, s, p["step"]["verdict_s"].as_object(), taken);
+            let label = format!("{}, level {}", numbers_n(p["where"].as_str().unwrap_or("?")), p["level"].as_i64().unwrap_or(1));
+            verdict_rows(&mut rows, "free", &label, &label, s, p["record"]["verdict_s"].as_object(), taken);
         }
         if let Some(s) = fr["delays"]["seconds"].as_f64() {
             used += s;
@@ -1280,13 +1280,13 @@ mod tests {
     fn a_free_try() {
         let mut r = base(25.0);
         r["e012"]["afford"] = Value::Null;
-        // free's record (COORD, IFACE free): the offer points under "at", the delays' seconds, the whole step's seconds
-        r["free"] = json!({"offers": 2, "points": 3, "trials": 40, "kept": {"1": 1}, "delays": {"counted": 3, "seconds": 2.0},
+        // free's record (e013-free ea0e920): the offer points, the delays' seconds, the whole step's seconds
+        r["free"] = json!({"offers": 2, "n_points": 3, "trials": 40, "kept": {"1": 1}, "delays": {"counted": 3, "seconds": 2.0},
                            "seconds": 15.0,
-                           "at": [{"at": "entry", "frame": 300, "level": 1, "seconds": 8.0, "step": {"verdict_s": {"ignored": 2.0, "taken": 5.0}},
-                                   "delays": {"seconds": 2.0}},
-                                  {"at": "stop", "frame": 4310, "level": 1, "seconds": 3.0, "step": {"ready": true}},
-                                  {"at": "kept", "frame": 320, "level": 2, "seconds": 1.0, "step": {"ready": false}}]});
+                           "points": [{"where": "entry", "frame": 300, "level": 1, "seconds": 8.0, "record": {"verdict_s": {"ignored": 2.0, "taken": 5.0}},
+                                       "delays": {"seconds": 2.0}},
+                                      {"where": "stop", "frame": 4310, "level": 1, "seconds": 3.0, "record": {"ready": true}},
+                                      {"where": "kept", "frame": 320, "level": 2, "seconds": 1.0, "record": {"ready": false}}]});
         r["new"] = json!([{"how": "wait"}, {"how": "free"}]);
         let a = account(&TryIn { result: &r, runs: &runs(), new: &[false, false], outcome: "ok", kind: "free" });
         assert!((sum(&a.rows) - 25.0).abs() < 1e-9);
@@ -1303,7 +1303,7 @@ mod tests {
         let b = account(&TryIn { result: &r, runs: &runs(), new: &[false, true], outcome: "ok", kind: "free" });
         assert!((secs(&b.rows, Class::Productive) - (10.5 + 1.0 + 5.0 + 1.0 + 3.0 + 1.0 + 2.0 + 1.0)).abs() < 1e-9);
         // a record with no points: the step's seconds in "other"
-        r["free"] = json!({"seconds": 4.0, "at": []});
+        r["free"] = json!({"seconds": 4.0, "n_points": 0, "points": []});
         let c = account(&TryIn { result: &r, runs: &runs(), new: &[false, false], outcome: "ok", kind: "free" });
         assert!(c.rows.iter().any(|x| x.0 == row("free", "other") && (x.2 - 4.0).abs() < 1e-9));
         assert!((sum(&c.rows) - 25.0).abs() < 1e-9);
@@ -1321,10 +1321,13 @@ mod tests {
         let dead = [json!({"reason": "restart@57:0D0E", "frame": 900, "events": [], "how": "wait"}),
                     json!({"reason": "restart@582:0067", "frame": 950, "events": [], "how": "afford"}),
                     json!({"reason": "quit", "frame": 990, "events": [], "how": "attempt"}),
-                    json!({"reason": "crash", "frame": 999, "events": [], "how": "wait"})];
+                    json!({"reason": "crash", "frame": 999, "events": [], "how": "wait"}),
+                    json!({"reason": "restart@57:0D0E", "frame": 960, "events": [], "how": "free"})];
         assert_eq!(part_of_item(&item("end", 900, true), &dead), "wait");
         assert_eq!(part_of_item(&item("end", 950, true), &dead), AFFORD_END);
         assert_eq!(part_of_item(&item("end", 990, true), &dead), "end");
+        // a free trial's end (amendment (3)): the free step's
+        assert_eq!(part_of_item(&item("end", 960, true), &dead), "free");
         // not a game end, or no dead move: the attempt's
         assert_eq!(part_of_item(&item("end", 999, true), &dead), "end");
         assert_eq!(part_of_item(&item("end", 700, true), &dead), "end");

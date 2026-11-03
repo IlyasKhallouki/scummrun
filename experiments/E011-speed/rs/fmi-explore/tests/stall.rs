@@ -171,9 +171,9 @@ fn script(d: &Path, n: usize, gain: bool) -> Value {
     let mut res = res;
     if free {
         res["kind"] = json!("free");
-        res["free"] = json!({"offers": 2, "points": 2, "trials": 30, "delays": {"counted": 2, "seconds": 0.6}, "seconds": 5.0,
-                             "at": [{"at": "entry", "frame": f0, "level": 1, "seconds": 3.0, "step": {"verdict_s": {"ignored": 0.5, "taken": 2.0}}},
-                                    {"at": "kept", "frame": f0 + 6, "level": 2, "seconds": 1.0, "step": {"ready": true}}]});
+        res["free"] = json!({"offers": 2, "n_points": 2, "trials": 30, "delays": {"counted": 2, "seconds": 0.6}, "seconds": 5.0,
+                             "points": [{"where": "entry", "frame": f0, "level": 1, "seconds": 3.0, "record": {"verdict_s": {"ignored": 0.5, "taken": 2.0}}},
+                                        {"where": "kept", "frame": f0 + 6, "level": 2, "seconds": 1.0, "record": {"ready": true}}]});
     }
     files::write_json(&d.join("result.json"), &res, Some(1)).unwrap();
     res
