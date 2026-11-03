@@ -43,7 +43,9 @@ pub struct HostCfg {
 pub const DEFAULT_BIN: &str = "/var/tmp/fast-mi/svm-e011/build/scummvm/scummvm";
 
 impl HostCfg {
-    /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd.
+    /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd;
+    /// FMI_ENGINE_CUTS=1: every engine also gets SPEEDRUN_CUTS=1, round 2's count-only mixer and no pixel output
+    /// (patch 0003, engine/CUTS.md; FMI_ENGINE_BIN must then be a build with patch 0003).
     pub fn from_env() -> HostCfg {
         let bin = std::env::var_os("FMI_ENGINE_BIN")
             .map(PathBuf::from)
@@ -56,12 +58,16 @@ impl HostCfg {
         });
         let game = root.join("game").join("dos-cd");
         let game_dir = game.canonicalize().unwrap_or(game);
+        let mut extra_env = Vec::new();
+        if std::env::var("FMI_ENGINE_CUTS").is_ok_and(|v| v == "1") {
+            extra_env.push(("SPEEDRUN_CUTS".to_string(), "1".to_string()));
+        }
         HostCfg {
             bin,
             root,
             game_dir,
             timeout: Duration::from_secs(600),
-            extra_env: Vec::new(),
+            extra_env,
         }
     }
 
