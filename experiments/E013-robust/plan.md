@@ -859,3 +859,33 @@ ran, unchanged.
 The demo is finished when F's write-up is done and the PI decides what follows. Until then P does not run. P's
 dated amendment with the projection is still written before it. E013's success threshold is scored as written: while
 P has not run, the result is at most "partly".
+
+## Amendment 2026-11-03, component `stall` (2): E014's records, free's record and port, rule (2)
+
+Written after e013 (31da643) was merged into e013-stall, and before the code it changes. Stall's amendment above stands;
+this adds what the merge and free's posted record bring.
+
+- **E014's end entries.** With `FMI_GOAL_END=1`, a run that ends at a script's restart or quit gives an entry of how
+  "end" (`mech::end_extra`), made by the wait, the attempt or an affordance step. The attempt's own last checkpoint is
+  also of how "end"; only the extras' items carry a "novel" list. Such an extra belongs to the part whose dead move the
+  same end made (result.json "dead": the move at the same frame with a game end, its "how": wait, attempt, afford or
+  free). An afford end belongs to the step whose kept items come before it (a try runs at most one affordance step).
+  With no such dead move it is the attempt's, as before.
+- **free's record**, as free posted it in COORD.md: result.json "free" holds "seconds" (the whole free step), "delays"
+  {"seconds"}, and "at", a list of offer points {"at": entry | stop | kept, "level", "seconds" (the point's offers
+  without its delays), "step": its affordance record, with B's "verdict_s" once merged}. The rows are ("free", "AT,
+  level L") per point, split by verdict as above; ("free", "delays"); and ("free", "other"), the step's seconds less
+  the points' and the delays'. The shape stall's code guessed before free posted (a "points" list, "wall") is dropped.
+- **free's port.** free asks for the two rules through `free::Shift`, with the open archive as argument.
+  `stall::ArchivePort` answers `share(&Archive, ρ0)` and `free_cell(&Archive, cell)` from a table it keeps over the
+  archive's log lines, caught up at each call with the live table's own push: at every commit it equals the table from
+  the files, also after a reopen. The integration wires it (`impl free::Shift for stall::ArchivePort`,
+  `free::set_shift`). The driver keeps its live table only with `FMI_STALLS=1`.
+- **Rule (2) for stall.** Stall changes no run: it reads files after each commit. Its check on Monkey Island is E012's
+  smoke run (4 jobs from the boot, the kitchen's settings, b = 1), run twice on one build, with and without
+  `FMI_STALLS=1 FMI_FREE_SHIFT=1`, in two switch sets: E012's switches on (E012's engine), and E012's with E014's
+  mechanism switches of amendment (2) (b) (E014's engine; the switches of input, refuse and free are not on this
+  branch). In each set the two runs give the same tries (`fmi check tries`), job files and archive rows, timing aside;
+  every entry verifies from boot; and the run's stalls.json equals stall-report's table over the same files (C3's
+  check on a real run). Reported, not a gate: the table over E014's scratch archives on the interactive demo (read
+  only), each try's rows summing to its wall.
