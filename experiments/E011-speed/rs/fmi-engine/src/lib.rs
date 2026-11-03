@@ -10,7 +10,9 @@
 //!
 //! The engine side is patch 0002 (patches/0002-scumm-speedrun-lean.patch); engine/WIRE.md describes both ends. E012's
 //! patch 0005 adds the Boxes command (`Engine::boxes`, `BinEngine::boxes_json`) and the end reasons "restart" and "pause"
-//! (`report_restart`: SPEEDRUN_REPORT_RESTART=1 passed to every engine).
+//! (`report_restart`: SPEEDRUN_REPORT_RESTART=1 passed to every engine). E013's patch 0007 adds the InputLog and Digest
+//! commands (`Engine::input_log`, `Engine::digest`, their JSON twins `BinEngine::input_log_json`, `digest_json`;
+//! `input_log_on`: SPEEDRUN_INPUT=1, or FMI_REFUSE=1, passes SPEEDRUN_INPUT=1 to every engine).
 
 pub mod archive;
 pub mod block;
@@ -21,5 +23,5 @@ pub mod replay;
 pub mod sys;
 pub mod wire;
 
-pub use host::{boxes_on, report_restart, BinEngine, Host, HostCfg, StepOut};
+pub use host::{boxes_on, input_log_on, report_restart, BinEngine, Host, HostCfg, StepOut};
 pub use pool::{EntrySpec, Pool};
