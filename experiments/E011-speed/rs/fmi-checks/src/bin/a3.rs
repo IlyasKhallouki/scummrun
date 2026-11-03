@@ -211,7 +211,15 @@ fn main() {
                     // the state: an entry the try made at the offer's frame, else the try's own entry at that frame
                     let at = new_ids.iter().copied().find(|&i| i < ro.frame.len() && ro.frame[i] == f && !r["new"].as_array().map(|n| n.iter().any(|x| x["how"] == "afford" && x["frame"].as_u64() == Some(f))).unwrap_or(false))
                         .or_else(|| new_ids.iter().copied().find(|&i| i < ro.frame.len() && ro.frame[i] == f))
-                        .or(entry.filter(|&i| ro.frame[i] == f));
+                        .or(entry.filter(|&i| ro.frame[i] == f))
+                        // else the step made its offer after idling to its decision point ("ready") from the try's
+                        // latest state before it: the entry or an attempt's checkpoint, whose movie has no later input
+                        .or_else(|| {
+                            let made = |i: usize| r["new"].as_array().and_then(|n| new_ids.iter().position(|&x| x == i).and_then(|k| n.get(k))).and_then(|x| x["how"].as_str()).unwrap_or("");
+                            new_ids.iter().copied().filter(|&i| i < ro.frame.len() && ro.frame[i] <= f && matches!(made(i), "checkpoint" | "end"))
+                                .chain(entry.filter(|&i| ro.frame[i] <= f))
+                                .max_by_key(|&i| ro.frame[i])
+                        });
                     let Some(at) = at else {
                         writeln!(out, "{}", json!({"job": job, "step": k, "offer_frame": f, "error": "no entry at the offer's frame"})).unwrap();
                         continue;
@@ -231,7 +239,7 @@ fn main() {
                         }
                         kept_tally.add(&o, &n, 1);
                     }
-                    writeln!(out, "{}", json!({"job": job, "step": k, "why": s["why"], "kind": s["offer"]["idle"], "offer_frame": f, "entry": at,
+                    writeln!(out, "{}", json!({"job": job, "step": k, "why": s["why"], "kind": s["offer"]["idle"], "offer_frame": f, "entry": at, "entry_frame": ro.frame[at],
                                                 "trials": s["trials"], "kept": kept, "room": o.room, "old": read(&o), "handler": read(&n),
                                                 "class": class(&o, &n), "same_state": same})).unwrap();
                 }
