@@ -334,9 +334,8 @@ fn task_keys(rd: &dyn ReadingSource) -> HashSet<String> {
 }
 
 /// What the reading choice reads of a reading, made once per reading in the process (FMI_TRY_MEMO; a reading's files
-/// never change once made, and it is keyed as warm.rs keys reading.json: its folder and its packed file's sha1): its
-/// start facts as texts and, when they map onto fmi-core's packed facts one to one (every key its key's own text,
-/// every value an int), packed; and its task facts' keys, as texts.
+/// never change once made): its start facts as texts and, when they map onto fmi-core's packed facts one to one
+/// (every key its key's own text, every value an int), packed; and its task facts' keys, as texts.
 struct ReadingMemo {
     start: crate::archive::FactMap,
     packed: Option<Facts>,
@@ -344,13 +343,14 @@ struct ReadingMemo {
 }
 
 fn reading_memo(rd: &dyn ReadingSource) -> Arc<ReadingMemo> {
-    type Memo = Mutex<std::collections::HashMap<(PathBuf, [u8; 20]), Arc<ReadingMemo>>>;
+    // keyed by the packed file's sha1 and the reading.json warm.rs gives (one parse per text), which the memo holds
+    type Memo = Mutex<std::collections::HashMap<([u8; 20], usize), (Arc<Value>, Arc<ReadingMemo>)>>;
     static C: std::sync::OnceLock<Memo> = std::sync::OnceLock::new();
-    let id = (rd.dir().to_path_buf(), rd.id());
-    if let Some(m) = C.get_or_init(Default::default).lock().unwrap().get(&id) {
+    let doc = doc_of(rd);
+    let id = (rd.id(), Arc::as_ptr(&doc) as usize);
+    if let Some((_, m)) = C.get_or_init(Default::default).lock().unwrap().get(&id) {
         return m.clone();
     }
-    let doc = doc_of(rd);
     let sj = &doc["start"]["facts"];
     let m = Arc::new(ReadingMemo { start: crate::archive::fact_map(sj), packed: step::packed_facts(sj), keys: task_keys(rd) });
     let mut c = C.get_or_init(Default::default).lock().unwrap();
@@ -359,7 +359,7 @@ fn reading_memo(rd: &dyn ReadingSource) -> Arc<ReadingMemo> {
             c.remove(&k);
         }
     }
-    c.insert(id, m.clone());
+    c.insert(id, (doc.clone(), m.clone()));
     m
 }
 
