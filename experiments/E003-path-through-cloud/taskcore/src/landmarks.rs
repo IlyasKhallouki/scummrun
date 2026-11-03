@@ -244,6 +244,8 @@ struct Reach {
     ps_of: Vec<u32>,
     ps_ops_off: Vec<u32>,
     ps_ops: Vec<u32>,
+    /// per operator: its precondition set
+    op_ps: Vec<u32>,
     /// per operator: its unconditional effect atoms
     unc_off: Vec<u32>,
     unc: Vec<u32>,
@@ -251,20 +253,32 @@ struct Reach {
     op_ce_off: Vec<u32>,
     ce_set: Vec<u32>,
     ce_prop: Vec<u32>,
-    ce_op: Vec<u32>,
-    /// condition sets: per set its size; per proposition the sets it is in; per set its conditional effects
+    /// condition sets: per set its size; per proposition the sets it is in
     cs_n: Vec<u32>,
     cs_of_off: Vec<u32>,
     cs_of: Vec<u32>,
-    cs_ce_off: Vec<u32>,
-    cs_ce: Vec<u32>,
+    /// per precondition set, what its operators reach together when none of them is excluded: the union of their
+    /// unconditional effect atoms, and of their conditional effects (condition set, atom) on other atoms; per
+    /// condition set, the (precondition set, atom) of those unions
+    u_off: Vec<u32>,
+    u: Vec<u32>,
+    c_off: Vec<u32>,
+    c: Vec<(u32, u32)>,
+    cu_off: Vec<u32>,
+    cu: Vec<(u32, u32)>,
     // working state
     reached: Vec<bool>,
     excluded: Vec<bool>,
     op_excluded: Vec<bool>,
-    op_fired: Vec<bool>,
     ps_unsat: Vec<u32>,
     cs_unsat: Vec<u32>,
+    ps_fired: Vec<bool>,
+    /// precondition sets with an excluded operator (their operators fire one by one)
+    tainted: Vec<bool>,
+    tainted_list: Vec<u32>,
+    /// conditional effects of tainted sets' operators that fired before their condition set: per condition set
+    pending: Vec<Vec<u32>>,
+    pending_list: Vec<u32>,
     queue: Vec<u32>,
     pub runs: u64,
     /// sizes for the profile: preconditions, conditions, conditional effects
@@ -314,7 +328,6 @@ impl Reach {
         op_ce_off.push(0u32);
         let mut ce_set: Vec<u32> = Vec::new();
         let mut ce_prop: Vec<u32> = Vec::new();
-        let mut ce_op: Vec<u32> = Vec::new();
         let mut pre: Vec<u32> = Vec::new();
         let mut cbuf: Vec<u32> = Vec::new();
         let mut ces: Vec<(u32, u32)> = Vec::new();
@@ -378,7 +391,6 @@ impl Reach {
                     n_conds += (csets.off[cs as usize + 1] - csets.off[cs as usize]) as usize;
                     ce_set.push(cs);
                     ce_prop.push(p);
-                    ce_op.push(o as u32);
                 }
             }
             for &p in &pre {
@@ -412,8 +424,67 @@ impl Reach {
             }
         }
         let (cs_of_off, cs_of) = csr(tv.n_props, &pairs);
-        let ce_pairs: Vec<(u32, u32)> = ce_set.iter().enumerate().map(|(e, &cs)| (cs, e as u32)).collect();
-        let (cs_ce_off, cs_ce) = csr(ncs, &ce_pairs);
+        // the unions per precondition set
+        let mut u_off = Vec::with_capacity(nps + 1);
+        u_off.push(0u32);
+        let mut u: Vec<u32> = Vec::new();
+        let mut c_off = Vec::with_capacity(nps + 1);
+        c_off.push(0u32);
+        let mut c: Vec<(u32, u32)> = Vec::new();
+        let mut umark = vec![false; tv.n_props];
+        for ps in 0..nps {
+            let u0 = u.len();
+            let c0 = c.len();
+            let ops = &ps_ops[ps_ops_off[ps] as usize..ps_ops_off[ps + 1] as usize];
+            for &o in ops {
+                for &p in &unc[unc_off[o as usize] as usize..unc_off[o as usize + 1] as usize] {
+                    if !umark[p as usize] {
+                        umark[p as usize] = true;
+                        u.push(p);
+                    }
+                }
+            }
+            for &o in ops {
+                for e in op_ce_off[o as usize] as usize..op_ce_off[o as usize + 1] as usize {
+                    if !umark[ce_prop[e] as usize] {
+                        c.push((ce_set[e], ce_prop[e]));
+                    }
+                }
+            }
+            for &p in &u[u0..] {
+                umark[p as usize] = false;
+            }
+            c[c0..].sort_unstable();
+            let mut k = c0;
+            for i in c0..c.len() {
+                if i == c0 || c[i] != c[k - 1] {
+                    c[k] = c[i];
+                    k += 1;
+                }
+            }
+            c.truncate(k);
+            u_off.push(u.len() as u32);
+            c_off.push(c.len() as u32);
+        }
+        let mut cu_pairs: Vec<(u32, (u32, u32))> = Vec::with_capacity(c.len());
+        for ps in 0..nps {
+            for &(cs, p) in &c[c_off[ps] as usize..c_off[ps + 1] as usize] {
+                cu_pairs.push((cs, (ps as u32, p)));
+            }
+        }
+        let mut cu_off = vec![0u32; ncs + 1];
+        for &(cs, _) in &cu_pairs {
+            cu_off[cs as usize + 1] += 1;
+        }
+        for i in 0..ncs {
+            cu_off[i + 1] += cu_off[i];
+        }
+        let mut fill = cu_off.clone();
+        let mut cu = vec![(0u32, 0u32); cu_pairs.len()];
+        for &(cs, x) in &cu_pairs {
+            cu[fill[cs as usize] as usize] = x;
+            fill[cs as usize] += 1;
+        }
         let n_pre = psets.data.len();
         if std::env::var_os("TASKCORE_PROFILE").is_some() {
             eprintln!(
@@ -429,23 +500,31 @@ impl Reach {
             ps_of,
             ps_ops_off,
             ps_ops,
+            op_ps,
             unc_off,
             unc,
             op_ce_off,
             ce_set,
             ce_prop,
-            ce_op,
             cs_n,
             cs_of_off,
             cs_of,
-            cs_ce_off,
-            cs_ce,
+            u_off,
+            u,
+            c_off,
+            c,
+            cu_off,
+            cu,
             reached: vec![false; tv.n_props],
             excluded: vec![false; tv.n_props],
             op_excluded: vec![false; n_ops],
-            op_fired: vec![false; n_ops],
             ps_unsat: vec![0; nps],
             cs_unsat: vec![0; ncs],
+            ps_fired: vec![false; nps],
+            tainted: vec![false; nps],
+            tainted_list: Vec::new(),
+            pending: vec![Vec::new(); ncs],
+            pending_list: Vec::new(),
             queue: Vec::new(),
             runs: 0,
             sizes: [nps, n_pre, ncs, n_conds, 0],
@@ -460,9 +539,9 @@ impl Reach {
         }
     }
 
-    #[inline]
+    /// A tainted set's operator fires (it is not excluded): its own effects, its conditional effects whose condition
+    /// set is not reached yet waiting on it.
     fn fire(&mut self, o: usize) {
-        self.op_fired[o] = true;
         for i in self.unc_off[o] as usize..self.unc_off[o + 1] as usize {
             let p = self.unc[i];
             if !self.excluded[p as usize] {
@@ -470,13 +549,38 @@ impl Reach {
             }
         }
         for e in self.op_ce_off[o] as usize..self.op_ce_off[o + 1] as usize {
-            if self.cs_unsat[self.ce_set[e] as usize] == 0 && !self.excluded[self.ce_prop[e] as usize] {
-                self.reach(self.ce_prop[e]);
+            let cs = self.ce_set[e] as usize;
+            let p = self.ce_prop[e];
+            if self.cs_unsat[cs] == 0 {
+                if !self.excluded[p as usize] {
+                    self.reach(p);
+                }
+            } else {
+                if self.pending[cs].is_empty() {
+                    self.pending_list.push(cs as u32);
+                }
+                self.pending[cs].push(p);
             }
         }
     }
 
     fn fire_set(&mut self, ps: usize) {
+        self.ps_fired[ps] = true;
+        if !self.tainted[ps] {
+            for i in self.u_off[ps] as usize..self.u_off[ps + 1] as usize {
+                let p = self.u[i];
+                if !self.excluded[p as usize] {
+                    self.reach(p);
+                }
+            }
+            for i in self.c_off[ps] as usize..self.c_off[ps + 1] as usize {
+                let (cs, p) = self.c[i];
+                if self.cs_unsat[cs as usize] == 0 && !self.excluded[p as usize] {
+                    self.reach(p);
+                }
+            }
+            return;
+        }
         for i in self.ps_ops_off[ps] as usize..self.ps_ops_off[ps + 1] as usize {
             let o = self.ps_ops[i] as usize;
             if !self.op_excluded[o] {
@@ -493,20 +597,32 @@ impl Reach {
         for &f in excluded {
             self.excluded[tv.prop(f)] = true;
         }
-        // get_excluded_operators: an unconditional effect on an excluded atom
-        self.op_excluded.iter_mut().for_each(|x| *x = false);
+        // get_excluded_operators: an unconditional effect on an excluded atom; their precondition sets are tainted
+        for &ps in &self.tainted_list {
+            self.tainted[ps as usize] = false;
+        }
+        self.tainted_list.clear();
         for &f in excluded {
             let p = tv.prop(f) as u32;
             for &o in tv.providing(f) {
                 let o = o as usize;
                 if !self.op_excluded[o] && self.unc[self.unc_off[o] as usize..self.unc_off[o + 1] as usize].binary_search(&p).is_ok() {
                     self.op_excluded[o] = true;
+                    let ps = self.op_ps_of(o);
+                    if !self.tainted[ps] {
+                        self.tainted[ps] = true;
+                        self.tainted_list.push(ps as u32);
+                    }
                 }
             }
         }
+        for &cs in &self.pending_list {
+            self.pending[cs as usize].clear();
+        }
+        self.pending_list.clear();
         self.ps_unsat.copy_from_slice(&self.ps_n);
         self.cs_unsat.copy_from_slice(&self.cs_n);
-        self.op_fired.iter_mut().for_each(|x| *x = false);
+        self.ps_fired.iter_mut().for_each(|x| *x = false);
         self.queue.clear();
         for v in 0..t.sizes.len() {
             let p = (tv.prop_off[v] + t.init[v]) as usize;
@@ -534,10 +650,16 @@ impl Reach {
                 let cs = self.cs_of[i] as usize;
                 self.cs_unsat[cs] -= 1;
                 if self.cs_unsat[cs] == 0 {
-                    for j in self.cs_ce_off[cs] as usize..self.cs_ce_off[cs + 1] as usize {
-                        let e = self.cs_ce[j] as usize;
-                        if self.op_fired[self.ce_op[e] as usize] && !self.excluded[self.ce_prop[e] as usize] {
-                            self.reach(self.ce_prop[e]);
+                    for j in self.cu_off[cs] as usize..self.cu_off[cs + 1] as usize {
+                        let (ps, q) = self.cu[j];
+                        if self.ps_fired[ps as usize] && !self.tainted[ps as usize] && !self.excluded[q as usize] {
+                            self.reach(q);
+                        }
+                    }
+                    for j in 0..self.pending[cs].len() {
+                        let q = self.pending[cs][j];
+                        if !self.excluded[q as usize] {
+                            self.reach(q);
                         }
                     }
                 }
@@ -546,7 +668,15 @@ impl Reach {
         for &f in excluded {
             self.excluded[tv.prop(f)] = false;
         }
+        for &o in excluded.iter().flat_map(|&f| tv.providing(f)) {
+            self.op_excluded[o as usize] = false;
+        }
         &self.reached
+    }
+
+    /// the precondition set of operator `o`
+    fn op_ps_of(&self, o: usize) -> usize {
+        self.op_ps[o] as usize
     }
 }
 
