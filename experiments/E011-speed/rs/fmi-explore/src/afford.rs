@@ -358,11 +358,33 @@ pub struct AffordCfg {
     pub fixed: bool,
     /// the third click over every target of the frame when a verb-then-target trial left the game composing
     pub third: bool,
+    /// E013's refused inputs (FMI_REFUSE=1): a trial whose every input the engine dropped or the handler ignored ends
+    /// at the frame after its last click, with no wait
+    pub refuse: bool,
+    /// E013 (FMI_REFUSE=1, unless FMI_REFUSE_DEDUPE=0): a trial whose state at its stop has the digest of an earlier
+    /// trial's stop, or of the no-input twin at the same frame, shares that state's wait: its stop and the wait's stops
+    /// are not read again
+    pub dedupe: bool,
+    /// gate B4 (FMI_REFUSE_CHECK=1): a trial that shares a wait also runs its own, and the two are compared
+    pub check: bool,
+}
+
+/// E013's switch (component refuse), read as fmi-play's `refuse::on`.
+pub fn refuse_on() -> bool {
+    std::env::var("FMI_REFUSE").is_ok_and(|v| v == "1")
 }
 
 impl Default for AffordCfg {
     fn default() -> Self {
-        AffordCfg { horizon: W, fixed: false, third: true }
+        let refuse = refuse_on();
+        AffordCfg {
+            horizon: W,
+            fixed: false,
+            third: true,
+            refuse,
+            dedupe: refuse && std::env::var("FMI_REFUSE_DEDUPE").map_or(true, |v| v != "0"),
+            check: refuse && std::env::var("FMI_REFUSE_CHECK").is_ok_and(|v| v == "1"),
+        }
     }
 }
 
@@ -390,6 +412,11 @@ pub struct Trial {
     pub seconds: f64,
     /// E014: the tick at the stop or at the end
     pub tick: u64,
+    /// E013 (FMI_REFUSE): the verdict of the inputs this trial gave its engine ("taken" when any was taken, else the
+    /// first one's: "dropped: gate", "ignored", ...); its stop's digest; the trial or the twin whose wait it shared
+    pub verdict: Option<String>,
+    pub digest: Option<u64>,
+    pub shared: Option<String>,
 }
 
 /// A kept outcome: an entry to commit (its parent is the entry the step ran from).
@@ -425,6 +452,21 @@ pub struct AffordOut {
     /// wall seconds by phase: the forks, the inputs and runs, the reads (facts, runs, dumps, hit tests), the quits,
     /// the no-input control
     pub phases: [f64; 5],
+    /// E013 (FMI_REFUSE): the shared waits' counts and gate B4's pairs (FMI_REFUSE_CHECK)
+    pub refuse: Option<RefuseOut>,
+}
+
+/// E013's refused inputs in a step: digests taken, waits shared (with an earlier trial, with the no-input twin), the
+/// twin's forks, and with FMI_REFUSE_CHECK the pairs whose own waits were run and compared (B4).
+#[derive(Clone, Debug, Default)]
+pub struct RefuseOut {
+    pub digests: usize,
+    pub shared_trial: usize,
+    pub shared_twin: usize,
+    pub twin_forks: usize,
+    pub digest_s: f64,
+    /// (trial, the trial or "twin" it shared with, same stops and last checkpoint)
+    pub pairs: Vec<(usize, String, bool)>,
 }
 
 impl AffordOut {
@@ -454,7 +496,7 @@ impl AffordOut {
         }
         let mut backs: Vec<u64> = self.trials.iter().filter_map(|t| t.back).collect();
         backs.sort_unstable();
-        json!({"offer": self.offer.json(), "trials": n, "third": self.trials.iter().filter(|t| t.inputs.clicks.len() == 3).count(),
+        let mut v = json!({"offer": self.offer.json(), "trials": n, "third": self.trials.iter().filter(|t| t.inputs.clicks.len() == 3).count(),
                "composing": self.trials.iter().filter(|t| t.composing).count(),
                "ended": self.trials.iter().filter(|t| t.ended).count(), "outcomes": self.outcomes().len(),
                "outcomes_world": self.outcomes_world(),
@@ -464,7 +506,25 @@ impl AffordOut {
                "own_cpu_s": self.own_cpu_s,
                "cpu_ms_per_trial": if n > 0 { 1e3 * (self.engine_cpu_s + self.own_cpu_s) / n as f64 } else { 0.0 },
                "phases_s": {"fork": self.phases[0], "run": self.phases[1], "read": self.phases[2], "quit": self.phases[3],
-                            "control": self.phases[4]}})
+                            "control": self.phases[4]}});
+        if let Some(r) = &self.refuse {
+            // E013: the trials by verdict, with their seconds (the stall table's rows), and the shared waits
+            let mut by: BTreeMap<String, (usize, f64)> = BTreeMap::new();
+            for t in &self.trials {
+                let e = by.entry(t.verdict.clone().unwrap_or_else(|| "none".into())).or_default();
+                e.0 += 1;
+                e.1 += t.seconds;
+            }
+            v["verdicts"] = json!(by.iter().map(|(k, x)| (k.clone(), json!(x.0))).collect::<serde_json::Map<_, _>>());
+            v["verdict_s"] = json!(by.iter().map(|(k, x)| (k.clone(), json!(x.1))).collect::<serde_json::Map<_, _>>());
+            v["refuse"] = json!({"ended_at_once": self.trials.iter().filter(|t| t.reason == "refused").count(),
+                                 "digests": r.digests, "shared_trial": r.shared_trial, "shared_twin": r.shared_twin,
+                                 "twin_forks": r.twin_forks, "digest_s": r.digest_s,
+                                 "waits_run": self.trials.iter().filter(|t| t.digest.is_some() && t.shared.is_none()).count(),
+                                 "pairs": r.pairs.len(), "pairs_same": r.pairs.iter().filter(|p| p.2).count(),
+                                 "pairs_differ": r.pairs.iter().filter(|p| !p.2).map(|p| json!([p.0, p.1])).collect::<Vec<_>>()});
+        }
+        v
     }
 }
 
@@ -511,15 +571,27 @@ pub fn composing(idle: Option<&str>, runs: &[Run], from: u64, input: &[i32], sen
     ran_input && !ran_sentence && !ran_object
 }
 
-/// How a trial's run went: stopped (its status and the idle stop's frame, if any), or ended (the end status).
+/// How a trial's run went: stopped (its status and the idle stop's frame, if any), ended (the end status), or, with
+/// E013's refused inputs, stopped at the frame after its last click because the engine took none of its inputs.
 enum Ran {
     Stopped(Status, Option<u64>),
     Ended(Status),
+    Refused(Status),
+}
+
+/// The verdict of a trial's inputs on its engine (E013): "taken" when the handler took any of them, else the first
+/// record's ("dropped: gate", "ignored", ...); "unread" with no record.
+pub fn trial_verdict(recs: &[InputRecord]) -> String {
+    if recs.iter().any(|r| r.verdict == Verdict::Taken) {
+        return "taken".into();
+    }
+    recs.first().map(|r| r.verdict.text()).unwrap_or_else(|| "dropped: unread".into())
 }
 
 /// A trial's engine after its clicks: run to the frame after the last click, then to the bridge's idle stop or the
-/// end frame `end`; in M4's form (`fixed`) then on to `end`.
-fn run_trial(b: &mut Box<dyn Engine>, last: u64, end: u64, fixed: bool) -> EResult<Ran> {
+/// end frame `end`; in M4's form (`fixed`) then on to `end`. With `refuse` (E013) the input log is read at the frame
+/// after the last click: its verdict is returned, and when no input was taken the trial stops there (Ran::Refused).
+fn run_trial(b: &mut Box<dyn Engine>, last: u64, end: u64, fixed: bool, refuse: bool) -> EResult<(Ran, Option<String>)> {
     let go = |b: &mut Box<dyn Engine>, spec: RunSpec| -> EResult<Result<Status, Status>> {
         match b.run(&spec) {
             Ok(s) => Ok(Ok(s)),
@@ -529,13 +601,22 @@ fn run_trial(b: &mut Box<dyn Engine>, last: u64, end: u64, fixed: bool) -> EResu
     };
     let mut st = match go(b, RunSpec { frame: Some(last + 1), ..Default::default() })? {
         Ok(s) => s,
-        Err(s) => return Ok(Ran::Ended(s)),
+        Err(s) => return Ok((Ran::Ended(s), None)),
     };
+    let mut verdict = None;
+    if refuse {
+        let v = trial_verdict(&b.input_log()?.records);
+        let stop = v != "taken";
+        verdict = Some(v);
+        if stop {
+            return Ok((Ran::Refused(st), verdict));
+        }
+    }
     let mut back = None;
     if st.frame < end {
         st = match go(b, RunSpec { idle: true, max_frame: Some(end), ..Default::default() })? {
             Ok(s) => s,
-            Err(s) => return Ok(Ran::Ended(s)),
+            Err(s) => return Ok((Ran::Ended(s), verdict)),
         };
         if st.reason == "idle" {
             back = Some(st.frame);
@@ -544,10 +625,70 @@ fn run_trial(b: &mut Box<dyn Engine>, last: u64, end: u64, fixed: bool) -> EResu
     if fixed && st.frame < end {
         st = match go(b, RunSpec { frame: Some(end), ..Default::default() })? {
             Ok(s) => s,
-            Err(s) => return Ok(Ran::Ended(s)),
+            Err(s) => return Ok((Ran::Ended(s), verdict)),
         };
     }
-    Ok(Ran::Stopped(st, back))
+    Ok((Ran::Stopped(st, back), verdict))
+}
+
+/// E013's shared waits (AffordCfg::dedupe): the digests of the trials' stops seen in this step, with the first trial
+/// that stopped in each state and its stops (for gate B4's comparison), and the no-input twin: a fork of the offer's
+/// engine run with no input to the frames asked, in order (forked again for an earlier frame).
+#[derive(Default)]
+struct Shared {
+    seen: std::collections::HashMap<u64, (usize, u64, Vec<(u64, Checkpoint)>)>,
+    twin: Option<Box<dyn Engine>>,
+    twin_digest: std::collections::HashMap<u64, Option<u64>>,
+}
+
+impl Shared {
+    /// The twin's digest at frame f (None: its run ended before f).
+    fn twin_at(&mut self, e: &mut Box<dyn Engine>, f: u64, out: &mut RefuseOut) -> EResult<Option<u64>> {
+        if let Some(d) = self.twin_digest.get(&f) {
+            return Ok(*d);
+        }
+        if self.twin.as_ref().is_some_and(|t| t.status().frame > f) {
+            self.twin.take().unwrap().quit();
+        }
+        if self.twin.is_none() {
+            self.twin = Some(e.fork()?);
+            out.twin_forks += 1;
+        }
+        let t = self.twin.as_mut().unwrap();
+        let d = if t.status().frame == f {
+            Some(t.digest()?.digest)
+        } else {
+            match t.run(&RunSpec { frame: Some(f), ..Default::default() }) {
+                Ok(_) if t.status().frame == f => Some(t.digest()?.digest),
+                Ok(_) => None,
+                Err(EngineError::Ended(_)) => {
+                    self.twin = None;
+                    None
+                }
+                Err(x) => return Err(x),
+            }
+        };
+        self.twin_digest.insert(f, d);
+        Ok(d)
+    }
+
+    fn quit(&mut self) -> f64 {
+        match self.twin.take() {
+            Some(t) => {
+                let c = t.cpu_s();
+                t.quit();
+                c
+            }
+            None => 0.0,
+        }
+    }
+}
+
+/// The stops of a wait relative to the trial's stop: (frames after it, checkpoint less its frame).
+fn rel_stops(f: u64, cps: &[Checkpoint]) -> Vec<(u64, Checkpoint)> {
+    cps.iter()
+        .map(|c| (c.frame.saturating_sub(f), Checkpoint { frame: 0, facts: c.facts.clone(), tick: 0, rng: c.rng, actors: c.actors.clone() }))
+        .collect()
 }
 
 /// The step's running state: the record, the atoms kept so far in this step (IW(1) within the step), and each trial's
@@ -563,12 +704,15 @@ struct Run1<'a> {
     kept_atoms: HashSet<String>,
     worlds: Vec<(u64, Option<Facts>)>,
     cpu: f64,
+    shared: Shared,
 }
 
 impl Run1<'_> {
     /// One trial on `b`, whose clicks `events` are scheduled: its run, its record, its world facts, and its stops kept
-    /// by novelty. Returns the trial's index and its stop's status and facts (None: the run ended).
-    fn trial(&mut self, b: &mut Box<dyn Engine>, inputs: Inputs, events: Vec<Event>) -> EResult<(usize, Option<(Status, Facts)>)> {
+    /// by novelty. Returns the trial's index and its stop's status and facts (None: the run ended, or no input was
+    /// taken). `e`: the offer's engine (the no-input twin's source, with E013's shared waits).
+    fn trial(&mut self, e: &mut Box<dyn Engine>, b: &mut Box<dyn Engine>, inputs: Inputs, events: Vec<Event>)
+             -> EResult<(usize, Option<(Status, Facts)>)> {
         let tt = Instant::now();
         let last = events.last().map(|x| x.frame).unwrap_or(self.f0);
         let mut tr = Trial {
@@ -586,9 +730,14 @@ impl Run1<'_> {
             kept: 0,
             seconds: 0.0,
             tick: 0,
+            verdict: None,
+            digest: None,
+            shared: None,
         };
+        let idx = self.out.trials.len();
         let tr0 = Instant::now();
-        let ran = run_trial(b, last, self.end, self.cfg.fixed)?;
+        let (ran, verdict) = run_trial(b, last, self.end, self.cfg.fixed, self.cfg.refuse)?;
+        tr.verdict = verdict;
         self.out.phases[1] += tr0.elapsed().as_secs_f64();
         let tr1 = Instant::now();
         let res = match ran {
@@ -601,6 +750,16 @@ impl Run1<'_> {
                 self.worlds.push((st.frame, None));
                 None
             }
+            Ran::Refused(st) => {
+                // E013: no input taken: the trial ends here, with no wait (its outcome still read against no input)
+                tr.reason = "refused".into();
+                tr.frame = st.frame;
+                tr.tick = st.tick;
+                tr.room = st.room;
+                let f = b.facts()?;
+                self.worlds.push((st.frame, Some(world_of(&self.tested, &f))));
+                None
+            }
             Ran::Stopped(st, back) => {
                 tr.frame = st.frame;
                 tr.tick = st.tick;
@@ -610,12 +769,64 @@ impl Run1<'_> {
                 tr.back = back.map(|f| f - self.f0);
                 let f = b.facts()?;
                 self.worlds.push((st.frame, Some(world_of(&self.tested, &f))));
-                let mut stops: Vec<(Option<Checkpoint>, Facts)> = vec![(None, f.clone())];
-                if let (Some(th), false) = (self.then, self.cfg.fixed) {
-                    for c in th(b).map_err(EngineError::Bridge)? {
-                        let fc = c.facts.clone();
-                        stops.push((Some(c), fc));
+                // E013: the stop's digest; an earlier trial's stop or the no-input twin in the same state shares its wait
+                let mut share: Option<(String, Option<Vec<(u64, Checkpoint)>>)> = None;
+                if self.cfg.dedupe && !self.cfg.fixed {
+                    let td = Instant::now();
+                    let ro = self.out.refuse.get_or_insert_with(RefuseOut::default);
+                    let d = b.digest()?.digest;
+                    ro.digests += 1;
+                    tr.digest = Some(d);
+                    if let Some((k, _, stops)) = self.shared.seen.get(&d) {
+                        share = Some((format!("trial {k}"), Some(stops.clone())));
+                        ro.shared_trial += 1;
+                    } else if self.shared.twin_at(e, st.frame, ro)? == Some(d) {
+                        share = Some(("twin".into(), None));
+                        ro.shared_twin += 1;
                     }
+                    ro.digest_s += td.elapsed().as_secs_f64();
+                }
+                let mut stops: Vec<(Option<Checkpoint>, Facts)> = vec![(None, f.clone())];
+                if share.is_none() || self.cfg.check {
+                    if let (Some(th), false) = (self.then, self.cfg.fixed) {
+                        let cps = th(b).map_err(EngineError::Bridge)?;
+                        let rel = rel_stops(st.frame, &cps);
+                        match &share {
+                            // gate B4: the shared wait against this trial's own
+                            Some((who, theirs)) => {
+                                let same = match theirs {
+                                    Some(t) => *t == rel,
+                                    None => {
+                                        // the twin's own wait from the same frame
+                                        let mut tw = self.shared.twin.as_mut().unwrap().fork()?;
+                                        let r = th(&mut tw).map_err(EngineError::Bridge)?;
+                                        tw.quit();
+                                        rel_stops(st.frame, &r) == rel
+                                    }
+                                };
+                                self.out.refuse.get_or_insert_with(RefuseOut::default).pairs.push((idx, who.clone(), same));
+                            }
+                            None => {
+                                if let Some(d) = tr.digest {
+                                    self.shared.seen.insert(d, (idx, st.frame, rel));
+                                }
+                            }
+                        }
+                        if share.is_none() {
+                            for c in cps {
+                                let fc = c.facts.clone();
+                                stops.push((Some(c), fc));
+                            }
+                        }
+                    } else if let (None, Some(d)) = (&share, tr.digest) {
+                        self.shared.seen.insert(d, (idx, st.frame, vec![]));
+                    }
+                }
+                if let Some((who, _)) = &share {
+                    // the stop's state is one this step has read (an earlier trial's) or the twin's (the try's wait
+                    // reads the entry's no-input frames): neither the stop nor its wait gives anything new here
+                    tr.shared = Some(who.clone());
+                    stops.clear();
                 }
                 for (cp, fs) in stops {
                     let nov: Vec<String> = self.novelty.novel(&fs).into_iter().filter(|a| !self.kept_atoms.contains(a)).collect();
@@ -638,7 +849,7 @@ impl Run1<'_> {
         self.out.phases[2] += tr1.elapsed().as_secs_f64();
         tr.seconds = tt.elapsed().as_secs_f64();
         self.out.trials.push(tr);
-        Ok((self.out.trials.len() - 1, res))
+        Ok((idx, res))
     }
 }
 
@@ -667,11 +878,16 @@ pub fn try_all(
         tested: tested.iter().copied().collect(),
         novelty,
         then,
-        out: AffordOut { offer: of.clone(), ..Default::default() },
+        out: AffordOut { offer: of.clone(), refuse: cfg.refuse.then(RefuseOut::default), ..Default::default() },
         kept_atoms: HashSet::new(),
         worlds: Vec::new(),
         cpu: 0.0,
+        shared: Shared::default(),
     };
+    if cfg.refuse {
+        // E013: the records the engine's movie left; every trial's fork starts with an empty input log
+        e.input_log()?;
+    }
     for inp in inputs {
         let tf = Instant::now();
         let mut b = e.fork()?;
@@ -686,7 +902,7 @@ pub fn try_all(
         b.inputs(&evs)?;
         r.out.phases[1] += ti.elapsed().as_secs_f64();
         let last = evs.last().map(|x| x.frame).unwrap_or(f0);
-        let (i, res) = r.trial(&mut b, inp.clone(), evs.clone())?;
+        let (i, res) = r.trial(e, &mut b, inp.clone(), evs.clone())?;
         if let (true, Some((st, f))) = (check, res) {
             let tr = Instant::now();
             let runs = b.runs()?;
@@ -708,7 +924,7 @@ pub fn try_all(
                     c.inputs(&evs3[evs3.len() - 1..])?;
                     r.out.phases[1] += ti.elapsed().as_secs_f64();
                     let inp3 = Inputs { clicks: vec![inp.clicks[0], inp.clicks[1], *t] };
-                    r.trial(&mut c, inp3, evs3)?;
+                    r.trial(e, &mut c, inp3, evs3)?;
                     r.cpu += c.cpu_s();
                     let tq = Instant::now();
                     c.quit();
@@ -745,6 +961,7 @@ pub fn try_all(
         c.quit();
     }
     r.out.phases[4] += tc.elapsed().as_secs_f64();
+    r.cpu += r.shared.quit();
     for (t, (fr, w)) in r.out.trials.iter_mut().zip(r.worlds.iter()) {
         if let (Some(w), Some(c)) = (w, control.get(fr)) {
             t.outcome = outcome_of(c, w);
