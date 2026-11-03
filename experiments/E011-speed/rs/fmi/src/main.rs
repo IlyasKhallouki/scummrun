@@ -360,6 +360,8 @@ fn cmd_run(argv: &[String]) -> i32 {
         eprintln!("fmi explore run: the verify needs the engine host (wire.rs); give --no-verify");
         return 2;
     }
+    // E013: stall's two rules as free's port (asked only with FMI_FREE_SHIFT=1)
+    fmi_explore::free::set_shift(Box::new(fmi_explore::stall::ArchivePort::default()));
     let mut stats = DriverStats::default();
     let ver: Option<&dyn fmi_explore::driver::Verifier> = if a.flag("no-verify") { None } else { verifier.as_ref().map(|v| v as &dyn fmi_explore::driver::Verifier) };
     match driver::run(&PathBuf::from(root), workers, &mode, ver, &mut stats) {

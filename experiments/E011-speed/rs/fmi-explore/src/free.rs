@@ -200,10 +200,10 @@ fn delay_candidate(t: &Trial) -> bool {
     t.inputs.clicks.len() < 3 && !t.ended && taken(t)
 }
 
-/// Whether a trial's input was taken. E012's trials carry no verdict: every trial counts (refuse's verdict replaces
-/// this when it is merged).
-fn taken(_t: &Trial) -> bool {
-    true
+/// Whether a trial's input was taken: refuse's verdict (FMI_REFUSE=1, "taken" when the handler took any of its
+/// inputs). A trial with no verdict (refuse off) counts as taken, as E012's trials do.
+pub fn taken(t: &Trial) -> bool {
+    t.verdict.as_deref().map_or(true, |v| v == "taken")
 }
 
 // --- the free try --------------------------------------------------------------------------------------------------

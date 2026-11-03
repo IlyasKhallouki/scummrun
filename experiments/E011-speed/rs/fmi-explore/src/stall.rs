@@ -1007,8 +1007,7 @@ impl Live {
 
 /// free's port (`free::Shift`, the stall amendment (2)): the two rules over the open archive, from a table kept over
 /// its log lines and caught up at each call with the live table's own push, so that it equals the table from the files
-/// at every commit, also after a reopen. The integration wires it: `impl free::Shift for stall::ArchivePort` and
-/// `free::set_shift(Box::new(stall::ArchivePort::default()))`.
+/// at every commit, also after a reopen. `fmi explore run` wires it (`free::set_shift`) before the driver starts.
 #[derive(Default)]
 pub struct ArchivePort {
     /// the archive's root, the log lines pushed, the table
@@ -1039,6 +1038,16 @@ impl ArchivePort {
     /// The cell rule on `cell` now.
     pub fn free_cell(&self, a: &Archive, cell: &str) -> Res<bool> {
         self.with(a, |s| s.free_cell(cell))
+    }
+}
+
+/// free's port, wired by `fmi explore run` (`free::set_shift`): free asks it only with FMI_FREE_SHIFT=1.
+impl crate::free::Shift for ArchivePort {
+    fn share(&self, a: &Archive, rho0: f64) -> Result<f64, String> {
+        ArchivePort::share(self, a, rho0)
+    }
+    fn free_cell(&self, a: &Archive, cell: &str) -> Result<bool, String> {
+        ArchivePort::free_cell(self, a, cell)
     }
 }
 
