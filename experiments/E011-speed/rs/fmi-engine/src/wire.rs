@@ -28,6 +28,10 @@ pub const C_STEP_OBS: u8 = 0x91;
 pub const C_AT_MANY: u8 = 0x92;
 /// patch 0004 (round 2, play): a run answered with the dump at its stop
 pub const C_RUN_OBS: u8 = 0x93;
+/// patch 0005 (E012, end): the current room's walk boxes, no payload; replies `R_BOXES`
+pub const C_BOXES: u8 = 0x94;
+/// patch 0005 (E012, end): the same as the JSON "boxes" reply's text, no payload; replies `R_JSON`
+pub const C_BOXES_JSON: u8 = 0x95;
 
 // engine to controller
 pub const R_HELLO: u8 = 0x01;
@@ -50,6 +54,8 @@ pub const R_STEP_OBS_REPLY: u8 = 0x0F;
 pub const R_AT_MANY: u8 = 0x10;
 /// patch 0004: `Status`, `Obs`
 pub const R_RUN_OBS_REPLY: u8 = 0x11;
+/// patch 0005: `Boxes`
+pub const R_BOXES: u8 = 0x12;
 
 /// A message being written: the 5-byte header first, its length set by `finish`.
 pub struct W(pub Vec<u8>);
@@ -406,6 +412,27 @@ impl<'a> R<'a> {
             main,
             verb_slot,
         })
+    }
+
+    /// patch 0005: fmi-core `Boxes` (room, then each box's ul, ur, lr, ll and flags).
+    pub fn boxes(&mut self) -> DResult<Boxes> {
+        let room = self.i32()?;
+        let n = self.count(33)?;
+        let mut boxes = Vec::with_capacity(n);
+        for _ in 0..n {
+            let mut p = [(0, 0); 4];
+            for q in &mut p {
+                *q = (self.i32()?, self.i32()?);
+            }
+            boxes.push(WalkBox {
+                ul: p[0],
+                ur: p[1],
+                lr: p[2],
+                ll: p[3],
+                flags: self.u8()?,
+            });
+        }
+        Ok(Boxes { room, boxes })
     }
 
     pub fn runs_reply(&mut self) -> DResult<RunsReply> {
