@@ -395,8 +395,10 @@ pub fn reach_start(start: &Facts) -> Vec<(String, i64)> {
 /// `start_file_text(&reach_start(start))` written from the keys' texts in place: their order (by text) is kept from the
 /// last call while the key set is the same (the engine's facts change little from start to start).
 pub fn reach_start_text(start: &Facts) -> String {
+    /// the last call's keys, and (index, text) of those written, by text
+    type Order = (Vec<Key>, Vec<(usize, std::rc::Rc<str>)>);
     thread_local! {
-        static LAST: std::cell::RefCell<(Vec<Key>, Vec<(usize, std::rc::Rc<str>)>)> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+        static LAST: std::cell::RefCell<Order> = const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
     }
     LAST.with(|l| {
         let mut l = l.borrow_mut();
