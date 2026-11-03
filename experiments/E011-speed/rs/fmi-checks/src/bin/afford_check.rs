@@ -183,19 +183,31 @@ fn m4(a: &Args) -> Res<()> {
     Ok(())
 }
 
-/// Verify from boot (replay.verify with one checkpoint): a fresh engine plays the movie from boot to the checkpoint's
-/// frame; its facts, tick, random state and actors are compared with the checkpoint's. Returns the differences.
-fn verify(h: &Host, out: &Path, movie: &[Value], cp: &Checkpoint) -> Res<Vec<Value>> {
-    let want = fmi_explore::pyjson::loads(&fmi_explore::archive::checkpoint_text(cp)).map_err(e2s)?;
-    let mut e = match boot(h, out, movie, cp.frame) {
-        Ok(e) => e,
-        Err(x) => return Ok(vec![json!({"frame": cp.frame, "error": x})]),
-    };
-    let o = e.obs(&ObsReq::default()).map_err(e2s)?;
-    let st = e.status().clone();
-    e.quit();
-    let d = fmi_explore::tryjob::compare_checkpoint(&want, &o, &st);
-    Ok(if d.is_empty() { vec![] } else { vec![Value::Object(d)] })
+/// A checkpoint of an entry file ([frame, facts, {"tick", "rng", "actors"}]).
+fn checkpoint_of_json(v: &Value) -> Res<Checkpoint> {
+    let frame = v[0].as_u64().ok_or("checkpoint frame")?;
+    let mut pairs = Vec::new();
+    for (k, x) in v[1].as_object().ok_or("checkpoint facts")? {
+        pairs.push((Key::parse(k), x.as_i64().ok_or_else(|| format!("checkpoint fact {k}: {x}"))?));
+    }
+    let ex = &v[2];
+    let actors = ex["actors"]
+        .as_array()
+        .ok_or("checkpoint actors")?
+        .iter()
+        .map(|a| (a[0].as_i64().unwrap_or(0) as i32, a[1].as_i64().unwrap_or(0) as i32, a[2].as_i64().unwrap_or(0) as i32))
+        .collect();
+    Ok(Checkpoint { frame, facts: Facts::from_pairs(pairs), tick: ex["tick"].as_u64().ok_or("tick")?, rng: ex["rng"].as_u64().ok_or("rng")?, actors })
+}
+
+/// Verify from boot as E011's G11 (fmi-engine's replay::verify, replay.py's port): a fresh lean engine plays the
+/// movie from boot, compared on facts, tick, random state and actors at the root's checkpoints, the entry's last one
+/// and the kept one. Returns the differences.
+fn verify(h: &Host, out: &Path, movie: &[Value], cps: &[Checkpoint]) -> Res<Vec<Value>> {
+    let events: Vec<Event> = movie.iter().filter_map(fmi_explore::events::event_of).collect();
+    let base = BootCfg { seed: 1, events: vec![], frame: None, dump_locals: false, lean: true, out_dir: out.to_path_buf() };
+    let v = fmi_engine::replay::verify(h, &base, &events, cps, &[]).map_err(e2s)?;
+    Ok(v.differ.iter().map(|d| json!({"frame": d.frame, "error": d.error, "facts": d.diff.facts, "extra": d.diff.extra.len()})).collect())
 }
 
 /// M4's probe file (name, all, outcome) against this run's (name, outcome), name by name.
@@ -296,13 +308,25 @@ fn run(a: &Args) -> Res<()> {
     if a.flag("verify") {
         let mut rows = Vec::new();
         let mut differ_total = 0;
+        // the root's checkpoints and the entry's last one, before each kept one
+        let mut chain: Vec<Checkpoint> = Vec::new();
+        for c in entry(&arch, 0)?["checkpoints"].as_array().ok_or("root checkpoints")? {
+            chain.push(checkpoint_of_json(c)?);
+        }
+        let ent = entry(&arch, idx)?;
+        let last = ent["checkpoints"].as_array().and_then(|c| c.last()).ok_or("entry checkpoints")?;
+        if idx != 0 {
+            chain.push(checkpoint_of_json(last)?);
+        }
         for (i, k) in res.kept.iter().enumerate() {
             let mut m = evs.clone();
             m.extend(k.events_json());
+            let mut cps = chain.clone();
+            cps.push(k.checkpoint.clone());
             let t = Instant::now();
-            let d = verify(&h, &out.join(format!("verify-{i}")), &m, &k.checkpoint)?;
+            let d = verify(&h, &out.join(format!("verify-{i}")), &m, &cps)?;
             differ_total += d.len();
-            rows.push(json!({"kept": i, "name": k.name, "frame": k.checkpoint.frame, "same": d.is_empty(), "differ": d.len(),
+            rows.push(json!({"kept": i, "name": k.name, "frame": k.checkpoint.frame, "checkpoints": cps.len(), "same": d.is_empty(), "differ": d.len(),
                              "first": d.first(), "seconds": t.elapsed().as_secs_f64()}));
         }
         summary["verify"] = json!({"kept": res.kept.len(), "same": rows.iter().filter(|r| r["same"] == json!(true)).count(),
