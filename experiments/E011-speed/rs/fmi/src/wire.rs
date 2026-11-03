@@ -75,6 +75,7 @@ fn real(o: &WireOpts) -> Result<Wired, String> {
             search_name: search_name(o.search).into(),
             forced_targets: o.forced_targets.clone(),
             tail: o.tail,
+            mech: crate::wire_real::mech(),
         }),
     })
 }
@@ -120,6 +121,7 @@ fn doubles(rec: &Path, o: &WireOpts) -> Result<Wired, String> {
             search_name: search_name(o.search).into(),
             forced_targets: o.forced_targets.clone(),
             tail: o.tail,
+            mech: Default::default(),
         }),
     })
 }

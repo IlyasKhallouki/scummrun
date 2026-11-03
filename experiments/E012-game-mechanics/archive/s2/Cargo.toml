@@ -1,0 +1,19 @@
+[package]
+name = "archive-s2"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E012 component archive, gate S2: the kitchen's readings' T, and the E011 kitchen archive recounted under the cells over T"
+
+[dependencies]
+fmi-core = { path = "../../../E011-speed/rs/fmi-core" }
+fmi-explore = { path = "../../../E011-speed/rs/fmi-explore" }
+fmi-reading = { path = "../../../E011-speed/rs/fmi-reading" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+
+# its own workspace: built alone (CARGO_TARGET_DIR of the component), never with E011's
+[workspace]
+
+[profile.dev]
+opt-level = 2
+debug = 0

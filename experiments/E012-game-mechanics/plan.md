@@ -502,3 +502,540 @@ components that share them.
   E012 adds no idea beyond its components.
 - **Watchdogs.** The harness's, the window search's and the reader's limits are E006's. The guard's 3 GB and the disk
   floors are the machine's. All are engineering watchdogs, reported where they fire.
+
+## Amendment 2026-11-03, component `end`: the pause hook's place, a test trigger, and the interface
+
+Written before patch 0005's code.
+
+- **Measured** (round 2's engine `svm-e011-r2int`, lean, seed 1):
+  - The key "space", which the bridge injects like any key, at the kitchen archive's entry 0 (room 33, frame 2728,
+    sentence idle) reaches `pauseGame()` through the engine's pause key (`input.cpp:1416`). The run then makes no
+    reply within the command's 15 s timeout: the pause dialog waits for a backend event that the bridge never sends.
+    The key "x" at the same frame runs 200 frames in 0.03 s.
+  - In this game's scripts (statistics only): SO_PAUSE at 0 sites; SO_RESTART at 9 sites, all in the global script
+    that `VAR_POST_SAVELOAD_SCRIPT` names (it runs after the original save menu, which these runs never open); SO_QUIT
+    at 2 sites, in two global scripts of one room (the research above counted 1).
+  - No input the bridge can inject reaches `restart()`: the restart key (F8, `VAR_RESTART_KEY`) is not an injectable
+    key, and the original GUI is off.
+  - The recorded movies hold the keys "o", "p" and "t" only (the E008 and E011 kitchen archives and B0's).
+- **What changes.**
+  1. The pause hook is at the start of `pauseGame()`, which SO_PAUSE calls, instead of at SO_PAUSE alone. The engine's
+     pause key then ends the run as "pause" too, where today it blocks the run until the command's timeout.
+  2. A test trigger, `SPEEDRUN_TEST_RESTART=<frame>`: the bridge calls `restart()` at the start of that frame, where
+     the engine's restart key calls it from `processKeyboard()`. The restart hook's tests need it, since no input
+     reaches `restart()` here. Unset, nothing changes, and no run sets it.
+  3. `Boxes` is a binary command (0x94, reply 0x12) and a JSON one (`{"cmd": "boxes"}`). A second binary command,
+     `BoxesJson` (0x95, reply `Json`), returns the JSON command's text, as `StateJson` does for the dump. The gate
+     compares the two, and the corners and flags with the room's BOXD block read from the game files.
+  4. With `SPEEDRUN_REPORT_RESTART=1` in `fmi`'s environment, every engine it starts gets it (as `FMI_ENGINE_CUTS`
+     passes `SPEEDRUN_CUTS`). `FMI_BOXES=1` is the switch the walk-box affordances read; off, nothing sends `Boxes`.
+- **Interface,** added to `fmi-core` (E011 Appendix A) byte for byte. After `struct At`:
+
+  ```rust
+  /// E012 (patch 0005): the end reasons that are the game's own end (E012 plan.md, method (5)): the scripts' quit
+  /// (SO_QUIT; the bridge reports "quit" when the engine shuts down), `restart()` and `pauseGame()` (both reported only
+  /// with SPEEDRUN_REPORT_RESTART=1). An End's Status carries one of them in `reason`.
+  pub const GAME_ENDS: [&str; 3] = ["quit", "restart", "pause"];
+
+  /// Whether an end reason is the game's own end (`GAME_ENDS`).
+  pub fn is_game_end(reason: &str) -> bool {
+      GAME_ENDS.contains(&reason)
+  }
+
+  /// E012 (patch 0005): one walk box of the current room as the engine holds it (boxes.cpp `getBoxCoordinates`,
+  /// `getBoxFlags`): the corners in room coordinates and the flags (0x08 x flip, 0x10 y flip, 0x20 player only or
+  /// ignore scale, 0x40 locked, 0x80 invisible).
+  #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+  pub struct WalkBox {
+      pub ul: (i32, i32),
+      pub ur: (i32, i32),
+      pub lr: (i32, i32),
+      pub ll: (i32, i32),
+      pub flags: u8,
+  }
+
+  /// E012 (patch 0005): the Boxes reply, the current room and its walk boxes 0..count-1.
+  #[derive(Clone, PartialEq, Eq, Debug, Default)]
+  pub struct Boxes {
+      pub room: i32,
+      pub boxes: Vec<WalkBox>,
+  }
+  ```
+
+  In `trait Engine`, after `at_many`:
+
+  ```rust
+      /// E012 (patch 0005): the current room's walk boxes at this stop (the Boxes command reads and changes nothing).
+      /// Default: an error, for an engine without the command.
+      fn boxes(&mut self) -> EResult<Boxes> {
+          Err(EngineError::Bridge("boxes: this engine has no Boxes command".into()))
+      }
+  ```
+
+## Amendment 2026-11-03, component `tested`: T exactly, and where a draw's range and share come from
+
+Written before the component's code.
+
+- **T, exactly.** For each action, its record's keys (the line's `pre_keys`) that its precondition holds, each with
+  the precondition's value set (`Record::pre`). An action is an event when its source is `event` (the Esc events
+  too), and an input otherwise (`sentence`, which holds the walks, and `verb`, which holds the dialog lines). An
+  event's own unit's keys are dropped: the slot (`local:N`, `script:N`, `objscript:O`), and the unit's `pos`,
+  `escpos`, `args`, `frozen`, `at` and `esc` keys. The goal's atoms are added. An atom is a (key, value set) pair;
+  the value sets hold the domain's `below` and `above` where the precondition does.
+- **Interface** (fmi-reading, `tested.rs`; no fmi-core addition: fmi-explore takes T as plain atoms and keys, which
+  the try passes it):
+  - `Tested::of(&dyn ReadingSource) -> Tested { atoms: Vec<(Key, Vec<Vec<Val>>)>, inputs: Vec<Key>, events:
+    Vec<Key>, goal: Vec<Key>, counts }`, with `flat()` (every atom as `(Key, Vec<Val>)`) and `keys()`;
+  - `draws(&dyn ReadingSource, action, Option<&DrawGame>) -> Vec<Draw { check, cite, cond, side, why, site, range:
+    Option<(i32, i32)>, share: Option<f64> }>`, one per check whose reason is a random draw.
+- **Why the game is a parameter.** A check names the draw but not its constants (`?(random draw: (getRandomNr) +
+  ...)`, the reader's `arith_at`), so range and share need the scripts. `DrawGame` is the game loaded once per process.
+  Without it, range and share are None.
+- **Range and share** (this replaces "by interval arithmetic, as `costs.rs` prices draws", which follows only the
+  straight code before the test and would leave the else-if chains on a draw unpriced):
+  - The check's cite gives the jump. Each `Local[n]` or `Var[n]` its test reads is followed back to the one assignment
+    that reaches it in the unit. A local is followed through yields (no other script writes it). A variable is
+    followed only through jumps and assignments to other targets. The search fails at the unit's start, an object's
+    verb entry, an Esc point, an op that writes the target in another way, or two reaching assignments.
+  - The test must then depend on exactly one `getRandomNr(n)`, whose `n` resolves to a constant the same way.
+    `range` is (0, n) (`o5_getRandomNr`, `common/random.cpp:62`).
+  - `share` is the fraction of the n + 1 values for which the test takes the check's side, each value run through the
+    resolved arithmetic as the reader's machine does it (int32 arithmetic, comparisons at int16). It is exact under
+    the uniformity that gate R2 checks.
+  - The resolved operand, printed the reader's way (`getRandomNr`, `(x) op ...`), must equal the check's own text.
+    Otherwise range and share are None.
+  - `share` is per check. Checks of one action on the same draw site carry the same `site`; a caller that wants the
+    joint share of such checks combines them.
+- **Measured with T1:** how many draw checks get a range and a share, on 28-33-41-j00065 and on the other kept
+  readings, and the time of `Tested::of`.
+
+## Amendment 2026-11-03, component `targets`: one target per key in detail, and how T2 is run
+
+Written after the component's first code (branch e012-targets, cf364b4, 67ac2ae and 03d4b83, unit tests only),
+before T2 ran. It fills in what section 3 leaves open; nothing in section 3 changes.
+
+- **The group.** For each reached key of a guide kind, the values left after `targets`' own exclusions (the entry's
+  value, tier 0's atom, the values tried from this entry, and for an any-value atom the root's value) split in two:
+  a value the guide names (its atom (k, v) is in R) stays its own target; the others, whose only atom is (k, any),
+  form one target, the key at any of them (`TV::Values`, sorted). A group of one value stays an int target, the same
+  request as before. So the targets' (key, value) pairs are E008's, grouped.
+- **Tier and depth of a group.** Tier 1 when one of its values is not held by the archive, else 2; the depth is the
+  any-value atom's (every value of the group has it).
+- **Records.** A group is tried, deferred and counted as `[k, [v, ...]]` in the try's result, job.json and the log;
+  the archive keeps these records as they are. A tried list leaves out each of its values from later targets of the
+  same entry, so a value reached only later is a target again.
+- **Order.** Tier 0 first, also under E009's rotation (section 3's order); then the targets whose key is in T; then
+  E008's order or E009's rotation. In the rotation a target's counts are the records of its key that cover one of
+  its values (an int record its value, a list each of its values); on int targets alone this is E009's count.
+- **T in the try.** `targets_per_key` takes T as a predicate on the key; the try passes `Tested::of(&reading)`'s keys.
+  Until the try does, the switch gives the groups with no T tier.
+- **Forced targets** (the benchmark's `--targets`) stay single values; a forced value inside a group gets the group's
+  tier and depth.
+- **T2, how.** The 19 readings the 65 tries used were evicted from the archive. They are made again from the start
+  files kept in the archive, with round 1's reader-scope (the kitchen check's) and the arguments the try and the
+  harness gave it (fresh readings; the reach and refine readings with their reach-also start files and fact
+  variables, followed through the attempts' records). A reading made again must have the log's record and action
+  counts. Then, for each try: with the switch off the targets must equal the log's (by tier, their number, the first
+  20), and with it on the targets must have the same (key, value) pairs, with at most one value list per key; var:103
+  must give at most one target per try. Reported per try: targets off and on, the keys grouped, the groups that hold
+  both held and unheld values.
+
+## Amendment 2026-11-03, component afford: its interface, and what section 4 left open
+
+Written before afford's code is committed. Its first runs (M4's form at entries 203, 205 and 4, against M4's probe)
+only checked that the enumeration below is M4's.
+
+- **Interface** (fmi-explore `afford`, no fmi-core change; posted in COORD.md):
+  - `offer(engine, &Obs) -> Offer` (the idle kind, the verb slots and targets with their points), `inputs_of(&Offer)`,
+    and `affordances(engine, &Obs)`, which is the two.
+  - `try_all(engine, &Offer, &[Inputs], tested keys, &dyn Novelty, &AffordCfg, then) -> AffordOut { trials, kept }`.
+    The archive provides `Novelty`: the atoms of T and the room a state holds that no archive entry holds. `then`
+    gives the wait's stops after a trial's idle stop.
+  - `ready(engine, horizon)`: where the trigger's frame is not idle, a fork run with no input to the first idle stop.
+    No input is given on the way, so the offer's movie is the entry's.
+  - Switch `FMI_AFFORD=1`. The try calls the step; afford does not wire itself into the try.
+- **What section 4 left open:**
+  - **Clicks.** Click k comes at the offer's frame + 1 + 2k (M4's timing). A third click comes at the frame after its
+    two-click trial's idle stop.
+  - **Hit points** (M4's). A verb slot gets the first of (2, 2), (4, 3), (1, 1), (0, 0) from its rectangle's top
+    left. An object gets the first point of a 5 × 5 grid over its on-screen box, in quarters from the centre out. An
+    actor gets the first of 20, 30, 10, 40 pixels above its feet, less its elevation. Screen y adds the main
+    screen's topline from the status. Every candidate goes in one AtMany. A point counts when the hit test answers
+    that slot, object or actor. The hit cache is not used: an offer is one round trip.
+  - **Composing.** The two-click trial stops in a sentence idle, and the slot runs (segment on) from the second click's
+    frame on hold a run of the input script (VAR_VERB_SCRIPT's value) and none of the sentence script
+    (VAR_SENTENCE_SCRIPT's) or of an object's verb script. These are the units a click can start, the same three that
+    the bridge's idle rule names as blockers. The third click goes over the targets the hit test finds at that stop.
+  - **Horizon.** The wait's horizon once the try passes it, else W = 1,600 frames after the offer.
+  - **Outcome**, a measurement only: the changes on the world keys against a no-input fork at the same frame (M4's).
+    The world keys are T's keys, the room, every owner and every bit.
+  - **Kept.** Novelty is the archive's. Within the step, an atom kept once is not novel again (IW(1)). A trial whose
+    run ends records the end's reason; the try marks it dead (end's `is_game_end`).
+  - **Walk boxes** come only with end's Boxes (`FMI_BOXES`) and are not in A1-A3.
+- **Gates as run:**
+  - A1: every kept entry is verified from boot in a fresh lean engine. The engine plays the entry's movie and the
+    trial's clicks to the kept frame, and `compare_checkpoint` compares facts, tick, RNG state and actors.
+  - A2: M4's form (fixed horizon, no third click), name for name against the probe's `afford.tsv`: at 203 with 400
+    frames, at 205 and 4 with 600.
+  - A3: the wall per trial of the step in the try's form (idle stops, third clicks) at 203, on round 2's engine
+    (`svm-e011-r2int`, lean, cuts).
+  - Novelty stand-in in the gate runs: (key, value) pairs of T's keys and the room, over every archive entry's last
+    checkpoint. T's keys come from the plan's list for `readings/28-33-41-j00065`.
+
+## Amendment 2026-11-03, component afford: the walk-box clicks (FMI_BOXES)
+
+Written after end pushed Boxes (e012-end 2f6d84a; its fmi-core and fmi-engine commits are cherry-picked unchanged
+into e012-afford) and before afford's code for it.
+
+- **Boxes clicked.** The current room's boxes 1 to count - 1, less those flagged invisible (0x80) or locked (0x40).
+  These are the boxes in which the engine lets the player's walk end: `adjustXYToBeInBox` (actor.cpp:1990-2040) starts
+  at box 1 in a v5 game and skips invisible boxes for the player, and a locked box ends a walk before it
+  (actor.cpp:1284).
+- **The point.**
+  - Candidates: first the box's centre (the mean of its corners), then the points halfway from the centre to each
+    corner (ul, ur, lr, ll).
+  - On screen: x less xstart, y plus the main screen's topline; inside [0, 320) and the main screen's [b, h).
+  - The first candidate counts where the hit test answers the main screen with no object and no actor: a floor
+    click. A box with no such point is not clicked.
+  - These candidates go in the offer's one AtMany.
+- **The inputs.** Only in a sentence idle: one click per such box, named "w<box>", after M4's inputs. With FMI_BOXES
+  off, the inputs are M4's.
+- **Switch.** FMI_BOXES=1, the variable end's `boxes_on` reads. Off, the Boxes command is never sent.
+- **Measured first,** at the probe's 13 entries on end's engine (patches 0001-0005, read only), with the switch off
+  and on:
+  - the boxes, the walkable ones, and the ones with a floor point;
+  - the extra trials, their outcomes, and their kept entries, each verified from boot;
+  - their cost.
+
+  With the switch off, A2 must give the probe's trials again.
+
+## Amendment 2026-11-03, component `archive`: T, novelty, marks, cells and the order in the archive, exactly
+
+Written before the component's code. It fills in what sections 5 and 6 leave open; nothing there changes.
+
+- **Switch.** `FMI_SELECT=progress` when the archive is made. stage.json then keeps `"e012": {"select": "progress"}`,
+  so a resume keeps the mode. Off, nothing below runs, and rows, cells.json, job.json and log lines are E011's.
+- **An atom in the archive.** The archive holds T's atoms without the reading, so a value set's `below` and `above`
+  become the domain's bounds. Atom (k, vs, lo, hi) holds at value v (facts.py's: an absent key is 0) when v is one of
+  vs's ints, or lo is set and v < lo (vs held `below`), or hi is set and v > hi (vs held `above`). This is
+  `atom_holds` through `Domain::label`, exactly. Its text is `k=a|b|<lo|>hi`.
+- **The archive's T.** The goal's atoms, then each committed try's T (result.json "tested"), each atom in the order it
+  first came. T only grows.
+- **Live entries** are every entry but the dead ones. A new entry is dead when its item in result.json's "new" carries
+  `"dead": reason` (`is_game_end`, component end). A dead move with no entry goes in result.json's "dead"
+  (`{"reason", "frame", "events", ...}`, kept as given). The log keeps both. job.json gives the entry's dead moves
+  back to the try.
+- **Novelty.** An atom of T, or a room, is novel for a state when no live entry's last facts hold it. A committed try
+  records `new_t`: the atoms of T, after its own T is merged, that its new live entries hold and no earlier live entry
+  holds. It also records `new_rooms`.
+- **Cells:** [room, owned objects, the texts of T's atoms the entry's last facts hold, sorted]. The atoms on
+  script-control keys are left out: the slot (`script:`, `local:`, `objscript:`), the position (`pos:`, `escpos:`,
+  `at:`, `esc:`), the arguments (`args:`) and the freeze (`frozen:`). E009's idle set is not used here (finding 3).
+  When T grows, every row is keyed again from the entries' last facts, and the counts are counted again from the log.
+- **Counts per cell** (Go-Explore's):
+  - `chosen`: the committed tries from an entry of the cell;
+  - `n`: the tries since one from the cell last gave a `new_t` or `new_rooms` atom (0 then).
+  - A "return differs" line counts in neither (E008).
+- **Exhausted** (result.json "exhausted", decided by the try by section 5's rule): the mark keeps |T| at the commit.
+  The entry is skipped while |T| has not grown since.
+- **The order.**
+  - A cell's candidate is its least live, not exhausted entry in an allowed room, by (−rooms on its chain, −novel
+    atoms held, frame, id).
+  - Rooms on the chain: the distinct rooms of the entries from the root to it.
+  - Novel atoms held: the atoms of T it holds whose least live holder, by (frame, id), is the entry.
+  - Cells are taken by (n, chosen), then their candidates' keys. Busy cells are skipped (E008).
+- **Stagnation:** E009's rule with `new_t` and `new_rooms` in place of `new_r`. After the last committed try that gave
+  one, it fires after as many committed tries as there were selectable cells right after that try, none giving one.
+- **Interface:**
+  - fmi-explore `progress`: `TAtom { key, vals, lo, hi }` with `TAtom::of(Key, &[Val], Option<&Domain>)`,
+    `t_atoms(&[(Key, Vec<Val>)], &Domains)` (for the try: `t_atoms(&Tested::of(&rd).flat(), rd.domains())`),
+    `holds`, `text`, `json`, `of_json`.
+  - result.json (from the try): "tested", the try's T as `[[key, [ints], lo, hi], ...]`; "dead" on a "new" item; the
+    "dead" list.
+  - job.json (from the archive, progress only): "novelty" `{"t": [the archive's T], "rooms": [the live entries'
+    rooms], "seen": {key: [the values the live entries' last facts hold]}}` and "dead", the entry's dead moves.
+  - `Novel::of_job(&job, Option<Vec<TAtom>>)` (the try's T, or the archive's when None). `Novel::novel(&Facts) ->
+    Vec<String>` gives the novel atoms' texts, then `room=R`. `Novel::is_novel(&Facts) -> bool`. afford's `Novelty`
+    and delay's `novel_of` are these two methods. The try writes the two adapters, since the archive's branch does
+    not hold afford's trait.
+  - Log line, progress only: "t_new" (the atoms new to T, as JSON), "t_size", "new_t", "new_rooms", "chosen",
+    "dead_entries", "dead".
+- **S1** (unit tests): the atom's truth against `atom_holds`; cells over T and the control keys; novelty and `new_t`;
+  each key of the order alone; the candidate within a cell; dead and exhausted marks, and an exhausted entry back when
+  T grows; the counts and the order unchanged when the archive is opened again; stagnation; switch off gives E011's
+  files.
+- **S2, how.**
+  - The E011 kitchen archive is copied (stage.json, entries.jsonl, entries, log.jsonl, cells.json, readings.jsonl).
+    The original stays read only.
+  - The copy is opened with the switch on. T is the goal's atoms and the union of T over the kitchen's readings that
+    still exist or can be made again from their start files.
+  - Its log has no `new_t` or `new_rooms`. They are computed from the rows in commit order: the atoms and rooms of a
+    try's new entries that no entry of a lower id holds. Then the counts are counted again.
+  - Reported:
+    - E011's cells against the new ones, and entries per cell;
+    - `chosen` and `n` per cell;
+    - the order's first 20 entries;
+    - where stagnation would have fired;
+    - the novel atoms per room;
+    - the cost of the recount and of job.json's novelty.
+
+## Amendment 2026-11-03, component `try`: the order of a try in detail, and how G0 and G-on are run
+
+Written before try's code is committed. It fills in what "How a try runs" leaves open; nothing there changes.
+
+- **Where.** fmi-explore's `tryjob.rs` runs the order; a new module `mech.rs` holds the switches, the ports, the try's
+  novelty, the commit of the extra entries, the dead moves and the triggers. fmi wires the ports: T from fmi-reading's
+  `tested` (fmi-explore does not depend on fmi-reading), and the wait. `ports.rs` gains `PlayExtras` (T's keys and
+  the try's novelty for the delay fork) and a provided `PlayerHost::player_with`, whose default is `player`.
+- **No switch of its own.** Each step runs under its component's switch (`FMI_WAIT`, `FMI_TARGET_PER_KEY`,
+  `FMI_DELAY_FORK`, `FMI_AFFORD`, `FMI_SELECT=progress`; end's are read where they act). With every switch off the try
+  computes no T and writes no new field: it is round 2's.
+- **The order,** with some switch on:
+  1. Return and reading, as round 2.
+  2. T is `Tested::of(reading)`, flattened, made once per reading in the process. With `FMI_SELECT=progress`,
+     result.json "tested" holds it as the archive's atoms.
+  3. **Wait** (`FMI_WAIT`) on the entry's engine, after the reading. It replaces E009's idle measurement. When the job
+     asks for that measurement, the wait's first frames feed the idle rule and its record is result.json "idle" as
+     before. A stop that holds a novel atom (below) becomes an entry: no events, the stop's checkpoint.
+  4. **Targets.** With `FMI_TARGET_PER_KEY`, the T tier is `Tested::has`.
+  5. **Attempts** as round 2. With `FMI_DELAY_FORK`, the window search gets T's keys and the try's novelty.
+  6. **The goal again.** The tier-0 attempt from the entry may end with status "unsolvable" or "incomplete" (a proof,
+     or a finished search, with no plan) or be deferred by deepening. If the wait has stops, the goal is then attempted
+     from each stop in frame order, before the next target, once per try.
+     - The engine at a stop is a fork of the entry's, run with no input to the stop's frame. It is held to the stop's
+       checkpoint; a difference is an error of the try.
+     - If such an attempt plays, it is the try's played attempt. Its entries come from its checkpoints, as any
+       attempt's. Its target is not recorded twice in "tried", and its probe carries "from_stop".
+  7. **The played attempt's** entries, as round 2. Then:
+     - the delay fork's candidates in its window records, each kept when novel;
+     - a dead move when its run ended in the game's end (stop "engine: engine ended: R" with `is_game_end(R)`): the
+       inputs after its last checkpoint.
+  8. **Affordance step** (`FMI_AFFORD`). Its triggers are the played attempt's stop being Lemma R's R0 or "the same
+     empty window", or no attempt playing (every target dead, deferred or at its limit, or no target).
+     - It runs on the attempt's engine at its end, or on the entry's engine. The kept entries continue the attempt's
+       inputs and checkpoints up to that frame.
+     - The horizon is W, plus, with the wait on, the frames from the offer to the last due frame there.
+     - With the wait on, each trial goes on through the wait's stops (afford's `then`).
+     - An input whose movie equals one of job.json's dead moves for the entry is not tried.
+     - A kept outcome is an entry: the prefix and the clicks, the prefix's checkpoints and the kept one. A trial that
+       ends in the game's end is a dead move.
+  9. **Commit.** The extra entries follow the attempt's in result.json "new", with "how" "wait", "delay" or "afford"
+     and their novel atoms. result.json "dead" lists the dead moves. "e012" is the record: T's counts, the wait, the
+     goal again, the delay fork, the affordance steps, the entries kept by kind, the dead moves and the switches. The
+     CPU record gains "wait" and "afford".
+- **Novelty.** The archive's: job.json's "novelty" with this try's T (`Novel::of_job`). A job without it (made with
+  `FMI_SELECT` off, or B0's) takes the entry's own state as the archive. On top, IW(1) within the try: an atom that an
+  entry the try keeps holds is not novel again in this try. Entries are counted in this order: the wait's stops, the
+  attempt's checkpoints, the delay candidates, the affordance outcomes.
+- **Exhausted** (plan.md 5). Round 2's rule, and with any switch on also: no extra entry is kept, the wait (when on) is
+  static, and the affordance step (when on) offered no input.
+- **Not here.** The due frame as a planned event's window (plan.md 1, last bullet) belongs to fmi-play's window search
+  (delay's `window.rs`).
+- **Gates as run.**
+  - **G0.** B3's 15 tries from round 2's job folders, one resident fmi per sequence, with every E012 switch unset and
+    round 2's switches as round 2 ran them: the fast settings (`b3f/r2-fast`, ON2) and the reference settings
+    (`b3/r2-ref`). Compared to round 2's outputs as `cmp_tries.py` compares, with `fmi check tries` (Rust): per try
+    the attempt's stop, target, frames, replans, inputs and refinements, and every new entry (frame, tick, how,
+    events, every checkpoint's facts).
+  - **G-on.** The same 15 tries in the fast settings with ON3 and every E012 switch on (`FMI_WAIT=1`,
+    `FMI_TARGET_PER_KEY=1`, `FMI_DELAY_FORK=1`, `FMI_AFFORD=1`, `FMI_SELECT=progress`, `SPEEDRUN_REPORT_RESTART=1`,
+    `FMI_BOXES=1`), on end's engine (patches 0001-0005). Every new entry is verified from boot in a fresh lean
+    engine (fmi-engine's `replay::verify`: the entry's movie, its checkpoints and the try's entry's), with
+    `fmi check verify-new`.
+  - **Measured,** off against on: per try the wall and CPU by part (return, read, wait, plan, play, afford), and the
+    mechanisms' counts (stops and kept, goal-again requests, delay windows and candidates, affordance steps with
+    trials and kept, dead moves).
+
+## Amendment 2026-11-03, component `delay`: the fork's rules in the ready search, its bound, its record and the interface
+
+Written before the delay fork's code.
+
+- **Measured** (statistics of readings at hand, not inputs of the system):
+  - Draw checks are on events only. Test (a)'s reading 28-33-41-ta: 8,201 of its 40,773 actions, events of room 28's
+    locals 208-210. Ring(38)'s 33-38-83-85-96 (B3's j00001): 165 of 9,286, events of room 85's local 202. Ring(33)'s
+    28-33-35-38 (B3's j00000): 6,471 of 234,401, events of rooms 28 and 35 and of script 47. No sentence, walk or verb
+    click checks a draw there.
+  - A draw check's reason names the draw but not its range (`?(random draw: ((getRandomNr) * ...) + ...)`): the range
+    and the share need the script, which is `tested`'s `draws`.
+  - No window of B3's 15 tries (b-lama-strict's records) has a member that checks a draw.
+- **Where it acts.** Only in E010's play when ready (`ready`), in a window with an input. The strict search without
+  ready already forks every frame and keeps the least Q.
+- **Trigger.** A record of the window's members (the input's own record and the records after it up to the window's
+  end, any of each one's paths) has a check whose reason is "random draw". The window's draws are listed in its record.
+- **p and K.**
+  - Per draw: its share; else 1/(hi − lo + 1) from its range; else unknown.
+  - Per path, the product over its draws (independent draws); per record, the largest over its paths (a path with no
+    draw gives 1); per window, the product over its records.
+  - K = ceil(ln 0.01 / ln(1 − p)), with a 10⁻⁹ tolerance on the ratio (p = 0.9 gives 2), and K = 1 for p = 1.
+  - When some draw has neither share nor range, K is not computed: the record says `"k_max": null`, the fork keeps
+    its rules below, and the ready search's own bound (294 failed tries) is the only one.
+- **The tries.** k = the try's first input frame minus that of the window's first try that issued an input. Tries
+  that issued no input, duplicates and cancelled tries get no k.
+  - A try that ends in success or the goal from the plan's records **matches the plan's branch**: the first in fork
+    order is chosen.
+  - A deviation is not chosen while k < K: it is kept as an outcome and the next try is forked at the frame E010 gives
+    a failed try.
+  - A try with k ≥ K (forked in parallel before the bound was known) is not counted.
+- **Refuted.** When every try left would have k ≥ K and none matched:
+  - the first deviation among the tries is chosen, which is E010's choice (the first end point), and the harness
+    replans from the observed state;
+  - with no deviation, the window ends at once ("delay fork: the plan's branch refuted ..."), an empty window: the
+    harness replans with the window's cause.
+- **Record.** The window record's `"delay"` (only with `FMI_DELAY_FORK=1`):
+  - every window: `"rng"`, the random calls per frame over the parent's frames, counted exactly by stepping xorshift32
+    from one Status `rng` to the next (frames, calls, least, most, histogram);
+  - a triggered window: `"draws"` (record, check, cite, side, range, share), `"p"`, `"k_max"`, `"first"`, `"chosen"`
+    (k or null), `"outcomes"` ([k, digest, novel, outcome] per try with a k), `"refuted"`, `"candidates"`.
+- **Outcome digest and candidates.**
+  - A try's end state: its last checkpoint when it is an end point; otherwise, when it issued its input, a full dump
+    taken where it stopped (one more observation per try of a triggered window).
+  - The digest is a hash of the end state's facts on the tested keys (`Search.tested_keys`, given by the try; unset:
+    the window's own keys, those of its tracked records, the goal and the room).
+  - A candidate is a try other than the chosen one, with an end state, whose digest differs from the chosen try's and
+    from every earlier candidate's, and whose novelty is not false (`Search.novel_of`, given by the try: archive
+    novelty over T and rooms; unset: null). It carries its inputs (the attempt's movie up to the window, then its own
+    events, absolute frames) and its end checkpoint. The try commits it as an entry (A0, Lemma C, verified from boot
+    like any entry).
+- **Draws from `tested`.** `Search.draws_of`, given by the try or the integration from `tested`'s `draws`; unset: the
+  checks whose reason is "random draw", with no range and no share.
+- **Per try** (`Search.summary()`'s `"delay"`): windows triggered, tries with a k, chosen k's, refutations,
+  candidates, and the calls per frame over every window's parent frames.
+- **Gates, as run.**
+  - R2: from state 3182679328, the outputs `(s · 0xDEADBF03) mod n` over 100,000 successive calls, for n = 1..233
+    (every range 0..max of M6 has n = max + 1 ≤ 233), at call strides 1-10 (M1's calls per frame). χ² per n at 1%,
+    and the family of 232 non-trivial n per stride at 1% (Bonferroni). The gate is the family test.
+  - R3: the fixture of forced branches is the window search's own resolution of tries (fork order, parallel tries,
+    duplicates, tries without an input, deviations, tries past K) with each try's outcome set by a table; over
+    every table up to 6 tries and 2,000 random longer ones, the record's chosen k equals the least k < K whose try
+    matches, or null and refuted. Also on the engine, below.
+  - R1: test (a)'s three plans played on round 2's lean engine in ready mode with the fork on every input window
+    (`Search.delay_force_p`, a test setting no run sets, p = 1/2, 1/4 and 1/21). Every candidate and the attempt's
+    checkpoints verify from boot with 0 differences, and each record's chosen k is the least k with a matching try.
+  - G0 for this switch: with `FMI_DELAY_FORK` unset, test (a)'s play fixtures (strict and ready) and B3's 15 tries
+    in the fast settings give round 2's records; with it set, B3's tries give the same records but the new
+    `"delay"` field.
+- **Interface,** added to `fmi-core` (E011 Appendix A) byte for byte, at the end of the play section:
+
+  ```rust
+  /// A random draw one of a record's checks reads (E012 `tested`, `draws(&Reading, action)`): the check's index in the
+  /// record's checks (the reading line's "checks"), the draw's range of values when interval arithmetic over the
+  /// script gives it, and the share of that range on the record's side of the check (the planned outcome's p).
+  #[derive(Clone, PartialEq, Debug)]
+  pub struct Draw {
+      pub check: usize,
+      pub range: Option<(i32, i32)>,
+      pub share: Option<f64>,
+  }
+  ```
+- **Prediction.** R1-R3 pass. With the switch on, no window of B3's tries is triggered and the calls per frame are 1
+  in rooms 33 and 38 and 2-6 in room 28 (M1). On test (a) with the fork forced, k = 0 is chosen in windows 1, 2 and 4
+  (their first try succeeds); window 3 (293 failed tries before the chosen one in the strict search) is refuted for
+  every p tried and its harness replans.
+
+## Amendment 2026-11-03, the `wait` component (branch e012-wait): its interface, before its code
+
+- **Where the plan's words are made exact** (ScummVM's `scumm.cpp` 2821 and 3110-3134, `script.cpp` 1535):
+  1. **Δ.** The engine's frame delta is var 19 (VAR_TIMER_NEXT) at the stop, at least 1. A paused delay goes down by
+     at most 15 in a frame. Only a slot whose status is exactly ssPaused (1) is lowered; a frozen one has 0x80 set.
+  2. **Due frame.** In SCUMM v5 the woken slot runs before the frame's decision point (`runAllScripts` comes before
+     `checkExecVerbs`). So a slot paused with delay D at the stop of frame f runs in frame f + floor(D / Δ) + 1, and
+     its effect is in that frame's state.
+  3. **H re-read at each stop.** The stop's own due frames replace the earlier ones: a slot that is no longer paused
+     has no due frame. The wait ends at max(last stop, last due frame) + W.
+  4. **Truth.** An atom (key, values) holds when the harness's view of the key is in its values: `start::view`
+     (replay.view), pos: and escpos: from the at: and esc: facts, every value labelled by its domain. Unobserved keys
+     (args:, saved:, actorroom:) are never stops.
+- **What the wait gives the try.**
+  - Each stop carries its checkpoint (facts, tick, rng, actors, as the harness makes them), so the try can make it an
+    entry. The wait itself makes and keeps no entry: novelty is the try's and the archive's.
+  - With `idle_frames` > 0, E009's idle rule runs on the wait's first `idle_frames` frames. Those are the idle
+    measurement's frames and changes, so its record is the idle measurement's.
+- **Engineering watchdog.** A wait's frames have a watchdog (`FMI_WAIT_MAX_FRAMES`). Where it fires, the wait's end is
+  `Watchdog`, and it is reported.
+- **Split with the other components.**
+  - `due` goes into fmi-core, so that fmi-play's window search (`delay`'s window.rs) can give a paused slot's planned
+    event its due frame. This branch does not change the window search.
+  - The wait's place in the try (after the reading, in place of the idle measurement) is the `try` component's
+    (tryjob.rs).
+  - This branch adds `fmi_explore::wait` and `fmi check wait`, which runs W1-W4.
+  - Until `tested` lands, the check computes T as section 1 defines it, from the reading's records: the union of the
+    preconditions' atoms, less each event's atoms on its own unit, plus the goal's. At integration `Tested::of`
+    replaces it.
+- **The gates' inputs.**
+  - Entries 203, 205 and 225 of the kitchen archive (room 28): T from the kept reading 28-33-41-j00065.
+  - Entry 4 (room 38): T from a fresh reading of its job's scope (33, 38, 83, 85, 96) from its state, since that
+    reading is evicted.
+  - The entries are rebuilt from boot from the read-only archive, as the plan's measurements were.
+
+### Appendix A additions: `fmi-core`, the wait
+
+Added at the end of fmi-core's `lib.rs` (the constants and functions) and to the `Engine` trait after `step_changes`
+(the provided method).
+
+```rust
+// --- E012: time passing (plan.md section 1, the wait component) ---------------------------------------------------
+
+/// A slot's status while it waits out a delay (script.h ssPaused); a frozen slot has 0x80 set on top of it.
+pub const SS_PAUSED: i32 = 1;
+/// VAR_TIMER_NEXT (var 19 in SCUMM v5): the ticks the engine's next frame lasts.
+pub const VAR_TIMER_NEXT: usize = 19;
+/// The most a paused slot's delay goes down in one frame (scumm.cpp scummLoop: `if (delta > 15) delta = 15;`).
+pub const DELAY_STEP_MAX: i64 = 15;
+
+/// The ticks the next frame takes off every paused slot's delay: the stop's var 19 (the main loop's delta is
+/// VAR_TIMER_NEXT, at least 1), at most DELAY_STEP_MAX (scummLoop's cap before decreaseScriptDelay). None when the
+/// dump has no var 19.
+pub fn delay_step(o: &Obs) -> Option<i64> {
+    let v = *o.vars.get(VAR_TIMER_NEXT)? as i64;
+    Some(v.clamp(1, DELAY_STEP_MAX))
+}
+
+/// The frame in which the dump's slot `slot` runs again, by the engine's own rule (script.cpp decreaseScriptDelay):
+/// each frame lowers the delay of every slot whose status is exactly SS_PAUSED (not a frozen one) by the frame's
+/// delta, and the slot runs in the frame its delay goes below 0, before that frame's decision point (v5:
+/// runAllScripts before checkExecVerbs). So the stop's frame + floor(delay / delta) + 1. None for a slot not in the
+/// dump or not paused. Exact while var 19 keeps its value.
+pub fn due(o: &Obs, slot: i32) -> Option<u64> {
+    let s = o.slots.iter().find(|s| s.slot == slot)?;
+    if s.status != SS_PAUSED {
+        return None;
+    }
+    let d = delay_step(o)?;
+    Some(o.frame + (i64::from(s.delay.max(0)) / d) as u64 + 1)
+}
+```
+
+```rust
+    /// The wait move's run (E012, plan.md section 1): frames with no new input from this stop, one at a time. After
+    /// each, `each` gets its status and the facts' changes from the frame before (as `step_changes(1)` gives them)
+    /// and returns true to stop there. At most `frames` frames. Returns the last status and the frames run. Default:
+    /// one `step_changes(1)` per frame; a provider may run the same frames in fewer round trips.
+    fn wait(&mut self, frames: u64, each: &mut dyn FnMut(&Status, &[(Key, Val, Val)]) -> bool) -> EResult<(Status, u64)> {
+        let mut st = self.status().clone();
+        let mut n = 0;
+        while n < frames {
+            let (s, ch) = self.step_changes(1)?;
+            n += 1;
+            st = s;
+            if each(&st, &ch) {
+                break;
+            }
+        }
+        Ok((st, n))
+    }
+```
+
+## Amendment 2026-11-03 (2), component `delay`: no K, no change of choice
+
+Written after the first gate runs, before the code it changes.
+
+- **Why.** `tested`'s T1 resolves none of the draw sites of the kitchen reading j00065 (0 of 6: room 28's animation
+  loops) and 27 of 37 on the k = 2 scope. In a window whose draws have no share and no range, the first amendment let
+  the fork skip deviations up to the ready search's bound: 294 failed tries or the window's 3,600 frames, the cost of
+  the empty windows that the plan sets out to cut (55% of the kitchen check's wall). In the kitchen every triggered
+  window would be of that kind.
+- **What changes.** When K is not computed, the fork changes no choice: the first end point in the order of tries is
+  chosen, as E010 chooses it. The record keeps the draws, `"k_max": null`, and every try's k and outcome up to the
+  choice; `"chosen"` is the k of a matching try, null when the choice is a deviation. With K computed, the first
+  amendment's rules hold unchanged.
+- **Gate R3** gains the case: with no K, the chosen try is the first end point in fork order.

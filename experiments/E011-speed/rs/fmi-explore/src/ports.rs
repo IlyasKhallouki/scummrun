@@ -127,9 +127,23 @@ pub struct WindowCfg {
     pub frame_costs: Value,
 }
 
+/// E012's settings of an attempt's window search for the delay fork (component delay, FMI_DELAY_FORK; plan.md 2),
+/// from the try: T's keys (the outcome digest's keys) and the try's novelty of an end state (None: unknown). Default:
+/// none, the window search's own.
+#[derive(Clone, Default)]
+pub struct PlayExtras {
+    pub tested_keys: Option<Arc<Vec<fmi_core::Key>>>,
+    pub novel_of: Option<Arc<dyn Fn(&fmi_core::Facts) -> Option<bool> + Send + Sync>>,
+}
+
 /// Makes the window search of an attempt (provider: play).
 pub trait PlayerHost: Send + Sync {
     fn player(&self, cfg: &WindowCfg) -> Box<dyn WindowPlayer>;
+    /// The attempt's window search with E012's settings (`PlayExtras`). Default: `player`, the settings unused.
+    fn player_with(&self, cfg: &WindowCfg, x: &PlayExtras) -> Box<dyn WindowPlayer> {
+        let _ = x;
+        self.player(cfg)
+    }
     /// The attempt's player when its attempt has ended (E011 round 2, FMI_PLAYER_DONE). Default: freed on a thread of
     /// its own, off the try's path (the window search's reading data and game: 20-90 ms of frees). A provider may keep
     /// what the next player can use.

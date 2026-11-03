@@ -722,6 +722,35 @@ pub struct At {
     pub verb_slot: i32,
 }
 
+/// E012 (patch 0005): the end reasons that are the game's own end (E012 plan.md, method (5)): the scripts' quit
+/// (SO_QUIT; the bridge reports "quit" when the engine shuts down), `restart()` and `pauseGame()` (both reported only
+/// with SPEEDRUN_REPORT_RESTART=1). An End's Status carries one of them in `reason`.
+pub const GAME_ENDS: [&str; 3] = ["quit", "restart", "pause"];
+
+/// Whether an end reason is the game's own end (`GAME_ENDS`).
+pub fn is_game_end(reason: &str) -> bool {
+    GAME_ENDS.contains(&reason)
+}
+
+/// E012 (patch 0005): one walk box of the current room as the engine holds it (boxes.cpp `getBoxCoordinates`,
+/// `getBoxFlags`): the corners in room coordinates and the flags (0x08 x flip, 0x10 y flip, 0x20 player only or
+/// ignore scale, 0x40 locked, 0x80 invisible).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct WalkBox {
+    pub ul: (i32, i32),
+    pub ur: (i32, i32),
+    pub lr: (i32, i32),
+    pub ll: (i32, i32),
+    pub flags: u8,
+}
+
+/// E012 (patch 0005): the Boxes reply, the current room and its walk boxes 0..count-1.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Boxes {
+    pub room: i32,
+    pub boxes: Vec<WalkBox>,
+}
+
 /// One slot run (speedrun_explain.cpp, the "runs" reply's rows), field for field.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct Run {
@@ -885,6 +914,11 @@ pub trait Engine: Send {
     fn at_many(&mut self, pts: &[(i32, i32)]) -> EResult<Vec<At>> {
         pts.iter().map(|&(x, y)| self.at(x, y)).collect()
     }
+    /// E012 (patch 0005): the current room's walk boxes at this stop (the Boxes command reads and changes nothing).
+    /// Default: an error, for an engine without the command.
+    fn boxes(&mut self) -> EResult<Boxes> {
+        Err(EngineError::Bridge("boxes: this engine has no Boxes command".into()))
+    }
     /// Runs `frames` frames with no new input (a run to the frame `frames` after this stop) and returns the stop's
     /// status and the facts' changes from this stop to it: (key, old, new) for every key whose value differs, absent
     /// 0, in `Key` order (`Facts::diff` of the facts before and after). Default: today's calls; a provider that
@@ -895,6 +929,23 @@ pub trait Engine: Send {
         let st = self.run(&RunSpec { frame: Some(to), ..Default::default() })?;
         let after = self.facts()?;
         Ok((st, before.diff(&after)))
+    }
+    /// The wait move's run (E012, plan.md section 1): frames with no new input from this stop, one at a time. After
+    /// each, `each` gets its status and the facts' changes from the frame before (as `step_changes(1)` gives them)
+    /// and returns true to stop there. At most `frames` frames. Returns the last status and the frames run. Default:
+    /// one `step_changes(1)` per frame; a provider may run the same frames in fewer round trips.
+    fn wait(&mut self, frames: u64, each: &mut dyn FnMut(&Status, &[(Key, Val, Val)]) -> bool) -> EResult<(Status, u64)> {
+        let mut st = self.status().clone();
+        let mut n = 0;
+        while n < frames {
+            let (s, ch) = self.step_changes(1)?;
+            n += 1;
+            st = s;
+            if each(&st, &ch) {
+                break;
+            }
+        }
+        Ok((st, n))
     }
 }
 
@@ -1172,6 +1223,47 @@ pub enum PlayOutcome {
 pub trait Player: Send {
     fn observe(&mut self, ctx: &PlanCtx<'_>, ps: &mut PlayState) -> EResult<()>;
     fn play_plan(&mut self, ctx: &PlanCtx<'_>, ps: &mut PlayState, n_plan: u32) -> PlayOutcome;
+}
+
+/// A random draw one of a record's checks reads (E012 `tested`, `draws(&Reading, action)`): the check's index in the
+/// record's checks (the reading line's "checks"), the draw's range of values when interval arithmetic over the
+/// script gives it, and the share of that range on the record's side of the check (the planned outcome's p).
+#[derive(Clone, PartialEq, Debug)]
+pub struct Draw {
+    pub check: usize,
+    pub range: Option<(i32, i32)>,
+    pub share: Option<f64>,
+}
+
+// --- E012: time passing (plan.md section 1, the wait component) ---------------------------------------------------
+
+/// A slot's status while it waits out a delay (script.h ssPaused); a frozen slot has 0x80 set on top of it.
+pub const SS_PAUSED: i32 = 1;
+/// VAR_TIMER_NEXT (var 19 in SCUMM v5): the ticks the engine's next frame lasts.
+pub const VAR_TIMER_NEXT: usize = 19;
+/// The most a paused slot's delay goes down in one frame (scumm.cpp scummLoop: `if (delta > 15) delta = 15;`).
+pub const DELAY_STEP_MAX: i64 = 15;
+
+/// The ticks the next frame takes off every paused slot's delay: the stop's var 19 (the main loop's delta is
+/// VAR_TIMER_NEXT, at least 1), at most DELAY_STEP_MAX (scummLoop's cap before decreaseScriptDelay). None when the
+/// dump has no var 19.
+pub fn delay_step(o: &Obs) -> Option<i64> {
+    let v = *o.vars.get(VAR_TIMER_NEXT)? as i64;
+    Some(v.clamp(1, DELAY_STEP_MAX))
+}
+
+/// The frame in which the dump's slot `slot` runs again, by the engine's own rule (script.cpp decreaseScriptDelay):
+/// each frame lowers the delay of every slot whose status is exactly SS_PAUSED (not a frozen one) by the frame's
+/// delta, and the slot runs in the frame its delay goes below 0, before that frame's decision point (v5:
+/// runAllScripts before checkExecVerbs). So the stop's frame + floor(delay / delta) + 1. None for a slot not in the
+/// dump or not paused. Exact while var 19 keeps its value.
+pub fn due(o: &Obs, slot: i32) -> Option<u64> {
+    let s = o.slots.iter().find(|s| s.slot == slot)?;
+    if s.status != SS_PAUSED {
+        return None;
+    }
+    let d = delay_step(o)?;
+    Some(o.frame + (i64::from(s.delay.max(0)) / d) as u64 + 1)
 }
 
 #[cfg(test)]

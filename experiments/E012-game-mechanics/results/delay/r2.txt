@@ -1,0 +1,12 @@
+R2 stride 1: n = 2..233, 2 of 232 under 1% (expected 2.3), least p 0.00250 at n = 63; family (Bonferroni 1%): pass
+R2 stride 2: n = 2..233, 2 of 232 under 1% (expected 2.3), least p 0.00692 at n = 224; family (Bonferroni 1%): pass
+R2 stride 3: n = 2..233, 7 of 232 under 1% (expected 2.3), least p 0.00068 at n = 136; family (Bonferroni 1%): pass
+R2 stride 4: n = 2..233, 1 of 232 under 1% (expected 2.3), least p 0.00855 at n = 194; family (Bonferroni 1%): pass
+R2 stride 5: n = 2..233, 2 of 232 under 1% (expected 2.3), least p 0.00013 at n = 162; family (Bonferroni 1%): pass
+R2 stride 6: n = 2..233, 2 of 232 under 1% (expected 2.3), least p 0.00440 at n = 73; family (Bonferroni 1%): pass
+R2 stride 7: n = 2..233, 9 of 232 under 1% (expected 2.3), least p 0.00101 at n = 176; family (Bonferroni 1%): pass
+R2 stride 8: n = 2..233, 3 of 232 under 1% (expected 2.3), least p 0.00385 at n = 216; family (Bonferroni 1%): pass
+R2 stride 9: n = 2..233, 2 of 232 under 1% (expected 2.3), least p 0.00235 at n = 169; family (Bonferroni 1%): pass
+R2 stride 10: n = 2..233, 1 of 232 under 1% (expected 2.3), least p 0.00657 at n = 84; family (Bonferroni 1%): pass
+R2: PASS
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 10.23s
