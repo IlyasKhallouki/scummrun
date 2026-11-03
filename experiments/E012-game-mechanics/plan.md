@@ -1354,3 +1354,39 @@ in 168 s:
 
 **Not in the merged build.** The due-frame window of section 1 (a paused slot's planned event gets its due frame in
 the window search): no component built it. The kitchen rerun's window search is E010's, with the delay fork.
+
+## Amendment 2026-11-03, the kitchen rerun: how it runs
+
+Written before the rerun starts. It fills in what "Runs" leaves open; nothing there changes.
+
+- **Build.** Branch e012 at ba63331 (the integration), built by `integrate/build.sh` into its own target folder. The
+  engine is end's `svm-e012-end` (patches 0001-0005), read only. E011's two fixes for an archive made from the boot are
+  in it: the pool boots the root at frame 0 with no input to the first idle stop, and init accepts the root as a fork
+  of the kept idle boot.
+- **Settings** (`kitchen/run.sh`), as "Runs" lists them:
+  - `fmi explore init` to owner:566 = 1 with E009's copy of E008's guides (`kitchen.json`), the 10 rooms of the k = 2
+    scope (28, 29, 33, 34, 35, 38, 41, 83, 85, 96), b = 2, E009's switches (`--idle-frames 1600 --rotate
+    --evict-by-size --reuse-nonfacts`), play when ready and commit as finished, and the falsifier `--stop-jobs 80`;
+  - `fmi explore run --workers 2 --search fd --tail` with ON3 (round 2's switches with the Rust lama-first-costs, the
+    no-plan proofs and deepening at L0 = 120 s) and every E012 switch (`integrate/env.sh`'s E12ON, `FMI_READER_LIB`
+    included).
+- **What "Runs" does not name,** set as the integration's driver run set it:
+  - the job memo is the resident store alone (`FMI_MEMO` unset);
+  - the reading cache, the plan store, the pool and the planner's temporary files are under
+    `/var/tmp/fast-mi/e012-archives/run`;
+  - `E008_DISK_PATH=/var/tmp`, with the disk floor `E008_FLOOR_GB=5`;
+  - `FMI_PLAN_TIME` is unset: an attempt's first plan has deepening's limit, and its replans E006's.
+- **b stays 2.** In the integration's driver run, fmi with the reader resident peaked at 2.9 GB, and MemAvailable
+  is 10-12 GB with the desktop running. A second job starts only while MemAvailable is at least 7 GB
+  (`E008_MEM_SECOND_GB`).
+- **The heavy lock.** The driver takes it for each job whose scope has 5 rooms or more, as in E011's check. The run as
+  a whole runs under the guard.
+- **Not in the build:** the due-frame window (integration results). The rerun's window search is E010's, with the
+  delay fork.
+- **Stop rules** unchanged: E009's, with stagnation over T and rooms (`FMI_SELECT=progress`, the archive amendment),
+  and the falsifier. Archive's S2 found that this stagnation rule would have fired after the 4th try of E011's check.
+  The rule is kept as planned, and the rerun shows whether it fires once the layer adds its entries.
+- **Verify** (`kitchen/verify.sh`): the goal entry through `fmi explore verify` in a fresh lean engine (end's), and
+  through E008's `explore.py verify` on svm-w3b, on a copy of the archive's files.
+- **Reported** from the archive's files by a Rust report over its tries (`fmi-checks`' `kitchen-report`, written after
+  the run starts; it reads files only): what "Runs" lists, against E011's table and the prediction.
