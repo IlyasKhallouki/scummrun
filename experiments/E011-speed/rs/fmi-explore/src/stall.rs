@@ -167,7 +167,7 @@ pub fn stop_kind(stop: &str) -> String {
         return "Lemma 2's premise".into();
     }
     if let Some(r) = stop.strip_prefix("engine: engine ended: ") {
-        return format!("engine ended: {}", end_reason_of(r));
+        return format!("engine ended: {}", fmi_core::end_base(end_reason_of(r)));
     }
     if stop.starts_with("engine: ") {
         return "engine error".into();
@@ -295,6 +295,43 @@ pub struct Account {
 }
 
 const ATTEMPT_HOWS: [&str; 3] = ["checkpoint", "end", "delay"];
+/// An affordance step's E014 end entry (the part `part_of_item` names; never an archive "how").
+const AFFORD_END: &str = "afford: end";
+
+/// A result.json "new" item's part (the stall amendment (2)): its "how"; for E014's end entries (an extra of how
+/// "end", `mech::end_extra`: only the extras' items carry "novel") the part whose dead move the same end made (the
+/// move at the same frame with a game end), the attempt's when there is none.
+fn part_of_item(n: &Value, dead: &[Value]) -> String {
+    let how = n["how"].as_str().filter(|h| !h.is_empty()).unwrap_or("checkpoint");
+    if how != "end" || n.get("novel").is_none() {
+        return how.to_string();
+    }
+    let f = n["frame"].as_u64();
+    let by = dead
+        .iter()
+        .find(|d| f.is_some() && d["frame"].as_u64() == f && fmi_core::is_game_end(d["reason"].as_str().unwrap_or("")))
+        .and_then(|d| d["how"].as_str());
+    match by {
+        Some("wait") => "wait",
+        Some("afford") => AFFORD_END,
+        Some("free") => "free",
+        _ => "end",
+    }
+    .to_string()
+}
+
+/// The affordance step an item belongs to, given the afford items up to it (`c`) and each step's kept count: the step
+/// whose kept items reach the c-th (an end entry: the step of the afford items before it); the last step past them.
+fn step_of(kept: &[usize], c: usize) -> Option<usize> {
+    let mut cum = 0usize;
+    for (s, n) in kept.iter().enumerate() {
+        cum += n;
+        if cum >= c {
+            return Some(s);
+        }
+    }
+    kept.len().checked_sub(1)
+}
 
 /// Seconds by verdict, or the whole part as one row: (label: verdict) rows, the part's other seconds as (label:
 /// other); refusals are refused input, the rest `taken`.
@@ -319,16 +356,31 @@ fn verdict_rows(rows: &mut Vec<(Row, Class, f64)>, phase: &str, label: &str, who
 /// The amendment's attribution of one try: every part once, the rest the wall less the parts.
 pub fn account(t: &TryIn) -> Account {
     let r = t.result;
-    let hows: Vec<String> = r["new"]
-        .as_array()
-        .map(|a| a.iter().map(|n| n["how"].as_str().filter(|h| !h.is_empty()).unwrap_or("checkpoint").to_string()).collect())
-        .unwrap_or_default();
+    let dead: &[Value] = r["dead"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+    let hows: Vec<String> = r["new"].as_array().map(|a| a.iter().map(|n| part_of_item(n, dead)).collect()).unwrap_or_default();
     let flag = |k: usize| t.new.get(k).copied().unwrap_or(false);
     let any_of = |hs: &[&str]| hows.iter().enumerate().any(|(k, h)| hs.contains(&h.as_str()) && flag(k));
     let attempt_new = any_of(&ATTEMPT_HOWS);
     let wait_new = any_of(&["wait"]);
     let free_new = any_of(&["free"]);
-    let afford_flags: Vec<bool> = hows.iter().enumerate().filter(|(_, h)| h.as_str() == "afford").map(|(k, _)| flag(k)).collect();
+    let steps: &[Value] = r["e012"]["afford"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+    let kept: Vec<usize> = steps.iter().map(|a| a["kept"].as_u64().unwrap_or(0) as usize).collect();
+    // each step's entries: the next `kept` items of how "afford", and the end entries its trials made
+    let mut step_new = vec![false; steps.len()];
+    let mut c = 0usize;
+    for (k, h) in hows.iter().enumerate() {
+        let s = match h.as_str() {
+            "afford" => {
+                c += 1;
+                step_of(&kept, c)
+            }
+            AFFORD_END => step_of(&kept, c),
+            _ => None,
+        };
+        if let Some(s) = s {
+            step_new[s] |= flag(k);
+        }
+    }
     let any_new = (0..hows.len()).any(flag);
     let free = t.kind == "free";
     let probes: Vec<Value> = r["probes"].as_array().cloned().unwrap_or_default();
@@ -431,46 +483,32 @@ pub fn account(t: &TryIn) -> Account {
         };
         rows.push((row("plan", outcome), model, (total - inner).max(0.0)));
     }
-    // the affordance steps: each step's entries are the next `kept` of how "afford"
-    let mut k = 0usize;
-    for a in e12["afford"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
-        let n = a["kept"].as_u64().unwrap_or(0) as usize;
-        let step_new = afford_flags.iter().skip(k).take(n).any(|x| *x);
-        k += n;
+    // the affordance steps
+    for (s, a) in steps.iter().enumerate() {
         let why = numbers_n(a["why"].as_str().unwrap_or("?"));
         let whole = match a["offer"]["idle"].as_str() {
             Some(kind) => format!("{why}, {kind}"),
             None => why.clone(),
         };
-        let taken = if step_new { Class::Productive } else { Class::InterfaceNoYield };
+        let taken = if step_new[s] { Class::Productive } else { Class::InterfaceNoYield };
         verdict_rows(&mut rows, "afford", &why, &whole, f64_of(&a["step_seconds"]), a["verdict_s"].as_object(), taken);
     }
-    // a free try's part (free's record: its offer points, its delays, its wall)
+    // a free try's step (free's record, the stall amendment (2)): each offer point ("at"), the delays, the rest of it
     let fr = &r["free"];
     if fr.is_object() {
         let taken = if free_new { Class::Productive } else { Class::InterfaceNoYield };
         let mut used = 0.0;
-        let points = fr["points"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
-        for p in points {
+        for p in fr["at"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
             let s = f64_of(&p["seconds"]);
             used += s;
-            let label = format!("{}, level {}", numbers_n(p["where"].as_str().unwrap_or("?")), p["level"].as_i64().unwrap_or(1));
-            let vs = p["verdict_s"].as_object().or_else(|| p["record"]["verdict_s"].as_object());
-            verdict_rows(&mut rows, "free", &label, &label, s, vs, taken);
+            let label = format!("{}, level {}", numbers_n(p["at"].as_str().unwrap_or("?")), p["level"].as_i64().unwrap_or(1));
+            verdict_rows(&mut rows, "free", &label, &label, s, p["step"]["verdict_s"].as_object(), taken);
         }
-        if fr["delays"].is_object() {
-            let s = f64_of(&fr["delays"]["seconds"]);
+        if let Some(s) = fr["delays"]["seconds"].as_f64() {
             used += s;
             rows.push((row("free", "delays"), taken, s));
         }
-        let whole = fr["wall"].as_f64().or_else(|| fr["seconds"].as_f64());
-        if let Some(w) = whole {
-            if points.is_empty() && !fr["delays"].is_object() {
-                rows.push((row("free", ""), taken, w));
-            } else {
-                rows.push((row("free", "other"), taken, (w - used).max(0.0)));
-            }
-        }
+        rows.push((row("free", "other"), taken, (f64_of(&fr["seconds"]) - used).max(0.0)));
     }
     // the rest
     let wall = f64_of(&r["wall_s"]);
@@ -1211,20 +1249,90 @@ mod tests {
     fn a_free_try() {
         let mut r = base(25.0);
         r["e012"]["afford"] = Value::Null;
-        r["free"] = json!({"points": [{"where": "entry", "level": 1, "seconds": 8.0, "record": {"verdict_s": {"ignored": 2.0, "taken": 5.0}}},
-                                      {"where": "stop 4310", "level": 1, "seconds": 4.0}],
-                           "delays": {"seconds": 2.0}, "wall": 15.0});
+        // free's record (COORD, IFACE free): the offer points under "at", the delays' seconds, the whole step's seconds
+        r["free"] = json!({"offers": 2, "points": 3, "trials": 40, "kept": {"1": 1}, "delays": {"counted": 3, "seconds": 2.0},
+                           "seconds": 15.0,
+                           "at": [{"at": "entry", "frame": 300, "level": 1, "seconds": 8.0, "step": {"verdict_s": {"ignored": 2.0, "taken": 5.0}},
+                                   "delays": {"seconds": 2.0}},
+                                  {"at": "stop", "frame": 4310, "level": 1, "seconds": 3.0, "step": {"ready": true}},
+                                  {"at": "kept", "frame": 320, "level": 2, "seconds": 1.0, "step": {"ready": false}}]});
         r["new"] = json!([{"how": "wait"}, {"how": "free"}]);
         let a = account(&TryIn { result: &r, runs: &runs(), new: &[false, false], outcome: "ok", kind: "free" });
         assert!((sum(&a.rows) - 25.0).abs() < 1e-9);
         assert!((secs(&a.rows, Class::Refused) - 2.0).abs() < 1e-9);
-        assert!(a.rows.iter().any(|x| x.0 == row("free", "stop N, level 1")));
+        assert!(a.rows.iter().any(|x| x.0 == row("free", "entry, level 1: taken") && (x.2 - 5.0).abs() < 1e-9));
+        assert!(a.rows.iter().any(|x| x.0 == row("free", "entry, level 1: other") && (x.2 - 1.0).abs() < 1e-9));
+        assert!(a.rows.iter().any(|x| x.0 == row("free", "stop, level 1") && (x.2 - 3.0).abs() < 1e-9));
+        assert!(a.rows.iter().any(|x| x.0 == row("free", "kept, level 2") && (x.2 - 1.0).abs() < 1e-9));
+        assert!(a.rows.iter().any(|x| x.0 == row("free", "delays") && (x.2 - 2.0).abs() < 1e-9));
         assert!(a.rows.iter().any(|x| x.0 == row("free", "other") && (x.2 - 1.0).abs() < 1e-9));
         // nothing new: read and T are "interface, no yield", and so is the try's class (the most seconds)
         assert_eq!(a.stop_class, Class::InterfaceNoYield);
-        assert!((secs(&a.rows, Class::InterfaceNoYield) - (10.5 + 1.0 + 5.0 + 1.0 + 4.0 + 2.0 + 1.0)).abs() < 1e-9);
+        assert!((secs(&a.rows, Class::InterfaceNoYield) - (10.5 + 1.0 + 5.0 + 1.0 + 3.0 + 1.0 + 2.0 + 1.0)).abs() < 1e-9);
         let b = account(&TryIn { result: &r, runs: &runs(), new: &[false, true], outcome: "ok", kind: "free" });
-        assert!((secs(&b.rows, Class::Productive) - (10.5 + 1.0 + 5.0 + 1.0 + 4.0 + 2.0 + 1.0)).abs() < 1e-9);
+        assert!((secs(&b.rows, Class::Productive) - (10.5 + 1.0 + 5.0 + 1.0 + 3.0 + 1.0 + 2.0 + 1.0)).abs() < 1e-9);
+        // a record with no points: the step's seconds in "other"
+        r["free"] = json!({"seconds": 4.0, "at": []});
+        let c = account(&TryIn { result: &r, runs: &runs(), new: &[false, false], outcome: "ok", kind: "free" });
+        assert!(c.rows.iter().any(|x| x.0 == row("free", "other") && (x.2 - 4.0).abs() < 1e-9));
+        assert!((sum(&c.rows) - 25.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn e014_end_entries_go_to_the_part_whose_dead_move_the_end_made() {
+        let item = |how: &str, frame: u64, novel: bool| {
+            let mut v = json!({"file": "new/0.json.gz", "frame": frame, "tick": frame, "how": how});
+            if novel {
+                v["novel"] = json!(["end"]);
+            }
+            v
+        };
+        let dead = [json!({"reason": "restart@57:0D0E", "frame": 900, "events": [], "how": "wait"}),
+                    json!({"reason": "restart@582:0067", "frame": 950, "events": [], "how": "afford"}),
+                    json!({"reason": "quit", "frame": 990, "events": [], "how": "attempt"}),
+                    json!({"reason": "crash", "frame": 999, "events": [], "how": "wait"})];
+        assert_eq!(part_of_item(&item("end", 900, true), &dead), "wait");
+        assert_eq!(part_of_item(&item("end", 950, true), &dead), AFFORD_END);
+        assert_eq!(part_of_item(&item("end", 990, true), &dead), "end");
+        // not a game end, or no dead move: the attempt's
+        assert_eq!(part_of_item(&item("end", 999, true), &dead), "end");
+        assert_eq!(part_of_item(&item("end", 700, true), &dead), "end");
+        // the attempt's own last checkpoint (no "novel") and the other hows are their own
+        assert_eq!(part_of_item(&item("end", 900, false), &dead), "end");
+        assert_eq!(part_of_item(&item("wait", 900, true), &dead), "wait");
+        assert_eq!(part_of_item(&json!({"frame": 1}), &dead), "checkpoint");
+        // the steps' items: the c-th afford item and the end entries after c afford items
+        assert_eq!(step_of(&[2, 1], 1), Some(0));
+        assert_eq!(step_of(&[2, 1], 2), Some(0));
+        assert_eq!(step_of(&[2, 1], 3), Some(1));
+        assert_eq!(step_of(&[0], 0), Some(0));
+        assert_eq!(step_of(&[2], 5), Some(0));
+        assert_eq!(step_of(&[], 0), None);
+        // in a try: a new end entry from the wait makes the wait productive, not the attempt's seconds
+        let mut r = base(30.0);
+        r["probes"] = json!([{"status": "plan", "stop": "goal", "seconds": 5.0, "attempt": "a00"}]);
+        r["attempt"] = json!({"stop": "goal", "reached": true});
+        r["e012"]["afford"] = json!([{"why": "R0", "kept": 1, "step_seconds": 3.0}]);
+        r["new"] = json!([item("end", 800, false), item("wait", 850, true), item("end", 900, true), item("afford", 940, true),
+                          item("end", 950, true)]);
+        r["dead"] = json!(dead);
+        let a = account(&TryIn { result: &r, runs: &runs(), new: &[false, false, true, false, false], outcome: "ok", kind: "model" });
+        assert!(!a.attempt_new);
+        assert!((secs(&a.rows, Class::Productive) - 0.2).abs() < 1e-9);
+        assert!((secs(&a.rows, Class::ModelNoYield) - 16.5).abs() < 1e-9);
+        assert!((secs(&a.rows, Class::InterfaceNoYield) - 3.0).abs() < 1e-9);
+        // a new end entry from the affordance step makes the step productive
+        let b = account(&TryIn { result: &r, runs: &runs(), new: &[false, false, false, false, true], outcome: "ok", kind: "model" });
+        assert!((secs(&b.rows, Class::Productive) - 3.0).abs() < 1e-9);
+        assert!((secs(&b.rows, Class::Wait) - 0.2).abs() < 1e-9);
+        // the attempt's end entry is the attempt's
+        r["dead"][2]["frame"] = json!(800);
+        r["new"][0] = item("end", 800, true);
+        let c = account(&TryIn { result: &r, runs: &runs(), new: &[true, false, false, false, false], outcome: "ok", kind: "model" });
+        assert!(c.attempt_new);
+        // a stop at a script's end names the end without its site
+        assert_eq!(stop_kind("engine: engine ended: restart@57:0D0E"), "engine ended: restart");
+        assert_eq!(stop_class("engine: engine ended: restart@57:0D0E", false), Class::ModelNoYield);
     }
 
     fn tstall(job: &str, entry: usize, kind: &str, gave: bool, stop_class: Class, by: &[(Class, f64)]) -> TryStall {
