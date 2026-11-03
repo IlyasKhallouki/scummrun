@@ -6,6 +6,7 @@
 # usage: r2g10.sh OUT FMI ENGINE FMI_ENGINE_TOOL [fd-strict|fd-ready ...]   (env: FMI_* switches pass through)
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 here=$(cd "$(dirname "$0")" && pwd)
 bench=$here/../bench
 PY=$here/../../../.venv/bin/python

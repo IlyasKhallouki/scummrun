@@ -6,6 +6,7 @@
 # usage: play-r2.sh OUT    (PLAY_LEAN: fmi-checks' play-lean built from this branch; E011_ENGINE_BIN: the build)
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 export FMI_ENGINE_BIN=${E011_ENGINE_BIN:-/var/tmp/fast-mi/svm-e011-r2/build/scummvm/scummvm}
 export FMI_ENGINE_CUTS=1
 B=${PLAY_LEAN:-/var/tmp/fast-mi/target-e011-r2-engine/release/play-lean}

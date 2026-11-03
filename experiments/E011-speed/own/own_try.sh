@@ -8,6 +8,7 @@
 # usage: own_try.sh FMI_BIN TAG JOB [N] [ENV=VALUE...]     (data: ~/.cache/fast-mi-e011/own)
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 FMI=$1; TAG=$2; JOB=$3; N=${4:-7}; shift 4 2>/dev/null || shift $#
 D=$HOME/.cache/fast-mi-e011/own; R=$D/runs/$TAG
 LOCK=/var/tmp/fast-mi/heavy.lock; GUARD=$HOME/.cache/fast-mi-e007/guard.sh

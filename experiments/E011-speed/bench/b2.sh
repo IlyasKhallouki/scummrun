@@ -9,6 +9,7 @@
 # usage: b2.sh [B] [before|after|all]
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 here=$(cd "$(dirname "$0")" && pwd)
 PY=$here/../../../.venv/bin/python
 B=${1:-$HOME/.cache/fast-mi-e011/bench}; what=${2:-all}

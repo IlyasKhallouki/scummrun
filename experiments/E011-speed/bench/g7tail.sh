@@ -6,6 +6,7 @@
 # usage: g7tail.sh OUT
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 C=$WT11/experiments/E011-speed/rs/fmi-plan/check
 T=/var/tmp/fast-mi/e011-plan-scratch/tails
 OUT=$1; rm -rf $OUT; mkdir -p $OUT

@@ -8,6 +8,7 @@
 # usage: OWN_FMI=FMI_BIN OWN_WT=WORKTREE own_g9.sh OUT   (bench/g9.sh with a given fmi and worktree)
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 # own: the fmi binary and the worktree under test
 FMI_BIN=${OWN_FMI:-$FMI_BIN}; WT11=${OWN_WT:-$WT11}
 here=$(cd "$(dirname "$0")" && pwd)

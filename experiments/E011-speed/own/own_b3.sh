@@ -7,6 +7,7 @@
 #   and CPU (tree_cpu.sh) and the load. B0: ~/.cache/fast-mi-e011/bench/b0.
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 here=$(cd "$(dirname "$0")" && pwd)
 bench=$here/../bench
 PY=$here/../../../.venv/bin/python

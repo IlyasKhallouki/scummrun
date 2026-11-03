@@ -15,6 +15,7 @@
 # usage: b1.sh [B] [engine|readings|planner|windows|all]
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
+[ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
 here=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$here/../../.." && pwd)
 PY=$ROOT/.venv/bin/python
