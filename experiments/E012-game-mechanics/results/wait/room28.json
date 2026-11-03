@@ -1,0 +1,832 @@
+{
+ "tested": {
+  "actions": {
+   "event": 23781,
+   "sentence": 15712,
+   "verb": 168
+  },
+  "input_keys": 60,
+  "event_keys": 46,
+  "keys": 97,
+  "pre_keys_not_held": 0,
+  "atoms": 154,
+  "observed_keys": 96,
+  "seconds": 1.09,
+  "reading": "/var/tmp/fast-mi/e012-wait/readings/28-33-41-j00065/reading.json"
+ },
+ "entries": [
+  {
+   "entry": 203,
+   "frame": 3393,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.34
+   },
+   "due_check": [
+    {
+     "slot": 6,
+     "unit": "local:210",
+     "delay": 26,
+     "due": 5,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    },
+    {
+     "slot": 9,
+     "unit": "local:207",
+     "delay": 54,
+     "due": 10,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    },
+    {
+     "slot": 10,
+     "unit": "local:211",
+     "delay": 2760,
+     "due": 461,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    }
+   ],
+   "wait": {
+    "frame0": 3393,
+    "frames": 2079,
+    "end": "horizon",
+    "seconds": 0.764,
+    "cpu_s": 0.25,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      5
+     ],
+     [
+      9,
+      10
+     ],
+     [
+      10,
+      461
+     ]
+    ],
+    "horizon": 479,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3395,
+      "off": 2,
+      "room": 28,
+      "tick": 20323,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        true
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        3
+       ],
+       [
+        9,
+        8
+       ],
+       [
+        10,
+        459
+       ]
+      ]
+     },
+     {
+      "frame": 3398,
+      "off": 5,
+      "room": 28,
+      "tick": 20341,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        5
+       ],
+       [
+        10,
+        456
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 461,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        18
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0022
+     ],
+     [
+      "entry",
+      0.0013
+     ],
+     [
+      "frames",
+      0.755
+     ],
+     [
+      "stops",
+      0.0014
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_checked": 2079,
+    "view_misses": 0,
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      26,
+      5
+     ],
+     [
+      "local:207",
+      54,
+      10
+     ],
+     [
+      "local:211",
+      2760,
+      461
+     ]
+    ],
+    "idle_same": true,
+    "idle_returns": 66,
+    "floor": {
+     "n": 5,
+     "median_s": 0.224,
+     "frames_median_s": 0.222,
+     "us_per_frame": 106.9
+    },
+    "repeat": {
+     "n": 5,
+     "median_s": 0.252,
+     "max_s": 0.294,
+     "min_s": 0.228
+    },
+    "verify": [
+     {
+      "stop": 0,
+      "frame": 3395,
+      "checkpoints": 51,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.28
+     },
+     {
+      "stop": 1,
+      "frame": 3398,
+      "checkpoints": 51,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.28
+     },
+     {
+      "stop": 2,
+      "frame": 3854,
+      "checkpoints": 51,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.34
+     }
+    ]
+   }
+  },
+  {
+   "entry": 205,
+   "frame": 3443,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.29
+   },
+   "due_check": [
+    {
+     "slot": 6,
+     "unit": "local:210",
+     "delay": 9,
+     "due": 2,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    },
+    {
+     "slot": 9,
+     "unit": "local:207",
+     "delay": 120,
+     "due": 21,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    },
+    {
+     "slot": 10,
+     "unit": "local:211",
+     "delay": 2460,
+     "due": 411,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    }
+   ],
+   "wait": {
+    "frame0": 3443,
+    "frames": 2016,
+    "end": "horizon",
+    "seconds": 0.676,
+    "cpu_s": 0.21,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      2
+     ],
+     [
+      9,
+      21
+     ],
+     [
+      10,
+      411
+     ]
+    ],
+    "horizon": 416,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3445,
+      "off": 2,
+      "room": 28,
+      "tick": 20623,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        19
+       ],
+       [
+        10,
+        409
+       ]
+      ]
+     },
+     {
+      "frame": 3450,
+      "off": 7,
+      "room": 28,
+      "tick": 20653,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        14
+       ],
+       [
+        10,
+        404
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 411,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        4
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0022
+     ],
+     [
+      "entry",
+      0.0012
+     ],
+     [
+      "frames",
+      0.67
+     ],
+     [
+      "stops",
+      0.0011
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_checked": 2016,
+    "view_misses": 0,
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      9,
+      2
+     ],
+     [
+      "local:207",
+      120,
+      21
+     ],
+     [
+      "local:211",
+      2460,
+      411
+     ]
+    ],
+    "idle_same": true,
+    "idle_returns": 66,
+    "floor": {
+     "n": 5,
+     "median_s": 0.228,
+     "frames_median_s": 0.227,
+     "us_per_frame": 112.5
+    },
+    "repeat": {
+     "n": 5,
+     "median_s": 0.241,
+     "max_s": 0.272,
+     "min_s": 0.239
+    },
+    "verify": [
+     {
+      "stop": 0,
+      "frame": 3445,
+      "checkpoints": 53,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.28
+     },
+     {
+      "stop": 1,
+      "frame": 3450,
+      "checkpoints": 53,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.39
+     },
+     {
+      "stop": 2,
+      "frame": 3854,
+      "checkpoints": 53,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.37
+     }
+    ]
+   }
+  },
+  {
+   "entry": 225,
+   "frame": 3530,
+   "room": 28,
+   "return": {
+    "same": true,
+    "differ": {},
+    "boot_s": 0.32
+   },
+   "due_check": [
+    {
+     "slot": 6,
+     "unit": "local:210",
+     "delay": 10,
+     "due": 2,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    },
+    {
+     "slot": 9,
+     "unit": "local:207",
+     "delay": 48,
+     "due": 9,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    },
+    {
+     "slot": 10,
+     "unit": "local:211",
+     "delay": 1938,
+     "due": 324,
+     "paused_before": true,
+     "ran_at_due": true,
+     "v19_same": true
+    }
+   ],
+   "wait": {
+    "frame0": 3530,
+    "frames": 1929,
+    "end": "horizon",
+    "seconds": 0.681,
+    "cpu_s": 0.21,
+    "delta": 6,
+    "dues0": [
+     [
+      6,
+      2
+     ],
+     [
+      9,
+      9
+     ],
+     [
+      10,
+      324
+     ]
+    ],
+    "horizon": 329,
+    "atoms": 154,
+    "observed": 151,
+    "stops": [
+     {
+      "frame": 3532,
+      "off": 2,
+      "room": 28,
+      "tick": 21145,
+      "atoms": [
+       [
+        "local:208",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        5
+       ],
+       [
+        9,
+        7
+       ],
+       [
+        10,
+        322
+       ]
+      ]
+     },
+     {
+      "frame": 3543,
+      "off": 13,
+      "room": 28,
+      "tick": 21211,
+      "atoms": [
+       [
+        "local:209",
+        [
+         0
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        6
+       ],
+       [
+        9,
+        17
+       ],
+       [
+        10,
+        311
+       ]
+      ]
+     },
+     {
+      "frame": 3854,
+      "off": 324,
+      "room": 28,
+      "tick": 23077,
+      "atoms": [
+       [
+        "state:316",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:316",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "state:570",
+        [
+         0
+        ],
+        false
+       ],
+       [
+        "state:570",
+        [
+         1
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         0
+        ],
+        true
+       ],
+       [
+        "local:211",
+        [
+         1
+        ],
+        false
+       ]
+      ],
+      "dues": [
+       [
+        6,
+        2
+       ],
+       [
+        9,
+        5
+       ]
+      ]
+     }
+    ],
+    "delta_misses": 0,
+    "facts_misses": 0,
+    "parts": [
+     [
+      "fork",
+      0.0017
+     ],
+     [
+      "entry",
+      0.0008
+     ],
+     [
+      "frames",
+      0.6761
+     ],
+     [
+      "stops",
+      0.001
+     ],
+     [
+      "quit",
+      0.0
+     ]
+    ],
+    "view_checked": 1929,
+    "view_misses": 0,
+    "view_misses_first": [],
+    "dues0_units": [
+     [
+      "local:210",
+      10,
+      2
+     ],
+     [
+      "local:207",
+      48,
+      9
+     ],
+     [
+      "local:211",
+      1938,
+      324
+     ]
+    ],
+    "idle_same": true,
+    "idle_returns": 66,
+    "floor": {
+     "n": 5,
+     "median_s": 0.163,
+     "frames_median_s": 0.161,
+     "us_per_frame": 83.7
+    },
+    "repeat": {
+     "n": 5,
+     "median_s": 0.255,
+     "max_s": 0.272,
+     "min_s": 0.233
+    },
+    "verify": [
+     {
+      "stop": 0,
+      "frame": 3532,
+      "checkpoints": 58,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.37
+     },
+     {
+      "stop": 1,
+      "frame": 3543,
+      "checkpoints": 58,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.33
+     },
+     {
+      "stop": 2,
+      "frame": 3854,
+      "checkpoints": 58,
+      "same": true,
+      "differ": 0,
+      "first": null,
+      "seconds": 0.43
+     }
+    ]
+   }
+  }
+ ]
+}
