@@ -417,6 +417,17 @@ enum Status {
 /// lama-first-costs on `t` from its start (module docstring); `pred` the predicate of each variable's atoms
 /// (`predicates_of` for a task taskcore made); past `deadline` the status is "time".
 pub fn lama_first_costs(t: &SasTask, pred: &[String], deadline: Option<Instant>) -> Outcome {
+    lama_first_costs_with(t, pred, deadline, Ff::new)
+}
+
+/// `lama_first_costs` with the h_FF evaluator `make_ff(task, adapted costs)` makes (search.rs `Ff::new`, or another
+/// with the same values and preferred operators).
+pub fn lama_first_costs_with<H: RelaxedEval>(
+    t: &SasTask,
+    pred: &[String],
+    deadline: Option<Instant>,
+    make_ff: impl FnOnce(&SasTask, &[i32]) -> H,
+) -> Outcome {
     let t0 = Instant::now();
     let adj = search::plusone(t);
     let g = match landmarks::build(t, &adj, pred, deadline) {
@@ -426,7 +437,7 @@ pub fn lama_first_costs(t: &SasTask, pred: &[String], deadline: Option<Instant>)
     };
     let graph_s = t0.elapsed().as_secs_f64();
     let t1 = Instant::now();
-    let mut ff = Ff::new(t, &adj);
+    let mut ff = make_ff(t, &adj);
     let ff_s = t1.elapsed().as_secs_f64();
     let succ = Succ::new(t);
     let relax_s = t1.elapsed().as_secs_f64();
