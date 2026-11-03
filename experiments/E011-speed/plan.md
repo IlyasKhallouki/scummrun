@@ -2262,3 +2262,13 @@ mod tests {
   E009's copy of E008's guides, E009's stop rules and `--stop-jobs 80`, verify from boot twice.
 - **Where.** The archive is `/var/tmp/fast-mi/e011-archives/kitchen` with `E008_DISK_PATH=/var/tmp`, since /home is at
   its floor.
+
+## Amendment 2026-11-03, during the kitchen check: the planner's limit per request from the recorded plans
+
+- **Measured.** Over the 260 plans found in E008's, E009's and this check's tries, a found plan's planning took at
+  most 161 s (median 18 s, p90 45 s, p99 74 s). The only two requests that reached the 600 s limit were in this check
+  (tries 15 and 16, target bit:118 = 1, from frames 2770 and 2771) and returned no plan; with targets in rotation, each
+  such target cost 10 minutes of a worker.
+- **What.** The check was stopped after 15 committed tries (two running, uncommitted) and resumed from its files with
+  `FMI_PLAN_TIME=180`: above every found plan's time, so no plan the tries have found would have been lost. Nothing
+  else changes.
