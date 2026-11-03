@@ -44,11 +44,18 @@ impl Returns for PoolReturns {
     }
 }
 
+/// The process's allocator: the system's, or (E012 resident, FMI_READER_LIB=1 at the start) mimalloc, the one the
+/// reader is made for, now that it reads in this process (fmi_reading::inproc).
+#[global_allocator]
+static GLOBAL: fmi_reading::inproc::ReaderAlloc = fmi_reading::inproc::ReaderAlloc;
+
 /// The readings: reader-scope with --out-dir, opened by fmi-reading. `cache`: fmi-reading's exact reading cache
 /// (FMI_READING_CACHE, a folder; off when unset or empty); a hit's files are linked into the request's folder.
 /// `memo`: readcore's job memo across readings (FMI_MEMO, a folder, given to reader-scope as --memo; off when unset or
 /// empty). `prep`: reader-scope's --prep (FMI_READER_PREP=1; e011-r2-read: the workers work out the reading thread's
 /// and the sink's part of their records; the same files), off unless set.
+/// `inproc` (E012 resident, FMI_READER_LIB=1, off by default): the reading in this process, the game and the job
+/// memo's store resident, --prep on, the store's key over the units as a set (fmi_reading::inproc).
 pub struct RealReadings {
     pub reader: PathBuf,
     pub opened: Mutex<HashMap<PathBuf, Arc<fmi_reading::Reading>>>,
@@ -58,6 +65,7 @@ pub struct RealReadings {
     pub memo: Option<PathBuf>,
     pub prep: bool,
     pub shas: std::sync::OnceLock<(String, String)>,
+    pub inproc: Option<fmi_reading::inproc::InProc>,
 }
 
 fn env_dir(name: &str) -> Option<PathBuf> {
@@ -70,33 +78,46 @@ impl RealReadings {
             Some(d) => Some(fmi_reading::cache::ReadingCache::new(&d).map_err(|e| format!("{}: {e}", d.display()))?),
             None => None,
         };
+        let memo = env_dir("FMI_MEMO");
+        let inproc = fmi_reading::inproc::InProc::from_env(&root, memo.clone());
         Ok(RealReadings {
             reader,
             opened: Mutex::new(Default::default()),
             reuse: Mutex::new(None),
             root,
             cache,
-            memo: env_dir("FMI_MEMO"),
+            memo,
             prep: std::env::var("FMI_READER_PREP").is_ok_and(|v| v == "1"),
             shas: std::sync::OnceLock::new(),
+            inproc,
         })
     }
 
-    fn run_reader(&self, spec: &fmi_reading::cache::ReadSpec, dir: &Path, q: &ReadReq) -> Result<(), String> {
-        let mut cmd = std::process::Command::new(&self.reader);
-        cmd.args(spec.args(dir, &q.name, q.threads as usize));
+    fn run_reader(&self, spec: &fmi_reading::cache::ReadSpec, dir: &Path, q: &ReadReq, cancel: &AtomicBool) -> Result<(), String> {
+        self.read_args(spec.args(dir, &q.name, q.threads as usize), dir, cancel).map(|_| ())
+    }
+
+    /// One reading by reader-scope's arguments `args`, with this port's own (--memo, --prep, and the switch
+    /// FMI_READER_LIB's) added: reader-scope as a child process, or (the switch) this process. `dir`: where the
+    /// progress goes (reader-scope.err). Returns the reader's arguments as given.
+    pub fn read_args(&self, mut args: Vec<String>, dir: &Path, cancel: &AtomicBool) -> Result<Vec<String>, String> {
         if let Some(m) = &self.memo {
-            cmd.arg("--memo").arg(m);
+            args.extend(["--memo".to_string(), m.display().to_string()]);
+        }
+        if let Some(ip) = &self.inproc {
+            args.extend(ip.extra_args(self.memo.is_some()));
+            ip.read(&args, dir, cancel)?;
+            return Ok(args);
         }
         if self.prep {
-            cmd.arg("--prep");
+            args.push("--prep".into());
         }
-        let out = cmd.output().map_err(|e| format!("reader-scope: {e}"))?;
+        let out = std::process::Command::new(&self.reader).args(&args).output().map_err(|e| format!("reader-scope: {e}"))?;
         std::fs::write(dir.join("reader-scope.err"), &out.stderr).ok();
         if !out.status.success() {
             return Err(format!("reader-scope failed ({}): {}", out.status, String::from_utf8_lossy(&out.stderr).chars().rev().take(600).collect::<String>().chars().rev().collect::<String>()));
         }
-        Ok(())
+        Ok(args)
     }
 }
 
@@ -136,7 +157,7 @@ impl Readings for RealReadings {
         let ks: BTreeSet<String> = g.as_ref().unwrap().reuse_keys(&r).map_err(|e| format!("reuse keys: {e}"))?;
         Ok(ks.into_iter().collect())
     }
-    fn read(&self, q: &ReadReq, _cancel: &AtomicBool) -> Result<PathBuf, String> {
+    fn read(&self, q: &ReadReq, cancel: &AtomicBool) -> Result<PathBuf, String> {
         std::fs::create_dir_all(&q.out).map_err(|e| format!("{}: {e}", q.out.display()))?;
         let slot = if q.slot_locals.is_empty() {
             None
@@ -162,13 +183,18 @@ impl Readings for RealReadings {
             slot_locals: slot,
         };
         let Some(cache) = &self.cache else {
-            self.run_reader(&spec, &q.out, q)?;
+            self.run_reader(&spec, &q.out, q, cancel)?;
             return Ok(q.out.join("reading.json"));
         };
         let (rs, gs) = match self.shas.get() {
             Some(s) => s.clone(),
             None => {
-                let rs = fmi_reading::cache::file_sha1(&self.reader).map_err(|e| format!("{}: {e}", self.reader.display()))?;
+                // the reader: reader-scope's binary, or (the switch FMI_READER_LIB) this one
+                let bin = match &self.inproc {
+                    Some(_) => std::env::current_exe().map_err(|e| format!("this binary: {e}"))?,
+                    None => self.reader.clone(),
+                };
+                let rs = fmi_reading::cache::file_sha1(&bin).map_err(|e| format!("{}: {e}", bin.display()))?;
                 let gi = fmi_reading::cache::game_index(&self.root);
                 let gs = fmi_reading::cache::file_sha1(&gi).map_err(|e| format!("{}: {e}", gi.display()))?;
                 self.shas.get_or_init(|| (rs, gs)).clone()
@@ -180,7 +206,7 @@ impl Readings for RealReadings {
             cache.dir_of(&key)
         } else {
             let tmp = cache.scratch().map_err(|e| e.to_string())?;
-            self.run_reader(&spec, &tmp, q)?;
+            self.run_reader(&spec, &tmp, q, cancel)?;
             let d = cache.put(&key, &tmp).map_err(|e| e.to_string())?;
             cache.evict(std::slice::from_ref(&d)).map_err(|e| format!("the reading cache's eviction: {e}"))?;
             d
@@ -282,10 +308,28 @@ impl WindowPlayer for PlayAdapter {
 #[derive(Default)]
 pub struct PlayHost {
     kept: Arc<PlayKept>,
+    /// E012's delay fork: the game's draws (component tested's `DrawGame`), loaded once in the process when the fork
+    /// is on (None: the game did not load; the fork reads the checks' reasons alone)
+    draws: std::sync::OnceLock<Option<Arc<fmi_reading::draws::DrawGame>>>,
+}
+
+impl PlayHost {
+    /// tested's `draws` as the window search reads a record's draws (delay's `DrawsOf`): check, range and share.
+    fn draws_of(&self) -> Option<fmi_play::delay::DrawsOf> {
+        let g = self.draws.get_or_init(|| fmi_reading::draws::DrawGame::load(&fmi_explore::guide::default_root()).ok().map(Arc::new)).clone()?;
+        Some(Arc::new(move |rd: &dyn ReadingSource, i: u32| {
+            fmi_reading::draws::draws(rd, i, Some(&g)).into_iter().map(|d| Draw { check: d.check, range: d.range, share: d.share }).collect()
+        }))
+    }
 }
 
 impl PlayerHost for PlayHost {
     fn player(&self, cfg: &WindowCfg) -> Box<dyn WindowPlayer> {
+        self.player_with(cfg, &PlayExtras::default())
+    }
+    /// The window search, with E012's delay fork's settings when it is on (FMI_DELAY_FORK=1, read by the search):
+    /// tested's draws, the try's T keys and novelty.
+    fn player_with(&self, cfg: &WindowCfg, x: &PlayExtras) -> Box<dyn WindowPlayer> {
         let dmax = cfg.frame_costs.get("dmax").and_then(|d| d.as_i64());
         let mut s = fmi_play::Search::for_step(cfg.workers as usize, cfg.fork_each, cfg.ready, dmax).expect("the window search's config");
         if play_keep() {
@@ -296,6 +340,43 @@ impl PlayerHost for PlayHost {
                 }
             }
         }
+        if s.delay_on {
+            s.draws_of = self.draws_of();
+            s.novel_of = x.novel_of.clone();
+            s.tested_keys = x.tested_keys.as_ref().map(|k| Arc::new(k.iter().copied().collect()));
+        }
         Box::new(PlayAdapter { p: fmi_play::StrictPlayer { search: s }, notes: 0, kept: self.kept.clone() })
+    }
+}
+
+/// E012's ports of the try (fmi_explore::mech::Mech): T from fmi-reading's `tested`, and the wait component's wait.
+pub fn mech() -> fmi_explore::mech::Mech {
+    fmi_explore::mech::Mech { tested: Some(Arc::new(RealTested::default())), wait: Some(Arc::new(fmi_explore::mech::RealWait)) }
+}
+
+/// T of a reading (component tested, `Tested::of`), made once per reading in the process (a reading's files never
+/// change once made; at most 16 kept).
+#[derive(Default)]
+pub struct RealTested {
+    made: Mutex<Vec<([u8; 20], Arc<fmi_explore::mech::TestedT>)>>,
+}
+
+impl fmi_explore::mech::TestedPort for RealTested {
+    fn tested(&self, rd: &dyn ReadingSource) -> Result<fmi_explore::mech::TestedT, String> {
+        let id = rd.id();
+        if let Some((_, t)) = self.made.lock().unwrap().iter().find(|(k, _)| *k == id) {
+            return Ok((**t).clone());
+        }
+        let t0 = std::time::Instant::now();
+        let t = fmi_reading::tested::Tested::of(rd);
+        let mut rec = t.json();
+        rec["of_s"] = serde_json::json!(t0.elapsed().as_secs_f64());
+        let tt = Arc::new(fmi_explore::mech::TestedT::new(t.flat(), rec));
+        let mut m = self.made.lock().unwrap();
+        if m.len() >= 16 {
+            m.remove(0);
+        }
+        m.push((id, tt.clone()));
+        Ok((*tt).clone())
     }
 }

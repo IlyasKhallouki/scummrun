@@ -1,0 +1,34 @@
+[11:16:55] on-system: fmi pid 1801521 (FMI_READER_LIB=1 FMI_READER_ALLOC=system)
+[11:23:29] on-system j00000 177.4 s, load 3.42, fmi RSS 3366 MB
+[11:23:33] on-system j00001 4.7 s, load 3.47, fmi RSS 3379 MB
+[11:23:37] on-system j00002 3.8 s, load 3.47, fmi RSS 3391 MB
+[11:23:40] on-system j00003 2.5 s, load 3.27, fmi RSS 3411 MB
+[11:23:40] on-system j00004 0.4 s, load 3.27, fmi RSS 3415 MB
+[11:23:40] on-system j00005 0.3 s, load 3.27, fmi RSS 3418 MB
+[11:24:00] on-system j00006 19.2 s, load 3.61, fmi RSS 3973 MB
+[11:24:01] on-system j00007 1.0 s, load 3.61, fmi RSS 3974 MB
+[11:24:07] on-system j00008 6.1 s, load 3.40, fmi RSS 4098 MB
+[11:24:12] on-system j00009 5.6 s, load 3.19, fmi RSS 4245 MB
+[11:24:13] on-system j00010 0.3 s, load 3.19, fmi RSS 4246 MB
+[11:24:19] on-system j00011 6.4 s, load 3.25, fmi RSS 4405 MB
+[11:24:19] on-system j00012 0.2 s, load 3.25, fmi RSS 4410 MB
+[11:24:20] on-system j00013 0.3 s, load 3.25, fmi RSS 4411 MB
+[11:24:26] on-system j00014 6.1 s, load 3.07, fmi RSS 4423 MB
+done /var/tmp/fast-mi/e012-resident/b3/on-system/jobs/j00014 0
+GUARD: rc 0 wall 452.8 s low 0 min MemAvailable 10444896 kB
+j00000: class 'refinement' (= B0's), new [2767, 2848, 2850, 2862], same as B0
+j00001: class 'refinement' (= B0's), new [2863], same as B0
+j00002: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00003: class 'refinement' (= B0's), new [2850, 2862], same as B0
+j00004: class 'refinement' (= B0's), new [2854, 2862], same as B0
+j00005: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00006: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00007: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00008: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00009: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00010: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00011: class 'refinement' (= B0's), new [2770, 2818, 2820, 2854], same as B0
+j00012: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00013: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00014: class 'refinement' (= B0's), new [2771, 2818, 2820, 2854], same as B0
+G11 on-system: 15 tries, stop class = B0's in 15, everything = B0's in 15

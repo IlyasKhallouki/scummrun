@@ -1,0 +1,275 @@
+diff --git a/engines/scumm/scumm.cpp b/engines/scumm/scumm.cpp
+index 76ad6193..c62e74a8 100644
+--- a/engines/scumm/scumm.cpp
++++ b/engines/scumm/scumm.cpp
+@@ -4216,10 +4216,16 @@ void ScummEngine_v60he::pauseEngineIntern(bool pause) {
+ }
+ 
+ void ScummEngine::pauseGame() {
++	// E012 (patch 0005): with SPEEDRUN_REPORT_RESTART the bridge ends the run as "pause" (SO_PAUSE, the pause key)
++	if (_speedrun && _speedrun->onPause())
++		return;
+ 	pauseDialog();
+ }
+ 
+ void ScummEngine::restart() {
++	// E012 (patch 0005): with SPEEDRUN_REPORT_RESTART the bridge ends the run as "restart" (SO_RESTART, the keys)
++	if (_speedrun && _speedrun->onRestart())
++		return;
+ 	// FIXME: This function *leaks memory*, and quite a lot so. For example,
+ 	// we re-init the resource manager, which causes readMAXS() to be called
+ 	// again, which allocates some memory. There are many other leaks, though.
+diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+index a514e3df..90fb0c2d 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -207,6 +207,8 @@ void SpeedrunBridge::readEnv() {
+ 		{"SPEEDRUN_COUNT_MIXER", &SpeedrunBridge::_cutCountMixer},
+ 		{"SPEEDRUN_NO_PIXELS", &SpeedrunBridge::_cutNoPixels},
+ 		{"SPEEDRUN_DUMP_NOPIXELS", &SpeedrunBridge::_dumpNoPixels},
++		// E012 (patch 0005): restart() and pauseGame() end the run (onRestart(), onPause()).
++		{"SPEEDRUN_REPORT_RESTART", &SpeedrunBridge::_reportRestart},
+ 	};
+ 	for (const auto &var : kBoolVars) {
+ 		const char *value = envValue(var.name);
+@@ -232,6 +234,10 @@ void SpeedrunBridge::readEnv() {
+ 		_dumpNoPixels = true;
+ 	if ((_cutCountMixer || _cutNoPixels) && !_videoPrefix.empty() && _envError.empty())
+ 		_envError = "SPEEDRUN_VIDEO cannot be used with SPEEDRUN_COUNT_MIXER or SPEEDRUN_NO_PIXELS";
++	// E012 (patch 0005), tests only: SPEEDRUN_TEST_RESTART=<frame>, restart() at the start of that frame.
++	const char *testRestart = envValue("SPEEDRUN_TEST_RESTART");
++	if (testRestart && (!parseUint64(testRestart, _testRestartFrame) || _testRestartFrame == 0) && _envError.empty())
++		_envError = Common::String::format("invalid SPEEDRUN_TEST_RESTART '%s'", testRestart);
+ 	// E011 (patch 0002): SPEEDRUN_WIRE=bin, the control socket's binary channel (speedrun_wire.cpp); json, the
+ 	// default, is the JSON lines protocol (speedrun_control.cpp).
+ 	const char *wire = envValue("SPEEDRUN_WIRE");
+@@ -431,6 +437,13 @@ void SpeedrunBridge::onFrameBegin(int delta) {
+ 	_inputWindow = true; // processInput() comes next
+ 	if (_pumpAudio)
+ 		pumpAudio(delta);
++	// E012 (patch 0005), tests only: restart() where processInput()'s restart key would call it (processKeyboard()).
++	if (_testRestartFrame && _frames == _testRestartFrame) {
++		_testRestartFrame = 0;
++		_vm->restart();
++		if (_finished)
++			return;
++	}
+ 
+ 	// 4. Watchdog, stamped after the add.
+ 	if (_hasMaxTicks && _ticks >= _maxTicks) {
+@@ -760,6 +773,24 @@ void SpeedrunBridge::finish(const char *reason) {
+ 		_vm->quitGame();
+ }
+ 
++// E012 (patch 0005): the game's own end states (speedrun_bridge.h). A restart clears the variables and the room and
++// runs the boot again (scumm.cpp restart()); a pause opens a dialog that waits for a backend event the bridge never
++// sends. With SPEEDRUN_REPORT_RESTART the run ends there instead, with the end record of the state before either.
++
++bool SpeedrunBridge::onRestart() {
++	if (!_reportRestart)
++		return false;
++	finish("restart"); // a no-op if the run has already ended: the engine is on its way out
++	return true;
++}
++
++bool SpeedrunBridge::onPause() {
++	if (!_reportRestart)
++		return false;
++	finish("pause");
++	return true;
++}
++
+ void SpeedrunBridge::fail(const char *code, const Common::String &message) {
+ 	if (endTrace("error", code, message.c_str()))
+ 		_vm->quitGame();
+diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+index 4c68e220..4e57dbfb 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -277,6 +277,11 @@ bool parseSpeedrunInterrupts(const Common::String &text, Common::Array<SpeedrunI
+  *  - SPEEDRUN_START_FRAME=<n>    start the segment at the decision point of frame n
+  *                                instead of SPEEDRUN_START (Any% timing starts at the
+  *                                logo skip, which is an input, not a game state)
++ *  - SPEEDRUN_REPORT_RESTART=1   E012 (patch 0005): restart() ends the run as "restart" and
++ *                                pauseGame() as "pause" (off: the engine restarts, or opens
++ *                                its pause dialog, as before)
++ *  - SPEEDRUN_TEST_RESTART=<n>   E012 (patch 0005), tests only: restart() at the start of
++ *                                frame n, as the engine's restart key calls it
+  * The RNG seed is ScummVM's own --random-seed (ConfMan "random_seed").
+  *
+  * Record stamping (contract C2): records about the completed previous frame
+@@ -353,6 +358,14 @@ public:
+ 	/** writeVar(), first statement: the variable and the value (DEBUG_VARS's writeVar line). */
+ 	void onWriteVar(uint var, int value);
+ 
++	// E012 (patch 0005; experiments/E012-game-mechanics/plan.md, component "end"): the game's own end states.
++	// SPEEDRUN_REPORT_RESTART=1 turns both hooks on; off (the default) they return false and the engine runs as
++	// before. On, they read nothing more than the end record does, then end the run (finish()).
++	/** restart(), first statement: true if the run ended as "restart" (restart() then returns at once). */
++	bool onRestart();
++	/** pauseGame(), first statement (SO_PAUSE, the pause key): true if the run ended as "pause" (no pause dialog). */
++	bool onPause();
++
+ private:
+ 	enum IdleKind { kNotIdle, kIdleSentence, kIdleDialog };
+ 
+@@ -764,6 +777,13 @@ private:
+ 	void wireObsReq(SpeedrunReader &in);
+ 	/** fmi-core At: the "at" reply's fields for screen point (x, y) now (At and AtMany). */
+ 	void wireAt(SpeedrunBytes &o, int x, int y);
++	// E012 (patch 0005): the end hooks' switch and test trigger, and the walk boxes (Boxes, BoxesJson, "boxes")
++	bool _reportRestart = false;    // SPEEDRUN_REPORT_RESTART
++	uint64 _testRestartFrame = 0;   // SPEEDRUN_TEST_RESTART=<frame>: restart() at the start of that frame (tests only)
++	/** fmi-core Boxes: the current room and each box's corners and flags (getBoxCoordinates, getBoxFlags). */
++	void wireBoxes(SpeedrunBytes &o) const;
++	/** The "boxes" reply's object: {"room": r, "boxes": [{"ul": [x, y], "ur", "lr", "ll", "flags"}, ...]}. */
++	Common::String boxesJson() const;
+ 	void logExplainRow(byte kind, int64 a, int64 b, int64 c, int64 d = 0, int64 e = 0, int64 f = 0, int64 g = 0,
+ 	                   int64 h = 0);
+ };
+diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
+index deaabdb6..95a37ba3 100644
+--- a/engines/scumm/speedrun/speedrun_control.cpp
++++ b/engines/scumm/speedrun/speedrun_control.cpp
+@@ -390,6 +390,9 @@ void SpeedrunBridge::controlLoop(const char *reason) {
+ 				at.add("verb_slot", _vm->findVerbAtPos(x, y));
+ 				controlSend("{\"at\":" + at.str() + "}");
+ 			}
++		} else if (cmd == "boxes") {
++			// E012 (patch 0005): the current room's walk boxes, as the engine holds them (boxes.cpp); reads only.
++			controlSend("{\"boxes\":" + boxesJson() + "}");
+ 		} else if (cmd == "set_rng") {
+ 			// Search only: put the RNG in a state, so a branch stands in for a
+ 			// run from boot with another seed. The trace record marks the run.
+diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
+index 83b66506..7ae39576 100644
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -29,6 +29,7 @@
+ #include "backends/audiocd/audiocd.h"
+ 
+ #include "scumm/actor.h"
++#include "scumm/boxes.h"
+ #include "scumm/object.h"
+ #include "scumm/resource.h"
+ #include "scumm/scumm.h"
+@@ -1000,4 +1001,26 @@ Common::String SpeedrunBridge::objectsJson() {
+ 	return dump.str();
+ }
+ 
++// E012 (patch 0005): the "boxes" reply. The current room's walk boxes, 0..getNumBoxes()-1, each as boxes.cpp's
++// getBoxCoordinates() and getBoxFlags() give it (both read the room's box data, a copy of its BOXD block that
++// matrixOps may have changed since). Reads only.
++Common::String SpeedrunBridge::boxesJson() const {
++	ScummEngine &e = *_vm;
++	const int n = (int)e.getNumBoxes();
++	JsonArray boxes;
++	for (int i = 0; i < n; i++) {
++		const BoxCoords c = e.getBoxCoordinates(i);
++		JsonObject b;
++		b.addRaw("ul", JsonArray().add((int)c.ul.x).add((int)c.ul.y).str())
++		 .addRaw("ur", JsonArray().add((int)c.ur.x).add((int)c.ur.y).str())
++		 .addRaw("lr", JsonArray().add((int)c.lr.x).add((int)c.lr.y).str())
++		 .addRaw("ll", JsonArray().add((int)c.ll.x).add((int)c.ll.y).str())
++		 .add("flags", (int)e.getBoxFlags(i));
++		boxes.add(b);
++	}
++	JsonObject o;
++	o.add("room", (int)e._currentRoom).addRaw("boxes", boxes.str());
++	return o.str();
++}
++
+ } // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
+index d34df603..6414f5bd 100644
+--- a/engines/scumm/speedrun/speedrun_wire.cpp
++++ b/engines/scumm/speedrun/speedrun_wire.cpp
+@@ -33,6 +33,9 @@
+ //
+ // Observation only, as the JSON dumps: the encoders read engine members and call the const members the JSON dumps
+ // call. Without names, the binary dumps call fewer of them (no getObjOrActorName, no verb text).
++//
++// E012 (patch 0005): Boxes (0x94, reply 0x12: fmi-core Boxes) and BoxesJson (0x95, reply Json: the JSON "boxes"
++// reply's text), the current room's walk boxes; both read only (getNumBoxes, getBoxCoordinates, getBoxFlags).
+ 
+ #define FORBIDDEN_SYMBOL_ALLOW_ALL
+ 
+@@ -46,6 +49,7 @@
+ #include "backends/audiocd/audiocd.h"
+ 
+ #include "scumm/actor.h"
++#include "scumm/boxes.h"
+ #include "scumm/object.h"
+ #include "scumm/resource.h"
+ #include "scumm/scumm.h"
+@@ -77,7 +81,9 @@ enum : uint8 {
+ 	kWStep = 0x90,
+ 	kWStepObs = 0x91, // E011 round 2 (patch 0004)
+ 	kWAtMany = 0x92,  // E011 round 2 (patch 0004)
+-	kWRunObs = 0x93   // E011 round 2 (patch 0004)
++	kWRunObs = 0x93,  // E011 round 2 (patch 0004)
++	kWBoxes = 0x94,   // E012 (patch 0005)
++	kWBoxesJson = 0x95 // E012 (patch 0005)
+ };
+ 
+ // Engine to controller
+@@ -98,7 +104,8 @@ enum : uint8 {
+ 	kRStepReply = 0x0E,
+ 	kRStepObsReply = 0x0F, // E011 round 2 (patch 0004)
+ 	kRAtMany = 0x10,       // E011 round 2 (patch 0004)
+-	kRRunObsReply = 0x11   // E011 round 2 (patch 0004)
++	kRRunObsReply = 0x11,  // E011 round 2 (patch 0004)
++	kRBoxes = 0x12         // E012 (patch 0005)
+ };
+ 
+ const uint32 kBlockMagic = 0x31534D46; // "FMS1"
+@@ -906,6 +913,24 @@ void SpeedrunBridge::wireAt(SpeedrunBytes &o, int x, int y) {
+ 	o.i32(_vm->findVerbAtPos(x, y));
+ }
+ 
++void SpeedrunBridge::wireBoxes(SpeedrunBytes &o) const {
++	// E012 (patch 0005): fmi-core Boxes, as boxesJson() (speedrun_state.cpp): the room, then per box ul, ur, lr, ll
++	// (each i32 x, i32 y) and u8 flags
++	ScummEngine &e = *_vm;
++	const int n = (int)e.getNumBoxes();
++	o.i32((int)e._currentRoom);
++	o.u32((uint32)n);
++	for (int i = 0; i < n; i++) {
++		const BoxCoords c = e.getBoxCoordinates(i);
++		const Common::Point *pts[4] = {&c.ul, &c.ur, &c.lr, &c.ll};
++		for (const Common::Point *p : pts) {
++			o.i32((int)p->x);
++			o.i32((int)p->y);
++		}
++		o.u8(e.getBoxFlags(i));
++	}
++}
++
+ #pragma mark - Decoders
+ 
+ bool SpeedrunBridge::wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const {
+@@ -1303,6 +1328,24 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 			wireFlush();
+ 			break;
+ 		}
++		case kWBoxes:
++		case kWBoxesJson: {
++			// E012 (patch 0005): the current room's walk boxes, as fmi-core Boxes or as the JSON "boxes" reply's text
++			if (!in.done()) {
++				error = "boxes: bad payload";
++				break;
++			}
++			if (type == kWBoxes) {
++				wireBegin(kRBoxes);
++				wireBoxes(_wireOut);
++			} else {
++				wireBegin(kRJson);
++				const Common::String j = boxesJson();
++				_wireOut.str(j.c_str(), j.size());
++			}
++			wireFlush();
++			break;
++		}
+ 		case kWSetRng: {
+ 			const uint32 state = in.u32();
+ 			if (!in.done() || state == 0) {

@@ -83,3 +83,15 @@ Wall times are inflated by the shared load, so CPU seconds are given where the c
   pass over the same file and gives the index its word offsets and names.
 - **Cached open.** The key also needs the reader binary's sha1 and the game index's, 70-170 ms, which a resident
   process computes once.
+
+## E012: `tested` (experiments/E012-game-mechanics/plan.md)
+
+- **`tested::Tested`** (src/tested.rs): the reading's tested atoms T, per key the value sets the actions'
+  preconditions hold it to, less each event's own unit's keys, plus the goal's; the keys tested by inputs and by
+  events; counts. `Tested::of` takes any `ReadingSource`; `Tested::of_reading` gives the same from the files, with
+  the preconditions decoded alone (`Reading::pre_of`).
+- **`draws::draws`** (src/draws.rs): an action's checks on a random draw, with the draw's range and the share of its
+  values on the check's side, worked out from the scripts by `DrawGame` (the game, loaded once per process).
+- **Checks:** `cargo test -p fmi-reading` (unit tests on hand-made units); gate T1 with
+  `FMI_T1_READING=<the kitchen's 28-33-41-j00065>` (`tests/tested.rs`); `fmi-reading tested DIR --draws --sites`
+  for the counts and times. Results: `experiments/E012-game-mechanics/results/tested/t1.md`.

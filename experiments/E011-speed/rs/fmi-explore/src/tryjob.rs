@@ -6,7 +6,9 @@ use crate::driver::{JobLog, Step};
 use crate::files::{self, read_json, Res};
 use crate::harness::{self, Harness, HarnessCfg, PlannerCache};
 use crate::machine;
-use crate::ports::{EntryRef, PlayerHost, Readings, Returns, ReadReq, WindowCfg};
+use crate::ports::{EntryRef, PlayExtras, PlayerHost, Readings, Returns, ReadReq, WindowCfg};
+use crate::mech::{self, Extra, Switches, TestedT, TryNovel, Trigger};
+use crate::progress;
 use crate::pyjson;
 use crate::start;
 use crate::step::{self, Target, TV};
@@ -34,6 +36,8 @@ pub struct Resident {
     pub forced_targets: Option<Vec<(String, i64)>>,
     /// E011's old tail first at a replan (the fast settings)
     pub tail: bool,
+    /// E012's ports outside this crate (T, the wait); unused with every E012 switch off
+    pub mech: mech::Mech,
 }
 
 /// The try as the driver's in-process step.
@@ -531,23 +535,21 @@ struct Attempt {
     inputs: Vec<Value>,
     secs: f64,
     cpu: f64,
+    /// the attempt's engine at its end, kept when asked (E012's affordance step runs from it), else quit
+    engine: Option<Box<dyn Engine>>,
 }
 
 /// Step 4 for one target (step.py `attempt`): a fork of the returned engine and the harness with step.py's wiring.
 #[allow(clippy::too_many_arguments)]
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
            adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
-           cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
-    let (hgoal, text): (Vec<(Key, Vec<Val>)>, String) = if tg.tier == 0 {
-        (goal.iter().map(|(k, vs)| (Key::parse(k), vs.clone())).collect(), step::goal_text(goal)?)
-    } else {
-        let v = match &tg.v {
-            TV::Int(n) => *n,
-            TV::Text(_) => return Err("a tier 1 or 2 target with a text value".into()),
-        };
-        (vec![(Key::parse(&tg.k), vec![v])], tg.text())
-    };
-    let _ = text;
+           cancel: &Arc<AtomicBool>, x: &PlayExtras, keep: bool) -> Result<Attempt, String> {
+    // the harness's goal (step::target_goal: E012's one target per key gives the key a value list); tier 0's goal has
+    // reader-scope's form
+    if tg.tier == 0 {
+        step::goal_text(goal)?;
+    }
+    let hgoal: Vec<(Key, Vec<Val>)> = step::target_goal(tg, goal)?;
     let doc = doc_of(&**rd);
     let frame_costs = files::or(doc.get("frame_costs"), &json!({})).clone();
     std::fs::create_dir_all(adir).map_err(|e| files::io_err(adir, e))?;
@@ -571,7 +573,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
         tail: r.tail,
     };
     let mut wiring = Wiring::new(r.readings.clone(), &**rd, adir, threads, cancel.clone())?;
-    let player = machine::port(|| r.players.player(&WindowCfg { workers, fork_each: step::FORK_EACH, ready, frame_costs: frame_costs.clone() }));
+    let player = machine::port(|| r.players.player_with(&WindowCfg { workers, fork_each: step::FORK_EACH, ready, frame_costs: frame_costs.clone() }, x));
     let ps = PlayState {
         engine: branch,
         state: Obs::default(),
@@ -596,7 +598,12 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let checkpoints = std::mem::take(&mut h.ps.checkpoints);
     let inputs = res["inputs"].as_array().cloned().unwrap_or_default();
     let (ps, last, player) = h.into_all();
-    machine::port(|| ps.engine.quit());
+    let engine = if keep {
+        Some(ps.engine)
+    } else {
+        machine::port(|| ps.engine.quit());
+        None
+    };
     // the window search's player: its reading data and game go off this thread (FMI_PLAYER_DONE), or here (round 1)
     if switch("FMI_PLAYER_DONE") {
         r.players.done(player);
@@ -622,7 +629,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
             }
         }
     }
-    Ok(Attempt { res, packed, checkpoints, inputs, secs: t0.elapsed().as_secs_f64(), cpu: cpu_now() - cpu0 + wiring.cpu_s })
+    Ok(Attempt { res, packed, checkpoints, inputs, secs: t0.elapsed().as_secs_f64(), cpu: cpu_now() - cpu0 + wiring.cpu_s, engine })
 }
 
 /// A guide's atoms (step::guide_atoms), kept for the last guide seen (warm.rs keeps the guide while its file is the
@@ -643,14 +650,19 @@ fn guide_atoms(g: &Arc<Value>) -> Arc<step::Atoms> {
 
 /// The targets, or the ones forced (`--targets`), as step.targets gives them.
 fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path, facts: &EntryFacts,
-              goal: &[(String, Vec<i64>)]) -> Res<Vec<Target>> {
+              goal: &[(String, Vec<i64>)], t: Option<&TestedT>) -> Res<Vec<Target>> {
     let guide = crate::warm::guide(Path::new(job["guide"].as_str().unwrap_or("")))?;
     let reached = crate::warm::reached(rd);
     let empty = vec![];
     let held = job.get("held").and_then(|h| h.as_array()).unwrap_or(&empty);
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
-    let ts = if switch("FMI_TRY_MEMO") {
+    let ts = if step::per_key() {
+        // E012's one target per key (plan.md section 3), with the T tier: the keys an action of the try's reading tests
+        let has = t.map(|t| move |k: &str| t.has(Key::parse(k)));
+        step::targets_per_key(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal,
+                              rot, has.as_ref().map(|h| h as step::TestedKey))?
+    } else if switch("FMI_TRY_MEMO") {
         step::targets_with(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
     } else {
         step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?
@@ -663,7 +675,9 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
         // the benchmark's: the log's targets in its order, each with its tier and depth as targets gives them
         let mut out = Vec::new();
         for (k, v) in forced {
-            let t = ts.iter().find(|t| t.k == *k && t.v == TV::Int(*v)).cloned()
+            // (a value list of E012's one target per key gives a forced value of it its tier and depth)
+            let t = ts.iter().find(|t| t.k == *k && t.v.ints().contains(v))
+                .map(|t| Target { k: k.clone(), v: TV::Int(*v), tier: t.tier, depth: t.depth })
                 .unwrap_or(Target { k: k.clone(), v: TV::Int(*v), tier: if goal.len() == 1 && goal[0].0 == *k { 0 } else { 1 }, depth: 0 });
             out.push(t);
         }
@@ -692,6 +706,9 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     let cancel_arc = Arc::new(AtomicBool::new(cancel.load(Ordering::SeqCst)));
     let mut root_engine: Option<Box<dyn Engine>> = None;
     let mut prof = Prof::new();
+    // E012's mechanisms in the try (plan.md, "How a try runs"); every switch off: none runs, the try is round 2's
+    let sw = Switches::from_env();
+    let mut e12 = Map::new();
     let res: Result<(), Result<ReturnDiffers, String>> = (|| {
         if job.get("seed").and_then(|s| s.as_i64()) != Some(step::SEED) {
             return Err(Err(format!("ValueError: seed {}: E008 runs seed {} only (plan.md)", files::py_str(job.get("seed")), step::SEED)));
@@ -722,7 +739,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             EntryFacts::Text(crate::archive::fact_map(&step::facts_of_ordered(&state)))
         };
         let idle_frames = files::as_i64(job.get("idle_frames")).unwrap_or(0);
-        if idle_frames != 0 && !files::truthy(job.get("idle_measured")) {
+        // E012 (FMI_WAIT): the wait, after the reading, replaces the idle measurement and feeds E009's idle rule from
+        // its own first frames (plan.md 1, "In the try")
+        let idle_due = idle_frames != 0 && !files::truthy(job.get("idle_measured"));
+        if idle_due && !sw.wait {
             log.say(&format!("idle: {idle_frames} frames with no input from frame {}", status.frame));
             let c0 = cpu_now();
             let idle = measure_idle(root, idle_frames as u64).map_err(Err)?;
@@ -753,8 +773,67 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         log.say(&format!("reading {}: {} ({why})", out["reading"]["path"].as_str().unwrap_or(""),
                          if files::truthy(out["reading"].get("fresh")) { "fresh" } else { "reused" }));
         prof.mark("reading");
+        // E012, 2: T (the reading's tested atoms) and the try's novelty over T and the rooms
+        let entry_frame_u = status.frame;
+        let entry_facts = if sw.any() { facts_of(&state) } else { Facts::new() };
+        let mut extras: Vec<Extra> = Vec::new();
+        let mut dead: Vec<Value> = Vec::new();
+        let (tt, nov): (Option<TestedT>, Option<TryNovel>) = if sw.any() {
+            let t0 = Instant::now();
+            let port = r.mech.tested.as_ref().ok_or_else(|| Err("E012: the E012 switches read T, and no tested port is wired".to_string()))?;
+            let t = port.tested(&*rd).map_err(|e| Err(format!("E012 tested: {e}")))?;
+            let atoms = progress::t_atoms(&t.flat, rd.domains());
+            if sw.select {
+                out["tested"] = progress::atoms_json(&atoms);
+            }
+            let nov = TryNovel::new(&job, &atoms, &entry_facts);
+            let mut rec = t.record.clone();
+            rec["atoms"] = json!(atoms.len());
+            rec["keys"] = json!(t.keys().len());
+            rec["novelty"] = json!(nov.source);
+            rec["open"] = json!(nov.open());
+            rec["seconds"] = json!(t0.elapsed().as_secs_f64());
+            e12.insert("t".into(), rec);
+            (Some(t), Some(nov))
+        } else {
+            (None, None)
+        };
+        // E012, 3 (FMI_WAIT): time passes; the stops become candidate entries, kept by novelty
+        let mut waited: Option<mech::Waited> = None;
+        if sw.wait {
+            let (t, nov) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
+            let port = r.mech.wait.as_ref().ok_or_else(|| Err("E012: FMI_WAIT=1, and no wait port is wired".to_string()))?;
+            let c0 = cpu_now();
+            let w = port.wait(root, &t.flat, &*rd, if idle_due { idle_frames as u64 } else { 0 }).map_err(|e| Err(format!("E012 wait: {e}")))?;
+            cpu_set(&mut cpu, "wait", cpu_now() - c0 + w.cpu_s);
+            if idle_due {
+                if let Some(idle) = &w.idle {
+                    out["idle"] = idle.clone();
+                }
+            }
+            let mut kept = 0;
+            for s in &w.stops {
+                let n = nov.novel(&s.checkpoint.facts);
+                if !n.is_empty() {
+                    nov.keep(&n);
+                    kept += 1;
+                    extras.push(Extra { how: "wait", events: vec![], cps: vec![s.checkpoint.clone()], novel: n });
+                }
+            }
+            if let Some((reason, frame)) = &w.ended {
+                if fmi_core::is_game_end(reason) {
+                    dead.push(mech::dead_json(reason, *frame, &[], "wait"));
+                }
+            }
+            let mut rec = w.record.clone();
+            rec["kept"] = json!(kept);
+            log.say(&format!("wait: {} stops, {} kept, end {}, {:.2} s", w.stops.len(), kept, w.end, w.seconds));
+            e12.insert("wait".into(), rec);
+            waited = Some(w);
+            prof.mark("wait");
+        }
         // 3. targets
-        let ts = targets_of(r, &*rd, &job, &job_dir, &facts, &goal).map_err(Err)?;
+        let ts = targets_of(r, &*rd, &job, &job_dir, &facts, &goal, tt.as_ref()).map_err(Err)?;
         let by = |n: i64| ts.iter().filter(|x| x.tier == n).count();
         out["targets"] = json!({"by_tier": {"0": by(0), "1": by(1), "2": by(2)},
                                 "first": ts.iter().take(20).map(|x| x.json()).collect::<Vec<_>>(), "n": ts.len()});
@@ -762,23 +841,46 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         prof.mark("targets");
         // 4. attempts
         let ready = files::truthy(job.get("ready"));
-        let mut played: Option<(Target, Attempt)> = None;
+        let mut played: Option<(Target, Attempt, Option<usize>)> = None;
         let mut fresh_again = false;
         // E011's deepening (step::deepen): the deferred targets last, each with its doubled limit
         let deepen = step::deepen();
         let deferred_in = if deepen.is_some() { step::deferred_of(&job) } else { Default::default() };
-        let mut queue: std::collections::VecDeque<(Target, u32)> = match deepen {
-            Some(_) => step::deepen_order(ts, &deferred_in).into_iter().collect(),
-            None => ts.into_iter().map(|t| (t, 0)).collect(),
+        // each target with its deferral count and, for E012's goal again from a wait's stop, the stop's index
+        let mut queue: std::collections::VecDeque<(Target, u32, Option<usize>)> = match deepen {
+            Some(_) => step::deepen_order(ts, &deferred_in).into_iter().map(|(t, n)| (t, n, None)).collect(),
+            None => ts.into_iter().map(|t| (t, 0, None)).collect(),
         };
+        // E012 (FMI_DELAY_FORK): the window search's digest keys and novelty, from the try
+        let extras_of = |nov: Option<&TryNovel>| -> PlayExtras {
+            match (sw.delay, tt.as_ref(), nov) {
+                (true, Some(t), Some(n)) => PlayExtras { tested_keys: Some(Arc::new(t.keys().to_vec())), novel_of: Some(n.snapshot()) },
+                _ => PlayExtras::default(),
+            }
+        };
+        let keep_engine = sw.afford;
+        let mut goal_again = false;
+        let mut goal_again_rec: Vec<Value> = Vec::new();
         let mut n_att = 0;
-        while let Some((tg, n_def)) = queue.pop_front() {
+        while let Some((tg, n_def, from_stop)) = queue.pop_front() {
             if cancel.load(Ordering::SeqCst) {
                 return Err(Err("the guard's kill".into()));
             }
             let adir = run_dir.join(format!("a{n_att:02}"));
             let first_limit = deepen.map(|l0| step::deepen_limit(l0, n_def));
-            let att = attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc).map_err(Err)?;
+            let x = extras_of(nov.as_ref());
+            let att = match from_stop {
+                None => attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine).map_err(Err)?,
+                Some(si) => {
+                    // the goal again from a wait's stop: the entry's state run on with no input to the stop's frame
+                    // (a fork of the entry; the stop's checkpoint is held to it)
+                    let stop = &waited.as_ref().unwrap().stops[si];
+                    let mut b = engine_at(root, &stop.checkpoint).map_err(Err)?;
+                    let a = attempt(r, &rd, &mut b, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine);
+                    machine::port(|| b.quit());
+                    a.map_err(Err)?
+                }
+            };
             prof.mark("attempt");
             n_att += 1;
             let status_ = step::first_plan_status(att.res["plans"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
@@ -800,9 +902,34 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 pr["limit_s"] = json!(l);
                 pr["deferred_before"] = json!(n_def);
             }
+            if let Some(si) = from_stop {
+                let f = waited.as_ref().unwrap().stops[si].frame;
+                out["probes"].as_array_mut().unwrap().last_mut().unwrap()["from_stop"] = json!(f);
+                goal_again_rec.push(json!({"stop": f, "status": status_, "stop_reason": att.res.get("stop"), "seconds": pyjson::round(att.secs, 1)}));
+            }
             if status_.as_deref() == Some("plan") {
-                played = Some((tg, att));
+                played = Some((tg, att, from_stop));
                 break;
+            }
+            if let Some(e) = att.engine {
+                machine::port(|| e.quit());
+            }
+            // E012 (FMI_WAIT): the goal proven dead or deferred from the entry is requested again from each of the
+            // wait's stops, on the same reading, before the other targets (plan.md 1, "The planner plans only up to
+            // where the player must wait")
+            if from_stop.is_some() {
+                continue;
+            }
+            let goal_dead = matches!(status_.as_deref(), Some("unsolvable") | Some("incomplete"))
+                || (deepen.is_some() && status_.as_deref() == Some("time"));
+            if tg.tier == 0 && goal_dead && !goal_again {
+                if let Some(w) = waited.as_ref().filter(|w| !w.stops.is_empty()) {
+                    goal_again = true;
+                    log.say(&format!("the goal again from the wait's {} stops", w.stops.len()));
+                    for si in (0..w.stops.len()).rev() {
+                        queue.push_front((tg.clone(), n_def, Some(si)));
+                    }
+                }
             }
             if deepen.is_some() && status_.as_deref() == Some("time") {
                 // the first plan ran into its limit: deferred, not tried (later tries retry it with twice the limit)
@@ -826,12 +953,22 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"]["candidates"] = json!(checked);
                 cpu_add(&mut cpu, "read", cpu_now() - c0);
                 out["tried"].as_array_mut().unwrap().pop();
-                queue.push_front((tg, n_def));
+                queue.push_front((tg, n_def, None));
             }
         }
         prof.mark("probes");
-        if let Some((tg, mut att)) = played {
-            out["tried"].as_array_mut().unwrap().push(json!([tg.k, tg.v.json()]));
+        if goal_again {
+            e12.insert("goal_again".into(), json!(goal_again_rec));
+        }
+        let mut afford_recs: Vec<Value> = Vec::new();
+        let mut afford_offered: Option<usize> = None;
+        let parent = files::as_i64(entry.get("id")).unwrap_or(-1);
+        if let Some((tg, mut att, played_from)) = played {
+            // the goal again from a stop is the entry's goal target, tried once in its records
+            let rec = json!([tg.k, tg.v.json()]);
+            if played_from.is_none() || !out["tried"].as_array().unwrap().contains(&rec) {
+                out["tried"].as_array_mut().unwrap().push(rec);
+            }
             let entry_frame = entry["frame"].as_i64().unwrap_or(0);
             let frames: Vec<i64> = att.checkpoints.iter().map(|c| c.frame as i64).collect();
             let plan = step::entries_plan(entry_frame, &att.inputs, &frames).map_err(Err)?;
@@ -843,11 +980,21 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             att.res["_reached"] = json!(reached);
             att.res["_ready"] = json!(ready);
             out["attempt"] = step::attempt_record(&tg, &att.res, att.secs);
+            let att_engine = att.engine.take();
+            let att_stop: Option<String> = att.res.get("stop").and_then(|s| s.as_str()).map(|s| s.to_string());
             // the entries share the attempt's checkpoints (each a prefix): each checkpoint's text is made once, and the
             // files are written together; the ingest of this process takes them from the stash
             let kept: Vec<Checkpoint> = att.checkpoints.into_iter().filter(|c| c.frame as i64 > entry_frame).collect();
+            // E012: the attempt's entries are kept, so what they hold is novel no more in this try; the affordance
+            // step's entries continue the attempt's movie and checkpoints
+            if let Some(n) = nov.as_ref() {
+                for c in &kept {
+                    n.keep_facts(&c.facts);
+                }
+            }
+            let prefix_cps: Vec<Checkpoint> = if att_engine.is_some() { kept.clone() } else { Vec::new() };
+            let last_cp = kept.last().map(|c| c.frame as i64).unwrap_or(entry_frame);
             let shared = Arc::new(crate::archive::SharedCps::new(kept));
-            let parent = files::as_i64(entry.get("id")).unwrap_or(-1);
             let new_dir = job_dir.join("new");
             std::fs::create_dir_all(&new_dir).map_err(|e| Err(files::io_err(&new_dir, e)))?;
             let ents: Vec<crate::archive::NewEntry> = plan.iter().map(|(n, evs, _)| crate::archive::NewEntry {
@@ -869,14 +1016,97 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             }
             log.say(&format!("played {}: stop {}, {} frames, {} entries", tg.text(), files::py_repr(att.res.get("stop").unwrap_or(&Value::Null)),
                              files::py_str(att.res.get("frames")), out["new"].as_array().unwrap().len()));
+            // E012, 5 (FMI_DELAY_FORK): the delay fork's candidates, kept by the try's novelty
+            if sw.delay {
+                let ws = att.res["windows"].as_array().cloned().unwrap_or_default();
+                let nv = nov.as_ref().unwrap();
+                let mut rec = mech::delay_record(&ws);
+                let mut n_kept = 0;
+                for (_, _, inputs, cp) in mech::delay_candidates(&ws) {
+                    let n = nv.novel(&cp.facts);
+                    if n.is_empty() {
+                        continue;
+                    }
+                    nv.keep(&n);
+                    n_kept += 1;
+                    extras.push(Extra { how: "delay", events: inputs, cps: vec![cp], novel: n });
+                }
+                rec["kept"] = json!(n_kept);
+                rec["summary"] = att.res["window_summary"].get("delay").cloned().unwrap_or(Value::Null);
+                e12.insert("delay".into(), rec);
+            }
+            // E012, 5 (component end): a move whose run ends in the game's own end is dead; it has no entry
+            if sw.any() {
+                if let Some(reason) = mech::game_end_of_stop(att_stop.as_deref()) {
+                    let evs: Vec<Value> = att.inputs.iter().filter(|e| files::as_i64(e.get("frame")).unwrap_or(0) > last_cp).cloned().collect();
+                    dead.push(mech::dead_json(&reason, att.res["frame_end"].as_u64().unwrap_or(0), &evs, "attempt"));
+                }
+            }
+            // E012, 6 (FMI_AFFORD): the interface's own inputs where the model could not act (R0, the same empty window)
+            if let Some(mut e) = att_engine {
+                if let (Some(trig), Some(t), Some(nv)) = (mech::trigger_of_stop(att_stop.as_deref()), tt.as_ref(), nov.as_ref()) {
+                    let f = e.status().frame as i64;
+                    let prefix: Vec<Value> = att.inputs.iter().filter(|x| files::as_i64(x.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
+                    let c0 = cpu_now();
+                    let a = run_afford(r, &sw, &mut e, trig, t, nv, &*rd, &job, &prefix, &prefix_cps, log);
+                    machine::port(|| e.quit());
+                    let a = a.map_err(Err)?;
+                    cpu_set(&mut cpu, "afford", cpu_now() - c0 + a.cpu_s);
+                    afford_recs.push(a.record);
+                    extras.extend(a.kept);
+                    dead.extend(a.dead);
+                } else {
+                    machine::port(|| e.quit());
+                }
+            }
+        }
+        // E012, 6 (FMI_AFFORD): no target of the try plans: the interface's own inputs at the entry
+        if sw.afford && played_none(&out) {
+            let (t, nv) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
+            let c0 = cpu_now();
+            let a = run_afford(r, &sw, root, Trigger::NoPlan, t, nv, &*rd, &job, &[], &[], log).map_err(Err)?;
+            cpu_set(&mut cpu, "afford", cpu_now() - c0 + a.cpu_s);
+            afford_offered = Some(a.offered);
+            afford_recs.push(a.record);
+            extras.extend(a.kept);
+            dead.extend(a.dead);
         }
         prof.mark("new entries");
+        // E012, 7: the commit: the candidate entries kept by novelty (after the attempt's), and the dead moves
+        let n_extra = extras.len();
+        if sw.any() {
+            let mut by_how = Map::new();
+            for x in &extras {
+                let n = by_how.get(x.how).and_then(|v| v.as_u64()).unwrap_or(0);
+                by_how.insert(x.how.into(), json!(n + 1));
+            }
+            let first = out["new"].as_array().unwrap().len();
+            let items = mech::write_extras(&job_dir.join("new"), first, parent, entry_frame_u, extras).map_err(Err)?;
+            out["new"].as_array_mut().unwrap().extend(items);
+            if !afford_recs.is_empty() {
+                e12.insert("afford".into(), json!(afford_recs));
+            }
+            e12.insert("kept".into(), Value::Object(by_how));
+            e12.insert("dead".into(), json!(dead.len()));
+            out["dead"] = json!(dead);
+            if n_extra > 0 || !dead.is_empty() {
+                log.say(&format!("E012: {n_extra} more entries ({}), {} dead moves", pyjson::compact(&e12["kept"]), dead.len()));
+            }
+        }
         // with deepening, an entry whose try deferred a target is not exhausted: the target comes back
         let deferred_now = out.get("deferred").and_then(|d| d.as_array()).map(|d| !d.is_empty()).unwrap_or(false);
-        out["exhausted"] = json!(played_none(&out) && !deferred_now);
+        // E012 (plan.md 5): exhausted also needs the entry static for waiting, offering no input, and no entry kept
+        let e12_exhausted = !sw.any()
+            || (n_extra == 0 && (!sw.wait || waited.as_ref().map(|w| w.is_static).unwrap_or(false))
+                && (!sw.afford || afford_offered == Some(0)));
+        out["exhausted"] = json!(played_none(&out) && !deferred_now && e12_exhausted);
         out["ok"] = json!(true);
         Ok(())
     })();
+    if sw.any() {
+        e12.insert("switches".into(), sw.json());
+        out["e012"] = Value::Object(e12);
+    }
     match res {
         Ok(()) => {}
         Err(Ok(ReturnDiffers(m))) => out["error"] = json!(m),
@@ -911,6 +1141,52 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     prof.mark("result");
     prof.print();
     out
+}
+
+/// E012: an engine at a wait's stop: a fork of the entry's engine run with no input to the stop's frame, held to the
+/// stop's checkpoint (facts, tick, random state, actors), so the goal is requested again from that state.
+fn engine_at(root: &mut Box<dyn Engine>, cp: &Checkpoint) -> Result<Box<dyn Engine>, String> {
+    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let st = machine::port(|| b.run(&RunSpec { frame: Some(cp.frame), ..Default::default() }));
+    let differ = match st {
+        Ok(st) if st.frame == cp.frame => {
+            let obs = machine::port(|| b.obs(&ObsReq::default())).map_err(|e| format!("EngineError: {e}"));
+            match obs {
+                Ok(o) => {
+                    let d = compare_checkpoint(&harness::checkpoint_json(cp), &o, b.status());
+                    (!d.is_empty()).then(|| files::py_repr(&Value::Object(d)))
+                }
+                Err(e) => Some(e),
+            }
+        }
+        Ok(st) => Some(format!("the run stopped at frame {} ({})", st.frame, st.reason)),
+        Err(e) => Some(format!("EngineError: {e}")),
+    };
+    if let Some(d) = differ {
+        machine::port(|| b.quit());
+        return Err(format!("E012: the wait's stop at frame {} is not reached again from the entry: {d}", cp.frame));
+    }
+    Ok(b)
+}
+
+/// E012's affordance step in the try (mech::afford_step) with the wait's horizon and stops when the wait is on, and
+/// job.json's dead moves of the entry left out.
+#[allow(clippy::too_many_arguments)]
+fn run_afford(r: &Resident, sw: &Switches, e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nv: &TryNovel, rd: &dyn ReadingSource,
+              job: &Value, prefix: &[Value], prefix_cps: &[Checkpoint], log: &JobLog) -> Result<mech::Afforded, String> {
+    let dead_moves: Vec<Value> = job.get("dead").and_then(|d| d.as_array()).cloned().unwrap_or_default();
+    let wait = if sw.wait { r.mech.wait.clone() } else { None };
+    let then_f = wait.as_ref().map(|w| {
+        move |b: &mut Box<dyn Engine>| -> Result<Vec<Checkpoint>, String> { Ok(w.wait(b, &t.flat, rd, 0)?.stops.into_iter().map(|s| s.checkpoint).collect()) }
+    });
+    let due_f = wait.as_ref().map(|w| move |o: &Obs| w.last_due(o));
+    let then: Option<crate::afford::Then<'_>> = then_f.as_ref().map(|f| f as crate::afford::Then<'_>);
+    let due: Option<&dyn Fn(&Obs) -> Option<u64>> = due_f.as_ref().map(|f| f as &dyn Fn(&Obs) -> Option<u64>);
+    let a = machine::port(|| mech::afford_step(e, why, t, nv, due, then, &dead_moves, prefix, prefix_cps))
+        .map_err(|e| format!("EngineError: afford: {e}"))?;
+    log.say(&format!("afford ({}): {} trials, {} kept, {} dead, {:.2} s", why.text(), a.record["trials"], a.kept.len(), a.dead.len(),
+                     a.record["step_seconds"].as_f64().unwrap_or(0.0)));
+    Ok(a)
 }
 
 fn cpu_set(cpu: &mut Vec<(&str, f64)>, k: &'static str, v: f64) {

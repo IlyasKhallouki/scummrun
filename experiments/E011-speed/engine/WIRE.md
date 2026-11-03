@@ -217,3 +217,35 @@ Checked by `fmi-checks`' `play-wire check` (two engines in lockstep on the kitch
 from 1500, every command answered equal to the commands it stands for: StepObs against Run, Runs, ExplainLog and Obs;
 RunObs against Run and Obs; RunObs with the room's dump against Run, Obs and `room_cut`; AtMany equal to one At per
 point over a grid of screen points) and by play's tests 2-4 through fmi-engine.
+
+## Patch 0005 (E012, component end): the game's end and the walk boxes
+
+`patches/0005-scumm-speedrun-end.patch` applies on top of 0001-0004 (`experiments/E012-game-mechanics/end/build.sh`).
+It adds two messages to the binary channel, one command to the JSON protocol, two end reasons and their switch
+(`experiments/E012-game-mechanics/plan.md`, the amendment "component end").
+
+| type | message | payload | reply |
+|---|---|---|---|
+| 0x94 | Boxes | none | Boxes (0x12) |
+| 0x95 | BoxesJson | none | Json (0x0D): the JSON "boxes" reply's object |
+
+| type | message | payload |
+|---|---|---|
+| 0x12 | Boxes | `Boxes`: i32 room, then a `Vec<WalkBox>` (per box ul, ur, lr, ll as (i32, i32), then u8 flags) |
+
+- **Boxes** answers the current room's walk boxes 0..`getNumBoxes()`-1, each as `getBoxCoordinates()` and
+  `getBoxFlags()` give it (boxes.cpp). Both read the room's box data: a copy of the room's BOXD block, whose flags the
+  scripts may change since (`o5_matrixOps`). It reads and changes nothing. fmi-core: `Engine::boxes`.
+- **JSON**: `{"cmd": "boxes"}` answers `{"boxes": {"room": r, "boxes": [{"ul": [x, y], "ur": [x, y], "lr": [x, y],
+  "ll": [x, y], "flags": f}, ...]}}`, the same encoder as BoxesJson.
+- **The end reasons "restart" and "pause"**, with `SPEEDRUN_REPORT_RESTART=1` (off by default): the first statement
+  of `restart()` and of `pauseGame()` (which SO_PAUSE and the pause key call) ends the run through `finish()`: the end
+  record, then End (binary) or `{"end": ...}` (JSON), with the room and counters before either; `restart()` then
+  returns at once and no pause dialog opens. Off, both run as before. "quit" is the bridge's end at the engine's
+  shutdown, as before. fmi-core: `GAME_ENDS`, `is_game_end`; `fmi-engine` passes the switch from its own environment
+  to every engine.
+- **Tests only:** `SPEEDRUN_TEST_RESTART=<frame>` calls `restart()` at the start of that frame, where the engine's
+  restart key would (`processKeyboard()`).
+
+Checked by `experiments/E012-game-mechanics/end/check.sh` (`fmi-engine-end hooks`, `boxes`, `unreach`; E011's G1-G4
+with the switch off and on).

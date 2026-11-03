@@ -9,6 +9,8 @@ description = "E011 integration: the components' differential tests over the rea
 fmi-core = { path = "../fmi-core" }
 fmi-engine = { path = "../fmi-engine" }
 fmi-play = { path = "../fmi-play", features = ["json-double"] }
+fmi-explore = { path = "../fmi-explore" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [[bin]]
 name = "play-lean"
@@ -17,3 +19,15 @@ path = "src/bin/play_lean.rs"
 [[bin]]
 name = "play-wire"
 path = "src/bin/play_wire.rs"
+
+[[bin]]
+name = "afford-check"
+path = "src/bin/afford_check.rs"
+
+[[bin]]
+name = "delay-check"
+path = "src/bin/delay_check.rs"
+
+[[bin]]
+name = "kitchen-report"
+path = "src/bin/kitchen_report.rs"

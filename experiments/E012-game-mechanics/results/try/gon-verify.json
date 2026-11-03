@@ -1,0 +1,762 @@
+[
+ {
+  "entry": "j00000-0",
+  "how": "checkpoint",
+  "checkpoints": 2,
+  "inputs": 19,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.14832986
+ },
+ {
+  "entry": "j00000-1",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 19,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.16506435
+ },
+ {
+  "entry": "j00000-2",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.151347295
+ },
+ {
+  "entry": "j00000-3",
+  "how": "end",
+  "checkpoints": 5,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.130358233
+ },
+ {
+  "entry": "j00000-4",
+  "how": "afford",
+  "checkpoints": 6,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.17319448
+ },
+ {
+  "entry": "j00001-0",
+  "how": "end",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.157266296
+ },
+ {
+  "entry": "j00001-1",
+  "how": "afford",
+  "checkpoints": 4,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.193853013
+ },
+ {
+  "entry": "j00002-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.181712865
+ },
+ {
+  "entry": "j00002-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.180347209
+ },
+ {
+  "entry": "j00002-2",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.185657324
+ },
+ {
+  "entry": "j00002-3",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.198947065
+ },
+ {
+  "entry": "j00002-4",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.201712147
+ },
+ {
+  "entry": "j00003-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.16450213
+ },
+ {
+  "entry": "j00003-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.177368797
+ },
+ {
+  "entry": "j00003-2",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.2268512
+ },
+ {
+  "entry": "j00004-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 25,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.150805923
+ },
+ {
+  "entry": "j00004-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 25,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.214230971
+ },
+ {
+  "entry": "j00004-2",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.205070689
+ },
+ {
+  "entry": "j00004-3",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.167059728
+ },
+ {
+  "entry": "j00004-4",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 26,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.174437921
+ },
+ {
+  "entry": "j00005-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.164014796
+ },
+ {
+  "entry": "j00005-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.144175327
+ },
+ {
+  "entry": "j00005-2",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.172210323
+ },
+ {
+  "entry": "j00005-3",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.138281857
+ },
+ {
+  "entry": "j00005-4",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.226847477
+ },
+ {
+  "entry": "j00006-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.21763175
+ },
+ {
+  "entry": "j00006-1",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.195931975
+ },
+ {
+  "entry": "j00006-2",
+  "how": "checkpoint",
+  "checkpoints": 5,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.236739283
+ },
+ {
+  "entry": "j00006-3",
+  "how": "end",
+  "checkpoints": 6,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.224266324
+ },
+ {
+  "entry": "j00006-4",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 19,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.208035707
+ },
+ {
+  "entry": "j00006-5",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 19,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.1869953
+ },
+ {
+  "entry": "j00006-6",
+  "how": "afford",
+  "checkpoints": 7,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.188104642
+ },
+ {
+  "entry": "j00007-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.194592425
+ },
+ {
+  "entry": "j00007-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.200740885
+ },
+ {
+  "entry": "j00007-2",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.18537449
+ },
+ {
+  "entry": "j00008-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.21428267
+ },
+ {
+  "entry": "j00008-1",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.205933295
+ },
+ {
+  "entry": "j00008-2",
+  "how": "checkpoint",
+  "checkpoints": 5,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.201490944
+ },
+ {
+  "entry": "j00008-3",
+  "how": "end",
+  "checkpoints": 6,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.222083447
+ },
+ {
+  "entry": "j00008-4",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.209392006
+ },
+ {
+  "entry": "j00008-5",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.207463521
+ },
+ {
+  "entry": "j00008-6",
+  "how": "afford",
+  "checkpoints": 7,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.166310878
+ },
+ {
+  "entry": "j00009-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.157924842
+ },
+ {
+  "entry": "j00009-1",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.167819378
+ },
+ {
+  "entry": "j00009-2",
+  "how": "checkpoint",
+  "checkpoints": 5,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.204156008
+ },
+ {
+  "entry": "j00009-3",
+  "how": "end",
+  "checkpoints": 6,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.184866591
+ },
+ {
+  "entry": "j00009-4",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 19,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.202000873
+ },
+ {
+  "entry": "j00009-5",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 19,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.20558155
+ },
+ {
+  "entry": "j00009-6",
+  "how": "afford",
+  "checkpoints": 7,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.186534316
+ },
+ {
+  "entry": "j00010-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.207166663
+ },
+ {
+  "entry": "j00010-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.158598119
+ },
+ {
+  "entry": "j00010-2",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.21312423
+ },
+ {
+  "entry": "j00011-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.208720655
+ },
+ {
+  "entry": "j00011-1",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.205505371
+ },
+ {
+  "entry": "j00011-2",
+  "how": "checkpoint",
+  "checkpoints": 5,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.174235153
+ },
+ {
+  "entry": "j00011-3",
+  "how": "end",
+  "checkpoints": 6,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.171941719
+ },
+ {
+  "entry": "j00011-4",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.195320391
+ },
+ {
+  "entry": "j00011-5",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.191677638
+ },
+ {
+  "entry": "j00011-6",
+  "how": "afford",
+  "checkpoints": 7,
+  "inputs": 25,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.175397622
+ },
+ {
+  "entry": "j00012-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.213181053
+ },
+ {
+  "entry": "j00012-1",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 21,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.16495193
+ },
+ {
+  "entry": "j00012-2",
+  "how": "checkpoint",
+  "checkpoints": 5,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.132020964
+ },
+ {
+  "entry": "j00012-3",
+  "how": "end",
+  "checkpoints": 6,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.133081484
+ },
+ {
+  "entry": "j00012-4",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.186927095
+ },
+ {
+  "entry": "j00012-5",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 20,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.192461789
+ },
+ {
+  "entry": "j00012-6",
+  "how": "afford",
+  "checkpoints": 7,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.173783104
+ },
+ {
+  "entry": "j00013-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.210565799
+ },
+ {
+  "entry": "j00013-1",
+  "how": "end",
+  "checkpoints": 4,
+  "inputs": 24,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.217336127
+ },
+ {
+  "entry": "j00013-2",
+  "how": "afford",
+  "checkpoints": 5,
+  "inputs": 25,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.202412
+ },
+ {
+  "entry": "j00014-0",
+  "how": "checkpoint",
+  "checkpoints": 3,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.185832655
+ },
+ {
+  "entry": "j00014-1",
+  "how": "checkpoint",
+  "checkpoints": 4,
+  "inputs": 23,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.171871961
+ },
+ {
+  "entry": "j00014-2",
+  "how": "checkpoint",
+  "checkpoints": 5,
+  "inputs": 25,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.22807273
+ },
+ {
+  "entry": "j00014-3",
+  "how": "end",
+  "checkpoints": 6,
+  "inputs": 25,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.224551875
+ },
+ {
+  "entry": "j00014-4",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.200871657
+ },
+ {
+  "entry": "j00014-5",
+  "how": "wait",
+  "checkpoints": 3,
+  "inputs": 22,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.180745455
+ },
+ {
+  "entry": "j00014-6",
+  "how": "afford",
+  "checkpoints": 7,
+  "inputs": 26,
+  "differ": 0,
+  "first": null,
+  "same": true,
+  "seconds": 0.189539724
+ }
+]

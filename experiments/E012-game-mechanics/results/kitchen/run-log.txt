@@ -1,0 +1,110 @@
+[14:42:06] j00000: entry 0 (room 33), scope [28, 33, 35, 38], key [0,0,-1,0,2728,0]
+[14:44:26] j00000: entry 0 ok; 5 entries, 3 new cells, 26 new atoms; archive 6 entries, 4 cells
+[14:44:26] j00001: entry 4 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-7,2862,4]
+[14:44:26] j00002: entry 5 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-3,2929,5]
+[14:44:31] j00001: entry 4 ok; 1 entries, 0 new cells, 0 new atoms; archive 7 entries, 4 cells
+[14:44:31] j00003: entry 2 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-2,2848,2]
+[14:44:35] j00002: entry 5 ok; 5 entries, 4 new cells, 8 new atoms; archive 12 entries, 8 cells
+[14:44:35] j00004: entry 10 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-4,2987,10]
+[14:44:39] j00003: entry 2 ok; 2 entries, 0 new cells, 0 new atoms; archive 14 entries, 8 cells
+[14:44:39] j00005: entry 8 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-2,2997,8]
+[14:44:43] j00004: entry 10 ok; 3 entries, 2 new cells, 2 new atoms; archive 17 entries, 10 cells
+[14:44:43] j00006: entry 9 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-1,2955,9]
+[14:44:44] j00005: entry 8 ok; 1 entries, 0 new cells, 0 new atoms; archive 18 entries, 10 cells
+[14:44:44] j00007: entry 11 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-1,2955,11]
+[14:44:46] j00006: entry 9 ok; 1 entries, 0 new cells, 0 new atoms; archive 19 entries, 10 cells
+[14:44:46] j00008: entry 16 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-1,3023,16]
+[14:44:47] j00007: entry 11 ok; 3 entries, 1 new cells, 0 new atoms; archive 22 entries, 11 cells
+[14:44:47] j00009: entry 15 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,-1,3033,15]
+[14:44:49] j00008: entry 16 ok; 2 entries, 0 new cells, 0 new atoms; archive 24 entries, 11 cells
+[14:44:49] j00010: entry 20 (room 38), scope [33, 38, 83, 85, 96], key [0,0,-2,0,2958,20]
+[14:44:50] j00009: entry 15 ok; 2 entries, 0 new cells, 0 new atoms; archive 26 entries, 11 cells
+[14:44:50] j00011: entry 10 (room 38), scope [33, 38, 83, 85, 96], key [0,1,-2,-4,2987,10]
+[14:44:52] j00010: entry 20 ok; 1 entries, 0 new cells, 0 new atoms; archive 27 entries, 11 cells
+[14:44:52] j00012: entry 5 (room 38), scope [33, 38, 83, 85, 96], key [0,1,-2,-3,2929,5]
+[14:44:53] j00011: entry 10 ok; 1 entries, 0 new cells, 0 new atoms; archive 28 entries, 11 cells
+[14:44:53] j00013: entry 0 (room 33), scope [28, 33, 35, 38], key [0,1,-1,-456,2728,0]
+[14:44:54] j00012: entry 5 ok; 1 entries, 0 new cells, 0 new atoms; archive 29 entries, 11 cells
+[14:44:54] j00014: entry 4 (room 38), scope [33, 38, 83, 85, 96], key [1,1,-2,-7,2862,4]
+[14:44:55] j00014: entry 4 ok; 1 entries, 0 new cells, 0 new atoms; archive 30 entries, 11 cells
+[14:44:55] j00015: entry 2 (room 38), scope [33, 38, 83, 85, 96], key [1,1,-2,-2,2848,2]
+[14:44:56] j00015: entry 2 ok; 2 entries, 0 new cells, 0 new atoms; archive 32 entries, 11 cells
+[14:47:37] j00013: entry 0 ok; 14 entries, 11 new cells, 39 new atoms; archive 46 entries, 23 cells
+[14:47:37] j00016: entry 33 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-2,-3,2887,33]
+[14:47:37] j00017: entry 44 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-2,-1,10102,44]
+[14:48:08] j00016: entry 33 ok; 6 entries, 3 new cells, 27 new atoms; archive 52 entries, 26 cells
+[14:48:08] j00018: entry 49 (room 29), scope [29, 35], key [0,0,-3,-1,2947,49]
+[14:48:28] j00017: entry 44 ok; 6 entries, 3 new cells, 0 new atoms; archive 58 entries, 29 cells
+[14:48:28] j00019: entry 51 (room 29), scope [29, 35], key [0,0,-3,-1,2978,51]
+[14:49:20] j00018: entry 49 ok; 3 entries, 2 new cells, 7 new atoms; archive 61 entries, 31 cells
+[14:49:20] j00020: entry 60 (room 29), scope [29, 35], key [0,0,-3,-2,10199,60]
+[14:49:22] j00019: entry 51 ok; 3 entries, 1 new cells, 4 new atoms; archive 64 entries, 32 cells
+[14:49:22] j00021: entry 55 (room 29), scope [29, 35], key [0,0,-3,-1,10162,55]
+[14:49:49] j00020: entry 60 ok; 3 entries, 2 new cells, 3 new atoms; archive 67 entries, 34 cells
+[14:49:49] j00022: entry 66 (room 29), scope [29, 35], key [0,0,-3,-1,10233,66]
+[14:49:57] j00022: entry 66 ok; 4 entries, 2 new cells, 5 new atoms; archive 71 entries, 36 cells
+[14:49:57] j00023: entry 69 (room 29), scope [29, 35], key [0,0,-3,-2,10681,69]
+[14:50:13] j00023: entry 69 ok; 8 entries, 5 new cells, 18 new atoms; archive 79 entries, 41 cells
+[14:50:13] j00024: entry 70 (room 29), scope [29, 35], key [0,0,-3,-1,10260,70]
+[14:50:24] j00024: entry 70 ok; 1 entries, 0 new cells, 0 new atoms; archive 80 entries, 41 cells
+[14:50:24] j00025: entry 65 (room 29), scope [29, 35], key [0,0,-3,-1,10310,65]
+[14:50:32] j00025: entry 65 ok; 1 entries, 1 new cells, 1 new atoms; archive 81 entries, 42 cells
+[14:50:32] j00026: entry 80 (room 29), scope [29, 35], key [0,0,-3,-1,10346,80]
+[14:50:42] j00026: entry 80 ok; 1 entries, 0 new cells, 0 new atoms; archive 82 entries, 42 cells
+[14:50:42] j00027: entry 76 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,-1,10708,76]
+[14:50:44] j00027: entry 76 ok; 0 entries, 0 new cells, 0 new atoms; archive 82 entries, 42 cells
+[14:50:44] j00028: entry 78 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,-1,10934,78]
+[14:51:02] j00028: entry 78 ok; 1 entries, 0 new cells, 0 new atoms; archive 83 entries, 42 cells
+[14:51:02] j00029: entry 58 (room 29), scope [29, 35], key [0,0,-3,0,6547,58]
+[14:51:05] j00021: entry 55 ok; 5 entries, 3 new cells, 3 new atoms; archive 88 entries, 45 cells
+[14:51:05] j00030: entry 87 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,-1,17423,87]
+[14:51:50] j00029: entry 58 ok; 0 entries, 0 new cells, 0 new atoms; archive 88 entries, 45 cells
+[14:51:50] j00031: entry 84 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,10167,84]
+[14:52:02] j00030: entry 87 ok; 6 entries, 3 new cells, 1 new atoms; archive 94 entries, 48 cells
+[14:52:02] j00032: entry 57 (room 29), scope [29, 35], key [0,0,-3,0,10193,57]
+[14:52:23] j00031: entry 84 ok; 3 entries, 1 new cells, 2 new atoms; archive 97 entries, 49 cells
+[14:52:23] j00033: entry 96 (room 34), scope [34, 35], key [0,0,-4,0,13830,96]
+[14:52:49] j00032: entry 57 ok; 2 entries, 0 new cells, 0 new atoms; archive 99 entries, 49 cells
+[14:52:49] j00034: entry 63 (room 29), scope [29, 35], key [0,0,-3,0,10224,63]
+[14:53:03] j00034: entry 63 ok; 2 entries, 1 new cells, 1 new atoms; archive 101 entries, 50 cells
+[14:53:03] j00035: entry 100 (room 29), scope [29, 35], key [0,0,-3,-1,10317,100]
+[14:53:10] j00035: entry 100 ok; 1 entries, 0 new cells, 0 new atoms; archive 102 entries, 50 cells
+[14:53:10] j00036: entry 72 (room 29), scope [29, 35], key [0,0,-3,0,10703,72]
+[14:53:12] j00036: entry 72 ok; 2 entries, 1 new cells, 0 new atoms; archive 104 entries, 51 cells
+[14:53:12] j00037: entry 74 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,10705,74]
+[14:53:38] j00033: entry 96 ok; 5 entries, 3 new cells, 7 new atoms; archive 109 entries, 54 cells
+[14:53:38] j00038: entry 105 (room 34), scope [34, 35], key [0,0,-4,-1,14012,105]
+[14:53:39] j00038: entry 105 ok; 1 entries, 0 new cells, 0 new atoms; archive 110 entries, 54 cells
+[14:53:39] j00039: entry 107 (room 34), scope [34, 35], key [0,0,-4,-1,14279,107]
+[14:53:39] j00039: entry 107 ok; 1 entries, 0 new cells, 0 new atoms; archive 111 entries, 54 cells
+[14:53:39] j00040: entry 103 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,10715,103]
+[14:54:46] j00037: entry 74 ok; 2 entries, 2 new cells, 0 new atoms; archive 113 entries, 56 cells
+[14:54:46] j00041: entry 111 (room 34), scope [34, 35], key [0,0,-4,-1,11036,111]
+[14:55:06] j00041: entry 111 ok; 4 entries, 0 new cells, 4 new atoms; archive 117 entries, 56 cells
+[14:55:07] j00042: entry 112 (room 34), scope [34, 35], key [0,0,-4,-1,11057,112]
+[14:55:08] j00042: entry 112 ok; 1 entries, 1 new cells, 0 new atoms; archive 118 entries, 57 cells
+[14:55:55] j00040: entry 103 ok; 0 entries, 0 new cells, 0 new atoms; archive 118 entries, 57 cells
+[14:55:55] j00043: entry 117 (room 34), scope [34, 35], key [0,0,-4,0,11061,117]
+[14:56:29] j00043: entry 117 ok; 3 entries, 1 new cells, 6 new atoms; archive 121 entries, 58 cells
+[14:56:29] j00044: entry 77 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,10779,77]
+[14:58:44] j00045: entry 85 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,13767,85]
+[14:58:45] j00044: entry 77 ok; 1 entries, 0 new cells, 0 new atoms; archive 122 entries, 58 cells
+[14:58:45] j00046: entry 89 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,17489,89]
+[14:59:32] j00045: entry 85 ok; 6 entries, 3 new cells, 0 new atoms; archive 128 entries, 61 cells
+[15:00:13] j00046: entry 89 ok; 4 entries, 0 new cells, 0 new atoms; archive 132 entries, 61 cells
+[15:00:13] j00047: entry 123 (room 35), scope [29, 33, 34, 35, 83], key [0,0,-3,0,13776,123]
+[15:00:17] j00047: entry 123 ok; 4 entries, 2 new cells, 14 new atoms; archive 136 entries, 63 cells
+[15:00:17] j00048: entry 135 (room 33), scope [28, 33, 35, 38], key [0,0,-3,-2,13924,135]
+[15:02:02] j00048: entry 135 ok; 7 entries, 3 new cells, 16 new atoms; archive 143 entries, 66 cells
+[15:02:02] j00049: entry 138 (room 28), scope [28, 33, 41], key [0,0,-4,-3,17526,138]
+[15:02:04] j00050: entry 140 (room 28), scope [28, 33, 41], key [0,0,-4,-1,17576,140]
+[15:02:35] j00049: entry 138 ok; 1 entries, 0 new cells, 0 new atoms; archive 144 entries, 66 cells
+[15:02:47] j00050: entry 140 ok; 1 entries, 0 new cells, 0 new atoms; archive 145 entries, 66 cells
+[15:02:47] j00051: entry 142 (room 28), scope [28, 33, 41], key [0,0,-4,-2,17917,142]
+[15:03:19] j00051: entry 142 ok; 2 entries, 1 new cells, 3 new atoms; archive 147 entries, 67 cells
+[15:03:19] j00052: entry 146 (room 28), scope [28, 33, 41], key [0,0,-4,-1,18056,146]
+[15:03:35] j00052: entry 146 ok; 4 entries, 3 new cells, 14 new atoms; archive 151 entries, 70 cells
+[15:03:35] goal entry 150: verifying its movie from boot
+[15:03:36] stop: goal {'entry': 150}
+driver: 53 jobs started, own 8.178386 s; per committed job [0.069627259, 0.027958445, 0.089827615, 0.037916883, 0.039800606, 0.030494342, 0.037649953, 0.045509268, 0.041828118, 0.045642081, 0.028199225, 0.029714881, 0.015593036, 0.02451473, 0.016864741, 0.081054794, 0.243611931, 0.3467284, 0.327349507, 0.037484499, 0.067076229, 0.073502997, 0.072261389, 0.034215872, 0.072909483, 0.040727769, 0.419990555, 0.045101016, 0.044647373, 0.0574065, 0.521581716, 0.071582182, 0.042385378, 0.071161859, 0.036585921, 0.081663913, 0.840721647, 0.03136311, 0.03139899, 0.675007608, 0.048975896, 0.023610833, 0.073255116, 0.026021855, 0.041917357, 0.07997229, 0.044457387, 0.606923722, 0.128187684, 0.99243126, 0.029218479, 0.038748815]
+GUARD: rc 0 wall 1292.4 s low 0 min MemAvailable 5638816 kB

@@ -1,0 +1,56 @@
+    Finished `release` profile [optimized] target(s) in 1m 43s
+[11:31:39] step tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[11:32:40] step kitchen,28-33-35-38,j00000,j00059,before,3
+[11:32:40] before 3: FMI_READER_PREP=1
+GUARD: rc 0 wall 73.4 s low 0 min MemAvailable 13520980 kB
+  k-j00000   wall  35.86 s cpu  99.97 s  taken None ran 0 (key differs None)  rss peak seen 874 MB, process 3 MB, child max 873 MB  mem store None MB  
+  k-j00059   wall  37.38 s cpu 103.38 s  taken None ran 0 (key differs None)  rss peak seen 851 MB, process 4 MB, child max 873 MB  mem store None MB  
+[11:33:54] step kitchen,28-33-35-38,j00000,j00059,after,4
+[11:33:54] after 4: FMI_READER_LIB=1
+GUARD: rc 0 wall 67.4 s low 0 min MemAvailable 13411768 kB
+  k-j00000   wall  37.66 s cpu 111.30 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 1002 MB, process 1085 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  16.08 s cpu  42.36 s  taken 39115 ran 400 (key differs 400)  rss peak seen 456 MB, process 1125 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  13.38 s cpu  34.74 s  taken 39515 ran 0 (key differs 0)  rss peak seen 698 MB, process 1125 MB, child max 0 MB  mem store 189 MB  
+[11:35:04] step kitchen,28-33-35-38,j00000,j00059,after,5
+[11:35:04] after 5: FMI_READER_LIB=1
+GUARD: rc 0 wall 67.4 s low 0 min MemAvailable 13495100 kB
+  k-j00000   wall  38.02 s cpu 111.82 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 1004 MB, process 1091 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  15.53 s cpu  40.89 s  taken 39115 ran 400 (key differs 400)  rss peak seen 558 MB, process 1144 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  13.77 s cpu  36.33 s  taken 39515 ran 0 (key differs 0)  rss peak seen 464 MB, process 1144 MB, child max 0 MB  mem store 189 MB  
+[11:36:14] step kitchen,28-33-35-38,j00000,j00059,cmp
+before-1/k2: five files vs ref/k2 pass, reading.json pass
+before-2/k1: five files vs before-1/k1 pass, reading.json pass
+before-2/k2: five files vs ref/k2 pass, reading.json pass
+before-3/k1: five files vs before-1/k1 pass, reading.json pass
+before-3/k2: five files vs ref/k2 pass, reading.json pass
+disk-1/k1: five files vs before-1/k1 pass, reading.json pass
+disk-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k2-again: five files vs ref/k2 pass, reading.json pass
+after-2/k1: five files vs before-1/k1 pass, reading.json pass
+after-2/k2: five files vs ref/k2 pass, reading.json pass
+after-2/k2-again: five files vs ref/k2 pass, reading.json pass
+after-3/k1: five files vs before-1/k1 pass, reading.json pass
+after-3/k2: five files vs ref/k2 pass, reading.json pass
+after-3/k2-again: five files vs ref/k2 pass, reading.json pass
+after-4/k1: five files vs before-1/k1 pass, reading.json pass
+after-4/k2: five files vs ref/k2 pass, reading.json pass
+after-4/k2-again: five files vs ref/k2 pass, reading.json pass
+after-5/k1: five files vs before-1/k1 pass, reading.json pass
+after-5/k2: five files vs ref/k2 pass, reading.json pass
+after-5/k2-again: five files vs ref/k2 pass, reading.json pass
+after-system-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-system-1/k2: five files vs ref/k2 pass, reading.json pass
+after-system-1/k2-again: five files vs ref/k2 pass, reading.json pass
+after-system-2/k1: five files vs before-1/k1 pass, reading.json pass
+after-system-2/k2: five files vs ref/k2 pass, reading.json pass
+after-system-2/k2-again: five files vs ref/k2 pass, reading.json pass
+ref/k2: five files vs before-1/k2 pass, reading.json pass
+RS2 files PASS

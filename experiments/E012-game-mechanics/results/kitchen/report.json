@@ -1,0 +1,2924 @@
+{
+  "archive": "/var/tmp/fast-mi/e012-archives/kitchen",
+  "stage": {
+    "goal": {
+      "owner:566": [
+        1
+      ]
+    },
+    "allowed_rooms": [
+      28,
+      29,
+      33,
+      34,
+      35,
+      38,
+      41,
+      83,
+      85,
+      96
+    ],
+    "e009": {
+      "idle_frames": 1600,
+      "rotate": true,
+      "evict_by_size": true,
+      "reuse_nonfacts": true,
+      "stop_jobs": 80
+    },
+    "e010": {
+      "ready": true,
+      "commit_finished": true
+    },
+    "e012": {
+      "select": "progress"
+    }
+  },
+  "summary": {
+    "stop": "goal",
+    "detail": {
+      "entry": 150
+    },
+    "jobs": 53,
+    "entries": 151,
+    "cells": 70,
+    "goal_entries": [
+      150
+    ],
+    "time": "2026-11-03T15:03:35",
+    "verify": {
+      "entry": 150,
+      "same": true,
+      "goal": true,
+      "frames": 15688,
+      "qf": 376512,
+      "seconds": 1568.8512723618917,
+      "inputs": 85,
+      "segments": 8
+    }
+  },
+  "tries": [
+    {
+      "job": "j00000",
+      "entry": 0,
+      "room": 33,
+      "scope": [
+        28,
+        33,
+        35,
+        38
+      ],
+      "wall": 139.8,
+      "parts": {
+        "return": 0.13,
+        "read": 119.50999999999999,
+        "T": 1.9061829810000002,
+        "idle/wait": 0.066,
+        "plan": 17.33,
+        "play": 0.26,
+        "afford": 0.594347462,
+        "rest": 0.0034695570000451426
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:108",
+        1
+      ],
+      "probes": 1,
+      "new": 5,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/1"
+      ],
+      "new_t": [
+        "bit:386=1",
+        "bit:387=1",
+        "bit:390=1",
+        "local:202=0",
+        "room=38",
+        "var:256=1",
+        "var:32=14",
+        "verb:120=1",
+        "verb:121=1",
+        "verb:122=1",
+        "verb:123=1",
+        "verb:126=1"
+      ],
+      "new_rooms": [
+        38
+      ],
+      "t_size": 559,
+      "selectable": 4
+    },
+    {
+      "job": "j00001",
+      "entry": 4,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 5.1,
+      "parts": {
+        "return": 0.01,
+        "read": 3.47,
+        "T": 0.154029548,
+        "idle/wait": 0.217,
+        "plan": 0.42999999999999994,
+        "play": 0.0,
+        "afford": 0.787557047,
+        "rest": 0.03141340499999945
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:109",
+        1
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 4
+    },
+    {
+      "job": "j00002",
+      "entry": 5,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 3.7,
+      "parts": {
+        "return": 0.0,
+        "read": 1.92,
+        "T": 0.104990894,
+        "idle/wait": 0.063,
+        "plan": 0.28000000000000014,
+        "play": 0.0,
+        "afford": 1.270900602,
+        "rest": 0.0611085039999999
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:109",
+        1
+      ],
+      "probes": 1,
+      "new": 5,
+      "new_how": {
+        "afford": 4,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 5/4"
+      ],
+      "new_t": [
+        "bit:108=1",
+        "bit:109=1",
+        "bit:110=1",
+        "bit:111=1",
+        "bit:388=1",
+        "var:254=1",
+        "verb:124=1",
+        "verb:125=1"
+      ],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 8
+    },
+    {
+      "job": "j00003",
+      "entry": 2,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 4.1,
+      "parts": {
+        "return": 0.02,
+        "read": 2.4699999999999998,
+        "T": 0.110150607,
+        "idle/wait": 0.084,
+        "plan": 0.31000000000000005,
+        "play": 0.02,
+        "afford": 0.775527599,
+        "rest": 0.3103217939999996
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:110",
+        1
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 8
+    },
+    {
+      "job": "j00004",
+      "entry": 10,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 3.4,
+      "parts": {
+        "return": 0.01,
+        "read": 2.16,
+        "T": 0.107611336,
+        "idle/wait": 0.069,
+        "plan": 0.24,
+        "play": 0.0,
+        "afford": 0.63106739,
+        "rest": 0.18232127399999998
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:113",
+        1
+      ],
+      "probes": 1,
+      "new": 3,
+      "new_how": {
+        "afford": 2,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/2"
+      ],
+      "new_t": [
+        "bit:113=1",
+        "bit:114=1"
+      ],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 10
+    },
+    {
+      "job": "j00005",
+      "entry": 8,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.5,
+      "parts": {
+        "return": 0.0,
+        "read": 0.78,
+        "T": 0.000612981,
+        "idle/wait": 0.074,
+        "plan": 0.19000000000000006,
+        "play": 0.0,
+        "afford": 0.429690081,
+        "rest": 0.025696938000000058
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:113",
+        1
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 5/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 10
+    },
+    {
+      "job": "j00006",
+      "entry": 9,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.8,
+      "parts": {
+        "return": 0.0,
+        "read": 0.69,
+        "T": 0.000572962,
+        "idle/wait": 0.111,
+        "plan": 0.28,
+        "play": 0.0,
+        "afford": 0.676845503,
+        "rest": 0.04158153499999995
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:115",
+        1
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 10
+    },
+    {
+      "job": "j00007",
+      "entry": 11,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.2,
+      "parts": {
+        "return": 0.0,
+        "read": 0.51,
+        "T": 0.000608264,
+        "idle/wait": 0.082,
+        "plan": 0.17999999999999994,
+        "play": 0.01,
+        "afford": 0.358456413,
+        "rest": 0.05893532300000004
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:115",
+        1
+      ],
+      "probes": 1,
+      "new": 3,
+      "new_how": {
+        "checkpoint": 2,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00008",
+      "entry": 16,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.6,
+      "parts": {
+        "return": 0.0,
+        "read": 0.9,
+        "T": 0.093993092,
+        "idle/wait": 0.117,
+        "plan": 0.18000000000000002,
+        "play": 0.02,
+        "afford": 0.231831292,
+        "rest": 0.057175616000000096
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on esc(local:202@801)#5400: refuted event(local:202@3249)#3 at 3025: end pos:local:202: no branch off the records' path found; local:202 ; ; class None",
+      "target": [
+        "bit:117",
+        1
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "empty window:dialog 3/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00009",
+      "entry": 15,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.7,
+      "parts": {
+        "return": 0.0,
+        "read": 1.0,
+        "T": 0.07364583,
+        "idle/wait": 0.107,
+        "plan": 0.27999999999999997,
+        "play": 0.02,
+        "afford": 0.260217046,
+        "rest": 0.0
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on esc(local:202@801)#5400: refuted event(local:202@3249)#4 at 3035: end pos:local:202: no branch off the records' path found; local:202 ; ; class None",
+      "target": [
+        "bit:117",
+        1
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "empty window:dialog 3/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00010",
+      "entry": 20,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.9,
+      "parts": {
+        "return": 0.0,
+        "read": 0.71,
+        "T": 0.000658527,
+        "idle/wait": 0.073,
+        "plan": 0.28,
+        "play": 0.0,
+        "afford": 0.782588746,
+        "rest": 0.053752727
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "room",
+        85
+      ],
+      "probes": 2,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00011",
+      "entry": 10,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 0.8,
+      "parts": {
+        "return": 0.0,
+        "read": 0.08,
+        "T": 0.000491806,
+        "idle/wait": 0.071,
+        "plan": 0.28,
+        "play": 0.01,
+        "afford": 0.372537145,
+        "rest": 0.0
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "room",
+        85
+      ],
+      "probes": 2,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00012",
+      "entry": 5,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 0.8,
+      "parts": {
+        "return": 0.0,
+        "read": 0.01,
+        "T": 0.000601301,
+        "idle/wait": 0.111,
+        "plan": 0.18,
+        "play": 0.01,
+        "afford": 0.423457257,
+        "rest": 0.06494144200000007
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "var:102",
+        3
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 5/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00014",
+      "entry": 4,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.0,
+      "parts": {
+        "return": 0.0,
+        "read": 0.01,
+        "T": 0.000458871,
+        "idle/wait": 0.078,
+        "plan": 0.39,
+        "play": 0.0,
+        "afford": 0.466301523,
+        "rest": 0.055239606
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:111",
+        1
+      ],
+      "probes": 2,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00015",
+      "entry": 2,
+      "room": 38,
+      "scope": [
+        33,
+        38,
+        83,
+        85,
+        96
+      ],
+      "wall": 1.0,
+      "parts": {
+        "return": 0.0,
+        "read": 0.01,
+        "T": 0.00084317,
+        "idle/wait": 0.09,
+        "plan": 0.26999999999999996,
+        "play": 0.02,
+        "afford": 0.533241062,
+        "rest": 0.075915768
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:114",
+        1
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 576,
+      "selectable": 11
+    },
+    {
+      "job": "j00013",
+      "entry": 0,
+      "room": 33,
+      "scope": [
+        28,
+        33,
+        35,
+        38
+      ],
+      "wall": 163.6,
+      "parts": {
+        "return": 0.0,
+        "read": 0.01,
+        "T": 2.566750103,
+        "idle/wait": 0.111,
+        "plan": 25.27,
+        "play": 6.03,
+        "afford": 129.594812384,
+        "rest": 0.0174375130000044
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,452)#2636: no cause",
+      "target": [
+        "bit:124",
+        1
+      ],
+      "probes": 1,
+      "new": 14,
+      "new_how": {
+        "afford": 10,
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "empty window:sentence 544/10"
+      ],
+      "new_t": [
+        "bit:16=1",
+        "local:203=1",
+        "local:214=1",
+        "room=35",
+        "state:444=1",
+        "state:445=1",
+        "state:446=1",
+        "state:447=1",
+        "state:448=1",
+        "var:103=427",
+        "var:192=>0",
+        "var:193=208",
+        "var:248=1"
+      ],
+      "new_rooms": [
+        34,
+        35
+      ],
+      "t_size": 594,
+      "selectable": 23
+    },
+    {
+      "job": "j00016",
+      "entry": 33,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 30.9,
+      "parts": {
+        "return": 0.01,
+        "read": 26.490000000000002,
+        "T": 0.446444396,
+        "idle/wait": 0.178,
+        "plan": 3.6300000000000026,
+        "play": 0.08,
+        "afford": 0.0,
+        "rest": 0.06555560399999294
+      },
+      "stop_kind": "goal",
+      "stop": "goal",
+      "target": [
+        "owner:377",
+        1
+      ],
+      "probes": 1,
+      "new": 6,
+      "new_how": {
+        "checkpoint": 5,
+        "end": 1
+      },
+      "wait": "horizon/7/0",
+      "afford": [],
+      "new_t": [
+        "owner:377=1",
+        "room=29",
+        "state:367=1"
+      ],
+      "new_rooms": [
+        29
+      ],
+      "t_size": 827,
+      "selectable": 26
+    },
+    {
+      "job": "j00017",
+      "entry": 44,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 19.6,
+      "parts": {
+        "return": 0.09,
+        "read": 14.09,
+        "T": 0.398212491,
+        "idle/wait": 0.262,
+        "plan": 4.72,
+        "play": 0.09,
+        "afford": 0.0,
+        "rest": 0.0
+      },
+      "stop_kind": "goal",
+      "stop": "goal",
+      "target": [
+        "owner:377",
+        1
+      ],
+      "probes": 1,
+      "new": 6,
+      "new_how": {
+        "checkpoint": 5,
+        "end": 1
+      },
+      "wait": "horizon/10/0",
+      "afford": [],
+      "new_t": [
+        "var:248=>1"
+      ],
+      "new_rooms": [],
+      "t_size": 827,
+      "selectable": 29
+    },
+    {
+      "job": "j00018",
+      "entry": 49,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 72.2,
+      "parts": {
+        "return": 0.0,
+        "read": 11.1,
+        "T": 0.285822397,
+        "idle/wait": 0.086,
+        "plan": 2.9999999999999996,
+        "play": 3.1,
+        "afford": 54.576952498,
+        "rest": 0.051225105000000326
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,382)#296: no cause",
+      "target": [
+        "var:5",
+        1
+      ],
+      "probes": 1,
+      "new": 3,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [
+        "empty window:sentence 506/1"
+      ],
+      "new_t": [
+        "bit:118=1",
+        "bit:488=1"
+      ],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 31
+    },
+    {
+      "job": "j00019",
+      "entry": 51,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 53.9,
+      "parts": {
+        "return": 0.0,
+        "read": 10.6,
+        "T": 0.362449252,
+        "idle/wait": 0.08,
+        "plan": 2.3500000000000005,
+        "play": 4.05,
+        "afford": 36.396541027,
+        "rest": 0.061009720999997796
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,382)#300: no cause",
+      "target": [
+        "var:5",
+        1
+      ],
+      "probes": 1,
+      "new": 3,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "empty window:sentence 362/1"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 32
+    },
+    {
+      "job": "j00020",
+      "entry": 60,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 28.5,
+      "parts": {
+        "return": 0.11,
+        "read": 16.44,
+        "T": 0.274929669,
+        "idle/wait": 0.081,
+        "plan": 11.06,
+        "play": 0.0,
+        "afford": 0.416042693,
+        "rest": 0.11802763800000093
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:490",
+        1
+      ],
+      "probes": 7,
+      "new": 3,
+      "new_how": {
+        "afford": 2,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 3/2"
+      ],
+      "new_t": [
+        "bit:490=1",
+        "bit:492=1"
+      ],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 34
+    },
+    {
+      "job": "j00022",
+      "entry": 66,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 8.1,
+      "parts": {
+        "return": 0.0,
+        "read": 5.8,
+        "T": 0.310594365,
+        "idle/wait": 0.079,
+        "plan": 1.6,
+        "play": 0.0,
+        "afford": 0.20398267,
+        "rest": 0.10642296500000015
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on event(local:200@71)#2: refuted event(local:200@71)#2 at 10235: end pos:local:200: left the records' path; local:200 [004C] jump unless; var 0 = 7 (position); class split",
+      "target": [
+        "bit:491",
+        1
+      ],
+      "probes": 1,
+      "new": 4,
+      "new_how": {
+        "afford": 2,
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "empty window:dialog 2/2"
+      ],
+      "new_t": [
+        "bit:494=1",
+        "var:294=1",
+        "var:294=1|2"
+      ],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 36
+    },
+    {
+      "job": "j00023",
+      "entry": 69,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 16.2,
+      "parts": {
+        "return": 0.01,
+        "read": 12.66,
+        "T": 0.001077361,
+        "idle/wait": 0.061,
+        "plan": 2.6099999999999994,
+        "play": 0.3,
+        "afford": 0.573808238,
+        "rest": 0.0
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:65",
+        1
+      ],
+      "probes": 2,
+      "new": 8,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 6,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/1"
+      ],
+      "new_t": [
+        "bit:475=1",
+        "script:2=1"
+      ],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 41
+    },
+    {
+      "job": "j00024",
+      "entry": 70,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 10.5,
+      "parts": {
+        "return": 0.0,
+        "read": 3.3699999999999997,
+        "T": 0.001085387,
+        "idle/wait": 0.06,
+        "plan": 6.869999999999999,
+        "play": 0.01,
+        "afford": 0.282783301,
+        "rest": 0.0
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "var:294",
+        1
+      ],
+      "probes": 8,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 3/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 41
+    },
+    {
+      "job": "j00025",
+      "entry": 65,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 8.2,
+      "parts": {
+        "return": 0.01,
+        "read": 0.0,
+        "T": 0.294649852,
+        "idle/wait": 0.067,
+        "plan": 7.899999999999991,
+        "play": 0.0,
+        "afford": 0.146469899,
+        "rest": 0.0
+      },
+      "stop_kind": "none played",
+      "stop": null,
+      "target": null,
+      "probes": 35,
+      "new": 1,
+      "new_how": {
+        "afford": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "no plan:dialog 2/1"
+      ],
+      "new_t": [
+        "bit:495=1"
+      ],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 42
+    },
+    {
+      "job": "j00026",
+      "entry": 80,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 9.3,
+      "parts": {
+        "return": 0.0,
+        "read": 7.44,
+        "T": 0.001455412,
+        "idle/wait": 0.076,
+        "plan": 1.379999999999999,
+        "play": 0.11,
+        "afford": 0.283968836,
+        "rest": 0.008575752000002268
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "var:102",
+        3
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 3/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 42
+    },
+    {
+      "job": "j00027",
+      "entry": 76,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 1.6,
+      "parts": {
+        "return": 0.0,
+        "read": 0.7,
+        "T": 0.000698494,
+        "idle/wait": 0.088,
+        "plan": 0.0,
+        "play": 0.0,
+        "afford": 0.352560759,
+        "rest": 0.4587407470000002
+      },
+      "stop_kind": "none played",
+      "stop": null,
+      "target": null,
+      "probes": 0,
+      "new": 0,
+      "new_how": {},
+      "wait": "static/0/0",
+      "afford": [
+        "no plan:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 42
+    },
+    {
+      "job": "j00028",
+      "entry": 78,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 17.8,
+      "parts": {
+        "return": 0.01,
+        "read": 13.190000000000001,
+        "T": 0.438629157,
+        "idle/wait": 0.087,
+        "plan": 3.3599999999999985,
+        "play": 0.05,
+        "afford": 0.582865436,
+        "rest": 0.08150540700000164
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "room",
+        33
+      ],
+      "probes": 2,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 2/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 42
+    },
+    {
+      "job": "j00021",
+      "entry": 55,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 103.8,
+      "parts": {
+        "return": 0.01,
+        "read": 14.69,
+        "T": 0.304583061,
+        "idle/wait": 0.055,
+        "plan": 2.990000000000002,
+        "play": 5.22,
+        "afford": 80.400038972,
+        "rest": 0.13037796700000115
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,452)#268: no cause",
+      "target": [
+        "bit:125",
+        1
+      ],
+      "probes": 1,
+      "new": 5,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [
+        "empty window:sentence 381/1"
+      ],
+      "new_t": [
+        "var:235=1"
+      ],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 45
+    },
+    {
+      "job": "j00029",
+      "entry": 58,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 48.5,
+      "parts": {
+        "return": 0.08,
+        "read": 0.01,
+        "T": 0.001606439,
+        "idle/wait": 0.077,
+        "plan": 4.7,
+        "play": 0.0,
+        "afford": 42.765405127,
+        "rest": 0.8659884340000019
+      },
+      "stop_kind": "none played",
+      "stop": null,
+      "target": null,
+      "probes": 37,
+      "new": 0,
+      "new_how": {},
+      "wait": "static/0/0",
+      "afford": [
+        "no plan:sentence 506/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 918,
+      "selectable": 45
+    },
+    {
+      "job": "j00030",
+      "entry": 87,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 56.4,
+      "parts": {
+        "return": 0.17,
+        "read": 12.100000000000001,
+        "T": 0.411527914,
+        "idle/wait": 0.273,
+        "plan": 3.99,
+        "play": 3.01,
+        "afford": 36.332392894,
+        "rest": 0.11307919199999361
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,382)#2443: no cause",
+      "target": [
+        "bit:488",
+        1
+      ],
+      "probes": 1,
+      "new": 6,
+      "new_how": {
+        "checkpoint": 5,
+        "end": 1
+      },
+      "wait": "horizon/10/0",
+      "afford": [
+        "empty window:sentence 506/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 919,
+      "selectable": 48
+    },
+    {
+      "job": "j00031",
+      "entry": 84,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 20.8,
+      "parts": {
+        "return": 0.0,
+        "read": 13.27,
+        "T": 0.494722098,
+        "idle/wait": 0.125,
+        "plan": 3.5299999999999985,
+        "play": 3.3,
+        "afford": 0.0,
+        "rest": 0.0802779020000024
+      },
+      "stop_kind": "goal, not from the plan",
+      "stop": "goal, not from the plan: it held at a plan's start",
+      "target": [
+        "room",
+        34
+      ],
+      "probes": 1,
+      "new": 3,
+      "new_how": {
+        "checkpoint": 2,
+        "end": 1
+      },
+      "wait": "horizon/8/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 919,
+      "selectable": 49
+    },
+    {
+      "job": "j00032",
+      "entry": 57,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 46.2,
+      "parts": {
+        "return": 0.0,
+        "read": 2.37,
+        "T": 0.36630307,
+        "idle/wait": 0.09,
+        "plan": 5.340000000000001,
+        "play": 3.0599999999999996,
+        "afford": 34.986002661,
+        "rest": 0.0
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,382)#148: no cause",
+      "target": [
+        "bit:488",
+        1
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "empty window:sentence 362/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 919,
+      "selectable": 49
+    },
+    {
+      "job": "j00034",
+      "entry": 63,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 14.6,
+      "parts": {
+        "return": 0.11,
+        "read": 11.27,
+        "T": 0.345722831,
+        "idle/wait": 0.077,
+        "plan": 2.2299999999999995,
+        "play": 0.0,
+        "afford": 0.477325274,
+        "rest": 0.08995189500000222
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:490",
+        1
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "afford": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/1"
+      ],
+      "new_t": [
+        "bit:491=1"
+      ],
+      "new_rooms": [],
+      "t_size": 919,
+      "selectable": 50
+    },
+    {
+      "job": "j00035",
+      "entry": 100,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 7.1,
+      "parts": {
+        "return": 0.01,
+        "read": 3.43,
+        "T": 0.001040882,
+        "idle/wait": 0.068,
+        "plan": 3.23,
+        "play": 0.0,
+        "afford": 0.348795438,
+        "rest": 0.012163680000000454
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:492",
+        1
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 3/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 919,
+      "selectable": 50
+    },
+    {
+      "job": "j00036",
+      "entry": 72,
+      "room": 29,
+      "scope": [
+        29,
+        35
+      ],
+      "wall": 1.6,
+      "parts": {
+        "return": 0.0,
+        "read": 0.05,
+        "T": 0.245398272,
+        "idle/wait": 0.055,
+        "plan": 1.13,
+        "play": 0.07,
+        "afford": 0.0,
+        "rest": 0.04960172800000007
+      },
+      "stop_kind": "goal",
+      "stop": "goal",
+      "target": [
+        "state:367",
+        0
+      ],
+      "probes": 1,
+      "new": 2,
+      "new_how": {
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 919,
+      "selectable": 51
+    },
+    {
+      "job": "j00033",
+      "entry": 96,
+      "room": 34,
+      "scope": [
+        34,
+        35
+      ],
+      "wall": 74.2,
+      "parts": {
+        "return": 0.07,
+        "read": 10.1,
+        "T": 0.321065978,
+        "idle/wait": 0.125,
+        "plan": 1.56,
+        "play": 0.04,
+        "afford": 61.937680143,
+        "rest": 0.04625387900000533
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on event(script:47@35)#205: refuted event(script:47@35)#205 at 14012: end pos:script:47: no branch off the records' path found; script:47 ; ; class None",
+      "target": [
+        "state:437",
+        1
+      ],
+      "probes": 1,
+      "new": 5,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 1,
+        "end": 1,
+        "wait": 2
+      },
+      "wait": "horizon/2/2",
+      "afford": [
+        "empty window:sentence 434/1"
+      ],
+      "new_t": [
+        "state:437=1",
+        "state:438=1"
+      ],
+      "new_rooms": [
+        32
+      ],
+      "t_size": 938,
+      "selectable": 53
+    },
+    {
+      "job": "j00038",
+      "entry": 105,
+      "room": 34,
+      "scope": [
+        34,
+        35
+      ],
+      "wall": 0.9,
+      "parts": {
+        "return": 0.01,
+        "read": 0.07,
+        "T": 0.00107825,
+        "idle/wait": 0.114,
+        "plan": 0.7,
+        "play": 0.0,
+        "afford": 0.0,
+        "rest": 0.004921750000000058
+      },
+      "stop_kind": "goal, not from the plan",
+      "stop": "goal, not from the plan: it held in the idling engine at frame 14016 with none of the plan's goal records matched; cause: goal writer  at 14016: wrote state:437: a unit the plan does not name wrote the goal's fact; script:26 [001B] setState; var 0 = 1; class semantics",
+      "target": [
+        "state:437",
+        0
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 53
+    },
+    {
+      "job": "j00039",
+      "entry": 107,
+      "room": 34,
+      "scope": [
+        34,
+        35
+      ],
+      "wall": 0.7,
+      "parts": {
+        "return": 0.01,
+        "read": 0.0,
+        "T": 0.001391824,
+        "idle/wait": 0.091,
+        "plan": 0.6,
+        "play": 0.0,
+        "afford": 0.0,
+        "rest": 0.0
+      },
+      "stop_kind": "goal, not from the plan",
+      "stop": "goal, not from the plan: it held in the idling engine at frame 14283 with none of the plan's goal records matched; cause: goal writer  at 14283: wrote state:438: a unit the plan does not name wrote the goal's fact; script:26 [001B] setState; var 0 = 1; class semantics",
+      "target": [
+        "state:438",
+        0
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 53
+    },
+    {
+      "job": "j00037",
+      "entry": 74,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 92.8,
+      "parts": {
+        "return": 0.01,
+        "read": 0.63,
+        "T": 0.002381026,
+        "idle/wait": 0.403,
+        "plan": 11.699999999999989,
+        "play": 0.0,
+        "afford": 80.55619335,
+        "rest": 0.0
+      },
+      "stop_kind": "none played",
+      "stop": null,
+      "target": null,
+      "probes": 35,
+      "new": 2,
+      "new_how": {
+        "afford": 2
+      },
+      "wait": "horizon/9/0",
+      "afford": [
+        "no plan:sentence 381/2"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 55
+    },
+    {
+      "job": "j00041",
+      "entry": 111,
+      "room": 34,
+      "scope": [
+        34,
+        35
+      ],
+      "wall": 20.8,
+      "parts": {
+        "return": 0.01,
+        "read": 14.79,
+        "T": 0.500956378,
+        "idle/wait": 0.176,
+        "plan": 5.119999999999999,
+        "play": 0.09,
+        "afford": 0.0,
+        "rest": 0.11304362200000284
+      },
+      "stop_kind": "goal",
+      "stop": "goal",
+      "target": [
+        "state:444",
+        1
+      ],
+      "probes": 1,
+      "new": 4,
+      "new_how": {
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 55
+    },
+    {
+      "job": "j00042",
+      "entry": 112,
+      "room": 34,
+      "scope": [
+        34,
+        35
+      ],
+      "wall": 1.7,
+      "parts": {
+        "return": 0.0,
+        "read": 0.1,
+        "T": 0.320764675,
+        "idle/wait": 0.121,
+        "plan": 1.1,
+        "play": 0.0,
+        "afford": 0.0,
+        "rest": 0.05823532499999984
+      },
+      "stop_kind": "goal, not from the plan",
+      "stop": "goal, not from the plan: it held in the idling engine at frame 11061 with none of the plan's goal records matched; cause: goal writer  at 11061: wrote state:437: a unit the plan does not name wrote the goal's fact; script:26 [001B] setState; var 0 = 1; class semantics",
+      "target": [
+        "state:437",
+        0
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 56
+    },
+    {
+      "job": "j00040",
+      "entry": 103,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 69.5,
+      "parts": {
+        "return": 0.0,
+        "read": 0.01,
+        "T": 0.00160222,
+        "idle/wait": 0.226,
+        "plan": 14.199999999999989,
+        "play": 0.0,
+        "afford": 55.720941346000004,
+        "rest": 0.0
+      },
+      "stop_kind": "none played",
+      "stop": null,
+      "target": null,
+      "probes": 35,
+      "new": 0,
+      "new_how": {},
+      "wait": "horizon/9/0",
+      "afford": [
+        "no plan:sentence 263/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 56
+    },
+    {
+      "job": "j00043",
+      "entry": 117,
+      "room": 34,
+      "scope": [
+        34,
+        35
+      ],
+      "wall": 34.9,
+      "parts": {
+        "return": 0.0,
+        "read": 0.0,
+        "T": 0.001393121,
+        "idle/wait": 0.119,
+        "plan": 0.57,
+        "play": 0.03,
+        "afford": 34.116660943,
+        "rest": 0.06294593599999843
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on event(local:200@151)#1115: refuted event(local:200@151)#1115 at 11205: end pos:local:200: no branch off the records' path found; local:200 ; ; class None",
+      "target": [
+        "state:438",
+        1
+      ],
+      "probes": 1,
+      "new": 3,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 1,
+        "end": 1
+      },
+      "wait": "horizon/2/0",
+      "afford": [
+        "empty window:sentence 403/1"
+      ],
+      "new_t": [],
+      "new_rooms": [
+        31
+      ],
+      "t_size": 938,
+      "selectable": 56
+    },
+    {
+      "job": "j00044",
+      "entry": 77,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 135.1,
+      "parts": {
+        "return": 0.0,
+        "read": 7.01,
+        "T": 0.402416696,
+        "idle/wait": 0.056,
+        "plan": 122.67999999999999,
+        "play": 0.01,
+        "afford": 0.699105363,
+        "rest": 4.242477941000004
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "state:444",
+        1
+      ],
+      "probes": 2,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 56
+    },
+    {
+      "job": "j00045",
+      "entry": 85,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 47.1,
+      "parts": {
+        "return": 0.06,
+        "read": 8.02,
+        "T": 0.286553726,
+        "idle/wait": 0.085,
+        "plan": 3.3000000000000007,
+        "play": 2.98,
+        "afford": 32.262238644,
+        "rest": 0.10620763000000011
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,382)#2434: no cause",
+      "target": [
+        "bit:494",
+        1
+      ],
+      "probes": 1,
+      "new": 6,
+      "new_how": {
+        "checkpoint": 5,
+        "end": 1
+      },
+      "wait": "horizon/8/0",
+      "afford": [
+        "empty window:sentence 506/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 59
+    },
+    {
+      "job": "j00046",
+      "entry": 89,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 41.7,
+      "parts": {
+        "return": 0.01,
+        "read": 0.2,
+        "T": 0.398832263,
+        "idle/wait": 0.277,
+        "plan": 2.1800000000000006,
+        "play": 3.7199999999999998,
+        "afford": 34.889448877,
+        "rest": 0.02471886000000012
+      },
+      "stop_kind": "the same empty window 2 times",
+      "stop": "the same empty window 2 times on sentence(10,382)#2443: no cause",
+      "target": [
+        "bit:494",
+        1
+      ],
+      "probes": 1,
+      "new": 4,
+      "new_how": {
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "horizon/9/0",
+      "afford": [
+        "empty window:sentence 506/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 59
+    },
+    {
+      "job": "j00047",
+      "entry": 123,
+      "room": 35,
+      "scope": [
+        29,
+        33,
+        34,
+        35,
+        83
+      ],
+      "wall": 2.6,
+      "parts": {
+        "return": 0.0,
+        "read": 0.17,
+        "T": 0.379715699,
+        "idle/wait": 0.2,
+        "plan": 1.75,
+        "play": 0.05,
+        "afford": 0.0,
+        "rest": 0.05028430100000003
+      },
+      "stop_kind": "goal",
+      "stop": "goal",
+      "target": [
+        "state:428",
+        1
+      ],
+      "probes": 1,
+      "new": 4,
+      "new_how": {
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "horizon/10/0",
+      "afford": [],
+      "new_t": [
+        "state:315=1",
+        "state:428=1"
+      ],
+      "new_rooms": [],
+      "t_size": 938,
+      "selectable": 61
+    },
+    {
+      "job": "j00048",
+      "entry": 135,
+      "room": 33,
+      "scope": [
+        28,
+        33,
+        35,
+        38
+      ],
+      "wall": 105.0,
+      "parts": {
+        "return": 0.01,
+        "read": 76.85,
+        "T": 1.71104062,
+        "idle/wait": 0.05,
+        "plan": 23.620000000000005,
+        "play": 2.03,
+        "afford": 0.603718128,
+        "rest": 0.12524125199999503
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:348",
+        1
+      ],
+      "probes": 1,
+      "new": 7,
+      "new_how": {
+        "afford": 1,
+        "checkpoint": 5,
+        "end": 1
+      },
+      "wait": "static/0/0",
+      "afford": [
+        "R0:dialog 4/1"
+      ],
+      "new_t": [
+        "local:211=1",
+        "room=28",
+        "state:316=1",
+        "var:103=339",
+        "var:32=202"
+      ],
+      "new_rooms": [
+        28
+      ],
+      "t_size": 938,
+      "selectable": 64
+    },
+    {
+      "job": "j00049",
+      "entry": 138,
+      "room": 28,
+      "scope": [
+        28,
+        33,
+        41
+      ],
+      "wall": 31.7,
+      "parts": {
+        "return": 0.11,
+        "read": 21.919999999999998,
+        "T": 0.2908848,
+        "idle/wait": 0.191,
+        "plan": 4.289999999999999,
+        "play": 4.89,
+        "afford": 0.0,
+        "rest": 0.008115200000002432
+      },
+      "stop_kind": "reach extension",
+      "stop": "reach extension: the start at frame 21126 holds 2 values the extended reading did not reach either: ['state:333=0', 'state:354=0']",
+      "target": [
+        "owner:566",
+        1
+      ],
+      "probes": 1,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "horizon/3/0",
+      "afford": [],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 976,
+      "selectable": 64
+    },
+    {
+      "job": "j00050",
+      "entry": 140,
+      "room": 28,
+      "scope": [
+        28,
+        33,
+        41
+      ],
+      "wall": 43.6,
+      "parts": {
+        "return": 0.01,
+        "read": 21.78,
+        "T": 0.696857386,
+        "idle/wait": 0.138,
+        "plan": 20.52,
+        "play": 0.0,
+        "afford": 0.368978075,
+        "rest": 0.08616453899999499
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "room",
+        41
+      ],
+      "probes": 5,
+      "new": 1,
+      "new_how": {
+        "end": 1
+      },
+      "wait": "horizon/3/0",
+      "afford": [
+        "R0:dialog 4/0"
+      ],
+      "new_t": [],
+      "new_rooms": [],
+      "t_size": 976,
+      "selectable": 64
+    },
+    {
+      "job": "j00051",
+      "entry": 142,
+      "room": 28,
+      "scope": [
+        28,
+        33,
+        41
+      ],
+      "wall": 31.8,
+      "parts": {
+        "return": 0.01,
+        "read": 7.72,
+        "T": 0.311043801,
+        "idle/wait": 0.084,
+        "plan": 22.879999999999995,
+        "play": 0.0,
+        "afford": 0.365276226,
+        "rest": 0.4296799730000096
+      },
+      "stop_kind": "Lemma R's R0",
+      "stop": "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain",
+      "target": [
+        "bit:424",
+        1
+      ],
+      "probes": 18,
+      "new": 2,
+      "new_how": {
+        "afford": 1,
+        "end": 1
+      },
+      "wait": "horizon/3/0",
+      "afford": [
+        "R0:dialog 4/1"
+      ],
+      "new_t": [
+        "bit:348=1"
+      ],
+      "new_rooms": [],
+      "t_size": 976,
+      "selectable": 65
+    },
+    {
+      "job": "j00052",
+      "entry": 146,
+      "room": 28,
+      "scope": [
+        28,
+        33,
+        41
+      ],
+      "wall": 15.2,
+      "parts": {
+        "return": 0.01,
+        "read": 9.07,
+        "T": 0.367150733,
+        "idle/wait": 0.131,
+        "plan": 3.2199999999999998,
+        "play": 2.31,
+        "afford": 0.0,
+        "rest": 0.09184926699999885
+      },
+      "stop_kind": "goal",
+      "stop": "goal",
+      "target": [
+        "owner:566",
+        1
+      ],
+      "probes": 1,
+      "new": 4,
+      "new_how": {
+        "checkpoint": 3,
+        "end": 1
+      },
+      "wait": "horizon/3/0",
+      "afford": [],
+      "new_t": [
+        "owner:566=1",
+        "room=41",
+        "var:103=316"
+      ],
+      "new_rooms": [
+        41
+      ],
+      "t_size": 976,
+      "selectable": 68
+    }
+  ],
+  "wall": {
+    "sum": 1658.1,
+    "median": 15.2,
+    "max": 163.6,
+    "parts": {
+      "return": 1.1200000000000003,
+      "read": 491.75000000000006,
+      "T": 16.104284269,
+      "idle/wait": 6.136,
+      "plan": 361.98,
+      "play": 45.0,
+      "afford": 728.83555537,
+      "rest": 8.78195421400006
+    },
+    "by_stop": {
+      "Lemma R's R0": {
+        "tries": 24,
+        "wall": 585.6,
+        "median": 6.1,
+        "max": 139.8
+      },
+      "goal": {
+        "tries": 6,
+        "wall": 90.7,
+        "median": 17.4,
+        "max": 30.9
+      },
+      "goal, not from the plan": {
+        "tries": 4,
+        "wall": 24.099999999999998,
+        "median": 1.3,
+        "max": 20.8
+      },
+      "none played": {
+        "tries": 5,
+        "wall": 220.6,
+        "median": 48.5,
+        "max": 92.8
+      },
+      "reach extension": {
+        "tries": 1,
+        "wall": 31.7,
+        "median": 31.7,
+        "max": 31.7
+      },
+      "the same empty window 2 times": {
+        "tries": 13,
+        "wall": 705.4000000000001,
+        "median": 47.1,
+        "max": 163.6
+      }
+    }
+  },
+  "outcomes": {
+    "ok": 53
+  },
+  "r0": {
+    "tries": 24,
+    "with_afford": 24
+  },
+  "empty_window": {
+    "tries": 13,
+    "with_afford": 13
+  },
+  "wait": {
+    "n": 53,
+    "ends": {
+      "horizon": 21,
+      "static": 32
+    },
+    "stops": 108,
+    "kept": 2,
+    "with_dues": 36,
+    "median_s": 0.087,
+    "max_s": 0.403
+  },
+  "goal_again": [
+    {
+      "stop": 17582,
+      "status": "unsolvable",
+      "stop_reason": "no plan (the planner proved none)",
+      "seconds": 2.7,
+      "job": "j00050"
+    },
+    {
+      "stop": 17583,
+      "status": "unsolvable",
+      "stop_reason": "no plan (the planner proved none)",
+      "seconds": 2.6,
+      "job": "j00050"
+    },
+    {
+      "stop": 17917,
+      "status": "unsolvable",
+      "stop_reason": "no plan (the planner proved none)",
+      "seconds": 8.1,
+      "job": "j00050"
+    },
+    {
+      "stop": 17927,
+      "status": "unsolvable",
+      "stop_reason": "no plan (the planner proved none)",
+      "seconds": 2.2,
+      "job": "j00051"
+    },
+    {
+      "stop": 17928,
+      "status": "unsolvable",
+      "stop_reason": "no plan (the planner proved none)",
+      "seconds": 2.2,
+      "job": "j00051"
+    },
+    {
+      "stop": 18027,
+      "status": "unsolvable",
+      "stop_reason": "no plan (the planner proved none)",
+      "seconds": 1.8,
+      "job": "j00051"
+    }
+  ],
+  "delay": {
+    "windows": 84,
+    "triggered": 2,
+    "chosen": [
+      null,
+      null
+    ],
+    "refuted": 0,
+    "no_k": 2,
+    "outcomes": 2,
+    "candidates": 0,
+    "kept": 0
+  },
+  "afford": {
+    "R0, dialog": {
+      "steps": 24,
+      "trials": 93,
+      "kept": 13,
+      "third": 0,
+      "walks": 0,
+      "ended": 0,
+      "seconds": 13.105184838
+    },
+    "empty window, dialog": {
+      "steps": 3,
+      "trials": 8,
+      "kept": 2,
+      "third": 0,
+      "walks": 0,
+      "ended": 0,
+      "seconds": 0.6960310080000001
+    },
+    "empty window, sentence": {
+      "steps": 10,
+      "trials": 4510,
+      "kept": 15,
+      "third": 2088,
+      "walks": 76,
+      "ended": 0,
+      "seconds": 535.492769043
+    },
+    "no plan, dialog": {
+      "steps": 2,
+      "trials": 6,
+      "kept": 1,
+      "third": 0,
+      "walks": 0,
+      "ended": 0,
+      "seconds": 0.499030658
+    },
+    "no plan, sentence": {
+      "steps": 3,
+      "trials": 1150,
+      "kept": 2,
+      "third": 377,
+      "walks": 35,
+      "ended": 0,
+      "seconds": 179.04253982300003
+    }
+  },
+  "afford_phases": {
+    "control": 0.2802095070000001,
+    "fork": 5.2041723950000005,
+    "quit": 0.113655463,
+    "read": 711.2594400059997,
+    "run": 11.412091951
+  },
+  "dead": [],
+  "kept": {
+    "afford": 33,
+    "wait": 2
+  },
+  "new_how": {
+    "afford": 33,
+    "checkpoint": 67,
+    "end": 48,
+    "wait": 2
+  },
+  "probe_status": {
+    "null": 142,
+    "plan": 48,
+    "time": 1,
+    "unsolvable": 39
+  },
+  "limits": [
+    {
+      "job": "j00044",
+      "target": [
+        "state:428",
+        1
+      ],
+      "limit_s": 120,
+      "seconds": 121.4,
+      "kind": "first plan at deepening's limit"
+    }
+  ],
+  "deferred": 1,
+  "last_target_keys": {
+    "bit:108": 1,
+    "bit:109": 2,
+    "bit:110": 1,
+    "bit:111": 1,
+    "bit:113": 2,
+    "bit:114": 1,
+    "bit:115": 2,
+    "bit:117": 2,
+    "bit:124": 1,
+    "bit:125": 1,
+    "bit:348": 1,
+    "bit:424": 1,
+    "bit:488": 2,
+    "bit:490": 2,
+    "bit:491": 1,
+    "bit:492": 1,
+    "bit:494": 2,
+    "bit:65": 1,
+    "owner:377": 2,
+    "owner:566": 2,
+    "room": 5,
+    "state:367": 1,
+    "state:428": 1,
+    "state:437": 3,
+    "state:438": 2,
+    "state:444": 2,
+    "var:102": 2,
+    "var:145": 4,
+    "var:294": 1,
+    "var:5": 2
+  },
+  "last_var103": 0,
+  "last_refined": 0,
+  "last_list": 0,
+  "max_var103": 1,
+  "rng": {
+    "28": {
+      "frames": 3866,
+      "calls": 9009,
+      "least": 1,
+      "most": 4,
+      "hist": [
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          3219
+        ],
+        [
+          3,
+          14
+        ],
+        [
+          4,
+          632
+        ]
+      ]
+    },
+    "29": {
+      "frames": 28883,
+      "calls": 29905,
+      "least": 0,
+      "most": 11,
+      "hist": [
+        [
+          0,
+          11
+        ],
+        [
+          1,
+          28284
+        ],
+        [
+          2,
+          477
+        ],
+        [
+          3,
+          55
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          9,
+          44
+        ],
+        [
+          10,
+          4
+        ],
+        [
+          11,
+          2
+        ]
+      ]
+    },
+    "33": {
+      "frames": 10806,
+      "calls": 11263,
+      "least": 1,
+      "most": 12,
+      "hist": [
+        [
+          1,
+          10647
+        ],
+        [
+          2,
+          68
+        ],
+        [
+          3,
+          54
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          8,
+          10
+        ],
+        [
+          9,
+          22
+        ],
+        [
+          10,
+          2
+        ],
+        [
+          12,
+          1
+        ]
+      ]
+    },
+    "34": {
+      "frames": 340,
+      "calls": 390,
+      "least": 1,
+      "most": 13,
+      "hist": [
+        [
+          1,
+          324
+        ],
+        [
+          2,
+          10
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          8,
+          1
+        ],
+        [
+          9,
+          2
+        ],
+        [
+          13,
+          1
+        ]
+      ]
+    },
+    "35": {
+      "frames": 25216,
+      "calls": 25938,
+      "least": 1,
+      "most": 11,
+      "hist": [
+        [
+          1,
+          24714
+        ],
+        [
+          2,
+          448
+        ],
+        [
+          3,
+          27
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          9,
+          21
+        ],
+        [
+          10,
+          2
+        ],
+        [
+          11,
+          2
+        ]
+      ]
+    },
+    "38": {
+      "frames": 17,
+      "calls": 27,
+      "least": 1,
+      "most": 2,
+      "hist": [
+        [
+          1,
+          7
+        ],
+        [
+          2,
+          10
+        ]
+      ]
+    }
+  },
+  "rooms": {
+    "28": {
+      "entry": 138,
+      "frame": 17526,
+      "how": "checkpoint",
+      "job": "j00048"
+    },
+    "29": {
+      "entry": 49,
+      "frame": 2947,
+      "how": "checkpoint",
+      "job": "j00016"
+    },
+    "31": {
+      "entry": 120,
+      "frame": 11292,
+      "how": "afford",
+      "job": "j00043"
+    },
+    "32": {
+      "entry": 108,
+      "frame": 14143,
+      "how": "afford",
+      "job": "j00033"
+    },
+    "33": {
+      "entry": 0,
+      "frame": 2728,
+      "how": "boot",
+      "job": null
+    },
+    "34": {
+      "entry": 42,
+      "frame": 10199,
+      "how": "afford",
+      "job": "j00013"
+    },
+    "35": {
+      "entry": 33,
+      "frame": 2887,
+      "how": "checkpoint",
+      "job": "j00013"
+    },
+    "38": {
+      "entry": 2,
+      "frame": 2848,
+      "how": "checkpoint",
+      "job": "j00000"
+    },
+    "41": {
+      "entry": 148,
+      "frame": 18404,
+      "how": "checkpoint",
+      "job": "j00052"
+    }
+  },
+  "entries_by_how": {
+    "afford": 33,
+    "boot": 1,
+    "checkpoint": 67,
+    "end": 48,
+    "wait": 2
+  },
+  "t_first": 559,
+  "t_last": 976,
+  "goal": {
+    "entry": 150,
+    "frame": 18416,
+    "frames": 15688,
+    "chain": [
+      {
+        "entry": 0,
+        "frame": 2728,
+        "room": 33,
+        "how": "boot",
+        "job": null
+      },
+      {
+        "entry": 44,
+        "frame": 10102,
+        "room": 35,
+        "how": "afford",
+        "job": "j00013"
+      },
+      {
+        "entry": 55,
+        "frame": 10162,
+        "room": 29,
+        "how": "checkpoint",
+        "job": "j00017"
+      },
+      {
+        "entry": 85,
+        "frame": 13767,
+        "room": 35,
+        "how": "checkpoint",
+        "job": "j00021"
+      },
+      {
+        "entry": 123,
+        "frame": 13776,
+        "room": 35,
+        "how": "checkpoint",
+        "job": "j00045"
+      },
+      {
+        "entry": 135,
+        "frame": 13924,
+        "room": 33,
+        "how": "end",
+        "job": "j00047"
+      },
+      {
+        "entry": 142,
+        "frame": 17917,
+        "room": 28,
+        "how": "afford",
+        "job": "j00048"
+      },
+      {
+        "entry": 146,
+        "frame": 18056,
+        "room": 28,
+        "how": "afford",
+        "job": "j00051"
+      },
+      {
+        "entry": 150,
+        "frame": 18416,
+        "room": 41,
+        "how": "end",
+        "job": "j00052"
+      }
+    ],
+    "verify": [
+      {
+        "file": "verify-150.json",
+        "entry": 150,
+        "same": true,
+        "goal": true,
+        "frames": 15688,
+        "qf": 376512,
+        "seconds": 1568.8512723618917,
+        "inputs": 85,
+        "differences": 0,
+        "final": {
+          "owner:566": 1
+        }
+      }
+    ],
+    "driver_verify": {
+      "entry": 150,
+      "same": true,
+      "goal": true,
+      "frames": 15688,
+      "qf": 376512,
+      "seconds": 1568.8512723618917,
+      "inputs": 85,
+      "segments": 8
+    }
+  }
+}
