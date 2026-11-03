@@ -28,7 +28,7 @@ Wall / CPU seconds. ring(33): 4-room scope; ring(38): 5-room.
 | ring33 | 7 | 231.30 | 313.80 | 308.47 | 439.41 | 636.90 | 2.60 | 9.20 | 69.81 | 155.42 | 6.48 | 0.32 |
 | ring38 | 8 | 29.00 | 34.60 | 30.76 | 35.06 | 50.00 | 2.62 | 10.00 | 8.13 | 5.71 | 0.44 | 0.12 |
 
-## on
+## on-mimalloc
 
 | try | scope | return | idle | read | plan | play | rest | try | stop |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
@@ -79,4 +79,30 @@ Wall / CPU seconds. ring(33): 4-room scope; ring(38): 5-room.
 | all | 15 | 3.80 | 1.80 | 15.60 | 5.69 | 177.40 | 0.00 | 0.10 | 0.05 | 0.34 | 0.02 | 0.00 |
 | ring33 | 7 | 6.10 | 4.90 | 31.56 | 11.19 | 177.40 | 0.00 | 0.10 | 0.01 | 5.76 | 0.24 | 0.00 |
 | ring38 | 8 | 0.65 | 0.50 | 1.64 | 0.89 | 4.70 | 0.00 | 0.10 | 0.41 | 0.19 | 0.01 | 0.00 |
+
+## on
+
+| try | scope | return | idle | read | plan | play | rest | try | stop |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| j00000 | 4 | 0.09 / 0.00 | 0.10 / 0.00 | 107.16 / 320.50 | 15.64 / 30.90 | 0.30 / 0.00 | 0.01 / 0.00 | 123.30 / 38.90 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00001 | 5 | 0.02 / 0.00 | 0.10 / 0.10 | 2.96 / 8.30 | 0.34 / 0.70 | 0.00 / 0.00 | 0.00 / 0.00 | 3.40 / 1.20 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00002 | 5 | 0.01 / 0.00 | 0.10 / 0.00 | 2.36 / 6.60 | 0.33 / 0.70 | 0.01 / 0.00 | 0.00 / 0.00 | 2.80 / 1.30 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00003 | 5 | 0.01 / 0.00 | 0.10 / 0.10 | 1.31 / 3.40 | 0.38 / 0.70 | 0.01 / 0.00 | 0.00 / 0.00 | 1.80 / 1.30 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00004 | 5 | 0.00 / 0.00 | 0.10 / 0.10 | 0.19 / 0.20 | 0.19 / 0.20 | 0.01 / 0.00 | 0.01 / 0.00 | 0.50 / 0.40 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00005 | 5 | 0.00 / 0.00 | 0.00 / 0.00 | 0.06 / 0.10 | 0.19 / 0.20 | 0.01 / 0.00 | 0.04 / 0.00 | 0.30 / 0.20 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00006 | 4 | 0.01 / 0.00 | 0.10 / 0.00 | 7.64 / 17.00 | 8.60 / 12.60 | 0.22 / 0.00 | 0.03 / 0.00 | 16.60 / 12.60 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00007 | 5 | 0.00 / 0.00 | 0.10 / 0.10 | 0.48 / 1.00 | 0.21 / 0.50 | 0.01 / 0.00 | 0.00 / 0.00 | 0.80 / 0.50 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00008 | 4 | 0.00 / 0.00 | 0.10 / 0.10 | 0.01 / 0.00 | 5.43 / 4.70 | 0.26 / 0.00 | 0.00 / 0.00 | 5.80 / 4.70 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00009 | 4 | 0.00 / 0.00 | 0.00 / 0.00 | 0.01 / 0.00 | 5.61 / 4.80 | 0.08 / 0.00 | 0.00 / 0.00 | 5.70 / 4.80 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00010 | 5 | 0.00 / 0.00 | 0.10 / 0.00 | 0.01 / 0.00 | 0.17 / 0.20 | 0.02 / 0.00 | 0.00 / 0.00 | 0.30 / 0.20 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00011 | 4 | 0.00 / 0.00 | 0.10 / 0.00 | 0.01 / 0.00 | 5.24 / 4.30 | 0.25 / 0.00 | 0.00 / 0.00 | 5.50 / 4.30 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00012 | 4 | 0.00 / 0.00 | 0.00 / 0.00 | 0.00 / 0.00 | 0.01 / 0.10 | 0.09 / 0.00 | 0.00 / 0.00 | 0.10 / 0.10 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00013 | 5 | 0.00 / 0.00 | 0.10 / 0.00 | 0.01 / 0.00 | 0.17 / 0.20 | 0.02 / 0.00 | 0.00 / 0.00 | 0.30 / 0.20 | refinement: Lemma R's premise R0: the last pass wrote values |
+| j00014 | 4 | 0.00 / 0.00 | 0.10 / 0.00 | 0.01 / 0.00 | 5.59 / 4.70 | 0.20 / 0.00 | 0.00 / 0.10 | 5.90 / 4.80 | refinement: Lemma R's premise R0: the last pass wrote values |
+
+| over | n | try wall median | try CPU median | try wall mean | try CPU mean | try wall max | return wall med | idle wall med | read wall med | plan wall med | play wall med | rest wall med |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| all | 15 | 2.80 | 1.30 | 11.54 | 5.03 | 123.30 | 0.00 | 0.10 | 0.06 | 0.34 | 0.02 | 0.00 |
+| ring33 | 7 | 5.80 | 4.80 | 23.27 | 10.03 | 123.30 | 0.00 | 0.10 | 0.01 | 5.59 | 0.22 | 0.00 |
+| ring38 | 8 | 0.65 | 0.45 | 1.27 | 0.66 | 3.40 | 0.00 | 0.10 | 0.33 | 0.20 | 0.01 | 0.00 |
 
