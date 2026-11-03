@@ -54,11 +54,16 @@ pub struct Host {
     pub downward: PathBuf,
     /// where Fast Downward's files go
     pub work: PathBuf,
+    /// the no-plan proofs before the search (taskcore dead.rs: h^1, h^2); false: the old behaviour
+    pub dead: bool,
+    /// h^2's watchdog, seconds: past it the proof is open and the search runs
+    pub dead_s: u64,
 }
 
 impl Host {
     /// The host E011 runs: the plan cache on (FMI_PLAN_NO_CACHE set: off), its store `~/.cache/fast-mi-e011/plans`
-    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR.
+    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR; the no-plan proofs with FMI_PLAN_DEAD=1 (h^2's
+    /// watchdog FMI_PLAN_DEAD_S, 60 s).
     pub fn from_env() -> Host {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
         let cache_dir = match std::env::var("FMI_PLAN_CACHE") {
@@ -73,6 +78,8 @@ impl Host {
             keep: 4,
             downward: PathBuf::from(dw).join("builds/release/bin/downward"),
             work: std::env::temp_dir().join("fmi-plan"),
+            dead: std::env::var("FMI_PLAN_DEAD").map(|v| v == "1").unwrap_or(false),
+            dead_s: std::env::var("FMI_PLAN_DEAD_S").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0).unwrap_or(60),
         }
     }
 }
@@ -103,6 +110,9 @@ pub struct Timing {
     pub operators: usize,
     pub unary: usize,
     pub kept: String,
+    /// the no-plan proofs' seconds and outcome ("h1", "h2", "open"; "" when they did not run)
+    pub dead: f64,
+    pub proof: String,
 }
 
 /// Cost caps as taskcore reads them: (label prefix, frames).
@@ -452,6 +462,48 @@ impl WarmPlanner {
         let (plan, st, of) = search::build(&mut x, start_vals).map_err(tc_err)?;
         self.last.build = t2.elapsed().as_secs_f64();
         self.last.operators = st.n_ops();
+        // the no-plan proofs before the search (plan.md, amendment "targets with no plan made cheap")
+        let mut proof_json = None;
+        if self.host.dead {
+            let td = Instant::now();
+            let p = taskcore::dead::prove(&st, Some(td + Duration::from_secs(self.host.dead_s.max(1))));
+            self.last.dead = td.elapsed().as_secs_f64();
+            self.last.proof = p.dead.unwrap_or("open").to_string();
+            let nf = t.facts.len() as u32;
+            let miss: Vec<String> = p
+                .miss
+                .iter()
+                .map(|&(v, x)| {
+                    let f = plan.vars[v as usize];
+                    let val = if f < nf { decode::val_text(t, f, x).to_string() } else { x.to_string() };
+                    taskcore::cli::esc(&format!("{}={}", st.names[v as usize], val))
+                })
+                .collect();
+            let pj = format!(
+                "{{\"proof\": \"{}\", \"miss\": [{}], \"seconds\": {:.3}, \"h1_s\": {:.3}, \"h2_s\": {:.3}, \"h2_passes\": {}, \"h2_done\": {}}}",
+                self.last.proof,
+                miss.join(", "),
+                self.last.dead,
+                p.h1_s,
+                p.h2_s,
+                p.h2_passes,
+                p.h2_done
+            );
+            if p.dead.is_some() {
+                let mut stats = red.stats;
+                let mut c = plan.counts.clone();
+                c.bytes = 0;
+                stats.raw("sas", &taskcore::cli::sas_json(&c));
+                stats.s("search", match req.search {
+                    Search::Gbfs => "gbfs",
+                    Search::FdLamaFirstCosts => "lama-first-costs",
+                });
+                stats.s("kept", red.kept);
+                stats.raw("dead", &pj);
+                return Ok(PlanResult { status: "unsolvable".into(), source: "proof".into(), stats: stats.done(), ..Default::default() });
+            }
+            proof_json = Some(pj);
+        }
         let deadline = Some(Instant::now() + Duration::from_secs(req.time_limit_s.max(1)));
         let (status, ops, plan_cost) = match req.search {
             Search::Gbfs => {
@@ -480,6 +532,9 @@ impl WarmPlanner {
             Search::FdLamaFirstCosts => "lama-first-costs",
         });
         stats.s("kept", red.kept);
+        if let Some(pj) = &proof_json {
+            stats.raw("dead", pj);
+        }
         let nf = t.facts.len() as u32;
         let file_facts: Vec<Key> = plan.vars.iter().filter(|&&v| v < nf).map(|&v| Key::parse(t.key(v))).collect();
         let needed_facts: Vec<Key> = red.needed.iter().map(|k| Key::parse(k)).collect();
