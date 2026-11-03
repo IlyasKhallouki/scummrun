@@ -7,6 +7,7 @@
 //! the file.
 
 use crate::files::{self, as_i64, or, py_str, read_gz, read_json, read_jsonl, truthy, Res};
+use crate::progress::{self, Progress, TAtom};
 use crate::pyjson::{self, canonical};
 use serde_json::{json, Map, Value};
 use std::cell::RefCell;
@@ -53,12 +54,23 @@ pub trait FactLook {
     fn owners(&self) -> Vec<(i64, i64)>;
 }
 
+/// E012: a facts map's every (key, value) pair, for the progress store (the maps the archive adds rows from).
+pub trait FactPairs {
+    fn pairs(&self) -> Vec<(String, i64)>;
+}
+
 impl FactLook for FactMap {
     fn look(&self, k: &str) -> Option<i64> {
         self.get(k).copied()
     }
     fn owners(&self) -> Vec<(i64, i64)> {
         self.iter().filter_map(|(k, v)| Some((k.strip_prefix("owner:")?.parse().ok()?, *v))).collect()
+    }
+}
+
+impl FactPairs for FactMap {
+    fn pairs(&self) -> Vec<(String, i64)> {
+        self.iter().map(|(k, v)| (k.clone(), *v)).collect()
     }
 }
 
@@ -71,12 +83,31 @@ impl FactLook for Map<String, Value> {
     }
 }
 
+impl FactPairs for Map<String, Value> {
+    fn pairs(&self) -> Vec<(String, i64)> {
+        self.iter().map(|(k, x)| (k.clone(), as_i64(Some(x)).unwrap_or(NOT_INT))).collect()
+    }
+}
+
 impl FactLook for fmi_core::Facts {
     fn look(&self, k: &str) -> Option<i64> {
         self.get(fmi_core::Key::parse(k)).map(|v| if v == fmi_core::NONE || v == fmi_core::BELOW || v == fmi_core::ABOVE { NOT_INT } else { v })
     }
     fn owners(&self) -> Vec<(i64, i64)> {
         self.0.iter().filter(|(k, _)| k.kind() == fmi_core::K_OWNER).map(|(k, v)| (k.a() as i64, *v)).collect()
+    }
+}
+
+impl FactPairs for fmi_core::Facts {
+    fn pairs(&self) -> Vec<(String, i64)> {
+        self.0
+            .iter()
+            .map(|(k, v)| {
+                let mut s = String::with_capacity(24);
+                write_key(&mut s, *k);
+                (s, if *v == fmi_core::NONE || *v == fmi_core::BELOW || *v == fmi_core::ABOVE { NOT_INT } else { *v })
+            })
+            .collect()
     }
 }
 
@@ -362,6 +393,8 @@ pub struct Cell {
     pub tried: Vec<(String, Value)>,
     /// E011's deepening (step::deepen): str(entry) -> [[k, v, n], ...], the targets deferred n times; empty without it
     pub deferred: Vec<(String, Value)>,
+    /// E012 (FMI_SELECT=progress): the committed tries from the cell's entries; None with the switch off
+    pub chosen: Option<i64>,
 }
 
 impl Cell {
@@ -378,6 +411,9 @@ impl Cell {
                 d.insert(k.clone(), v.clone());
             }
             out["deferred"] = Value::Object(d);
+        }
+        if let Some(c) = self.chosen {
+            out["chosen"] = Value::from(c);
         }
         out
     }
@@ -419,6 +455,9 @@ pub struct Row {
     pub how: String,
     pub goal: bool,
     pub seg_held: Vec<(String, i64)>,
+    /// E012: the game's own end that the entry's run ended in (a dead entry is never selected); None for every
+    /// entry with the switch off
+    pub dead: Option<String>,
 }
 
 fn pairs_json(p: &[(String, i64)]) -> Value {
@@ -437,9 +476,13 @@ fn pairs_of(v: &Value) -> Vec<(String, i64)> {
 
 impl Row {
     pub fn to_json(&self) -> Value {
-        json!({"id": self.id, "parent": self.parent, "frame": self.frame, "tick": self.tick, "room": self.room,
+        let mut v = json!({"id": self.id, "parent": self.parent, "frame": self.frame, "tick": self.tick, "room": self.room,
                "cell": self.cell, "g": self.g, "held": pairs_json(&self.held), "r_path": self.r_path,
-               "job": self.job, "how": self.how, "goal": self.goal, "seg_held": pairs_json(&self.seg_held)})
+               "job": self.job, "how": self.how, "goal": self.goal, "seg_held": pairs_json(&self.seg_held)});
+        if let Some(d) = &self.dead {
+            v["dead"] = Value::from(d.clone());
+        }
+        v
     }
     pub fn of_json(v: &Value) -> Res<Row> {
         Ok(Row {
@@ -456,6 +499,7 @@ impl Row {
             how: v["how"].as_str().unwrap_or("checkpoint").to_string(),
             goal: v["goal"].as_bool().unwrap_or(false),
             seg_held: pairs_of(&v["seg_held"]),
+            dead: v.get("dead").and_then(|d| d.as_str()).map(|d| d.to_string()),
         })
     }
 }
@@ -519,11 +563,18 @@ pub struct Archive {
     entries: RefCell<HashMap<usize, Rc<EntryInfo>>>,
     /// cells.json's text per cell (json.dumps of the cell) and the cell's shape it was made from: a cell's lists only
     /// grow and its n changes, so an equal shape is an equal cell (rekey clears it)
-    cell_text: RefCell<HashMap<String, ((bool, usize, usize, i64, usize, usize, usize), String)>>,
+    cell_text: RefCell<HashMap<String, ((bool, usize, usize, i64, usize, usize, usize, i64), String)>>,
     /// during an ingest: the entries.jsonl rows written in one append (one sync) after the entries' files
     pending_rows: Option<Vec<Value>>,
     /// during an ingest: the entries' files (path, text), compressed and written together before the rows
     pending_files: Option<Vec<(PathBuf, String)>>,
+    /// E012 (FMI_SELECT=progress, or an archive made with it): T, the rows' facts and the marks; None with the switch
+    /// off
+    pub progress: Option<Progress>,
+    /// during an ingest: the dead mark of the entry being added
+    next_dead: Option<String>,
+    /// E012: row -> the distinct rooms of the entries from the root to it
+    chain_rooms: RefCell<HashMap<usize, Rc<BTreeSet<i64>>>>,
 }
 
 fn goal_pairs(v: &Value) -> Vec<(String, Vec<i64>)> {
@@ -590,6 +641,8 @@ impl Archive {
         let e009 = stage.get("e009").and_then(|v| v.as_object()).cloned().unwrap_or_default();
         let e010 = stage.get("e010").and_then(|v| v.as_object()).cloned().unwrap_or_default();
         let idle_frames = as_i64(e009.get("idle_frames")).unwrap_or(0);
+        let made_progress = stage.get("e012").and_then(|e| e.get("select")).and_then(|s| s.as_str()) == Some(progress::PROGRESS);
+        let prog = if progress::on() || made_progress { Some(Progress::new(&goal_pairs(&goal_json))) } else { None };
         Ok(Archive {
             root: root.to_path_buf(),
             goal: goal_pairs(&goal_json),
@@ -619,6 +672,9 @@ impl Archive {
             cell_text: RefCell::new(HashMap::new()),
             pending_rows: None,
             pending_files: None,
+            progress: prog,
+            next_dead: None,
+            chain_rooms: RefCell::new(HashMap::new()),
         })
     }
 
@@ -656,6 +712,9 @@ impl Archive {
         if let Some(e) = e010.filter(|e| truthy(Some(e))) {
             doc["e010"] = e;
         }
+        if progress::on() {
+            doc["e012"] = json!({"select": progress::PROGRESS});
+        }
         files::write_json(&root.join("stage.json"), &doc, Some(1))?;
         for f in ["entries.jsonl", "log.jsonl", "readings.jsonl"] {
             let p = root.join(f);
@@ -679,6 +738,14 @@ impl Archive {
             files::rewrite_jsonl(&r.join("log.jsonl"), &self.logs)?;
         }
         let committed_jobs: HashSet<String> = self.committed_jobs();
+        if let Some(p) = self.progress.as_mut() {
+            // E012: T as the committed tries left it (the goal's atoms, then each line's new atoms)
+            for x in &self.logs {
+                if committed(x) && x["outcome"].as_str() != Some("return differs") {
+                    p.merge(&progress::atoms_of_json(x.get("t_new")));
+                }
+            }
+        }
         let (rows, clean) = read_jsonl(&r.join("entries.jsonl"))?;
         let mut keep: Vec<Value> = Vec::new();
         for row in &rows {
@@ -742,7 +809,8 @@ impl Archive {
             }
         }
         for ci in 0..self.cells.len() {
-            if self.cells[ci].1.key.is_none() {
+            // (E012: the rows are keyed again below)
+            if self.cells[ci].1.key.is_none() && self.progress.is_none() {
                 let e0 = self.cells[ci].1.entries[0];
                 let f = self.facts(e0)?;
                 self.cells[ci].1.key = Some(self.cell_key(&f));
@@ -778,6 +846,8 @@ impl Archive {
                     }
                 }
             }
+        }
+        if self.idle_frames != 0 || self.progress.is_some() {
             self.rekey()?;
         }
         Ok(())
@@ -823,6 +893,11 @@ impl Archive {
             owned = facts.owners().into_iter().filter(|(_, v)| *v == ego).map(|(o, _)| o).collect();
         }
         owned.sort();
+        if let Some(p) = &self.progress {
+            // E012: room, owned objects, the atoms of T held but the script-control keys' (the amendment)
+            owned.retain(|_| ego != Some(0));
+            return json!([facts.look("room"), owned, p.cell_atoms(facts)]);
+        }
         let kv: Vec<Value> =
             self.cell_keys.iter().filter(|k| !self.idle.contains(*k)).map(|k| json!([k, lk(facts, k)])).collect();
         json!([facts.look("room"), owned, kv])
@@ -944,6 +1019,9 @@ impl Archive {
         if parent.is_none() {
             self.root_facts = Some(fact_map(&cps.last().unwrap()[1]));
         }
+        if let Some(p) = self.progress.as_mut() {
+            p.store.put(i, &last.pairs());
+        }
         let key = self.cell_key(last);
         let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
         for c in cps {
@@ -970,6 +1048,7 @@ impl Archive {
             how: how.to_string(),
             goal: g == 0,
             seg_held: seg.into_iter().collect(),
+            dead: self.next_dead.take(),
         };
         let t1 = ta.elapsed().as_secs_f64();
         // write_gz's text of {"id", "parent", "frame", "tick", "events", "checkpoints"}, from the slices (no copy)
@@ -997,6 +1076,7 @@ impl Archive {
         let info = Rc::new(EntryInfo::of(Value::Array(events.to_vec()), cps.last().unwrap().clone()));
         self.entries.borrow_mut().insert(i, info);
         self.last_place = self.place(row, Some(key));
+        self.progress_place(i);
         Ok(i)
     }
 
@@ -1026,6 +1106,9 @@ impl Archive {
             return Err(format!("ValueError: entry {i}: a checkpoint at or before the parent's frame {f0}"));
         }
         let last = &cps.last().unwrap().facts;
+        if let Some(p) = self.progress.as_mut() {
+            p.store.put(i, &last.pairs());
+        }
         let key = self.cell_key(last);
         let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
         for c in cps {
@@ -1052,6 +1135,7 @@ impl Archive {
             how: how.to_string(),
             goal: g == 0,
             seg_held: seg.into_iter().collect(),
+            dead: self.next_dead.take(),
         };
         // the file from the attempt's compressed checkpoints (no text made, nothing compressed but its head)
         ne.write(&self.root.join("entries").join(format!("{i}.json.gz")), Some(i))?;
@@ -1063,6 +1147,7 @@ impl Archive {
                                        last_text: Some((ne.shared.clone(), ne.n - 1)) });
         self.entries.borrow_mut().insert(i, info);
         self.last_place = self.place(row, Some(key));
+        self.progress_place(i);
         Ok(i)
     }
 
@@ -1075,7 +1160,8 @@ impl Archive {
         let new_cell = !self.cell_ix.contains_key(&c);
         if new_cell {
             self.cell_ix.insert(c.clone(), self.cells.len());
-            self.cells.push((c.clone(), Cell { key, rep: i, entries: vec![], n: 0, exhausted: vec![], tried: vec![], deferred: vec![] }));
+            let chosen = self.progress.as_ref().map(|_| 0);
+            self.cells.push((c.clone(), Cell { key, rep: i, entries: vec![], n: 0, exhausted: vec![], tried: vec![], deferred: vec![], chosen }));
         }
         let ci = self.cell_ix[&c];
         self.cells[ci].1.entries.push(i);
@@ -1138,6 +1224,9 @@ impl Archive {
         self.cell_text.borrow_mut().clear();
         self.held_by.clear();
         self.chain_r.borrow_mut().clear();
+        if let Some(p) = self.progress.as_mut() {
+            p.clear_rows();
+        }
         for row in rows {
             let e = self.entry(row.id)?;
             let cps = e["checkpoints"].as_array().cloned().unwrap_or_default();
@@ -1146,6 +1235,9 @@ impl Archive {
                 self.root_facts = Some(fact_map(&cps.last().unwrap()[1]));
             }
             let facts = last;
+            if let Some(p) = self.progress.as_mut() {
+                p.store.put(row.id, &facts.pairs());
+            }
             let key = self.cell_key(facts);
             let mut seg: BTreeSet<(String, i64)> = BTreeSet::new();
             for c in &cps {
@@ -1159,15 +1251,172 @@ impl Archive {
             let mut u: HashSet<&(String, i64)> = cr.iter().collect();
             u.extend(seg.iter());
             new.r_path = u.len();
+            let id = new.id;
             self.place(new, Some(key));
+            self.progress_place(id);
         }
         self.recount();
         Ok(())
     }
 
-    /// n, tried and exhausted of the current cells from the committed log lines, in order.
-    fn recount(&mut self) {
+    // --- E012 (FMI_SELECT=progress): T, novelty, marks, the order (progress.rs, the plan's amendment)
+
+    /// Row i's T atoms, and, when it is live, its share of the least holders and the rooms (its facts are in the
+    /// store already).
+    fn progress_place(&mut self, i: usize) {
+        let (frame, room, live) = (self.rows[i].frame, self.rows[i].room, self.rows[i].dead.is_none());
+        if let Some(p) = self.progress.as_mut() {
+            p.place(i, frame, room, live);
+        }
+    }
+
+    /// Every row keyed again from the store (T grew): no file is read. The counts are counted again from the log.
+    pub fn rekey_t(&mut self) {
+        if self.progress.is_none() {
+            return;
+        }
+        let rows = std::mem::take(&mut self.rows);
+        self.cells.clear();
+        self.cell_ix.clear();
+        self.cell_text.borrow_mut().clear();
+        self.held_by.clear();
+        self.progress.as_mut().unwrap().clear_rows();
+        for mut row in rows {
+            let key = self.cell_key(&self.progress.as_ref().unwrap().store.view(row.id));
+            row.cell = Self::cell_id(&key);
+            let id = row.id;
+            self.place(row, Some(key));
+            self.progress_place(id);
+        }
+        self.recount();
+    }
+
+    /// The live rows (every row but the dead ones).
+    pub fn live_rows(&self) -> Vec<usize> {
+        self.rows.iter().filter(|r| r.dead.is_none()).map(|r| r.id).collect()
+    }
+
+    /// The distinct rooms of the entries from the root to row i.
+    pub fn chain_rooms(&self, i: usize) -> Rc<BTreeSet<i64>> {
+        if let Some(s) = self.chain_rooms.borrow().get(&i) {
+            return s.clone();
+        }
+        let mut s = match self.rows[i].parent {
+            Some(p) => (*self.chain_rooms(p)).clone(),
+            None => BTreeSet::new(),
+        };
+        if let Some(r) = self.rows[i].room {
+            s.insert(r);
+        }
+        let s = Rc::new(s);
+        self.chain_rooms.borrow_mut().insert(i, s.clone());
+        s
+    }
+
+    /// An entry's key within its cell: (-rooms on its chain, -novel atoms held, frame, id).
+    fn entry_key_p(&self, i: usize, nov: &HashMap<usize, i64>) -> (i64, i64, i64, usize) {
+        (-(self.chain_rooms(i).len() as i64), -nov.get(&i).copied().unwrap_or(0), self.rows[i].frame, i)
+    }
+
+    /// A cell's candidate under the switch: its least live entry, not exhausted under the current T, in an allowed
+    /// room, by `entry_key_p`.
+    fn candidate_p(&self, cell: &str, nov: &HashMap<usize, i64>) -> Option<usize> {
+        let p = self.progress.as_ref()?;
+        let c = self.cell(cell);
+        c.entries
+            .iter()
+            .copied()
+            .filter(|&i| {
+                let r = &self.rows[i];
+                r.dead.is_none() && !p.exhausted_now(i) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
+            })
+            .min_by_key(|&i| self.entry_key_p(i, nov))
+    }
+
+    /// The selection key under the switch: (n, chosen, -rooms on the chain, -novel atoms held, frame, id).
+    pub fn sel_key_p(&self, i: usize, nov: &HashMap<usize, i64>) -> (i64, i64, i64, i64, i64, usize) {
+        let c = self.cell(&self.rows[i].cell);
+        let (a, b, f, id) = self.entry_key_p(i, nov);
+        (c.n, c.chosen.unwrap_or(0), a, b, f, id)
+    }
+
+    /// Per entry, the atoms of T whose least live holder it is.
+    pub fn novel_counts(&self) -> HashMap<usize, i64> {
+        self.progress.as_ref().map(|p| p.novel_counts()).unwrap_or_default()
+    }
+
+    /// The dead moves the log gives for entry i (job.json "dead").
+    pub fn dead_moves(&self, i: usize) -> Vec<Value> {
+        let mut out = Vec::new();
+        for x in &self.logs {
+            if committed(x) && x.get("entry").and_then(|e| e.as_u64()) == Some(i as u64) {
+                if let Some(d) = x.get("dead").and_then(|d| d.as_array()) {
+                    out.extend(d.iter().cloned());
+                }
+            }
+        }
+        out
+    }
+
+    /// The atoms of T and the rooms that a try's new live entries hold and no live entry of a lower id holds, per
+    /// committed line (in the log's order): what `new_t` and `new_rooms` are, computed from the rows (S2: a log made
+    /// without the switch). Lines with no new entry give nothing.
+    pub fn novelty_from_rows(&self) -> Vec<(usize, Vec<String>, Vec<i64>)> {
+        let Some(p) = &self.progress else { return Vec::new() };
+        let mut first: HashMap<u32, usize> = HashMap::new();
+        let mut room_first: HashMap<i64, usize> = HashMap::new();
+        for r in self.rows.iter().filter(|r| r.dead.is_none()) {
+            for &a in &p.held[r.id] {
+                first.entry(a).or_insert(r.id);
+            }
+            if let Some(room) = r.room {
+                room_first.entry(room).or_insert(r.id);
+            }
+        }
+        let mut out = Vec::new();
+        for (k, x) in self.logs.iter().enumerate() {
+            if !committed(x) || x["outcome"].as_str() == Some("return differs") {
+                continue;
+            }
+            let ids: BTreeSet<usize> = x
+                .get("new_entries")
+                .and_then(|n| n.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_u64().map(|v| v as usize)).filter(|&i| i < self.rows.len()).collect())
+                .unwrap_or_default();
+            let mut t: Vec<String> = first.iter().filter(|(_, i)| ids.contains(i)).map(|(a, _)| p.t[*a as usize].text()).collect();
+            t.sort();
+            let mut rooms: Vec<i64> = room_first.iter().filter(|(_, i)| ids.contains(i)).map(|(r, _)| *r).collect();
+            rooms.sort();
+            out.push((k, t, rooms));
+        }
+        out
+    }
+
+    /// S2: `new_t` and `new_rooms` written into the log lines in memory (not the file) where a line has none, from
+    /// `novelty_from_rows`, and the counts counted again.
+    pub fn backfill_novelty(&mut self) -> usize {
+        let fill = self.novelty_from_rows();
+        let mut n = 0;
+        for (k, t, rooms) in fill {
+            let x = &mut self.logs[k];
+            if x.get("new_t").is_none() && x.get("new_rooms").is_none() {
+                x["new_t"] = json!(t);
+                x["new_rooms"] = json!(rooms);
+                n += 1;
+            }
+        }
+        self.recount();
+        n
+    }
+
+    /// n, tried and exhausted of the current cells from the committed log lines, in order (E012: n and chosen from
+    /// `new_t` and `new_rooms`, and the exhausted marks with |T| at each).
+    pub fn recount(&mut self) {
         let logs = std::mem::take(&mut self.logs);
+        let prog = self.progress.is_some();
+        if let Some(p) = self.progress.as_mut() {
+            p.exhausted.clear();
+        }
         for x in &logs {
             if !committed(x) {
                 continue;
@@ -1176,10 +1425,21 @@ impl Archive {
             if e >= self.rows.len() {
                 continue;
             }
+            if prog && x["outcome"].as_str() != Some("return differs") && truthy(x.get("exhausted")) {
+                let p = self.progress.as_mut().unwrap();
+                let at = as_i64(x.get("t_size")).map(|n| n as usize).unwrap_or(p.t.len());
+                p.exhausted.insert(e, at);
+            }
             let cid = self.rows[e].cell.clone();
             let c = self.cell_mut(&cid);
             if x["outcome"].as_str() != Some("return differs") {
-                c.n = if truthy(x.get("new_cells")) || truthy(x.get("new_reps")) { 0 } else { c.n + 1 };
+                if prog {
+                    let gave = |k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                    c.n = if gave("new_t") || gave("new_rooms") { 0 } else { c.n + 1 };
+                    c.chosen = Some(c.chosen.unwrap_or(0) + 1);
+                } else {
+                    c.n = if truthy(x.get("new_cells")) || truthy(x.get("new_reps")) { 0 } else { c.n + 1 };
+                }
             }
             if x.get("tried").map(|t| !t.is_null()).unwrap_or(false) {
                 c.set_tried(e.to_string(), x["tried"].clone());
@@ -1197,6 +1457,9 @@ impl Archive {
     /// The entry a cell offers for selection (E008: its representative unless exhausted; fix a: its least (tick, id)
     /// entry that is not exhausted).
     pub fn candidate(&self, cell: &str) -> Option<usize> {
+        if self.progress.is_some() {
+            return self.candidate_p(cell, &self.novel_counts());
+        }
         let c = self.cell(cell);
         if self.idle_frames == 0 {
             return if c.exhausted.contains(&c.rep) { None } else { Some(c.rep) };
@@ -1270,12 +1533,19 @@ impl Archive {
     }
 
     pub fn sel_key_json(&self, i: usize) -> Value {
+        if self.progress.is_some() {
+            let k = self.sel_key_p(i, &self.novel_counts());
+            return json!([k.0, k.1, k.2, k.3, k.4, k.5]);
+        }
         let k = self.sel_key(i, &self.favoured());
         let t = if k.4 == i128::MAX { Value::from(f64::INFINITY) } else { Value::from(k.4 as i64) };
         json!([k.0, k.1, k.2, k.3, t, k.5])
     }
 
     pub fn selectable(&self, cell: &str) -> bool {
+        if self.progress.is_some() {
+            return self.candidate(cell).is_some();
+        }
         match self.candidate(cell) {
             Some(i) => self.rows[i].room.map(|r| self.allowed.contains(&r)).unwrap_or(false),
             None => false,
@@ -1283,6 +1553,10 @@ impl Archive {
     }
 
     pub fn n_selectable(&self) -> usize {
+        if self.progress.is_some() {
+            let nov = self.novel_counts();
+            return self.cells.iter().filter(|(c, _)| self.candidate_p(c, &nov).is_some()).count();
+        }
         self.cells.iter().filter(|(c, _)| self.selectable(c)).count()
     }
 
@@ -1292,6 +1566,20 @@ impl Archive {
         let mut busy_cells: HashSet<&str> = self.busy.values().map(|(_, c)| c.as_str()).collect();
         for e in &busy_ids {
             busy_cells.insert(self.rows[*e].cell.as_str());
+        }
+        if self.progress.is_some() {
+            // E012: cells by (n, chosen), then their candidates' keys (plan.md 6)
+            let nov = self.novel_counts();
+            let mut cands: Vec<((i64, i64, i64, i64, i64, usize), usize)> = self
+                .cells
+                .iter()
+                .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
+                .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
+                .filter(|i| !busy_ids.contains(i))
+                .map(|i| (self.sel_key_p(i, &nov), i))
+                .collect();
+            cands.sort();
+            return cands.into_iter().take(b).map(|(_, i)| i).collect();
         }
         let fav = self.favoured();
         let mut cands: Vec<usize> = self
@@ -1307,13 +1595,24 @@ impl Archive {
     }
 
     pub fn goal_entries(&self) -> Vec<usize> {
-        self.rows.iter().filter(|r| r.goal).map(|r| r.id).collect()
+        self.rows.iter().filter(|r| r.goal && r.dead.is_none()).map(|r| r.id).collect()
     }
 
     /// After the last committed job that added a pair no earlier entry held (outside I), as many committed jobs as
     /// there were selectable cells right after it, none adding one.
     pub fn stagnant(&self) -> bool {
         let done: Vec<&Value> = self.logs.iter().filter(|x| committed(x)).collect();
+        if self.progress.is_some() {
+            // E012: over new atoms of T and new rooms
+            let gave = |x: &Value, k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+            let last = done.iter().rposition(|x| gave(x, "new_t") || gave(x, "new_rooms"));
+            let frontier = match last {
+                None => 1,
+                Some(l) => as_i64(done[l].get("selectable")).unwrap_or(1).max(1),
+            };
+            let since = done.len() as i64 - last.map(|l| l as i64 + 1).unwrap_or(0);
+            return since >= frontier;
+        }
         let last = done
             .iter()
             .enumerate()
@@ -1499,6 +1798,10 @@ impl Archive {
         if crate::step::deepen().is_some() {
             m.insert("deferred".into(), cell.deferred_of(&i.to_string()).cloned().unwrap_or_else(|| json!([])));
         }
+        if let Some(p) = &self.progress {
+            m.insert("novelty".into(), progress::novelty_json(p, &self.live_rows()));
+            m.insert("dead".into(), Value::Array(self.dead_moves(i)));
+        }
         Ok(doc)
     }
 
@@ -1554,6 +1857,14 @@ impl Archive {
                                "new": new_idle, "size": self.idle.len(), "frames": res["idle"].get("frames"),
                                "seconds": res["idle"].get("seconds")});
         }
+        // E012: the try's T joins the archive's before anything is placed (the rows are keyed again when T grows)
+        let mut t_new: Vec<TAtom> = Vec::new();
+        if self.progress.is_some() && ret.get("same") != Some(&Value::Bool(false)) {
+            t_new = self.progress.as_mut().unwrap().merge(&progress::atoms_of_json(res.get("tested")));
+            if !t_new.is_empty() {
+                self.rekey_t();
+            }
+        }
         let cell = self.rows[e].cell.clone();
         let sel = if job_dir.join("select.json").exists() { read_json(&job_dir.join("select.json"))? } else { json!({}) };
         let mut line = Map::new();
@@ -1584,11 +1895,19 @@ impl Archive {
         let tp = std::time::Instant::now();
         let cp0 = crate::machine::thread_cpu_s();
         let before: HashSet<(String, i64)> = self.held_by.keys().cloned().collect();
+        let (before_t, before_rooms): (HashSet<u32>, BTreeSet<i64>) = match &self.progress {
+            Some(p) => (p.first.keys().copied().collect(), p.rooms.keys().copied().collect()),
+            None => (HashSet::new(), BTreeSet::new()),
+        };
         let (mut ids, mut new_cells, mut new_reps) = (Vec::new(), 0i64, 0i64);
         self.pending_rows = Some(Vec::new());
         self.pending_files = Some(Vec::new());
         for (n, doc) in &new_files {
             let how = n.get("how").and_then(|h| h.as_str()).filter(|h| !h.is_empty()).unwrap_or("checkpoint").to_string();
+            if self.progress.is_some() {
+                self.next_dead =
+                    n.get("dead").filter(|d| !d.is_null()).map(|d| d.as_str().map(|s| s.to_string()).unwrap_or_else(|| d.to_string()));
+            }
             let id = match doc {
                 NewDoc::Doc(doc) => self.add(
                     Some(e),
@@ -1624,6 +1943,26 @@ impl Archive {
         let t_add = tp.elapsed().as_secs_f64();
         let mut new_r: Vec<(String, i64)> = self.held_by.keys().filter(|p| !before.contains(*p)).cloned().collect();
         new_r.sort();
+        // E012: the atoms of T and the rooms the new live entries hold and no earlier live entry held
+        let (mut new_t, mut new_rooms, mut dead_entries): (Vec<String>, Vec<i64>, Vec<usize>) = (Vec::new(), Vec::new(), Vec::new());
+        if let Some(p) = &self.progress {
+            let mut ts: BTreeSet<u32> = BTreeSet::new();
+            let mut rs: BTreeSet<i64> = BTreeSet::new();
+            for &i in &ids {
+                if self.rows[i].dead.is_some() {
+                    dead_entries.push(i);
+                    continue;
+                }
+                ts.extend(p.held[i].iter().copied().filter(|a| !before_t.contains(a)));
+                if let Some(r) = self.rows[i].room.filter(|r| !before_rooms.contains(r)) {
+                    rs.insert(r);
+                }
+            }
+            new_t = ts.into_iter().map(|a| p.t[a as usize].text()).collect();
+            new_t.sort();
+            new_rooms = rs.into_iter().collect();
+        }
+        let gave = !new_t.is_empty() || !new_rooms.is_empty();
         if outcome != "return differs" {
             let mut tried: HashMap<String, Value> = HashMap::new();
             if let Some(t) = self.cell(&cell).tried_of(&e.to_string()).and_then(|t| t.as_array()) {
@@ -1652,14 +1991,24 @@ impl Archive {
             } else {
                 None
             };
+            let prog = self.progress.is_some();
             let c = self.cell_mut(&cell);
-            c.n = if new_cells != 0 || new_reps != 0 { 0 } else { c.n + 1 };
+            if prog {
+                c.n = if gave { 0 } else { c.n + 1 };
+                c.chosen = Some(c.chosen.unwrap_or(0) + 1);
+            } else {
+                c.n = if new_cells != 0 || new_reps != 0 { 0 } else { c.n + 1 };
+            }
             c.set_tried(e.to_string(), Value::Array(tv.into_iter().map(|(_, v)| v).collect()));
             if let Some(d) = deferred {
                 c.set_deferred(e.to_string(), d);
             }
             if exhausted && !c.exhausted.contains(&e) {
                 c.exhausted.push(e);
+            }
+            if let Some(p) = self.progress.as_mut().filter(|_| exhausted) {
+                let n = p.t.len();
+                p.exhausted.insert(e, n);
             }
         }
         let used = self.committed_jobs().len() as i64;
@@ -1731,6 +2080,16 @@ impl Archive {
         }
         if !self.e010.is_empty() {
             line.insert("commit_index".into(), json!(used));
+        }
+        if let Some(p) = &self.progress {
+            line.insert("t_new".into(), progress::atoms_json(&t_new));
+            line.insert("t_size".into(), json!(p.t.len()));
+            line.insert("new_t".into(), json!(new_t));
+            line.insert("new_rooms".into(), json!(new_rooms));
+            line.insert("chosen".into(), json!(self.cell(&cell).chosen));
+            line.insert("dead_entries".into(), json!(dead_entries));
+            let dead = if outcome != "return differs" { res.get("dead").filter(|d| d.is_array()).cloned() } else { None };
+            line.insert("dead".into(), dead.unwrap_or_else(|| json!([])));
         }
         if let Some(x) = extra {
             for (k, v) in x {
@@ -1821,7 +2180,8 @@ impl Archive {
         out.push('{');
         for (i, (id, c)) in self.cells.iter().enumerate() {
             let shape = (c.key.is_some(), c.rep, c.entries.len(), c.n, c.exhausted.len(), c.tried.len(),
-                         c.tried.iter().map(|(_, v)| v.as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>());
+                         c.tried.iter().map(|(_, v)| v.as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>(),
+                         c.chosen.unwrap_or(-1));
             let fresh = match cache.get(id) {
                 Some((sh, _)) => *sh != shape,
                 None => true,
