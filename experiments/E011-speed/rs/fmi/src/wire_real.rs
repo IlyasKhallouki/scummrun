@@ -47,7 +47,8 @@ impl Returns for PoolReturns {
 /// The readings: reader-scope with --out-dir, opened by fmi-reading. `cache`: fmi-reading's exact reading cache
 /// (FMI_READING_CACHE, a folder; off when unset or empty); a hit's files are linked into the request's folder.
 /// `memo`: readcore's job memo across readings (FMI_MEMO, a folder, given to reader-scope as --memo; off when unset or
-/// empty).
+/// empty). `prep`: reader-scope's --prep (FMI_READER_PREP=1; e011-r2-read: the workers work out the reading thread's
+/// and the sink's part of their records; the same files), off unless set.
 pub struct RealReadings {
     pub reader: PathBuf,
     pub opened: Mutex<HashMap<PathBuf, Arc<fmi_reading::Reading>>>,
@@ -55,6 +56,7 @@ pub struct RealReadings {
     pub root: PathBuf,
     pub cache: Option<fmi_reading::cache::ReadingCache>,
     pub memo: Option<PathBuf>,
+    pub prep: bool,
     pub shas: std::sync::OnceLock<(String, String)>,
 }
 
@@ -75,6 +77,7 @@ impl RealReadings {
             root,
             cache,
             memo: env_dir("FMI_MEMO"),
+            prep: std::env::var("FMI_READER_PREP").is_ok_and(|v| v == "1"),
             shas: std::sync::OnceLock::new(),
         })
     }
@@ -84,6 +87,9 @@ impl RealReadings {
         cmd.args(spec.args(dir, &q.name, q.threads as usize));
         if let Some(m) = &self.memo {
             cmd.arg("--memo").arg(m);
+        }
+        if self.prep {
+            cmd.arg("--prep");
         }
         let out = cmd.output().map_err(|e| format!("reader-scope: {e}"))?;
         std::fs::write(dir.join("reader-scope.err"), &out.stderr).ok();
