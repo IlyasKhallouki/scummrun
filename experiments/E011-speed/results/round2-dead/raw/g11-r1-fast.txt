@@ -1,0 +1,16 @@
+j00000: class 'refinement' (= B0's), new [2767, 2848, 2850, 2862], same as B0
+j00001: class 'refinement' (= B0's), new [2863], same as B0
+j00002: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00003: class 'refinement' (= B0's), new [2850, 2862], same as B0
+j00004: class 'refinement' (= B0's), new [2854, 2862], same as B0
+j00005: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00006: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00007: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00008: class 'refinement' (= B0's), new [2769, 2818, 2819, 2821, 2822, 2824, 2826, 2860], differs: [["frames", 86, 92], ["frame_end", 2854, 2860], ["qf", 2064, 2208], ["inputs", 3, 5], ["new entries", 4, 8], ["new 2 frame", "2820", "2819"], ["new 2 tick", "16873", "16867"], ["new 2 events", "[{'frame': 2769, 'click': [11, 71]}, {'frame': 2819, 'key': 't'}, {'frame': 2820", "[{'frame': 2769, 'clic
+j00009: class 'refinement' (= B0's), new [2768, 2818, 2819, 2821, 2822, 2824, 2826, 2860], differs: [["frames", 87, 93], ["frame_end", 2854, 2860], ["qf", 2088, 2232], ["inputs", 3, 5], ["new entries", 4, 8], ["new 2 frame", "2820", "2819"], ["new 2 tick", "16873", "16867"], ["new 2 events", "[{'frame': 2768, 'click': [7, 71]}, {'frame': 2819, 'key': 't'}, {'frame': 2820,", "[{'frame': 2768, 'clic
+j00010: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00011: class 'refinement' (= B0's), new [2770, 2818, 2820, 2854], same as B0
+j00012: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00013: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00014: class 'refinement' (= B0's), new [2771, 2818, 2819, 2821, 2822, 2824, 2826, 2860], differs: [["frames", 84, 90], ["frame_end", 2854, 2860], ["qf", 2016, 2160], ["inputs", 3, 5], ["new entries", 4, 8], ["new 2 frame", "2820", "2819"], ["new 2 tick", "16873", "16867"], ["new 2 events", "[{'frame': 2771, 'click': [19, 71]}, {'frame': 2819, 'key': 't'}, {'frame': 2820", "[{'frame': 2771, 'clic
+G11 r1-fast: 15 tries, stop class = B0's in 15, everything = B0's in 12
