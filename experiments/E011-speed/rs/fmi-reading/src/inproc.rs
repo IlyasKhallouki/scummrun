@@ -11,14 +11,15 @@
 //! * [`InProc::extra_args`]: what the switch adds to reader-scope's arguments: `--memo-mem` (the store in memory,
 //!   when no `--memo` folder is given), `--memo-units-set` (memo.md's amendment of 2026-11-03; `FMI_READER_UNITS_SET=0`
 //!   leaves it out) and `--prep` (`FMI_READER_PREP=0` leaves it out);
-//! * [`ReaderAlloc`]: the process's allocator, mimalloc (reader-scope's own) with the switch on, the system allocator
-//!   with it off or with `FMI_READER_ALLOC=system`, chosen at the process's first allocation.
+//! * [`ReaderAlloc`]: the process's allocator, chosen at its first allocation: with the switch on, mimalloc
+//!   (reader-scope's own) for the blocks made while a reading runs and the system's for the others (`phase`, the
+//!   default; `FMI_READER_ALLOC=mimalloc` or `system` for one of them throughout); with it off, the system's.
 
 use scumm_reader::memo::MemStore;
 use scumm_reader::run::{run, Ctl, Log, Resident};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -100,6 +101,8 @@ impl InProc {
     /// One reading by reader-scope's arguments `args` (with [`InProc::extra_args`] already in them), its progress in
     /// `dir`/reader-scope.err; `cancel` stops it. Returns the report.
     pub fn read(&self, args: &[String], dir: &Path, cancel: &AtomicBool) -> Result<serde_json::Value, String> {
+        // by phase (`ReaderAlloc`): the blocks made from here to the reading's end come from mimalloc
+        let _reading = Reading::enter();
         let res = self.resident()?;
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let log = Log::file(&dir.join("reader-scope.err")).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -139,26 +142,45 @@ impl InProc {
     }
 }
 
-/// The process's allocator (module docstring): mimalloc when the switch is on at the first allocation, else the
-/// system allocator. The choice is made once, before anything is allocated, so every block is freed by the allocator
-/// that made it. A binary takes it with `#[global_allocator] static A: fmi_reading::inproc::ReaderAlloc =
+/// The process's allocator (module docstring; E012 plan.md, resident, "the allocator by phase"). Its mode is chosen
+/// once, at the process's first allocation, from the environment:
+/// * the switch off, or `FMI_READER_ALLOC=system`: the system allocator for every block;
+/// * `FMI_READER_ALLOC=mimalloc`: mimalloc for every block;
+/// * otherwise (`phase`, the switch's default): mimalloc for the blocks made while a reading runs in the process
+///   ([`InProc::read`]), the system allocator for the others.
+///
+/// A block is always freed, grown or shrunk by the allocator that made it: in the first two modes there is one; by
+/// phase, mimalloc's page map (`mi_is_in_heap_region`) tells its blocks, which lie in the regions it reserved, from
+/// the system's. A binary takes it with `#[global_allocator] static A: fmi_reading::inproc::ReaderAlloc =
 /// fmi_reading::inproc::ReaderAlloc;`.
 pub struct ReaderAlloc;
 
-/// 0 not chosen yet, 1 the system's, 2 mimalloc
+const SYSTEM: u8 = 1;
+const MIMALLOC: u8 = 2;
+const PHASE: u8 = 3;
+
+/// 0 not chosen yet, else one of the modes above
 static CHOICE: AtomicU8 = AtomicU8::new(0);
+/// the readings running in this process (by phase: new blocks from mimalloc while it is above 0)
+static READING: AtomicUsize = AtomicUsize::new(0);
+/// mimalloc has made a block (before that, no block is its)
+static MI_USED: AtomicBool = AtomicBool::new(false);
+
+extern "C" {
+    /// mimalloc's own test: the address lies in a region mimalloc reserved (its page map); false before its first block
+    fn mi_is_in_heap_region(p: *const std::ffi::c_void) -> bool;
+}
 
 #[inline]
-fn mimalloc_on() -> bool {
+fn mode() -> u8 {
     match CHOICE.load(Ordering::Relaxed) {
-        1 => false,
-        2 => true,
-        _ => choose(),
+        0 => choose(),
+        m => m,
     }
 }
 
 #[cold]
-fn choose() -> bool {
+fn choose() -> u8 {
     // getenv allocates nothing; the process's first allocation comes before any other thread
     let env = |name: &std::ffi::CStr| -> Option<&'static [u8]> {
         // SAFETY: a NUL-terminated name; the value, if any, is a NUL-terminated string the C library owns and keeps
@@ -167,27 +189,70 @@ fn choose() -> bool {
             (!p.is_null()).then(|| std::ffi::CStr::from_ptr(p).to_bytes())
         }
     };
-    // the switch on, unless FMI_READER_ALLOC=system keeps the system's (E012 plan.md, resident, "the allocator")
-    let on = env(c"FMI_READER_LIB") == Some(b"1") && env(c"FMI_READER_ALLOC") != Some(b"system");
-    CHOICE.store(if on { 2 } else { 1 }, Ordering::Relaxed);
-    on
+    let m = if env(c"FMI_READER_LIB") != Some(b"1") {
+        SYSTEM
+    } else {
+        match env(c"FMI_READER_ALLOC") {
+            Some(b"system") => SYSTEM,
+            Some(b"mimalloc") => MIMALLOC,
+            _ => PHASE,
+        }
+    };
+    CHOICE.store(m, Ordering::Relaxed);
+    m
 }
 
-/// Which allocator the process took: "mimalloc" or "system" (for reports).
+/// Which allocator the process takes: "system", "mimalloc" or "phase" (for reports).
 pub fn allocator() -> &'static str {
-    if mimalloc_on() {
-        "mimalloc"
-    } else {
-        "system"
+    match mode() {
+        MIMALLOC => "mimalloc",
+        PHASE => "phase",
+        _ => "system",
     }
 }
 
-// SAFETY: each call goes to one allocator, the same for the process's whole life (`choose` runs once, before the
-// first block), so a block is always freed, grown or shrunk by the allocator that made it
+/// A reading runs in the process while this lives (by phase: its blocks come from mimalloc).
+pub struct Reading(());
+
+impl Reading {
+    pub fn enter() -> Reading {
+        READING.fetch_add(1, Ordering::SeqCst);
+        Reading(())
+    }
+}
+
+impl Drop for Reading {
+    fn drop(&mut self) {
+        READING.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Whether a new block comes from mimalloc, in mode `m`.
+#[inline]
+fn make_mi(m: u8) -> bool {
+    m == MIMALLOC || (m == PHASE && READING.load(Ordering::Relaxed) > 0)
+}
+
+/// Whether block `p` is mimalloc's, in mode `m`.
+#[inline]
+unsafe fn mi_owns(m: u8, p: *mut u8) -> bool {
+    m == MIMALLOC || (m == PHASE && MI_USED.load(Ordering::Relaxed) && mi_is_in_heap_region(p as *const std::ffi::c_void))
+}
+
+#[inline]
+fn mark_mi() {
+    if !MI_USED.load(Ordering::Relaxed) {
+        MI_USED.store(true, Ordering::Relaxed);
+    }
+}
+
+// SAFETY: a block is made by one allocator and always freed, grown or shrunk by the one that made it (the type's
+// docstring): the mode never changes after the first block, and by phase the owner is mimalloc's own answer
 unsafe impl GlobalAlloc for ReaderAlloc {
     #[inline]
     unsafe fn alloc(&self, l: Layout) -> *mut u8 {
-        if mimalloc_on() {
+        if make_mi(mode()) {
+            mark_mi();
             mimalloc::MiMalloc.alloc(l)
         } else {
             System.alloc(l)
@@ -195,7 +260,8 @@ unsafe impl GlobalAlloc for ReaderAlloc {
     }
     #[inline]
     unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
-        if mimalloc_on() {
+        if make_mi(mode()) {
+            mark_mi();
             mimalloc::MiMalloc.alloc_zeroed(l)
         } else {
             System.alloc_zeroed(l)
@@ -203,7 +269,7 @@ unsafe impl GlobalAlloc for ReaderAlloc {
     }
     #[inline]
     unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
-        if mimalloc_on() {
+        if mi_owns(mode(), p) {
             mimalloc::MiMalloc.dealloc(p, l)
         } else {
             System.dealloc(p, l)
@@ -211,7 +277,8 @@ unsafe impl GlobalAlloc for ReaderAlloc {
     }
     #[inline]
     unsafe fn realloc(&self, p: *mut u8, l: Layout, n: usize) -> *mut u8 {
-        if mimalloc_on() {
+        // a block stays with the allocator that made it
+        if mi_owns(mode(), p) {
             mimalloc::MiMalloc.realloc(p, l, n)
         } else {
             System.realloc(p, l, n)
@@ -242,6 +309,39 @@ pub fn children_maxrss_mb() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// By phase, a block made during a reading is mimalloc's and one made outside is the system's, and each is freed
+    /// and grown by its maker whenever and wherever that happens.
+    #[test]
+    fn the_allocator_by_phase() {
+        CHOICE.store(PHASE, Ordering::SeqCst);
+        let a = ReaderAlloc;
+        let l = Layout::from_size_align(4096, 16).unwrap();
+        // SAFETY: blocks of layout `l`, each freed once by the same GlobalAlloc
+        unsafe {
+            let outside = a.alloc(l);
+            let (during, during2) = {
+                let _r = Reading::enter();
+                (a.alloc(l), a.alloc_zeroed(l))
+            };
+            assert!(!mi_is_in_heap_region(outside as _), "made outside a reading: the system's");
+            assert!(mi_is_in_heap_region(during as _) && mi_is_in_heap_region(during2 as _), "made during one: mimalloc's");
+            // grown outside a reading, a mimalloc block stays mimalloc's; a system block grown during one stays the system's
+            let grown = a.realloc(during, l, 1 << 20);
+            assert!(mi_is_in_heap_region(grown as _));
+            let sys_grown = {
+                let _r = Reading::enter();
+                a.realloc(outside, l, 1 << 20)
+            };
+            assert!(!mi_is_in_heap_region(sys_grown as _));
+            let big = Layout::from_size_align(1 << 20, 16).unwrap();
+            a.dealloc(grown, big);
+            a.dealloc(sys_grown, big);
+            // freed on another thread than the one that made it
+            let p = during2 as usize;
+            std::thread::spawn(move || a.dealloc(p as *mut u8, l)).join().unwrap();
+        }
+    }
 
     /// What the switch adds to reader-scope's arguments: the store in memory alone unless a --memo folder is given,
     /// the key's units as a set whenever a memo is on, --prep unless left out.
