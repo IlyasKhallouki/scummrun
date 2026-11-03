@@ -592,6 +592,91 @@ All runs use seed 1, laptop rules (below), and every E012 switch on as in E012's
 - **The due-frame window** (E012, section 1), still not built.
 - **AGI and SCI adapters.** E013 defines `PlayerNow` and builds SCUMM's. No other family's game is run.
 
+## Amendment 2026-11-03, component `stall`: the rows, the class table and the shift rules, before its code
+
+Written before stall's code (branch e013-stall). It fills in what section C and the component's row leave open; two
+points go beyond them and are marked as such.
+
+- **What a try's seconds are.** The try's wall is result.json `wall_s` (report.json's `wall`). The parts are the try's
+  own records, each once, none nested in another:
+  - return `return.boot_s`;
+  - read: the reading's `wall_s` plus `load_s` when fresh, its `load_s` when reused;
+  - T `e012.t.seconds`; the wait `e012.wait.seconds`, or with the wait off E009's `idle.seconds`;
+  - per request (each `probes` item, its attempt's `run/aNN/run.json`): each window's `wall_s` (play), each refinement's
+    and extension's `seconds` (read), and the request's `seconds` less those (plan, at least 0);
+  - each affordance step's `step_seconds`; a free try's `free` record (free's amendment: its offer points' seconds,
+    its delays', and the rest of its wall);
+  - the rest: the wall less every part above. It is the only row that can be negative (the records round to 0.1 s and
+    0.01 s).
+- **Rows** are (phase, outcome), the outcome as the harness wrote it, its numbers written N:
+  - ("return", same | differs); ("read", the reading's `why`); ("read: refinement", added | none added); ("read:
+    extension", replan | no replan); ("T", ""); ("wait", its `end`); ("idle", "");
+  - ("plan", the request's status, or its stop's kind when it has none, e.g. "reach extension");
+  - ("play", the window's end reason; its children's outcomes but "cancelled"), e.g. ("play", "N frames; interface");
+    B's windows end "refused input: CAUSE";
+  - ("afford", "WHY, KIND") per step, and with B's verdicts ("afford", "WHY: VERDICT") per verdict with the step's
+    other seconds under ("afford", "WHY: other");
+  - ("free", "WHERE, level L") per offer point (by verdict likewise), ("free", "delays"), ("free", "other");
+  - ("rest", "").
+- **Which entries are new.** An entry is new when it is live and holds an atom of the commit's `new_t` (its last facts,
+  `TAtom::holds_in`) or its room is in `new_rooms`: the archive's own novelty at the commit (log.jsonl), not the try's.
+  result.json `new` item k is the line's `new_entries[k]`. The attempt's entries are those of how "checkpoint", "end"
+  and "delay"; the wait's "wait"; an affordance step's the next `kept` items of how "afford", step by step; a free
+  try's "free". The report checks that the new entries' atoms and rooms give back each line's `new_t` and `new_rooms`.
+- **The class table** (fixed; it names no game fact):
+
+  | rows | class |
+  |---|---|
+  | return, rest | overhead |
+  | read, T, plan, play of a model try whose attempt's entries include a new one | productive |
+  | the same, otherwise | the try's stop class (below) |
+  | wait or idle | productive when a wait entry is new, else wait |
+  | an affordance step or a free try's part, its trials taken or without verdicts | productive when one of its entries is new, else interface, no yield |
+  | its trials `dropped` or `ignored` | refused input |
+  | read and T of a free try with nothing new | interface, no yield |
+
+  | the try's stop (the played attempt's; else from its requests) | stop class |
+  |---|---|
+  | "refinement: ..." (Lemma R's R0 and the other refinement stops), "reach extension: ...", "the engine's state is outside the task's domains ...", "... Lemma 2's premise failed"; no attempt played and every request stopped on the reach extension | model-blind |
+  | "no plan (...)", "planner timeout ...", "planner ...", "time limit"; no attempt played otherwise (no target, every request dead, deferred or incomplete) | no plan |
+  | "the same empty window N times on R: ..." when each empty window on R ended "refused input: ..." or ran to its frame bound with every try failing at the interface (children "interface") | refused input |
+  | "the same empty window ..." otherwise, "replan limit", "replan ... the same plan again" | effect mismatch |
+  | "goal", "goal, not from the plan ..." (the target reached), "engine: engine ended: R" with R the game's end | model, no yield |
+  | "engine: ..." otherwise, "error: ...", an error, the return differs | overhead |
+
+  **Beyond section C:** "model, no yield" is a ninth class. Section C names none for an attempt that reached its target
+  (or the game's end) and kept nothing new; E012's kitchen had 6 such tries.
+- **A try's class** (the cell rule, the reports): productive when its line gave a `new_t` atom or a new room; else, for a
+  model try, its stop class; for a free try, the class with most of its seconds other than overhead. A try's kind is
+  the log line's `kind` (free's), "model" when absent.
+- **stalls.json** (`FMI_STALLS=1`, written by the driver after each commit, and by `fmi explore stalls ARCHIVE --json`):
+  per class and per row (seconds, tries), over the run and over the last 20 committed tries; each try's job, entry,
+  kind, wall, class and seconds by class; the trace after each commit (the last 20's share per class, the shift's
+  state); the cells the cell rule names. The driver prints one line: the run's top three classes, the last 20's top
+  three and the shift. Live and offline are the same function over the same files.
+- **The shift rules** (`FMI_FREE_SHIFT=1`), replayed over the committed tries in commit order, so that a reopened archive
+  gives the same answers:
+  - after each commit, the last min(20, committed) tries' seconds by class. Off: when a non-productive class holds at
+    least 50% of them, the shift is on for that class. On: when its class falls below 30%, it is off, and the same
+    commit is then looked at again as from off;
+  - `share(ρ0)` is ρ0 when off and max(ρ0, min(2ρ0, 0.5)) when on. **Beyond section C:** the max keeps K2's ρ0 = 1
+    from being lowered to 0.5;
+  - the cell rule: a cell (its current id, cells.json's) is named when its last two committed tries are both model
+    tries, neither productive, in the same stop class. A free try in the cell clears it, so the rule cannot hold a
+    cell to free tries.
+  - free's port (`free::Shift`) is given `share` and `free_cell` over the live table.
+- **Gates as run.**
+  - C1: `fmi-checks`' `stall-report` over `/var/tmp/fast-mi/e012-archives/kitchen` (read only) and E012's
+    `results/kitchen/report.json`: the rows over the 53 tries sum to 1,658.1 s, the rest row is at most 1% (signed and
+    absolute), every try's rows sum to its `wall` in report.json, and the novelty check holds on every line. Reported:
+    the baseline table by class and by row, by stop, the last-20 trace, where the shift would have fired and which
+    cells the cell rule would have named.
+  - C2: unit tests on a generated archive (the archive tests' way): each outcome kind's rows and classes, the stop
+    table, the shift's threshold and hysteresis, the cell rule, and `share` and `free_cell` after each commit equal to
+    the same from the archive opened again at that commit (with free's kind rule, the same kind sequence).
+  - C3 at K1's end; before it, a driver run with a scripted step on a generated archive: the stalls.json the driver
+    wrote equals `fmi explore stalls`'s over the same files, with `FMI_STALLS` unset nothing is written.
+
 ## Amendment 2026-11-03 (2): E014 merged, one code path for both games, the interactive demo after the kitchen
 
 Written and committed before any further code or run of E013. The sections above stay as written: their predictions
@@ -774,6 +859,46 @@ ran, unchanged.
 The demo is finished when F's write-up is done and the PI decides what follows. Until then P does not run. P's
 dated amendment with the projection is still written before it. E013's success threshold is scored as written: while
 P has not run, the result is at most "partly".
+
+## Amendment 2026-11-03, component `stall` (2): E014's records, free's record and port, rule (2)
+
+Written after e013 (31da643) was merged into e013-stall, and before the code it changes. Stall's amendment above stands;
+this adds what the merge and free's posted record bring.
+
+- **E014's end entries.** With `FMI_GOAL_END=1`, a run that ends at a script's restart or quit gives an entry of how
+  "end" (`mech::end_extra`), made by the wait, the attempt or an affordance step. The attempt's own last checkpoint is
+  also of how "end"; only the extras' items carry a "novel" list. Such an extra belongs to the part whose dead move the
+  same end made (result.json "dead": the move at the same frame with a game end, its "how": wait, attempt, afford or
+  free). An afford end belongs to the step whose kept items come before it (a try runs at most one affordance step).
+  With no such dead move it is the attempt's, as before.
+- **free's record**, as free posted it in COORD.md: result.json "free" holds "seconds" (the whole free step), "delays"
+  {"seconds"}, and "at", a list of offer points {"at": entry | stop | kept, "level", "seconds" (the point's offers
+  without its delays), "step": its affordance record, with B's "verdict_s" once merged}. The rows are ("free", "AT,
+  level L") per point, split by verdict as above; ("free", "delays"); and ("free", "other"), the step's seconds less
+  the points' and the delays'. The shape stall's code guessed before free posted (a "points" list, "wall") is dropped.
+- **free's port.** free asks for the two rules through `free::Shift`, with the open archive as argument.
+  `stall::ArchivePort` answers `share(&Archive, ρ0)` and `free_cell(&Archive, cell)` from a table it keeps over the
+  archive's log lines, caught up at each call with the live table's own push: at every commit it equals the table from
+  the files, also after a reopen. The integration wires it (`impl free::Shift for stall::ArchivePort`,
+  `free::set_shift`). The driver keeps its live table only with `FMI_STALLS=1`.
+- **Rule (2) for stall.** Stall changes no run: it reads files after each commit. Its check on Monkey Island is E012's
+  smoke run (4 jobs from the boot, the kitchen's settings, b = 1), run twice on one build, with and without
+  `FMI_STALLS=1 FMI_FREE_SHIFT=1`, in two switch sets: E012's switches on (E012's engine), and E012's with E014's
+  mechanism switches of amendment (2) (b) (E014's engine; the switches of input, refuse and free are not on this
+  branch). In each set the two runs give the same tries (`fmi check tries`), job files and archive rows, timing aside;
+  every entry verifies from boot; and the run's stalls.json equals stall-report's table over the same files (C3's
+  check on a real run). Reported, not a gate: the table over E014's scratch archives on the interactive demo (read
+  only), each try's rows summing to its wall.
+
+## Amendment 2026-11-03, component `stall` (3): free's record as committed
+
+Written before the code it changes. free replaced the record shape it had posted (COORD.md, 20:15Z; e013-free ea0e920),
+after amendment (2) above was written from the earlier one. In result.json "free", "points" is now the list of offer
+points {"where": entry | stop | kept, "frame", "level", "seconds" (the point's offers without its delays), "record"
+(its affordance record, with B's "verdict_s" once merged), "delays"}; "n_points" is their count; "seconds" is the whole
+free step, and "delays" {"seconds"} the delays'. The rows are amendment (2)'s, read from "points", "where" and "record"
+in place of "at", "at" and "step". free's own end entries (`FMI_GOAL_END=1`) are of how "end" with a dead move of how
+"free": by amendment (2)'s rule they are the free step's.
 
 ## Amendment 2026-11-03 (3): how B reads a try, after M1
 

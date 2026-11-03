@@ -45,3 +45,7 @@ path = "src/bin/probe.rs"
 [[bin]]
 name = "refuse-check"
 path = "src/bin/refuse_check.rs"
+
+[[bin]]
+name = "stall-report"
+path = "src/bin/stall_report.rs"
