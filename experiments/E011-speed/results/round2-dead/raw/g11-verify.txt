@@ -1,0 +1,3 @@
+verify d-fast: 43 new entries from boot, 0 with differences
+verify d-ref: 43 new entries from boot, 0 with differences
+verify doff-ref: 43 new entries from boot, 0 with differences

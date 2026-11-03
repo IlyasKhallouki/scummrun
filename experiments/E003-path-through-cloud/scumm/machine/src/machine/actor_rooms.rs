@@ -11,54 +11,60 @@ use super::*;
 
 impl<'g> Machine<'g> {
     /// F9: the room of actor value `a` (getActorRoom: 0 for a number that is no actor).
-    pub(super) fn actor_room(&mut self, p: &mut Path, o: &FactOracle, a: i32) -> Val {
-        if !(0..NUM_ACTORS).contains(&a) {
-            return Val::Int(0);
-        }
-        self.read(p, Fact::ActorRoom(a), o)
+    pub(super) fn actor_room(&mut self, p: &mut Path, o: &FactOracle, a: i32) -> R<Val> {
+        Ok({
+            if !(0..NUM_ACTORS).contains(&a) {
+                return Ok(Val::Int(0));
+            }
+            self.read(p, Fact::ActorRoom(a), o)?
+        })
     }
 
     /// F9: o5_putActorInRoom with switch actor_rooms: the actor's room is the value as a byte. The stopTalk it runs
     /// for a visible talking actor leaving the current room (2165-2167) stays out of the model, as before.
-    pub(super) fn put_actor_in_room(&mut self, p: &mut Path, o: &FactOracle, x: X, args: &[ExprId]) -> Vec<Path> {
-        let cite = self.cite(x);
-        let a = self.val(p, o, args[0], Some(x));
-        let r = self.val(p, o, args[1], Some(x));
-        let a = match a {
-            Val::Int(a) => a,
-            Val::Unk(_) => {
-                let w = format!("actorroom of actor {}", self.show(a));
-                p.unknown_writes.push((rc("putActorInRoom"), cite, w.into()));
-                return Vec::new();
+    pub(super) fn put_actor_in_room(&mut self, p: &mut Path, o: &FactOracle, x: X, args: &[ExprId]) -> R<Vec<Path>> {
+        Ok({
+            let cite = self.cite(x);
+            let a = self.val(p, o, args[0], Some(x))?;
+            let r = self.val(p, o, args[1], Some(x))?;
+            let a = match a {
+                Val::Int(a) => a,
+                Val::Unk(_) => {
+                    let w = format!("actorroom of actor {}", self.show(a));
+                    p.unknown_writes.push((rc("putActorInRoom"), cite, w.into()));
+                    return Ok(Vec::new());
+                }
+            };
+            if !(0..NUM_ACTORS).contains(&a) {
+                let d = format!("putActorInRoom: actor {a} is no actor (derefActor's error(), actor.cpp:2281-2290)");
+                self.error(p, "no such actor", cite, &d, true);
+                return Ok(Vec::new());
             }
-        };
-        if !(0..NUM_ACTORS).contains(&a) {
-            let d = format!("putActorInRoom: actor {a} is no actor (derefActor's error(), actor.cpp:2281-2290)");
-            self.error(p, "no such actor", cite, &d, true);
-            return Vec::new();
-        }
-        let v = self.byte(r, format!("actorroom:{a}"));
-        self.write(p, Fact::ActorRoom(a), v);
-        Vec::new()
+            let v = self.byte(r, format!("actorroom:{a}"));
+            self.write(p, Fact::ActorRoom(a), v);
+            Vec::new()
+        })
     }
 
     /// F9: o5_loadRoomWithEgo's `a->putActor(room)` (script_v5.cpp:1866): the ego's room before its startScene.
-    pub(super) fn ego_room(&mut self, p: &mut Path, o: &FactOracle, x: X, room: Val) {
-        if !self.switches.actor_rooms {
-            return;
-        }
-        let ego = self.read(p, Fact::Var(VAR_EGO), o);
-        match ego {
-            Val::Int(e) if (0..NUM_ACTORS).contains(&e) => {
-                let v = self.byte(room, format!("actorroom:{e}"));
-                self.write(p, Fact::ActorRoom(e), v);
+    pub(super) fn ego_room(&mut self, p: &mut Path, o: &FactOracle, x: X, room: Val) -> R<()> {
+        Ok({
+            if !self.switches.actor_rooms {
+                return Ok(());
             }
-            _ => {
-                let cite = self.cite(x);
-                let w = format!("actorroom of the ego {}", self.show(ego));
-                p.unknown_writes.push((rc("loadRoomWithEgo"), cite, w.into()));
+            let ego = self.read(p, Fact::Var(VAR_EGO), o)?;
+            match ego {
+                Val::Int(e) if (0..NUM_ACTORS).contains(&e) => {
+                    let v = self.byte(room, format!("actorroom:{e}"));
+                    self.write(p, Fact::ActorRoom(e), v);
+                }
+                _ => {
+                    let cite = self.cite(x);
+                    let w = format!("actorroom of the ego {}", self.show(ego));
+                    p.unknown_writes.push((rc("loadRoomWithEgo"), cite, w.into()));
+                }
             }
-        }
+        })
     }
 
     /// A value stored in a byte (Actor::_room): itself when every value it can have fits.

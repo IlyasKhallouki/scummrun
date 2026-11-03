@@ -126,6 +126,12 @@ impl J {
 /// A string as Python's ensure_ascii encoder writes it.
 pub fn write_str(s: &str, out: &mut String) {
     out.push('"');
+    // printable ASCII but `"` and `\\`: as it is
+    if s.bytes().all(|b| (b' '..=b'~').contains(&b) && b != b'"' && b != b'\\') {
+        out.push_str(s);
+        out.push('"');
+        return;
+    }
     for c in s.chars() {
         match c {
             '\\' => out.push_str("\\\\"),

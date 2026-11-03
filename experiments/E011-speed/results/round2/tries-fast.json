@@ -1,0 +1,2610 @@
+{
+ "tries": {
+  "b0/j00000": {
+   "return": [
+    2.01,
+    1.3
+   ],
+   "idle": [
+    6.5,
+    6.3
+   ],
+   "read": [
+    296.9,
+    716.9
+   ],
+   "play": [
+    38.099999999999994,
+    54.5
+   ],
+   "plan": [
+    292.69999999999993,
+    277.8
+   ],
+   "rest": [
+    0.6900000000000546,
+    0.0
+   ],
+   "try": [
+    636.9,
+    1035.3
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 4
+  },
+  "b0/j00001": {
+   "return": [
+    2.69,
+    2.0
+   ],
+   "idle": [
+    17.7,
+    15.7
+   ],
+   "read": [
+    23.75,
+    34.0
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    5.73,
+    5.5
+   ],
+   "rest": [
+    0.10999999999999943,
+    0.0
+   ],
+   "try": [
+    50.0,
+    52.6
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00002": {
+   "return": [
+    2.44,
+    1.8
+   ],
+   "idle": [
+    9.8,
+    9.7
+   ],
+   "read": [
+    13.67,
+    27.7
+   ],
+   "play": [
+    0.16,
+    0.1
+   ],
+   "plan": [
+    4.57,
+    4.6
+   ],
+   "rest": [
+    0.16000000000000014,
+    0.0
+   ],
+   "try": [
+    30.8,
+    40.9
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00003": {
+   "return": [
+    3.98,
+    3.3
+   ],
+   "idle": [
+    15.3,
+    15.1
+   ],
+   "read": [
+    14.46,
+    31.7
+   ],
+   "play": [
+    0.68,
+    0.8
+   ],
+   "plan": [
+    5.76,
+    5.7
+   ],
+   "rest": [
+    0.11999999999999744,
+    0.0
+   ],
+   "try": [
+    40.3,
+    51.8
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00004": {
+   "return": [
+    2.72,
+    2.1
+   ],
+   "idle": [
+    10.2,
+    10.0
+   ],
+   "read": [
+    7.859999999999999,
+    14.0
+   ],
+   "play": [
+    0.2,
+    0.2
+   ],
+   "plan": [
+    5.090000000000002,
+    5.1
+   ],
+   "rest": [
+    0.129999999999999,
+    0.0
+   ],
+   "try": [
+    26.2,
+    28.1
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00005": {
+   "return": [
+    2.02,
+    1.3
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    3.39,
+    7.6
+   ],
+   "play": [
+    0.16,
+    0.1
+   ],
+   "plan": [
+    4.790000000000001,
+    4.7
+   ],
+   "rest": [
+    0.03999999999999915,
+    0.10000000000000142
+   ],
+   "try": [
+    10.4,
+    13.8
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00006": {
+   "return": [
+    2.55,
+    1.9
+   ],
+   "idle": [
+    13.8,
+    13.5
+   ],
+   "read": [
+    63.92,
+    150.8
+   ],
+   "play": [
+    5.46,
+    6.2
+   ],
+   "plan": [
+    145.32,
+    143.4
+   ],
+   "rest": [
+    0.2500000000000284,
+    0.0
+   ],
+   "try": [
+    231.3,
+    311.2
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b0/j00007": {
+   "return": [
+    2.41,
+    1.8
+   ],
+   "idle": [
+    12.7,
+    12.3
+   ],
+   "read": [
+    8.399999999999999,
+    14.9
+   ],
+   "play": [
+    3.97,
+    4.5
+   ],
+   "plan": [
+    10.970000000000002,
+    10.8
+   ],
+   "rest": [
+    0.14999999999999858,
+    0.0
+   ],
+   "try": [
+    38.6,
+    39.1
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00008": {
+   "return": [
+    3.52,
+    2.9
+   ],
+   "idle": [
+    18.6,
+    17.2
+   ],
+   "read": [
+    140.29,
+    236.0
+   ],
+   "play": [
+    12.05,
+    12.6
+   ],
+   "plan": [
+    205.4,
+    199.1
+   ],
+   "rest": [
+    0.5399999999999636,
+    0.0
+   ],
+   "try": [
+    380.4,
+    461.4
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b0/j00009": {
+   "return": [
+    2.5,
+    1.8
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    69.81,
+    169.3
+   ],
+   "play": [
+    6.4799999999999995,
+    7.4
+   ],
+   "plan": [
+    115.30000000000001,
+    113.0
+   ],
+   "rest": [
+    0.10999999999998522,
+    0.0
+   ],
+   "try": [
+    194.2,
+    290.6
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b0/j00010": {
+   "return": [
+    2.55,
+    1.9
+   ],
+   "idle": [
+    8.2,
+    8.1
+   ],
+   "read": [
+    4.16,
+    9.1
+   ],
+   "play": [
+    1.89,
+    2.5
+   ],
+   "plan": [
+    5.679999999999999,
+    5.6
+   ],
+   "rest": [
+    0.12000000000000455,
+    0.0
+   ],
+   "try": [
+    22.6,
+    24.1
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00011": {
+   "return": [
+    3.03,
+    2.4
+   ],
+   "idle": [
+    14.6,
+    13.9
+   ],
+   "read": [
+    121.86,
+    231.8
+   ],
+   "play": [
+    7.29,
+    8.4
+   ],
+   "plan": [
+    160.19999999999996,
+    157.6
+   ],
+   "rest": [
+    0.32000000000005,
+    0.0
+   ],
+   "try": [
+    307.3,
+    408.9
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b0/j00012": {
+   "return": [
+    4.17,
+    3.4
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    62.92,
+    153.5
+   ],
+   "play": [
+    5.49,
+    6.2
+   ],
+   "plan": [
+    155.42000000000002,
+    151.0
+   ],
+   "rest": [
+    0.39999999999997726,
+    0.0
+   ],
+   "try": [
+    228.4,
+    313.8
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b0/j00013": {
+   "return": [
+    2.7,
+    2.0
+   ],
+   "idle": [
+    8.9,
+    8.8
+   ],
+   "read": [
+    6.16,
+    12.9
+   ],
+   "play": [
+    2.36,
+    3.0
+   ],
+   "plan": [
+    7.0200000000000005,
+    6.9
+   ],
+   "rest": [
+    0.05999999999999872,
+    0.0
+   ],
+   "try": [
+    27.2,
+    30.1
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b0/j00014": {
+   "return": [
+    2.6,
+    1.9
+   ],
+   "idle": [
+    9.2,
+    9.1
+   ],
+   "read": [
+    58.12,
+    136.9
+   ],
+   "play": [
+    4.85,
+    5.4
+   ],
+   "plan": [
+    105.8,
+    104.7
+   ],
+   "rest": [
+    0.2300000000000182,
+    0.0
+   ],
+   "try": [
+    180.8,
+    254.7
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00000": {
+   "return": [
+    2.05,
+    1.4
+   ],
+   "idle": [
+    8.4,
+    8.3
+   ],
+   "read": [
+    265.32000000000005,
+    653.4
+   ],
+   "play": [
+    21.51,
+    32.9
+   ],
+   "plan": [
+    186.17000000000002,
+    184.7
+   ],
+   "rest": [
+    0.4499999999999318,
+    0.0
+   ],
+   "try": [
+    483.9,
+    866.5
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00001": {
+   "return": [
+    2.43,
+    1.7
+   ],
+   "idle": [
+    8.8,
+    8.6
+   ],
+   "read": [
+    11.67,
+    23.6
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    5.210000000000001,
+    5.1
+   ],
+   "rest": [
+    0.16999999999999815,
+    0.0
+   ],
+   "try": [
+    28.3,
+    36.7
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00002": {
+   "return": [
+    2.12,
+    1.5
+   ],
+   "idle": [
+    7.9,
+    7.8
+   ],
+   "read": [
+    11.34,
+    25.5
+   ],
+   "play": [
+    0.15,
+    0.1
+   ],
+   "plan": [
+    4.409999999999999,
+    4.4
+   ],
+   "rest": [
+    0.08000000000000185,
+    0.0
+   ],
+   "try": [
+    26.0,
+    37.0
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00003": {
+   "return": [
+    2.84,
+    2.2
+   ],
+   "idle": [
+    9.7,
+    9.6
+   ],
+   "read": [
+    11.78,
+    25.8
+   ],
+   "play": [
+    0.43,
+    0.5
+   ],
+   "plan": [
+    4.59,
+    4.5
+   ],
+   "rest": [
+    0.05999999999999872,
+    0.0
+   ],
+   "try": [
+    29.4,
+    39.7
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00004": {
+   "return": [
+    2.2,
+    1.6
+   ],
+   "idle": [
+    9.0,
+    8.8
+   ],
+   "read": [
+    4.15,
+    9.3
+   ],
+   "play": [
+    0.17,
+    0.1
+   ],
+   "plan": [
+    5.21,
+    5.2
+   ],
+   "rest": [
+    0.07000000000000028,
+    0.0
+   ],
+   "try": [
+    20.8,
+    22.4
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00005": {
+   "return": [
+    2.03,
+    1.4
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    4.069999999999999,
+    9.5
+   ],
+   "play": [
+    0.16,
+    0.1
+   ],
+   "plan": [
+    5.489999999999999,
+    5.4
+   ],
+   "rest": [
+    0.05000000000000249,
+    0.20000000000000284
+   ],
+   "try": [
+    11.8,
+    16.6
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00006": {
+   "return": [
+    2.36,
+    1.7
+   ],
+   "idle": [
+    7.7,
+    7.6
+   ],
+   "read": [
+    69.65,
+    170.3
+   ],
+   "play": [
+    6.84,
+    7.6
+   ],
+   "plan": [
+    105.35000000000001,
+    104.5
+   ],
+   "rest": [
+    0.19999999999998863,
+    0.0
+   ],
+   "try": [
+    192.1,
+    288.6
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00007": {
+   "return": [
+    2.42,
+    1.8
+   ],
+   "idle": [
+    8.3,
+    8.1
+   ],
+   "read": [
+    4.46,
+    10.4
+   ],
+   "play": [
+    1.71,
+    2.3
+   ],
+   "plan": [
+    5.260000000000002,
+    5.2
+   ],
+   "rest": [
+    0.04999999999999716,
+    0.0
+   ],
+   "try": [
+    22.2,
+    24.7
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00008": {
+   "return": [
+    2.07,
+    1.4
+   ],
+   "idle": [
+    8.5,
+    8.3
+   ],
+   "read": [
+    63.63,
+    152.7
+   ],
+   "play": [
+    5.08,
+    5.7
+   ],
+   "plan": [
+    105.61,
+    104.8
+   ],
+   "rest": [
+    0.20999999999997954,
+    0.0
+   ],
+   "try": [
+    185.1,
+    269.9
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00009": {
+   "return": [
+    2.56,
+    1.9
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    70.92,
+    172.8
+   ],
+   "play": [
+    6.93,
+    7.8
+   ],
+   "plan": [
+    125.86999999999999,
+    124.5
+   ],
+   "rest": [
+    0.21999999999999886,
+    0.0
+   ],
+   "try": [
+    206.5,
+    306.1
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00010": {
+   "return": [
+    2.22,
+    1.5
+   ],
+   "idle": [
+    7.9,
+    7.8
+   ],
+   "read": [
+    4.51,
+    10.8
+   ],
+   "play": [
+    1.78,
+    2.3
+   ],
+   "plan": [
+    5.83,
+    5.7
+   ],
+   "rest": [
+    0.05999999999999872,
+    0.0
+   ],
+   "try": [
+    22.3,
+    25.1
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00011": {
+   "return": [
+    2.32,
+    1.7
+   ],
+   "idle": [
+    8.2,
+    8.0
+   ],
+   "read": [
+    57.699999999999996,
+    139.4
+   ],
+   "play": [
+    4.96,
+    5.6
+   ],
+   "plan": [
+    102.91,
+    102.2
+   ],
+   "rest": [
+    0.10999999999998522,
+    0.0
+   ],
+   "try": [
+    176.2,
+    253.9
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00012": {
+   "return": [
+    2.08,
+    1.4
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    56.089999999999996,
+    135.5
+   ],
+   "play": [
+    4.63,
+    5.2
+   ],
+   "plan": [
+    100.79,
+    100.1
+   ],
+   "rest": [
+    0.21000000000000796,
+    0.0
+   ],
+   "try": [
+    163.8,
+    241.7
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "b4/j00013": {
+   "return": [
+    2.12,
+    1.5
+   ],
+   "idle": [
+    9.5,
+    9.3
+   ],
+   "read": [
+    5.12,
+    11.9
+   ],
+   "play": [
+    2.1,
+    2.7
+   ],
+   "plan": [
+    6.32,
+    6.2
+   ],
+   "rest": [
+    0.03999999999999915,
+    0.0
+   ],
+   "try": [
+    25.2,
+    27.9
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 5
+  },
+  "b4/j00014": {
+   "return": [
+    2.59,
+    2.0
+   ],
+   "idle": [
+    9.3,
+    9.1
+   ],
+   "read": [
+    57.23,
+    140.3
+   ],
+   "play": [
+    5.21,
+    6.0
+   ],
+   "plan": [
+    111.66,
+    110.6
+   ],
+   "rest": [
+    0.21000000000000796,
+    0.0
+   ],
+   "try": [
+    186.2,
+    264.5
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": false,
+   "scope": 4
+  },
+  "r1-fast/j00000": {
+   "return": [
+    0.33,
+    0.0
+   ],
+   "idle": [
+    0.2,
+    0.2
+   ],
+   "read": [
+    94.53,
+    311.6
+   ],
+   "play": [
+    0.52,
+    0.0
+   ],
+   "plan": [
+    19.250000000000014,
+    19.6
+   ],
+   "rest": [
+    0.06999999999999318,
+    2.1999999999999886
+   ],
+   "try": [
+    114.9,
+    333.6
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 4,
+   "load": 4.59
+  },
+  "r1-fast/j00001": {
+   "return": [
+    0.02,
+    0.0
+   ],
+   "idle": [
+    0.3,
+    0.3
+   ],
+   "read": [
+    3.59,
+    9.0
+   ],
+   "play": [
+    0.0,
+    0.0
+   ],
+   "plan": [
+    0.71,
+    0.7
+   ],
+   "rest": [
+    0.08000000000000007,
+    1.1899999999999995
+   ],
+   "try": [
+    4.7,
+    11.19
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 5,
+   "load": 4.81
+  },
+  "r1-fast/j00002": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.3,
+    0.3
+   ],
+   "read": [
+    4.09,
+    11.1
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.49,
+    0.5
+   ],
+   "rest": [
+    0.0,
+    0.3100000000000005
+   ],
+   "try": [
+    4.9,
+    12.21
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 5,
+   "load": 3.45
+  },
+  "r1-fast/j00003": {
+   "return": [
+    0.02,
+    0.0
+   ],
+   "idle": [
+    0.3,
+    0.3
+   ],
+   "read": [
+    4.3100000000000005,
+    11.7
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.47,
+    0.5
+   ],
+   "rest": [
+    0.0,
+    0.2599999999999998
+   ],
+   "try": [
+    5.1,
+    12.76
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 5,
+   "load": 3.74
+  },
+  "r1-fast/j00004": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.4,
+    0.3
+   ],
+   "read": [
+    0.19,
+    0.2
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.47,
+    0.4
+   ],
+   "rest": [
+    0.0,
+    0.0
+   ],
+   "try": [
+    1.0,
+    0.82
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 3.46
+  },
+  "r1-fast/j00005": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    0.060000000000000005,
+    0.1
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.47,
+    0.5
+   ],
+   "rest": [
+    0.050000000000000044,
+    0.0
+   ],
+   "try": [
+    0.6,
+    0.6
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 3.46
+  },
+  "r1-fast/j00006": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.3,
+    0.2
+   ],
+   "read": [
+    20.26,
+    62.5
+   ],
+   "play": [
+    0.37,
+    0.0
+   ],
+   "plan": [
+    16.74,
+    16.7
+   ],
+   "rest": [
+    0.0,
+    0.14999999999999147
+   ],
+   "try": [
+    37.6,
+    79.55
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 3.37
+  },
+  "r1-fast/j00007": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.3,
+    0.3
+   ],
+   "read": [
+    1.71,
+    4.7
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.4700000000000002,
+    0.5
+   ],
+   "rest": [
+    0.0,
+    0.0
+   ],
+   "try": [
+    2.5,
+    5.34
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 2.97
+  },
+  "r1-fast/j00008": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.2,
+    0.2
+   ],
+   "read": [
+    19.310000000000002,
+    59.7
+   ],
+   "play": [
+    0.4,
+    0.0
+   ],
+   "plan": [
+    16.900000000000002,
+    17.1
+   ],
+   "rest": [
+    0.0899999999999963,
+    0.030000000000001137
+   ],
+   "try": [
+    36.9,
+    77.03
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.99
+  },
+  "r1-fast/j00009": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.4,
+    0.0
+   ],
+   "plan": [
+    16.69,
+    16.8
+   ],
+   "rest": [
+    0.0,
+    0.14999999999999858
+   ],
+   "try": [
+    17.1,
+    16.95
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.5
+  },
+  "r1-fast/j00010": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.2,
+    0.2
+   ],
+   "read": [
+    0.02,
+    0.0
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.57,
+    0.6
+   ],
+   "rest": [
+    0.0,
+    0.0
+   ],
+   "try": [
+    0.8,
+    0.73
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 2.58
+  },
+  "r1-fast/j00011": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.2,
+    0.2
+   ],
+   "read": [
+    0.02,
+    0.0
+   ],
+   "play": [
+    0.37,
+    0.0
+   ],
+   "plan": [
+    16.919999999999998,
+    17.1
+   ],
+   "rest": [
+    0.09000000000000341,
+    0.019999999999999574
+   ],
+   "try": [
+    17.6,
+    17.32
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.38
+  },
+  "r1-fast/j00012": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.35,
+    0.0
+   ],
+   "plan": [
+    2.74,
+    2.9
+   ],
+   "rest": [
+    0.0,
+    0.10999999999999988
+   ],
+   "try": [
+    3.1,
+    3.01
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.32
+  },
+  "r1-fast/j00013": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.2,
+    0.2
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.48,
+    0.5
+   ],
+   "rest": [
+    0.08000000000000007,
+    0.0
+   ],
+   "try": [
+    0.8,
+    0.66
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 2.21
+  },
+  "r1-fast/j00014": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.2,
+    0.2
+   ],
+   "read": [
+    0.02,
+    0.0
+   ],
+   "play": [
+    0.38,
+    0.0
+   ],
+   "plan": [
+    16.71,
+    16.8
+   ],
+   "rest": [
+    0.0,
+    0.07000000000000028
+   ],
+   "try": [
+    17.3,
+    17.07
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.09
+  },
+  "r2-fast/j00000": {
+   "return": [
+    0.09,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    105.77000000000001,
+    293.3
+   ],
+   "play": [
+    0.25,
+    0.0
+   ],
+   "plan": [
+    14.780000000000001,
+    13.8
+   ],
+   "rest": [
+    0.009999999999990905,
+    6.470000000000027
+   ],
+   "try": [
+    121.0,
+    313.67
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 4,
+   "load": 4.49
+  },
+  "r2-fast/j00001": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    4.41,
+    9.5
+   ],
+   "play": [
+    0.0,
+    0.0
+   ],
+   "plan": [
+    0.29000000000000004,
+    0.3
+   ],
+   "rest": [
+    0.08999999999999986,
+    0.8200000000000003
+   ],
+   "try": [
+    4.9,
+    10.72
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 5,
+   "load": 2.9
+  },
+  "r2-fast/j00002": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    4.51,
+    10.7
+   ],
+   "play": [
+    0.01,
+    0.0
+   ],
+   "plan": [
+    0.38000000000000034,
+    0.3
+   ],
+   "rest": [
+    0.0,
+    0.6799999999999997
+   ],
+   "try": [
+    4.9,
+    11.78
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 5,
+   "load": 3.52
+  },
+  "r2-fast/j00003": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.0
+   ],
+   "read": [
+    4.8100000000000005,
+    12.100000000000001
+   ],
+   "play": [
+    0.01,
+    0.0
+   ],
+   "plan": [
+    0.28000000000000025,
+    0.3
+   ],
+   "rest": [
+    0.0,
+    0.509999999999998
+   ],
+   "try": [
+    5.2,
+    12.91
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": true,
+   "rust": true,
+   "scope": 5,
+   "load": 3.76
+  },
+  "r2-fast/j00004": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    0.29000000000000004,
+    0.2
+   ],
+   "play": [
+    0.01,
+    0.0
+   ],
+   "plan": [
+    0.18,
+    0.2
+   ],
+   "rest": [
+    0.019999999999999907,
+    0.12
+   ],
+   "try": [
+    0.6,
+    0.62
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 3.46
+  },
+  "r2-fast/j00005": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    0.05,
+    0.0
+   ],
+   "play": [
+    0.01,
+    0.0
+   ],
+   "plan": [
+    0.19,
+    0.2
+   ],
+   "rest": [
+    0.04999999999999999,
+    0.14999999999999997
+   ],
+   "try": [
+    0.3,
+    0.35
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 3.46
+  },
+  "r2-fast/j00006": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.0
+   ],
+   "read": [
+    20.59,
+    55.3
+   ],
+   "play": [
+    0.2,
+    0.0
+   ],
+   "plan": [
+    8.98,
+    7.8
+   ],
+   "rest": [
+    0.0,
+    4.3500000000000085
+   ],
+   "try": [
+    29.8,
+    67.45
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 3.15
+  },
+  "r2-fast/j00007": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    1.72,
+    4.5
+   ],
+   "play": [
+    0.01,
+    0.0
+   ],
+   "plan": [
+    0.16999999999999993,
+    0.2
+   ],
+   "rest": [
+    0.0,
+    0.08999999999999986
+   ],
+   "try": [
+    2.0,
+    4.89
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 2.97
+  },
+  "r2-fast/j00008": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.0
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.22,
+    0.0
+   ],
+   "plan": [
+    6.2700000000000005,
+    5.3
+   ],
+   "rest": [
+    0.0,
+    3.830000000000001
+   ],
+   "try": [
+    6.6,
+    9.13
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.83
+  },
+  "r2-fast/j00009": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.09,
+    0.0
+   ],
+   "plan": [
+    5.5,
+    4.6
+   ],
+   "rest": [
+    0.0,
+    3.1900000000000004
+   ],
+   "try": [
+    5.6,
+    7.79
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.58
+  },
+  "r2-fast/j00010": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.0
+   ],
+   "read": [
+    0.0,
+    0.0
+   ],
+   "play": [
+    0.01,
+    0.0
+   ],
+   "plan": [
+    0.19,
+    0.2
+   ],
+   "rest": [
+    0.0,
+    0.15999999999999998
+   ],
+   "try": [
+    0.3,
+    0.36
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 2.58
+  },
+  "r2-fast/j00011": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.35,
+    0.0
+   ],
+   "plan": [
+    5.640000000000001,
+    4.8
+   ],
+   "rest": [
+    0.0,
+    3.55
+   ],
+   "try": [
+    6.1,
+    8.45
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.32
+  },
+  "r2-fast/j00012": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.0,
+    0.0
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.09,
+    0.0
+   ],
+   "plan": [
+    8.673617379884035e-18,
+    0.1
+   ],
+   "rest": [
+    0.0,
+    0.0
+   ],
+   "try": [
+    0.1,
+    0.09
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.32
+  },
+  "r2-fast/j00013": {
+   "return": [
+    0.01,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.0
+   ],
+   "read": [
+    0.0,
+    0.0
+   ],
+   "play": [
+    0.02,
+    0.0
+   ],
+   "plan": [
+    0.18000000000000002,
+    0.2
+   ],
+   "rest": [
+    0.0,
+    0.14
+   ],
+   "try": [
+    0.3,
+    0.34
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 5,
+   "load": 2.21
+  },
+  "r2-fast/j00014": {
+   "return": [
+    0.0,
+    0.0
+   ],
+   "idle": [
+    0.1,
+    0.1
+   ],
+   "read": [
+    0.01,
+    0.0
+   ],
+   "play": [
+    0.22999999999999998,
+    0.0
+   ],
+   "plan": [
+    5.0600000000000005,
+    4.3
+   ],
+   "rest": [
+    0.0,
+    3.290000000000001
+   ],
+   "try": [
+    5.4,
+    7.69
+   ],
+   "ok": true,
+   "stop": "refinement: Lemma R's premise R0: the last pass wrote values",
+   "fresh": false,
+   "rust": true,
+   "scope": 4,
+   "load": 2.0
+  }
+ },
+ "summary": {
+  "b0": {
+   "all": {
+    "return": {
+     "wall_median": 2.6,
+     "cpu_median": 1.9,
+     "wall_max": 4.17,
+     "wall_mean": 2.792666666666667,
+     "cpu_mean": 2.12
+    },
+    "idle": {
+     "wall_median": 9.8,
+     "cpu_median": 9.7,
+     "wall_max": 18.6,
+     "wall_mean": 9.7,
+     "cpu_mean": 9.313333333333333
+    },
+    "read": {
+     "wall_median": 23.75,
+     "cpu_median": 34.0,
+     "wall_max": 296.9,
+     "wall_mean": 59.71133333333333,
+     "cpu_mean": 129.80666666666667
+    },
+    "plan": {
+     "wall_median": 10.970000000000002,
+     "cpu_median": 10.8,
+     "wall_max": 292.69999999999993,
+     "wall_mean": 81.98333333333333,
+     "cpu_mean": 79.7
+    },
+    "play": {
+     "wall_median": 3.97,
+     "cpu_median": 4.5,
+     "wall_max": 38.099999999999994,
+     "wall_mean": 5.944,
+     "cpu_mean": 7.46
+    },
+    "rest": {
+     "wall_median": 0.14999999999999858,
+     "cpu_median": 0.0,
+     "wall_max": 0.6900000000000546,
+     "wall_mean": 0.22866666666667163,
+     "cpu_mean": 0.006666666666666762
+    },
+    "try": {
+     "wall_median": 50.0,
+     "cpu_median": 52.6,
+     "wall_max": 636.9,
+     "wall_mean": 160.35999999999999,
+     "cpu_mean": 223.76
+    },
+    "n": 15
+   },
+   "ring33": {
+    "return": {
+     "wall_median": 2.6,
+     "cpu_median": 1.9,
+     "wall_max": 4.17,
+     "wall_mean": 2.9114285714285715,
+     "cpu_mean": 2.2285714285714286
+    },
+    "idle": {
+     "wall_median": 9.2,
+     "cpu_median": 9.1,
+     "wall_max": 18.6,
+     "wall_mean": 8.957142857142857,
+     "cpu_mean": 8.571428571428571
+    },
+    "read": {
+     "wall_median": 69.81,
+     "cpu_median": 169.3,
+     "wall_max": 296.9,
+     "wall_mean": 116.25999999999999,
+     "cpu_mean": 256.45714285714286
+    },
+    "plan": {
+     "wall_median": 155.42000000000002,
+     "cpu_median": 151.0,
+     "wall_max": 292.69999999999993,
+     "wall_mean": 168.59142857142857,
+     "cpu_mean": 163.8
+    },
+    "play": {
+     "wall_median": 6.4799999999999995,
+     "cpu_median": 7.4,
+     "wall_max": 38.099999999999994,
+     "wall_mean": 11.388571428571428,
+     "cpu_mean": 14.385714285714286
+    },
+    "rest": {
+     "wall_median": 0.32000000000005,
+     "cpu_median": 0.0,
+     "wall_max": 0.6900000000000546,
+     "wall_mean": 0.3628571428571539,
+     "cpu_mean": 0.0
+    },
+    "try": {
+     "wall_median": 231.3,
+     "cpu_median": 313.8,
+     "wall_max": 636.9,
+     "wall_mean": 308.4714285714286,
+     "cpu_mean": 439.4142857142857
+    },
+    "n": 7
+   },
+   "ring38": {
+    "return": {
+     "wall_median": 2.62,
+     "cpu_median": 1.95,
+     "wall_max": 3.98,
+     "wall_mean": 2.68875,
+     "cpu_mean": 2.025
+    },
+    "idle": {
+     "wall_median": 10.0,
+     "cpu_median": 9.85,
+     "wall_max": 17.7,
+     "wall_mean": 10.35,
+     "cpu_mean": 9.9625
+    },
+    "read": {
+     "wall_median": 8.129999999999999,
+     "cpu_median": 14.45,
+     "wall_max": 23.75,
+     "wall_mean": 10.23125,
+     "cpu_mean": 18.9875
+    },
+    "plan": {
+     "wall_median": 5.705,
+     "cpu_median": 5.55,
+     "wall_max": 10.970000000000002,
+     "wall_mean": 6.201250000000001,
+     "cpu_mean": 6.1125
+    },
+    "play": {
+     "wall_median": 0.44000000000000006,
+     "cpu_median": 0.5,
+     "wall_max": 3.97,
+     "wall_mean": 1.18,
+     "cpu_mean": 1.4
+    },
+    "rest": {
+     "wall_median": 0.120000000000001,
+     "cpu_median": 0.0,
+     "wall_max": 0.16000000000000014,
+     "wall_mean": 0.11124999999999963,
+     "cpu_mean": 0.012500000000000178
+    },
+    "try": {
+     "wall_median": 29.0,
+     "cpu_median": 34.6,
+     "wall_max": 50.0,
+     "wall_mean": 30.7625,
+     "cpu_mean": 35.0625
+    },
+    "n": 8
+   }
+  },
+  "r1-fast": {
+   "all": {
+    "return": {
+     "wall_median": 0.01,
+     "cpu_median": 0.0,
+     "wall_max": 0.33,
+     "wall_mean": 0.028,
+     "cpu_mean": 0.0
+    },
+    "idle": {
+     "wall_median": 0.2,
+     "cpu_median": 0.2,
+     "wall_max": 0.4,
+     "wall_mean": 0.20666666666666667,
+     "cpu_mean": 0.19333333333333333
+    },
+    "read": {
+     "wall_median": 0.19,
+     "cpu_median": 0.2,
+     "wall_max": 94.53,
+     "wall_mean": 9.876000000000001,
+     "cpu_mean": 31.373333333333335
+    },
+    "plan": {
+     "wall_median": 0.71,
+     "cpu_median": 0.7,
+     "wall_max": 19.250000000000014,
+     "wall_mean": 7.338666666666668,
+     "cpu_mean": 7.413333333333334
+    },
+    "play": {
+     "wall_median": 0.02,
+     "cpu_median": 0.0,
+     "wall_max": 0.52,
+     "wall_mean": 0.19533333333333333,
+     "cpu_mean": 0.0
+    },
+    "rest": {
+     "wall_median": 0.0,
+     "cpu_median": 0.07000000000000028,
+     "wall_max": 0.09000000000000341,
+     "wall_mean": 0.030666666666666207,
+     "cpu_mean": 0.29933333333333195
+    },
+    "try": {
+     "wall_median": 4.9,
+     "cpu_median": 12.21,
+     "wall_max": 114.9,
+     "wall_mean": 17.66,
+     "cpu_mean": 39.256
+    },
+    "n": 15
+   },
+   "ring33": {
+    "return": {
+     "wall_median": 0.0,
+     "cpu_median": 0.0,
+     "wall_max": 0.33,
+     "wall_mean": 0.04857142857142857,
+     "cpu_mean": 0.0
+    },
+    "idle": {
+     "wall_median": 0.2,
+     "cpu_median": 0.2,
+     "wall_max": 0.3,
+     "wall_mean": 0.15714285714285714,
+     "cpu_mean": 0.14285714285714288
+    },
+    "read": {
+     "wall_median": 0.02,
+     "cpu_median": 0.0,
+     "wall_max": 94.53,
+     "wall_mean": 19.165714285714287,
+     "cpu_mean": 61.971428571428575
+    },
+    "plan": {
+     "wall_median": 16.74,
+     "cpu_median": 16.8,
+     "wall_max": 19.250000000000014,
+     "wall_mean": 15.135714285714288,
+     "cpu_mean": 15.285714285714286
+    },
+    "play": {
+     "wall_median": 0.38,
+     "cpu_median": 0.0,
+     "wall_max": 0.52,
+     "wall_mean": 0.3985714285714286,
+     "cpu_mean": 0.0
+    },
+    "rest": {
+     "wall_median": 0.0,
+     "cpu_median": 0.10999999999999988,
+     "wall_max": 0.09000000000000341,
+     "wall_mean": 0.0357142857142847,
+     "cpu_mean": 0.38999999999999707
+    },
+    "try": {
+     "wall_median": 17.6,
+     "cpu_median": 17.32,
+     "wall_max": 114.9,
+     "wall_mean": 34.92857142857143,
+     "cpu_mean": 77.79
+    },
+    "n": 7
+   },
+   "ring38": {
+    "return": {
+     "wall_median": 0.01,
+     "cpu_median": 0.0,
+     "wall_max": 0.02,
+     "wall_mean": 0.01,
+     "cpu_mean": 0.0
+    },
+    "idle": {
+     "wall_median": 0.3,
+     "cpu_median": 0.3,
+     "wall_max": 0.4,
+     "wall_mean": 0.25,
+     "cpu_mean": 0.2375
+    },
+    "read": {
+     "wall_median": 0.95,
+     "cpu_median": 2.45,
+     "wall_max": 4.3100000000000005,
+     "wall_mean": 1.7475,
+     "cpu_mean": 4.6
+    },
+    "plan": {
+     "wall_median": 0.4750000000000001,
+     "cpu_median": 0.5,
+     "wall_max": 0.71,
+     "wall_mean": 0.51625,
+     "cpu_mean": 0.525
+    },
+    "play": {
+     "wall_median": 0.02,
+     "cpu_median": 0.0,
+     "wall_max": 0.02,
+     "wall_mean": 0.0175,
+     "cpu_mean": 0.0
+    },
+    "rest": {
+     "wall_median": 0.0,
+     "cpu_median": 0.0,
+     "wall_max": 0.08000000000000007,
+     "wall_mean": 0.026250000000000023,
+     "cpu_mean": 0.21999999999999997
+    },
+    "try": {
+     "wall_median": 1.75,
+     "cpu_median": 3.08,
+     "wall_max": 5.1,
+     "wall_mean": 2.55,
+     "cpu_mean": 5.53875
+    },
+    "n": 8
+   }
+  },
+  "r2-fast": {
+   "all": {
+    "return": {
+     "wall_median": 0.0,
+     "cpu_median": 0.0,
+     "wall_max": 0.09,
+     "wall_mean": 0.01,
+     "cpu_mean": 0.0
+    },
+    "idle": {
+     "wall_median": 0.1,
+     "cpu_median": 0.0,
+     "wall_max": 0.1,
+     "wall_mean": 0.08,
+     "cpu_mean": 0.04666666666666667
+    },
+    "read": {
+     "wall_median": 0.05,
+     "cpu_median": 0.0,
+     "wall_max": 105.77000000000001,
+     "wall_mean": 9.48,
+     "cpu_mean": 25.706666666666667
+    },
+    "plan": {
+     "wall_median": 0.29000000000000004,
+     "cpu_median": 0.3,
+     "wall_max": 14.780000000000001,
+     "wall_mean": 3.2060000000000004,
+     "cpu_mean": 2.84
+    },
+    "play": {
+     "wall_median": 0.02,
+     "cpu_median": 0.0,
+     "wall_max": 0.35,
+     "wall_mean": 0.10066666666666667,
+     "cpu_mean": 0.0
+    },
+    "rest": {
+     "wall_median": 0.0,
+     "cpu_median": 0.6799999999999997,
+     "wall_max": 0.08999999999999986,
+     "wall_mean": 0.011333333333332711,
+     "cpu_mean": 1.8233333333333357
+    },
+    "try": {
+     "wall_median": 4.9,
+     "cpu_median": 7.79,
+     "wall_max": 121.0,
+     "wall_mean": 12.873333333333333,
+     "cpu_mean": 30.416
+    },
+    "n": 15
+   },
+   "ring33": {
+    "return": {
+     "wall_median": 0.0,
+     "cpu_median": 0.0,
+     "wall_max": 0.09,
+     "wall_mean": 0.014285714285714285,
+     "cpu_mean": 0.0
+    },
+    "idle": {
+     "wall_median": 0.1,
+     "cpu_median": 0.0,
+     "wall_max": 0.1,
+     "wall_mean": 0.07142857142857144,
+     "cpu_mean": 0.04285714285714286
+    },
+    "read": {
+     "wall_median": 0.01,
+     "cpu_median": 0.0,
+     "wall_max": 105.77000000000001,
+     "wall_mean": 18.05857142857143,
+     "cpu_mean": 49.800000000000004
+    },
+    "plan": {
+     "wall_median": 5.640000000000001,
+     "cpu_median": 4.8,
+     "wall_max": 14.780000000000001,
+     "wall_mean": 6.604285714285715,
+     "cpu_mean": 5.814285714285714
+    },
+    "play": {
+     "wall_median": 0.22,
+     "cpu_median": 0.0,
+     "wall_max": 0.35,
+     "wall_mean": 0.2042857142857143,
+     "cpu_mean": 0.0
+    },
+    "rest": {
+     "wall_median": 0.0,
+     "cpu_median": 3.55,
+     "wall_max": 0.009999999999990905,
+     "wall_mean": 0.0014285714285701293,
+     "cpu_mean": 3.525714285714291
+    },
+    "try": {
+     "wall_median": 6.1,
+     "cpu_median": 8.45,
+     "wall_max": 121.0,
+     "wall_mean": 24.942857142857143,
+     "cpu_mean": 59.181428571428576
+    },
+    "n": 7
+   },
+   "ring38": {
+    "return": {
+     "wall_median": 0.01,
+     "cpu_median": 0.0,
+     "wall_max": 0.01,
+     "wall_mean": 0.00625,
+     "cpu_mean": 0.0
+    },
+    "idle": {
+     "wall_median": 0.1,
+     "cpu_median": 0.05,
+     "wall_max": 0.1,
+     "wall_mean": 0.08750000000000001,
+     "cpu_mean": 0.05
+    },
+    "read": {
+     "wall_median": 1.005,
+     "cpu_median": 2.35,
+     "wall_max": 4.8100000000000005,
+     "wall_mean": 1.9737500000000001,
+     "cpu_mean": 4.625
+    },
+    "plan": {
+     "wall_median": 0.19,
+     "cpu_median": 0.2,
+     "wall_max": 0.38000000000000034,
+     "wall_mean": 0.23250000000000007,
+     "cpu_mean": 0.2375
+    },
+    "play": {
+     "wall_median": 0.01,
+     "cpu_median": 0.0,
+     "wall_max": 0.02,
+     "wall_mean": 0.01,
+     "cpu_mean": 0.0
+    },
+    "rest": {
+     "wall_median": 0.0,
+     "cpu_median": 0.15499999999999997,
+     "wall_max": 0.08999999999999986,
+     "wall_mean": 0.01999999999999997,
+     "cpu_mean": 0.3337499999999997
+    },
+    "try": {
+     "wall_median": 1.3,
+     "cpu_median": 2.755,
+     "wall_max": 5.2,
+     "wall_mean": 2.3125,
+     "cpu_mean": 5.24625
+    },
+    "n": 8
+   }
+  }
+ }
+}

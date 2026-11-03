@@ -1,0 +1,268 @@
+E008 stage 1, kitchen: archive from the boot, goal {'owner:566': [1]}, allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96], b = 2, guide kitchen.json; created 2026-11-02T00:50:14; env {'FAST_MI_SCUMMVM_BIN': '~/.cache/fast-mi/svm-w3b/build/scummvm/scummvm', 'DOWNWARD_DIR': '~/projects/fast-mi/third_party/downward', 'TASKCORE_BIN': '~/.cache/fast-mi-walk/target/release/taskcore', 'READER_SCOPE_BIN': '~/.cache/fast-mi-e008/target-scumm/release/reader-scope'}
+root: {'frame': 2728, 'tick': 16321, 'qf': 65284, 'room': 33, 'boot_s': 1.9, 'stop': {'stop': 'idle', 'frame': 2728, 'tick': 16321, 'room': 33, 'idle': 'sentence', 'rng': 3182679328, 'up': 1, 'cs': 0, 'ego': [346, 133]}}
+
+== the run (stage1.sh: init, explore.py run, verify, report)
+00:50:10 MemAvailable 15395392 kB
+[00:50:10] ~/.cache/fast-mi-e008/archives/kitchen: booting the root
+[00:50:14] ~/.cache/fast-mi-e008/archives/kitchen: root at frame 2728 (room 33, qf 65284); allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+[00:50:14] j00000: entry 0 (room 33), scope [28, 33, 35, 38], key [1, 0, 0, -95, 16321, 0]
+[01:00:31] j00000: entry 0 ok; 4 entries, 4 new cells, 26 new atoms; archive 5 entries, 5 cells
+[01:00:31] j00001: entry 4 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -121, 17125, 4]
+[01:00:31] j00002: entry 3 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -118, 17053, 3]
+[01:00:50] j00001: entry 4 ok; 1 entries, 1 new cells, 1 new atoms; archive 6 entries, 6 cells
+[01:00:51] j00003: entry 5 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -122, 17131, 5]
+[01:01:11] j00002: entry 3 ok; 2 entries, 1 new cells, 1 new atoms; archive 8 entries, 7 cells
+[01:01:11] j00004: entry 4 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -121, 17125, 4]
+[01:01:28] j00003: entry 5 ok; 1 entries, 1 new cells, 1 new atoms; archive 9 entries, 8 cells
+[01:01:28] j00005: entry 8 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -123, 17137, 8]
+[01:01:42] j00004: entry 4 ok; 1 entries, 0 new cells, 0 new atoms; archive 10 entries, 8 cells
+[01:01:42] j00006: entry 5 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -122, 17131, 5]
+[01:02:08] j00005: entry 8 ok; 1 entries, 1 new cells, 1 new atoms; archive 11 entries, 9 cells
+[01:02:08] j00007: entry 10 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -124, 17143, 10]
+[01:02:20] j00006: entry 5 ok; 1 entries, 0 new cells, 0 new atoms; archive 12 entries, 9 cells
+[01:02:20] j00008: entry 8 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -123, 17137, 8]
+[01:02:40] j00007: entry 10 ok; 1 entries, 1 new cells, 1 new atoms; archive 13 entries, 10 cells
+[01:02:40] j00009: entry 12 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -125, 17149, 12]
+[01:02:56] j00008: entry 8 ok; 1 entries, 0 new cells, 0 new atoms; archive 14 entries, 10 cells
+[01:02:56] j00010: entry 10 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -124, 17143, 10]
+[01:03:14] j00009: entry 12 ok; 1 entries, 1 new cells, 1 new atoms; archive 15 entries, 11 cells
+[01:03:14] j00011: entry 14 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -126, 17155, 14]
+[01:03:29] j00010: entry 10 ok; 1 entries, 0 new cells, 0 new atoms; archive 16 entries, 11 cells
+[01:03:29] j00012: entry 12 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -125, 17149, 12]
+[01:03:51] j00011: entry 14 ok; 1 entries, 1 new cells, 1 new atoms; archive 17 entries, 12 cells
+[01:03:51] j00013: entry 16 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -127, 17161, 16]
+[01:04:05] j00012: entry 12 ok; 1 entries, 0 new cells, 0 new atoms; archive 18 entries, 12 cells
+[01:04:05] j00014: entry 14 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -126, 17155, 14]
+[01:04:28] j00013: entry 16 ok; 1 entries, 1 new cells, 1 new atoms; archive 19 entries, 13 cells
+[01:04:28] j00015: entry 18 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -128, 17167, 18]
+[01:04:43] j00014: entry 14 ok; 1 entries, 0 new cells, 0 new atoms; archive 20 entries, 13 cells
+[01:04:43] j00016: entry 16 (room 38), scope [33, 38, 83, 85, 96], key [1, 0, 0, -127, 17161, 16]
+Terminated                 nice -n 10 $PY -u explore.py run $E/archives/$name --workers 2
+run exit 143
+~/.cache/fast-mi-e008/archives/kitchen: no goal entry to verify
+verify exit 1
+report exit 0
+stage kitchen: goal {'owner:566': [1]}, allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+jobs {'committed': 15, 'ok': 15, 'errors': 0, 'guard_kills': 0, 'exhausted': 0}
+entries 20, cells 13 (13 selectable), R atoms held 129
+readings {'registered': 10, 'fresh': 9, 'reused': 6, 'by_kind': {'fresh': 9, 'refine': 1}, 'scopes': {'28-33-35-38': 1, '33-38-83-85-96': 8}, 'records': 311099, 'read_cpu_s': 364.8, 'read_wall_s': 103.3, 'peak_rss_mb': 543, 'bytes': 813560650, 'evicted': 0}
+targets by tier {'0': 0, '1': 342, '2': 14}, probes {'plan': 15}, attempts 15, refinements 16
+CPU s {'return': 29.1, 'read': 1075.4, 'plan': 293.9, 'play': 35.3, 'total': 1433.7, 'rusage_total': 1422.2}, peak MB {'python': 1134, 'children': 1134}, driver 25.6 MB, disk 1048.3 MB
+
+== per job (log.jsonl, result.json)
+j00000 entry 0 (frame 2728) key [1, 0, 0, -95, 16321, 0] scope [28, 33, 35, 38]: ok 
+  return same True, boot 2.04 s
+  reading fresh True (no cached reading): 235579 records, 234401 actions, read wall 77.9 s, read CPU 273.0 s, peak 543 MB, files 79.3 s
+  targets {'0': 0, '1': 54, '2': 0}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 453.2)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 134 (2728 -> 2862), qf 65284 -> 68500, replans 1, inputs 21, checkpoints 5
+    refinements [(0, 2848, 'split', [103], 131.55, 317.12), (1, 2862, 'split', [194], 76.03, 175.08)]
+    extensions []
+    window search: 2 windows, 134 children, 7228 child frames, outcomes {'deviation': 2, 'duplicate': 6, 'pruned': 126}, engine CPU {'child': 14.21, 'snapshot': 0.0, 'the last engine': 0.02}, Python CPU 20.86
+  readings made [('refine', [28, 33, 35, 38])]
+  entries [1, 2, 3, 4] (frames [2767, 2848, 2850, 2862]), new cells 4, new reps 0, new atoms 26, n 0, selectable after 5, goal entries []
+  CPU s {'return': 1.4, 'read': 845.8, 'plan': 221.3, 'play': 35.1, 'total': 1103.6, 'rusage_total': 1090.9}; peak RSS MB {'python': 1134, 'children': 1134}; job wall 614.9 s; driver wall 617.3 s; wait4 {'cpu_s': 1096.1, 'maxrss_mb': 1134.0}; GUARD: rc 0 wall 616.9 s low 0 min MemAvailable 12288404 kB
+j00001 entry 4 (frame 2862) key [1, 0, 0, -121, 17125, 4] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.42 s
+  reading fresh True (no cached reading): 9440 records, 9286 actions, read wall 2.7 s, read CPU 10.1 s, peak 228 MB, files 3.7 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 7.4)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2862 -> 2863), qf 68500 -> 68524, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2863, 'split', [194], 3.24, 5.74)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.03
+  readings made []
+  entries [5] (frames [2863]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 6, goal entries []
+  CPU s {'return': 1.8, 'read': 19.7, 'plan': 4.1, 'play': 0.0, 'total': 25.6, 'rusage_total': 25.7}; peak RSS MB {'python': 163, 'children': 228}; job wall 16.4 s; driver wall 19.1 s; wait4 {'cpu_s': 26.7, 'maxrss_mb': 228.1}; GUARD: rc 0 wall 18.1 s low 0 min MemAvailable 14982244 kB
+j00002 entry 3 (frame 2850) key [1, 0, 0, -118, 17053, 3] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.28 s
+  reading fresh True (no cached reading): 9440 records, 9286 actions, read wall 3.0 s, read CPU 11.4 s, peak 256 MB, files 4.2 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 8.5)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 12 (2850 -> 2862), qf 68212 -> 68500, replans 0, inputs 2, checkpoints 3
+    refinements [(0, 2862, 'split', [194], 4.19, 9.18)]
+    extensions []
+    window search: 1 windows, 1 children, 12 child frames, outcomes {'deviation': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.01}, Python CPU 0.09
+  readings made []
+  entries [6, 7] (frames [2852, 2862]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 7, goal entries []
+  CPU s {'return': 1.6, 'read': 25.1, 'plan': 4.2, 'play': 0.1, 'total': 31.0, 'rusage_total': 31.1}; peak RSS MB {'python': 169, 'children': 271}; job wall 18.3 s; driver wall 39.1 s; wait4 {'cpu_s': 32.0, 'maxrss_mb': 271.1}; GUARD: rc 0 wall 20.1 s low 0 min MemAvailable 14971624 kB
+j00003 entry 5 (frame 2863) key [1, 0, 0, -122, 17131, 5] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.06 s
+  reading fresh True (differs on 1 keys): 9440 records, 9286 actions, read wall 2.5 s, read CPU 9.6 s, peak 230 MB, files 4.2 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 6.9)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2863 -> 2864), qf 68524 -> 68548, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2864, 'split', [194], 3.14, 5.72)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.02
+  readings made []
+  entries [8] (frames [2864]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 8, goal entries []
+  CPU s {'return': 1.4, 'read': 19.8, 'plan': 3.6, 'play': 0.0, 'total': 24.8, 'rusage_total': 25.0}; peak RSS MB {'python': 162, 'children': 241}; job wall 16.0 s; driver wall 37.1 s; wait4 {'cpu_s': 25.8, 'maxrss_mb': 241.1}; GUARD: rc 0 wall 17.1 s low 0 min MemAvailable 14983896 kB
+j00004 entry 4 (frame 2862) key [1, 0, 0, -121, 17125, 4] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.09 s
+  reading fresh False (reused): 9440 records, 9286 actions, read wall 0.0 s, read CPU 0.0 s, peak 0 MB, files 0.0 s
+  targets {'0': 0, '1': 20, '2': 1}; first [['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2], ['bit:118', 1, 1, 2]]
+  probes [(['bit:109', 1], 'plan', 10.6)]
+  played ['bit:109', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2862 -> 2863), qf 68500 -> 68524, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2863, 'split', [194], 4.85, 7.7)]
+    extensions []
+    window search: 1 windows, 0 children, 0 child frames, outcomes {}, engine CPU {}, Python CPU 0.02
+  readings made []
+  entries [9] (frames [2863]), new cells 0, new reps 0, new atoms 0, n 1, selectable after 8, goal entries []
+  CPU s {'return': 1.5, 'read': 7.7, 'plan': 5.7, 'play': 0.0, 'total': 14.9, 'rusage_total': 15.0}; peak RSS MB {'python': 162, 'children': 229}; job wall 12.8 s; driver wall 31.1 s; wait4 {'cpu_s': 15.9, 'maxrss_mb': 229.5}; GUARD: rc 0 wall 14.1 s low 0 min MemAvailable 13981908 kB
+j00005 entry 8 (frame 2864) key [1, 0, 0, -123, 17137, 8] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 3.25 s
+  reading fresh True (differs on 1 keys): 9440 records, 9286 actions, read wall 4.6 s, read CPU 14.7 s, peak 219 MB, files 6.6 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 9.7)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2864 -> 2865), qf 68548 -> 68572, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2865, 'split', [194], 4.45, 8.07)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.04
+  readings made []
+  entries [10] (frames [2865]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 9, goal entries []
+  CPU s {'return': 2.6, 'read': 29.8, 'plan': 5.1, 'play': 0.0, 'total': 37.5, 'rusage_total': 37.6}; peak RSS MB {'python': 163, 'children': 220}; job wall 24.6 s; driver wall 40.1 s; wait4 {'cpu_s': 38.7, 'maxrss_mb': 220.5}; GUARD: rc 0 wall 26.2 s low 0 min MemAvailable 12558084 kB
+j00006 entry 5 (frame 2863) key [1, 0, 0, -122, 17131, 5] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.29 s
+  reading fresh False (reused): 9440 records, 9286 actions, read wall 0.0 s, read CPU 0.0 s, peak 0 MB, files 0.0 s
+  targets {'0': 0, '1': 20, '2': 1}; first [['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2], ['bit:118', 1, 1, 2]]
+  probes [(['bit:109', 1], 'plan', 8.1)]
+  played ['bit:109', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2863 -> 2864), qf 68524 -> 68548, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2864, 'split', [194], 3.31, 5.92)]
+    extensions []
+    window search: 1 windows, 0 children, 0 child frames, outcomes {}, engine CPU {}, Python CPU 0.01
+  readings made []
+  entries [11] (frames [2864]), new cells 0, new reps 0, new atoms 0, n 1, selectable after 9, goal entries []
+  CPU s {'return': 1.7, 'read': 5.9, 'plan': 4.7, 'play': 0.0, 'total': 12.3, 'rusage_total': 12.4}; peak RSS MB {'python': 162, 'children': 247}; job wall 10.4 s; driver wall 38.1 s; wait4 {'cpu_s': 13.2, 'maxrss_mb': 247.0}; GUARD: rc 0 wall 12.1 s low 0 min MemAvailable 15026120 kB
+j00007 entry 10 (frame 2865) key [1, 0, 0, -124, 17143, 10] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.36 s
+  reading fresh True (differs on 1 keys): 9440 records, 9286 actions, read wall 3.0 s, read CPU 10.9 s, peak 224 MB, files 4.9 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 8.7)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2865 -> 2866), qf 68572 -> 68596, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2866, 'split', [194], 3.79, 6.68)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.04
+  readings made []
+  entries [12] (frames [2866]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 10, goal entries []
+  CPU s {'return': 1.7, 'read': 22.8, 'plan': 4.8, 'play': 0.0, 'total': 29.3, 'rusage_total': 29.4}; peak RSS MB {'python': 162, 'children': 246}; job wall 19.3 s; driver wall 32.1 s; wait4 {'cpu_s': 30.3, 'maxrss_mb': 246.9}; GUARD: rc 0 wall 20.1 s low 0 min MemAvailable 14196636 kB
+j00008 entry 8 (frame 2864) key [1, 0, 0, -123, 17137, 8] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.96 s
+  reading fresh False (reused): 9440 records, 9286 actions, read wall 0.0 s, read CPU 0.0 s, peak 0 MB, files 0.0 s
+  targets {'0': 0, '1': 20, '2': 1}; first [['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2], ['bit:118', 1, 1, 2]]
+  probes [(['bit:109', 1], 'plan', 11.6)]
+  played ['bit:109', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2864 -> 2865), qf 68548 -> 68572, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2865, 'split', [194], 4.09, 7.91)]
+    extensions []
+    window search: 1 windows, 0 children, 0 child frames, outcomes {}, engine CPU {}, Python CPU 0.02
+  readings made []
+  entries [13] (frames [2865]), new cells 0, new reps 0, new atoms 0, n 1, selectable after 10, goal entries []
+  CPU s {'return': 2.3, 'read': 8.0, 'plan': 7.5, 'play': 0.0, 'total': 17.8, 'rusage_total': 17.8}; peak RSS MB {'python': 163, 'children': 214}; job wall 14.7 s; driver wall 36.1 s; wait4 {'cpu_s': 18.8, 'maxrss_mb': 214.1}; GUARD: rc 0 wall 16.1 s low 0 min MemAvailable 13193544 kB
+j00009 entry 12 (frame 2866) key [1, 0, 0, -125, 17149, 12] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.79 s
+  reading fresh True (differs on 1 keys): 9440 records, 9286 actions, read wall 3.1 s, read CPU 11.4 s, peak 240 MB, files 3.8 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 6.5)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2866 -> 2867), qf 68596 -> 68620, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2867, 'split', [194], 2.79, 5.14)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.02
+  readings made []
+  entries [14] (frames [2867]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 11, goal entries []
+  CPU s {'return': 2.1, 'read': 20.7, 'plan': 3.6, 'play': 0.0, 'total': 26.4, 'rusage_total': 26.5}; peak RSS MB {'python': 162, 'children': 240}; job wall 16.5 s; driver wall 34.0 s; wait4 {'cpu_s': 27.4, 'maxrss_mb': 240.9}; GUARD: rc 0 wall 18.1 s low 0 min MemAvailable 14611820 kB
+j00010 entry 10 (frame 2865) key [1, 0, 0, -124, 17143, 10] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 3.29 s
+  reading fresh False (reused): 9440 records, 9286 actions, read wall 0.0 s, read CPU 0.0 s, peak 0 MB, files 0.0 s
+  targets {'0': 0, '1': 20, '2': 1}; first [['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2], ['bit:118', 1, 1, 2]]
+  probes [(['bit:109', 1], 'plan', 10.9)]
+  played ['bit:109', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2865 -> 2866), qf 68572 -> 68596, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2866, 'split', [194], 3.54, 6.54)]
+    extensions []
+    window search: 1 windows, 0 children, 0 child frames, outcomes {}, engine CPU {}, Python CPU 0.01
+  readings made []
+  entries [15] (frames [2866]), new cells 0, new reps 0, new atoms 0, n 1, selectable after 11, goal entries []
+  CPU s {'return': 2.7, 'read': 6.6, 'plan': 7.3, 'play': 0.0, 'total': 16.6, 'rusage_total': 16.6}; peak RSS MB {'python': 162, 'children': 216}; job wall 14.3 s; driver wall 33.1 s; wait4 {'cpu_s': 17.5, 'maxrss_mb': 216.9}; GUARD: rc 0 wall 15.1 s low 0 min MemAvailable 14632300 kB
+j00011 entry 14 (frame 2867) key [1, 0, 0, -126, 17155, 14] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.5 s
+  reading fresh True (differs on 1 keys): 9440 records, 9286 actions, read wall 2.9 s, read CPU 10.8 s, peak 247 MB, files 5.2 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 9.8)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2867 -> 2868), qf 68620 -> 68644, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2868, 'split', [194], 4.2, 7.38)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.01, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.05
+  readings made []
+  entries [16] (frames [2868]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 12, goal entries []
+  CPU s {'return': 1.9, 'read': 23.7, 'plan': 5.4, 'play': 0.1, 'total': 31.1, 'rusage_total': 31.2}; peak RSS MB {'python': 163, 'children': 247}; job wall 20.8 s; driver wall 37.1 s; wait4 {'cpu_s': 32.1, 'maxrss_mb': 247.1}; GUARD: rc 0 wall 22.1 s low 0 min MemAvailable 14765876 kB
+j00012 entry 12 (frame 2866) key [1, 0, 0, -125, 17149, 12] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.73 s
+  reading fresh False (reused): 9440 records, 9286 actions, read wall 0.0 s, read CPU 0.0 s, peak 0 MB, files 0.0 s
+  targets {'0': 0, '1': 20, '2': 1}; first [['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2], ['bit:118', 1, 1, 2]]
+  probes [(['bit:109', 1], 'plan', 9.4)]
+  played ['bit:109', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2866 -> 2867), qf 68596 -> 68620, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2867, 'split', [194], 3.7, 6.53)]
+    extensions []
+    window search: 1 windows, 0 children, 0 child frames, outcomes {}, engine CPU {}, Python CPU 0.01
+  readings made []
+  entries [17] (frames [2867]), new cells 0, new reps 0, new atoms 0, n 1, selectable after 12, goal entries []
+  CPU s {'return': 2.1, 'read': 6.6, 'plan': 5.7, 'play': 0.0, 'total': 14.4, 'rusage_total': 14.4}; peak RSS MB {'python': 162, 'children': 239}; job wall 12.3 s; driver wall 36.1 s; wait4 {'cpu_s': 15.4, 'maxrss_mb': 239.1}; GUARD: rc 0 wall 14.1 s low 0 min MemAvailable 15006532 kB
+j00013 entry 16 (frame 2868) key [1, 0, 0, -127, 17161, 16] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.9 s
+  reading fresh True (differs on 1 keys): 9440 records, 9286 actions, read wall 3.6 s, read CPU 12.9 s, peak 223 MB, files 5.4 s
+  targets {'0': 0, '1': 21, '2': 1}; first [['bit:108', 1, 1, 2], ['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2]]
+  probes [(['bit:108', 1], 'plan', 8.9)]
+  played ['bit:108', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2868 -> 2869), qf 68644 -> 68668, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2869, 'split', [194], 4.33, 7.33)]
+    extensions []
+    window search: 1 windows, 1 children, 2 child frames, outcomes {'refuted': 1}, engine CPU {'child': 0.0, 'snapshot': 0.0, 'the last engine': 0.0}, Python CPU 0.03
+  readings made []
+  entries [18] (frames [2869]), new cells 1, new reps 0, new atoms 1, n 0, selectable after 13, goal entries []
+  CPU s {'return': 2.2, 'read': 26.1, 'plan': 4.5, 'play': 0.0, 'total': 32.8, 'rusage_total': 32.9}; peak RSS MB {'python': 163, 'children': 224}; job wall 21.4 s; driver wall 37.1 s; wait4 {'cpu_s': 34.0, 'maxrss_mb': 224.8}; GUARD: rc 0 wall 23.1 s low 0 min MemAvailable 14159984 kB
+j00014 entry 14 (frame 2867) key [1, 0, 0, -126, 17155, 14] scope [33, 38, 83, 85, 96]: ok 
+  return same True, boot 2.78 s
+  reading fresh False (reused): 9440 records, 9286 actions, read wall 0.0 s, read CPU 0.0 s, peak 0 MB, files 0.0 s
+  targets {'0': 0, '1': 20, '2': 1}; first [['bit:109', 1, 1, 2], ['bit:110', 1, 1, 2], ['bit:111', 1, 1, 2], ['bit:113', 1, 1, 2], ['bit:114', 1, 1, 2], ['bit:115', 1, 1, 2], ['bit:117', 1, 1, 2], ['bit:118', 1, 1, 2]]
+  probes [(['bit:109', 1], 'plan', 10.5)]
+  played ['bit:109', 1] (tier 1, depth 2): stop "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"
+    reached False, from the plan False, frames 1 (2867 -> 2868), qf 68620 -> 68644, replans 0, inputs 0, checkpoints 2
+    refinements [(0, 2868, 'split', [194], 4.0, 7.03)]
+    extensions []
+    window search: 1 windows, 0 children, 0 child frames, outcomes {}, engine CPU {}, Python CPU 0.02
+  readings made []
+  entries [19] (frames [2868]), new cells 0, new reps 0, new atoms 0, n 1, selectable after 13, goal entries []
+  CPU s {'return': 2.1, 'read': 7.1, 'plan': 6.4, 'play': 0.0, 'total': 15.6, 'rusage_total': 15.7}; peak RSS MB {'python': 162, 'children': 239}; job wall 13.3 s; driver wall 38.1 s; wait4 {'cpu_s': 16.6, 'maxrss_mb': 239.1}; GUARD: rc 0 wall 15.1 s low 0 min MemAvailable 14451192 kB
+
+== explore.py report
+stage kitchen: goal {'owner:566': [1]}, allowed rooms [28, 29, 33, 34, 35, 38, 41, 83, 85, 96]
+jobs {'committed': 15, 'ok': 15, 'errors': 0, 'guard_kills': 0, 'exhausted': 0}
+entries 20, cells 13 (13 selectable), R atoms held 129
+readings {'registered': 10, 'fresh': 9, 'reused': 6, 'by_kind': {'fresh': 9, 'refine': 1}, 'scopes': {'28-33-35-38': 1, '33-38-83-85-96': 8}, 'records': 311099, 'read_cpu_s': 364.8, 'read_wall_s': 103.3, 'peak_rss_mb': 543, 'bytes': 813560650, 'evicted': 0}
+targets by tier {'0': 0, '1': 342, '2': 14}, probes {'plan': 15}, attempts 15, refinements 16
+CPU s {'return': 29.1, 'read': 1075.4, 'plan': 293.9, 'play': 35.3, 'total': 1433.7, 'rusage_total': 1422.2}, peak MB {'python': 1134, 'children': 1134}, driver 25.5 MB, disk 1059.2 MB
+goal chain {'entry': 18, 'chain': [0, 4, 5, 8, 10, 12, 14, 16, 18], 'frames': 141, 'inputs': 21, 'goal_from_the_plan': False, 'stop': "refinement: Lemma R's premise R0: the last pass wrote values of var [194] outside the domain"}
+verified entry 18: same True, goal False, 141 frames, 3384 qf, 14.10 s from the root, 21 inputs, 8 segments
+
+== verify-18.json: entry 18, chain [0, 4, 5, 8, 10, 12, 14, 16, 18], segments 8, frame 2869, 141 frames, qf 3384 (65284 -> 68668), 14.10 s from the root, 21 inputs, goal False, same True; checkpoints 12, differences 0, final {'owner:566': 15}
+
+== summary.json: none (the driver was stopped by hand; no stop rule fired)
+
+== the stop, by hand at 01:04:43 (no stop rule had fired); the driver and its two running jobs (j00015 from entry 18, j00016 from entry 16) killed, both uncommitted
+diagnosis (an analysis of the archive, not an input of the system): entry 12's movie (21 events) booted in a fresh engine and run on with no input:
+  frame 2870, 2900, 2950, 3000, 3100, 3300, 3600, 4000: room 38, cs 0, idle 'dialog', slots local:202 and script:159 running, var 100 = 167, 73, 138, 114, 186, 177, 25, 168
+  so the engine waits in room 38's dialog (local 202) for an input at least to frame 4000.
+every room-38 job: plan 0's first step esc(local:202@801); its window refuted event(local:202@794) one frame on (local:202 [031A] jump unless; var 194 = 0, not a fact of the reading; class split); the refinement made var 194 a fact and the harness stopped on Lemma R's premise R0 (the last pass wrote values of var 194 outside its domain) before any input: one entry one frame on.
+the facts of consecutive frontier entries differ only in var 100 (a value each frame); (var:100, any) is in R at depth 1 (writers: 150 units), so each such entry holds a new pair and is a new cell, and the cached reading differs from the next entry on 1 key (var 100) outside the task facts.

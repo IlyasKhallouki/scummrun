@@ -1,0 +1,6 @@
+r1 round 1: {"read_wall_s":36.3,"read_cpu_s":127.5,"peak_rss_mb":583} packed a1ed4f5c reached 9b0c87b7; wall 38.3 s; load 4.27
+r2 round 1: {"read_wall_s":38.7,"read_cpu_s":136.3,"peak_rss_mb":781} packed a1ed4f5c reached 9b0c87b7; wall 42.3 s; load 4.71
+r2prep round 1: {"read_wall_s":36.9,"read_cpu_s":108.2,"peak_rss_mb":803} packed a1ed4f5c reached 9b0c87b7; wall 39.2 s; load 2.90
+r1 round 2: {"read_wall_s":35.0,"read_cpu_s":122.0,"peak_rss_mb":567} packed a1ed4f5c reached 9b0c87b7; wall 38.2 s; load 3.40
+r2 round 2: {"read_wall_s":36.4,"read_cpu_s":127.5,"peak_rss_mb":818} packed a1ed4f5c reached 9b0c87b7; wall 39.2 s; load 3.57
+r2prep round 2: {"read_wall_s":40.8,"read_cpu_s":117.2,"peak_rss_mb":821} packed a1ed4f5c reached 9b0c87b7; wall 43.3 s; load 3.63

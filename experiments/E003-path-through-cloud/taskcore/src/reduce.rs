@@ -21,6 +21,8 @@
 use crate::model::*;
 use std::collections::BTreeMap;
 
+pub mod fast;
+
 pub type Counts = BTreeMap<String, u64>;
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -66,8 +68,19 @@ pub fn prof<F: FnOnce(Task) -> (Task, bool)>(name: &str, t: Task, f: F) -> (Task
         return f(t);
     }
     let t0 = std::time::Instant::now();
+    let k0 = crate::perf::now();
     let r = f(t);
-    eprintln!("profile {} {:.3} s, {} actions, {} words, changed {}", name, t0.elapsed().as_secs_f64(), r.0.acts.len(), r.0.acts.words.len(), r.1);
+    let (mi, mc) = crate::perf::since(k0);
+    eprintln!(
+        "profile {} {:.3} s, {:.0} M instructions, {:.0} M cycles, {} actions, {} words, changed {}",
+        name,
+        t0.elapsed().as_secs_f64(),
+        mi,
+        mc,
+        r.0.acts.len(),
+        r.0.acts.words.len(),
+        r.1
+    );
     r
 }
 
@@ -81,6 +94,8 @@ enum Edit {
     Same,
     Drop,
     New(OAct),
+    /// the action's new words, as `Actions::push` writes them (`View::words_keeping`)
+    Words(Vec<u32>),
 }
 
 /// The task with each action kept, dropped or replaced by `f`; true when something changed.
@@ -110,6 +125,14 @@ fn rebuild(t: Task, mut f: impl FnMut(&Facts, usize, View) -> Edit) -> (Task, bo
             Edit::Drop => {
                 changed = true;
                 false
+            }
+            Edit::Words(nw) => {
+                changed = true;
+                let len = nw.len();
+                assert!(w + len <= end, "a reduction made an action longer ({} words, was {})", len, end - start);
+                acts.words[w..w + len].copy_from_slice(&nw);
+                w += len;
+                true
             }
             Edit::New(a) => {
                 changed = true;
@@ -300,9 +323,7 @@ pub fn red_b(t: Task, c: &mut Counts) -> (Task, bool) {
                 return Edit::Same;
             }
             dropped += n as u64;
-            let mut a = v.to_owned();
-            a.eff.retain(|e| read[e.fact as usize] || e.kind == K_BAD);
-            Edit::New(a)
+            Edit::Words(v.words_keeping(|_, e| read[e.fact as usize] || e.kind == K_BAD))
         });
         t = nt;
         add(c, "(b) effects on facts nothing reads, left out", dropped);
@@ -603,7 +624,11 @@ fn red_d_core(t: &Task, st: &[u32], c: &mut Counts) -> DOut {
 /// condition fact needed whole; this one is finer and keeps no more.
 pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
     let nf = t.facts.len();
+    let t0 = std::time::Instant::now();
     let Needed { ncount, kept, rounds, .. } = needed(&t);
+    if std::env::var_os("TASKCORE_PROFILE").is_some() {
+        eprintln!("profile e: needed {:.3} s, {} rounds", t0.elapsed().as_secs_f64(), rounds);
+    }
     let whole = (0..nf).filter(|&f| ncount[f] > 0 && ncount[f] == t.facts.size(f as u32)).count();
     let needed: u64 = ncount.iter().map(|&x| x as u64).sum();
     let (mut da, mut de) = (0u64, 0u64);
@@ -617,9 +642,7 @@ pub fn red_e(t: Task, c: &mut Counts) -> (Task, bool) {
             return Edit::Same;
         }
         de += k as u64;
-        let mut a = v.to_owned();
-        a.eff.retain(|e| e.kind == K_BAD || ncount[e.fact as usize] > 0);
-        Edit::New(a)
+        Edit::Words(v.words_keeping(|_, e| e.kind == K_BAD || ncount[e.fact as usize] > 0))
     });
     add(c, "(e) actions that write no needed value, left out", da);
     add(c, "(e) effects on facts with no needed value, left out", de);
@@ -764,6 +787,107 @@ pub fn needed_src<S: Src + ?Sized>(src: &S, facts: &Facts, goal: &[(u32, Vec<u32
     Needed { ncount, kept, rounds }
 }
 
+/// A precondition laid out as [fact, n, values..]* (sorted by fact, then values), read as (fact, values).
+struct PreSets<'a> {
+    w: &'a [u32],
+}
+
+impl<'a> Iterator for PreSets<'a> {
+    type Item = (u32, &'a [u32]);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.w.is_empty() {
+            return None;
+        }
+        let (f, n) = (self.w[0], self.w[1] as usize);
+        let s = &self.w[2..2 + n];
+        self.w = &self.w[2 + n..];
+        Some((f, s))
+    }
+}
+
+/// (f)'s dominance test: every set of `k` has a set of `i` on its fact (the first, in order) within it. Both are laid
+/// out sorted by fact, so one walk replaces a search per set (the same answer as the first match of a search).
+fn pre_within(k: &[u32], i: &[u32]) -> bool {
+    let mut it = PreSets { w: i }.peekable();
+    for (f, sk) in (PreSets { w: k }) {
+        // the first set of `i` on `f`
+        while let Some(&(g, _)) = it.peek() {
+            if g < f {
+                it.next();
+            } else {
+                break;
+            }
+        }
+        match it.peek() {
+            Some(&(g, si)) if g == f => {
+                if !is_subset(si, sk) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// `sig_hash`'s buffers, kept from action to action.
+#[derive(Default)]
+struct SigScratch {
+    buf: Vec<u32>,
+    ranges: Vec<(usize, usize)>,
+}
+
+/// `hash_words` of (f)'s signature of an action (its effects, each as [fact, kind, n, values, nwhen, (fact, n,
+/// values) sorted], sorted, without duplicates, concatenated), with no allocation per effect: the effects are laid out
+/// in one buffer, their ranges sorted by content and deduplicated, and the words hashed in that order. `hash_words` is
+/// a fold over the words, so this is the hash of the concatenation (TASKCORE_CHECK_SIG checks it on every action).
+fn sig_hash(v: View, s: &mut SigScratch) -> u64 {
+    sig_layout(v, s);
+    let buf = &s.buf;
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for &(a, b) in &s.ranges {
+        for &x in &buf[a..b] {
+            h = (h.rotate_left(5) ^ x as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+        }
+    }
+    h
+}
+
+/// (f)'s signature of an action appended to `out` (the concatenation `sig_hash` hashes).
+fn sig_into(v: View, s: &mut SigScratch, out: &mut Vec<u32>) {
+    sig_layout(v, s);
+    for &(a, b) in &s.ranges {
+        out.extend_from_slice(&s.buf[a..b]);
+    }
+}
+
+/// The effects laid out in `s.buf`, their ranges in `s.ranges` sorted by content without duplicates.
+fn sig_layout(v: View, s: &mut SigScratch) {
+    s.buf.clear();
+    s.ranges.clear();
+    let mut w: Vec<(u32, &[u32])> = Vec::new();
+    for e in v.effs() {
+        w.clear();
+        w.extend(e.when());
+        w.sort();
+        let st = s.buf.len();
+        s.buf.push(e.fact);
+        s.buf.push(e.kind);
+        s.buf.push(e.vals.len() as u32);
+        s.buf.extend_from_slice(e.vals);
+        s.buf.push(w.len() as u32);
+        for &(f, vs) in &w {
+            s.buf.push(f);
+            s.buf.push(vs.len() as u32);
+            s.buf.extend_from_slice(vs);
+        }
+        s.ranges.push((st, s.buf.len()));
+    }
+    let buf = &s.buf;
+    s.ranges.sort_by(|a, b| buf[a.0..a.1].cmp(&buf[b.0..b.1]));
+    s.ranges.dedup_by(|a, b| buf[a.0..a.1] == buf[b.0..b.1]);
+}
+
 /// (f) Duplicates and dominance among actions with the same effects (the same set of effects, conditions and
 /// guessed values included). Action A dominates action B when every precondition set of A contains B's set on
 /// the same fact (so A applies wherever B does) and A costs no more. B is dropped. Identical actions (each
@@ -800,22 +924,43 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
         effs.concat()
     };
     let mut by_hash: FxMap<u64, Vec<usize>> = FxMap::default();
+    let check = std::env::var_os("TASKCORE_CHECK_SIG").is_some();
+    let mut scratch = SigScratch::default();
     for i in 0..n {
-        by_hash.entry(hash_words(&sig(i))).or_default().push(i);
+        let h = sig_hash(t.acts.view(i), &mut scratch);
+        if check {
+            assert_eq!(h, hash_words(&sig(i)), "(f): sig_hash differs from the signature's hash at action {}", i);
+        }
+        by_hash.entry(h).or_default().push(i);
     }
     let mut drop = vec![false; n];
     let (mut dup, mut dom) = (0u64, 0u64);
+    let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
+    let t_groups = std::time::Instant::now();
+    let (mut n_exact, mut max_exact, mut n_checks, mut n_walks) = (0u64, 0usize, 0u64, 0u64);
     let mut groups: Vec<Vec<usize>> = by_hash.into_values().filter(|g| g.len() > 1).collect();
     groups.sort();
+    let mut arena: Vec<u32> = Vec::new();
+    let mut spans: Vec<(usize, usize)> = Vec::new();
     for hg in groups {
-        // exact groups inside the hash group
-        let sigs: Vec<Vec<u32>> = hg.iter().map(|&i| sig(i)).collect();
+        // exact groups inside the hash group: each member's signature laid out once in one arena
+        arena.clear();
+        spans.clear();
+        for &i in &hg {
+            let a = arena.len();
+            sig_into(t.acts.view(i), &mut scratch, &mut arena);
+            if check {
+                assert_eq!(arena[a..], sig(i)[..], "(f): sig_into differs from the signature at action {}", i);
+            }
+            spans.push((a, arena.len()));
+        }
+        let sigs = |y: usize| &arena[spans[y].0..spans[y].1];
         let mut done = vec![false; hg.len()];
         for x in 0..hg.len() {
             if done[x] {
                 continue;
             }
-            let g: Vec<usize> = (x..hg.len()).filter(|&y| !done[y] && sigs[y] == sigs[x]).collect();
+            let g: Vec<usize> = (x..hg.len()).filter(|&y| !done[y] && sigs(y) == sigs(x)).collect();
             for &y in &g {
                 done[y] = true;
             }
@@ -823,27 +968,56 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
                 continue;
             }
             let mut ix: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
-            let pres: FxMap<usize, Vec<(u32, Vec<u32>)>> = ix
-                .iter()
-                .map(|&i| {
-                    let mut p: Vec<(u32, Vec<u32>)> = t.acts.view(i).pre().map(|(f, s)| (f, s.to_vec())).collect();
-                    p.sort();
-                    (i, p)
-                })
-                .collect();
-            let size = |i: usize| -> u64 { pres[&i].iter().map(|(_, s)| s.len() as u64).sum() };
-            ix.sort_by_key(|&i| (t.acts.meta[i].cost, pres[&i].len(), std::cmp::Reverse(size(i)), i));
+            n_exact += 1;
+            max_exact = max_exact.max(ix.len());
+            // each member's precondition sorted (by fact, then values), in one arena: pre_at[i] its sets
+            let mut parena: Vec<u32> = Vec::new();
+            let mut pspan: FxMap<usize, (usize, usize)> = FxMap::default();
+            let mut tmp: Vec<(u32, &[u32])> = Vec::new();
+            for &i in &ix {
+                tmp.clear();
+                tmp.extend(t.acts.view(i).pre());
+                tmp.sort();
+                let a = parena.len();
+                for &(f, s) in &tmp {
+                    parena.push(f);
+                    parena.push(s.len() as u32);
+                    parena.extend_from_slice(s);
+                }
+                pspan.insert(i, (a, parena.len()));
+            }
+            let sets = |i: usize| -> PreSets<'_> {
+                let (a, b) = pspan[&i];
+                PreSets { w: &parena[a..b] }
+            };
+            let size = |i: usize| -> u64 { sets(i).map(|(_, s)| s.len() as u64).sum() };
+            let count = |i: usize| -> usize { sets(i).count() };
+            ix.sort_by_key(|&i| (t.acts.meta[i].cost, count(i), std::cmp::Reverse(size(i)), i));
+            // a bit per fact (mod 64): an action whose facts are not among another's cannot dominate it, so the
+            // walk runs only where the bits allow (the same first dominator in `keep`'s order)
+            let bits: FxMap<usize, u64> = ix.iter().map(|&i| (i, sets(i).fold(0u64, |b, (f, _)| b | 1 << (f % 64)))).collect();
             let mut keep: Vec<usize> = Vec::new();
             for &i in &ix {
-                let pi = &pres[&i];
+                let (pa, pb) = pspan[&i];
+                let pi = &parena[pa..pb];
+                let bi = bits[&i];
                 let by = keep.iter().copied().find(|&k| {
+                    if prof {
+                        n_checks += 1;
+                    }
                     t.acts.meta[k].cost <= t.acts.meta[i].cost
-                        && pres[&k].iter().all(|(f, sk)| pi.iter().find(|(g, _)| g == f).map_or(false, |(_, si)| is_subset(si, sk)))
+                        && bits[&k] & !bi == 0
+                        && {
+                            if prof {
+                                n_walks += 1;
+                            }
+                            pre_within(&parena[pspan[&k].0..pspan[&k].1], pi)
+                        }
                 });
                 match by {
                     Some(k) => {
                         drop[i] = true;
-                        if pres[&k] == *pi && t.acts.meta[k].cost == t.acts.meta[i].cost {
+                        if parena[pspan[&k].0..pspan[&k].1] == *pi && t.acts.meta[k].cost == t.acts.meta[i].cost {
                             dup += 1;
                         } else {
                             dom += 1;
@@ -854,6 +1028,16 @@ pub fn red_f(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>) -> (Task, 
                 }
             }
         }
+    }
+    if prof {
+        eprintln!(
+            "profile f: groups {:.3} s, {} exact groups of up to {}, {} dominance checks, {} walks",
+            t_groups.elapsed().as_secs_f64(),
+            n_exact,
+            max_exact,
+            n_checks,
+            n_walks
+        );
     }
     // the replaced pairs as members (input actions), for the record: every member of the dropped action (a folded
     // action has one per path) points at the first member of the action that replaced it

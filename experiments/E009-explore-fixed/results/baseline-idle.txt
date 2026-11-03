@@ -1,0 +1,34 @@
+# E009 baseline 1: E008 archive entries run on 3,200 frames with no input (analysis only, not an input of the system).
+# Made by ~/.cache/fast-mi-e009/scripts/idle_measure.py (per-frame facts) and idle_rule.py (a key is idle when its
+# value comes back to one it had before, the start value included), on ~/.cache/fast-mi-e008/archives/{door,kitchen,smoke}.
+# Per entry: the number of idle keys at L frames; the latest first returns; the one-shot keys (every value new).
+door-1       room  33 frame 2776: idle at L 25:2 50:3 100:3 200:3 400:3 800:3 1600:3 3200:3 | doubling from 100 stops at 100, all
+   latest first returns [(26, 'var:100'), (4, 'var:108'), (4, 'var:0')]; one-shot keys 9, latest [(20, 'var:23'), (20, 'state:428'), (20, 'state:315'), (19, 'var:20')]
+door-2       room  33 frame 2796: idle at L 25:1 50:1 100:1 200:1 400:1 800:1 1600:1 3200:1 | doubling from 100 stops at 100, all
+   latest first returns [(6, 'var:100')]; one-shot keys 1, latest [(1, 'var:0')]
+door-3       room  33 frame 2797: idle at L 25:20 50:29 100:36 200:43 400:44 800:46 1600:46 3200:46 | doubling from 100 stops at 800, all
+   latest first returns [(420, 'state:570'), (420, 'state:316'), (332, 'var:23')]; one-shot keys 17, latest [(1, 'var:72'), (1, 'var:70'), (1, 'var:7'), (1, 'var:4')]
+door-4       room  28 frame 2798: idle at L 25:19 50:25 100:35 200:43 400:43 800:45 1600:46 3200:46 | doubling from 100 stops at 200, MISSES ['state:316', 'state:570', 'var:23']
+   latest first returns [(921, 'var:23'), (419, 'state:570'), (419, 'state:316')]; one-shot keys 0, latest []
+door-5       room  28 frame 3129: idle at L 25:23 50:31 100:38 200:43 400:43 800:46 1600:46 3200:46 | doubling from 100 stops at 200, MISSES ['state:316', 'state:570', 'var:23']
+   latest first returns [(590, 'var:23'), (590, 'state:570'), (590, 'state:316')]; one-shot keys 0, latest []
+kitchen-0    room  33 frame 2728: idle at L 25:0 50:1 100:1 200:1 400:1 800:1 1600:1 3200:1 | doubling from 100 stops at 100, all
+   latest first returns [(33, 'var:100')]; one-shot keys 2, latest [(6, 'var:20'), (6, 'var:2')]
+kitchen-1    room  33 frame 2767: idle at L 25:0 50:2 100:3 200:3 400:3 800:3 1600:3 3200:3 | doubling from 100 stops at 100, all
+   latest first returns [(51, 'var:108'), (44, 'var:0'), (35, 'var:100')]; one-shot keys 14, latest [(51, 'var:72'), (51, 'var:7'), (51, 'var:4'), (51, 'var:23')]
+kitchen-102  room  33 frame 2768: idle at L 25:0 50:3 100:3 200:3 400:3 800:3 1600:3 3200:3 | doubling from 100 stops at 100, all
+   latest first returns [(50, 'var:108'), (43, 'var:0'), (34, 'var:100')]; one-shot keys 14, latest [(50, 'var:72'), (50, 'var:7'), (50, 'var:4'), (50, 'var:23')]
+kitchen-2    room  38 frame 2848: idle at L 25:0 50:1 100:1 200:1 400:1 800:1 1600:1 3200:1 | doubling from 100 stops at 100, all
+   latest first returns [(50, 'var:100')]; one-shot keys 0, latest []
+kitchen-3    room  38 frame 2850: idle at L 25:2 50:3 100:3 200:3 400:3 800:3 1600:3 3200:3 | doubling from 100 stops at 100, all
+   latest first returns [(48, 'var:100'), (11, 'var:181'), (11, 'var:0')]; one-shot keys 32, latest [(11, 'verb:9'), (11, 'verb:8'), (11, 'verb:7'), (11, 'verb:6')]
+kitchen-356  room  33 frame 2800: idle at L 25:3 50:3 100:3 200:3 400:3 800:3 1600:3 3200:3 | doubling from 100 stops at 100, all
+   latest first returns [(18, 'var:108'), (11, 'var:100'), (11, 'var:0')]; one-shot keys 12, latest [(18, 'var:72'), (18, 'var:7'), (18, 'var:4'), (18, 'var:23')]
+kitchen-4    room  38 frame 2862: idle at L 25:0 50:1 100:1 200:1 400:1 800:1 1600:1 3200:1 | doubling from 100 stops at 100, all
+   latest first returns [(40, 'var:100')]; one-shot keys 0, latest []
+kitchen-76   room  38 frame 2898: idle at L 25:0 50:1 100:1 200:1 400:1 800:1 1600:1 3200:1 | doubling from 100 stops at 100, all
+   latest first returns [(35, 'var:100')]; one-shot keys 0, latest []
+smoke-11     room  28 frame 3073: idle at L 25:16 50:24 100:32 200:42 400:45 800:46 1600:46 3200:46 | doubling from 100 stops at 800, all
+   latest first returns [(466, 'var:23'), (270, 'state:348'), (269, 'state:350')]; one-shot keys 7, latest [(10, 'var:20'), (10, 'var:2'), (1, 'var:7'), (1, 'var:3')]
+smoke-15     room  41 frame 3216: idle at L 25:4 50:4 100:4 200:4 400:4 800:4 1600:4 3200:4 | doubling from 100 stops at 100, all
+   latest first returns [(14, 'var:100'), (3, 'state:572'), (3, 'state:571')]; one-shot keys 1, latest [(1, 'var:0')]

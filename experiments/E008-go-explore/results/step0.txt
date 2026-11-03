@@ -1,0 +1,96 @@
+E008 step 0, 2026-11-02, before stage 1. Code: e008 at c09053a (guide.py at 842b555, step.py at 6d4360d, explore.py at 60f1b65,
+merged with no conflict; no existing file edited). Seed 1. Numbers only.
+
+1. Guides (guide.py map, the direct map; --wide for the measurement map), ~/.cache/fast-mi-e008/guides/:
+== door
+goal {"state:316": [1]}  map direct
+|R| 1162 atoms over 805 keys, depth at most 5, writer units 681, 16.22 s
+depth histogram 0:1 1:3 2:52 3:586 4:487 5:33
+wide map: |R| 1187 atoms over 817 keys
+atoms with no writer: 383
+writers of state:316=1: local:28:200 local:28:205 local:28:206 local:28:207 local:28:208 local:28:209
+room atoms (value@depth): 28@1 33@2 41@2 42@2 61@2 64@2 1@3 11@3 12@3 14@3 15@3 19@3 2@3 20@3 21@3 25@3 29@3 3@3 30@3 31@3 32@3 34@3 35@3 36@3 37@3 38@3 39@3 4@3 40@3 43@3 45@3 48@3 49@3 5@3 50@3 51@3 53@3 57@3 58@3 59@3 ...
+rooms: start 33, reached 80
+== kitchen
+goal {"owner:566": [1]}  map direct
+|R| 1162 atoms over 805 keys, depth at most 4, writer units 681, 15.855 s
+depth histogram 0:1 1:24 2:608 3:493 4:36
+wide map: |R| 1187 atoms over 817 keys
+atoms with no writer: 383
+writers of owner:566=1: global:1 global:107 global:122 local:36:201 local:41:213 local:41:214 obj:566
+room atoms (value@depth): 19@1 36@1 41@1 83@1 1@2 11@2 12@2 14@2 15@2 17@2 2@2 20@2 21@2 25@2 28@2 29@2 3@2 30@2 31@2 32@2 34@2 35@2 37@2 38@2 39@2 4@2 40@2 42@2 43@2 45@2 48@2 49@2 5@2 50@2 51@2 53@2 57@2 59@2 6@2 61@2 ...
+rooms: start 33, reached 80
+== part1
+goal {"owner:901": [1], "owner:902": [1], "owner:903": [1]}  map direct
+|R| 1164 atoms over 805 keys, depth at most 6, writer units 681, 14.614 s
+depth histogram 0:3 1:15 2:605 3:497 4:38 5:4 6:2
+wide map: |R| 1189 atoms over 817 keys
+atoms with no writer: 383
+writers of owner:901=1: global:1 local:83:200
+writers of owner:902=1: global:1 global:104 local:83:200
+writers of owner:903=1: global:1 local:83:200
+room atoms (value@depth): 25@1 83@1 1@2 11@2 12@2 14@2 15@2 19@2 2@2 20@2 21@2 27@2 28@2 29@2 3@2 30@2 31@2 32@2 34@2 35@2 36@2 37@2 38@2 39@2 4@2 40@2 42@2 43@2 45@2 48@2 49@2 5@2 50@2 51@2 53@2 57@2 59@2 6@2 61@2 63@2 ...
+rooms: start 33, reached 80
+key (evaluation only): 99 Part I facts, key in R 86, (key, value) or (key, null) in R 83
+== part1-wide
+goal {"owner:901": [1], "owner:902": [1], "owner:903": [1]}  map wide
+|R| 1189 atoms over 817 keys, depth at most 5, writer units 720, 14.577 s
+depth histogram 0:3 1:136 2:869 3:166 4:13 5:2
+wide map: |R| 1189 atoms over 817 keys
+atoms with no writer: 0
+writers of owner:901=1: entry:83 global:1 global:10 global:183 global:184 global:68 global:69 global:70 local:18:202 local:21:203 local:80:201 local:83:200 obj:158 obj:164 obj:165 obj:238 obj:270 obj:291 obj:314 obj:377 obj:388 obj:396 obj:75 obj:761 obj:788 obj:82 obj:820 obj:91
+writers of owner:902=1: entry:83 global:1 global:10 global:104 global:183 global:184 global:68 global:69 global:70 local:18:202 local:21:203 local:80:201 local:83:200 obj:158 obj:164 obj:165 obj:238 obj:270 obj:291 obj:314 obj:377 obj:388 obj:396 obj:75 obj:761 obj:788 obj:82 obj:820 obj:91
+writers of owner:903=1: entry:83 global:1 global:10 global:183 global:184 global:68 global:69 global:70 local:18:202 local:21:203 local:80:201 local:83:200 obj:158 obj:164 obj:165 obj:238 obj:270 obj:291 obj:314 obj:377 obj:388 obj:396 obj:75 obj:761 obj:788 obj:82 obj:820 obj:91
+room atoms (value@depth): 14@1 17@1 18@1 20@1 21@1 25@1 27@1 28@1 29@1 30@1 31@1 33@1 34@1 35@1 41@1 59@1 61@1 69@1 7@1 71@1 73@1 75@1 8@1 80@1 83@1 85@1 1@2 11@2 12@2 15@2 16@2 19@2 2@2 3@2 32@2 36@2 37@2 38@2 39@2 4@2 ...
+rooms: start 33, reached 80
+key (evaluation only): 99 Part I facts, key in R 86, (key, value) or (key, null) in R 83
+times:
+door: exit 0, wall 16.6 s, cpu 15.9 s, peak rss 98 MB
+kitchen: exit 0, wall 16.3 s, cpu 16.1 s, peak rss 98 MB
+part1: exit 0, wall 15.0 s, cpu 14.9 s, peak rss 98 MB
+part1-wide: exit 0, wall 15.0 s, peak rss 100 MB (a second run: wall 21.2 s, user 18.9 s)
+
+2. Off checks on the merged branch:
+- reader-port read kitchen --packed (reader built from e008's scumm, unchanged from main):
+    game loaded in 0.30 s
+    kitchen: 72256 records, reading 45.39 s, 45.0 CPU s, peak RSS 709 MB
+    kitchen reading against golden.py's: 72258 compared, 0 differences
+    ~/.cache/fast-mi-e008/off/kitchen.tc: 71729 actions (527 folded), 44792868 bytes
+    total 49.96 s, peak RSS 729852 kB
+    279b7a24dc91a76a94aa75a1c23b7a750e335152  kitchen.tc
+- E003 tests (test_replay_part1, test_window, test_strict, test_refine, test_reach_extend), unchanged: 108 passed, 1 skipped (needs READER_PICKLE)
+- E008 tests without the engine (test_guide, test_step, test_explore): 58 passed, 3 skipped (the engine tests), 116 s
+- E008 engine tests (E008_ENGINE=1, under the guard at nice 10): 3 passed in 676 s, min MemAvailable 8.1 GB
+  step's (a), the first job from the root on (28, 33, 41) with owner:566 = 1, and (b), a job from (a)'s entry at 3165:
+    E008 step.py engine tests (test_step.py), 2026-11-02 00:26
+    [a] job ta from entry 0: ok True, error None, CLI wall 472.5 s, job wall 471.5 s
+      return: same True, boot 2.96 s
+      reading: fresh True, why 'no cached reading', scope [28, 33, 41], records 41877, actions 40773, read wall 22.7 s, read CPU 77.4 s, reader peak 250 MB, files 16.1 s, load 0.24 s; candidates []
+      targets {'0': 1, '1': 0, '2': 0}, first [['owner:566', 1, 0, 0]]; probes [(['owner:566', 1], 'plan', 428.1)]
+      attempt: target ['owner:566', 1], stop 'goal', reached True, from the plan True, frames 488 (2728 -> 3216), qf 11712 (65284 -> 76996), replans 2, refinements [{'plan': 0, 'frame': 2798, 'class': None, 'added': [], 'why_not': 'no cause', 'seconds': None, 'cpu_s': None}, {'plan': 1, 'frame': 3204, 'class': 'split', 'added': [], 'why_not': 'a split on no variable the reading holds no fact of', 'seconds': None, 'cpu_s': None}], extensions [], inputs 36, 428.1 s
+      window search: 4 windows, 501 children, engine CPU {'child': 145.6, 'snapshot': 0.24, 'stone trial': 66.69, 'the last engine': 0.02}, Python CPU 199.89
+      new entries 8: [(2776, 'checkpoint'), (2796, 'checkpoint'), (2797, 'checkpoint'), (2798, 'checkpoint'), (3165, 'checkpoint'), (3204, 'checkpoint'), (3206, 'checkpoint'), (3216, 'end')]; readings made []
+      CPU s {'return': 2.3, 'read': 94.2, 'plan': 121.9, 'play': 412.4, 'total': 630.8, 'rusage_total': 420.4}; peak RSS MB {'python': 382, 'children': 382}
+    [b] job tb from entry 1: ok True, error None, CLI wall 179.6 s, job wall 178.5 s
+      return: same True, boot 3.23 s
+      reading: fresh True, why 'differs on 19 keys', scope [28, 33, 41], records 40765, actions 39661, read wall 26.7 s, read CPU 88.4 s, reader peak 266 MB, files 17.6 s, load 0.23 s; candidates [(False, 19, 27, 6)]
+      targets {'0': 1, '1': 0, '2': 0}, first [['owner:566', 1, 0, 0]]; probes [(['owner:566', 1], 'plan', 129.6)]
+      attempt: target ['owner:566', 1], stop 'goal', reached True, from the plan True, frames 51 (3165 -> 3216), qf 1224 (75772 -> 76996), replans 1, refinements [{'plan': 0, 'frame': 3204, 'class': 'split', 'added': [], 'why_not': 'a split on no variable the reading holds no fact of', 'seconds': None, 'cpu_s': None}], extensions [{'plan': 1, 'frame': 3204, 'n_values': 2, 'seconds': 59.23, 'cpu_s': 109.94, 'actions_before': 39661, 'actions': 39661}], inputs 3, 129.6 s
+      window search: 2 windows, 8 children, engine CPU {'child': 0.2, 'snapshot': 0.0, 'the last engine': 0.02}, Python CPU 1.44
+      new entries 4: [(3166, 'checkpoint'), (3204, 'checkpoint'), (3206, 'checkpoint'), (3216, 'end')]; readings made [{'path': '~/.cache/fast-mi-e008/int-step-tests/jobs/tb/run/a00/reach-01/reading.json', 'scope': [28, 33, 41], 'kind': 'reach'}]
+      CPU s {'return': 2.5, 'read': 216.9, 'plan': 67.6, 'play': 1.7, 'total': 288.7, 'rusage_total': 289.3}; peak RSS MB {'python': 397, 'children': 587}
+    [b] verify from boot of (a)'s entry at 3165 then (b)'s segment to 3216: 0 differences at 10 checkpoints, 37 inputs, final {'owner:566': 1}, 3.1 s
+  explore's: the root at 2728 (qf 65,284, room 33), E007's kitchen movie as a two-entry chain verified from boot, 0 differences, 488 frames, 11,712 qf
+
+3. Smoke: explore.py run with the real step (kitchen guide, goal owner:566 = 1, allowed rooms 28, 33, 41, b = 1)
+- init: the root at frame 2728, tick 16321, qf 65284, room 33, boot 2.7 s
+- job j00000 from entry 0: scope [28, 33] (ring(33) = 28, 33, 35, 38 cut to the allowed rooms); return same True, boot 4.94 s
+  reading fresh (no cached reading): 38874 records, 37776 actions, read wall 123.9 s, read CPU 102.5 s, peak 238 MB, files 26.7 s
+  targets by tier {'0': 0, '1': 26, '2': 0}; first [['bit:118', 1, 1, 2], ['bit:348', 1, 1, 2], ['bit:349', 1, 1, 2], ['bit:412', 1, 1, 2], ['bit:87', 1, 1, 2], ['owner:578', 0, 1, 2], ['room', 28, 1, 2], ['var:102', 3, 1, 2]]
+  probes: [(['bit:118', 1], 'time', 645.2), (['bit:348', 1], 'plan', 201.5)]
+  played: target ['bit:348', 1] (tier 1, depth 2), stop "goal, not from the plan: it held at a plan's start", frames 345 (2728 -> 3073), qf 65284 -> 73564, replans 5, inputs 33
+  refinements: [(0, 2798, None, []), (1, 2848, None, []), (2, 2849, 'split', [194]), (3, 2935, None, []), (4, 3073, None, [])]
+  window search: 7 windows, 145 children, outcomes {'duplicate': 6, 'pruned': 108, 'success': 4, 'refuted': 2, 'spent': 18, 'deviation': 7}
+  entries 11 (frames [2775, 2796, 2797, 2798, 2800, 2848, 2849, 2850, 2935, 2936, 3073]), new cells 10, new atoms 55, selectable after 11
+  CPU s {'return': 3.0, 'read': 217.0, 'plan': 705.6, 'play': 41.5, 'total': 967.1, 'rusage_total': 951.8}; peak RSS MB {'python': 409, 'children': 409}; job wall 1008.3 s; driver's wait4 of the job tree {'cpu_s': 960.1, 'maxrss_mb': 409.2}; GUARD: rc 0 wall 1010.2 s low 0 min MemAvailable 7666424 kB
+- explore.py verify --entry 11 (the job's end entry): same True, 0 differences, 345 frames, 8280 qf from the root, 33 inputs, 1 segment

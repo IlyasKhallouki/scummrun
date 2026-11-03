@@ -1,0 +1,1108 @@
+//! step.py's parts a test can call alone, line for line: the targets from a reading's reached values and the guide
+//! (`targets`, E009's `rotate`), the reuse rule (`reusable`, `reusable_detail`), E009's idle rule, the entries a
+//! played attempt gives (`entries_from`), the start row, the result's records, and the cached readings' order.
+
+use crate::archive::{fact_map, FactLook, FactMap, NOT_INT};
+use crate::files::{self, as_i64, Res};
+use crate::pyjson::{self, canonical};
+use serde_json::{json, Map, Value};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::path::{Path, PathBuf};
+
+pub const SEED: i64 = 1;
+/// the start maps them to pos:/escpos:
+pub const SLOT_PREFIXES: [&str; 5] = ["at:", "script:", "local:", "objscript:", "esc:"];
+/// and "room" (GUIDE.json's atoms)
+pub const GUIDE_KINDS: [&str; 5] = ["var:", "bit:", "owner:", "state:", "class:"];
+/// read.sh's, with wait_pass_cost
+pub const SWITCHES: &str = "value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost";
+/// walk's run.sh (E006's limits)
+pub const REPLAN_LIMIT: u32 = 30;
+pub const TIME_LIMIT: f64 = 86400.0;
+pub const PLAN_TIME: u64 = 600;
+/// The planner's limit per request: PLAN_TIME, or FMI_PLAN_TIME seconds when set (E011's kitchen check amendment)
+pub fn plan_time() -> u64 {
+    std::env::var("FMI_PLAN_TIME").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0).unwrap_or(PLAN_TIME)
+}
+/// E011's iterative deepening on planning time (plan.md, amendment "targets with no plan made cheap"): the first
+/// limit L0 in seconds from FMI_PLAN_DEEPEN; None (unset): the old behaviour. A target deferred n times is planned with
+/// L0 * 2^n until its attempt has a plan.
+pub fn deepen() -> Option<u64> {
+    std::env::var("FMI_PLAN_DEEPEN").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0)
+}
+/// The limit of a target deferred n times: L0 * 2^n (saturating).
+pub fn deepen_limit(l0: u64, n: u32) -> u64 {
+    l0.saturating_mul(1u64.checked_shl(n).unwrap_or(u64::MAX))
+}
+/// job.json's "deferred" [[k, v, n], ...] as {(k, v as canonical json): n}.
+pub fn deferred_of(job: &Value) -> HashMap<String, u32> {
+    let mut out = HashMap::new();
+    for d in job.get("deferred").and_then(|d| d.as_array()).cloned().unwrap_or_default() {
+        let k = d.get(0).and_then(|k| k.as_str()).unwrap_or("").to_string();
+        let n = d.get(2).and_then(|n| n.as_u64()).unwrap_or(0) as u32;
+        out.insert(pair_key(&k, d.get(1).unwrap_or(&Value::Null)), n);
+    }
+    out
+}
+/// The try's target order with deepening: the targets no try deferred in their order, then the deferred ones by how
+/// many times they were deferred (then in their order).
+pub fn deepen_order(ts: Vec<Target>, deferred: &HashMap<String, u32>) -> Vec<(Target, u32)> {
+    let mut out: Vec<(Target, u32)> =
+        ts.into_iter().map(|t| { let n = deferred.get(&pair_key(&t.k, &t.v.json())).copied().unwrap_or(0); (t, n) }).collect();
+    out.sort_by_key(|(_, n)| *n);
+    out
+}
+pub const PLAN_MEMORY: &str = "3G";
+pub const FORK_EACH: u32 = 7;
+/// the first plan's status on which a cached reading is read fresh
+pub const NOT_A_PLAN_RETRY: &str = "out of domain";
+pub const REUSE_KEYS_FILE: &str = "reuse-keys.json";
+pub const MADE_KINDS: [&str; 3] = ["reach", "refine", "reread"];
+pub const KEEP_FILES: [&str; 3] = ["reading.json", "start.txt", "start.jsonl"];
+
+pub fn guide_kind(k: &str) -> bool {
+    k == "room" || GUIDE_KINDS.iter().any(|p| k.starts_with(p))
+}
+
+/// GUIDE.json's atoms as {(key, value or None for any): depth}.
+pub fn guide_atoms(guide: &Value) -> HashMap<(String, Option<i64>), i64> {
+    let mut out: HashMap<(String, Option<i64>), i64> = HashMap::new();
+    for a in guide["atoms"].as_array().cloned().unwrap_or_default() {
+        let key = (a[0].as_str().unwrap_or("").to_string(), as_i64(a.get(1)));
+        let d = as_i64(a.get(2)).unwrap_or(0);
+        let e = out.entry(key).or_insert(d);
+        *e = (*e).min(d);
+    }
+    out
+}
+
+/// plan.md's rule: the least of the depths of [k, v] and [k, null]; None when neither is in R.
+pub fn depth_of(atoms: &HashMap<(String, Option<i64>), i64>, k: &str, v: i64) -> Option<i64> {
+    let a = atoms.get(&(k.to_string(), Some(v)));
+    let b = atoms.get(&(k.to_string(), None));
+    match (a, b) {
+        (Some(x), Some(y)) => Some(*x.min(y)),
+        (Some(x), None) | (None, Some(x)) => Some(*x),
+        _ => None,
+    }
+}
+
+/// reading.reached (key<TAB>v1<TAB>v2...) as {key: sorted int values}; non-int values left out, a key on several
+/// lines gets the union. Keys in file order (Python's dict).
+pub fn read_reached_text(text: &str) -> Vec<(String, Vec<i64>)> {
+    let mut order: Vec<String> = Vec::new();
+    let mut out: HashMap<String, BTreeSet<i64>> = HashMap::new();
+    for ln in files::py_splitlines(text) {
+        let parts: Vec<&str> = ln.trim_end_matches('\n').split('\t').collect();
+        if parts.is_empty() || parts[0].is_empty() {
+            continue;
+        }
+        if !out.contains_key(parts[0]) {
+            order.push(parts[0].to_string());
+        }
+        let vals = out.entry(parts[0].to_string()).or_default();
+        for x in &parts[1..] {
+            if let Some(n) = py_int(x) {
+                vals.insert(n);
+            }
+        }
+    }
+    order.into_iter().map(|k| { let v = out.remove(&k).unwrap(); (k, v.into_iter().collect()) }).collect()
+}
+
+/// Python's `int(x)` on a text (surrounding whitespace, a sign, underscores between digits).
+pub fn py_int(x: &str) -> Option<i64> {
+    let t = x.trim();
+    let (neg, d) = match t.strip_prefix('-') {
+        Some(r) => (true, r),
+        None => (false, t.strip_prefix('+').unwrap_or(t)),
+    };
+    if d.is_empty() || d.starts_with('_') || d.ends_with('_') || d.contains("__") || !d.bytes().all(|c| c.is_ascii_digit() || c == b'_') {
+        return None;
+    }
+    let n: i64 = d.replace('_', "").parse().ok()?;
+    Some(if neg { -n } else { n })
+}
+
+pub fn read_reached(path: &Path) -> Res<Vec<(String, Vec<i64>)>> {
+    Ok(read_reached_text(&files::read_text(path)?))
+}
+
+/// replay_part1.goal_text_of: {fact: [value]} as reader-scope's --goal (one value per fact, sorted by key).
+pub fn goal_text(goal: &[(String, Vec<i64>)]) -> Res<String> {
+    let mut g: Vec<&(String, Vec<i64>)> = goal.iter().collect();
+    g.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut parts = Vec::new();
+    for (k, vs) in g {
+        let s: BTreeSet<i64> = vs.iter().copied().collect();
+        if s.len() != 1 {
+            return Err(format!("reader-scope's --goal takes one value per fact; {k} has {vs:?}"));
+        }
+        parts.push(format!("{k}={}", s.iter().next().unwrap()));
+    }
+    Ok(parts.join(","))
+}
+
+/// A target's value: an int, or tier 0's "K=V,K=V" for a goal of several keys.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum TV {
+    Int(i64),
+    Text(String),
+}
+
+impl TV {
+    pub fn json(&self) -> Value {
+        match self {
+            TV::Int(n) => json!(n),
+            TV::Text(s) => json!(s),
+        }
+    }
+    pub fn of(v: &Value) -> Option<TV> {
+        match v {
+            Value::String(s) => Some(TV::Text(s.clone())),
+            x => as_i64(Some(x)).map(TV::Int),
+        }
+    }
+    fn text(&self) -> String {
+        match self {
+            TV::Int(n) => n.to_string(),
+            TV::Text(s) => s.clone(),
+        }
+    }
+}
+
+/// (k, v, tier, depth)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Target {
+    pub k: String,
+    pub v: TV,
+    pub tier: i64,
+    pub depth: i64,
+}
+
+impl Target {
+    pub fn json(&self) -> Value {
+        json!([self.k, self.v.json(), self.tier, self.depth])
+    }
+    pub fn text(&self) -> String {
+        format!("{}={}", self.k, self.v.text())
+    }
+}
+
+/// Tier 0's target: the goal's one atom, or ("goal", "K=V,K=V") for a goal of several keys.
+pub fn goal_target(goal: &[(String, Vec<i64>)]) -> Res<(String, TV)> {
+    if goal.len() == 1 {
+        let (k, vs) = &goal[0];
+        return Ok((k.clone(), TV::Int(*vs.first().ok_or("an empty goal value")?)));
+    }
+    Ok(("goal".into(), TV::Text(goal_text(goal)?)))
+}
+
+fn pair_key(k: &str, v: &Value) -> String {
+    canonical(&json!([k, v]))
+}
+
+/// Step 3: [(k, v, tier, depth)], tier 0 first, then by (depth, key, value) within a tier (step.py `targets`).
+#[allow(clippy::too_many_arguments)]
+pub fn targets<F: FactLook + ?Sized>(reached: &[(String, Vec<i64>)], guide: &Value, entry_facts: &F, root_facts: Option<&FactMap>,
+               held: &[Value], tried: &[Value], goal: &[(String, Vec<i64>)], rotation: Option<&Value>) -> Res<Vec<Target>> {
+    targets_with(reached, &guide_atoms(guide), entry_facts, root_facts, held, tried, goal, rotation)
+}
+
+/// GUIDE.json's atoms as `guide_atoms` gives them.
+pub type Atoms = HashMap<(String, Option<i64>), i64>;
+
+/// `targets` on the guide's atoms made before (a try keeps them per guide).
+#[allow(clippy::too_many_arguments)]
+pub fn targets_with<F: FactLook + ?Sized>(reached: &[(String, Vec<i64>)], atoms: &Atoms, entry_facts: &F, root_facts: Option<&FactMap>,
+               held: &[Value], tried: &[Value], goal: &[(String, Vec<i64>)], rotation: Option<&Value>) -> Res<Vec<Target>> {
+    let pair = |p: &Value| pair_key(p.get(0).and_then(|k| k.as_str()).unwrap_or(""), p.get(1).unwrap_or(&Value::Null));
+    let held_set: HashSet<String> = held.iter().map(pair).collect();
+    let tried_set: HashSet<String> = tried.iter().map(pair).collect();
+    let reached_map: HashMap<&str, &Vec<i64>> = reached.iter().map(|(k, v)| (k.as_str(), v)).collect();
+    let mut out = Vec::new();
+    let mut first: Option<(String, TV)> = None;
+    if !goal.is_empty() {
+        let all_reached = goal.iter().all(|(k, vs)| vs.iter().any(|v| reached_map.get(k.as_str()).map(|r| r.contains(v)).unwrap_or(false)));
+        let holds = goal.iter().all(|(k, vs)| vs.contains(&entry_facts.look(k).unwrap_or(0)));
+        if all_reached && !holds {
+            let f = goal_target(goal)?;
+            if !tried_set.contains(&pair_key(&f.0, &f.1.json())) {
+                out.push(Target { k: f.0.clone(), v: f.1.clone(), tier: 0, depth: 0 });
+            }
+            first = Some(f);
+        }
+    }
+    let mut rest = Vec::new();
+    for (k, vals) in reached {
+        if !guide_kind(k) {
+            continue;
+        }
+        let now = entry_facts.look(k).unwrap_or(0);
+        for &v in vals {
+            if v == now || first.as_ref().map(|f| f.0 == *k && f.1 == TV::Int(v)).unwrap_or(false)
+                || (!tried_set.is_empty() && tried_set.contains(&pair_key(k, &json!(v)))) {
+                continue;
+            }
+            let Some(d) = depth_of(atoms, k, v) else { continue };
+            let concrete = atoms.contains_key(&(k.clone(), Some(v)));
+            if !concrete {
+                if let Some(r) = root_facts {
+                    if v == r.get(k).copied().unwrap_or(0) {
+                        continue;
+                    }
+                }
+            }
+            let is_held = !held_set.is_empty()
+                && (held_set.contains(&pair_key(k, &json!(v))) || (!concrete && held_set.contains(&pair_key(k, &Value::Null))));
+            rest.push(Target { k: k.clone(), v: TV::Int(v), tier: if is_held { 2 } else { 1 }, depth: d });
+        }
+    }
+    rest.sort_by(|a, b| (a.tier, a.depth, &a.k, &a.v).cmp(&(b.tier, b.depth, &b.k, &b.v)));
+    out.extend(rest);
+    match rotation {
+        None => Ok(out),
+        Some(r) => Ok(rotate(out, r)),
+    }
+}
+
+/// E009 fix b: ``ts`` ordered by (tried in the cell, tried in all, depth, then E008's order (tier, depth, key, value)).
+pub fn rotate(ts: Vec<Target>, rotation: &Value) -> Vec<Target> {
+    let counts = |name: &str| -> HashMap<String, i64> {
+        let mut m = HashMap::new();
+        for r in rotation.get(name).and_then(|x| x.as_array()).cloned().unwrap_or_default() {
+            m.insert(pair_key(r[0].as_str().unwrap_or(""), &r[1]), as_i64(r.get(2)).unwrap_or(0));
+        }
+        m
+    };
+    let (cell, every) = (counts("cell"), counts("all"));
+    let mut ts = ts;
+    ts.sort_by_key(|t| {
+        let a = pair_key(&t.k, &t.v.json());
+        let vk = match &t.v {
+            TV::Int(n) => (0, *n, String::new()),
+            TV::Text(s) => (1, 0, s.clone()),
+        };
+        (cell.get(&a).copied().unwrap_or(0), every.get(&a).copied().unwrap_or(0), t.depth, t.tier, t.k.clone(), vk)
+    });
+    ts
+}
+
+/// facts.py `diff`: {key: (old, new)}, absent 0.
+pub fn diff(a: &FactMap, b: &FactMap) -> BTreeMap<String, (i64, i64)> {
+    let mut out = BTreeMap::new();
+    for (k, &x) in a {
+        let y = b.get(k).copied().unwrap_or(0);
+        if x != y {
+            out.insert(k.clone(), (x, y));
+        }
+    }
+    for (k, &y) in b {
+        if !a.contains_key(k) && y != 0 {
+            out.insert(k.clone(), (0, y));
+        }
+    }
+    out
+}
+
+fn is_slot(k: &str) -> bool {
+    SLOT_PREFIXES.iter().any(|p| k.starts_with(p))
+}
+
+/// Step 2's rule: (whether the entry's facts differ from the reading's start facts only on the reading's task facts
+/// and on slot keys, the number of keys they differ on besides those).
+pub fn reusable(start: &FactMap, task_keys: &HashSet<String>, entry: &FactMap) -> (bool, usize) {
+    let d = diff(start, entry);
+    let bad = d.keys().filter(|k| !task_keys.contains(*k) && !is_slot(k)).count();
+    (bad == 0, bad)
+}
+
+pub fn reusable_detail(start: &FactMap, task_keys: &HashSet<String>, entry: &FactMap) -> Value {
+    let d = diff(start, entry);
+    let bad: Vec<&String> = d.keys().filter(|k| !task_keys.contains(*k) && !is_slot(k)).collect();
+    json!({"differ": d.len(), "task": d.keys().filter(|k| task_keys.contains(*k)).count(),
+           "slots": d.keys().filter(|k| !task_keys.contains(*k) && is_slot(k)).count(), "other": bad.len(),
+           "first": bad.iter().take(12).map(|k| json!([k, d[*k].0, d[*k].1])).collect::<Vec<_>>()})
+}
+
+/// `reusable` and `reusable_detail` from one diff of the reading's start facts and the entry's facts (`d`, as `diff`
+/// gives it), the task facts being those `in_task` holds: (reusable, the detail).
+pub fn reuse_of(d: &BTreeMap<String, (i64, i64)>, in_task: impl Fn(&str) -> bool) -> (bool, Value) {
+    let bad: Vec<&String> = d.keys().filter(|k| !in_task(k) && !is_slot(k)).collect();
+    let detail = json!({"differ": d.len(), "task": d.keys().filter(|k| in_task(k)).count(),
+           "slots": d.keys().filter(|k| !in_task(k) && is_slot(k)).count(), "other": bad.len(),
+           "first": bad.iter().take(12).map(|k| json!([k, d[*k].0, d[*k].1])).collect::<Vec<_>>()});
+    (bad.is_empty(), detail)
+}
+
+/// `fact_map(&facts_of_ordered(s))` made from fmi-core's `facts_of`: the same keys and values, with no JSON between.
+pub fn fact_map_of(s: &fmi_core::Obs) -> FactMap {
+    let f = fmi_core::facts_of(s);
+    let mut m = FactMap::with_capacity(f.len());
+    for &(k, v) in f.iter() {
+        m.insert(k.text(), v);
+    }
+    m
+}
+
+/// E009 fix a: a key is idle when its value comes back to a value it had before (the entry's value included).
+/// {"returns": sorted idle keys, "first_return": {k: offset}, "changes": {k: n}} (dict orders as Python builds them).
+pub fn idle_rule<'a, I>(start: &FactMap, frames: I) -> Value
+where
+    I: IntoIterator<Item = (i64, FactMap)>,
+{
+    let mut seen: HashMap<String, HashSet<i64>> = HashMap::new();
+    let mut first: Vec<(String, i64)> = Vec::new();
+    let mut first_set: HashSet<String> = HashSet::new();
+    let mut changes: Vec<(String, i64)> = Vec::new();
+    let mut ch_ix: HashMap<String, usize> = HashMap::new();
+    let mut prev = start.clone();
+    for (off, fa) in frames {
+        // Python iterates set(fa) | set(prev): an order of its own; the counts and the first returns do not depend on
+        // it within one frame, but the dicts' insertion order does: keys in sorted order here, and the
+        // reference's outputs are compared as maps
+        let mut keys: Vec<&String> = fa.keys().chain(prev.keys().filter(|k| !fa.contains_key(*k))).collect();
+        keys.sort();
+        for k in keys {
+            let v = fa.get(k).copied().unwrap_or(0);
+            if v == prev.get(k).copied().unwrap_or(0) {
+                continue;
+            }
+            match ch_ix.get(k) {
+                Some(&i) => changes[i].1 += 1,
+                None => {
+                    ch_ix.insert(k.clone(), changes.len());
+                    changes.push((k.clone(), 1));
+                }
+            }
+            let s = seen.entry(k.clone()).or_insert_with(|| HashSet::from([start.get(k).copied().unwrap_or(0)]));
+            if s.contains(&v) && !first_set.contains(k) {
+                first_set.insert(k.clone());
+                first.push((k.clone(), off));
+            }
+            s.insert(v);
+        }
+        prev = fa;
+    }
+    let mut returns: Vec<&String> = first_set.iter().collect();
+    returns.sort();
+    let mut fr = Map::new();
+    for (k, o) in &first {
+        fr.insert(k.clone(), json!(o));
+    }
+    let mut chm = Map::new();
+    for (k, n) in &changes {
+        chm.insert(k.clone(), json!(n));
+    }
+    json!({"returns": returns, "first_return": Value::Object(fr), "changes": Value::Object(chm)})
+}
+
+/// Step 5: one entry per checkpoint with frame > ``entry_frame`` (frame order, one per frame). Every input must come
+/// after ``entry_frame`` (premise S of Lemma C).
+pub fn entries_from(entry_frame: i64, inputs: &[Value], checkpoints: &[Value]) -> Res<Vec<Value>> {
+    let early: Vec<&Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MIN) <= entry_frame).collect();
+    if let Some(e0) = early.first() {
+        return Err(format!("ValueError: {} inputs at or before the entry's frame {entry_frame}: first {}", early.len(), files::py_repr(e0)));
+    }
+    let mut sorted: Vec<&Value> = checkpoints.iter().collect();
+    sorted.sort_by_key(|c| as_i64(c.get(0)).unwrap_or(i64::MIN)); // stable, as Python's sorted
+    let mut seen = HashSet::new();
+    let mut cps: Vec<Value> = Vec::new();
+    for c in sorted {
+        let f = as_i64(c.get(0)).unwrap_or(i64::MIN);
+        if f > entry_frame && seen.insert(f) {
+            let extra = c.get(2).cloned().unwrap_or(json!({}));
+            cps.push(json!([c[0], c[1], extra]));
+        }
+    }
+    let mut out = Vec::new();
+    for (i, c) in cps.iter().enumerate() {
+        let f = as_i64(c.get(0)).unwrap();
+        let tick = c[2].get("tick").cloned().unwrap_or(Value::Null);
+        let events: Vec<Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
+        out.push(json!({"id": null, "parent": null, "frame": c[0], "tick": tick, "events": events,
+                        "checkpoints": cps[..=i].to_vec(), "how": if i == cps.len() - 1 { "end" } else { "checkpoint" }}));
+    }
+    Ok(out)
+}
+
+pub fn first_plan_status(plans: &[Value]) -> Option<String> {
+    plans.iter().find(|p| p.get("status").and_then(|s| s.as_str()) != Some("reach extension"))
+        .map(|p| p.get("status").and_then(|s| s.as_str()).map(|s| s.to_string()).unwrap_or_else(|| "None".into()))
+}
+
+pub fn empty_result(job: &Value) -> Value {
+    json!({"job": job.get("job"), "entry": job.get("entry").and_then(|e| e.get("id")), "ok": false, "error": null,
+           "return": null, "reading": null, "targets": {"by_tier": {"0": 0, "1": 0, "2": 0}, "first": []},
+           "probes": [], "attempt": null, "readings_made": [], "new": [], "tried": [], "exhausted": false,
+           "cpu_s": {"return": 0.0, "read": 0.0, "plan": 0.0, "play": 0.0, "total": 0.0},
+           "peak_rss_mb": {"python": 0, "children": 0}, "wall_s": 0.0})
+}
+
+/// The CLI's exit: 0 ok, 3 the return differs, 1 any other error.
+pub fn exit_code(result: &Value) -> i32 {
+    if files::truthy(result.get("ok")) {
+        return 0;
+    }
+    if result.get("return").and_then(|r| r.get("same")) == Some(&Value::Bool(false)) {
+        return 3;
+    }
+    1
+}
+
+/// The start-rows file a reading names as its start (``PATH seed N``), or None for start-part1.jsonl's starts.
+pub fn start_rows_of(doc: &Value) -> Option<PathBuf> {
+    let name = doc.get("start").and_then(|s| s.get("name")).and_then(|n| n.as_str()).unwrap_or("");
+    let (head, _) = name.rsplit_once(" seed ")?;
+    if head.starts_with('/') && head.ends_with(".jsonl") {
+        Some(PathBuf::from(head))
+    } else {
+        None
+    }
+}
+
+/// The job's readings of its scope whose files exist, newest first (reading.json's mtime, then the job's order).
+pub fn cached_readings(job: &Value) -> Vec<PathBuf> {
+    cached_readings_with(job, false)
+}
+
+/// What `cached_readings` reads of a reading.json: its scope's rooms (sorted), its packed file's name and the start
+/// rows' file it names.
+#[derive(Clone)]
+struct HeadFields {
+    rooms: Vec<i64>,
+    packed: String,
+    rows: Option<PathBuf>,
+}
+
+/// at most this many files' fields kept (warm.rs's bound)
+const MEMO_KEEP: usize = 64;
+
+type FileMemo<T> = std::sync::Mutex<HashMap<PathBuf, (Vec<u8>, T)>>;
+
+fn heads_memo() -> &'static FileMemo<HeadFields> {
+    static C: std::sync::OnceLock<FileMemo<HeadFields>> = std::sync::OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// A memo by a file's content: the value kept for `p` when its bytes are those read now, else `make` of them.
+fn by_content<T: Clone>(memo: &FileMemo<T>, p: &Path, bytes: Vec<u8>, make: impl FnOnce(&[u8]) -> Option<T>) -> Option<T> {
+    if let Some((b, v)) = memo.lock().unwrap().get(p) {
+        if *b == bytes {
+            return Some(v.clone());
+        }
+    }
+    let v = make(&bytes)?;
+    let mut m = memo.lock().unwrap();
+    if m.len() >= MEMO_KEEP {
+        if let Some(k) = m.keys().next().cloned() {
+            m.remove(&k);
+        }
+    }
+    m.insert(p.to_path_buf(), (bytes, v.clone()));
+    Some(v)
+}
+
+fn head_fields_of(bytes: &[u8]) -> Option<HeadFields> {
+    let doc = pyjson::loads(std::str::from_utf8(bytes).ok()?).ok()?;
+    let mut rooms: Vec<i64> = doc.get("scope").and_then(|s| s.get("rooms")).and_then(|r| r.as_array())
+        .map(|a| a.iter().filter_map(|x| as_i64(Some(x))).collect()).unwrap_or_default();
+    rooms.sort();
+    Some(HeadFields { rooms, packed: doc.get("packed").and_then(|x| x.as_str()).unwrap_or("reading.tc").to_string(), rows: start_rows_of(&doc) })
+}
+
+/// `cached_readings`; with `memo` (E011 round 2, FMI_TRY_MEMO) a reading.json is read and compared with the bytes
+/// it had when its fields were taken, and parsed again only when they differ.
+pub fn cached_readings_with(job: &Value, memo: bool) -> Vec<PathBuf> {
+    let mut scope: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| as_i64(Some(x))).collect()).unwrap_or_default();
+    scope.sort();
+    let mut out: Vec<(i128, usize, PathBuf)> = Vec::new();
+    for (i, r) in job.get("readings").and_then(|r| r.as_array()).cloned().unwrap_or_default().iter().enumerate() {
+        let p = PathBuf::from(r["path"].as_str().unwrap_or(""));
+        let Ok(bytes) = std::fs::read(&p) else { continue };
+        let fields = if memo { by_content(heads_memo(), &p, bytes, head_fields_of) } else { head_fields_of(&bytes) };
+        let Some(h) = fields else { continue };
+        if h.rooms != scope {
+            continue;
+        }
+        let packed = p.parent().unwrap_or(Path::new("")).join(&h.packed);
+        if !packed.exists() || !packed.with_extension("reached").exists() {
+            continue;
+        }
+        if let Some(rows) = &h.rows {
+            if !rows.exists() {
+                continue;
+            }
+        }
+        let mt = std::fs::metadata(&p).and_then(|m| m.modified()).ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos() as i128).unwrap_or(0);
+        out.push((-mt, i, p));
+    }
+    out.sort();
+    out.into_iter().map(|x| x.2).collect()
+}
+
+/// The root's facts, for the hold rule of (k, any) atoms: the job's ``root_facts``, the root entry itself, or the
+/// archive's root entry file; else None.
+pub fn root_facts_of(job: &Value, job_dir: &Path) -> Option<FactMap> {
+    if let Some(r) = job.get("root_facts").filter(|r| !r.is_null()) {
+        return Some(fact_map(r));
+    }
+    if files::truthy(job["entry"].get("root")) {
+        return Some(fact_map(&job["entry"]["checkpoint"][1]));
+    }
+    let jd = std::fs::canonicalize(job_dir).ok()?;
+    let arch = jd.parent()?.parent()?;
+    let text = std::fs::read_to_string(arch.join("entries.jsonl")).ok()?;
+    for ln in files::py_splitlines(&text) {
+        let e = pyjson::loads(ln).ok()?;
+        if e.get("parent").map(|p| p.is_null()).unwrap_or(false) {
+            let id = e.get("id")?;
+            let doc = files::read_gz(&arch.join("entries").join(format!("{}.json.gz", files::py_str(Some(id))))).ok()?;
+            return doc["checkpoints"].as_array()?.last().map(|c| fact_map(&c[1]));
+        }
+    }
+    None
+}
+
+fn roots_memo() -> &'static FileMemo<std::sync::Arc<FactMap>> {
+    static C: std::sync::OnceLock<FileMemo<std::sync::Arc<FactMap>>> = std::sync::OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// `root_facts_of`, the root entry file's facts kept per its content (E011 round 2, FMI_TRY_MEMO): the file is read
+/// and compared with the bytes it had, and decompressed and parsed again only when they differ.
+pub fn root_facts_of_memo(job: &Value, job_dir: &Path) -> Option<std::sync::Arc<FactMap>> {
+    if let Some(r) = job.get("root_facts").filter(|r| !r.is_null()) {
+        return Some(std::sync::Arc::new(fact_map(r)));
+    }
+    if files::truthy(job["entry"].get("root")) {
+        return Some(std::sync::Arc::new(fact_map(&job["entry"]["checkpoint"][1])));
+    }
+    let jd = std::fs::canonicalize(job_dir).ok()?;
+    let arch = jd.parent()?.parent()?;
+    let text = std::fs::read_to_string(arch.join("entries.jsonl")).ok()?;
+    for ln in files::py_splitlines(&text) {
+        let e = pyjson::loads(ln).ok()?;
+        if e.get("parent").map(|p| p.is_null()).unwrap_or(false) {
+            let id = e.get("id")?;
+            let p = arch.join("entries").join(format!("{}.json.gz", files::py_str(Some(id))));
+            let bytes = std::fs::read(&p).ok()?;
+            return by_content(roots_memo(), &p, bytes, |b| {
+                let mut s = String::new();
+                std::io::Read::read_to_string(&mut flate2::read::MultiGzDecoder::new(b), &mut s).ok()?;
+                let doc = pyjson::loads(&s).ok()?;
+                doc["checkpoints"].as_array()?.last().map(|c| std::sync::Arc::new(fact_map(&c[1])))
+            });
+        }
+    }
+    None
+}
+
+/// The harness's last reading when it is not the one it started on: its reading.json, its scope and its kind.
+pub fn made_reading(h_packed: &Path, rd_packed: &Path) -> Option<Value> {
+    if h_packed == rd_packed {
+        return None;
+    }
+    let head = h_packed.parent().unwrap_or(Path::new("")).join("reading.json");
+    let scope = std::fs::read_to_string(&head).ok().and_then(|t| pyjson::loads(&t).ok())
+        .and_then(|d| d.get("scope").and_then(|s| s.get("rooms")).cloned()).unwrap_or(Value::Null);
+    let name = h_packed.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let kind = MADE_KINDS.iter().find(|k| name.starts_with(&format!("{k}-"))).copied().unwrap_or("other");
+    Some(json!({"path": head.to_string_lossy(), "scope": scope, "kind": kind}))
+}
+
+/// The readings the harness made in the attempt's folder and did not end on: their files go, but for reading.json
+/// and the start files. Returns [[folder, bytes freed], ...].
+pub fn drop_unused(adir: &Path, made: Option<&Value>) -> Vec<Value> {
+    let keep = made.and_then(|m| m["path"].as_str()).map(|p| crate::archive::resolve(Path::new(p).parent().unwrap_or(Path::new(""))));
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(adir).map(|rd| rd.flatten().filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false)).map(|e| e.path()).collect()).unwrap_or_default();
+    dirs.sort();
+    let mut out = Vec::new();
+    for d in dirs {
+        let name = d.file_name().unwrap().to_string_lossy().into_owned();
+        let kind = name.split('-').next().unwrap_or("");
+        if !MADE_KINDS.contains(&kind) || keep.as_ref().map(|k| crate::archive::resolve(&d) == *k).unwrap_or(false) {
+            continue;
+        }
+        let mut freed = 0u64;
+        let mut todo = vec![d.clone()];
+        while let Some(p) = todo.pop() {
+            for e in std::fs::read_dir(&p).map(|rd| rd.flatten().collect::<Vec<_>>()).unwrap_or_default() {
+                if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    todo.push(e.path());
+                } else if !KEEP_FILES.contains(&e.file_name().to_string_lossy().as_ref()) {
+                    if let Ok(m) = e.metadata() {
+                        if std::fs::remove_file(e.path()).is_ok() {
+                            freed += m.len();
+                        }
+                    }
+                }
+            }
+        }
+        out.push(json!([name, freed]));
+    }
+    out
+}
+
+fn pick(x: &Value, keys: &[&str]) -> Value {
+    let mut m = Map::new();
+    for k in keys {
+        m.insert((*k).into(), x.get(*k).cloned().unwrap_or(Value::Null));
+    }
+    Value::Object(m)
+}
+
+pub fn attempt_record(t: &Target, res: &Value, seconds: f64) -> Value {
+    // `_checkpoints`: the checkpoints, or their count (a try of fmi keeps them as packed facts)
+    let cps = res.get("_checkpoints").map(|c| c.as_array().map(|a| a.len()).or(c.as_u64().map(|n| n as usize)).unwrap_or(0)).unwrap_or(0);
+    let list = |k: &str| res.get(k).and_then(|x| x.as_array()).cloned().unwrap_or_default();
+    let mut out = json!({"target": [t.k, t.v.json()], "tier": t.tier, "depth": t.depth, "stop": res.get("stop"),
+        "reached": res.get("_reached"), "goal_from_the_plan": res.get("goal_from_the_plan"), "frames": res.get("frames"),
+        "frame0": res.get("frame0"), "frame_end": res.get("frame_end"), "qf0": res.get("qf0"), "qf_end": res.get("qf_end"),
+        "qf": res.get("qf"), "replans": res.get("replans"),
+        "refinements": list("refinements").iter().map(|x| pick(x, &["plan", "frame", "class", "added", "why_not", "seconds", "cpu_s"])).collect::<Vec<_>>(),
+        "extensions": list("extensions").iter().map(|x| pick(x, &["plan", "frame", "n_values", "seconds", "cpu_s", "actions_before", "actions"])).collect::<Vec<_>>(),
+        "window_summary": res.get("window_summary"), "seconds": pyjson::round(seconds, 1),
+        "inputs": list("inputs").len(), "checkpoints": cps, "error": res.get("error")});
+    if files::truthy(res.get("_ready")) {
+        out["ready"] = json!(true);
+        out["earliest"] = json!(false);
+    }
+    out
+}
+
+/// An attempt's CPU by part: ``read`` its reach extensions' and refinements' readers, ``play`` the window search's
+/// engines and its own, ``plan`` the rest.
+pub fn attempt_costs(res: &Value, att_cpu: f64) -> (f64, f64, f64) {
+    let empty = json!({});
+    let ws = files::or(res.get("window_summary"), &empty);
+    let py = ws.get("python_cpu_s").and_then(|x| x.as_f64()).unwrap_or(0.0);
+    let list = |k: &str| res.get(k).and_then(|x| x.as_array()).cloned().unwrap_or_default();
+    let reads: f64 = list("extensions").iter().chain(list("refinements").iter()).map(|x| x.get("cpu_s").and_then(|c| c.as_f64()).unwrap_or(0.0)).sum();
+    let eng: f64 = ws.get("engine_cpu_s").and_then(|e| e.as_object()).map(|m| m.values().filter_map(|v| v.as_f64()).sum()).unwrap_or(0.0);
+    (reads, eng + py, (att_cpu - py - reads).max(0.0))
+}
+
+pub fn target_holds(t: &Target, goal: &[(String, Vec<i64>)], facts: &FactMap) -> bool {
+    if t.tier == 0 {
+        return goal.iter().all(|(k, vs)| vs.contains(&facts.get(k).copied().unwrap_or(0)));
+    }
+    match t.v {
+        TV::Int(v) => facts.get(&t.k).copied().unwrap_or(0) == v,
+        TV::Text(_) => false,
+    }
+}
+
+/// The goal of job.json ({key: [values]}) as pairs.
+pub fn goal_of(job: &Value) -> Vec<(String, Vec<i64>)> {
+    job["goal"].as_object().map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_array().map(|a| a.iter().filter_map(|x| as_i64(Some(x))).collect()).unwrap_or_default())).collect()).unwrap_or_default()
+}
+
+/// A facts.py map as a JSON object, keys in the map's own order (callers sort where the reference does).
+pub fn facts_json(f: &FactMap) -> Value {
+    let mut keys: Vec<&String> = f.keys().collect();
+    keys.sort();
+    let mut m = Map::new();
+    for k in keys {
+        let v = f[k];
+        m.insert(k.clone(), if v == NOT_INT { Value::Null } else { json!(v) });
+    }
+    Value::Object(m)
+}
+
+/// E009 fix a's rule on fmi-core's packed facts (the try's hot path: one diff per frame, no key text built but for
+/// the keys that change). The same result as `idle_rule` (its maps in key order).
+pub fn idle_rule_facts<I>(start: &fmi_core::Facts, frames: I) -> Value
+where
+    I: IntoIterator<Item = (i64, fmi_core::Facts)>,
+{
+    let mut seen: HashMap<fmi_core::Key, HashSet<i64>> = HashMap::new();
+    let mut first: Vec<(fmi_core::Key, i64)> = Vec::new();
+    let mut first_set: HashSet<fmi_core::Key> = HashSet::new();
+    let mut changes: Vec<(fmi_core::Key, i64)> = Vec::new();
+    let mut ch_ix: HashMap<fmi_core::Key, usize> = HashMap::new();
+    let mut prev = start.clone();
+    for (off, fa) in frames {
+        for (k, _old, v) in prev.diff(&fa) {
+            match ch_ix.get(&k) {
+                Some(&i) => changes[i].1 += 1,
+                None => {
+                    ch_ix.insert(k, changes.len());
+                    changes.push((k, 1));
+                }
+            }
+            let s = seen.entry(k).or_insert_with(|| HashSet::from([start.get(k).unwrap_or(0)]));
+            if s.contains(&v) && first_set.insert(k) {
+                first.push((k, off));
+            }
+            s.insert(v);
+        }
+        prev = fa;
+    }
+    let mut returns: Vec<String> = first_set.iter().map(|k| k.text()).collect();
+    returns.sort();
+    let mut fr = Map::new();
+    for (k, o) in &first {
+        fr.insert(k.text(), json!(o));
+    }
+    let mut chm = Map::new();
+    for (k, n) in &changes {
+        chm.insert(k.text(), json!(n));
+    }
+    json!({"returns": returns, "first_return": Value::Object(fr), "changes": Value::Object(chm)})
+}
+
+/// E009 fix a's rule evaluated frame by frame on the facts' changes, with no whole facts map kept: each frame gives
+/// (key, old, new) for every key whose value differs from the frame before (absent 0, in `Key` order, as
+/// `Facts::diff` gives them). A key's value at the entry is its `old` at its first change, as it holds that value until
+/// then. The same result as `idle_rule_facts` on the frames' whole facts, its maps in the same orders.
+#[derive(Default)]
+pub struct IdleRule {
+    ix: HashMap<fmi_core::Key, usize>,
+    /// the keys in the order of their first change
+    keys: Vec<IdleKey>,
+    /// (index into `keys`, offset) in the order of the first returns
+    first: Vec<(usize, i64)>,
+}
+
+struct IdleKey {
+    key: fmi_core::Key,
+    changes: i64,
+    /// the values the key has had, its value at the entry first
+    seen: Vec<fmi_core::Val>,
+    returned: bool,
+}
+
+impl IdleRule {
+    pub fn new() -> IdleRule {
+        IdleRule::default()
+    }
+
+    /// The frame at `off` (1 for the first frame after the entry) and its changes.
+    pub fn frame(&mut self, off: i64, changes: &[(fmi_core::Key, fmi_core::Val, fmi_core::Val)]) {
+        for &(k, old, new) in changes {
+            let i = match self.ix.get(&k) {
+                Some(&i) => i,
+                None => {
+                    self.ix.insert(k, self.keys.len());
+                    self.keys.push(IdleKey { key: k, changes: 0, seen: vec![old], returned: false });
+                    self.keys.len() - 1
+                }
+            };
+            let e = &mut self.keys[i];
+            e.changes += 1;
+            if e.seen.contains(&new) {
+                if !e.returned {
+                    e.returned = true;
+                    self.first.push((i, off));
+                }
+            } else {
+                e.seen.push(new);
+            }
+        }
+    }
+
+    /// {"returns": sorted idle keys, "first_return": {k: offset}, "changes": {k: n}}, as `idle_rule_facts`.
+    pub fn result(&self) -> Value {
+        let mut returns: Vec<String> = self.first.iter().map(|&(i, _)| self.keys[i].key.text()).collect();
+        returns.sort();
+        let mut fr = Map::new();
+        for &(i, o) in &self.first {
+            fr.insert(self.keys[i].key.text(), json!(o));
+        }
+        let mut chm = Map::new();
+        for e in &self.keys {
+            chm.insert(e.key.text(), json!(e.changes));
+        }
+        json!({"returns": returns, "first_return": Value::Object(fr), "changes": Value::Object(chm)})
+    }
+}
+
+/// `Facts::diff` (key, old, new for every key whose value differs, absent 0, in `Key` order) appended to `out`, with
+/// a fast path over the run of equal pairs two frames' facts mostly are.
+pub fn diff_into(a: &fmi_core::Facts, b: &fmi_core::Facts, out: &mut Vec<(fmi_core::Key, fmi_core::Val, fmi_core::Val)>) {
+    let (a, b) = (&a.0, &b.0);
+    let (mut i, mut j) = (0, 0);
+    const RUN: usize = 16;
+    loop {
+        // equal pairs give nothing: whole runs of them compared with no branch inside, then pair by pair
+        while i + RUN <= a.len() && j + RUN <= b.len() {
+            let x = a[i..i + RUN].iter().zip(&b[j..j + RUN]).fold(0u64, |m, (p, q)| m | (p.0 .0 ^ q.0 .0) | (p.1 ^ q.1) as u64);
+            if x != 0 {
+                break;
+            }
+            i += RUN;
+            j += RUN;
+        }
+        while i < a.len() && j < b.len() && a[i] == b[j] {
+            i += 1;
+            j += 1;
+        }
+        if i >= a.len() && j >= b.len() {
+            return;
+        }
+        let (k, x, y) = if j >= b.len() || (i < a.len() && a[i].0 < b[j].0) {
+            i += 1;
+            (a[i - 1].0, a[i - 1].1, 0)
+        } else if i >= a.len() || b[j].0 < a[i].0 {
+            j += 1;
+            (b[j - 1].0, 0, b[j - 1].1)
+        } else {
+            i += 1;
+            j += 1;
+            (a[i - 1].0, a[i - 1].1, b[j - 1].1)
+        };
+        if x != y {
+            out.push((k, x, y));
+        }
+    }
+}
+
+/// facts.py `facts_of` as an ordered JSON object, keys in the order facts.py inserts them (the start row's file).
+pub fn facts_of_ordered(s: &fmi_core::Obs) -> Value {
+    use fmi_core::{CLOCKS, ENCD, EXCD, WIO_FLOBJECT, WIO_GLOBAL, WIO_INVENTORY, WIO_LOCAL, WIO_ROOM};
+    let mut f = Map::new();
+    for (n, &v) in s.vars.iter().enumerate() {
+        if !CLOCKS.contains(&n) {
+            f.insert(format!("var:{n}"), json!(v));
+        }
+    }
+    for n in &s.bits_set {
+        f.insert(format!("bit:{n}"), json!(1));
+    }
+    for (o, v) in &s.owners {
+        f.insert(format!("owner:{o}"), json!(v));
+    }
+    for (o, v) in &s.states {
+        f.insert(format!("state:{o}"), json!(v));
+    }
+    for (o, cs) in &s.classes {
+        for c in cs {
+            f.insert(format!("class:{o}:{c}"), json!(1));
+        }
+    }
+    f.insert("room".into(), json!(s.room));
+    if let Some(e) = s.ego {
+        f.insert("ego".into(), json!(e));
+    }
+    for sl in &s.slots {
+        if sl.where_ == WIO_GLOBAL {
+            f.insert(format!("script:{}", sl.number), json!(1));
+        } else if sl.where_ == WIO_LOCAL {
+            f.insert(format!("local:{}", sl.number), json!(1));
+        } else if [WIO_INVENTORY, WIO_ROOM, WIO_FLOBJECT].contains(&sl.where_) && sl.number != ENCD && sl.number != EXCD {
+            f.insert(format!("objscript:{}", sl.number), json!(1));
+        }
+        let unit = crate::start::unit_name(sl.where_, sl.number);
+        if let Some(u) = &unit {
+            if sl.code >= 0 {
+                f.insert(format!("at:{u}:{}", sl.code), json!(1));
+            }
+            if sl.frozen > 0 {
+                f.insert(format!("frozen:{u}"), json!(1));
+            }
+        }
+    }
+    f.insert("cutscene".into(), json!(s.cutscene.depth));
+    if let Some(top) = s.cutscene.levels.last().and_then(|l| l.override_.as_ref()) {
+        if !top.stale && top.code >= 0 {
+            if let Some(u) = crate::start::unit_name(top.where_, top.number) {
+                f.insert(format!("esc:{u}:{}", top.code), json!(1));
+            }
+        }
+    }
+    for v in &s.verbs {
+        f.insert(format!("verb:{}", v.id), json!(1));
+    }
+    Value::Object(f)
+}
+
+/// step.py `start_row`: the entry's start row in start-part1.jsonl's format (reader-scope --start-rows reads seed
+/// and facts).
+pub fn start_row(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) -> Res<Value> {
+    if seed != SEED {
+        return Err(format!("ValueError: seed {seed}: E008 runs seed {SEED} only (plan.md)"));
+    }
+    let ego = status.ego.map(|(x, y)| json!([x, y])).unwrap_or(Value::Null);
+    Ok(json!({"seed": seed, "frame": status.frame,
+              "stop": {"stop": status.reason, "frame": status.frame, "tick": status.tick, "qf": status.qf, "room": status.room,
+                       "idle": status.idle, "rng": status.rng, "up": status.up, "cs": status.cs, "ego": ego},
+              "dump": {"frame": state.frame, "tick": state.tick, "room": state.room, "ego": state.ego,
+                       "ego_pos": state.ego_pos.map(|(x, y)| json!([x, y])), "seed": state.seed, "boot_param": state.boot_param},
+              "facts": facts_of_ordered(state)}))
+}
+
+/// entries_from's plan on frames alone: per entry (in frame order) the number of the attempt's checkpoints it holds
+/// (frames > the entry's frame, one per frame, in order: a prefix), its events (the inputs up to its frame) and its
+/// `how`; the same rules and the same error as entries_from.
+pub fn entries_plan(entry_frame: i64, inputs: &[Value], frames: &[i64]) -> Res<Vec<(usize, Vec<Value>, &'static str)>> {
+    let early: Vec<&Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MIN) <= entry_frame).collect();
+    if let Some(e0) = early.first() {
+        return Err(format!("ValueError: {} inputs at or before the entry's frame {entry_frame}: first {}", early.len(), files::py_repr(e0)));
+    }
+    let kept: Vec<i64> = frames.iter().copied().filter(|f| *f > entry_frame).collect();
+    let n = kept.len();
+    Ok(kept.iter().enumerate().map(|(i, &f)| {
+        let events: Vec<Value> = inputs.iter().filter(|e| as_i64(e.get("frame")).unwrap_or(i64::MAX) <= f).cloned().collect();
+        (i + 1, events, if i == n - 1 { "end" } else { "checkpoint" })
+    }).collect())
+}
+
+/// A facts.py map (JSON) as fmi-core's packed facts when the two read the same: every key its key's own text, every
+/// value an int; else None.
+pub fn packed_facts(v: &Value) -> Option<fmi_core::Facts> {
+    let m = v.as_object()?;
+    let mut pairs = Vec::with_capacity(m.len());
+    let mut t = String::with_capacity(48);
+    for (k, x) in m {
+        let n = x.as_i64()?;
+        let key = fmi_core::Key::parse(k);
+        t.clear();
+        crate::archive::write_key(&mut t, key);
+        if t != *k {
+            return None;
+        }
+        pairs.push((key, n));
+    }
+    Some(fmi_core::Facts::from_pairs(pairs))
+}
+
+/// The packed facts' changes as `diff` gives them on the text maps of the same facts.
+pub fn diff_packed(a: &fmi_core::Facts, b: &fmi_core::Facts) -> BTreeMap<String, (i64, i64)> {
+    let mut ch = Vec::new();
+    diff_into(a, b, &mut ch);
+    ch.into_iter().map(|(k, x, y)| (k.text(), (x, y))).collect()
+}
+
+/// A try's entry facts (fmi-core's packed facts) read by key text as the text map of them (`fact_map_of`) reads: a text
+/// that is not its key's own text is in no such map.
+pub struct PackedLook<'a>(pub &'a fmi_core::Facts);
+
+impl crate::archive::FactLook for PackedLook<'_> {
+    fn look(&self, k: &str) -> Option<i64> {
+        let key = fmi_core::Key::parse(k);
+        let v = self.0.get(key)?;
+        let mut t = String::with_capacity(k.len() + 8);
+        crate::archive::write_key(&mut t, key);
+        (t == k).then_some(v)
+    }
+    fn owners(&self) -> Vec<(i64, i64)> {
+        self.0.0.iter().filter(|(k, _)| k.kind() == fmi_core::K_OWNER).map(|(k, v)| (k.a() as i64, *v)).collect()
+    }
+}
+
+/// target_holds on any facts map.
+pub fn target_holds_in<F: crate::archive::FactLook + ?Sized>(t: &Target, goal: &[(String, Vec<i64>)], facts: &F) -> bool {
+    let get = |k: &str| facts.look(k).unwrap_or(0);
+    if t.tier == 0 {
+        return goal.iter().all(|(k, vs)| vs.contains(&get(k)));
+    }
+    match t.v {
+        TV::Int(v) => get(&t.k) == v,
+        TV::Text(_) => false,
+    }
+}
+
+/// json.dumps(start_row(...)) (default separators), the facts written straight from the dump in facts.py's order.
+pub fn start_row_text(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) -> Res<String> {
+    let mut head = start_row_head(seed, state, status)?;
+    let mut s = crate::pyjson::dumps_default(&head);
+    // the head's text ends with "}": the facts go before it
+    s.pop();
+    s.push_str(", \"facts\": ");
+    write_facts_ordered(&mut s, state);
+    s.push('}');
+    head.as_object_mut().map(|m| m.clear());
+    Ok(s)
+}
+
+fn start_row_head(seed: i64, state: &fmi_core::Obs, status: &fmi_core::Status) -> Res<Value> {
+    let mut v = start_row(seed, state, &fmi_core::Status { ..status.clone() })?;
+    v.as_object_mut().unwrap().remove("facts");
+    Ok(v)
+}
+
+/// facts_of's map as JSON text (default separators), keys in facts.py's order; a key set twice keeps its first place
+/// (Python's dict).
+fn write_facts_ordered(s: &mut String, st: &fmi_core::Obs) {
+    use fmi_core::{CLOCKS, ENCD, EXCD, WIO_FLOBJECT, WIO_GLOBAL, WIO_INVENTORY, WIO_LOCAL, WIO_ROOM};
+    // the slots' and the verbs' keys may repeat (two slots of one unit): the order of first insertion, the last value
+    let mut order: Vec<String> = Vec::with_capacity(st.vars.len() + 4096);
+    let mut vals: HashMap<String, i64> = HashMap::new();
+    let mut put = |k: String, v: i64, order: &mut Vec<String>| {
+        if vals.insert(k.clone(), v).is_none() {
+            order.push(k);
+        }
+    };
+    let mut b = itoa::Buffer::new();
+    s.push('{');
+    let mut first = true;
+    // the vars, bits, owners, states and classes cannot repeat: written as they come
+    let emit = |s: &mut String, k: &str, v: i64, first: &mut bool| {
+        if !*first {
+            s.push_str(", ");
+        }
+        *first = false;
+        s.push('"');
+        s.push_str(k);
+        s.push_str("\": ");
+        s.push_str(itoa::Buffer::new().format(v));
+    };
+    for (n, &v) in st.vars.iter().enumerate() {
+        if !CLOCKS.contains(&n) {
+            let k = format!("var:{}", b.format(n));
+            emit(s, &k, v as i64, &mut first);
+        }
+    }
+    for n in &st.bits_set {
+        emit(s, &format!("bit:{n}"), 1, &mut first);
+    }
+    for (o, v) in &st.owners {
+        emit(s, &format!("owner:{o}"), *v as i64, &mut first);
+    }
+    for (o, v) in &st.states {
+        emit(s, &format!("state:{o}"), *v as i64, &mut first);
+    }
+    for (o, cs) in &st.classes {
+        for c in cs {
+            emit(s, &format!("class:{o}:{c}"), 1, &mut first);
+        }
+    }
+    put("room".into(), st.room as i64, &mut order);
+    if let Some(e) = st.ego {
+        put("ego".into(), e as i64, &mut order);
+    }
+    for sl in &st.slots {
+        if sl.where_ == WIO_GLOBAL {
+            put(format!("script:{}", sl.number), 1, &mut order);
+        } else if sl.where_ == WIO_LOCAL {
+            put(format!("local:{}", sl.number), 1, &mut order);
+        } else if [WIO_INVENTORY, WIO_ROOM, WIO_FLOBJECT].contains(&sl.where_) && sl.number != ENCD && sl.number != EXCD {
+            put(format!("objscript:{}", sl.number), 1, &mut order);
+        }
+        if let Some(u) = crate::start::unit_name(sl.where_, sl.number) {
+            if sl.code >= 0 {
+                put(format!("at:{u}:{}", sl.code), 1, &mut order);
+            }
+            if sl.frozen > 0 {
+                put(format!("frozen:{u}"), 1, &mut order);
+            }
+        }
+    }
+    put("cutscene".into(), st.cutscene.depth as i64, &mut order);
+    if let Some(top) = st.cutscene.levels.last().and_then(|l| l.override_.as_ref()) {
+        if !top.stale && top.code >= 0 {
+            if let Some(u) = crate::start::unit_name(top.where_, top.number) {
+                put(format!("esc:{u}:{}", top.code), 1, &mut order);
+            }
+        }
+    }
+    for v in &st.verbs {
+        put(format!("verb:{}", v.id), 1, &mut order);
+    }
+    for k in &order {
+        emit(s, k, vals[k], &mut first);
+    }
+    s.push('}');
+}

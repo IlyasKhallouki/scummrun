@@ -1,0 +1,9 @@
+[package]
+name = "fmi-engine"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the engine's Rust driver over the binary channel F1 (experiments/E011-speed/plan.md, component engine)"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }

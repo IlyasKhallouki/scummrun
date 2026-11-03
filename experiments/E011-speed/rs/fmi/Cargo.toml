@@ -1,0 +1,20 @@
+[package]
+name = "fmi"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the one resident process of a run (fmi explore|try|guide)"
+
+[[bin]]
+name = "fmi"
+path = "src/main.rs"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+fmi-explore = { path = "../fmi-explore", features = ["step_changes"] }
+fmi-engine = { path = "../fmi-engine" }
+fmi-reading = { path = "../fmi-reading" }
+fmi-plan = { path = "../fmi-plan" }
+fmi-play = { path = "../fmi-play" }
+scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }

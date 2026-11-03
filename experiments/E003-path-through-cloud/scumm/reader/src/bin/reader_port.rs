@@ -15,7 +15,9 @@
 //!                                     packed file and --task-out's files; the records are the same, the reading's
 //!                                     head gets the costs' parameters (the comparison leaves that key out);
 //!                                     --no-keep (with --packed) keeps no records in memory, as reader-scope
-//!                                     without --keep: the packed file is the same, and there is no comparison
+//!                                     without --keep: the packed file is the same, and there is no comparison;
+//!                                     --memo DIR: the job memo across readings (experiments/E011-speed/memo.md;
+//!                                     needs --switches reach,split_limit and --threads N), the output the same
 //! reader-port task --out DIR          the kitchen's packed files (build_task, prune) from the replayed reading
 //! reader-port stream --out FILE       the kitchen reading with its records written to a packed file as made
 //! reader-port bench-task --out DIR    build_task, relevance, prune and the packed files on the kitchen, timed
@@ -175,12 +177,13 @@ fn main() {
             // builder counters, which the reading (golden.py's file) must not have
             let mut packing: Option<packed::RecordStream> = None;
             let (mut b, secs) = match arg(&args, "--threads") {
-                _ if live || elsewhere || frame_costs || sw.reach || packed_out.is_some() => {
+                _ if live || elsewhere || frame_costs || sw.reach || packed_out.is_some() || arg(&args, "--memo").is_some() => {
                     // a switch on, or the packed file written as made: on `--threads` workers (default 0)
                     let threads: usize = arg(&args, "--threads").map_or(0, |n| n.parse().unwrap());
                     let mut b = oracle::builder_with(&game, &st, name, sw);
                     b.table.elsewhere = elsewhere;
                     b.keep_records = !no_keep;
+                    b.memo_dir = arg(&args, "--memo").map(PathBuf::from);
                     if sw.reach {
                         // the start the packed file gets: the kitchen's s17, another scope's own
                         b.reach_starts.push(if name == "kitchen" {
@@ -228,6 +231,9 @@ fn main() {
                 scumm_reader::cpu_secs() - cpu0,
                 peak_rss_kb().unwrap_or(0) / 1024
             );
+            if let Some(m) = b.memo_json() {
+                println!("{name}: memo {m}");
+            }
             let golden = oracle::golden_dir().join(format!("{name}.jsonl.gz"));
             if let Some(out) = arg(&args, "--out") {
                 let f = std::fs::File::create(&out).unwrap();

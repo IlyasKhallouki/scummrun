@@ -1,0 +1,35 @@
+{
+ "entry": 18,
+ "chain": [
+  0,
+  4,
+  5,
+  8,
+  10,
+  12,
+  14,
+  16,
+  18
+ ],
+ "segments": 8,
+ "frame": 2869,
+ "frames": 141,
+ "qf": 3384,
+ "qf_end": 68668,
+ "qf_root": 65284,
+ "seconds": 14.100460823752343,
+ "tick_end": 17167,
+ "inputs": 21,
+ "goal": false,
+ "same": true,
+ "verify": {
+  "checkpoints": 12,
+  "differ": [],
+  "inputs": 21,
+  "final": {
+   "owner:566": 15
+  },
+  "same": true,
+  "seconds": 2.4
+ }
+}

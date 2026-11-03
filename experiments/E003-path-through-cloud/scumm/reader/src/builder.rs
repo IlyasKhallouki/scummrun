@@ -147,7 +147,66 @@ pub struct JobOut {
     pub last_pins: Pins,
     /// the job's wall seconds where it ran
     pub secs: f64,
+    /// the switch --prep: what the reading's thread and the sink work out of the records, worked out here
+    pub prep: Option<JobPrep>,
 }
+
+impl JobOut {
+    /// The job's records, also those that stayed with its worker (`Lite`).
+    pub fn n_records(&self) -> usize {
+        self.records.len() + self.prep.as_ref().and_then(|p| p.lite.as_ref()).map_or(0, |l| l.n)
+    }
+}
+
+/// The switch --prep (E011 round 2): what the reading's thread (`reach_after_job`) and the sink work out of a job's
+/// records, worked out by the worker that ran the job (par.rs), so that their own threads only take it in the jobs'
+/// order. Each part is a function of the records and of what stays fixed while the job's batch runs (the table's
+/// domains, the reached values), made by the same code the reading's thread or the sink would run.
+#[derive(Default)]
+pub struct JobPrep {
+    /// per record, the (d) effects with their first unmet condition (reach.rs `reach_prep`)
+    pub reach: Option<Vec<crate::reach::ReachEff>>,
+    /// the sink's part, one per record (the sink's own type: `PrepFn`)
+    pub sink: Option<Box<dyn std::any::Any + Send>>,
+    /// all that the reading's thread reads of the records besides the parts above, when the records stay with the
+    /// worker (`Builder::prep_lite`; `JobOut::records` is then empty)
+    pub lite: Option<Lite>,
+}
+
+/// What the reading's thread reads of a job's records (`run_jobs_shared`, `NextEvents::add`, `emit`) when they stay
+/// with the worker that made them: their count, their `args:` sets in order, their next events (each (name, unit,
+/// w, sig, abort) once, in order).
+#[derive(Debug)]
+pub struct Lite {
+    pub n: usize,
+    pub args: Vec<(String, i64)>,
+    pub next_events: Vec<Event>,
+}
+
+impl Lite {
+    pub fn of(recs: &[Record]) -> Lite {
+        let mut args = Vec::new();
+        for r in recs {
+            for (k, e) in &r.effects {
+                if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
+                    args.push((k.clone(), *s));
+                }
+            }
+        }
+        let mut nexts = NextEvents::default();
+        nexts.add(recs);
+        Lite { n: recs.len(), args, next_events: nexts.events }
+    }
+}
+
+impl std::fmt::Debug for JobPrep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "JobPrep {{ reach: {:?}, sink: {}, lite: {:?} }}", self.reach.as_ref().map(|r| r.len()), self.sink.is_some(), self.lite.as_ref().map(|l| l.n))
+    }
+}
+
+/// The sink's part of the switch --prep: made from a job's records and the worker's table.
+pub type PrepFn = dyn Fn(&[Record], &FactTable) -> Box<dyn std::any::Any + Send> + Send + Sync;
 
 /// Takes the records as the Builder makes them (packed.rs `RecordStream`): a batch after each round of runs, `first`
 /// the index of its first record; `reset` when a pass starts over (its records are dropped).
@@ -158,6 +217,11 @@ pub trait RecordSink {
     /// thread (par.rs `SinkThread`). The default lends them to `batch`.
     fn batch_owned(&mut self, first: usize, recs: Vec<Record>, table: &FactTable) {
         self.batch(first, &recs, table)
+    }
+    /// `batch_owned` with the sink's part of the switch --prep (`JobPrep::sink`), made where the job ran. The default
+    /// leaves it.
+    fn batch_prepared(&mut self, first: usize, recs: Vec<Record>, table: &FactTable, _prep: Box<dyn std::any::Any + Send>) {
+        self.batch_owned(first, recs, table)
     }
 }
 
@@ -188,6 +252,15 @@ impl NextEvents {
                 if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
                     self.events.push(e.clone());
                 }
+            }
+        }
+    }
+
+    /// `add` of a job's records whose next events a worker took (`Lite`): the same events, each once, in order.
+    pub(crate) fn add_events(&mut self, evs: Vec<Event>) {
+        for e in evs {
+            if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
+                self.events.push(e);
             }
         }
     }
@@ -435,6 +508,10 @@ pub struct Builder<'g> {
     pub last_pins: Pins,
     bverb_cache: FxHashMap<(i64, i64), BTreeSet<i64>>,
     unknown_cache: FxHashMap<(String, String), Option<Vec<String>>>,
+    /// `sig`'s lists numbered so far, by the hash of their inputs
+    sig_cache: FxHashMap<u64, Vec<SigMade>>,
+    /// `unknown_targets_listed`'s answers, by the hash of (head, cite)
+    unknown_listed: FxHashMap<u64, Vec<(String, String, bool)>>,
     cites: Option<FxHashMap<String, (UnitId, u32)>>,
     ego_cache: Option<Vec<Label>>,
     /// kind and domain of the keys `effect` reads, for one pass (an `args:`, `pos:` or `escpos:` domain grows
@@ -465,6 +542,8 @@ pub struct Builder<'g> {
     pub on_job: Option<JobHook>,
     /// `oracle_keys`' cache: the universe as a set, and its keys by prefix
     uni_keys: std::cell::RefCell<(FxHashSet<String>, FxHashMap<String, Vec<String>>)>,
+    /// `pin_kind`'s cache
+    pin_kinds: std::cell::RefCell<FxHashMap<String, Kind>>,
     /// `args_domain`'s cache: key -> (its count of list numbers, its domain)
     args_doms: std::cell::RefCell<FxHashMap<String, (usize, Domain)>>,
     /// F10: slots live in the engine with their dumped locals; their events are read with the start's (empty: the
@@ -480,8 +559,26 @@ pub struct Builder<'g> {
     pub(crate) reach_out: Vec<crate::reach::Held>,
     /// the switch --reach: the job being run, as reach.rs keys it (`job_key`)
     pub(crate) cur_job_key: Option<Arc<str>>,
-    /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs)
+    /// the switch pass2_reuse: what the job being run depends on, in pass 1 (memo.rs); the switch --memo: in every
+    /// job that runs
     pub(crate) memo_log: Option<crate::memo::RunLog>,
+    /// the switch --memo (experiments/E011-speed/memo.md): the store's root folder; None off
+    pub memo_dir: Option<std::path::PathBuf>,
+    /// the switch --memo in a resident process (run.rs `Resident`): the store kept in memory from reading to reading,
+    /// with `memo_dir` (if any) its disk store; None off
+    pub memo_mem: Option<Arc<crate::memo::MemStore>>,
+    /// the switch --memo: each consulted key's kind, domain and constant start in this table (`Builder::key_info`)
+    pub(crate) memo_infos: FxHashMap<String, (u8, Option<Domain>, Option<i64>)>,
+    /// the switch --prep: the job being taken in (par.rs `run_batch`), its part worked out where it ran
+    pub(crate) job_prep: Option<JobPrep>,
+    /// the switch --prep (E011 round 2): the workers work out what the reading's thread and the sink would of each
+    /// job's records (`JobPrep`); the reading is byte for byte the same. Off by default.
+    pub prep: bool,
+    /// the switch --prep: the sink's part (`PrepFn`), None for none
+    pub prep_sink: Option<Arc<PrepFn>>,
+    /// the switch --prep: the records stay with the worker (`Lite`); for a sink that reads only its part (`PrepFn`),
+    /// with no records kept and no `on_job`
+    pub prep_lite: bool,
 }
 
 /// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
@@ -496,6 +593,17 @@ pub fn flag_free(ev: &Event) -> i64 {
     ev.override_.hash(&mut h);
     ev.cut_data.hash(&mut h);
     h.finish() as i64
+}
+
+/// A list `Builder::sig` numbered: its inputs, its number and its text.
+struct SigMade {
+    name: String,
+    locals: Vec<(i64, Val)>,
+    ov: i64,
+    cd: Vec<CutData>,
+    flags: Vec<(String, String)>,
+    sig: i64,
+    text: String,
 }
 
 /// reader.py `_why`: the reason of an assumption's `why` (model.Unknown's text).
@@ -534,6 +642,8 @@ impl<'g> Builder<'g> {
             self.table = t.clone();
             self.fact_info.clear();
             self.ego_cache = None;
+            self.memo_infos.clear();
+            self.pin_kinds.borrow_mut().clear();
         }
         if self.table.args_vals != *args_vals {
             self.table.args_vals.clone_from(args_vals);
@@ -636,6 +746,8 @@ impl<'g> Builder<'g> {
             last_pins: Pins::new(),
             bverb_cache: FxHashMap::default(),
             unknown_cache: FxHashMap::default(),
+            sig_cache: FxHashMap::default(),
+            unknown_listed: FxHashMap::default(),
             cites: None,
             ego_cache: None,
             fact_info: FxHashMap::default(),
@@ -648,6 +760,7 @@ impl<'g> Builder<'g> {
             phase_secs: BTreeMap::new(),
             uni_keys: Default::default(),
             args_doms: Default::default(),
+            pin_kinds: Default::default(),
             on_job: None,
             widened: Vec::new(),
             slot_locals: Vec::new(),
@@ -658,6 +771,13 @@ impl<'g> Builder<'g> {
             reach_out: Vec::new(),
             cur_job_key: None,
             memo_log: None,
+            memo_dir: None,
+            memo_mem: None,
+            memo_infos: FxHashMap::default(),
+            job_prep: None,
+            prep: false,
+            prep_sink: None,
+            prep_lite: false,
         }
     }
 
@@ -698,6 +818,17 @@ impl<'g> Builder<'g> {
         out
     }
 
+    /// `kind(key)`, kept for the table (a key's kind changes only with the table: `sync_table`, `reset` and
+    /// `extend_domains` forget them).
+    fn pin_kind(&self, key: &str) -> Kind {
+        if let Some(&k) = self.pin_kinds.borrow().get(key) {
+            return k;
+        }
+        let k = self.kind(key);
+        self.pin_kinds.borrow_mut().insert(key.to_string(), k);
+        k
+    }
+
     /// `table.domain` of an `args:` key, kept while its list numbers do not change (within a pass they only grow,
     /// so their count tells; `reset` forgets them).
     fn args_domain(&self, key: &str) -> Domain {
@@ -717,7 +848,7 @@ impl<'g> Builder<'g> {
     /// single value also a pin).
     pub fn pin(&self, pins: &mut Pins, pre: &mut Pre, key: &str, values: &[Label]) -> bool {
         let mut values: PinVals = lab_set(values.iter().copied());
-        if self.kind(key) == Kind::Const {
+        if self.pin_kind(key) == Kind::Const {
             return values.contains(&Label::Int(self.table.start.get0(key)));
         }
         let dom = if key.starts_with("args:") { Some(std::borrow::Cow::Owned(self.args_domain(key))) } else { self.table.domain(key) };
@@ -1328,6 +1459,29 @@ impl<'g> Builder<'g> {
         if !args_known {
             return 0;
         }
+        // a list numbered before: its number and text again (`sig` is a function of these inputs), found by their
+        // hash and compared whole
+        let h = {
+            use std::hash::{Hash, Hasher};
+            let mut h = rustc_hash::FxHasher::default();
+            (name, locals, ov, cd, flags).hash(&mut h);
+            h.finish()
+        };
+        let known = self.sig_cache.get(&h).and_then(|v| {
+            v.iter().find(|e| e.name == name && e.locals == locals && e.ov == ov && e.cd == cd && e.flags.iter().map(|(a, b)| (a.as_str(), b.as_str())).eq(flags.iter().map(|(a, b)| (*a, b.as_str()))))
+        });
+        if let Some(e) = known {
+            let set = self.sig_ids.entry(e.sig).or_default();
+            if !set.contains(&e.text) {
+                set.insert(e.text.clone());
+            }
+            return e.sig;
+        }
+        self.sig_made(name, locals, ov, cd, flags)
+    }
+
+    /// `sig`, made: the text, its hash, the number; kept in `sig_cache`.
+    fn sig_made(&mut self, name: &str, locals: &[(i64, Val)], ov: i64, cd: &[CutData], flags: &[(&str, String)]) -> i64 {
         let mut pairs: Vec<(String, String)> = locals.iter().map(|(i, v)| (i.to_string(), v.show())).collect();
         pairs.push(("override".into(), ov.to_string()));
         pairs.push(("cut_data".into(), cut_tuple_str(cd)));
@@ -1340,25 +1494,43 @@ impl<'g> Builder<'g> {
         if sig == 0 {
             sig = 1;
         }
+        let h = {
+            use std::hash::{Hash, Hasher};
+            let mut h = rustc_hash::FxHasher::default();
+            (name, locals, ov, cd, flags).hash(&mut h);
+            h.finish()
+        };
+        self.sig_cache.entry(h).or_default().push(SigMade {
+            name: name.to_string(),
+            locals: locals.to_vec(),
+            ov,
+            cd: cd.to_vec(),
+            flags: flags.iter().map(|(a, b)| (a.to_string(), b.clone())).collect(),
+            sig,
+            text: text.clone(),
+        });
         self.sig_ids.entry(sig).or_default().insert(text);
         sig
     }
 
-    /// The slot keys of a unit the oracle lists (`SymOracle.keys(prefix)`): the scope's universe, then the last
-    /// run's pins that the universe lacks, sorted. The universe's part is worked out once per prefix (the scope
-    /// does not change).
-    fn oracle_keys(&self, prefix: &str) -> Vec<String> {
+    /// The slot keys of a unit the oracle lists (`SymOracle.keys(prefix)`), each handed to `f`: the scope's universe,
+    /// then the last run's pins that the universe lacks, sorted. The universe's part is worked out once per prefix
+    /// (the scope does not change).
+    fn oracle_keys_each(&self, prefix: &str, f: &mut dyn FnMut(&String)) {
         let mut cache = self.uni_keys.borrow_mut();
         let (uni, by_prefix) = &mut *cache;
         if uni.is_empty() {
             uni.extend(self.scope.universe.iter().cloned());
         }
-        let mut out: Vec<String> = by_prefix
-            .entry(prefix.to_string())
-            .or_insert_with(|| self.scope.universe.iter().filter(|k| k.starts_with(prefix)).cloned().collect())
-            .clone();
-        out.extend(self.last_pins.keys().filter(|k| k.starts_with(prefix) && !uni.contains(*k)).cloned());
-        out
+        if !by_prefix.contains_key(prefix) {
+            by_prefix.insert(prefix.to_string(), self.scope.universe.iter().filter(|k| k.starts_with(prefix)).cloned().collect());
+        }
+        for k in &by_prefix[prefix] {
+            f(k);
+        }
+        for k in self.last_pins.keys().filter(|k| k.starts_with(prefix) && !uni.contains(*k)) {
+            f(k);
+        }
     }
 
     /// `Builder.event_pins`.
@@ -1368,8 +1540,8 @@ impl<'g> Builder<'g> {
         if let Some(key) = self.game.lifecycle_key(ev.unit) {
             ok = self.pin(&mut pins, &mut pre, &key.to_string(), &[Label::Int(1)]);
         }
-        let exit_key = format!("var:{VAR_CUTSCENEEXIT_KEY}");
         if ev.abort {
+            let exit_key = format!("var:{VAR_CUTSCENEEXIT_KEY}");
             ok = ok && self.pin(&mut pins, &mut pre, &format!("esc:{}:{}", ev.name, ev.w), &[Label::Int(1)]);
             let dom = self.domain(&exit_key);
             if self.kind(&exit_key) == Kind::Const {
@@ -1379,14 +1551,15 @@ impl<'g> Builder<'g> {
                 ok = ok && self.pin(&mut pins, &mut pre, &exit_key, &vals);
             }
         } else {
-            ok = ok && self.pin(&mut pins, &mut pre, &format!("at:{}:{}", ev.name, ev.w), &[Label::Int(1)]);
+            let prefix = format!("at:{}:", ev.name);
+            let own = format!("{prefix}{}", ev.w);
+            ok = ok && self.pin(&mut pins, &mut pre, &own, &[Label::Int(1)]);
             ok = ok && self.pin(&mut pins, &mut pre, &format!("frozen:{}", ev.name), &[Label::Int(0)]);
-            let own = format!("at:{}:{}", ev.name, ev.w);
-            for k in self.oracle_keys(&format!("at:{}:", ev.name)) {
-                if k != own {
-                    pins.insert(k, Val::Int(0));
+            self.oracle_keys_each(&prefix, &mut |k: &String| {
+                if *k != own {
+                    pins.insert(k.clone(), Val::Int(0));
                 }
-            }
+            });
         }
         ok = ok && self.pin(&mut pins, &mut pre, &format!("args:{}", ev.name), &[Label::Int(ev.sig)]);
         if let UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) = ev.unit {
@@ -1408,10 +1581,14 @@ impl<'g> Builder<'g> {
     pub fn run_job(&mut self, m: &mut dyn Machine, job: &Job) -> Vec<Record> {
         // the switch --reach: a job's guides are found by the whole job (reach.rs `job_key`), not by its label, which
         // rooms share
-        self.cur_job_key = self.table.reach.is_some().then(|| Arc::from(crate::reach::job_key(job)));
+        // (the key is made only when some rerun has guides this batch: with none, no key finds any)
+        self.cur_job_key = self.table.reach.as_ref().filter(|r| r.has_guides()).map(|_| Arc::from(crate::reach::job_key(job)));
         if self.args_log.is_some() {
             if let Some(memo) = self.table.memo.clone() {
                 return self.run_job_memo(&memo, m, job);
+            }
+            if let Some(cm) = self.table.cross.clone() {
+                return self.run_job_cross(&cm, m, job);
             }
         }
         self.run_job_real(m, job)
@@ -1506,10 +1683,19 @@ impl<'g> Builder<'g> {
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
                 continue;
             }
-            if self.table.reach.is_some() && !self.reach_path(job, p) {
-                continue;
+            // --reach: the path's precondition as its record will have it, made once (`reach_path`, `record_with`)
+            let mut placed: Option<Pre> = None;
+            if self.table.reach.is_some() {
+                match self.reach_path(job, p) {
+                    Some(pre) => placed = Some(pre),
+                    None => continue,
+                }
             }
-            let rec = if havoc { Some(self.havoc_record(&job.kind, &job.label, p, &job.what)) } else { self.record(&job.kind, &job.label, p, &job.what) };
+            let rec = if havoc {
+                Some(self.havoc_record(&job.kind, &job.label, p, &job.what))
+            } else {
+                self.record_with(&job.kind, &job.label, p, &job.what, placed)
+            };
             let Some(mut rec) = rec else {
                 self.counts.inc(format!("no-op paths (no effect): {}", job.kind));
                 continue;
@@ -1610,14 +1796,26 @@ impl<'g> Builder<'g> {
 
     /// `Builder.record`: the record of one path, or None when it changes nothing.
     pub fn record(&mut self, kind: &str, label: &str, p: &PathOut, what: &What) -> Option<Record> {
-        let mut pre = Pre::new();
-        for (k, s) in &p.pre {
-            if let Some(dom) = self.table.domain(k) {
-                if *s != dom.values || (k.starts_with("args:") && self.table.reach.is_some()) {
-                    pre.insert(k.clone(), s.clone());
+        self.record_with(kind, label, p, what, None)
+    }
+
+    /// `record`, with the path's precondition already made and placed (`positions`) when given (`reach_path` makes
+    /// it under --reach: the same keys and sets as here, and `positions` leaves a placed precondition as it is).
+    pub(crate) fn record_with(&mut self, kind: &str, label: &str, p: &PathOut, what: &What, placed: Option<Pre>) -> Option<Record> {
+        let pre = match placed {
+            Some(pre) => pre,
+            None => {
+                let mut pre = Pre::new();
+                for (k, s) in &p.pre {
+                    if let Some(dom) = self.table.domain(k) {
+                        if *s != dom.values || (k.starts_with("args:") && self.table.reach.is_some()) {
+                            pre.insert(k.clone(), s.clone());
+                        }
+                    }
                 }
+                pre
             }
-        }
+        };
         let mut effects: Vec<(String, Eff)> = Vec::new();
         for (k, v) in &p.writes {
             if let Some(e) = self.effect(k, v, p) {
@@ -1697,7 +1895,7 @@ impl<'g> Builder<'g> {
             self.unknown_writes.inc(&head);
             self.unknown_sites.add(Py::Tuple(vec![Py::str(&head), Py::str(&cite)]), 1);
             unknown.push(w.clone());
-            let which = if self.unknown_targets(&head, &cite).is_none() { "no candidate list" } else { "with a candidate list" };
+            let which = if self.unknown_targets_listed(&head, &cite) { "with a candidate list" } else { "no candidate list" };
             self.counts.inc(format!("unknown-target writes left out and listed on the record ({which}): {head}"));
         }
         let effects: Vec<(String, Eff)> = effects
@@ -1707,9 +1905,9 @@ impl<'g> Builder<'g> {
         if effects.is_empty() {
             return None;
         }
-        let mut sides: FxHashMap<(&str, &str), BTreeSet<String>> = FxHashMap::default();
+        let mut sides: FxHashMap<(&str, &str), BTreeSet<std::borrow::Cow<str>>> = FxHashMap::default();
         for a in &p.assumptions {
-            sides.entry((&a.cite, &a.cond)).or_default().insert(a.side_str());
+            sides.entry((&a.cite, &a.cond)).or_default().insert(a.side_text());
         }
         let mut checks: Vec<Assumption> = Vec::new();
         let mut either: Vec<(String, String)> = Vec::new();
@@ -1739,6 +1937,20 @@ impl<'g> Builder<'g> {
             engine_pre: vec![],
             unknown,
         })
+    }
+
+    /// Whether `unknown_targets` gives a list (kept by the pair's hash, the list not copied).
+    pub fn unknown_targets_listed(&mut self, head: &str, cite: &str) -> bool {
+        use std::hash::{Hash, Hasher};
+        let mut h = rustc_hash::FxHasher::default();
+        (head, cite).hash(&mut h);
+        let h = h.finish();
+        if let Some(e) = self.unknown_listed.get(&h).and_then(|v| v.iter().find(|e| e.0 == head && e.1 == cite)) {
+            return e.2;
+        }
+        let listed = self.unknown_targets(head, cite).is_some();
+        self.unknown_listed.entry(h).or_default().push((head.to_string(), cite.to_string(), listed));
+        listed
     }
 
     /// `Builder.unknown_targets`: the facts a write whose target does not fold may hit, or None.
@@ -1816,63 +2028,69 @@ impl<'g> Builder<'g> {
     /// but listed in `outside_points`. With the switch on (`table.elsewhere`) such a place is written as ELSEWHERE,
     /// and no precondition set holds ELSEWHERE (PORT-NOTES.md, "ELSEWHERE").
     pub fn positions(&mut self, mut pre: Pre, mut effects: Vec<(String, Eff)>) -> (Pre, Vec<(String, Eff)>) {
-        for (kind, pos) in [("at", "pos"), ("esc", "escpos")] {
-            let prefix = format!("{kind}:");
-            let mut ones: BTreeMap<String, Vec<i64>> = BTreeMap::new();
-            let mut zeros: BTreeSet<String> = BTreeSet::new();
-            let mut kept = Vec::with_capacity(effects.len());
-            for (k, e) in effects {
-                if !k.starts_with(&prefix) {
-                    kept.push((k, e));
-                    continue;
-                }
-                let (name, w) = k[prefix.len()..].rsplit_once(':').unwrap();
-                if w == "*" {
-                    zeros.insert(name.to_string());
-                } else if e == Eff::Set(Label::Int(1)) {
-                    ones.entry(name.to_string()).or_default().push(w.parse().unwrap());
-                } else if e == Eff::Set(Label::Int(0)) {
-                    zeros.insert(name.to_string());
-                } else {
-                    self.counts.inc(format!("{kind}: writes not 0 or 1 (left out)"));
-                }
-            }
+        for (kind, pos, prefix) in [("at", "pos", "at:"), ("esc", "escpos", "esc:")] {
+            // the unit's writes apart, the others in their order
+            let (mine, kept): (Vec<(String, Eff)>, Vec<(String, Eff)>) = effects.into_iter().partition(|(k, _)| k.starts_with(prefix));
             effects = kept;
-            let names: BTreeSet<String> = ones.keys().cloned().chain(zeros.iter().cloned()).collect();
-            for name in names {
-                let key = format!("{pos}:{name}");
-                for &w in ones.get(&name).into_iter().flatten() {
-                    if !self.table.is_point(kind, &name, w) {
-                        *self.outside_points.entry(key.clone()).or_default().entry(w).or_default() += 1;
-                        if self.table.elsewhere {
-                            self.counts.inc(format!("{kind}: a place none of the scope's points written as ELSEWHERE"));
-                        }
+            if !mine.is_empty() {
+                let mut ones: BTreeMap<&str, Vec<i64>> = BTreeMap::new();
+                let mut zeros: BTreeSet<&str> = BTreeSet::new();
+                for (k, e) in &mine {
+                    let (name, w) = k[prefix.len()..].rsplit_once(':').unwrap();
+                    if w == "*" {
+                        zeros.insert(name);
+                    } else if *e == Eff::Set(Label::Int(1)) {
+                        ones.entry(name).or_default().push(w.parse().unwrap());
+                    } else if *e == Eff::Set(Label::Int(0)) {
+                        zeros.insert(name);
+                    } else {
+                        self.counts.inc(format!("{kind}: writes not 0 or 1 (left out)"));
                     }
                 }
-                let e = match ones.get(&name) {
-                    Some(ws) if ws.len() > 1 => {
-                        self.counts.inc(format!("{kind}: more than one place written for one unit (a guess)"));
-                        let labs = lab_set(ws.iter().map(|&w| Label::Int(self.table.place(kind, &name, w))));
-                        if labs.len() == 1 {
-                            Eff::Set(labs[0])
-                        } else {
-                            Eff::Guess(labs)
+                let names: BTreeSet<&str> = ones.keys().copied().chain(zeros.iter().copied()).collect();
+                for name in names {
+                    let key = format!("{pos}:{name}");
+                    for &w in ones.get(name).into_iter().flatten() {
+                        if !self.table.is_point(kind, name, w) {
+                            *self.outside_points.entry(key.clone()).or_default().entry(w).or_default() += 1;
+                            if self.table.elsewhere {
+                                self.counts.inc(format!("{kind}: a place none of the scope's points written as ELSEWHERE"));
+                            }
                         }
                     }
-                    Some(ws) => Eff::Set(Label::Int(self.table.place(kind, &name, ws[0]))),
-                    None => Eff::Set(Label::Int(crate::table::NOWHERE)),
-                };
-                match effects.iter_mut().find(|x| x.0 == key) {
-                    Some(x) => x.1 = e,
-                    None => effects.push((key, e)),
+                    let e = match ones.get(name) {
+                        Some(ws) if ws.len() > 1 => {
+                            self.counts.inc(format!("{kind}: more than one place written for one unit (a guess)"));
+                            let labs = lab_set(ws.iter().map(|&w| Label::Int(self.table.place(kind, name, w))));
+                            if labs.len() == 1 {
+                                Eff::Set(labs[0])
+                            } else {
+                                Eff::Guess(labs)
+                            }
+                        }
+                        Some(ws) => Eff::Set(Label::Int(self.table.place(kind, name, ws[0]))),
+                        None => Eff::Set(Label::Int(crate::table::NOWHERE)),
+                    };
+                    match effects.iter_mut().find(|x| x.0 == key) {
+                        Some(x) => x.1 = e,
+                        None => effects.push((key, e)),
+                    }
                 }
             }
-            let mut need: BTreeMap<String, Vec<(i64, Labels)>> = BTreeMap::new();
-            let keys: Vec<String> = pre.keys().filter(|k| k.starts_with(&prefix)).cloned().collect();
-            for k in keys {
-                let s = pre.remove(&k).unwrap();
+            // the precondition's keys of the prefix, which sort together
+            let keys: Vec<String> = pre
+                .range::<str, _>((std::ops::Bound::Included(prefix), std::ops::Bound::Unbounded))
+                .take_while(|(k, _)| k.starts_with(prefix))
+                .map(|(k, _)| k.clone())
+                .collect();
+            if keys.is_empty() {
+                continue;
+            }
+            let mut need: BTreeMap<&str, Vec<(i64, Labels)>> = BTreeMap::new();
+            for k in &keys {
+                let s = pre.remove(k).unwrap();
                 let (name, w) = k[prefix.len()..].rsplit_once(':').unwrap();
-                let e = need.entry(name.to_string()).or_default();
+                let e = need.entry(name).or_default();
                 let w: i64 = w.parse().unwrap();
                 match e.iter_mut().find(|x| x.0 == w) {
                     Some(x) => x.1 = s,
@@ -1881,18 +2099,19 @@ impl<'g> Builder<'g> {
             }
             for (name, ws) in need {
                 let key = format!("{pos}:{name}");
-                let mut ok: BTreeSet<Label> = self.table.domain(&key).unwrap().values.iter().copied().collect();
+                // the domain's values, sorted and distinct: kept so as each test leaves them
+                let mut ok: Labels = self.table.domain(&key).unwrap().values.clone();
                 for (w, s) in ws {
                     if s == [Label::Int(1)] {
                         ok.retain(|x| *x == Label::Int(w));
                     } else if s == [Label::Int(0)] {
-                        ok.remove(&Label::Int(w));
+                        ok.retain(|x| *x != Label::Int(w));
                     }
                 }
                 if self.table.elsewhere {
-                    ok.remove(&Label::Int(crate::table::ELSEWHERE));
+                    ok.retain(|x| *x != Label::Int(crate::table::ELSEWHERE));
                 }
-                pre.insert(key, ok.into_iter().collect());
+                pre.insert(key, ok);
             }
         }
         (pre, effects)
@@ -1942,6 +2161,10 @@ impl<'g> Builder<'g> {
         if let Val::Unk(u) = v {
             if u.class != UClass::Unknown {
                 let src = u.what.clone();
+                if let Some(l) = &mut self.memo_log {
+                    // its kind (and a constant's start) is read here (memo.md, item 4)
+                    l.touched.insert(src.clone());
+                }
                 let s: Option<Label> = if self.fact_info(&src).0 == Kind::Const {
                     Some(Label::Int(self.table.start.get0(&src)))
                 } else {
@@ -2069,6 +2292,10 @@ impl<'g> Builder<'g> {
         if self.switches.shared_runs && self.table.shared.is_none() {
             self.table.shared = Some(Arc::new(crate::shared::SharedRuns::default()));
         }
+        if self.memo_dir.is_some() || self.memo_mem.is_some() {
+            let root = self.memo_dir.clone();
+            self.open_memo(root.as_deref());
+        }
         for n in 0..passes {
             if n > 0 {
                 if let Some(s) = &mut sink {
@@ -2076,6 +2303,10 @@ impl<'g> Builder<'g> {
                 }
             }
             self.read_once(m, start_events, skip, &mut sink);
+            if let Some(cm) = &self.table.cross {
+                // the runs this pass stored join the index: the next pass may take them (memo.md)
+                cm.index_own();
+            }
             self.counts.set(format!("pass {}: records", n + 1), self.n_records as i64);
             if self.out_of_domain.is_empty() || n == passes - 1 {
                 break;
@@ -2093,6 +2324,10 @@ impl<'g> Builder<'g> {
         self.counts.set("records", self.n_records as i64);
         if let Some(memo) = &self.table.memo {
             memo.clear();
+        }
+        if let Some(cm) = &self.table.cross {
+            let n = cm.finish().unwrap_or_else(|e| panic!("--memo: the store file: {e}"));
+            eprintln!("[memo] {} runs stored in {}", n, cm.dir.display());
         }
         if self.switches.due_first {
             crate::due::apply(self);
@@ -2125,6 +2360,8 @@ impl<'g> Builder<'g> {
         self.folded.clear();
         self.ego_cache = None;
         self.fact_info.clear();
+        self.memo_infos.clear();
+        self.pin_kinds.borrow_mut().clear();
         self.n_records = 0;
         self.args_set.clear();
     }
@@ -2167,6 +2404,7 @@ impl<'g> Builder<'g> {
         }
         // reader.py reads VAR_EGO afresh on every call: its domain may have grown
         self.ego_cache = None;
+        self.pin_kinds.borrow_mut().clear();
         added
     }
 
@@ -2197,7 +2435,7 @@ impl<'g> Builder<'g> {
         }
         let mut nexts = NextEvents::default();
         self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
-            nexts.add(&recs);
+            b.next_events_of(&recs, &mut nexts);
             b.emit(recs, sink);
         });
         let jobs_len = n_jobs;
@@ -2224,7 +2462,7 @@ impl<'g> Builder<'g> {
             drop(todo);
             let mut nexts = NextEvents::default();
             self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
-                nexts.add(&recs);
+                b.next_events_of(&recs, &mut nexts);
                 b.emit(recs, sink);
             });
             todo = nexts.events;
@@ -2257,15 +2495,17 @@ impl<'g> Builder<'g> {
         *self.phase_secs.entry("events: replans").or_default() += te.elapsed().as_secs_f64();
         let mut tp = 0.0;
         for ev0 in todo.iter() {
-            let ev = self.limit(ev0);
-            if ev.sig == 0 && ev0.sig != 0 {
-                self.reach_folded(&ev.name);
+            // `limit`, the event made only when it is not done already
+            let folds = self.limit_folds(ev0);
+            if folds {
+                self.reach_folded(&ev0.name);
             }
-            let k = (ev.name.clone(), ev.unit, ev.w, ev.sig, ev.abort);
+            let k = (ev0.name.clone(), ev0.unit, ev0.w, if folds { 0 } else { ev0.sig }, ev0.abort);
             if self.events_done.contains(&k) {
                 continue;
             }
             self.events_done.insert(k);
+            let ev = if folds { ev0.unknown_locals(false) } else { ev0.clone() };
             if skip.is_some_and(|f| f(&ev)) {
                 self.counts.inc("events left out by the caller");
                 continue;
@@ -2323,6 +2563,10 @@ impl<'g> Builder<'g> {
 
     /// One job's records, as made: to the sink, then kept (or, with `keep_records` off, only counted).
     pub(crate) fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
+        if let Some(lite) = self.job_prep.as_mut().and_then(|p| p.lite.take()) {
+            self.emit_lite(lite, sink);
+            return;
+        }
         if recs.is_empty() {
             return;
         }
@@ -2343,10 +2587,40 @@ impl<'g> Builder<'g> {
                 }
             }
             if let Some(s) = sink {
-                s.batch_owned(first, recs, &self.table);
+                match self.job_prep.as_mut().and_then(|p| p.sink.take()) {
+                    Some(prep) => s.batch_prepared(first, recs, &self.table, prep),
+                    None => s.batch_owned(first, recs, &self.table),
+                }
             }
         }
         *self.phase_secs.entry("emit").or_default() += t.elapsed().as_secs_f64();
+    }
+
+    /// `emit` of a job whose records stayed with the worker (`Lite`): the same count, `args:` values and sink.
+    fn emit_lite(&mut self, lite: Lite, sink: &mut Option<&mut dyn RecordSink>) {
+        if lite.n == 0 {
+            return;
+        }
+        assert!(!self.keep_records, "--prep: the records stay with the worker only when none are kept");
+        let t = std::time::Instant::now();
+        let first = self.n_records;
+        self.n_records += lite.n;
+        for (k, s) in lite.args {
+            self.args_set.entry(k).or_default().insert(s);
+        }
+        if let Some(s) = sink {
+            let prep = self.job_prep.as_mut().and_then(|p| p.sink.take()).expect("--prep: the sink's part with the records' count");
+            s.batch_prepared(first, Vec::new(), &self.table, prep);
+        }
+        *self.phase_secs.entry("emit").or_default() += t.elapsed().as_secs_f64();
+    }
+
+    /// `NextEvents::add` of a job's records, or of what the worker took of them (`Lite`).
+    pub(crate) fn next_events_of(&mut self, recs: &[Record], nexts: &mut NextEvents) {
+        match self.job_prep.as_mut().and_then(|p| p.lite.as_mut()) {
+            Some(l) => nexts.add_events(std::mem::take(&mut l.next_events)),
+            None => nexts.add(recs),
+        }
     }
 
     /// The progress callback (reader.py `Builder.progress`): what ran, its jobs, its records, its seconds.
@@ -2373,23 +2647,36 @@ impl<'g> Builder<'g> {
     /// place, so the switch folds a wait point's lists only where their lists of all locals pass SIG_LIMIT too
     /// (PORT-NOTES.md, "Live locals", point 6).
     pub fn limit(&mut self, ev: &Event) -> Event {
+        if self.limit_folds(ev) {
+            ev.unknown_locals(false)
+        } else {
+            ev.clone()
+        }
+    }
+
+    /// `limit`'s decision, with its side effects: true when the event's list is folded (`limit` gives
+    /// `unknown_locals(false)`), false when it stays as it is.
+    fn limit_folds(&mut self, ev: &Event) -> bool {
         if ev.sig == 0 {
-            return ev.clone();
+            return false;
         }
         let key = if self.table.live_locals.is_some() { flag_free(ev) } else { ev.sig };
-        let seen = self.sig_seen.entry((ev.name.clone(), ev.w)).or_default();
+        let seen = match self.sig_seen.get_mut(&(ev.name.clone(), ev.w)) {
+            Some(s) => s,
+            None => self.sig_seen.entry((ev.name.clone(), ev.w)).or_default(),
+        };
         if seen.contains(&key) {
-            return ev.clone();
+            return false;
         }
         if !self.folded.contains(&ev.sig) && seen.len() < self.sig_limit {
             seen.push(key);
-            return ev.clone();
+            return false;
         }
         if !self.folded.contains(&ev.sig) {
             self.folded.insert(ev.sig);
             self.counts.inc("lists of locals past SIG_LIMIT (taken as unknown)");
         }
-        ev.unknown_locals(false)
+        true
     }
 
     /// `Builder._run_jobs`: the event jobs' lists of locals registered first, the records' after. Each job's
@@ -2419,10 +2706,16 @@ impl<'g> Builder<'g> {
                 if let (Some(h), Some((a, f))) = (b.on_job.as_mut(), &start) {
                     h(&jobs[i], &recs, a, f);
                 }
-                for r in &recs {
-                    for (k, e) in &r.effects {
-                        if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
-                            args.push((k.clone(), *s));
+                match b.job_prep.as_ref().and_then(|p| p.lite.as_ref()) {
+                    // the switch --prep: the records stayed with the worker, which took their `args:` sets
+                    Some(l) => args.extend(l.args.iter().cloned()),
+                    None => {
+                        for r in &recs {
+                            for (k, e) in &r.effects {
+                                if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
+                                    args.push((k.clone(), *s));
+                                }
+                            }
                         }
                     }
                 }

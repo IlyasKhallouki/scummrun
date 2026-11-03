@@ -1,0 +1,20 @@
+[package]
+name = "fmi-explore"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011: the explorer (explore.py), its tries (step.py), the guide (guide.py) and the harness's planning loop (replay.Harness), in Rust"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+flate2 = "1"
+sha1_smol = "1"
+libc = "0.2"
+itoa = "1"
+
+[features]
+# fmi-core's Engine::step_changes (IFACE e011-r2-own, COORD.md): the idle measurement's frames from the engine's Step
+# delta. Off until the integrator applies the IFACE.
+step_changes = []

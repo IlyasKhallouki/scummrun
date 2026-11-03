@@ -52,7 +52,7 @@ use crate::fold::{self, FoldMode};
 use crate::model::*;
 use crate::reduce::{self, Counts};
 use crate::{bans, packed, sas};
-use crate::{check_args, counts_json, parse_goal, parse_opts, write_out, Args, Prepared, J};
+use crate::cli::{check_args, counts_json, parse_goal, parse_opts, write_out, Args, Prepared, J};
 use std::io::{BufRead, Write};
 use std::time::Instant;
 

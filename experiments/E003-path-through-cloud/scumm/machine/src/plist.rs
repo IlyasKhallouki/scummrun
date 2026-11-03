@@ -18,12 +18,12 @@ struct Chunk<T> {
     items: Box<[T]>,
 }
 
-/// An append-only list whose clones share its frozen part.
+/// An append-only list whose clones share its frozen part, and its tail until one of them changes it.
 pub struct PList<T> {
     head: Option<Rc<Chunk<T>>>,
     /// the number of items in chunks (a multiple of CHUNK)
     frozen: usize,
-    tail: Vec<T>,
+    tail: Rc<Vec<T>>,
 }
 
 impl<T: Clone> Clone for PList<T> {
@@ -34,7 +34,7 @@ impl<T: Clone> Clone for PList<T> {
 
 impl<T> Default for PList<T> {
     fn default() -> Self {
-        PList { head: None, frozen: 0, tail: Vec::new() }
+        PList { head: None, frozen: 0, tail: Rc::new(Vec::new()) }
     }
 }
 
@@ -72,15 +72,6 @@ impl<T> PList<T> {
         self.len() == 0
     }
 
-    pub fn push(&mut self, x: T) {
-        self.tail.push(x);
-        if self.tail.len() == CHUNK {
-            let items = std::mem::replace(&mut self.tail, Vec::with_capacity(CHUNK)).into_boxed_slice();
-            self.head = Some(Rc::new(Chunk { prev: self.head.take(), items }));
-            self.frozen += CHUNK;
-        }
-    }
-
     pub fn last(&self) -> Option<&T> {
         self.tail.last().or_else(|| self.head.as_ref().map(|c| &c.items[CHUNK - 1]))
     }
@@ -109,13 +100,23 @@ impl<T> PList<T> {
 }
 
 impl<T: Clone> PList<T> {
+    pub fn push(&mut self, x: T) {
+        let tail = Rc::make_mut(&mut self.tail);
+        tail.push(x);
+        if tail.len() == CHUNK {
+            let items = std::mem::replace(tail, Vec::with_capacity(CHUNK)).into_boxed_slice();
+            self.head = Some(Rc::new(Chunk { prev: self.head.take(), items }));
+            self.frozen += CHUNK;
+        }
+    }
+
     /// Keeps the first `n` items (model.py `del list[n:]`).
     pub fn truncate(&mut self, n: usize) {
         if n >= self.len() {
             return;
         }
         if n >= self.frozen {
-            self.tail.truncate(n - self.frozen);
+            Rc::make_mut(&mut self.tail).truncate(n - self.frozen);
             return;
         }
         // the chunk that holds item n becomes the tail, cut at n
@@ -126,7 +127,7 @@ impl<T: Clone> PList<T> {
             cur = cur.prev.clone().expect("a chunk");
             i -= 1;
         }
-        self.tail = cur.items[..n % CHUNK].to_vec();
+        self.tail = Rc::new(cur.items[..n % CHUNK].to_vec());
         self.head = cur.prev.clone();
         self.frozen = k * CHUNK;
     }

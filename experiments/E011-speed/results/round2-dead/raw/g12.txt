@@ -1,0 +1,2 @@
+G12: 645 samples, 640 with an fmi process, largest fmi tree 41 processes, python processes in an fmi tree 0
+G12: 1014 samples, 1009 with an fmi process, largest fmi tree 29 processes, python processes in an fmi tree 0

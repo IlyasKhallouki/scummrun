@@ -1,0 +1,19 @@
+[package]
+name = "fmi-checks"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "E011 integration: the components' differential tests over the real ports (play's fixture tests on fmi-engine)"
+
+[dependencies]
+fmi-core = { path = "../fmi-core" }
+fmi-engine = { path = "../fmi-engine" }
+fmi-play = { path = "../fmi-play", features = ["json-double"] }
+
+[[bin]]
+name = "play-lean"
+path = "src/bin/play_lean.rs"
+
+[[bin]]
+name = "play-wire"
+path = "src/bin/play_wire.rs"
