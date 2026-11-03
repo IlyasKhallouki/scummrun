@@ -646,7 +646,11 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
     let held = job.get("held").and_then(|h| h.as_array()).unwrap_or(&empty);
     let tried = job.get("tried").and_then(|h| h.as_array()).unwrap_or(&empty);
     let rot = job.get("rotation").filter(|x| !x.is_null());
-    let ts = if switch("FMI_TRY_MEMO") {
+    let ts = if step::per_key() {
+        // E012's one target per key (plan.md section 3); the T tier once the try gives it the reading's tested keys
+        step::targets_per_key(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal,
+                              rot, None)?
+    } else if switch("FMI_TRY_MEMO") {
         step::targets_with(&reached, &guide_atoms(&guide), facts, step::root_facts_of_memo(job, job_dir).as_deref(), held, tried, goal, rot)?
     } else {
         step::targets(&reached, &guide, facts, step::root_facts_of(job, job_dir).as_ref(), held, tried, goal, rot)?
