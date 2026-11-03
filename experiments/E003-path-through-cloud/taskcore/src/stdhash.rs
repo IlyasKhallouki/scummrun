@@ -231,9 +231,35 @@ impl<K: Copy + Eq + Hash + StdHash> StdSet<K> {
         }
     }
 
+    /// Back to a default-constructed set (`clear()` and a fresh rehash policy: one bucket, nothing allocated), the
+    /// memory kept: the same as a new set in every later step.
+    pub fn reset(&mut self) {
+        self.keys.clear();
+        self.codes.clear();
+        self.next.clear();
+        self.head = NIL;
+        self.buckets.clear();
+        self.buckets.push(NIL);
+        self.n_bkt = 1;
+        self.len = 0;
+        self.policy = Policy::default();
+    }
+
+    /// `*self = get_intersection(a, b)` (`intersection`) in this set's memory.
+    pub fn assign_intersection(&mut self, a: &Self, b: &Self) {
+        self.reset();
+        for k in a.iter() {
+            if b.contains(&k) {
+                self.insert(k);
+            }
+        }
+    }
+
     /// `_M_rehash(n, true_type)`
     fn rehash(&mut self, n: u64) {
-        let mut nb = vec![NIL; n as usize];
+        let mut nb = std::mem::take(&mut self.buckets);
+        nb.clear();
+        nb.resize(n as usize, NIL);
         let mut p = self.head;
         self.head = NIL;
         let mut bbegin = 0usize;

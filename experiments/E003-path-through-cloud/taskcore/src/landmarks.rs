@@ -562,6 +562,17 @@ fn possibly_reaches(tv: &Tv, reached: &[bool], o: usize, atoms: &[Fact]) -> bool
 
 // --- lm_rhw (landmark_factory_rpg_sasp.cc) ------------------------------------------------------------------------
 
+/// Scratch sets of the precondition approximations, reused for their memory (a reset set is a new one).
+#[derive(Default)]
+struct Scratch {
+    vars: Vec<u32>,
+    pre: StdSet<Fact>,
+    shared_tmp: StdSet<Fact>,
+    inter: StdSet<Fact>,
+    ec: StdSet<Fact>,
+    tmp: StdSet<Fact>,
+}
+
 /// The graph while it is made: nodes in an arena (creation order), the atom maps of landmark_graph.cc.
 struct Builder<'a> {
     tv: &'a Tv<'a>,
@@ -577,6 +588,7 @@ struct Builder<'a> {
     dtg: HashMap<u32, (Vec<Vec<u32>>, Vec<u32>)>,
     /// CPU seconds: explorations, shared preconditions, lookahead, disjunctive preconditions
     prof: [f64; 4],
+    scratch: Scratch,
 }
 
 impl<'a> Builder<'a> {
@@ -716,82 +728,90 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// approximate_preconditions_to_achieve_landmark: (1) the operator's preconditions, (2) the start's value of a
-    /// binary variable the operator writes but does not read, where the landmark has another value of it, (3) the
-    /// conditions shared by all effects that achieve the landmark.
-    fn approx_preconditions(&self, atoms: &[Fact], o: usize) -> StdSet<Fact> {
+    /// approximate_preconditions_to_achieve_landmark into `out`: (1) the operator's preconditions, (2) the start's
+    /// value of a binary variable the operator writes but does not read, where the landmark has another value of it,
+    /// (3) the conditions shared by all effects that achieve the landmark. `sc` holds scratch sets (their memory only).
+    fn approx_preconditions(&self, atoms: &[Fact], o: usize, out: &mut StdSet<Fact>, sc: &mut Scratch) {
         let t = self.tv.t;
-        let mut result = StdSet::new();
-        let mut pre_vars: Vec<u32> = Vec::new();
+        out.reset();
+        sc.vars.clear();
         for &f in t.pre(o) {
-            result.insert(f);
-            pre_vars.push(f.0);
+            out.insert(f);
+            sc.vars.push(f.0);
         }
         // add_binary_variable_conditions
         for e in t.effs(o) {
             let var = e.var;
-            if !pre_vars.contains(&var) && self.tv.size(var) == 2 {
+            if !sc.vars.contains(&var) && self.tv.size(var) == 2 {
                 for &a in atoms {
                     if a.0 == var && self.tv.init(var) != a.1 {
-                        result.insert((var, self.tv.init(var)));
+                        out.insert((var, self.tv.init(var)));
                         break;
                     }
                 }
             }
         }
         // add_effect_conditions
-        let mut inter: StdSet<Fact> = StdSet::new();
+        sc.inter.reset();
         let mut init = true;
         for e in t.effs(o) {
             if !atoms.contains(&(e.var, e.post)) {
                 continue;
             }
             if e.c0 == e.c1 {
-                return result;
+                return;
             }
-            let ec = StdSet::from_iter_std(t.conds(e).iter().copied());
+            sc.ec.reset();
+            for &c in t.conds(e) {
+                sc.ec.insert(c);
+            }
             if init {
-                inter = ec;
+                std::mem::swap(&mut sc.inter, &mut sc.ec);
                 init = false;
             } else {
-                inter = inter.intersection(&ec);
+                sc.tmp.assign_intersection(&sc.inter, &sc.ec);
+                std::mem::swap(&mut sc.inter, &mut sc.tmp);
             }
-            if inter.is_empty() {
+            if sc.inter.is_empty() {
                 break;
             }
         }
-        for f in inter.iter() {
-            result.insert(f);
+        for f in sc.inter.iter() {
+            out.insert(f);
         }
-        result
     }
 
     /// compute_shared_preconditions
-    fn shared_preconditions(&self, atoms: &[Fact], reached: &[bool]) -> StdSet<Fact> {
+    fn shared_preconditions(&self, atoms: &[Fact], reached: &[bool], sc: &mut Scratch) -> StdSet<Fact> {
         let mut shared: StdSet<Fact> = StdSet::new();
+        let mut pre = std::mem::take(&mut sc.pre);
+        let mut tmp = std::mem::take(&mut sc.shared_tmp);
         let mut init = true;
-        for &a in atoms {
+        'all: for &a in atoms {
             for &o in self.tv.providing(a) {
                 let o = o as usize;
                 if possibly_reaches(self.tv, reached, o, atoms) {
-                    let pre = self.approx_preconditions(atoms, o);
+                    self.approx_preconditions(atoms, o, &mut pre, sc);
                     if init {
-                        shared = pre;
+                        std::mem::swap(&mut shared, &mut pre);
                         init = false;
                     } else {
-                        shared = shared.intersection(&pre);
+                        tmp.assign_intersection(&shared, &pre);
+                        std::mem::swap(&mut shared, &mut tmp);
                     }
                     if shared.is_empty() {
-                        return shared;
+                        break 'all;
                     }
                 }
             }
         }
+        sc.pre = pre;
+        sc.shared_tmp = tmp;
         shared
     }
 
     /// compute_disjunctive_preconditions (with get_disjunctive_preconditions)
-    fn disjunctive_preconditions(&self, atoms: &[Fact], reached: &[bool]) -> Vec<StdSet<Fact>> {
+    fn disjunctive_preconditions(&self, atoms: &[Fact], reached: &[bool], sc: &mut Scratch) -> Vec<StdSet<Fact>> {
         // get_operators_achieving_landmark: an unordered_set<int> of the achievers, as a vector in its order
         let mut ids: StdSet<i32> = StdSet::new();
         for &a in atoms {
@@ -802,11 +822,12 @@ impl<'a> Builder<'a> {
         let mut num_ops = 0usize;
         let mut by_class: StdMap<i32, Vec<Fact>> = StdMap::new();
         let mut used: HashMap<i32, BTreeSet<u32>> = HashMap::new();
+        let mut pre = std::mem::take(&mut sc.pre);
         for o in ids.iter() {
             let o = o as usize;
             if possibly_reaches(self.tv, reached, o, atoms) {
                 num_ops += 1;
-                let pre = self.approx_preconditions(atoms, o);
+                self.approx_preconditions(atoms, o, &mut pre, sc);
                 // extend_disjunction_class_lookups
                 for f in pre.iter() {
                     let class = self.classes[self.tv.prop(f)];
@@ -820,6 +841,7 @@ impl<'a> Builder<'a> {
                 }
             }
         }
+        sc.pre = pre;
         let mut out = Vec::new();
         for (class, fs) in by_class.iter() {
             if used[&class].len() == num_ops {
@@ -958,7 +980,8 @@ impl<'a> Builder<'a> {
             let reached = reach.compute(self.tv, &atoms).to_vec();
             let c1 = thread_cpu();
             // generate_shared_precondition_landmarks
-            let shared = self.shared_preconditions(&atoms, &reached);
+            let mut sc = std::mem::take(&mut self.scratch);
+            let shared = self.shared_preconditions(&atoms, &reached, &mut sc);
             for f in shared.iter() {
                 self.add_atomic(f, node, OrderingType::GreedyNecessary);
             }
@@ -969,7 +992,9 @@ impl<'a> Builder<'a> {
             self.lookahead(node, &reached);
             let c3 = thread_cpu();
             // generate_disjunctive_precondition_landmarks
-            for set in self.disjunctive_preconditions(&atoms, &reached) {
+            let sets = self.disjunctive_preconditions(&atoms, &reached, &mut sc);
+            self.scratch = sc;
+            for set in sets {
                 if set.len() < 5 && set.iter().all(|f| self.tv.init(f.0) != f.1) {
                     self.add_disjunctive(&set, node, OrderingType::GreedyNecessary);
                 }
@@ -1219,6 +1244,7 @@ pub fn build(t: &SasTask, adj: &[i32], pred: &[String], deadline: Option<Instant
         classes,
         dtg: HashMap::new(),
         prof: [0.0; 4],
+        scratch: Scratch::default(),
     };
     // generate_goal_landmarks
     for &g in &t.goal {
