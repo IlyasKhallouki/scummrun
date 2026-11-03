@@ -48,6 +48,8 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi check step|harness FIXTURES.jsonl
        fmi check replay JOB_DIR --out DIR [--domains DIR]
        fmi check reingest ARCHIVE --out DIR
+       fmi check wait ARCHIVE --entries I,J,.. (--reading READING.json | --read-scope R,R,.. --read-dir DIR) --out DIR
+                [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
        fmi guide stats GUIDE.json [--key KEY.json]";
 
@@ -131,6 +133,7 @@ fn main() {
         ("check", Some("harness")) => cmd_check_harness(&argv[2..]),
         ("check", Some("replay")) => cmd_check_replay(&argv[2..]),
         ("check", Some("reingest")) => cmd_check_reingest(&argv[2..]),
+        ("check", Some("wait")) => cmd_check_wait(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         _ => usage(),
@@ -443,6 +446,48 @@ fn cmd_check_reingest(argv: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("fmi check reingest: {e}");
+            1
+        }
+    }
+}
+
+/// E012's wait gates (fmi_explore::waitcheck): the record on stdout, one summary line per entry on stderr.
+fn cmd_check_wait(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["entries", "reading", "read-scope", "read-dir", "out", "repeat", "search"]);
+    let (Some(arch), Some(entries), Some(out)) = (a.pos.first(), a.get("entries"), a.get("out")) else { usage() };
+    let ints = |t: &str| -> Vec<i64> { t.split(',').filter_map(|x| x.trim().parse().ok()).collect() };
+    let args = fmi_explore::waitcheck::WaitCheckArgs {
+        archive: PathBuf::from(arch),
+        entries: ints(entries).into_iter().map(|x| x as usize).collect(),
+        reading: a.get("reading").map(PathBuf::from),
+        read_scope: a.get("read-scope").map(ints),
+        read_dir: a.get("read-dir").map(PathBuf::from),
+        out: PathBuf::from(out),
+        verify: a.flag("verify"),
+        view_check: a.flag("view-check"),
+        due_check: a.flag("due-check"),
+        idle_check: a.flag("idle-check"),
+        repeat: a.get("repeat").and_then(|x| x.parse().ok()).unwrap_or(0),
+    };
+    let w = match wire_opts(&a).and_then(|o| wire::wire(&o)) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("fmi check wait: {e}");
+            return 2;
+        }
+    };
+    let Some(host) = w.host.clone() else {
+        eprintln!("fmi check wait: no engine host wired");
+        return 2;
+    };
+    fmi_explore::machine::nice10();
+    match fmi_explore::waitcheck::wait_check(host, w.resident.readings.clone(), &args) {
+        Ok(v) => {
+            println!("{}", fmi_explore::pyjson::dumps_default(&v));
+            0
+        }
+        Err(e) => {
+            eprintln!("fmi check wait: {e}");
             1
         }
     }

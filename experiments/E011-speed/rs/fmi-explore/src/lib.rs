@@ -7,7 +7,7 @@
 //! * `step`: step.py's parts; `tryjob`: step.py's run_job on the ports; `harness`: replay.Harness's planning loop with
 //!   the window search; `start`: the harness's start rules; `wiring`: replay_part1's reach extender and refiner;
 //!   `ports`: the ports beyond fmi-core's (IFACE); `guide`: guide.py; `check`: the differential checks.
-//! * `wait`: E012's wait move (plan.md section 1).
+//! * `wait`: E012's wait move (plan.md section 1); `waitcheck`: its gates (`fmi check wait`).
 
 pub mod archive;
 pub mod check;
@@ -26,5 +26,6 @@ pub mod start;
 pub mod step;
 pub mod tryjob;
 pub mod wait;
+pub mod waitcheck;
 pub mod warm;
 pub mod wiring;
