@@ -1,7 +1,8 @@
 """E011 B5 (experiments/E011-speed/plan.md, "Benchmark"): the 15 tries' times by part, per regime, from the tries'
 result.json files and B3's times.jsonl.
 
-usage: python report.py B OUT_DIR
+usage: python report.py B OUT_DIR [B3_DIR REGIME,...]
+  (round 2: B3_DIR another B3 run's folder, b3r2.sh's, and its sequences, e.g. r1-ref,r2-ref; b0 is B's)
 
 Regimes: b0 (the reference during round 1), b4 (the reference interleaved with B3), and B3's a-ref, a-fast, b-ref,
 b-fast. For each try, wall and CPU seconds by part, from the try's own result.json, the same rule for Python and Rust:
@@ -80,15 +81,17 @@ def med(xs):
 
 def main() -> None:
     b, out = Path(sys.argv[1]), Path(sys.argv[2])
+    b3 = Path(sys.argv[3]) if len(sys.argv) > 3 else b / "b3"
+    regimes = ("b0", *sys.argv[4].split(",")) if len(sys.argv) > 4 else REGIMES
     out.mkdir(parents=True, exist_ok=True)
-    times = {(t["regime"], t["job"]): t for t in load_jsonl(b / "b3" / "times.jsonl")}
-    fix = b / "b3" / "times-fixup.txt"  # lines "REGIME JOB cpu_s X": a measurement recovered by hand, with its reason
+    times = {(t["regime"], t["job"]): t for t in load_jsonl(b3 / "times.jsonl")}
+    fix = b3 / "times-fixup.txt"  # lines "REGIME JOB cpu_s X": a measurement recovered by hand, with its reason
     for ln in (fix.read_text().splitlines() if fix.exists() else ()):
         w = ln.split()
         if len(w) == 4 and not ln.startswith("#") and (w[0], w[1]) in times:
             times[(w[0], w[1])]["cpu_s"] = float(w[3])
     jobs = [f"j{n:05d}" for n in range(15)]
-    seqs = {"b0": b / "b0", "b4": b / "b4", **{r: b / "b3" / r for r in REGIMES[2:]}}
+    seqs = {"b0": b / "b0", "b4": b / "b4", **{r: b3 / r for r in regimes if r not in ("b0", "b4")}}
     data = {}
     for reg, seq in seqs.items():
         for j in jobs:
@@ -100,7 +103,7 @@ def main() -> None:
                 data[(reg, j)] = p
     lines = ["# E011 B5: the 15 tries by part", "", "Wall / CPU seconds. ring(33): 4-room scope; ring(38): 5-room.", ""]
     summary = {}
-    for reg in REGIMES:
+    for reg in regimes:
         rows = [(j, data[(reg, j)]) for j in jobs if (reg, j) in data]
         if not rows:
             continue

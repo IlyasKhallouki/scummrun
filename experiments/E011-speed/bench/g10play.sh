@@ -7,7 +7,7 @@
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
-B=/var/tmp/fast-mi/target-e011-checks/release/play-lean
+B=${FMI_PLAY_LEAN:-/var/tmp/fast-mi/target-e011-checks/release/play-lean}  # round 2: env-r2.sh names its build
 F=$HOME/.cache/fast-mi-e011/fixtures/play/a
 R="$HOME/.cache/fast-mi-e009/off/step-a/jobs/ta/run/a00/windows.jsonl $HOME/.cache/fast-mi-e008-check/step-a/jobs/ta/run/a00/windows.jsonl $HOME/.cache/fast-mi-e008/step-tests/jobs/ta/run/a00/windows.jsonl"
 OUT=$1; mkdir -p $OUT
