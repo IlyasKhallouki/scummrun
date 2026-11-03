@@ -592,6 +592,67 @@ All runs use seed 1, laptop rules (below), and every E012 switch on as in E012's
 - **The due-frame window** (E012, section 1), still not built.
 - **AGI and SCI adapters.** E013 defines `PlayerNow` and builds SCUMM's. No other family's game is run.
 
+## Amendment 2026-11-03, component `free`: what D leaves open, before its code
+
+Written before free's code (branch e013-free). It fills in what section D and the component's row leave open; nothing
+there changes.
+
+- **The kind.** Job n is the job's number in the archive (j00003 is n = 3). With ρ the share, the job is free when
+  floor((n + 1)·ρ + 10⁻⁹) > floor(n·ρ + 10⁻⁹) (the tolerance keeps ρ = 0.3 exact on the float). ρ is `FMI_FREE`'s
+  ρ0, or with `FMI_FREE_SHIFT=1` stall's `share` over the archive at the job's start. When the share does not make the
+  job free, the model's candidate is selected as in E012, and with `FMI_FREE_SHIFT=1` stall's cell rule on that
+  candidate's cell can make the job free from the same entry (a cell's candidate does not depend on the counts).
+  free gives stall's two rules a port (`free::Shift`); without stall wired, `FMI_FREE_SHIFT=1` stops the driver with
+  an error. `FMI_FREE` needs `FMI_SELECT=progress` (the cells over T); the driver refuses it alone.
+- **Counts.** A committed line carries its job's kind. The model's counts (`n`, `chosen`) are counted over the model's
+  tries only, and the free counts (`free_n`, `free_chosen`: the free tries from the cell, and the free tries since one
+  from the cell last gave a new atom of T or a new room) over the free tries only. A free job's entry is selected by
+  E012's order with the free counts in place of the model's: (free_n, free_chosen, −rooms on the chain, −novel atoms
+  held, frame, id). A free try never marks its entry exhausted (it tries no target). Stagnation is E012's over every
+  committed try.
+- **The reading and T.** A free try plans nothing, so it needs a reading only for T. It takes the first reusable cached
+  reading of the scope (E011's choice); when none is reusable, the newest cached reading of the scope ("T only", the
+  reading's start differs from the entry's); when the scope has none, a fresh reading, which the archive registers as
+  any. The try's T is that reading's, written to result.json "tested" as a model try's. Novelty is over that T merged
+  with the archive's T (job.json "novelty"), each atom once. The wait runs on the reading's T, as E012's wait.
+- **The order of a free try:** return; the reading and T; the wait (its stops kept by novelty, "how": "wait"); then
+  the offers.
+  1. **Offer points:** the entry, then each of the wait's stops in frame order (an engine at a stop is a fork of the
+     entry run with no input to the stop's frame, held to the stop's checkpoint). At each, E012's affordance step
+     (`mech::afford_step`: ready, the offer, the inputs, the trials with the wait's stops after each, IW(1) within the
+     try). With input and refuse merged and their switches on, that step's enumeration is A's and its verdicts and
+     dedupe are B's; free calls the same step. The step runs whatever `FMI_AFFORD` says (that switch is the model
+     tries').
+  2. **Delays,** at each first-level offer point: for each trial of one or two clicks that the run did not end (and,
+     with refuse, whose verdict is `taken`), its clicks are played again in a fork of the offer's engine to the
+     trial's stop frame, and the random calls from the offer's state are counted exactly (xorshift32 steps from the
+     offer's `rng`, up to E012's 100,000) for it and for a no-input fork at the same frame. Where the trial's count is
+     larger, its clicks are tried again 1, 2, 3, 5, 8, 13 and 21 frames later: the offer's engine run d frames with
+     no input, then afford's `try_all` with the same clicks (two-click trials may compose a third click as in E012).
+     A count not found within the cap is reported as unknown and gives no delay. Three-click trials get no delay
+     (their third click's frame follows the second's stop).
+  3. **Depth:** from each outcome kept by 1 or 2 (in the order kept), the engine at its checkpoint (a fork of the
+     entry with the outcome's clicks, run to its frame and held to its checkpoint) gets the affordance step once
+     more, without delays and without a further level.
+  4. **Commit:** the outcomes of 1-3 are entries with "how": "free", their events the entry's movie then the clicks
+     (and the delay's idle frames, which have no event). Dead moves as E012's.
+- **Records.** With `FMI_FREE` unset nothing below is written and job.json, select.json, result.json, cells.json and
+  the log are E012's. With it set: job.json "kind" ("model" or "free"); select.json "kind", "why" ("share" or "cell")
+  and "rho"; result.json "kind" and, for a free try, "free": the offer points (where, frame, level, trials, kept,
+  seconds, the step's record), the trials (with refuse: by verdict), the waits run (the wait's stops after a trial)
+  and reused (the trials that stopped less the waits run), the delays (trials counted, inputs delayed, unknown
+  counts, delayed trials, kept), the kept by level and the wall; the log line "kind"; cells.json "free" ([free_n,
+  free_chosen]) per cell.
+- **Gates as run on the branch** (before input and refuse are cherry-picked, the step is E012's):
+  - D2: E012's smoke run (`integrate/smoke.sh`, 4 jobs from the boot) with b = 1, `FMI_FREE` unset, on this build
+    and on E012's merged build (`target-e012`), one after the other: the same job.json, select.json and result.json
+    (timing and path fields aside), entries.jsonl, cells.json and log.jsonl (timing aside).
+  - D1: the smoke run with `FMI_FREE=0.25` (b = 1, 4 jobs: j00003 free) and with `FMI_FREE=1` (b = 2, 4 jobs, every
+    job free); every entry verified from boot (`fmi explore verify`), 0 differences.
+  - D3 reported from those runs; unit tests of the kind sequence, the counts and the free order, the job files with
+    the switch off, the delay rule and the shift port.
+  - Once input's and refuse's commits are cherry-picked, D1 again with their switches on.
+
 ## Amendment 2026-11-03, component `stall`: the rows, the class table and the shift rules, before its code
 
 Written before stall's code (branch e013-stall). It fills in what section C and the component's row leave open; two
