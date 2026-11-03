@@ -544,3 +544,30 @@ only checked that the enumeration below is M4's.
     (`svm-e011-r2int`, lean, cuts).
   - Novelty stand-in in the gate runs: (key, value) pairs of T's keys and the room, over every archive entry's last
     checkpoint. T's keys come from the plan's list for `readings/28-33-41-j00065`.
+
+## Amendment 2026-11-03, component afford: the walk-box clicks (FMI_BOXES)
+
+Written after end pushed Boxes (e012-end 2f6d84a; its fmi-core and fmi-engine commits are cherry-picked unchanged
+into e012-afford) and before afford's code for it.
+
+- **Boxes clicked.** The current room's boxes 1 to count - 1, less those flagged invisible (0x80) or locked (0x40).
+  These are the boxes in which the engine lets the player's walk end: `adjustXYToBeInBox` (actor.cpp:1990-2040) starts
+  at box 1 in a v5 game and skips invisible boxes for the player, and a locked box ends a walk before it
+  (actor.cpp:1284).
+- **The point.**
+  - Candidates: first the box's centre (the mean of its corners), then the points halfway from the centre to each
+    corner (ul, ur, lr, ll).
+  - On screen: x less xstart, y plus the main screen's topline; inside [0, 320) and the main screen's [b, h).
+  - The first candidate counts where the hit test answers the main screen with no object and no actor: a floor
+    click. A box with no such point is not clicked.
+  - These candidates go in the offer's one AtMany.
+- **The inputs.** Only in a sentence idle: one click per such box, named "w<box>", after M4's inputs. With FMI_BOXES
+  off, the inputs are M4's.
+- **Switch.** FMI_BOXES=1, the variable end's `boxes_on` reads. Off, the Boxes command is never sent.
+- **Measured first,** at the probe's 13 entries on end's engine (patches 0001-0005, read only), with the switch off
+  and on:
+  - the boxes, the walkable ones, and the ones with a floor point;
+  - the extra trials, their outcomes, and their kept entries, each verified from boot;
+  - their cost.
+
+  With the switch off, A2 must give the probe's trials again.
