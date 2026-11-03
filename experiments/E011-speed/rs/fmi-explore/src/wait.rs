@@ -112,6 +112,8 @@ pub struct WaitOut {
     /// the differential check's frames and the keys that differed there (view_check)
     pub view_checked: u64,
     pub view_misses: Vec<(u64, String, Val, Val)>,
+    /// wall seconds by part: the fork, the entry's dump, the frames, the stops' dumps, the quit
+    pub parts: Vec<(&'static str, f64)>,
 }
 
 impl WaitOut {
@@ -140,7 +142,8 @@ impl WaitOut {
             "cpu_s": pyjson::round(self.cpu_s, 3), "delta": self.delta,
             "dues0": self.dues0.iter().map(|(sl, f)| json!([sl, f - f0])).collect::<Vec<_>>(),
             "horizon": self.horizon - f0, "atoms": atoms.len(), "observed": observed, "stops": stops,
-            "delta_misses": self.delta_misses, "facts_misses": self.facts_misses});
+            "delta_misses": self.delta_misses, "facts_misses": self.facts_misses,
+            "parts": self.parts.iter().map(|(k, v)| json!([k, pyjson::round(*v, 4)])).collect::<Vec<_>>()});
         if self.view_checked > 0 {
             out["view_checked"] = json!(self.view_checked);
             out["view_misses"] = json!(self.view_misses.len());
@@ -360,11 +363,15 @@ fn eng(e: EngineError) -> String {
 pub fn wait(root: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], rd: &dyn ReadingSource, cfg: &WaitCfg) -> Result<WaitOut, String> {
     let t = Instant::now();
     let mut b = machine::port(|| root.fork()).map_err(eng)?;
+    let t_fork = t.elapsed().as_secs_f64();
     let r = wait_on(&mut b, atoms, rd.domains(), points_of(rd), cfg, t);
     let cpu = b.cpu_s();
+    let tq = Instant::now();
     machine::port(|| b.quit());
     let mut out = r?;
     out.cpu_s = cpu;
+    out.parts.insert(0, ("fork", t_fork));
+    out.parts.push(("quit", tq.elapsed().as_secs_f64()));
     out.seconds = t.elapsed().as_secs_f64();
     Ok(out)
 }
@@ -372,6 +379,7 @@ pub fn wait(root: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], rd: &dyn Read
 /// The wait on `b` itself (the caller's fork): it runs on from where `b` stands.
 pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domains, points: Points, cfg: &WaitCfg, t: Instant)
                -> Result<WaitOut, String> {
+    let t0 = Instant::now();
     let o0 = machine::port(|| b.obs(&ObsReq::default())).map_err(eng)?;
     let st0 = b.status().clone();
     let f0 = st0.frame;
@@ -395,6 +403,8 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
     let mut end = None;
     let mut bad_frame: Option<String> = None;
     let mut view_points = if cfg.view_check { Some(tv.points.clone()) } else { None };
+    let s_entry = t0.elapsed().as_secs_f64();
+    let (mut s_frames, mut s_stops) = (0.0, 0.0);
     loop {
         let cur = b.status().frame;
         let target = end_frame.min(cap);
@@ -437,7 +447,10 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
                 }
                 !newly.is_empty()
             };
-            machine::port(|| b.wait(target - cur, &mut each))
+            let tw = Instant::now();
+            let r = machine::port(|| b.wait(target - cur, &mut each));
+            s_frames += tw.elapsed().as_secs_f64();
+            r
         };
         if let Some(e) = bad_frame {
             return Err(e);
@@ -447,6 +460,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
                 if newly.is_empty() {
                     continue;
                 }
+                let ts = Instant::now();
                 let o = machine::port(|| b.obs(&ObsReq::default())).map_err(eng)?;
                 let facts = facts_of(&o);
                 // the same facts.py map (absent is 0: the dump lists every var, a patch drops the 0s)
@@ -466,6 +480,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
                     room: o.room,
                     dues,
                 });
+                s_stops += ts.elapsed().as_secs_f64();
             }
             Err(EngineError::Ended(s)) => {
                 end = Some(WaitEnd::Ended(s.reason.clone()));
@@ -507,6 +522,7 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
         facts_misses,
         view_checked,
         view_misses,
+        parts: vec![("entry", s_entry), ("frames", s_frames), ("stops", s_stops)],
     })
 }
 
