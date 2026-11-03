@@ -1174,6 +1174,16 @@ pub trait Player: Send {
     fn play_plan(&mut self, ctx: &PlanCtx<'_>, ps: &mut PlayState, n_plan: u32) -> PlayOutcome;
 }
 
+/// A random draw one of a record's checks reads (E012 `tested`, `draws(&Reading, action)`): the check's index in the
+/// record's checks (the reading line's "checks"), the draw's range of values when interval arithmetic over the
+/// script gives it, and the share of that range on the record's side of the check (the planned outcome's p).
+#[derive(Clone, PartialEq, Debug)]
+pub struct Draw {
+    pub check: usize,
+    pub range: Option<(i32, i32)>,
+    pub share: Option<f64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
