@@ -22,6 +22,7 @@
 
 pub mod check;
 pub mod code;
+pub mod delay;
 pub mod executor;
 pub mod pyj;
 pub mod reading;

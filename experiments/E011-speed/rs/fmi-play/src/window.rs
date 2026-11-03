@@ -14,6 +14,7 @@
 //! record is one the reference's semantics gives under that order.
 
 use crate::code::{Code, RunR};
+use crate::delay;
 use crate::executor::{self, Br, Executor, FrameObs, PlayErr};
 use crate::pyj::{self, cut, Py, J};
 use crate::reading::{ArgsView, FastView, PlayReading, ReadingData};
@@ -228,6 +229,9 @@ pub struct Child {
     pub lemma9: u32,
     pub bound_violation: Option<J>,
     pub delta_violation: Option<J>,
+    /// E012's delay fork: the end state of a try that issued its input and is not an end point (a full dump where it
+    /// stopped); only in a window with a fork
+    pub end_cp: Option<Checkpoint>,
 }
 
 impl Child {
@@ -274,6 +278,15 @@ impl Child {
             lemma9: 0,
             bound_violation: None,
             delta_violation: None,
+            end_cp: None,
+        }
+    }
+    /// The end state the delay fork digests: an end point's last checkpoint, else the try's own end dump.
+    pub fn end_state(&self) -> Option<&Checkpoint> {
+        if self.is_end_point() {
+            self.checkpoints.last()
+        } else {
+            self.end_cp.as_ref()
         }
     }
     /// Child.row
@@ -488,6 +501,27 @@ pub struct W<'a> {
     pub oracle: Option<&'a dyn ChildOracle>,
     pub prof: Prof,
     pub hit_cache: Option<&'a executor::HitCache>,
+    /// E012's delay fork in this window (FMI_DELAY_FORK=1 and a trigger): the end states' digest keys and novelty
+    pub delay: Option<DelayW>,
+}
+
+/// What a window's delay fork gives its children and its resolution.
+pub struct DelayW {
+    pub keys: Arc<FxHashSet<Key>>,
+    pub novel_of: Option<delay::NovelOf>,
+}
+
+impl DelayW {
+    /// (digest, novelty) of a try's end state.
+    pub fn of(&self, ch: &Child) -> (Option<String>, Option<bool>) {
+        match ch.end_state() {
+            Some(cp) => (
+                Some(delay::digest(&cp.facts, &self.keys)),
+                self.novel_of.as_ref().and_then(|f| f(&cp.facts)),
+            ),
+            None => (None, None),
+        }
+    }
 }
 
 /// Where an observed child frame's wall goes (summed over the window's children), and the input code's.
@@ -1657,6 +1691,14 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
                 cr.ch.end = Some(cb.status().frame);
                 cr.ch.q_end = Some(cb.status().qf);
             }
+            // E012's delay fork: a try that is not an end point keeps its end state for the fork's outcomes
+            if w.delay.is_some()
+                && !cr.ch.is_end_point()
+                && !["cancelled", "pruned", "ended", "error"].contains(&cr.ch.outcome.as_str())
+            {
+                let s_end = cb.obs(&ObsReq::default())?;
+                cr.ch.end_cp = Some(replay::checkpoint(cb.status().frame, facts_of(&s_end), &s_end, cb.status()));
+            }
             if cr.ch.is_end_point() {
                 if w.cfg.lite {
                     s = Arc::new(cb.obs(&ObsReq::default())?);
@@ -1729,6 +1771,77 @@ fn ready_duplicate(w: &W, c: usize, first: u64) -> bool {
     w.ready_failed_firsts.lock().unwrap().contains(&first)
 }
 
+/// E010 _Ready.resolve: the ended tries in fork order (`children[c]` None: not ended yet). With E012's delay fork, a
+/// try is chosen when it matches the plan's branch (delay::Fork::take), and tries forked where no k < K is left are
+/// cancelled.
+fn resolve_tries(
+    rd: &mut Ready,
+    board: &Board,
+    failed_firsts: &Mutex<FxHashSet<u64>>,
+    dw: Option<&DelayW>,
+    children: &[Option<Child>],
+    child_g: &[u64],
+) {
+    while rd.cursor < child_g.len() && rd.chosen.is_none() && !rd.stopped {
+        let c = rd.cursor;
+        if rd.next.is_some_and(|n| child_g[c] < n) || rd.delay.as_ref().is_some_and(|d| !d.open_at(child_g[c])) {
+            board.cancel(c);
+            rd.cancelled += 1;
+            rd.cursor += 1;
+            continue;
+        }
+        let Some(ch) = &children[c] else { return };
+        rd.cursor += 1;
+        rd.order.push(J::Arr(vec![
+            J::Int(ch.g as i64),
+            ch.first.map(|x| J::Int(x as i64)).unwrap_or(J::Null),
+            J::Str(ch.outcome.clone()),
+        ]));
+        match rd.delay.as_mut() {
+            None => {
+                if ch.is_end_point() {
+                    rd.chosen = Some(c);
+                    break;
+                }
+            }
+            Some(d) => {
+                let (dg, nv) = dw.map(|x| x.of(ch)).unwrap_or((None, None));
+                if d.take(c, ch.first, &ch.outcome, dg, nv) == delay::Take::Choose {
+                    rd.chosen = Some(c);
+                    break;
+                }
+            }
+        }
+        let nxt = match ch.first {
+            None => (ch.g + 1).max(ch.reached.unwrap_or(ch.g + 1)),
+            Some(f1) => {
+                let mut ff = failed_firsts.lock().unwrap();
+                let seen = !ff.insert(f1);
+                if !seen && ch.outcome != "duplicate" && ch.outcome != "cancelled" {
+                    rd.failed += 1;
+                }
+                if rd.parallel_from.is_none() {
+                    rd.parallel_from = Some(ch.g);
+                    rd.limit = rd.workers;
+                }
+                if rd.failed >= rd.max_failed {
+                    rd.stopped = true;
+                }
+                (ch.g + 1).max(f1.saturating_sub(1))
+            }
+        };
+        rd.next = Some(rd.next.map_or(nxt, |n| n.max(nxt)));
+    }
+    if rd.chosen.is_some() || rd.stopped {
+        for c in rd.cursor..child_g.len() {
+            if !board.cancelled(c) {
+                board.cancel(c);
+                rd.cancelled += 1;
+            }
+        }
+    }
+}
+
 // --- the window ------------------------------------------------------------------------------------------------------
 
 /// What window_strict returns.
@@ -1756,11 +1869,33 @@ struct Ready {
     order: Vec<J>,
     cancelled: u32,
     parallel_from: Option<u64>,
+    /// E012's delay fork (None: E010's rule)
+    delay: Option<delay::Fork>,
 }
 
 impl Ready {
     fn may_fork(&self, g: u64) -> bool {
-        self.chosen.is_none() && !self.stopped && self.next.is_none_or(|n| g >= n)
+        self.chosen.is_none()
+            && !self.stopped
+            && self.next.is_none_or(|n| g >= n)
+            && self.delay.as_ref().is_none_or(|d| d.open_at(g))
+    }
+
+    /// The delay fork's refutation at parent frame g: every try is resolved and none left can have k < K. The first
+    /// deviation is chosen (E010's choice), or the tries stop.
+    fn delay_refute(&mut self, g: u64, n_children: usize) -> bool {
+        let Some(d) = self.delay.as_mut() else { return false };
+        if self.chosen.is_some() || self.stopped || d.refuted || self.cursor < n_children || d.first.is_none() {
+            return false;
+        }
+        if d.open_at(g.max(self.next.unwrap_or(0))) {
+            return false;
+        }
+        match d.refute() {
+            Some(c) => self.chosen = Some(c),
+            None => self.stopped = true,
+        }
+        true
     }
 }
 
@@ -2009,6 +2144,27 @@ impl Search {
             .collect();
         let mut needed_order: Vec<usize> = needed.iter().copied().collect();
         needed_order.sort();
+        // E012's delay fork: a ready window with an input whose members check a random draw (or the test setting)
+        let fork: Option<delay::Fork> = if self.delay_on && cfg.ready && has_input {
+            match self.delay_force_p {
+                Some(p) => Some(delay::Fork::new(delay::forced(p))),
+                None => delay::window_draws(recs, members, rd.src, self.draws_of.as_ref()).map(delay::Fork::new),
+            }
+        } else {
+            None
+        };
+        let delay_w = fork.as_ref().map(|_| DelayW {
+            keys: self
+                .tested_keys
+                .clone()
+                .unwrap_or_else(|| Arc::new(dom_keys.clone())),
+            novel_of: self.novel_of.clone(),
+        });
+        let mut rngc: Option<delay::RngCount> = if self.delay_on {
+            Some(delay::RngCount::default())
+        } else {
+            None
+        };
         let w = W {
             cfg: &cfg,
             rd,
@@ -2046,6 +2202,7 @@ impl Search {
             oracle: self.oracle,
             prof: Prof::default(),
             hit_cache: self.hit_cache.as_deref(),
+            delay: delay_w,
         };
         let mut rec = J::Obj(vec![]);
         let rr = |rec: &mut J, k: &str, v: J| rec.set(k, v);
@@ -2139,6 +2296,7 @@ impl Search {
             order: vec![],
             cancelled: 0,
             parallel_from: None,
+            delay: fork,
         };
         let t_setup = t0.elapsed();
         let pool = Pool::new(cfg.workers.max(1));
@@ -2296,6 +2454,24 @@ impl Search {
                                 collect(&mut children);
                                 self.resolve(&w, &mut ready, &mut children, &child_g, &collect);
                             }
+                            // E012's delay fork: no try forked from here can have k < K; the tries in flight decide
+                            if ready
+                                .delay
+                                .as_ref()
+                                .is_some_and(|d| d.first.is_some() && !d.open_at(g.max(ready.next.unwrap_or(0))))
+                            {
+                                while ready.chosen.is_none() && !ready.stopped && ready.cursor < child_g.len() {
+                                    std::thread::sleep(std::time::Duration::from_micros(200));
+                                    collect(&mut children);
+                                    self.resolve(&w, &mut ready, &mut children, &child_g, &collect);
+                                }
+                                if ready.delay_refute(g, child_g.len()) && ready.chosen.is_none() {
+                                    end_reason =
+                                        "delay fork: the plan's branch refuted, no try matched it within K frames"
+                                            .into();
+                                    break;
+                                }
+                            }
                             if ready.chosen.is_some() {
                                 end_reason = "ready: the first end point in the order of tries".into();
                                 break;
@@ -2381,6 +2557,9 @@ impl Search {
                     plog.kept.frame(g + 1, r_, Some(s.clone()), Some(nowa.clone()));
                     prev_view = nowa;
                     prev_dump = s.clone();
+                    if let Some(rc) = rngc.as_mut() {
+                        rc.add(pfr.st.rng, parent.status().rng);
+                    }
                     pfr = PFrame {
                         st: parent.status().clone(),
                         s,
@@ -2456,6 +2635,40 @@ impl Search {
                 if let Some(e) = c.live.take() {
                     e.quit();
                 }
+            }
+        }
+        // E012's delay fork: the candidates, the other tries' outcomes new to the window, in k order
+        if let Some(d) = ready.delay.as_mut() {
+            let chosen_digest = best_i
+                .and_then(|b| d.tries.iter().find(|t| t.c == b))
+                .and_then(|t| t.digest.clone());
+            let mut seen: FxHashSet<String> = chosen_digest.into_iter().collect();
+            let mut tries = d.tries.clone();
+            tries.sort_by_key(|t| (t.k, t.c));
+            for t in &tries {
+                if Some(t.c) == best_i || t.novel == Some(false) {
+                    continue;
+                }
+                let Some(dg) = &t.digest else { continue };
+                if !seen.insert(dg.clone()) {
+                    continue;
+                }
+                let ch = &children[t.c];
+                let Some(cp) = ch.end_state() else { continue };
+                let mut inputs = self.movie.clone();
+                inputs.extend(ch.events.iter().cloned());
+                let cand = delay::Candidate {
+                    plan: plan_no,
+                    window: k,
+                    k: t.k,
+                    outcome: t.outcome.clone(),
+                    digest: dg.clone(),
+                    novel: t.novel,
+                    inputs,
+                    checkpoint: cp.clone(),
+                };
+                d.candidates.push(cand.j());
+                self.delay_candidates.push(cand);
             }
         }
         // the counters the reference keeps in `w`, in fork order
@@ -2658,6 +2871,26 @@ impl Search {
                 },
             );
         }
+        // E012's delay fork (FMI_DELAY_FORK=1): the calls per parent frame, and the fork when the window has one
+        if self.delay_on {
+            let rc = rngc.unwrap_or_default();
+            let mut dj = crate::jobj! {"rng" => rc.j()};
+            self.delay_log.windows += 1;
+            self.delay_log.rng.merge(&rc);
+            if let Some(d) = &ready.delay {
+                for (kk, v) in d.j().obj() {
+                    dj.set(kk, v.clone());
+                }
+                let lg = &mut self.delay_log;
+                lg.triggered += 1;
+                lg.tries += d.tries.len() as u64;
+                lg.chosen.extend(d.chosen);
+                lg.refuted += d.refuted as u64;
+                lg.unbounded += d.k_max().is_none() as u64;
+                lg.candidates += d.candidates.len() as u64;
+            }
+            rec.set("delay", dj);
+        }
         rec.set(
             "parent_matched",
             J::Obj(
@@ -2729,53 +2962,7 @@ impl Search {
         collect: &dyn Fn(&mut Vec<Option<Child>>),
     ) {
         let _ = collect;
-        while rd.cursor < child_g.len() && rd.chosen.is_none() && !rd.stopped {
-            let c = rd.cursor;
-            if rd.next.is_some_and(|n| child_g[c] < n) {
-                w.board.cancel(c);
-                rd.cancelled += 1;
-                rd.cursor += 1;
-                continue;
-            }
-            let Some(ch) = &children[c] else { return };
-            rd.cursor += 1;
-            rd.order.push(J::Arr(vec![
-                J::Int(ch.g as i64),
-                ch.first.map(|x| J::Int(x as i64)).unwrap_or(J::Null),
-                J::Str(ch.outcome.clone()),
-            ]));
-            if ch.is_end_point() {
-                rd.chosen = Some(c);
-                break;
-            }
-            let nxt = match ch.first {
-                None => (ch.g + 1).max(ch.reached.unwrap_or(ch.g + 1)),
-                Some(f1) => {
-                    let mut ff = w.ready_failed_firsts.lock().unwrap();
-                    let seen = !ff.insert(f1);
-                    if !seen && ch.outcome != "duplicate" && ch.outcome != "cancelled" {
-                        rd.failed += 1;
-                    }
-                    if rd.parallel_from.is_none() {
-                        rd.parallel_from = Some(ch.g);
-                        rd.limit = rd.workers;
-                    }
-                    if rd.failed >= rd.max_failed {
-                        rd.stopped = true;
-                    }
-                    (ch.g + 1).max(f1.saturating_sub(1))
-                }
-            };
-            rd.next = Some(rd.next.map_or(nxt, |n| n.max(nxt)));
-        }
-        if rd.chosen.is_some() || rd.stopped {
-            for c in rd.cursor..child_g.len() {
-                if !w.board.cancelled(c) {
-                    w.board.cancel(c);
-                    rd.cancelled += 1;
-                }
-            }
-        }
+        resolve_tries(rd, &w.board, &w.ready_failed_firsts, w.delay.as_ref(), children, child_g);
     }
 
     fn resolve_final(&self, w: &W, rd: &mut Ready, children: &mut Vec<Child>) -> Option<usize> {
@@ -2783,6 +2970,12 @@ impl Search {
         let gs: Vec<u64> = opt.iter().map(|c| c.as_ref().unwrap().g).collect();
         self.resolve(w, rd, &mut opt, &gs, &|_| {});
         children.extend(opt.into_iter().map(|c| c.unwrap()));
+        // E012's delay fork: a window that ended with no try matching takes the first deviation, E010's choice
+        if rd.chosen.is_none() {
+            if let Some(f) = rd.delay.as_ref().and_then(|d| d.fallback) {
+                rd.chosen = Some(f);
+            }
+        }
         rd.chosen
     }
 
@@ -2982,6 +3175,19 @@ pub struct Search {
     pub windows_path: Option<std::path::PathBuf>,
     /// the hit tests' object answers (executor::HitCache), kept across windows; None: every hit test is asked
     pub hit_cache: Option<Arc<executor::HitCache>>,
+    /// E012's delay fork (FMI_DELAY_FORK=1, read when the search is made; off: E010's ready rule, records unchanged)
+    pub delay_on: bool,
+    /// the draws of an action (`tested`'s); None: the checks whose reason is a random draw, no range, no share
+    pub draws_of: Option<delay::DrawsOf>,
+    /// archive novelty of a try's end facts (the try's); None: unknown (null in the records)
+    pub novel_of: Option<delay::NovelOf>,
+    /// the keys of the outcome digest (T, the try's); None: each window's own keys
+    pub tested_keys: Option<Arc<FxHashSet<Key>>>,
+    /// a test setting no run sets: every input window of the ready search is a fork with this p
+    pub delay_force_p: Option<f64>,
+    /// the candidate entries of every fork, in the order made
+    pub delay_candidates: Vec<delay::Candidate>,
+    pub delay_log: delay::Log,
 }
 
 /// window.Search._goal_writers
@@ -3035,6 +3241,13 @@ impl Search {
             } else {
                 None
             },
+            delay_on: delay::on(),
+            draws_of: None,
+            novel_of: None,
+            tested_keys: None,
+            delay_force_p: None,
+            delay_candidates: vec![],
+            delay_log: delay::Log::default(),
         })
     }
 
@@ -3092,7 +3305,7 @@ impl Search {
                 outside.push(o);
             }
         }
-        crate::jobj! {
+        let mut out = crate::jobj! {
             "windows" => ws.len(),
             "children" => sum("forks"),
             "child_frames" => sum("child_frames"),
@@ -3111,7 +3324,11 @@ impl Search {
             "python_cpu_by_part_s" => J::Obj(vec![]),
             "empty_windows" => J::Arr(self.empty_keys.iter().map(|(k, n)| J::Arr(vec![k.clone(), J::Int(*n as i64)])).collect()),
             "outside_domain" => J::Arr(outside),
+        };
+        if self.delay_on {
+            out.set("delay", self.delay_log.j());
         }
+        out
     }
 
     pub fn game(&mut self) -> Result<Arc<scumm_ir::Game>, String> {
@@ -3689,3 +3906,8 @@ impl Player for StrictPlayer {
         self.search.play_plan(ctx, ps, n_plan)
     }
 }
+
+/// Gate R3: the delay fork on a fixture of forced branches (the window search's own resolution of tries).
+#[cfg(test)]
+#[path = "delay_fixture.rs"]
+mod delay_fixture;
