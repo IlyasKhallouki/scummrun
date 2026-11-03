@@ -663,7 +663,9 @@ fn targets_of(r: &Resident, rd: &dyn ReadingSource, job: &Value, job_dir: &Path,
         // the benchmark's: the log's targets in its order, each with its tier and depth as targets gives them
         let mut out = Vec::new();
         for (k, v) in forced {
-            let t = ts.iter().find(|t| t.k == *k && t.v == TV::Int(*v)).cloned()
+            // (a value list of E012's one target per key gives a forced value of it its tier and depth)
+            let t = ts.iter().find(|t| t.k == *k && t.v.ints().contains(v))
+                .map(|t| Target { k: k.clone(), v: TV::Int(*v), tier: t.tier, depth: t.depth })
                 .unwrap_or(Target { k: k.clone(), v: TV::Int(*v), tier: if goal.len() == 1 && goal[0].0 == *k { 0 } else { 1 }, depth: 0 });
             out.push(t);
         }
