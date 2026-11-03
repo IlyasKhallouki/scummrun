@@ -1,0 +1,1277 @@
+{
+ "summary": {
+  "requests": 41,
+  "records": 103,
+  "with_recorded_plan": 40,
+  "claimed_dead": [
+   [
+    "check-j00015-a00-p0",
+    "bit:118=1",
+    "h2",
+    3.113,
+    6.5923
+   ]
+  ],
+  "same_plan": 40,
+  "fd_found_search_s": {
+   "n": 26,
+   "median": 0.076,
+   "p90": 0.456,
+   "p99": 0.533,
+   "max": 0.533
+  },
+  "L0": 10,
+  "dead_s_ring33": [
+   1.963,
+   1.988,
+   2.266,
+   2.321,
+   2.323,
+   2.341,
+   2.47,
+   2.505,
+   2.513,
+   2.536,
+   2.682,
+   2.696,
+   2.714,
+   2.765,
+   2.781,
+   2.866,
+   2.866,
+   2.907,
+   2.909,
+   2.938,
+   2.94,
+   3.113,
+   3.15
+  ],
+  "dead_s_ring38": [
+   0.009,
+   0.012,
+   0.016,
+   0.016,
+   0.016,
+   0.016,
+   0.017,
+   0.017,
+   0.018,
+   0.019,
+   0.019,
+   0.019,
+   0.019,
+   0.019,
+   0.02,
+   0.021,
+   0.021,
+   0.021
+  ],
+  "serve": {
+   "serve38": {
+    "n": 6,
+    "differ": [],
+    "on": {
+     "r1_cold_A": [
+      "plan",
+      "open",
+      0.016
+     ],
+     "r2_same_A": [
+      "plan",
+      "open",
+      0.016
+     ],
+     "r3_newstart_C": [
+      "plan",
+      "open",
+      0.016
+     ],
+     "r4_newcaps_B": [
+      "plan",
+      "open",
+      0.009
+     ],
+     "r5_newgoal_A109": [
+      "plan",
+      "open",
+      0.019
+     ],
+     "r6_same_A109": [
+      "plan",
+      "open",
+      0.02
+     ]
+    }
+   },
+   "serve33": {
+    "n": 7,
+    "differ": [],
+    "on": {
+     "r1_cold_A": [
+      "plan",
+      "open",
+      2.283
+     ],
+     "r2_same_A": [
+      "plan",
+      "open",
+      2.231
+     ],
+     "r3_newstart_C": [
+      "plan",
+      "open",
+      2.217
+     ],
+     "r4_newcaps_B": [
+      "plan",
+      "open",
+      2.389
+     ],
+     "r5_newgoal_B109": [
+      "plan",
+      "open",
+      2.034
+     ],
+     "r6_newcaps_A109": [
+      "plan",
+      "open",
+      2.397
+     ],
+     "r7_same_A109": [
+      "plan",
+      "open",
+      2.199
+     ]
+    }
+   }
+  },
+  "bad": [],
+  "pass": true
+ },
+ "rows": [
+  {
+   "name": "e008-j00089-a00-p0",
+   "group": "ac0a874d-fd",
+   "goal": "bit:108=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "e008/j00089/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.513,
+   "search_s": 0.086,
+   "reduce_s": 6.542,
+   "total_s": 14.7189,
+   "operators": 97547,
+   "steps": 7,
+   "error": "",
+   "operators_recorded": [
+    97547
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "e008-j00091-a00-p0",
+   "group": "5b820e79-fd",
+   "goal": "bit:108=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "e008/j00091/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.019,
+   "search_s": 0.002,
+   "reduce_s": 0.113,
+   "total_s": 0.2191,
+   "operators": 10330,
+   "steps": 5,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00000-a00-p0",
+   "group": "a391d5a0-fd",
+   "goal": "bit:108=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00000/a00/plan-000",
+    "b3aref/j00000/a00/plan-000",
+    "b3bref/j00000/a00/plan-000",
+    "check/j00000/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.266,
+   "search_s": 0.081,
+   "reduce_s": 5.835,
+   "total_s": 13.6933,
+   "operators": 97547,
+   "steps": 7,
+   "error": "",
+   "operators_recorded": [
+    97547
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00000-a00-p1",
+   "group": "8476b381-fd",
+   "goal": "bit:108=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00000/a00/plan-001",
+    "b3aref/j00000/a00/plan-001",
+    "b3bref/j00000/a00/plan-001",
+    "check/j00000/a00/plan-001"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.781,
+   "search_s": 0.118,
+   "reduce_s": 5.728,
+   "total_s": 16.2129,
+   "operators": 154661,
+   "steps": 5,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00001-a00-p0",
+   "group": "02319d6c-fd",
+   "goal": "bit:109=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00001/a00/plan-000",
+    "b3aref/j00001/a00/plan-000",
+    "b3bref/j00001/a00/plan-000",
+    "check/j00001/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.012,
+   "search_s": 0.021,
+   "reduce_s": 0.128,
+   "total_s": 0.2127,
+   "operators": 10330,
+   "steps": 5,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00002-a00-p0",
+   "group": "fbcecdce-fd",
+   "goal": "bit:109=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00002/a00/plan-000",
+    "b3aref/j00002/a00/plan-000",
+    "b3bref/j00002/a00/plan-000",
+    "check/j00002/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.021,
+   "search_s": 0.004,
+   "reduce_s": 0.124,
+   "total_s": 0.2457,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00003-a00-p0",
+   "group": "b1833035-fd",
+   "goal": "bit:110=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00003/a00/plan-000",
+    "b3aref/j00003/a00/plan-000",
+    "b3bref/j00003/a00/plan-000",
+    "check/j00003/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.019,
+   "search_s": 0.004,
+   "reduce_s": 0.115,
+   "total_s": 0.2313,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00004-a00-p0",
+   "group": "fbcecdce-fd",
+   "goal": "bit:110=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00004/a00/plan-000",
+    "b3aref/j00004/a00/plan-000",
+    "b3bref/j00004/a00/plan-000",
+    "check/j00004/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.02,
+   "search_s": 0.004,
+   "reduce_s": 0.053,
+   "total_s": 0.1805,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00005-a00-p0",
+   "group": "b1833035-fd",
+   "goal": "bit:111=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00005/a00/plan-000",
+    "b3aref/j00005/a00/plan-000",
+    "b3bref/j00005/a00/plan-000",
+    "check/j00005/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.019,
+   "search_s": 0.003,
+   "reduce_s": 0.049,
+   "total_s": 0.1442,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00006-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:111=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00006/a00/plan-000",
+    "b3aref/j00006/a00/plan-000",
+    "b3bref/j00006/a00/plan-000",
+    "check/j00006/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.909,
+   "search_s": 0.111,
+   "reduce_s": 3.59,
+   "total_s": 13.9868,
+   "operators": 154661,
+   "steps": 17,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00007-a00-p0",
+   "group": "b1833035-fd",
+   "goal": "bit:113=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00007/a00/plan-000",
+    "b3aref/j00007/a00/plan-000",
+    "b3bref/j00007/a00/plan-000",
+    "check/j00007/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.016,
+   "search_s": 0.004,
+   "reduce_s": 0.038,
+   "total_s": 0.1357,
+   "operators": 10330,
+   "steps": 19,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00008-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:113=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00008/a00/plan-000",
+    "b3aref/j00008/a00/plan-000",
+    "b3bref/j00008/a00/plan-000",
+    "check/j00008/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.696,
+   "search_s": 0.138,
+   "reduce_s": 3.243,
+   "total_s": 13.505,
+   "operators": 154661,
+   "steps": 21,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00009-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:114=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00009/a00/plan-000",
+    "b3aref/j00009/a00/plan-000",
+    "b3bref/j00009/a00/plan-000",
+    "check/j00010/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.94,
+   "search_s": 0.154,
+   "reduce_s": 3.114,
+   "total_s": 14.1251,
+   "operators": 154661,
+   "steps": 21,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00010-a00-p0",
+   "group": "b1833035-fd",
+   "goal": "bit:114=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00010/a00/plan-000",
+    "b3aref/j00010/a00/plan-000",
+    "b3bref/j00010/a00/plan-000",
+    "check/j00009/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.017,
+   "search_s": 0.004,
+   "reduce_s": 0.044,
+   "total_s": 0.1474,
+   "operators": 10330,
+   "steps": 19,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00011-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:115=1",
+   "records": 6,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00011/a00/plan-000",
+    "b0/j00012/a00/plan-000",
+    "b3aref/j00011/a00/plan-000",
+    "b3aref/j00012/a00/plan-000",
+    "b3bref/j00011/a00/plan-000",
+    "check/j00011/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.714,
+   "search_s": 0.123,
+   "reduce_s": 3.409,
+   "total_s": 14.1826,
+   "operators": 154661,
+   "steps": 17,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00013-a00-p0",
+   "group": "b1833035-fd",
+   "goal": "bit:117=1",
+   "records": 3,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00013/a00/plan-000",
+    "b3aref/j00013/a00/plan-000",
+    "b3bref/j00013/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.019,
+   "search_s": 0.005,
+   "reduce_s": 0.039,
+   "total_s": 0.1475,
+   "operators": 10330,
+   "steps": 23,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b0-j00014-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:117=1",
+   "records": 4,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b0/j00014/a00/plan-000",
+    "b3aref/j00014/a00/plan-000",
+    "b3bref/j00014/a00/plan-000",
+    "check/j00014/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.536,
+   "search_s": 0.137,
+   "reduce_s": 3.222,
+   "total_s": 13.3133,
+   "operators": 154661,
+   "steps": 25,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00000-a00-p0",
+   "group": "a391d5a0-gbfs",
+   "goal": "bit:108=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00000/a00/plan-000",
+    "b3bfast/j00000/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.341,
+   "search_s": 0.087,
+   "reduce_s": 5.389,
+   "total_s": 12.9649,
+   "operators": 97547,
+   "steps": 7,
+   "error": "",
+   "operators_recorded": [
+    97547
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00001-a00-p0",
+   "group": "02319d6c-gbfs",
+   "goal": "bit:109=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00001/a00/plan-000",
+    "b3bfast/j00001/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.009,
+   "search_s": 0.019,
+   "reduce_s": 0.129,
+   "total_s": 0.1898,
+   "operators": 10330,
+   "steps": 5,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00002-a00-p0",
+   "group": "fbcecdce-gbfs",
+   "goal": "bit:109=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00002/a00/plan-000",
+    "b3bfast/j00002/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.016,
+   "search_s": 0.004,
+   "reduce_s": 0.127,
+   "total_s": 0.2229,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00003-a00-p0",
+   "group": "b1833035-gbfs",
+   "goal": "bit:110=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00003/a00/plan-000",
+    "b3bfast/j00003/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.019,
+   "search_s": 0.004,
+   "reduce_s": 0.111,
+   "total_s": 0.2138,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00004-a00-p0",
+   "group": "fbcecdce-gbfs",
+   "goal": "bit:110=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00004/a00/plan-000",
+    "b3bfast/j00004/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.017,
+   "search_s": 0.004,
+   "reduce_s": 0.05,
+   "total_s": 0.1436,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00005-a00-p0",
+   "group": "b1833035-gbfs",
+   "goal": "bit:111=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00005/a00/plan-000",
+    "b3bfast/j00005/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.021,
+   "search_s": 0.004,
+   "reduce_s": 0.054,
+   "total_s": 0.1474,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00006-a00-p0",
+   "group": "8476b381-gbfs",
+   "goal": "bit:111=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00006/a00/plan-000",
+    "b3bfast/j00006/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.938,
+   "search_s": 0.138,
+   "reduce_s": 5.793,
+   "total_s": 16.2236,
+   "operators": 154661,
+   "steps": 17,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00007-a00-p0",
+   "group": "b1833035-gbfs",
+   "goal": "bit:113=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00007/a00/plan-000",
+    "b3bfast/j00007/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.016,
+   "search_s": 0.005,
+   "reduce_s": 0.038,
+   "total_s": 0.1291,
+   "operators": 10330,
+   "steps": 19,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00008-a00-p0",
+   "group": "8476b381-gbfs",
+   "goal": "bit:113=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00008/a00/plan-000",
+    "b3bfast/j00008/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.505,
+   "search_s": 0.165,
+   "reduce_s": 2.971,
+   "total_s": 12.3246,
+   "operators": 154661,
+   "steps": 25,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00009-a00-p0",
+   "group": "8476b381-gbfs",
+   "goal": "bit:114=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00009/a00/plan-000",
+    "b3bfast/j00009/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.765,
+   "search_s": 0.216,
+   "reduce_s": 3.52,
+   "total_s": 14.3857,
+   "operators": 154661,
+   "steps": 25,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00010-a00-p0",
+   "group": "b1833035-gbfs",
+   "goal": "bit:114=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00010/a00/plan-000",
+    "b3bfast/j00010/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.021,
+   "search_s": 0.006,
+   "reduce_s": 0.05,
+   "total_s": 0.1456,
+   "operators": 10330,
+   "steps": 19,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00011-a00-p0",
+   "group": "8476b381-gbfs",
+   "goal": "bit:115=1",
+   "records": 3,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00011/a00/plan-000",
+    "b3afast/j00012/a00/plan-000",
+    "b3bfast/j00011/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 3.15,
+   "search_s": 0.126,
+   "reduce_s": 3.696,
+   "total_s": 13.6355,
+   "operators": 154661,
+   "steps": 17,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00013-a00-p0",
+   "group": "b1833035-gbfs",
+   "goal": "bit:117=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00013/a00/plan-000",
+    "b3bfast/j00013/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.018,
+   "search_s": 0.006,
+   "reduce_s": 0.041,
+   "total_s": 0.13,
+   "operators": 10330,
+   "steps": 23,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "b3afast-j00014-a00-p0",
+   "group": "8476b381-gbfs",
+   "goal": "bit:117=1",
+   "records": 2,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "b3afast/j00014/a00/plan-000",
+    "b3bfast/j00014/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.682,
+   "search_s": 0.208,
+   "reduce_s": 3.008,
+   "total_s": 13.6582,
+   "operators": 154661,
+   "steps": 29,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00012-a00-p0",
+   "group": "b1833035-fd",
+   "goal": "bit:115=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00012/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 0.016,
+   "search_s": 0.003,
+   "reduce_s": 0.039,
+   "total_s": 0.1385,
+   "operators": 10330,
+   "steps": 15,
+   "error": "",
+   "operators_recorded": [
+    10330
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00015-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:118=1",
+   "records": 2,
+   "recorded": [
+    "time"
+   ],
+   "from": [
+    "check/j00015/a00/plan-000",
+    "check/j00016/a00/plan-000"
+   ],
+   "status": "unsolvable",
+   "source": "proof",
+   "proof": "h2",
+   "dead_s": 3.113,
+   "search_s": 0.0,
+   "reduce_s": 3.189,
+   "total_s": 6.5923,
+   "operators": 154661,
+   "steps": 0,
+   "error": ""
+  },
+  {
+   "name": "check-j00015-a01-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:124=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00015/a01/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.907,
+   "search_s": 0.456,
+   "reduce_s": 3.469,
+   "total_s": 15.6185,
+   "operators": 154661,
+   "steps": 50,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00015-a01-p1",
+   "group": "8476b381-fd",
+   "goal": "bit:124=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00015/a01/plan-001"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.866,
+   "search_s": 0.533,
+   "reduce_s": 1.945,
+   "total_s": 13.0612,
+   "operators": 154661,
+   "steps": 51,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00015-a01-p2",
+   "group": "8476b381-fd",
+   "goal": "bit:124=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00015/a01/plan-002"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.47,
+   "search_s": 0.226,
+   "reduce_s": 1.9,
+   "total_s": 12.2915,
+   "operators": 154661,
+   "steps": 52,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00015-a01-p4",
+   "group": "8476b381-fd",
+   "goal": "bit:124=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00015/a01/plan-004"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 1.963,
+   "search_s": 0.067,
+   "reduce_s": 5.783,
+   "total_s": 14.9237,
+   "operators": 151455,
+   "steps": 3,
+   "error": "",
+   "operators_recorded": [
+    151455
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00016-a01-p3",
+   "group": "8476b381-fd",
+   "goal": "bit:124=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00016/a01/plan-003"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.321,
+   "search_s": 0.085,
+   "reduce_s": 1.996,
+   "total_s": 11.6342,
+   "operators": 151455,
+   "steps": 3,
+   "error": "",
+   "operators_recorded": [
+    151455
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00018-a00-p0",
+   "group": "8476b381-fd",
+   "goal": "bit:125=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00018/a00/plan-000"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.866,
+   "search_s": 0.511,
+   "reduce_s": 2.989,
+   "total_s": 15.8089,
+   "operators": 154661,
+   "steps": 52,
+   "error": "",
+   "operators_recorded": [
+    154661
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00018-a00-p1",
+   "group": "8476b381-fd",
+   "goal": "bit:125=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00018/a00/plan-001"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 2.323,
+   "search_s": 0.072,
+   "reduce_s": 2.117,
+   "total_s": 11.0119,
+   "operators": 151455,
+   "steps": 5,
+   "error": "",
+   "operators_recorded": [
+    151455
+   ],
+   "same_plan": true
+  },
+  {
+   "name": "check-j00018-a00-p2",
+   "group": "8476b381-fd",
+   "goal": "bit:125=1",
+   "records": 1,
+   "recorded": [
+    "plan"
+   ],
+   "from": [
+    "check/j00018/a00/plan-002"
+   ],
+   "status": "plan",
+   "source": "search",
+   "proof": "open",
+   "dead_s": 1.988,
+   "search_s": 0.076,
+   "reduce_s": 2.971,
+   "total_s": 11.8289,
+   "operators": 151455,
+   "steps": 5,
+   "error": "",
+   "operators_recorded": [
+    151455
+   ],
+   "same_plan": true
+  }
+ ]
+}

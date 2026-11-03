@@ -10,12 +10,16 @@
 #   r1     round 1's fmi, reader-scope and engine (env-r2.sh's R1_*);
 #   r2     round 2's binaries with every round-2 switch on (ON2);
 #   r2off  round 2's binaries with every round-2 switch off (OFF2: round 1's behaviour).
+# With e011-deadtarget merged (E011_ENV=env-r2d.sh: FMI_BIN the merged build, R2_FMI_BIN round 2's own fmi):
+#   r2     round 2's own fmi (R2_FMI_BIN when set) with ON2;
+#   d      the merged build with everything on (ON3: ON2, FMI_PLAN_DEAD=1, FMI_PLAN_DEEPEN=120);
+#   doff   the merged build with everything off (OFF3).
 # Each try holds the heavy lock while it runs; each process runs under the guard at nice 10. Per try a line in
 # OUT/times.jsonl: wall, CPU of the resident process's tree (tree_cpu.sh before and after), the load. G12's watcher
 # samples /proc every second for the whole run.
 # usage: E011_ENV=$HOME/.cache/fast-mi-e011/env-r2.sh b3r2.sh ref|fast OUT SEQ... [-- FIRST_JOB]
 #   B3_MEMO=0: no job memo store (FMI_MEMO unset) in every sequence; E008_FLOOR_GB (the reading cache's disk floor) passes
-#   through
+#   through; HEAVY_HELD=1: the caller holds the heavy lock for the whole run, so no try takes it
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
@@ -43,9 +47,11 @@ env_of() { # SEQ
     r1) echo "FMI_READER_SCOPE=$R1_READER_SCOPE FMI_ENGINE_BIN=$R1_ENGINE_BIN $OFF2";;
     r2) echo "$ON2";;
     r2off) echo "$OFF2";;
+    d) echo "$ON3";;
+    doff) echo "$OFF3";;
   esac
 }
-bin_of() { case $1 in r1) echo $R1_FMI_BIN;; *) echo $FMI_BIN;; esac; }
+bin_of() { case $1 in r1) echo $R1_FMI_BIN;; r2) echo ${R2_FMI_BIN:-$FMI_BIN};; *) echo $FMI_BIN;; esac; }
 now() { date +%s.%N; }
 calc() { awk "BEGIN { printf \"%.3f\", $1 }"; }
 mkdir -p $OUT
@@ -77,7 +83,7 @@ for k in $(seq 0 14); do
   for q in $seqs; do
     n=$q-$S; d=$OUT/$n/jobs/$j
     rm -rf $d/run $d/new $d/result.json $d/log
-    exec 9>$LOCK; flock 9
+    [ "${HEAVY_HELD:-0}" = 1 ] || { exec 200>$LOCK; flock 200; }
     c0=$($here/tree_cpu.sh ${PID[$q]}); t0=$(now)
     echo "$d" >&${FD[$q]}
     until grep -q "^done $d " $OUT/$n/fmi.log 2>/dev/null; do
@@ -85,7 +91,7 @@ for k in $(seq 0 14); do
       sleep 0.05
     done
     t1=$(now); c1=$($here/tree_cpu.sh ${PID[$q]})
-    flock -u 9; exec 9>&-
+    [ "${HEAVY_HELD:-0}" = 1 ] || { flock -u 200; exec 200>&-; }
     echo "{\"regime\": \"$n\", \"job\": \"$j\", \"wall_s\": $(calc "$t1 - $t0"), \"cpu_s\": $(calc "$c1 - $c0"), \"load\": $(cut -d' ' -f1 /proc/loadavg), \"mem_avail_kb\": $(awk '/MemAvailable/{print $2}' /proc/meminfo)}" >> $OUT/times.jsonl
     echo "[$(date +%T)] $n $j $(tail -1 $OUT/times.jsonl | cut -c1-140)"
   done

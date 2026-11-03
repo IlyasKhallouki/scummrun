@@ -1,0 +1,16 @@
+j00000: class 'refinement' (= B0's), new [2767, 2848, 2850, 2862], same as B0
+j00001: class 'refinement' (= B0's), new [2863], same as B0
+j00002: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00003: class 'refinement' (= B0's), new [2850, 2862], same as B0
+j00004: class 'refinement' (= B0's), new [2854, 2862], same as B0
+j00005: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00006: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00007: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00008: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00009: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00010: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00011: class 'refinement' (= B0's), new [2770, 2818, 2820, 2854], same as B0
+j00012: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00013: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00014: class 'refinement' (= B0's), new [2771, 2818, 2820, 2854], same as B0
+G11 d-fast: 15 tries, stop class = B0's in 15, everything = B0's in 15
