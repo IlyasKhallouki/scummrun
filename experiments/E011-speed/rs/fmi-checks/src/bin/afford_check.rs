@@ -160,7 +160,7 @@ fn m4(a: &Args) -> Res<()> {
     let offer_s = t.elapsed().as_secs_f64();
     let inputs = afford::inputs_of(&of);
     let all_seen = NoNovelty;
-    let cfg = AffordCfg { horizon, fixed: true, third: false };
+    let cfg = AffordCfg { horizon, fixed: true, third: false, ..Default::default() };
     let res = afford::try_all(&mut e, &of, &inputs, &tested, &all_seen, &cfg, None).map_err(e2s)?;
     e.quit();
     let mut tsv = String::new();
@@ -255,7 +255,7 @@ fn run(a: &Args) -> Res<()> {
     for f in archive_states(&arch)? {
         nov.add(&f);
     }
-    let cfg = AffordCfg { horizon, fixed: false, third: !a.flag("no-third") };
+    let cfg = AffordCfg { horizon, fixed: false, third: !a.flag("no-third"), ..Default::default() };
     // the interface is read where the bridge is idle (a fork run to the first idle stop when the entry is not)
     let mut readied = match afford::ready(&mut e, horizon).map_err(e2s)? {
         None => None,

@@ -232,6 +232,10 @@ pub struct Child {
     /// E012's delay fork: the end state of a try that issued its input and is not an end point (a full dump where it
     /// stopped); only in a window with a fork
     pub end_cp: Option<Checkpoint>,
+    /// E013 (FMI_REFUSE): on a route error, the input log's records after the fork frame, and the executor's failed
+    /// check (its variable; None: it could not form its input)
+    pub log: Option<Vec<InputRecord>>,
+    pub check_var: Option<usize>,
 }
 
 impl Child {
@@ -279,6 +283,8 @@ impl Child {
             bound_violation: None,
             delta_violation: None,
             end_cp: None,
+            log: None,
+            check_var: None,
         }
     }
     /// The end state the delay fork digests: an end point's last checkpoint, else the try's own end dump.
@@ -503,6 +509,9 @@ pub struct W<'a> {
     pub hit_cache: Option<&'a executor::HitCache>,
     /// E012's delay fork in this window (FMI_DELAY_FORK=1 and a trigger): the end states' digest keys and novelty
     pub delay: Option<DelayW>,
+    /// E013's refused inputs in this window (FMI_REFUSE=1, a ready window with an input): the children read their input
+    /// log on a route error
+    pub refuse: bool,
 }
 
 /// What a window's delay fork gives its children and its resolution.
@@ -1181,6 +1190,12 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         match play_res {
             Err(PlayErr::Route(m)) => {
                 ch.set("interface", Some(Py::s(m)));
+                if w.refuse {
+                    // E013: the try's input log (patch 0007) and the executor's failed check name the cause
+                    let g = ch.g;
+                    ch.log = Some(cb.input_log()?.records.into_iter().filter(|r| r.frame > g).collect());
+                    ch.check_var = ex.check_var;
+                }
                 if w.ready {
                     let ins: Vec<u64> = ex
                         .movie
@@ -1822,7 +1837,9 @@ fn resolve_tries(
                 }
                 if rd.parallel_from.is_none() {
                     rd.parallel_from = Some(ch.g);
-                    rd.limit = rd.workers;
+                    if !rd.sequential {
+                        rd.limit = rd.workers;
+                    }
                 }
                 if rd.failed >= rd.max_failed {
                     rd.stopped = true;
@@ -1871,6 +1888,8 @@ struct Ready {
     parallel_from: Option<u64>,
     /// E012's delay fork (None: E010's rule)
     delay: Option<delay::Fork>,
+    /// E013 (FMI_REFUSE): one try at a time, so that each try's cause is known before the next fork (amendment (3))
+    sequential: bool,
 }
 
 impl Ready {
@@ -1896,6 +1915,149 @@ impl Ready {
             None => self.stopped = true,
         }
         true
+    }
+}
+
+/// E013's refused inputs (crate::refuse): a fork of the parent kept at a try's fork frame, with what the window's end
+/// at that frame takes back (the parent's matches and the record's fields, as a StopCand does).
+struct Kept {
+    e: Box<dyn Engine>,
+    st: Status,
+    s: Arc<Obs>,
+    lens: (usize, usize, usize, usize),
+    splits: u64,
+    gate_shut: u64,
+    open: J,
+}
+
+/// A refused try's skip: the cause, the parent's watched values at its fork frame, its kept fork.
+struct Skip {
+    g: u64,
+    cause: String,
+    watch: crate::refuse::Watch,
+    base: [u64; 10],
+    kept: Kept,
+    skipped: u64,
+    /// the frame where a watched value changed (the next try forked there)
+    changed: Option<u64>,
+    /// its row in the record's tries
+    t: usize,
+}
+
+/// The window's refused-input state: the kept forks of the tries not yet resolved, the skip, the record.
+#[derive(Default)]
+struct BState {
+    kept_of: Vec<Option<Kept>>,
+    skip: Option<Skip>,
+    cursor: usize,
+    tries: Vec<J>,
+    skipped: u64,
+}
+
+impl BState {
+    fn drop_skip(&mut self) {
+        if let Some(s) = self.skip.take() {
+            self.close(&s);
+            s.kept.e.quit();
+        }
+    }
+
+    fn close(&mut self, s: &Skip) {
+        if let Some(t) = self.tries.get_mut(s.t) {
+            t.set("skipped", J::Int(s.skipped as i64));
+        }
+    }
+
+    /// Reads the tries resolved in fork order (`view[c]`, c < `upto`): a refused try starts a skip (amendment (3)); a
+    /// duplicate (Lemma 5: the same run as a failed try) moves the skip to its own fork frame; any other outcome ends
+    /// the skip.
+    fn advance(&mut self, upto: usize, view: &[Option<&Child>]) {
+        while self.cursor < upto.min(view.len()) {
+            let c = self.cursor;
+            let Some(ch) = view[c] else { break };
+            self.cursor += 1;
+            let kept = self.kept_of.get_mut(c).and_then(|k| k.take());
+            let Some(mut kept) = kept else { continue };
+            match ch.outcome.as_str() {
+                "interface" => {
+                    let recs = ch.log.clone().unwrap_or_default();
+                    let ke = &mut kept.e;
+                    let mut gate_open = |f: u64| -> bool {
+                        // the parent's gate at frame f, with no input: a fork of the kept parent run there
+                        let Ok(mut p) = ke.fork() else { return false };
+                        let ok = f <= p.status().frame || p.run(&RunSpec { frame: Some(f), ..Default::default() }).is_ok();
+                        let open = ok && p.status().up > 0;
+                        p.quit();
+                        open
+                    };
+                    let cause = if ch.log.is_some() {
+                        crate::refuse::cause_of(&recs, ch.check_var, &mut gate_open)
+                    } else {
+                        None
+                    };
+                    let verdicts: Vec<J> = recs.iter().map(|r| J::Arr(vec![J::Int(r.frame as i64), J::Str(r.verdict.text())])).collect();
+                    let mut row = crate::jobj! {"g" => ch.g, "first" => ch.first, "reached" => ch.reached,
+                                                "verdicts" => J::Arr(verdicts), "check_var" => ch.check_var};
+                    self.drop_skip();
+                    match cause {
+                        Some((cause, watch)) => {
+                            row.set("cause", J::Str(cause.clone()));
+                            row.set("watch", watch.j());
+                            let base = watch.parts(&kept.st, &kept.s);
+                            self.tries.push(row);
+                            self.skip = Some(Skip { g: ch.g, cause, watch, base, kept, skipped: 0, changed: None, t: self.tries.len() - 1 });
+                        }
+                        None => {
+                            row.set("cause", J::Str(crate::refuse::GATE.into()));
+                            self.tries.push(row);
+                            kept.e.quit();
+                        }
+                    }
+                }
+                "duplicate" if self.skip.is_some() => {
+                    let s = self.skip.as_mut().unwrap();
+                    let old = std::mem::replace(&mut s.kept, kept);
+                    old.e.quit();
+                    s.g = ch.g;
+                    s.base = s.watch.parts(&s.kept.st, &s.kept.s);
+                    s.changed = None;
+                }
+                "cancelled" => kept.e.quit(),
+                _ => {
+                    self.drop_skip();
+                    kept.e.quit();
+                }
+            }
+        }
+    }
+
+    /// At a parent frame where E010 would fork a try: false skips it (a skip is on and no watched value changed).
+    fn may_fork(&mut self, g: u64, st: &Status, s: &Obs) -> bool {
+        let Some(sk) = self.skip.as_mut() else { return true };
+        if sk.changed.is_some() {
+            return true;
+        }
+        let now = sk.watch.parts(st, s);
+        if now == sk.base {
+            sk.skipped += 1;
+            self.skipped += 1;
+            return false;
+        }
+        sk.changed = Some(g);
+        let parts: Vec<J> = crate::refuse::changed(&sk.base, &now).into_iter().map(J::from).collect();
+        let (t, skipped) = (sk.t, sk.skipped);
+        if let Some(row) = self.tries.get_mut(t) {
+            row.set("change", crate::jobj! {"frame" => g, "parts" => J::Arr(parts)});
+            row.set("skipped", J::Int(skipped as i64));
+        }
+        true
+    }
+
+    fn quit_all(&mut self) {
+        for k in self.kept_of.drain(..).flatten() {
+            k.e.quit();
+        }
+        self.drop_skip();
     }
 }
 
@@ -2165,6 +2327,8 @@ impl Search {
         } else {
             None
         };
+        // E013's refused inputs (FMI_REFUSE=1): a ready window with an input
+        let refuse_w = self.refuse_on && cfg.ready && has_input;
         let w = W {
             cfg: &cfg,
             rd,
@@ -2203,6 +2367,7 @@ impl Search {
             prof: Prof::default(),
             hit_cache: self.hit_cache.as_deref(),
             delay: delay_w,
+            refuse: refuse_w,
         };
         let mut rec = J::Obj(vec![]);
         let rr = |rec: &mut J, k: &str, v: J| rec.set(k, v);
@@ -2262,6 +2427,10 @@ impl Search {
             }))
             .map_err(|e| e.to_string())?;
         parent.explain_log().map_err(|e| e.to_string())?;
+        if refuse_w {
+            // the log's records the parent's movie left: its children start with an empty log
+            parent.input_log().map_err(|e| e.to_string())?;
+        }
         let mut ptrack = self.strack.clone();
         let mut plog = BranchLog::new(cfg.split_wait);
         let s0 = Arc::new(parent.obs(&ObsReq::default()).map_err(|e| e.to_string())?);
@@ -2284,6 +2453,7 @@ impl Search {
         let mut children: Vec<Option<Child>> = Vec::new();
         let mut child_g: Vec<u64> = Vec::new();
         let mut delta_violation: Option<J> = None;
+        let mut bst = BState::default();
         let mut ready = Ready {
             workers: cfg.workers,
             max_failed: cfg.ready_tries,
@@ -2297,6 +2467,7 @@ impl Search {
             cancelled: 0,
             parallel_from: None,
             delay: fork,
+            sequential: refuse_w,
         };
         let t_setup = t0.elapsed();
         let pool = Pool::new(cfg.workers.max(1));
@@ -2477,6 +2648,15 @@ impl Search {
                                 break;
                             }
                             turn = gate && ready.may_fork(g);
+                            // E013: the tries resolved so far, read in fork order; then no try at this frame while a
+                            // refused try's watched values have not changed (amendment (3))
+                            if refuse_w {
+                                let view: Vec<Option<&Child>> = children.iter().map(|c| c.as_ref()).collect();
+                                bst.advance(ready.cursor, &view);
+                                if turn && !bst.may_fork(g, &st, &pfr.s) {
+                                    turn = false;
+                                }
+                            }
                         }
                         if turn {
                             while pool.running() + pool.queued() >= cfg.workers + 2 && stop_at.is_none() {
@@ -2497,6 +2677,24 @@ impl Search {
                                 std::thread::sleep(std::time::Duration::from_millis(50));
                             }
                             let cb = parent.fork().map_err(|e| e.to_string())?;
+                            if refuse_w {
+                                // the parent at this try's fork frame, kept: a refused try's window may end here
+                                let ke = parent.fork().map_err(|e| e.to_string())?;
+                                bst.kept_of.push(Some(Kept {
+                                    e: ke,
+                                    st: st.clone(),
+                                    s: pfr.s.clone(),
+                                    lens: (
+                                        ptrack.matched.len(),
+                                        ptrack.refuted.len(),
+                                        ptrack.choices.len(),
+                                        ptrack.outside.len(),
+                                    ),
+                                    splits: plog.splits(),
+                                    gate_shut,
+                                    open: rec.get("open").cloned().unwrap_or(J::Null),
+                                }));
+                            }
                             let mut ch = Child::new(
                                 g,
                                 st.qf,
@@ -2627,6 +2825,42 @@ impl Search {
                 .filter(|&i| children[i].is_end_point())
                 .min_by_key(|&i| children[i].end_key())
         };
+        // E013's refused inputs: the tries left to read, then the window's end at the refused try's fork frame when its
+        // frames ended with no change since that try (amendment (3) item 5): the parent becomes the fork kept there
+        let mut b_end: Option<J> = None;
+        if refuse_w {
+            let view: Vec<Option<&Child>> = children.iter().map(Some).collect();
+            bst.advance(children.len(), &view);
+            if best_i.is_none() && end_reason == format!("{} frames", cfg.window_frames) && bst.skip.is_some() {
+                let sk = bst.skip.take().unwrap();
+                bst.close(&sk);
+                end_reason = format!("refused input: {}", sk.cause);
+                b_end = Some(crate::jobj! {"frame" => sk.g, "cause" => sk.cause.clone(), "bound" => pend.frame});
+                let k = sk.kept;
+                ptrack.matched.truncate(k.lens.0);
+                ptrack.refuted.truncate(k.lens.1);
+                ptrack.choices.truncate(k.lens.2);
+                ptrack.outside.truncate(k.lens.3);
+                if let Some(p) = plog.parter.as_mut() {
+                    p.splits = k.splits;
+                }
+                gate_shut = k.gate_shut;
+                rec.set("open", k.open.clone());
+                if let J::Obj(o) = &mut rec {
+                    o.retain(|x| x.0 != "end_change");
+                }
+                parent_fail = None;
+                delta_violation = None;
+                pend = k.st.clone();
+                let old = std::mem::replace(parent, k.e);
+                if self.root.is_none() {
+                    self.root = Some(old); // the harness's root: never quit here (set_branch)
+                } else {
+                    old.quit();
+                }
+            }
+            bst.quit_all();
+        }
         for (i, c) in children.iter_mut().enumerate() {
             if Some(i) != best_i {
                 if let Some(e) = c.snapshot.take() {
@@ -2868,6 +3102,17 @@ impl Search {
                     "failed" => ready.failed, "bound" => ready.max_failed, "stopped" => ready.stopped,
                     "cancelled" => ready.cancelled, "parallel_from" => ready.parallel_from, "next" => ready.next,
                     "earliest" => false,
+                },
+            );
+        }
+        // E013's refused inputs (FMI_REFUSE=1): per failed try its cause, what it watched, the frames skipped and the
+        // change that ended the skip; the window's end at a refused try's fork frame
+        if refuse_w {
+            rec.set(
+                "refuse",
+                crate::jobj! {
+                    "tries" => J::Arr(bst.tries.clone()), "skipped_frames" => bst.skipped,
+                    "end" => b_end.clone().unwrap_or(J::Null), "sequential" => true,
                 },
             );
         }
@@ -3188,6 +3433,8 @@ pub struct Search {
     /// the candidate entries of every fork, in the order made
     pub delay_candidates: Vec<delay::Candidate>,
     pub delay_log: delay::Log,
+    /// E013's component refuse (FMI_REFUSE=1, read when the search is made; off: E010's and E012's windows)
+    pub refuse_on: bool,
 }
 
 /// window.Search._goal_writers
@@ -3248,6 +3495,7 @@ impl Search {
             delay_force_p: None,
             delay_candidates: vec![],
             delay_log: delay::Log::default(),
+            refuse_on: crate::refuse::on(),
         })
     }
 

@@ -32,6 +32,13 @@ pub const C_RUN_OBS: u8 = 0x93;
 pub const C_BOXES: u8 = 0x94;
 /// patch 0005 (E012, end): the same as the JSON "boxes" reply's text, no payload; replies `R_JSON`
 pub const C_BOXES_JSON: u8 = 0x95;
+/// patch 0007 (E013, refuse): the input log since the last call (taken), no payload; replies `R_INPUT_LOG`
+pub const C_INPUT_LOG: u8 = 0x97;
+/// patch 0007 (E013, refuse): the state digest, no payload; replies `R_DIGEST`
+pub const C_DIGEST: u8 = 0x98;
+/// patch 0007: the JSON "input_log" and "digest" replies' text, no payload; reply `R_JSON`
+pub const C_INPUT_LOG_JSON: u8 = 0x99;
+pub const C_DIGEST_JSON: u8 = 0x9A;
 
 // engine to controller
 pub const R_HELLO: u8 = 0x01;
@@ -56,6 +63,10 @@ pub const R_AT_MANY: u8 = 0x10;
 pub const R_RUN_OBS_REPLY: u8 = 0x11;
 /// patch 0005: `Boxes`
 pub const R_BOXES: u8 = 0x12;
+/// patch 0007: `InputLog`
+pub const R_INPUT_LOG: u8 = 0x14;
+/// patch 0007: `Digest`
+pub const R_DIGEST: u8 = 0x15;
 
 /// A message being written: the 5-byte header first, its length set by `finish`.
 pub struct W(pub Vec<u8>);
@@ -433,6 +444,83 @@ impl<'a> R<'a> {
             });
         }
         Ok(Boxes { room, boxes })
+    }
+
+    /// patch 0007: fmi-core `InputLog` (speedrun_wire.cpp wireInputLog): per record the frame, the inputs (u8 0 click,
+    /// 1 right click, 3 key), the stat, the verdict (u8 0 dropped and its why, 1 ignored, 2 taken), area, value, mode,
+    /// slot, zone, key_match, handler, the writes and the reads (u8 kind, a, b, old, now), the ops, the two drop
+    /// counts; then the records dropped and the frame.
+    pub fn input_log(&mut self) -> DResult<InputLog> {
+        let n = self.count(8 + 4 + 4 + 1 + 4 * 6 + 1 + 4 + 4 + 4 + 4 + 4 + 4)?;
+        let mut records = Vec::with_capacity(n);
+        for _ in 0..n {
+            let frame = self.u64()?;
+            let ni = self.count(1 + 4)?;
+            let mut input = Vec::with_capacity(ni);
+            for _ in 0..ni {
+                input.push(match self.u8()? {
+                    0 => Input::Click(self.i32()?, self.i32()?),
+                    1 => Input::RClick(self.i32()?, self.i32()?),
+                    3 => Input::Key(self.str()?),
+                    k => return Err(format!("input_log: input kind {k}")),
+                });
+            }
+            let stat = self.i32()?;
+            let verdict = match self.u8()? {
+                0 => Verdict::Dropped(self.str()?),
+                1 => Verdict::Ignored,
+                2 => Verdict::Taken,
+                v => return Err(format!("input_log: verdict {v}")),
+            };
+            let (area, value, mode, slot, zone) = (self.i32()?, self.i32()?, self.i32()?, self.i32()?, self.i32()?);
+            let key_match = self.b()?;
+            let handler = self.i32()?;
+            let touches = |r: &mut Self| -> DResult<Vec<Touch>> {
+                let m = r.count(17)?;
+                let mut v = Vec::with_capacity(m);
+                for _ in 0..m {
+                    let k = r.u8()?;
+                    let kind = TouchKind::of_u8(k).ok_or_else(|| format!("input_log: touch kind {k}"))?;
+                    v.push(Touch { kind, a: r.i32()?, b: r.i32()?, old: r.i32()?, now: r.i32()? });
+                }
+                Ok(v)
+            };
+            let writes = touches(self)?;
+            let reads = touches(self)?;
+            let no = self.count(4 * 3 + 8 + 1)?;
+            let mut ops = Vec::with_capacity(no);
+            for _ in 0..no {
+                ops.push(LogOp { slot: self.i32()?, number: self.i32()?, where_: self.i32()?, code: self.i64()?, opcode: self.u8()? });
+            }
+            let ops_dropped = self.u32()?;
+            let touches_dropped = self.u32()?;
+            records.push(InputRecord {
+                frame,
+                input,
+                stat,
+                verdict,
+                area,
+                value,
+                mode,
+                slot,
+                zone,
+                key_match,
+                handler,
+                writes,
+                reads,
+                ops,
+                ops_dropped,
+                touches_dropped,
+            });
+        }
+        let dropped = self.u32()?;
+        let frame = self.u64()?;
+        Ok(InputLog { records, dropped, frame })
+    }
+
+    /// patch 0007: fmi-core `Digest` (frame, digest, bytes).
+    pub fn digest(&mut self) -> DResult<Digest> {
+        Ok(Digest { frame: self.u64()?, digest: self.u64()?, bytes: self.u32()? })
     }
 
     pub fn runs_reply(&mut self) -> DResult<RunsReply> {
