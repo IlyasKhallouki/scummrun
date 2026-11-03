@@ -2577,3 +2577,77 @@ Written after the merge built and its cargo tests passed, before any gate or mea
   sequence, then for the two bit:118 tries still to run (round 2's and the merged build's on try 16). Before, it was
   taken once per try. The tries still alternate one by one between the three processes, so they meet the same load,
   and no other heavy step runs between them. Everything else is as in the amendment above.
+
+## Results of the merge of the no-plan proofs into round 2 (2026-11-03, written after the runs)
+
+Branch e011-r2: round 2 (736f306) with e011-deadtarget (aacf668) and e011 (0bde069) merged. The proofs run before
+every search arm. Conflicts were only in fmi-plan's fields and plan.md, and both sides were kept. Numbers and tables:
+`results/round2-dead/` (README.md, gates.md, tries-*.md). Laptop, seed 1, nice 10, the heavy lock shared with E012.
+
+**Gates.** With everything off (OFF3) and everything on (ON3), every gate the two branches touch passes:
+
+- the cargo tests;
+- G7, with the fast forms in every check mode and the proofs on;
+- G9;
+- G10: E007's CHECK line with Fast Downward's binary (strict, ready) and with the Rust lama-first-costs (strict, ready,
+  ready with the old tail), every entry verified from boot with 0 differences;
+- G11: the 15 tries equal B0's in everything under the reference settings with everything off and on, and under the
+  fast settings with everything on; 43 new entries per sequence verify from boot;
+- G12: 0 python processes;
+- the dead-target gates 1-5, on the merged path with the Rust lama-first-costs. Of the 41 recorded requests, the 40
+  with a plan return their recorded plans, and no proof claims any of them dead. bit:118 = 1 is proven dead. The 53
+  plans' states are inside h^2. The fast h^2 equals the plain one. serve38 and serve33 give the same bytes with the
+  proofs on and off. The deepening's check passes.
+
+**B3, the fast settings** (warm, the memo off, three processes alternating one by one with the heavy lock held across
+the sequence, load 2.0-4.3; wall per try):
+
+| binaries | median, 15 | ring(33), 7 | ring(38), 8 | mean | max | sum |
+|---|---:|---:|---:|---:|---:|---:|
+| round 1 (Gbfs) | 4.8 s | 17.1 s | 1.75 s | 17.3 s | 115.6 s | 260.1 s |
+| round 2 alone (the Rust lama-first-costs) | 4.5 s | 5.8 s | 1.15 s | 12.7 s | 121.3 s | 190.0 s |
+| merged, everything on | 4.3 s | 6.1 s | 1.2 s | 14.0 s | 139.1 s | 209.5 s |
+
+- **Outcomes.** The 15 tries have no dead target. The merged build's tries equal round 2's and B0's in everything.
+- **The proofs' cost.** 0.25-0.90 s per searched ring(33) request and under 0.01 s per ring(38) request: 3.2 s over
+  the 15 tries.
+- **The other 14 tries** sum to 70.4 s against round 2 alone's 68.7 s.
+- **j00000.** The merged build's is 17.8 s longer than round 2's. 14.6 s of that is its fresh reading and first
+  refinement, made by the same reader binary in both. The same try took 99.6-296.9 s across the sequences of the two
+  stopped starts.
+
+**The check's bit:118 = 1 tries** (cold, `fmi try` with the target forced, the check's 180 s limit):
+
+| binaries | try 15 | try 16 |
+|---|---:|---:|
+| round 1, Fast Downward's binary (the check's settings) | 201.1 s | 203.6 s |
+| round 2 alone, the Rust lama-first-costs | 203.1 s | 189.9 s |
+| merged, everything on | 25.3 s | 12.1 s |
+
+Round 1 and round 2 alone end on the planner's limit. The merged build ends with "no plan (the planner proved none)":
+on try 15, h^2 took 5.9 s inside a 19.3 s request.
+
+**Against the prediction.**
+
+- Hit:
+  - the gates;
+  - equal outcomes;
+  - the median within 0.5 s of round 2's (4.3 s against 4.5 s).
+- Missed:
+  - Ring(33) tries 0.4-1.5 s slower: they were 0.0-0.8 s slower, and j00000 17.8 s slower from its reading.
+  - The sum 1-5% higher: it was 10.3% higher, and 2.5% without j00000.
+  - The bit:118 ranges: the merged build took 12.1 s and 25.3 s, predicted 15-25 s. Round 1 and round 2 took
+    189.9-203.6 s, predicted 185-200 s.
+
+**Found on the way.** With everything on, the replay of the recorded requests serves Fast Downward's groups with the
+Rust lama-first-costs:
+
+- The check's eight requests with a plan on the refinement reading took 88.9-119.8 s in Fast Downward's binary. Here
+  they search for 0.07-0.53 s, plus 1.5-1.8 s for the landmark graph and the relaxed task.
+- All 26 found plans of those groups search for a median of 0.08 s (max 0.53 s).
+- By the amendment's own rule (the p90, rounded up to 10 s), L0 on this path would be 10 s, not 120 s.
+- The bit:118 request is not ended by the Rust search either: it searches the whole 180 s.
+
+**Threshold.** Unchanged: "yes" fails on the warm median (4.3 s against 1 s), so the answer stays "partly". The
+ring(33) median (6.1 s) is under 10 s, every gate passes, and the kitchen clause is still the kitchen check's. The merge
+makes a dead target that h^2 proves cost 12-25 s per try instead of the planner's whole limit.
