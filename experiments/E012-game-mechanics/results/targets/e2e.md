@@ -21,11 +21,11 @@ that the entries it makes verify from boot. Scripts: `targets/e2e-setup.sh`, `ta
 
 - The switch-off try is the kitchen check's j00030 again: the same target, stop, frames and new entries' frames
   (the check: 11.3 s on round 1's binaries).
-- With the switch on the planner took the value whose plan costs least in the reading, 382 (a walk to object 382).
-  The play cannot make that input run ("no run of the click's units starts script:2"), the same failure the kitchen
+- With the switch on the planner took 382 (a walk to object 382), at the same plan cost as 369 (1): among the
+  values of equal cost the search's own order chose. The play cannot make that input run ("no run of the click's units starts script:2"), the same failure the kitchen
   check met when it tried var:103 = 382 alone (j00051 and j00052, stopped after 3,618-3,619 frames). The list is then
   tried from this entry, so later tries from entry 93 go to other targets; var:103's other values stay targets from
   the other entries.
 - So a value list hands the choice of value to the planner's costs. A value whose input the play cannot make, and
-  which the planner prices lowest, takes the key's attempt from that entry. The same empty window twice is one of
+  which the planner picks among the cheapest, takes the key's attempt from that entry. The same empty window twice is one of
   section 4's triggers of the affordance step, which is where E012 acts on it.
