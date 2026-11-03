@@ -1159,3 +1159,71 @@ Written before the component's code. This is E011's round 3 item for the reading
   in regions the system mapped, which no reservation of mimalloc's shares; before mimalloc's first block the map is
   empty and answers no.
 - **Measured with it:** B3 with the switch on and the kitchen pair (`after`), as above; a unit test of the routing.
+
+## Amendment 2026-11-03, the integration: what is merged, one fix, and how the gates and the measurement run
+
+Written after the merges and before any gate or measurement on the merged build.
+
+- **Merged into e012** (worktree `/var/tmp/fast-mi/wt-e012`):
+  - origin/e011 928f437, E011's merged round 2 (the no-plan proofs) results: documents and bench scripts only;
+  - e012-try 58cfaef, which holds end d9c7f8d, tested 784095d, targets c6ee4bf, afford 71a5559, archive c02a4f3,
+    delay 96c46cf and wait e1560ab unchanged, and the try's order;
+  - e012-resident 9395b0d.
+
+  Each component's own files are byte for byte its final head's. The conflicts were plan.md (every component's
+  amendment is kept: the others' in try's order, then resident's) and one doc line in fmi-reading's lib.rs.
+- **One fix, in E011's code.** `HostVerifier::replay_verify` (`fmi explore verify`, and the driver's verify of a goal
+  entry, which the kitchen rerun's falsifier uses) boots to the first checkpoint's frame, then asks the bridge to run
+  to that same frame, which it refuses. The boot also keeps only the events up to its frame, so the later events were
+  never scheduled. afford and wait measured both (COORD.md). It now does what `waitcheck::verify_from_boot` does: the
+  events after the boot's frame are scheduled at that stop, and the first checkpoint is compared where the boot
+  stopped. It is checked against E008's `explore.py verify` on E009's door archive (entry 5, `verify-5.json`).
+- **Not built by any component:** the due-frame window in E010's window search (section 1, last bullet; "How a try
+  runs", step 5). delay and wait each left it out, and `fmi_core::due` is there for it. This integration adds no
+  mechanism ("E012 adds no idea beyond its components"), so the merged build runs the window search without it.
+- **The build.** `integrate/build.sh` into `/var/tmp/fast-mi/target-e012`: the rs/ workspace, fmi-checks and the
+  scumm workspace's readers, release, debug info off. taskcore has not changed since round 2 and its binaries are
+  used as they are. The engine is end's build `svm-e012-end` (patches 0001-0005, scummvm sha1 cc6615ea).
+- **"Every E012 switch off"** is round 2's switches with the no-plan proofs (E011's ON3) and these unset:
+  `FMI_WAIT`, `FMI_TARGET_PER_KEY`, `FMI_DELAY_FORK`, `FMI_AFFORD`, `FMI_SELECT`, `SPEEDRUN_REPORT_RESTART`,
+  `FMI_BOXES`, `FMI_READER_LIB`. **"Every one on"** is ON3 with `FMI_WAIT=1 FMI_TARGET_PER_KEY=1 FMI_DELAY_FORK=1
+  FMI_AFFORD=1 FMI_SELECT=progress SPEEDRUN_REPORT_RESTART=1 FMI_BOXES=1 FMI_READER_LIB=1` (`integrate/env.sh`).
+- **G0, G-on and the measurement** come from one run of B3's 15 tries in the fast settings (`integrate/b3.sh`;
+  E011's b3r2.sh with E012's sequences). Three resident processes alternate try by try, and the heavy lock is held
+  across the whole run:
+  - d: round 2 with the no-plan proofs (its fmi and reader-scope, round 2's engine), ON3;
+  - eoff: e012 with every E012 switch off, end's engine;
+  - e: e012 with every E012 switch on, end's engine.
+
+  The job folders are round 2's own B3 folders' job.json with the paths changed, as try's gates.sh makes them. The
+  reading cache is on as in B3 (B), with its floor at 5 GB; the job memo is off, as in round 2's B3.
+  - **G0:** eoff's 15 tries equal d's and round 2's published `r2-fast` in everything (`fmi check tries`). Also,
+    the reference settings: eoff alone against round 2's `r2-ref`.
+  - **G-on:** every new entry of e's tries is verified from boot in a fresh lean engine (`fmi check verify-new`).
+  - **G11's second part:** eoff's new entries are verified from boot the same way.
+  - **G12:** the watcher, rooted at the three processes.
+  - **The measurement:** e against d, per try, by wall and by part (`fmi check try-report`: return, read, idle or
+    wait, plan, play, afford).
+- **E011's gates** on the merged build:
+  - G1-G5 (engine/check-r2.sh) on end's engine with `SPEEDRUN_REPORT_RESTART` off and on;
+  - G6 on e012's reader-scope (the kitchen golden; --prep as fmi runs it, the memo off and both memo pairs), then
+    resident's RS1;
+  - G7 off and on, G8;
+  - G9 with everything off and with everything on;
+  - G10: play's fixture tests; `fmi try` on test (a) with the Rust lama-first-costs (strict, ready, fast) with every
+    E012 switch off and on; Fast Downward's binary (strict, ready) with everything off;
+  - G11 and G12 as above.
+- **The components' gates with their switches on**, on the merged build:
+  - the cargo tests: S1, T1, R2-R3, the units of afford, targets and wait, end's engine tests, resident's memo tests;
+  - end's hooks and boxes; wait's W1-W4; delay's R1 and R3 on the engine; targets' T2; afford's A1-A3 and the walk
+    boxes; resident's RS1.
+
+  end's `unreach` (1,122 entries) and archive's S2 (reported, not a gate) are not run again: their code, the
+  engine and the inputs are the same bytes as on their branches.
+- **Prediction.**
+  - Every gate passes with no fix round beyond the one above.
+  - G0: 15 of 15 in both settings.
+  - G-on: 76 new entries, as try counted them, all verified with 0 differences.
+  - The 15 tries' wall sum, with everything on, is 0.80-0.95 of d's in the same run. The reading in process saves
+    15-25 s (resident's B3: 173.1 s against round 2's 193.1 s). The E012 steps add 8-15 s: T 3.7 s, the waits 1.1 s,
+    the affordance steps 5.1 s in try's measurement.
