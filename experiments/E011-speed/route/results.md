@@ -91,11 +91,15 @@ search, the check, the decode):
 | serve38, round 1's reductions and h_FF (3 rounds, mean) | 0.947 s for the 6 | 1.050 s | 0.92-1.20 per request (least of 3), 1.11 the sequence |
 | serve38, with r2-plan's fast switch (scratch merge; 10 rounds, mean) | 0.853 s for the 6 | 0.968 s | 1.04-1.21 per request (means), 1.135 the sequence |
 | test (a)'s 5 requests (2 rounds, least) | a0 65.4, a1 6.4, a2 5.2, g1 6.4, g2 8.0 s | 61.6, 4.75, 3.04, 4.06, 7.02 s | 0.94, 0.74, 0.58, 0.63, 0.88 |
-| serve33 (2 rounds, least; an earlier build of the graph) | 16.5, 7.3, 6.9, 6.5, 17.7, 16.4, 14.0 s | 17.2, 8.4, 7.9, 8.6, 17.4, 16.0, 10.5 s | 1.04, 1.15, 1.14, 1.34, 0.98, 0.98, 0.75 |
+| serve33 (2 rounds, least; the final build) | 10.1, 5.5, 5.4, 6.7, 15.7, 7.5, 7.5 s | 9.9, 6.3, 5.9, 8.7, 11.9, 6.9, 7.2 s | 0.97, 1.14, 1.09, 1.30, 0.76, 0.92, 0.96 |
+| serve33 with r2-plan's fast switch (scratch merge; 1 round) | 8.6, 4.5, 4.5, 4.7, 7.3, 3.8, 4.0 s | 7.0, 3.8, 4.5, 4.7, 8.7, 6.3, 7.6 s | 0.81, 0.84, 1.00, 1.00, 1.18, 1.65, 1.91 |
 | B3's ring(33) requests on j00000's refined reading (j00006, j00008, j00009, j00011; 1 round) | 11.7, 11.4, 18.0, 14.8 s; 21, 31, 31, 21 evaluated | 12.7, 11.3, 9.8, 10.2 s; 21, 27, 27, 21 | 1.08, 0.99, 0.54, 0.69 |
 | the same with r2-plan's fast switch (scratch merge; 1 round) | 7.96, 8.07, 7.96, 7.84 s | 8.93, 8.09, 7.47, 7.53 s | 1.12, 1.00, 0.94, 0.96 |
 
-The two searches evaluate as many states on serve33, lama more on ring(38) (11 against 8 on three requests) and fewer
+In the serve33 rows the outliers (1.30, 1.65, 1.91) are in parts both searches run with the same code: lama's process
+took 5.8-10.2 s for the reductions and 1.8-3.4 s for the in-memory task where Gbfs's took 5.1-5.2 and 0.75-0.89 (r4),
+and 3.8-5.5 s against 2.6-2.7 (r6, r7, fast); lama's own parts there were 0.6-2.4 s of wall. The two searches evaluate
+as many states on serve33, lama more on ring(38) (11 against 8 on three requests) and fewer
 on test (a)'s second and fourth requests (20 against 40). lama's own fixed work per request is the landmark graph and
 the successor trie (ring(38): 0.015-0.02 s; ring(33): 0.3-0.4 s). On test (a) lama is the cheaper: Gbfs's successors
 are a scan of every operator per expansion, lama's a walk of the trie.
