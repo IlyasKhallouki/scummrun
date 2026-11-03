@@ -8,6 +8,7 @@
 pub mod bans;
 pub mod cache;
 pub mod cli;
+pub mod dead;
 pub mod decode;
 pub mod fold;
 pub mod model;

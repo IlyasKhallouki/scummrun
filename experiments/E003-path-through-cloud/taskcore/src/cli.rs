@@ -745,6 +745,9 @@ pub fn run() -> Result<(), String> {
     if argv.first().map(|s| s.as_str()) == Some("warm") {
         return warm_cmd(&argv[1..]);
     }
+    if argv.first().map(|s| s.as_str()) == Some("dead") {
+        return crate::dead::dead_cmd(&argv[1..]);
+    }
     let a = parse()?;
     let t0 = Instant::now();
     match a.cmd.as_str() {

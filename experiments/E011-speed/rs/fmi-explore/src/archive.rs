@@ -360,6 +360,8 @@ pub struct Cell {
     pub exhausted: Vec<usize>,
     /// str(entry) -> [[k, v], ...], in insertion order
     pub tried: Vec<(String, Value)>,
+    /// E011's deepening (step::deepen): str(entry) -> [[k, v, n], ...], the targets deferred n times; empty without it
+    pub deferred: Vec<(String, Value)>,
 }
 
 impl Cell {
@@ -368,8 +370,16 @@ impl Cell {
         for (k, v) in &self.tried {
             tried.insert(k.clone(), v.clone());
         }
-        json!({"key": self.key.clone().unwrap_or(Value::Null), "rep": self.rep, "entries": self.entries,
-               "n": self.n, "exhausted": self.exhausted, "tried": Value::Object(tried)})
+        let mut out = json!({"key": self.key.clone().unwrap_or(Value::Null), "rep": self.rep, "entries": self.entries,
+               "n": self.n, "exhausted": self.exhausted, "tried": Value::Object(tried)});
+        if !self.deferred.is_empty() {
+            let mut d = Map::new();
+            for (k, v) in &self.deferred {
+                d.insert(k.clone(), v.clone());
+            }
+            out["deferred"] = Value::Object(d);
+        }
+        out
     }
     pub fn tried_of(&self, e: &str) -> Option<&Value> {
         self.tried.iter().find(|(k, _)| k == e).map(|(_, v)| v)
@@ -379,6 +389,16 @@ impl Cell {
             x.1 = v;
         } else {
             self.tried.push((e, v));
+        }
+    }
+    pub fn deferred_of(&self, e: &str) -> Option<&Value> {
+        self.deferred.iter().find(|(k, _)| k == e).map(|(_, v)| v)
+    }
+    fn set_deferred(&mut self, e: String, v: Value) {
+        let empty = v.as_array().map(|a| a.is_empty()).unwrap_or(true);
+        self.deferred.retain(|(k, _)| *k != e);
+        if !empty {
+            self.deferred.push((e, v));
         }
     }
 }
@@ -710,6 +730,9 @@ impl Archive {
             c.n = as_i64(x.get("n")).unwrap_or(0);
             if x.get("tried").map(|t| !t.is_null()).unwrap_or(false) {
                 c.set_tried(py_str(x.get("entry")), x["tried"].clone());
+            }
+            if let Some(d) = x.get("deferred").filter(|d| !d.is_null()) {
+                c.set_deferred(py_str(x.get("entry")), d.clone());
             }
             if truthy(x.get("exhausted")) {
                 let e = x["entry"].as_u64().unwrap_or(0) as usize;
@@ -1052,7 +1075,7 @@ impl Archive {
         let new_cell = !self.cell_ix.contains_key(&c);
         if new_cell {
             self.cell_ix.insert(c.clone(), self.cells.len());
-            self.cells.push((c.clone(), Cell { key, rep: i, entries: vec![], n: 0, exhausted: vec![], tried: vec![] }));
+            self.cells.push((c.clone(), Cell { key, rep: i, entries: vec![], n: 0, exhausted: vec![], tried: vec![], deferred: vec![] }));
         }
         let ci = self.cell_ix[&c];
         self.cells[ci].1.entries.push(i);
@@ -1160,6 +1183,9 @@ impl Archive {
             }
             if x.get("tried").map(|t| !t.is_null()).unwrap_or(false) {
                 c.set_tried(e.to_string(), x["tried"].clone());
+            }
+            if let Some(d) = x.get("deferred").filter(|d| !d.is_null()) {
+                c.set_deferred(e.to_string(), d.clone());
             }
             if truthy(x.get("exhausted")) && !c.exhausted.contains(&e) {
                 c.exhausted.push(e);
@@ -1470,6 +1496,9 @@ impl Archive {
         if truthy(self.e010.get("ready")) {
             m.insert("ready".into(), Value::Bool(true));
         }
+        if crate::step::deepen().is_some() {
+            m.insert("deferred".into(), cell.deferred_of(&i.to_string()).cloned().unwrap_or_else(|| json!([])));
+        }
         Ok(doc)
     }
 
@@ -1610,9 +1639,25 @@ impl Archive {
             let mut tv: Vec<(String, Value)> = tried.into_iter().collect();
             tv.sort_by(|a, b| a.0.cmp(&b.0));
             let exhausted = truthy(res.get("exhausted"));
+            // the deepening's deferred targets: the old ones not tried now, then this try's (with their new counts)
+            let deferred = if crate::step::deepen().is_some() {
+                let key = |x: &Value| canonical(&json!([x.get(0).cloned().unwrap_or(Value::Null), x.get(1).cloned().unwrap_or(Value::Null)]));
+                let tried_now: HashSet<String> = tv.iter().map(|(k, _)| k.clone()).collect();
+                let new: Vec<Value> = res.get("deferred").and_then(|d| d.as_array()).cloned().unwrap_or_default();
+                let new_keys: HashSet<String> = new.iter().map(key).collect();
+                let mut d: Vec<Value> = self.cell(&cell).deferred_of(&e.to_string()).and_then(|d| d.as_array()).cloned().unwrap_or_default();
+                d.retain(|x| !tried_now.contains(&key(x)) && !new_keys.contains(&key(x)));
+                d.extend(new);
+                Some(Value::Array(d))
+            } else {
+                None
+            };
             let c = self.cell_mut(&cell);
             c.n = if new_cells != 0 || new_reps != 0 { 0 } else { c.n + 1 };
             c.set_tried(e.to_string(), Value::Array(tv.into_iter().map(|(_, v)| v).collect()));
+            if let Some(d) = deferred {
+                c.set_deferred(e.to_string(), d);
+            }
             if exhausted && !c.exhausted.contains(&e) {
                 c.exhausted.push(e);
             }
@@ -1653,6 +1698,9 @@ impl Archive {
         line.insert("new_r".into(), pairs_json(&new_r));
         line.insert("n".into(), json!(n_now));
         line.insert("tried".into(), tried_now);
+        if crate::step::deepen().is_some() {
+            line.insert("deferred".into(), self.cell(&cell).deferred_of(&e.to_string()).cloned().unwrap_or_else(|| json!([])));
+        }
         line.insert("exhausted".into(), json!(truthy(res.get("exhausted"))));
         line.insert("selectable".into(), json!(self.n_selectable()));
         line.insert("goal_entries".into(), json!(goal_entries));

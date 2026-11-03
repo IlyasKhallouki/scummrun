@@ -2365,3 +2365,130 @@ amendments above). So the answer stays "partly", now with all its gates.
 reading (74%): the first try's fresh ring(33) reading and two refinements (106 s), a refinement from another entry
 (21 s without the memo), and the fresh ring(38) readings (4.4-4.8 s each), which set the median. Then the planner's
 per-start reductions (25%).
+
+## Amendment 2026-11-03, during the kitchen check: targets with no plan made cheap
+
+- **Why.** In the check, target bit:118 = 1 from frames 2770 and 2771 (tries 15 and 16) made Fast Downward's
+  lama-first-costs search its whole limit and end with no plan: 607 s and 612 s, then 191 s and 187 s under the 180 s
+  limit. With targets in rotation, each such target costs a worker the whole limit. A found plan took at most 161 s
+  over the 260 recorded (median 18 s, p90 45 s, p99 74 s). The PI asked for targets with no plan to be cheap.
+- **Prior work** (each paper opened):
+  - h^m (Haslum and Geffner, AIPS 2000): reachability over sets of m facts; m = 2 gives the pairs no reachable state
+    holds (mutexes), polynomial in facts² × operators.
+  - Alcázar and Torralba (ICAPS 2015): h^2 mutexes on SAS+ as preprocessing, forward and in regression; the
+    computation took up to minutes on the largest IPC tasks.
+  - Hoffmann, Kissmann and Torralba (ECAI 2014): heuristics aimed at unsolvability only (∞ or 0); merge-and-shrink with
+    shrinking that keeps solvability; they cite projections tested for unsolvability (Bäckström, Jonsson and
+    Ståhlberg 2013).
+  - The Unsolvability IPC 2016: Fast Downward Aidos (Seipp, Pommerening, Sievers, Wehrle, Fawcett, Alkhazraji), the
+    winner, a portfolio of breadth-first search with dead-end pattern databases (Pommerening and Seipp), dead-end
+    potentials (an LP over features of up to two facts), resource detection, h^m, h^max, and h^2-mutex operator pruning
+    in every portfolio.
+  - Traps (Lipovetzky, Muise and Geffner, ICAPS 2016): k-DNF conditional invariants, compared against h^1 and h^2.
+  - Certificates of unsolvability (Eriksson, Röger and Helmert, ICAPS 2017).
+- **What fits our tasks.** A request's task is 10 k (ring(38)) to 155 k (ring(33)) operators, 460 to 7,200 facts,
+  with conditional effects (1.45 M of 3.8 M effects on ring(33)). taskcore's reductions already apply forward value
+  reachability (d) and backward relevance (e), so h^1 seldom proves more. h^2 is polynomial and needs no pattern
+  choice and no LP. Pattern databases, merge-and-shrink and potentials need a pattern or merge strategy and much more
+  code. A blind complete search is not cheap here: Fast Downward's blind A* on the 10 k-operator ring(38) task for
+  bit:118 = 1 ran 120 s without ending.
+- **Measured before this amendment** (exploration, the code below in its first form):
+  - h^2 proves bit:118 = 1 dead on both of the check's requests (j00015, j00016): the goal fact itself is outside the
+    fixpoint. On the profile's ring(38) target survey, where 3 of 33 targets ran the 30 s limit with no plan, h^2
+    proves bit:118 = 1 and var:53 = -1 dead and not var:52 = -1.
+  - h^2 takes 0.05 s on ring(38) and 6.2 s on ring(33) at load 10-12, with the same rows as the plain fixpoint.
+- **Method (1): sound no-plan proofs before the search.** Switch `FMI_PLAN_DEAD=1` (off: the old behaviour).
+  - In fmi-plan, after the reduced task is built in memory and before the search (Gbfs or Fast Downward):
+    1. h^1, relaxed reachability on the SAS task;
+    2. h^2, the pair fixpoint (taskcore `dead.rs`).
+  - A goal fact or pair outside the fixpoint is a proven no-plan: status "unsolvable" (the harness's "no plan (the
+    planner proved none)"), source "proof". Its stats name the method and the goal fact, with the seconds.
+  - Otherwise the search runs as before. The h^2 fixpoint has an engineering watchdog (`FMI_PLAN_DEAD_S`, 60 s): past
+    it, the proof is open and the search runs.
+- **Soundness.**
+  - h^1: every fact of a reachable state is in the fixpoint (induction on the path). An effect's fact is added once
+    its operator's preconditions and its own conditions are in.
+  - h^2: every pair of facts of a reachable state is in the fixpoint (induction on the path). For a step o from s to
+    s', a fact of s' was written by an effect that fired (its conditions and o's preconditions hold in s) or kept
+    from s (no fired effect writes its variable, so no unconditional effect does). Each case of a pair (both written,
+    one written and one kept, both kept) is a rule of the fixpoint whose premises are pairs of s. So a goal pair
+    outside the fixpoint is in no reachable state.
+  - Neither proof can claim no plan for a task with one. The fast fixpoint must equal the plain one row for row; that
+    is a test, not an argument.
+- **Method (2): iterative deepening on planning time.** Switch `FMI_PLAN_DEEPEN=L0` in seconds (unset: the old
+  behaviour).
+  - **The first limit.** L0 is the p90 of the found plans' search seconds on the warm Rust path (fmi-plan, warm
+    planner), measured on the recorded requests of the gate below, rounded up to 10 s.
+  - **Within a try.** A target deferred n times is planned with limit L0 · 2^n (n = 0: not deferred). This limit
+    applies to its plans until the attempt finds one; replans after that keep the old limit. The try's targets come in
+    their order, the deferred ones last, by n.
+  - **Deferral.** An attempt whose first plan ends on the limit ("time") defers its target (n + 1): it is not "tried"
+    and stays in the entry's targets for later tries. Each target is attempted at most once per try.
+  - **Exhaustion.** An entry is exhausted only when a try played nothing and deferred nothing. So a deferred target is
+    retried, with a doubled limit, only when its entry has no undeferred target left.
+  - **The archive.** It keeps the deferred targets per (cell, entry) as it keeps the tried ones: job.json "deferred",
+    the log line's "deferred". A resumed run reads them back.
+  - **Completeness.** No target is dropped for good by a limit. A target with a plan whose search takes t seconds is
+    found once L0 · 2^n ≥ t.
+- **Prediction** (before the code that uses it):
+  - The gate below passes: no recorded request with a plan is claimed dead, and every plan is the recorded one.
+  - The check's two bit:118 requests are proven dead by h^2, each in under 30 s of request wall at the check's load
+    (was 187-612 s).
+  - h^2 costs ring(33) requests 3-10 s each (load 5-12) and ring(38) requests under 0.1 s.
+  - Over every target at the check's entries 36 and 26 (89 each), h^2 proves 1-10 dead and h^1 proves none.
+  - L0 lands in 30-60 s, and a dead target that no proof catches costs L0 in its first round.
+- **Gate.**
+  1. Every recorded request with a plan that can be rebuilt is replayed with both switches on: E008's fixed tasks
+     (ring(38) j00091, ring(33) j00089, serve38, serve33), the benchmark's B0 (E009's) and B3 tries, and the check's
+     tries. For each: no proof claims no plan, and the planner returns the recorded plan.
+  2. Each found plan's states are inside the h^2 rows (`taskcore dead --plan`).
+  3. The fast h^2 equals the plain h^2 row for row on the gate's tasks.
+  4. With both switches off: fmi-plan's results are byte for byte the old ones on serve38 and serve33, and the
+     explorer passes G9 (fake steps against explore.py).
+  5. Deepening, on fake steps:
+     - a target that times out at L0 is deferred and retried at 2 · L0 only after the entry's undeferred targets;
+     - an entry with deferred targets is not exhausted;
+     - a resumed archive keeps the counts.
+  6. Report the check's bit:118 requests: what proves them dead and how long it takes.
+
+## Results of the amendment "targets with no plan made cheap" (2026-11-03, written after the runs)
+
+Branch e011-deadtarget. Tables and lists: `results/deadtarget.md`. Laptop, seed 1, nice 10, at load 3-15.
+
+- **What it does now.** With `FMI_PLAN_DEAD=1`, the check's bit:118 = 1 request ends in 18-19 s as a proven no-plan
+  ("no plan (the planner proved none)"), against 187-191 s with the 180 s limit and 607-612 s with 600 s. End to end,
+  `fmi try` on try 15's job with the target forced ends its attempt in 15.6 s with that stop. With
+  `FMI_PLAN_DEEPEN=120`, a dead target that no proof catches costs 120 s plus the reductions in its first round, and
+  comes back with 240 s, 480 s, ... only once its entry has no other target left. Both switches are off by default.
+- **What proves bit:118.** h^2: the goal fact is outside the pair fixpoint. Each of its 8,712 writers needs a pair of
+  facts no reachable state holds (bit:386 = 0 with var:252 = 1, bit:387 = 0 with var:253 = 1, and nine more of that
+  kind). h^1 reaches it. Tries 15 and 16 give the same task.
+- **Gates.**
+  - Gate 1: 41 distinct recorded requests were rebuilt (103 records: the check 25, B0 16, B3 60, E008 2), plus E008's
+    serve38 and serve33; 319 recorded plans had their reading evicted or gone. No proof claims no plan where a plan
+    is recorded, and each of the 40 requests with a plan returns the recorded plan of every record (101). serve38 and
+    serve33 give the same bytes with the proofs on and off.
+  - Gate 2: the states of all 53 found plans are inside the h^2 rows.
+  - Gate 3: the fast h^2 equals the plain one on those 53 tasks and on 20,000 random tasks.
+  - Gate 4: with both switches off, G9 passes (18 scenarios × 2 modes, 0 differing).
+  - Gate 5: deepen_check passes.
+  - Gate 6: above.
+- **Fraction proven dead.** Over every target at entries 36 and 26 (89 each), h^1 proves none and h^2 proves one at
+  each (bit:118 = 1). Over the check's 24 rebuildable distinct requests, h^2 proves the same one. On the profile's
+  ring(38) survey, h^2 proves 2 of the 3 targets that ran out of time (var:52 = -1 stays open).
+- **Cost.** h^2 stops once the goal is in its rows. On ring(33) requests with a plan the proofs take a median of
+  0.38 s (max 1.4 s), against 13.8 s of reductions; on ring(38), 0.01 s. The dead one takes 4.5 s. The whole fixpoint
+  takes 2.6-7.3 s on ring(33).
+- **L0.** The 26 found plans with Fast Downward's search on the warm path took a median of 37.3 s of search, p90
+  111.6 s and max 119.8 s, so L0 = 120 s.
+- **Against the prediction.**
+  - Gate: yes.
+  - bit:118 proven dead by h^2 in under 30 s: yes (18.4-19.1 s).
+  - h^2 cost on ring(33), predicted 3-10 s: the whole fixpoint took 2.6-7.3 s. With the early stop (added after the
+    prediction), requests with a plan pay 0.4 s.
+  - ring(38) under 0.1 s: yes.
+  - 1-10 dead per entry and none by h^1: 1 per entry, none by h^1.
+  - L0 in 30-60 s: no. It is 120 s, because the check's requests on the refinement reading take 89-120 s of Fast
+    Downward's search at this load.
+- **Interaction.** A try that only defers targets makes no new reached values, so it counts toward E008's stagnation
+  stop. The stop rules are unchanged.
