@@ -83,7 +83,7 @@ for k in $(seq 0 14); do
   for q in $seqs; do
     n=$q-$S; d=$OUT/$n/jobs/$j
     rm -rf $d/run $d/new $d/result.json $d/log
-    exec 9>$LOCK; flock 9
+    exec 200>$LOCK; flock 200
     c0=$($here/tree_cpu.sh ${PID[$q]}); t0=$(now)
     echo "$d" >&${FD[$q]}
     until grep -q "^done $d " $OUT/$n/fmi.log 2>/dev/null; do
@@ -91,7 +91,7 @@ for k in $(seq 0 14); do
       sleep 0.05
     done
     t1=$(now); c1=$($here/tree_cpu.sh ${PID[$q]})
-    flock -u 9; exec 9>&-
+    flock -u 200; exec 200>&-
     echo "{\"regime\": \"$n\", \"job\": \"$j\", \"wall_s\": $(calc "$t1 - $t0"), \"cpu_s\": $(calc "$c1 - $c0"), \"load\": $(cut -d' ' -f1 /proc/loadavg), \"mem_avail_kb\": $(awk '/MemAvailable/{print $2}' /proc/meminfo)}" >> $OUT/times.jsonl
     echo "[$(date +%T)] $n $j $(tail -1 $OUT/times.jsonl | cut -c1-140)"
   done
