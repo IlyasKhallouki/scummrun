@@ -1,0 +1,21 @@
+[10:22:36] step kitchen,28-33-35-38,j00000,j00059,cmp
+before-1/k2: five files vs ref/k2 pass, reading.json pass
+before-2/k1: five files vs before-1/k1 pass, reading.json pass
+before-2/k2: five files vs ref/k2 pass, reading.json pass
+disk-1/k1: five files vs before-1/k1 pass, reading.json pass
+disk-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k2-again: five files vs ref/k2 pass, reading.json pass
+after-2/k1: five files vs before-1/k1 pass, reading.json pass
+after-2/k2: five files vs ref/k2 pass, reading.json pass
+after-2/k2-again: five files vs ref/k2 pass, reading.json pass
+ref/k2: five files vs before-1/k2 pass, reading.json pass
+RS2 files PASS
+[10:22:37] step kitchen,28-33-41,j00061,j00062,cmp
+before-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k2-again: five files vs ref/k2 pass, reading.json pass
+ref/k2: five files vs before-1/k2 pass, reading.json pass
+RS2 files PASS

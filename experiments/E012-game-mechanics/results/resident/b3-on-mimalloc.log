@@ -1,0 +1,34 @@
+[10:26:43] on: fmi pid 1603810 (FMI_READER_LIB=1)
+[10:43:26] on j00000 131.3 s, load 2.85, fmi RSS 2325 MB
+[10:46:51] on j00001 3.4 s, load 2.98, fmi RSS 1925 MB
+[10:46:53] on j00002 2.9 s, load 3.22, fmi RSS 1975 MB
+[10:46:55] on j00003 1.6 s, load 3.22, fmi RSS 1977 MB
+[10:46:56] on j00004 0.6 s, load 3.22, fmi RSS 1990 MB
+[10:46:56] on j00005 0.3 s, load 3.22, fmi RSS 1991 MB
+[10:52:28] on j00006 23.2 s, load 2.77, fmi RSS 2328 MB
+[10:57:51] on j00007 1.3 s, load 3.23, fmi RSS 1664 MB
+[10:58:05] on j00008 13.8 s, load 2.87, fmi RSS 2121 MB
+[10:58:16] on j00009 11.2 s, load 2.91, fmi RSS 2341 MB
+[10:58:17] on j00010 0.4 s, load 2.91, fmi RSS 2000 MB
+[10:58:28] on j00011 10.6 s, load 2.77, fmi RSS 2360 MB
+[10:58:28] on j00012 0.2 s, load 2.77, fmi RSS 2319 MB
+[10:58:28] on j00013 0.4 s, load 2.77, fmi RSS 2311 MB
+[10:58:39] on j00014 11.0 s, load 2.72, fmi RSS 2408 MB
+done /var/tmp/fast-mi/e012-resident/b3/on/jobs/j00014 0
+GUARD: rc 0 wall 1918.2 s low 0 min MemAvailable 9653428 kB
+j00000: class 'refinement' (= B0's), new [2767, 2848, 2850, 2862], same as B0
+j00001: class 'refinement' (= B0's), new [2863], same as B0
+j00002: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00003: class 'refinement' (= B0's), new [2850, 2862], same as B0
+j00004: class 'refinement' (= B0's), new [2854, 2862], same as B0
+j00005: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00006: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00007: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00008: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00009: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00010: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00011: class 'refinement' (= B0's), new [2770, 2818, 2820, 2854], same as B0
+j00012: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00013: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00014: class 'refinement' (= B0's), new [2771, 2818, 2820, 2854], same as B0
+G11 on: 15 tries, stop class = B0's in 15, everything = B0's in 15

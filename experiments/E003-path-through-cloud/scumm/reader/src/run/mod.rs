@@ -54,6 +54,11 @@
 //!               another reading (or this reading's earlier pass) stored under DIR for the same whole-reading inputs
 //!               when what the run consulted reads the same here; the runs made are stored. The output is byte for
 //!               byte the same. Needs --reach and --split-limit. Off by default.
+//! --memo-mem   E012 resident: the job memo with the store a resident process keeps in memory alone (`Resident::memo`;
+//!               with --memo DIR the store in memory spills to DIR). In a process with no resident store, no memo.
+//! --memo-units-set  E012 resident (memo.md's amendment of 2026-11-03): the memo's store key holds the scope's units
+//!               as a set, so that readings of the same scope whose units come in another order share their runs. The
+//!               output is byte for byte the same. Off by default.
 //! --prep       E011 round 2: each worker works out, from the records of the job it ran, what the reading's thread
 //!               (the reached values' effects, reach.rs `reach_prep`) and the sink (the packed file's actions, the
 //!               line files' lines: `TeePrep`) would work out of them, so that those threads only take it in the
@@ -787,9 +792,10 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     b.switches.reach |= reach;
     b.switches.pass2_reuse |= pass2_reuse;
     b.memo_dir = arg(&args, "--memo").map(PathBuf::from);
-    if b.memo_dir.is_some() {
+    if b.memo_dir.is_some() || args.iter().any(|a| a == "--memo-mem") {
         b.memo_mem = res.memo.clone();
     }
+    b.memo_units_set = args.iter().any(|a| a == "--memo-units-set");
     if step_limit != 0 {
         b.switches.step_limit = step_limit;
     }

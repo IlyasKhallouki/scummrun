@@ -1,0 +1,5 @@
+key 604782dd (entry 191) against key e6b0072e (entries 0 and 189): the lines of memo.md's item 3 that differ
+  units: eb3901f8 vs b9f7550f
+    140 and 140 units; the same set: True; first differing place: 134
+    entry 191's order from there: ['Global(2)', 'Global(19)', 'Global(18)', 'Global(7)', 'Global(6)', 'Global(5)']
+    entry 0's order from there: ['Global(19)', 'Global(18)', 'Global(7)', 'Global(6)', 'Global(5)', 'Global(2)']

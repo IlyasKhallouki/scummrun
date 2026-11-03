@@ -1039,6 +1039,15 @@ fn file_sha1(p: &std::path::Path) -> std::io::Result<String> {
     Ok(h.digest().to_string())
 }
 
+/// The scope's units as the store's key holds them: in `Scope::units`' order, or (the switch --memo-units-set,
+/// memo.md's amendment of 2026-11-03: no run reads their order, only the set) sorted.
+pub fn units_of_key(mut units: Vec<scumm_ir::UnitKey>, as_set: bool) -> Vec<scumm_ir::UnitKey> {
+    if as_set {
+        units.sort_unstable();
+    }
+    units
+}
+
 impl Builder<'_> {
     /// The canonical text of the whole reading's fixed inputs (memo.md, item 3): the reader's code, the game, the
     /// scope, the Builder's switches and the table's parts that are not per key. Its sha1 names the store folder.
@@ -1058,7 +1067,7 @@ impl Builder<'_> {
         writeln!(t, "reader {exe_sha}").unwrap();
         writeln!(t, "game {game_sha}").unwrap();
         let s = &self.scope;
-        let units: Vec<scumm_ir::UnitKey> = s.units.iter().map(|&u| self.game.unit(u).key).collect();
+        let units = units_of_key(s.units.iter().map(|&u| self.game.unit(u).key).collect(), self.memo_units_set);
         writeln!(t, "rooms {:?}\nunits {units:?}\nobjects {:?}\nverbs {:?}\ndialog {:?}\nwalk {:?}", s.rooms, s.objects, s.verbs, s.dialog_verbs, s.walk_verb).unwrap();
         writeln!(t, "universe {:?}\nwrites {:?}\nscope switches {:?}\nscope counts {:?}", s.universe, s.writes, s.switches, s.counts).unwrap();
         let tb = &self.table;
@@ -1365,6 +1374,21 @@ mod tests {
         let cm = CrossMemo::open(None, Some(mem.clone()), "a").unwrap();
         assert_eq!(cm.opened_files, 0, "spilled: no longer in memory");
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    /// The key's units line: as a set (--memo-units-set) the same for the units in another order and another for
+    /// another set; without the switch, the order as given.
+    #[test]
+    fn the_keys_units_as_a_set() {
+        use scumm_ir::UnitKey::*;
+        let line = |u: Vec<scumm_ir::UnitKey>, set: bool| format!("{:?}", units_of_key(u, set));
+        let a = vec![Entry(28), Local(28, 200), Global(2), Global(15), Obj(316)];
+        let b = vec![Global(15), Entry(28), Obj(316), Global(2), Local(28, 200)];
+        let c = vec![Global(15), Entry(28), Obj(316), Local(28, 200)];
+        assert_eq!(line(a.clone(), true), line(b.clone(), true));
+        assert_ne!(line(a.clone(), true), line(c.clone(), true));
+        assert_ne!(line(a.clone(), false), line(b.clone(), false));
+        assert_eq!(line(a.clone(), false), format!("{a:?}"));
     }
 
     /// Under the floor, the other folders' files go oldest first, until the floor plus twice the largest file is

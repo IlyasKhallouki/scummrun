@@ -1039,3 +1039,123 @@ Written after the first gate runs, before the code it changes.
   choice; `"chosen"` is the k of a matching try, null when the choice is a deviation. With K computed, the first
   amendment's rules hold unchanged.
 - **Gate R3** gains the case: with no K, the chosen try is the first end point in fork order.
+
+## Amendment 2026-11-03, component `resident`: the reader in fmi's process, the job memo resident, the store's key over the scope's units as a set
+
+Written before the component's code. This is E011's round 3 item for the reading (E011's plan.md, "Results, round
+2", "What binds": the reader inside the process with the memo held in memory), built here as an E012 component.
+
+- **Why (measured).**
+  - E011 round 2: a fresh ring(33) reading takes 36.4-40.8 s of wall and 108-136 CPU s with round 2's reader (35.0-36.3
+    s with round 1's), the slowest part of a try; the reading is 74% of round 2's fast warm sum. Round 2's
+    `reader-scope --prep` cut 10-15% of the reader's CPU, not its wall. fmi still runs reader-scope as a child process:
+    the reader as a library call and the memo's store in memory (e011-r2-read) were not merged.
+  - The job memo across readings (E011 memo.md) takes a stored run only between readings with the same whole-reading
+    key (memo.md, item 3). The kitchen check's store (`/var/tmp/fast-mi/e011-archives/run/memo`, 14 folders) holds
+    two pairs of folders of the same scope and refinement whose key texts differ only in the line `units`: ring(33)
+    (28, 33, 35, 38) unrefined, and (28, 33, 41) unrefined. Each pair's units are the same set (140 and 110 units) in
+    another order. The order comes from the walk that adds the global scripts (`Scope::of_with`: the start's running
+    scripts and hook variables first). So a reading of the same scope from another entry took no run from the first.
+- **What.** One switch, `FMI_READER_LIB=1`, off by default. With it:
+  1. **The reading runs in fmi's process** (`fmi_reading::inproc`): `scumm_reader::run::run` with the arguments fmi
+     gives reader-scope (`ReadSpec::args` and the extras below), the game loaded once per process (`run::Resident`),
+     the progress in the folder's `reader-scope.err`, the try's cancel passed to the reading's stop flag. A reading
+     that stops or fails is an error of the read, as a reader-scope that exits non-zero is.
+  2. **The allocator** is mimalloc, reader-scope's own, chosen at the process's first allocation from the
+     environment; with the switch off, the system allocator, as today.
+  3. **The job memo resident**: the store in memory (memo.rs `MemStore`) kept from reading to reading, at most
+     `FMI_READER_MEMO_GB` (default 1.5; 0: no memo), its oldest files going to `FMI_MEMO`'s folder when that is set,
+     else dropped. reader-scope gains `--memo-mem`: the memo with the resident store alone.
+  4. **`--prep` on** (the workers work out the reading thread's and the sink's part of their records), unless
+     `FMI_READER_PREP=0`.
+  5. **The store's key over the units as a set**: reader-scope gains `--memo-units-set`, which writes the key's
+     `units` line as the scope's unit keys sorted. The switch passes it. The argument is memo.md's amendment of this
+     date, written before this code.
+  - `fmi read FILE`: readings one after another through fmi's readings port (reader-scope as a child, or the process
+    itself with the switch), one per line of reader-scope's arguments, each line's wall, CPU and memo counts printed.
+    It is the gate's and the measure's driver.
+  - With the switch off, fmi runs reader-scope as a child exactly as before, with the system allocator and no added
+    argument; reader-scope without the two new flags writes the same files and keys as before.
+- **Gates.**
+  - **RS1, byte for byte.** G6's recorded inputs read in one fmi process with the switch on, in this order: ring(33)
+    j00089 (stores), ring(33) j00119 (takes), the refinement j00089 [103, 194] (stores), the same refinement again
+    (takes), ring(38) j00091. Each reading's `reading.tc`, `.reached`, `.actions.jsonl`, `.lists.jsonl` and `.idx`
+    have the sha1 of reader-scope's reading of the same arguments (this branch's build, a child process, no memo), and
+    G6's recorded sha1 where G6 has one; `reading.json` is the same but for its measured fields (`read_s`, and
+    `reader_scope`'s `read_wall_s`, `read_cpu_s` and `peak_rss_mb`).
+  - **RS2, the kitchen's pair.** Ring(33) from entry 0 (j00000's start row) and then from a second entry, in one
+    process with the switch on: the second takes runs; its files equal reader-scope's for the same arguments. The
+    second entry is the first of the check's other fresh ring(33) starts (entry 191, j00057; entry 189, j00059) whose
+    key text's units order differs from entry 0's (read from the store's `inputs.txt`); if neither differs, entry 191,
+    and RS2's units part is reported as not exercised. The same pair without `--memo-units-set` is reported (how many
+    runs the order kept from being taken).
+  - **RS3, the memo's argument**: memo.md's amendment; cargo tests of memo.rs, and a test that the key is the same for
+    the units in another order and differs for another set.
+  - **G0**: with the switch off no code path of a try changes (by construction above); the cargo tests of fmi,
+    fmi-reading and scumm-reader pass.
+- **Measure.** A fresh ring(33) reading from a second entry (RS2's, after entry 0's), wall and CPU, each
+  under the heavy lock and the guard at nice 10, 3 threads, before and after interleaved:
+  - before: round 2's way, B3's settings (reader-scope as a child, `--prep`, no memo);
+  - before, with round 1's disk memo (`FMI_MEMO`, reader-scope as a child): what the key's units order leaves;
+  - after: the switch on;
+  - the floor: the same start read again in the process, every run taken (round 1 measured that reading at 12-16 s
+    with the store on disk);
+  - per reading: wall, CPU (fmi's own in the process; the child's otherwise), runs taken and run, peak memory, and
+    the reading's parts (the pool's job seconds, the reading thread's and the sink's CPU).
+- **Prediction.** RS1-RS3 and G0 pass. Before: 35-42 s of wall and 105-140 CPU s; with the disk memo, as before (the
+  key differs: nothing taken). After: at least 80% of the second reading's runs taken, 5-15 s of wall and 15-45 CPU s.
+  The floor: 4-12 s. fmi's peak memory during the readings: at most 3 GB.
+- Any further change to the taken path (for example outputs kept decoded in memory) waits for a dated amendment with
+  these measurements.
+
+### Amendment 2026-11-03 (resident, after RS1 and the keys, before the measure): the second entry
+
+- **Measured.** RS1 passes (`results/resident/README.md`). The keys step read ring(33) from entries 0, 191 and 189
+  in one process with the units in their order: entry 191's key differs from entry 0's in the `units` line alone, and
+  entry 189's key is entry 0's. But entry 191's reading (j00057's start, script 2 running) has 0 records, as the
+  check's own reading of it had (log.jsonl: 0 records, 0.6 s): its start reaches no job, so it measures nothing.
+  Entry 189's reading took 39,115 of its 39,515 runs from entry 0's.
+- **What changes.**
+  - The measure's second entry is entry 189 (j00059): a fresh ring(33) reading from another entry with 235,568
+    records, whose key is entry 0's without the units as a set.
+  - RS2's units part runs on the check's other scope with readings of both orders, (28, 33, 41): j00061's start
+    (entry 205, dialog, script 159) and then j00062's (entry 204, scripts 159 and 23), both 40,765 records in the
+    check. The keys step is repeated on them (the units in their order); if their keys differ in the `units` line
+    alone, the pair is read again with the switch on (the second takes runs) and by reader-scope (the files the same).
+    The pair is also measured before and after as the measure's second case.
+  - Nothing else changes.
+
+### Amendment 2026-11-03 (resident, after B3 with the switch on, before the code it changes): the allocator
+
+- **Measured.** `resident/b3.sh on`: B3's 15 tries in the fast settings with FMI_READER_LIB=1 in one resident fmi,
+  each try under the heavy lock. All 15 equal B0's in everything (cmp_tries.py). The median try is 2.8 s (round 2's
+  B3: 4.9 s), the fresh ring(38) readings 1.2-3.0 s (4.4-4.8 s), j00006's refinement from another entry 8.2 s (20.6
+  s), the reading's sum 124 s (142 s). But the planning of the ring(33) tries on the refined reading takes 10.3-13.3
+  s of wall and 8.6-11.2 CPU s (j00008, j00009, j00011, j00014), where round 2's fmi on the laptop at the same time
+  (E011's check, its r2-fast and d-fast sequences, 10:36) took 5.5-7.2 s and 4.4-6.0 CPU s; the first try's planning
+  22.4 s against 14.8 s. The switch changed the planner's process in one way besides the reading: the allocator
+  (mimalloc for the whole process).
+- **What changes.** `FMI_READER_ALLOC=system` keeps the system allocator with the switch on (default: mimalloc, as
+  above). Measured with it: B3 with the switch on, and the kitchen pair (`after`). The switch's allocator becomes the
+  system's if, with it, the ring(33) tries' planning is back within 20% of round 2's concurrent run and the kitchen
+  pair's second reading is within 10% of mimalloc's; otherwise the one with the lower B3 sum. Nothing else changes.
+
+### Amendment 2026-11-03 (resident, after B3 with the system allocator, before the code it changes): the allocator by phase
+
+- **Measured.** `b3.sh on-system`: all 15 tries equal B0's. The ring(33) tries' planning is back at 5.4-6.0 s of
+  wall (4.6-5.2 CPU s), round 2's concurrent run's 5.5-7.2 s; the first try's 14.5 s (round 2: 14.8 s). But the
+  reading is slower with the system allocator: the first try's reading 162.3 s against 108.3 s, the kitchen pair's
+  second reading 23.1-23.9 s against 15.7 s (`after-system`, interleaved with `after 3`), its first 55.7-61.3 s
+  against 38.1 s; fmi's resident set 4.4 GB against 2.4 GB. By the previous amendment's rule the switch keeps
+  mimalloc (B3's sum 212.2 s against 234.3 s), and the planner stays twice as slow in it.
+- **What changes.** The allocator by phase, the switch's default (`FMI_READER_ALLOC=phase`; `mimalloc` and `system`
+  stay as measured): while a reading runs in the process (`InProc::read`), new blocks come from mimalloc, the
+  reader's own; at any other time from the system's, the planner's and the window search's own. A block is freed,
+  grown or shrunk by the allocator that made it: mimalloc's own test of its address ranges (`mi_is_in_heap_region`,
+  its page map) tells its blocks from the system's.
+- **Why it is sound.** No computation reads where its memory comes from; the outputs are the same with either
+  allocator (RS1, RS2 and B3, with mimalloc and with the system's). What remains is that every block goes back to its
+  maker: mimalloc's page map holds exactly the slices of the regions mimalloc reserved, and the system's blocks lie
+  in regions the system mapped, which no reservation of mimalloc's shares; before mimalloc's first block the map is
+  empty and answers no.
+- **Measured with it:** B3 with the switch on and the kitchen pair (`after`), as above; a unit test of the routing.

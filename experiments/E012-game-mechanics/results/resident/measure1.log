@@ -1,0 +1,74 @@
+[10:14:21] step kitchen,28-33-41,j00061,j00062,keys
+[10:14:21] keys 1: FMI_READER_LIB=1 FMI_READER_UNITS_SET=0 FMI_MEMO=/var/tmp/fast-mi/e012-resident/kitchen/28-33-41/keys/memo READER_MEMO_FLOOR_GB=5
+GUARD: rc 0 wall 16.1 s low 0 min MemAvailable 13114104 kB
+  k-j00061   wall   9.08 s cpu  24.56 s  taken 7092 ran 9250 (key differs 762)  rss peak seen 411 MB, process 516 MB, child max 0 MB  mem store 59 MB  
+  k-j00062   wall   6.31 s cpu  16.44 s  taken 16239 ran 1821 (key differs 15)  rss peak seen 128 MB, process 516 MB, child max 0 MB  mem store 69 MB  
+  k-j00061: key 3ec2e3b6; lines that differ from k-j00061's: []
+  k-j00062: key 3ec2e3b6; lines that differ from k-j00061's: []
+[10:14:38] step kitchen,28-33-35-38,j00000,j00059,before,1
+[10:14:38] before 1: FMI_READER_PREP=1
+GUARD: rc 0 wall 93.7 s low 0 min MemAvailable 12573108 kB
+  k-j00000   wall  46.06 s cpu 128.35 s  taken None ran 0 (key differs None)  rss peak seen 855 MB, process 3 MB, child max 855 MB  mem store None MB  
+  k-j00059   wall  47.25 s cpu 133.30 s  taken None ran 0 (key differs None)  rss peak seen 856 MB, process 3 MB, child max 855 MB  mem store None MB  
+[10:16:13] step kitchen,28-33-35-38,j00000,j00059,after,1
+[10:16:13] after 1: FMI_READER_LIB=1
+GUARD: rc 0 wall 82.6 s low 0 min MemAvailable 12418712 kB
+  k-j00000   wall  45.07 s cpu 132.40 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 994 MB, process 1064 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  20.16 s cpu  51.89 s  taken 39115 ran 400 (key differs 400)  rss peak seen 484 MB, process 1103 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  17.15 s cpu  44.09 s  taken 39515 ran 0 (key differs 0)  rss peak seen 502 MB, process 1103 MB, child max 0 MB  mem store 189 MB  
+[10:17:38] step kitchen,28-33-35-38,j00000,j00059,before,2
+[10:17:38] before 2: FMI_READER_PREP=1
+GUARD: rc 0 wall 78.5 s low 0 min MemAvailable 13087212 kB
+  k-j00000   wall  38.96 s cpu 109.04 s  taken None ran 0 (key differs None)  rss peak seen 857 MB, process 3 MB, child max 871 MB  mem store None MB  
+  k-j00059   wall  38.97 s cpu 108.94 s  taken None ran 0 (key differs None)  rss peak seen 853 MB, process 3 MB, child max 871 MB  mem store None MB  
+[10:18:58] step kitchen,28-33-35-38,j00000,j00059,after,2
+[10:18:58] after 2: FMI_READER_LIB=1
+GUARD: rc 0 wall 68.4 s low 0 min MemAvailable 12841908 kB
+  k-j00000   wall  39.06 s cpu 113.30 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 999 MB, process 1071 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  15.68 s cpu  41.38 s  taken 39115 ran 400 (key differs 400)  rss peak seen 723 MB, process 1115 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  13.62 s cpu  35.46 s  taken 39515 ran 0 (key differs 0)  rss peak seen 422 MB, process 1115 MB, child max 0 MB  mem store 189 MB  
+[10:20:08] step kitchen,28-33-35-38,j00000,j00059,disk,1
+[10:20:08] disk 1: FMI_READER_PREP=1 FMI_MEMO=/var/tmp/fast-mi/e012-resident/kitchen/28-33-35-38/disk-1/memo READER_MEMO_FLOOR_GB=5
+GUARD: rc 0 wall 53.3 s low 0 min MemAvailable 13110912 kB
+  k-j00000   wall  35.82 s cpu 104.00 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 913 MB, process 3 MB, child max 915 MB  mem store None MB  
+  k-j00059   wall  16.66 s cpu  40.09 s  taken 39115 ran 400 (key differs 400)  rss peak seen 822 MB, process 3 MB, child max 915 MB  mem store None MB  
+[10:21:03] step kitchen,28-33-41,j00061,j00062,before,1
+[10:21:03] before 1: FMI_READER_PREP=1
+GUARD: rc 0 wall 22.1 s low 0 min MemAvailable 13647972 kB
+  k-j00061   wall  10.25 s cpu  27.23 s  taken None ran 0 (key differs None)  rss peak seen 361 MB, process 3 MB, child max 397 MB  mem store None MB  
+  k-j00062   wall  11.34 s cpu  30.22 s  taken None ran 0 (key differs None)  rss peak seen 339 MB, process 3 MB, child max 406 MB  mem store None MB  
+[10:21:25] step kitchen,28-33-41,j00061,j00062,after,1
+[10:21:25] after 1: FMI_READER_LIB=1
+GUARD: rc 0 wall 21.1 s low 0 min MemAvailable 13604040 kB
+  k-j00061   wall   9.61 s cpu  26.29 s  taken 7092 ran 9250 (key differs 762)  rss peak seen 395 MB, process 497 MB, child max 0 MB  mem store 59 MB  
+  k-j00062   wall   6.71 s cpu  17.66 s  taken 16239 ran 1821 (key differs 15)  rss peak seen 0 MB, process 497 MB, child max 0 MB  mem store 69 MB  
+  k-j00062   wall   4.11 s cpu   9.49 s  taken 18060 ran 0 (key differs 0)  rss peak seen 22 MB, process 497 MB, child max 0 MB  mem store 69 MB  
+[10:21:47] step kitchen,28-33-41,j00061,j00062,ref
+[10:21:47] ref 1: 
+GUARD: rc 0 wall 11.1 s low 0 min MemAvailable 13794544 kB
+  k-j00062   wall  11.00 s cpu  34.21 s  taken None ran 0 (key differs None)  rss peak seen 321 MB, process 3 MB, child max 402 MB  mem store None MB  
+[10:21:58] step kitchen,28-33-35-38,j00000,j00059,ref
+[10:21:58] ref 1: 
+GUARD: rc 0 wall 37.3 s low 0 min MemAvailable 13191268 kB
+  k-j00059   wall  37.02 s cpu 124.54 s  taken None ran 0 (key differs None)  rss peak seen 842 MB, process 3 MB, child max 856 MB  mem store None MB  
+[10:22:36] step kitchen,28-33-35-38,j00000,j00059,cmp
+before-1/k2: five files vs ref/k2 pass, reading.json pass
+before-2/k1: five files vs before-1/k1 pass, reading.json pass
+before-2/k2: five files vs ref/k2 pass, reading.json pass
+disk-1/k1: five files vs before-1/k1 pass, reading.json pass
+disk-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k2-again: five files vs ref/k2 pass, reading.json pass
+after-2/k1: five files vs before-1/k1 pass, reading.json pass
+after-2/k2: five files vs ref/k2 pass, reading.json pass
+after-2/k2-again: five files vs ref/k2 pass, reading.json pass
+ref/k2: five files vs before-1/k2 pass, reading.json pass
+RS2 files PASS
+[10:22:37] step kitchen,28-33-41,j00061,j00062,cmp
+before-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k2-again: five files vs ref/k2 pass, reading.json pass
+ref/k2: five files vs before-1/k2 pass, reading.json pass
+RS2 files PASS

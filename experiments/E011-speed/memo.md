@@ -164,3 +164,45 @@ the store, and on the j00000 refinement with the store against E009's binary's r
 - **Store and memory.** A fresh ring(33) reading stores 22,842 runs in 445 MB, the j00000 refinement 24,197 in
   201 MB. A reading taking from boot's store peaks at 973-1,014 MB, against 526-554 MB for E009's binary; without
   the store readcore's reading peaks at 616-642 MB.
+
+## Amendment 2026-11-03 (E012, component `resident`): the store in memory, the reading in fmi's process, `--prep`, the units as a set
+
+Written before the code it covers (E012's plan.md, "Amendment 2026-11-03, component `resident`"). Four additions to
+the claim above; conditions 1-5 and the induction are unchanged.
+
+1. **The store in memory** (`MemStore`: `--memo DIR` with a resident store, or `--memo-mem`, the resident store
+   alone). A file in memory holds the bytes a finished file on disk holds, in chunks, and a run's bytes are read from
+   its chunk as from the file (`Blob`); its keys' and questions' tables are the file's. `take` checks conditions 2-5
+   on those bytes as on a file's. A reading's file joins the store when the reading ends (`finish`), as a file on disk
+   is renamed into place; until then only its own later passes index its runs (`index_own`), as on disk. So the store
+   decides only where a stored run's bytes are, and the induction holds as it stands.
+2. **The reading in another process's run** (fmi, `fmi_reading::inproc`). The reading is `run::run` with
+   reader-scope's arguments: the code of reader-scope's main. What lives on from one reading to the next and could
+   reach a run: the game (`Resident::game`, loaded from the game files and only read: `&Game`), the store (1), and the
+   key's two sha1s (item 3: the running binary's, now fmi's, and the game index's, made once per process). The pool's
+   workers with their machines and Builders, the reading's Builder and its table are made by each reading and dropped
+   at its end. The allocator is reader-scope's (mimalloc).
+3. **`--prep`.** A worker works out the sink's and the reading thread's part of a job's records after its run returns
+   them, run or taken (par.rs `worker`), from the records and the worker's table for the batch, the same table the
+   conditions are checked against. The store holds and gives only records, counters and last pins, as before. So a
+   taken run's part is the part of the records the run would give.
+4. **The units as a set** (`--memo-units-set`: the key's `units` line is the scope's unit keys sorted, in place of
+   their order in `Scope::units`). Where the order of `Scope::units` is read:
+   - **In a run.** The machine half reads the scope's `rooms`, `objects`, `dialog_verbs`, `universe` and `switches`
+     (machine.rs, the copy made at a run's start), and the table's `kind` reads `writes`. The Builder
+     reads `rooms`, `objects`, `verbs`, `dialog_verbs`, `walk_verb`, `universe`, `counts` and the unit set
+     (`has_unit`, a hash set). Each of these is a line of item 3 by its value, or the set. The one read of `units`
+     (`Builder::settled_rule`) makes the F1c rule once per table; its value is item 3's `settled` line.
+   - **At the reading's setup.** `Scope::of_with` makes `writes` (item 3 by value), `universe` (sorted) and `counts`
+     (by value) from the units. `FactTable::new` reads them for the hook variables', the room's and (switch
+     actor_rooms) the actors' rooms' domains: sets filled by insertion, read by a run per key (condition 3).
+   - **Outside runs.** The job list and its order follow the units' order; they are the reading's thread's ("Nothing
+     else reaches a run"). LiveLocals' counts and the report read the units for counting only.
+   - The switches that read `units` otherwise (havoc_cut and the havoc switches, due_first) are refused with the memo.
+
+   So two readings whose scopes hold the same units in another order, and agree on every other line of item 3, give
+   each run the same inputs that item 3 covers. With the key's `units` line as the sorted set, conditions 1-5 still
+   give each run's inputs item for item, and the induction holds. Without the flag the key is as before.
+
+The check (E012's plan.md, RS1-RS3): the readings with the store in memory, in fmi's process, with `--prep` and the
+units as a set, against reader-scope's readings of the same arguments without the memo, byte for byte.

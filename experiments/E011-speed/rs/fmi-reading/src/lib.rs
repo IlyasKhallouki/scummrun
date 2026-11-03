@@ -10,9 +10,12 @@
 //! * [`cache`]: the exact reading cache (plan.md, readio item 3).
 //! * [`reuse`]: step.py's `reusable` (E008) and `reuse_keys_of` / `reuse_keys` (E009's K).
 //! * [`tested`]: E012's tested atoms T of a reading; [`draws`]: its actions' checks on a random draw.
+//! * [`inproc`]: the reader in the calling process, with the game and the job memo's store resident (E012's
+//!   component `resident`, the switch `FMI_READER_LIB`).
 
 pub mod cache;
 pub mod idx;
+pub mod inproc;
 pub mod line;
 pub mod mmap;
 pub mod pyjson;

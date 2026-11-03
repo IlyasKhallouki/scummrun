@@ -1,0 +1,44 @@
+    Finished `release` profile [optimized] target(s) in 1m 52s
+BUILD-DONE
+GUARD: rc 0 wall 112.6 s low 0 min MemAvailable 14188064 kB
+[11:10:39] step kitchen,28-33-35-38,j00000,j00059,after-system,1
+[11:10:39] after-system 1: FMI_READER_LIB=1 FMI_READER_ALLOC=system
+GUARD: rc 0 wall 101.6 s low 0 min MemAvailable 13761456 kB
+  k-j00000   wall  55.73 s cpu 184.34 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 1128 MB, process 1157 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  23.89 s cpu  71.07 s  taken 39115 ran 400 (key differs 400)  rss peak seen 188 MB, process 1173 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  21.09 s cpu  62.69 s  taken 39515 ran 0 (key differs 0)  rss peak seen 158 MB, process 1173 MB, child max 0 MB  mem store 189 MB  
+[11:12:22] step kitchen,28-33-35-38,j00000,j00059,after,3
+[11:12:22] after 3: FMI_READER_LIB=1
+GUARD: rc 0 wall 67.4 s low 0 min MemAvailable 13633420 kB
+  k-j00000   wall  38.12 s cpu 109.71 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 1021 MB, process 1112 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  15.68 s cpu  41.67 s  taken 39115 ran 400 (key differs 400)  rss peak seen 517 MB, process 1165 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  13.27 s cpu  34.57 s  taken 39515 ran 0 (key differs 0)  rss peak seen 302 MB, process 1165 MB, child max 0 MB  mem store 189 MB  
+[11:13:32] step kitchen,28-33-35-38,j00000,j00059,after-system,2
+[11:13:32] after-system 2: FMI_READER_LIB=1 FMI_READER_ALLOC=system
+GUARD: rc 0 wall 105.7 s low 0 min MemAvailable 13626016 kB
+  k-j00000   wall  61.27 s cpu 200.27 s  taken 16673 ran 22842 (key differs 1610)  rss peak seen 1134 MB, process 1163 MB, child max 0 MB  mem store 181 MB  
+  k-j00059   wall  23.09 s cpu  69.00 s  taken 39115 ran 400 (key differs 400)  rss peak seen 318 MB, process 1330 MB, child max 0 MB  mem store 189 MB  
+  k-j00059   wall  20.28 s cpu  60.71 s  taken 39515 ran 0 (key differs 0)  rss peak seen 170 MB, process 1342 MB, child max 0 MB  mem store 189 MB  
+[11:15:20] step kitchen,28-33-35-38,j00000,j00059,cmp
+before-1/k2: five files vs ref/k2 pass, reading.json pass
+before-2/k1: five files vs before-1/k1 pass, reading.json pass
+before-2/k2: five files vs ref/k2 pass, reading.json pass
+disk-1/k1: five files vs before-1/k1 pass, reading.json pass
+disk-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-1/k2: five files vs ref/k2 pass, reading.json pass
+after-1/k2-again: five files vs ref/k2 pass, reading.json pass
+after-2/k1: five files vs before-1/k1 pass, reading.json pass
+after-2/k2: five files vs ref/k2 pass, reading.json pass
+after-2/k2-again: five files vs ref/k2 pass, reading.json pass
+after-3/k1: five files vs before-1/k1 pass, reading.json pass
+after-3/k2: five files vs ref/k2 pass, reading.json pass
+after-3/k2-again: five files vs ref/k2 pass, reading.json pass
+after-system-1/k1: five files vs before-1/k1 pass, reading.json pass
+after-system-1/k2: five files vs ref/k2 pass, reading.json pass
+after-system-1/k2-again: five files vs ref/k2 pass, reading.json pass
+after-system-2/k1: five files vs before-1/k1 pass, reading.json pass
+after-system-2/k2: five files vs ref/k2 pass, reading.json pass
+after-system-2/k2-again: five files vs ref/k2 pass, reading.json pass
+ref/k2: five files vs before-1/k2 pass, reading.json pass
+RS2 files PASS

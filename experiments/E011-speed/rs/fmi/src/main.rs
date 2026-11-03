@@ -15,6 +15,8 @@
 //!   fmi check step FIXTURES.jsonl      (step.py's targets, reusable and idle_rule against the reference's outputs)
 //!   fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]   (guide.py map)
 //!   fmi guide stats GUIDE.json [--key KEY.json]                                     (guide.py stats)
+//!   fmi read FILE      readings one after another through the readings port, one per line of reader-scope's
+//!                      arguments (E012 resident: read.rs)
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
@@ -22,6 +24,7 @@
 //! `try` is step.py's `run JOB_DIR`: one try from a job.json; `--targets` forces the targets, in order (the benchmark).
 //! With several JOB_DIRs (or "-": one per line on stdin) the tries run one after the other in this process, warm.
 
+mod read;
 mod wire;
 mod wire_real;
 mod trycheck;
@@ -55,7 +58,8 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi check wait ARCHIVE --entries I,J,.. (--reading READING.json | --read-scope R,R,.. --read-dir DIR) --out DIR
                 [--verify] [--view-check] [--due-check] [--idle-check] [--repeat N]
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
-       fmi guide stats GUIDE.json [--key KEY.json]";
+       fmi guide stats GUIDE.json [--key KEY.json]
+       fmi read FILE";
 
 struct Args {
     pos: Vec<String>,
@@ -143,6 +147,7 @@ fn main() {
         ("check", Some("wait")) => cmd_check_wait(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
+        ("read", Some(_)) => read::cmd_read(&argv[1..]),
         _ => usage(),
     };
     std::process::exit(code)
