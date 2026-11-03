@@ -241,6 +241,9 @@ struct Tee {
     prog: Arc<Mutex<Prog>>,
     /// --out-dir: the reading's line files as the records come (files.rs)
     files: Option<files::Files>,
+    /// the switch --prep: the texts' numbers (packed.rs `Interner`), and the kinds' names by number
+    nums: Option<Arc<crate::packed::Interner>>,
+    kind_names: Vec<Option<String>>,
 }
 
 impl RecordSink for Tee {
@@ -320,10 +323,10 @@ pub struct TeePrep {
 
 /// The switch --prep's function for the sink (`Tee`): `costs` the frame costs, `lines` whether the line files are
 /// written (--out-dir), `flags` the list lines' slot flags (--live-locals).
-fn tee_prep(costs: Option<Arc<crate::costs::FrameCosts>>, lines: bool, flags: bool) -> Arc<crate::builder::PrepFn> {
+fn tee_prep(costs: Option<Arc<crate::costs::FrameCosts>>, lines: bool, flags: bool, nums: Arc<crate::packed::Interner>) -> Arc<crate::builder::PrepFn> {
     Arc::new(move |recs: &[Record], table: &FactTable| -> Box<dyn std::any::Any + Send> {
         Box::new(TeePrep {
-            recs: crate::packed::prep_records(costs.as_deref(), recs, table),
+            recs: crate::packed::prep_records(costs.as_deref(), recs, table, &nums),
             lines: lines.then(|| files::prep_lines(recs, flags)),
         })
     })
@@ -336,17 +339,23 @@ impl Tee {
         let TeePrep { recs: rp, lines } = prep;
         let n = rp.len();
         assert!(recs.is_empty() || recs.len() == n, "--prep: one part per record");
+        let nums = self.nums.clone().expect("--prep: the texts' numbers");
         for p in &rp {
-            self.count(&p.kind, p.end == "havoc");
+            let k = p.kind as usize;
+            if k >= self.kind_names.len() {
+                self.kind_names.resize(k + 1, None);
+            }
+            let name = self.kind_names[k].get_or_insert_with(|| nums.text(p.kind).to_string()).clone();
+            self.count(&name, p.havoc);
         }
         if let Some(s) = &mut self.stream {
             match (&mut self.files, lines) {
                 (Some(f), Some(lines)) => {
                     let mut written = Vec::new();
-                    s.records_prepared(first, rp, &mut |j| written.push(j)).expect("the packed file");
+                    s.records_prepared(first, rp, &nums, &mut |j| written.push(j)).expect("the packed file");
                     f.batch_prepared(first, lines, &written).expect("the reading's files");
                 }
-                (None, None) => s.records_prepared(first, rp, &mut |_| {}).expect("the packed file"),
+                (None, None) => s.records_prepared(first, rp, &nums, &mut |_| {}).expect("the packed file"),
                 _ => panic!("--prep: the line files' part does not match the sink's"),
             }
         }
@@ -886,9 +895,10 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
             }
         }));
     }
-    if prep {
+    let nums = prep.then(crate::packed::Interner::new);
+    if let Some(nums) = &nums {
         b.prep = true;
-        b.prep_sink = Some(tee_prep(b.frame_costs.clone(), out_dir.is_some(), live_locals));
+        b.prep_sink = Some(tee_prep(b.frame_costs.clone(), out_dir.is_some(), live_locals, nums.clone()));
         // the records stay with the workers unless the sink writes them itself (--hash, --golden)
         b.prep_lite = !hash && golden.is_none() && !keep;
     }
@@ -914,6 +924,8 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
             f.sha_at_end = prep;
             f
         }),
+        nums,
+        kind_names: Vec::new(),
     };
 
     // the watchdog: the cap, the process's memory, the machine's free memory (and, in another process's run, the

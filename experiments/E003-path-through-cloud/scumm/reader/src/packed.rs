@@ -50,6 +50,10 @@ pub struct Writer {
     /// the action being written (reused)
     buf: Vec<u8>,
     out: Vec<u32>,
+    /// the switch --prep: a text's number (`Interner`) to its string id and its fact id here, once seen (u32::MAX: not
+    /// yet)
+    sid_of: Vec<u32>,
+    fid_of: Vec<u32>,
 }
 
 /// What a reader of the packed file reads of its tables (E011 `reading.idx` and `reading.json`): the strings, each
@@ -90,6 +94,8 @@ impl Writer {
             acts: Vec::new(),
             buf: Vec::with_capacity(4096),
             out: Vec::with_capacity(1024),
+            sid_of: Vec::new(),
+            fid_of: Vec::new(),
         };
         w.put(&[MAGIC, VERSION])?;
         w.body_start = w.words;
@@ -132,6 +138,104 @@ impl Writer {
         self.facts.insert(key.to_string(), i);
         self.flist.push(key.to_string());
         i
+    }
+
+    /// `s` of the text numbered `g`.
+    fn sid(&mut self, g: u32, nums: &Interner) -> u32 {
+        let i = g as usize;
+        if i >= self.sid_of.len() {
+            self.sid_of.resize(i + 1, u32::MAX);
+        }
+        if self.sid_of[i] == u32::MAX {
+            self.sid_of[i] = self.s(&nums.text(g));
+        }
+        self.sid_of[i]
+    }
+
+    /// `fact` of the text numbered `g`.
+    fn fid(&mut self, g: u32, nums: &Interner) -> u32 {
+        let i = g as usize;
+        if i >= self.fid_of.len() {
+            self.fid_of.resize(i + 1, u32::MAX);
+        }
+        if self.fid_of[i] == u32::MAX {
+            self.fid_of[i] = self.fact(&nums.text(g));
+        }
+        self.fid_of[i]
+    }
+
+    fn set_entry_n(&mut self, out: &mut Vec<u32>, key: u32, vals: &[u32], nums: &Interner) {
+        out.push(self.fid(key, nums));
+        out.push(vals.len() as u32);
+        for &v in vals {
+            let s = self.sid(v, nums);
+            out.push(s);
+        }
+    }
+
+    /// `action` of an action with its texts as numbers (the switch --prep): the same words, the same strings and
+    /// facts numbered in the same order.
+    pub fn action_n(&mut self, rec: u32, a: &ActN, cost: u32, nums: &Interner) -> io::Result<()> {
+        let mut out: Vec<u32> = std::mem::take(&mut self.out);
+        out.clear();
+        out.push(rec);
+        let label_id = self.sid(a.label, nums);
+        self.acts.push((self.words, rec, label_id, a.has_args));
+        out.push(label_id);
+        out.push(self.sid(a.kind, nums));
+        out.push(self.sid(a.end, nums));
+        out.push(self.sid(a.cont, nums));
+        out.push(cost);
+        out.push(a.pre.len() as u32);
+        for (k, vals) in &a.pre {
+            self.set_entry_n(&mut out, *k, vals, nums);
+        }
+        out.push(a.effs.len() as u32);
+        for e in &a.effs {
+            out.push(e.op);
+            let fid = self.fid(e.key, nums);
+            out.push(fid);
+            match e.op {
+                OP_SET => {
+                    let s = self.sid(e.vals[0], nums);
+                    out.push(s);
+                }
+                OP_GUESS => {
+                    let mut ids: Vec<u32> = Vec::new();
+                    for &v in &e.vals {
+                        let s = self.sid(v, nums);
+                        if !ids.contains(&s) {
+                            ids.push(s);
+                        }
+                    }
+                    out.push(ids.len() as u32);
+                    out.extend(ids);
+                }
+                _ => {
+                    out.push(e.step as u32);
+                    if !self.add_index.contains_key(&(fid, e.step)) {
+                        self.add_index.insert((fid, e.step), self.adds.len() as u32);
+                        self.adds.push((fid, e.step));
+                    }
+                }
+            }
+            out.push(e.when.len() as u32);
+            for (wk, wv) in &e.when {
+                self.set_entry_n(&mut out, *wk, wv, nums);
+            }
+        }
+        let mut b = std::mem::take(&mut self.buf);
+        b.clear();
+        b.extend_from_slice(&(out.len() as u32).to_le_bytes());
+        for x in &out {
+            b.extend_from_slice(&x.to_le_bytes());
+        }
+        self.f.write_all(&b)?;
+        self.words += 1 + out.len() as u64;
+        self.buf = b;
+        self.out = out;
+        self.n_actions += 1;
+        Ok(())
     }
 
     fn set_entry(&mut self, out: &mut Vec<u32>, key: &str, vals: &[Label]) {
@@ -538,15 +642,14 @@ impl RecordStream {
 
     /// `records_with` on records the switch --prep worked out where their job ran (`prep_records`, one per record):
     /// the same actions, folds and calls of `written`.
-    pub fn records_prepared(&mut self, first: usize, preps: Vec<RecPrep>, written: &mut dyn FnMut(usize)) -> io::Result<()> {
+    pub fn records_prepared(&mut self, first: usize, preps: Vec<RecPrep>, nums: &Interner, written: &mut dyn FnMut(usize)) -> io::Result<()> {
         let w = self.w.as_mut().unwrap();
         for (j, p) in preps.into_iter().enumerate() {
             if !self.seen.insert(p.hash0) {
                 self.folded_written += 1;
                 continue;
             }
-            // the effects' values are labelled already
-            w.action((first + j) as u32, &p.label, &p.kind, &p.end, &p.cont, p.cost.unwrap_or(1), &p.pre, &p.effects, &|_, v| v)?;
+            w.action_n((first + j) as u32, &p.act, p.cost.unwrap_or(1), nums)?;
             self.written.push((p.parts, p.step_room));
             written(j);
         }
@@ -603,27 +706,138 @@ impl RecordStream {
     }
 }
 
+/// Texts numbered once for a whole reading, shared by its workers (the switch --prep): a worker gives each text of an
+/// action (label, kind, end, `_cont`, facts, values) its number here, so that the sink only maps numbers to the packed
+/// file's string and fact ids, at their first sight in the file, as `Writer::s` and `Writer::fact` would.
+pub struct Interner {
+    /// this instance's number (each thread keeps its own cache of the texts it numbered, for one instance)
+    id: u64,
+    shards: Vec<std::sync::RwLock<FxHashMap<std::sync::Arc<str>, u32>>>,
+    texts: std::sync::RwLock<Vec<std::sync::Arc<str>>>,
+}
+
+const SHARDS: usize = 64;
+
+thread_local! {
+    /// this thread's numbers: (the interner's id, texts, values)
+    static NUMBERED: std::cell::RefCell<(u64, FxHashMap<Box<str>, u32>, FxHashMap<Label, u32>)> = std::cell::RefCell::new((0, FxHashMap::default(), FxHashMap::default()));
+}
+
+impl Interner {
+    pub fn new() -> std::sync::Arc<Interner> {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        std::sync::Arc::new(Interner {
+            id: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            shards: (0..SHARDS).map(|_| Default::default()).collect(),
+            texts: Default::default(),
+        })
+    }
+
+    fn shared(&self, t: &str) -> u32 {
+        use std::hash::{BuildHasher, Hash, Hasher};
+        let mut h = rustc_hash::FxBuildHasher.build_hasher();
+        t.hash(&mut h);
+        let sh = &self.shards[(h.finish() >> 32) as usize % SHARDS];
+        if let Some(&g) = sh.read().unwrap().get(t) {
+            return g;
+        }
+        let mut w = sh.write().unwrap();
+        if let Some(&g) = w.get(t) {
+            return g;
+        }
+        let a: std::sync::Arc<str> = std::sync::Arc::from(t);
+        let g = {
+            let mut texts = self.texts.write().unwrap();
+            texts.push(a.clone());
+            texts.len() as u32 - 1
+        };
+        w.insert(a, g);
+        g
+    }
+
+    /// The number of a text.
+    pub fn num(&self, t: &str) -> u32 {
+        NUMBERED.with(|c| {
+            let mut c = c.borrow_mut();
+            if c.0 != self.id {
+                *c = (self.id, FxHashMap::default(), FxHashMap::default());
+            }
+            if let Some(&g) = c.1.get(t) {
+                return g;
+            }
+            let g = self.shared(t);
+            c.1.insert(t.into(), g);
+            g
+        })
+    }
+
+    /// The number of a value's text (`str(v)`).
+    pub fn num_label(&self, l: Label) -> u32 {
+        let hit = NUMBERED.with(|c| {
+            let c = c.borrow();
+            if c.0 == self.id {
+                c.2.get(&l).copied()
+            } else {
+                None
+            }
+        });
+        if let Some(g) = hit {
+            return g;
+        }
+        let g = self.num(&l.text());
+        NUMBERED.with(|c| {
+            c.borrow_mut().2.insert(l, g);
+        });
+        g
+    }
+
+    /// The text of a number.
+    pub fn text(&self, g: u32) -> std::sync::Arc<str> {
+        self.texts.read().unwrap()[g as usize].clone()
+    }
+}
+
+/// An action as `Writer::action` writes it, with its texts as numbers (`Interner`): label, kind, end, `_cont`; the
+/// precondition (fact, values); the effects (`EffN`).
+pub struct ActN {
+    label: u32,
+    kind: u32,
+    end: u32,
+    cont: u32,
+    pre: Vec<(u32, Vec<u32>)>,
+    effs: Vec<EffN>,
+    /// a fact `args:` in the precondition or in a set (`Writer::acts`)
+    has_args: bool,
+}
+
+/// An effect of an `ActN`: OP_SET (one value), OP_GUESS (the values, as labelled, before `Writer::action` drops a
+/// repeated one), OP_ADD (the step); its conditions (fact, values).
+pub struct EffN {
+    op: u32,
+    key: u32,
+    vals: Vec<u32>,
+    step: i64,
+    when: Vec<(u32, Vec<u32>)>,
+}
+
 /// One record as `RecordStream::records_with` works it out before it writes it (the switch --prep, made where the
-/// record's job ran): its cost, its fold key's parts and their hash as written, its action's precondition and effects
-/// (the effects' values labelled by their domains' bounds), its count of steps that need room, its `_cont`.
+/// record's job ran): its cost, its fold key's parts and their hash as written, its action with the effects' values
+/// labelled by their domains' bounds (`ActN`), its count of steps that need room; its kind's number and whether it
+/// ends "havoc" (the sink's counts).
 pub struct RecPrep {
-    /// the record's label, kind and end (`end_text`)
-    pub label: String,
-    pub kind: String,
-    pub end: String,
+    pub kind: u32,
+    pub havoc: bool,
     cost: Option<u32>,
     parts: FoldParts,
     hash0: [u8; 16],
-    pre: Vec<(String, Labels)>,
-    effects: Vec<TEffect>,
+    act: ActN,
     step_room: u32,
-    cont: String,
 }
 
 /// `RecordStream::records_with`'s work on `recs` before it writes them: a function of the records, the frame costs
 /// and the bounds of the table's domains (which change only between passes), so the same in the worker that made
-/// them as on the sink's thread.
-pub fn prep_records(costs: Option<&FrameCosts>, recs: &[Record], table: &FactTable) -> Vec<RecPrep> {
+/// them as on the sink's thread; the texts numbered in `nums`.
+pub fn prep_records(costs: Option<&FrameCosts>, recs: &[Record], table: &FactTable, nums: &Interner) -> Vec<RecPrep> {
     let none = BTreeSet::new();
     let mut bounds: FxHashMap<&str, (Option<i64>, Option<i64>)> = FxHashMap::default();
     for r in recs {
@@ -644,6 +858,9 @@ pub fn prep_records(costs: Option<&FrameCosts>, recs: &[Record], table: &FactTab
         (Label::Int(n), (Some(l), _)) if n < l => Label::Below,
         _ => v,
     };
+    let entries = |xs: &[(String, Labels)]| -> Vec<(u32, Vec<u32>)> {
+        xs.iter().map(|(k, vs)| (nums.num(k), vs.iter().map(|&v| nums.num_label(v)).collect())).collect()
+    };
     let mut counts = Counter::default();
     recs.iter()
         .map(|r| {
@@ -651,28 +868,31 @@ pub fn prep_records(costs: Option<&FrameCosts>, recs: &[Record], table: &FactTab
             let parts = fold_parts_cost(r, cost);
             let hash0 = parts.hash_after(&none);
             counts.clear();
-            let (pre, mut effects) = record_action(table, r, &mut counts);
-            for e in &mut effects {
-                if let Some(v) = e.value {
-                    e.value = Some(lab(&e.key, v));
-                } else if let Some(vs) = &mut e.values {
-                    for v in vs.iter_mut() {
-                        *v = lab(&e.key, *v);
-                    }
-                }
-            }
-            RecPrep {
-                label: r.label.clone(),
-                kind: r.kind.clone(),
-                end: r.end_text().to_string(),
-                cost,
-                parts,
-                hash0,
-                pre,
-                effects,
-                step_room: counts.get(STEP_ROOM) as u32,
-                cont: cont(r),
-            }
+            let (pre, effects) = record_action(table, r, &mut counts);
+            let has_args = pre.iter().any(|(k, _)| k.starts_with("args:")) || effects.iter().any(|e| e.value.is_some() && e.key.starts_with("args:"));
+            let effs = effects
+                .iter()
+                .map(|e| {
+                    let (op, vals, step) = if let Some(v) = e.value {
+                        (OP_SET, vec![nums.num_label(lab(&e.key, v))], 0)
+                    } else if let Some(vs) = &e.values {
+                        (OP_GUESS, vs.iter().map(|&v| nums.num_label(lab(&e.key, v))).collect(), 0)
+                    } else {
+                        (OP_ADD, Vec::new(), e.add.unwrap())
+                    };
+                    EffN { op, key: nums.num(&e.key), vals, step, when: entries(&e.when) }
+                })
+                .collect();
+            let act = ActN {
+                label: nums.num(&r.label),
+                kind: nums.num(&r.kind),
+                end: nums.num(r.end_text()),
+                cont: nums.num(&cont(r)),
+                pre: entries(&pre),
+                effs,
+                has_args,
+            };
+            RecPrep { kind: act.kind, havoc: r.end.as_deref() == Some("havoc"), cost, parts, hash0, act, step_room: counts.get(STEP_ROOM) as u32 }
         })
         .collect()
 }
