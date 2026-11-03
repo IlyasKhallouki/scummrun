@@ -147,7 +147,66 @@ pub struct JobOut {
     pub last_pins: Pins,
     /// the job's wall seconds where it ran
     pub secs: f64,
+    /// the switch --prep: what the reading's thread and the sink work out of the records, worked out here
+    pub prep: Option<JobPrep>,
 }
+
+impl JobOut {
+    /// The job's records, also those that stayed with its worker (`Lite`).
+    pub fn n_records(&self) -> usize {
+        self.records.len() + self.prep.as_ref().and_then(|p| p.lite.as_ref()).map_or(0, |l| l.n)
+    }
+}
+
+/// The switch --prep (E011 round 2): what the reading's thread (`reach_after_job`) and the sink work out of a job's
+/// records, worked out by the worker that ran the job (par.rs), so that their own threads only take it in the jobs'
+/// order. Each part is a function of the records and of what stays fixed while the job's batch runs (the table's
+/// domains, the reached values), made by the same code the reading's thread or the sink would run.
+#[derive(Default)]
+pub struct JobPrep {
+    /// per record, the (d) effects with their first unmet condition (reach.rs `reach_prep`)
+    pub reach: Option<Vec<crate::reach::ReachEff>>,
+    /// the sink's part, one per record (the sink's own type: `PrepFn`)
+    pub sink: Option<Box<dyn std::any::Any + Send>>,
+    /// all that the reading's thread reads of the records besides the parts above, when the records stay with the
+    /// worker (`Builder::prep_lite`; `JobOut::records` is then empty)
+    pub lite: Option<Lite>,
+}
+
+/// What the reading's thread reads of a job's records (`run_jobs_shared`, `NextEvents::add`, `emit`) when they stay
+/// with the worker that made them: their count, their `args:` sets in order, their next events (each (name, unit,
+/// w, sig, abort) once, in order).
+#[derive(Debug)]
+pub struct Lite {
+    pub n: usize,
+    pub args: Vec<(String, i64)>,
+    pub next_events: Vec<Event>,
+}
+
+impl Lite {
+    pub fn of(recs: &[Record]) -> Lite {
+        let mut args = Vec::new();
+        for r in recs {
+            for (k, e) in &r.effects {
+                if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
+                    args.push((k.clone(), *s));
+                }
+            }
+        }
+        let mut nexts = NextEvents::default();
+        nexts.add(recs);
+        Lite { n: recs.len(), args, next_events: nexts.events }
+    }
+}
+
+impl std::fmt::Debug for JobPrep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "JobPrep {{ reach: {:?}, sink: {}, lite: {:?} }}", self.reach.as_ref().map(|r| r.len()), self.sink.is_some(), self.lite.as_ref().map(|l| l.n))
+    }
+}
+
+/// The sink's part of the switch --prep: made from a job's records and the worker's table.
+pub type PrepFn = dyn Fn(&[Record], &FactTable) -> Box<dyn std::any::Any + Send> + Send + Sync;
 
 /// Takes the records as the Builder makes them (packed.rs `RecordStream`): a batch after each round of runs, `first`
 /// the index of its first record; `reset` when a pass starts over (its records are dropped).
@@ -158,6 +217,11 @@ pub trait RecordSink {
     /// thread (par.rs `SinkThread`). The default lends them to `batch`.
     fn batch_owned(&mut self, first: usize, recs: Vec<Record>, table: &FactTable) {
         self.batch(first, &recs, table)
+    }
+    /// `batch_owned` with the sink's part of the switch --prep (`JobPrep::sink`), made where the job ran. The default
+    /// leaves it.
+    fn batch_prepared(&mut self, first: usize, recs: Vec<Record>, table: &FactTable, _prep: Box<dyn std::any::Any + Send>) {
+        self.batch_owned(first, recs, table)
     }
 }
 
@@ -188,6 +252,15 @@ impl NextEvents {
                 if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
                     self.events.push(e.clone());
                 }
+            }
+        }
+    }
+
+    /// `add` of a job's records whose next events a worker took (`Lite`): the same events, each once, in order.
+    pub(crate) fn add_events(&mut self, evs: Vec<Event>) {
+        for e in evs {
+            if self.seen.insert((e.name.clone(), e.unit, e.w, e.sig, e.abort)) {
+                self.events.push(e);
             }
         }
     }
@@ -496,6 +569,16 @@ pub struct Builder<'g> {
     pub memo_mem: Option<Arc<crate::memo::MemStore>>,
     /// the switch --memo: each consulted key's kind, domain and constant start in this table (`Builder::key_info`)
     pub(crate) memo_infos: FxHashMap<String, (u8, Option<Domain>, Option<i64>)>,
+    /// the switch --prep: the job being taken in (par.rs `run_batch`), its part worked out where it ran
+    pub(crate) job_prep: Option<JobPrep>,
+    /// the switch --prep (E011 round 2): the workers work out what the reading's thread and the sink would of each
+    /// job's records (`JobPrep`); the reading is byte for byte the same. Off by default.
+    pub prep: bool,
+    /// the switch --prep: the sink's part (`PrepFn`), None for none
+    pub prep_sink: Option<Arc<PrepFn>>,
+    /// the switch --prep: the records stay with the worker (`Lite`); for a sink that reads only its part (`PrepFn`),
+    /// with no records kept and no `on_job`
+    pub prep_lite: bool,
 }
 
 /// An event's list of locals apart from the slot's flags, for `Builder::limit` under the switch --live-locals: a hash
@@ -691,6 +774,10 @@ impl<'g> Builder<'g> {
             memo_dir: None,
             memo_mem: None,
             memo_infos: FxHashMap::default(),
+            job_prep: None,
+            prep: false,
+            prep_sink: None,
+            prep_lite: false,
         }
     }
 
@@ -2344,7 +2431,7 @@ impl<'g> Builder<'g> {
         }
         let mut nexts = NextEvents::default();
         self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
-            nexts.add(&recs);
+            b.next_events_of(&recs, &mut nexts);
             b.emit(recs, sink);
         });
         let jobs_len = n_jobs;
@@ -2371,7 +2458,7 @@ impl<'g> Builder<'g> {
             drop(todo);
             let mut nexts = NextEvents::default();
             self.run_jobs_shared(m, Arc::new(jobs), &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
-                nexts.add(&recs);
+                b.next_events_of(&recs, &mut nexts);
                 b.emit(recs, sink);
             });
             todo = nexts.events;
@@ -2470,6 +2557,10 @@ impl<'g> Builder<'g> {
 
     /// One job's records, as made: to the sink, then kept (or, with `keep_records` off, only counted).
     pub(crate) fn emit(&mut self, recs: Vec<Record>, sink: &mut Option<&mut dyn RecordSink>) {
+        if let Some(lite) = self.job_prep.as_mut().and_then(|p| p.lite.take()) {
+            self.emit_lite(lite, sink);
+            return;
+        }
         if recs.is_empty() {
             return;
         }
@@ -2490,10 +2581,40 @@ impl<'g> Builder<'g> {
                 }
             }
             if let Some(s) = sink {
-                s.batch_owned(first, recs, &self.table);
+                match self.job_prep.as_mut().and_then(|p| p.sink.take()) {
+                    Some(prep) => s.batch_prepared(first, recs, &self.table, prep),
+                    None => s.batch_owned(first, recs, &self.table),
+                }
             }
         }
         *self.phase_secs.entry("emit").or_default() += t.elapsed().as_secs_f64();
+    }
+
+    /// `emit` of a job whose records stayed with the worker (`Lite`): the same count, `args:` values and sink.
+    fn emit_lite(&mut self, lite: Lite, sink: &mut Option<&mut dyn RecordSink>) {
+        if lite.n == 0 {
+            return;
+        }
+        assert!(!self.keep_records, "--prep: the records stay with the worker only when none are kept");
+        let t = std::time::Instant::now();
+        let first = self.n_records;
+        self.n_records += lite.n;
+        for (k, s) in lite.args {
+            self.args_set.entry(k).or_default().insert(s);
+        }
+        if let Some(s) = sink {
+            let prep = self.job_prep.as_mut().and_then(|p| p.sink.take()).expect("--prep: the sink's part with the records' count");
+            s.batch_prepared(first, Vec::new(), &self.table, prep);
+        }
+        *self.phase_secs.entry("emit").or_default() += t.elapsed().as_secs_f64();
+    }
+
+    /// `NextEvents::add` of a job's records, or of what the worker took of them (`Lite`).
+    pub(crate) fn next_events_of(&mut self, recs: &[Record], nexts: &mut NextEvents) {
+        match self.job_prep.as_mut().and_then(|p| p.lite.as_mut()) {
+            Some(l) => nexts.add_events(std::mem::take(&mut l.next_events)),
+            None => nexts.add(recs),
+        }
     }
 
     /// The progress callback (reader.py `Builder.progress`): what ran, its jobs, its records, its seconds.
@@ -2566,10 +2687,16 @@ impl<'g> Builder<'g> {
                 if let (Some(h), Some((a, f))) = (b.on_job.as_mut(), &start) {
                     h(&jobs[i], &recs, a, f);
                 }
-                for r in &recs {
-                    for (k, e) in &r.effects {
-                        if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
-                            args.push((k.clone(), *s));
+                match b.job_prep.as_ref().and_then(|p| p.lite.as_ref()) {
+                    // the switch --prep: the records stayed with the worker, which took their `args:` sets
+                    Some(l) => args.extend(l.args.iter().cloned()),
+                    None => {
+                        for r in &recs {
+                            for (k, e) in &r.effects {
+                                if let (true, Eff::Set(Label::Int(s))) = (k.starts_with("args:"), e) {
+                                    args.push((k.clone(), *s));
+                                }
+                            }
                         }
                     }
                 }

@@ -54,6 +54,10 @@
 //!               another reading (or this reading's earlier pass) stored under DIR for the same whole-reading inputs
 //!               when what the run consulted reads the same here; the runs made are stored. The output is byte for
 //!               byte the same. Needs --reach and --split-limit. Off by default.
+//! --prep       E011 round 2: each worker works out, from the records of the job it ran, what the reading's thread
+//!               (the reached values' effects, reach.rs `reach_prep`) and the sink (the packed file's actions, the
+//!               line files' lines: `TeePrep`) would work out of them, so that those threads only take it in the
+//!               jobs' order. The output is byte for byte the same. Off by default.
 //! --pass2-reuse pass 2 takes from pass 1 each run nothing widened touches (memo.rs,
 //!               experiments/E004-fast-exact/pass2-reuse.md): the output is byte for byte the same. Off by default.
 //! --frame-costs the switch for frame costs (costs.rs): each action of the packed file costs its record's frames, a
@@ -256,6 +260,18 @@ impl RecordSink for Tee {
         }
         self.busy += t.elapsed().as_secs_f64();
     }
+    fn batch_prepared(&mut self, first: usize, recs: Vec<Record>, table: &FactTable, prep: Box<dyn std::any::Any + Send>) {
+        let t = Instant::now();
+        let prep = *prep.downcast::<TeePrep>().expect("--prep: the sink's part");
+        // the records themselves (none when they stayed with the worker, `Builder::prep_lite`) only for --hash and
+        // --golden
+        self.batch_timed_prepared(first, &recs, prep);
+        let _ = table;
+        if let Some((_, pool)) = &mut self.body {
+            pool.send(first, recs);
+        }
+        self.busy += t.elapsed().as_secs_f64();
+    }
     fn reset(&mut self) {
         if let Some(s) = &mut self.stream {
             s.reset().expect("the packed file");
@@ -291,15 +307,80 @@ impl Tee {
                 None => s.records(first, recs, table).expect("the packed file"),
             }
         }
+        self.tally(first, recs);
+    }
+}
+
+/// The sink's part of the switch --prep (`Builder::prep_sink`): the packed file's and the line files' work on a job's
+/// records, made where the job ran.
+pub struct TeePrep {
+    recs: Vec<crate::packed::RecPrep>,
+    lines: Option<Vec<files::LinePrep>>,
+}
+
+/// The switch --prep's function for the sink (`Tee`): `costs` the frame costs, `lines` whether the line files are
+/// written (--out-dir), `flags` the list lines' slot flags (--live-locals).
+fn tee_prep(costs: Option<Arc<crate::costs::FrameCosts>>, lines: bool, flags: bool) -> Arc<crate::builder::PrepFn> {
+    Arc::new(move |recs: &[Record], table: &FactTable| -> Box<dyn std::any::Any + Send> {
+        Box::new(TeePrep {
+            recs: crate::packed::prep_records(costs.as_deref(), recs, table),
+            lines: lines.then(|| files::prep_lines(recs, flags)),
+        })
+    })
+}
+
+impl Tee {
+    /// `batch_timed` on records the switch --prep worked out where their job ran (`recs`: the records, or none when
+    /// they stayed there).
+    fn batch_timed_prepared(&mut self, first: usize, recs: &[Record], prep: TeePrep) {
+        let TeePrep { recs: rp, lines } = prep;
+        let n = rp.len();
+        assert!(recs.is_empty() || recs.len() == n, "--prep: one part per record");
+        for p in &rp {
+            self.count(&p.kind, p.end == "havoc");
+        }
+        if let Some(s) = &mut self.stream {
+            match (&mut self.files, lines) {
+                (Some(f), Some(lines)) => {
+                    let mut written = Vec::new();
+                    s.records_prepared(first, rp, &mut |j| written.push(j)).expect("the packed file");
+                    f.batch_prepared(first, lines, &written).expect("the reading's files");
+                }
+                (None, None) => s.records_prepared(first, rp, &mut |_| {}).expect("the packed file"),
+                _ => panic!("--prep: the line files' part does not match the sink's"),
+            }
+        }
+        if let Some(h) = &mut self.hash {
+            assert_eq!(recs.len(), n, "--hash: the records stay with the sink");
+            for (j, r) in recs.iter().enumerate() {
+                h.update(record_line(first + j, r).as_bytes());
+                h.update(b"\n");
+            }
+        }
+        self.prog.lock().unwrap().records = first + n;
+    }
+
+    /// A record's kind and whether it ends "havoc", counted.
+    fn count(&mut self, kind: &str, havoc: bool) {
+        match self.kinds.get_mut(kind) {
+            Some(n) => *n += 1,
+            None => {
+                self.kinds.insert(kind.to_string(), 1);
+            }
+        }
+        if havoc {
+            self.havoc += 1;
+        }
+    }
+
+    /// The hash (--hash), the kinds, the havoc records, the progress.
+    fn tally(&mut self, first: usize, recs: &[Record]) {
         for (j, r) in recs.iter().enumerate() {
             if let Some(h) = &mut self.hash {
                 h.update(record_line(first + j, r).as_bytes());
                 h.update(b"\n");
             }
-            *self.kinds.entry(r.kind.clone()).or_default() += 1;
-            if r.end.as_deref() == Some("havoc") {
-                self.havoc += 1;
-            }
+            self.count(&r.kind, r.end.as_deref() == Some("havoc"));
         }
         self.prog.lock().unwrap().records = first + recs.len();
     }
@@ -620,6 +701,7 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let frame_costs = args.iter().any(|a| a == "--frame-costs");
     let reach = args.iter().any(|a| a == "--reach");
     let pass2_reuse = args.iter().any(|a| a == "--pass2-reuse");
+    let prep = args.iter().any(|a| a == "--prep");
     let step_limit: u32 = arg(&args, "--step-limit").map_or(0, |n| n.parse().expect("--step-limit N"));
     let fact_vars: Option<Vec<i32>> = arg(&args, "--fact-vars")
         .map(|s| s.split(',').filter(|x| !x.trim().is_empty()).map(|x| x.trim().parse().expect("--fact-vars N,...")).collect());
@@ -674,6 +756,9 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     });
     if step_limit != 0 {
         base["step_limit"] = json!(step_limit);
+    }
+    if prep {
+        base["prep"] = json!(true);
     }
     base["setup_s"] = json!((t_setup.elapsed().as_secs_f64() * 100.0).round() / 100.0);
     log!(lg, 
@@ -801,6 +886,12 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
             }
         }));
     }
+    if prep {
+        b.prep = true;
+        b.prep_sink = Some(tee_prep(b.frame_costs.clone(), out_dir.is_some(), live_locals));
+        // the records stay with the workers unless the sink writes them itself (--hash, --golden)
+        b.prep_lite = !hash && golden.is_none() && !keep;
+    }
     let mut tee = Tee {
         busy: 0.0,
         stream: Some({
@@ -818,7 +909,11 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
         kinds: BTreeMap::new(),
         havoc: 0,
         prog: prog.clone(),
-        files: out_dir.as_ref().map(|d| files::Files::create(d, live_locals).expect("the reading's files")),
+        files: out_dir.as_ref().map(|d| {
+            let mut f = files::Files::create(d, live_locals).expect("the reading's files");
+            f.sha_at_end = prep;
+            f
+        }),
     };
 
     // the watchdog: the cap, the process's memory, the machine's free memory (and, in another process's run, the
@@ -907,6 +1002,8 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     // the records are written on their own thread (par.rs `SinkThread`), unless they are kept or the reading has
     // no workers (one thread in all)
     let max_waiting: u64 = arg(&args, "--max-waiting").map_or(par::DEFAULT_MAX_WAITING, |n| n.parse().unwrap());
+    let main_cpu0 = par::thread_cpu();
+    let mut sink_cpu = 0.0;
     let stats = if keep || threads == 0 {
         par::with_pool(&game, &scope, threads, |pool| {
             pool.set_max_waiting(max_waiting);
@@ -926,10 +1023,11 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
             b.read_all_into(pool, true, None, 2, Some(&mut sink));
             pool.stats.clone()
         });
-        tee = sink.finish();
+        (tee, sink_cpu) = sink.finish_cpu();
         stats
     };
     let read_wall = t_read.elapsed().as_secs_f64();
+    let main_cpu = par::thread_cpu() - main_cpu0;
 
     let read_cpu = cpu_secs() - cpu0;
     let read_rss = peak_rss_kb().unwrap_or(0);
@@ -943,7 +1041,19 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let goal_labels: Vec<(String, Vec<Label>)> = goal.iter().map(|(k, v)| (k.clone(), v.iter().map(|&x| Label::Int(x)).collect())).collect();
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
     let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
-    let (info, folded, kept_actions) = stream.finish_keep(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+    let (info, folded, kept_actions, written) = if prep {
+        let (i, f, k, w) = stream.finish_written(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+        (i, f, k, Some(w))
+    } else {
+        let (i, f, k) = stream.finish_keep(&mut b, &goal_labels, &[("start".to_string(), s0)]).expect("the packed file");
+        (i, f, k, None)
+    };
+    // --prep: the packed file's sha1 on a thread of its own, while the rest is written; what the index and the head
+    // read of the file comes from the writer (`Written`), not from reading it again
+    let packed_sha = written.as_ref().map(|_| {
+        let p = packed.clone();
+        std::thread::spawn(move || files::file_sha1(&p).expect("the packed file"))
+    });
     let reached_path = packed.with_extension("reached");
     if let Some(reached) = &b.table.reach {
         std::fs::write(&reached_path, reached.lines(&b.table, fact_keys.iter()).join("\n") + "\n").expect("the reached values");
@@ -955,10 +1065,20 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let fin_s = t_fin.elapsed().as_secs_f64();
     // --out-dir: the packed file read once for the index and the head, which gives its sha1 too
     let t_tc = Instant::now();
-    let tc = out_dir.as_ref().map(|_| files::Tc::read(&packed).expect("the packed file"));
+    let hex = |d: &[u8; 20]| -> String { d.iter().map(|b| format!("{b:02x}")).collect() };
+    // --prep with --out-dir: the sha1 is waited for where the index needs it
+    let (mut tc, mut sha_pending) = match (written, packed_sha) {
+        (Some(w), Some(h)) if out_dir.is_some() => (Some(files::Tc::from_written(w, [0; 20])), Some(h)),
+        (Some(_), Some(h)) => (None, Some(h)),
+        _ => (out_dir.as_ref().map(|_| files::Tc::read(&packed).expect("the packed file")), None),
+    };
     let tc_s = t_tc.elapsed().as_secs_f64();
-    let packed_sha1 = if let Some(tc) = &tc {
+    let packed_sha1 = if let (Some(tc), None) = (&tc, &sha_pending) {
         tc.sha1_hex()
+    } else if tc.is_some() {
+        String::new()
+    } else if let Some(h) = sha_pending.take() {
+        hex(&h.join().expect("the packed file's sha1"))
     } else {
         let mut h = sha1_smol::Sha1::new();
         let mut f = std::fs::File::open(&packed).unwrap();
@@ -1084,6 +1204,9 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
             .collect::<Vec<_>>());
     }
     r["sink_thread_busy_s"] = json!((tee.busy * 10.0).round() / 10.0);
+    // the reading's thread's and the sink thread's CPU seconds while it read (the workers' are the rest)
+    r["reading_thread_cpu_s"] = json!((main_cpu * 100.0).round() / 100.0);
+    r["sink_thread_cpu_s"] = json!((sink_cpu * 100.0).round() / 100.0);
     r["phases_s"] = json!(b.phase_secs.iter().map(|(k, v)| (k.to_string(), (v * 100.0).round() / 100.0)).collect::<BTreeMap<_, _>>());
     {
         let p = prog.lock().unwrap();
@@ -1120,11 +1243,16 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     r["total_s"] = json!((t_all.elapsed().as_secs_f64() * 10.0).round() / 10.0);
     r["load_at_end"] = json!(loadavg());
     write_json(&report_path, &r);
-    if let (Some(dir), Some(fl), Some(tc)) = (&out_dir, tee.files.take(), &tc) {
+    if let (Some(dir), Some(fl), Some(tc)) = (&out_dir, tee.files.take(), &mut tc) {
         // --out-dir: the line files made final, the index, the head (files.rs)
         let t = Instant::now();
         let extra: Vec<PJ> = r["slot_events"].as_array().map_or_else(Vec::new, |xs| xs.iter().map(PJ::from_serde).collect());
         let lines = fl.finish(&kept_actions, &b.folded, &extra).expect("the reading's line files");
+        if let Some(h) = sha_pending.take() {
+            tc.sha1 = h.join().expect("the packed file's sha1");
+            r["packed"]["sha1"] = json!(tc.sha1_hex());
+        }
+        let tc = &*tc;
         files::write_idx(&dir.join(files::IDX), tc, &lines).expect("the reading's index");
         let bounds = files::bounds_pj(tc, &|k| b.table.domain(k).map(|d| d.into_owned())).unwrap_or_else(|e| panic!("{e}"));
         let rows = match &start_rows {

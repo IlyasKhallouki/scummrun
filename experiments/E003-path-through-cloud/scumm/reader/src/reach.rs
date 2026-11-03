@@ -253,6 +253,70 @@ pub(crate) fn value_of(table: &FactTable, key: &str, l: Label) -> Option<Label> 
     d.label_of(l).filter(|x| d.contains(*x))
 }
 
+/// (d)'s effects of a written record's action effects (`packed.rs` of taskcore: `add` as one effect per current
+/// value), each as (its conditions, its fact, its values), in order: what `Builder::reach_apply` hands to
+/// `reach_effect`. A function of the effects and the table's domains (a written value as (d) takes it: `value_of`).
+pub(crate) fn apply_effects(table: &FactTable, effects: Vec<TEffect>, out: &mut dyn FnMut(Vec<(String, Labels)>, String, Labels)) {
+    for e in effects {
+        if let Some(d) = e.add {
+            let dom = table.domain(&e.key).expect("a step's fact has a domain").into_owned();
+            let size = dom.values.len();
+            let own: Option<Labels> = e.when.iter().rev().find(|(f, s)| *f == e.key && s.iter().filter(|x| dom.contains(**x)).count() < size).map(|x| x.1.clone());
+            let rest: Vec<(String, Labels)> = e.when.iter().filter(|(f, _)| *f != e.key).cloned().collect();
+            for &u in &dom.values {
+                if own.as_ref().is_some_and(|o| !o.contains(&u)) {
+                    continue;
+                }
+                let nxt = dom.add(u, d);
+                if nxt.is_empty() || (size == 1 && nxt == [u]) {
+                    continue;
+                }
+                let mut w = rest.clone();
+                w.push((e.key.clone(), vec![u]));
+                out(w, e.key.clone(), nxt);
+            }
+            continue;
+        }
+        let vals: Labels = match (e.value, &e.values) {
+            (Some(v), _) => vec![v],
+            (None, Some(vs)) => vs.clone(),
+            _ => continue,
+        };
+        let got: Vec<Option<Label>> = vals.iter().map(|&v| value_of(table, &e.key, v)).collect();
+        if got.iter().any(|x| x.is_none()) {
+            continue;
+        }
+        out(e.when, e.key, got.into_iter().flatten().collect());
+    }
+}
+
+/// One of (d)'s effects of a written record (`apply_effects`), with the first of its conditions the reached values
+/// do not meet (`Reached::first_unmet`; None: it fires): what `Builder::reach_effect` works out, made where the job
+/// ran (the switch --prep, par.rs).
+pub struct ReachEff {
+    when: Vec<(String, Labels)>,
+    key: String,
+    vals: Labels,
+    unmet: Option<String>,
+}
+
+/// The (d) effects of a job's records, as `Builder::reach_after_job` works them out on the reading's thread: a function
+/// of the records, the table's domains (which change only between passes) and the reached values (written only
+/// between batches, `reach_commit`), so the same where the job ran, while its batch runs. Not with the switch
+/// reach_pairs (the pairs are the reading thread's).
+pub fn reach_prep(table: &FactTable, reach: &Reached, recs: &[Record]) -> Vec<ReachEff> {
+    let mut out = Vec::new();
+    for r in recs {
+        let mut c = Counter::default();
+        let (_, effects) = record_action(table, r, &mut c);
+        apply_effects(table, effects, &mut |when, key, vals| {
+            let unmet = reach.first_unmet(table, when.iter().map(|(k, s)| (k, s)), None).map(|x| x.0);
+            out.push(ReachEff { when, key, vals, unmet });
+        });
+    }
+    out
+}
+
 /// A start's pair of the verb script and the room (pairs.rs), from its seed values; None when it lacks either.
 fn pair_of(vals: &[(String, Label)]) -> Option<crate::pairs::Pair> {
     let a = crate::pairs::fact_a();
@@ -287,7 +351,8 @@ pub struct ReachState {
     wait_set: FxHashSet<Arc<Wait>>,
     ready_jobs: Vec<u32>,
     ready_guides: BTreeMap<u32, Vec<Guide>>,
-    fresh: Vec<(String, Label)>,
+    /// values written this round, by fact, in the order written (a fact's values together as one effect wrote them)
+    fresh: Vec<(String, Labels)>,
     effects: FxHashMap<String, Vec<PendingEff>>,
     todo: Vec<Event>,
     pub rounds: i64,
@@ -298,6 +363,13 @@ pub struct ReachState {
     pub(crate) pairs: Option<crate::pairs::Pairs>,
     pair_waits: BTreeMap<u32, (Labels, Labels)>,
     pairs_held: usize,
+}
+
+impl ReachState {
+    /// Whether the switch reach_pairs is off for the pass (the switch --prep's reach part is made only then).
+    pub(crate) fn pairs_off(&self) -> bool {
+        self.pairs.is_none()
+    }
 }
 
 impl ReachState {
@@ -445,7 +517,9 @@ impl Builder<'_> {
         match reach.first_unmet(&self.table, when.iter().map(|(k, s)| (k, s)), None) {
             None => {
                 let st = self.reach_state.as_mut().unwrap();
-                st.fresh.extend(vals.into_iter().map(|v| (key.to_string(), v)));
+                if !vals.is_empty() {
+                    st.fresh.push((key.to_string(), vals));
+                }
             }
             Some((k, _)) => {
                 let st = self.reach_state.as_mut().unwrap();
@@ -454,44 +528,12 @@ impl Builder<'_> {
         }
     }
 
-    /// A written value as (d) takes it: `packed.rs` writes a value past a domain's bounds as the collapsed value, and
-    /// taskcore's load gives a value the domain lacks no index (K_BAD, which reaches nothing).
-    fn reach_value(&self, key: &str, l: Label) -> Option<Label> {
-        value_of(&self.table, key, l)
-    }
-
     /// (d)'s effects of a written record (`packed.rs` of taskcore: `add` as one effect per current value).
     fn reach_apply(&mut self, reach: &Reached, effects: Vec<TEffect>) {
-        for e in effects {
-            if let Some(d) = e.add {
-                let dom = self.table.domain(&e.key).expect("a step's fact has a domain").into_owned();
-                let size = dom.values.len();
-                let own: Option<Labels> = e.when.iter().rev().find(|(f, s)| *f == e.key && s.iter().filter(|x| dom.contains(**x)).count() < size).map(|x| x.1.clone());
-                let rest: Vec<(String, Labels)> = e.when.iter().filter(|(f, _)| *f != e.key).cloned().collect();
-                for &u in &dom.values {
-                    if own.as_ref().is_some_and(|o| !o.contains(&u)) {
-                        continue;
-                    }
-                    let nxt = dom.add(u, d);
-                    if nxt.is_empty() || (size == 1 && nxt == [u]) {
-                        continue;
-                    }
-                    let mut w = rest.clone();
-                    w.push((e.key.clone(), vec![u]));
-                    self.reach_effect(reach, w, &e.key, nxt);
-                }
-                continue;
-            }
-            let vals: Labels = match (e.value, &e.values) {
-                (Some(v), _) => vec![v],
-                (None, Some(vs)) => vs.clone(),
-                _ => continue,
-            };
-            let got: Vec<Option<Label>> = vals.iter().map(|&v| self.reach_value(&e.key, v)).collect();
-            if got.iter().any(|x| x.is_none()) {
-                continue;
-            }
-            self.reach_effect(reach, e.when.clone(), &e.key, got.into_iter().flatten().collect());
+        let mut out = Vec::new();
+        apply_effects(&self.table, effects, &mut |when, key, vals| out.push((when, key, vals)));
+        for (when, key, vals) in out {
+            self.reach_effect(reach, when, &key, vals);
         }
     }
 
@@ -504,6 +546,22 @@ impl Builder<'_> {
             for h in held {
                 st.add_wait(Wait { job: id, guide: Some(h.guide), key: h.key, set: h.set });
             }
+        }
+        if let Some(effs) = self.job_prep.as_mut().and_then(|p| p.reach.take()) {
+            // the switch --prep: `reach_apply` and `reach_effect` worked out where the job ran (`reach_prep`)
+            let st = self.reach_state.as_mut().unwrap();
+            assert!(st.pairs.is_none(), "--prep: not with reach_pairs");
+            for e in effs {
+                match e.unmet {
+                    None => {
+                        if !e.vals.is_empty() {
+                            st.fresh.push((e.key, e.vals));
+                        }
+                    }
+                    Some(k) => st.effects.entry(k).or_default().push(PendingEff { when: e.when, key: e.key, vals: e.vals }),
+                }
+            }
+            return;
         }
         for r in recs {
             let mut c = Counter::default();
@@ -561,14 +619,20 @@ impl Builder<'_> {
             {
                 let mut i = reach.w();
                 let now = i.now;
-                for (k, l) in fresh {
+                for (k, ls) in fresh {
                     if !i.vals.contains_key(&k) {
                         let m: FxHashMap<Label, u32> = default_of(&self.table, &k).into_iter().map(|d| (d, 0)).collect();
                         i.vals.insert(k.clone(), m);
                     }
                     let m = i.vals.get_mut(&k).unwrap();
-                    if !m.contains_key(&l) {
-                        m.insert(l, now);
+                    let mut new = false;
+                    for l in ls {
+                        if !m.contains_key(&l) {
+                            m.insert(l, now);
+                            new = true;
+                        }
+                    }
+                    if new {
                         new_keys.insert(k.clone());
                         woken.push(k);
                     }
@@ -624,7 +688,7 @@ impl Builder<'_> {
     /// is what they reach.
     pub(crate) fn reach_folded(&mut self, name: &str) {
         if let Some(st) = &mut self.reach_state {
-            st.fresh.push((format!("args:{name}"), Label::Int(0)));
+            st.fresh.push((format!("args:{name}"), vec![Label::Int(0)]));
         }
     }
 
@@ -686,7 +750,7 @@ impl Builder<'_> {
             self.run_jobs_shared(m, jobs_arc, &mut |b: &mut Builder<'_>, recs: Vec<Record>| {
                 b.reach_after_job(&r2, &order[i], &recs);
                 i += 1;
-                nexts.add(&recs);
+                b.next_events_of(&recs, &mut nexts);
                 b.emit(recs, sink);
             });
             self.reach_state.as_mut().unwrap().todo.extend(nexts.events);
@@ -801,7 +865,7 @@ impl Builder<'_> {
                 }
             }
         }
-        st.fresh.extend(vals);
+        st.fresh.extend(vals.into_iter().map(|(k, l)| (k, vec![l])));
         self.reach_commit(&reach);
         let jobs = self.reach_batch(&reach, skip);
         self.reach_rounds(m, jobs, skip, &mut sink);

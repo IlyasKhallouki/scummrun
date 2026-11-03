@@ -43,6 +43,30 @@ pub struct Writer {
     pub n_actions: u32,
     pub words: u64,
     body_start: u64,
+    /// per action written: the word offset of its length word, its record number and its label's string id, and
+    /// whether it names an `args:` fact in its precondition or in a set (the only entries the folded lists' rewrite
+    /// changes, `rewrite_action`)
+    pub acts: Vec<(u64, u32, u32, bool)>,
+    /// the action being written (reused)
+    buf: Vec<u8>,
+    out: Vec<u32>,
+}
+
+/// What a reader of the packed file reads of its tables (E011 `reading.idx` and `reading.json`): the strings, each
+/// fact's key and values' texts in the file's order, the goal's keys and values' texts.
+#[derive(Clone, Debug, Default)]
+pub struct Tables {
+    pub strings: Vec<String>,
+    pub facts: Vec<(String, Vec<String>)>,
+    pub goal: Vec<(String, Vec<String>)>,
+}
+
+/// The packed file as written: its actions' word offsets and (record, label string id), its tables.
+#[derive(Clone, Debug, Default)]
+pub struct Written {
+    pub words: Vec<u64>,
+    pub rec_label: Vec<(u32, u32)>,
+    pub tables: Tables,
 }
 
 /// A precondition or condition entry: (fact key, values).
@@ -63,6 +87,9 @@ impl Writer {
             n_actions: 0,
             words: 0,
             body_start: 0,
+            acts: Vec::new(),
+            buf: Vec::with_capacity(4096),
+            out: Vec::with_capacity(1024),
         };
         w.put(&[MAGIC, VERSION])?;
         w.body_start = w.words;
@@ -131,8 +158,13 @@ impl Writer {
         effects: &[TEffect],
         lab: &dyn Fn(&str, Label) -> Label,
     ) -> io::Result<()> {
-        let mut out: Vec<u32> = vec![rec];
-        out.push(self.s(label));
+        let mut out: Vec<u32> = std::mem::take(&mut self.out);
+        out.clear();
+        out.push(rec);
+        let label_id = self.s(label);
+        let has_args = pre.iter().any(|(k, _)| k.starts_with("args:")) || effects.iter().any(|e| e.value.is_some() && e.key.starts_with("args:"));
+        self.acts.push((self.words, rec, label_id, has_args));
+        out.push(label_id);
         out.push(self.s(kind));
         out.push(self.s(end));
         out.push(self.s(cont));
@@ -177,18 +209,40 @@ impl Writer {
                 self.set_entry(&mut out, wk, wv);
             }
         }
-        self.put(&[out.len() as u32])?;
-        self.put(&out)?;
+        // the action's words in one write
+        let mut b = std::mem::take(&mut self.buf);
+        b.clear();
+        b.extend_from_slice(&(out.len() as u32).to_le_bytes());
+        for x in &out {
+            b.extend_from_slice(&x.to_le_bytes());
+        }
+        self.f.write_all(&b)?;
+        self.words += 1 + out.len() as u64;
+        self.buf = b;
+        self.out = out;
         self.n_actions += 1;
         Ok(())
     }
 
     /// The tables and the footer (export_records.py `Writer.close`): `goal` {key: values}, `starts` (name, facts).
-    pub fn close(mut self, goal: &[(String, Labels)], starts: &[(String, Facts)], dom: &dyn Fn(&str) -> Domain) -> io::Result<WriterInfo> {
+    pub fn close(self, goal: &[(String, Labels)], starts: &[(String, Facts)], dom: &dyn Fn(&str) -> Domain) -> io::Result<WriterInfo> {
+        self.close_tables(goal, starts, dom).map(|x| x.0)
+    }
+
+    /// `close`, with the tables' texts as a reader of the file reads them (`Tables`) and the actions written (`acts`).
+    pub fn close_tables(
+        mut self,
+        goal: &[(String, Labels)],
+        starts: &[(String, Facts)],
+        dom: &dyn Fn(&str) -> Domain,
+    ) -> io::Result<(WriterInfo, Tables, Vec<(u64, u32, u32, bool)>)> {
         for (k, _) in goal {
             self.fact(k);
         }
         let doms: Vec<Domain> = self.flist.iter().map(|k| dom(k)).collect();
+        let tab_facts: Vec<(String, Vec<String>)> =
+            self.flist.iter().zip(&doms).map(|(k, d)| (k.clone(), d.values.iter().map(|v| v.text()).collect())).collect();
+        let mut tab_goal: Vec<(String, Vec<String>)> = Vec::new();
         let mut facts_arr = vec![self.flist.len() as u32];
         for (k, d) in self.flist.clone().iter().zip(&doms) {
             facts_arr.push(self.s(k));
@@ -222,6 +276,7 @@ impl Writer {
                 }
             }
             goal_arr.extend([fid, labs.len() as u32]);
+            tab_goal.push((k.clone(), labs.iter().map(|l| l.text()).collect()));
             for l in labs {
                 goal_arr.push(self.s(&l.text()));
             }
@@ -263,7 +318,9 @@ impl Writer {
         ];
         self.put(&footer)?;
         self.f.flush()?;
-        Ok(WriterInfo { actions: self.n_actions, facts: self.flist.len(), strings: self.slist.len(), bytes: self.words * 4, zeroed: 0 })
+        let info = WriterInfo { actions: self.n_actions, facts: self.flist.len(), strings: self.slist.len(), bytes: self.words * 4, zeroed: 0 };
+        let tables = Tables { strings: std::mem::take(&mut self.slist), facts: tab_facts, goal: tab_goal };
+        Ok((info, tables, std::mem::take(&mut self.acts)))
     }
 }
 
@@ -479,6 +536,23 @@ impl RecordStream {
         Ok(())
     }
 
+    /// `records_with` on records the switch --prep worked out where their job ran (`prep_records`, one per record):
+    /// the same actions, folds and calls of `written`.
+    pub fn records_prepared(&mut self, first: usize, preps: Vec<RecPrep>, written: &mut dyn FnMut(usize)) -> io::Result<()> {
+        let w = self.w.as_mut().unwrap();
+        for (j, p) in preps.into_iter().enumerate() {
+            if !self.seen.insert(p.hash0) {
+                self.folded_written += 1;
+                continue;
+            }
+            // the effects' values are labelled already
+            w.action((first + j) as u32, &p.label, &p.kind, &p.end, &p.cont, p.cost.unwrap_or(1), &p.pre, &p.effects, &|_, v| v)?;
+            self.written.push((p.parts, p.step_room));
+            written(j);
+        }
+        Ok(())
+    }
+
     /// The tables and the footer; then the fold and the values of lists folded since their records were written.
     /// Returns the file's info and the records folded (as build_task's `folded`).
     pub fn finish(self, b: &mut Builder, goal: &[(String, Labels)], starts: &[(String, Facts)]) -> io::Result<(WriterInfo, usize)> {
@@ -488,11 +562,21 @@ impl RecordStream {
     /// `finish`, with which of the written actions the file keeps (false: folded at the end into an earlier one by
     /// the rewrite of the folded lists), one per action written, in order.
     pub fn finish_keep(
-        mut self,
+        self,
         b: &mut Builder,
         goal: &[(String, Labels)],
         starts: &[(String, Facts)],
     ) -> io::Result<(WriterInfo, usize, Vec<bool>)> {
+        self.finish_written(b, goal, starts).map(|(info, folded, keep, _)| (info, folded, keep))
+    }
+
+    /// `finish_keep`, with the final file's actions and tables as a reader of it reads them (`Written`).
+    pub fn finish_written(
+        mut self,
+        b: &mut Builder,
+        goal: &[(String, Labels)],
+        starts: &[(String, Facts)],
+    ) -> io::Result<(WriterInfo, usize, Vec<bool>, Written)> {
         let mut w = self.w.take().unwrap();
         let zero = w.s("0");
         let mut seen: FxHashSet<[u8; 16]> = FxHashSet::default();
@@ -504,15 +588,93 @@ impl RecordStream {
             b.folded.iter().filter_map(|&x| w.strings.get(&Label::Int(x).text()).copied()).collect();
         let args_facts: FxHashSet<u32> =
             w.flist.iter().enumerate().filter(|(_, k)| k.starts_with("args:")).map(|(i, _)| i as u32).collect();
-        let mut info = w.close(goal, starts, &table_dom(&b.table))?;
+        let (mut info, tables, acts) = w.close_tables(goal, starts, &table_dom(&b.table))?;
+        let mut words: Vec<u64> = acts.iter().map(|a| a.0).collect();
         if dropped > 0 || !folded_ids.is_empty() {
-            info = rewrite_body(&self.path, info, &keep, &args_facts, &folded_ids, zero)?;
+            let has_args: Vec<bool> = acts.iter().map(|a| a.3).collect();
+            (info, words) = rewrite_body(&self.path, info, &keep, &has_args, &args_facts, &folded_ids, zero)?;
         }
+        let rec_label: Vec<(u32, u32)> = acts.iter().zip(&keep).filter(|(_, k)| **k).map(|(a, _)| (a.1, a.2)).collect();
+        assert_eq!(words.len(), rec_label.len(), "one word offset per action kept");
         if steps > 0 {
             b.counts.add(STEP_ROOM, steps as i64);
         }
-        Ok((info, self.folded_written + dropped, keep))
+        Ok((info, self.folded_written + dropped, keep, Written { words, rec_label, tables }))
     }
+}
+
+/// One record as `RecordStream::records_with` works it out before it writes it (the switch --prep, made where the
+/// record's job ran): its cost, its fold key's parts and their hash as written, its action's precondition and effects
+/// (the effects' values labelled by their domains' bounds), its count of steps that need room, its `_cont`.
+pub struct RecPrep {
+    /// the record's label, kind and end (`end_text`)
+    pub label: String,
+    pub kind: String,
+    pub end: String,
+    cost: Option<u32>,
+    parts: FoldParts,
+    hash0: [u8; 16],
+    pre: Vec<(String, Labels)>,
+    effects: Vec<TEffect>,
+    step_room: u32,
+    cont: String,
+}
+
+/// `RecordStream::records_with`'s work on `recs` before it writes them: a function of the records, the frame costs
+/// and the bounds of the table's domains (which change only between passes), so the same in the worker that made
+/// them as on the sink's thread.
+pub fn prep_records(costs: Option<&FrameCosts>, recs: &[Record], table: &FactTable) -> Vec<RecPrep> {
+    let none = BTreeSet::new();
+    let mut bounds: FxHashMap<&str, (Option<i64>, Option<i64>)> = FxHashMap::default();
+    for r in recs {
+        for (k, _) in &r.effects {
+            if !bounds.contains_key(k.as_str()) {
+                let b = if k.starts_with("args:") || crate::table::pos_key(k).is_some() {
+                    (None, None)
+                } else {
+                    let d = table.domain(k).unwrap_or_else(|| panic!("no domain for {k}"));
+                    (d.low, d.high)
+                };
+                bounds.insert(k.as_str(), b);
+            }
+        }
+    }
+    let lab = |k: &str, v: Label| match (v, bounds[k]) {
+        (Label::Int(n), (_, Some(h))) if n > h => Label::Above,
+        (Label::Int(n), (Some(l), _)) if n < l => Label::Below,
+        _ => v,
+    };
+    let mut counts = Counter::default();
+    recs.iter()
+        .map(|r| {
+            let cost = costs.map(|fc| fc.cost(r));
+            let parts = fold_parts_cost(r, cost);
+            let hash0 = parts.hash_after(&none);
+            counts.clear();
+            let (pre, mut effects) = record_action(table, r, &mut counts);
+            for e in &mut effects {
+                if let Some(v) = e.value {
+                    e.value = Some(lab(&e.key, v));
+                } else if let Some(vs) = &mut e.values {
+                    for v in vs.iter_mut() {
+                        *v = lab(&e.key, *v);
+                    }
+                }
+            }
+            RecPrep {
+                label: r.label.clone(),
+                kind: r.kind.clone(),
+                end: r.end_text().to_string(),
+                cost,
+                parts,
+                hash0,
+                pre,
+                effects,
+                step_room: counts.get(STEP_ROOM) as u32,
+                cont: cont(r),
+            }
+        })
+        .collect()
 }
 
 fn read_words(r: &mut impl io::Read, n: usize, buf: &mut Vec<u32>) -> io::Result<()> {
@@ -587,9 +749,18 @@ fn rewrite_action(a: &[u32], args_facts: &FxHashSet<u32>, folded: &FxHashSet<u32
     out
 }
 
-/// The packed file at `path` again, streaming: the actions `keep` marks, rewritten by [`rewrite_action`]; the
-/// tables as they were; the footer's count and offsets moved.
-fn rewrite_body(path: &Path, info: WriterInfo, keep: &[bool], args_facts: &FxHashSet<u32>, folded: &FxHashSet<u32>, zero: u32) -> io::Result<WriterInfo> {
+/// The packed file at `path` again, streaming: the actions `keep` marks, rewritten by [`rewrite_action`] (only those
+/// `has_args` marks can change, and only when a list is folded: the others are copied as they are); the tables as they
+/// were; the footer's count and offsets moved. Returns the info and the word offset of each action kept.
+fn rewrite_body(
+    path: &Path,
+    info: WriterInfo,
+    keep: &[bool],
+    has_args: &[bool],
+    args_facts: &FxHashSet<u32>,
+    folded: &FxHashSet<u32>,
+    zero: u32,
+) -> io::Result<(WriterInfo, Vec<u64>)> {
     use std::io::{BufReader, Read};
     let mut f = File::open(path)?;
     let total = f.metadata()?.len() / 4;
@@ -600,9 +771,9 @@ fn rewrite_body(path: &Path, info: WriterInfo, keep: &[bool], args_facts: &FxHas
     let (body_start, n_actions, off_strings) = (footer[0] as u64, footer[1] as usize, footer[2] as u64);
     assert_eq!(n_actions, keep.len(), "one written action per kept fold key");
     f.seek(SeekFrom::Start(0))?;
-    let mut r = BufReader::with_capacity(1 << 20, f);
+    let mut r = BufReader::with_capacity(4 << 20, f);
     let tmp = path.with_extension("rewrite");
-    let mut out = BufWriter::with_capacity(1 << 20, File::create(&tmp)?);
+    let mut out = BufWriter::with_capacity(4 << 20, File::create(&tmp)?);
     let mut buf = Vec::new();
     read_words(&mut r, body_start as usize, &mut buf)?;
     let mut words = body_start;
@@ -616,18 +787,32 @@ fn rewrite_body(path: &Path, info: WriterInfo, keep: &[bool], args_facts: &FxHas
     let mut kept = 0u32;
     let mut zeroed = 0u64;
     let mut at = body_start;
-    for &k in keep {
-        read_words(&mut r, 1, &mut buf)?;
-        let len = buf[0] as usize;
-        read_words(&mut r, len, &mut buf)?;
+    let mut offs = Vec::with_capacity(keep.len());
+    let mut bytes: Vec<u8> = Vec::with_capacity(4096);
+    let mut lenb = [0u8; 4];
+    for (i, &k) in keep.iter().enumerate() {
+        r.read_exact(&mut lenb)?;
+        let len = u32::from_le_bytes(lenb) as usize;
+        bytes.resize(4 * len, 0);
+        r.read_exact(&mut bytes)?;
         at += 1 + len as u64;
         if !k {
             continue;
         }
-        let a = rewrite_action(&buf, args_facts, folded, zero, &mut zeroed);
-        put(&mut out, &[a.len() as u32])?;
-        put(&mut out, &a)?;
-        words += 1 + a.len() as u64;
+        offs.push(words);
+        if folded.is_empty() || !has_args[i] {
+            // nothing in it the rewrite changes: as it is
+            out.write_all(&lenb)?;
+            out.write_all(&bytes)?;
+            words += 1 + len as u64;
+        } else {
+            buf.clear();
+            buf.extend(bytes.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])));
+            let a = rewrite_action(&buf, args_facts, folded, zero, &mut zeroed);
+            put(&mut out, &[a.len() as u32])?;
+            put(&mut out, &a)?;
+            words += 1 + a.len() as u64;
+        }
         kept += 1;
     }
     assert_eq!(at, off_strings, "the body ends where the tables start");
@@ -645,5 +830,5 @@ fn rewrite_body(path: &Path, info: WriterInfo, keep: &[bool], args_facts: &FxHas
     out.flush()?;
     drop(out);
     std::fs::rename(&tmp, path)?;
-    Ok(WriterInfo { actions: kept, bytes: std::fs::metadata(path)?.len(), zeroed, ..info })
+    Ok((WriterInfo { actions: kept, bytes: std::fs::metadata(path)?.len(), zeroed, ..info }, offs))
 }

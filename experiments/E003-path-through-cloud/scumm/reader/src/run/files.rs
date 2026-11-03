@@ -59,6 +59,8 @@ pub struct Files {
     pub busy: f64,
     pub busy_cpu: f64,
     line: String,
+    /// the switch --prep: the actions file's sha1 is made at the end, off the sink's thread (`finish`)
+    pub sha_at_end: bool,
 }
 
 /// Python's `str()` of a decoded golden value that is not a bool or None (`_flag_json`'s text).
@@ -107,8 +109,15 @@ fn side_json(p: &Py, out: &mut String) {
 
 /// packed_reading.py `line_of_golden(i, rec, r)` as `json.dumps` writes it, with its newline.
 pub fn action_line(out: &mut String, i: usize, rec: usize, r: &Record) {
+    let _ = write!(out, "{{\"i\": {i}, \"rec\": {rec}");
+    action_line_tail(out, r);
+}
+
+/// `action_line` after its `{"i": N, "rec": M` (the switch --prep makes it where the record's job ran; the numbers
+/// are the sink's).
+pub fn action_line_tail(out: &mut String, r: &Record) {
     use scumm_ir::json::write_str;
-    let _ = write!(out, "{{\"i\": {i}, \"rec\": {rec}, \"label\": ");
+    out.push_str(", \"label\": ");
     write_str(&r.label, out);
     out.push_str(", \"source\": ");
     match &r.source {
@@ -214,13 +223,36 @@ pub fn list_lines(
     }
 }
 
-/// CPU seconds of the calling thread so far (/proc/thread-self/schedstat: its run time in ns); 0 where unknown.
-pub fn thread_cpu() -> f64 {
-    std::fs::read_to_string("/proc/thread-self/schedstat")
-        .ok()
-        .and_then(|t| t.split_whitespace().next().and_then(|x| x.parse::<u64>().ok()))
-        .map_or(0.0, |ns| ns as f64 / 1e9)
+/// `list_lines` of one record with no list seen yet: every (name, w, sig) it would write, in order, with its line;
+/// the sink keeps those it has not seen (the switch --prep makes these where the record's job ran).
+pub fn list_candidates(r: &Record, flags: bool) -> Vec<((String, i64, i64), String)> {
+    let mut seen = FxHashSet::default();
+    let mut out = Vec::new();
+    if !r.next_events.is_empty() {
+        list_lines(r, flags, &mut seen, &mut out);
+    }
+    out
 }
+
+/// The line files' part of the switch --prep for one record: its action line after `{"i": N, "rec": M`, and its
+/// list lines (`list_candidates`).
+pub struct LinePrep {
+    tail: String,
+    lists: Vec<((String, i64, i64), String)>,
+}
+
+/// The line files' part of the switch --prep for a job's records, one per record.
+pub fn prep_lines(recs: &[Record], flags: bool) -> Vec<LinePrep> {
+    recs.iter()
+        .map(|r| {
+            let mut tail = String::with_capacity(256);
+            action_line_tail(&mut tail, r);
+            LinePrep { tail, lists: list_candidates(r, flags) }
+        })
+        .collect()
+}
+
+pub use crate::par::thread_cpu;
 
 fn sha1_hex(d: &[u8; 20]) -> String {
     d.iter().map(|b| format!("{b:02x}")).collect()
@@ -252,6 +284,7 @@ impl Files {
             busy: 0.0,
             busy_cpu: 0.0,
             line: String::with_capacity(4096),
+            sha_at_end: false,
         })
     }
 
@@ -291,6 +324,38 @@ impl Files {
         Ok(())
     }
 
+    /// `batch` on records the switch --prep worked out where their job ran (`prep_lines`, one per record): the same
+    /// lines.
+    pub fn batch_prepared(&mut self, first: usize, preps: Vec<LinePrep>, written: &[usize]) -> io::Result<()> {
+        let t = Instant::now();
+        let n = preps.len();
+        let mut tails = Vec::with_capacity(n);
+        for p in preps {
+            for (k, line) in p.lists {
+                if !self.seen.contains(&k) {
+                    self.seen.insert(k.clone());
+                    self.lists.push((k, line));
+                }
+            }
+            tails.push(p.tail);
+        }
+        for &j in written {
+            self.line.clear();
+            let _ = write!(self.line, "{{\"i\": {}, \"rec\": {}", self.act_off.len(), first + j);
+            self.line.push_str(&tails[j]);
+            self.act_off.push(self.act_end);
+            self.act_end += self.line.len() as u64;
+            if !self.sha_at_end {
+                self.act_sha.update(self.line.as_bytes());
+            }
+            self.actions.write_all(self.line.as_bytes())?;
+        }
+        self.n_records += n;
+        // (the thread's CPU is not asked per batch: the sink thread's is reported whole)
+        self.busy += t.elapsed().as_secs_f64();
+        Ok(())
+    }
+
     /// The line files made final (module docstring): the actions the packed file kept (`keep`, one per action
     /// written), numbered again when some went; the lists less the `folded` ones, then the `extra` lists (the
     /// report's `slot_events`) not among them.
@@ -302,7 +367,8 @@ impl Files {
         let (action_off, sha_actions) = if keep.iter().all(|k| *k) {
             let mut off = self.act_off;
             off.push(self.act_end);
-            (off, self.act_sha.digest().bytes())
+            let sha = if self.sha_at_end { file_sha1(&path)? } else { self.act_sha.digest().bytes() };
+            (off, sha)
         } else {
             renumber(&path, keep)?
         };
@@ -410,6 +476,11 @@ impl Tc {
         }
     }
 
+    /// What `read` reads, from what the writer wrote (packed.rs `Written`), with the file's sha1.
+    pub fn from_written(w: crate::packed::Written, sha1: [u8; 20]) -> Tc {
+        Tc { sha1, words: w.words, rec_label: w.rec_label, strings: w.tables.strings, facts: w.tables.facts, goal: w.tables.goal }
+    }
+
     /// Reads the packed file (taskcore/README.md, version 1) once, front to back.
     pub fn read(path: &Path) -> io::Result<Tc> {
         let bad = |what: &str| io::Error::new(io::ErrorKind::InvalidData, format!("{}: {what}", path.display()));
@@ -490,6 +561,21 @@ impl Tc {
         }
         Ok(Tc { sha1: sha.digest().bytes(), words, rec_label, strings, facts, goal })
     }
+}
+
+/// sha1 of a file's bytes.
+pub fn file_sha1(path: &Path) -> io::Result<[u8; 20]> {
+    let mut f = File::open(path)?;
+    let mut h = sha1_smol::Sha1::new();
+    let mut buf = vec![0u8; 4 << 20];
+    loop {
+        let n = f.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        h.update(&buf[..n]);
+    }
+    Ok(h.digest().bytes())
 }
 
 /// `reading.idx` (plan.md, F3).
