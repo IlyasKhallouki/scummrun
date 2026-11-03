@@ -10,6 +10,8 @@
 # usage: g6.sh OUT
 #   G6_ARGS: more reader-scope switches (round 2: --prep); G6_THREADS: the readings' threads (3); G6_NOGOLDEN=1: no
 #   --golden (the files fmi reads, as fmi asks them; the golden body and builder line are then not compared)
+#   G6_PARTS: which checks (default "kitchen off memo89 memo33": the golden; memo off; the refinement pair; the fresh
+#   ring(33) pair)
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
@@ -66,7 +68,9 @@ files() { # TAG REFDIR|SHA1FILE: the four files against readio's reference
 }
 drop() { rm -f $OUT/$1/reading.tc $OUT/$1/*.golden.jsonl.gz $OUT/$1/reading.actions.jsonl $OUT/$1/reading.lists.jsonl \
            $OUT/$1/reading.idx; }
+part() { [[ " ${G6_PARTS:-kitchen off memo89 memo33} " == *" $1 "* ]]; }  # G6_PARTS: the checks to run
 
+if part kitchen; then
 echo "[$(date +%T)] kitchen golden (reader-port)"
 d=$OUT/kitchen; rm -rf $d; mkdir -p $d
 TIMEFORMAT="%R %U %S"
@@ -76,7 +80,9 @@ s=$(sha1sum < $d/kitchen.tc | cut -c1-8)
 grep -iE "compared|differ" $d/guard.log | tail -3
 [ "$s" = 279b7a24 ] || bad=1
 echo "kitchen packed $s (want 279b7a24): $([ "$s" = 279b7a24 ] && echo pass || echo FAIL); wall/user/sys $(cat $d/time)"
+fi
 
+if part off; then
 echo "[$(date +%T)] memo off"
 read1 r38 33,38,83,85,96 $ROWS38 "00dbb753 f8caa72f fb177a89 90b3d43a"
 files r38 $RIO/ref/r38; drop r38
@@ -84,12 +90,17 @@ read1 r33 28,33,35,38 $IN/ring33-j00089.jsonl "a1ed4f5c d4dbc9fe 59faac2f 9b0c87
 files r33 $RIO/r33-files.sha1; drop r33
 read1 ref89 28,33,35,38 $ROWS33 "397fb6f1 95f02638 494c1368 ab30e2ef" $REF89
 files ref89 $RIO/ref/ref89; drop ref89
+fi
 
 echo "[$(date +%T)] memo on"
+if part memo89; then
 read1 ref89-m1 28,33,35,38 $IN/ring33-j00089.jsonl "397fb6f1 95f02638 494c1368 ab30e2ef" $REF89 --memo $M; drop ref89-m1
 read1 ref89-m2 28,33,35,38 $IN/ring33-j00089.jsonl "397fb6f1 95f02638 494c1368 ab30e2ef" $REF89 --memo $M; drop ref89-m2
+fi
+if part memo33; then
 read1 r33-m1 28,33,35,38 $IN/ring33-j00089.jsonl "a1ed4f5c d4dbc9fe 59faac2f 9b0c87b7" --memo $M2; drop r33-m1
 read1 r33-119-m2 28,33,35,38 $IN/ring33-j00119.jsonl "41eea348 dc7364c8 59faac2f 9b0c87b7" --memo $M2; drop r33-119-m2
+fi
 rm -rf $M $M2
 echo "[$(date +%T)] G6 $([ $bad = 0 ] && echo PASS || echo FAIL)"
 exit $bad
