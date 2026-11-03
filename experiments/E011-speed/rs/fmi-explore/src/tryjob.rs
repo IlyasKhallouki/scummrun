@@ -324,7 +324,8 @@ struct Attempt {
 /// Step 4 for one target (step.py `attempt`): a fork of the returned engine and the harness with step.py's wiring.
 #[allow(clippy::too_many_arguments)]
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
-           adir: &Path, threads: u32, workers: u32, ready: bool, log: &JobLog, cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
+           adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
+           cancel: &Arc<AtomicBool>) -> Result<Attempt, String> {
     let (hgoal, text): (Vec<(Key, Vec<Val>)>, String) = if tg.tier == 0 {
         (goal.iter().map(|(k, vs)| (Key::parse(k), vs.clone())).collect(), step::goal_text(goal)?)
     } else {
@@ -344,6 +345,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
         replan_limit: step::REPLAN_LIMIT,
         time_limit_s: step::TIME_LIMIT,
         plan_time_s: step::plan_time(),
+        first_plan_time_s: first_limit,
         search: r.search,
         cost_caps: true,
         cost_dmax: frame_costs.get("dmax").and_then(|d| d.as_i64()),
@@ -521,14 +523,21 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         let ready = files::truthy(job.get("ready"));
         let mut played: Option<(Target, Attempt)> = None;
         let mut fresh_again = false;
-        let mut queue: std::collections::VecDeque<Target> = ts.into_iter().collect();
+        // E011's deepening (step::deepen): the deferred targets last, each with its doubled limit
+        let deepen = step::deepen();
+        let deferred_in = if deepen.is_some() { step::deferred_of(&job) } else { Default::default() };
+        let mut queue: std::collections::VecDeque<(Target, u32)> = match deepen {
+            Some(_) => step::deepen_order(ts, &deferred_in).into_iter().collect(),
+            None => ts.into_iter().map(|t| (t, 0)).collect(),
+        };
         let mut n_att = 0;
-        while let Some(tg) = queue.pop_front() {
+        while let Some((tg, n_def)) = queue.pop_front() {
             if cancel.load(Ordering::SeqCst) {
                 return Err(Err("the guard's kill".into()));
             }
             let adir = run_dir.join(format!("a{n_att:02}"));
-            let att = attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, log, &cancel_arc).map_err(Err)?;
+            let first_limit = deepen.map(|l0| step::deepen_limit(l0, n_def));
+            let att = attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc).map_err(Err)?;
             prof.mark("attempt");
             n_att += 1;
             let status_ = step::first_plan_status(att.res["plans"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
@@ -545,9 +554,23 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             out["probes"].as_array_mut().unwrap().push(json!({"target": [tg.k, tg.v.json()], "tier": tg.tier, "depth": tg.depth,
                 "status": status_, "stop": att.res.get("stop"), "seconds": pyjson::round(att.secs, 1),
                 "attempt": format!("a{:02}", n_att - 1), "reading": reading_path(&*rd).to_string_lossy(), "dropped": dropped}));
+            if let Some(l) = first_limit {
+                let pr = out["probes"].as_array_mut().unwrap().last_mut().unwrap();
+                pr["limit_s"] = json!(l);
+                pr["deferred_before"] = json!(n_def);
+            }
             if status_.as_deref() == Some("plan") {
                 played = Some((tg, att));
                 break;
+            }
+            if deepen.is_some() && status_.as_deref() == Some("time") {
+                // the first plan ran into its limit: deferred, not tried (later tries retry it with twice the limit)
+                if out.get("deferred").is_none() {
+                    out["deferred"] = json!([]);
+                }
+                out["deferred"].as_array_mut().unwrap().push(json!([tg.k, tg.v.json(), n_def + 1]));
+                log.say(&format!("deferred {} ({} s limit, deferred {} times now)", tg.text(), first_limit.unwrap_or(0), n_def + 1));
+                continue;
             }
             out["tried"].as_array_mut().unwrap().push(json!([tg.k, tg.v.json()]));
             if status_.as_deref() == Some(step::NOT_A_PLAN_RETRY) && !files::truthy(out["reading"].get("fresh")) && !fresh_again {
@@ -562,7 +585,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"]["candidates"] = json!(checked);
                 cpu_add(&mut cpu, "read", cpu_now() - c0);
                 out["tried"].as_array_mut().unwrap().pop();
-                queue.push_front(tg);
+                queue.push_front((tg, n_def));
             }
         }
         prof.mark("probes");
@@ -607,7 +630,9 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                              files::py_str(att.res.get("frames")), out["new"].as_array().unwrap().len()));
         }
         prof.mark("new entries");
-        out["exhausted"] = json!(played_none(&out));
+        // with deepening, an entry whose try deferred a target is not exhausted: the target comes back
+        let deferred_now = out.get("deferred").and_then(|d| d.as_array()).map(|d| !d.is_empty()).unwrap_or(false);
+        out["exhausted"] = json!(played_none(&out) && !deferred_now);
         out["ok"] = json!(true);
         Ok(())
     })();

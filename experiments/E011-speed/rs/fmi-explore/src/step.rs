@@ -24,6 +24,34 @@ pub const PLAN_TIME: u64 = 600;
 pub fn plan_time() -> u64 {
     std::env::var("FMI_PLAN_TIME").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0).unwrap_or(PLAN_TIME)
 }
+/// E011's iterative deepening on planning time (plan.md, amendment "targets with no plan made cheap"): the first
+/// limit L0 in seconds from FMI_PLAN_DEEPEN; None (unset): the old behaviour. A target deferred n times is planned with
+/// L0 * 2^n until its attempt has a plan.
+pub fn deepen() -> Option<u64> {
+    std::env::var("FMI_PLAN_DEEPEN").ok().and_then(|v| v.parse().ok()).filter(|&v| v > 0)
+}
+/// The limit of a target deferred n times: L0 * 2^n (saturating).
+pub fn deepen_limit(l0: u64, n: u32) -> u64 {
+    l0.saturating_mul(1u64.checked_shl(n).unwrap_or(u64::MAX))
+}
+/// job.json's "deferred" [[k, v, n], ...] as {(k, v as canonical json): n}.
+pub fn deferred_of(job: &Value) -> HashMap<String, u32> {
+    let mut out = HashMap::new();
+    for d in job.get("deferred").and_then(|d| d.as_array()).cloned().unwrap_or_default() {
+        let k = d.get(0).and_then(|k| k.as_str()).unwrap_or("").to_string();
+        let n = d.get(2).and_then(|n| n.as_u64()).unwrap_or(0) as u32;
+        out.insert(pair_key(&k, d.get(1).unwrap_or(&Value::Null)), n);
+    }
+    out
+}
+/// The try's target order with deepening: the targets no try deferred in their order, then the deferred ones by how
+/// many times they were deferred (then in their order).
+pub fn deepen_order(ts: Vec<Target>, deferred: &HashMap<String, u32>) -> Vec<(Target, u32)> {
+    let mut out: Vec<(Target, u32)> =
+        ts.into_iter().map(|t| { let n = deferred.get(&pair_key(&t.k, &t.v.json())).copied().unwrap_or(0); (t, n) }).collect();
+    out.sort_by_key(|(_, n)| *n);
+    out
+}
 pub const PLAN_MEMORY: &str = "3G";
 pub const FORK_EACH: u32 = 7;
 /// the first plan's status on which a cached reading is read fresh
