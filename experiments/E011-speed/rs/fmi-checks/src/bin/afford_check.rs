@@ -247,6 +247,7 @@ impl Novelty for NoNovelty {
 
 fn run(a: &Args) -> Res<()> {
     let (out, arch, idx, h, evs, mut e, boot_s) = setup(a)?;
+    let entry_frame = e.status().frame;
     let tested = tested_keys(a.get("tested").ok_or("--tested FILE")?)?;
     let horizon: u64 = a.get("horizon").map(|h| h.parse().map_err(e2s)).transpose()?.unwrap_or(afford::W);
     let repeat: usize = a.get("repeat").map(|h| h.parse().map_err(e2s)).transpose()?.unwrap_or(1);
@@ -300,6 +301,7 @@ fn run(a: &Args) -> Res<()> {
     let mut summary = res.json();
     summary["entry"] = json!(idx);
     summary["frame"] = json!(f0);
+    summary["entry_frame"] = json!(entry_frame);
     summary["boot_s"] = json!(boot_s);
     summary["horizon"] = json!(horizon);
     summary["third_on"] = json!(cfg.third);
