@@ -223,6 +223,7 @@ fn run() -> Result<(), String> {
             },
             time_limit_s: 600,
         };
+        let k0 = taskcore::perf::now();
         let r = if opt.contains_key("--tail-only") {
             match planner.tail_only(&req) {
                 Ok(Some(r)) => Ok(r),
@@ -233,6 +234,7 @@ fn run() -> Result<(), String> {
             planner.plan(&req)
         };
         let tm = planner.last.clone();
+        let (minstr, mcyc) = taskcore::perf::since(k0);
         let (status, n, source, err) = match &r {
             Ok(r) => (r.status.clone(), r.steps.len(), r.source.clone(), String::new()),
             Err(e) => ("error".to_string(), 0, String::new(), format!("{:?}", e)),
@@ -246,7 +248,7 @@ fn run() -> Result<(), String> {
             _ => String::new(),
         };
         println!(
-            "{{\"name\": {}, \"status\": {}, \"source\": {}, \"steps\": {}, \"kept\": {}, \"total_s\": {:.4}, \"cpu_s\": {:.2}, \"key_s\": {:.4}, \"tail_s\": {:.4}, \"reduce_s\": {:.3}, \"build_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"check_s\": {:.4}, \"decode_s\": {:.4}, \"predict_s\": {:.4}, \"store_s\": {:.4}, \"operators\": {}, \"unary\": {}, \"expanded\": {}, \"evaluated\": {}, \"error\": {}{}}}",
+            "{{\"name\": {}, \"status\": {}, \"source\": {}, \"steps\": {}, \"kept\": {}, \"total_s\": {:.4}, \"cpu_s\": {:.2}, \"key_s\": {:.4}, \"tail_s\": {:.4}, \"reduce_s\": {:.3}, \"build_s\": {:.3}, \"relax_s\": {:.3}, \"search_s\": {:.3}, \"check_s\": {:.4}, \"decode_s\": {:.4}, \"predict_s\": {:.4}, \"store_s\": {:.4}, \"operators\": {}, \"unary\": {}, \"expanded\": {}, \"evaluated\": {}, \"minstr\": {:.0}, \"mcycles\": {:.0}, \"reduce_mi\": {:.0}, \"build_mi\": {:.0}, \"search_mi\": {:.0}, \"error\": {}{}}}",
             esc(f[0]),
             esc(&status),
             esc(&source),
@@ -268,6 +270,11 @@ fn run() -> Result<(), String> {
             tm.unary,
             tm.expanded,
             tm.evaluated,
+            minstr,
+            mcyc,
+            tm.reduce_mi,
+            tm.build_mi,
+            tm.search_mi,
             esc(&err),
             tail_info
         );

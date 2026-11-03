@@ -106,6 +106,7 @@ pub struct Expander<'t> {
     pub model: bool,         // the model encoding (module docstring); false: task.py's
     goal_set: Vec<Vec<u32>>, // per fact its goal set when the goal is a set of values, else empty
     pub windows: bool,       // pick windows (module docstring); needs `model`
+    pub fast: bool,          // E011 round 2: the same variants with less work (duplicate effects found by hash)
     pub n_windows: u64,      // the windows of the file (pass1 sets it); `lock` has n_windows + 1 values
 }
 
@@ -175,6 +176,7 @@ impl<'t> Expander<'t> {
             model: false,
             goal_set,
             windows: false,
+            fast: false,
             n_windows: 0,
         }
     }
@@ -276,6 +278,8 @@ impl<'t> Expander<'t> {
         let mut ranges: Vec<(usize, usize)> = Vec::new();
         let mut kept: Vec<(usize, usize)> = Vec::new();
         let mut cidx: Vec<usize> = Vec::new();
+        let mut khash: Vec<u64> = Vec::new();
+        let mut ckbuf: Vec<(u32, usize)> = Vec::new();
         let mut nvariants = 0u64;
         let mut result = Ok(());
         'pre: loop {
@@ -378,7 +382,22 @@ impl<'t> Expander<'t> {
                 }
                 // duplicates written once (dict.fromkeys)
                 kept.clear();
-                if ranges.len() <= 48 {
+                if self.fast && ranges.len() <= 48 {
+                    // the same first occurrences in the same order: a range is compared in full only with the earlier
+                    // kept ones of the same hash
+                    khash.clear();
+                    for &r in &ranges {
+                        let s = &effbuf[r.0..r.1];
+                        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                        for &x in s {
+                            h = (h.rotate_left(5) ^ x as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+                        }
+                        if !kept.iter().zip(&khash).any(|(k, &kh)| kh == h && &effbuf[k.0..k.1] == s) {
+                            kept.push(r);
+                            khash.push(h);
+                        }
+                    }
+                } else if ranges.len() <= 48 {
                     for &r in &ranges {
                         let s = &effbuf[r.0..r.1];
                         if !kept.iter().any(|k| &effbuf[k.0..k.1] == s) {
@@ -398,7 +417,8 @@ impl<'t> Expander<'t> {
                     self.c.empty_variants += 1;
                 } else {
                     if self.check {
-                        if let Err(e) = check_effects(&effbuf, &kept) {
+                        let r = if self.fast { check_effects_fast(&effbuf, &kept, &mut ckbuf) } else { check_effects(&effbuf, &kept) };
+                        if let Err(e) = r {
                             result = Err(format!("{}: {}", t.name(ai), e));
                             break 'pre;
                         }
@@ -519,6 +539,122 @@ fn check_effects(effbuf: &[u32], kept: &[(usize, usize)]) -> Result<(), String> 
                         let eb = &effbuf[kept[by[b].1].0..kept[by[b].1].1];
                         if ea[1] != eb[1] && compatible(ea, eb) {
                             return Err(format!("two effects on fact {} can both happen", ea[0]));
+                        }
+                    }
+                }
+            }
+        }
+        i = j;
+    }
+    Ok(())
+}
+
+/// `check_effects`, the same answer (Ok, or the same message: it names the first fact, in fact order, with two effects
+/// that can both happen; `compatible` is symmetric, so which pair is found does not matter). Two effects on one fact
+/// are `compatible` exactly when their conditions give the keys both name the same (last) values. So, within one
+/// fact's effects, grouped by the set of keys their conditions name: for each two such sets (a set with itself
+/// included), the effects of both are sorted by their values on the keys the sets share, and a pair writing different
+/// values with the same such values, one effect from each set, is a compatible pair.
+fn check_effects_fast(effbuf: &[u32], kept: &[(usize, usize)], by: &mut Vec<(u32, usize)>) -> Result<(), String> {
+    by.clear();
+    by.extend(kept.iter().enumerate().map(|(i, r)| (effbuf[r.0], i)));
+    by.sort_unstable();
+    let mut maps: Vec<u32> = Vec::new();
+    let mut moff: Vec<usize> = Vec::new();
+    let mut i = 0;
+    while i < by.len() {
+        let mut j = i;
+        while j < by.len() && by[j].0 == by[i].0 {
+            j += 1;
+        }
+        if j - i > 1 {
+            let v0 = effbuf[kept[by[i].1].0 + 1];
+            if by[i..j].iter().any(|&(_, k)| effbuf[kept[k].0 + 1] != v0) {
+                let eff = |a: usize| &effbuf[kept[by[a].1].0..kept[by[a].1].1];
+                // each effect's conditions as (key, last value), sorted by key
+                maps.clear();
+                moff.clear();
+                for a in i..j {
+                    let e = eff(a);
+                    let st = maps.len();
+                    moff.push(st);
+                    let nc = e[2] as usize;
+                    for c in 0..nc {
+                        let key = e[3 + 2 * c];
+                        if (c + 1..nc).any(|l| e[3 + 2 * l] == key) {
+                            continue;
+                        }
+                        maps.push(key);
+                        maps.push(e[4 + 2 * c]);
+                    }
+                    let m = &mut maps[st..];
+                    let np = m.len() / 2;
+                    for x in 1..np {
+                        let mut y = x;
+                        while y > 0 && m[2 * (y - 1)] > m[2 * y] {
+                            m.swap(2 * (y - 1), 2 * y);
+                            m.swap(2 * (y - 1) + 1, 2 * y + 1);
+                            y -= 1;
+                        }
+                    }
+                }
+                moff.push(maps.len());
+                let n = j - i;
+                let map = |x: usize| &maps[moff[x]..moff[x + 1]];
+                let val = |x: usize| eff(i + x)[1];
+                // the key sets: each effect's set's number (by its first effect)
+                let mut set_of: Vec<usize> = Vec::with_capacity(n);
+                let mut firsts: Vec<usize> = Vec::new();
+                for x in 0..n {
+                    let same = |y: usize| {
+                        let (a, b) = (map(x), map(y));
+                        a.len() == b.len() && (0..a.len() / 2).all(|p| a[2 * p] == b[2 * p])
+                    };
+                    match firsts.iter().position(|&y| same(y)) {
+                        Some(s) => set_of.push(s),
+                        None => {
+                            set_of.push(firsts.len());
+                            firsts.push(x);
+                        }
+                    }
+                }
+                let mut proj: Vec<u32> = Vec::new();
+                let mut items: Vec<(usize, usize, usize)> = Vec::new();
+                for s in 0..firsts.len() {
+                    for t in s..firsts.len() {
+                        // the shared keys, and each effect's values on them (in key order)
+                        let (ks, kt) = (map(firsts[s]), map(firsts[t]));
+                        let shared: Vec<u32> = (0..ks.len() / 2).map(|p| ks[2 * p]).filter(|k| (0..kt.len() / 2).any(|q| kt[2 * q] == *k)).collect();
+                        proj.clear();
+                        items.clear();
+                        for x in (0..n).filter(|&x| set_of[x] == s || set_of[x] == t) {
+                            let m = map(x);
+                            let st = proj.len();
+                            for &k in &shared {
+                                let p = (0..m.len() / 2).find(|&p| m[2 * p] == k).unwrap();
+                                proj.push(m[2 * p + 1]);
+                            }
+                            items.push((st, proj.len(), x));
+                        }
+                        items.sort_unstable_by(|a, b| proj[a.0..a.1].cmp(&proj[b.0..b.1]));
+                        let mut p = 0;
+                        while p < items.len() {
+                            let mut q = p;
+                            while q < items.len() && proj[items[q].0..items[q].1] == proj[items[p].0..items[p].1] {
+                                q += 1;
+                            }
+                            let run = &items[p..q];
+                            let found = if s == t {
+                                run.iter().any(|it| val(it.2) != val(run[0].2))
+                            } else {
+                                let from_s = run.iter().any(|it| set_of[it.2] == s);
+                                let from_t = run.iter().any(|it| set_of[it.2] == t);
+                                from_s && from_t && run.iter().any(|it| val(it.2) != val(run[0].2))
+                            };
+                            if found {
+                                return Err(format!("two effects on fact {} can both happen", eff(i)[0]));
+                            }
+                            p = q;
                         }
                     }
                 }

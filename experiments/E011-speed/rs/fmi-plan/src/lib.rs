@@ -54,6 +54,8 @@ pub struct Host {
     pub downward: PathBuf,
     /// where Fast Downward's files go
     pub work: PathBuf,
+    /// E011 round 2's faster forms of the same work (taskcore warm.rs `Config::fast`, h_FF by watches); off: round 1's
+    pub fast: bool,
 }
 
 impl Host {
@@ -73,6 +75,7 @@ impl Host {
             keep: 4,
             downward: PathBuf::from(dw).join("builds/release/bin/downward"),
             work: std::env::temp_dir().join("fmi-plan"),
+            fast: std::env::var("FMI_PLAN_FAST").is_ok_and(|v| v == "1"),
         }
     }
 }
@@ -103,6 +106,10 @@ pub struct Timing {
     pub operators: usize,
     pub unary: usize,
     pub kept: String,
+    /// millions of instructions (this thread's) of the reductions, the build, and the relaxed task with the search
+    pub reduce_mi: f64,
+    pub build_mi: f64,
+    pub search_mi: f64,
 }
 
 /// Cost caps as taskcore reads them: (label prefix, frames).
@@ -181,7 +188,7 @@ impl WarmPlanner {
     pub fn new(host: &Host, reading: &dyn ReadingSource) -> Result<WarmPlanner, PlanError> {
         let head = fmi_plan_head(reading.head()).map_err(tc_err)?;
         let reached = if reading.reached().is_empty() { None } else { Some(reading.reached().to_string()) };
-        let cfg = warm::Config { keep: host.keep, ..Default::default() };
+        let cfg = warm::Config { keep: host.keep, fast: host.fast, ..Default::default() };
         let path = reading.dir().join(&head);
         let w = warm::Warm::new(reading.packed(), &path.display().to_string(), reached, cfg).map_err(tc_err)?;
         let t = w.task();
@@ -418,6 +425,7 @@ impl WarmPlanner {
         caps: Vec<(String, u32)>,
     ) -> Result<PlanResult, PlanError> {
         let t1 = Instant::now();
+        let k1 = taskcore::perf::now();
         let wreq = warm::Request {
             goal: Some(goal),
             start: lines,
@@ -442,20 +450,26 @@ impl WarmPlanner {
             }
         };
         self.last.reduce = t1.elapsed().as_secs_f64();
+        self.last.reduce_mi = taskcore::perf::since(k1).0;
         self.last.kept = red.kept.to_string();
         let t2 = Instant::now();
+        let k2 = taskcore::perf::now();
         let cfg = self.warm.cfg;
         let t = &red.task;
         let mut x = sas::Expander::new(t, cfg.limit);
         x.model = cfg.model;
+        x.fast = self.host.fast;
         let start_vals = &t.starts[red.start].1;
         let (plan, st, of) = search::build(&mut x, start_vals).map_err(tc_err)?;
         self.last.build = t2.elapsed().as_secs_f64();
+        self.last.build_mi = taskcore::perf::since(k2).0;
         self.last.operators = st.n_ops();
+        let k3 = taskcore::perf::now();
         let deadline = Some(Instant::now() + Duration::from_secs(req.time_limit_s.max(1)));
         let (status, ops, plan_cost) = match req.search {
             Search::Gbfs => {
-                let o = search::lazy_greedy(&st, deadline);
+                let mode = if self.host.fast { search::HffMode::Watch } else { search::HffMode::Fd };
+                let o = search::lazy_greedy_mode(&st, deadline, mode);
                 self.last.relax = o.relax_s;
                 self.last.search = o.search_s;
                 self.last.expanded = o.expanded;
@@ -471,6 +485,7 @@ impl WarmPlanner {
                 r
             }
         };
+        self.last.search_mi = taskcore::perf::since(k3).0;
         let mut stats = red.stats;
         let mut c = plan.counts.clone();
         c.bytes = 0;
