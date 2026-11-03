@@ -1,12 +1,15 @@
 #!/bin/bash
-# g12watch.sh FLAG LOG (G12, experiments/E011-speed/plan.md): while FLAG exists, every second, the processes whose
+# g12watch.sh FLAG LOG [ROOTS] (G12, experiments/E011-speed/plan.md): while FLAG exists, every second, the processes whose
 # ancestors include an fmi process; any python among them is a violation (logged with its pid and command line).
 # The last line of LOG: samples, samples with an fmi process, the largest fmi tree, python processes seen.
-flag=$1; log=$2
+# ROOTS: a file of pids, one per line (read every second): only those processes are roots, not every process named
+# fmi (round 2: the benchmark's resident processes, while another fmi run shares the laptop).
+flag=$1; log=$2; roots=${3:-}
 n=0; with=0; maxt=0; py=0
 while [ -e "$flag" ]; do
-  r=$(ps -eo pid=,ppid=,comm= | awk '
-    { pp[$1] = $2; cm[$1] = $3; if ($3 == "fmi") root[$1] = 1 }
+  rl=""; [ -n "$roots" ] && rl=" $(tr '\n' ' ' < "$roots" 2>/dev/null) "
+  r=$(ps -eo pid=,ppid=,comm= | awk -v rl="$rl" '
+    { pp[$1] = $2; cm[$1] = $3; if ((rl == "" && $3 == "fmi") || (rl != "" && index(rl, " " $1 " ") > 0)) root[$1] = 1 }
     END {
       nr = 0; for (r in root) nr++
       t = 0; py = 0

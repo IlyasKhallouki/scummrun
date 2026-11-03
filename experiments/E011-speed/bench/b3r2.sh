@@ -14,6 +14,8 @@
 # OUT/times.jsonl: wall, CPU of the resident process's tree (tree_cpu.sh before and after), the load. G12's watcher
 # samples /proc every second for the whole run.
 # usage: E011_ENV=$HOME/.cache/fast-mi-e011/env-r2.sh b3r2.sh ref|fast OUT SEQ... [-- FIRST_JOB]
+#   B3_MEMO=0: no job memo store (FMI_MEMO unset) in every sequence; E008_FLOOR_GB (the reading cache's disk floor) passes
+#   through
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
@@ -47,7 +49,7 @@ bin_of() { case $1 in r1) echo $R1_FMI_BIN;; *) echo $FMI_BIN;; esac; }
 now() { date +%s.%N; }
 calc() { awk "BEGIN { printf \"%.3f\", $1 }"; }
 mkdir -p $OUT
-touch $OUT/g12.flag; $here/g12watch.sh $OUT/g12.flag $OUT/g12.log &
+touch $OUT/g12.flag; : > $OUT/g12.roots; $here/g12watch.sh $OUT/g12.flag $OUT/g12.log $OUT/g12.roots &
 watch=$!
 declare -A FIFO PID FD GPID
 fd=7
@@ -57,13 +59,15 @@ for q in $seqs; do
   mkdir -p $R/logs
   FIFO[$q]=$R/jobs.fifo; rm -f ${FIFO[$q]}; mkfifo ${FIFO[$q]}
   rm -rf $R/rcache $R/memo $R/plans $R/pool
-  env $(env_of $q) FMI_READING_CACHE=$R/rcache FMI_MEMO=$R/memo FMI_PLAN_CACHE=$R/plans FMI_POOL_DIR=$R/pool \
+  memo=$R/memo; [ "${B3_MEMO:-1}" = 0 ] && memo=
+  env $(env_of $q) FMI_READING_CACHE=$R/rcache FMI_MEMO=$memo FMI_PLAN_CACHE=$R/plans FMI_POOL_DIR=$R/pool \
     $GUARD $R/fmi.log $(bin_of $q) try @${FIFO[$q]} $(args_of $q) &
   GPID[$q]=$!
   eval "exec $fd>${FIFO[$q]}"; FD[$q]=$fd; fd=$((fd + 1))
   sleep 1
   PID[$q]=$(pgrep -f "^$(bin_of $q) try @${FIFO[$q]}" | head -1)
   [ -n "${PID[$q]}" ] || { echo "warm $n: no process"; exit 1; }
+  echo ${PID[$q]} >> $OUT/g12.roots
   echo "warm $n: $(bin_of $q) pid ${PID[$q]} ($(args_of $q); $(env_of $q | wc -w) switch settings)"
   echo "{\"regime\": \"$n\", \"bin\": \"$(bin_of $q)\", \"args\": \"$(args_of $q)\", \"env\": \"$(env_of $q)\"}" >> $OUT/seqs.jsonl
 done
