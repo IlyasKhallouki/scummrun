@@ -118,6 +118,8 @@ struct Tv<'a> {
     /// operators_providing_effect[var][value], flat by proposition: operator per effect, in operator then effect order
     prov_off: Vec<u32>,
     prov: Vec<u32>,
+    /// the effect (its global number) of each entry of `prov`
+    prov_eff: Vec<u32>,
 }
 
 impl<'a> Tv<'a> {
@@ -141,14 +143,17 @@ impl<'a> Tv<'a> {
         }
         let mut fill = cnt.clone();
         let mut prov = vec![0u32; cnt[n_props] as usize];
+        let mut prov_eff = vec![0u32; cnt[n_props] as usize];
         for o in 0..t.n_ops() {
-            for e in t.effs(o) {
+            let e0 = t.eff_off[o] as usize;
+            for (k, e) in t.effs(o).iter().enumerate() {
                 let p = (prop_off[e.var as usize] + e.post) as usize;
                 prov[fill[p] as usize] = o as u32;
+                prov_eff[fill[p] as usize] = (e0 + k) as u32;
                 fill[p] += 1;
             }
         }
-        Tv { t, prop_off, n_props, prov_off: cnt, prov }
+        Tv { t, prop_off, n_props, prov_off: cnt, prov, prov_eff }
     }
     #[inline]
     fn prop(&self, f: Fact) -> usize {
@@ -1011,20 +1016,14 @@ impl<'a> Builder<'a> {
             let size = self.tv.size(var) as usize;
             let mut succ: Vec<Vec<u32>> = vec![Vec::new(); size];
             let mut any: Vec<u32> = Vec::new();
-            let mut seen_ops: Vec<u32> = Vec::new();
+            // the effects on `var`, each once (the providers' entries are per effect)
             for val in 0..size as u32 {
-                seen_ops.extend_from_slice(self.tv.providing((var, val)));
-            }
-            seen_ops.sort_unstable();
-            seen_ops.dedup();
-            for o in seen_ops {
-                let o = o as usize;
-                // build_conditions_map: the last precondition on a variable wins
-                let pre = t.pre(o).iter().rev().find(|f| f.0 == var).map(|f| f.1 as i64).unwrap_or(-1);
-                for e in t.effs(o) {
-                    if e.var != var {
-                        continue;
-                    }
+                let p = self.tv.prop((var, val));
+                for i in self.tv.prov_off[p] as usize..self.tv.prov_off[p + 1] as usize {
+                    let o = self.tv.prov[i] as usize;
+                    let e = &t.effs[self.tv.prov_eff[i] as usize];
+                    // build_conditions_map: the last precondition on a variable wins
+                    let pre = t.pre(o).iter().rev().find(|f| f.0 == var).map(|f| f.1 as i64).unwrap_or(-1);
                     let post = e.post;
                     let ec = t.conds(e).iter().rev().find(|f| f.0 == var).map(|f| f.1 as i64).unwrap_or(-1);
                     if pre != -1 {
@@ -1054,7 +1053,6 @@ impl<'a> Builder<'a> {
         &self.dtg[&var]
     }
 
-    /// value_critical_to_reach_landmark
     /// value_critical_to_reach_landmark. The successors every value has (`dtg.1`) are the same for each value taken,
     /// so they are looked at once, with the first value (the start's): what they reach is then reached.
     fn critical(dtg: &(Vec<Vec<u32>>, Vec<u32>), init: u32, lm: u32, excluded: u32, reached: &[bool]) -> bool {
