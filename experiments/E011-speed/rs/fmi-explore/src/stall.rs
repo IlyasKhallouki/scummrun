@@ -654,6 +654,11 @@ impl Stalls {
         self.cells = cells;
     }
 
+    /// Each entry's current cell (cells.json's, or the open archive's).
+    pub fn cells_now(&self) -> &HashMap<usize, String> {
+        &self.cells
+    }
+
     /// The table as it stood after the first k commits (the cells as they are now): the reports' replay.
     pub fn upto(&self, k: usize) -> Stalls {
         Stalls { root: self.root.clone(), tries: self.tries[..k.min(self.tries.len())].to_vec(), atoms: self.atoms.clone(), cells: self.cells.clone() }
