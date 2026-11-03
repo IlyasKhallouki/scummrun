@@ -1393,7 +1393,7 @@ impl Archive {
     }
 
     /// S2: `new_t` and `new_rooms` written into the log lines in memory (not the file) where a line has none, from
-    /// `novelty_from_rows`, and the counts counted again.
+    /// `novelty_from_rows`, and the counts counted again (on cells made afresh).
     pub fn backfill_novelty(&mut self) -> usize {
         let fill = self.novelty_from_rows();
         let mut n = 0;
@@ -1405,7 +1405,8 @@ impl Archive {
                 n += 1;
             }
         }
-        self.recount();
+        // the cells made again, then counted from the log (recount adds to a cell's counts)
+        self.rekey_t();
         n
     }
 
