@@ -7,6 +7,7 @@
 #   before N    round 2's way (B3's settings): reader-scope as a child, --prep, no memo: FIRST, then SECOND
 #   disk        reader-scope as a child, --prep, round 1's disk memo (FMI_MEMO, a new folder): FIRST, SECOND
 #   after N     the switch FMI_READER_LIB=1: FIRST, SECOND, SECOND again (every run taken: the floor)
+#   after-system N   the same with FMI_READER_ALLOC=system (the plan's amendment "the allocator")
 #   ref         reader-scope as a child, no memo, no --prep: SECOND (RS2's files)
 #   cmp         every phase's readings against `before 1`'s (and `ref`'s), by sha1, reading.json by cmp_reading.py
 # SCOPE: the check's readings folder prefix (28-33-35-38, 28-33-41); FIRST, SECOND: the check's jobs (j00000, ...)
@@ -21,7 +22,7 @@ k() { read_line k-$1 ${SCOPE//-/,} $(row $1) $2; }  # ENTRYJOB OUTDIR
 run() { # D ENV...: `fmi read` of D/lines.txt under the heavy lock and the guard, with the environment given
   local D=$1; shift
   echo "[$(date +%T)] $PHASE $N: $*"
-  env -u FMI_READER_LIB -u FMI_MEMO -u FMI_READER_PREP -u FMI_READER_UNITS_SET -u FMI_READER_MEMO_GB "$@" \
+  env -u FMI_READER_LIB -u FMI_MEMO -u FMI_READER_PREP -u FMI_READER_UNITS_SET -u FMI_READER_MEMO_GB -u FMI_READER_ALLOC "$@" \
     $HEAVY $D/guard.log $FMI_BIN read $D/lines.txt
   grep '"name"' $D/guard.log > $D/read.jsonl; tail -1 $D/guard.log
   for d in $D/*/; do [ -f $d/reading.json ] && sums_drop $d; done
@@ -70,6 +71,10 @@ PYEOF
     D=$OUT/after-$N; rm -rf $D; mkdir -p $D
     { k $FIRST $D/k1; k $SECOND $D/k2; k $SECOND $D/k2-again; } > $D/lines.txt
     run $D FMI_READER_LIB=1 ;;
+  after-system)
+    D=$OUT/after-system-$N; rm -rf $D; mkdir -p $D
+    { k $FIRST $D/k1; k $SECOND $D/k2; k $SECOND $D/k2-again; } > $D/lines.txt
+    run $D FMI_READER_LIB=1 FMI_READER_ALLOC=system ;;
   ref)
     D=$OUT/ref; rm -rf $D; mkdir -p $D
     { k $SECOND $D/k2; } > $D/lines.txt
@@ -77,7 +82,7 @@ PYEOF
   cmp)
     # every reading against reader-scope's: `ref` (no --prep) where it was run, else `before 1` (--prep)
     bad=0
-    for D in $OUT/before-* $OUT/disk-* $OUT/after-* $OUT/ref; do
+    for D in $OUT/before-* $OUT/disk-* $OUT/after-* $OUT/ref; do  # after-* covers after-system-*
       [ -d $D ] || continue
       for t in k1 k2 k2-again; do
         [ -f $D/$t/sums.txt ] || continue
@@ -89,5 +94,5 @@ PYEOF
       done
     done
     echo "RS2 files $([ $bad = 0 ] && echo PASS || echo FAIL)" ;;
-  *) echo "phase: keys | before N | disk | after N | ref | cmp"; exit 2 ;;
+  *) echo "phase: keys | before N | disk | after N | after-system N | ref | cmp"; exit 2 ;;
 esac
