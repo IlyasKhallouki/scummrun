@@ -114,6 +114,14 @@ times. The floor is what the engine's frames cost; the idle measurement that the
   from the floor: 0.00-0.03 s per wait.
 - The cost is the engine's frames: one Step round trip per frame, 91-149 µs per frame at this load.
 
+**In the try,** the wait replaces the idle measurement of 1,600 frames and runs those same frames. So what it adds to a
+try is its frames past 1,600, plus its own work:
+
+- room-28 entries: 329-479 frames, about 0.03-0.07 s at the floor's rate;
+- entry 4: none.
+
+The fork's engine CPU was 50-91 µs per frame (cpu_s in `w4-*.json`). The wall was 1.3-1.6 times that.
+
 **W4 as stated (≤ 0.3 s per wait) does not hold for every wait at load 7.5.** It holds for the median of 13 of 14
 entries. What binds is the floor, which no work on the wait's side removes. At round 2's B3 load (1.9-5.1), the idle
 measurement of 1,600 frames took 0.10 s, about 62 µs per frame. At that rate the room-28 waits come to 0.13 s plus
