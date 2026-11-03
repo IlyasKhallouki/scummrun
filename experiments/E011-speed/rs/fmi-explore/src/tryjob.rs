@@ -789,6 +789,16 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             let t0 = Instant::now();
             let port = r.mech.tested.as_ref().ok_or_else(|| Err("E012: the E012 switches read T, and no tested port is wired".to_string()))?;
             let t = port.tested(&*rd).map_err(|e| Err(format!("E012 tested: {e}")))?;
+            // E014 (FMI_NOVEL_VERBS, FMI_NOVEL_GUIDE): T with the interface's and the guide's atoms
+            let t = if ["FMI_NOVEL_VERBS", "FMI_NOVEL_GUIDE"].iter().any(|k| std::env::var(k).is_ok_and(|v| v == "1")) {
+                let mut flat = t.flat.clone();
+                let n = mech::novelty_extra(&mut flat, &job, &doc_of(&*rd)["scope"], &entry_facts);
+                let mut rec = t.record.clone();
+                rec["e014_extra"] = json!(n);
+                TestedT::new(flat, rec)
+            } else {
+                t
+            };
             let atoms = progress::t_atoms(&t.flat, rd.domains());
             if sw.select {
                 out["tested"] = progress::atoms_json(&atoms);

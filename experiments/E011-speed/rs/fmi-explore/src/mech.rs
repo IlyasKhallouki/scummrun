@@ -455,6 +455,66 @@ pub fn afford_step(e: &mut Box<dyn Engine>, why: Trigger, t: &TestedT, nov: &Try
     Ok(out)
 }
 
+
+/// E014's switches `FMI_NOVEL_VERBS=1` and `FMI_NOVEL_GUIDE=1`: more atoms for T, the atoms the wait stops on and the
+/// try's novelty is over, from the game's own mechanics, where the reading tests few (a reading that models few inputs,
+/// e.g. a dialog's lines at the start, or one read short):
+///
+/// - verbs: `verb:V = 1` for every verb of the reading's scope (its sentence and dialog verbs, read from the scripts'
+///   VerbOps) and every verb the entry shows: a state that shows an input slot no entry showed offers inputs no entry
+///   offered (plan.md 4 enumerates inputs from the visible verb slots);
+/// - guide: the guide's atoms of one value (the regression from the goal's sites: values tested on the way to it), and
+///   `= 1` for each bit the guide names with any value.
+///
+/// Each is added once, after the reading's own atoms. Returns the number added. Unset: T is the reading's, as before.
+pub fn novelty_extra(flat: &mut Vec<(Key, Vec<Val>)>, job: &Value, scope: &Value, entry: &Facts) -> usize {
+    let on = |k: &str| std::env::var(k).is_ok_and(|v| v == "1");
+    let mut have: HashSet<(Key, Vec<Val>)> = flat.iter().cloned().collect();
+    let n0 = flat.len();
+    let mut push = |flat: &mut Vec<(Key, Vec<Val>)>, k: Key, v: Val| {
+        let a = (k, vec![v]);
+        if have.insert(a.clone()) {
+            flat.push(a);
+        }
+    };
+    if on("FMI_NOVEL_VERBS") {
+        let mut vs: BTreeSet<i64> = BTreeSet::new();
+        for f in ["verbs", "dialog_verbs"] {
+            if let Some(a) = scope.get(f).and_then(|x| x.as_array()) {
+                vs.extend(a.iter().filter_map(|x| x.as_i64()));
+            }
+        }
+        for &(k, v) in entry.iter() {
+            if v != 0 {
+                if let Some(n) = k.text().strip_prefix("verb:").and_then(|n| n.parse::<i64>().ok()) {
+                    vs.insert(n);
+                }
+            }
+        }
+        for v in vs {
+            push(flat, Key::parse(&format!("verb:{v}")), 1);
+        }
+    }
+    if on("FMI_NOVEL_GUIDE") {
+        if let Some(g) = job.get("guide").and_then(|g| g.as_str()).and_then(|p| std::fs::read_to_string(p).ok()) {
+            if let Ok(g) = serde_json::from_str::<Value>(&g) {
+                for a in g.get("atoms").and_then(|x| x.as_array()).into_iter().flatten() {
+                    let Some(k) = a.get(0).and_then(|x| x.as_str()) else { continue };
+                    if k == "room" {
+                        continue; // rooms are novel by themselves
+                    }
+                    match a.get(1).and_then(|x| x.as_i64()) {
+                        Some(v) => push(flat, Key::parse(k), v),
+                        None if k.starts_with("bit:") => push(flat, Key::parse(k), 1),
+                        None => {}
+                    }
+                }
+            }
+        }
+    }
+    flat.len() - n0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
