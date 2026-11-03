@@ -52,6 +52,9 @@ pub struct Host {
     pub keep: usize,
     /// Fast Downward's search binary (`Search::FdLamaFirstCosts`)
     pub downward: PathBuf,
+    /// `Search::FdLamaFirstCosts` by the Rust port of the same search (taskcore lama.rs: the same plans, byte for
+    /// byte) instead of Fast Downward's binary; false: Fast Downward's binary (the old behaviour)
+    pub rust_lama: bool,
     /// where Fast Downward's files go
     pub work: PathBuf,
     /// E011 round 2's faster forms of the same work (taskcore warm.rs `Config::fast`, h_FF by watches); off: round 1's
@@ -60,7 +63,8 @@ pub struct Host {
 
 impl Host {
     /// The host E011 runs: the plan cache on (FMI_PLAN_NO_CACHE set: off), its store `~/.cache/fast-mi-e011/plans`
-    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR.
+    /// (FMI_PLAN_CACHE, "" for none), Fast Downward from DOWNWARD_DIR; FMI_PLAN_LAMA=rust: `FdLamaFirstCosts` by the
+    /// Rust port (`rust_lama`).
     pub fn from_env() -> Host {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
         let cache_dir = match std::env::var("FMI_PLAN_CACHE") {
@@ -74,6 +78,7 @@ impl Host {
             cache_dir,
             keep: 4,
             downward: PathBuf::from(dw).join("builds/release/bin/downward"),
+            rust_lama: std::env::var("FMI_PLAN_LAMA").is_ok_and(|v| v == "rust"),
             work: std::env::temp_dir().join("fmi-plan"),
             fast: std::env::var("FMI_PLAN_FAST").is_ok_and(|v| v == "1"),
         }
@@ -477,6 +482,24 @@ impl WarmPlanner {
                 self.last.unary = o.unary;
                 let cost = if o.status == "plan" { Some(o.cost) } else { None };
                 (o.status, o.plan, cost)
+            }
+            Search::FdLamaFirstCosts if self.host.rust_lama => {
+                let o = taskcore::lama::lama_first_costs(&st, &taskcore::lama::predicates_of(&st), deadline);
+                if o.status.starts_with("error: ") {
+                    // a graph the port does not make (lama.rs refuses rather than guess): Fast Downward's binary
+                    eprintln!("fmi-plan: the Rust lama-first-costs: {}; Fast Downward's binary instead", o.status);
+                    let ts = Instant::now();
+                    let r = self.fd(&mut x, &plan, start_vals, req.time_limit_s)?;
+                    self.last.search = ts.elapsed().as_secs_f64();
+                    r
+                } else {
+                    self.last.relax = o.graph_s + o.relax_s;
+                    self.last.search = o.search_s;
+                    self.last.expanded = o.expanded;
+                    self.last.evaluated = o.evaluated;
+                    let cost = if o.status == "plan" { Some(o.cost) } else { None };
+                    (o.status, o.plan, cost)
+                }
             }
             Search::FdLamaFirstCosts => {
                 let ts = Instant::now();

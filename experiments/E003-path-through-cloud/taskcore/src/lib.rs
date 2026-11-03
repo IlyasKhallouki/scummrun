@@ -21,3 +21,8 @@ pub mod search;
 pub mod serve;
 pub mod tail;
 pub mod warm;
+// E011 route: Fast Downward's lama-first-costs in Rust (lama.rs), its landmark graph (landmarks.rs) and the libstdc++
+// container order the landmark code depends on (stdhash.rs)
+pub mod lama;
+pub mod landmarks;
+pub mod stdhash;
