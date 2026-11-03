@@ -38,12 +38,23 @@ frame too wide the random tables fail.
   - ready, unset and set: the same 4 children as the capture, the 3 plans with 0 differences. Set, no window is
     triggered (test (a)'s windows check no draw); the records gain `"delay"` with the calls per frame only.
 - **The fork forced with no K** (amendment 2): the route is E010's, the goal at 3216 with 36 inputs, as the capture.
-- **B3's 15 tries** in round 2's fast settings: below.
+- **B3's 15 tries** in round 2's fast settings (`delay/b3.sh`: play when ready, the old tail first, the Rust
+  lama-first-costs, every round-2 switch on; one resident fmi per sequence; ring(38)'s 8 tries without the heavy
+  lock, the resident under 0.27 GB after them; ring(33)'s 7 in one hold of it), checked with E011's cmp_tries.py
+  against B0 (the stop and its class, target, frames, replans, refinements, inputs, and every new entry's frame,
+  tick, how, inputs and checkpoints):
+  - FMI_DELAY_FORK unset: 15 of 15 tries = B0's in everything (`b3-off.txt`);
+  - set: 15 of 15 = B0's in everything (`b3-on.txt`); 0 of the 22 windows triggered; every window record has
+    `"delay"` with the calls per frame only, and every try's summary has `"delay"` (`b3-on-delay.jsonl`). The new
+    entries are B0's, which round 2's G11 verified from boot.
+- The first B3 start, every try under the lock, ran 3 tries in 85 minutes of the lock's queue; it was stopped and run
+  again in the order above.
 
 ## Measured
 
 - **Calls per frame** (test (a), the parent's frames): room 33 (2728-2799), 1 per frame in its 24 frames; room 28, 2 per
-  frame in 250 and 4 in 46 of the 296 frames from 2798, and 1 in the frame at 3204. M1 measured 1 in room 33 and 2-6
+  frame in 250 and 4 in 46 of the 296 frames from 2798, and 1 in the frame at 3204. B3's 22 windows (rooms 33 and 38):
+  1 call in each of their 309 parent frames. M1 measured 1 in rooms 33 and 38 and 2-6
   in room 28.
 - **The forced forks on test (a)** (per window: tries with a k, their outcomes, the choice):
 

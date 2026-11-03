@@ -1,0 +1,33 @@
+[09:44:24] on: fmi pid 1432714 (FMI_DELAY_FORK=1)
+[09:44:31] on j00001 (33,38,83,85,96) 7.3 s, load 2.94, fmi RSS 100988 kB
+[09:44:40] on j00002 (33,38,83,85,96) 8.3 s, load 3.75, fmi RSS 170524 kB
+[09:44:48] on j00003 (33,38,83,85,96) 7.9 s, load 4.24, fmi RSS 214352 kB
+[09:44:48] on j00004 (33,38,83,85,96) 0.8 s, load 4.24, fmi RSS 237804 kB
+[09:44:49] on j00005 (33,38,83,85,96) 0.6 s, load 4.24, fmi RSS 253160 kB
+[09:44:52] on j00007 (33,38,83,85,96) 3.2 s, load 4.30, fmi RSS 258236 kB
+[09:44:53] on j00010 (33,38,83,85,96) 0.4 s, load 4.30, fmi RSS 261804 kB
+[09:44:53] on j00013 (33,38,83,85,96) 0.4 s, load 4.30, fmi RSS 264496 kB
+[10:27:33] on: the heavy lock held for ring(33)'s tries
+[10:29:39] on j00000 (28,33,35,38) 125.5 s, load 3.31, fmi RSS 1777400 kB
+[10:30:09] on j00006 (28,33,35,38) 30.7 s, load 3.25, fmi RSS 2158748 kB
+[10:30:15] on j00008 (28,33,35,38) 6.0 s, load 3.07, fmi RSS 2338880 kB
+[10:30:21] on j00009 (28,33,35,38) 5.2 s, load 2.90, fmi RSS 2531172 kB
+[10:30:26] on j00011 (28,33,35,38) 5.1 s, load 2.83, fmi RSS 2738868 kB
+[10:30:26] on j00012 (28,33,35,38) 0.2 s, load 2.83, fmi RSS 2741892 kB
+[10:30:32] on j00014 (28,33,35,38) 6.1 s, load 2.78, fmi RSS 2706524 kB
+j00000: class 'refinement' (= B0's), new [2767, 2848, 2850, 2862], same as B0
+j00001: class 'refinement' (= B0's), new [2863], same as B0
+j00002: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00003: class 'refinement' (= B0's), new [2850, 2862], same as B0
+j00004: class 'refinement' (= B0's), new [2854, 2862], same as B0
+j00005: class 'refinement' (= B0's), new [2852, 2862], same as B0
+j00006: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00007: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00008: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00009: class 'refinement' (= B0's), new [2768, 2818, 2820, 2854], same as B0
+j00010: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00011: class 'refinement' (= B0's), new [2770, 2818, 2820, 2854], same as B0
+j00012: class 'refinement' (= B0's), new [2769, 2818, 2820, 2854], same as B0
+j00013: class 'refinement' (= B0's), new [2820, 2854], same as B0
+j00014: class 'refinement' (= B0's), new [2771, 2818, 2820, 2854], same as B0
+G11 on: 15 tries, stop class = B0's in 15, everything = B0's in 15
