@@ -330,31 +330,55 @@ impl Reach {
         let mut ce_prop: Vec<u32> = Vec::new();
         let mut pre: Vec<u32> = Vec::new();
         let mut cbuf: Vec<u32> = Vec::new();
-        let mut ces: Vec<(u32, u32)> = Vec::new();
-        let mut n_conds = 0usize;
+        let n_conds: usize;
         let q0 = thread_cpu();
-        // marks of the operator's precondition atoms (1) and unconditional effect atoms (2), cleared after it
-        let mut mark = vec![0u8; tv.n_props];
+        // marks of the operator's unconditional effect atoms, cleared after it
+        let mut mark = vec![false; tv.n_props];
         let mut misses = 0u64;
+        // whether an operator's effects are its predecessor's (variants of one action): then so are its tables
+        let same_as_prev = |o: usize| -> bool {
+            if o == 0 {
+                return false;
+            }
+            let (a, b) = (t.effs(o - 1), t.effs(o));
+            a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.var == y.var && x.post == y.post && t.conds(x) == t.conds(y))
+        };
         for o in 0..n_ops {
             pre.clear();
             pre.extend(t.pre(o).iter().map(|&f| tv.prop(f) as u32));
             sorted_unique(&mut pre, 0);
             op_ps.push(psets.intern(&pre));
-            for &p in &pre {
-                mark[p as usize] |= 1;
+            if same_as_prev(o) {
+                let (a, b) = (unc_off[o - 1] as usize, unc_off[o] as usize);
+                unc.extend_from_within(a..b);
+                unc_off.push(unc.len() as u32);
+                let (a, b) = (op_ce_off[o - 1] as usize, op_ce_off[o] as usize);
+                ce_set.extend_from_within(a..b);
+                ce_prop.extend_from_within(a..b);
+                op_ce_off.push(ce_prop.len() as u32);
+                continue;
             }
             let u0 = unc.len();
-            ces.clear();
-            // effects in a row with the same conditions (one branch of the action) share their set
-            let mut last: (&[(u32, u32)], u32) = (&[], u32::MAX);
-            for e in t.effs(o) {
-                let p = tv.prop((e.var, e.post));
+            let effs = t.effs(o);
+            for e in effs {
                 if e.c0 == e.c1 {
-                    if mark[p] & 2 == 0 {
-                        mark[p] |= 2;
+                    let p = tv.prop((e.var, e.post));
+                    if !mark[p] {
+                        mark[p] = true;
                         unc.push(p as u32);
                     }
+                }
+            }
+            // the conditional effects: their condition sets (a condition that is also a precondition is reached when
+            // the operator fires, so it is kept); one on an atom an unconditional effect reaches is left out; repeats
+            // are kept (they only repeat work). Effects in a row with the same conditions share their set.
+            let mut last: (&[(u32, u32)], u32) = (&[], u32::MAX);
+            for e in effs {
+                if e.c0 == e.c1 {
+                    continue;
+                }
+                let p = tv.prop((e.var, e.post));
+                if mark[p] {
                     continue;
                 }
                 let raw = t.conds(e);
@@ -365,12 +389,10 @@ impl Reach {
                     let mut sorted = true;
                     for &f in raw {
                         let c = tv.prop(f) as u32;
-                        if mark[c as usize] & 1 == 0 {
-                            if cbuf.last().is_some_and(|&l| l >= c) {
-                                sorted = false;
-                            }
-                            cbuf.push(c);
+                        if cbuf.last().is_some_and(|&l| l >= c) {
+                            sorted = false;
                         }
+                        cbuf.push(c);
                     }
                     if !sorted {
                         sorted_unique(&mut cbuf, 0);
@@ -380,27 +402,17 @@ impl Reach {
                     last = (raw, cs);
                     cs
                 };
-                ces.push((cs, p as u32));
+                ce_set.push(cs);
+                ce_prop.push(p as u32);
             }
             unc[u0..].sort_unstable();
             unc_off.push(unc.len() as u32);
-            // a conditional effect on an atom an unconditional effect reaches is left out; repeats are kept (they
-            // only repeat work)
-            for &(cs, p) in &ces {
-                if mark[p as usize] & 2 == 0 {
-                    n_conds += (csets.off[cs as usize + 1] - csets.off[cs as usize]) as usize;
-                    ce_set.push(cs);
-                    ce_prop.push(p);
-                }
-            }
-            for &p in &pre {
-                mark[p as usize] = 0;
-            }
             for &p in &unc[u0..] {
-                mark[p as usize] = 0;
+                mark[p as usize] = false;
             }
             op_ce_off.push(ce_prop.len() as u32);
         }
+        n_conds = ce_set.iter().map(|&cs| (csets.off[cs as usize + 1] - csets.off[cs as usize]) as usize).sum();
         let q1 = thread_cpu();
         // precondition sets: membership and operators
         let nps = psets.len();
@@ -454,15 +466,18 @@ impl Reach {
             for &p in &u[u0..] {
                 umark[p as usize] = false;
             }
-            c[c0..].sort_unstable();
-            let mut k = c0;
-            for i in c0..c.len() {
-                if i == c0 || c[i] != c[k - 1] {
-                    c[k] = c[i];
-                    k += 1;
+            // repeats only repeat work: a set of one operator keeps its own (few)
+            if ops.len() > 1 {
+                c[c0..].sort_unstable();
+                let mut k = c0;
+                for i in c0..c.len() {
+                    if i == c0 || c[i] != c[k - 1] {
+                        c[k] = c[i];
+                        k += 1;
+                    }
                 }
+                c.truncate(k);
             }
-            c.truncate(k);
             u_off.push(u.len() as u32);
             c_off.push(c.len() as u32);
         }
