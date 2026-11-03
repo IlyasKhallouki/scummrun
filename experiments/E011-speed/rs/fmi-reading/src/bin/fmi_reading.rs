@@ -15,6 +15,11 @@
 //!        fmi-reading cache ROWS ROOMS GOAL DIR --reader BIN [--fact-vars ..] [--reach-also ..] [--threads N]
 //!                                                         the reading through the cache under DIR (a miss runs the
 //!                                                         reader), with the seconds of the lookup and the open
+//!        fmi-reading tested DIR [--reps R] [--draws] [--sites]
+//!                                                         E012's T of the reading (counts, keys, the CPU and wall
+//!                                                         seconds of Tested::of, best of R) and, with --draws, every
+//!                                                         action's draw checks with range and share from the game
+//!                                                         (counts; --sites: each check site's resolution)
 
 use fmi_core::{val_text, EffVal, ReadingSource, RecEff, Val, ABOVE, BELOW};
 use fmi_reading::cache::{file_sha1, game_index, ReadSpec, ReadingCache};
@@ -24,6 +29,87 @@ use fmi_reading::{idx, Reading};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+
+/// `tested DIR`: E012's T and the draw checks (the usage above), as one JSON object.
+fn tested(args: &[String]) {
+    use fmi_reading::tested::{draws, DrawGame, Tested};
+    use serde_json::{json, Value};
+    use std::collections::BTreeMap;
+    let reps: usize = arg(args, "--reps").map_or(1, |n| n.parse().unwrap());
+    let r3 = |x: f64| (x * 1000.0).round() / 1000.0;
+    let (w0, c0) = (Instant::now(), cpu());
+    let rd = Reading::open(Path::new(&args[1])).expect("the reading");
+    let open = (w0.elapsed().as_secs_f64(), cpu() - c0);
+    let mut best = (f64::MAX, f64::MAX);
+    let mut best_dyn = (f64::MAX, f64::MAX);
+    let mut t = Tested::default();
+    for _ in 0..reps.max(1) {
+        let (w, c) = (Instant::now(), cpu());
+        t = Tested::of_reading(&rd);
+        best = (best.0.min(w.elapsed().as_secs_f64()), best.1.min(cpu() - c));
+        let (w, c) = (Instant::now(), cpu());
+        let t2 = Tested::of(&rd);
+        best_dyn = (best_dyn.0.min(w.elapsed().as_secs_f64()), best_dyn.1.min(cpu() - c));
+        assert_eq!(t, t2, "Tested::of and Tested::of_reading differ");
+    }
+    let mut out = json!({
+        "reading": args[1], "open_s": r3(open.0), "open_cpu_s": r3(open.1), "of_reading_s": r3(best.0),
+        "of_reading_cpu_s": r3(best.1), "of_s": r3(best_dyn.0), "of_cpu_s": r3(best_dyn.1), "reps": reps,
+        "tested": t.json(),
+    });
+    if args.iter().any(|a| a == "--draws") {
+        let (w, c) = (Instant::now(), cpu());
+        let g = DrawGame::load(&scumm_ir::default_root()).expect("the game");
+        let load = (w.elapsed().as_secs_f64(), cpu() - c);
+        let (w, c) = (Instant::now(), cpu());
+        let (mut checks, mut actions, mut with_range, mut with_share) = (0usize, 0usize, 0usize, 0usize);
+        let mut by_site: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+        let mut mismatch: BTreeMap<String, usize> = BTreeMap::new();
+        let mut shares: BTreeMap<String, usize> = BTreeMap::new();
+        for i in 0..rd.n_actions() {
+            let ds = draws(&rd, i, Some(&g));
+            actions += !ds.is_empty() as usize;
+            for d in ds {
+                checks += 1;
+                with_range += d.range.is_some() as usize;
+                with_share += d.share.is_some() as usize;
+                let e = by_site.entry(d.cite.clone()).or_default();
+                e.0 += 1;
+                e.1 += d.range.is_some() as usize;
+                if let (Ok(s), None) = (g.site(&d.cite), d.range) {
+                    // resolved, but the reader's text differs: the check is left without range and share
+                    *mismatch.entry(format!("{} | {} | {}", d.cite, s.what, d.why)).or_default() += 1;
+                }
+                if let Some(p) = d.share {
+                    *shares.entry(format!("{p:.4}")).or_default() += 1;
+                }
+            }
+        }
+        let scan = (w.elapsed().as_secs_f64(), cpu() - c);
+        let mut sites: Vec<Value> = Vec::new();
+        let mut why_not: BTreeMap<String, usize> = BTreeMap::new();
+        for (cite, (n, ranged)) in &by_site {
+            let s = g.site(cite);
+            if let Err(e) = &s {
+                *why_not.entry(e.clone()).or_default() += 1;
+            }
+            if args.iter().any(|a| a == "--sites") {
+                sites.push(match s {
+                    Ok(s) => json!({"cite": cite, "checks": n, "ranged": ranged, "site": s.site, "n": s.n,
+                                    "what": s.what, "trues": s.trues}),
+                    Err(e) => json!({"cite": cite, "checks": n, "ranged": ranged, "error": e}),
+                });
+            }
+        }
+        out["draws"] = json!({
+            "game_load_s": r3(load.0), "game_load_cpu_s": r3(load.1), "scan_s": r3(scan.0), "scan_cpu_s": r3(scan.1),
+            "actions": actions, "checks": checks, "with_range": with_range, "with_share": with_share,
+            "check_sites": by_site.len(), "sites_resolved": by_site.len() - why_not.values().sum::<usize>(),
+            "sites_why_not": why_not, "text_mismatch": mismatch, "shares": shares, "sites": sites,
+        });
+    }
+    println!("{}", serde_json::to_string(&out).unwrap());
+}
 
 /// CPU seconds of this thread (CLOCK_THREAD_CPUTIME_ID): the measures, less the machine's load.
 fn cpu() -> f64 {
@@ -357,8 +443,9 @@ fn main() {
                 .compact_text()
             );
         }
+        "tested" => tested(&args),
         _ => {
-            eprintln!("usage: fmi-reading dump|names|reuse-keys|idx|bench|key|cache ... (the module docstring)");
+            eprintln!("usage: fmi-reading dump|names|reuse-keys|idx|bench|key|cache|tested ... (the module docstring)");
             std::process::exit(2);
         }
     }
