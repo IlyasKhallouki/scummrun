@@ -21,6 +21,32 @@ pub const VAR_CUTSCENEEXIT_KEY: i32 = 24;
 pub const VAR_VERB_SCRIPT: i32 = 32;
 pub const VAR_SENTENCE_SCRIPT: i32 = 33;
 pub const VAR_EGO: i32 = 1;
+
+/// E014's switch `FMI_EGO_VALUES=1`: VAR_EGO may have several values in a scope (`Builder::ego_values`).
+fn ego_values_switch() -> bool {
+    std::env::var("FMI_EGO_VALUES").is_ok_and(|v| v == "1")
+}
+
+/// E014's switch `FMI_READ_CUT`: under split_limit, a run past the path limit with no fact left to split on, or with
+/// paths the step limit ended, is read short in place of stopping the reading, its cut paths dropped and counted.
+/// `1`: such a run gives no record (the machine hands over none of its paths, as for a run split_limit splits);
+/// `paths`: the paths it finished make its records (slower: on the interactive demo's room 49 alone the reading ran
+/// past 10 minutes against 30 s, its finished paths starting events that meet the same loop again). Unset: the reading
+/// stops there, as before.
+pub(crate) fn read_cut_switch() -> bool {
+    read_cut_mode() != 0
+}
+
+/// `FMI_READ_CUT`'s mode: 0 unset, 1 the run gives no record, 2 (`paths`) its finished paths make records.
+pub(crate) fn read_cut_mode() -> u8 {
+    static ON: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| match std::env::var("FMI_READ_CUT").as_deref() {
+        Ok("1") => 1,
+        Ok("paths") => 2,
+        _ => 0,
+    })
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
@@ -808,6 +834,19 @@ impl<'g> Builder<'g> {
         let dom = self.domain(&key);
         let out = match self.kind(&key) {
             Kind::Const => vec![Label::Int(self.table.start.get0(&key))],
+            // E014 (FMI_EGO_VALUES=1): a game whose scripts give VAR_EGO several values in the scope. The inventory's
+            // condition (owner = the ego) then takes every value of the domain: a superset of the engine's own test,
+            // which the run decides (unset: one value, as MI's scopes always have)
+            Kind::Fact if ego_values_switch() && dom.as_ref().is_some_and(|d| d.values.len() > 1) => {
+                let d = dom.clone().unwrap();
+                d.values
+                    .iter()
+                    .map(|&l| match self.table.value(&key, l) {
+                        Val::Int(n) => Label::Int(n),
+                        _ => l,
+                    })
+                    .collect()
+            }
             Kind::Fact => {
                 let d = dom.clone().unwrap();
                 assert_eq!(d.values.len(), 1, "VAR_EGO forks on read: reader.py's ego_values raises Fork here");
@@ -1634,14 +1673,24 @@ impl<'g> Builder<'g> {
             self.reach_out.extend(run.held);
         }
         if self.table.split_limit {
-            if run.limit != 0 {
+            if run.limit != 0 && !(read_cut_switch() && !self.splits(&run.first_fork, pre)) {
                 return self.run_split(m, job, pins, pre, budget, run.first_fork.clone(), run.limit);
+            }
+            if run.limit != 0 {
+                // E014 (FMI_READ_CUT): no fact left to split on and no larger limit to read it with: the run is read
+                // short (mode 1: no record; mode `paths`: its finished paths make its records, and the paths the limit
+                // ended are dropped, DROP_ENDS), counted; the reading goes on
+                self.counts.inc("FMI_READ_CUT: runs past the path limit with no fact left to split on, read short");
             }
             // scumm-machine's step limit ends a path "limit" too; in a run the path limit cut nothing (limit 0)
             // every such end is the step limit's, and no split lifts it
             let n = run.paths.iter().filter(|p| p.end.as_deref() == Some("limit")).count();
-            if n != 0 && !self.table.havoc_cut {
+            if n != 0 && !self.table.havoc_cut && !read_cut_switch() {
                 panic!("split_limit: {} has {n} paths the step limit ended; the reading stops", job.label);
+            }
+            if n != 0 && !self.table.havoc_cut {
+                // E014 (FMI_READ_CUT=1): the paths the step limit ended are dropped, counted
+                self.counts.add("FMI_READ_CUT: paths the step limit ended, dropped", n as i64);
             }
         } else if run.limit != 0 && run.first_fork.is_some() && facts < nonfacts {
             self.counts.inc("runs past the path limit not split (more forks on non-facts than on facts)");
@@ -1719,6 +1768,20 @@ impl<'g> Builder<'g> {
             out.push(rec);
         }
         out
+    }
+
+    /// E014 (FMI_READ_CUT): whether `run_split` can lift a run past the path limit: its first fork on a read has two
+    /// or more values left, or grow_limit can read it whole with a larger limit.
+    fn splits(&self, first_fork: &Option<String>, pre: &Pre) -> bool {
+        let n = match first_fork {
+            Some(key) => match (self.domain(key), pre.get(key)) {
+                (Some(dom), Some(s)) => dom.values.iter().filter(|v| s.contains(v)).count(),
+                (Some(dom), None) => dom.values.len(),
+                (None, _) => 0,
+            },
+            None => 0,
+        };
+        n >= 2 || (self.table.grow_limit && self.path_limit_now.max(crate::machine::PATH_LIMIT) < GROW_MAX)
     }
 
     /// The switch split_limit: a run past the path limit is run again once per value of its first fork on a read

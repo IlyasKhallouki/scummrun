@@ -1057,6 +1057,18 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
     let stream = tee.stream.take().unwrap();
     let keys = stream.fact_keys();
     let goal_labels: Vec<(String, Vec<Label>)> = goal.iter().map(|(k, v)| (k.clone(), v.iter().map(|&x| Label::Int(x)).collect())).collect();
+    // E014 (FMI_GOAL_END=1): a goal key that is no fact of the game (the game's own end, `end`) has no domain; it gets
+    // {its start value, the goal's values}. Nothing writes it, so the task never reaches it. Off: as before (every
+    // goal key of a fact goal has its domain).
+    if std::env::var("FMI_GOAL_END").is_ok_and(|v| v == "1") {
+        for (k, vs) in &goal {
+            if b.table.domain(k).is_none() {
+                let mut v: Vec<i64> = vs.clone();
+                v.push(start.get0(k));
+                b.table.extra.insert(k.clone(), crate::domain::Domain::of(v, None, None));
+            }
+        }
+    }
     let s0 = task::task_start(&mut b, &start, keys.iter().chain(goal.iter().map(|g| &g.0)));
     let fact_keys: Vec<String> = keys.iter().cloned().chain(goal.iter().map(|g| g.0.clone())).collect();
     let (info, folded, kept_actions, written) = if prep {

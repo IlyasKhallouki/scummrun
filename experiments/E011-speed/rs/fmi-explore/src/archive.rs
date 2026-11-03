@@ -1676,6 +1676,8 @@ impl Archive {
 
     /// After the last committed job that added a pair no earlier entry held (outside I), as many committed jobs as
     /// there were selectable cells right after it, none adding one.
+    /// E012's stagnation (FMI_SELECT=progress): a full sweep of the selectable cells with no new atom of T and no new
+    /// room since the last try that gave one.
     pub fn stagnant(&self) -> bool {
         let done: Vec<&Value> = self.logs.iter().filter(|x| committed(x)).collect();
         if self.progress.is_some() {
@@ -1683,6 +1685,9 @@ impl Archive {
             let gave = |x: &Value, k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
             let last = done.iter().rposition(|x| gave(x, "new_t") || gave(x, "new_rooms"));
             let frontier = match last {
+                // E014 (FMI_STAG_SWEEP=1): no try has given a new atom of T or a new room yet: the sweep is of the
+                // cells selectable now (the last committed try's count), not of the root's cell alone
+                None if stag_sweep() => done.last().and_then(|x| as_i64(x.get("selectable"))).unwrap_or(1).max(1),
                 None => 1,
                 Some(l) => as_i64(done[l].get("selectable")).unwrap_or(1).max(1),
             };
@@ -2378,4 +2383,11 @@ pub fn evict_dir(d: &Path, keep: &[PathBuf]) {
 /// The archive's stage name, for messages.
 pub fn pyjson_text(v: &Value) -> String {
     pyjson::compact(v)
+}
+
+/// E014's switch `FMI_STAG_SWEEP=1`: before any try has given a new atom of T or a new room, E012's stagnation sweep
+/// is of the cells selectable at the last committed try, not of one cell (a game whose first readings test few atoms,
+/// e.g. a dialog at the start, stopped after one try). Unset: one cell, as before.
+fn stag_sweep() -> bool {
+    std::env::var("FMI_STAG_SWEEP").is_ok_and(|v| v == "1")
 }

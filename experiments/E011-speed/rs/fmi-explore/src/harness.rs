@@ -678,6 +678,10 @@ impl<'a> Harness<'a> {
             "frame0": self.frame0, "frame_end": st.frame, "seconds": self.t0.elapsed().as_secs_f64(),
             "inputs": self.player.movie().iter().map(events::event_json).collect::<Vec<_>>(),
         });
+        if crate::mech::goal_end() {
+            // E014 (FMI_GOAL_END): the end status's tick, for an end entry's checkpoint
+            out["tick_end"] = json!(st.tick);
+        }
         if self.cfg.reach_extend {
             out["extensions"] = json!(self.extensions);
         }
