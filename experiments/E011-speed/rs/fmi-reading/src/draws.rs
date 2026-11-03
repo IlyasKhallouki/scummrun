@@ -531,6 +531,14 @@ mod tests {
         DrawGame::of(Game::new(sc, GameData { first_local: 200, ..Default::default() }))
     }
 
+    /// One game for a process's threads (the window search's workers call `draws` through an `Arc`).
+    #[test]
+    fn shared() {
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<DrawGame>();
+        send_sync::<Draw>();
+    }
+
     #[test]
     fn reasons() {
         assert!(is_draw("?(random draw: getRandomNr)"));
