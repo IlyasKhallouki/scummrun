@@ -588,3 +588,18 @@ Written before the delay fork's code.
   in rooms 33 and 38 and 2-6 in room 28 (M1). On test (a) with the fork forced, k = 0 is chosen in windows 1, 2 and 4
   (their first try succeeds); window 3 (293 failed tries before the chosen one in the strict search) is refuted for
   every p tried and its harness replans.
+
+## Amendment 2026-11-03 (2), component `delay`: no K, no change of choice
+
+Written after the first gate runs, before the code it changes.
+
+- **Why.** `tested`'s T1 resolves none of the draw sites of the kitchen reading j00065 (0 of 6: room 28's animation
+  loops) and 27 of 37 on the k = 2 scope. In a window whose draws have no share and no range, the first amendment let
+  the fork skip deviations up to the ready search's bound: 294 failed tries or the window's 3,600 frames, the cost of
+  the empty windows that the plan sets out to cut (55% of the kitchen check's wall). In the kitchen every triggered
+  window would be of that kind.
+- **What changes.** When K is not computed, the fork changes no choice: the first end point in the order of tries is
+  chosen, as E010 chooses it. The record keeps the draws, `"k_max": null`, and every try's k and outcome up to the
+  choice; `"chosen"` is the k of a matching try, null when the choice is a deviation. With K computed, the first
+  amendment's rules hold unchanged.
+- **Gate R3** gains the case: with no K, the chosen try is the first end point in fork order.
