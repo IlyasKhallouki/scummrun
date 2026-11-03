@@ -639,3 +639,72 @@ before T2 ran. It fills in what section 3 leaves open; nothing in section 3 chan
   20), and with it on the targets must have the same (key, value) pairs, with at most one value list per key; var:103
   must give at most one target per try. Reported per try: targets off and on, the keys grouped, the groups that hold
   both held and unheld values.
+
+## Amendment 2026-11-03, component afford: its interface, and what section 4 left open
+
+Written before afford's code is committed. Its first runs (M4's form at entries 203, 205 and 4, against M4's probe)
+only checked that the enumeration below is M4's.
+
+- **Interface** (fmi-explore `afford`, no fmi-core change; posted in COORD.md):
+  - `offer(engine, &Obs) -> Offer` (the idle kind, the verb slots and targets with their points), `inputs_of(&Offer)`,
+    and `affordances(engine, &Obs)`, which is the two.
+  - `try_all(engine, &Offer, &[Inputs], tested keys, &dyn Novelty, &AffordCfg, then) -> AffordOut { trials, kept }`.
+    The archive provides `Novelty`: the atoms of T and the room a state holds that no archive entry holds. `then`
+    gives the wait's stops after a trial's idle stop.
+  - `ready(engine, horizon)`: where the trigger's frame is not idle, a fork run with no input to the first idle stop.
+    No input is given on the way, so the offer's movie is the entry's.
+  - Switch `FMI_AFFORD=1`. The try calls the step; afford does not wire itself into the try.
+- **What section 4 left open:**
+  - **Clicks.** Click k comes at the offer's frame + 1 + 2k (M4's timing). A third click comes at the frame after its
+    two-click trial's idle stop.
+  - **Hit points** (M4's). A verb slot gets the first of (2, 2), (4, 3), (1, 1), (0, 0) from its rectangle's top
+    left. An object gets the first point of a 5 × 5 grid over its on-screen box, in quarters from the centre out. An
+    actor gets the first of 20, 30, 10, 40 pixels above its feet, less its elevation. Screen y adds the main
+    screen's topline from the status. Every candidate goes in one AtMany. A point counts when the hit test answers
+    that slot, object or actor. The hit cache is not used: an offer is one round trip.
+  - **Composing.** The two-click trial stops in a sentence idle, and the slot runs (segment on) from the second click's
+    frame on hold a run of the input script (VAR_VERB_SCRIPT's value) and none of the sentence script
+    (VAR_SENTENCE_SCRIPT's) or of an object's verb script. These are the units a click can start, the same three that
+    the bridge's idle rule names as blockers. The third click goes over the targets the hit test finds at that stop.
+  - **Horizon.** The wait's horizon once the try passes it, else W = 1,600 frames after the offer.
+  - **Outcome**, a measurement only: the changes on the world keys against a no-input fork at the same frame (M4's).
+    The world keys are T's keys, the room, every owner and every bit.
+  - **Kept.** Novelty is the archive's. Within the step, an atom kept once is not novel again (IW(1)). A trial whose
+    run ends records the end's reason; the try marks it dead (end's `is_game_end`).
+  - **Walk boxes** come only with end's Boxes (`FMI_BOXES`) and are not in A1-A3.
+- **Gates as run:**
+  - A1: every kept entry is verified from boot in a fresh lean engine. The engine plays the entry's movie and the
+    trial's clicks to the kept frame, and `compare_checkpoint` compares facts, tick, RNG state and actors.
+  - A2: M4's form (fixed horizon, no third click), name for name against the probe's `afford.tsv`: at 203 with 400
+    frames, at 205 and 4 with 600.
+  - A3: the wall per trial of the step in the try's form (idle stops, third clicks) at 203, on round 2's engine
+    (`svm-e011-r2int`, lean, cuts).
+  - Novelty stand-in in the gate runs: (key, value) pairs of T's keys and the room, over every archive entry's last
+    checkpoint. T's keys come from the plan's list for `readings/28-33-41-j00065`.
+
+## Amendment 2026-11-03, component afford: the walk-box clicks (FMI_BOXES)
+
+Written after end pushed Boxes (e012-end 2f6d84a; its fmi-core and fmi-engine commits are cherry-picked unchanged
+into e012-afford) and before afford's code for it.
+
+- **Boxes clicked.** The current room's boxes 1 to count - 1, less those flagged invisible (0x80) or locked (0x40).
+  These are the boxes in which the engine lets the player's walk end: `adjustXYToBeInBox` (actor.cpp:1990-2040) starts
+  at box 1 in a v5 game and skips invisible boxes for the player, and a locked box ends a walk before it
+  (actor.cpp:1284).
+- **The point.**
+  - Candidates: first the box's centre (the mean of its corners), then the points halfway from the centre to each
+    corner (ul, ur, lr, ll).
+  - On screen: x less xstart, y plus the main screen's topline; inside [0, 320) and the main screen's [b, h).
+  - The first candidate counts where the hit test answers the main screen with no object and no actor: a floor
+    click. A box with no such point is not clicked.
+  - These candidates go in the offer's one AtMany.
+- **The inputs.** Only in a sentence idle: one click per such box, named "w<box>", after M4's inputs. With FMI_BOXES
+  off, the inputs are M4's.
+- **Switch.** FMI_BOXES=1, the variable end's `boxes_on` reads. Off, the Boxes command is never sent.
+- **Measured first,** at the probe's 13 entries on end's engine (patches 0001-0005, read only), with the switch off
+  and on:
+  - the boxes, the walkable ones, and the ones with a floor point;
+  - the extra trials, their outcomes, and their kept entries, each verified from boot;
+  - their cost.
+
+  With the switch off, A2 must give the probe's trials again.
