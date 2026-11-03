@@ -29,7 +29,7 @@ while IFS=$'\t' read -r name start caps goal; do
   rc=$(python3 -c "import json;d=json.load(open('$d/rust.json'));print(d['expanded'],d['evaluated'],d['generated'],'')" 2>/dev/null)
   if [ -f "$d/sas_plan" ] && [ -f "$d/rust_plan" ] && cmp -s "$d/sas_plan" "$d/rust_plan" && [ "$fdc" = "$rc" ] && [[ $g == same* ]]; then
     same=$((same+1)); echo "same  $name: $(tail -1 "$d/sas_plan") e/e/g $rc; graph $g; fd $(cut -d' ' -f1 "$d/fd.time") s, rust $(cut -d' ' -f1 "$d/rust.time") s"
-  elif [ ! -f "$d/sas_plan" ] && [ ! -f "$d/rust_plan" ] && grep -q "Search stopped without finding a solution\|Completely explored" "$d/fd.log" && grep -q '"unsolvable"' "$d/rust.json" && [ "$fdc" = "$rc" ] && [[ $g == same* ]]; then
+  elif [ ! -f "$d/sas_plan" ] && [ ! -f "$d/rust_plan" ] && grep -q "Search stopped without finding a solution\|Completely explored\|provably unsolvable" "$d/fd.log" && grep -q '"unsolvable"' "$d/rust.json" && [ "$fdc" = "$rc" ] && [[ $g == same* ]]; then
     same=$((same+1)); echo "same  $name: no plan (FD and Rust unsolvable), e/e/g $rc; graph $g"
   else
     diff=$((diff+1)); echo "DIFF  $name: graph $g; FD '$fdc' $(tr '\n' ' ' < "$d/sas_plan" 2>/dev/null | cut -c1-200); Rust '$rc' $(tr '\n' ' ' < "$d/rust_plan" 2>/dev/null | cut -c1-200)"
