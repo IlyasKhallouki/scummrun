@@ -416,8 +416,10 @@ pub struct AffordOut {
     pub trials: Vec<Trial>,
     pub kept: Vec<Kept>,
     pub seconds: f64,
-    /// the engines' CPU (the trials' forks, the control) and this thread's
+    /// the engines' CPU (the trials' forks and the control: /proc's ticks, read at each quit)
     pub engine_cpu_s: f64,
+    /// this thread's CPU over the step (CLOCK_THREAD_CPUTIME_ID)
+    pub own_cpu_s: f64,
     /// wall seconds by phase: the forks, the inputs and runs, the reads (facts, runs, dumps, hit tests), the quits,
     /// the no-input control
     pub phases: [f64; 5],
@@ -457,6 +459,8 @@ impl AffordOut {
                "kept": self.kept.len(), "rooms": rooms.iter().map(|(r, c)| json!([r, c])).collect::<Vec<_>>(),
                "back_median": backs.get(backs.len() / 2), "seconds": self.seconds,
                "ms_per_trial": if n > 0 { 1e3 * self.seconds / n as f64 } else { 0.0 }, "engine_cpu_s": self.engine_cpu_s,
+               "own_cpu_s": self.own_cpu_s,
+               "cpu_ms_per_trial": if n > 0 { 1e3 * (self.engine_cpu_s + self.own_cpu_s) / n as f64 } else { 0.0 },
                "phases_s": {"fork": self.phases[0], "run": self.phases[1], "read": self.phases[2], "quit": self.phases[3],
                             "control": self.phases[4]}})
     }
@@ -646,6 +650,7 @@ pub fn try_all(
     then: Option<Then<'_>>,
 ) -> EResult<AffordOut> {
     let t0 = Instant::now();
+    let c0 = crate::machine::thread_cpu_s();
     let f0 = e.status().frame;
     let entry = e.facts()?;
     let sentence = entry.val(Key::var(VAR_SENTENCE_SCRIPT as u64)) as i32;
@@ -741,6 +746,7 @@ pub fn try_all(
         }
     }
     r.out.engine_cpu_s = r.cpu;
+    r.out.own_cpu_s = crate::machine::thread_cpu_s() - c0;
     r.out.seconds = t0.elapsed().as_secs_f64();
     Ok(r.out)
 }

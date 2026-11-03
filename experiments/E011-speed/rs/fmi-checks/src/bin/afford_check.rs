@@ -305,7 +305,7 @@ fn run(a: &Args) -> Res<()> {
     summary["boot_s"] = json!(boot_s);
     summary["horizon"] = json!(horizon);
     summary["third_on"] = json!(cfg.third);
-    summary["runs"] = json!(runs.iter().map(|r| json!({"ms_per_trial": r["ms_per_trial"], "step_s": r["step_s"], "offer_s": r["offer_s"]})).collect::<Vec<_>>());
+    summary["runs"] = json!(runs.iter().map(|r| json!({"ms_per_trial": r["ms_per_trial"], "cpu_ms_per_trial": r["cpu_ms_per_trial"], "step_s": r["step_s"], "offer_s": r["offer_s"]})).collect::<Vec<_>>());
     summary["kept_list"] = json!(res.kept.iter().map(|k| json!({"name": k.name, "frame": k.checkpoint.frame, "room": k.room, "novel": k.novel.len()})).collect::<Vec<_>>());
     if a.flag("verify") {
         let mut rows = Vec::new();
