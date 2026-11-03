@@ -37,13 +37,13 @@ texts: entries 0 (j00000), 191 (j00057), 189 (j00059). `keys-r33.jsonl`, `keys-r
 
 ## RS2 and the units as a set
 
-- **The units part is not exercised by the check's readings.** On (28, 33, 41) the keys step gave j00061's start
-  (entry 205) and j00062's (entry 204) the same key with the units in their order (`measure-28-33-41-keys.jsonl`).
-  In the check's store the folders that differ in the units' order alone are, on both scopes, a reading whose start
-  runs script 2 (entries 191 and 208, j00057 and j00063), and each such reading has 0 records (the check's log, and
-  entry 191's reading here). So on these inputs the key's units as a set lets no further run be taken. It stays in
-  the switch: its argument holds (memo.md) and it is tested (`memo::tests::the_keys_units_as_a_set`), but this
-  measure gives it no gain.
+- **The units part is not exercised by the check's readings.** The check's store has two pairs of folders that
+  differ in the units' order alone. With this branch's reader the keys steps find that order differing only for
+  entry 191's ring(33) start (j00057, script 2 running), whose reading has 0 records; j00061's and j00062's (28, 33,
+  41) starts (entries 205 and 204) share one key (`measure-28-33-41-keys.jsonl`). The check's other (28, 33, 41) start
+  with script 2 running, j00063 (entry 208), has 0 records too (the check's log). So on these inputs the key's units
+  as a set lets no further run be taken. It stays in the switch: its argument holds (memo.md) and it is tested
+  (`memo::tests::the_keys_units_as_a_set`), but this measure gives it no gain.
 - **RS2's files pass.** Every reading of the measure below was summed and compared with reader-scope's reading of the
   same arguments (`kitchen.sh ... ref`: a child, no memo, no `--prep`), and reading.json by cmp_reading.py:
   ring(33) entry 0 and entry 189 in `before` (2), `disk` (1) and `after` (2, each with entry 189 twice), and
