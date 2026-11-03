@@ -165,7 +165,8 @@ impl Pool {
                 let cfg = BootCfg {
                     seed: self.seed,
                     events: spec.events.clone(),
-                    frame: Some(spec.frame),
+                    // the archive's root (explore.py boot_root): frame 0 and no input mean the first idle stop
+                    frame: if spec.frame == 0 && spec.events.is_empty() { None } else { Some(spec.frame) },
                     dump_locals: self.dump_locals,
                     lean: self.lean,
                     out_dir: self.out_dir.join(format!("boot-{id}")),
