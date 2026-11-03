@@ -1,0 +1,20 @@
+# reading path (the kitchen check's log, reading.path) -> its name in s2-readings.sh's T.jsonl
+/var/tmp/fast-mi/e011-archives/kitchen/readings/28-33-35-38-j00000/reading.json	F1
+/var/tmp/fast-mi/e011-archives/kitchen/readings/33-38-83-85-96-j00001/reading.json	F2
+/var/tmp/fast-mi/e011-archives/kitchen/readings/33-38-83-85-96-j00002/reading.json	F3
+/var/tmp/fast-mi/e011-archives/kitchen/readings/33-38-83-85-96-j00003/reading.json	F4
+/var/tmp/fast-mi/e011-archives/kitchen/readings/29-33-34-35-83-j00017/reading.json	F5
+/var/tmp/fast-mi/e011-archives/kitchen/readings/29-33-34-35-83-j00019/reading.json	F6
+/var/tmp/fast-mi/e011-archives/kitchen/readings/29-35-j00020/reading.json	F7
+/var/tmp/fast-mi/e011-archives/kitchen/readings/34-35-j00025/reading.json	F8
+/var/tmp/fast-mi/e011-archives/kitchen/readings/28-33-35-38-j00057/reading.json	F9
+/var/tmp/fast-mi/e011-archives/kitchen/readings/28-33-35-38-j00059/reading.json	F10
+/var/tmp/fast-mi/e011-archives/kitchen/readings/29-33-34-35-83-j00060/reading.json	F11
+/var/tmp/fast-mi/e011-archives/kitchen/readings/28-33-41-j00061/reading.json	F12
+/var/tmp/fast-mi/e011-archives/kitchen/readings/28-33-41-j00062/reading.json	F13
+/var/tmp/fast-mi/e011-archives/kitchen/readings/28-33-41-j00063/reading.json	F14
+/var/tmp/fast-mi/e011-archives/kitchen/jobs/j00000/run/a00/refine-01/reading.json	D1
+/var/tmp/fast-mi/e011-archives/kitchen/jobs/j00019/run/a00/refine-01/reading.json	D2
+/var/tmp/fast-mi/e011-archives/kitchen/jobs/j00022/run/a36/reach-01/reading.json	D3
+/var/tmp/fast-mi/e011-archives/kitchen/jobs/j00023/run/a36/reach-02/reading.json	D4
+/var/tmp/fast-mi/e011-archives/kitchen/jobs/j00028/run/a00/refine-01/reading.json	D5
