@@ -70,3 +70,13 @@ frame too wide the random tables fail.
   293 failed ones, so every K tried refutes it, as predicted.
 - **Cost of the fork:** one full dump per try that is not an end point. Window 3 with K = 95: 96 children in 1.08 s
   (11 ms per try with its end dump); with no K, 296 children in 3.56 s.
+
+## What the try or the integration wires
+
+- `Search.draws_of` from `tested`'s `draws` (its COORD note gives the closure), `Search.novel_of` (archive novelty
+  over T and rooms) and `Search.tested_keys` (T), in `fmi/src/wire_real.rs`'s `PlayHost::player` when
+  FMI_DELAY_FORK=1. Unset, the draws come from the checks' reasons with no K, and amendment (2) makes the fork change
+  no choice.
+- The candidates (`Search.delay_candidates`, and each window record's `"delay"."candidates"`) are for the try's
+  commit: an entry is the root's movie plus the candidate's inputs, checked by its end checkpoint.
+- Method (1)'s due frame for a planned event of a paused slot in the window search is not part of this component.
