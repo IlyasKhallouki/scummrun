@@ -217,14 +217,14 @@ fn f64_of(v: &Value) -> f64 {
 pub fn cmd_report(seqs: &[PathBuf]) -> Result<(), String> {
     for seq in seqs {
         println!("\n### {}\n", seq.display());
-        println!("| try | entry | wall s | return | read | wait | plan | play | afford | stop | new (how) | wait stops/kept | delay trig/cand/kept | afford trials/kept | dead |");
+        println!("| try | entry | wall s | return | read | idle+wait | plan | play | afford | stop | new (how) | wait stops/kept | delay trig/cand/kept | afford trials/kept | dead |");
         println!("|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|---|---|");
         let mut sums = [0.0f64; 7];
         let mut counts = [0usize; 9];
         for d in job_dirs(seq) {
             let r = read_json(&d.join("result.json"))?;
             let c = &r["cpu_s"];
-            let parts = [f64_of(&r["wall_s"]), f64_of(&c["return"]), f64_of(&c["read"]), f64_of(&c["wait"]), f64_of(&c["plan"]), f64_of(&c["play"]),
+            let parts = [f64_of(&r["wall_s"]), f64_of(&c["return"]), f64_of(&c["read"]), f64_of(&c["idle"]) + f64_of(&c["wait"]), f64_of(&c["plan"]), f64_of(&c["play"]),
                          f64_of(&c["afford"])];
             for (s, p) in sums.iter_mut().zip(parts.iter()) {
                 *s += p;
