@@ -396,6 +396,9 @@ pub struct Executor {
     pub stone_at: u64,
     /// the stone trials kept as the branch (`stone_keep`)
     pub stats_kept: u32,
+    /// E013 (component refuse): set when a check after an input this executor issued failed (the verb key check:
+    /// the profile's selected-verb variable it read); None when a route error is one of forming the input
+    pub check_var: Option<usize>,
 }
 
 impl Executor {
@@ -411,6 +414,7 @@ impl Executor {
             stone_frames: 0,
             stone_at: 0,
             stats_kept: 0,
+            check_var: None,
         }
     }
 
@@ -776,6 +780,7 @@ impl Executor {
             self.run_to(b, kf)?;
             let state = b.state()?;
             if state.vars.get(self.p.verb_var).copied().unwrap_or(0) as i64 != verb {
+                self.check_var = Some(self.p.verb_var);
                 return route(format!("{}: verb key did not select verb {verb}", mv.name));
             }
             if let Some(o) = mv.obj {
