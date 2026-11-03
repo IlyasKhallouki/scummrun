@@ -79,6 +79,8 @@ impl Prof {
             for (w, t, p) in &self.rows {
                 eprintln!("try profile: {w}: {:.2} ms, of which ports {:.2} ms", t * 1e3, p * 1e3);
             }
+            let own: f64 = self.rows.iter().map(|r| r.1 - r.2).sum();
+            eprintln!("try profile: own {:.2} ms", own * 1e3);
             for (w, t, n) in secs {
                 eprintln!("try profile:   section {w}: {:.2} ms in {n} calls", t * 1e3);
             }
