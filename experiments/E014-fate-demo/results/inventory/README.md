@@ -48,3 +48,39 @@ sites in global 61 and quits in globals 155 and 176.
 
 `speedrun_state.cpp:60-61` (2-10 for a sentence, 120-128 for a dialog), used at `:346` and `:412`, and the E003 plan
 player's `speedrun_plan.cpp:42, 439, 473`.
+
+## The second game: the interactive demo (2026-11-03)
+
+`fate-play-demo/inventory.md` and `inventory.json`: the same tool on the interactive demo ("Interactive Demonstration
+v2", ScummVM id `atlantis`, Demo/DOS/English, SCUMM v5; files PLAYFATE.000, PLAYFATE.001), made before any run of the
+bridge, the harness or the explorer on it:
+
+    inventory --engine-src /var/tmp/fast-mi/svm-e012-end/third_party/scummvm \
+      --game mi-dos-cd=<repo>/data/scripts-dos-cd \
+      --game fate-play-demo=/var/tmp/fast-mi/e014-root/data/scripts-fate-play-demo --out DIR
+
+Its extraction is `scripts/dump-scripts.sh` with `SCUMMRP_GAME=atlantis INDEX_NAME=PLAYFATE.000
+RELEASE=fate-play-demo OUT_ROOT=/var/tmp/fast-mi/e014-root GAME_DIR=/var/tmp/fast-mi/games/fate-play-demo` (no
+`GAME_TITLE`): 11 rooms in the files (the index names 97), 93 global scripts, 78 local, 11 entry and 11 exit scripts,
+224 objects (66 with verb code, 227 verb entry points); descumm decoded every script (417 files, 0 errors, 0
+warnings). 12,998 instructions, twice the talkie demo's.
+
+### What it uses that the reader has never met
+
+| what | play demo | MI | the reader's model |
+|---|---:|---:|---|
+| `soundKludge` (opcode 0x4C/0xCC: iMUSE commands; the engine queues them and stores a result in `VAR_SOUNDRESULT`) | 275 in 39 units | 0 | no rule: a path ends there ("unmodelled") |
+| `saveString`, `loadString` (roomOps 13, 14: a file `TARGET.iq` in the save folder) | 1 and 2 | 0 | no rule |
+| `saveLoad` (roomOps 9: a temporary state in save slot 99) | 2 in 1 unit | 0 | no rule |
+| `setRoomShadow` (roomOps 12: the shadow palette) | 3 in 3 units | 0 | no rule |
+| `debug` (opcode 0x6B) | 1 in 1 unit | 0 | no rule |
+| `getActorScale` | 9 in 4 units | 0 | an unknown value |
+| `drawObject` with `setImage` (the object's state from the argument) | 13 in 4 units | 0 | modelled (the machine reads `setImage`'s state) |
+
+Unlike the talkie demo, no `print` holds a speech code: the IR parses every statement of this demo. Every other
+opcode, statement head and sub-op it uses, MI's scripts use too.
+
+### Its end sites
+
+Two `systemOps` sites, both sub-op 1 (restart): global script 57 at offset 0D0E, and object 582's verb code at
+offset 0067. No quit site.
