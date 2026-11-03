@@ -1,0 +1,15 @@
+{"regime": "eoff-ref", "job": "j00000", "wall_s": 122.298, "cpu_s": 302.640, "load": 3.00, "mem_avail_kb": 12972856, "rss_kb": 2082040}
+{"regime": "eoff-ref", "job": "j00001", "wall_s": 3.991, "cpu_s": 9.040, "load": 2.84, "mem_avail_kb": 12942824, "rss_kb": 2088968}
+{"regime": "eoff-ref", "job": "j00002", "wall_s": 4.379, "cpu_s": 10.900, "load": 2.94, "mem_avail_kb": 12933656, "rss_kb": 2100360}
+{"regime": "eoff-ref", "job": "j00003", "wall_s": 4.871, "cpu_s": 11.730, "load": 2.94, "mem_avail_kb": 12912352, "rss_kb": 2111696}
+{"regime": "eoff-ref", "job": "j00004", "wall_s": 0.481, "cpu_s": 0.520, "load": 2.94, "mem_avail_kb": 12907512, "rss_kb": 2114724}
+{"regime": "eoff-ref", "job": "j00005", "wall_s": 0.322, "cpu_s": 0.350, "load": 2.94, "mem_avail_kb": 12903828, "rss_kb": 2115608}
+{"regime": "eoff-ref", "job": "j00006", "wall_s": 26.478, "cpu_s": 62.800, "load": 3.34, "mem_avail_kb": 12641540, "rss_kb": 2477564}
+{"regime": "eoff-ref", "job": "j00007", "wall_s": 2.434, "cpu_s": 5.500, "load": 3.23, "mem_avail_kb": 12648464, "rss_kb": 2482560}
+{"regime": "eoff-ref", "job": "j00008", "wall_s": 6.739, "cpu_s": 8.980, "load": 3.14, "mem_avail_kb": 12371384, "rss_kb": 2652396}
+{"regime": "eoff-ref", "job": "j00009", "wall_s": 6.368, "cpu_s": 8.830, "load": 2.96, "mem_avail_kb": 12229444, "rss_kb": 2829880}
+{"regime": "eoff-ref", "job": "j00010", "wall_s": 0.428, "cpu_s": 0.470, "load": 2.96, "mem_avail_kb": 12222080, "rss_kb": 2846212}
+{"regime": "eoff-ref", "job": "j00011", "wall_s": 6.118, "cpu_s": 8.280, "load": 2.81, "mem_avail_kb": 12195704, "rss_kb": 2850780}
+{"regime": "eoff-ref", "job": "j00012", "wall_s": 0.270, "cpu_s": 0.260, "load": 2.66, "mem_avail_kb": 12189712, "rss_kb": 2853808}
+{"regime": "eoff-ref", "job": "j00013", "wall_s": 0.429, "cpu_s": 0.450, "load": 2.66, "mem_avail_kb": 12188244, "rss_kb": 2864120}
+{"regime": "eoff-ref", "job": "j00014", "wall_s": 6.829, "cpu_s": 9.310, "load": 2.61, "mem_avail_kb": 12169392, "rss_kb": 2866312}
