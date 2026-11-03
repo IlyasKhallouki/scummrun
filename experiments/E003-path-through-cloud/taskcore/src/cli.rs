@@ -588,6 +588,7 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
         match k.as_str() {
             "--task" => task = Some(PathBuf::from(v)),
             "--keep" => cfg.keep = v.parse().map_err(|e| format!("--keep: {}", e))?,
+            "--fast" => cfg.fast = v == "1",
             _ => return Err(format!("warm: unknown option {}", k)),
         }
     }
@@ -672,7 +673,8 @@ fn warm_cmd(argv: &[String]) -> Result<(), String> {
                 x.model = cfg.model;
                 let (_, st, of) = crate::search::build(&mut x, &red.task.starts[red.start].1)?;
                 let build_s = t1.elapsed().as_secs_f64();
-                let o = crate::search::lazy_greedy(&st, None);
+                let mode = if cfg.fast { crate::search::HffMode::Watch } else { crate::search::HffMode::Fd };
+                let o = crate::search::lazy_greedy_mode(&st, None, mode);
                 if o.status == "plan" {
                     crate::search::check_plan(&st, &o.plan)?;
                     std::fs::write(plan_path, crate::search::plan_text(&st, &o.plan)).map_err(|e| e.to_string())?;

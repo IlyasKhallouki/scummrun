@@ -54,6 +54,8 @@ pub struct Host {
     pub downward: PathBuf,
     /// where Fast Downward's files go
     pub work: PathBuf,
+    /// E011 round 2's faster forms of the same work (taskcore warm.rs `Config::fast`, h_FF by watches); off: round 1's
+    pub fast: bool,
 }
 
 impl Host {
@@ -73,6 +75,7 @@ impl Host {
             keep: 4,
             downward: PathBuf::from(dw).join("builds/release/bin/downward"),
             work: std::env::temp_dir().join("fmi-plan"),
+            fast: std::env::var("FMI_PLAN_FAST").is_ok_and(|v| v == "1"),
         }
     }
 }
@@ -181,7 +184,7 @@ impl WarmPlanner {
     pub fn new(host: &Host, reading: &dyn ReadingSource) -> Result<WarmPlanner, PlanError> {
         let head = fmi_plan_head(reading.head()).map_err(tc_err)?;
         let reached = if reading.reached().is_empty() { None } else { Some(reading.reached().to_string()) };
-        let cfg = warm::Config { keep: host.keep, ..Default::default() };
+        let cfg = warm::Config { keep: host.keep, fast: host.fast, ..Default::default() };
         let path = reading.dir().join(&head);
         let w = warm::Warm::new(reading.packed(), &path.display().to_string(), reached, cfg).map_err(tc_err)?;
         let t = w.task();
@@ -455,7 +458,8 @@ impl WarmPlanner {
         let deadline = Some(Instant::now() + Duration::from_secs(req.time_limit_s.max(1)));
         let (status, ops, plan_cost) = match req.search {
             Search::Gbfs => {
-                let o = search::lazy_greedy(&st, deadline);
+                let mode = if self.host.fast { search::HffMode::Watch } else { search::HffMode::Fd };
+                let o = search::lazy_greedy_mode(&st, deadline, mode);
                 self.last.relax = o.relax_s;
                 self.last.search = o.search_s;
                 self.last.expanded = o.expanded;

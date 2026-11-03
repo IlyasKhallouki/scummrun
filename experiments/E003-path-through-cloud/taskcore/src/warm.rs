@@ -39,6 +39,8 @@ pub struct Config {
     pub model: bool,
     /// how many (bans, goal, caps) are kept
     pub keep: usize,
+    /// E011 round 2's faster forms of the same work (reduce/fast.rs); off: round 1's code
+    pub fast: bool,
 }
 
 impl Default for Config {
@@ -49,6 +51,7 @@ impl Default for Config {
             limit: 64,
             model: true,
             keep: 4,
+            fast: false,
         }
     }
 }
@@ -289,6 +292,11 @@ impl Warm {
             acts,
             n_orig: t.n_orig,
         };
+        let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
+        if prof {
+            eprintln!("profile warm bans {:.3} s", ban_seconds);
+        }
+        let tf = Instant::now();
         let (folded, fold_js) = if cfg.fold != FoldMode::Off {
             let (acts, fc, _) = fold::fold_src(&b, &t.facts, &t.strs, cfg.fold);
             let js = fold_json(&fc, &acts);
@@ -300,6 +308,9 @@ impl Warm {
             }
             (task_of(acts), String::new())
         };
+        if prof {
+            eprintln!("profile warm fold (first) {:.3} s", tf.elapsed().as_secs_f64());
+        }
         let mut counts = Counts::new();
         let (task, bad, changed) = if cfg.reduce.any() {
             match reduce::bad_effect(&folded) {
@@ -480,6 +491,9 @@ impl Warm {
         let check = r.needed_check && !input_misses.is_empty();
         let needed = self.needed(k);
         let mut seconds_needed = t_needed.elapsed().as_secs_f64();
+        if std::env::var_os("TASKCORE_PROFILE").is_some() {
+            eprintln!("profile warm start check {:.3} s, needed {:.3} s", t_needed.duration_since(t0).as_secs_f64(), seconds_needed);
+        }
         st.s("fold", &format!("{:?}", cfg.fold)).s("reduce", &format!("{:?}", cfg.reduce)).n("product_limit", cfg.limit);
         st.s("encoding", if cfg.model { "model" } else { "task" });
         let passes = if cfg.fold != FoldMode::Off && cfg.reduce.any() { 2 } else { 1 };
@@ -506,55 +520,38 @@ impl Warm {
             st.raw("start_check", &j.done());
         }
         // the reductions: (d) from this start on the kept task, then the rest of the loop
-        let kept = &self.kept[k];
-        let mut c = kept.counts.clone();
-        let mut replaced = Vec::new();
         let start = self.t.starts.len();
-        let mut t = if cfg.reduce.any() {
-            if let Some(e) = &kept.bad {
-                return Err(e.clone());
+        let out = if std::env::var_os("TASKCORE_CHECK_REDUCE").is_some() && cfg.fast {
+            let a = self.reduce_from(k, &vals, &r.start_name, passes, false)?;
+            let b = self.reduce_from(k, &vals, &r.start_name, passes, true)?;
+            if let Some(d) = reduce::fast::task_diff(&a.task, &b.task) {
+                panic!("the fast reductions give another task: {}", d);
             }
-            let base = kept.task.as_ref().expect("built");
-            let t1 = Instant::now();
-            let (mut nt, ch) = if cfg.reduce.d {
-                let td = Instant::now();
-                let r = reduce::red_d_from(base, Some((0, vals.clone())), start, &mut c);
-                if std::env::var_os("TASKCORE_PROFILE").is_some() {
-                    eprintln!("profile d (kept task) {:.3} s, {} actions", td.elapsed().as_secs_f64(), r.0.acts.len());
-                }
-                r
-            } else {
-                let mut tt = base.clone();
-                tt.starts.push((0, vals.clone()));
-                (tt, false)
-            };
-            let id = nt.strs.intern(&r.start_name);
-            nt.starts.last_mut().unwrap().0 = id;
-            let nt = reduce::finish(nt, cfg.reduce, start, &mut c, &mut replaced, kept.changed | ch);
-            st.f("seconds_reduce", t1.elapsed().as_secs_f64());
-            st.n("actions_after_reduce", nt.acts.len());
-            nt
+            assert!(a.c == b.c, "the fast reductions give other counts: {:?} / {:?}", a.c, b.c);
+            assert!(a.replaced == b.replaced, "the fast reductions give other replaced pairs");
+            assert!(
+                (a.after, &a.fold2, a.after2) == (b.after, &b.fold2, b.after2),
+                "the fast reductions give other numbers: {:?} / {:?}",
+                (a.after, &a.fold2, a.after2),
+                (b.after, &b.fold2, b.after2)
+            );
+            eprintln!("check: the fast reductions give the reference's task, counts and pairs ({} actions)", b.task.acts.len());
+            b
         } else {
-            let mut tt = kept.task.as_ref().expect("built").clone();
-            let id = tt.strs.intern(&r.start_name);
-            tt.starts.push((id, vals.clone()));
-            tt
+            self.reduce_from(k, &vals, &r.start_name, passes, cfg.fast)?
         };
-        if passes == 2 {
-            let t1 = Instant::now();
-            let (nt, fc, _) = fold::fold(t, cfg.fold);
-            if std::env::var_os("TASKCORE_PROFILE").is_some() {
-                eprintln!("profile fold (second) {:.3} s, {} folded", t1.elapsed().as_secs_f64(), fc.folded_actions);
-            }
-            t = nt;
-            st.f("seconds_fold_second", t1.elapsed().as_secs_f64());
-            st.raw("fold_counts_second", &fold_json(&fc, &t.acts));
-            if fc.folded_actions > 0 {
-                let t1 = Instant::now();
-                t = reduce::run(t, cfg.reduce, start, &mut c, &mut replaced)?;
-                st.f("seconds_reduce_second", t1.elapsed().as_secs_f64());
-                st.n("actions_after_reduce_second", t.acts.len());
-            }
+        let ReduceOut { task: t, c, replaced, .. } = out;
+        if let Some(n) = out.after {
+            st.f("seconds_reduce", out.seconds.0);
+            st.n("actions_after_reduce", n);
+        }
+        if let Some(fj) = &out.fold2 {
+            st.f("seconds_fold_second", out.seconds.1);
+            st.raw("fold_counts_second", fj);
+        }
+        if let Some(n) = out.after2 {
+            st.f("seconds_reduce_second", out.seconds.2);
+            st.n("actions_after_reduce_second", n);
         }
         if cfg.reduce.any() {
             st.raw("reduce_counts", &counts_json(&c));
@@ -572,6 +569,92 @@ impl Warm {
             kept: if built { "built" } else { "kept" },
             seconds: t0.elapsed().as_secs_f64(),
         })
+    }
+}
+
+/// The reductions from one start (`request`'s), and the numbers its stats print.
+struct ReduceOut {
+    task: Task,
+    c: Counts,
+    replaced: Vec<(u32, u32)>,
+    /// actions after the loop, the second fold's counts, actions after the second loop (when they run)
+    after: Option<usize>,
+    fold2: Option<String>,
+    after2: Option<usize>,
+    /// seconds of the loop, the second fold, the second loop
+    seconds: (f64, f64, f64),
+}
+
+impl Warm {
+    /// (d) from `vals` on what is kept at `k`, the rest of the loop, the second fold and its loop: `reduce::finish` and
+    /// `reduce::run`, or with `fast` their fast forms (reduce/fast.rs, the same result).
+    fn reduce_from(&self, k: usize, vals: &[u32], start_name: &str, passes: i32, fast: bool) -> Result<ReduceOut, String> {
+        let cfg = self.cfg;
+        let kept = &self.kept[k];
+        let mut c = kept.counts.clone();
+        let mut replaced = Vec::new();
+        let start = self.t.starts.len();
+        let mut memo = reduce::fast::Memo::default();
+        let (mut after, mut fold2, mut after2, mut seconds) = (None, None, None, (0.0, 0.0, 0.0));
+        let mut t = if cfg.reduce.any() {
+            if let Some(e) = &kept.bad {
+                return Err(e.clone());
+            }
+            let base = kept.task.as_ref().expect("built");
+            let t1 = Instant::now();
+            let (mut nt, ch) = if cfg.reduce.d {
+                let td = Instant::now();
+                let r = if fast {
+                    reduce::fast::red_d_from_fast(base, Some((0, vals.to_vec())), start, &mut c)
+                } else {
+                    reduce::red_d_from(base, Some((0, vals.to_vec())), start, &mut c)
+                };
+                if std::env::var_os("TASKCORE_PROFILE").is_some() {
+                    eprintln!("profile d (kept task) {:.3} s, {} actions", td.elapsed().as_secs_f64(), r.0.acts.len());
+                }
+                r
+            } else {
+                let mut tt = base.clone();
+                tt.starts.push((0, vals.to_vec()));
+                (tt, false)
+            };
+            let id = nt.strs.intern(start_name);
+            nt.starts.last_mut().unwrap().0 = id;
+            let nt = if fast {
+                reduce::fast::finish_fast(nt, cfg.reduce, start, &mut c, &mut replaced, kept.changed | ch, &mut memo)
+            } else {
+                reduce::finish(nt, cfg.reduce, start, &mut c, &mut replaced, kept.changed | ch)
+            };
+            seconds.0 = t1.elapsed().as_secs_f64();
+            after = Some(nt.acts.len());
+            nt
+        } else {
+            let mut tt = kept.task.as_ref().expect("built").clone();
+            let id = tt.strs.intern(start_name);
+            tt.starts.push((id, vals.to_vec()));
+            tt
+        };
+        if passes == 2 {
+            let t1 = Instant::now();
+            let (nt, fc, _) = fold::fold(t, cfg.fold);
+            if std::env::var_os("TASKCORE_PROFILE").is_some() {
+                eprintln!("profile fold (second) {:.3} s, {} folded", t1.elapsed().as_secs_f64(), fc.folded_actions);
+            }
+            t = nt;
+            seconds.1 = t1.elapsed().as_secs_f64();
+            fold2 = Some(fold_json(&fc, &t.acts));
+            if fc.folded_actions > 0 {
+                let t1 = Instant::now();
+                t = if fast {
+                    reduce::fast::run_fast(t, cfg.reduce, start, &mut c, &mut replaced, &mut memo)?
+                } else {
+                    reduce::run(t, cfg.reduce, start, &mut c, &mut replaced)?
+                };
+                seconds.2 = t1.elapsed().as_secs_f64();
+                after2 = Some(t.acts.len());
+            }
+        }
+        Ok(ReduceOut { task: t, c, replaced, after, fold2, after2, seconds })
     }
 }
 
