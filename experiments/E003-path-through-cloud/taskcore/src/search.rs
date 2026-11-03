@@ -338,7 +338,53 @@ pub fn build(x: &mut Expander, start: &[u32]) -> Result<(Plan, SasTask, Vec<OpOf
     let mut of = Vec::new();
     let mut costs_raw: Vec<u32> = Vec::new();
     let kb0 = crate::perf::now();
-    for ai in 0..t.acts.len() {
+    let th = if x.fast { crate::par::threads() } else { 1 };
+    if th > 1 {
+        // the actions in chunks on threads, each with its own expander, joined in action order (`BuildPart`)
+        let n = t.acts.len();
+        let nchunks = (th * 8).min(n.max(1));
+        let size = n.div_ceil(nchunks.max(1)).max(1);
+        let (limit, model, check, fast) = (x.limit, x.model, x.check, x.fast);
+        let init = || {
+            let mut xw = Expander::new(t, limit);
+            xw.model = model;
+            xw.check = check;
+            xw.fast = fast;
+            xw
+        };
+        let parts: Vec<BuildPart> = crate::par::map_dyn(n.div_ceil(size), th, init, |xw, k| BuildPart::of(xw, k * size..((k + 1) * size).min(n)));
+        for p in parts {
+            if let Some(e) = p.err {
+                return Err(e);
+            }
+            let (bp, be, bc) = (st.pre.len() as u32, st.effs.len() as u32, st.conds.len() as u32);
+            st.pre.extend_from_slice(&p.pre);
+            st.pre_off.extend(p.pre_end.iter().map(|&e| e + bp));
+            st.conds.extend_from_slice(&p.conds);
+            st.effs.extend(p.effs.iter().map(|e| Eff { c0: e.c0 + bc, c1: e.c1 + bc, var: e.var, post: e.post }));
+            st.eff_off.extend(p.eff_end.iter().map(|&e| e + be));
+            costs_raw.extend_from_slice(&p.costs);
+            of.extend_from_slice(&p.of);
+            for &u in &p.used {
+                used[u as usize] = true;
+            }
+            for &f in &p.picks {
+                x.picks[f as usize] = true;
+            }
+            n_ops += p.n_ops;
+            effects += p.effects;
+            cond += p.cond;
+            metric |= p.metric;
+            resets += p.resets;
+            x.c.dead_actions += p.c.dead_actions;
+            x.c.pick_actions += p.c.pick_actions;
+            x.c.noop_effects += p.c.noop_effects;
+            x.c.empty_variants += p.c.empty_variants;
+            x.c.variants += p.c.variants;
+            x.c.max_variants = x.c.max_variants.max(p.c.max_variants);
+        }
+    }
+    for ai in 0..if th > 1 { 0 } else { t.acts.len() } {
         let mut k = 0u32;
         x.expand(ai, &mut |v: &sas::Variant| {
             n_ops += 1;
@@ -532,6 +578,101 @@ pub fn thread_cpu_s() -> f64 {
 }
 
 // --- the adapted costs ----------------------------------------------------------------------------------------------
+
+/// One chunk of `build`'s actions expanded alone (the fast form's threads): what the sequential loop appends for them, with
+/// offsets from the chunk's own start, the facts it marks used, the pick facts, and the expander's counts.
+struct BuildPart {
+    pre: Vec<(u32, u32)>,
+    pre_end: Vec<u32>,
+    effs: Vec<Eff>,
+    eff_end: Vec<u32>,
+    conds: Vec<(u32, u32)>,
+    costs: Vec<u32>,
+    of: Vec<OpOf>,
+    used: Vec<u32>,
+    picks: Vec<u32>,
+    n_ops: u64,
+    effects: u64,
+    cond: u64,
+    metric: bool,
+    resets: u64,
+    c: sas::SasCounts,
+    err: Option<String>,
+}
+
+impl BuildPart {
+    fn of(x: &mut Expander, range: std::ops::Range<usize>) -> BuildPart {
+        let nf = x.nf;
+        let mut p = BuildPart {
+            pre: Vec::new(),
+            pre_end: Vec::new(),
+            effs: Vec::new(),
+            eff_end: Vec::new(),
+            conds: Vec::new(),
+            costs: Vec::new(),
+            of: Vec::new(),
+            used: Vec::new(),
+            picks: Vec::new(),
+            n_ops: 0,
+            effects: 0,
+            cond: 0,
+            metric: false,
+            resets: 0,
+            c: sas::SasCounts::default(),
+            err: None,
+        };
+        let mut used = vec![false; 2 * nf as usize + 2];
+        for ai in range {
+            let mut k = 0u32;
+            let r = x.expand(ai, &mut |v: &sas::Variant| {
+                p.n_ops += 1;
+                for &(f, val) in v.chosen {
+                    used[f as usize] = true;
+                    p.pre.push((f, val));
+                }
+                p.pre_end.push(p.pre.len() as u32);
+                for &(s, _) in v.ranges {
+                    let e = &v.effs[s..];
+                    used[e[0] as usize] = true;
+                    if e[0] == 2 * nf {
+                        p.resets += 1;
+                    }
+                    let nc = e[2] as usize;
+                    if nc > 0 {
+                        p.cond += 1;
+                    }
+                    let c0 = p.conds.len() as u32;
+                    for j in 0..nc {
+                        used[e[3 + 2 * j] as usize] = true;
+                        p.conds.push((e[3 + 2 * j], e[4 + 2 * j]));
+                    }
+                    p.effs.push(Eff { c0, c1: p.conds.len() as u32, var: e[0], post: e[1] });
+                }
+                p.eff_end.push(p.effs.len() as u32);
+                p.effects += v.ranges.len() as u64;
+                if v.cost != 1 && v.cost != 0 {
+                    p.metric = true;
+                }
+                p.costs.push(v.cost);
+                p.of.push(OpOf::Action(ai as u32, k));
+                k += 1;
+                Ok(())
+            });
+            if let Err(e) = r {
+                p.err = Some(e);
+                break;
+            }
+        }
+        p.used = (0..used.len() as u32).filter(|&u| used[u as usize]).collect();
+        // the chunk's own picks and counts, the expander left as new for the thread's next chunk
+        p.picks = (0..nf).filter(|&f| x.picks[f as usize]).collect();
+        for &f in &p.picks {
+            x.picks[f as usize] = false;
+        }
+        p.c = std::mem::take(&mut x.c);
+        p
+    }
+}
 
 /// operator_cost.cc PLUSONE on the task: cost + 1, or 1 for every operator when every operator costs 1.
 pub fn plusone(t: &SasTask) -> Vec<i32> {
@@ -749,6 +890,88 @@ pub struct Ff {
 /// whole: any length) and the effect.
 type SKey = (Box<[u32]>, u32);
 
+/// `build_unary_operators` for the operators in `ops` (`Ff::new`): per effect, the operator's preconditions merged with
+/// the effect's conditions (sorted, unique), the effect, the base cost and the operator; offsets from 0.
+#[allow(clippy::type_complexity)]
+fn unary_ops(t: &SasTask, adj: &[i32], prop_off: &[u32], ops: std::ops::Range<usize>) -> (Vec<u32>, Vec<i32>, Vec<u32>, Vec<u32>, Vec<u32>) {
+    let prop = |v: u32, x: u32| prop_off[v as usize] + x;
+    let mut b_eff = Vec::new();
+    let mut b_base = Vec::new();
+    let mut b_pre_off = vec![0u32];
+    let mut b_pre: Vec<u32> = Vec::new();
+    let mut b_op = Vec::new();
+    let mut buf: Vec<u32> = Vec::new();
+    let mut opre: Vec<u32> = Vec::new();
+    let mut cbuf: Vec<u32> = Vec::new();
+    for o in ops {
+        opre.clear();
+        opre.extend(t.pre(o).iter().map(|&(v, x)| prop(v, x)));
+        opre.sort_unstable();
+        opre.dedup();
+        for e in t.effs(o) {
+            // sorted and unique: the operator's (sorted once) merged with the effect's conditions (sorted)
+            cbuf.clear();
+            cbuf.extend(t.conds(e).iter().map(|&(v, x)| prop(v, x)));
+            cbuf.sort_unstable();
+            buf.clear();
+            let (mut i, mut j) = (0, 0);
+            while i < opre.len() || j < cbuf.len() {
+                let x = if j == cbuf.len() || (i < opre.len() && opre[i] <= cbuf[j]) {
+                    i += 1;
+                    opre[i - 1]
+                } else {
+                    j += 1;
+                    cbuf[j - 1]
+                };
+                if buf.last() != Some(&x) {
+                    buf.push(x);
+                }
+            }
+            b_pre.extend_from_slice(&buf);
+            b_pre_off.push(b_pre.len() as u32);
+            b_eff.push(prop(e.var, e.post));
+            b_base.push(adj[o]);
+            b_op.push(o as u32);
+        }
+    }
+    (b_eff, b_base, b_pre_off, b_pre, b_op)
+}
+
+/// `simplify_keep` per effect: a unary operator's keep flag reads only the unary operators with its effect (both rules
+/// look up keys with its effect), so the operators are split by effect into `threads` shards, each run alone with the
+/// same rules on its operators (in increasing number), and the flags put back.
+pub fn simplify_keep_sharded(pre_off: &[u32], pre: &[u32], eff: &[u32], base: &[i32], n_props: usize, threads: usize) -> Vec<bool> {
+    let nb = eff.len();
+    let k = threads.max(1);
+    let mut shards: Vec<Vec<u32>> = vec![Vec::new(); k];
+    for u in 0..nb {
+        shards[eff[u] as usize % k].push(u as u32);
+    }
+    let parts: Vec<Vec<bool>> = crate::par::map_dyn(k, k, || (), |_, s| {
+        let us = &shards[s];
+        // the shard as its own arrays
+        let mut p_off = vec![0u32];
+        let mut p = Vec::new();
+        let mut e = Vec::with_capacity(us.len());
+        let mut b = Vec::with_capacity(us.len());
+        for &u in us {
+            let u = u as usize;
+            p.extend_from_slice(&pre[pre_off[u] as usize..pre_off[u + 1] as usize]);
+            p_off.push(p.len() as u32);
+            e.push(eff[u]);
+            b.push(base[u]);
+        }
+        simplify_keep_ids(&p_off, &p, &e, &b, n_props, us)
+    });
+    let mut keep = vec![false; nb];
+    for (s, part) in parts.into_iter().enumerate() {
+        for (j, &u) in shards[s].iter().enumerate() {
+            keep[u as usize] = part[j];
+        }
+    }
+    keep
+}
+
 /// FD's `simplify` (module docstring) as a keep flag per unary operator: the reference, FD's map with whole keys.
 pub fn simplify_keep_reference(pre_off: &[u32], pre: &[u32], eff: &[u32], base: &[i32]) -> Vec<bool> {
     let nb = eff.len();
@@ -885,9 +1108,102 @@ pub fn simplify_keep(pre_off: &[u32], pre: &[u32], eff: &[u32], base: &[i32], n_
     keep
 }
 
+/// `simplify_keep` on a shard of unary operators (`simplify_keep_sharded`): an exact duplicate keeps the cheapest, then
+/// the lowest number, with each operator's number `ids[j]` (the whole task's), the rest as `simplify_keep`.
+fn simplify_keep_ids(pre_off: &[u32], pre: &[u32], eff: &[u32], base: &[i32], n_props: usize, ids: &[u32]) -> Vec<bool> {
+    const EMPTY: u32 = u32::MAX;
+    let nb = eff.len();
+    let pre_of = |u: usize| &pre[pre_off[u] as usize..pre_off[u + 1] as usize];
+    let cap = (2 * nb.max(1)).next_power_of_two();
+    let mask = cap - 1;
+    let mut table = vec![EMPTY; cap];
+    let mut minlen = vec![u32::MAX; n_props];
+    // the map: per key its least (cost, number); `slot_of[u]`: where u's key lives (so its own lookup is a read)
+    let mut slot_of = vec![0u32; nb];
+    for u in 0..nb {
+        let p = pre_of(u);
+        let e = eff[u];
+        minlen[e as usize] = minlen[e as usize].min(p.len() as u32);
+        let mut slot = skey_hash(p, e) as usize & mask;
+        loop {
+            let x = table[slot];
+            if x == EMPTY {
+                table[slot] = u as u32;
+                break;
+            }
+            let xu = x as usize;
+            if eff[xu] == e && pre_of(xu) == p {
+                if (base[u], ids[u]) < (base[xu], ids[xu]) {
+                    table[slot] = u as u32;
+                }
+                break;
+            }
+            slot = (slot + 1) & mask;
+        }
+        slot_of[u] = slot as u32;
+    }
+    let find = |p: &[u32], e: u32| -> u32 {
+        let mut slot = skey_hash(p, e) as usize & mask;
+        loop {
+            let x = table[slot];
+            if x == EMPTY {
+                return EMPTY;
+            }
+            if eff[x as usize] == e && pre_of(x as usize) == p {
+                return x;
+            }
+            slot = (slot + 1) & mask;
+        }
+    };
+    let t_ins = std::time::Instant::now();
+    let mut probes = 0u64;
+    let mut keep = vec![true; nb];
+    let mut probe = [0u32; MAX_PRECONDITIONS_TO_TEST];
+    for u in 0..nb {
+        let p = pre_of(u);
+        let e = eff[u];
+        if table[slot_of[u] as usize] != u as u32 {
+            keep[u] = false;
+            continue;
+        }
+        let n = p.len();
+        if n > MAX_PRECONDITIONS_TO_TEST || n as u32 <= minlen[e as usize] {
+            continue;
+        }
+        let least = minlen[e as usize];
+        for m in 0..(1u32 << n) - 1 {
+            if m.count_ones() < least {
+                continue;
+            }
+            let mut k = 0;
+            for (i, &x) in p.iter().enumerate() {
+                if m & (1 << i) != 0 {
+                    probe[k] = x;
+                    k += 1;
+                }
+            }
+            probes += 1;
+            let d = find(&probe[..k], e);
+            if d != EMPTY && base[d as usize] <= base[u] {
+                keep[u] = false;
+                break;
+            }
+        }
+    }
+    let _ = (t_ins, probes);
+    keep
+}
+
 impl Ff {
     /// The relaxed task of `t` with the adapted costs `adj` (one per operator).
     pub fn new(t: &SasTask, adj: &[i32]) -> Ff {
+        Ff::new_threads(t, adj, 1)
+    }
+
+    /// `new` with the unary operators built in chunks of operators and `simplify` run per effect (`threads` > 1, the fast
+    /// form): the same unary operators in the same order (each chunk's, in operator order), and the same keep flags
+    /// (`simplify_keep_sharded`).
+    pub fn new_threads(t: &SasTask, adj: &[i32], threads: usize) -> Ff {
         let t_new = Instant::now();
         let mut prop_off = Vec::with_capacity(t.sizes.len());
         let mut n = 0u32;
@@ -906,62 +1222,61 @@ impl Ff {
         }
         // build_unary_operators
         let t_bu = Instant::now();
-        let mut b_eff = Vec::with_capacity(t.effs.len());
-        let mut b_base = Vec::with_capacity(t.effs.len());
-        let mut b_pre_off = Vec::with_capacity(t.effs.len() + 1);
-        b_pre_off.push(0u32);
-        let mut b_pre: Vec<u32> = Vec::with_capacity(t.effs.len() * 4);
-        let mut b_op = Vec::with_capacity(t.effs.len());
-        let mut buf: Vec<u32> = Vec::new();
-        let mut opre: Vec<u32> = Vec::new();
-        let mut cbuf: Vec<u32> = Vec::new();
-        for o in 0..t.n_ops() {
-            opre.clear();
-            opre.extend(t.pre(o).iter().map(|&(v, x)| prop(v, x)));
-            opre.sort_unstable();
-            opre.dedup();
-            for e in t.effs(o) {
-                // sorted and unique: the operator's (sorted once) merged with the effect's conditions (sorted)
-                cbuf.clear();
-                cbuf.extend(t.conds(e).iter().map(|&(v, x)| prop(v, x)));
-                cbuf.sort_unstable();
-                buf.clear();
-                let (mut i, mut j) = (0, 0);
-                while i < opre.len() || j < cbuf.len() {
-                    let x = if j == cbuf.len() || (i < opre.len() && opre[i] <= cbuf[j]) {
-                        i += 1;
-                        opre[i - 1]
-                    } else {
-                        j += 1;
-                        cbuf[j - 1]
-                    };
-                    if buf.last() != Some(&x) {
-                        buf.push(x);
-                    }
-                }
-                b_pre.extend_from_slice(&buf);
-                b_pre_off.push(b_pre.len() as u32);
-                b_eff.push(prop(e.var, e.post));
-                b_base.push(adj[o]);
-                b_op.push(o as u32);
+        let (b_eff, b_base, b_pre_off, b_pre, b_op) = if threads > 1 {
+            let parts = crate::par::map_chunks(t.n_ops(), threads * 4, || (), |_, r| unary_ops(t, adj, &prop_off, r));
+            let mut all = (Vec::new(), Vec::new(), vec![0u32], Vec::new(), Vec::new());
+            for (e, b, off, pre, op) in parts {
+                let base = all.3.len() as u32;
+                all.0.extend_from_slice(&e);
+                all.1.extend_from_slice(&b);
+                all.2.extend(off[1..].iter().map(|&x| x + base));
+                all.3.extend_from_slice(&pre);
+                all.4.extend_from_slice(&op);
             }
-        }
+            all
+        } else {
+            unary_ops(t, adj, &prop_off, 0..t.n_ops())
+        };
         let nb = b_eff.len();
         let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
         if prof {
             eprintln!("profile relax: build_unary_operators {:.3} s", t_bu.elapsed().as_secs_f64());
         }
         let tb = Instant::now();
-        let pre_of = |u: usize| &b_pre[b_pre_off[u] as usize..b_pre_off[u + 1] as usize];
         let keep = if std::env::var_os("TASKCORE_CHECK_RELAX").is_some() {
-            let a = simplify_keep(&b_pre_off, &b_pre, &b_eff, &b_base, n_props);
+            let a = if threads > 1 { simplify_keep_sharded(&b_pre_off, &b_pre, &b_eff, &b_base, n_props, threads) } else { simplify_keep(&b_pre_off, &b_pre, &b_eff, &b_base, n_props) };
             let b = simplify_keep_reference(&b_pre_off, &b_pre, &b_eff, &b_base);
             assert!(a == b, "simplify: the fast table differs from the reference");
             eprintln!("simplify: the fast table equals the reference ({} of {} kept)", a.iter().filter(|&&k| k).count(), a.len());
             a
+        } else if threads > 1 {
+            simplify_keep_sharded(&b_pre_off, &b_pre, &b_eff, &b_base, n_props, threads)
         } else {
             simplify_keep(&b_pre_off, &b_pre, &b_eff, &b_base, n_props)
         };
+        Ff::finish_new(t, adj, t_new, tb, prof, prop_off, goal_props, is_goal, nb, keep, &b_eff, &b_base, &b_pre_off, &b_pre, &b_op)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finish_new(
+        t: &SasTask,
+        adj: &[i32],
+        t_new: Instant,
+        tb: Instant,
+        prof: bool,
+        prop_off: Vec<u32>,
+        goal_props: Vec<u32>,
+        is_goal: Vec<bool>,
+        nb: usize,
+        keep: Vec<bool>,
+        b_eff: &[u32],
+        b_base: &[i32],
+        b_pre_off: &[u32],
+        b_pre: &[u32],
+        b_op: &[u32],
+    ) -> Ff {
+        let n_props = is_goal.len();
+        let pre_of = |u: usize| &b_pre[b_pre_off[u] as usize..b_pre_off[u + 1] as usize];
         if prof {
             eprintln!("profile relax: {} unary built, simplify {:.3} s", nb, tb.elapsed().as_secs_f64());
         }
@@ -979,6 +1294,25 @@ impl Ff {
                 u_op.push(b_op[u]);
             }
         }
+        Ff::assemble(t, adj, t_new, prop_off, goal_props, is_goal, n_props, nb, u_eff, u_base, u_pre_off, u_pre, u_op)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn assemble(
+        t: &SasTask,
+        adj: &[i32],
+        t_new: Instant,
+        prop_off: Vec<u32>,
+        goal_props: Vec<u32>,
+        is_goal: Vec<bool>,
+        n_props: usize,
+        nb: usize,
+        u_eff: Vec<u32>,
+        u_base: Vec<i32>,
+        u_pre_off: Vec<u32>,
+        u_pre: Vec<u32>,
+        u_op: Vec<u32>,
+    ) -> Ff {
         // cross-reference: per proposition the unary operators it is a precondition of, in their order
         let nu = u_eff.len();
         let mut cnt = vec![0u32; n_props + 1];
@@ -1046,7 +1380,7 @@ impl Ff {
 
     /// The relaxed task of `t`, its exploration in `mode`.
     pub fn with_mode(t: &SasTask, adj: &[i32], mode: HffMode) -> Ff {
-        let mut ff = Ff::new(t, adj);
+        let mut ff = if mode == HffMode::Watch { Ff::new_threads(t, adj, crate::par::threads()) } else { Ff::new(t, adj) };
         ff.mode = mode;
         ff
     }
@@ -1374,6 +1708,25 @@ impl SuccIndex {
     }
 }
 
+/// `successor_order`, the same order: each operator's sorted preconditions in one array, the operators sorted by them
+/// (then by number), with no list allocated per operator.
+pub fn successor_order_flat(t: &SasTask) -> Vec<u32> {
+    let n = t.n_ops();
+    let mut flat: Vec<(u32, u32)> = Vec::with_capacity(t.pre.len());
+    let mut off: Vec<u32> = Vec::with_capacity(n + 1);
+    off.push(0);
+    for o in 0..n {
+        let a = flat.len();
+        flat.extend_from_slice(t.pre(o));
+        flat[a..].sort_unstable();
+        off.push(flat.len() as u32);
+    }
+    let mut ids: Vec<u32> = (0..n as u32).collect();
+    let key = |o: u32| &flat[off[o as usize] as usize..off[o as usize + 1] as usize];
+    ids.sort_by(|&a, &b| key(a).cmp(key(b)).then(a.cmp(&b)));
+    ids
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum NodeStatus {
     New,
@@ -1392,7 +1745,7 @@ pub fn lazy_greedy_mode(t: &SasTask, deadline: Option<Instant>, mode: HffMode) -
     let t0 = Instant::now();
     let adj = plusone(t);
     let mut ff = Ff::with_mode(t, &adj, mode);
-    let order = successor_order(t);
+    let order = if mode == HffMode::Watch { successor_order_flat(t) } else { successor_order(t) };
     let relax_s = t0.elapsed().as_secs_f64();
     let t1 = Instant::now();
     let mut out = lazy_greedy_with(t, &mut ff, &order, deadline);
@@ -1725,6 +2078,11 @@ mod tests {
             }
             let w = lazy_greedy_with(&t, &mut b, &order, None);
             assert_eq!((&fd.status, &fd.plan, fd.expanded, fd.evaluated, fd.generated), (&w.status, &w.plan, w.expanded, w.evaluated, w.generated), "seed {}", seed);
+            assert_eq!(successor_order_flat(&t), order, "seed {}", seed);
+            for th in [2, 3] {
+                let c = Ff::new_threads(&t, &adj, th);
+                assert_eq!((&c.u_eff, &c.u_base, &c.u_pre_off, &c.u_pre, &c.u_op, c.n_unary_built), (&a.u_eff, &a.u_base, &a.u_pre_off, &a.u_pre, &a.u_op, a.n_unary_built), "seed {}", seed);
+            }
             if fd.status == "plan" {
                 plans += 1;
             }
