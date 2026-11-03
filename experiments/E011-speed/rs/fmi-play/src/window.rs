@@ -2776,8 +2776,19 @@ impl Search {
             return Ok(false);
         }
         if inp.kind == "line" {
-            let mut at = |x: i32, y: i32| parent.at(x, y);
-            return Ok(replay::verb_point(inp.verb.unwrap_or(0), s, &mut at)?.is_some());
+            let verb = inp.verb.unwrap_or(0);
+            // the verb's points asked in one AtMany when batching (the same answers at this stop)
+            let pts = if executor::batch() {
+                replay::verb_candidates(verb, s)
+            } else {
+                vec![]
+            };
+            let got: Vec<((i32, i32), At)> = pts.iter().copied().zip(parent.at_many(&pts)?).collect();
+            let mut at = |x: i32, y: i32| match got.iter().find(|g| g.0 == (x, y)) {
+                Some(g) => Ok(g.1.clone()),
+                None => parent.at(x, y),
+            };
+            return Ok(replay::verb_point(verb, s, &mut at)?.is_some());
         }
         Ok(st.cs == 0 && st.room != 0 && (executor::DOS_CD.verbless_rooms.contains(&st.room) || !s.verbs.is_empty()))
     }
