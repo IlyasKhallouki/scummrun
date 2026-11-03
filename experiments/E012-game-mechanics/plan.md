@@ -708,3 +708,73 @@ into e012-afford) and before afford's code for it.
   - their cost.
 
   With the switch off, A2 must give the probe's trials again.
+
+## Amendment 2026-11-03, component `archive`: T, novelty, marks, cells and the order in the archive, exactly
+
+Written before the component's code. It fills in what sections 5 and 6 leave open; nothing there changes.
+
+- **Switch.** `FMI_SELECT=progress` when the archive is made. stage.json then keeps `"e012": {"select": "progress"}`,
+  so a resume keeps the mode. Off, nothing below runs, and rows, cells.json, job.json and log lines are E011's.
+- **An atom in the archive.** The archive holds T's atoms without the reading, so a value set's `below` and `above`
+  become the domain's bounds. Atom (k, vs, lo, hi) holds at value v (facts.py's: an absent key is 0) when v is one of
+  vs's ints, or lo is set and v < lo (vs held `below`), or hi is set and v > hi (vs held `above`). This is
+  `atom_holds` through `Domain::label`, exactly. Its text is `k=a|b|<lo|>hi`.
+- **The archive's T.** The goal's atoms, then each committed try's T (result.json "tested"), each atom in the order it
+  first came. T only grows.
+- **Live entries** are every entry but the dead ones. A new entry is dead when its item in result.json's "new" carries
+  `"dead": reason` (`is_game_end`, component end). A dead move with no entry goes in result.json's "dead"
+  (`{"reason", "frame", "events", ...}`, kept as given). The log keeps both. job.json gives the entry's dead moves
+  back to the try.
+- **Novelty.** An atom of T, or a room, is novel for a state when no live entry's last facts hold it. A committed try
+  records `new_t`: the atoms of T, after its own T is merged, that its new live entries hold and no earlier live entry
+  holds. It also records `new_rooms`.
+- **Cells:** [room, owned objects, the texts of T's atoms the entry's last facts hold, sorted]. The atoms on
+  script-control keys are left out: the slot (`script:`, `local:`, `objscript:`), the position (`pos:`, `escpos:`,
+  `at:`, `esc:`), the arguments (`args:`) and the freeze (`frozen:`). E009's idle set is not used here (finding 3).
+  When T grows, every row is keyed again from the entries' last facts, and the counts are counted again from the log.
+- **Counts per cell** (Go-Explore's):
+  - `chosen`: the committed tries from an entry of the cell;
+  - `n`: the tries since one from the cell last gave a `new_t` or `new_rooms` atom (0 then).
+  - A "return differs" line counts in neither (E008).
+- **Exhausted** (result.json "exhausted", decided by the try by section 5's rule): the mark keeps |T| at the commit.
+  The entry is skipped while |T| has not grown since.
+- **The order.**
+  - A cell's candidate is its least live, not exhausted entry in an allowed room, by (−rooms on its chain, −novel
+    atoms held, frame, id).
+  - Rooms on the chain: the distinct rooms of the entries from the root to it.
+  - Novel atoms held: the atoms of T it holds whose least live holder, by (frame, id), is the entry.
+  - Cells are taken by (n, chosen), then their candidates' keys. Busy cells are skipped (E008).
+- **Stagnation:** E009's rule with `new_t` and `new_rooms` in place of `new_r`. After the last committed try that gave
+  one, it fires after as many committed tries as there were selectable cells right after that try, none giving one.
+- **Interface:**
+  - fmi-explore `progress`: `TAtom { key, vals, lo, hi }` with `TAtom::of(Key, &[Val], Option<&Domain>)`,
+    `t_atoms(&[(Key, Vec<Val>)], &Domains)` (for the try: `t_atoms(&Tested::of(&rd).flat(), rd.domains())`),
+    `holds`, `text`, `json`, `of_json`.
+  - result.json (from the try): "tested", the try's T as `[[key, [ints], lo, hi], ...]`; "dead" on a "new" item; the
+    "dead" list.
+  - job.json (from the archive, progress only): "novelty" `{"t": [the archive's T], "rooms": [the live entries'
+    rooms], "seen": {key: [the values the live entries' last facts hold]}}` and "dead", the entry's dead moves.
+  - `Novel::of_job(&job, Option<Vec<TAtom>>)` (the try's T, or the archive's when None). `Novel::novel(&Facts) ->
+    Vec<String>` gives the novel atoms' texts, then `room=R`. `Novel::is_novel(&Facts) -> bool`. afford's `Novelty`
+    and delay's `novel_of` are these two methods. The try writes the two adapters, since the archive's branch does
+    not hold afford's trait.
+  - Log line, progress only: "t_new" (the atoms new to T, as JSON), "t_size", "new_t", "new_rooms", "chosen",
+    "dead_entries", "dead".
+- **S1** (unit tests): the atom's truth against `atom_holds`; cells over T and the control keys; novelty and `new_t`;
+  each key of the order alone; the candidate within a cell; dead and exhausted marks, and an exhausted entry back when
+  T grows; the counts and the order unchanged when the archive is opened again; stagnation; switch off gives E011's
+  files.
+- **S2, how.**
+  - The E011 kitchen archive is copied (stage.json, entries.jsonl, entries, log.jsonl, cells.json, readings.jsonl).
+    The original stays read only.
+  - The copy is opened with the switch on. T is the goal's atoms and the union of T over the kitchen's readings that
+    still exist or can be made again from their start files.
+  - Its log has no `new_t` or `new_rooms`. They are computed from the rows in commit order: the atoms and rooms of a
+    try's new entries that no entry of a lower id holds. Then the counts are counted again.
+  - Reported:
+    - E011's cells against the new ones, and entries per cell;
+    - `chosen` and `n` per cell;
+    - the order's first 20 entries;
+    - where stagnation would have fired;
+    - the novel atoms per room;
+    - the cost of the recount and of job.json's novelty.

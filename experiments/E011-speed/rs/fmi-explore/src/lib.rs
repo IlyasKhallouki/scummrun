@@ -22,6 +22,7 @@ pub mod guide;
 pub mod harness;
 pub mod machine;
 pub mod ports;
+pub mod progress;
 pub mod pyjson;
 pub mod start;
 pub mod step;
