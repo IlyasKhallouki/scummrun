@@ -140,6 +140,19 @@ impl<A: Wire, B: Wire> Wire for (A, B) {
     }
 }
 
+impl<A: Wire, B: Wire, C: Wire> Wire for (A, B, C) {
+    fn put(&self, b: &mut Vec<u8>) {
+        self.0.put(b);
+        self.1.put(b);
+        self.2.put(b);
+    }
+    fn take(r: &mut Rd) -> Self {
+        let a = A::take(r);
+        let bb = B::take(r);
+        (a, bb, C::take(r))
+    }
+}
+
 impl<A: Wire, B: Wire, C: Wire, D: Wire> Wire for (A, B, C, D) {
     fn put(&self, b: &mut Vec<u8>) {
         self.0.put(b);
