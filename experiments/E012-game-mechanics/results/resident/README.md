@@ -10,8 +10,9 @@ reader-scope as a child, or the process itself with FMI_READER_LIB=1).
 
 Reader-scope (a child of `fmi read`, no memo, no `--prep`; under the guard, load 4-6) made the reference readings;
 then one fmi process with the switch (the store in memory, `--prep`, the key's units as a set; the build of that
-hour, mimalloc for the whole process; under the heavy lock and the guard) read the five in RS1's order. The switch's
-later builds (the system allocator, the allocator by phase) gave the same files again on the kitchen pair (RS2). Per-file sha1s: `rs1-sums.txt`; per-reading lines: `rs1-ref.jsonl`,
+hour, mimalloc for the whole process; under the heavy lock and the guard) read the five in RS1's order. The final
+build (the allocator by phase) read them again in one process with the same result in every column
+(`rs1-inproc-final.jsonl`, `rs1-sums.txt`: 29.5, 11.3, 15.9, 5.3 and 1.7 s of wall). Per-file sha1s: `rs1-sums.txt`; per-reading lines: `rs1-ref.jsonl`,
 `rs1-inproc.jsonl`.
 
 | reading | five files vs reader-scope | tc, reached, actions, lists vs G6's recorded sha1 | reading.json (cmp_reading.py) | memo: taken / run | wall | CPU |
