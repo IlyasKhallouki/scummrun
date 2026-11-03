@@ -7,7 +7,7 @@
 #   on-fast   every E012 switch on, ON3, --search fd --tail, end's engine (patches 0001-0005)   (G-on: verify-new)
 #   g10-off   E011 G10 (test (a), E009's job ta from the root), the fast settings, every E012 switch unset (its CHECK line)
 #   g10-on    the same with every E012 switch on, ON3, end's engine (verify-new)
-# usage: gates.sh off-fast|off-ref|on-fast|g10-off|g10-on OUT      (TRY_FMI_BIN: the fmi binary, default this component's build)
+# usage: gates.sh off-fast|off-ref|on-fast|g10-off|g10-on OUT      (TRY_FMI_BIN: the fmi binary, default this component's build); TRY_NO_CACHE=1: no reading cache; TRY_SUFFIX: a suffix of the output folder
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 source $HOME/.cache/fast-mi-e011/env-r2d.sh
@@ -23,7 +23,10 @@ case $1 in
   g10-on) SRC=g10; ARGS="--search fd --tail"; SW="$ON3 $E12ON FMI_ENGINE_BIN=$END_ENGINE";;
   *) echo "usage: gates.sh off-fast|off-ref|on-fast|g10-off|g10-on OUT"; exit 2;;
 esac
-OUT=$2; R=$OUT/$1
+OUT=$2; R=$OUT/$1${TRY_SUFFIX:-}
+# TRY_NO_CACHE=1: no reading cache (a run's refinements are made again whatever the disk's level, so that two runs
+# compare by their code, not by the cache's floor)
+RCACHE=$R/rcache; [ "${TRY_NO_CACHE:-0}" = 1 ] && RCACHE=
 rm -rf $R; mkdir -p $R/jobs $R/tmp
 jobs=()
 if [ $SRC = g10 ]; then
@@ -41,10 +44,10 @@ else
     jobs+=($R/jobs/$j)
   done
 fi
-echo "{\"seq\": \"$1\", \"src\": \"$SRC\", \"bin\": \"$FMI\", \"args\": \"$ARGS\", \"env\": \"$SW\", \"start\": \"$(date -Is)\", \"load\": \"$(cut -d' ' -f1-3 /proc/loadavg)\"}" > $R/run.json
+echo "{\"seq\": \"$1\", \"src\": \"$SRC\", \"bin\": \"$FMI\", \"bin_sha1\": \"$(sha1sum $FMI | cut -c1-12)\", \"cache\": \"$RCACHE\", \"args\": \"$ARGS\", \"env\": \"$SW\", \"start\": \"$(date -Is)\", \"load\": \"$(cut -d' ' -f1-3 /proc/loadavg)\"}" > $R/run.json
 exec 9>/var/tmp/fast-mi/heavy.lock; flock 9
 t0=$(date +%s.%N)
-env $SW FMI_READING_CACHE=$R/rcache FMI_MEMO= FMI_PLAN_CACHE=$R/plans FMI_POOL_DIR=$R/pool TMPDIR=$R/tmp \
+env $SW FMI_READING_CACHE=$RCACHE FMI_MEMO= FMI_PLAN_CACHE=$R/plans FMI_POOL_DIR=$R/pool TMPDIR=$R/tmp \
   E008_DISK_PATH=$HOME E008_FLOOR_GB=5 \
   $HOME/.cache/fast-mi-e007/guard.sh $R/fmi.log $FMI try "${jobs[@]}" $ARGS
 rc=$?
