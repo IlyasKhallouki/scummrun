@@ -108,14 +108,41 @@ pub fn default_root() -> PathBuf {
     }
 }
 
+/// E014's switch `FMI_GAME_SCRIPTS` (experiments/E014-fate-demo): the absolute path of another game's extraction
+/// (`scripts/dump-scripts.sh`'s OUT_ROOT/data/scripts-RELEASE, holding index.json). Unset: MI's, as before.
+pub fn game_scripts_env() -> Option<PathBuf> {
+    std::env::var_os("FMI_GAME_SCRIPTS").filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// The game's decompiled scripts: `FMI_GAME_SCRIPTS`, else `root`/data/scripts-dos-cd.
+pub fn scripts_dir(root: &Path) -> PathBuf {
+    game_scripts_env().unwrap_or_else(|| root.join("data").join("scripts-dos-cd"))
+}
+
+/// The root the index's block paths (`lflf`, `block`) are relative to: the extraction's root (two folders above
+/// `FMI_GAME_SCRIPTS`), else `root`.
+pub fn data_root(root: &Path) -> PathBuf {
+    match game_scripts_env() {
+        Some(s) => s.parent().and_then(|p| p.parent()).map(Path::to_path_buf).unwrap_or(s),
+        None => root.to_path_buf(),
+    }
+}
+
+/// The game's index.json (`scripts_dir`'s).
+pub fn game_index(root: &Path) -> PathBuf {
+    scripts_dir(root).join("index.json")
+}
+
 impl Game {
     /// model.py `Game.load`: the units of data/scripts-dos-cd under `root`, with the raw blocks under
-    /// `root`, and every analysis.
+    /// `root`, and every analysis. E014: `FMI_GAME_SCRIPTS` names another game's extraction (`scripts_dir`,
+    /// `data_root`).
     pub fn load(root: &Path) -> io::Result<Game> {
-        let scripts = root.join("data").join("scripts-dos-cd");
+        let scripts = scripts_dir(root);
+        let data = data_root(root);
         let meta: Value = serde_json::from_slice(&std::fs::read(scripts.join("index.json"))?)?;
-        let script = read::load_with(&scripts, Some(root), &meta)?;
-        Game::from_script(script, root, &meta)
+        let script = read::load_with(&scripts, Some(&data), &meta)?;
+        Game::from_script(script, &data, &meta)
     }
 
     /// The rest of model.py `Game.load`, over units already read.
