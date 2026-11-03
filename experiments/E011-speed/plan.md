@@ -2272,3 +2272,24 @@ mod tests {
 - **What.** The check was stopped after 15 committed tries (two running, uncommitted) and resumed from its files with
   `FMI_PLAN_TIME=180`: above every found plan's time, so no plan the tries have found would have been lost. Nothing
   else changes.
+
+## Amendment 2026-11-03, round 2's integration: the fast settings' search, and what round 2 is measured against
+
+Written before round 2's benchmark ran (branch e011-r2: the six round-2 branches merged, then the integration's own
+commits).
+
+- **Why.** Round 2's route component (e011-r2-route) ported Fast Downward's lama-first-costs to Rust, with plans,
+  landmark graphs and counts byte for byte Fast Downward's on 30 requests. On its branch the fast settings with that
+  search reached the kitchen on test (a) and gave B0's tries in everything, where Gbfs (round 1's fast search) fails G10.
+- **What changes.**
+  1. The fast settings become: play when ready, the old tail first, and `Search::FdLamaFirstCosts` served by the Rust
+     port (`--search fd --tail`, `FMI_PLAN_LAMA=rust`). G10's third clause and G11's second are run with them. Gbfs
+     stays in the code; its G10 clause stays as round 1 left it.
+  2. Round 2's B3 is the warm regime (B3 (B)) of round 2's binaries against round 1's (e011 9bbd44a's `fmi`, round
+     1's reader-scope and engine build), interleaved try by try as B4 interleaves the reference: round 2's "before" is
+     round 1. The reference settings run three resident processes (round 1; round 2 with every round-2 switch off;
+     round 2 with every round-2 switch on), the fast settings two (round 1 with Gbfs; round 2 with every switch on and
+     the Rust lama-first-costs). The Python reference is not timed again: its times are round 1's B4.
+  3. "Switches off" and "on" in round 2's gates mean every round-2 switch at once (`env-r2.sh`'s OFF2 and ON2), on top
+     of each component's own checks of its switch alone where its script makes them.
+- Nothing else changes: the gates, the 15 tries, B0, the parts and the floors are as above.
