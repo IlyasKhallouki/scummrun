@@ -177,13 +177,15 @@ fn check(a: &Args) -> Res<()> {
     let pts = grid();
     let (mut bad, mut runs, mut ents, mut ats, mut runobs) = (Vec::<String>::new(), 0usize, 0usize, 0usize, 0usize);
     let mut rooms = 0usize;
-    let mut screens: Vec<(Option<(i32, i32, bool)>, u64, u64)> = Vec::new();
+    // (the screen layout, the first and last frame it held)
+    type Span = (Option<(i32, i32, bool)>, u64, u64);
+    let mut screens: Vec<Span> = Vec::new();
     let mut i = 0u64;
     while x.status().frame < a.from + a.n {
         let f = x.status().frame + 1;
         let req = &reqs[(i / 4) as usize % reqs.len()];
         let (p, q);
-        if i % 4 == 0 {
+        if i.is_multiple_of(4) {
             p = x.step_observe(f, req).map_err(e2s)?;
             q = four(&mut y, f, req).map_err(e2s)?;
         } else if i % 4 == 3 {
@@ -249,7 +251,7 @@ fn check(a: &Args) -> Res<()> {
             Some(s) if s.0 == p.0.screen => s.2 = f,
             _ => screens.push((p.0.screen, f, f)),
         }
-        if i % 10 == 0 {
+        if i.is_multiple_of(10) {
             let many = x.at_many(&pts).map_err(e2s)?;
             let one: Vec<At> = pts.iter().map(|&(u, v)| y.at(u, v)).collect::<EResult<_>>().map_err(e2s)?;
             ats += pts.len();
