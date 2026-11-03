@@ -17,8 +17,9 @@ run() {  # name bin set N B rho
   [ -e $OUT/$name/kitchen ] && { echo "[$(date +%T)] $name: there already"; return; }
   FMI_BIN=$bin SET=$set flock /var/tmp/fast-mi/heavy.lock $here/smoke.sh $OUT/$name $n $b $rho > $OUT/$name.out 2>&1
   cat $OUT/$name.out
-  # the readings' bulk (about 350 MB each) is not read after the run and its verify: reading.json and the start rows stay
-  find $OUT/$name -path '*/readings/*' \( -name 'reading.tc' -o -name 'reading.actions.jsonl' -o -name 'reading.lists.jsonl' \
+  # the readings' bulk (about 350 MB each, the archive's and the attempts' kept ones) is not read after the run and its
+  # verify: reading.json and the start rows stay
+  find $OUT/$name \( -name 'reading.tc' -o -name 'reading.actions.jsonl' -o -name 'reading.lists.jsonl' \
     -o -name 'reading.idx' -o -name 'reading.reached' \) -delete
 }
 if [ $what = all ] || [ $what = d2 ]; then
