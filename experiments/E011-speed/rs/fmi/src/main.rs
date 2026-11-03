@@ -51,6 +51,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi check reingest ARCHIVE --out DIR
        fmi check tries A_SEQ B_SEQ [--json OUT]
        fmi check verify-new SEQ --out DIR [--threads N]
+       fmi check try-report SEQ...
        fmi guide map --goal K=V[,K=V] | part1 --out GUIDE.json [--wide] [--seed 1]
        fmi guide stats GUIDE.json [--key KEY.json]";
 
@@ -136,6 +137,7 @@ fn main() {
         ("check", Some("reingest")) => cmd_check_reingest(&argv[2..]),
         ("check", Some("tries")) => cmd_check_tries(&argv[2..]),
         ("check", Some("verify-new")) => cmd_check_verify_new(&argv[2..]),
+        ("check", Some("try-report")) => cmd_check_try_report(&argv[2..]),
         ("guide", Some("map")) => cmd_guide_map(&argv[2..]),
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         _ => usage(),
@@ -576,6 +578,18 @@ fn cmd_check_verify_new(argv: &[String]) -> i32 {
         Ok(false) => 1,
         Err(e) => {
             eprintln!("fmi check verify-new: {e}");
+            2
+        }
+    }
+}
+
+/// E012 try's measurements: `fmi check try-report SEQ...` (trycheck.rs).
+fn cmd_check_try_report(argv: &[String]) -> i32 {
+    let seqs: Vec<PathBuf> = argv.iter().map(PathBuf::from).collect();
+    match trycheck::cmd_report(&seqs) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("fmi check try-report: {e}");
             2
         }
     }

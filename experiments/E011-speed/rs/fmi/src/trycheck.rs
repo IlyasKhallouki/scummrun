@@ -207,3 +207,54 @@ pub fn cmd_verify_new(seq: &Path, out: &Path, threads: usize) -> Result<bool, St
              by_how.iter().map(|(k, (n, s))| format!("{k} {s}/{n}")).collect::<Vec<_>>().join(", "));
     Ok(bad.is_empty())
 }
+
+fn f64_of(v: &Value) -> f64 {
+    v.as_f64().unwrap_or(0.0)
+}
+
+/// `fmi check try-report SEQ...`: per sequence and try, the wall and CPU by part and E012's counts, as a Markdown table,
+/// and the sequence's sums (the try component's measurements).
+pub fn cmd_report(seqs: &[PathBuf]) -> Result<(), String> {
+    for seq in seqs {
+        println!("\n### {}\n", seq.display());
+        println!("| try | entry | wall s | return | read | wait | plan | play | afford | stop | new (how) | wait stops/kept | delay trig/cand/kept | afford trials/kept | dead |");
+        println!("|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|---|---|---|");
+        let mut sums = [0.0f64; 7];
+        let mut counts = [0usize; 9];
+        for d in job_dirs(seq) {
+            let r = read_json(&d.join("result.json"))?;
+            let c = &r["cpu_s"];
+            let parts = [f64_of(&r["wall_s"]), f64_of(&c["return"]), f64_of(&c["read"]), f64_of(&c["wait"]), f64_of(&c["plan"]), f64_of(&c["play"]),
+                         f64_of(&c["afford"])];
+            for (s, p) in sums.iter_mut().zip(parts.iter()) {
+                *s += p;
+            }
+            let mut hows: std::collections::BTreeMap<String, usize> = Default::default();
+            for n in r["new"].as_array().cloned().unwrap_or_default() {
+                *hows.entry(n["how"].as_str().unwrap_or("?").to_string()).or_default() += 1;
+            }
+            let e = &r["e012"];
+            let w = &e["wait"];
+            let (ws, wk) = (w["stops"].as_array().map(|a| a.len()).unwrap_or(0), w["kept"].as_u64().unwrap_or(0) as usize);
+            let dl = &e["delay"];
+            let (dt, dc, dk) = (dl["triggered"].as_u64().unwrap_or(0) as usize, dl["candidates"].as_u64().unwrap_or(0) as usize,
+                                dl["kept"].as_u64().unwrap_or(0) as usize);
+            let afs = e["afford"].as_array().cloned().unwrap_or_default();
+            let at: usize = afs.iter().map(|a| a["trials"].as_u64().unwrap_or(0) as usize).sum();
+            let ak: usize = afs.iter().map(|a| a["kept"].as_u64().unwrap_or(0) as usize).sum();
+            let dead = r["dead"].as_array().map(|a| a.len()).unwrap_or(0);
+            for (s, p) in counts.iter_mut().zip([ws, wk, dt, dc, dk, afs.len(), at, ak, dead]) {
+                *s += p;
+            }
+            let stop = stop_class(&r["attempt"]["stop"]);
+            println!("| {} | {} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {} | {} {} | {ws}/{wk} | {dt}/{dc}/{dk} | {at}/{ak} | {dead} |",
+                     d.file_name().unwrap().to_string_lossy(), r["entry"], parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], parts[6],
+                     if stop.is_empty() { "(none played)".into() } else { stop }, r["new"].as_array().map(|a| a.len()).unwrap_or(0),
+                     json!(hows));
+        }
+        println!("| sum | | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | {:.1} | | | {}/{} | {}/{}/{} | {} steps, {}/{} | {} |",
+                 sums[0], sums[1], sums[2], sums[3], sums[4], sums[5], sums[6], counts[0], counts[1], counts[2], counts[3], counts[4],
+                 counts[5], counts[6], counts[7], counts[8]);
+    }
+    Ok(())
+}
