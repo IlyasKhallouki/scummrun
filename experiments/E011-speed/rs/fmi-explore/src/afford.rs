@@ -35,6 +35,12 @@ pub fn on() -> bool {
     std::env::var(SWITCH).is_ok_and(|v| v == "1")
 }
 
+/// The walk-box clicks' switch, end's FMI_BOXES (fmi-engine `boxes_on` reads the same variable): with it off the
+/// Boxes command is never sent.
+pub fn boxes_on() -> bool {
+    std::env::var("FMI_BOXES").is_ok_and(|v| v == "1")
+}
+
 /// SCUMM v5's screen (`_screenWidth`, `_screenHeight`): the hit test's coordinates.
 pub const SCREEN_W: i32 = 320;
 pub const SCREEN_H: i32 = 200;
@@ -51,6 +57,11 @@ const VERB_DXY: [(i32, i32); 4] = [(2, 2), (4, 3), (1, 1), (0, 0)];
 const GRID: [i32; 5] = [2, 1, 3, 0, 4];
 /// Heights over an actor's feet tried for its point, in order (M4).
 const ACTOR_DY: [i32; 4] = [-20, -30, -10, -40];
+/// Walk boxes (boxes.h): a locked box ends a walk before it (actor.cpp:1284); an invisible one is skipped for the
+/// player when a walk's end is put in a box (actor.cpp:2040); a v5 game's boxes start at 1 (actor.cpp:1990).
+pub const BOX_LOCKED: u8 = 0x40;
+pub const BOX_INVISIBLE: u8 = 0x80;
+pub const FIRST_VALID_BOX: usize = 1;
 
 /// What a click at a point hits, by the engine's hit test there.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
@@ -58,6 +69,8 @@ pub enum Hit {
     Verb { slot: i32, id: i32 },
     Object(i32),
     Actor(i32),
+    /// a floor point in a walk box (FMI_BOXES)
+    Walk(i32),
 }
 
 impl Hit {
@@ -67,6 +80,7 @@ impl Hit {
             Hit::Verb { id, .. } => format!("v{id}"),
             Hit::Object(o) => format!("t{o}"),
             Hit::Actor(a) => format!("t-{a}"),
+            Hit::Walk(b) => format!("w{b}"),
         }
     }
 }
@@ -86,6 +100,10 @@ pub struct Offer {
     pub idle: Option<String>,
     pub verbs: Vec<Point>,
     pub targets: Vec<Point>,
+    /// the walk boxes' floor points (FMI_BOXES; empty with it off)
+    pub walks: Vec<Point>,
+    /// the Boxes reply: the boxes, those the player's walk can end in (`walkable`); None with FMI_BOXES off
+    pub boxes: Option<(usize, usize)>,
     /// what the dump listed: visible verb slots, room objects (all, and touchable with a box), actors in the room
     pub n_verbs: usize,
     pub n_objects: usize,
@@ -99,7 +117,8 @@ impl Offer {
     pub fn json(&self) -> Value {
         json!({"frame": self.frame, "idle": self.idle, "verbs": self.n_verbs, "verbs_hit": self.verbs.len(),
                "objects": self.n_objects, "touchable": self.n_touchable, "actors": self.n_actors,
-               "targets_hit": self.targets.len(), "points": self.n_points})
+               "targets_hit": self.targets.len(), "points": self.n_points,
+               "boxes": self.boxes.map(|b| b.0), "walkable": self.boxes.map(|b| b.1), "walks": self.walks.len()})
     }
 }
 
@@ -124,9 +143,30 @@ impl Inputs {
     }
 }
 
+/// Whether the player's walk can end in a box with these flags (the box's index from FIRST_VALID_BOX on).
+pub fn walkable(flags: u8) -> bool {
+    flags & (BOX_LOCKED | BOX_INVISIBLE) == 0
+}
+
+/// The candidate floor points of a walk box, in room coordinates: its centre (the corners' mean), then halfway from
+/// the centre to each corner (ul, ur, lr, ll).
+pub fn box_points(b: &WalkBox) -> Vec<(i32, i32)> {
+    let cs = [b.ul, b.ur, b.lr, b.ll];
+    let cx = cs.iter().map(|c| c.0).sum::<i32>().div_euclid(4);
+    let cy = cs.iter().map(|c| c.1).sum::<i32>().div_euclid(4);
+    let mut v = vec![(cx, cy)];
+    v.extend(cs.iter().map(|c| ((cx + c.0).div_euclid(2), (cy + c.1).div_euclid(2))));
+    v
+}
+
 /// The offer at the engine's stop, from its dump `o` (a full dump: verbs, room objects, classes, actors) and its
-/// status (the camera's xstart, the screen layout, the idle kind).
+/// status (the camera's xstart, the screen layout, the idle kind); the walk boxes with FMI_BOXES.
 pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
+    offer_with(e, o, boxes_on())
+}
+
+/// `offer`, the walk boxes asked when `boxes` (in a sentence idle only).
+pub fn offer_with(e: &mut Box<dyn Engine>, o: &Obs, boxes: bool) -> EResult<Offer> {
     let st = e.status().clone();
     let xs = st.xstart;
     // the main screen's topline (patch 0004's layout in the status; 0 where the status has none)
@@ -162,6 +202,27 @@ pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
         let pts = ACTOR_DY.iter().map(|&dy| (a.x - xs, a.y - a.elevation + dy + top)).collect();
         cands.push((Hit::Actor(a.id), pts));
     }
+    let mut box_counts = None;
+    if boxes && st.idle.as_deref() == Some("sentence") {
+        let bx = e.boxes()?;
+        let (b, h) = st.screen.map(|s| (s.0, s.1)).unwrap_or((0, SCREEN_H));
+        let mut n_walkable = 0;
+        for (i, w) in bx.boxes.iter().enumerate().skip(FIRST_VALID_BOX) {
+            if !walkable(w.flags) {
+                continue;
+            }
+            n_walkable += 1;
+            let pts: Vec<(i32, i32)> = box_points(w)
+                .into_iter()
+                .map(|(x, y)| (x - xs, y + top))
+                .filter(|&(x, y)| (0..SCREEN_W).contains(&x) && (b..h).contains(&y))
+                .collect();
+            if !pts.is_empty() {
+                cands.push((Hit::Walk(i as i32), pts));
+            }
+        }
+        box_counts = Some((bx.boxes.len(), n_walkable));
+    }
     let mut all: Vec<(i32, i32)> = cands.iter().flat_map(|(_, p)| p.iter().copied()).collect();
     all.sort_unstable();
     all.dedup();
@@ -170,6 +231,7 @@ pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
     let mut out = Offer {
         frame: st.frame,
         idle: st.idle.clone(),
+        boxes: box_counts,
         n_verbs,
         n_objects: ros.len(),
         n_touchable,
@@ -183,14 +245,16 @@ pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
                 Hit::Verb { slot, .. } => a.verb_slot == slot,
                 Hit::Object(id) => a.main.map(|m| m.2) == Some(id),
                 Hit::Actor(id) => a.main.map(|m| m.3) == Some(id),
+                // a floor click: the main screen, no object and no actor there
+                Hit::Walk(_) => a.main.is_some_and(|m| m.2 == 0 && m.3 == 0),
             })
         });
         if let Some((x, y)) = found {
             let p = Point { x, y, hit };
-            if matches!(hit, Hit::Verb { .. }) {
-                out.verbs.push(p);
-            } else {
-                out.targets.push(p);
+            match hit {
+                Hit::Verb { .. } => out.verbs.push(p),
+                Hit::Walk(_) => out.walks.push(p),
+                _ => out.targets.push(p),
             }
         }
     }
@@ -198,7 +262,8 @@ pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
 }
 
 /// The inputs of an offer (plan.md, section 4, "Enumeration"): in a dialog idle each verb slot; in a sentence idle each
-/// verb slot alone, each verb then each target, each target alone (M4's order). None when the bridge is not idle.
+/// verb slot alone, each verb then each target, each target alone (M4's order), then each walk box's floor point
+/// (FMI_BOXES). None when the bridge is not idle.
 pub fn inputs_of(of: &Offer) -> Vec<Inputs> {
     let one = |p: &Point| Inputs { clicks: vec![*p] };
     match of.idle.as_deref() {
@@ -211,6 +276,7 @@ pub fn inputs_of(of: &Offer) -> Vec<Inputs> {
                 }
             }
             v.extend(of.targets.iter().map(one));
+            v.extend(of.walks.iter().map(one));
             v
         }
         _ => Vec::new(),
