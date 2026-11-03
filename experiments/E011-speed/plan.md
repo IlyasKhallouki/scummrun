@@ -2293,3 +2293,24 @@ commits).
   3. "Switches off" and "on" in round 2's gates mean every round-2 switch at once (`env-r2.sh`'s OFF2 and ON2), on top
      of each component's own checks of its switch alone where its script makes them.
 - Nothing else changes: the gates, the 15 tries, B0, the parts and the floors are as above.
+
+## Amendment 2026-11-03, during round 2's integration: B3 without the job memo, and G12's roots
+
+Written after a first start of round 2's B3 was stopped (two tries in), before it ran again.
+
+- **Measured.** During the integration / had 6-8.8 GB free (other experiments' folders on the same disk). The job
+  memo's store writes nothing while its disk is under 8 GB plus twice its largest file (memo.md, "The store"; round 1's
+  reader has that floor built in, round 2's reads it from READER_MEMO_FLOOR_GB). In the stopped start, round 1's
+  j00000 stored 22,842 runs and round 2's, ten minutes later, none: the memo was on in one sequence and off in the
+  other by the disk's level, not by the code. G6's memo clause for the fresh ring(33) pair stored and took nothing for
+  the same reason (its refinement pair did store and take).
+- **What changes.**
+  1. Round 2's B3 runs with the job memo off in every sequence (FMI_MEMO unset), so that both rounds read the same way
+     whatever the disk's level; the reading cache, kept entries, warm planners and plan store stay as B3 (B) has them,
+     with the reading cache's floor (E008_FLOOR_GB) at 5 GB, the disk rule of this run, in every sequence. The memo's
+     own gains are measured by G6's memo clauses, not by B3.
+  2. G6 runs again with READER_MEMO_FLOOR_GB=5 for round 2's reader, so that its memo clauses store and take.
+  3. G12's watcher counts as roots only the benchmark's resident fmi processes. The kitchen check's `fmi explore run`
+     shares the laptop and runs each job under guard.sh (driver.rs, a process per job), whose last line is
+     `python3 -c "print(round(...))"` for its wall time; the round-1 watcher, rooted at every process named fmi, logged
+     seven such processes in the stopped start. None of them was under a process of the benchmark.
