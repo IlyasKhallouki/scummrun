@@ -587,3 +587,18 @@ Written before the component's code. This is E011's round 3 item for the reading
     alone, the pair is read again with the switch on (the second takes runs) and by reader-scope (the files the same).
     The pair is also measured before and after as the measure's second case.
   - Nothing else changes.
+
+### Amendment 2026-11-03 (resident, after B3 with the switch on, before the code it changes): the allocator
+
+- **Measured.** `resident/b3.sh on`: B3's 15 tries in the fast settings with FMI_READER_LIB=1 in one resident fmi,
+  each try under the heavy lock. All 15 equal B0's in everything (cmp_tries.py). The median try is 2.8 s (round 2's
+  B3: 4.9 s), the fresh ring(38) readings 1.2-3.0 s (4.4-4.8 s), j00006's refinement from another entry 8.2 s (20.6
+  s), the reading's sum 124 s (142 s). But the planning of the ring(33) tries on the refined reading takes 10.3-13.3
+  s of wall and 8.6-11.2 CPU s (j00008, j00009, j00011, j00014), where round 2's fmi on the laptop at the same time
+  (E011's check, its r2-fast and d-fast sequences, 10:36) took 5.5-7.2 s and 4.4-6.0 CPU s; the first try's planning
+  22.4 s against 14.8 s. The switch changed the planner's process in one way besides the reading: the allocator
+  (mimalloc for the whole process).
+- **What changes.** `FMI_READER_ALLOC=system` keeps the system allocator with the switch on (default: mimalloc, as
+  above). Measured with it: B3 with the switch on, and the kitchen pair (`after`). The switch's allocator becomes the
+  system's if, with it, the ring(33) tries' planning is back within 20% of round 2's concurrent run and the kitchen
+  pair's second reading is within 10% of mimalloc's; otherwise the one with the lower B3 sum. Nothing else changes.
