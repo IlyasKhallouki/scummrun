@@ -19,7 +19,6 @@
 //! * **The bucket of a hash code** is `code % bucket_count`. `std::hash<int>` is the value as `size_t` (sign
 //!   extended); Fast Downward's `utils::Hash<FactPair>` is its lookup3-based `get_hash64` of (var, value).
 
-use std::collections::HashMap;
 use std::hash::Hash;
 
 const NIL: u32 = u32::MAX;
@@ -136,8 +135,8 @@ pub fn fd_hash64_2(x: u32, y: u32) -> u64 {
     ((b as u64) << 32) | c as u64
 }
 
-/// An `std::unordered_set<K>` (unique keys) in libstdc++'s order (module docstring), with a map from keys to nodes
-/// for lookups. `StdMap` adds a value per node.
+/// An `std::unordered_set<K>` (unique keys) in libstdc++'s order (module docstring); a lookup walks the key's bucket
+/// as libstdc++'s does. `StdMap` adds a value per node.
 #[derive(Clone, Debug)]
 pub struct StdSet<K: Copy + Eq + Hash + StdHash> {
     keys: Vec<K>,
@@ -149,7 +148,6 @@ pub struct StdSet<K: Copy + Eq + Hash + StdHash> {
     n_bkt: u64,
     len: usize,
     policy: Policy,
-    index: HashMap<K, u32>,
 }
 
 impl<K: Copy + Eq + Hash + StdHash> Default for StdSet<K> {
@@ -170,7 +168,6 @@ impl<K: Copy + Eq + Hash + StdHash> StdSet<K> {
             n_bkt: 1,
             len: 0,
             policy: Policy::default(),
-            index: HashMap::new(),
         }
     }
 
@@ -190,7 +187,28 @@ impl<K: Copy + Eq + Hash + StdHash> StdSet<K> {
         self.len == 0
     }
     pub fn contains(&self, k: &K) -> bool {
-        self.index.contains_key(k)
+        self.find(k).is_some()
+    }
+
+    /// The node holding `k`: the nodes of its bucket, from the node before them.
+    fn find(&self, k: &K) -> Option<u32> {
+        if self.len == 0 {
+            return None;
+        }
+        let code = k.std_hash();
+        let b = code % self.n_bkt;
+        let before = self.buckets[b as usize];
+        if before == NIL {
+            return None;
+        }
+        let mut n = self.next_of(before);
+        while n != NIL && self.codes[n as usize] % self.n_bkt == b {
+            if self.keys[n as usize] == *k {
+                return Some(n);
+            }
+            n = self.next[n as usize];
+        }
+        None
     }
     pub fn bucket_count(&self) -> u64 {
         self.n_bkt
@@ -267,7 +285,7 @@ impl<K: Copy + Eq + Hash + StdHash> StdSet<K> {
 
     /// `insert(k)` / `emplace(k)`: true when the key is new. Returns the node.
     pub fn insert_node(&mut self, k: K) -> (u32, bool) {
-        if let Some(&n) = self.index.get(&k) {
+        if let Some(n) = self.find(&k) {
             return (n, false);
         }
         let code = k.std_hash();
@@ -281,7 +299,6 @@ impl<K: Copy + Eq + Hash + StdHash> StdSet<K> {
         self.next.push(NIL);
         self.insert_bucket_begin(b, node);
         self.len += 1;
-        self.index.insert(k, node);
         (node, true)
     }
 
@@ -291,7 +308,7 @@ impl<K: Copy + Eq + Hash + StdHash> StdSet<K> {
 
     /// `erase(k)`: `_M_erase(bkt, prev, n)`.
     pub fn erase(&mut self, k: &K) -> bool {
-        let Some(n) = self.index.remove(k) else { return false };
+        let Some(n) = self.find(k) else { return false };
         let b = (self.codes[n as usize] % self.n_bkt) as usize;
         let mut prev = self.buckets[b];
         while self.next_of(prev) != n {
@@ -398,7 +415,7 @@ impl<K: Copy + Eq + Hash + StdHash, V: Default> StdMap<K, V> {
         &mut self.vals[n as usize]
     }
     pub fn get(&self, k: &K) -> Option<&V> {
-        self.set.index.get(k).map(|&n| &self.vals[n as usize])
+        self.set.find(k).map(|n| &self.vals[n as usize])
     }
     pub fn len(&self) -> usize {
         self.set.len()

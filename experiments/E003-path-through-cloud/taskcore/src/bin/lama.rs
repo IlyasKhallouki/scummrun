@@ -107,16 +107,19 @@ fn graph(args: &[String]) {
     let (t, pred, names) = read_sas(args);
     let adj = taskcore::search::plusone(&t);
     let t0 = std::time::Instant::now();
+    let c0 = taskcore::landmarks::thread_cpu();
     let g = taskcore::landmarks::build(&t, &adj, &pred, None).expect("the landmark graph");
+    let cpu = taskcore::landmarks::thread_cpu() - c0;
     let s = t0.elapsed().as_secs_f64();
     print!("{}", g.dump(&t.init, &|v, x| names[v as usize][x as usize].clone()));
     eprintln!(
-        "landmarks {} disjunctive {} orderings {} explorations {} seconds {:.3} (setup {:.3} rhw {:.3} achievers {:.3} hps {:.3})",
+        "landmarks {} disjunctive {} orderings {} explorations {} seconds {:.3} cpu {:.3} (setup {:.3} rhw {:.3} achievers {:.3} hps {:.3})",
         g.len(),
         g.n_disjunctive,
         g.n_orderings,
         g.stats.explorations,
         s,
+        cpu,
         g.stats.setup_s,
         g.stats.rhw_s,
         g.stats.achievers_s,
