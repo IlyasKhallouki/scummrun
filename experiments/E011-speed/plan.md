@@ -2250,3 +2250,15 @@ mod tests {
 }
 ```
 <!-- fmi-core/src/lib.rs end -->
+
+## Amendment 2026-11-03, before the kitchen check: FD's search on the Rust path
+
+- **Why.** Round 1's integration passes every gate but G10's Gbfs clause: with the Rust search (`--search gbfs`),
+  test (a) does not reach the kitchen, while `FdLamaFirstCosts` (`--search fd`) gives the reference's route, inputs
+  and entries. Round 2, which would have taken that up, did not run.
+- **What changes.** The kitchen check runs with `--search fd` instead of the fast settings' Gbfs; that configuration
+  passes G1-G12 (G10's first clause), and its warm median per try in B3 is 3.8 s (b-ref), under the 10 s condition.
+  Everything else is as above: the 10 k = 2 rooms, b = 2, E009's switches, play when ready, commit as finished,
+  E009's copy of E008's guides, E009's stop rules and `--stop-jobs 80`, verify from boot twice.
+- **Where.** The archive is `/var/tmp/fast-mi/e011-archives/kitchen` with `E008_DISK_PATH=/var/tmp`, since /home is at
+  its floor.
