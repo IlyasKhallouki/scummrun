@@ -106,6 +106,10 @@ pub struct Timing {
     pub operators: usize,
     pub unary: usize,
     pub kept: String,
+    /// millions of instructions (this thread's) of the reductions, the build, and the relaxed task with the search
+    pub reduce_mi: f64,
+    pub build_mi: f64,
+    pub search_mi: f64,
 }
 
 /// Cost caps as taskcore reads them: (label prefix, frames).
@@ -421,6 +425,7 @@ impl WarmPlanner {
         caps: Vec<(String, u32)>,
     ) -> Result<PlanResult, PlanError> {
         let t1 = Instant::now();
+        let k1 = taskcore::perf::now();
         let wreq = warm::Request {
             goal: Some(goal),
             start: lines,
@@ -445,16 +450,21 @@ impl WarmPlanner {
             }
         };
         self.last.reduce = t1.elapsed().as_secs_f64();
+        self.last.reduce_mi = taskcore::perf::since(k1).0;
         self.last.kept = red.kept.to_string();
         let t2 = Instant::now();
+        let k2 = taskcore::perf::now();
         let cfg = self.warm.cfg;
         let t = &red.task;
         let mut x = sas::Expander::new(t, cfg.limit);
         x.model = cfg.model;
+        x.fast = self.host.fast;
         let start_vals = &t.starts[red.start].1;
         let (plan, st, of) = search::build(&mut x, start_vals).map_err(tc_err)?;
         self.last.build = t2.elapsed().as_secs_f64();
+        self.last.build_mi = taskcore::perf::since(k2).0;
         self.last.operators = st.n_ops();
+        let k3 = taskcore::perf::now();
         let deadline = Some(Instant::now() + Duration::from_secs(req.time_limit_s.max(1)));
         let (status, ops, plan_cost) = match req.search {
             Search::Gbfs => {
@@ -475,6 +485,7 @@ impl WarmPlanner {
                 r
             }
         };
+        self.last.search_mi = taskcore::perf::since(k3).0;
         let mut stats = red.stats;
         let mut c = plan.counts.clone();
         c.bytes = 0;
