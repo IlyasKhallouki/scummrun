@@ -20,7 +20,8 @@
 #   RELEASE       the output folders' name: build/blocks-RELEASE, build/verb-blocks-RELEASE, data/scripts-RELEASE
 #   INDEX_NAME    the index file's name in GAME_DIR, when it differs from the name in scummrp's table (a demo's): a
 #                 folder of links, build/scummrp-in-RELEASE, gives scummrp the table's names for the game's files
-#   GAME_TITLE    the title in the index and in each file's header (default: MI's text, as before)
+#   GAME_TITLE    the title in the index and in each file's header (default with SCUMMRP_GAME: the game named from
+#                 these settings, "atlantis, release fate-play-demo (PLAYFATE.000, SCUMM v5)"; else MI's text, as before)
 #   OUT_ROOT      where build/ and data/ outputs go (default: the repository); GAME_DIR is relative to it
 #   TOOLS_ROOT    where scummrp, descumm and their sources are (default: the repository)
 set -euo pipefail
@@ -53,6 +54,12 @@ else
   RELEASE="mac"
   GAME_ID="monkeycdalt"          # scummrp id for MONKEY1.000 / MONKEY1.00x (SCUMM v5, XOR 0x69)
   INDEX_FILE="$GAME_DIR/MONKEY1.000"
+fi
+
+# E014: another game with no GAME_TITLE is named from its settings (scummrp's id, the release, the index file), not
+# by MI's default text
+if [[ -n "${SCUMMRP_GAME:-}" && -z "${GAME_TITLE:-}" ]]; then
+  GAME_TITLE="$SCUMMRP_GAME, release $RELEASE ($INDEX_NAME, SCUMM v5)"
 fi
 
 SCUMMTR_URL="https://github.com/dwatteau/scummtr.git"

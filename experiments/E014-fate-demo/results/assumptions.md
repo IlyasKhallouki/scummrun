@@ -1,0 +1,20 @@
+# E014: the Monkey Island assumptions met on another game
+
+Method (c) of `../plan.md`: every place where the system assumed Monkey Island, in the order met, with what replaced
+it. A switch is named with its default; with every switch unset the system is as before on MI. "talkie" rows were
+met on the talkie demo (fate-demo), "play" rows on the interactive demo (fate-play-demo).
+
+| # | game | what | where | why it breaks | the general replacement (switch) | fixed? |
+|---|---|---|---|---|---|---|
+| 1 | talkie | the extraction picks the release by MI's file names; scummrp's table names the index file | `scripts/dump-scripts.sh`, `dump_scripts.py` | another game's files and index name are not MI's | explicit settings: `SCUMMRP_GAME`, `INDEX_NAME`, `RELEASE`, `GAME_TITLE`, `OUT_ROOT`, `TOOLS_ROOT` (unset: MI's extraction byte for byte) | yes (12c6955) |
+| 2 | talkie | the reader's game data is `data/scripts-dos-cd` | scumm-ir `game.rs`, scumm-reader `domains.rs`, `memo.rs`, fmi-reading `cache.rs` | another game's extraction is elsewhere | `FMI_GAME_SCRIPTS` (unset: MI's) | yes (f0faf36) |
+| 3 | talkie | the engine's target `monkey-cd`, game id `monkey`, files `game/dos-cd`, one shared save folder | fmi-engine `host.rs` | another game; its scripts write files in the save folder (roomOps 9, 13, 14) | `FMI_GAME_ID`, `FMI_GAME_DIR`; with them, a save folder of its own per boot, empty at the boot | yes (3a830f7) |
+| 4 | talkie | the decision point needs a visible verb 2-10 (sentence) or 120-128 (dialog), ids read from MI's scripts | patch 0001 `speedrun_state.cpp`, `speedrun_control.cpp` | another game's verb ids differ | `SPEEDRUN_IDLE=handler` (patch 0006-e014): the click gate open, the input handler (`VAR_VERB_SCRIPT`) set and idle, nothing the last input started running; kind always sentence, no menu stop. The smallest version; E013 builds the engine's full input state | yes, smallest version (cbdeba0) |
+| 5 | talkie | the boot's checks hold MI's boot param 0 | fmi-explore `tryjob.rs` | the engine sets its own boot param for this game id (copy-protection skip, `scumm.cpp`) | under `FMI_GAME_ID` the boot checks accept what the engine holds | yes (f932834) |
+| 6 | talkie | a goal is a set of facts; the game's end marks a move dead | fmi-explore `mech.rs`, `archive.rs`, `tryjob.rs` | the game's own end is the goal, and no fact names it | `FMI_GOAL_END=1`, goal `end = 1`: a run ending at a script's restart or quit (`SPEEDRUN_END_SITE=1`'s site) is an end entry, verified from boot by ending at the same frame, tick and site | yes (cbdeba0, f932834) |
+| 7 | talkie | the guides are E009's copies for MI's stages, from MI's start row | fmi-explore `guide.rs`, `fmi` | another game's goal and start | `fmi guide map --goal end=1 --start-boot`: the regression from the `systemOps` sites, from the facts of the game's own boot | yes (f932834) |
+| 8 | talkie | the allowed rooms are MI's list | `fmi explore init --allowed files` | another game's rooms | the rooms of the extraction's files (`FMI_GAME_SCRIPTS`) | yes (f932834) |
+| 9 | talkie | the reader's reach rounds start from an input job (F1c's plain input script) | scumm-reader `reach.rs` | a game with no modelled input has none, so nothing is read | `FMI_READ_EVENTS=1`: the rounds start from the start's events when no input job exists | yes (0db581e) |
+| 10 | talkie | the reader's goal key is a fact of the game | scumm-reader `run/mod.rs` | `end` is no fact of the game | under `FMI_GOAL_END=1` the key's domain is {start, goal values} | yes (0db581e) |
+| 11 | talkie | `print` with a speech code (descumm prints `sound(0x.., 0x..)`) | scumm-ir parse | not parsed: a path ends there | none needed on the play demo (it has no speech codes) | not met on the explorer's paths |
+| 12 | play | the extraction's file headers and index title name MI | `scripts/dump-scripts.sh` | `GAME_TITLE` unset defaulted to MI's text | with `SCUMMRP_GAME` set and no `GAME_TITLE`, the game is named from its settings (scummrp's id, the release, the index file); every script body byte for byte the same | yes |
