@@ -1,7 +1,7 @@
 # E012 `resident`: the reader in fmi's process, the job memo resident (2026-11-03)
 
-Branch e012-resident. Method: E012 plan.md, "Amendment 2026-11-03, component `resident`" and its amendment "the second
-entry"; the argument: E011 memo.md, "Amendment 2026-11-03 (E012, component `resident`)". Laptop, seed 1, nice 10, 3
+Branch e012-resident. Method: E012 plan.md, "Amendment 2026-11-03, component `resident`" and its amendments "the
+second entry", "the allocator" and "the allocator by phase"; the argument: E011 memo.md, "Amendment 2026-11-03 (E012, component `resident`)". Laptop, seed 1, nice 10, 3
 reader threads, this branch's release builds (`resident/build.sh`: fmi and reader-scope, debug info off). Drivers:
 `resident/rs1.sh`, `resident/kitchen.sh`, `resident/heavy.sh`, each reading through `fmi read` (fmi's readings port:
 reader-scope as a child, or the process itself with FMI_READER_LIB=1).
@@ -9,8 +9,9 @@ reader-scope as a child, or the process itself with FMI_READER_LIB=1).
 ## RS1: byte for byte on G6's recorded inputs
 
 Reader-scope (a child of `fmi read`, no memo, no `--prep`; under the guard, load 4-6) made the reference readings;
-then one fmi process with the switch (the store in memory, `--prep`, the key's units as a set; under the heavy lock
-and the guard) read the five in RS1's order. Per-file sha1s: `rs1-sums.txt`; per-reading lines: `rs1-ref.jsonl`,
+then one fmi process with the switch (the store in memory, `--prep`, the key's units as a set; the build of that
+hour, mimalloc for the whole process; under the heavy lock and the guard) read the five in RS1's order. The switch's
+later builds (the system allocator, the allocator by phase) gave the same files again on the kitchen pair (RS2). Per-file sha1s: `rs1-sums.txt`; per-reading lines: `rs1-ref.jsonl`,
 `rs1-inproc.jsonl`.
 
 | reading | five files vs reader-scope | tc, reached, actions, lists vs G6's recorded sha1 | reading.json (cmp_reading.py) | memo: taken / run | wall | CPU |
