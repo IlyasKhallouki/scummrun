@@ -19,7 +19,7 @@
 # samples /proc every second for the whole run.
 # usage: E011_ENV=$HOME/.cache/fast-mi-e011/env-r2.sh b3r2.sh ref|fast OUT SEQ... [-- FIRST_JOB]
 #   B3_MEMO=0: no job memo store (FMI_MEMO unset) in every sequence; E008_FLOOR_GB (the reading cache's disk floor) passes
-#   through
+#   through; HEAVY_HELD=1: the caller holds the heavy lock for the whole run, so no try takes it
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV" # a second env file after env.sh (round 2: env-r2.sh, its binaries)
@@ -83,7 +83,7 @@ for k in $(seq 0 14); do
   for q in $seqs; do
     n=$q-$S; d=$OUT/$n/jobs/$j
     rm -rf $d/run $d/new $d/result.json $d/log
-    exec 200>$LOCK; flock 200
+    [ "${HEAVY_HELD:-0}" = 1 ] || { exec 200>$LOCK; flock 200; }
     c0=$($here/tree_cpu.sh ${PID[$q]}); t0=$(now)
     echo "$d" >&${FD[$q]}
     until grep -q "^done $d " $OUT/$n/fmi.log 2>/dev/null; do
@@ -91,7 +91,7 @@ for k in $(seq 0 14); do
       sleep 0.05
     done
     t1=$(now); c1=$($here/tree_cpu.sh ${PID[$q]})
-    flock -u 200; exec 200>&-
+    [ "${HEAVY_HELD:-0}" = 1 ] || { flock -u 200; exec 200>&-; }
     echo "{\"regime\": \"$n\", \"job\": \"$j\", \"wall_s\": $(calc "$t1 - $t0"), \"cpu_s\": $(calc "$c1 - $c0"), \"load\": $(cut -d' ' -f1 /proc/loadavg), \"mem_avail_kb\": $(awk '/MemAvailable/{print $2}' /proc/meminfo)}" >> $OUT/times.jsonl
     echo "[$(date +%T)] $n $j $(tail -1 $OUT/times.jsonl | cut -c1-140)"
   done

@@ -12,7 +12,8 @@
 # same start file (sha1) and the same records and actions, so the job copies name it (big files hardlinked, small ones
 # copied, so nothing is written into B0's folders).
 # usage: E011_ENV=$HOME/.cache/fast-mi-e011/env-r2d.sh b118.sh JOBS_DIR OUT [SEQ...]
-#   JOBS_DIR holds j00015/job.json and j00016/job.json (the check's job files)
+#   JOBS_DIR holds j00015/job.json and j00016/job.json (the check's job files); B118_JOBS: which of them (default both);
+#   HEAVY_HELD=1: the caller holds the heavy lock for the whole run, so no try takes it
 set -u
 source $HOME/.cache/fast-mi-e011/env.sh
 [ -n "${E011_ENV:-}" ] && source "$E011_ENV"
@@ -46,7 +47,7 @@ env_of() {
 }
 bin_of() { case $1 in r1) echo $R1_FMI_BIN;; r2) echo $R2_FMI_BIN;; *) echo $FMI_BIN;; esac; }
 now() { date +%s.%N; }
-for j in j00015 j00016; do
+for j in ${B118_JOBS:-j00015 j00016}; do
   for q in $seqs; do
     d=$OUT/$q/$j; rm -rf $d; mkdir -p $d
     $PY - $JOBS/$j/job.json $d/job.json $R1 $R0 $d/reading <<'PYEOF'
@@ -57,12 +58,12 @@ j["readings"] = [{"path": sys.argv[3] + "/reading.json", "start_entry": 0},
 j["reading_dir"] = sys.argv[5]
 open(sys.argv[2], "w").write(json.dumps(j) + "\n")
 PYEOF
-    exec 9>$LOCK; flock 9
+    [ "${HEAVY_HELD:-0}" = 1 ] || { exec 200>$LOCK; flock 200; }
     t0=$(now)
     env $(env_of $q) FMI_PLAN_TIME=180 FMI_PLAN_CACHE= FMI_POOL_DIR=$d/pool FMI_READING_CACHE= FMI_MEMO= \
       $GUARD $d/fmi.log $(bin_of $q) try $d --targets bit:118=1 $(args_of $q)
     t1=$(now)
-    flock -u 9; exec 9>&-
+    [ "${HEAVY_HELD:-0}" = 1 ] || { flock -u 200; exec 200>&-; }
     rm -rf $d/pool
     $PY - $d $q $j $t0 $t1 >> $OUT/times.jsonl <<'PYEOF'
 import json, sys
