@@ -1490,3 +1490,26 @@ a dated amendment first, with the projection from these try costs: a mean of 31.
 - The sentence-idle affordance steps: 44% of the try wall, nearly all of it the wait run after each trial.
 - The empty windows' 3,600 frames, carried into the chain, and a due frame past play when ready's 294 tries (entry
   138). These are the cases the due-frame window was meant to cover.
+
+## Corrections after the independent check (2026-11-03)
+
+The check (notes/log/2026-11-03-e012.md, "Check") reproduced the goal and every entry from boot. It also found that
+parts of the two Results sections above say more than the runs measured. These corrections stand in their place:
+
+- **The planned timing.** The integration's amendment named the three-process run as the measure. In it, the 15 tries
+  with everything on took 201.3 s against round 2's 178.2 s, 1.13 times, where 0.80-0.95 was predicted; the reading
+  took 125.9 s against 125.5 s, where 15-25 s saved was predicted. Both are misses. The two-process run (0.96, 23.2 s
+  saved) was added after these results and does not replace them.
+- **G9 with everything on** was planned, ran, and failed (exit 1). It is a failed gate, not a gate that does not
+  apply; the reason (selection over T changes the cells, and the replay doubles hold no reading for T) is recorded.
+- **Two kitchen predictions missed:** one wait of 53 took 0.403 s (predicted at most 0.3 s), and 12 of 29 dialog
+  steps took longer than 0.5 s (up to 1.27 s).
+- **The affordance step depends on this game's verb numbers.** It offers inputs by the bridge's idle kind, and the
+  bridge (`speedrun_state.cpp`, from E003) calls a frame a dialog when a verb 120-128 is visible and a sentence idle
+  when a verb 2-10 is visible. Those ranges were read from this game's scripts by hand, against D9 and against the
+  plan's own statement that no verb id list is used. Entries 142 and 146 on the goal's chain came from dialog steps.
+  The kitchen result holds as an exact run, but this part of the method is not general until the idle kind comes
+  from the engine's own input state.
+- **What bound the goal's chain** was not a timer: of its four 3,600-frame windows, three retried a sentence the
+  interface refused ("verb key did not select verb 10") and one a walk whose effect on var:102 never matched.
+- Some amendments came before their code by commit order only (the check lists them).
