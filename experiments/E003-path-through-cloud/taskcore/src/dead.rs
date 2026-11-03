@@ -28,17 +28,21 @@ pub struct Proof {
     pub h1_s: f64,
     pub h2_s: f64,
     pub h2_passes: u32,
-    /// false: h^2 stopped at its watchdog (it proves nothing then)
+    /// false: h^2 stopped at its watchdog or once the goal was in (it proves nothing then)
     pub h2_done: bool,
+    /// h^2 stopped once every goal fact and pair was in
+    pub h2_goal_in: bool,
 }
 
-/// h^1, then h^2 when h^1 proves nothing (module docstring); `h2_deadline` is h^2's watchdog.
+/// h^1, then h^2 when h^1 proves nothing (module docstring); `h2_deadline` is h^2's watchdog. h^2 stops as soon as
+/// the goal is in it (it cannot prove anything after that).
 pub fn prove(t: &SasTask, h2_deadline: Option<Instant>) -> Proof {
-    prove_keep(t, h2_deadline).0
+    prove_keep(t, h2_deadline, false).0
 }
 
-/// `prove`, with the h^2 fixpoint when it ran (the checks: a plan's states against its rows, the plain fixpoint).
-pub fn prove_keep(t: &SasTask, h2_deadline: Option<Instant>) -> (Proof, Option<H2>) {
+/// `prove`, with the h^2 rows when it ran; `full`: the whole fixpoint even when the goal is in early (the checks: a
+/// plan's states against its rows, the plain fixpoint).
+pub fn prove_keep(t: &SasTask, h2_deadline: Option<Instant>, full: bool) -> (Proof, Option<H2>) {
     let mut p = Proof::default();
     let t0 = Instant::now();
     let fx = FactIdx::new(t);
@@ -49,10 +53,11 @@ pub fn prove_keep(t: &SasTask, h2_deadline: Option<Instant>) -> (Proof, Option<H
         p.miss = vec![(v, x)];
         return (p, None);
     }
-    let h = H2::run(t, h2_deadline);
+    let h = H2::run_until(t, h2_deadline, !full);
     p.h2_s = h.seconds;
     p.h2_passes = h.passes;
     p.h2_done = h.done;
+    p.h2_goal_in = h.goal_in;
     if let Some((a, b)) = h.goal_miss(t) {
         p.dead = Some("h2");
         let of = |f: u32| (fx.var_of[f as usize], f - fx.off[fx.var_of[f as usize] as usize]);
@@ -207,6 +212,8 @@ pub struct H2 {
     pub seconds: f64,
     /// false: stopped at the deadline, the rows are not a fixpoint (and prove nothing)
     pub done: bool,
+    /// stopped as soon as every goal fact and pair was in (`run_until`): rows only grow, so it proves nothing
+    pub goal_in: bool,
 }
 
 impl H2 {
@@ -249,12 +256,18 @@ impl H2 {
     ///
     /// `deadline` stops it (done false).
     pub fn run(t: &SasTask, deadline: Option<Instant>) -> H2 {
+        H2::run_until(t, deadline, false)
+    }
+
+    /// `run`; `stop_at_goal`: stop once every goal fact and pair is in (goal_in; the rows are then not the fixpoint,
+    /// and no proof can come from them: rows only grow).
+    pub fn run_until(t: &SasTask, deadline: Option<Instant>, stop_at_goal: bool) -> H2 {
         let t0 = Instant::now();
         let fx = FactIdx::new(t);
         let ops = Ops::new(t, &fx);
         let n = fx.n;
         let w = (n + 63) / 64;
-        let mut h = H2 { w, rows: vec![0u64; n * w], fx, passes: 0, seconds: 0.0, done: false };
+        let mut h = H2 { w, rows: vec![0u64; n * w], fx, passes: 0, seconds: 0.0, done: false, goal_in: false };
         let init: Vec<u32> = t.init.iter().enumerate().map(|(v, &x)| h.fx.id(v as u32, x)).collect();
         for &a in &init {
             for &b in &init {
@@ -315,6 +328,8 @@ impl H2 {
         let off = h.fx.off.clone();
         let var_of = h.fx.var_of.clone();
         let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
+        let goal: Vec<u32> = t.goal.iter().map(|&(v, x)| h.fx.id(v, x)).collect();
+        let goal_in = |h: &H2| goal.iter().enumerate().all(|(i, &a)| goal[i..].iter().all(|&b| h.pair(a, b)));
         // row(p) |= src \ (p's variable), both ways; true when something was new
         fn spread(h: &mut H2, ver: &mut [u64], clock: &mut u64, p: u32, lo: u32, hi: u32, src: &dyn Fn(usize) -> u64) -> bool {
             let w = h.w;
@@ -372,12 +387,16 @@ impl H2 {
             ver[p2 as usize] = *clock;
             true
         }
-        loop {
+        'passes: loop {
             h.passes += 1;
             let mut changed = false;
             let tp = Instant::now();
             let (mut n_looked, mut n_fired_g, mut n_joins) = (0u64, 0u64, 0u64);
             for op in 0..n_ops {
+                if stop_at_goal && changed && goal_in(&h) {
+                    h.goal_in = true;
+                    break 'passes;
+                }
                 let pre = ops.pre(op);
                 let us = &unc[unc_off[op] as usize..unc_off[op + 1] as usize];
                 let gs = grp_off[op] as usize..grp_off[op + 1] as usize;
@@ -531,7 +550,7 @@ impl H2 {
         let fx = FactIdx::new(t);
         let ops = Ops::new(t, &fx);
         let w = (fx.n + 63) / 64;
-        let mut h = H2 { w, rows: vec![0u64; fx.n * w], fx, passes: 0, seconds: 0.0, done: false };
+        let mut h = H2 { w, rows: vec![0u64; fx.n * w], fx, passes: 0, seconds: 0.0, done: false, goal_in: false };
         let init: Vec<u32> = t.init.iter().enumerate().map(|(v, &x)| h.fx.id(v as u32, x)).collect();
         for &a in &init {
             for &b in &init {
@@ -915,6 +934,8 @@ mod tests {
             }
             let solvable = states.iter().any(|s| t.is_goal(s));
             let p = prove(&t, None);
+            // the early stop at the goal never changes the verdict
+            assert_eq!(p.dead, prove_keep(&t, None, true).0.dead, "the early stop changes the verdict on {:?}", t);
             if solvable {
                 assert_eq!(p.dead, None, "a proof claims no plan for a task with one: {:?}", t);
                 live += 1;
