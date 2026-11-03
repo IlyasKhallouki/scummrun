@@ -149,7 +149,161 @@ fn sig_hash_fast(v: View, s: &mut SigScratch, r: &mut Vec<(u32, u32)>) -> u64 {
     h
 }
 
+/// One hash group's part of (f): the dominated members and their pairs (in the group's order), the counts.
+#[derive(Default)]
+struct GroupOut {
+    pairs: Vec<(usize, usize)>,
+    dup: u64,
+    dom: u64,
+    skipped: u64,
+    checked: u64,
+    walks: u64,
+}
+
+/// A thread's buffers for `f_group`.
+#[derive(Default)]
+struct FScratch {
+    sig: SigScratch,
+    rs: Vec<(u32, u32)>,
+    arena: Vec<u32>,
+    spans: Vec<(usize, usize)>,
+    parena: Vec<u32>,
+    members: Vec<Member>,
+    fl: Vec<u32>,
+    fact_lists: FxMap<Vec<u32>, u32>,
+}
+
+/// Every member a survivor of the last pass, in the same order: nothing to drop there (module docstring).
+fn clean(t: &Task, memo: &Memo, ix: &[usize]) -> bool {
+    if !memo.valid {
+        return false;
+    }
+    let mut last: Option<u32> = None;
+    ix.iter().all(|&i| match memo.survivor(t, i) {
+        Some(j) if last.is_none_or(|l| j > l) => {
+            last = Some(j);
+            true
+        }
+        _ => false,
+    })
+}
+
+/// `red_f`'s work on one hash group `hg` (its exact groups in order, each keep order, first dominators), alone.
+fn f_group(t: &Task, memo: &Memo, hg: &[usize], sc: &mut FScratch) -> GroupOut {
+    let mut out = GroupOut::default();
+    if clean(t, memo, hg) {
+        out.skipped += 1;
+        return out;
+    }
+    // each member's signature laid out in the arena (from its effects' sorted ranges when it can)
+    sc.arena.clear();
+    sc.spans.clear();
+    for &i in hg {
+        let v = t.acts.view(i);
+        let a = sc.arena.len();
+        if sig_ranges(v.w, &mut sc.rs).is_some() {
+            for &(x, y) in &sc.rs {
+                sc.arena.extend_from_slice(&v.w[x as usize..y as usize]);
+            }
+        } else {
+            sig_into(v, &mut sc.sig, &mut sc.arena);
+        }
+        sc.spans.push((a, sc.arena.len()));
+    }
+    let mut done = vec![false; hg.len()];
+    let mut tmp: Vec<(u32, &[u32])> = Vec::new();
+    for x in 0..hg.len() {
+        if done[x] {
+            continue;
+        }
+        let sigs = |y: usize| &sc.arena[sc.spans[y].0..sc.spans[y].1];
+        let g: Vec<usize> = (x..hg.len()).filter(|&y| !done[y] && sigs(y) == sigs(x)).collect();
+        for &y in &g {
+            done[y] = true;
+        }
+        if g.len() < 2 {
+            continue;
+        }
+        let ixs: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
+        if clean(t, memo, &ixs) {
+            out.skipped += 1;
+            continue;
+        }
+        out.checked += 1;
+        // each member's precondition sorted (by fact, then values), in one arena, with its filters; members are
+        // numbered by their place in `ixs`
+        sc.parena.clear();
+        sc.members.clear();
+        sc.fact_lists.clear();
+        for &i in &ixs {
+            tmp.clear();
+            tmp.extend(t.acts.view(i).pre());
+            if !tmp.windows(2).all(|w| w[0] <= w[1]) {
+                tmp.sort();
+            }
+            let a = sc.parena.len();
+            let mut size = 0u64;
+            let mut bits = 0u64;
+            let mut vb = [0u64; VB_WORDS];
+            sc.fl.clear();
+            for &(f, s) in &tmp {
+                sc.parena.push(f);
+                sc.parena.push(s.len() as u32);
+                sc.parena.extend_from_slice(s);
+                size += s.len() as u64;
+                bits |= 1 << (f % 64);
+                sc.fl.push(f);
+                for &v in s {
+                    let b = pair_bit(f, v);
+                    vb[b / 64] |= 1 << (b % 64);
+                }
+            }
+            let dupf = sc.fl.windows(2).any(|w| w[0] == w[1]);
+            let next = sc.fact_lists.len() as u32;
+            let facts = *sc.fact_lists.entry(sc.fl.clone()).or_insert(next);
+            sc.members.push(Member { span: (a, sc.parena.len()), count: tmp.len(), size, bits, facts, dup: dupf, vb });
+        }
+        let (members, parena) = (&sc.members, &sc.parena);
+        let mut order: Vec<usize> = (0..ixs.len()).collect();
+        order.sort_by_key(|&m| (t.acts.meta[ixs[m]].cost, members[m].count, std::cmp::Reverse(members[m].size), ixs[m]));
+        let mut keep: Vec<usize> = Vec::new();
+        for &mi in &order {
+            let i = ixs[mi];
+            let a = &members[mi];
+            let pi = &parena[a.span.0..a.span.1];
+            let ci = t.acts.meta[i].cost;
+            let by = keep.iter().copied().find(|&mk| {
+                let b = &members[mk];
+                if t.acts.meta[ixs[mk]].cost > ci || b.bits & !a.bits != 0 {
+                    return false;
+                }
+                if b.facts == a.facts && !b.dup && !a.dup && (0..VB_WORDS).any(|w| a.vb[w] & !b.vb[w] != 0) {
+                    return false;
+                }
+                out.walks += 1;
+                pre_within(&parena[b.span.0..b.span.1], pi)
+            });
+            match by {
+                Some(mk) => {
+                    let k = ixs[mk];
+                    let b = &members[mk];
+                    if parena[b.span.0..b.span.1] == *pi && t.acts.meta[k].cost == ci {
+                        out.dup += 1;
+                    } else {
+                        out.dom += 1;
+                    }
+                    out.pairs.push((i, k));
+                }
+                None => keep.push(mi),
+            }
+        }
+    }
+    out
+}
+
 /// `red_f` with the same result (module docstring): the same groups, keep orders, first dominators, pairs and counts.
+/// The signatures and the hash groups are worked on by `par::threads()` threads, each alone; the results are joined in
+/// the groups' order.
 pub fn red_f_fast(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, memo: &mut Memo) -> (Task, bool) {
     let n = t.acts.len();
     // the whole task the last pass's survivors, word for word and cost for cost, in order: every group is left out
@@ -159,161 +313,39 @@ pub fn red_f_fast(t: Task, c: &mut Counts, replaced: &mut Vec<(u32, u32)>, memo:
     }
     let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
     let k0 = crate::perf::now();
-    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    let th = crate::par::threads();
+    let hashes: Vec<Vec<u64>> = crate::par::map_chunks(n, th, || (SigScratch::default(), Vec::new()), |(sig, rs), r| {
+        r.map(|i| sig_hash_fast(t.acts.view(i), sig, rs)).collect()
+    });
     let mut by_hash: FxMap<u64, Vec<usize>> = FxMap::default();
-    let mut scratch = SigScratch::default();
-    let mut rs: Vec<(u32, u32)> = Vec::new();
-    for i in 0..n {
-        let h = sig_hash_fast(t.acts.view(i), &mut scratch, &mut rs);
+    for (i, h) in hashes.into_iter().flatten().enumerate() {
         by_hash.entry(h).or_default().push(i);
     }
-    let mut drop = vec![false; n];
-    let (mut dup, mut dom) = (0u64, 0u64);
     let mut groups: Vec<Vec<usize>> = by_hash.into_values().filter(|g| g.len() > 1).collect();
     groups.sort();
     let k1 = crate::perf::now();
-    let mut arena: Vec<u32> = Vec::new();
-    let mut spans: Vec<(usize, usize, bool)> = Vec::new();
-    let (mut skipped, mut checked, mut walks) = (0u64, 0u64, 0u64);
-    let mut parena: Vec<u32> = Vec::new();
-    let mut members: Vec<Member> = Vec::new();
-    let mut tmp: Vec<(u32, &[u32])> = Vec::new();
-    let mut fl: Vec<u32> = Vec::new();
-    let mut fact_lists: FxMap<Vec<u32>, u32> = FxMap::default();
-    // every member a survivor of the last pass, in the same order: nothing to drop there (module docstring)
-    let clean = |ix: &[usize]| -> bool {
-        if !memo.valid {
-            return false;
+    let memo_r: &Memo = memo;
+    let tr = &t;
+    let outs: Vec<GroupOut> = crate::par::map_dyn(groups.len(), th, FScratch::default, |sc, g| f_group(tr, memo_r, &groups[g], sc));
+    let mut drop = vec![false; n];
+    let (mut dup, mut dom, mut skipped, mut checked, mut walks) = (0u64, 0u64, 0u64, 0u64, 0u64);
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    for o in outs {
+        dup += o.dup;
+        dom += o.dom;
+        skipped += o.skipped;
+        checked += o.checked;
+        walks += o.walks;
+        for &(i, _) in &o.pairs {
+            drop[i] = true;
         }
-        let mut last: Option<u32> = None;
-        ix.iter().all(|&i| match memo.survivor(&t, i) {
-            Some(j) if last.is_none_or(|l| j > l) => {
-                last = Some(j);
-                true
-            }
-            _ => false,
-        })
-    };
-    for hg in groups {
-        if clean(&hg) {
-            skipped += 1;
-            continue;
-        }
-        // each member's signature: its effect words when laid out already, else laid out in the arena
-        arena.clear();
-        spans.clear();
-        for &i in &hg {
-            let v = t.acts.view(i);
-            let a = arena.len();
-            if sig_ranges(v.w, &mut rs).is_some() {
-                for &(x, y) in &rs {
-                    arena.extend_from_slice(&v.w[x as usize..y as usize]);
-                }
-            } else {
-                sig_into(v, &mut scratch, &mut arena);
-            }
-            spans.push((a, arena.len(), false));
-        }
-        let sigs = |y: usize| -> &[u32] {
-            let (a, b, in_place) = spans[y];
-            if in_place {
-                &t.acts.words[a..b]
-            } else {
-                &arena[a..b]
-            }
-        };
-        let mut done = vec![false; hg.len()];
-        for x in 0..hg.len() {
-            if done[x] {
-                continue;
-            }
-            let g: Vec<usize> = (x..hg.len()).filter(|&y| !done[y] && sigs(y) == sigs(x)).collect();
-            for &y in &g {
-                done[y] = true;
-            }
-            if g.len() < 2 {
-                continue;
-            }
-            let ixs: Vec<usize> = g.iter().map(|&y| hg[y]).collect();
-            if clean(&ixs) {
-                skipped += 1;
-                continue;
-            }
-            checked += 1;
-            // each member's precondition sorted (by fact, then values), in one arena, with its filters; members are
-            // numbered by their place in `ixs`
-            parena.clear();
-            members.clear();
-            fact_lists.clear();
-            for &i in &ixs {
-                tmp.clear();
-                tmp.extend(t.acts.view(i).pre());
-                if !tmp.windows(2).all(|w| w[0] <= w[1]) {
-                    tmp.sort();
-                }
-                let a = parena.len();
-                let mut size = 0u64;
-                let mut bits = 0u64;
-                let mut vb = [0u64; VB_WORDS];
-                fl.clear();
-                for &(f, s) in &tmp {
-                    parena.push(f);
-                    parena.push(s.len() as u32);
-                    parena.extend_from_slice(s);
-                    size += s.len() as u64;
-                    bits |= 1 << (f % 64);
-                    fl.push(f);
-                    for &v in s {
-                        let b = pair_bit(f, v);
-                        vb[b / 64] |= 1 << (b % 64);
-                    }
-                }
-                let dupf = fl.windows(2).any(|w| w[0] == w[1]);
-                let next = fact_lists.len() as u32;
-                let facts = *fact_lists.entry(fl.clone()).or_insert(next);
-                members.push(Member { span: (a, parena.len()), count: tmp.len(), size, bits, facts, dup: dupf, vb });
-            }
-            let mut order: Vec<usize> = (0..ixs.len()).collect();
-            order.sort_by_key(|&m| (t.acts.meta[ixs[m]].cost, members[m].count, std::cmp::Reverse(members[m].size), ixs[m]));
-            let mut keep: Vec<usize> = Vec::new();
-            for &mi in &order {
-                let i = ixs[mi];
-                let a = &members[mi];
-                let pi = &parena[a.span.0..a.span.1];
-                let ci = t.acts.meta[i].cost;
-                let by = keep.iter().copied().find(|&mk| {
-                    let b = &members[mk];
-                    if t.acts.meta[ixs[mk]].cost > ci || b.bits & !a.bits != 0 {
-                        return false;
-                    }
-                    if b.facts == a.facts && !b.dup && !a.dup && (0..VB_WORDS).any(|w| a.vb[w] & !b.vb[w] != 0) {
-                        return false;
-                    }
-                    walks += 1;
-                    pre_within(&parena[b.span.0..b.span.1], pi)
-                });
-                match by {
-                    Some(mk) => {
-                        let k = ixs[mk];
-                        drop[i] = true;
-                        let b = &members[mk];
-                        if parena[b.span.0..b.span.1] == *pi && t.acts.meta[k].cost == ci {
-                            dup += 1;
-                        } else {
-                            dom += 1;
-                        }
-                        pairs.push((i, k));
-                    }
-                    None => keep.push(mi),
-                }
-            }
-        }
+        pairs.extend(o.pairs);
     }
     memo.skipped = skipped;
     memo.checked = checked;
     if prof {
         let (h, r) = ((k1.0 - k0.0) / 1_000_000, (crate::perf::now().0 - k1.0) / 1_000_000);
-        eprintln!("profile f fast: hash {} M instructions, groups {} M; groups left out {}, checked {}, walks {}", h, r, skipped, checked, walks);
+        eprintln!("profile f fast: hash {} M instructions, groups {} M (this thread's; {} threads); groups left out {}, checked {}, walks {}", h, r, th, skipped, checked, walks);
     }
     for &(i, k) in &pairs {
         let to = t.acts.members(k)[0];
