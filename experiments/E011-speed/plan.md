@@ -2564,3 +2564,16 @@ Written after the merge built and its cargo tests passed, before any gate or mea
     - Its sum is 1-5% above round 2's.
   - **bit:118.** The merged build ends each try in 15-25 s. Round 1 and round 2 alone take 185-200 s each: the 180 s
     limit plus the reductions.
+
+## Amendment 2026-11-03, during the merged build's measurement: the heavy lock held across the fast sequence
+
+- **Measured.**
+  - The fast B3's first start lost its third sequence (the merged build) at its first try. b3r2.sh took the heavy lock
+    on fd 9, the third sequence's fifo, so that process saw its input end. b3r2.sh now holds the lock on fd 200.
+  - The second start ran each sequence's first try (j00000, 3.1-5.0 min each at load 8-15). Then it waited more than 25
+    minutes for its next single try: another experiment's steps held the heavy lock, and several more were queued for
+    it.
+- **What changes.** The fast B3 runs again from an empty start. The heavy lock is taken once and held for the whole
+  sequence, then for the two bit:118 tries still to run (round 2's and the merged build's on try 16). Before, it was
+  taken once per try. The tries still alternate one by one between the three processes, so they meet the same load,
+  and no other heavy step runs between them. Everything else is as in the amendment above.
