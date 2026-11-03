@@ -1390,3 +1390,102 @@ Written before the rerun starts. It fills in what "Runs" leaves open; nothing th
   through E008's `explore.py verify` on svm-w3b, on a copy of the archive's files.
 - **Reported** from the archive's files by a Rust report over its tries (`fmi-checks`' `kitchen-report`, written after
   the run starts; it reads files only): what "Runs" lists, against E011's table and the prediction.
+
+## Results of the kitchen rerun (2026-11-03, written after the run)
+
+The run followed the amendment above, with no step by hand. Numbers, tables and files: `results/kitchen/README.md`.
+Laptop, seed 1, b = 2.
+
+**Reached.** The driver stopped on "goal" at the 53rd committed try (j00052): entry 150, owner:566 = 1, 15,688 frames
+from the root (2728 to 18416), 85 inputs, 8 segments. No other stop rule fired first: stagnation over T did not fire
+(68 cells still selectable), and the falsifier stood at 53 of 80. The goal entry verifies from boot with 0
+differences on its 32 checkpoints three times: the driver's verify, `fmi explore verify` in a fresh lean engine, and
+E008's `explore.py verify` on svm-w3b. Every entry of the archive verifies from boot (150 of 150). The
+driver ran 21.5 minutes; the tries' own wall adds up to 1,658 s (0.46 h), median 15.2 s, max 163.6 s, with no error
+and no guard kill.
+
+**How the goal came.**
+
+- The chain is boot, then an affordance outcome from the root (room 35), then attempts' entries through rooms 29, 35
+  and 33 to room 28, then two dialog affordance outcomes in room 28, then the goal's attempt.
+- From entry 142, idle in a room-28 dialog after R0 on var 194, h^2 proves the goal dead. It does so from the entry
+  and from each of the wait's three stops (the goal again). Thirteen other targets are proven dead in about 1 s each.
+  E011's check spent 24 minutes on the same kind of targets at the planner's limit.
+- The affordance step then clicks a dialog line and keeps entry 146, with control back. From 146 the goal plans and
+  plays in 10.4 s. Its walk to the cook's door ends at the door's opening, frame 18329. That frame is entry 146's
+  frame plus the paused slot's due delay of 273 frames, where the wait stopped on the door. E010's play when ready
+  found it with 253 forks in 2.3 s; the due-frame window is not in the build.
+- From the first room-28 entry with control (138, frame 17526, j00049) the goal planned too. But play when ready's
+  294 tries ran out at frame 17821, and the door opened at the slot's due frame, 17917 (+391). The window then ran to
+  its 3,600-frame bound. From 146 the due delay, 273 frames, fell inside those 294 tries.
+- So the research's first finding held: E011's failure was a dialog. Once the dialog is passed, the cook's timer is a
+  wait the engine plays.
+
+**Where the chain's frames went.** Four windows on the chain ran to E010's 3,600-frame bound with no end point. They
+account for 14,400 of the 15,688 frames, because each window's parent idles to the bound and the next entry continues
+from there.
+
+**Each mechanism** (plan.md "Runs", reported per run):
+
+- **The wait:** 53 waits, 32 static, 21 ending W frames after their last stop (108 stops, 2 kept as entries). Median
+  0.087 s, max 0.403 s. Every wait ended by W. Three of four room-28 waits stopped on the door exactly at the paused
+  slot's due frame; the fourth entry was at the door's own frame.
+- **The goal again:** 6 requests, all proven dead by h^2.
+- **Due-frame windows:** 0, not built.
+- **The delay fork:** 2 of 84 windows triggered, by draws with no range or share, so no K. The fork changed no choice:
+  the first end point, at k = 0, was taken.
+- **The affordance step:** 42 steps, 5,767 trials, 33 kept, no trial ending the run.
+  - Every R0 stop (24) and every "same empty window" stop (13) was followed by the step, and 5 tries where no attempt
+    played also ran it.
+  - Dialog steps took a median of 0.43 s. Sentence-idle steps took 32-130 s each, 714 s in all, mostly reading each
+    trial's outcome through the wait's stops (126 ms per trial).
+- **Dead marks:** 0.
+- **Targets:** var:103 was attempted at most once per try, and no try's last target was a refined key's value (E011:
+  29 of 65). One request reached a limit, deepening's first 120 s (E011: 10 at 180 s).
+- **Calls per frame:** 0-13 by room, and 1-4 in room 28 (2 in 3,219 of its 3,866 frames). Room 29 had 11 frames with no call, which M1 had not seen.
+
+**The wall against E011's check** (tries' wall):
+
+| | E011 | E012 |
+|---|---|---|
+| total | 6,077 s over 65 tries, not reached | 1,658 s over 53 tries, reached |
+| empty-window tries | 3,355 s (55%) | 705 s (42.5%), 536 s of it in their affordance steps |
+| R0 tries | 1,273 s (21%) | 586 s (35.3%) |
+| target reached | 1,084 s | 115 s |
+| no attempt played | | 221 s (13.3%) |
+
+By part: read 29.7%, plan 21.8%, the affordance steps 44.0%, play 2.7%, T 1.0%, the wait 0.4%.
+
+**Against the prediction.**
+
+- Hit:
+  - reached and verified;
+  - the wait's cost (52 of 53 under 0.3 s) and the door at the due frame;
+  - no R0 stop or empty window without the affordance step;
+  - dialog steps;
+  - the targets;
+  - the planner's limits (1);
+  - 2 delay forks;
+  - 0.46 h of try wall.
+- Missed:
+  - 53 tries, predicted 3-25;
+  - 15,688 frames, predicted 488-1,300;
+  - 42 affordance steps, predicted 3-20;
+  - sentence-idle steps of 32-130 s, predicted 1-5 s;
+  - the empty-window tries at 42.5% of the wall, predicted ≤ 20%;
+  - calls per frame from 0 to 13, predicted ≥ 1 and up to about 10.
+
+**Threshold.** The kitchen clause of "yes" holds:
+
+- every gate passes;
+- the kitchen is reached and verified from boot within 80 tries, with no manual step;
+- no try ends on R0 or on an empty window without the affordance step.
+
+Part I has not run. By the success threshold E012 stands at "partly" until Part I runs. By the stop rule, Part I needs
+a dated amendment first, with the projection from these try costs: a mean of 31.3 s and a median of 15.2 s per try.
+
+**What binds next** (measured, for that amendment):
+
+- The sentence-idle affordance steps: 44% of the try wall, nearly all of it the wait run after each trial.
+- The empty windows' 3,600 frames, carried into the chain, and a due frame past play when ready's 294 tries (entry
+  138). These are the cases the due-frame window was meant to cover.
