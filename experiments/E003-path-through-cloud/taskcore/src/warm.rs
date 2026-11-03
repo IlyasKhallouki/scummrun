@@ -28,6 +28,7 @@ use crate::model::*;
 use crate::reduce::{self, Counts, Enabled};
 use crate::sas;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 /// The warm task's settings: E009's (module docstring).
@@ -85,14 +86,32 @@ pub struct Reduced {
     pub seconds: f64,
 }
 
-/// The kept work for one (bans, goal, caps) (serve.rs `Kept`).
-struct Kept {
-    key: KeyOf,
-    goal: Vec<(u32, Vec<u32>)>,
+/// The banned view of one bans list: its pieces and order (bans.rs `Banned`), its counts and seconds.
+struct BanView {
     pieces: Actions,
     order: Vec<u32>,
     ban_counts: BanCounts,
     ban_seconds: f64,
+}
+
+/// What reads no goal and no start, kept per (bans, caps) in the fast form (`Config::fast`): the banned view, the fold
+/// and the first round's normalize and (a), with their counts.
+struct Base {
+    key: (String, Vec<(u32, u32)>),
+    bv: Arc<BanView>,
+    fold_json: String,
+    bad: Option<String>,
+    task: Option<Task>,
+    counts: Counts,
+    changed: bool,
+    used: u64,
+}
+
+/// The kept work for one (bans, goal, caps) (serve.rs `Kept`).
+struct Kept {
+    key: KeyOf,
+    goal: Vec<(u32, Vec<u32>)>,
+    bv: Arc<BanView>,
     needed: Option<Vec<String>>,
     needed_after: Option<Vec<String>>,
     fold_json: String,
@@ -115,6 +134,8 @@ pub struct Warm {
     reached: Option<String>,
     fact_of: HashMap<String, u32>,
     kept: Vec<Kept>,
+    /// the fast form's work per (bans, caps)
+    bases: Vec<Base>,
     /// (bans text, goal) -> the facts (e) needs on the banned task (they read no cost: no caps in the key)
     needed_memo: HashMap<(String, Option<String>), Vec<String>>,
     clock: u64,
@@ -180,6 +201,7 @@ impl Warm {
             reached,
             fact_of,
             kept: Vec::new(),
+            bases: Vec::new(),
             needed_memo: HashMap::new(),
             clock: 0,
             file_bytes: loaded.file_bytes,
@@ -272,8 +294,138 @@ impl Warm {
         self.kept.iter().position(|k| &k.key == key)
     }
 
+    /// The fast form's work for (bans, caps) (`Base`): kept, or built and kept, dropping the least recently used beyond
+    /// `keep`. The same steps as `build`'s up to (a), on the same task: the fold reads no goal, nor do normalize and (a).
+    fn base(&mut self, list: &[Ban], lowered: &[(u32, u32)], goal: &[(u32, Vec<u32>)]) -> usize {
+        let key = (bans_text(list), lowered.to_vec());
+        self.clock += 1;
+        if let Some(i) = self.bases.iter().position(|b| b.key == key) {
+            self.bases[i].used = self.clock;
+            return i;
+        }
+        if self.bases.len() >= self.cfg.keep.max(1) {
+            let lru = (0..self.bases.len()).min_by_key(|&i| self.bases[i].used).unwrap();
+            self.bases.remove(lru);
+        }
+        let cfg = self.cfg;
+        let t = &self.t;
+        let prof = std::env::var_os("TASKCORE_PROFILE").is_some();
+        let tb = Instant::now();
+        let mut bc = BanCounts::default();
+        let b = bans::banned(t, list, None, &mut bc).expect("bans::banned stops only on the start file's keys");
+        let ban_seconds = tb.elapsed().as_secs_f64();
+        let task_of = |acts: Actions| Task {
+            strs: t.strs.clone(),
+            facts: t.facts.clone(),
+            goal: goal.to_vec(),
+            starts: t.starts.clone(),
+            acts,
+            n_orig: t.n_orig,
+        };
+        let tf = Instant::now();
+        let kf = crate::perf::now();
+        let (folded, fold_js) = if cfg.fold != FoldMode::Off {
+            let (acts, fc, _) = fold::fold_src(&b, &t.facts, &t.strs, cfg.fold);
+            let js = fold_json(&fc, &acts);
+            (task_of(acts), js)
+        } else {
+            let mut acts = Actions::default();
+            for i in 0..b.n() {
+                acts.copy_src(&b, i);
+            }
+            (task_of(acts), String::new())
+        };
+        if prof {
+            eprintln!("profile warm fold (first) {:.3} s, {:.0} M instructions; bans {:.3} s", tf.elapsed().as_secs_f64(), crate::perf::since(kf).0, ban_seconds);
+        }
+        let mut counts = Counts::new();
+        let (task, bad, changed) = if cfg.reduce.any() {
+            match reduce::bad_effect(&folded) {
+                Some(e) => (None, Some(e), false),
+                None => {
+                    let t = reduce::normalize(folded, &mut counts);
+                    let (t, ch) = if cfg.reduce.a { reduce::prof("a", t, |t| reduce::red_a(t, &mut counts)) } else { (t, false) };
+                    (Some(t), None, ch)
+                }
+            }
+        } else {
+            (Some(folded), None, false)
+        };
+        let bans::Banned { pieces, order, .. } = b;
+        let bv = Arc::new(BanView { pieces, order, ban_counts: bc, ban_seconds });
+        self.bases.push(Base { key, bv, fold_json: fold_js, bad, task, counts, changed, used: self.clock });
+        self.bases.len() - 1
+    }
+
+    /// `build` in the fast form: from the base of (bans, caps), the goal's (b) and (c) (`reduce::prefix`'s rest).
+    fn build_fast(&mut self, key: KeyOf, list: &[Ban], goal: Vec<(u32, Vec<u32>)>) -> usize {
+        if self.kept.len() >= self.cfg.keep.max(1) {
+            let lru = (0..self.kept.len()).min_by_key(|&i| self.kept[i].used).unwrap();
+            self.kept.remove(lru);
+        }
+        let cfg = self.cfg;
+        let bi = self.base(list, &key.2, &goal);
+        let b = &self.bases[bi];
+        let mut counts = b.counts.clone();
+        let (task, changed) = match &b.task {
+            Some(bt) if cfg.reduce.any() => {
+                let mut t = bt.clone();
+                t.goal = goal.clone();
+                let mut changed = b.changed;
+                if cfg.reduce.b {
+                    let (nt, ch) = reduce::prof("b", t, |t| reduce::red_b(t, &mut counts));
+                    t = nt;
+                    changed |= ch;
+                }
+                if cfg.reduce.c {
+                    let (nt, ch) = reduce::prof("c", t, |t| reduce::red_c(t, &mut counts));
+                    t = nt;
+                    changed |= ch;
+                }
+                (Some(t), changed)
+            }
+            Some(bt) => {
+                let mut t = bt.clone();
+                t.goal = goal.clone();
+                (Some(t), false)
+            }
+            None => (None, false),
+        };
+        let (bv, fold_json, bad) = (b.bv.clone(), b.fold_json.clone(), b.bad.clone());
+        self.clock += 1;
+        self.kept.push(Kept { key: key.clone(), goal: goal.clone(), bv, needed: None, needed_after: None, fold_json, bad, task, counts, changed, used: self.clock });
+        let k = self.kept.len() - 1;
+        if std::env::var_os("TASKCORE_CHECK_REDUCE").is_some() {
+            // the reference's build of the same key, compared (and dropped)
+            self.cfg.fast = false;
+            self.cfg.keep += 1;
+            let r = self.build(key, list, goal);
+            self.cfg.fast = true;
+            self.cfg.keep -= 1;
+            let (a, b) = (&self.kept[r], &self.kept[k]);
+            match (&a.task, &b.task) {
+                (Some(x), Some(y)) => {
+                    if let Some(d) = reduce::fast::task_diff(x, y) {
+                        panic!("the two-level kept task differs from the reference's: {}", d);
+                    }
+                }
+                (None, None) => {}
+                _ => panic!("the two-level kept task differs from the reference's: one has none"),
+            }
+            assert!(a.counts == b.counts && a.changed == b.changed && a.fold_json == b.fold_json && a.bad == b.bad, "the two-level kept work differs from the reference's");
+            assert!(a.bv.order == b.bv.order && a.bv.pieces.words == b.bv.pieces.words, "the banned views differ");
+            eprintln!("check: the two-level kept work is the reference's ({} actions)", b.task.as_ref().map_or(0, |t| t.acts.len()));
+            self.kept.remove(r);
+            return if r < k { k - 1 } else { k };
+        }
+        k
+    }
+
     /// Build what is kept for `key` (serve.rs `build`), dropping the least recently used beyond `keep`.
     fn build(&mut self, key: KeyOf, list: &[Ban], goal: Vec<(u32, Vec<u32>)>) -> usize {
+        if self.cfg.fast {
+            return self.build_fast(key, list, goal);
+        }
         if self.kept.len() >= self.cfg.keep.max(1) {
             let lru = (0..self.kept.len()).min_by_key(|&i| self.kept[i].used).unwrap();
             self.kept.remove(lru);
@@ -328,10 +480,7 @@ impl Warm {
         self.kept.push(Kept {
             key,
             goal,
-            pieces,
-            order,
-            ban_counts: bc,
-            ban_seconds,
+            bv: Arc::new(BanView { pieces, order, ban_counts: bc, ban_seconds }),
             needed: None,
             needed_after: None,
             fold_json: fold_js,
@@ -348,8 +497,12 @@ impl Warm {
         if self.kept[k].needed.is_none() {
             let nd = {
                 let kept = &self.kept[k];
-                let b = BannedRef { input: &self.t.acts, pieces: &kept.pieces, order: &kept.order };
-                reduce::needed_src(&b, &self.t.facts, &kept.goal)
+                let b = BannedRef { input: &self.t.acts, pieces: &kept.bv.pieces, order: &kept.bv.order };
+                if self.cfg.fast {
+                    reduce::fast::needed_fast_src(&b, &self.t.facts, &kept.goal)
+                } else {
+                    reduce::needed_src(&b, &self.t.facts, &kept.goal)
+                }
             };
             let keys = needed_keys(&nd, &self.t);
             self.kept[k].needed = Some(keys);
@@ -361,7 +514,7 @@ impl Warm {
         if self.kept[k].needed_after.is_none() {
             let keys = {
                 let kept = &self.kept[k];
-                let b = BannedRef { input: &self.t.acts, pieces: &kept.pieces, order: &kept.order };
+                let b = BannedRef { input: &self.t.acts, pieces: &kept.bv.pieces, order: &kept.bv.order };
                 let (acts, _, _) = fold::fold_src(&b, &self.t.facts, &self.t.strs, self.cfg.fold);
                 let nd = reduce::needed_src(&acts, &self.t.facts, &kept.goal);
                 needed_keys(&nd, &self.t)
@@ -405,7 +558,7 @@ impl Warm {
         };
         let mut bc = BanCounts::default();
         let b = bans::banned(&self.t, bans_list, None, &mut bc)?;
-        let nd = reduce::needed_src(&b, &self.t.facts, &goal_ids);
+        let nd = if self.cfg.fast { reduce::fast::needed_fast_src(&b, &self.t.facts, &goal_ids) } else { reduce::needed_src(&b, &self.t.facts, &goal_ids) };
         drop(b);
         let keys = needed_keys(&nd, &self.t);
         self.needed_memo.insert(mk, keys.clone());
@@ -466,21 +619,21 @@ impl Warm {
         self.kept[k].used = self.clock;
         if !r.bans.is_empty() {
             let kept = &self.kept[k];
-            let bc = &kept.ban_counts;
+            let bc = &kept.bv.ban_counts;
             let mut j = J::new();
             j.n("bans", bc.bans)
                 .n("not_applied", bc.not_applied)
                 .n("actions_hit", bc.actions_hit)
                 .n("pieces", bc.pieces)
                 .n("actions_after", bc.actions_after)
-                .f("seconds", kept.ban_seconds);
+                .f("seconds", kept.bv.ban_seconds);
             st.raw("bans", &j.done());
         }
         st.s("start", &r.start_name);
         // the start check on the banned task
         let input_misses = {
             let kept = &self.kept[k];
-            let b = BannedRef { input: &self.t.acts, pieces: &kept.pieces, order: &kept.order };
+            let b = BannedRef { input: &self.t.acts, pieces: &kept.bv.pieces, order: &kept.bv.order };
             sas::start_misses_src(&b, &self.t, &kept.goal, &vals, cfg.limit)?
         };
         if !r.needed_check && !input_misses.is_empty() {
@@ -488,11 +641,12 @@ impl Warm {
             return Err(format!("{} facts out of their domains: {:?}", m.len(), &m[..m.len().min(10)]));
         }
         let t_needed = Instant::now();
+        let kn = crate::perf::now();
         let check = r.needed_check && !input_misses.is_empty();
         let needed = self.needed(k);
         let mut seconds_needed = t_needed.elapsed().as_secs_f64();
         if std::env::var_os("TASKCORE_PROFILE").is_some() {
-            eprintln!("profile warm start check {:.3} s, needed {:.3} s", t_needed.duration_since(t0).as_secs_f64(), seconds_needed);
+            eprintln!("profile warm needed {:.3} s, {:.0} M instructions; up to the start check {:.3} s", seconds_needed, crate::perf::since(kn).0, t_needed.duration_since(t0).as_secs_f64());
         }
         st.s("fold", &format!("{:?}", cfg.fold)).s("reduce", &format!("{:?}", cfg.reduce)).n("product_limit", cfg.limit);
         st.s("encoding", if cfg.model { "model" } else { "task" });
