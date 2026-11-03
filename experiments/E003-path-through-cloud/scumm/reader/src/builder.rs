@@ -567,6 +567,9 @@ pub struct Builder<'g> {
     /// the switch --memo in a resident process (run.rs `Resident`): the store kept in memory from reading to reading,
     /// with `memo_dir` (if any) its disk store; None off
     pub memo_mem: Option<Arc<crate::memo::MemStore>>,
+    /// the switch --memo-units-set (E012 resident, memo.md's amendment of 2026-11-03): the store's key holds the
+    /// scope's units as a set (their keys sorted), not in `Scope::units`' order; off: the key as before
+    pub memo_units_set: bool,
     /// the switch --memo: each consulted key's kind, domain and constant start in this table (`Builder::key_info`)
     pub(crate) memo_infos: FxHashMap<String, (u8, Option<Domain>, Option<i64>)>,
     /// the switch --prep: the job being taken in (par.rs `run_batch`), its part worked out where it ran
@@ -773,6 +776,7 @@ impl<'g> Builder<'g> {
             memo_log: None,
             memo_dir: None,
             memo_mem: None,
+            memo_units_set: false,
             memo_infos: FxHashMap::default(),
             job_prep: None,
             prep: false,
