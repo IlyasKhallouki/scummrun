@@ -21,6 +21,7 @@ pub mod events;
 pub mod explorecmd;
 pub mod fake;
 pub mod files;
+pub mod free;
 pub mod guide;
 pub mod harness;
 pub mod machine;

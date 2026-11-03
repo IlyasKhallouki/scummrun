@@ -414,6 +414,9 @@ pub struct Cell {
     pub deferred: Vec<(String, Value)>,
     /// E012 (FMI_SELECT=progress): the committed tries from the cell's entries; None with the switch off
     pub chosen: Option<i64>,
+    /// E013 (FMI_FREE, component free): the free tries' counts (free_n, free_chosen), counted apart from the model's
+    /// (`n`, `chosen` count the model's tries only); None with the switch off
+    pub free: Option<(i64, i64)>,
 }
 
 impl Cell {
@@ -433,6 +436,9 @@ impl Cell {
         }
         if let Some(c) = self.chosen {
             out["chosen"] = Value::from(c);
+        }
+        if let Some((n, c)) = self.free {
+            out["free"] = json!([n, c]);
         }
         out
     }
@@ -550,6 +556,10 @@ impl EntryInfo {
 /// A reading of readings.jsonl.
 pub type ReadingRow = Map<String, Value>;
 
+/// What cells.json's text of a cell is made from (an equal shape is an equal text): E012's fields, then E013's free
+/// counts.
+type CellShape = ((bool, usize, usize, i64, usize, usize, usize, i64), Option<(i64, i64)>);
+
 pub struct Archive {
     pub root: PathBuf,
     pub stage: Value,
@@ -582,7 +592,7 @@ pub struct Archive {
     entries: RefCell<HashMap<usize, Rc<EntryInfo>>>,
     /// cells.json's text per cell (json.dumps of the cell) and the cell's shape it was made from: a cell's lists only
     /// grow and its n changes, so an equal shape is an equal cell (rekey clears it)
-    cell_text: RefCell<HashMap<String, ((bool, usize, usize, i64, usize, usize, usize, i64), String)>>,
+    cell_text: RefCell<HashMap<String, (CellShape, String)>>,
     /// during an ingest: the entries.jsonl rows written in one append (one sync) after the entries' files
     pending_rows: Option<Vec<Value>>,
     /// during an ingest: the entries' files (path, text), compressed and written together before the rows
@@ -594,6 +604,9 @@ pub struct Archive {
     next_dead: Option<String>,
     /// E012: row -> the distinct rooms of the entries from the root to it
     chain_rooms: RefCell<HashMap<usize, Rc<BTreeSet<i64>>>>,
+    /// E013 (component free): the free tries' counts are kept (FMI_FREE set, or a committed line of the log has a
+    /// kind); off, every cell and file is E012's
+    pub free_on: bool,
 }
 
 fn goal_pairs(v: &Value) -> Vec<(String, Vec<i64>)> {
@@ -694,6 +707,7 @@ impl Archive {
             progress: prog,
             next_dead: None,
             chain_rooms: RefCell::new(HashMap::new()),
+            free_on: crate::free::rho0().is_some(),
         })
     }
 
@@ -753,6 +767,7 @@ impl Archive {
         let r = self.root.clone();
         let (logs, clean) = read_jsonl(&r.join("log.jsonl"))?;
         self.logs = logs;
+        self.free_on = self.free_on || self.logs.iter().any(|x| committed(x) && x.get("kind").is_some());
         if !clean {
             files::rewrite_jsonl(&r.join("log.jsonl"), &self.logs)?;
         }
@@ -1180,7 +1195,8 @@ impl Archive {
         if new_cell {
             self.cell_ix.insert(c.clone(), self.cells.len());
             let chosen = self.progress.as_ref().map(|_| 0);
-            self.cells.push((c.clone(), Cell { key, rep: i, entries: vec![], n: 0, exhausted: vec![], tried: vec![], deferred: vec![], chosen }));
+            let free = self.free_on.then_some((0, 0));
+            self.cells.push((c.clone(), Cell { key, rep: i, entries: vec![], n: 0, exhausted: vec![], tried: vec![], deferred: vec![], chosen, free }));
         }
         let ci = self.cell_ix[&c];
         self.cells[ci].1.entries.push(i);
@@ -1453,7 +1469,13 @@ impl Archive {
             let cid = self.rows[e].cell.clone();
             let c = self.cell_mut(&cid);
             if x["outcome"].as_str() != Some("return differs") {
-                if prog {
+                if crate::free::line_is_free(x) {
+                    // E013: a free try counts in the cell's free counts only
+                    let gave = |k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                    let f = c.free.get_or_insert((0, 0));
+                    f.0 = if gave("new_t") || gave("new_rooms") { 0 } else { f.0 + 1 };
+                    f.1 += 1;
+                } else if prog {
                     let gave = |k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
                     c.n = if gave("new_t") || gave("new_rooms") { 0 } else { c.n + 1 };
                     c.chosen = Some(c.chosen.unwrap_or(0) + 1);
@@ -1612,6 +1634,40 @@ impl Archive {
         cands.sort_by_key(|&i| self.sel_key(i, &fav));
         cands.truncate(b);
         cands
+    }
+
+    /// E013 (component free): a free job's selection key: E012's under the switch with the cell's free counts in place of
+    /// the model's: (free_n, free_chosen, -rooms on the chain, -novel atoms held, frame, id).
+    pub fn sel_key_free(&self, i: usize, nov: &HashMap<usize, i64>) -> (i64, i64, i64, i64, i64, usize) {
+        let c = self.cell(&self.rows[i].cell);
+        let (a, b, f, id) = self.entry_key_p(i, nov);
+        let (n, ch) = c.free.unwrap_or((0, 0));
+        (n, ch, a, b, f, id)
+    }
+
+    /// E013 (component free): the first ``b`` candidates for free jobs, each of another cell: E012's candidates (a cell's
+    /// candidate does not depend on its counts) in the free order (`sel_key_free`). Without the progress order, the
+    /// model's selection.
+    pub fn select_free(&self, b: usize) -> Vec<usize> {
+        if self.progress.is_none() {
+            return self.select(b);
+        }
+        let busy_ids: HashSet<usize> = self.busy.values().map(|(e, _)| *e).collect();
+        let mut busy_cells: HashSet<&str> = self.busy.values().map(|(_, c)| c.as_str()).collect();
+        for e in &busy_ids {
+            busy_cells.insert(self.rows[*e].cell.as_str());
+        }
+        let nov = self.novel_counts();
+        let mut cands: Vec<((i64, i64, i64, i64, i64, usize), usize)> = self
+            .cells
+            .iter()
+            .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
+            .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
+            .filter(|i| !busy_ids.contains(i))
+            .map(|i| (self.sel_key_free(i, &nov), i))
+            .collect();
+        cands.sort();
+        cands.into_iter().take(b).map(|(_, i)| i).collect()
     }
 
     pub fn goal_entries(&self) -> Vec<usize> {
@@ -1841,6 +1897,28 @@ impl Archive {
         Value::Object(out)
     }
 
+    /// E013 (component free): `prepare_job` with the job's kind: job.json "kind", select.json "kind", "why" and "rho",
+    /// and a free job's key in the free order. None: `prepare_job`, E012's files.
+    pub fn prepare_job_as(&self, i: usize, kind: Option<&crate::free::Kind>) -> Res<PathBuf> {
+        let Some(k) = kind else { return self.prepare_job(i) };
+        let job = self.next_job();
+        let d = self.root.join("jobs").join(&job);
+        fs::create_dir_all(&d).map_err(|e| files::io_err(&d, e))?;
+        let key = if k.free && self.progress.is_some() {
+            let x = self.sel_key_free(i, &self.novel_counts());
+            json!([x.0, x.1, x.2, x.3, x.4, x.5])
+        } else {
+            self.sel_key_json(i)
+        };
+        let sel = json!({"key": key, "cell": self.rows[i].cell, "selectable": self.n_selectable(), "time": files::now_s(),
+                         "kind": k.text(), "why": k.why, "rho": k.rho});
+        files::write_json(&d.join("select.json"), &sel, Some(1))?;
+        let mut doc = self.job_doc(&job, i)?;
+        doc["kind"] = json!(k.text());
+        files::write_json(&d.join("job.json"), &doc, Some(1))?;
+        Ok(d)
+    }
+
     /// jobs/JOB/job.json for candidate ``i``, and select.json.
     pub fn prepare_job(&self, i: usize) -> Res<PathBuf> {
         let job = self.next_job();
@@ -2013,7 +2091,12 @@ impl Archive {
             };
             let prog = self.progress.is_some();
             let c = self.cell_mut(&cell);
-            if prog {
+            if crate::free::job_is_free(&job) {
+                // E013: a free try counts in the cell's free counts only
+                let f = c.free.get_or_insert((0, 0));
+                f.0 = if gave { 0 } else { f.0 + 1 };
+                f.1 += 1;
+            } else if prog {
                 c.n = if gave { 0 } else { c.n + 1 };
                 c.chosen = Some(c.chosen.unwrap_or(0) + 1);
             } else {
@@ -2111,6 +2194,11 @@ impl Archive {
             let dead = if outcome != "return differs" { res.get("dead").filter(|d| d.is_array()).cloned() } else { None };
             line.insert("dead".into(), dead.unwrap_or_else(|| json!([])));
         }
+        if let Some(k) = job.get("kind") {
+            // E013 (FMI_FREE): the job's kind, and the cell's free counts after it
+            line.insert("kind".into(), k.clone());
+            line.insert("free".into(), json!(self.cell(&cell).free));
+        }
         if let Some(x) = extra {
             for (k, v) in x {
                 line.insert(k.clone(), v.clone());
@@ -2199,9 +2287,9 @@ impl Archive {
         let mut out = String::with_capacity(1 << 16);
         out.push('{');
         for (i, (id, c)) in self.cells.iter().enumerate() {
-            let shape = (c.key.is_some(), c.rep, c.entries.len(), c.n, c.exhausted.len(), c.tried.len(),
-                         c.tried.iter().map(|(_, v)| v.as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>(),
-                         c.chosen.unwrap_or(-1));
+            let shape = ((c.key.is_some(), c.rep, c.entries.len(), c.n, c.exhausted.len(), c.tried.len(),
+                          c.tried.iter().map(|(_, v)| v.as_array().map(|a| a.len()).unwrap_or(0)).sum::<usize>(),
+                          c.chosen.unwrap_or(-1)), c.free);
             let fresh = match cache.get(id) {
                 Some((sh, _)) => *sh != shape,
                 None => true,
