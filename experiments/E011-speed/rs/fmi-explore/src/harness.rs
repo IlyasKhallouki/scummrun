@@ -29,6 +29,9 @@ pub struct HarnessCfg {
     pub replan_limit: u32,
     pub time_limit_s: f64,
     pub plan_time_s: u64,
+    /// E011's iterative deepening (plan.md, amendment "targets with no plan made cheap"): the planner's limit for the
+    /// plans before the attempt's first plan; None: plan_time_s for every plan (the old behaviour)
+    pub first_plan_time_s: Option<u64>,
     pub search: Search,
     pub cost_caps: bool,
     pub cost_dmax: Option<i64>,
@@ -250,6 +253,15 @@ impl<'a> Harness<'a> {
         crate::machine::section("start.txt", || {
             let _ = start::write_text(&pdir.join("start.txt"), &start::start_text_in(&self.order.as_ref().unwrap().1, doms, &start_f));
         });
+        // the deepening's limit until the attempt has a plan, then the old one
+        let found = self.plans.iter().any(|p| p.get("status").and_then(|x| x.as_str()) == Some("plan"));
+        let limit = match self.cfg.first_plan_time_s {
+            Some(l) if !found => {
+                self.plans.last_mut().unwrap().insert("limit_s".into(), json!(l));
+                l
+            }
+            _ => self.cfg.plan_time_s,
+        };
         let req = PlanRequest {
             goal: self.goal.clone(),
             start: start_f.clone(),
@@ -263,7 +275,7 @@ impl<'a> Harness<'a> {
             } else {
                 None
             },
-            time_limit_s: self.cfg.plan_time_s,
+            time_limit_s: limit,
         };
         // the planners' lock is held for the request only (an extension below plans again)
         let planned = {
@@ -302,7 +314,7 @@ impl<'a> Harness<'a> {
         (self.progress)(&format!("plan {n}: {}, {} steps, {:.0} s", res.status, res.steps.len(), res.seconds));
         if res.status != "plan" {
             let why = match res.status.as_str() {
-                "time" => format!("planner timeout ({} s)", self.cfg.plan_time_s),
+                "time" => format!("planner timeout ({} s)", limit),
                 "unsolvable" => "no plan (the planner proved none)".into(),
                 "incomplete" => "no plan (the search ended without one)".into(),
                 "memory" => "planner memory limit (3G)".into(),
@@ -348,6 +360,10 @@ impl<'a> Harness<'a> {
         e.insert("choices".into(), Value::Object(ch));
         e.insert("source".into(), json!(res.source));
         e.insert("cpu_s".into(), json!(res.cpu_s));
+        // the no-plan proofs' record, when they ran (FMI_PLAN_DEAD)
+        if let Some(d) = stats.get("dead") {
+            e.insert("dead".into(), d.clone());
+        }
     }
 
     /// Harness._extend: a replan start the --reach reading does not cover; the reading extended, the plan made again.
