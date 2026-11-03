@@ -46,6 +46,7 @@ else
 fi
 echo "{\"seq\": \"$1\", \"src\": \"$SRC\", \"bin\": \"$FMI\", \"bin_sha1\": \"$(sha1sum $FMI | cut -c1-12)\", \"cache\": \"$RCACHE\", \"args\": \"$ARGS\", \"env\": \"$SW\", \"start\": \"$(date -Is)\", \"load\": \"$(cut -d' ' -f1-3 /proc/loadavg)\"}" > $R/run.json
 exec 9>/var/tmp/fast-mi/heavy.lock; flock 9
+echo "{\"locked\": \"$(date -Is)\", \"bin_sha1\": \"$(sha1sum $FMI | cut -c1-12)\"}" >> $R/run.json
 t0=$(date +%s.%N)
 env $SW FMI_READING_CACHE=$RCACHE FMI_MEMO= FMI_PLAN_CACHE=$R/plans FMI_POOL_DIR=$R/pool TMPDIR=$R/tmp \
   E008_DISK_PATH=$HOME E008_FLOOR_GB=5 \
