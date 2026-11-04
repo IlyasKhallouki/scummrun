@@ -8,10 +8,10 @@
 #            from boot (`fmi explore verify`, E014's mechanism switches and A4 on)
 #   smoke    E012's smoke run (E013's integrate/smoke.sh: 4 jobs from the boot, the kitchen's settings, b = 1) with SET=all
 #            (ALLON with A4), every entry verified from boot, the stall report over it
-# usage: mi-check.sh OUT b3|kitchen|smoke...
+# usage: [A4_ENV=ENV] mi-check.sh OUT b3|kitchen|smoke...   (A4_ENV: another env file, as a6/env.sh; default a4/env.sh)
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-export ENV=$here/env.sh
+export ENV=${A4_ENV:-$here/env.sh}
 source $ENV
 I=/var/tmp/fast-mi/wt-e014/experiments/E013-robust/integrate
 O=$1; shift
