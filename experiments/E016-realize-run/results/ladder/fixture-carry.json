@@ -1,0 +1,118 @@
+{
+ "archive": "/var/tmp/fast-mi/wt-e016-b/experiments/E016-realize-run/results/ladder/fixture-carry",
+ "entries": 12,
+ "files_read": 12,
+ "t0": 1793809558.565027,
+ "t0_from": "the root's file",
+ "t0_time": "2026-11-04T16:25:58Z",
+ "furthest": "C6",
+ "furthest_in_order": "C6",
+ "rungs": [
+  {
+   "rung": "C0",
+   "what": "room=49 and var:32=4",
+   "reached": true,
+   "entry": 1,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 1043,
+   "room": 49,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C1",
+   "what": "room=63",
+   "reached": true,
+   "entry": 3,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 1344,
+   "room": 63,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C2",
+   "what": "room=69",
+   "reached": true,
+   "entry": 4,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 1444,
+   "room": 69,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C3",
+   "what": "owner:946=ego",
+   "reached": true,
+   "entry": 5,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 1459,
+   "room": 69,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C4",
+   "what": "room=49 and owner:946=ego",
+   "reached": true,
+   "entry": 7,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 1910,
+   "room": 49,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C5",
+   "what": "room=42 and owner:946=ego",
+   "reached": true,
+   "entry": 9,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 2980,
+   "room": 42,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C6",
+   "what": "class:491:12=0 (a full state)",
+   "reached": true,
+   "entry": 11,
+   "job": "fixture",
+   "how": "fixture",
+   "step": "unknown",
+   "frame": 3044,
+   "room": 42,
+   "wall_s": 0.0,
+   "time": "2026-11-04T16:25:58Z"
+  },
+  {
+   "rung": "C7",
+   "what": "room=82",
+   "reached": false
+  },
+  {
+   "rung": "C8",
+   "what": "room=48",
+   "reached": false
+  },
+  {
+   "rung": "C9",
+   "what": "end=1, end:kind=1, end:number=582, end:offset=0x67, end:where in {0,1,4}",
+   "reached": false
+  }
+ ]
+}
