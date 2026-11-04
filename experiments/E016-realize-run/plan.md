@@ -190,3 +190,82 @@ Calibrated by the project's 2-10x optimism on game progress.
 - **The VM:** nothing, so the ledger's $9.01 stays untouched.
 
 ## Amendments
+
+### (1) 2026-11-04, A: the profile reads on the run path, their engine facts, and walk steps in the input log
+
+Written before any code of A, at 4c40b3c. The run path is a window child's input (`window.rs` `child_strict_` →
+`executor::play_input`) and the window's gate (`window.rs` `Search::gate`). The reads were found with
+`grep -n 'DOS_CD\|self\.p\.\|DIALOG_\|MAX_ACTOR\|MAIN_H\|EXECUTOR_EGO\|VAR_EGO'` over `fmi-play/src`,
+`fmi-explore/src` and `fmi/src`. Only `executor.rs` and `window.rs:3251` read them.
+
+**What the switch changes.** With `FMI_REALIZE=1`, `play_input` gives a "click" step (a sentence or walk_to record)
+and a "line" step (a dialog_line record) to realize, and none of `wait_camera`, `check_ego`, `Executor::play` or
+`click_verb` runs for it. A "key" step and a "wait" step keep the executor, which reads no profile for them (a key is
+scheduled at the next frame).
+
+**The reads and their replacements while `FMI_REALIZE=1`:**
+
+| # | read | where | replacement |
+|---|---|---|---|
+| 1 | `DOS_CD.verbless_rooms`, with up, cs, room and "a verb is listed" | the gate of a click step (`window.rs:3251`); `wait_gate` (`executor.rs:610`) | The bridge's idle rule, `Status::idle` set. With `SPEEDRUN_IDLE=handler` (patch 0006-e014) it is the click gate open, VAR_VERB_SCRIPT set and idle, and nothing the last input started still running. A child whose fork frame is not idle is run to the next idle stop first, at most afford's W = 1,600 frames. |
+| 2 | `DOS_CD.verbless_rooms` and `MAIN_H` (144) | `main_h` (`executor.rs:475`), used by `actor_points`, `object_cands`, `floor_point` and `click`'s point check | The main screen's topline and height from `Status::screen` (patch 0004), as afford's `object_grid` uses them. A point counts only where the engine's hit test answers the object. |
+| 3 | the camera formula for xstart (`cam`, the room width) | `xstart` (`executor.rs:464`) | `Status::xstart`, the engine's own. |
+| 4 | `verb_var` (107), `hover_saved_verb_var` (394) | `selected_verb` (`:679`), the verb key's check (`:782`, `check_var`), `wait_walk_to` (`:812`), the approach (`:921`) | No variable is read. A candidate is accepted by patch 0007's input log: the handler's Sentence touch (v, a, b). The bare click (whatever verb the engine has selected) is tried first, then the verb slots. `check_var` stays None, so E013's refuse gets no checked variable from a realized step. |
+| 5 | `walk_to` (11) | `click`'s default verb (`:712`), `wait_walk_to`, the approach's floor click (`:921`), the stepping stones (`:993`, `:1066`) | The approach clicks a walk box's floor point (FMI_BOXES' Boxes command, afford's offer) with no verb click. It is accepted when the input log shows a Walk touch and `Status::xstart` moved toward the target, or the target gained a hit point (E015 G1). A walk_to step's verb is the record's own (the reader's walk verb, read from the scripts), judged as below. |
+| 6 | `verb_key` (the key of verb id v in the dump) | `click` (`:445`, `:739`) | A visible verb slot from the dump is clicked, at a point where the hit test answers that slot. No key. |
+| 7 | `inv_first_var` (133), `inv_first_verb` (200), `inv_slots` (8) | `inventory_point` (`:552`) | None of them. The inventory extension (Method A, "Inventory objects") tries each visible verb slot as a's click. The input log decides which slot is a's; no slot is read as a's. |
+| 8 | `inv_scroll_var` (118), `inv_row` (4), `inv_up` / `inv_down` (208 / 209) | `scroll_to` (`:649`), the arrow move (`:694`) | **No engine-fact replacement.** Realize does not scroll the inventory, so an object whose slot is scrolled out of view misses with "no sentence". (The arrow move is never formed from a record: no record has an arrow verb and no object.) |
+| 9 | `EXECUTOR_EGO` (actor 1) against `VAR_EGO` | `check_ego` (`:1150`), `ego_of` (`:878`), `stepping_stone` (`:946`) | Nothing needed. Realize's approach reads no actor: it judges a click by the input log's Walk touch and the camera. |
+| 10 | `MAX_ACTOR` (12): an id of at most 12 not among the room's objects is an actor | `object_points` (`:532`), `click` (`:757`), `check_ego` (`:1157`) | The hit test's own answer: a target is Object(a) where the hit test answers object a, Actor(a) where it answers actor a. |
+| 11 | `wait_camera`'s rule: run on while the camera moves, until both objects have a point | `executor.rs:1125` | The run to the idle stop (row 1), then realize's approach. |
+| 12 | `DIALOG_FIRST` / `DIALOG_LAST` (120 / 128) | defined at `executor.rs:15-16`; read nowhere | A "line" step already uses `verb_point`: the dump's verb with id v, listed once, at a point whose hit test answers its slot. With the switch on it is realize's dialog step: the offered slot whose dump id is v, accepted when patch 0007's verdict is "taken". |
+| 13 | limits, not game facts: `INPUT_LIMIT` (600), `wait_walk_to`'s 120, `STONE_FRAMES` (300) | | Realize's `Cfg`: max_approach 6, max_candidates 60, max_points 3, max_slots 15, horizon W = 1,600, log_frames 8. |
+
+**What the switch needs.** `SPEEDRUN_INPUT=1` (with the input log off, every candidate misses) and `FMI_BOXES=1`
+(the approach's floor points). Also `SPEEDRUN_IDLE=handler`: with it unset, the bridge's idle rule reads Monkey
+Island's verb ids (assumptions row 4). play9's switches and Monkey Island's `E14M` have all three.
+
+**The inventory extension's order.** When a has no hit point on the screen and no place in the room (an inventory
+object), the candidates are: a verb choice, then a slot as a's click, then b. b's click is its hit point, or each
+visible slot when b has none.
+- The verb choices, in order: the offered slot whose dump id is v (in SCUMM v5 a slot's id is its verb number, as
+  the dialog step uses); then no verb click; then the other offered slots in the dump's order.
+- For each verb choice, a's slot runs over the visible slots in the dump's order, leaving out the verb choice's own
+  slot, at most max_slots = 15 of them.
+- A candidate is accepted on the Sentence touch (v, a, b), as before; the order only decides what is tried first.
+- The approach's target is a when a has a place in the room (a room object's walk point or an actor's feet), else b
+  when b has one.
+
+A room object's candidates keep G1's order.
+
+**The hook.**
+- `play_input` hands the step to `realize::realize` on the child's engine.
+- It plays the accepted events in place on the child's branch (`Br`): scheduled with `Br::inputs`, then run to the
+  last event's frame through `Br::run`, so the frame observer and the strict matcher see every frame as today.
+- It quits the accepted fork.
+- A miss is `PlayErr::Route("<name>: realize: <reason> ...")` with realize's reason ("approach", "no sentence",
+  "no slot", "not taken"). The window records it as the child's interface outcome.
+- The switch is read by `realize::on()` in `play_input` and in `Search::gate`. With it unset, neither changes
+  anything.
+
+**Walk steps in patch 0007's log.** The probe is `e016 inlog` (fmi-checks; committed after this amendment, before
+any gate run). It ran on Monkey Island's E012 kitchen chain: entries 0, 44, 55, 85, 123, 135, 142, 146 and 150, their
+events from boot. It used E013's engine, `SPEEDRUN_IDLE=handler`, `SPEEDRUN_INPUT=1` and `FMI_BOXES=1`.
+- **walk_to(444)**, one click on the object at frame 10161 with no verb chosen: one record, verdict taken, handler 4.
+  Its writes: Sentence (11, 444, 0), var 107 11 → 11, var 108 → 444.
+- **walk_to(367)** at frame 10163: Sentence (11, 367, 0).
+- **walk_to(316)'s window** (job j00052):
+  - the four floor clicks at frames 18318-18324 each give a Walk touch (actor 1 to the click) and no Sentence;
+  - the click at 18325, on another object, gives Sentence (11, 323, 0);
+  - the click on 316 at 18365 gives a Walk and Sentence (11, 316, 0).
+- **For comparison, sentence(9,566):** the key at frame 18405 gives var 107 = 9 and no Sentence; the click at 18406
+  gives Sentence (9, 566, 0).
+
+So a walk_to step's run shows as the handler's Sentence touch (w, a, 0), with w the walk verb, in the frame of the
+click on a. A floor click shows only a Walk touch.
+
+**The test realize accepts a walk step by.** Realize takes a walk_to step as `Step::Sentence { v: w, a, b: None }`,
+with w the record's verb (`step_input`'s src[1]). It accepts a candidate when the input log holds the Sentence touch
+(w, a, 0): the same test as for any sentence. The first candidate, the bare click on a, gives that touch whenever the
+interface's selected verb is the walk verb. In the demo, none of play8's 502 job results names a walk_to record, so
+this test is exercised on Monkey Island (G4).
