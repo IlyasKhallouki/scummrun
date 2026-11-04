@@ -425,6 +425,29 @@ pub fn reach_start_text(start: &Facts) -> String {
     })
 }
 
+/// E016 amendment (13) (`FMI_REACH_ZEROS=1`): `reach_start_text` with every key of the reading's domains the start
+/// lacks, at 0. Engine facts leave a cleared bit or local out and read it as 0, as the planner's start does
+/// (`start_text_in`); a reach or refine start without the key lets the reader keep an earlier start's value as the
+/// only one reached, and the planner then refuses the start ("did not reach either"). Position keys (pos:, escpos:) and
+/// actorroom: keys are left out: 0 is not their default. The plain `reach_start_text` with the switch off.
+pub fn reach_start_text_full(start: &Facts, doms: &Domains) -> String {
+    if !std::env::var("FMI_REACH_ZEROS").is_ok_and(|v| v == "1") {
+        return reach_start_text(start);
+    }
+    let mut v = reach_start(start);
+    for (k, _) in &doms.0 {
+        if matches!(k.kind(), K_POS | K_ESCPOS | K_ACTORROOM) || start.get(*k).is_some() {
+            continue;
+        }
+        let t = key_text(*k);
+        if !t.contains('\t') && !t.contains('\n') {
+            v.push((t.to_string(), 0));
+        }
+    }
+    v.sort_unstable_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    start_file_text(&v)
+}
+
 /// The text of a start file of `reach_start` (replay_part1's reach_extender and refiner).
 pub fn start_file_text(start: &[(String, i64)]) -> String {
     let mut s = String::new();
@@ -590,4 +613,28 @@ pub fn facts_of_json(v: &Value) -> Facts {
         }
     }
     Facts::from_pairs(pairs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fmi_core::Domain;
+
+    /// Amendment (13): a cleared bit the engine's facts leave out is written at 0 with the switch on; a position key
+    /// is not; with the switch off the text is `reach_start_text`'s.
+    #[test]
+    fn the_reach_start_writes_the_domains_cleared_keys_at_0() {
+        let d = || Domain { values: vec![0, 1], low: None, high: None };
+        let mut doms = vec![(Key::parse("bit:404"), d()), (Key::parse("bit:408"), d()), (Key::parse("pos:script:86"), d()),
+                            (Key::parse("var:443"), Domain { values: vec![0, 42, 44], low: None, high: None })];
+        doms.sort_by_key(|p| p.0);
+        let doms = Domains(doms);
+        let start = Facts::from_pairs(vec![(Key::parse("bit:408"), 1), (Key::parse("var:443"), 44), (Key::parse("room"), 49)]);
+        std::env::remove_var("FMI_REACH_ZEROS");
+        assert_eq!(reach_start_text_full(&start, &doms), reach_start_text(&start));
+        std::env::set_var("FMI_REACH_ZEROS", "1");
+        let t = reach_start_text_full(&start, &doms);
+        std::env::remove_var("FMI_REACH_ZEROS");
+        assert_eq!(t, "bit:404\t0\nbit:408\t1\nroom\t49\nvar:443\t44\n");
+    }
 }

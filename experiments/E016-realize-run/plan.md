@@ -583,3 +583,30 @@ At 21:46-21:49 the rerun's 10 restarted tries committed nothing for 3 minutes. A
 `FMI_PLAN_DEEPEN=10` bounds only a try's first plans; later plans had `PLAN_TIME` (600 s). In play9, successful plans
 took 0.1 s of planning at the median and 3.5 s at the p95, so `FMI_PLAN_TIME=30` is added to E16. This changes a
 setting only, with no new code. The rerun resumed from its archive at 21:49:42 UTC.
+
+### (13) 2026-11-04/05: reach starts without the cleared keys; the C4 resumes
+
+- **C4 at 121.4 min** (e3412, j01004, model-free), after (11) and (12): 946 is held in rooms 49 and 63.
+  - Google stopped the VM at its booked time, 22:31 UTC. It was restarted for 2 h (Ilyas: "Just continue") and play9
+    resumed at 22:39 UTC.
+  - From then to 23:09 it made 820 tries and no new entry. The archive has entries in rooms 49, 63 and 69 only; no
+    try has visited room 42.
+- **The cause** (two investigators, each checked by a second agent):
+  - play8 reached room 42 from a room-49 conversation state, entry 198. A model try planned bit:403=1 there, and a
+    free try from that plan's checkpoint left for room 42.
+  - play9 has the same state (entries 240 and 549). Every model try from it stopped with "reach extension: ... did
+    not reach either: ['bit:404=0']".
+  - Engine facts leave out a bit or local that is 0. The planner's start reads the missing key as 0
+    (`start_text_in`). `reach_start_text` writes only the keys present, and the reader seeds reached values only from
+    keys a start names.
+  - So once a reused reading's earlier starts held bit 404 at 1, no extension can make 0 reached. The defect then
+    spread through the extended readings that were registered and reused.
+  - It cost 132 of play9's 137 "did not reach either" stops, including every model try from the dialog states.
+  - A planner-only check on a copy of j00130's reach-03 reading, with `bit:404\t0 1` added to reading.reached, planned
+    bit:403=1 in 5 steps. Unchanged, all 8 targets were refused.
+- **Fix, `FMI_REACH_ZEROS=1`:** reach and refine starts (`start::reach_start_text_full`, called from
+  `Harness::extend` and the refinement) also write every key of the reading's domains that the start lacks, at 0.
+  - pos:, escpos: and actorroom: keys are not written, because 0 is not their default.
+  - Test: `the_reach_start_writes_the_domains_cleared_keys_at_0`. fmi-explore's lib (52) and integration tests pass
+    on the VM build.
+- play9 resumed from its archive at 23:09:42 UTC with the switch on.
