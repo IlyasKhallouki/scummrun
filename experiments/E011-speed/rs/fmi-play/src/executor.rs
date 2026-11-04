@@ -1090,8 +1090,13 @@ impl Executor {
 // --- replay.Harness's input code on a child (window._Ctx) ------------------------------------------------------------
 
 /// The harness's input code for one input (window.Search._play: Harness._wait_camera and _check_ego for a click,
-/// _click_verb for a dialog line, else the Executor's play).
+/// _click_verb for a dialog line, else the Executor's play). E016 A (plan.md, "A. Realization on the run path";
+/// amendment (1)): with FMI_REALIZE=1 a click or a dialog line is realized by the engine (`realize::play`), and no
+/// profile is read for it; its events go to the executor's movie.
 pub fn play_input(ex: &mut Executor, b: &mut Br, inp: &InputStep, name: &str) -> PResult<()> {
+    if (inp.kind == "click" || inp.kind == "line") && crate::realize::on() {
+        return crate::realize::play(b, inp, name, &mut ex.movie);
+    }
     if inp.kind == "click" {
         wait_camera(ex, b, inp, INPUT_LIMIT)?;
         check_ego(ex, b, inp)?;
