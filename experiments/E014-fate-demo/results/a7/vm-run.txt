@@ -1,0 +1,49 @@
+# E014 amendment (7): the check before the run on the VM (a7/vm.sh check, pull-check), then the run's own lines
+[08:22:42] verify the laptop's check archive from boot on the VM
+[08:22:42] verify /var/tmp/fast-mi/e014-archives/vm-check7: 4 entries from boot, 0 with differences or errors
+[08:22:42] the same 2 tries on the VM (b = 1), at the laptop's paths
+[08:22:42] /var/tmp/fast-mi/e014-archives/vm-check7: booting the root
+[08:22:43] /var/tmp/fast-mi/e014-archives/vm-check7: root at frame 992 (room 49, qf 14105); allowed rooms [24, 42, 48, 49, 63, 68, 69, 75, 82, 83]; E009 {'idle_frames': 1600, 'rotate': True, 'evict_by_size': True, 'reuse_nonfacts': True, 'stop_jobs': 2}; E010 {'ready': True, 'commit_finished': True}
+[08:22:43] start, workers 1, load 0.10 0.08 0.03, log /var/tmp/fast-mi/e014-vm-check7/run.log
+[08:24:41] GUARD: rc 0 wall 118.4 s low 0 min MemAvailable 99999999 kB
+[08:24:42] verify /var/tmp/fast-mi/e014-archives/vm-check7: 4 entries from boot, 0 with differences or errors
+[08:24:42] check done
+[08:25:00] fmi check tries laptop VM: G0 /var/tmp/fast-mi/e014-archives/vm-check7-vm: 2 tries, stop class = A's in 2, everything = A's in 2
+[08:25:00] files: 2 jobs, 5 entries, 2 log lines; 0 differ
+[08:25:15] /var/tmp/fast-mi/e014-archives/play7: booting the root
+[08:25:15] /var/tmp/fast-mi/e014-archives/play7: root at frame 992 (room 49, qf 14105); allowed rooms [24, 42, 48, 49, 63, 68, 69, 75, 82, 83]; E009 {'idle_frames': 1600, 'rotate': True, 'evict_by_size': True, 'reuse_nonfacts': True, 'stop_jobs': 80}; E010 {'ready': True, 'commit_finished': True}
+[08:25:15] start, workers 10, load 1.00 0.64 0.26, log /var/tmp/fast-mi/e014-play7/run.log
+[08:32:56] GUARD: rc 0 wall 460.7 s low 0 min MemAvailable 99999999 kB
+[08:32:56] run done
+# Stalls: /var/tmp/fast-mi/e014-archives/play7
+
+80 tries, wall 3429.2 s, rows 3429.2 s
+
+## the run (80 tries, 3429.2 s)
+
+| class | seconds | share |
+|---|---:|---:|
+| productive | 463.2 | 13.5% |
+| model-blind | 482.1 | 14.1% |
+| no plan | 343.1 | 10.0% |
+| refused input | 17.4 | 0.5% |
+| effect mismatch | 1316.6 | 38.4% |
+| interface, no yield | 798.3 | 23.3% |
+| model, no yield | 0.0 | 0.0% |
+| wait | 7.8 | 0.2% |
+| overhead | 0.7 | 0.0% |
+| reading bound | 0.0 | 0.0% |
+
+rest: 0.39 s (0.01%), absolute 2.95 s (0.09%)
+
+## the last 20 (20 tries, 1759.3 s)
+
+| class | seconds | share |
+|---|---:|---:|
+| productive | 221.6 | 12.6% |
+| model-blind | 0.0 | 0.0% |
+| no plan | 0.0 | 0.0% |
+| refused input | 0.1 | 0.0% |
+| effect mismatch | 1313.9 | 74.7% |
+[08:32:56] stalls done
+# verify on the laptop after the VM stopped (fmi explore verify, every entry, 5 at a time, 08:36:34-08:37:33): 174 entries from boot, 0 with differences or errors
