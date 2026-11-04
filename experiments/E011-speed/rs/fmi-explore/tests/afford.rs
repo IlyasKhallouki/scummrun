@@ -378,6 +378,30 @@ fn offer_follows_camera_and_topline() {
     assert_eq!(t, vec![(19, 57, Hit::Object(100)), (164, 52, Hit::Object(102)), (110, 108, Hit::Actor(1))]);
 }
 
+/// E014 amendment (8), FMI_OFFER_SCREEN (row 24): the camera moved right of the actor, which stands left of the screen;
+/// the bridge's hit test still answers for the point (x less the camera), and its input check refuses it.
+#[test]
+fn an_actor_left_of_the_screen_is_offered_only_with_the_switch_off() {
+    let mut t = toy(100, false);
+    t.st.xstart = 160;
+    let mut e = boxed(t);
+    let o = e.obs(&ObsReq::default()).unwrap();
+    let off = afford::offer_cfg(&mut e, &o, false, false).unwrap();
+    let actors = |of: &afford::Offer| -> Vec<(i32, i32)> {
+        of.targets.iter().filter(|p| matches!(p.hit, Hit::Actor(_))).map(|p| (p.x, p.y)).collect()
+    };
+    assert_eq!(actors(&off), vec![(-10, 100)]);
+    let on = afford::offer_cfg(&mut e, &o, false, true).unwrap();
+    assert_eq!(actors(&on), Vec::<(i32, i32)>::new());
+    // the rest of the offer is the same
+    assert_eq!(on.verbs.len(), off.verbs.len());
+    assert_eq!(on.targets.len() + 1, off.targets.len());
+    // on the screen, the actor is offered either way
+    let mut e = boxed(toy(100, false));
+    let o = e.obs(&ObsReq::default()).unwrap();
+    assert_eq!(actors(&afford::offer_cfg(&mut e, &o, false, true).unwrap()), vec![(150, 100)]);
+}
+
 #[test]
 fn dialog_and_not_idle() {
     let mut e = boxed(toy(100, true));
