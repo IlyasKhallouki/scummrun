@@ -15,9 +15,7 @@
 //! * **The sentence** (v, a, b): candidates in order, (i) a bare click on a, (ii) each offered verb slot then a, and
 //!   for a two-object sentence each of those followed by b, or by each visible slot when b has no hit point. Each is
 //!   tried at up to `max_points` of a's hit points, in a fork run until the input log has the last click's record. A
-//!   candidate is accepted when the log's `Sentence` touch is (v, a, b). At most `max_candidates`. E016 amendment (5):
-//!   also when the log shows no Sentence touch at all and object a's script starts before the next idle stop (the
-//!   engine's slot runs; the verb is not checked). A walk_to step is a
+//!   candidate is accepted when the log's `Sentence` touch is (v, a, b). At most `max_candidates`. A walk_to step is a
 //!   sentence with the record's walk verb (amendment (1): its run shows as the Sentence touch (w, a, 0)).
 //! * **An inventory object** (E016 A, amendment (1)): when a has no hit point on the screen and no place in the room,
 //!   each visible verb slot is tried as a's click: a verb choice, the slot, then b's hit point (or each visible slot
@@ -305,9 +303,6 @@ fn try_clicks(e: &mut Box<dyn Engine>, phase: &'static str, clicks: &[Point], cf
     let evs = inp.events(e.status().frame);
     let last = evs.last().map(|x| x.frame).unwrap_or(e.status().frame);
     let mut b = e.fork()?;
-    // E016 amendment (5): the fork's slot runs are read from here on (`judge`)
-    b.segment(true)?;
-    b.runs()?;
     let mut records = Vec::new();
     match b.inputs(&evs) {
         Ok(()) => {
@@ -549,7 +544,6 @@ fn sentence(e: &mut Box<dyn Engine>, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, 
         }
     };
     let want = (v, a, b.unwrap_or(0));
-    let live = live_slots(&o, a);
     for c in cands {
         if rec.candidates >= cfg.max_candidates {
             break;
@@ -557,11 +551,11 @@ fn sentence(e: &mut Box<dyn Engine>, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, 
         rec.candidates += 1;
         for p in &pts {
             let clicks: Vec<Point> = c.iter().map(|x| x.unwrap_or(*p)).collect();
-            let (mut fork, records, mut att) = try_clicks(e, "sentence", &clicks, cfg)?;
+            let (fork, records, mut att) = try_clicks(e, "sentence", &clicks, cfg)?;
             rec.tries += 1;
-            let (ok, seen) = judge(&mut fork, &records, want, &att, &live, cfg)?;
-            att.seen = seen;
-            att.frame = fork.status().frame;
+            let seen = sentences(&records);
+            let ok = seen.contains(&want);
+            att.seen = seen_text(&seen);
             att.accepted = ok;
             rec.attempts.push(att);
             if ok {
@@ -571,41 +565,6 @@ fn sentence(e: &mut Box<dyn Engine>, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, 
         }
     }
     Ok(None)
-}
-
-/// Where an object's script runs (ScummVM's WIO_INVENTORY, WIO_ROOM, WIO_FLOBJECT).
-const OBJECT_WHERE: [i32; 3] = [WIO_INVENTORY, WIO_ROOM, WIO_FLOBJECT];
-
-/// The slots that hold a script of object `a` in the dump `o` (live at the step's start).
-fn live_slots(o: &Obs, a: i32) -> Vec<i32> {
-    o.slots.iter().filter(|s| OBJECT_WHERE.contains(&s.where_) && s.number == a).map(|s| s.slot).collect()
-}
-
-/// A sentence candidate judged on its fork (stopped where its last click's record appeared), E016 amendment (5):
-/// accepted when its input log shows the Sentence touch `want` (as E015 G1); or, when the log shows no Sentence touch
-/// at all, when object a's script starts after the candidate's first click: the fork is run on to the bridge's next
-/// idle stop (at most `horizon` frames) and its slot runs (the segment, armed in `try_clicks`) are read for a run with
-/// where inventory, room or floating object, number a, in a slot not in `live`. The engine reports no verb for such a
-/// run, so the verb is not checked (the amendment's weakness). The verdict and what was seen.
-fn judge(fork: &mut Box<dyn Engine>, records: &[InputRecord], want: (i32, i32, i32), att: &Attempt, live: &[i32], cfg: &Cfg)
-         -> EResult<(bool, String)> {
-    let seen = sentences(records);
-    if seen.contains(&want) || !seen.is_empty() {
-        return Ok((seen.contains(&want), seen_text(&seen)));
-    }
-    let first = att.events.first().map(|x| x.frame).unwrap_or(0);
-    let mut runs = fork.runs()?.runs;
-    let end = fork.status().frame + cfg.horizon;
-    match fork.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {
-        Ok(_) => runs.extend(fork.runs()?.runs),
-        Err(EngineError::Ended(_)) => return Ok((false, "ended".into())),
-        Err(x) => return Err(x),
-    }
-    let started = runs.iter().find(|r| OBJECT_WHERE.contains(&r.where_) && r.number == want.1 && r.frame >= first && !live.contains(&r.slot));
-    Ok(match started {
-        Some(r) => (true, format!("run of {}'s script at frame {} (slot {}, code {})", want.1, r.frame, r.slot, r.code0)),
-        None => (false, String::new()),
-    })
 }
 
 /// The Sentence touches (verb, object A, object B) of the records, in order.
@@ -659,7 +618,6 @@ fn inventory(e: &mut Box<dyn Engine>, o: &Obs, of: &Offer, v: i32, a: i32, b: Op
         }
     };
     let want = (v, a, b.unwrap_or(0));
-    let live = live_slots(o, a);
     for c in &choices {
         let slots: Vec<Point> = ordered.iter().filter(|p| Some(**p) != *c).take(cfg.max_slots).copied().collect();
         for s in &slots {
@@ -669,11 +627,11 @@ fn inventory(e: &mut Box<dyn Engine>, o: &Obs, of: &Offer, v: i32, a: i32, b: Op
                 }
                 rec.candidates += 1;
                 let clicks: Vec<Point> = c.iter().chain(std::iter::once(s)).chain(t.iter()).copied().collect();
-                let (mut fork, records, mut att) = try_clicks(e, "inventory", &clicks, cfg)?;
+                let (fork, records, mut att) = try_clicks(e, "inventory", &clicks, cfg)?;
                 rec.tries += 1;
-                let (ok, seen) = judge(&mut fork, &records, want, &att, &live, cfg)?;
-                att.seen = seen;
-                att.frame = fork.status().frame;
+                let seen = sentences(&records);
+                let ok = seen.contains(&want);
+                att.seen = seen_text(&seen);
                 att.accepted = ok;
                 rec.attempts.push(att);
                 if ok {
