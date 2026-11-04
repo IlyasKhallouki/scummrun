@@ -1,0 +1,54 @@
+{
+  "entry": 184,
+  "entry_frame": 1154,
+  "boot_s": 0.086949053,
+  "start": {
+    "frame": 1154,
+    "idle": "sentence",
+    "room": 49,
+    "xstart": 0
+  },
+  "steps": [
+    {
+      "step": "s10:596",
+      "ok": true,
+      "from": 1154,
+      "approach": 0,
+      "candidates": 1,
+      "tries": 1,
+      "seconds": 0.002127357,
+      "events": [
+        {
+          "frame": 1155,
+          "click": [
+            31,
+            23
+          ]
+        }
+      ],
+      "accepted_at": 1156,
+      "attempts": [
+        {
+          "phase": "sentence",
+          "name": "t596",
+          "accepted": true,
+          "seen": "(10,596,0)",
+          "frame": 1156,
+          "events": [
+            {
+              "frame": 1155,
+              "click": [
+                31,
+                23
+              ]
+            }
+          ],
+          "seconds": 0.001505758
+        }
+      ]
+    }
+  ],
+  "all_realized": true,
+  "last_frame": 1156,
+  "seconds": 0.090270529
+}

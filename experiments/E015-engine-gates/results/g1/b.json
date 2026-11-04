@@ -1,0 +1,164 @@
+{
+  "entry": 0,
+  "entry_frame": 992,
+  "boot_s": 0.062505278,
+  "start": {
+    "frame": 992,
+    "idle": "sentence",
+    "room": 49,
+    "xstart": 256
+  },
+  "steps": [
+    {
+      "step": "s11:593",
+      "ok": false,
+      "from": 992,
+      "reason": "approach",
+      "approach": 0,
+      "candidates": 0,
+      "tries": 8,
+      "seconds": 0.029351718,
+      "attempts": [
+        {
+          "phase": "approach",
+          "name": "w10",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                138,
+                129
+              ]
+            }
+          ],
+          "seconds": 0.00186249
+        },
+        {
+          "phase": "approach",
+          "name": "w11",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                142,
+                113
+              ]
+            }
+          ],
+          "seconds": 0.001336537
+        },
+        {
+          "phase": "approach",
+          "name": "w9",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                238,
+                139
+              ]
+            }
+          ],
+          "seconds": 0.001352208
+        },
+        {
+          "phase": "approach",
+          "name": "w16",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                120,
+                106
+              ]
+            }
+          ],
+          "seconds": 0.00147163
+        },
+        {
+          "phase": "approach",
+          "name": "w13",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                93,
+                107
+              ]
+            }
+          ],
+          "seconds": 0.001229569
+        },
+        {
+          "phase": "approach",
+          "name": "w15",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                73,
+                141
+              ]
+            }
+          ],
+          "seconds": 0.001186367
+        },
+        {
+          "phase": "approach",
+          "name": "w8",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                13,
+                135
+              ]
+            }
+          ],
+          "seconds": 0.001377219
+        },
+        {
+          "phase": "approach",
+          "name": "w7",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=256->256",
+          "frame": 1032,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                5,
+                125
+              ]
+            }
+          ],
+          "seconds": 0.001105601
+        }
+      ]
+    }
+  ],
+  "all_realized": false,
+  "last_frame": 992,
+  "seconds": 0.093228024
+}
