@@ -519,3 +519,36 @@ this commit's tree.
 - **Monkey Island's checks** with room scopes, before this amendment's changes: kitchen pass; smoke pass (23 entries,
   0 differences). K1 was killed by the laptop's memory guard while a build ran beside it. The checks and K1 run again
   with this amendment's set.
+
+### (10) 2026-11-04: what a try keeps; a held object's place; play9 resumed again
+
+- **The finding:** play9 stayed at C3 from 5.4 min on.
+  - All 25 entries that hold 946 are in room 69. The selection gave room 69 its first tries by 19:58 and none after,
+    because room 49 kept making untried cells.
+  - That is not the block. Free tries from 946-holding entries (j00083, j00085, j00087, j00095) walked ego into room
+    63 at 38 points and kept nothing.
+  - A try keeps a state only for single-atom novelty: an atom of T or a room that no live entry holds
+    (`Novel::novel`). "Room 63 holding 946" has neither, since room 63 and owner:946=1 are each already held.
+  - So C3 to C4 and C5, a known room entered with a new owned object, cannot be kept, whatever the selection does.
+    Diagnosed by two investigators, each checked by a second agent; the check found this cause.
+- **Fix 1, `FMI_NOVEL_PLACE=1`:** a state is also novel when its place is one no live entry holds. The place is the
+  room with the objects ego owns, the cell key's first two fields. Both are engine facts, and no room, object or
+  verb is named.
+  - `progress::place_text`, `Progress.places`, `novelty_json`'s "places", `Seen.places`, `Novel::novel_place`.
+  - Test: `a_seen_room_with_a_new_owned_set_is_a_novel_place`.
+- **Fix 2, realize's `place_of`:** ScummVM's pickup (o5_pickupObject) leaves the object in the room's object table.
+  Realize therefore placed held 946 at its old walk point and tried to approach it: "approach (0 approach clicks, 0
+  candidates, 17 forks)", the empty window of sentence(8,946,940).
+  - An object whose owner is not the room now has no place in the room, as whereIsObject has it. The inventory
+    search then forms (8,946,940); offline, the click order v8, v105, t940 shows the touch.
+  - Test: `a_held_object_has_no_place_in_the_room`.
+- **Not fixed, noted:** the room-69 targets var:106=940 and var:104=3 are the input handler's own sentence
+  variables. The sentence sets var 106 only to 0, so these targets are not game progress.
+- **Build:** the laptop ran out of memory (the session's own build was stopped by the host), so on Ilyas's word ("do
+  the fixes on the vm") the fmi binary was built on the VM from this tree, with cargo 1.99.1 and --locked.
+  - fmi-explore's and fmi-play's unit tests pass there: 51 and 23, the two new tests among them.
+  - The binary that ran 20:29-21:08 is kept as `target-e016/release/fmi.pre-a10` on the VM.
+- **play9 resumed** from its archive at 21:08 UTC with `FMI_NOVEL_PLACE=1` in E16: 652 tries, 1,310 entries, still
+  C3. The 40-minute rule had not fired.
+- Monkey Island's checks are owed with this set; the last laptop attempt broke under the laptop's load (b3's warm
+  process died at load 22, and its watcher held the heavy lock).

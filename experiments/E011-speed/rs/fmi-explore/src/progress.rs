@@ -311,6 +311,8 @@ pub struct Progress {
     pub first: HashMap<u32, (i64, usize)>,
     /// room -> its live entries
     pub rooms: BTreeMap<i64, usize>,
+    /// E016 amendment (10) (FMI_NOVEL_PLACE=1): place text (`place_text`) -> its live entries
+    pub places: BTreeMap<String, usize>,
     /// entry -> |T| when it was marked exhausted
     pub exhausted: HashMap<usize, usize>,
     /// row -> the distinct rooms of the entries from the root to it
@@ -380,6 +382,7 @@ impl Progress {
         self.held.clear();
         self.first.clear();
         self.rooms.clear();
+        self.places.clear();
     }
 
     /// Row i (placed in id order): its held atoms from the store, and, when live, its share of the least holders and
@@ -397,6 +400,10 @@ impl Progress {
             }
             if let Some(r) = room {
                 *self.rooms.entry(r).or_insert(0) += 1;
+                if place_on() {
+                    let p = place_text(r, &self.store.view(i));
+                    *self.places.entry(p).or_insert(0) += 1;
+                }
             }
         }
         while self.held.len() <= i {
@@ -428,6 +435,29 @@ impl Progress {
 pub struct Seen {
     pub rooms: BTreeSet<i64>,
     pub vals: HashMap<String, Vec<i64>>,
+    /// E016 amendment (10): the live entries' places (None: job.json has none, the switch was off)
+    pub places: Option<BTreeSet<String>>,
+}
+
+/// E016 amendment (10) (`FMI_NOVEL_PLACE=1`): a state is novel too when its place, the room with the objects ego
+/// owns (the cell key's first two fields), is one no live entry holds. Carrying an object into a room seen without it
+/// is a pair of facts that single atoms never make novel.
+pub const PLACE_ENV: &str = "FMI_NOVEL_PLACE";
+
+pub fn place_on() -> bool {
+    std::env::var(PLACE_ENV).is_ok_and(|v| v == "1")
+}
+
+/// The place of a state in room `room`: `place=R:o1,o2` with the objects ego owns ascending, none when ego is 0 or
+/// unknown (as `Archive::cell_key`).
+pub fn place_text<F: FactLook + ?Sized>(room: i64, f: &F) -> String {
+    let mut owned: Vec<i64> = match f.look("ego") {
+        Some(ego) if ego != 0 => f.owners().into_iter().filter(|&(_, v)| v == ego).map(|(o, _)| o).collect(),
+        _ => Vec::new(),
+    };
+    owned.sort_unstable();
+    owned.dedup();
+    format!("place={room}:{}", owned.iter().map(|o| o.to_string()).collect::<Vec<_>>().join(","))
 }
 
 impl Seen {
@@ -446,7 +476,8 @@ impl Seen {
                     .collect()
             })
             .unwrap_or_default();
-        Seen { rooms, vals }
+        let places = v.get("places").and_then(|p| p.as_array()).map(|a| a.iter().filter_map(|x| x.as_str()).map(String::from).collect());
+        Seen { rooms, vals, places }
     }
 
     /// Whether some live entry holds the atom (a key no entry has is 0 in every one).
@@ -483,13 +514,17 @@ impl Novel {
         Some(Novel::new(Seen::of_json(nv), &t))
     }
 
-    /// The novel atoms' texts (T's order), then `room=R` when the room is novel.
+    /// The novel atoms' texts (T's order), then `room=R` when the room is novel, then `place=R:..` when the place is
+    /// (amendment (10)).
     pub fn novel<F: FactLook + ?Sized>(&self, f: &F) -> Vec<String> {
         let mut out: Vec<String> = self.open.iter().filter(|a| a.holds_in(f)).map(|a| a.text()).collect();
         if let Some(r) = f.look("room") {
             if r != NOT_INT && !self.seen.rooms.contains(&r) {
                 out.push(format!("room={r}"));
             }
+        }
+        if let Some(p) = self.novel_place(f) {
+            out.push(p);
         }
         out
     }
@@ -500,7 +535,15 @@ impl Novel {
                 return true;
             }
         }
-        self.open.iter().any(|a| a.holds_in(f))
+        self.novel_place(f).is_some() || self.open.iter().any(|a| a.holds_in(f))
+    }
+
+    /// The state's place when the live entries' places are known and none is it.
+    fn novel_place<F: FactLook + ?Sized>(&self, f: &F) -> Option<String> {
+        let places = self.seen.places.as_ref()?;
+        let r = f.look("room").filter(|&r| r != NOT_INT)?;
+        let p = place_text(r, f);
+        (!places.contains(&p)).then_some(p)
     }
 }
 
@@ -513,7 +556,11 @@ pub fn novelty_json(p: &Progress, live: &[usize]) -> Value {
             seen.insert(k, json!(vs));
         }
     }
-    json!({"t": atoms_json(&p.t), "rooms": p.rooms.keys().collect::<Vec<_>>(), "seen": Value::Object(seen)})
+    let mut nv = json!({"t": atoms_json(&p.t), "rooms": p.rooms.keys().collect::<Vec<_>>(), "seen": Value::Object(seen)});
+    if place_on() {
+        nv["places"] = json!(p.places.keys().collect::<Vec<_>>());
+    }
+    nv
 }
 
 #[cfg(test)]
@@ -596,6 +643,7 @@ mod tests {
         let seen = Seen {
             rooms: [33, 28].into_iter().collect(),
             vals: [("var:5".to_string(), vec![0, 7]), ("state:316".to_string(), vec![0])].into_iter().collect(),
+            places: None,
         };
         let t = vec![TAtom::value("var:5", 7), TAtom::value("var:5", 3), TAtom::value("state:316", 1),
                      TAtom { key: "var:9".into(), vals: vec![], lo: None, hi: Some(2) }, TAtom::value("var:9", 0)];
@@ -612,5 +660,30 @@ mod tests {
         assert!(Novel::of_job(&json!({}), None).is_none());
         let facts = fmi_core::Facts::from_pairs(vec![(Key::parse("room"), 41), (Key::parse("var:5"), 3)]);
         assert_eq!(m.novel(&facts), vec!["var:5=3", "room=41"]);
+    }
+
+    /// Amendment (10): carrying an owned object into a seen room is novel once its place is unseen, and only with
+    /// the live entries' places in job.json.
+    #[test]
+    fn a_seen_room_with_a_new_owned_set_is_a_novel_place() {
+        let t = vec![TAtom::value("owner:946", 1)];
+        let job = |places: Option<Value>| {
+            let mut nv = json!({"t": atoms_json(&t), "rooms": [49, 63, 69], "seen": {"owner:946": [0, 1]}});
+            if let Some(p) = places {
+                nv["places"] = p;
+            }
+            json!({"novelty": nv})
+        };
+        let carried = fm(&[("room", 63), ("ego", 1), ("owner:946", 1), ("owner:20", 1), ("owner:937", 2)]);
+        assert_eq!(place_text(63, &carried), "place=63:20,946");
+        let off = Novel::of_job(&job(None), None).unwrap();
+        assert!(off.novel(&carried).is_empty() && !off.is_novel(&carried));
+        let on = Novel::of_job(&job(Some(json!(["place=49:20", "place=63:20", "place=69:20,946"]))), None).unwrap();
+        assert_eq!(on.novel(&carried), vec!["place=63:20,946"]);
+        assert!(on.is_novel(&carried));
+        let back = fm(&[("room", 69), ("ego", 1), ("owner:946", 1), ("owner:20", 1)]);
+        assert!(on.novel(&back).is_empty() && !on.is_novel(&back));
+        let no_ego = fm(&[("room", 63), ("ego", 0), ("owner:946", 1)]);
+        assert_eq!(place_text(63, &no_ego), "place=63:");
     }
 }
