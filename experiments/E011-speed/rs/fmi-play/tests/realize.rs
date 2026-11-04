@@ -47,14 +47,6 @@ struct Toy {
     one_box: Option<i32>,
     obj_walks: bool,
     stone_obj: bool,
-    /// E016 amendment (5): a bare click on an object (the default verb) queues no sentence in the handler's run; the
-    /// sentence runs when the walk there ends, and the object's script starts then (`deferred`), unless `no_script`;
-    /// with `obj_runs` every sentence the toy runs starts its object's script at once
-    deferred: bool,
-    no_script: bool,
-    obj_runs: bool,
-    pending_run: Option<i32>,
-    runs_log: Vec<Run>,
 }
 
 fn toy(xstart: i32, dialog: bool) -> Box<dyn Engine> {
@@ -77,11 +69,6 @@ fn toy_raw(xstart: i32, dialog: bool) -> Toy {
         one_box: None,
         obj_walks: false,
         stone_obj: false,
-        deferred: false,
-        no_script: false,
-        obj_runs: false,
-        pending_run: None,
-        runs_log: vec![],
     };
     t.st.idle = t.idle();
     t
@@ -175,18 +162,10 @@ impl Toy {
                 if self.sel == 3 && self.obj1 == 0 {
                     self.obj1 = obj;
                     self.busy = 1;
-                } else if self.deferred && self.sel == DEFAULT_VERB && self.obj1 == 0 {
-                    // the walk first; the sentence (and the object's script) when it ends
-                    writes.push(Touch { kind: TouchKind::Walk, a: 1, b: 0, old: vx, now: vy });
-                    self.pending_run = Some(obj);
-                    self.busy = 6;
                 } else {
                     let (o1, o2) = if self.obj1 != 0 { (self.obj1, obj) } else { (obj, 0) };
                     writes.push(Touch { kind: TouchKind::Sentence, a: self.sel, b: o1, old: o2, now: 0 });
                     self.done.push((self.sel, o1, o2));
-                    if self.obj_runs {
-                        self.runs_log.push(Run { frame: self.st.frame, slot: 5, where_: WIO_ROOM, number: o1, ..Default::default() });
-                    }
                     self.obj1 = 0;
                     self.sel = DEFAULT_VERB;
                     self.busy = 4;
@@ -229,12 +208,6 @@ impl Toy {
             if self.busy == 0 {
                 if let Some(x) = self.walk_to.take() {
                     self.st.xstart = (x - 160).clamp(0, ROOM_W - 320);
-                }
-                if let Some(o) = self.pending_run.take() {
-                    self.done.push((DEFAULT_VERB, o, 0));
-                    if !self.no_script {
-                        self.runs_log.push(Run { frame: self.st.frame, slot: 7, where_: WIO_ROOM, number: o, ..Default::default() });
-                    }
                 }
             }
         }
@@ -314,7 +287,7 @@ impl Engine for Toy {
         Ok(())
     }
     fn runs(&mut self) -> EResult<RunsReply> {
-        Ok(RunsReply { runs: std::mem::take(&mut self.runs_log), ..Default::default() })
+        Ok(RunsReply::default())
     }
     fn explain(&mut self, _arm: Option<&ExplainArm>) -> EResult<()> {
         Ok(())
@@ -645,62 +618,4 @@ fn approach_is_bounded() {
     let cfg = Cfg { max_approach: 1, ..Default::default() };
     let m = realize::realize(&mut e, &sentence(DEFAULT_VERB, 503, None), &cfg).unwrap().err().expect("a miss");
     assert_eq!((m.reason.as_str(), m.approach), ("approach", 1));
-}
-
-// --- E016 amendment (5): a sentence the handler does not log ---------------------------------------------------------
-
-/// The sentences a toy queued, by replaying `evs` on it and running on `extra` frames after the last.
-fn replayed_long(mut t: Toy, evs: &[Event], extra: u64) -> Vec<(i32, i32, i32)> {
-    t.inputs(evs).unwrap();
-    let last = evs.iter().map(|e| e.frame).max().unwrap_or(0);
-    t.run(&RunSpec { frame: Some(last + extra), ..Default::default() }).unwrap();
-    t.done.clone()
-}
-
-#[test]
-fn deferred_sentence_accepted_by_the_object_run() {
-    setup();
-    let mut t = toy_raw(320, false);
-    t.deferred = true;
-    let mut e: Box<dyn Engine> = Box::new(t.clone());
-    let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 500, None), &Cfg::default()).unwrap().expect("realized");
-    assert_eq!((r.candidates, r.tries), (1, 1));
-    assert!(r.attempts[0].seen.starts_with("run of 500's script"), "{}", r.attempts[0].seen);
-    assert_eq!(replayed_long(t, &r.events, 10), vec![(DEFAULT_VERB, 500, 0)]);
-}
-
-#[test]
-fn a_logged_sentence_of_another_verb_is_not_overruled() {
-    setup();
-    // every sentence starts its object's script: the bare click's (10, 502, 0) and its run do not stand for verb 2
-    let mut t = toy_raw(320, false);
-    t.obj_runs = true;
-    let mut e: Box<dyn Engine> = Box::new(t);
-    let r = realize::realize(&mut e, &sentence(2, 502, None), &Cfg::default()).unwrap().expect("realized");
-    assert_eq!((r.candidates, r.tries), (3, 3 + 3 + 1));
-    assert_eq!(r.attempts.last().unwrap().seen, "(2,502,0)");
-}
-
-#[test]
-fn the_verb_is_not_checked_by_a_run() {
-    setup();
-    // the amendment's weakness: with no sentence logged, a's script starting accepts the step whatever its verb
-    let mut t = toy_raw(320, false);
-    t.deferred = true;
-    let mut e: Box<dyn Engine> = Box::new(t);
-    let r = realize::realize(&mut e, &sentence(7, 500, None), &Cfg::default()).unwrap().expect("accepted by the run");
-    assert_eq!(r.candidates, 1);
-}
-
-#[test]
-fn no_sentence_and_no_run_is_a_miss() {
-    setup();
-    let mut t = toy_raw(320, false);
-    t.deferred = true;
-    t.no_script = true;
-    let mut e: Box<dyn Engine> = Box::new(t);
-    let m = realize::realize(&mut e, &sentence(DEFAULT_VERB, 500, None), &Cfg::default()).unwrap().err().expect("a miss");
-    assert_eq!(m.reason, "no sentence");
-    // the bare click and the 3 verb slots, each at 3 hit points: none logs (10, 500, 0), and none starts 500's script
-    assert_eq!((m.candidates, m.tries), (4, 12));
 }
