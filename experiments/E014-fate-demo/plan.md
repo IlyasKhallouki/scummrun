@@ -1457,3 +1457,163 @@ row of the assumptions table; not applied here (the profile's numbers are not re
 | entries verified from boot | every entry, 0 differences |
 | the VM, if it starts | 2.2-2.5 h used, $3.4-3.9 |
 | the laptop, if not | 2.5 h of driver wall at most |
+
+## Result (2026-11-04): amendment (8) on the cloud VM; stopped by the disk floor after 502 tries, two rooms entered
+
+### In plain terms
+
+- **Where it ran.** The VM started (10:15 UTC), so the run was on the VM: b = 10, 2 readings in the background. Rule
+  (2) on Monkey Island and the check before the run passed. The driver ran 5,509.7 s (1 h 32 min) and the VM was
+  stopped at 12:05: 1.85 h, $2.84 in the ledger ($20.49 committed, $9.01 left).
+- **How it stopped:** by the disk floor (0.5 GB free against the floor of 2 GB), an E009 stop rule, before the wall
+  limit. Not by hand.
+- **The end** was not reached. The run entered **room 42**, its second room, at frame 1,965, and kept 316 of its 628
+  entries there. All 627 entries past the root verify from boot with 0 differences (the lean engine, on the VM).
+- **The two diagnosed causes are gone.** Effect mismatch fell from 38.4% to 0.3% of the try wall: the walk to object
+  592 for the cursor off reached its target from the plan in all 26 attempts that played it (play7: 0 of 9), and no
+  try was refuted on an object's args. Model-blind fell from 14.1% to 1.9%: no try stopped on the ambient script's
+  position. No trial was refused by the bridge (play7: 86).
+- **What bound it now: the reading.** Reading the sound commands made the readings of the scope that holds the world
+  map (room 75) far larger: 177 tries (82 model, 95 free) reached the 300 s bound, 65.0% of the try wall, and 14
+  readings stopped at the 8 GB memory limit. Those readings also filled the VM's disk, which stopped the run.
+- **And the executor's interface (row 27).** 40 tries (2,838.7 s) stopped because the executor waits for Monkey
+  Island's walk-to verb before it walks: every sentence with verb 11, and every walk to an object off the screen.
+
+### The run's numbers
+
+| | |
+|---|---|
+| committed tries | 502: 264 model (159 with an attempt), 238 free; 486 "ok", 16 errors |
+| try wall | 52,117.3 s; model tries 128.3 s on average (median 33.6 s), free tries 76.6 s (median 31.3 s); the first 139 tries 52.8 s |
+| driver wall | 5,509.7 s with b = 10 |
+| fresh readings | 76, 0.2-66.0 s; 177 more stopped at the bound, all of scope {42, 48, 49, 75}, from j00140 on |
+| scopes | {49} grown by room 42 (j00025), 48 (j00068), 75 (j00130); room 42's by 48, 49, 75 and 68; all by case 1 (a target needs one) |
+| entries, cells | 628 entries (312 in room 49, 316 in room 42), 197 cells; T 543 atoms at the end (play7: 454) |
+| rooms entered | 2: room 49 and room 42 |
+| goal entries | none |
+| attempts that reached their target from the plan | 46 (play7: 0): var 52 = 0 26 times, class 26 of object 491 set (class:491:6 = 1) 14 times, bit 446 = 1 6 times |
+| errors | 14 "the reading's RSS passed 8.0 GB" (j00132-j00138, j00470-j00484), 2 "the sink thread stopped" at the disk floor (j00498, j00500) |
+
+### The stall table by cause (`results/a8/stalls-play8.md`, made on the VM by the run's own `stalls` step)
+
+| class | seconds | share | play7 |
+|---|---:|---:|---:|
+| reading bound | 33,900.0 | 65.0% | 0.0% |
+| interface, no yield | 10,297.6 | 19.8% | 23.3% |
+| refused input | 2,366.1 | 4.5% | 0.5% |
+| overhead | 2,172.3 | 4.2% | 0.0% |
+| model, no yield | 1,020.3 | 2.0% | 0.0% |
+| model-blind | 997.8 | 1.9% | 14.1% |
+| productive | 829.5 | 1.6% | 13.5% |
+| no plan | 312.7 | 0.6% | 10.0% |
+| effect mismatch | 158.6 | 0.3% | 38.4% |
+| wait | 62.4 | 0.1% | 0.2% |
+
+- **Reading bound:** 177 tries, each 300 s, all of scope {42, 48, 49, 75}; the try then went on model-free from a
+  stand-in reading and kept nothing. Reads of that scope sometimes ended under the bound on the VM (76 fresh readings
+  in all), and the tries that reused them went on.
+- **Overhead** is the rest row (2,167.8 s, 4.16%): the 16 tries that ended on an error have no rows.
+- **Refused input** here is the executor, not the bridge: windows whose children could not form the planned input
+  ("the verb did not return to Walk to within 120 frames", row 27; 38 tries).
+- **Model, no yield:** 43 tries reached their target (mostly the cursor off again) with no new atom.
+
+### The fixes, measured
+
+- **(a) `FMI_ARGS_LATER`.** 35 attempts targeted var 52 = 0: 26 reached it from the plan (0.1-74.1 s, median 3.2 s;
+  play7's 9 tries took 108-178 s and were refuted), 9 found it already holding at the plan's start. No stop names an
+  object's args. Widening was not the cause: the reading of entry 36 with `FMI_READ_WIDEN` off holds the same two
+  records of the sentence script's resumption, with the same preconditions, effects and checks.
+- **(b) `FMI_READ_SOUND`.** No try stopped on the ambient script's position (play7: 16). Its cost was not predicted:
+  read from entry 159's start (frame 1,438) on the laptop, scope {42, 48, 49, 75}: off, 269.8 s, 61,406 records,
+  159 splits; on, still reading at 1,500 s (stopped), 2,753 splits, 1,901 of them in the interface's per-frame hover
+  script's resumption, whose objects' verb scripts in the map room now run past their sound commands. On the VM a
+  finished reading of that scope held 518,131 records (a packed file of 619 MB, 505 MB of actions).
+- **(c) `FMI_OFFER_SCREEN`.** 0 trials refused by the bridge (play7: 86 in 4 tries).
+- **(d) `FMI_GOAL_FACT`.** 2 attempts stopped as "refinement: the refined task holds no fact of the target: bit:20"
+  instead of a planner error.
+- **(e) `FMI_STOP_WALL`.** Not reached: the disk floor came first, at 5,509.7 s of the 6,600 s.
+
+### The furthest state, in the game's numbers
+
+- **Entry 356:** room 42, frame 19,916. The chain is entries 0, 2, 22, 138, 177, 198, 199, 296, 299, 308, 310, 326,
+  338, 345, 356: 18 inputs, the system's own (16 clicks and the keys "u" and "o"); the last at frame 9,112. Entries
+  345 and 356 are the wait's stops after it.
+- **How room 42 was entered.** Entry 296 (j00180, a model try whose reading was bounded, its model-free step): one
+  click on a dialog line at frame 1,574 from entry 199; the room changes at frame 1,965. The eight inputs before it on
+  the chain are six clicks on dialog lines (x 4, y 154 or 174, with the dialog's lines on) and two clicks at frames
+  1,044 and 1,046. The game changed the room after the dialog the system chose its way through.
+- **Since the root:** object states 490 = 1, 492 = 1, 494 = 2, 500 = 1; classes 26 of object 490 and 6 of object 491
+  set; bits 16, 403, 408, 410, 411 and 446 set, bits 7-10 and 20 cleared; 54 vars changed; the sentence verbs (1,
+  3-12, 100-104) on and the dialog verbs off. No object changed owner: nothing went into the inventory.
+- **New atoms of T over the run:** 78 distinct (play7: 62), in 25 tries: vars 44, bits 16, verbs 12, and one each of
+  a cutscene depth, a frozen slot, a script, a room script, an object state (490 = 1) and a class (491's 6 = 1). The
+  last two tries with new atoms are j00495 and j00499, near the end.
+
+### Rule (2) on Monkey Island (`results/a8/mi-check.txt`)
+
+B3's 15 tries equal E013's G-on in every field compared (15 of 15); their 126 new entries verify from boot; the kitchen's
+goal chain (8 entries) verifies; the smoke run's 21 entries verify and its stall report passes its 5 checks. MI's
+scripts hold no `soundKludge`, `setRoomShadow`, `debug` or VAR_SOUNDRESULT.
+
+### Engineering met on the way (not the method)
+
+- **The VM's disk.** It had 13 GB free at the start (earlier runs' files: play7's archive with its readings, E009's
+  copies), so the floor was set to 2 GB before the run (1012d33). The map scope's readings (one cached reading of 1.1 GB; the
+  cache recorded a largest reading of 11.4 GB) took the disk from 7.9 GB free at 11:47 to 0.5 GB at 11:57.
+- **GitHub** refused pushes twice ("Internal Server Error"); they went through on a later try.
+
+### Predictions scored
+
+| | predicted | measured | |
+|---|---|---|---|
+| rule (2) on Monkey Island | all four checks | all hold | hit |
+| walk to object 592 for var 52 = 0 | the goal from the plan wherever planned; 0 stops on args | 26 of 26 played reached it; 0 such stops | hit |
+| how the run stops | wall limit 60%; stagnation 20%; disk floor or a break 15%; goal 5% | the disk floor | (15%) |
+| committed tries | 550-1,650 | 502 | miss |
+| rooms entered | 1-3, most likely 2 | 2 | hit |
+| the end | not reached (reached 5%) | not reached | hit |
+| new atoms of T | 80-250 | 78 | miss |
+| effect mismatch | 0-15% | 0.3% | hit |
+| model-blind | 0-8% | 1.9% | hit |
+| refused input | 0-0.2%, no trial refused on an actor | 4.5% (the executor's refusals); 0 refused by the bridge | miss; hit |
+| interface, no yield | 20-50% | 19.8% | miss |
+| no plan | 5-25% | 0.6% | miss |
+| productive | 5-30% | 1.6% | miss |
+| the rest row | at most 1% | 4.16% | miss |
+| readings at the bound | at most 5% of model tries | 82 of 264 model tries (31%); 65.0% of the try wall | miss |
+| entries verified from boot | every entry, 0 differences | 627 of 627 | hit |
+| the VM | 2.2-2.5 h, $3.4-3.9 | 1.85 h, $2.84 | miss |
+| the laptop | at most 2.5 h | not run | not scored |
+
+**Misses, stated plainly.**
+
+1. **The reading bound took 65.0% of the try wall, against at most 5% of model tries.** Fix (b) lets the reader run
+   past sound commands; the world map room's scripts are full of them (its entry script has 18), and the interface's
+   per-frame hover script runs the hovered object's verb script, so the scope with the map room went from 270 s to
+   past 1,500 s on the laptop and to readings of 518,131 records. The prediction did not consider that a reading that
+   drops paths is cheaper.
+2. **The disk floor stopped the run at 502 tries, against 550-1,650 and the wall limit.** The same readings filled the
+   VM's disk.
+3. **Productive 1.6%, no plan 0.6%, interface 19.8%, the rest 4.16%, all outside their ranges.** The reading bound's
+   share pushed every other class down; the rest row is the 16 tries that ended on an error (14 at the reading's
+   8 GB memory limit, 2 at the full disk).
+4. **Refused input 4.5% against 0-0.2%.** The bridge refused nothing, as predicted; the class's seconds are the
+   executor's own refusals of row 27, which this amendment found and did not fix.
+5. **78 new atoms, against 80-250.**
+6. **The VM: 1.85 h and $2.84, against 2.2-2.5 h and $3.4-3.9,** because the run stopped early.
+
+### Threshold and what bound it
+
+**Partly**, by the success threshold. The run went from the boot into a second room with every entry exact, and the
+model's plans reached their targets 46 times (play7: 0). The end was not reached and nothing went into the inventory.
+
+1. **The readings of the scope with the world map** (65.0%; 14 at the memory limit; the disk floor). The hover
+   script's fan-out over the room's objects multiplies paths that widening cannot summarise (forks on facts), and the
+   split ladder repeats them; with the sound commands read, the map room's objects' scripts run on. Amendment (6)'s
+   open item ("the hover script's fact forks are the next cost") is now the first cost. A row of the assumptions table
+   (29), recorded and not applied.
+2. **The executor's interface numbers are Monkey Island's** (row 27): 40 tries stopped on verb 11 (13, object 593) or
+   a walk to an object off the screen (26, object 596); 11 more on inventory sentences and 10 on a two-object sentence
+   (verb 8 on objects 496 and 491: the sentence script did not start in the matched step) were not diagnosed. Picking
+   up an object never formed an input, so the inventory stayed empty.
+3. **Nothing is learned across tries** (row 28): the cursor-off target was reached 26 times and kept being chosen.

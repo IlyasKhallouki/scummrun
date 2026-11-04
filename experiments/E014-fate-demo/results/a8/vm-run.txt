@@ -1,0 +1,59 @@
+# E014 amendment (8): the check before the run on the VM (a8/vm.sh check, pull-check), then the run's own lines, the verification and the stall table
+[10:22:24] verify the laptop's check archive from boot on the VM
+[10:22:34] verify /var/tmp/fast-mi/e014-archives/vm-check8: 24 entries from boot, 0 with differences or errors
+[10:22:34] the same 2 tries on the VM (b = 1), at the laptop's paths
+[10:22:34] /var/tmp/fast-mi/e014-archives/vm-check8: booting the root
+[10:22:34] /var/tmp/fast-mi/e014-archives/vm-check8: root at frame 992 (room 49, qf 14105); allowed rooms [24, 42, 48, 49, 63, 68, 69, 75, 82, 83]; E009 {'idle_frames': 1600, 'rotate': True, 'evict_by_size': True, 'reuse_nonfacts': True, 'stop_jobs': 2}; E010 {'ready': True, 'commit_finished': True}
+[10:22:34] start, workers 1, load 0.17 0.04 0.01, log /var/tmp/fast-mi/e014-vm-check8/run.log
+[10:24:50] GUARD: rc 0 wall 135.5 s low 0 min MemAvailable 99999999 kB
+[10:25:01] verify /var/tmp/fast-mi/e014-archives/vm-check8: 24 entries from boot, 0 with differences or errors
+[10:25:01] check done
+[10:25:21] fmi check tries laptop VM: G0 /var/tmp/fast-mi/e014-archives/vm-check8-vm: 2 tries, stop class = A's in 2, everything = A's in 2
+[10:25:21] files: 2 jobs, 25 entries, 2 log lines; 0 differ
+[10:25:48] /var/tmp/fast-mi/e014-archives/play8: booting the root
+[10:25:48] /var/tmp/fast-mi/e014-archives/play8: root at frame 992 (room 49, qf 14105); allowed rooms [24, 42, 48, 49, 63, 68, 69, 75, 82, 83]; E009 {'idle_frames': 1600, 'rotate': True, 'evict_by_size': True, 'reuse_nonfacts': True, 'stop_jobs': 100000}; E010 {'ready': True, 'commit_finished': True}
+[10:25:48] start, workers 10, load 0.67 0.56 0.24, log /var/tmp/fast-mi/e014-play8/run.log
+[11:57:38] GUARD: rc 0 wall 5509.7 s low 0 min MemAvailable 87479428 kB
+[11:57:38] run done
+[11:57:39] stalls done
+[12:02:01] verify /var/tmp/fast-mi/e014-archives/play8: 627 entries from boot, 0 with differences or errors
+# Stalls: /var/tmp/fast-mi/e014-archives/play8
+
+502 tries, wall 52117.3 s, rows 52117.3 s
+
+## the run (502 tries, 52117.3 s)
+
+| class | seconds | share |
+|---|---:|---:|
+| productive | 829.5 | 1.6% |
+| model-blind | 997.8 | 1.9% |
+| no plan | 312.7 | 0.6% |
+| refused input | 2366.1 | 4.5% |
+| effect mismatch | 158.6 | 0.3% |
+| interface, no yield | 10297.6 | 19.8% |
+| model, no yield | 1020.3 | 2.0% |
+| wait | 62.4 | 0.1% |
+| overhead | 2172.3 | 4.2% |
+| reading bound | 33900.0 | 65.0% |
+
+rest: 2167.81 s (4.16%), absolute 2175.92 s (4.17%)
+
+## the last 20 (20 tries, 2178.1 s)
+
+| class | seconds | share |
+|---|---:|---:|
+| productive | 29.2 | 1.3% |
+| model-blind | 0.0 | 0.0% |
+| no plan | 0.0 | 0.0% |
+| refused input | 741.4 | 34.0% |
+| effect mismatch | 0.0 | 0.0% |
+| interface, no yield | 243.4 | 11.2% |
+| model, no yield | 0.0 | 0.0% |
+| wait | 1.3 | 0.1% |
+| overhead | 862.9 | 39.6% |
+| reading bound | 300.0 | 13.8% |
+
+rest: 862.83 s (39.61%), absolute 862.97 s (39.62%)
+
+## Rows over the run (largest 40)
+
