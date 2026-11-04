@@ -1,0 +1,10 @@
+[06:53:30] b3 all: GUARD: rc 0 wall 302.6 s low 0 min MemAvailable 6293300 kB G12: 296 samples, 291 with an fmi process, largest fmi tree 19 processes, python processes in an fmi tree 0 [06:53:30] heavy lock released; done 
+[06:53:31] b3 all vs E013's G-on all rc 0: G0 /var/tmp/fast-mi/e014-a6/mi/b3f/all-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+[06:53:31] b3 tries whose reading waited on the bound's thread: 10; bounded: 0
+[06:53:54] b3 verify-new all (E014's mechanisms on) rc 0: verify-new /var/tmp/fast-mi/e014-a6/mi/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
+[06:54:13] kitchen: the goal entry 150's chain, 8 entries (44 55 85 123 135 142 146 150) verified from boot, 0 with differences or errors; goal entry: differences: 0; final {'owner:566': 1}
+[06:55:29] smoke (ALLON with A4): [06:54:13] start: /var/tmp/fast-mi/target-e014c/release/fmi, set all, engine /var/tmp/fast-mi/svm-e013/build/scummvm/scummvm, b 1, N 4; load 2.12 2.56 3.11 [06:55:14] run: 60.3279 s; GUARD: rc 0 wall 60.3 s low 0 min MemAvailable 8978852 kB [06:55:29] verify: 21 entries from boot (fmi explore verify), 0 with differences or errors [06:55:29] stall-report rc 0: 5 PASS, 0 FAIL 
+  smoke j00000 scope [33] grow null new 2 reading no cached reading
+  smoke j00001 scope [33] grow null new 2 reading reused (e009 keys)
+  smoke j00002 scope [33] grow null new 5 reading reused (e009 keys)
+  smoke j00003 scope [33] grow null new 12 reading reused
