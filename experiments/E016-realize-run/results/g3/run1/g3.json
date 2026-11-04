@@ -1,0 +1,843 @@
+{
+  "start": {
+    "frame": 2980,
+    "room": 42,
+    "idle": "sentence",
+    "xstart": 0,
+    "rng": 2450856443,
+    "owner": 1,
+    "class": 1
+  },
+  "boot_s": 0.211230792,
+  "steps": [
+    {
+      "step": "s3:490",
+      "ok": true,
+      "from": 2980,
+      "approach": 0,
+      "candidates": 4,
+      "tries": 10,
+      "seconds": 0.016055152,
+      "accepted_at": 2984,
+      "events": [
+        {
+          "frame": 2981,
+          "click": [
+            16,
+            175
+          ]
+        },
+        {
+          "frame": 2983,
+          "click": [
+            223,
+            79
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001604505
+        },
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001408745
+        },
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001307216
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001474372
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001286614
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001928618
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": false,
+          "seen": "",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001482638
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": false,
+          "seen": "",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001421711
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": false,
+          "seen": "",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001564507
+        },
+        {
+          "phase": "sentence",
+          "name": "v3t490",
+          "accepted": true,
+          "seen": "(3,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                16,
+                175
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001522612
+        }
+      ],
+      "next_idle": {
+        "frame": 2998,
+        "reason": "idle",
+        "room": 42,
+        "xstart": 0
+      }
+    },
+    {
+      "step": "s8:946:491",
+      "ok": true,
+      "from": 2998,
+      "approach": 1,
+      "candidates": 14,
+      "tries": 15,
+      "seconds": 0.026220311,
+      "accepted_at": 3009,
+      "events": [
+        {
+          "frame": 2999,
+          "click": [
+            228,
+            110
+          ]
+        },
+        {
+          "frame": 3004,
+          "click": [
+            110,
+            161
+          ]
+        },
+        {
+          "frame": 3006,
+          "click": [
+            290,
+            154
+          ]
+        },
+        {
+          "frame": 3008,
+          "click": [
+            227,
+            83
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "phase": "approach",
+          "name": "w10",
+          "accepted": true,
+          "seen": "walk=1 toward=0 hit=1 xstart=0->0",
+          "frame": 3003,
+          "events": [
+            {
+              "frame": 2999,
+              "click": [
+                228,
+                110
+              ]
+            }
+          ],
+          "seconds": 0.001746629
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v1t491",
+          "accepted": false,
+          "seen": "(8,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001614551
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v5t491",
+          "accepted": false,
+          "seen": "",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001669038
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v3t491",
+          "accepted": false,
+          "seen": "(3,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                16,
+                175
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001970984
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v4t491",
+          "accepted": false,
+          "seen": "(4,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                14,
+                189
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001600275
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v11t491",
+          "accepted": false,
+          "seen": "(11,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                56,
+                161
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001598314
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v12t491",
+          "accepted": false,
+          "seen": "",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                55,
+                175
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001622087
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v9t491",
+          "accepted": false,
+          "seen": "(9,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                55,
+                189
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001554955
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v6t491",
+          "accepted": false,
+          "seen": "(6,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                108,
+                175
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001654394
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v7t491",
+          "accepted": false,
+          "seen": "(7,491,0)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                110,
+                189
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.00179058
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v101t491",
+          "accepted": false,
+          "seen": "(8,20,491)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                162,
+                154
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001622663
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v102t491",
+          "accepted": false,
+          "seen": "(8,937,491)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                194,
+                154
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001602441
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v103t491",
+          "accepted": false,
+          "seen": "(8,934,491)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                226,
+                154
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001750447
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v104t491",
+          "accepted": false,
+          "seen": "(8,933,491)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                258,
+                154
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001633336
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v105t491",
+          "accepted": true,
+          "seen": "(8,946,491)",
+          "frame": 3009,
+          "events": [
+            {
+              "frame": 3004,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3006,
+              "click": [
+                290,
+                154
+              ]
+            },
+            {
+              "frame": 3008,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.00157704
+        }
+      ]
+    }
+  ],
+  "all_realized": true,
+  "candidates": 18,
+  "run_on": {
+    "last_input": 3008,
+    "local_ran": 3011,
+    "class_cleared": 3011,
+    "both": 3011,
+    "ended": null,
+    "stop": 3011,
+    "room": 42,
+    "owner": 1,
+    "class": 0
+  },
+  "verify": {
+    "frame": 3011,
+    "got_frame": 3011,
+    "inputs": 36,
+    "facts": 3870,
+    "facts_differ": 0,
+    "first": [],
+    "room": [
+      42,
+      42
+    ],
+    "digest": [
+      "0890b94a052fbfa2",
+      "0890b94a052fbfa2"
+    ],
+    "differences": 0,
+    "seconds": 0.176432587
+  },
+  "hook": {
+    "events": [
+      {
+        "frame": 2981,
+        "click": [
+          16,
+          175
+        ]
+      },
+      {
+        "frame": 2983,
+        "click": [
+          223,
+          79
+        ]
+      },
+      {
+        "frame": 2999,
+        "click": [
+          228,
+          110
+        ]
+      },
+      {
+        "frame": 3004,
+        "click": [
+          110,
+          161
+        ]
+      },
+      {
+        "frame": 3006,
+        "click": [
+          290,
+          154
+        ]
+      },
+      {
+        "frame": 3008,
+        "click": [
+          227,
+          83
+        ]
+      }
+    ],
+    "error": null,
+    "events_equal": true,
+    "frame": 3011,
+    "digest_equal": false
+  },
+  "pass": false,
+  "seconds": 0.438769345
+}
