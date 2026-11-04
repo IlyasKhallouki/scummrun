@@ -317,8 +317,10 @@ gaps before a run (play8's row 27 was known and left in), the approach is fixed 
   - it is kept only where the engine's hit test answers no object and no actor (afford's floor test), all points in
     one AtMany.
   
-  It is offered alongside the box's usual point. The candidates are ordered by distance to the target's place, at
-  most 2 per box. A point at the screen's edge on the target's side can now be a candidate.
+  It is offered alongside the box's usual point. The usual points come first, ordered by distance to the target's
+  place as before, so E015 G1's approach is unchanged where it already worked. Then come the nearest points, ordered
+  the same way: at most 2 points per box in all. A point at the screen's edge on the target's side can now be a
+  candidate.
 - **A stepping stone.** When no floor point is accepted, the approach tries a bare click on each room object that has
   a hit point and whose walk point is nearer the target's place than the view's middle column (xstart + 160), the
   nearest to the target first.
