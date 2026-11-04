@@ -40,6 +40,8 @@ struct Toy {
     done: Vec<(i32, i32, i32)>,
     /// E016: inventory slots shown (INV)
     inv: bool,
+    /// E016 amendment (2): the inventory slots are image slots (the dump's type 1)
+    inv_images: bool,
 }
 
 fn toy(xstart: i32, dialog: bool) -> Box<dyn Engine> {
@@ -58,6 +60,7 @@ fn toy_raw(xstart: i32, dialog: bool) -> Toy {
         log: vec![],
         done: vec![],
         inv: false,
+        inv_images: false,
     };
     t.st.idle = t.idle();
     t
@@ -86,7 +89,8 @@ impl Toy {
         let list: &[(i32, i32)] = if self.dialog { &DIALOG } else { &VERBS };
         let mut v: Vec<Verb> = list.iter().map(|&(slot, id)| Verb { slot, id, mode: 1, x: 10 + 50 * (slot - 1), y: 150, ..Default::default() }).collect();
         if self.inv && !self.dialog {
-            v.extend(INV.iter().map(|&(slot, id, _)| Verb { slot, id, mode: 1, x: 10 + 50 * (slot - 1), y: 150, ..Default::default() }));
+            let kind = if self.inv_images { realize::IMAGE_VERB } else { 0 };
+            v.extend(INV.iter().map(|&(slot, id, _)| Verb { slot, id, mode: 1, kind, x: 10 + 50 * (slot - 1), y: 150, ..Default::default() }));
         }
         v
     }
@@ -448,6 +452,22 @@ fn inventory_object_approaches_b() {
     assert_eq!(r.candidates, 4);
     assert_eq!(r.events.len(), 2 + 3);
     assert_eq!(replayed_on(inv_toy_raw(320), &r.events), vec![(3, 901, 501)]);
+}
+
+#[test]
+fn inventory_image_slots_first() {
+    setup();
+    // amendment (2): with the inventory slots of image type, a's slot runs over 900, 901, 902 before the verb slots
+    let mut t = inv_toy_raw(320);
+    t.inv_images = true;
+    let mut e: Box<dyn Engine> = Box::new(t.clone());
+    let r = realize::realize(&mut e, &sentence(3, 901, Some(500)), &Cfg::default()).unwrap().expect("realized");
+    assert_eq!(r.candidates, 2);
+    assert_eq!(replayed_on(t.clone(), &r.events), vec![(3, 901, 500)]);
+    // b in the inventory: b's slots in the same order (902 is the third image slot)
+    let r = realize::realize(&mut e, &sentence(3, 900, Some(902)), &Cfg::default()).unwrap().expect("realized");
+    assert_eq!(r.candidates, 3);
+    assert_eq!(replayed_on(t, &r.events), vec![(3, 900, 902)]);
 }
 
 #[test]
