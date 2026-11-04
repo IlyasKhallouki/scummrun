@@ -35,14 +35,9 @@ for st in "$@"; do
     K=$O/kitchen; A=/var/tmp/fast-mi/e012-archives/kitchen; C=$K/archive
     rm -rf $C; mkdir -p $C
     cp -r $A/{stage.json,entries.jsonl,entries,log.jsonl,cells.json,readings.jsonl} $C/
-    g=$(python3 -c "import json; print(json.load(open('$A/summary.json'))['goal_entries'][0])")
-    chain=$(python3 -c "
-import json
-rows=[json.loads(l) for l in open('$A/entries.jsonl')]
-i=$g; out=[]
-while i is not None and i != 0:
-    out.append(i); i=rows[i].get('parent')
-print(' '.join(str(x) for x in reversed(out)))")
+    g=$(jq '.goal_entries[0]' $A/summary.json)
+    # the goal entry and its ancestors up to the root's child, in chain order
+    chain=$(jq -rs --argjson g $g '. as $r | [$g | recurse(if ($r[.].parent // 0) != 0 then $r[.].parent else empty end)] | reverse | map(tostring) | join(" ")' $A/entries.jsonl)
     bad=0; n=0
     for i in $chain; do
       n=$((n + 1))
@@ -54,13 +49,7 @@ print(' '.join(str(x) for x in reversed(out)))")
     S=$O/smoke; rm -rf $S
     flock $LOCK $I/smoke.sh $S 4 1 all > $O/smoke.out 2>&1
     log "smoke (ALLON with A4): $(tail -4 $O/smoke.out | tr '\n' ' ')"
-    python3 - $S/kitchen >> $O/summary.txt <<'PY'
-import json, sys, glob
-a = sys.argv[1]
-for l in open(a + '/log.jsonl'):
-    x = json.loads(l)
-    print('  smoke', x.get('job'), 'scope', x.get('scope'), 'grow', x.get('grow'), 'new', len(x.get('new_entries') or []), 'reading', (x.get('reading') or {}).get('why'))
-PY
+    jq -rc '"  smoke \(.job) scope \(.scope) grow \(.grow) new \(.new_entries | length) reading \(.reading.why)"' $S/kitchen/log.jsonl >> $O/summary.txt
     tail -5 $O/summary.txt;;
   esac
 done
