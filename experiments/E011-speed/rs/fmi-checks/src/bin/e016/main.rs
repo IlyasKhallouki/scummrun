@@ -8,15 +8,28 @@
 //!       scheduled too) from boot to frame F, the input log taken there, the run on to frame T, and patch 0007's
 //!       records of (F, T]: per record its frame, inputs, verdict, the handler's area, value and mode, the verb slot,
 //!       the zone and the writes by kind (Sentence, Walk, Started, Var, ...). Writes OUT/inlog.json.
+//!
+//!   e016 g3 OUT --movie FILE --clicks N --frame F --steps S1,S2 --local L --class-obj C --class K [--object O]
+//!          [--run-on R]
+//!       G3: the first N clicks of FILE's "movie" ([frame, x, y] from boot) to frame F, a no-input fork to the first
+//!       idle stop when F is not one; each step ("s<v>:<a>[:<b>]" or "d<v>") realized by fmi-play's realize
+//!       (FMI_REALIZE=1) and its events played in place as the hook plays them, the chain run to the next idle between
+//!       steps; then on, frame by frame up to R frames (default 600), until the room's local L has run and class:C:K
+//!       is cleared. Pass: both, within 15 candidates over the steps, and the chain replayed from boot equal (every
+//!       fact, the room, the digest). A second pass plays the steps through `executor::play_input` (the hook) from
+//!       the same start; its events and digest are compared. owner:O is reported. Writes OUT/g3.json and
+//!       OUT/events.jsonl (the realized inputs).
 
 mod common;
+mod g3;
 mod inlog;
 
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let r = match argv.first().map(String::as_str) {
         Some("inlog") => inlog::run(&argv[1..]),
-        _ => Err("usage: e016 inlog OUT ...".to_string()),
+        Some("g3") => g3::run(&argv[1..]),
+        _ => Err("usage: e016 inlog OUT ... | e016 g3 OUT ...".to_string()),
     };
     if let Err(e) = r {
         eprintln!("e016: {e}");
