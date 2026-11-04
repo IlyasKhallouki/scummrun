@@ -57,3 +57,7 @@ path = "src/bin/a3.rs"
 [[bin]]
 name = "e013-report"
 path = "src/bin/e013_report.rs"
+
+[[bin]]
+name = "e015"
+path = "src/bin/e015/main.rs"
