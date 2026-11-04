@@ -1127,3 +1127,170 @@ and `FMI_STAG_CELLS=1`. It must pass before the run:
 | entries verified from boot | every entry, 0 differences |
 | the VM, if it starts | 1-1.5 h used, $1.5-2.3 |
 | the laptop, if not | 0.6-3 h of driver wall |
+
+## Result (2026-11-04): amendment (7) on the cloud VM; stopped by the falsifier at 80 tries, all in room 49
+
+### In plain terms
+
+- **Where it ran.** The VM started (08:13 UTC), so the run was on the VM: b = 10, 2 readings in the background. The
+  check before the run passed. The run took 460.7 s of driver wall (7.7 minutes) for 80 committed tries, and the VM was
+  stopped at 08:36: 0.39 h, $0.60 in the ledger ($17.65 committed, $11.85 left).
+- **How it stopped:** by the falsifier at 80 committed tries, the rule, not by hand. The run was still finding new
+  atoms: 14 of the 80 tries gave new atoms of T, the last two among them.
+- **The end** was not reached. All 175 entries are in room 49: 1 of the 11 rooms in the files. Every entry past the
+  root verifies from boot with 0 differences (174 of 174, the lean engine, on the laptop).
+- **What changed from play4.** The model now reads and plans from the states after the opening. No reading reached the
+  300 s bound (0 of 51 model tries). The run kept 175 entries (play4: 46), found 62 new atoms of T (play4: 40), and
+  went 10 inputs deep. No object changed owner or state.
+- **What bound it.** The plans from the states after the opening fail on the engine. 38.4% of the seconds are effect
+  mismatch: the plan's sentence ran, but the write its record predicted is not in the engine's run. 14.1% are
+  model-blind: the start holds a script position the reading does not reach.
+
+### The two fixes in the run
+
+- **(a) `FMI_STAG_CELLS=1`.** The run did not stop by stagnation, so the sweep rule did not decide the stop. On play4's
+  files the same rule turns play4's stop off (`fmi explore status`: stagnant false with the switch, true without).
+  9 of the 17 entries that hold a dialog state (dialog verbs on, sentence verbs off; the root's included) were a try's
+  entry: entries 0, 23, 30, 80, 97, 98, 112, 118 and 126. Entries 23, 97, 98, 112 and 118 gave new atoms.
+- **(b) The bridge's refused inputs.** 86 trials in 4 tries (j00065, j00075, j00076, j00078) were refused by the
+  bridge and recorded as refused trials. Every one clicks actor 7 at a point left of the screen, as the third click or
+  the target (`v12t592t-7`, `t-7`, ...). No try ended on an error (80 of 80 "ok"). Before the run, play4's entry 21 as
+  a free try, which had ended on this error, ran 630 trials with 1 refused by the bridge and kept 3 entries.
+
+### The run's numbers
+
+| | |
+|---|---|
+| committed tries | 80: 51 model, 29 free |
+| try wall | 3,429.2 s; model tries 52.5 s on average (median 34.0 s, longest 177.6 s); free tries 26.0 s (median 17.1 s) |
+| driver wall | 460.7 s with b = 10 |
+| fresh readings | 41: the boot's {49} 50.5 s; the rest 0.5-36.2 s; none bounded |
+| scopes | {49}, grown by room 42 (j00025) and room 48 (j00038), both by case 1 (a target needs one) |
+| entries, cells | 175 entries, 97 cells; T 454 atoms at the end (play4: 393) |
+| rooms entered | 1: room 49 |
+| goal entries | none |
+
+### The stall table by cause (`results/a7/stalls-play7.md`, made on the VM by the run's own `stalls` step)
+
+| class | seconds | share |
+|---|---:|---:|
+| effect mismatch | 1,316.6 | 38.4% |
+| interface, no yield | 798.3 | 23.3% |
+| model-blind | 482.1 | 14.1% |
+| productive | 463.2 | 13.5% |
+| no plan | 343.1 | 10.0% |
+| refused input | 17.4 | 0.5% |
+| wait | 7.8 | 0.2% |
+| overhead | 0.7 | 0.0% |
+| model, no yield, reading bound | 0.0 | 0.0% |
+
+- **Effect mismatch** grows over the run: 74.7% of the last 20 tries' seconds. Its 9 tries (1,182.9 s) stop on "the
+  same empty window" twice on a planned sentence. 7 of them are on verb 10 with object 592 (143.9-177.6 s each): the
+  sentence runs, and the refutation says the record's predicted write on the sentence's object argument is not in the
+  engine's run. Two more tries stopped on the same sentence but kept new atoms from their model-free step, so they
+  are classed productive.
+- **Model-blind:** 16 tries stop at a reach extension: the start holds `pos:script:151 = 59`, which the extended
+  reading does not reach either.
+- **No plan:** 7 tries in which the planner proved the target var 104 = 3 unreachable; 1 planner error (below).
+- **Lemma R's premise R0:** 5 tries; the last pass wrote values of var 165 outside its domain.
+- The table was also made again on the laptop from the copied archive. The copy has no `jobs/*/run` folders, so the
+  plan and reading rows split differently there (effect mismatch 38.9%, refused input 0.0%). The VM's table, made from
+  the full files, is the one given.
+
+### The furthest state, in the game's numbers
+
+- **Entry 151:** room 49, frame 12,272. The chain is entries 0, 2, 23, 97, 112, 119, 151, with 10 inputs: 9 clicks and
+  the key "o" at frame 1,471. The last input is at frame 1,472. Entries 148-151 are the wait's stops after it (frames
+  1,485, 5,072, 8,672 and 12,272).
+- **Owners, states, classes:** as at the root. In the whole archive one class bit changed: class 26 of object 934, set
+  at entry 17 (frame 1,080).
+- **Bits set since the root:** 16, 401, 403, 408 and 411.
+- **Vars changed since the root:**
+
+  | var | root | entry 151 |
+  |---|---:|---:|
+  | 0 | 8 | 31 |
+  | 7, 108, 120 | 0, 0, -1 | 592 |
+  | 20, 100 | 256, 0 | 363 |
+  | 21, 45, 101 | 0 | 79 |
+  | 32 | 17 | 4 |
+  | 44 | 0 | 107 |
+  | 116 | 0 | 3 |
+  | 123, 124 | 0 | 9 |
+  | 165 | 0 | 124 |
+  | 166 | 192 | 202 |
+  | 170 | 1 | 0 |
+  | 177 | 0 | 11 |
+  | 178 | 53 | 54 |
+  | 442 | 1 | 11 |
+  | 443 | 44 | 0 |
+  | 465 | 0 | 416 |
+  | 466 | 0 | 105 |
+
+- **Verbs:** 1, 3-12 and 100-104 on.
+- **New atoms of T over the run:** 62 distinct. They are bits (15), vars (33), verbs (12), one cutscene atom and one
+  script atom. The bits are 16, 18, 20 (= 0), 22, 401, 403-408, 410, 411, 415 and 733.
+
+### Rule (2) on Monkey Island (`results/a7/mi-check.txt`)
+
+- **B3.** The 15 tries equal E013's G-on in every field compared (15 of 15). 10 read on the bound's thread; none was
+  bounded. Their 126 new entries verify from boot.
+- **The kitchen.** The goal entry's chain (8 entries) verifies from boot.
+- **The smoke run.** Its 21 entries verify from boot, and the stall report passes its 5 checks.
+- **The disk floor.** The first smoke run stopped at once at the laptop's disk floor (3.9 GB free, with B3's 2.5 GB of
+  readings still on disk). B3's readings and this session's incremental build caches were deleted, and the smoke run
+  was made again.
+
+### Engineering met on the way (not the method)
+
+- **The VM's lock.** It was held by a stale `e009` lock file from 2026-11-02. The VM had just booted and ran nothing,
+  so the lock was released with `cloud.py release --job e009`.
+- **SDL3 on the VM.** The engine's libSDL2 is sdl2-compat, which loads SDL3 at run time, so `ldd` does not list it.
+  The engine aborted at the setup; the library was copied to the VM, and `a7/vm.sh` now pushes it (63284e0).
+- **The laptop's check archive.** `vm-check7` first stopped at the disk floor after one try. It was made again
+  (2 tries, 5 entries).
+
+### Predictions scored
+
+| | predicted | measured | |
+|---|---|---|---|
+| rule (2) on Monkey Island | B3 equal; their entries, the kitchen chain and the smoke run verify | all hold (the smoke run made again after the disk floor) | hit |
+| how the run stops | falsifier 55%; stagnation 20%; goal 15%; the VM's time or a break 10% | the falsifier at 80 tries | (55%) |
+| committed tries | 50-80 | 80 | hit |
+| rooms entered, of 11 | 2-5, most likely 3 | 1 | miss |
+| the end | not reached (reached: 15%) | not reached | hit |
+| model tries whose reading reaches the bound | 0-20% | 0 of 51 | hit |
+| the stall table | reading bound 0-15%; productive 25-60%; interface, no yield 10-40%; model, no yield 5-30%; no plan 0-15%; refused input 0-5%; the rest at most 1% | 0.0%; 13.5%; 23.3%; 0.0%; 10.0%; 0.5%; 0.01% | 5 of 7 |
+| (a) | if the stop is stagnation, every selectable cell tried; a dialog state gets a try | no stagnation stop; 9 dialog-state entries got a try | 1 of 1 scored |
+| (b) | 0-5 trials refused by the bridge; no try ends on a bridge error | 86 refused trials; no try ended on an error | 1 of 2 |
+| entries verified from boot | every entry, 0 differences | 174 of 174 | hit |
+| the VM | 1-1.5 h used, $1.5-2.3 | 0.39 h, $0.60 | miss |
+| the laptop | 0.6-3 h | not run | not scored |
+
+**Misses, stated plainly.**
+
+1. **Rooms: 1, against 2-5.** Room 49's scope grew to {42, 48, 49}, but no plan or model-free step left the room.
+2. **Productive 13.5%, against 25-60%; model, no yield 0.0%, against 5-30%.** The table's largest class, effect
+   mismatch at 38.4%, and model-blind at 14.1% were not predicted at all. The plans now exist, and the engine refutes
+   them.
+3. **86 trials refused by the bridge, against 0-5.** All click actor 7 left of the screen. The offer gives an actor
+   the point (x - camera, y), with no check that the point is on the screen. The bridge's hit test answers for it, and
+   its input check refuses it. The fix of (b) made each one a refused trial, as planned, so they cost 17.4 s.
+4. **The VM: 0.39 h and $0.60, against 1-1.5 h and $1.5-2.3.** The projection's 10-30 minutes of driver wall was
+   7.7 minutes: model tries took 52 s on average on the VM, and free tries 26 s.
+
+### Threshold and what bound it
+
+**Partly**, by the success threshold. The explorer ran from the boot with the model working after the opening. It made
+progress (62 new atoms of T, 10 inputs deep), and every entry is exact. The end was not reached and no other room was
+entered.
+
+1. **The falsifier at 80 tries** stopped a run that was still finding new atoms. With b = 10, 80 tries take
+   7.7 minutes on the VM.
+2. **Plans the engine refutes.** The plan for verb 10 on object 592 runs, and the record's predicted write is not in
+   the engine's run (effect mismatch, 38.4%). Whether the widened records of amendment (6) make these records too
+   general is not measured.
+3. **Starts the reading does not reach** (`pos:script:151 = 59`, 16 tries) and var 165's values outside its domain at
+   refinement (5 tries).
+4. **Two new rows**, recorded and not applied: 23 (the refined task lacks the target's fact) and 24 (an actor's offer
+   point off the screen).
