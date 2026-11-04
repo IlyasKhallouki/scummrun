@@ -388,3 +388,21 @@ As E013's F, with one addition for a break that stops the driver.
 | new rows of the assumptions table | 1-3, row 19 included |
 | entries verified from boot | every entry, 0 differences |
 | the VM | 2-6 h used, $3.1-9.2 |
+
+## Not run (2026-11-04, 01:56): the VM's standard start was refused
+
+- **The start.** `python3 scripts/cloud.py start --type n2-custom-30-122880 --hours 6 --standard` (main's) was refused
+  by Google before the VM started:
+  > Invalid value for field 'resource.provisioningModel': 'STANDARD'. For preemptible, only allowed provisioning_model
+  > value is SPOT.
+- **Why.** fast-mi-1 was last started as Spot, so its scheduling holds `preemptible = true`. cloud.py's `start` sets
+  `--provisioning-model=STANDARD` without `--no-preemptible`.
+- **Cost.** Nothing started and the ledger is unchanged: $17.05 committed, $12.45 left.
+- **What was not done.** A change of the VM's scheduling outside cloud.py was not made. The run of amendment (3) waits
+  for one of two things: a cloud.py whose standard start also clears the preemptible flag, or a Spot start that the PI
+  approves. Amendment (3) and its predictions stand for that run.
+- **The laptop check, measured further before it was stopped.**
+  - j00002's fresh reading from entry 3 had not ended after 50 minutes. It was in pass 1's event round 11, which had
+    run for more than 36 minutes.
+  - The run's processes peaked at 1.4 GB of RSS in all.
+  - The amendment's 15-60 minutes per fresh reading on the VM is then a lower bound for such states.
