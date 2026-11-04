@@ -280,10 +280,14 @@ fn has_hit(of: &Offer, a: i32) -> bool {
 }
 
 /// The target's place in room coordinates: a room object's walk point, else an actor's feet. None when the room
-/// holds neither.
+/// holds neither. An object some owner holds is not in the room (ScummVM's whereIsObject): a pickup leaves it in the
+/// room's object table, so the table alone would place a held object where it was picked up (E016 amendment (10)).
 fn place_of(o: &Obs, a: i32) -> Option<(i32, i32)> {
+    let held = o.owners.iter().any(|&(id, owner)| id as i32 == a && owner != crate::reading::OF_OWNER_ROOM);
     if let Some(r) = o.room_objects.as_deref().unwrap_or(&[]).iter().find(|r| r.id == a) {
-        return Some(r.walk);
+        if !held {
+            return Some(r.walk);
+        }
     }
     o.actors.iter().find(|x| x.id == a).map(|x| (x.x, x.y))
 }
@@ -693,5 +697,27 @@ pub fn play(b: &mut Br, inp: &InputStep, name: &str, movie: &mut Vec<Event>) -> 
             }
         }
         Err(m) => route(format!("{} ({} approach clicks, {} candidates, {} forks)", m.reason, m.approach, m.candidates, m.tries)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fmi_core::{ActorPos, RoomObject};
+
+    /// Amendment (10): a picked-up object the room's table still lists has no place in the room; one the room owns
+    /// keeps its walk point; an actor keeps its feet.
+    #[test]
+    fn a_held_object_has_no_place_in_the_room() {
+        let mut o = Obs::default();
+        o.room_objects = Some(vec![RoomObject { id: 946, walk: (104, 62), ..Default::default() },
+                                   RoomObject { id: 940, walk: (103, 50), ..Default::default() }]);
+        o.actors = vec![ActorPos { id: 1, x: 115, y: 57, ..Default::default() }];
+        o.owners = vec![(946, 1), (940, crate::reading::OF_OWNER_ROOM)];
+        assert_eq!(place_of(&o, 946), None);
+        assert_eq!(place_of(&o, 940), Some((103, 50)));
+        assert_eq!(place_of(&o, 1), Some((115, 57)));
+        o.owners.clear();
+        assert_eq!(place_of(&o, 946), Some((104, 62)));
     }
 }

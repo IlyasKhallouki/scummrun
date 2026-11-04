@@ -18,8 +18,9 @@ nogrow() {
   echo "$out"
 }
 # FMI_PLAN_DEEPEN=10 (amendment (9)): the first plan limit 10 s, doubled per deferral, where play8 had 120 s
-E16="FMI_REALIZE=1 FMI_NOGOOD=1 FMI_FREE_T=archive FMI_GOAL_SITE=verb FMI_FRONTIER=1 FMI_PLAN_DEEPEN=10"
-E16OFF="FMI_REALIZE= FMI_NOGOOD= FMI_FREE_T= FMI_GOAL_SITE= FMI_FRONTIER="
+# FMI_NOVEL_PLACE=1 (amendment (10)): a seen room with a new set of owned objects is novel
+E16="FMI_REALIZE=1 FMI_NOGOOD=1 FMI_FREE_T=archive FMI_GOAL_SITE=verb FMI_FRONTIER=1 FMI_PLAN_DEEPEN=10 FMI_NOVEL_PLACE=1"
+E16OFF="FMI_REALIZE= FMI_NOGOOD= FMI_FREE_T= FMI_GOAL_SITE= FMI_FRONTIER= FMI_NOVEL_PLACE="
 ALLON="$(nogrow "$ALLON") FMI_SCOPE_GROW=room $E16"
 ALLOFF="$ALLOFF $E16OFF"
 A4="$(nogrow "$A4") FMI_SCOPE_GROW=room $E16"
