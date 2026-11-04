@@ -1,12 +1,12 @@
-# grep over fmi-play/src/realize.rs (the realize path: realize, the inventory extension, the hook realize::play) at f5ab28d
+# grep over fmi-play/src/realize.rs (the realize path: realize, the inventory extension, the approach's nearest points and stones, the hook realize::play) at 7daacc6
 $ grep -nE "DOS_CD|Profile|selected_verb|wait_walk_to|DIALOG_FIRST|DIALOG_LAST|verb_var|inv_|verbless|hover|Executor|MAX_ACTOR|MAIN_H|EXECUTOR_EGO|VAR_EGO|verb_key|\.p\." fmi-play/src/realize.rs
 (no lines)
 
 # numeric literals in realize.rs's code lines (comments left out), with counts
-     11 0
-     19 1
-      3 2
-      1 3
+     31 0
+     45 1
+      4 2
+      2 3
       1 6
       1 8
       1 15

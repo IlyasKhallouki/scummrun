@@ -1,0 +1,225 @@
+{
+  "entry": 0,
+  "entry_frame": 992,
+  "boot_s": 0.062512161,
+  "start": {
+    "frame": 992,
+    "idle": "sentence",
+    "room": 49,
+    "xstart": 256
+  },
+  "steps": [
+    {
+      "step": "d120",
+      "ok": true,
+      "from": 992,
+      "approach": 0,
+      "candidates": 1,
+      "tries": 1,
+      "seconds": 0.001865146,
+      "events": [
+        {
+          "frame": 993,
+          "click": [
+            4,
+            154
+          ]
+        }
+      ],
+      "accepted_at": 994,
+      "attempts": [
+        {
+          "phase": "dialog",
+          "name": "v120",
+          "accepted": true,
+          "seen": "taken",
+          "frame": 994,
+          "events": [
+            {
+              "frame": 993,
+              "click": [
+                4,
+                154
+              ]
+            }
+          ],
+          "seconds": 0.0016314
+        }
+      ],
+      "next_idle": {
+        "frame": 1042,
+        "reason": "idle",
+        "idle": "sentence",
+        "room": 49,
+        "xstart": 256
+      }
+    },
+    {
+      "step": "s10:596",
+      "ok": true,
+      "from": 1042,
+      "approach": 2,
+      "candidates": 1,
+      "tries": 3,
+      "seconds": 0.010846363,
+      "events": [
+        {
+          "frame": 1043,
+          "click": [
+            0,
+            122
+          ]
+        },
+        {
+          "frame": 1070,
+          "click": [
+            0,
+            87
+          ]
+        },
+        {
+          "frame": 1127,
+          "click": [
+            31,
+            23
+          ]
+        }
+      ],
+      "accepted_at": 1128,
+      "attempts": [
+        {
+          "phase": "near",
+          "name": "w7",
+          "accepted": true,
+          "seen": "walk=1 toward=1 hit=0 xstart=256->128",
+          "frame": 1069,
+          "events": [
+            {
+              "frame": 1043,
+              "click": [
+                0,
+                122
+              ]
+            }
+          ],
+          "seconds": 0.001202552
+        },
+        {
+          "phase": "near",
+          "name": "w14",
+          "accepted": true,
+          "seen": "walk=1 toward=1 hit=1 xstart=128->0",
+          "frame": 1126,
+          "events": [
+            {
+              "frame": 1070,
+              "click": [
+                0,
+                87
+              ]
+            }
+          ],
+          "seconds": 0.001271066
+        },
+        {
+          "phase": "sentence",
+          "name": "t596",
+          "accepted": true,
+          "seen": "(10,596,0)",
+          "frame": 1128,
+          "events": [
+            {
+              "frame": 1127,
+              "click": [
+                31,
+                23
+              ]
+            }
+          ],
+          "seconds": 0.00129335
+        }
+      ],
+      "next_idle": {
+        "frame": 1231,
+        "reason": "idle",
+        "idle": "sentence",
+        "room": 49,
+        "xstart": 0
+      }
+    },
+    {
+      "step": "d120",
+      "ok": true,
+      "from": 1231,
+      "approach": 0,
+      "candidates": 1,
+      "tries": 1,
+      "seconds": 0.001280166,
+      "events": [
+        {
+          "frame": 1232,
+          "click": [
+            4,
+            154
+          ]
+        }
+      ],
+      "accepted_at": 1233,
+      "attempts": [
+        {
+          "phase": "dialog",
+          "name": "v120",
+          "accepted": true,
+          "seen": "taken",
+          "frame": 1233,
+          "events": [
+            {
+              "frame": 1232,
+              "click": [
+                4,
+                154
+              ]
+            }
+          ],
+          "seconds": 0.001058734
+        }
+      ]
+    }
+  ],
+  "all_realized": true,
+  "run_on": {
+    "from": 1233,
+    "room": 63,
+    "reached": 1304,
+    "ended": null,
+    "stop": 1304,
+    "room_at_stop": 63
+  },
+  "last_frame": 1304,
+  "verify": {
+    "frame": 1304,
+    "inputs": 5,
+    "facts": 3850,
+    "facts_differ": 0,
+    "first": [],
+    "room": [
+      63,
+      63
+    ],
+    "digest": [
+      15282481494304684177,
+      15282481494304684177
+    ],
+    "tick": [
+      5330,
+      5330
+    ],
+    "rng": [
+      677179275,
+      677179275
+    ],
+    "differences": 0,
+    "seconds": 0.080573148
+  },
+  "seconds": 0.171048993
+}
