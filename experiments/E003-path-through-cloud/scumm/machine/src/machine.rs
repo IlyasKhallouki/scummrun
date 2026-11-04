@@ -41,6 +41,7 @@ pub fn no_fork<T>(r: R<T>) -> T {
 }
 pub use hooks::Hooks;
 pub use settle::ROUND;
+pub use widen::WIDENED;
 
 use crate::enc;
 use crate::heads::{effect_with, Effect};
