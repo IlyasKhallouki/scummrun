@@ -349,3 +349,21 @@ fn with_the_switch_unset_the_driver_writes_no_stalls_json() {
     let s = Stalls::of_archive(&root).unwrap();
     assert_eq!(s.tries.len(), 3);
 }
+
+/// E014 amendment (8), FMI_GOAL_FACT (row 23): the stop of an attempt whose refined task lost the target's fact is a
+/// refinement's (model-blind), and the fact it names is the first the domains lack.
+#[test]
+fn a_refined_task_without_the_targets_fact() {
+    use fmi_explore::harness::{goal_fact_stop, missing_goal_fact};
+    use fmi_explore::stall::{stop_class, stop_kind, Class};
+    let k = fmi_core::Key::parse("bit:20");
+    let stop = goal_fact_stop(k);
+    assert_eq!(stop, "refinement: the refined task holds no fact of the target: bit:20");
+    assert_eq!(stop_kind(&stop), "refinement");
+    assert_eq!(stop_class(&stop, false), Class::ModelBlind);
+    let d = fmi_core::Domain { values: vec![0, 1], low: None, high: None };
+    let doms = fmi_core::Domains(vec![(fmi_core::Key::parse("var:165"), d)]);
+    let goal = vec![(fmi_core::Key::parse("var:165"), vec![1]), (k, vec![0])];
+    assert_eq!(missing_goal_fact(&goal, &doms), Some(k));
+    assert_eq!(missing_goal_fact(&goal[..1], &doms), None);
+}
