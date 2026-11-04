@@ -14,11 +14,14 @@ static N: AtomicUsize = AtomicUsize::new(0);
 static ENV: Mutex<()> = Mutex::new(());
 
 fn switch(on: bool) -> MutexGuard<'static, ()> {
+    switch_to(if on { Some("1") } else { None })
+}
+
+fn switch_to(v: Option<&str>) -> MutexGuard<'static, ()> {
     let g = ENV.lock().unwrap_or_else(|e| e.into_inner());
-    if on {
-        std::env::set_var("FMI_SCOPE_GROW", "1");
-    } else {
-        std::env::remove_var("FMI_SCOPE_GROW");
+    match v {
+        Some(v) => std::env::set_var("FMI_SCOPE_GROW", v),
+        None => std::env::remove_var("FMI_SCOPE_GROW"),
     }
     std::env::remove_var("FMI_READ_BOUND");
     g
@@ -137,6 +140,22 @@ fn off_the_scope_is_the_ring() {
     let line = a.ingest(&d, None).unwrap();
     assert!(line.get("grow").is_none());
     assert!(a.grown.is_none());
+}
+
+/// E016 amendment (8): FMI_SCOPE_GROW=room reads each room alone and never grows it.
+#[test]
+fn room_scopes_are_the_room_and_do_not_grow() {
+    let _g = switch_to(Some("room"));
+    let t = tmp("room");
+    let mut a = make(&t);
+    assert_eq!(job_json(&a, 0)["scope"], json!([33]));
+    let d = job(&a, 0, &[("free", 35)], Some(json!({"room": 28, "why": "target"})));
+    let line = a.ingest(&d, None).unwrap();
+    assert!(line.get("grow").is_none());
+    assert!(a.grown.is_none());
+    assert_eq!(job_json(&a, 0)["scope"], json!([33]));
+    let e35 = line["new_entries"][0].as_u64().unwrap() as usize;
+    assert_eq!(job_json(&a, e35)["scope"], json!([35]));
 }
 
 #[test]

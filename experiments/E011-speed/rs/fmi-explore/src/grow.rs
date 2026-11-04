@@ -21,6 +21,12 @@ pub fn on() -> bool {
     std::env::var(GROW_ENV).is_ok_and(|v| v == "1")
 }
 
+/// `FMI_SCOPE_GROW=room` (E016 plan F, amendment (8)): a room's reading is that room, and it never grows; a room outside
+/// the ring keeps E009's rule, as `scope` has it.
+pub fn room_only() -> bool {
+    std::env::var(GROW_ENV).is_ok_and(|v| v == "room")
+}
+
 /// The scope of room `room`: {room} ∪ `grown`, cut to `ring` (the guide's ring, cut to the allowed rooms); the ring
 /// itself when the room is not in it (a room outside the allowed ones keeps E009's rule).
 pub fn scope(room: i64, ring: &[i64], grown: Option<&BTreeSet<i64>>) -> Vec<i64> {

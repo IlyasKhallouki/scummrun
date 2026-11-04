@@ -3,9 +3,9 @@
 # builds), scope growth off and E016's switches; then the demo's settings and the run's paths, as a8/run-env.sh. Source
 # it as ENV (E014's vm/run.sh, a4/mi-check.sh as A4_ENV) or from run/laptop.sh, run/k1.sh, run/mi-check.sh.
 #   E16 / E16OFF   FMI_REALIZE=1 FMI_NOGOOD=1 FMI_FREE_T=archive FMI_GOAL_SITE=verb FMI_FRONTIER=1 / unset
-#   ALLON          play8's ALLON less FMI_SCOPE_GROW (set empty, so unset for the run), with E16
+#   ALLON          play8's ALLON with FMI_SCOPE_GROW=room (plan F: a room's reading is that room; amendment (8)), with E16
 #   ALLOFF         play8's ALLOFF with E16OFF
-#   A4             E014's A4 (a4/mi-check.sh's set: the bound, background readings, A6-A8) less FMI_SCOPE_GROW, with E16
+#   A4             E014's A4 (a4/mi-check.sh's set: the bound, background readings, A6-A8) with FMI_SCOPE_GROW=room, with E16
 #   LADDER         the outside ladder (fmi-checks ladder) of the merged build
 #   GAME, D_*      the demo's settings (the run's inputs, not mechanisms) and the run's files (play9 by default)
 export E13T=${E13T:-/var/tmp/fast-mi/target-e016}
@@ -19,9 +19,9 @@ nogrow() {
 }
 E16="FMI_REALIZE=1 FMI_NOGOOD=1 FMI_FREE_T=archive FMI_GOAL_SITE=verb FMI_FRONTIER=1"
 E16OFF="FMI_REALIZE= FMI_NOGOOD= FMI_FREE_T= FMI_GOAL_SITE= FMI_FRONTIER="
-ALLON="$(nogrow "$ALLON") FMI_SCOPE_GROW= $E16"
+ALLON="$(nogrow "$ALLON") FMI_SCOPE_GROW=room $E16"
 ALLOFF="$ALLOFF $E16OFF"
-A4="$(nogrow "$A4") FMI_SCOPE_GROW= $E16"
+A4="$(nogrow "$A4") FMI_SCOPE_GROW=room $E16"
 export A4 E16 E16OFF ALLON ALLOFF
 export LADDER=${LADDER:-$E13T/checks/release/ladder}
 # the demo: its files (read only) and its extraction (never committed)
