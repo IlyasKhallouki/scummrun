@@ -20,6 +20,7 @@ mod esc;
 mod hooks;
 mod rooms;
 mod settle;
+mod widen;
 
 pub use dialog::{LEFT_CLICK, VERB_CLICK_AREA};
 
@@ -94,8 +95,8 @@ pub const STEP_LIMIT: u32 = 5000;
 pub const ROUND_LIMIT: u32 = 400;
 /// model.py `TIME_VARS`' keys: VAR_CAMERA_POS_X, VAR_HAVE_MSG, VAR_LAST_SOUND, VAR_TALK_ACTOR
 pub const TIME_VARS: [i32; 4] = [2, 3, 23, 25];
-/// path ends left out of the predictions (model.py `INFEASIBLE`)
-pub const INFEASIBLE: [&str; 3] = ["spin", "nesting", "error"];
+/// path ends left out of the predictions (model.py `INFEASIBLE`; "widened" is E014's FMI_READ_WIDEN's, `widen.rs`)
+pub const INFEASIBLE: [&str; 4] = ["spin", "nesting", "error", "widened"];
 
 /// model.py `FEATURES`, as flags.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
@@ -260,6 +261,8 @@ pub struct Machine<'g> {
     pub path_limit: usize,
     pub step_limit: u32,
     pub round_limit: u32,
+    /// E014's switch FMI_READ_WIDEN (`widen.rs`): loops are widened in this run; off by default
+    pub widen_loops: bool,
     /// golden.py's TraceMachine events, when a run is traced
     pub trace: Option<Tracer>,
     /// the current run's unknowns (handed to its `Run`)
@@ -400,6 +403,7 @@ impl<'g> Machine<'g> {
             path_limit: PATH_LIMIT,
             step_limit: STEP_LIMIT,
             round_limit: ROUND_LIMIT,
+            widen_loops: false,
             trace: None,
             v: Vals::default(),
             cites: vec![None; game.ins.len()],
@@ -658,7 +662,9 @@ impl<'g> Machine<'g> {
                         // it out again, and gets the same: a merge changes nothing the signature holds)
                         let sig = p.joined.clone().expect("a merged path's join");
                         debug_assert!(self.join(&p, o).as_ref() == Some(&*sig));
-                        if matches!(p.stack.last(), Some(Entry::Frame(_))) && self.spins(&mut p, &sig) {
+                        if matches!(p.stack.last(), Some(Entry::Frame(_)))
+                            && (self.spins(&mut p, &sig) || (self.widen_loops && self.widen(&mut p)))
+                        {
                             break;
                         }
                     } else {
@@ -667,7 +673,9 @@ impl<'g> Machine<'g> {
                                 parked = Some(sig);
                                 break;
                             }
-                            if matches!(p.stack.last(), Some(Entry::Frame(_))) && self.spins(&mut p, &sig) {
+                            if matches!(p.stack.last(), Some(Entry::Frame(_)))
+                                && (self.spins(&mut p, &sig) || (self.widen_loops && self.widen(&mut p)))
+                            {
                                 break;
                             }
                         }
