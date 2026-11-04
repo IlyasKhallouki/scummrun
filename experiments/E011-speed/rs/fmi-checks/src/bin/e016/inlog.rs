@@ -39,6 +39,10 @@ pub fn run(argv: &[String]) -> Res<()> {
     let v = json!({"from": status_json(&st0), "to": status_json(&st1), "ended": ended, "records_before": dropped0,
                    "dropped": log.dropped, "verbs_at_from": verbs, "offer_at_from": offer,
                    "inventory_at_from": o.inventory,
+                   "objects_at_from": o.room_objects.as_deref().unwrap_or(&[]).iter()
+                       .map(|r| json!([r.id, r.x, r.y, r.w, r.h, r.parent, r.walk, o.classes.iter().find(|c| c.0 as i32 == r.id).map(|c| c.1.clone())]))
+                       .collect::<Vec<_>>(),
+                   "actors_at_from": o.actors.iter().map(|x| json!([x.id, x.x, x.y, x.elevation])).collect::<Vec<_>>(),
                    "records": log.records.iter().map(record_json).collect::<Vec<_>>()});
     std::fs::write(out.join("inlog.json"), serde_json::to_string_pretty(&v).map_err(e2s)?).map_err(e2s)?;
     println!("{v}");
