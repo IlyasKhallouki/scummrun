@@ -96,8 +96,9 @@ pub fn run(argv: &[String]) -> Res<()> {
     let f0 = e.facts().map_err(e2s)?;
     let start = json!({"frame": st0.frame, "room": st0.room, "idle": st0.idle, "xstart": st0.xstart, "rng": st0.rng,
                        "owner": f0.val(Key::owner(obj)), "class": f0.val(ck)});
-    // the second pass's start: a fork of the same stop
+    // the second pass's start: a fork of the same stop; and a control fork that gets the first pass's events at once
     let mut e2 = e.fork().map_err(e2s)?;
+    let mut e3 = e.fork().map_err(e2s)?;
     let cfg = Cfg::default();
     e.segment(true).map_err(e2s)?;
     e.runs().map_err(e2s)?;
@@ -200,8 +201,21 @@ pub fn run(argv: &[String]) -> Res<()> {
             }
             let d1 = e.digest().map_err(e2s)?.digest;
             let d2 = e2.digest().map_err(e2s)?.digest;
+            let diff = e.facts().map_err(e2s)?.diff(&e2.facts().map_err(e2s)?);
             hook["frame"] = json!(e2.status().frame);
             hook["digest_equal"] = json!(d1 == d2 && e2.status().frame == target);
+            hook["facts_differ"] = json!(diff.len());
+            hook["first"] = json!(diff.iter().take(8).map(|(k, x, y)| json!([k.text(), x, y])).collect::<Vec<_>>());
+            hook["rng"] = json!([e.status().rng, e2.status().rng]);
+            hook["tick"] = json!([e.status().tick, e2.status().tick]);
+            // the control: a fork of the start given the realized events at once and run to the same frame in one run
+            e3.inputs(&realized).map_err(e2s)?;
+            e3.run(&RunSpec { frame: Some(target), ..Default::default() }).map_err(e2s)?;
+            let d3 = e3.digest().map_err(e2s)?.digest;
+            let f3 = e3.facts().map_err(e2s)?;
+            hook["control"] = json!({"frame": e3.status().frame, "digest_equal_first": d3 == d1, "digest_equal_hook": d3 == d2,
+                                     "facts_differ_first": e.facts().map_err(e2s)?.diff(&f3).len(),
+                                     "facts_differ_hook": e2.facts().map_err(e2s)?.diff(&f3).len()});
         }
         v["hook"] = hook;
         v["pass"] = json!(pass && verified);
@@ -210,6 +224,7 @@ pub fn run(argv: &[String]) -> Res<()> {
     }
     e.quit();
     e2.quit();
+    e3.quit();
     write_events(&out.join("events.jsonl"), &realized)?;
     v["seconds"] = json!(t0.elapsed().as_secs_f64());
     std::fs::write(out.join("g3.json"), serde_json::to_string_pretty(&v).map_err(e2s)?).map_err(e2s)?;
