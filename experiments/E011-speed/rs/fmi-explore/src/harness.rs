@@ -23,6 +23,24 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+/// E014 amendment (8)'s switch `FMI_GOAL_FACT=1` (assumptions row 23): before a plan, a target fact the task's reading
+/// does not hold after a refinement stops the attempt (`goal_fact_stop`) without calling the planner, whose error it was
+/// ("taskcore: --goal: no fact ..."). Unset: as before.
+pub fn goal_fact_on() -> bool {
+    std::env::var("FMI_GOAL_FACT").is_ok_and(|v| v == "1")
+}
+
+/// The first of the goal's facts that the reading's domains do not hold.
+pub fn missing_goal_fact(goal: &[(Key, Vec<Val>)], doms: &Domains) -> Option<Key> {
+    goal.iter().map(|g| g.0).find(|k| doms.get(*k).is_none())
+}
+
+/// The stop of an attempt whose refined task holds no fact of its target: a refinement's stop (model-blind in the
+/// stall table), not the planner's error.
+pub fn goal_fact_stop(k: Key) -> String {
+    format!("refinement: the refined task holds no fact of the target: {}", k.text())
+}
+
 /// The harness's settings (step.py's attempt wiring).
 #[derive(Clone, Debug)]
 pub struct HarnessCfg {
@@ -242,6 +260,16 @@ impl<'a> Harness<'a> {
                 e.insert("status".into(), json!("same input"));
                 e.insert("steps".into(), json!([]));
                 self.stop(format!("replan at frame {frame} with plan {pn}'s start and bans and no frame played since: the same plan again"));
+                return Ok(false);
+            }
+        }
+        let refined = self.refinements.iter().any(|t| t["added"].as_array().is_some_and(|a| !a.is_empty()));
+        if goal_fact_on() && refined {
+            if let Some(k) = missing_goal_fact(&self.goal, doms) {
+                let e = self.plans.last_mut().unwrap();
+                e.insert("status".into(), json!("no target fact"));
+                e.insert("steps".into(), json!([]));
+                self.stop(goal_fact_stop(k));
                 return Ok(false);
             }
         }
