@@ -51,6 +51,19 @@ pub fn shift_on() -> bool {
     std::env::var(SHIFT_SWITCH).is_ok_and(|v| v == "1")
 }
 
+/// E016 section D's switch `FMI_FREE_T=archive` (experiments/E016-realize-run/plan.md, "D. Free tries without a fresh
+/// reading"): a free try never starts a reading. Its T is the union of T over the readings the archive has registered
+/// (job.json "novelty"."t", which the archive merges from its tries' T, with the try's stand-in's own T), and the wait
+/// views it through a registered reading: the scope's newest, else one of another scope holding the entry's room, else
+/// the newest of any scope (job.json "readings", "readings_room", "readings_any"). With none registered the free try
+/// keeps nothing. Model tries still read. Unset: a free try with no reading of its scope reads one, as in E013.
+pub fn t_archive() -> bool {
+    std::env::var("FMI_FREE_T").is_ok_and(|v| v == "archive")
+}
+
+/// E016 D: how many registered readings of any scope job.json "readings_any" lists, newest first.
+pub const READINGS_ANY: usize = 8;
+
 /// The driver's check at its start: with FMI_FREE set, a share in (0, 1], the progress order (FMI_SELECT=progress),
 /// and stall's port when FMI_FREE_SHIFT=1. With FMI_FREE unset there is nothing to check.
 pub fn check_env(a: &Archive) -> Res<()> {

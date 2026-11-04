@@ -388,3 +388,94 @@ fn the_wall_limit_stops_the_driver() {
     assert_eq!(s["stop"], json!("prediction bound"));
     assert_eq!(s["jobs"], json!(3));
 }
+
+/// E016: FMI_STOP_FILE. With the file there no try starts and the stop is "stop file", its detail the file's first line;
+/// without it the run goes to its other rules.
+#[test]
+fn a_stop_file_stops_the_driver() {
+    let _g = env(true);
+    let t = tmp("stopfile");
+    let root = make(&t, Some(json!({"stop_jobs": 3}))).root.clone();
+    let f = t.join("STOP");
+    std::env::set_var("FMI_STOP_FILE", &f);
+    std::fs::write(&f, "no new rung for 40 min\nmore\n").unwrap();
+    let s = drive(&root);
+    assert_eq!(s["stop"], json!("stop file"));
+    assert_eq!(s["jobs"], json!(0));
+    assert_eq!(s["detail"]["why"], json!("no new rung for 40 min"));
+    std::fs::remove_file(root.join("summary.json")).unwrap();
+    std::fs::remove_file(&f).unwrap();
+    let s = drive(&root);
+    std::env::remove_var("FMI_STOP_FILE");
+    assert_eq!(s["stop"], json!("prediction bound"));
+    assert_eq!(s["jobs"], json!(3));
+}
+
+/// E016 F's driver test: job 0 (the root, room 33) gives entries 1 (room 28) and 2 (room 35); job 1 (from entry 1) gives
+/// entry 3 in room 35 again, holding an object: three rooms on its chain. Then job 2's entry is entry 3 in the order,
+/// entry 2 with FMI_FRONTIER=1 (the first entry of room 35, which no job had yet).
+struct Rooms;
+
+impl Step for Rooms {
+    fn run(&self, job_dir: &Path, _log: &JobLog, _cancel: &AtomicBool) -> i32 {
+        let job = files::read_json(&job_dir.join("job.json")).unwrap();
+        let entry = job["entry"]["id"].as_u64().unwrap();
+        let c = job["entry"]["checkpoint"].clone();
+        let f0 = c[0].as_i64().unwrap();
+        let n: usize = job_dir.file_name().unwrap().to_string_lossy()[1..].parse().unwrap();
+        let news: Vec<(i64, Vec<(&str, Value)>)> = match n {
+            0 => vec![(5, vec![("room", json!(28))]), (6, vec![("room", json!(35))])],
+            1 => vec![(4, vec![("room", json!(35)), ("owner:600", json!(1))])],
+            _ => vec![],
+        };
+        let mut new = Vec::new();
+        for (k, (df, facts)) in news.iter().enumerate() {
+            let mut f = c[1].clone();
+            for (key, v) in facts {
+                f[*key] = v.clone();
+            }
+            let doc = json!({"id": null, "parent": entry, "frame": f0 + df, "tick": f0 + df,
+                             "events": [{"frame": f0 + df, "click": [2, 2]}], "checkpoints": [cp(f0 + df, f, f0 + df)]});
+            files::write_gz_default(&job_dir.join("new").join(format!("{k}.json.gz")), &doc).unwrap();
+            new.push(json!({"file": format!("new/{k}.json.gz"), "frame": f0 + df, "tick": f0 + df, "how": "checkpoint"}));
+        }
+        let res = json!({"job": job["job"], "entry": entry, "ok": true, "error": null, "return": {"same": true, "differ": {}, "boot_s": 0.0},
+                         "reading": null, "targets": {"by_tier": {"0": 0, "1": 1, "2": 0}, "first": []}, "probes": [], "attempt": null,
+                         "readings_made": [], "new": new, "tried": [], "exhausted": false, "tested": [], "dead": [],
+                         "cpu_s": {"total": 1.0}, "peak_rss_mb": {"python": 1.0, "children": 0.0}, "wall_s": 0.1});
+        std::fs::write(job_dir.join("result.json"), res.to_string()).unwrap();
+        0
+    }
+}
+
+fn drive_rooms(frontier: bool) -> (usize, Value) {
+    let t = tmp(if frontier { "front" } else { "order" });
+    let root = make(&t, Some(json!({"stop_jobs": 3}))).root.clone();
+    if frontier {
+        std::env::set_var("FMI_FRONTIER", "1");
+    }
+    std::env::set_var("E008_FLOOR_GB", "0.01");
+    std::env::set_var("E008_EVICT_GB", "0.01");
+    std::env::set_var("E008_MEM_SECOND_GB", "0");
+    std::env::set_var("E008_POLL_S", "0.01");
+    std::env::set_var("E008_DISK_PATH", &root);
+    std::env::set_var("E008_HEAVY_LOCK", root.join("heavy.lock"));
+    let mut st = DriverStats::default();
+    let s = driver::run(&root, 1, &StepMode::InProcess(Arc::new(Rooms)), None, &mut st);
+    std::env::remove_var("FMI_FRONTIER");
+    assert_eq!(s.unwrap()["jobs"], json!(3));
+    let j2 = files::read_json(&root.join("jobs/j00002/job.json")).unwrap();
+    let sel = files::read_json(&root.join("jobs/j00002/select.json")).unwrap();
+    (j2["entry"]["id"].as_u64().unwrap() as usize, sel)
+}
+
+#[test]
+fn e016_f_the_driver_gives_the_frontier_entry_the_next_worker() {
+    let _g = env(false);
+    let (e, sel) = drive_rooms(false);
+    assert_eq!(e, 3);
+    assert!(sel.get("frontier").is_none());
+    let (e, sel) = drive_rooms(true);
+    assert_eq!(e, 2);
+    assert_eq!(sel["frontier"], json!(true));
+}

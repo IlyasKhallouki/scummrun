@@ -1627,6 +1627,10 @@ impl Archive {
         if self.progress.is_some() {
             // E012: cells by (n, chosen), then their candidates' keys (plan.md 6)
             let nov = self.novel_counts();
+            if frontier_on() {
+                // E016 F: the frontier's entries first
+                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| self.sel_key_p(i, &nov));
+            }
             let mut cands: Vec<((i64, i64, i64, i64, i64, usize), usize)> = self
                 .cells
                 .iter()
@@ -1673,6 +1677,10 @@ impl Archive {
             busy_cells.insert(self.rows[*e].cell.as_str());
         }
         let nov = self.novel_counts();
+        if frontier_on() {
+            // E016 F: the frontier's entries first, whichever kind the next job is
+            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| self.sel_key_free(i, &nov));
+        }
         let mut cands: Vec<((i64, i64, i64, i64, i64, usize), usize)> = self
             .cells
             .iter()
@@ -1682,6 +1690,47 @@ impl Archive {
             .map(|i| (self.sel_key_free(i, &nov), i))
             .collect();
         cands.sort();
+        cands.into_iter().take(b).map(|(_, i)| i).collect()
+    }
+
+    /// E016 section F (`FMI_FRONTIER=1`, plan.md "F. Configuration and selection"): the frontier, every live entry that
+    /// is the first entry (least id) in its room and that no job has had as its entry yet, committed or running. Such
+    /// an entry is in a room no earlier entry held, and it gets the next free worker once.
+    pub fn frontier(&self) -> HashSet<usize> {
+        let mut first: HashMap<i64, usize> = HashMap::new();
+        for r in self.rows.iter().filter(|r| r.dead.is_none()) {
+            if let Some(room) = r.room {
+                first.entry(room).or_insert(r.id);
+            }
+        }
+        let mut chosen: HashSet<usize> = self.busy.values().map(|(e, _)| *e).collect();
+        chosen.extend(self.logs.iter().filter_map(|x| x.get("entry").and_then(|e| e.as_u64())).map(|e| e as usize));
+        first.into_values().filter(|i| !chosen.contains(i)).collect()
+    }
+
+    /// E016 F: the selection with the frontier first. Each idle cell gives its candidate as before, or its least
+    /// frontier entry that a candidate may be (live, not exhausted, in an allowed room); the frontier's entries come
+    /// first, then the rest, each part in the order `key` gives.
+    fn select_front<K: Ord>(&self, b: usize, busy_ids: &HashSet<usize>, busy_cells: &HashSet<&str>, nov: &HashMap<usize, i64>,
+                            key: impl Fn(usize) -> K) -> Vec<usize> {
+        let front = self.frontier();
+        let p = self.progress.as_ref();
+        let may = |i: usize| {
+            let r = &self.rows[i];
+            r.dead.is_none() && !p.is_some_and(|p| p.exhausted_now(i)) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
+        };
+        let mut cands: Vec<((bool, K), usize)> = self
+            .cells
+            .iter()
+            .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
+            .filter_map(|(cid, c)| {
+                let f = c.entries.iter().copied().filter(|&i| front.contains(&i) && may(i) && !busy_ids.contains(&i)).min();
+                f.or_else(|| self.candidate_p(cid, nov))
+            })
+            .filter(|i| !busy_ids.contains(i))
+            .map(|i| ((!front.contains(&i), key(i)), i))
+            .collect();
+        cands.sort_by(|a, b| a.0.cmp(&b.0));
         cands.into_iter().take(b).map(|(_, i)| i).collect()
     }
 
@@ -1956,6 +2005,14 @@ impl Archive {
             m.insert("novelty".into(), progress::novelty_json(p, &self.live_rows()));
             m.insert("dead".into(), Value::Array(self.dead_moves(i)));
         }
+        if crate::nogood::on() {
+            // E016 C: the entry's refutations, and the no-plan records of the scope's newest reading (a record of a
+            // reading that a newer one of its scope replaced, or that was evicted, is dropped)
+            let live: HashSet<String> =
+                self.readings_for(&scope).first().and_then(|x| x.get("path")).and_then(|p| p.as_str()).map(|p| p.to_string()).into_iter().collect();
+            let lines: Vec<&Value> = self.logs.iter().filter(|x| committed(x)).collect();
+            m.insert("nogood".into(), crate::nogood::job_json(&lines, i as i64, &live));
+        }
         // E014 amendment (4): the whole ring for the try's scope need (b), the readings that may stand in (a)
         if self.grown.is_some() {
             m.insert("ring".into(), json!(ring(&self.edges, row.room.unwrap_or(i64::MIN), &self.allowed)));
@@ -1999,13 +2056,37 @@ impl Archive {
         } else {
             self.sel_key_json(i)
         };
-        let sel = json!({"key": key, "cell": self.rows[i].cell, "selectable": self.n_selectable(), "time": files::now_s(),
-                         "kind": k.text(), "why": k.why, "rho": k.rho});
+        let mut sel = json!({"key": key, "cell": self.rows[i].cell, "selectable": self.n_selectable(), "time": files::now_s(),
+                             "kind": k.text(), "why": k.why, "rho": k.rho});
+        if frontier_on() {
+            sel["frontier"] = json!(self.frontier().contains(&i));
+        }
         files::write_json(&d.join("select.json"), &sel, Some(1))?;
         let mut doc = self.job_doc(&job, i)?;
         doc["kind"] = json!(k.text());
+        if k.free && crate::free::t_archive() {
+            // E016 D: the registered readings that may stand in for the wait, as the try never reads
+            let rows = |v: Vec<&ReadingRow>| -> Value {
+                Value::Array(v.into_iter().map(|x| json!({"path": x.get("path"), "start_entry": x.get("start_entry"), "scope": x.get("scope")})).collect())
+            };
+            if doc.get("readings_room").is_none() {
+                let room = self.rows[i].room;
+                doc["readings_room"] = rows(room.map(|r| self.readings_holding(r, &self.scope_of_room(Some(r)))).unwrap_or_default());
+            }
+            doc["readings_any"] = rows(self.readings_any(crate::free::READINGS_ANY));
+        }
         files::write_json(&d.join("job.json"), &doc, Some(1))?;
         Ok(d)
+    }
+
+    /// E016 D: the live registered readings of any scope, newest first, at most `n`.
+    pub fn readings_any(&self, n: usize) -> Vec<&ReadingRow> {
+        self.readings
+            .iter()
+            .rev()
+            .filter(|x| !truthy(x.get("evicted")) && x.get("path").and_then(|p| p.as_str()).map(|p| Path::new(p).exists()).unwrap_or(false))
+            .take(n)
+            .collect()
     }
 
     /// jobs/JOB/job.json for candidate ``i``, and select.json.
@@ -2013,8 +2094,12 @@ impl Archive {
         let job = self.next_job();
         let d = self.root.join("jobs").join(&job);
         fs::create_dir_all(&d).map_err(|e| files::io_err(&d, e))?;
-        let sel = json!({"key": self.sel_key_json(i), "cell": self.rows[i].cell, "selectable": self.n_selectable(),
-                         "time": files::now_s()});
+        let mut sel = json!({"key": self.sel_key_json(i), "cell": self.rows[i].cell, "selectable": self.n_selectable(),
+                             "time": files::now_s()});
+        if frontier_on() {
+            // E016 F: whether the entry was the frontier's
+            sel["frontier"] = json!(self.frontier().contains(&i));
+        }
         files::write_json(&d.join("select.json"), &sel, Some(1))?;
         files::write_json(&d.join("job.json"), &self.job_doc(&job, i)?, Some(1))?;
         Ok(d)
@@ -2285,6 +2370,10 @@ impl Archive {
             let dead = if outcome != "return differs" { res.get("dead").filter(|d| d.is_array()).cloned() } else { None };
             line.insert("dead".into(), dead.unwrap_or_else(|| json!([])));
         }
+        // E016 C (FMI_NOGOOD): what the try added to the failure memory (job_doc gives it to later tries)
+        if let Some(ng) = res.get("nogood").filter(|_| outcome != "return differs") {
+            line.insert("nogood".into(), ng.clone());
+        }
         if let Some(k) = job.get("kind") {
             // E013 (FMI_FREE): the job's kind, and the cell's free counts after it
             line.insert("kind".into(), k.clone());
@@ -2500,4 +2589,11 @@ fn stag_sweep() -> bool {
 /// the count alone, as before.
 pub fn stag_cells() -> bool {
     std::env::var("FMI_STAG_CELLS").is_ok_and(|v| v == "1")
+}
+
+/// E016 section F's switch `FMI_FRONTIER=1` (experiments/E016-realize-run/plan.md, "F. Configuration and selection"):
+/// under the progress order, an entry in a room that no earlier entry held goes ahead of the selection's order for
+/// the next free worker, once (`Archive::frontier`). Unset: the order as before.
+pub fn frontier_on() -> bool {
+    std::env::var("FMI_FRONTIER").is_ok_and(|v| v == "1")
 }
