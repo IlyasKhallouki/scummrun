@@ -1,7 +1,7 @@
 {
   "entry": 0,
   "entry_frame": 992,
-  "boot_s": 0.062512161,
+  "boot_s": 0.089985023,
   "start": {
     "frame": 992,
     "idle": "sentence",
@@ -16,7 +16,7 @@
       "approach": 0,
       "candidates": 1,
       "tries": 1,
-      "seconds": 0.001865146,
+      "seconds": 0.002733452,
       "events": [
         {
           "frame": 993,
@@ -43,7 +43,7 @@
               ]
             }
           ],
-          "seconds": 0.0016314
+          "seconds": 0.00240276
         }
       ],
       "next_idle": {
@@ -61,7 +61,7 @@
       "approach": 2,
       "candidates": 1,
       "tries": 3,
-      "seconds": 0.010846363,
+      "seconds": 0.018486869,
       "events": [
         {
           "frame": 1043,
@@ -102,7 +102,7 @@
               ]
             }
           ],
-          "seconds": 0.001202552
+          "seconds": 0.002193078
         },
         {
           "phase": "near",
@@ -119,7 +119,7 @@
               ]
             }
           ],
-          "seconds": 0.001271066
+          "seconds": 0.002842079
         },
         {
           "phase": "sentence",
@@ -136,7 +136,7 @@
               ]
             }
           ],
-          "seconds": 0.00129335
+          "seconds": 0.002318082
         }
       ],
       "next_idle": {
@@ -154,7 +154,7 @@
       "approach": 0,
       "candidates": 1,
       "tries": 1,
-      "seconds": 0.001280166,
+      "seconds": 0.002239055,
       "events": [
         {
           "frame": 1232,
@@ -181,7 +181,7 @@
               ]
             }
           ],
-          "seconds": 0.001058734
+          "seconds": 0.001953996
         }
       ]
     }
@@ -219,7 +219,7 @@
       677179275
     ],
     "differences": 0,
-    "seconds": 0.080573148
+    "seconds": 0.18774288
   },
-  "seconds": 0.171048993
+  "seconds": 0.32655756
 }
