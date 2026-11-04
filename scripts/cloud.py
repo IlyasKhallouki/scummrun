@@ -236,7 +236,9 @@ def start(a) -> None:
     allow(rows, a.hours * rate, f"start ({a.type}, {model(a)}, {a.hours} h)")
     if vm["machineType"].rsplit("/", 1)[-1] != a.type:
         gcloud("compute", "instances", "set-machine-type", NAME, f"--zone={ZONE}", f"--machine-type={a.type}")
-    gcloud("compute", "instances", "set-scheduling", NAME, f"--zone={ZONE}", f"--provisioning-model={model(a)}",
+    # a VM last run as Spot keeps preemptible = true, which Google refuses with STANDARD unless it is cleared
+    pre = ["--no-preemptible"] if model(a) == "STANDARD" else []
+    gcloud("compute", "instances", "set-scheduling", NAME, f"--zone={ZONE}", f"--provisioning-model={model(a)}", *pre,
            "--instance-termination-action=STOP", f"--termination-time={until(a.hours)}")
     open_run(rows, a.type, a.hours, rate, model(a))
     write(rows)
