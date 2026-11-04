@@ -1,0 +1,618 @@
+{
+  "start": {
+    "frame": 2980,
+    "room": 42,
+    "idle": "sentence",
+    "xstart": 0,
+    "rng": 2450856443,
+    "owner": 1,
+    "class": 1
+  },
+  "boot_s": 0.217670841,
+  "steps": [
+    {
+      "step": "s3:490",
+      "ok": true,
+      "from": 2980,
+      "approach": 0,
+      "candidates": 4,
+      "tries": 10,
+      "seconds": 0.01639479,
+      "accepted_at": 2984,
+      "events": [
+        {
+          "frame": 2981,
+          "click": [
+            16,
+            175
+          ]
+        },
+        {
+          "frame": 2983,
+          "click": [
+            223,
+            79
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001684816
+        },
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.00150855
+        },
+        {
+          "phase": "sentence",
+          "name": "t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2982,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001463066
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.00147431
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001550028
+        },
+        {
+          "phase": "sentence",
+          "name": "v1t490",
+          "accepted": false,
+          "seen": "(10,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001346581
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": false,
+          "seen": "",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001681658
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": false,
+          "seen": "",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                203,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001545732
+        },
+        {
+          "phase": "sentence",
+          "name": "v5t490",
+          "accepted": false,
+          "seen": "",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                17,
+                161
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                243,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001431326
+        },
+        {
+          "phase": "sentence",
+          "name": "v3t490",
+          "accepted": true,
+          "seen": "(3,490,0)",
+          "frame": 2984,
+          "events": [
+            {
+              "frame": 2981,
+              "click": [
+                16,
+                175
+              ]
+            },
+            {
+              "frame": 2983,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001582948
+        }
+      ],
+      "next_idle": {
+        "frame": 2998,
+        "reason": "idle",
+        "room": 42,
+        "xstart": 0
+      }
+    },
+    {
+      "step": "s8:946:491",
+      "ok": true,
+      "from": 2998,
+      "approach": 1,
+      "candidates": 6,
+      "tries": 7,
+      "seconds": 0.013401137,
+      "accepted_at": 3008,
+      "events": [
+        {
+          "frame": 2999,
+          "click": [
+            219,
+            109
+          ]
+        },
+        {
+          "frame": 3003,
+          "click": [
+            110,
+            161
+          ]
+        },
+        {
+          "frame": 3005,
+          "click": [
+            290,
+            154
+          ]
+        },
+        {
+          "frame": 3007,
+          "click": [
+            227,
+            83
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "phase": "near",
+          "name": "w10",
+          "accepted": true,
+          "seen": "walk=1 toward=0 hit=1 xstart=0->0",
+          "frame": 3002,
+          "events": [
+            {
+              "frame": 2999,
+              "click": [
+                219,
+                109
+              ]
+            }
+          ],
+          "seconds": 0.001587963
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v1t491",
+          "accepted": false,
+          "seen": "(8,491,0)",
+          "frame": 3008,
+          "events": [
+            {
+              "frame": 3003,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3005,
+              "click": [
+                2,
+                154
+              ]
+            },
+            {
+              "frame": 3007,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001674338
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v101t491",
+          "accepted": false,
+          "seen": "(8,20,491)",
+          "frame": 3008,
+          "events": [
+            {
+              "frame": 3003,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3005,
+              "click": [
+                162,
+                154
+              ]
+            },
+            {
+              "frame": 3007,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001850509
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v102t491",
+          "accepted": false,
+          "seen": "(8,937,491)",
+          "frame": 3008,
+          "events": [
+            {
+              "frame": 3003,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3005,
+              "click": [
+                194,
+                154
+              ]
+            },
+            {
+              "frame": 3007,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001787847
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v103t491",
+          "accepted": false,
+          "seen": "(8,934,491)",
+          "frame": 3008,
+          "events": [
+            {
+              "frame": 3003,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3005,
+              "click": [
+                226,
+                154
+              ]
+            },
+            {
+              "frame": 3007,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001910476
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v104t491",
+          "accepted": false,
+          "seen": "(8,933,491)",
+          "frame": 3008,
+          "events": [
+            {
+              "frame": 3003,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3005,
+              "click": [
+                258,
+                154
+              ]
+            },
+            {
+              "frame": 3007,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001860088
+        },
+        {
+          "phase": "inventory",
+          "name": "v8v105t491",
+          "accepted": true,
+          "seen": "(8,946,491)",
+          "frame": 3008,
+          "events": [
+            {
+              "frame": 3003,
+              "click": [
+                110,
+                161
+              ]
+            },
+            {
+              "frame": 3005,
+              "click": [
+                290,
+                154
+              ]
+            },
+            {
+              "frame": 3007,
+              "click": [
+                227,
+                83
+              ]
+            }
+          ],
+          "seconds": 0.001559124
+        }
+      ]
+    }
+  ],
+  "all_realized": true,
+  "candidates": 10,
+  "run_on": {
+    "last_input": 3007,
+    "local_ran": 3010,
+    "class_cleared": 3010,
+    "both": 3010,
+    "ended": null,
+    "stop": 3010,
+    "room": 42,
+    "owner": 1,
+    "class": 0
+  },
+  "verify": {
+    "frame": 3010,
+    "got_frame": 3010,
+    "inputs": 36,
+    "facts": 3870,
+    "facts_differ": 0,
+    "first": [],
+    "room": [
+      42,
+      42
+    ],
+    "digest": [
+      "f13abc735dd7e0ed",
+      "f13abc735dd7e0ed"
+    ],
+    "differences": 0,
+    "seconds": 0.157700523
+  },
+  "hook": {
+    "events": [
+      {
+        "frame": 2981,
+        "click": [
+          16,
+          175
+        ]
+      },
+      {
+        "frame": 2983,
+        "click": [
+          223,
+          79
+        ]
+      },
+      {
+        "frame": 2999,
+        "click": [
+          219,
+          109
+        ]
+      },
+      {
+        "frame": 3003,
+        "click": [
+          110,
+          161
+        ]
+      },
+      {
+        "frame": 3005,
+        "click": [
+          290,
+          154
+        ]
+      },
+      {
+        "frame": 3007,
+        "click": [
+          227,
+          83
+        ]
+      }
+    ],
+    "error": null,
+    "events_equal": true,
+    "frame": 3010,
+    "digest_equal": false,
+    "facts_differ": 1,
+    "first": [
+      [
+        "var:56",
+        0,
+        -1
+      ]
+    ],
+    "rng": [
+      849678398,
+      849678398
+    ],
+    "tick": [
+      15602,
+      15602
+    ],
+    "control": {
+      "frame": 3010,
+      "digest_equal_first": false,
+      "digest_equal_hook": true,
+      "facts_differ_first": 1,
+      "facts_differ_hook": 0
+    }
+  },
+  "pass": true,
+  "seconds": 0.413741377
+}
