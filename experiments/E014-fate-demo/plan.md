@@ -269,3 +269,122 @@ moved into the reader's internals to make the model see more. That is the case E
 code: a standing model-free share (the interface's inputs, waits and delays, from cells chosen by novelty) and stall
 accounting. So E014 continues after E013, on E013's build, with one more rule: a fix counts only if it is switched on
 for Monkey Island too and Monkey Island's checks still pass; a mechanic only this demo uses is recorded, not ported.
+
+## Amendment 2026-11-04 (3): the interactive demo on E013's build, every switch on, on the cloud VM
+
+Written and committed before the run, after the laptop check below. The sections above stay as written; their
+predictions are not edited. This is E013's run F (E013 amendment (2) (c)), written up in this plan: F's predictions in
+E013's plan stand and are scored there as written; the predictions below are this amendment's own.
+
+### Why now
+
+The PI, 2026-11-04: "Honestly, it feels like we should just move on to the demo then." E013's integration stopped
+before its kitchen rerun K1 (E013 plan, last section), and the PI approved (2026-11-03) running the demo on the cloud
+VM. The stall table over E014's stalled scratch archives (E013 `results/stall/demo-scratch-p5..p7.md`) put 59-61% of
+the seconds in planned moves that reached nothing new and 35-37% in interface inputs that changed nothing tracked; with
+the interface's atoms counted as progress (rows 16-18 of the assumptions table) 74% of p7's seconds were productive.
+
+### The build and the switches
+
+- **Code.** e014 merged e013 at 2797fb1 (merge 062d639); no code is added for this run and none is demo-specific.
+- **Binaries.** E013's build `/var/tmp/fast-mi/target-e013` (cargo found it current with e013's head; `fmi` sha1
+  f5b27870, `reader-scope` 135bf06b).
+- **Engine.** `/var/tmp/fast-mi/svm-e013` (patches 0001-0005, 0006-e014 and 0007; the tree's diff over 0006-e014 is
+  patch 0007 byte for byte; `scummvm` sha1 e9a809b2).
+- **Switches.** E013's `ALLON` (E013 amendment (2) (b)), one set for both games:
+  - ON3 (round 2's switches, the no-plan proofs, deepening);
+  - every E012 switch (`FMI_WAIT=1 FMI_TARGET_PER_KEY=1 FMI_DELAY_FORK=1 FMI_AFFORD=1 FMI_SELECT=progress
+    SPEEDRUN_REPORT_RESTART=1 FMI_BOXES=1 FMI_READER_LIB=1`);
+  - E014's mechanisms (`SPEEDRUN_IDLE=handler SPEEDRUN_END_SITE=1 FMI_GOAL_END=1 FMI_READ_EVENTS=1 FMI_EGO_VALUES=1
+    FMI_MERGE_DEDUP=1 FMI_READ_CUT=1 FMI_STAG_SWEEP=1 FMI_VERBS_VAR_ON=1 FMI_NOVEL_VERBS=1 FMI_NOVEL_GUIDE=1`);
+  - E013's (`SPEEDRUN_INPUT=1 FMI_REFUSE=1 FMI_STALLS=1 FMI_FREE=0.25 FMI_FREE_SHIFT=1`): the input log, refused
+    inputs with the shared waits, the stall table, the model-free share and its shift.
+- **The game's settings** are the run's inputs, not mechanisms: `FMI_GAME_ID=atlantis`, `FMI_GAME_DIR`,
+  `FMI_GAME_SCRIPTS` (amendment (2)'s files and extraction). Scripts: `vm/env.sh`, `vm/run.sh`, `vm/vm.sh`.
+
+### The run
+
+- **Settings.** Amendment (2)'s run: a new archive `/var/tmp/fast-mi/e014-archives/play-vm`, stage `play`, goal
+  `end = 1`, the guide from `fmi guide map --goal end=1 --start-boot` (the same file as amendment (2)'s, its timing
+  aside), the rooms from the files (the guide's reached rooms cut to the files' rooms: 10 of the 11; room 98 is not
+  among the guide's reached rooms), E009's switches, play when ready, commit as finished, the falsifier at 80 committed
+  tries, seed 1.
+- **Changed from E013's F:**
+  - the archive's path;
+  - b = 12 on the VM, not 2;
+  - the heavy lock off (`E008_HEAVY_LOCK=none`);
+  - K1 did not run before it.
+- **b.** The laptop check measured a try at about 2.5 cores (the reading's three threads, about 2 cores busy, and the
+  driver) and at most 0.5 GB of RSS, so the VM's 30 cores give b = 12; its 120 GB do not bind.
+- **The VM.** One start of `n2-custom-30-122880`, standard, through main's `scripts/cloud.py` ($1.5346/h; $12.45 left
+  under the ledger's stop).
+  - **Set up as E009's `vm_stage1.sh`.** The laptop's binaries and engine go to the same paths, with the copied loader
+    and libraries; each binary's code section is checked against the laptop's. The demo's files and extraction go to
+    the VM's private disk at the same paths, never into git.
+  - **The check before the run.** The laptop's 2-try archive with the run's settings and b = 1 (`vm-check2`: 21
+    entries, each verified from boot on the laptop, 0 differences) is verified from boot on the VM. The same 2 tries
+    then run on the VM at the same paths, and must give the same files as the laptop's (timing aside).
+  - **Copies back.** The archive's `log.jsonl` is copied to the laptop's
+    `/var/tmp/fast-mi/e014-archives/play-vm/log.jsonl` every 2 minutes, and the archive without readings every 30
+    minutes. At the end, every entry is verified from boot on the VM, the archive is copied back without readings, and
+    the VM is stopped.
+- **Verify.** Any goal entry is verified from boot on the laptop's lean engine (`fmi explore verify`).
+  - E008's `explore.py verify` on svm-w3b cannot run this game: the frozen reference's release table
+    (`src/speedrun/releases.py`) holds only Monkey Island's targets.
+  - A goal chain with no player input is reported as the game playing itself, not as reached.
+
+### What the laptop check showed before this amendment
+
+Three tries with the run's settings and b = 1 (`/var/tmp/fast-mi/e014-archives/vm-check`):
+
+- j00000 took 40.9 s (its reading 40.7 s) and reached var:52 = 0 by the plan.
+- j00001 took 15.6 s: from entry 1, the affordance step kept 18 entries (19 new cells, 94 new atoms of T).
+- j00002 started from entry 3, the wait's stop at frame 1042 after the opening dialog. Its fresh reading of the
+  8-room scope was still running after 29 minutes, in pass 1's event rounds:
+  - rounds 1-3: 572 runs in 30 s;
+  - round 9: 13 runs in 638 s;
+  - round 10: 7 runs in 190 s.
+
+  The reading has no wall bound, only the path and step limits. This is the first break of this run, row 19 of the
+  assumptions table: recorded and not fixed for this run.
+
+### Projection and the hours booked
+
+- **Fresh readings.** A model try from a state after the opening dialog may read for 30-90 minutes on the laptop. An
+  n2 core runs a thread about 1.5-2 times as fast as the laptop's (an i5-8350U at 58% of its clock), so 15-60 minutes
+  on the VM.
+- **Free tries** take the newest cached reading of their scope and read nothing fresh.
+- **Driver wall.** 80 tries with about 50 fresh readings over 12 workers: about 1-4 h.
+- **Hours booked.** About 0.5 h more goes to the setup, the check, the verify and the copies, so with the margin of
+  1.5 the start books H = 6 h ($9.21). The ledger counts the hours used once the VM is stopped.
+- **The VM's watchdog.** Google stops the VM at H. If the run has not stopped 20 minutes before that, the driver is
+  stopped there. The archive's committed tries are copied back and verified, and the write-up says that the VM's
+  booked time, not a stop rule, ended the run.
+
+### Stop rule
+
+As E013's F, with one addition for a break that stops the driver.
+
+- **When the run stops:** at the goal, at E009's stop rules (stagnation over T and rooms, an exhausted archive), or at
+  the falsifier (80 committed tries). It runs once. Exactness first: an entry that differs on verify from boot stops
+  everything until it is explained.
+- **A break that stops the driver** (an error on every try, a crash, "repeated failure") is fixed by a dated amendment
+  written before its code. The fix is built and tested on the laptop with rule (2) on Monkey Island: the 15 B3 tries'
+  entries verify from boot, and the kitchen chain of E012's archive verifies. It is then pushed to the VM, and the run
+  resumes from its files.
+- **Any other break** is a row of the assumptions table, recorded and not applied to the run.
+
+### Predictions (before the run)
+
+| | predicted |
+|---|---|
+| how it stops | the falsifier at 80 committed tries: 40%; E009's stagnation: 25%; the VM's booked time first: 25%; the goal: 10% |
+| committed tries | 30-80 |
+| rooms entered, of the 11 in the files | 2-5, most likely 3 (room 49, the root's, counted) |
+| the end | not reached; reached by the system's own inputs and verified from boot: 10% |
+| the stall table's top causes | productive 30-70% of the seconds; then interface, no yield 10-35%; model, no yield 5-30%; no plan 0-15%; refused input 0-10%; the rest row at most 1%; the reading's rows (read, in whichever class) at least 50% of the run's seconds |
+| free tries | 25-50% of the committed tries; at least 30% of them keep a novel entry |
+| longest stretch with no new atom of T or room | 5-20 committed tries |
+| new rows of the assumptions table | 1-3, row 19 included |
+| entries verified from boot | every entry, 0 differences |
+| the VM | 2-6 h used, $3.1-9.2 |
