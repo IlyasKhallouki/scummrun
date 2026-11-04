@@ -552,3 +552,26 @@ this commit's tree.
   C3. The 40-minute rule had not fired.
 - Monkey Island's checks are owed with this set; the last laptop attempt broke under the laptop's load (b3's warm
   process died at load 22, and its watcher held the heavy lock).
+
+### (11) 2026-11-04: places before cells in the selection; play9's amended rerun
+
+- **After (10):** from 21:08 to 21:45 UTC the run made 334+ tries, all from rooms 49 and 63, none from room 69. No
+  entry kept a place (`place=` never appears in the log), and the ladder stayed at C3.
+  - The place novelty acts only in tries that start where 946 is held, and the selection never went back to room 69:
+    room 49 kept making untried cells (3,382 entries at 21:39).
+  - This is the first investigator's selection finding of (10). The check called it optional; this run shows it is
+    needed.
+- **Fix, `FMI_SELECT_PLACE=1`:** the model's and the free selection order places before cells.
+  - Per place, the place being the cell key's room and owned objects, n counts the tries since one gave a new atom of
+    T or a room, and chosen counts every try, as a cell's counts do (`Archive::place_key`, from the log, cached per
+    log length).
+  - A place whose tries make new cells but nothing new in T can no longer hold every worker.
+  - select.json gives "place" and "place_key".
+  - Test: `places_tried_without_yield_come_after_untried_places` (tests/free.rs). fmi-explore's lib (51), free (8),
+    grow (10 with the earlier tests), nogood and free_explore tests pass on the VM build.
+- **The stop rule:** play9 stands at C3. The operator stopped it at 21:45, 4 minutes before its 40-minute rule.
+  - From the archive (about 1,000 tries, 3,382 entries), the run goes on with (9)-(11) as play9's one amended rerun.
+  - If it also stops below C5, patching stops and E016 is written up.
+- Also seen: at 21:41-21:45 no try committed for 4 minutes before the stop. With every try in one room, the tries
+  share one reading and so one planner, whose lock (9) still serializes them; plans after the first keep the 600 s
+  limit.

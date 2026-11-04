@@ -582,6 +582,9 @@ pub struct Archive {
     /// job -> (entry id, cell)
     pub busy: BTreeMap<String, (usize, String)>,
     chain_r: RefCell<HashMap<usize, Rc<HashSet<(String, i64)>>>>,
+    /// E016 amendment (11) (FMI_SELECT_PLACE=1): per place, the model's and the free tries' (n, chosen), made from
+    /// the log once per its length
+    place_counts: RefCell<Option<(usize, [HashMap<String, (i64, i64)>; 2])>>,
     pub e009: Map<String, Value>,
     pub e010: Map<String, Value>,
     pub idle_frames: i64,
@@ -710,6 +713,7 @@ impl Archive {
             progress: prog,
             next_dead: None,
             chain_rooms: RefCell::new(HashMap::new()),
+            place_counts: RefCell::new(None),
             free_on: crate::free::rho0().is_some(),
             grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
         })
@@ -1629,15 +1633,15 @@ impl Archive {
             let nov = self.novel_counts();
             if frontier_on() {
                 // E016 F: the frontier's entries first
-                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| self.sel_key_p(i, &nov));
+                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_key(i, false), self.sel_key_p(i, &nov)));
             }
-            let mut cands: Vec<((i64, i64, i64, i64, i64, usize), usize)> = self
+            let mut cands: Vec<(((i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
                 .cells
                 .iter()
                 .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
                 .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
                 .filter(|i| !busy_ids.contains(i))
-                .map(|i| (self.sel_key_p(i, &nov), i))
+                .map(|i| ((self.place_key(i, false), self.sel_key_p(i, &nov)), i))
                 .collect();
             cands.sort();
             return cands.into_iter().take(b).map(|(_, i)| i).collect();
@@ -1679,18 +1683,55 @@ impl Archive {
         let nov = self.novel_counts();
         if frontier_on() {
             // E016 F: the frontier's entries first, whichever kind the next job is
-            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| self.sel_key_free(i, &nov));
+            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_key(i, true), self.sel_key_free(i, &nov)));
         }
-        let mut cands: Vec<((i64, i64, i64, i64, i64, usize), usize)> = self
+        let mut cands: Vec<(((i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
             .cells
             .iter()
             .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
             .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
             .filter(|i| !busy_ids.contains(i))
-            .map(|i| (self.sel_key_free(i, &nov), i))
+            .map(|i| ((self.place_key(i, true), self.sel_key_free(i, &nov)), i))
             .collect();
         cands.sort();
         cands.into_iter().take(b).map(|(_, i)| i).collect()
+    }
+
+    /// E016 amendment (11): the place of entry i, its cell key's room and owned objects (None: a cell without a key).
+    pub fn place_of_row(&self, i: usize) -> Option<String> {
+        let k = self.cell(&self.rows[i].cell).key.as_ref()?;
+        Some(format!("{}|{}", k.get(0)?, k.get(1)?))
+    }
+
+    /// E016 amendment (11) (`FMI_SELECT_PLACE=1`): the place's (n, chosen) for the model's tries (free false) or the
+    /// free tries, counted as a cell's (`recount`): n is the tries from the place since one gave a new atom of T or a
+    /// room, chosen every try. A place's order comes before its cells': a place whose tries keep making new cells but
+    /// nothing new in T (a conversation) cannot hold every worker. (0, 0) with the switch off.
+    pub fn place_key(&self, i: usize, free: bool) -> (i64, i64) {
+        if !select_place_on() {
+            return (0, 0);
+        }
+        let Some(pl) = self.place_of_row(i) else { return (0, 0) };
+        let mut cache = self.place_counts.borrow_mut();
+        if cache.as_ref().map(|c| c.0) != Some(self.logs.len()) {
+            let mut counts: [HashMap<String, (i64, i64)>; 2] = [HashMap::new(), HashMap::new()];
+            for x in &self.logs {
+                if !committed(x) || x["outcome"].as_str() == Some("return differs") {
+                    continue;
+                }
+                let Some(e) = x.get("entry").and_then(|e| e.as_u64()).map(|e| e as usize) else { continue };
+                if e >= self.rows.len() {
+                    continue;
+                }
+                let Some(q) = self.place_of_row(e) else { continue };
+                let gave = |k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                let c = counts[crate::free::line_is_free(x) as usize].entry(q).or_insert((0, 0));
+                c.0 = if gave("new_t") || gave("new_rooms") { 0 } else { c.0 + 1 };
+                c.1 += 1;
+            }
+            *cache = Some((self.logs.len(), counts));
+        }
+        cache.as_ref().unwrap().1[free as usize].get(&pl).copied().unwrap_or((0, 0))
     }
 
     /// E016 section F (`FMI_FRONTIER=1`, plan.md "F. Configuration and selection"): the frontier, every live entry that
@@ -2061,6 +2102,10 @@ impl Archive {
                              "kind": k.text(), "why": k.why, "rho": k.rho});
         if frontier_on() {
             sel["frontier"] = json!(self.frontier().contains(&i));
+        }
+        if select_place_on() {
+            sel["place"] = json!(self.place_of_row(i));
+            sel["place_key"] = json!(self.place_key(i, k.free));
         }
         files::write_json(&d.join("select.json"), &sel, Some(1))?;
         let mut doc = self.job_doc(&job, i)?;
@@ -2597,4 +2642,9 @@ pub fn stag_cells() -> bool {
 /// the next free worker, once (`Archive::frontier`). Unset: the order as before.
 pub fn frontier_on() -> bool {
     std::env::var("FMI_FRONTIER").is_ok_and(|v| v == "1")
+}
+
+/// E016 amendment (11): the selection orders places before cells (`Archive::place_key`).
+pub fn select_place_on() -> bool {
+    std::env::var("FMI_SELECT_PLACE").is_ok_and(|v| v == "1")
 }
