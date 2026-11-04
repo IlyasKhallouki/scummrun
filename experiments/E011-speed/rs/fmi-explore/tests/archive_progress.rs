@@ -391,6 +391,102 @@ fn stagnation_over_t_and_rooms() {
     assert!(!a.stagnant());
 }
 
+/// E014 amendment (7)'s switch, set for one test and unset when it ends (the ENV lock is held by the caller).
+struct StagCells;
+
+impl StagCells {
+    fn on() -> StagCells {
+        std::env::set_var("FMI_STAG_CELLS", "1");
+        StagCells
+    }
+}
+
+impl Drop for StagCells {
+    fn drop(&mut self) {
+        std::env::remove_var("FMI_STAG_CELLS");
+    }
+}
+
+/// A committed log line of a try from `entry`: its kind, its outcome, and whether it gave a new atom of T.
+fn tried(job: &str, entry: usize, kind: &str, outcome: &str, gave: bool) -> Value {
+    json!({"job": job, "entry": entry, "kind": kind, "outcome": outcome, "new_t": if gave { json!(["var:103=1"]) } else { json!([]) },
+           "new_rooms": [], "new_r": if gave { json!([["var:103", 1]]) } else { json!([]) }, "selectable": 3})
+}
+
+/// Three cells: the root's, p's (var:103 = 1) and q's (state:316 = 1), each selectable.
+fn three_cells(a: &mut Archive) -> (usize, usize, Vec<String>) {
+    let l = ingest(a, 0, &[nw(5, &[("var:103", json!(1))]), nw(6, &[("state:316", json!(1))])],
+                   &[v("var:103", 1), v("state:316", 1)]);
+    let (p, q) = (ids(&l)[0], ids(&l)[1]);
+    let cells: Vec<String> = [0, p, q].iter().map(|&i| a.rows[i].cell.clone()).collect();
+    assert_eq!(cells.iter().collect::<BTreeSet<_>>().len(), 3);
+    assert_eq!(a.n_selectable(), 3);
+    (p, q, cells)
+}
+
+#[test]
+fn stagnation_waits_for_a_try_from_every_selectable_cell() {
+    let _g = switch(true);
+    let t = tmp("stagcells");
+    let mut a = make(&t);
+    let (p, q, cells) = three_cells(&mut a);
+    // the try that gave progress, then three that gave none, from the root's cell and p's: the count (3 >= 3) is
+    // reached, q's cell has no try since
+    a.logs = vec![tried("j0", 0, "model", "ok", true), tried("j1", 0, "model", "ok", false), tried("j2", p, "free", "ok", false),
+                  tried("j3", p, "model", "ok", false)];
+    assert!(a.stagnant(), "the count alone");
+    let sw = StagCells::on();
+    assert!(!a.stagnant());
+    let since: Vec<&Value> = a.logs[1..].iter().collect();
+    assert_eq!(a.untried_selectable(&since), vec![cells[2].clone()]);
+    // a "return differs" from q's cell is no try of it; a free try is
+    a.logs.push(tried("j4", q, "free", "return differs", false));
+    assert!(!a.stagnant());
+    a.logs.push(tried("j5", q, "free", "ok", false));
+    assert!(a.stagnant());
+    // a new atom starts a new sweep: the count and every cell again; an error counts as a try
+    a.logs.push(tried("j6", q, "model", "ok", true));
+    a.logs.extend([tried("j7", 0, "model", "ok", false), tried("j8", p, "model", "error", false), tried("j9", p, "free", "ok", false)]);
+    assert!(!a.stagnant());
+    a.logs.push(tried("j10", q, "model", "ok", false));
+    assert!(a.stagnant());
+    // before any try gave progress, the sweep is from the start
+    a.logs = vec![tried("j0", 0, "model", "ok", false), tried("j1", p, "model", "ok", false), tried("j2", p, "free", "ok", false)];
+    assert!(!a.stagnant());
+    // an exhausted cell (no candidate under the current T) is not waited for
+    let n = a.progress.as_ref().unwrap().t.len();
+    a.progress.as_mut().unwrap().exhausted.insert(q, n);
+    assert_eq!(a.n_selectable(), 2);
+    assert!(a.stagnant());
+    drop(sw);
+    // unset: the count alone again
+    a.progress.as_mut().unwrap().exhausted.clear();
+    a.logs = vec![tried("j0", 0, "model", "ok", true), tried("j1", 0, "model", "ok", false), tried("j2", 0, "free", "ok", false),
+                  tried("j3", 0, "model", "ok", false)];
+    assert!(a.stagnant());
+}
+
+#[test]
+fn stagnation_waits_for_every_selectable_cell_without_the_progress_order() {
+    let _g = switch(false);
+    let t = tmp("stagcells-off");
+    let mut a = make(&t);
+    assert!(a.progress.is_none());
+    let d = job(&a, 0, &[nw(5, &[("var:103", json!(1))]), nw(6, &[("state:316", json!(1))])], &[], false, json!([]));
+    let l = a.ingest(&d, None).unwrap();
+    let (p, q) = (ids(&l)[0], ids(&l)[1]);
+    let n = [0, p, q].iter().map(|&i| a.rows[i].cell.clone()).collect::<BTreeSet<_>>().len();
+    assert_eq!(n, 3);
+    assert_eq!(a.n_selectable(), 3);
+    a.logs = vec![tried("j0", 0, "model", "ok", true), tried("j1", 0, "model", "ok", false), tried("j2", p, "model", "ok", false),
+                  tried("j3", p, "model", "ok", false)];
+    assert!(a.stagnant(), "the count alone");
+    let _sw = StagCells::on();
+    assert!(!a.stagnant());
+    a.logs.push(tried("j4", q, "model", "ok", false));
+    assert!(a.stagnant());
+}
+
 #[test]
 fn off_nothing_of_e012_is_in_the_files() {
     let _g = switch(false);

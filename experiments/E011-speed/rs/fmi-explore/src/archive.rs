@@ -1707,7 +1707,7 @@ impl Archive {
                 Some(l) => as_i64(done[l].get("selectable")).unwrap_or(1).max(1),
             };
             let since = done.len() as i64 - last.map(|l| l as i64 + 1).unwrap_or(0);
-            return since >= frontier;
+            return since >= frontier && (!stag_cells() || self.swept(&done[last.map(|l| l + 1).unwrap_or(0)..]));
         }
         let last = done
             .iter()
@@ -1725,7 +1725,36 @@ impl Archive {
             Some(l) => as_i64(done[l].get("selectable")).unwrap_or(1).max(1),
         };
         let since = done.len() as i64 - last.map(|l| l as i64 + 1).unwrap_or(0);
-        since >= frontier
+        since >= frontier && (!stag_cells() || self.swept(&done[last.map(|l| l + 1).unwrap_or(0)..]))
+    }
+
+    /// E014 amendment (7) (`FMI_STAG_CELLS=1`): whether every cell selectable now has had a try among the committed
+    /// lines `since` (those after the last try that gave progress). A try is a committed line of either kind, errors
+    /// included and "return differs" excluded (as `recount` counts them); its cell is its entry's cell now.
+    pub fn swept(&self, since: &[&Value]) -> bool {
+        self.untried_selectable(since).is_empty()
+    }
+
+    /// The cells selectable now (the selection's own test) with no try among the committed lines `since`, in the cells'
+    /// order.
+    pub fn untried_selectable(&self, since: &[&Value]) -> Vec<String> {
+        let tried: HashSet<&str> = since
+            .iter()
+            .filter(|x| x["outcome"].as_str() != Some("return differs"))
+            .filter_map(|x| x.get("entry").and_then(|e| e.as_u64()).map(|e| e as usize))
+            .filter(|&e| e < self.rows.len())
+            .map(|e| self.rows[e].cell.as_str())
+            .collect();
+        if self.progress.is_some() {
+            let nov = self.novel_counts();
+            return self
+                .cells
+                .iter()
+                .filter(|(c, _)| !tried.contains(c.as_str()) && self.candidate_p(c, &nov).is_some())
+                .map(|(c, _)| c.clone())
+                .collect();
+        }
+        self.cells.iter().filter(|(c, _)| !tried.contains(c.as_str()) && self.selectable(c)).map(|(c, _)| c.clone()).collect()
     }
 
     /// {(entry, error): count} over the committed jobs that failed.
@@ -2463,4 +2492,12 @@ pub fn pyjson_text(v: &Value) -> String {
 /// e.g. a dialog at the start, stopped after one try). Unset: one cell, as before.
 fn stag_sweep() -> bool {
     std::env::var("FMI_STAG_SWEEP").is_ok_and(|v| v == "1")
+}
+
+/// E014 amendment (7)'s switch `FMI_STAG_CELLS=1`: stagnation fires only once every cell selectable now has had a
+/// committed try since the last try that gave a new atom of T or a new room (a new pair, without the progress order),
+/// besides the count. The count alone let the selection's order by frame leave late cells untried at the stop. Unset:
+/// the count alone, as before.
+pub fn stag_cells() -> bool {
+    std::env::var("FMI_STAG_CELLS").is_ok_and(|v| v == "1")
 }
