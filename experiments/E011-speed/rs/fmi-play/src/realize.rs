@@ -9,9 +9,9 @@
 //! * **The approach** (a target with no hit point on the screen): the floor points, nearest first to the target's
 //!   walk point in room coordinates, each clicked in a fork with no verb click and run to the bridge's next idle. A
 //!   click is accepted when its input log shows a walk and the camera's xstart moved toward the target, or the target
-//!   gained a hit point. From the accepted fork it repeats, at most `max_approach` clicks. E016 amendment (3): after
-//!   the boxes' usual points, each box's point nearest the target; then, as stepping stones, bare clicks on room
-//!   objects nearer the target, judged by the same test.
+//!   gained a hit point. From the accepted fork it repeats, at most `max_approach` clicks. E016 amendments (3) and (4):
+//!   each box's point nearest the target joins the boxes' usual points in that order; then, as stepping stones, bare
+//!   clicks on room objects nearer the target, judged by the same test.
 //! * **The sentence** (v, a, b): candidates in order, (i) a bare click on a, (ii) each offered verb slot then a, and
 //!   for a two-object sentence each of those followed by b, or by each visible slot when b has no hit point. Each is
 //!   tried at up to `max_points` of a's hit points, in a fork run until the input log has the last click's record. A
@@ -336,9 +336,10 @@ fn try_clicks(e: &mut Box<dyn Engine>, phase: &'static str, clicks: &[Point], cf
 }
 
 /// One approach click: the floor points nearest first to the target's place; the first accepted fork, run to the
-/// bridge's next idle (None: no point accepted, or the target has no place in the room). E016 amendment (3): after
-/// the walk boxes' usual points, each box's point nearest the target (`near_points`); when no floor point is
-/// accepted, a bare click on a room object nearer the target as a stepping stone (`stones`).
+/// bridge's next idle (None: no point accepted, or the target has no place in the room). E016 amendments (3) and
+/// (4): the walk boxes' usual points and each box's point nearest the target (`near_points`), in one list by
+/// distance to the target; when no floor point is accepted, a bare click on a room object nearer the target as a
+/// stepping stone (`stones`).
 fn approach_once(e: &mut Box<dyn Engine>, of: &Offer, a: i32, cfg: &Cfg, rec: &mut Rec) -> EResult<Option<Box<dyn Engine>>> {
     let o = e.obs(&ObsReq::default())?;
     let Some(place) = place_of(&o, a) else {
@@ -352,12 +353,12 @@ fn approach_once(e: &mut Box<dyn Engine>, of: &Offer, a: i32, cfg: &Cfg, rec: &m
         let (dx, dy) = ((rx - place.0) as i64, (ry - place.1) as i64);
         dx * dx + dy * dy
     };
-    let mut floor: Vec<Point> = of.walks.clone();
-    floor.sort_by_key(d2);
-    let mut near = near_points(e, of, place)?;
-    near.sort_by_key(d2);
-    let tries = floor.iter().map(|p| ("approach", *p, None)).chain(near.iter().map(|p| ("near", *p, None)));
+    // the boxes' usual points and each box's nearest point in one list, nearest the target first (amendment (4))
+    let mut floor: Vec<(&'static str, Point)> = of.walks.iter().map(|p| ("approach", *p)).collect();
+    floor.extend(near_points(e, of, place)?.into_iter().map(|p| ("near", p)));
+    floor.sort_by_key(|f| d2(&f.1));
     let stones = stones(&o, of, a, place, xs);
+    let tries = floor.into_iter().map(|(ph, p)| (ph, p, None));
     for (phase, p, stone) in tries.chain(stones.into_iter().map(|(p, s)| ("stone", p, Some(s)))) {
         if let Some(b) = approach_try(e, phase, p, stone, a, place, cfg, rec)? {
             return Ok(Some(b));
