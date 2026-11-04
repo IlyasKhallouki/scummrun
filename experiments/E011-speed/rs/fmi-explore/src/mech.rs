@@ -250,14 +250,34 @@ pub fn goal_end() -> bool {
     std::env::var("FMI_GOAL_END").is_ok_and(|v| v == "1")
 }
 
+/// E016 section E's switch `FMI_GOAL_SITE=verb` (experiments/E016-realize-run/plan.md, "E. The end must come from a
+/// verb handler"): with `goal_end` on, an end is the goal's entry only when the slot that ran systemOps runs an
+/// object's verb handler (`end_from_verb`). Unset (the default): every end with a script site is, as in E014.
+pub fn goal_site_verb() -> bool {
+    std::env::var("FMI_GOAL_SITE").is_ok_and(|v| v == "verb")
+}
+
+/// E016 E: the end's facts (`fmi_core::end_facts`) name an object's verb handler. `end:where` is the restarting slot's
+/// `where` (patch 0006-e014's `scriptSite`, ScummVM's WhereIsObject). An object's verb handler runs in a slot whose
+/// `where` is the object's place: 0 (inventory), 1 (room) or 4 (floating object). A global script's slot is 2 and a
+/// room's local script's 3, so a global reached through an override jump (a death screen that restarts on its
+/// override key) is not one. These are the engine's slot kinds, not a game's numbers.
+pub fn end_from_verb(facts: &Facts) -> bool {
+    facts.get(Key::parse("end")) == Some(1) && matches!(facts.get(Key::parse("end:where")), Some(0) | Some(1) | Some(4))
+}
+
 /// E014: the end entry of a move whose run ended at a script's restart or quit (`goal_end`): its events after the
 /// try's entry and one checkpoint at the end's frame and tick, with the end's facts. None when the switch is off or
-/// the end has no script site.
+/// the end has no script site. With E016's `goal_site_verb`, also None when the site is not an object's verb handler:
+/// the move is a dead move only.
 pub fn end_extra(reason: &str, frame: u64, tick: u64, events: Vec<Value>, prefix_cps: &[Checkpoint]) -> Option<Extra> {
     if !goal_end() {
         return None;
     }
     let facts = fmi_core::end_facts(reason)?;
+    if goal_site_verb() && !end_from_verb(&facts) {
+        return None;
+    }
     let mut cps: Vec<Checkpoint> = prefix_cps.iter().filter(|c| c.frame < frame).cloned().collect();
     cps.push(Checkpoint { frame, facts, tick, rng: 0, actors: vec![] });
     Some(Extra { how: "end", events, cps, novel: vec!["end".into()] })

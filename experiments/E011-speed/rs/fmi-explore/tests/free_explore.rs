@@ -315,15 +315,26 @@ struct Ran {
     waits: usize,
 }
 
-/// The switches are the process's environment: one test at a time, FMI_GOAL_END unset unless a test sets it.
+/// The switches are the process's environment: one test at a time, FMI_GOAL_END and E016's FMI_GOAL_SITE unset unless
+/// a test sets them.
 static ENV: Mutex<()> = Mutex::new(());
 
 fn env(goal_end: bool) -> MutexGuard<'static, ()> {
+    env_site(goal_end, false)
+}
+
+/// `env` with E016's FMI_GOAL_SITE=verb set (`site_verb`) or unset.
+fn env_site(goal_end: bool, site_verb: bool) -> MutexGuard<'static, ()> {
     let g = ENV.lock().unwrap_or_else(|e| e.into_inner());
     if goal_end {
         std::env::set_var("FMI_GOAL_END", "1");
     } else {
         std::env::remove_var("FMI_GOAL_END");
+    }
+    if site_verb {
+        std::env::set_var("FMI_GOAL_SITE", "verb");
+    } else {
+        std::env::remove_var("FMI_GOAL_SITE");
     }
     g
 }
@@ -475,4 +486,53 @@ fn with_the_goal_end_a_scripts_end_is_also_an_end_entry() {
     let r = explore_with(&[stop_at(F0 + 4)], false, "quit").unwrap();
     assert!(r.out.kept.iter().all(|k| k.how == "free"));
     assert_eq!(r.out.dead.len(), 3);
+}
+
+#[test]
+fn g5_a_forked_global_restart_is_no_goal_entry_with_the_verb_site() {
+    // E016 gate G5 (section E, FMI_GOAL_SITE=verb): a trial (a fork of the entry) that ends at a global script's
+    // restart, as a death screen restarts on its override key (the site's `where` 2: a global's slot), is a dead move
+    // and no end entry, so no goal entry; without the switch it is an end entry, as in E014
+    let global = "restart@2:9:-1:0100";
+    let _g = env_site(true, true);
+    let r = explore_with(&[stop_at(F0 + 4)], false, global).unwrap();
+    assert!(r.out.kept.iter().all(|k| k.how == "free"), "{:?}", r.out.kept.iter().map(|k| k.how).collect::<Vec<_>>());
+    assert!(r.out.kept.iter().all(|k| k.cps.iter().all(|c| c.facts.get(Key::parse("end")).is_none())));
+    assert_eq!(r.out.dead.len(), 3);
+    assert!(r.out.dead.iter().all(|d| d["reason"] == global));
+    assert!(r.out.record["kept"].get("end").is_none());
+    drop(_g);
+    let _g = env_site(true, false);
+    let r = explore_with(&[stop_at(F0 + 4)], false, global).unwrap();
+    assert_eq!(r.out.kept.iter().filter(|k| k.how == "end").count(), 3);
+}
+
+#[test]
+fn g5_an_object_verb_handlers_restart_is_the_goal_entry_with_the_verb_site() {
+    // E016 gate G5: the same trial ending at a restart that the clicked object's own verb handler runs (the lever,
+    // object 102 in room 3; the site's `where` 1: a room object's slot) is an end entry whose checkpoint holds the
+    // end's facts (`end` = 1, the stage goal end=1), with the switch on
+    let _g = env_site(true, true);
+    let r = explore_with(&[stop_at(F0 + 4)], false, "restart@1:102:3:0010").unwrap();
+    let ends: Vec<&fmi_explore::mech::Extra> = r.out.kept.iter().filter(|k| k.how == "end").collect();
+    assert_eq!(ends.len(), 3);
+    assert_eq!(r.out.dead.len(), 3);
+    for k in ends {
+        let c = k.cps.last().unwrap();
+        assert_eq!(c.facts.val(Key::parse("end")), 1);
+        assert_eq!(c.facts.val(Key::parse("end:kind")), 1);
+        assert_eq!(c.facts.val(Key::parse("end:where")), 1);
+        assert_eq!(c.facts.val(Key::parse("end:number")), 102);
+        assert_eq!(c.facts.val(Key::parse("end:room")), 3);
+        assert_eq!(c.facts.val(Key::parse("end:offset")), 0x10);
+        assert_eq!(k.novel, vec!["end".to_string()]);
+    }
+    // an inventory object's handler (`where` 0) and a floating object's (4) are verb handlers too; a room's local
+    // script (3) and a global (2) are not
+    for (reason, verb) in [("restart@0:102:-1:0010", true), ("quit@4:102:3:0010", true), ("restart@3:206:3:0010", false),
+                           ("restart@2:9:-1:0100", false)] {
+        let f = end_facts(reason).unwrap();
+        assert_eq!(fmi_explore::mech::end_from_verb(&f), verb, "{reason}");
+        assert_eq!(fmi_explore::mech::end_extra(reason, 200, 1200, vec![], &[]).is_some(), verb, "{reason}");
+    }
 }
