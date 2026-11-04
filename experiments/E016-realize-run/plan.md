@@ -428,3 +428,24 @@ entries would remove the weakness. It is left for a later experiment.
 - the chain realizes walk_to(316): 75%;
 - the chain reaches owner:566 = 1: 35% (the chain-mode probe stays in room 28 for 190 frames after the click);
 - G3 and G1 pass with the same inputs: 80%.
+
+### (6) 2026-11-04, A: fix 3 reverted; what goes into Monkey Island's checks and play9
+
+Fix 3 (268a9aa) made realize take verb slot 4 for steps that need verbs 8, 2, 10 and 9. G3 failed, and G4 along the
+chain fell to 4 of 14 (`results/g4/g4.md`, run 4). Amendment (5) makes fix 3 the last change to realize in E016, so
+it is reverted (2fda77b). Realize is again the code G3, G4 run 3 and G1's rerun ran: fix 2b, 7daacc6.
+
+- **G3: pass** (run 3).
+- **G4: fail as stated.**
+  - Each step from its job's entry: 14 of 14 realized.
+  - Along the chain from boot: 12 of 14, and the goal is not reached.
+  - The miss is a deferred sentence: the click starts a walk, and another script queues the sentence, which patch
+    0007's log does not show.
+  - By the stop rule this is a rule (2) regression. Monkey Island's checks and K1 run anyway, and nothing merges to
+    main until it is fixed.
+- **Not done in E016:** the fix amendment (5) names. An object's code offset in the runs reply would be mapped to its
+  verb through the object's verb table, read from the game's files by the reader. That would let realize accept a
+  deferred sentence by its verb.
+
+Monkey Island's checks (`run/mi-check.sh`, `run/k1.sh`) and play9 (`run/laptop.sh`) run on target-e016, built from
+this commit's tree.
