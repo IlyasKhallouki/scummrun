@@ -372,8 +372,9 @@ fn off_screen_target_after_two_floor_clicks() {
     assert_eq!(r.approach, 2, "{:?}", r.attempts.iter().map(|a| (&a.name, &a.seen)).collect::<Vec<_>>());
     assert_eq!(r.candidates, 1);
     assert_eq!(r.events.len(), 3);
-    assert!(r.attempts.iter().filter(|a| a.phase == "approach" && a.accepted).count() == 2);
-    assert_eq!(r.engine.status().xstart, 19);
+    // E016 amendment (4): each box's point nearest the target is a candidate too (the edge of box 8, then of box 4)
+    assert!(r.attempts.iter().filter(|a| (a.phase == "approach" || a.phase == "near") && a.accepted).count() == 2);
+    assert_eq!(r.engine.status().xstart, 0);
     assert_eq!(replayed(320, false, &r.events), vec![(DEFAULT_VERB, 501, 0)]);
 }
 
@@ -572,15 +573,16 @@ fn hook_waits_for_the_idle_stop_and_reports_a_miss() {
 #[test]
 fn near_point_brings_a_wide_room_target() {
     setup();
-    // one box from x 0 to 399: its usual point (the centre, x 199) leaves the camera at xstart 39; only the box's
-    // point nearest 504 (x 520), at the screen's right edge, moves it on
+    // one box from x 0 to 399: its usual point (the centre, x 199) would leave the camera at xstart 39; the box's
+    // point nearest 504 (x 520), at the screen's right edge, comes first and moves it to 159, then to 239
     let mut t = toy_raw(0, false);
     t.one_box = Some(399);
     let mut e: Box<dyn Engine> = Box::new(t.clone());
     let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 504, None), &Cfg::default()).unwrap().expect("realized");
     let acc: Vec<&str> = r.attempts.iter().filter(|a| a.accepted).map(|a| a.phase).collect();
-    assert_eq!(acc, vec!["approach", "near", "near", "sentence"], "{:?}", r.attempts.iter().map(|a| (a.phase, &a.seen)).collect::<Vec<_>>());
-    assert_eq!(r.approach, 3);
+    assert_eq!(acc, vec!["near", "near", "sentence"], "{:?}", r.attempts.iter().map(|a| (a.phase, &a.seen)).collect::<Vec<_>>());
+    assert!(r.attempts.iter().all(|a| a.accepted || a.phase != "near"));
+    assert_eq!(r.approach, 2);
     assert_eq!(replayed_on(t, &r.events), vec![(DEFAULT_VERB, 504, 0)]);
 }
 
@@ -596,7 +598,7 @@ fn stepping_stone_brings_the_target() {
     let mut e: Box<dyn Engine> = Box::new(t.clone());
     let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 502, None), &Cfg::default()).unwrap().expect("realized");
     let phases: Vec<(&str, bool)> = r.attempts.iter().map(|a| (a.phase, a.accepted)).collect();
-    assert_eq!(phases, vec![("approach", false), ("near", false), ("stone", true), ("sentence", true)], "{:?}",
+    assert_eq!(phases, vec![("near", false), ("approach", false), ("stone", true), ("sentence", true)], "{:?}",
                r.attempts.iter().map(|a| (a.phase, &a.name, &a.seen)).collect::<Vec<_>>());
     assert_eq!(r.approach, 1);
     assert_eq!(replayed_on(t, &r.events), vec![(DEFAULT_VERB, 505, 0), (DEFAULT_VERB, 502, 0)]);
