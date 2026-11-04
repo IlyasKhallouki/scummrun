@@ -8,23 +8,23 @@
     "owner": 1,
     "class": 1
   },
-  "boot_s": 0.217670841,
+  "boot_s": 0.322859823,
   "steps": [
     {
       "step": "s3:490",
       "ok": true,
       "from": 2980,
       "approach": 0,
-      "candidates": 4,
-      "tries": 10,
-      "seconds": 0.01639479,
-      "accepted_at": 2984,
+      "candidates": 3,
+      "tries": 7,
+      "seconds": 0.026319347,
+      "accepted_at": 2985,
       "events": [
         {
           "frame": 2981,
           "click": [
-            16,
-            175
+            17,
+            161
           ]
         },
         {
@@ -51,7 +51,7 @@
               ]
             }
           ],
-          "seconds": 0.001684816
+          "seconds": 0.002941647
         },
         {
           "phase": "sentence",
@@ -68,7 +68,7 @@
               ]
             }
           ],
-          "seconds": 0.00150855
+          "seconds": 0.003878118
         },
         {
           "phase": "sentence",
@@ -85,7 +85,7 @@
               ]
             }
           ],
-          "seconds": 0.001463066
+          "seconds": 0.003542427
         },
         {
           "phase": "sentence",
@@ -109,7 +109,7 @@
               ]
             }
           ],
-          "seconds": 0.00147431
+          "seconds": 0.003282868
         },
         {
           "phase": "sentence",
@@ -133,7 +133,7 @@
               ]
             }
           ],
-          "seconds": 0.001550028
+          "seconds": 0.003455544
         },
         {
           "phase": "sentence",
@@ -157,92 +157,20 @@
               ]
             }
           ],
-          "seconds": 0.001346581
+          "seconds": 0.003595494
         },
         {
           "phase": "sentence",
           "name": "v5t490",
-          "accepted": false,
-          "seen": "",
-          "frame": 2984,
-          "events": [
-            {
-              "frame": 2981,
-              "click": [
-                17,
-                161
-              ]
-            },
-            {
-              "frame": 2983,
-              "click": [
-                223,
-                79
-              ]
-            }
-          ],
-          "seconds": 0.001681658
-        },
-        {
-          "phase": "sentence",
-          "name": "v5t490",
-          "accepted": false,
-          "seen": "",
-          "frame": 2984,
-          "events": [
-            {
-              "frame": 2981,
-              "click": [
-                17,
-                161
-              ]
-            },
-            {
-              "frame": 2983,
-              "click": [
-                203,
-                79
-              ]
-            }
-          ],
-          "seconds": 0.001545732
-        },
-        {
-          "phase": "sentence",
-          "name": "v5t490",
-          "accepted": false,
-          "seen": "",
-          "frame": 2984,
-          "events": [
-            {
-              "frame": 2981,
-              "click": [
-                17,
-                161
-              ]
-            },
-            {
-              "frame": 2983,
-              "click": [
-                243,
-                79
-              ]
-            }
-          ],
-          "seconds": 0.001431326
-        },
-        {
-          "phase": "sentence",
-          "name": "v3t490",
           "accepted": true,
-          "seen": "(3,490,0)",
-          "frame": 2984,
+          "seen": "run of 490's script at frame 2983 (slot 1, code 253)",
+          "frame": 2985,
           "events": [
             {
               "frame": 2981,
               "click": [
-                16,
-                175
+                17,
+                161
               ]
             },
             {
@@ -253,11 +181,11 @@
               ]
             }
           ],
-          "seconds": 0.001582948
+          "seconds": 0.003744038
         }
       ],
       "next_idle": {
-        "frame": 2998,
+        "frame": 2984,
         "reason": "idle",
         "room": 42,
         "xstart": 0
@@ -265,354 +193,359 @@
     },
     {
       "step": "s8:946:491",
-      "ok": true,
-      "from": 2998,
-      "approach": 1,
-      "candidates": 6,
-      "tries": 7,
-      "seconds": 0.013401137,
-      "accepted_at": 3008,
-      "events": [
-        {
-          "frame": 2999,
-          "click": [
-            219,
-            109
-          ]
-        },
-        {
-          "frame": 3003,
-          "click": [
-            110,
-            161
-          ]
-        },
-        {
-          "frame": 3005,
-          "click": [
-            290,
-            154
-          ]
-        },
-        {
-          "frame": 3007,
-          "click": [
-            227,
-            83
-          ]
-        }
-      ],
+      "ok": false,
+      "from": 2984,
+      "reason": "approach",
+      "approach": 0,
+      "candidates": 0,
+      "tries": 20,
+      "seconds": 0.060423648,
       "attempts": [
         {
           "phase": "near",
           "name": "w10",
-          "accepted": true,
-          "seen": "walk=1 toward=0 hit=1 xstart=0->0",
-          "frame": 3002,
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 2999,
+              "frame": 2985,
               "click": [
                 219,
                 109
               ]
             }
           ],
-          "seconds": 0.001587963
+          "seconds": 0.002804683
         },
         {
-          "phase": "inventory",
-          "name": "v8v1t491",
+          "phase": "approach",
+          "name": "w10",
           "accepted": false,
-          "seen": "(8,491,0)",
-          "frame": 3008,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 3003,
+              "frame": 2985,
               "click": [
-                110,
-                161
-              ]
-            },
-            {
-              "frame": 3005,
-              "click": [
-                2,
-                154
-              ]
-            },
-            {
-              "frame": 3007,
-              "click": [
-                227,
-                83
+                228,
+                110
               ]
             }
           ],
-          "seconds": 0.001674338
+          "seconds": 0.002831956
         },
         {
-          "phase": "inventory",
-          "name": "v8v101t491",
+          "phase": "near",
+          "name": "w4",
           "accepted": false,
-          "seen": "(8,20,491)",
-          "frame": 3008,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 3003,
+              "frame": 2985,
               "click": [
-                110,
-                161
-              ]
-            },
-            {
-              "frame": 3005,
-              "click": [
-                162,
-                154
-              ]
-            },
-            {
-              "frame": 3007,
-              "click": [
-                227,
-                83
+                219,
+                117
               ]
             }
           ],
-          "seconds": 0.001850509
+          "seconds": 0.002534901
         },
         {
-          "phase": "inventory",
-          "name": "v8v102t491",
+          "phase": "approach",
+          "name": "w4",
           "accepted": false,
-          "seen": "(8,937,491)",
-          "frame": 3008,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 3003,
+              "frame": 2985,
               "click": [
-                110,
-                161
-              ]
-            },
-            {
-              "frame": 3005,
-              "click": [
-                194,
-                154
-              ]
-            },
-            {
-              "frame": 3007,
-              "click": [
-                227,
-                83
+                234,
+                120
               ]
             }
           ],
-          "seconds": 0.001787847
+          "seconds": 0.002570406
         },
         {
-          "phase": "inventory",
-          "name": "v8v103t491",
+          "phase": "approach",
+          "name": "w7",
           "accepted": false,
-          "seen": "(8,934,491)",
-          "frame": 3008,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 3003,
+              "frame": 2985,
               "click": [
-                110,
-                161
-              ]
-            },
-            {
-              "frame": 3005,
-              "click": [
-                226,
-                154
-              ]
-            },
-            {
-              "frame": 3007,
-              "click": [
-                227,
-                83
+                167,
+                112
               ]
             }
           ],
-          "seconds": 0.001910476
+          "seconds": 0.001844873
         },
         {
-          "phase": "inventory",
-          "name": "v8v104t491",
+          "phase": "near",
+          "name": "w9",
           "accepted": false,
-          "seen": "(8,933,491)",
-          "frame": 3008,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 3003,
+              "frame": 2985,
               "click": [
-                110,
-                161
-              ]
-            },
-            {
-              "frame": 3005,
-              "click": [
-                258,
-                154
-              ]
-            },
-            {
-              "frame": 3007,
-              "click": [
-                227,
-                83
+                133,
+                73
               ]
             }
           ],
-          "seconds": 0.001860088
+          "seconds": 0.002385203
         },
         {
-          "phase": "inventory",
-          "name": "v8v105t491",
-          "accepted": true,
-          "seen": "(8,946,491)",
-          "frame": 3008,
+          "phase": "approach",
+          "name": "w6",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
           "events": [
             {
-              "frame": 3003,
+              "frame": 2985,
               "click": [
-                110,
-                161
-              ]
-            },
-            {
-              "frame": 3005,
-              "click": [
-                290,
-                154
-              ]
-            },
-            {
-              "frame": 3007,
-              "click": [
-                227,
-                83
+                126,
+                81
               ]
             }
           ],
-          "seconds": 0.001559124
+          "seconds": 0.002195196
+        },
+        {
+          "phase": "approach",
+          "name": "w3",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                116,
+                110
+              ]
+            }
+          ],
+          "seconds": 0.0024458
+        },
+        {
+          "phase": "approach",
+          "name": "w9",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                107,
+                70
+              ]
+            }
+          ],
+          "seconds": 0.001754822
+        },
+        {
+          "phase": "near",
+          "name": "w3",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                90,
+                105
+              ]
+            }
+          ],
+          "seconds": 0.002383595
+        },
+        {
+          "phase": "near",
+          "name": "w2",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                84,
+                102
+              ]
+            }
+          ],
+          "seconds": 0.002099333
+        },
+        {
+          "phase": "approach",
+          "name": "w2",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                79,
+                99
+              ]
+            }
+          ],
+          "seconds": 0.002443162
+        },
+        {
+          "phase": "near",
+          "name": "w1",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                69,
+                94
+              ]
+            }
+          ],
+          "seconds": 0.002431827
+        },
+        {
+          "phase": "approach",
+          "name": "w5",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                58,
+                76
+              ]
+            }
+          ],
+          "seconds": 0.002279438
+        },
+        {
+          "phase": "approach",
+          "name": "w1",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                56,
+                87
+              ]
+            }
+          ],
+          "seconds": 0.002099537
+        },
+        {
+          "phase": "near",
+          "name": "w5",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                44,
+                80
+              ]
+            }
+          ],
+          "seconds": 0.00233491
+        },
+        {
+          "phase": "stone",
+          "name": "t490",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                223,
+                79
+              ]
+            }
+          ],
+          "seconds": 0.001950186
+        },
+        {
+          "phase": "stone",
+          "name": "t493",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                187,
+                103
+              ]
+            }
+          ],
+          "seconds": 0.002461338
+        },
+        {
+          "phase": "stone",
+          "name": "t496",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                259,
+                107
+              ]
+            }
+          ],
+          "seconds": 0.002468198
+        },
+        {
+          "phase": "stone",
+          "name": "t497",
+          "accepted": false,
+          "seen": "walk=0 toward=0 hit=0 xstart=0->0",
+          "frame": 2987,
+          "events": [
+            {
+              "frame": 2985,
+              "click": [
+                275,
+                67
+              ]
+            }
+          ],
+          "seconds": 0.002092336
         }
       ]
     }
   ],
-  "all_realized": true,
-  "candidates": 10,
-  "run_on": {
-    "last_input": 3007,
-    "local_ran": 3010,
-    "class_cleared": 3010,
-    "both": 3010,
-    "ended": null,
-    "stop": 3010,
-    "room": 42,
-    "owner": 1,
-    "class": 0
-  },
-  "verify": {
-    "frame": 3010,
-    "got_frame": 3010,
-    "inputs": 36,
-    "facts": 3870,
-    "facts_differ": 0,
-    "first": [],
-    "room": [
-      42,
-      42
-    ],
-    "digest": [
-      "f13abc735dd7e0ed",
-      "f13abc735dd7e0ed"
-    ],
-    "differences": 0,
-    "seconds": 0.157700523
-  },
-  "hook": {
-    "events": [
-      {
-        "frame": 2981,
-        "click": [
-          16,
-          175
-        ]
-      },
-      {
-        "frame": 2983,
-        "click": [
-          223,
-          79
-        ]
-      },
-      {
-        "frame": 2999,
-        "click": [
-          219,
-          109
-        ]
-      },
-      {
-        "frame": 3003,
-        "click": [
-          110,
-          161
-        ]
-      },
-      {
-        "frame": 3005,
-        "click": [
-          290,
-          154
-        ]
-      },
-      {
-        "frame": 3007,
-        "click": [
-          227,
-          83
-        ]
-      }
-    ],
-    "error": null,
-    "events_equal": true,
-    "frame": 3010,
-    "digest_equal": false,
-    "facts_differ": 1,
-    "first": [
-      [
-        "var:56",
-        0,
-        -1
-      ]
-    ],
-    "rng": [
-      849678398,
-      849678398
-    ],
-    "tick": [
-      15602,
-      15602
-    ],
-    "control": {
-      "frame": 3010,
-      "digest_equal_first": false,
-      "digest_equal_hook": true,
-      "facts_differ_first": 1,
-      "facts_differ_hook": 0
-    }
-  },
-  "pass": true,
-  "seconds": 0.413741377
+  "all_realized": false,
+  "candidates": 3,
+  "pass": false,
+  "seconds": 0.324168058
 }
