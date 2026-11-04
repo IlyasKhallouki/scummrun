@@ -409,8 +409,9 @@ feature or prediction changes.
     of the entry's no-input run, so the engine is run there; this is exact.
   - **The wait after each trial** runs fmi-explore's own wait with domains made from T's atoms, given only to T's own
     keys (the reading's atoms, before E014's extra ones), the verbs and the goal's key. This is the closest rule to the
-    recorded `observed` counts (it misses 2 of about 117 observed atoms in 176 of the 317 steps). It is not exact, so a
-    step whose T-kept count or trial count differs is excluded, as step 3 says.
+    recorded `observed` counts, and it is not exact: against them it has 2-3 atoms too few in 211 of the 317 steps
+    (room 49), 11 too many in all 80 room-42 steps and 13 room-49 steps, and 6-15 off in the 13 others. A step whose
+    T-kept count or trial count differs is excluded, as step 3 says.
 - **What a trial's atoms are.** U, W, R and C are read at the trial's own stop (its idle stop, or the horizon), on a
   fork. The wait's later stops are judged under T only, as the run judged them. A trial whose run ended, or whose
   inputs the bridge refused, has no stop: it is kept under E only if the run kept it under T.
