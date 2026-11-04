@@ -16,7 +16,7 @@
 //! * the runs `run_click_verb` and `run_event` start with a call whose one step is a marked note that the `eng`
 //!   hook runs as `_eng_input` (model.py's, without its switch) and `_eng_resume_at`.
 
-use crate::builder::{Ctx, Machine as RunMachine, RdCounts, RunOut, DROP_ENDS};
+use crate::builder::{Ctx, Machine as RunMachine, RdCounts, RunOut};
 use crate::domain::{Domain, Label, Labels};
 use crate::py::Py;
 use crate::record::{
@@ -2417,7 +2417,7 @@ fn path_out(game: &Game, run: &Run, p: &Path, havoc: bool, settled: Option<&Sett
     let sym = p.ext.is_some();
     // the switch havoc_cut: a path the step limit ended is handed over whole, with where it stood (havoc.rs)
     let cut = (havoc && sym && end.as_deref() == Some("limit")).then(|| cut_of(game, p, settled));
-    if !sym || (cut.is_none() && end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e))) {
+    if !sym || (cut.is_none() && end.as_deref().is_some_and(crate::builder::dropped_end)) {
         return PathOut { end, sym, ..Default::default() };
     }
     let x = sx(p);
@@ -2771,6 +2771,10 @@ impl Reader<'_> {
 impl RunMachine for Reader<'_> {
     fn set_path_limit(&mut self, n: usize) {
         self.m.path_limit = if n == 0 { PATH_LIMIT } else { n };
+    }
+
+    fn set_widen(&mut self, on: bool) {
+        self.m.widen_loops = on;
     }
 
     /// `Reader.run_sentence_sym`, `run_click_verb`, `run_event`. The label names the run only; under --reach its

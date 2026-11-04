@@ -1104,6 +1104,10 @@ impl Builder<'_> {
         }
         writeln!(t, "builder {:?} sig_limit {} path_limit {} machine path limit {}", self.switches, self.sig_limit, self.path_limit_now, crate::machine::PATH_LIMIT).unwrap();
         writeln!(t, "slot locals {:?}", self.slot_locals).unwrap();
+        if crate::builder::read_widen_switch() {
+            // E014's FMI_READ_WIDEN changes the runs the path limit cuts: its store is its own (unset: the text as before)
+            writeln!(t, "read_widen 1").unwrap();
+        }
         t
     }
 

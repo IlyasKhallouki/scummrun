@@ -47,9 +47,23 @@ pub(crate) fn read_cut_mode() -> u8 {
     })
 }
 
+/// E014's switch `FMI_READ_WIDEN=1` (plan.md, amendment (6)): under split_limit, a run past the path limit is run
+/// again once with its loops widened (scumm-machine's `widen.rs`); if that run ends under the limit it is the run, and
+/// nothing is split. A run the limit does not cut is never run again. Unset: as before.
+pub(crate) fn read_widen_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_WIDEN").is_ok_and(|v| v == "1"))
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
+
+/// Whether a path's end is no action: DROP_ENDS, or FMI_READ_WIDEN's "widened" (a loop came round again in a state
+/// its widened iteration holds; scumm-machine's `widen.rs`), which no path ends with when the switch is off.
+pub fn dropped_end(e: &str) -> bool {
+    DROP_ENDS.contains(&e) || e == "widened"
+}
 /// The Reader's counters the Builder reads to decide a split.
 /// The switch grow_limit: the largest path limit a run is read again with before the reading stops.
 pub const GROW_MAX: usize = 16_384;
@@ -140,6 +154,10 @@ pub trait Machine {
     /// The switch grow_limit: the path limit of the runs that follow, 0 for the machine's own. The default does
     /// nothing.
     fn set_path_limit(&mut self, _n: usize) {}
+
+    /// E014's switch FMI_READ_WIDEN: the runs that follow widen their loops (scumm-machine's `widen.rs`). The default
+    /// does nothing.
+    fn set_widen(&mut self, _on: bool) {}
 }
 
 /// What the Builder's counters and sets gained while one job ran (in a worker's Builder, par.rs), merged into the
@@ -1654,19 +1672,25 @@ impl<'g> Builder<'g> {
         let facts0 = self.rd.counts.get(FORKS_ON_READ);
         let nonfacts0 = self.rd.counts.get(FORKS_ON_NONFACTS);
         let t_run = std::time::Instant::now();
-        let run = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
+        let mut run = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
         crate::par::trace_run(&job.label, t_run.elapsed().as_secs_f64(), &run);
         self.last_pins = pins.clone();
-        self.rd.update(&run.rd);
-        self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
+        self.book_run(&run);
         let facts = self.rd.counts.get(FORKS_ON_READ) - facts0;
         let nonfacts = self.rd.counts.get(FORKS_ON_NONFACTS) - nonfacts0;
-        if let Some(l) = &mut self.memo_log {
-            l.touched.extend(run.touched.iter().cloned());
-            l.queries.extend(run.queries.iter().cloned());
-            for p in &run.paths {
-                l.touched.extend(p.pre.keys().cloned());
-                l.touched.extend(p.writes.keys().cloned());
+        if run.limit != 0 && self.table.split_limit && read_widen_switch() {
+            // E014 (FMI_READ_WIDEN): the run again with its loops widened; ended under the limit, it is the run
+            let t_w = std::time::Instant::now();
+            m.set_widen(true);
+            let w = m.run(&self.ctx(), &job.label, pins, pre, &job.what);
+            m.set_widen(false);
+            crate::par::trace_widen(&job.label, t_w.elapsed().as_secs_f64(), run.limit, &w);
+            self.book_run(&w);
+            if w.limit == 0 {
+                self.counts.inc("FMI_READ_WIDEN: runs past the path limit read whole with their loops widened");
+                run = w;
+            } else {
+                self.counts.inc("FMI_READ_WIDEN: runs past the path limit still past it with their loops widened (split as before)");
             }
         }
         if run.limit == 0 {
@@ -1730,7 +1754,7 @@ impl<'g> Builder<'g> {
             self.ends.add(Py::Tuple(vec![Py::str(&job.kind), end_py(&p.end)]), 1);
             // the switch havoc_cut: a path the step limit ended (machine.rs hands it over with where it stood)
             let havoc = self.table.havoc_cut && p.cut.is_some();
-            if !havoc && (p.end.as_deref().is_some_and(|e| DROP_ENDS.contains(&e)) || !p.sym) {
+            if !havoc && (p.end.as_deref().is_some_and(dropped_end) || !p.sym) {
                 let base = job.label.split('#').next().unwrap().split('@').next().unwrap();
                 let lab = format!("{base}{}", if job.label.contains('@') { ")" } else { "" });
                 self.drops.add(Py::Tuple(vec![Py::str(lab), end_py(&p.end)]), 1);
@@ -1768,6 +1792,20 @@ impl<'g> Builder<'g> {
             out.push(rec);
         }
         out
+    }
+
+    /// A run's counters and, for the job memo, what it touched and asked (`run`; FMI_READ_WIDEN books both runs).
+    fn book_run(&mut self, run: &RunOut) {
+        self.rd.update(&run.rd);
+        self.counts.add("value sets past model.MAX_VALUES (made plain unknowns)", run.value_caps);
+        if let Some(l) = &mut self.memo_log {
+            l.touched.extend(run.touched.iter().cloned());
+            l.queries.extend(run.queries.iter().cloned());
+            for p in &run.paths {
+                l.touched.extend(p.pre.keys().cloned());
+                l.touched.extend(p.writes.keys().cloned());
+            }
+        }
     }
 
     /// E014 (FMI_READ_CUT): whether `run_split` can lift a run past the path limit: its first fork on a read has two

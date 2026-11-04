@@ -240,6 +240,10 @@ impl Machine for Pool<'_, '_> {
         self.main.set_path_limit(n)
     }
 
+    fn set_widen(&mut self, on: bool) {
+        self.main.set_widen(on)
+    }
+
     fn run_batch(&mut self, b: &mut Builder<'_>, jobs: &Arc<Vec<Job>>, each: &mut dyn FnMut(&mut Builder<'_>, usize, Vec<Record>)) -> bool {
         if self.threads == 0 {
             return false;
@@ -408,6 +412,10 @@ impl Machine for WorkerMachine<'_, '_> {
         Machine::set_path_limit(self.rd, n)
     }
 
+    fn set_widen(&mut self, on: bool) {
+        Machine::set_widen(self.rd, on)
+    }
+
     fn prefetch(&mut self, cx: &Ctx, label: &str, runs: &[(Pins, Pre)], what: &What) {
         // the first part is run here next; the others wait at the front of the queue for an idle worker
         if runs.len() < 2 {
@@ -506,6 +514,14 @@ pub(crate) fn trace_havoc(label: &str, units: usize, effects: usize, events: usi
 pub(crate) fn trace_shared(label: &str, why: &str) {
     if trace_on() {
         eprintln!("shared {label}: not shared, {why}");
+    }
+}
+
+/// E014 (FMI_READ_WIDEN): a run past the path limit run again with its loops widened.
+pub(crate) fn trace_widen(label: &str, secs: f64, cut: i64, run: &crate::builder::RunOut) {
+    if trace_on() {
+        let widened = run.paths.iter().filter(|p| p.end.as_deref() == Some("widened")).count();
+        eprintln!("widen {label}: {cut} paths cut before; widened: {secs:.2} s, {} paths, {} cut, {widened} ends widened", run.paths.len(), run.limit);
     }
 }
 
