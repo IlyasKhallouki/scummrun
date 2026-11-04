@@ -388,3 +388,25 @@ fn the_wall_limit_stops_the_driver() {
     assert_eq!(s["stop"], json!("prediction bound"));
     assert_eq!(s["jobs"], json!(3));
 }
+
+/// E016: FMI_STOP_FILE. With the file there no try starts and the stop is "stop file", its detail the file's first line;
+/// without it the run goes to its other rules.
+#[test]
+fn a_stop_file_stops_the_driver() {
+    let _g = env(true);
+    let t = tmp("stopfile");
+    let root = make(&t, Some(json!({"stop_jobs": 3}))).root.clone();
+    let f = t.join("STOP");
+    std::env::set_var("FMI_STOP_FILE", &f);
+    std::fs::write(&f, "no new rung for 40 min\nmore\n").unwrap();
+    let s = drive(&root);
+    assert_eq!(s["stop"], json!("stop file"));
+    assert_eq!(s["jobs"], json!(0));
+    assert_eq!(s["detail"]["why"], json!("no new rung for 40 min"));
+    std::fs::remove_file(root.join("summary.json")).unwrap();
+    std::fs::remove_file(&f).unwrap();
+    let s = drive(&root);
+    std::env::remove_var("FMI_STOP_FILE");
+    assert_eq!(s["stop"], json!("prediction bound"));
+    assert_eq!(s["jobs"], json!(3));
+}

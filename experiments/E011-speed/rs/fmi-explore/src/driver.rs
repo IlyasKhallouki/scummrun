@@ -498,6 +498,13 @@ pub fn stop_wall_s() -> Option<f64> {
     std::env::var("FMI_STOP_WALL").ok().and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| *v >= 0.0)
 }
 
+/// E016 (plan.md "Stop rule"): `FMI_STOP_FILE=PATH`, a stop asked from outside the run (the ladder's watcher, after 40
+/// minutes of wall with no new rung). Once the file exists no try starts; the running tries finish and are committed;
+/// the stop is "stop file", its detail the file's first line. Unset: no such stop.
+pub fn stop_file() -> Option<PathBuf> {
+    std::env::var("FMI_STOP_FILE").ok().filter(|v| !v.trim().is_empty()).map(PathBuf::from)
+}
+
 /// The job loop (explore.py `run`): until a stop rule fires. Returns summary.json's contents.
 pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn Verifier>, stats: &mut DriverStats) -> Res<Value> {
     let mut a = Archive::open(root)?;
@@ -543,6 +550,8 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
     let mut bound = false;
     let (wall0, stop_wall) = (Instant::now(), stop_wall_s());
     let mut walled = false;
+    let stop_f = stop_file();
+    let mut asked = false;
     let commit_finished = files::truthy(a.e010.get("commit_finished"));
     let in_process = matches!(mode, StepMode::InProcess(_));
     let mut woken = 0u64;
@@ -686,6 +695,10 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                     walled = true;
                     break;
                 }
+                if stop_f.as_ref().is_some_and(|p| p.exists()) {
+                    asked = true;
+                    break;
+                }
                 if free() < m.floor_gb * GIB {
                     floor = true;
                     break;
@@ -717,6 +730,13 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 stop = Some("wall limit".into());
                 detail = json!({"wall_s": pyjson::round(wall0.elapsed().as_secs_f64(), 1), "stop_wall_s": stop_wall,
                                 "jobs": a.job_names().len()});
+            }
+            if stop.is_none() && asked && a.goal_entries().is_empty() {
+                let p = stop_f.as_ref().unwrap();
+                let why = fs::read_to_string(p).ok().and_then(|t| t.lines().next().map(|l| l.to_string())).unwrap_or_default();
+                stop = Some("stop file".into());
+                detail = json!({"wall_s": pyjson::round(wall0.elapsed().as_secs_f64(), 1), "file": p.to_string_lossy(),
+                                "why": why, "jobs": a.job_names().len()});
             }
             if stop.is_none() {
                 if a.select(1).is_empty() {
