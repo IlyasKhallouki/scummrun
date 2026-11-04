@@ -592,6 +592,18 @@ fn stand_in(r: &Resident, job: &Value, checked: &[Value]) -> Option<Arc<dyn Read
     paths.into_iter().find_map(|p| machine::port(|| r.readings.open(&p)).ok())
 }
 
+/// E016 D (`free::t_archive`): the registered reading a free try's wait views T through when its scope has none: E014's
+/// stand-in (another scope's that holds the entry's room), else the newest registered reading of any scope (job.json
+/// "readings_any"). None: the archive has none, and the try keeps nothing.
+fn free_stand_in(r: &Resident, job: &Value, checked: &[Value]) -> Option<Arc<dyn ReadingSource>> {
+    stand_in(r, job, checked).or_else(|| {
+        job.get("readings_any").and_then(|x| x.as_array()).map(|a| a.as_slice()).unwrap_or(&[]).iter()
+            .filter_map(|x| x["path"].as_str().map(PathBuf::from))
+            .filter(|p| p.is_file())
+            .find_map(|p| machine::port(|| r.readings.open(&p)).ok())
+    })
+}
+
 /// One attempt's outcome (step.py `attempt`'s return).
 struct Attempt {
     res: Value,
@@ -838,6 +850,24 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"] = reading_record(&*rd, false, &format!("T only: {why}"), 0.0, t.elapsed().as_secs_f64());
                 rd
             }
+            // E016 D (FMI_FREE_T=archive): a free try never starts a reading; another scope's registered reading
+            // stands in for the wait, and T is the archive's
+            None if free_try && crate::free::t_archive() => match free_stand_in(r, &job, &checked) {
+                Some(rd) => {
+                    out["reading"] = reading_record(&*rd, false, &format!("T from the archive: {why}"), 0.0, t.elapsed().as_secs_f64());
+                    log.say(&format!("the free try reads nothing; {} stands in for the wait", reading_path(&*rd).display()));
+                    rd
+                }
+                None => {
+                    log.say("the free try reads nothing, and no registered reading stands in: the try keeps nothing");
+                    out["reading"] = json!({"path": null, "fresh": false, "why": format!("T from the archive: {why}; no registered reading"),
+                                            "load_s": t.elapsed().as_secs_f64(), "candidates": checked});
+                    cpu_add(&mut cpu, "read", cpu_now() - c0);
+                    out["exhausted"] = json!(false);
+                    out["ok"] = json!(true);
+                    return Ok(());
+                }
+            },
             None => match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
                 Fresh::Read(rd, wall, load_s, info) => {
                     out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
@@ -911,6 +941,11 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 TryNovel::new(&job, &atoms, &entry_facts)
             };
             let mut rec = t.record.clone();
+            if free_try && crate::free::t_archive() {
+                // E016 D: T is the archive's union over its registered readings, with the stand-in's own
+                rec["free_t"] = json!("archive");
+                rec["archive_atoms"] = json!(job.get("novelty").and_then(|n| n.get("t")).and_then(|x| x.as_array()).map(|a| a.len()).unwrap_or(0));
+            }
             rec["atoms"] = json!(atoms.len());
             rec["keys"] = json!(t.keys().len());
             rec["novelty"] = json!(nov.source);

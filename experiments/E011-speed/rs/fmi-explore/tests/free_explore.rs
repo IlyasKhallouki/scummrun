@@ -536,3 +536,204 @@ fn g5_an_object_verb_handlers_restart_is_the_goal_entry_with_the_verb_site() {
         assert_eq!(fmi_explore::mech::end_extra(reason, 200, 1200, vec![], &[]).is_some(), verb, "{reason}");
     }
 }
+
+// --- E016 D: a free try never reads (FMI_FREE_T=archive) ------------------------------------------------------------
+
+/// A registered reading of another scope, as it stands in for the wait: its folder, a reading.json and no task facts.
+struct Registered {
+    dir: std::path::PathBuf,
+    head: String,
+    doms: Domains,
+    start: Facts,
+}
+
+impl ReadingSource for Registered {
+    fn id(&self) -> [u8; 20] {
+        [7; 20]
+    }
+    fn dir(&self) -> &Path {
+        &self.dir
+    }
+    fn head(&self) -> &str {
+        &self.head
+    }
+    fn packed(&self) -> &[u8] {
+        unimplemented!()
+    }
+    fn n_actions(&self) -> u32 {
+        0
+    }
+    fn action_line(&self, _i: u32) -> &str {
+        unimplemented!()
+    }
+    fn by_name(&self, _name: &str) -> Option<u32> {
+        None
+    }
+    fn n_lists(&self) -> u32 {
+        0
+    }
+    fn list_line(&self, _i: u32) -> &str {
+        unimplemented!()
+    }
+    fn reached(&self) -> &str {
+        ""
+    }
+    fn domains(&self) -> &Domains {
+        &self.doms
+    }
+    fn goal(&self) -> &[(Key, Vec<Val>)] {
+        &[]
+    }
+    fn start(&self) -> &Facts {
+        &self.start
+    }
+    fn action(&self, _i: u32) -> Action {
+        unimplemented!()
+    }
+    fn record(&self, _i: u32) -> Record {
+        unimplemented!()
+    }
+}
+
+/// The readings: open gives a registered reading; a fresh reading is counted and refused.
+struct Readings1 {
+    reads: AtomicUsize,
+}
+
+impl fmi_explore::ports::Readings for Readings1 {
+    fn open(&self, p: &Path) -> Result<Arc<dyn ReadingSource>, String> {
+        let dir = p.parent().unwrap().to_path_buf();
+        let head = std::fs::read_to_string(p).map_err(|e| e.to_string())?;
+        Ok(Arc::new(Registered { dir, head, doms: Domains::default(), start: Facts::new() }))
+    }
+    fn reuse_keys(&self, _rd: &dyn ReadingSource) -> Result<std::collections::HashSet<String>, String> {
+        Ok(Default::default())
+    }
+    fn read(&self, _req: &fmi_explore::ports::ReadReq, _c: &AtomicBool) -> Result<std::path::PathBuf, String> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        Err("this test reads nothing".into())
+    }
+}
+
+struct ToyReturns;
+
+impl fmi_explore::ports::Returns for ToyReturns {
+    fn return_to(&mut self, e: &fmi_explore::ports::EntryRef, _out: &Path) -> EResult<Box<dyn Engine>> {
+        assert_eq!(e.frame, F0);
+        Ok(boxed(toy(F0)))
+    }
+}
+
+struct NoPlanner;
+
+impl PlannerHost for NoPlanner {
+    fn planner(&self, _rd: &dyn ReadingSource) -> Result<Box<dyn Planner>, PlanError> {
+        Err(PlanError::Taskcore("a free try plans nothing".into()))
+    }
+}
+
+struct NoPlayer;
+
+impl fmi_explore::ports::PlayerHost for NoPlayer {
+    fn player(&self, _cfg: &fmi_explore::ports::WindowCfg) -> Box<dyn fmi_explore::ports::WindowPlayer> {
+        unimplemented!("a free try plays no plan")
+    }
+}
+
+struct TestedToy;
+
+impl fmi_explore::mech::TestedPort for TestedToy {
+    fn tested(&self, _rd: &dyn ReadingSource) -> Result<TestedT, String> {
+        Ok(tested())
+    }
+}
+
+/// A free try's job dir from a non-root entry at the toy's frame F0: no cached reading of its scope, and the registered
+/// readings of other scopes `any`.
+fn free_job(dir: &Path, any: &[std::path::PathBuf]) -> std::path::PathBuf {
+    let mut b = boxed(toy(F0));
+    let o = b.obs(&ObsReq::default()).unwrap();
+    let cp = afford::checkpoint_of(b.status(), &o);
+    let jd = dir.join("jobs").join("j00003");
+    std::fs::create_dir_all(&jd).unwrap();
+    let job = json!({"job": "j00003", "seed": 1, "stage": "test", "goal": {"bit:12": [1]},
+                     "entry": {"id": 4, "root": false, "frame": F0, "events": [], "checkpoint": fmi_explore::harness::checkpoint_json(&cp)},
+                     "scope": [3], "tried": [], "held": [], "readings": [],
+                     "reading_dir": dir.join("readings").join("3-j00003").to_string_lossy(), "threads": 1, "workers": 1,
+                     "kind": "free", "readings_room": [],
+                     "readings_any": any.iter().map(|p| json!({"path": p.to_string_lossy(), "start_entry": 0, "scope": [7]})).collect::<Vec<_>>()});
+    std::fs::write(jd.join("job.json"), job.to_string()).unwrap();
+    jd
+}
+
+fn resident(reads: Arc<Readings1>) -> fmi_explore::tryjob::Resident {
+    fmi_explore::tryjob::Resident {
+        returns: Mutex::new(Box::new(ToyReturns)),
+        readings: reads,
+        planners: Mutex::new(fmi_explore::harness::PlannerCache::new(Arc::new(NoPlanner))),
+        players: Arc::new(NoPlayer),
+        search: Search::Gbfs,
+        search_name: "gbfs".into(),
+        forced_targets: None,
+        tail: false,
+        mech: fmi_explore::mech::Mech { tested: Some(Arc::new(TestedToy)), wait: Some(Arc::new(NoStops(AtomicUsize::new(0)))) },
+    }
+}
+
+fn run_free(any: bool, t_archive: bool) -> (Value, usize) {
+    let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("e016-d-{}-{}-{}", std::process::id(), any, t_archive));
+    let _ = std::fs::remove_dir_all(&dir);
+    let rdir = dir.join("readings").join("7-j00001");
+    std::fs::create_dir_all(&rdir).unwrap();
+    let rj = rdir.join("reading.json");
+    std::fs::write(&rj, json!({"scope": {"rooms": [7]}, "start": {"name": "s", "facts": {}}, "n_records": 1, "n_actions": 1}).to_string()).unwrap();
+    let jd = free_job(&dir, if any { std::slice::from_ref(&rj) } else { &[] });
+    let reads = Arc::new(Readings1 { reads: AtomicUsize::new(0) });
+    let r = resident(reads.clone());
+    if t_archive {
+        std::env::set_var("FMI_FREE_T", "archive");
+    }
+    let log = fmi_explore::driver::JobLog::create(&jd.join("log")).unwrap();
+    let out = fmi_explore::tryjob::run_job(&jd, &r, &log, &AtomicBool::new(false));
+    std::env::remove_var("FMI_FREE_T");
+    (out, reads.reads.load(Ordering::SeqCst))
+}
+
+#[test]
+fn e016_d_a_free_try_reads_nothing_and_a_registered_reading_stands_in() {
+    // E016 section D (FMI_FREE_T=archive): a free try whose scope has no cached reading starts no reading. A registered
+    // reading of another scope stands in for the wait; T is the archive's union with the stand-in's own; the free step
+    // runs and keeps the door's room as before
+    let _g = env(false);
+    let (out, reads) = run_free(true, true);
+    assert_eq!(reads, 0);
+    assert_eq!(out["error"], Value::Null, "{out}");
+    assert!(out["reading"]["why"].as_str().unwrap().starts_with("T from the archive"), "{}", out["reading"]);
+    assert_eq!(out["reading"]["fresh"], json!(false));
+    assert!(out["reading"]["path"].as_str().unwrap().ends_with("7-j00001/reading.json"));
+    assert_eq!(out["e012"]["t"]["free_t"], json!("archive"));
+    assert!(out["free"]["trials"].as_u64().unwrap() > 0);
+    assert!(out["new"].as_array().unwrap().iter().any(|n| n["novel"] == json!(["room=7"])));
+    assert_eq!(out["exhausted"], json!(false));
+}
+
+#[test]
+fn e016_d_with_no_registered_reading_the_free_try_keeps_nothing() {
+    let _g = env(false);
+    let (out, reads) = run_free(false, true);
+    assert_eq!(reads, 0);
+    assert_eq!(out["ok"], json!(true));
+    assert!(out["reading"]["why"].as_str().unwrap().ends_with("no registered reading"), "{}", out["reading"]);
+    assert!(out["new"].as_array().unwrap().is_empty());
+    assert!(out.get("free").is_none());
+}
+
+#[test]
+fn e016_d_off_the_free_try_reads_its_scope() {
+    // the switch unset: a free try with no reading of its scope asks for a fresh one (E013), here refused
+    let _g = env(false);
+    let (out, reads) = run_free(true, false);
+    assert_eq!(reads, 1);
+    assert!(out["error"].as_str().unwrap().contains("this test reads nothing"), "{out}");
+}
