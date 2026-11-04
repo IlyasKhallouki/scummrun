@@ -1,0 +1,6109 @@
+{
+  "chain": [
+    0,
+    44,
+    55,
+    85,
+    123,
+    135,
+    142,
+    146,
+    150
+  ],
+  "goal": "owner:566=1",
+  "original": {
+    "frame": 18416,
+    "goal_value": 1,
+    "goal": true,
+    "inputs": 85
+  },
+  "steps": 14,
+  "jobs": {
+    "summary": {
+      "steps": 14,
+      "tried": 14,
+      "realized": 12,
+      "misses": {
+        "approach": 2
+      },
+      "kept": 0,
+      "candidates": 33,
+      "approach": 3,
+      "forks": 82,
+      "realize_s": 0.214303181
+    },
+    "rows": [
+      {
+        "entry": 44,
+        "how": "window",
+        "name": "walk_to(427)#61",
+        "start": 2728,
+        "chain_seen": {
+          "touch": [
+            2822,
+            11,
+            427,
+            0
+          ],
+          "touches": [
+            [
+              2774,
+              11,
+              428,
+              0
+            ],
+            [
+              2821,
+              11,
+              427,
+              0
+            ],
+            [
+              2822,
+              11,
+              427,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 2736,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2751,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2752,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2753,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2754,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2755,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2756,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2757,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2758,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2759,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2760,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2761,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2762,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2763,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2764,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2765,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2766,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2767,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2768,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2769,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2770,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2771,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2772,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2773,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2774,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2780,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2781,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2782,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2783,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2784,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2785,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2786,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2787,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2788,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2789,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2790,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2791,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2792,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2793,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2794,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2795,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2807,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2808,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2809,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2810,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2811,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2812,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2813,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2814,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2815,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2816,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2817,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2818,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2819,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2820,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2821,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2822,
+            "click": [
+              315,
+              71
+            ]
+          }
+        ],
+        "from": 2728,
+        "realized": {
+          "step": "s11:427",
+          "ok": false,
+          "from": 2728,
+          "reason": "approach",
+          "approach": 2,
+          "candidates": 0,
+          "tries": 3,
+          "seconds": 0.008403642,
+          "attempts": [
+            {
+              "phase": "approach",
+              "name": "w9",
+              "accepted": true,
+              "seen": "walk=1 toward=1 hit=0 xstart=136->224",
+              "frame": 2739,
+              "events": [
+                {
+                  "frame": 2729,
+                  "click": [
+                    267,
+                    131
+                  ]
+                }
+              ],
+              "seconds": 0.002027153
+            },
+            {
+              "phase": "approach",
+              "name": "w9",
+              "accepted": true,
+              "seen": "walk=1 toward=1 hit=0 xstart=224->296",
+              "frame": 2751,
+              "events": [
+                {
+                  "frame": 2740,
+                  "click": [
+                    249,
+                    132
+                  ]
+                }
+              ],
+              "seconds": 0.001502494
+            },
+            {
+              "phase": "approach",
+              "name": "w9",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=296->296",
+              "frame": 2764,
+              "events": [
+                {
+                  "frame": 2752,
+                  "click": [
+                    107,
+                    131
+                  ]
+                }
+              ],
+              "seconds": 0.001097689
+            }
+          ]
+        },
+        "played_chain_clicks": {
+          "shift": 0
+        }
+      },
+      {
+        "entry": 44,
+        "how": "afford",
+        "name": "",
+        "start": 10087,
+        "chain_seen": {
+          "touch": [
+            10090,
+            8,
+            449,
+            0
+          ],
+          "touches": [
+            [
+              10090,
+              8,
+              449,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10088,
+            "click": [
+              74,
+              173
+            ]
+          },
+          {
+            "frame": 10090,
+            "click": [
+              7,
+              35
+            ]
+          }
+        ],
+        "from": 10087,
+        "realized": {
+          "step": "s8:449",
+          "ok": true,
+          "from": 10087,
+          "approach": 0,
+          "candidates": 6,
+          "tries": 16,
+          "seconds": 0.028118984,
+          "accepted_at": 10091,
+          "events": [
+            {
+              "frame": 10088,
+              "click": [
+                74,
+                173
+              ]
+            },
+            {
+              "frame": 10090,
+              "click": [
+                7,
+                35
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t449",
+              "accepted": false,
+              "seen": "(11,449,0)",
+              "frame": 10089,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001934367
+            },
+            {
+              "phase": "sentence",
+              "name": "t449",
+              "accepted": false,
+              "seen": "(11,449,0)",
+              "frame": 10089,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001802123
+            },
+            {
+              "phase": "sentence",
+              "name": "t449",
+              "accepted": false,
+              "seen": "(11,449,0)",
+              "frame": 10089,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001363967
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t449",
+              "accepted": false,
+              "seen": "",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001722937
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t449",
+              "accepted": false,
+              "seen": "",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001631635
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t449",
+              "accepted": false,
+              "seen": "",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001561239
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t449",
+              "accepted": false,
+              "seen": "(2,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001593488
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t449",
+              "accepted": false,
+              "seen": "(2,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001878237
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t449",
+              "accepted": false,
+              "seen": "(2,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001650232
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t449",
+              "accepted": false,
+              "seen": "(3,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001689429
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t449",
+              "accepted": false,
+              "seen": "(3,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001955873
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t449",
+              "accepted": false,
+              "seen": "(3,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001649724
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t449",
+              "accepted": false,
+              "seen": "(9,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001511545
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t449",
+              "accepted": false,
+              "seen": "(9,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001596407
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t449",
+              "accepted": false,
+              "seen": "(9,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001592682
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t449",
+              "accepted": true,
+              "seen": "(8,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001616207
+            }
+          ]
+        }
+      },
+      {
+        "entry": 55,
+        "how": "window",
+        "name": "sentence(2,444)#60",
+        "start": 10102,
+        "chain_seen": {
+          "touch": [
+            10104,
+            2,
+            444,
+            0
+          ],
+          "touches": [
+            [
+              10104,
+              2,
+              444,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10103,
+            "key": "o"
+          },
+          {
+            "frame": 10104,
+            "click": [
+              71,
+              79
+            ]
+          }
+        ],
+        "from": 10102,
+        "realized": {
+          "step": "s2:444",
+          "ok": true,
+          "from": 10102,
+          "approach": 0,
+          "candidates": 3,
+          "tries": 7,
+          "seconds": 0.032338135,
+          "accepted_at": 10106,
+          "events": [
+            {
+              "frame": 10103,
+              "click": [
+                24,
+                173
+              ]
+            },
+            {
+              "frame": 10105,
+              "click": [
+                71,
+                79
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 10104,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    71,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.003490441
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 10104,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    63,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.006668369
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 10104,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    79,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.003904882
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    71,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.00382142
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    63,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.003931592
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    79,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.004623808
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t444",
+              "accepted": true,
+              "seen": "(2,444,0)",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    71,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.003861459
+            }
+          ]
+        }
+      },
+      {
+        "entry": 55,
+        "how": "window",
+        "name": "walk_to(444)#39",
+        "start": 10160,
+        "chain_seen": {
+          "touch": [
+            10161,
+            11,
+            444,
+            0
+          ],
+          "touches": [
+            [
+              10161,
+              11,
+              444,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10161,
+            "click": [
+              183,
+              79
+            ]
+          }
+        ],
+        "from": 10161,
+        "realized": {
+          "step": "s11:444",
+          "ok": true,
+          "from": 10161,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.008487215,
+          "accepted_at": 10163,
+          "events": [
+            {
+              "frame": 10162,
+              "click": [
+                183,
+                79
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": true,
+              "seen": "(11,444,0)",
+              "frame": 10163,
+              "events": [
+                {
+                  "frame": 10162,
+                  "click": [
+                    183,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.005547864
+            }
+          ]
+        }
+      },
+      {
+        "entry": 85,
+        "how": "window",
+        "name": "walk_to(367)#18",
+        "start": 10162,
+        "chain_seen": {
+          "touch": [
+            10163,
+            11,
+            367,
+            0
+          ],
+          "touches": [
+            [
+              10163,
+              11,
+              367,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10163,
+            "click": [
+              103,
+              75
+            ]
+          }
+        ],
+        "from": 10162,
+        "realized": {
+          "step": "s11:367",
+          "ok": true,
+          "from": 10162,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.003980228,
+          "accepted_at": 10164,
+          "events": [
+            {
+              "frame": 10163,
+              "click": [
+                103,
+                75
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t367",
+              "accepted": true,
+              "seen": "(11,367,0)",
+              "frame": 10164,
+              "events": [
+                {
+                  "frame": 10163,
+                  "click": [
+                    103,
+                    75
+                  ]
+                }
+              ],
+              "seconds": 0.002270986
+            }
+          ]
+        }
+      },
+      {
+        "entry": 123,
+        "how": "window",
+        "name": "sentence(2,444)#60",
+        "start": 13767,
+        "chain_seen": {
+          "touch": [
+            13769,
+            2,
+            444,
+            0
+          ],
+          "touches": [
+            [
+              13769,
+              2,
+              444,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 13768,
+            "key": "o"
+          },
+          {
+            "frame": 13769,
+            "click": [
+              159,
+              79
+            ]
+          }
+        ],
+        "from": 13767,
+        "realized": {
+          "step": "s2:444",
+          "ok": true,
+          "from": 13767,
+          "approach": 0,
+          "candidates": 3,
+          "tries": 7,
+          "seconds": 0.015732528,
+          "accepted_at": 13771,
+          "events": [
+            {
+              "frame": 13768,
+              "click": [
+                24,
+                173
+              ]
+            },
+            {
+              "frame": 13770,
+              "click": [
+                159,
+                79
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 13769,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    159,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.00246192
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 13769,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    151,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.002069106
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 13769,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    167,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.002130861
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    159,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.002119421
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    151,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001787856
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    167,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001659928
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t444",
+              "accepted": true,
+              "seen": "(2,444,0)",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    159,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001720764
+            }
+          ]
+        }
+      },
+      {
+        "entry": 135,
+        "how": "window",
+        "name": "walk_to(450)#99",
+        "start": 13776,
+        "chain_seen": {
+          "touch": [
+            13830,
+            11,
+            450,
+            0
+          ],
+          "touches": [
+            [
+              13829,
+              11,
+              450,
+              0
+            ],
+            [
+              13830,
+              11,
+              450,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 13778,
+            "click": [
+              319,
+              115
+            ]
+          },
+          {
+            "frame": 13827,
+            "click": [
+              319,
+              107
+            ]
+          },
+          {
+            "frame": 13828,
+            "click": [
+              319,
+              107
+            ]
+          },
+          {
+            "frame": 13829,
+            "click": [
+              319,
+              107
+            ]
+          },
+          {
+            "frame": 13830,
+            "click": [
+              315,
+              87
+            ]
+          }
+        ],
+        "from": 13776,
+        "realized": {
+          "step": "s11:450",
+          "ok": true,
+          "from": 13776,
+          "approach": 1,
+          "candidates": 1,
+          "tries": 2,
+          "seconds": 0.00884589,
+          "accepted_at": 13836,
+          "events": [
+            {
+              "frame": 13777,
+              "click": [
+                311,
+                134
+              ]
+            },
+            {
+              "frame": 13835,
+              "click": [
+                291,
+                87
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "approach",
+              "name": "w6",
+              "accepted": true,
+              "seen": "walk=1 toward=1 hit=1 xstart=72->144",
+              "frame": 13834,
+              "events": [
+                {
+                  "frame": 13777,
+                  "click": [
+                    311,
+                    134
+                  ]
+                }
+              ],
+              "seconds": 0.002676875
+            },
+            {
+              "phase": "sentence",
+              "name": "t450",
+              "accepted": true,
+              "seen": "(11,450,0)",
+              "frame": 13836,
+              "events": [
+                {
+                  "frame": 13835,
+                  "click": [
+                    291,
+                    87
+                  ]
+                }
+              ],
+              "seconds": 0.001428261
+            }
+          ]
+        }
+      },
+      {
+        "entry": 135,
+        "how": "window",
+        "name": "sentence(2,428)#4063",
+        "start": 13873,
+        "chain_seen": {
+          "touch": [
+            13875,
+            2,
+            428,
+            0
+          ],
+          "touches": [
+            [
+              13875,
+              2,
+              428,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 13874,
+            "key": "o"
+          },
+          {
+            "frame": 13875,
+            "click": [
+              27,
+              107
+            ]
+          }
+        ],
+        "from": 13882,
+        "realized": {
+          "step": "s2:428",
+          "ok": true,
+          "from": 13882,
+          "approach": 0,
+          "candidates": 3,
+          "tries": 7,
+          "seconds": 0.012876648,
+          "accepted_at": 13886,
+          "events": [
+            {
+              "frame": 13883,
+              "click": [
+                24,
+                173
+              ]
+            },
+            {
+              "frame": 13885,
+              "click": [
+                27,
+                107
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": false,
+              "seen": "(11,428,0)",
+              "frame": 13884,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    27,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001713653
+            },
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": false,
+              "seen": "(11,428,0)",
+              "frame": 13884,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    17,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001619507
+            },
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": false,
+              "seen": "(11,428,0)",
+              "frame": 13884,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    37,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001526405
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t428",
+              "accepted": false,
+              "seen": "",
+              "frame": 13886,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13885,
+                  "click": [
+                    27,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001745642
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t428",
+              "accepted": false,
+              "seen": "",
+              "frame": 13886,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13885,
+                  "click": [
+                    17,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001735269
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t428",
+              "accepted": false,
+              "seen": "",
+              "frame": 13886,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13885,
+                  "click": [
+                    37,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001850348
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t428",
+              "accepted": true,
+              "seen": "(2,428,0)",
+              "frame": 13886,
+              "events": [
+                {
+                  "frame": 13883,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 13885,
+                  "click": [
+                    27,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001899772
+            }
+          ]
+        }
+      },
+      {
+        "entry": 142,
+        "how": "window",
+        "name": "walk_to(428)#32",
+        "start": 17524,
+        "chain_seen": {
+          "touch": [
+            17525,
+            11,
+            428,
+            0
+          ],
+          "touches": [
+            [
+              17525,
+              11,
+              428,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 17525,
+            "click": [
+              163,
+              107
+            ]
+          }
+        ],
+        "from": 17524,
+        "realized": {
+          "step": "s11:428",
+          "ok": true,
+          "from": 17524,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.008116448,
+          "accepted_at": 17526,
+          "events": [
+            {
+              "frame": 17525,
+              "click": [
+                163,
+                107
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": true,
+              "seen": "(11,428,0)",
+              "frame": 17526,
+              "events": [
+                {
+                  "frame": 17525,
+                  "click": [
+                    163,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.007141596
+            }
+          ]
+        }
+      },
+      {
+        "entry": 142,
+        "how": "window",
+        "name": "sentence(10,339)[202]#1873",
+        "start": 17526,
+        "chain_seen": {
+          "touch": [
+            17528,
+            10,
+            339,
+            0
+          ],
+          "touches": [
+            [
+              17528,
+              10,
+              339,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 17527,
+            "key": "t"
+          },
+          {
+            "frame": 17528,
+            "click": [
+              299,
+              119
+            ]
+          }
+        ],
+        "from": 17526,
+        "realized": {
+          "step": "s10:339",
+          "ok": true,
+          "from": 17526,
+          "approach": 0,
+          "candidates": 7,
+          "tries": 19,
+          "seconds": 0.037403516,
+          "accepted_at": 17530,
+          "events": [
+            {
+              "frame": 17527,
+              "click": [
+                74,
+                189
+              ]
+            },
+            {
+              "frame": 17529,
+              "click": [
+                299,
+                119
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t339",
+              "accepted": false,
+              "seen": "(11,339,0)",
+              "frame": 17528,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001826747
+            },
+            {
+              "phase": "sentence",
+              "name": "t339",
+              "accepted": false,
+              "seen": "(11,339,0)",
+              "frame": 17528,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.00168932
+            },
+            {
+              "phase": "sentence",
+              "name": "t339",
+              "accepted": false,
+              "seen": "(11,339,0)",
+              "frame": 17528,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.00151242
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t339",
+              "accepted": false,
+              "seen": "",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001840193
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t339",
+              "accepted": false,
+              "seen": "",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002137837
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t339",
+              "accepted": false,
+              "seen": "",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002086314
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t339",
+              "accepted": false,
+              "seen": "(2,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001952773
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t339",
+              "accepted": false,
+              "seen": "(2,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002045215
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t339",
+              "accepted": false,
+              "seen": "(2,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001912152
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t339",
+              "accepted": false,
+              "seen": "(3,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001935218
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t339",
+              "accepted": false,
+              "seen": "(3,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001821986
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t339",
+              "accepted": false,
+              "seen": "(3,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001737415
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t339",
+              "accepted": false,
+              "seen": "(9,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001820824
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t339",
+              "accepted": false,
+              "seen": "(9,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001864174
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t339",
+              "accepted": false,
+              "seen": "(9,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001852781
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t339",
+              "accepted": false,
+              "seen": "(8,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001957408
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t339",
+              "accepted": false,
+              "seen": "(8,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001991432
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t339",
+              "accepted": false,
+              "seen": "(8,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002124784
+            },
+            {
+              "phase": "sentence",
+              "name": "v10t339",
+              "accepted": true,
+              "seen": "(10,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002111721
+            }
+          ]
+        }
+      },
+      {
+        "entry": 142,
+        "how": "afford",
+        "name": "",
+        "start": 17577,
+        "chain_seen": {
+          "dialog": 120,
+          "slot": 37,
+          "frame": 17578
+        },
+        "chain_events": [
+          {
+            "frame": 17578,
+            "click": [
+              4,
+              147
+            ]
+          }
+        ],
+        "from": 17577,
+        "realized": {
+          "step": "d120",
+          "ok": true,
+          "from": 17577,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.001839865,
+          "accepted_at": 17579,
+          "events": [
+            {
+              "frame": 17578,
+              "click": [
+                4,
+                147
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "dialog",
+              "name": "v120",
+              "accepted": true,
+              "seen": "taken",
+              "frame": 17579,
+              "events": [
+                {
+                  "frame": 17578,
+                  "click": [
+                    4,
+                    147
+                  ]
+                }
+              ],
+              "seconds": 0.001507553
+            }
+          ]
+        }
+      },
+      {
+        "entry": 146,
+        "how": "afford",
+        "name": "",
+        "start": 17918,
+        "chain_seen": {
+          "dialog": 122,
+          "slot": 39,
+          "frame": 17919
+        },
+        "chain_events": [
+          {
+            "frame": 17919,
+            "click": [
+              4,
+              163
+            ]
+          }
+        ],
+        "from": 17918,
+        "realized": {
+          "step": "d122",
+          "ok": true,
+          "from": 17918,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.002448094,
+          "accepted_at": 17920,
+          "events": [
+            {
+              "frame": 17919,
+              "click": [
+                4,
+                163
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "dialog",
+              "name": "v122",
+              "accepted": true,
+              "seen": "taken",
+              "frame": 17920,
+              "events": [
+                {
+                  "frame": 17919,
+                  "click": [
+                    4,
+                    163
+                  ]
+                }
+              ],
+              "seconds": 0.001826123
+            }
+          ]
+        }
+      },
+      {
+        "entry": 150,
+        "how": "window",
+        "name": "walk_to(316)[202]#107",
+        "start": 18316,
+        "chain_seen": {
+          "touch": [
+            18365,
+            11,
+            316,
+            0
+          ],
+          "touches": [
+            [
+              18325,
+              11,
+              323,
+              0
+            ],
+            [
+              18365,
+              11,
+              316,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 18318,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18322,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18323,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18324,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18325,
+            "click": [
+              311,
+              87
+            ]
+          },
+          {
+            "frame": 18365,
+            "click": [
+              315,
+              103
+            ]
+          }
+        ],
+        "from": 18316,
+        "realized": {
+          "step": "s11:316",
+          "ok": false,
+          "from": 18316,
+          "reason": "approach",
+          "approach": 0,
+          "candidates": 0,
+          "tries": 3,
+          "seconds": 0.019958892,
+          "attempts": [
+            {
+              "phase": "approach",
+              "name": "w3",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=0->0",
+              "frame": 18336,
+              "events": [
+                {
+                  "frame": 18317,
+                  "click": [
+                    133,
+                    132
+                  ]
+                }
+              ],
+              "seconds": 0.002511184
+            },
+            {
+              "phase": "approach",
+              "name": "w2",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=0->0",
+              "frame": 18339,
+              "events": [
+                {
+                  "frame": 18317,
+                  "click": [
+                    109,
+                    132
+                  ]
+                }
+              ],
+              "seconds": 0.002319854
+            },
+            {
+              "phase": "approach",
+              "name": "w1",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=0->0",
+              "frame": 18342,
+              "events": [
+                {
+                  "frame": 18317,
+                  "click": [
+                    77,
+                    129
+                  ]
+                }
+              ],
+              "seconds": 0.002272148
+            }
+          ]
+        },
+        "played_chain_clicks": {
+          "shift": 0
+        }
+      },
+      {
+        "entry": 150,
+        "how": "window",
+        "name": "sentence(9,566)#1264",
+        "start": 18404,
+        "chain_seen": {
+          "touch": [
+            18406,
+            9,
+            566,
+            0
+          ],
+          "touches": [
+            [
+              18406,
+              9,
+              566,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 18405,
+            "key": "p"
+          },
+          {
+            "frame": 18406,
+            "click": [
+              79,
+              99
+            ]
+          }
+        ],
+        "from": 18404,
+        "realized": {
+          "step": "s9:566",
+          "ok": true,
+          "from": 18404,
+          "approach": 0,
+          "candidates": 5,
+          "tries": 13,
+          "seconds": 0.025753096,
+          "accepted_at": 18408,
+          "events": [
+            {
+              "frame": 18405,
+              "click": [
+                74,
+                157
+              ]
+            },
+            {
+              "frame": 18407,
+              "click": [
+                79,
+                99
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t566",
+              "accepted": false,
+              "seen": "(11,566,0)",
+              "frame": 18406,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.002107716
+            },
+            {
+              "phase": "sentence",
+              "name": "t566",
+              "accepted": false,
+              "seen": "(11,566,0)",
+              "frame": 18406,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001719185
+            },
+            {
+              "phase": "sentence",
+              "name": "t566",
+              "accepted": false,
+              "seen": "(11,566,0)",
+              "frame": 18406,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001540551
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t566",
+              "accepted": false,
+              "seen": "",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001795166
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t566",
+              "accepted": false,
+              "seen": "",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.00201393
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t566",
+              "accepted": false,
+              "seen": "",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001812859
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t566",
+              "accepted": false,
+              "seen": "(2,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001966678
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t566",
+              "accepted": false,
+              "seen": "(2,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001889148
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t566",
+              "accepted": false,
+              "seen": "(2,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.002281889
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t566",
+              "accepted": false,
+              "seen": "(3,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001802433
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t566",
+              "accepted": false,
+              "seen": "(3,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.00172851
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t566",
+              "accepted": false,
+              "seen": "(3,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001787719
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t566",
+              "accepted": true,
+              "seen": "(9,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001938753
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "chain_run": {
+    "summary": {
+      "steps": 14,
+      "tried": 14,
+      "realized": 12,
+      "misses": {
+        "approach": 2
+      },
+      "kept": 0,
+      "candidates": 33,
+      "approach": 3,
+      "forks": 82,
+      "realize_s": 0.18045121299999997
+    },
+    "goal": {
+      "reached": 18417,
+      "ended": null,
+      "stop": 18417,
+      "room": 41
+    },
+    "verify": {
+      "frame": 18417,
+      "got_frame": 18417,
+      "inputs": 82,
+      "facts": 3661,
+      "facts_differ": 0,
+      "first": [],
+      "room": [
+        41,
+        41
+      ],
+      "digest": [
+        "dc8714f44597fc2f",
+        "dc8714f44597fc2f"
+      ],
+      "differences": 0,
+      "seconds": 1.034425799
+    },
+    "rows": [
+      {
+        "entry": 44,
+        "how": "window",
+        "name": "walk_to(427)#61",
+        "start": 2728,
+        "chain_seen": {
+          "touch": [
+            2822,
+            11,
+            427,
+            0
+          ],
+          "touches": [
+            [
+              2774,
+              11,
+              428,
+              0
+            ],
+            [
+              2821,
+              11,
+              427,
+              0
+            ],
+            [
+              2822,
+              11,
+              427,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 2736,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2751,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2752,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2753,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2754,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2755,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2756,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2757,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2758,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2759,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2760,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2761,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2762,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2763,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2764,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2765,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2766,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2767,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2768,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2769,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2770,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2771,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2772,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2773,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2774,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2780,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2781,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2782,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2783,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2784,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2785,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2786,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2787,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2788,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2789,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2790,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2791,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2792,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2793,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2794,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2795,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2807,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2808,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2809,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2810,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2811,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2812,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2813,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2814,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2815,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2816,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2817,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2818,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2819,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2820,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2821,
+            "click": [
+              319,
+              113
+            ]
+          },
+          {
+            "frame": 2822,
+            "click": [
+              315,
+              71
+            ]
+          }
+        ],
+        "from": 2728,
+        "realized": {
+          "step": "s11:427",
+          "ok": false,
+          "from": 2728,
+          "reason": "approach",
+          "approach": 2,
+          "candidates": 0,
+          "tries": 3,
+          "seconds": 0.010385998,
+          "attempts": [
+            {
+              "phase": "approach",
+              "name": "w9",
+              "accepted": true,
+              "seen": "walk=1 toward=1 hit=0 xstart=136->224",
+              "frame": 2739,
+              "events": [
+                {
+                  "frame": 2729,
+                  "click": [
+                    267,
+                    131
+                  ]
+                }
+              ],
+              "seconds": 0.002219195
+            },
+            {
+              "phase": "approach",
+              "name": "w9",
+              "accepted": true,
+              "seen": "walk=1 toward=1 hit=0 xstart=224->296",
+              "frame": 2751,
+              "events": [
+                {
+                  "frame": 2740,
+                  "click": [
+                    249,
+                    132
+                  ]
+                }
+              ],
+              "seconds": 0.00197214
+            },
+            {
+              "phase": "approach",
+              "name": "w9",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=296->296",
+              "frame": 2764,
+              "events": [
+                {
+                  "frame": 2752,
+                  "click": [
+                    107,
+                    131
+                  ]
+                }
+              ],
+              "seconds": 0.001370454
+            }
+          ]
+        },
+        "played_chain_clicks": {
+          "shift": 0
+        }
+      },
+      {
+        "entry": 44,
+        "how": "afford",
+        "name": "",
+        "start": 10087,
+        "chain_seen": {
+          "touch": [
+            10090,
+            8,
+            449,
+            0
+          ],
+          "touches": [
+            [
+              10090,
+              8,
+              449,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10088,
+            "click": [
+              74,
+              173
+            ]
+          },
+          {
+            "frame": 10090,
+            "click": [
+              7,
+              35
+            ]
+          }
+        ],
+        "from": 10087,
+        "realized": {
+          "step": "s8:449",
+          "ok": true,
+          "from": 10087,
+          "approach": 0,
+          "candidates": 6,
+          "tries": 16,
+          "seconds": 0.033209769,
+          "accepted_at": 10091,
+          "events": [
+            {
+              "frame": 10088,
+              "click": [
+                74,
+                173
+              ]
+            },
+            {
+              "frame": 10090,
+              "click": [
+                7,
+                35
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t449",
+              "accepted": false,
+              "seen": "(11,449,0)",
+              "frame": 10089,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.002229473
+            },
+            {
+              "phase": "sentence",
+              "name": "t449",
+              "accepted": false,
+              "seen": "(11,449,0)",
+              "frame": 10089,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.00248031
+            },
+            {
+              "phase": "sentence",
+              "name": "t449",
+              "accepted": false,
+              "seen": "(11,449,0)",
+              "frame": 10089,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.002206828
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t449",
+              "accepted": false,
+              "seen": "",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.002009975
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t449",
+              "accepted": false,
+              "seen": "",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.002032494
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t449",
+              "accepted": false,
+              "seen": "",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.00212839
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t449",
+              "accepted": false,
+              "seen": "(2,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.002101542
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t449",
+              "accepted": false,
+              "seen": "(2,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.002207709
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t449",
+              "accepted": false,
+              "seen": "(2,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.00214941
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t449",
+              "accepted": false,
+              "seen": "(3,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001828605
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t449",
+              "accepted": false,
+              "seen": "(3,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001685677
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t449",
+              "accepted": false,
+              "seen": "(3,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001954879
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t449",
+              "accepted": false,
+              "seen": "(9,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001852355
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t449",
+              "accepted": false,
+              "seen": "(9,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    3,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001565264
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t449",
+              "accepted": false,
+              "seen": "(9,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    11,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001618009
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t449",
+              "accepted": true,
+              "seen": "(8,449,0)",
+              "frame": 10091,
+              "events": [
+                {
+                  "frame": 10088,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10090,
+                  "click": [
+                    7,
+                    35
+                  ]
+                }
+              ],
+              "seconds": 0.001831191
+            }
+          ]
+        }
+      },
+      {
+        "entry": 55,
+        "how": "window",
+        "name": "sentence(2,444)#60",
+        "start": 10102,
+        "chain_seen": {
+          "touch": [
+            10104,
+            2,
+            444,
+            0
+          ],
+          "touches": [
+            [
+              10104,
+              2,
+              444,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10103,
+            "key": "o"
+          },
+          {
+            "frame": 10104,
+            "click": [
+              71,
+              79
+            ]
+          }
+        ],
+        "from": 10102,
+        "realized": {
+          "step": "s2:444",
+          "ok": true,
+          "from": 10102,
+          "approach": 0,
+          "candidates": 3,
+          "tries": 7,
+          "seconds": 0.011643553,
+          "accepted_at": 10106,
+          "events": [
+            {
+              "frame": 10103,
+              "click": [
+                24,
+                173
+              ]
+            },
+            {
+              "frame": 10105,
+              "click": [
+                71,
+                79
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 10104,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    71,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001292929
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 10104,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    63,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001122382
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 10104,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    79,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001290974
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    71,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.002220088
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    63,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001498468
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    79,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001749419
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t444",
+              "accepted": true,
+              "seen": "(2,444,0)",
+              "frame": 10106,
+              "events": [
+                {
+                  "frame": 10103,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 10105,
+                  "click": [
+                    71,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001486747
+            }
+          ]
+        }
+      },
+      {
+        "entry": 55,
+        "how": "window",
+        "name": "walk_to(444)#39",
+        "start": 10160,
+        "chain_seen": {
+          "touch": [
+            10161,
+            11,
+            444,
+            0
+          ],
+          "touches": [
+            [
+              10161,
+              11,
+              444,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10161,
+            "click": [
+              183,
+              79
+            ]
+          }
+        ],
+        "from": 10161,
+        "realized": {
+          "step": "s11:444",
+          "ok": true,
+          "from": 10161,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.003368081,
+          "accepted_at": 10163,
+          "events": [
+            {
+              "frame": 10162,
+              "click": [
+                183,
+                79
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": true,
+              "seen": "(11,444,0)",
+              "frame": 10163,
+              "events": [
+                {
+                  "frame": 10162,
+                  "click": [
+                    183,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.00254467
+            }
+          ]
+        }
+      },
+      {
+        "entry": 85,
+        "how": "window",
+        "name": "walk_to(367)#18",
+        "start": 10162,
+        "chain_seen": {
+          "touch": [
+            10163,
+            11,
+            367,
+            0
+          ],
+          "touches": [
+            [
+              10163,
+              11,
+              367,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 10163,
+            "click": [
+              103,
+              75
+            ]
+          }
+        ],
+        "from": 10163,
+        "realized": {
+          "step": "s11:367",
+          "ok": true,
+          "from": 10163,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.002398938,
+          "accepted_at": 10165,
+          "events": [
+            {
+              "frame": 10164,
+              "click": [
+                103,
+                75
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t367",
+              "accepted": true,
+              "seen": "(11,367,0)",
+              "frame": 10165,
+              "events": [
+                {
+                  "frame": 10164,
+                  "click": [
+                    103,
+                    75
+                  ]
+                }
+              ],
+              "seconds": 0.00168808
+            }
+          ]
+        }
+      },
+      {
+        "entry": 123,
+        "how": "window",
+        "name": "sentence(2,444)#60",
+        "start": 13767,
+        "chain_seen": {
+          "touch": [
+            13769,
+            2,
+            444,
+            0
+          ],
+          "touches": [
+            [
+              13769,
+              2,
+              444,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 13768,
+            "key": "o"
+          },
+          {
+            "frame": 13769,
+            "click": [
+              159,
+              79
+            ]
+          }
+        ],
+        "from": 13767,
+        "realized": {
+          "step": "s2:444",
+          "ok": true,
+          "from": 13767,
+          "approach": 0,
+          "candidates": 3,
+          "tries": 7,
+          "seconds": 0.012372973,
+          "accepted_at": 13771,
+          "events": [
+            {
+              "frame": 13768,
+              "click": [
+                24,
+                173
+              ]
+            },
+            {
+              "frame": 13770,
+              "click": [
+                159,
+                79
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 13769,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    159,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001788441
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 13769,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    151,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.00143953
+            },
+            {
+              "phase": "sentence",
+              "name": "t444",
+              "accepted": false,
+              "seen": "(11,444,0)",
+              "frame": 13769,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    167,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001654793
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    159,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.00162219
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    151,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001710152
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t444",
+              "accepted": false,
+              "seen": "",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    167,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001606376
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t444",
+              "accepted": true,
+              "seen": "(2,444,0)",
+              "frame": 13771,
+              "events": [
+                {
+                  "frame": 13768,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 13770,
+                  "click": [
+                    159,
+                    79
+                  ]
+                }
+              ],
+              "seconds": 0.001573629
+            }
+          ]
+        }
+      },
+      {
+        "entry": 135,
+        "how": "window",
+        "name": "walk_to(450)#99",
+        "start": 13776,
+        "chain_seen": {
+          "touch": [
+            13830,
+            11,
+            450,
+            0
+          ],
+          "touches": [
+            [
+              13829,
+              11,
+              450,
+              0
+            ],
+            [
+              13830,
+              11,
+              450,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 13778,
+            "click": [
+              319,
+              115
+            ]
+          },
+          {
+            "frame": 13827,
+            "click": [
+              319,
+              107
+            ]
+          },
+          {
+            "frame": 13828,
+            "click": [
+              319,
+              107
+            ]
+          },
+          {
+            "frame": 13829,
+            "click": [
+              319,
+              107
+            ]
+          },
+          {
+            "frame": 13830,
+            "click": [
+              315,
+              87
+            ]
+          }
+        ],
+        "from": 13777,
+        "realized": {
+          "step": "s11:450",
+          "ok": true,
+          "from": 13777,
+          "approach": 1,
+          "candidates": 1,
+          "tries": 2,
+          "seconds": 0.007382226,
+          "accepted_at": 13837,
+          "events": [
+            {
+              "frame": 13778,
+              "click": [
+                311,
+                134
+              ]
+            },
+            {
+              "frame": 13836,
+              "click": [
+                291,
+                87
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "approach",
+              "name": "w6",
+              "accepted": true,
+              "seen": "walk=1 toward=1 hit=1 xstart=72->144",
+              "frame": 13835,
+              "events": [
+                {
+                  "frame": 13778,
+                  "click": [
+                    311,
+                    134
+                  ]
+                }
+              ],
+              "seconds": 0.00153898
+            },
+            {
+              "phase": "sentence",
+              "name": "t450",
+              "accepted": true,
+              "seen": "(11,450,0)",
+              "frame": 13837,
+              "events": [
+                {
+                  "frame": 13836,
+                  "click": [
+                    291,
+                    87
+                  ]
+                }
+              ],
+              "seconds": 0.001548558
+            }
+          ]
+        }
+      },
+      {
+        "entry": 135,
+        "how": "window",
+        "name": "sentence(2,428)#4063",
+        "start": 13873,
+        "chain_seen": {
+          "touch": [
+            13875,
+            2,
+            428,
+            0
+          ],
+          "touches": [
+            [
+              13875,
+              2,
+              428,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 13874,
+            "key": "o"
+          },
+          {
+            "frame": 13875,
+            "click": [
+              27,
+              107
+            ]
+          }
+        ],
+        "from": 13883,
+        "realized": {
+          "step": "s2:428",
+          "ok": true,
+          "from": 13883,
+          "approach": 0,
+          "candidates": 3,
+          "tries": 7,
+          "seconds": 0.012389073,
+          "accepted_at": 13887,
+          "events": [
+            {
+              "frame": 13884,
+              "click": [
+                24,
+                173
+              ]
+            },
+            {
+              "frame": 13886,
+              "click": [
+                27,
+                107
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": false,
+              "seen": "(11,428,0)",
+              "frame": 13885,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    27,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001969856
+            },
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": false,
+              "seen": "(11,428,0)",
+              "frame": 13885,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    17,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001381648
+            },
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": false,
+              "seen": "(11,428,0)",
+              "frame": 13885,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    37,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.00150905
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t428",
+              "accepted": false,
+              "seen": "",
+              "frame": 13887,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13886,
+                  "click": [
+                    27,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001553158
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t428",
+              "accepted": false,
+              "seen": "",
+              "frame": 13887,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13886,
+                  "click": [
+                    17,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001684853
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t428",
+              "accepted": false,
+              "seen": "",
+              "frame": 13887,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 13886,
+                  "click": [
+                    37,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001879819
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t428",
+              "accepted": true,
+              "seen": "(2,428,0)",
+              "frame": 13887,
+              "events": [
+                {
+                  "frame": 13884,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 13886,
+                  "click": [
+                    27,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.001545322
+            }
+          ]
+        }
+      },
+      {
+        "entry": 142,
+        "how": "window",
+        "name": "walk_to(428)#32",
+        "start": 17524,
+        "chain_seen": {
+          "touch": [
+            17525,
+            11,
+            428,
+            0
+          ],
+          "touches": [
+            [
+              17525,
+              11,
+              428,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 17525,
+            "click": [
+              163,
+              107
+            ]
+          }
+        ],
+        "from": 17524,
+        "realized": {
+          "step": "s11:428",
+          "ok": true,
+          "from": 17524,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.0070451,
+          "accepted_at": 17526,
+          "events": [
+            {
+              "frame": 17525,
+              "click": [
+                163,
+                107
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t428",
+              "accepted": true,
+              "seen": "(11,428,0)",
+              "frame": 17526,
+              "events": [
+                {
+                  "frame": 17525,
+                  "click": [
+                    163,
+                    107
+                  ]
+                }
+              ],
+              "seconds": 0.006379284
+            }
+          ]
+        }
+      },
+      {
+        "entry": 142,
+        "how": "window",
+        "name": "sentence(10,339)[202]#1873",
+        "start": 17526,
+        "chain_seen": {
+          "touch": [
+            17528,
+            10,
+            339,
+            0
+          ],
+          "touches": [
+            [
+              17528,
+              10,
+              339,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 17527,
+            "key": "t"
+          },
+          {
+            "frame": 17528,
+            "click": [
+              299,
+              119
+            ]
+          }
+        ],
+        "from": 17526,
+        "realized": {
+          "step": "s10:339",
+          "ok": true,
+          "from": 17526,
+          "approach": 0,
+          "candidates": 7,
+          "tries": 19,
+          "seconds": 0.042297256,
+          "accepted_at": 17530,
+          "events": [
+            {
+              "frame": 17527,
+              "click": [
+                74,
+                189
+              ]
+            },
+            {
+              "frame": 17529,
+              "click": [
+                299,
+                119
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t339",
+              "accepted": false,
+              "seen": "(11,339,0)",
+              "frame": 17528,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001742876
+            },
+            {
+              "phase": "sentence",
+              "name": "t339",
+              "accepted": false,
+              "seen": "(11,339,0)",
+              "frame": 17528,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001748221
+            },
+            {
+              "phase": "sentence",
+              "name": "t339",
+              "accepted": false,
+              "seen": "(11,339,0)",
+              "frame": 17528,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001944271
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t339",
+              "accepted": false,
+              "seen": "",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002966189
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t339",
+              "accepted": false,
+              "seen": "",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002302228
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t339",
+              "accepted": false,
+              "seen": "",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002273307
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t339",
+              "accepted": false,
+              "seen": "(2,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002206136
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t339",
+              "accepted": false,
+              "seen": "(2,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002294855
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t339",
+              "accepted": false,
+              "seen": "(2,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002353415
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t339",
+              "accepted": false,
+              "seen": "(3,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002255146
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t339",
+              "accepted": false,
+              "seen": "(3,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.00250603
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t339",
+              "accepted": false,
+              "seen": "(3,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002264492
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t339",
+              "accepted": false,
+              "seen": "(9,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002041579
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t339",
+              "accepted": false,
+              "seen": "(9,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002507357
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t339",
+              "accepted": false,
+              "seen": "(9,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.002061421
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t339",
+              "accepted": false,
+              "seen": "(8,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001978563
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t339",
+              "accepted": false,
+              "seen": "(8,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    293,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.00190224
+            },
+            {
+              "phase": "sentence",
+              "name": "v8t339",
+              "accepted": false,
+              "seen": "(8,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    173
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    288,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001987799
+            },
+            {
+              "phase": "sentence",
+              "name": "v10t339",
+              "accepted": true,
+              "seen": "(10,339,0)",
+              "frame": 17530,
+              "events": [
+                {
+                  "frame": 17527,
+                  "click": [
+                    74,
+                    189
+                  ]
+                },
+                {
+                  "frame": 17529,
+                  "click": [
+                    299,
+                    119
+                  ]
+                }
+              ],
+              "seconds": 0.001797694
+            }
+          ]
+        }
+      },
+      {
+        "entry": 142,
+        "how": "afford",
+        "name": "",
+        "start": 17577,
+        "chain_seen": {
+          "dialog": 120,
+          "slot": 37,
+          "frame": 17578
+        },
+        "chain_events": [
+          {
+            "frame": 17578,
+            "click": [
+              4,
+              147
+            ]
+          }
+        ],
+        "from": 17577,
+        "realized": {
+          "step": "d120",
+          "ok": true,
+          "from": 17577,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.001771486,
+          "accepted_at": 17579,
+          "events": [
+            {
+              "frame": 17578,
+              "click": [
+                4,
+                147
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "dialog",
+              "name": "v120",
+              "accepted": true,
+              "seen": "taken",
+              "frame": 17579,
+              "events": [
+                {
+                  "frame": 17578,
+                  "click": [
+                    4,
+                    147
+                  ]
+                }
+              ],
+              "seconds": 0.001360653
+            }
+          ]
+        }
+      },
+      {
+        "entry": 146,
+        "how": "afford",
+        "name": "",
+        "start": 17918,
+        "chain_seen": {
+          "dialog": 122,
+          "slot": 39,
+          "frame": 17919
+        },
+        "chain_events": [
+          {
+            "frame": 17919,
+            "click": [
+              4,
+              163
+            ]
+          }
+        ],
+        "from": 17918,
+        "realized": {
+          "step": "d122",
+          "ok": true,
+          "from": 17918,
+          "approach": 0,
+          "candidates": 1,
+          "tries": 1,
+          "seconds": 0.002445647,
+          "accepted_at": 17920,
+          "events": [
+            {
+              "frame": 17919,
+              "click": [
+                4,
+                163
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "dialog",
+              "name": "v122",
+              "accepted": true,
+              "seen": "taken",
+              "frame": 17920,
+              "events": [
+                {
+                  "frame": 17919,
+                  "click": [
+                    4,
+                    163
+                  ]
+                }
+              ],
+              "seconds": 0.00199121
+            }
+          ]
+        }
+      },
+      {
+        "entry": 150,
+        "how": "window",
+        "name": "walk_to(316)[202]#107",
+        "start": 18316,
+        "chain_seen": {
+          "touch": [
+            18365,
+            11,
+            316,
+            0
+          ],
+          "touches": [
+            [
+              18325,
+              11,
+              323,
+              0
+            ],
+            [
+              18365,
+              11,
+              316,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 18318,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18322,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18323,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18324,
+            "click": [
+              303,
+              129
+            ]
+          },
+          {
+            "frame": 18325,
+            "click": [
+              311,
+              87
+            ]
+          },
+          {
+            "frame": 18365,
+            "click": [
+              315,
+              103
+            ]
+          }
+        ],
+        "from": 18316,
+        "realized": {
+          "step": "s11:316",
+          "ok": false,
+          "from": 18316,
+          "reason": "approach",
+          "approach": 0,
+          "candidates": 0,
+          "tries": 3,
+          "seconds": 0.013677582,
+          "attempts": [
+            {
+              "phase": "approach",
+              "name": "w3",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=0->0",
+              "frame": 18336,
+              "events": [
+                {
+                  "frame": 18317,
+                  "click": [
+                    133,
+                    132
+                  ]
+                }
+              ],
+              "seconds": 0.001751713
+            },
+            {
+              "phase": "approach",
+              "name": "w2",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=0->0",
+              "frame": 18339,
+              "events": [
+                {
+                  "frame": 18317,
+                  "click": [
+                    109,
+                    132
+                  ]
+                }
+              ],
+              "seconds": 0.001804922
+            },
+            {
+              "phase": "approach",
+              "name": "w1",
+              "accepted": false,
+              "seen": "walk=1 toward=0 hit=0 xstart=0->0",
+              "frame": 18342,
+              "events": [
+                {
+                  "frame": 18317,
+                  "click": [
+                    77,
+                    129
+                  ]
+                }
+              ],
+              "seconds": 0.001699105
+            }
+          ]
+        },
+        "played_chain_clicks": {
+          "shift": 0
+        }
+      },
+      {
+        "entry": 150,
+        "how": "window",
+        "name": "sentence(9,566)#1264",
+        "start": 18404,
+        "chain_seen": {
+          "touch": [
+            18406,
+            9,
+            566,
+            0
+          ],
+          "touches": [
+            [
+              18406,
+              9,
+              566,
+              0
+            ]
+          ]
+        },
+        "chain_events": [
+          {
+            "frame": 18405,
+            "key": "p"
+          },
+          {
+            "frame": 18406,
+            "click": [
+              79,
+              99
+            ]
+          }
+        ],
+        "from": 18404,
+        "realized": {
+          "step": "s9:566",
+          "ok": true,
+          "from": 18404,
+          "approach": 0,
+          "candidates": 5,
+          "tries": 13,
+          "seconds": 0.020063531,
+          "accepted_at": 18408,
+          "events": [
+            {
+              "frame": 18405,
+              "click": [
+                74,
+                157
+              ]
+            },
+            {
+              "frame": 18407,
+              "click": [
+                79,
+                99
+              ]
+            }
+          ],
+          "attempts": [
+            {
+              "phase": "sentence",
+              "name": "t566",
+              "accepted": false,
+              "seen": "(11,566,0)",
+              "frame": 18406,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001436548
+            },
+            {
+              "phase": "sentence",
+              "name": "t566",
+              "accepted": false,
+              "seen": "(11,566,0)",
+              "frame": 18406,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001459708
+            },
+            {
+              "phase": "sentence",
+              "name": "t566",
+              "accepted": false,
+              "seen": "(11,566,0)",
+              "frame": 18406,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001435999
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t566",
+              "accepted": false,
+              "seen": "",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001500568
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t566",
+              "accepted": false,
+              "seen": "",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001422454
+            },
+            {
+              "phase": "sentence",
+              "name": "v4t566",
+              "accepted": false,
+              "seen": "",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001373831
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t566",
+              "accepted": false,
+              "seen": "(2,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001469609
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t566",
+              "accepted": false,
+              "seen": "(2,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001509521
+            },
+            {
+              "phase": "sentence",
+              "name": "v2t566",
+              "accepted": false,
+              "seen": "(2,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    173
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001523015
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t566",
+              "accepted": false,
+              "seen": "(3,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001491313
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t566",
+              "accepted": false,
+              "seen": "(3,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    71,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001593501
+            },
+            {
+              "phase": "sentence",
+              "name": "v3t566",
+              "accepted": false,
+              "seen": "(3,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    24,
+                    189
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    87,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001344101
+            },
+            {
+              "phase": "sentence",
+              "name": "v9t566",
+              "accepted": true,
+              "seen": "(9,566,0)",
+              "frame": 18408,
+              "events": [
+                {
+                  "frame": 18405,
+                  "click": [
+                    74,
+                    157
+                  ]
+                },
+                {
+                  "frame": 18407,
+                  "click": [
+                    79,
+                    99
+                  ]
+                }
+              ],
+              "seconds": 0.001634313
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "pass": false,
+  "seconds": 9.227687514
+}

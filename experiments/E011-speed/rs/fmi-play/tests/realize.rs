@@ -2,6 +2,11 @@
 //! the object gives it; a target off the screen comes on after 2 floor clicks; a target that never comes on screen
 //! misses with "approach"; no candidate gives the sentence ("no sentence", within the limit); a dialog verb; a
 //! two-object sentence. The switch off is tested in tests/realize_off.rs (its own process).
+//!
+//! E016 A (experiments/E016-realize-run/plan.md, amendment (1)): the inventory extension on a toy with inventory slots
+//! (an inventory object with a room object, with another inventory object, after an approach to b, a bounded miss),
+//! and the run path's hook (`executor::play_input` with the switch on: the accepted events played on the branch; a
+//! miss as a route error with realize's reason).
 
 use fmi_core::*;
 use fmi_play::realize::{self, Cfg, Step};
@@ -11,6 +16,8 @@ use fmi_play::realize::{self, Cfg, Step};
 const DEFAULT_VERB: i32 = 10;
 const VERBS: [(i32, i32); 3] = [(1, 10), (2, 2), (3, 3)];
 const DIALOG: [(i32, i32); 2] = [(1, 120), (2, 121)];
+/// E016: the toy's inventory slots (slot, id, the object it shows), listed after the verbs when the toy has them.
+const INV: [(i32, i32, i32); 3] = [(4, 100, 900), (5, 101, 901), (6, 102, 902)];
 const ROOM_W: i32 = 640;
 const MAIN_H: i32 = 144;
 
@@ -31,6 +38,15 @@ struct Toy {
     walk_to: Option<i32>,
     log: Vec<InputRecord>,
     done: Vec<(i32, i32, i32)>,
+    /// E016: inventory slots shown (INV)
+    inv: bool,
+    /// E016 amendment (2): the inventory slots are image slots (the dump's type 1)
+    inv_images: bool,
+    /// E016 amendment (3): one walk box, x 0 to this (in place of the 16 strips); a click on an object also walks to
+    /// its walk point (the walk verb's sentence); object 505 at x 280 with its walk point at x 320
+    one_box: Option<i32>,
+    obj_walks: bool,
+    stone_obj: bool,
 }
 
 fn toy(xstart: i32, dialog: bool) -> Box<dyn Engine> {
@@ -48,9 +64,21 @@ fn toy_raw(xstart: i32, dialog: bool) -> Toy {
         walk_to: None,
         log: vec![],
         done: vec![],
+        inv: false,
+        inv_images: false,
+        one_box: None,
+        obj_walks: false,
+        stone_obj: false,
     };
     t.st.idle = t.idle();
     t
+}
+
+/// E016: the toy with its inventory slots.
+fn toy_inv(xstart: i32) -> Box<dyn Engine> {
+    let mut t = toy_raw(xstart, false);
+    t.inv = true;
+    Box::new(t)
 }
 
 fn inside(x: i32, y: i32, r: (i32, i32, i32, i32)) -> bool {
@@ -67,14 +95,27 @@ impl Toy {
     }
     fn verbs(&self) -> Vec<Verb> {
         let list: &[(i32, i32)] = if self.dialog { &DIALOG } else { &VERBS };
-        list.iter().map(|&(slot, id)| Verb { slot, id, mode: 1, x: 10 + 50 * (slot - 1), y: 150, ..Default::default() }).collect()
+        let mut v: Vec<Verb> = list.iter().map(|&(slot, id)| Verb { slot, id, mode: 1, x: 10 + 50 * (slot - 1), y: 150, ..Default::default() }).collect();
+        if self.inv && !self.dialog {
+            let kind = if self.inv_images { realize::IMAGE_VERB } else { 0 };
+            v.extend(INV.iter().map(|&(slot, id, _)| Verb { slot, id, mode: 1, kind, x: 10 + 50 * (slot - 1), y: 150, ..Default::default() }));
+        }
+        v
     }
     fn objects(&self) -> Vec<RoomObject> {
         let o = |id, x, y, w, h| RoomObject { id, x, y, w, h, walk: (x + w / 2, 70), ..Default::default() };
-        vec![o(500, 400, 20, 20, 20), o(501, 20, 20, 30, 30), o(502, 460, 20, 20, 20), o(503, 600, 20, 20, 20), o(504, 520, 20, 20, 20)]
+        let mut v = vec![o(500, 400, 20, 20, 20), o(501, 20, 20, 30, 30), o(502, 460, 20, 20, 20), o(503, 600, 20, 20, 20), o(504, 520, 20, 20, 20)];
+        if self.stone_obj {
+            v.push(RoomObject { id: 505, x: 280, y: 20, w: 20, h: 20, walk: (320, 70), ..Default::default() });
+        }
+        v
     }
     fn boxes_(&self) -> Vec<WalkBox> {
         let mut v = vec![WalkBox::default()];
+        if let Some(x1) = self.one_box {
+            v.push(WalkBox { ul: (0, 60), ur: (x1, 60), lr: (x1, 139), ll: (0, 139), flags: 0 });
+            return v;
+        }
         for i in 0..16 {
             let (x0, x1) = (40 * i, 40 * i + 39);
             v.push(WalkBox { ul: (x0, 60), ur: (x1, 60), lr: (x1, 139), ll: (x0, 139), flags: 0 });
@@ -97,7 +138,13 @@ impl Toy {
     fn click(&mut self, x: i32, y: i32) {
         let a = self.at_(x, y);
         let mut writes = Vec::new();
-        if a.verb_slot > 0 {
+        // an inventory slot is clicked as the object it shows
+        let inv_obj = INV.iter().find(|i| self.inv && !self.dialog && i.0 == a.verb_slot).map(|i| i.2);
+        let main = match inv_obj {
+            Some(o) => Some((0, 0, o, 0)),
+            None => a.main,
+        };
+        if a.verb_slot > 0 && inv_obj.is_none() {
             let id = self.verbs().iter().find(|v| v.slot == a.verb_slot).unwrap().id;
             if self.dialog {
                 if id == 120 {
@@ -110,7 +157,7 @@ impl Toy {
                 self.sel = id;
                 self.busy = 1;
             }
-        } else if let (Some((vx, vy, obj, _)), false) = (a.main, self.dialog) {
+        } else if let (Some((vx, vy, obj, _)), false) = (main, self.dialog) {
             if obj != 0 {
                 if self.sel == 3 && self.obj1 == 0 {
                     self.obj1 = obj;
@@ -122,6 +169,10 @@ impl Toy {
                     self.obj1 = 0;
                     self.sel = DEFAULT_VERB;
                     self.busy = 4;
+                    if self.obj_walks {
+                        self.walk_to = self.objects().iter().find(|r| r.id == obj).map(|r| r.walk.0);
+                        self.busy = 10;
+                    }
                 }
             } else if self.boxes_().iter().skip(1).any(|b| inside(vx, vy, (b.ul.0, b.ul.1, b.ur.0 - b.ul.0 + 1, b.ll.1 - b.ul.1 + 1))) {
                 writes.push(Touch { kind: TouchKind::Walk, a: 1, b: 0, old: vx, now: vy });
@@ -277,7 +328,10 @@ fn sentence(v: i32, a: i32, b: Option<i32>) -> Step {
 
 /// The sentences the toy queued on the realized engine's way, by replaying its events on a fresh toy.
 fn replayed(xstart: i32, dialog: bool, evs: &[Event]) -> Vec<(i32, i32, i32)> {
-    let mut t = toy_raw(xstart, dialog);
+    replayed_on(toy_raw(xstart, dialog), evs)
+}
+
+fn replayed_on(mut t: Toy, evs: &[Event]) -> Vec<(i32, i32, i32)> {
     t.inputs(evs).unwrap();
     let last = evs.iter().map(|e| e.frame).max().unwrap_or(0);
     t.run(&RunSpec { frame: Some(last + 1), ..Default::default() }).unwrap();
@@ -318,8 +372,9 @@ fn off_screen_target_after_two_floor_clicks() {
     assert_eq!(r.approach, 2, "{:?}", r.attempts.iter().map(|a| (&a.name, &a.seen)).collect::<Vec<_>>());
     assert_eq!(r.candidates, 1);
     assert_eq!(r.events.len(), 3);
-    assert!(r.attempts.iter().filter(|a| a.phase == "approach" && a.accepted).count() == 2);
-    assert_eq!(r.engine.status().xstart, 19);
+    // E016 amendment (4): each box's point nearest the target is a candidate too (the edge of box 8, then of box 4)
+    assert!(r.attempts.iter().filter(|a| (a.phase == "approach" || a.phase == "near") && a.accepted).count() == 2);
+    assert_eq!(r.engine.status().xstart, 0);
     assert_eq!(replayed(320, false, &r.events), vec![(DEFAULT_VERB, 501, 0)]);
 }
 
@@ -375,4 +430,192 @@ fn step_text_round_trips() {
         assert_eq!(Step::parse(s).unwrap().text(), s);
     }
     assert!(Step::parse("x1").is_none());
+}
+
+// --- E016 A: the inventory extension and the run path's hook ---------------------------------------------------------
+
+fn inv_toy_raw(xstart: i32) -> Toy {
+    let mut t = toy_raw(xstart, false);
+    t.inv = true;
+    t
+}
+
+#[test]
+fn inventory_object_with_a_room_object() {
+    setup();
+    let mut e = toy_inv(320);
+    let r = realize::realize(&mut e, &sentence(3, 901, Some(500)), &Cfg::default()).unwrap().expect("realized");
+    // the verb choice is verb 3's slot; a's slot runs over slots 1, 2, 4, 5: 901 is the 4th
+    assert_eq!((r.approach, r.candidates, r.tries), (0, 4, 4));
+    assert!(r.attempts.iter().all(|a| a.phase == "inventory"));
+    assert_eq!(r.events.len(), 3);
+    assert_eq!(replayed_on(inv_toy_raw(320), &r.events), vec![(3, 901, 500)]);
+}
+
+#[test]
+fn inventory_object_with_an_inventory_object() {
+    setup();
+    let mut e = toy_inv(320);
+    let r = realize::realize(&mut e, &sentence(3, 900, Some(902)), &Cfg::default()).unwrap().expect("realized");
+    // b has no hit point: each of the 6 visible slots is b's click; a's slot 900 is the 3rd after verb 3's own
+    assert_eq!(r.candidates, 6 + 6 + 6);
+    assert_eq!(r.events.len(), 3);
+    assert_eq!(replayed_on(inv_toy_raw(320), &r.events), vec![(3, 900, 902)]);
+}
+
+#[test]
+fn inventory_object_approaches_b() {
+    setup();
+    // 501 is off the screen from xstart 320: the approach goes to b, then the candidates as on the screen
+    let mut e = toy_inv(320);
+    let r = realize::realize(&mut e, &sentence(3, 901, Some(501)), &Cfg::default()).unwrap().expect("realized");
+    assert_eq!(r.approach, 2);
+    assert_eq!(r.candidates, 4);
+    assert_eq!(r.events.len(), 2 + 3);
+    assert_eq!(replayed_on(inv_toy_raw(320), &r.events), vec![(3, 901, 501)]);
+}
+
+#[test]
+fn inventory_image_slots_first() {
+    setup();
+    // amendment (2): with the inventory slots of image type, a's slot runs over 900, 901, 902 before the verb slots
+    let mut t = inv_toy_raw(320);
+    t.inv_images = true;
+    let mut e: Box<dyn Engine> = Box::new(t.clone());
+    let r = realize::realize(&mut e, &sentence(3, 901, Some(500)), &Cfg::default()).unwrap().expect("realized");
+    assert_eq!(r.candidates, 2);
+    assert_eq!(replayed_on(t.clone(), &r.events), vec![(3, 901, 500)]);
+    // b in the inventory: b's slots in the same order (902 is the third image slot)
+    let r = realize::realize(&mut e, &sentence(3, 900, Some(902)), &Cfg::default()).unwrap().expect("realized");
+    assert_eq!(r.candidates, 3);
+    assert_eq!(replayed_on(t, &r.events), vec![(3, 900, 902)]);
+}
+
+#[test]
+fn inventory_miss_is_bounded() {
+    setup();
+    let mut e = toy_inv(320);
+    // no slot has verb 7: no verb click (6 slots), then each of the 6 slots (5 slots each)
+    let m = realize::realize(&mut e, &sentence(7, 901, None), &Cfg::default()).unwrap().err().expect("a miss");
+    assert_eq!((m.reason.as_str(), m.candidates, m.approach), ("no sentence", 6 + 6 * 5, 0));
+    let cfg = Cfg { max_slots: 2, ..Default::default() };
+    let m = realize::realize(&mut e, &sentence(7, 901, None), &cfg).unwrap().err().expect("a miss");
+    assert_eq!(m.candidates, 2 + 6 * 2);
+    // an object neither on the screen, in the room nor on a slot: every candidate tried (verb 3's slot then 5
+    // slots, no verb click then 6, each other slot then 5), then "no sentence"; with max_candidates 10, 10
+    let m = realize::realize(&mut e, &sentence(3, 999, None), &Cfg::default()).unwrap().err().expect("a miss");
+    assert_eq!((m.reason.as_str(), m.candidates), ("no sentence", 5 + 6 + 5 * 5));
+    let cfg = Cfg { max_candidates: 10, ..Default::default() };
+    let m = realize::realize(&mut e, &sentence(3, 999, None), &cfg).unwrap().err().expect("a miss");
+    assert_eq!(m.candidates, 10);
+}
+
+#[test]
+fn hook_plays_the_accepted_events_on_the_branch() {
+    use fmi_play::executor::{self, Br, Executor};
+    use fmi_play::replay::InputStep;
+    setup();
+    let mut e = toy(320, false);
+    let inp = InputStep { kind: "click", verb: Some(2), a: Some(502), b: None, key: None };
+    let mut ex = Executor::new(false);
+    {
+        let mut br = Br::new(&mut e, None);
+        br.watch_first = true;
+        executor::play_input(&mut ex, &mut br, &inp, "sentence(2,502)#1").unwrap();
+        // the first input's frame and dump are taken where the branch scheduled it
+        assert_eq!(br.first_before.as_ref().map(|f| f.0), Some(100));
+    }
+    // the branch stands at the last event's frame with the events in the executor's movie
+    assert_eq!(ex.movie.len(), 2);
+    assert_eq!(e.status().frame, ex.movie.iter().map(|x| x.frame).max().unwrap());
+    e.run(&RunSpec { frame: Some(e.status().frame + 1), ..Default::default() }).unwrap();
+    let log = e.input_log().unwrap();
+    let seen: Vec<(i32, i32, i32)> =
+        log.records.iter().flat_map(|r| r.writes.iter()).filter(|t| t.kind == TouchKind::Sentence).map(|t| (t.a, t.b, t.old)).collect();
+    assert_eq!(seen, vec![(2, 502, 0)]);
+    assert_eq!(ex.check_var, None);
+    // a dialog line
+    let mut d = toy(320, true);
+    let mut ex = Executor::new(false);
+    let inp = InputStep { kind: "line", verb: Some(120), a: None, b: None, key: None };
+    executor::play_input(&mut ex, &mut Br::new(&mut d, None), &inp, "dialog_line(120)#1").unwrap();
+    assert_eq!((ex.movie.len(), d.status().frame), (1, 101));
+}
+
+#[test]
+fn hook_waits_for_the_idle_stop_and_reports_a_miss() {
+    use fmi_play::executor::{self, Br, Executor, PlayErr};
+    use fmi_play::replay::InputStep;
+    setup();
+    // a branch that is not idle runs to the idle stop first
+    let mut t = toy_raw(320, false);
+    t.busy = 5;
+    t.st.idle = None;
+    let mut e: Box<dyn Engine> = Box::new(t);
+    let mut ex = Executor::new(false);
+    let inp = InputStep { kind: "click", verb: Some(DEFAULT_VERB as i64), a: Some(500), b: None, key: None };
+    executor::play_input(&mut ex, &mut Br::new(&mut e, None), &inp, "s").unwrap();
+    assert_eq!(ex.movie[0].frame, 106);
+    // a miss is the child's interface outcome, with realize's reason
+    let mut e = toy(320, false);
+    let mut ex = Executor::new(false);
+    let inp = InputStep { kind: "click", verb: Some(7), a: Some(500), b: None, key: None };
+    match executor::play_input(&mut ex, &mut Br::new(&mut e, None), &inp, "sentence(7,500)#1") {
+        Err(PlayErr::Route(m)) => assert!(m.starts_with("sentence(7,500)#1: realize: no sentence"), "{m}"),
+        _ => panic!("not a route error"),
+    }
+    assert!(ex.movie.is_empty());
+    assert_eq!(e.status().frame, 100);
+}
+
+// --- E016 amendment (3): the approach in a wide room -----------------------------------------------------------------
+
+#[test]
+fn near_point_brings_a_wide_room_target() {
+    setup();
+    // one box from x 0 to 399: its usual point (the centre, x 199) would leave the camera at xstart 39; the box's
+    // point nearest 504 (x 520), at the screen's right edge, comes first and moves it to 159, then to 239
+    let mut t = toy_raw(0, false);
+    t.one_box = Some(399);
+    let mut e: Box<dyn Engine> = Box::new(t.clone());
+    let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 504, None), &Cfg::default()).unwrap().expect("realized");
+    let acc: Vec<&str> = r.attempts.iter().filter(|a| a.accepted).map(|a| a.phase).collect();
+    assert_eq!(acc, vec!["near", "near", "sentence"], "{:?}", r.attempts.iter().map(|a| (a.phase, &a.seen)).collect::<Vec<_>>());
+    assert!(r.attempts.iter().all(|a| a.accepted || a.phase != "near"));
+    assert_eq!(r.approach, 2);
+    assert_eq!(replayed_on(t, &r.events), vec![(DEFAULT_VERB, 504, 0)]);
+}
+
+#[test]
+fn stepping_stone_brings_the_target() {
+    setup();
+    // one box from x 0 to 79: no floor click moves the camera from xstart 0; the bare click on 505 (walk point x 320,
+    // nearer 502 than the view's middle) walks there and the camera follows; 501 (x 35) is not a stone
+    let mut t = toy_raw(0, false);
+    t.one_box = Some(79);
+    t.obj_walks = true;
+    t.stone_obj = true;
+    let mut e: Box<dyn Engine> = Box::new(t.clone());
+    let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 502, None), &Cfg::default()).unwrap().expect("realized");
+    let phases: Vec<(&str, bool)> = r.attempts.iter().map(|a| (a.phase, a.accepted)).collect();
+    assert_eq!(phases, vec![("near", false), ("approach", false), ("stone", true), ("sentence", true)], "{:?}",
+               r.attempts.iter().map(|a| (a.phase, &a.name, &a.seen)).collect::<Vec<_>>());
+    assert_eq!(r.approach, 1);
+    assert_eq!(replayed_on(t, &r.events), vec![(DEFAULT_VERB, 505, 0), (DEFAULT_VERB, 502, 0)]);
+}
+
+#[test]
+fn approach_is_bounded() {
+    setup();
+    // 503 is never hit: the approach stops at max_approach accepted clicks, each over at most 2 points per box and
+    // one stone per object
+    let mut e = toy(0, false);
+    let cfg = Cfg::default();
+    let m = realize::realize(&mut e, &sentence(DEFAULT_VERB, 503, None), &cfg).unwrap().err().expect("a miss");
+    assert_eq!(m.reason, "approach");
+    assert!(m.approach <= cfg.max_approach);
+    assert!(m.tries <= (cfg.max_approach + 1) * (2 * 16 + 5), "{}", m.tries);
+    let cfg = Cfg { max_approach: 1, ..Default::default() };
+    let m = realize::realize(&mut e, &sentence(DEFAULT_VERB, 503, None), &cfg).unwrap().err().expect("a miss");
+    assert_eq!((m.reason.as_str(), m.approach), ("approach", 1));
 }
