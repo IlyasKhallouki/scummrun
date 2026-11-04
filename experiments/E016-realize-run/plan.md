@@ -187,7 +187,8 @@ Calibrated by the project's 2-10x optimism on game progress.
   - C, D, E, F and the ladder, about half a day.
 - **Gates and Monkey Island's checks:** about 1.5 h of wall.
 - **play9:** at most 3 h of laptop wall.
-- **The VM:** nothing, so the ledger's $9.01 stays untouched.
+- **The VM:** nothing, so the ledger's $9.01 stays untouched. Amendment (7) moved play9 to the VM, at about $5.40
+  for the 3.5 h booked.
 
 ## Amendments
 
@@ -449,3 +450,24 @@ it is reverted (2fda77b). Realize is again the code G3, G4 run 3 and G1's rerun 
 
 Monkey Island's checks (`run/mi-check.sh`, `run/k1.sh`) and play9 (`run/laptop.sh`) run on target-e016, built from
 this commit's tree.
+
+### (7) 2026-11-04: play9 on the cloud VM; Monkey Island's checks rerun after a missing link
+
+- **Ilyas moved play9 to the VM:** "we do play 9 on the VM."
+  - A raise of the project's all-regions CPU quota from 32 to 64 was refused, so the VM is play8's size:
+    n2-custom-30-122880, standard, $1.535/h, booked for 3.5 h.
+  - The run is `run/laptop.sh`'s (init, run with the ladder's watcher, stalls, ladder) under `run/vm.sh`. It uses
+    play8's b = 10 with 2 readings in the background, no heavy lock, and a 2 GB disk floor as play8 had.
+  - The wall limit (10,800 s), the 40-minute rule and the predictions are unchanged. b = 10 is play8's setting, not
+    the plan's b = 4.
+  - Every entry is then verified from boot on the VM, 24 at a time.
+- **The first `mi-check.sh` was void.** The worktree had no link to Monkey Island's files (`game/`, never
+  committed), so every b3 job waited out the 600 s connect timeout ("engine 0 did not connect") for 1 h 40 min.
+  - The links that wt-e014 has (game, data, build, out, .venv, E001's key) are now in wt-e016.
+  - `run/env.sh` stops at once on missing demo files.
+  - `mi-check.sh` and `k1.sh` check the Monkey Island link before they start.
+  - The checks and K1 run again on the laptop, beside play9 on the VM.
+- **The VM's copy of SDL3:** ScummVM's sdl2-compat loads SDL3 at run time, which ldd does not list, so `vm.sh push`
+  adds it.
+- **On the VM's disk:** E014's archives (copies of the laptop's play7 and play8) and the E014 builds were removed,
+  which left 16 GB free.
