@@ -607,6 +607,9 @@ pub struct Archive {
     /// E013 (component free): the free tries' counts are kept (FMI_FREE set, or a committed line of the log has a
     /// kind); off, every cell and file is E012's
     pub free_on: bool,
+    /// E014 amendment (4) (b) (FMI_SCOPE_GROW, or a committed line of the log has a "grow"): room -> the rooms grown
+    /// for it (grow.rs); None: every scope is E009's ring
+    pub grown: Option<BTreeMap<i64, BTreeSet<i64>>>,
 }
 
 fn goal_pairs(v: &Value) -> Vec<(String, Vec<i64>)> {
@@ -708,6 +711,7 @@ impl Archive {
             next_dead: None,
             chain_rooms: RefCell::new(HashMap::new()),
             free_on: crate::free::rho0().is_some(),
+            grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
         })
     }
 
@@ -768,6 +772,17 @@ impl Archive {
         let (logs, clean) = read_jsonl(&r.join("log.jsonl"))?;
         self.logs = logs;
         self.free_on = self.free_on || self.logs.iter().any(|x| committed(x) && x.get("kind").is_some());
+        // E014 amendment (4) (b): the rooms grown, replayed from the committed lines in commit order
+        if self.grown.is_none() && self.logs.iter().any(|x| committed(x) && x.get("grow").is_some()) {
+            self.grown = Some(BTreeMap::new());
+        }
+        if let Some(g) = self.grown.as_mut() {
+            for x in self.logs.iter().filter(|x| committed(x)) {
+                if let (Some(r), Some(add)) = (x["grow"]["room"].as_i64(), x["grow"]["add"].as_array()) {
+                    g.entry(r).or_default().extend(add.iter().filter_map(|a| a.as_i64()));
+                }
+            }
+        }
         if !clean {
             files::rewrite_jsonl(&r.join("log.jsonl"), &self.logs)?;
         }
@@ -1844,11 +1859,40 @@ impl Archive {
             .collect()
     }
 
+    /// The scope of a try from an entry in `room` (None: no room): E009's ring, or with E014's grown scopes (amendment
+    /// (4) (b)) the room and the rooms grown for it, cut to the ring.
+    pub fn scope_of_room(&self, room: Option<i64>) -> Vec<i64> {
+        let r = room.unwrap_or(i64::MIN);
+        let rg = ring(&self.edges, r, &self.allowed);
+        match &self.grown {
+            Some(g) => crate::grow::scope(r, &rg, g.get(&r)),
+            None => rg,
+        }
+    }
+
+    /// E014 amendment (4) (a): the registered readings of other scopes than `scope` that hold `room`, newest first
+    /// (a bounded try's stand-in when its scope has none).
+    pub fn readings_holding(&self, room: i64, scope: &[i64]) -> Vec<&ReadingRow> {
+        let mut s = scope.to_vec();
+        s.sort();
+        let sv = json!(s);
+        self.readings
+            .iter()
+            .rev()
+            .filter(|x| {
+                x.get("scope") != Some(&sv)
+                    && x.get("scope").and_then(|v| v.as_array()).map(|a| a.iter().any(|r| r.as_i64() == Some(room))).unwrap_or(false)
+                    && !truthy(x.get("evicted"))
+                    && x.get("path").and_then(|p| p.as_str()).map(|p| Path::new(p).exists()).unwrap_or(false)
+            })
+            .collect()
+    }
+
     /// job.json (plan.md "Interfaces").
     pub fn job_doc(&self, job: &str, i: usize) -> Res<Value> {
         let row = &self.rows[i];
         let cell = self.cell(&row.cell);
-        let scope = ring(&self.edges, row.room.unwrap_or(i64::MIN), &self.allowed);
+        let scope = self.scope_of_room(row.room);
         let rooms = scope.iter().map(|r| r.to_string()).collect::<Vec<_>>().join("-");
         let mut held: Vec<&(String, i64)> = self.held_by.keys().collect();
         held.sort();
@@ -1882,6 +1926,17 @@ impl Archive {
         if let Some(p) = &self.progress {
             m.insert("novelty".into(), progress::novelty_json(p, &self.live_rows()));
             m.insert("dead".into(), Value::Array(self.dead_moves(i)));
+        }
+        // E014 amendment (4): the whole ring for the try's scope need (b), the readings that may stand in (a)
+        if self.grown.is_some() {
+            m.insert("ring".into(), json!(ring(&self.edges, row.room.unwrap_or(i64::MIN), &self.allowed)));
+        }
+        if crate::bound::on() {
+            if let Some(room) = row.room {
+                let rs: Vec<Value> = self.readings_holding(room, &scope).into_iter()
+                    .map(|x| json!({"path": x.get("path"), "start_entry": x.get("start_entry"), "scope": x.get("scope")})).collect();
+                m.insert("readings_room".into(), Value::Array(rs));
+            }
         }
         Ok(doc)
     }
@@ -2003,6 +2058,7 @@ impl Archive {
             None => (HashSet::new(), BTreeSet::new()),
         };
         let (mut ids, mut new_cells, mut new_reps) = (Vec::new(), 0i64, 0i64);
+        let mut hows: Vec<String> = Vec::new();
         self.pending_rows = Some(Vec::new());
         self.pending_files = Some(Vec::new());
         for (n, doc) in &new_files {
@@ -2024,6 +2080,7 @@ impl Archive {
                 NewDoc::Shared(ne) => self.add_shared(Some(e), ne, Some(&name), &how)?,
             };
             ids.push(id);
+            hows.push(how.clone());
             new_cells += self.last_place.0 as i64;
             new_reps += self.last_place.1 as i64;
         }
@@ -2203,6 +2260,22 @@ impl Archive {
             // E013 (FMI_FREE): the job's kind, and the cell's free counts after it
             line.insert("kind".into(), k.clone());
             line.insert("free".into(), json!(self.cell(&cell).free));
+        }
+        // E014 amendment (4) (b): the scope of the entry's room grows by the rooms the try needed and the rooms its
+        // model-free entries entered (grow.rs), checked against the ring and the scope as they stand at this commit
+        if self.grown.is_some() && outcome != "return differs" {
+            if let Some(r0) = self.rows[e].room {
+                let rg = ring(&self.edges, r0, &self.allowed);
+                let sc = self.scope_of_room(Some(r0));
+                let left: Vec<(String, Option<i64>)> = ids.iter().zip(&hows).map(|(&i, h)| (h.clone(), self.rows[i].room)).collect();
+                let add = crate::grow::growth(res.get("scope_need"), &left, &sc, &rg);
+                if !add.is_empty() {
+                    self.grown.as_mut().unwrap().entry(r0).or_default().extend(add.iter().map(|x| x.0));
+                    line.insert("grow".into(), json!({"room": r0, "add": add.iter().map(|x| x.0).collect::<Vec<_>>(),
+                                                       "why": add.iter().map(|x| x.1.clone()).collect::<Vec<_>>(),
+                                                       "scope": self.scope_of_room(Some(r0))}));
+                }
+            }
         }
         if let Some(x) = extra {
             for (k, v) in x {

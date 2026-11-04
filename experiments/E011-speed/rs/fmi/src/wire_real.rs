@@ -206,7 +206,11 @@ impl Readings for RealReadings {
             cache.dir_of(&key)
         } else {
             let tmp = cache.scratch().map_err(|e| e.to_string())?;
-            self.run_reader(&spec, &tmp, q, cancel)?;
+            // a reading that failed or was stopped leaves no scratch folder behind
+            if let Err(e) = self.run_reader(&spec, &tmp, q, cancel) {
+                let _ = std::fs::remove_dir_all(&tmp);
+                return Err(e);
+            }
             let d = cache.put(&key, &tmp).map_err(|e| e.to_string())?;
             cache.evict(std::slice::from_ref(&d)).map_err(|e| format!("the reading cache's eviction: {e}"))?;
             d

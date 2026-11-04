@@ -488,16 +488,27 @@ fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap)
     Ok((None, format!("differs on {} keys", first["other"]), checked))
 }
 
-/// Step 2's fresh reading from the returned engine's state (step.py `read_fresh`): (reading, wall s, load s).
-fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: u32, log: &JobLog, cancel: &AtomicBool)
-              -> Result<(Arc<dyn ReadingSource>, f64, f64), String> {
+/// A fresh reading's outcome: the reading (wall s, load s, and with E014's bound the wait's record), or the bound
+/// (E014 amendment (4) (a): its record).
+enum Fresh {
+    Read(Arc<dyn ReadingSource>, f64, f64, Option<Value>),
+    Bound(Value),
+}
+
+/// Step 2's fresh reading from the returned engine's state (step.py `read_fresh`). With E014's bound (`FMI_READ_BOUND`,
+/// bound.rs) the reading runs on a thread of its own and the try waits for it at most the bound (`live`: the try's own
+/// stop while it waits).
+#[allow(clippy::too_many_arguments)]
+fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: u32, log: &JobLog, cancel: &AtomicBool,
+              live: &AtomicBool) -> Result<Fresh, String> {
     let rdir = PathBuf::from(job["reading_dir"].as_str().unwrap_or(""));
     if !rdir.is_absolute() || rdir.to_string_lossy().chars().any(|c| c.is_whitespace()) {
         return Err(format!("ValueError: reading_dir {}: an absolute path with no spaces (the reach extender's start-rows rule)", rdir.display()));
     }
     std::fs::create_dir_all(&rdir).map_err(|e| files::io_err(&rdir, e))?;
     let rows = rdir.join("start.jsonl");
-    std::fs::write(&rows, step::start_row_text(step::SEED, state, status)? + "\n").map_err(|e| files::io_err(&rows, e))?;
+    let row_text = step::start_row_text(step::SEED, state, status)?;
+    std::fs::write(&rows, row_text.clone() + "\n").map_err(|e| files::io_err(&rows, e))?;
     let name = rdir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let mut scope: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default();
     scope.sort();
@@ -524,13 +535,61 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
         fact_vars: vec![],
         stream: true,
     };
-    let path = machine::port(|| r.readings.read(&req, cancel))?;
+    let mut info = None;
+    let path = match crate::bound::cfg() {
+        None => machine::port(|| r.readings.read(&req, cancel))?,
+        Some(cfg) => {
+            if !fmi_reading_in_process() {
+                return Err("E014: FMI_READ_BOUND needs the in-process reader (FMI_READER_LIB=1)".into());
+            }
+            let id = crate::bound::ident(&req.rooms, &req.goal_text, &row_text);
+            let (rr, q) = (r.readings.clone(), req.clone());
+            let got = machine::port(|| crate::bound::bounder().read(&id, cfg, live, move |stop| rr.read(&q, stop)));
+            match got {
+                crate::bound::Got::Done { ref out, joined, .. } => {
+                    if joined {
+                        log.say("reading: the same reading was running already; it ended within the bound");
+                    }
+                    info = Some(got.record(cfg.s));
+                    out.clone()?
+                }
+                crate::bound::Got::Bound { background, at_once, waited, .. } => {
+                    log.say(&format!("reading: the bound ({} s) after {waited:.1} s: {}", cfg.s,
+                                     if at_once { "stopped before in this process" } else if background { "it goes on in the background" } else { "stopped" }));
+                    return Ok(Fresh::Bound(got.record(cfg.s)));
+                }
+                crate::bound::Got::Cancelled { .. } => return Err("the guard's kill".into()),
+            }
+        }
+    };
     let wall = t.elapsed().as_secs_f64();
     let t = Instant::now();
     let rd = machine::port(|| r.readings.open(&path))?;
     let load_s = t.elapsed().as_secs_f64();
     let _ = std::fs::remove_file(rdir.join(format!("{}.golden.jsonl.gz", rdir.file_name().unwrap().to_string_lossy())));
-    Ok((rd, wall, load_s))
+    Ok(Fresh::Read(rd, wall, load_s, info))
+}
+
+/// The in-process reader's switch (fmi-reading's `inproc`, read here from the environment).
+fn fmi_reading_in_process() -> bool {
+    std::env::var("FMI_READER_LIB").is_ok_and(|v| v == "1")
+}
+
+/// E014 amendment (4) (a): the reading that stands in for a bounded one, for T and the wait only: the newest of the
+/// scope's (the candidates checked, in their order), else the newest registered reading of another scope that holds
+/// the entry's room (job.json "readings_room").
+fn stand_in(r: &Resident, job: &Value, checked: &[Value]) -> Option<Arc<dyn ReadingSource>> {
+    let mut paths: Vec<PathBuf> = checked.iter().filter_map(|c| c["path"].as_str()).map(PathBuf::from).collect();
+    for x in job.get("readings_room").and_then(|x| x.as_array()).map(|a| a.as_slice()).unwrap_or(&[]) {
+        if let Some(p) = x["path"].as_str() {
+            let p = PathBuf::from(p);
+            let dir = p.parent().unwrap_or(Path::new(""));
+            if p.is_file() && dir.join("reading.reached").exists() {
+                paths.push(p);
+            }
+        }
+    }
+    paths.into_iter().find_map(|p| machine::port(|| r.readings.open(&p)).ok())
 }
 
 /// One attempt's outcome (step.py `attempt`'s return).
@@ -717,7 +776,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     let sw = Switches::from_env();
     let mut e12 = Map::new();
     // E013 (FMI_FREE, component free): a free try plans nothing; its offers follow the wait (free.rs)
-    let free_try = crate::free::job_is_free(&job);
+    let mut free_try = crate::free::job_is_free(&job);
     let mut free_rec: Option<Value> = None;
     let res: Result<(), Result<ReturnDiffers, String>> = (|| {
         if job.get("seed").and_then(|s| s.as_i64()) != Some(step::SEED) {
@@ -779,11 +838,37 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"] = reading_record(&*rd, false, &format!("T only: {why}"), 0.0, t.elapsed().as_secs_f64());
                 rd
             }
-            None => {
-                let (rd, wall, load_s) = read_fresh(r, &job, &state, &status, threads, log, &cancel_arc).map_err(Err)?;
-                out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
-                rd
-            }
+            None => match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
+                Fresh::Read(rd, wall, load_s, info) => {
+                    out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
+                    if let Some(i) = info {
+                        out["reading"]["bound_wait"] = i;
+                    }
+                    rd
+                }
+                // E014 amendment (4) (a): the bound; the try goes on model-free from a stand-in reading
+                Fresh::Bound(rec) => {
+                    let t1 = Instant::now();
+                    match stand_in(r, &job, &checked) {
+                        Some(rd) => {
+                            out["reading"] = reading_record(&*rd, false, &format!("bound: {why}"), 0.0, t1.elapsed().as_secs_f64());
+                            out["reading"]["bound"] = rec;
+                            log.say(&format!("the try goes on model-free from the stand-in {}", reading_path(&*rd).display()));
+                            free_try = true;
+                            rd
+                        }
+                        None => {
+                            log.say("no reading stands in: the try keeps nothing");
+                            out["reading"] = json!({"path": null, "fresh": false, "why": format!("bound: {why}; no reading stands in"),
+                                                    "load_s": t1.elapsed().as_secs_f64(), "bound": rec, "candidates": checked});
+                            cpu_add(&mut cpu, "read", cpu_now() - c0);
+                            out["exhausted"] = json!(false);
+                            out["ok"] = json!(true);
+                            return Ok(());
+                        }
+                    }
+                }
+            },
         };
         out["reading"]["candidates"] = json!(checked);
         cpu_add(&mut cpu, "read", cpu_now() - c0);
@@ -919,6 +1004,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             }
         };
         let keep_engine = sw.afford;
+        // E014 amendment (4) (b) (job.json "ring", FMI_SCOPE_GROW): the room the try's scope needs, if any
+        let ring_of: Option<Vec<i64>> = job.get("ring").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_i64()).collect());
+        let scope_v: Vec<i64> = job["scope"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default();
+        let mut need: Option<crate::grow::Need> = None;
         let mut goal_again = false;
         let mut goal_again_rec: Vec<Value> = Vec::new();
         let mut n_att = 0;
@@ -943,6 +1032,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             };
             prof.mark("attempt");
             n_att += 1;
+            if let (Some(rg), true) = (ring_of.as_ref(), need.is_none()) {
+                let room = att.checkpoints.last().and_then(|c| c.facts.get(Key::parse("room")));
+                need = crate::grow::plan_need(att.res.get("stop").and_then(|s| s.as_str()), room, &scope_v, rg);
+            }
             let status_ = step::first_plan_status(att.res["plans"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
             let rd_packed = rd.dir().join(doc_of(&*rd).get("packed").and_then(|p| p.as_str()).unwrap_or("reading.tc"));
             let made = step::made_reading(&att.packed, &rd_packed);
@@ -1006,17 +1099,54 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 fresh_again = true;
                 let c0 = cpu_now();
                 let old = out["reading"].clone();
-                let (nrd, wall, load_s) = read_fresh(r, &job, &state, &status, threads, log, &cancel_arc).map_err(Err)?;
-                rd = nrd;
-                out["reading"] = reading_record(&*rd, true, step::NOT_A_PLAN_RETRY, wall, load_s);
-                out["reading"]["replaced"] = json!({"path": old["path"], "why": old["why"]});
-                out["reading"]["candidates"] = json!(checked);
-                cpu_add(&mut cpu, "read", cpu_now() - c0);
-                out["tried"].as_array_mut().unwrap().pop();
-                queue.push_front((tg, n_def, None));
+                match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
+                    Fresh::Read(nrd, wall, load_s, info) => {
+                        rd = nrd;
+                        out["reading"] = reading_record(&*rd, true, step::NOT_A_PLAN_RETRY, wall, load_s);
+                        out["reading"]["replaced"] = json!({"path": old["path"], "why": old["why"]});
+                        out["reading"]["candidates"] = json!(checked);
+                        if let Some(i) = info {
+                            out["reading"]["bound_wait"] = i;
+                        }
+                        cpu_add(&mut cpu, "read", cpu_now() - c0);
+                        out["tried"].as_array_mut().unwrap().pop();
+                        queue.push_front((tg, n_def, None));
+                    }
+                    // E014 amendment (4) (a): the reading again reached the bound; the cached one stays, the target
+                    // is tried
+                    Fresh::Bound(rec) => {
+                        out["reading"]["retry_bound"] = rec;
+                        cpu_add(&mut cpu, "read", cpu_now() - c0);
+                    }
+                }
             }
         }
         prof.mark("probes");
+        // E014 amendment (4) (b), case 1: a model try in which no attempt played names the room a target needs
+        if let (Some(rg), true, true, true) = (ring_of.as_ref(), need.is_none(), !free_try, played.is_none()) {
+            let g = crate::warm::guide(Path::new(job["guide"].as_str().unwrap_or(""))).map_err(Err)?;
+            let reached = crate::warm::reached(&*rd);
+            let rmap: std::collections::HashMap<&str, &Vec<i64>> = reached.iter().map(|(k, v)| (k.as_str(), v)).collect();
+            let root_f = step::root_facts_of_memo(&job, &job_dir);
+            let rootv = |k: &str| root_f.as_ref().and_then(|m| m.get(k).copied()).unwrap_or(0);
+            let now = |k: &str| crate::archive::FactLook::look(&facts, k).unwrap_or(0);
+            let held = |k: &str, v: Option<i64>| match v {
+                Some(v) => now(k) == v,
+                None => now(k) != rootv(k),
+            };
+            let reach = |k: &str, v: Option<i64>| match rmap.get(k) {
+                None => false,
+                Some(vs) => match v {
+                    Some(v) => vs.contains(&v),
+                    None => vs.iter().any(|x| *x != rootv(k)),
+                },
+            };
+            need = crate::grow::target_need(&g, &scope_v, rg, &held, &reach, crate::grow::obj_rooms());
+        }
+        if let Some(n) = &need {
+            log.say(&format!("the scope {:?} needs room {} ({})", scope_v, n.room, n.why));
+            out["scope_need"] = n.json();
+        }
         if goal_again {
             e12.insert("goal_again".into(), json!(goal_again_rec));
         }

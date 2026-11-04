@@ -42,7 +42,8 @@ fn env_is(k: &str) -> bool {
 
 // --- the classes and the rows ----------------------------------------------------------------------------------------
 
-/// The fixed class table's classes (the amendment): section C's eight and "model, no yield".
+/// The fixed class table's classes (the amendment): section C's eight, "model, no yield", and E014 amendment (4)'s
+/// "reading bound" (a try's fresh reading stopped at the bound, `FMI_READ_BOUND`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Class {
     Productive,
@@ -54,10 +55,14 @@ pub enum Class {
     ModelNoYield,
     Wait,
     Overhead,
+    ReadBound,
 }
 
+/// The number of classes.
+pub const N_CLASSES: usize = 10;
+
 impl Class {
-    pub const ALL: [Class; 9] = [
+    pub const ALL: [Class; N_CLASSES] = [
         Class::Productive,
         Class::ModelBlind,
         Class::NoPlan,
@@ -67,6 +72,7 @@ impl Class {
         Class::ModelNoYield,
         Class::Wait,
         Class::Overhead,
+        Class::ReadBound,
     ];
 
     pub fn name(self) -> &'static str {
@@ -80,6 +86,7 @@ impl Class {
             Class::ModelNoYield => "model, no yield",
             Class::Wait => "wait",
             Class::Overhead => "overhead",
+            Class::ReadBound => "reading bound",
         }
     }
 
@@ -383,6 +390,8 @@ pub fn account(t: &TryIn) -> Account {
     }
     let any_new = (0..hows.len()).any(flag);
     let free = t.kind == "free";
+    // E014 amendment (4) (a): a model try whose fresh reading reached the bound went on model-free
+    let bounded = r["reading"]["bound"].is_object();
     let probes: Vec<Value> = r["probes"].as_array().cloned().unwrap_or_default();
     let e12 = &r["e012"];
 
@@ -395,6 +404,8 @@ pub fn account(t: &TryIn) -> Account {
         ("error".to_string(), Class::Overhead)
     } else if free {
         ("free".to_string(), Class::InterfaceNoYield)
+    } else if bounded {
+        ("reading bound".to_string(), Class::ReadBound)
     } else if att.is_object() {
         match att["stop"].as_str() {
             Some(s) => {
@@ -411,7 +422,7 @@ pub fn account(t: &TryIn) -> Account {
     } else {
         ("none played: no plan".to_string(), Class::NoPlan)
     };
-    let model = if free {
+    let model = if free || bounded {
         if any_new {
             Class::Productive
         } else {
@@ -436,9 +447,17 @@ pub fn account(t: &TryIn) -> Account {
     }
     // the reading
     let rd = &r["reading"];
-    if rd.is_object() {
+    if rd.is_object() && bounded {
+        // the seconds waited for the reading, then the stand-in's load (E014 amendment (4) (a))
+        rows.push((row("read", "bound"), Class::ReadBound, f64_of(&rd["bound"]["waited_s"])));
+        let stand = if rd["path"].is_string() { "stand-in" } else { "no stand-in" };
+        rows.push((row("read", stand), model, f64_of(&rd["load_s"])));
+    } else if rd.is_object() {
         let s = if files::truthy(rd.get("fresh")) { f64_of(&rd["wall_s"]) + f64_of(&rd["load_s"]) } else { f64_of(&rd["load_s"]) };
         rows.push((row("read", numbers_n(rd["why"].as_str().unwrap_or(""))), model, s));
+    }
+    if rd["retry_bound"].is_object() {
+        rows.push((row("read", "bound: the reading again"), Class::ReadBound, f64_of(&rd["retry_bound"]["waited_s"])));
     }
     // T and the wait
     if e12["t"].is_object() {
@@ -520,7 +539,7 @@ pub fn account(t: &TryIn) -> Account {
 
 /// The class with most of the rows' seconds other than overhead and productive (a free try's stop class).
 fn dominant(rows: &[(Row, Class, f64)]) -> Option<Class> {
-    let mut s = [0.0f64; 9];
+    let mut s = [0.0f64; N_CLASSES];
     for (_, c, x) in rows {
         s[c.ix()] += x;
     }
@@ -787,8 +806,8 @@ impl Stalls {
     }
 
     /// Seconds by class over tries[lo..hi].
-    fn by_class(&self, lo: usize, hi: usize) -> [f64; 9] {
-        let mut s = [0.0f64; 9];
+    fn by_class(&self, lo: usize, hi: usize) -> [f64; N_CLASSES] {
+        let mut s = [0.0f64; N_CLASSES];
         for t in &self.tries[lo..hi] {
             for (_, c, x) in &t.rows {
                 s[c.ix()] += x;
@@ -803,16 +822,16 @@ impl Stalls {
     }
 
     /// The shift rule replayed after each commit: each commit's last-20 shares by class and the state after it.
-    pub fn shift_trace(&self) -> Vec<([f64; 9], Shift)> {
+    pub fn shift_trace(&self) -> Vec<([f64; N_CLASSES], Shift)> {
         let mut st = Shift { on: false, class: None };
         let mut out = Vec::with_capacity(self.tries.len());
         for i in 0..self.tries.len() {
             let (lo, hi) = self.window(i);
             let s = self.by_class(lo, hi);
             let total: f64 = s.iter().sum();
-            let mut fr = [0.0f64; 9];
+            let mut fr = [0.0f64; N_CLASSES];
             if total > 0.0 {
-                for k in 0..9 {
+                for k in 0..N_CLASSES {
                     fr[k] = s[k] / total;
                 }
                 if let (true, Some(c)) = (st.on, st.class) {
@@ -1316,6 +1335,46 @@ mod tests {
         let c = account(&TryIn { result: &r, runs: &runs(), new: &[false, false], outcome: "ok", kind: "free" });
         assert!(c.rows.iter().any(|x| x.0 == row("free", "other") && (x.2 - 4.0).abs() < 1e-9));
         assert!((sum(&c.rows) - 25.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_bounded_try() {
+        // E014 amendment (4) (a): the reading stopped at the bound after 300 s, a stand-in loaded in 0.5 s, then the
+        // free step from the entry
+        let mut r = base(320.0);
+        r["reading"] = json!({"path": "/x/reading.json", "fresh": false, "why": "bound: no cached reading", "load_s": 0.5,
+                              "bound": {"s": 300.0, "waited_s": 300.0, "background": true, "at_once": false, "joined": false}});
+        r["e012"]["afford"] = Value::Null;
+        r["free"] = json!({"seconds": 15.0, "n_points": 1,
+                           "points": [{"where": "entry", "frame": 300, "level": 1, "seconds": 15.0, "record": {"ready": true}}]});
+        r["new"] = json!([{"how": "free"}]);
+        let a = account(&TryIn { result: &r, runs: &runs(), new: &[false], outcome: "ok", kind: "model" });
+        assert!((sum(&a.rows) - 320.0).abs() < 1e-9);
+        assert_eq!((a.stop.as_str(), a.stop_class), ("reading bound", Class::ReadBound));
+        assert!((secs(&a.rows, Class::ReadBound) - 300.0).abs() < 1e-9);
+        assert!(a.rows.iter().any(|x| x.0 == row("read", "stand-in") && x.1 == Class::InterfaceNoYield && (x.2 - 0.5).abs() < 1e-9));
+        assert!(a.rows.iter().any(|x| x.0 == row("free", "entry, level 1") && x.1 == Class::InterfaceNoYield));
+        // its free step kept something new: the step's rows are productive, the bound's stay "reading bound"
+        let b = account(&TryIn { result: &r, runs: &runs(), new: &[true], outcome: "ok", kind: "model" });
+        assert!((secs(&b.rows, Class::ReadBound) - 300.0).abs() < 1e-9);
+        assert!(b.rows.iter().any(|x| x.0 == row("free", "entry, level 1") && x.1 == Class::Productive));
+        // no stand-in: the bound and the rest
+        let mut c = base(301.0);
+        c["reading"] = json!({"path": null, "fresh": false, "why": "bound: x; no reading stands in", "load_s": 0.0,
+                              "bound": {"s": 300.0, "waited_s": 300.0}});
+        c["e012"] = json!({});
+        let k = account(&TryIn { result: &c, runs: &runs(), new: &[], outcome: "ok", kind: "model" });
+        assert!(k.rows.iter().any(|x| x.0 == row("read", "no stand-in")));
+        assert!((sum(&k.rows) - 301.0).abs() < 1e-9);
+        // the reading again after "not a plan" reached the bound: its own row
+        let mut d = base(400.0);
+        d["reading"]["retry_bound"] = json!({"s": 300.0, "waited_s": 300.0});
+        let m = account(&TryIn { result: &d, runs: &runs(), new: &[], outcome: "ok", kind: "model" });
+        assert!(m.rows.iter().any(|x| x.0 == row("read", "bound: the reading again") && x.1 == Class::ReadBound));
+        // no bound record: no row of the class
+        let n = account(&TryIn { result: &base(20.0), runs: &runs(), new: &[], outcome: "ok", kind: "model" });
+        assert_eq!(secs(&n.rows, Class::ReadBound), 0.0);
+        assert_eq!(Class::of_name("reading bound"), Some(Class::ReadBound));
     }
 
     #[test]
