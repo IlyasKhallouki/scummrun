@@ -346,3 +346,34 @@ gaps before a run (play8's row 27 was known and left in), the approach is fixed 
 - walk_to(427) is realized by a nearest point: 80%;
 - walk_to(316) is realized, by a nearest point or a stone: 60%;
 - G3 and G1 give the same inputs as before: 85%.
+
+### (4) 2026-11-04, A: G4's rerun with fix 2; the approach's candidates in one order
+
+**G4 rerun 1** (`results/g4/run2/`, realize at 0c8f7ca): 13 of 14 steps per job, 12 of 14 along the chain.
+- **walk_to(316):**
+  - **Per job, realized** with 4 approach clicks: the stone 323 twice, then the nearest point of box 8 at the
+    screen's right edge, then a usual point. Then 1 candidate gives (11, 316, 0).
+  - **Along the chain, a miss.** There the state at 18316 differs a little: the earlier realized steps click a frame
+    or two later than the chain did. The right-edge points were not floor, and every stone moved the camera away.
+- **walk_to(427), both modes, a miss on the bound.**
+  - The nearest point at the right edge moved the camera from 296 to 392.
+  - Then the usual points (tried first) moved it about 80 pixels per click: 472, 552, 632.
+  - `max_approach` (6) ran out before 427, at room x 984, came on the screen. The chain's executor needed xstart ≥ 665.
+- **The chain reaches owner:566 = 1 at 18417 and verifies from boot (0 differences),** with the chain's own clicks for
+  the misses.
+
+**Fix 2b.** The usual points and the nearest points form one list, ordered by distance to the target's place. That
+is amendment (3)'s first text and G1's own rule for floor points, applied to every point.
+- A box's nearest point is never farther from the target than its usual point, so it comes first.
+- A walk to the screen's edge on the target's side moves the camera by up to half a screen (SCUMM v5's camera
+  follows the actor past its trigger strips), not by about 80 pixels.
+- The stones still come only after every floor point fails. The bounds are unchanged.
+- This drops amendment (3)'s "usual points first", so G1's and G3's approach clicks may change.
+
+**Reruns:** G4, G3 and G1's gate, as in amendment (3). This is the last change to the approach before the report: if
+G4 still misses, the misses are reported, not fixed again.
+
+**Predictions:**
+- G4 realizes all 14 steps in both modes: 50%;
+- walk_to(427) is realized within 6 approach clicks: 70%;
+- G3 and G1 pass with changed or unchanged inputs: 90%.
