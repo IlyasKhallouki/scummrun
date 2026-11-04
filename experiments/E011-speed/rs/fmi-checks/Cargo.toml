@@ -69,3 +69,7 @@ path = "src/bin/e015chk.rs"
 [[bin]]
 name = "e015-g2"
 path = "src/bin/e015_g2.rs"
+
+[[bin]]
+name = "e016"
+path = "src/bin/e016/main.rs"
