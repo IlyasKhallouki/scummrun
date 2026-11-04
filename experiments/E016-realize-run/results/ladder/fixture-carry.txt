@@ -1,0 +1,1 @@
+ladder /var/tmp/fast-mi/wt-e016-b/experiments/E016-realize-run/results/ladder/fixture-carry: furthest C6 (in order C6); 12 entries; C0 e1 fixture unknown 0.0 min; C1 e3 fixture unknown 0.0 min; C2 e4 fixture unknown 0.0 min; C3 e5 fixture unknown 0.0 min; C4 e7 fixture unknown 0.0 min; C5 e9 fixture unknown 0.0 min; C6 e11 fixture unknown 0.0 min
