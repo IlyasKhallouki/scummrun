@@ -708,3 +708,60 @@ fn backfill_gives_what_the_ingest_logged() {
     assert_eq!(got, want);
     assert_eq!(a.cells_json(), n0);
 }
+
+/// E016 F's switch, set for one test under the lock and unset when the guard goes (a failing test too).
+struct Frontier;
+
+impl Frontier {
+    fn on() -> Frontier {
+        std::env::set_var("FMI_FRONTIER", "1");
+        Frontier
+    }
+}
+
+impl Drop for Frontier {
+    fn drop(&mut self) {
+        std::env::remove_var("FMI_FRONTIER");
+    }
+}
+
+#[test]
+fn e016_f_the_frontier_entry_gets_the_next_worker_once() {
+    // E016 section F (FMI_FRONTIER=1): entries 1 (room 28) and 2 (room 35) from the root; then entry 3 in room 35 again,
+    // from entry 1 and holding an object, so in a cell of its own with three rooms on its chain. The order puts entry 3
+    // first (rooms on the chain); the frontier puts entry 2 first, the first entry of room 35, which no job had yet
+    let _g = switch(true);
+    let t = tmp("frontier");
+    let mut a = make(&t);
+    let l = ingest(&mut a, 0, &[nw(5, &[("room", json!(28))]), nw(6, &[("room", json!(35))])], &[]);
+    let (e1, e2) = (ids(&l)[0], ids(&l)[1]);
+    let l = ingest(&mut a, e1, &[nw(4, &[("room", json!(35)), ("owner:600", json!(1))])], &[]);
+    let e3 = ids(&l)[0];
+    assert_ne!(a.rows[e2].cell, a.rows[e3].cell);
+    assert_eq!(a.select(1), vec![e3]);
+    assert_eq!(a.select_free(1), vec![e3]);
+    let d = a.prepare_job(e2).unwrap();
+    assert!(files::read_json(&d.join("select.json")).unwrap().get("frontier").is_none());
+    std::fs::remove_dir_all(&d).unwrap();
+    {
+        let _f = Frontier::on();
+        // the root and entry 1 had jobs; entry 2 is the first of room 35; entry 3 is not the first of its room
+        assert_eq!(a.frontier(), [e2].into_iter().collect());
+        assert_eq!(a.select(1), vec![e2]);
+        assert_eq!(a.select_free(1), vec![e2]);
+        assert_eq!(a.select(2), vec![e2, e3]);
+        let d = a.prepare_job(e2).unwrap();
+        assert_eq!(files::read_json(&d.join("select.json")).unwrap()["frontier"], json!(true));
+        std::fs::remove_dir_all(&d).unwrap();
+        // a running job on entry 2: not the frontier's any more, and its cell is busy
+        a.busy.insert("j9".into(), (e2, a.rows[e2].cell.clone()));
+        assert!(a.frontier().is_empty());
+        assert_eq!(a.select(1), vec![e3]);
+        a.busy.clear();
+        // once its job is committed, the order is as before
+        ingest(&mut a, e2, &[], &[]);
+        assert!(a.frontier().is_empty());
+        assert_eq!(a.select(1), vec![e3]);
+    }
+    assert!(std::env::var("FMI_FRONTIER").is_err());
+}
