@@ -80,6 +80,8 @@ push() {
     local list; list=$(mktemp)
     for b in $(bins); do ldd $b | awk '/=> \//{print $3}'; done | sort -u > $list
     echo /lib64/ld-linux-x86-64.so.2 >> $list
+    # the engine's libSDL2 is sdl2-compat, which loads SDL3 at run time (dlopen): ldd does not list it
+    echo /usr/lib/libSDL3.so.0 >> $list
     say "$(wc -l < $list) libraries"
     rsync -aL --no-relative --files-from=$list -e "ssh $SSHOPT" / $V:$LIB/
     rm -f $list
