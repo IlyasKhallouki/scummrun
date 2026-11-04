@@ -981,6 +981,15 @@ pub trait Engine: Send {
         }
         Ok((st, n))
     }
+    /// E013 (patch 0007): the input log's records since the last call, which it takes (SPEEDRUN_INPUT=1). Default:
+    /// an error, for an engine without the command.
+    fn input_log(&mut self) -> EResult<InputLog> {
+        Err(EngineError::Bridge("input_log: this engine has no InputLog command".into()))
+    }
+    /// E013 (patch 0007): the state digest at this stop (reads only). Default: an error.
+    fn digest(&mut self) -> EResult<Digest> {
+        Err(EngineError::Bridge("digest: this engine has no Digest command".into()))
+    }
 }
 
 /// The room's dump made from a full dump: the owners, states and classes of the objects the room's object list
@@ -1298,6 +1307,177 @@ pub fn due(o: &Obs, slot: i32) -> Option<u64> {
     }
     let d = delay_step(o)?;
     Some(o.frame + (i64::from(s.delay.max(0)) / d) as u64 + 1)
+}
+
+// --- E013: the input log and the state digest (plan.md A.2-A.3, amendment (2) (a); patch 0007) --------------------
+
+/// What a handler's run read or wrote (patch 0007's input log), in the engine's order (`SpeedrunBridge::TouchKind`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+pub enum TouchKind {
+    /// a: the variable (a read, or a write with the value it replaced)
+    Var,
+    /// a: the bit
+    Bit,
+    /// a: the object
+    Owner,
+    State,
+    /// a: the object, b: the class
+    Class,
+    /// a: the actor (derefActor: any field of it)
+    Actor,
+    /// o5_findObject: a, b the point, old the answer
+    ObjectAt,
+    /// o5_getRandomNr: a the range's top, old the draw
+    Random,
+    /// isScriptRunning: a the script, old the answer
+    ScriptRunning,
+    /// a write: a script started (a its number, b its where, now its slot)
+    Started,
+    /// a write: a sentence queued (a the verb, b object A, old object B)
+    Sentence,
+    /// a write: a walk started (a the actor, old x, now y)
+    Walk,
+    /// a write: a message printed (a the actor)
+    Print,
+    /// a write: a verb slot changed (a the slot, b its verb, old and now its mode)
+    Verb,
+    /// a write: the camera moved or retargeted (a, b the destination, old and now its x)
+    Camera,
+    /// the cursor state (a write: old and now)
+    Cursor,
+    /// `_userPut`, the gate (a read by checkExecVerbs, or a write: old and now)
+    UserPut,
+    /// o5_actorFromPos: a, b the point, old the answer
+    ActorAt,
+}
+
+impl TouchKind {
+    pub const ALL: [TouchKind; 18] = [
+        TouchKind::Var,
+        TouchKind::Bit,
+        TouchKind::Owner,
+        TouchKind::State,
+        TouchKind::Class,
+        TouchKind::Actor,
+        TouchKind::ObjectAt,
+        TouchKind::Random,
+        TouchKind::ScriptRunning,
+        TouchKind::Started,
+        TouchKind::Sentence,
+        TouchKind::Walk,
+        TouchKind::Print,
+        TouchKind::Verb,
+        TouchKind::Camera,
+        TouchKind::Cursor,
+        TouchKind::UserPut,
+        TouchKind::ActorAt,
+    ];
+    /// The engine's variant index (u8 on the wire), and back.
+    pub fn of_u8(k: u8) -> Option<TouchKind> {
+        TouchKind::ALL.get(k as usize).copied()
+    }
+    /// The JSON reply's name of the kind.
+    pub fn name(self) -> &'static str {
+        [
+            "var", "bit", "owner", "state", "class", "actor", "object_at", "random", "script_running", "started",
+            "sentence", "walk", "print", "verb", "camera", "cursor", "userput", "actor_at",
+        ][self as usize]
+    }
+}
+
+/// One read or write: for a read, `old` is the value read and `now` equals it; for a write, the value replaced and
+/// the value written.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+pub struct Touch {
+    pub kind: TouchKind,
+    pub a: i32,
+    pub b: i32,
+    pub old: i32,
+    pub now: i32,
+}
+
+/// What became of an injected input (plan.md A.2, B).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Verdict {
+    /// it never reached the handler: "gate" (`_userPut` <= 0), "cleared" (the frame's key or click code was 0 at
+    /// checkExecVerbs: processInput used the key, or a script cleared it), "zone" (a click on no virtual screen),
+    /// "handler" (VAR_VERB_SCRIPT is 0), "unread" (no checkExecVerbs that frame)
+    Dropped(String),
+    /// the handler ran and changed nothing outside its own locals (patch 0007's rule: no value written differs from
+    /// the one it replaced, every slot it started died, no draw)
+    Ignored,
+    /// the handler ran and changed something else
+    Taken,
+}
+
+impl Verdict {
+    /// "dropped: gate", "ignored", "taken" (the plan's names; the stall table's rows)
+    pub fn text(&self) -> String {
+        match self {
+            Verdict::Dropped(w) => format!("dropped: {w}"),
+            Verdict::Ignored => "ignored".into(),
+            Verdict::Taken => "taken".into(),
+        }
+    }
+    /// Dropped or ignored: the input changed nothing (B's "refused").
+    pub fn refused(&self) -> bool {
+        !matches!(self, Verdict::Taken)
+    }
+}
+
+/// One opcode a handler's run executed: the slot, its script (number, where), the code offset and the opcode.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct LogOp {
+    pub slot: i32,
+    pub number: i32,
+    pub where_: i32,
+    pub code: i64,
+    pub opcode: u8,
+}
+
+/// One frame's injected keys and clicks and their path through checkExecVerbs and the handler (patch 0007).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct InputRecord {
+    pub frame: u64,
+    /// the schedule's keys and clicks of that frame, in order (`Input::Key`, `Click`, `RClick`)
+    pub input: Vec<Input>,
+    /// `_mouseAndKeyboardStat` when checkExecVerbs ran
+    pub stat: i32,
+    pub verdict: Verdict,
+    /// what runInputScript gave the handler (area, value, mode); 0 when dropped before it
+    pub area: i32,
+    pub value: i32,
+    pub mode: i32,
+    /// the verb slot whose key matched, or under the click (`findVerbAtPos`); 0 none
+    pub slot: i32,
+    /// the click's virtual screen; -1 for a key
+    pub zone: i32,
+    pub key_match: bool,
+    /// the script VAR_VERB_SCRIPT named
+    pub handler: i32,
+    pub writes: Vec<Touch>,
+    /// the path's reads (the gate, VAR_VERB_SCRIPT) and the handler run's
+    pub reads: Vec<Touch>,
+    pub ops: Vec<LogOp>,
+    pub ops_dropped: u32,
+    pub touches_dropped: u32,
+}
+
+/// The InputLog reply: the records since the last InputLog (taken), the records dropped over the bridge's cap.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct InputLog {
+    pub records: Vec<InputRecord>,
+    pub dropped: u32,
+    pub frame: u64,
+}
+
+/// The state digest (patch 0007's Digest): a 64-bit hash of the engine's save stream, its RNG state, its input
+/// registers and its sound state (plan.md A.3); `bytes` is the save stream's length.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Digest {
+    pub frame: u64,
+    pub digest: u64,
+    pub bytes: u32,
 }
 
 #[cfg(test)]

@@ -1,0 +1,16 @@
+j00000: class "refinement" (= A's), new [2767,2848,2850,2862,2929], same as A
+j00001: class "refinement" (= A's), new [2863,2930], same as A
+j00002: class "refinement" (= A's), new [2852,2862,2851,2861,2929], same as A
+j00003: class "refinement" (= A's), new [2850,2862,2929], same as A
+j00004: class "refinement" (= A's), new [2854,2862,2853,2861,2929], same as A
+j00005: class "refinement" (= A's), new [2852,2862,2851,2861,2929], same as A
+j00006: class "refinement" (= A's), new [2768,2818,2820,2854,2768,2818,2921], same as A
+j00007: class "refinement" (= A's), new [2820,2854,2921], same as A
+j00008: class "refinement" (= A's), new [2769,2818,2820,2854,2769,2818,2921], same as A
+j00009: class "refinement" (= A's), new [2768,2818,2820,2854,2768,2818,2921], same as A
+j00010: class "refinement" (= A's), new [2820,2854,2921], same as A
+j00011: class "refinement" (= A's), new [2770,2818,2820,2854,2770,2818,2921], same as A
+j00012: class "refinement" (= A's), new [2769,2818,2820,2854,2769,2818,2921], same as A
+j00013: class "refinement" (= A's), new [2820,2854,2921], same as A
+j00014: class "refinement" (= A's), new [2771,2818,2820,2854,2771,2818,2921], same as A
+G0 /var/tmp/fast-mi/e013-int/b3f/e-fast: 15 tries, stop class = A's in 15, everything = A's in 15

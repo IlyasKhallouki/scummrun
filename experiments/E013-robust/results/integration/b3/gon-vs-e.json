@@ -1,0 +1,1784 @@
+[
+ {
+  "job": "j00000",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2731,
+   2731,
+   2731,
+   2731,
+   2731,
+   2731,
+   2731,
+   2731,
+   2733,
+   2748,
+   2735
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:108\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "134",
+    "null"
+   ],
+   [
+    "replans",
+    "1",
+    "null"
+   ],
+   [
+    "frame0",
+    "2728",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2862",
+    "null"
+   ],
+   [
+    "qf",
+    "3216",
+    "null"
+   ],
+   [
+    "inputs",
+    "21",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      103
+     ],
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:108\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:108\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    5,
+    11
+   ],
+   [
+    "new 0 frame",
+    "2767",
+    "2731"
+   ],
+   [
+    "new 0 tick",
+    "16555",
+    "16339"
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2736,\"click\":[0,75]},{\"frame\":2750,\"click\":[0,75]},{\"frame\":2751,\"clic...",
+    "[{\"frame\":2729,\"click\":[24,157]}]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2767,{\"var:0\":15,\"var:1\":1,\"var:2\":192,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2731,{\"var:0\":9,\"var:1\":1,\"var:2\":320,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 frame",
+    "2848",
+    "2731"
+   ],
+   [
+    "new 1 tick",
+    "17041",
+    "16339"
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2736,\"click\":[0,75]},{\"frame\":2750,\"click\":[0,75]},{\"frame\":2751,\"clic...",
+    "[{\"frame\":2729,\"click\":[24,173]}]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2767,{\"var:0\":15,\"var:1\":1,\"var:2\":192,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2731,{\"var:0\":9,\"var:1\":1,\"var:2\":320,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2850",
+    "2731"
+   ],
+   [
+    "new 2 tick",
+    "17053",
+    "16339"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2736,\"click\":[0,75]},{\"frame\":2750,\"click\":[0,75]},{\"frame\":2751,\"clic...",
+    "[{\"frame\":2729,\"click\":[74,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2767,{\"var:0\":15,\"var:1\":1,\"var:2\":192,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2731,{\"var:0\":9,\"var:1\":1,\"var:2\":320,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2862",
+    "2731"
+   ],
+   [
+    "new 3 tick",
+    "17125",
+    "16339"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2736,\"click\":[0,75]},{\"frame\":2750,\"click\":[0,75]},{\"frame\":2751,\"clic...",
+    "[{\"frame\":2729,\"click\":[74,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2767,{\"var:0\":15,\"var:1\":1,\"var:2\":192,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2731,{\"var:0\":9,\"var:1\":1,\"var:2\":320,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2929",
+    "2731"
+   ],
+   [
+    "new 4 tick",
+    "17527",
+    "16339"
+   ],
+   [
+    "new 4 events",
+    "[{\"frame\":2736,\"click\":[0,75]},{\"frame\":2750,\"click\":[0,75]},{\"frame\":2751,\"clic...",
+    "[{\"frame\":2729,\"click\":[74,189]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2767,{\"var:0\":15,\"var:1\":1,\"var:2\":192,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2731,{\"var:0\":9,\"var:1\":1,\"var:2\":320,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ },
+ {
+  "job": "j00001",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2863,
+   2930,
+   2955
+  ],
+  "differ": [
+   [
+    "new entries",
+    2,
+    3
+   ]
+  ]
+ },
+ {
+  "job": "j00002",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2852,
+   2862,
+   2851,
+   2861,
+   2929,
+   2954
+  ],
+  "differ": [
+   [
+    "new entries",
+    5,
+    6
+   ]
+  ]
+ },
+ {
+  "job": "j00003",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2850,
+   2862,
+   2929,
+   2954
+  ],
+  "differ": [
+   [
+    "new entries",
+    3,
+    4
+   ]
+  ]
+ },
+ {
+  "job": "j00004",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2854,
+   2862,
+   2853,
+   2861,
+   2929,
+   2954
+  ],
+  "differ": [
+   [
+    "new entries",
+    5,
+    6
+   ]
+  ]
+ },
+ {
+  "job": "j00005",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2852,
+   2862,
+   2851,
+   2861,
+   2929,
+   2954
+  ],
+  "differ": [
+   [
+    "new entries",
+    5,
+    6
+   ]
+  ]
+ },
+ {
+  "job": "j00006",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2768,
+   2818,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2874,
+   2871,
+   2862
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:111\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "87",
+    "null"
+   ],
+   [
+    "replans",
+    "0",
+    "null"
+   ],
+   [
+    "frame0",
+    "2767",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2854",
+    "null"
+   ],
+   [
+    "qf",
+    "2088",
+    "null"
+   ],
+   [
+    "inputs",
+    "3",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:111\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:111\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    7,
+    13
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2768,\"click\":[7,71]}]",
+    "[]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2768,{\"var:0\":1,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2768,\"click\":[7,71]}]",
+    "[]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2820",
+    "2851"
+   ],
+   [
+    "new 2 tick",
+    "16873",
+    "17059"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2768,\"click\":[7,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[9...",
+    "[{\"frame\":2849,\"click\":[24,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2854",
+    "2851"
+   ],
+   [
+    "new 3 tick",
+    "17077",
+    "17059"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2768,\"click\":[7,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[9...",
+    "[{\"frame\":2849,\"click\":[24,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2768",
+    "2851"
+   ],
+   [
+    "new 4 tick",
+    "16561",
+    "17059"
+   ],
+   [
+    "new 4 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 4 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,157]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2768,{\"var:0\":1,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 5 frame",
+    "2818",
+    "2851"
+   ],
+   [
+    "new 5 tick",
+    "16861",
+    "17059"
+   ],
+   [
+    "new 5 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 5 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,173]}]"
+   ],
+   [
+    "new 5 checkpoints",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 6 frame",
+    "2921",
+    "2851"
+   ],
+   [
+    "new 6 tick",
+    "17479",
+    "17059"
+   ],
+   [
+    "new 6 events",
+    "[{\"frame\":2768,\"click\":[7,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[9...",
+    "[{\"frame\":2849,\"click\":[74,189]}]"
+   ],
+   [
+    "new 6 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ },
+ {
+  "job": "j00007",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2820,
+   2854,
+   2921,
+   2946
+  ],
+  "differ": [
+   [
+    "new entries",
+    3,
+    4
+   ]
+  ]
+ },
+ {
+  "job": "j00008",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2769,
+   2818,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2874,
+   2871,
+   2862
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:113\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "86",
+    "null"
+   ],
+   [
+    "replans",
+    "0",
+    "null"
+   ],
+   [
+    "frame0",
+    "2768",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2854",
+    "null"
+   ],
+   [
+    "qf",
+    "2064",
+    "null"
+   ],
+   [
+    "inputs",
+    "3",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:113\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:113\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    7,
+    13
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2769,\"click\":[11,71]}]",
+    "[]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2769,{\"var:0\":1,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2769,\"click\":[11,71]}]",
+    "[]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2820",
+    "2851"
+   ],
+   [
+    "new 2 tick",
+    "16873",
+    "17059"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2769,\"click\":[11,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2854",
+    "2851"
+   ],
+   [
+    "new 3 tick",
+    "17077",
+    "17059"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2769,\"click\":[11,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2769",
+    "2851"
+   ],
+   [
+    "new 4 tick",
+    "16567",
+    "17059"
+   ],
+   [
+    "new 4 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 4 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,157]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2769,{\"var:0\":1,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 5 frame",
+    "2818",
+    "2851"
+   ],
+   [
+    "new 5 tick",
+    "16861",
+    "17059"
+   ],
+   [
+    "new 5 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 5 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,173]}]"
+   ],
+   [
+    "new 5 checkpoints",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 6 frame",
+    "2921",
+    "2851"
+   ],
+   [
+    "new 6 tick",
+    "17479",
+    "17059"
+   ],
+   [
+    "new 6 events",
+    "[{\"frame\":2769,\"click\":[11,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[74,189]}]"
+   ],
+   [
+    "new 6 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ },
+ {
+  "job": "j00009",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2768,
+   2818,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2874,
+   2871,
+   2862
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:114\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "87",
+    "null"
+   ],
+   [
+    "replans",
+    "0",
+    "null"
+   ],
+   [
+    "frame0",
+    "2767",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2854",
+    "null"
+   ],
+   [
+    "qf",
+    "2088",
+    "null"
+   ],
+   [
+    "inputs",
+    "3",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:114\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:114\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    7,
+    13
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2768,\"click\":[7,71]}]",
+    "[]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2768,{\"var:0\":1,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2768,\"click\":[7,71]}]",
+    "[]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2820",
+    "2851"
+   ],
+   [
+    "new 2 tick",
+    "16873",
+    "17059"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2768,\"click\":[7,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[9...",
+    "[{\"frame\":2849,\"click\":[24,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2854",
+    "2851"
+   ],
+   [
+    "new 3 tick",
+    "17077",
+    "17059"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2768,\"click\":[7,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[9...",
+    "[{\"frame\":2849,\"click\":[24,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2768",
+    "2851"
+   ],
+   [
+    "new 4 tick",
+    "16561",
+    "17059"
+   ],
+   [
+    "new 4 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 4 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,157]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2768,{\"var:0\":1,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 5 frame",
+    "2818",
+    "2851"
+   ],
+   [
+    "new 5 tick",
+    "16861",
+    "17059"
+   ],
+   [
+    "new 5 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 5 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,173]}]"
+   ],
+   [
+    "new 5 checkpoints",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 6 frame",
+    "2921",
+    "2851"
+   ],
+   [
+    "new 6 tick",
+    "17479",
+    "17059"
+   ],
+   [
+    "new 6 events",
+    "[{\"frame\":2768,\"click\":[7,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[9...",
+    "[{\"frame\":2849,\"click\":[74,189]}]"
+   ],
+   [
+    "new 6 checkpoints",
+    "[[2768,{\"var:0\":15,\"var:1\":1,\"var:2\":184,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ },
+ {
+  "job": "j00010",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2820,
+   2854,
+   2921,
+   2946
+  ],
+  "differ": [
+   [
+    "new entries",
+    3,
+    4
+   ]
+  ]
+ },
+ {
+  "job": "j00011",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2770,
+   2818,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2874,
+   2871,
+   2862
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:115\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "85",
+    "null"
+   ],
+   [
+    "replans",
+    "0",
+    "null"
+   ],
+   [
+    "frame0",
+    "2769",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2854",
+    "null"
+   ],
+   [
+    "qf",
+    "2040",
+    "null"
+   ],
+   [
+    "inputs",
+    "3",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:115\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:115\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    7,
+    13
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2770,\"click\":[15,71]}]",
+    "[]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2770,{\"var:0\":15,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2770,{\"var:0\":1,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2770,\"click\":[15,71]}]",
+    "[]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2770,{\"var:0\":15,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2820",
+    "2851"
+   ],
+   [
+    "new 2 tick",
+    "16873",
+    "17059"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2770,\"click\":[15,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2770,{\"var:0\":15,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2854",
+    "2851"
+   ],
+   [
+    "new 3 tick",
+    "17077",
+    "17059"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2770,\"click\":[15,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2770,{\"var:0\":15,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2770",
+    "2851"
+   ],
+   [
+    "new 4 tick",
+    "16573",
+    "17059"
+   ],
+   [
+    "new 4 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 4 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,157]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2770,{\"var:0\":1,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 5 frame",
+    "2818",
+    "2851"
+   ],
+   [
+    "new 5 tick",
+    "16861",
+    "17059"
+   ],
+   [
+    "new 5 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 5 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,173]}]"
+   ],
+   [
+    "new 5 checkpoints",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 6 frame",
+    "2921",
+    "2851"
+   ],
+   [
+    "new 6 tick",
+    "17479",
+    "17059"
+   ],
+   [
+    "new 6 events",
+    "[{\"frame\":2770,\"click\":[15,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[74,189]}]"
+   ],
+   [
+    "new 6 checkpoints",
+    "[[2770,{\"var:0\":15,\"var:1\":1,\"var:2\":168,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ },
+ {
+  "job": "j00012",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2769,
+   2818,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2874,
+   2871,
+   2862
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:115\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "86",
+    "null"
+   ],
+   [
+    "replans",
+    "0",
+    "null"
+   ],
+   [
+    "frame0",
+    "2768",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2854",
+    "null"
+   ],
+   [
+    "qf",
+    "2064",
+    "null"
+   ],
+   [
+    "inputs",
+    "3",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:115\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:115\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    7,
+    13
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2769,\"click\":[11,71]}]",
+    "[]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2769,{\"var:0\":1,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2769,\"click\":[11,71]}]",
+    "[]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2820",
+    "2851"
+   ],
+   [
+    "new 2 tick",
+    "16873",
+    "17059"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2769,\"click\":[11,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2854",
+    "2851"
+   ],
+   [
+    "new 3 tick",
+    "17077",
+    "17059"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2769,\"click\":[11,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2769",
+    "2851"
+   ],
+   [
+    "new 4 tick",
+    "16567",
+    "17059"
+   ],
+   [
+    "new 4 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 4 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,157]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2769,{\"var:0\":1,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 5 frame",
+    "2818",
+    "2851"
+   ],
+   [
+    "new 5 tick",
+    "16861",
+    "17059"
+   ],
+   [
+    "new 5 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 5 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,173]}]"
+   ],
+   [
+    "new 5 checkpoints",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 6 frame",
+    "2921",
+    "2851"
+   ],
+   [
+    "new 6 tick",
+    "17479",
+    "17059"
+   ],
+   [
+    "new 6 events",
+    "[{\"frame\":2769,\"click\":[11,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[74,189]}]"
+   ],
+   [
+    "new 6 checkpoints",
+    "[[2769,{\"var:0\":15,\"var:1\":1,\"var:2\":176,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ },
+ {
+  "job": "j00013",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2820,
+   2854,
+   2921,
+   2946
+  ],
+  "differ": [
+   [
+    "new entries",
+    3,
+    4
+   ]
+  ]
+ },
+ {
+  "job": "j00014",
+  "class": [
+   "refinement",
+   ""
+  ],
+  "same_class": false,
+  "new": [
+   2771,
+   2818,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2851,
+   2874,
+   2871,
+   2862
+  ],
+  "differ": [
+   [
+    "stop",
+    "\"refinement: Lemma R's premise R0: the last pass wrote values of var [194] outsi...",
+    "null"
+   ],
+   [
+    "target",
+    "[\"bit:117\",1]",
+    "null"
+   ],
+   [
+    "frames",
+    "84",
+    "null"
+   ],
+   [
+    "replans",
+    "0",
+    "null"
+   ],
+   [
+    "frame0",
+    "2770",
+    "null"
+   ],
+   [
+    "frame_end",
+    "2854",
+    "null"
+   ],
+   [
+    "qf",
+    "2016",
+    "null"
+   ],
+   [
+    "inputs",
+    "3",
+    "null"
+   ],
+   [
+    "refinements",
+    [
+     [
+      194
+     ]
+    ],
+    []
+   ],
+   [
+    "probes",
+    "[{\"target\":[\"bit:117\",1],\"tier\":1,\"depth\":2,\"status\":\"plan\",\"stop\":\"refinement: ...",
+    "[{\"target\":[\"bit:117\",1],\"tier\":1,\"depth\":2,\"status\":\"unsolvable\",\"stop\":\"no pla..."
+   ],
+   [
+    "new entries",
+    7,
+    13
+   ],
+   [
+    "new 0 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 0 events",
+    "[{\"frame\":2771,\"click\":[19,71]}]",
+    "[]"
+   ],
+   [
+    "new 0 checkpoints",
+    "[[2771,{\"var:0\":15,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2771,{\"var:0\":1,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 1 how",
+    "\"checkpoint\"",
+    "\"wait\""
+   ],
+   [
+    "new 1 events",
+    "[{\"frame\":2771,\"click\":[19,71]}]",
+    "[]"
+   ],
+   [
+    "new 1 checkpoints",
+    "[[2771,{\"var:0\":15,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 2 frame",
+    "2820",
+    "2851"
+   ],
+   [
+    "new 2 tick",
+    "16873",
+    "17059"
+   ],
+   [
+    "new 2 how",
+    "\"checkpoint\"",
+    "\"afford\""
+   ],
+   [
+    "new 2 events",
+    "[{\"frame\":2771,\"click\":[19,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,157]}]"
+   ],
+   [
+    "new 2 checkpoints",
+    "[[2771,{\"var:0\":15,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 3 frame",
+    "2854",
+    "2851"
+   ],
+   [
+    "new 3 tick",
+    "17077",
+    "17059"
+   ],
+   [
+    "new 3 how",
+    "\"end\"",
+    "\"afford\""
+   ],
+   [
+    "new 3 events",
+    "[{\"frame\":2771,\"click\":[19,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[24,173]}]"
+   ],
+   [
+    "new 3 checkpoints",
+    "[[2771,{\"var:0\":15,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 4 frame",
+    "2771",
+    "2851"
+   ],
+   [
+    "new 4 tick",
+    "16579",
+    "17059"
+   ],
+   [
+    "new 4 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 4 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,157]}]"
+   ],
+   [
+    "new 4 checkpoints",
+    "[[2771,{\"var:0\":1,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 5 frame",
+    "2818",
+    "2851"
+   ],
+   [
+    "new 5 tick",
+    "16861",
+    "17059"
+   ],
+   [
+    "new 5 how",
+    "\"wait\"",
+    "\"afford\""
+   ],
+   [
+    "new 5 events",
+    "[]",
+    "[{\"frame\":2849,\"click\":[74,173]}]"
+   ],
+   [
+    "new 5 checkpoints",
+    "[[2818,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ],
+   [
+    "new 6 frame",
+    "2921",
+    "2851"
+   ],
+   [
+    "new 6 tick",
+    "17479",
+    "17059"
+   ],
+   [
+    "new 6 events",
+    "[{\"frame\":2771,\"click\":[19,71]},{\"frame\":2819,\"key\":\"t\"},{\"frame\":2820,\"click\":[...",
+    "[{\"frame\":2849,\"click\":[74,189]}]"
+   ],
+   [
+    "new 6 checkpoints",
+    "[[2771,{\"var:0\":15,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":33,\"var:5\":0,\"var:6\":...",
+    "[[2851,{\"var:0\":0,\"var:1\":1,\"var:2\":160,\"var:3\":0,\"var:4\":38,\"var:5\":0,\"var:6\":2..."
+   ]
+  ]
+ }
+]

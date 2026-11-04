@@ -28,6 +28,8 @@ struct Toy {
     dialog: bool,
     /// Boxes commands answered
     boxes_asked: std::sync::Arc<std::sync::atomic::AtomicU32>,
+    /// E013: the input log (a click that changes no state is "ignored")
+    log: Vec<InputRecord>,
 }
 
 fn toy(frame: u64, dialog: bool) -> Toy {
@@ -48,6 +50,7 @@ fn toy(frame: u64, dialog: bool) -> Toy {
         end_at: None,
         dialog,
         boxes_asked: Default::default(),
+        log: vec![],
     };
     t.st.idle = t.idle();
     t
@@ -58,6 +61,14 @@ fn rect_hit(x: i32, y: i32, r: (i32, i32, i32, i32)) -> bool {
 }
 
 impl Toy {
+    /// The state a digest reads (every field the toy's future depends on; the frame counters aside).
+    fn state_key(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (self.st.room, &self.vars, &self.bits, self.busy, self.verb, self.obj1, self.dialog, self.room_at, self.end_at).hash(&mut h);
+        self.pending.iter().map(|e| format!("{e:?}")).collect::<Vec<_>>().hash(&mut h);
+        h.finish()
+    }
     fn idle(&self) -> Option<String> {
         if self.busy > 0 {
             None
@@ -186,7 +197,14 @@ impl Toy {
         self.pending.retain(|e| e.frame != f);
         for e in now {
             if let Input::Click(x, y) = e.what {
+                let before = self.state_key();
                 self.click(x, y);
+                let verdict = if self.state_key() == before { Verdict::Ignored } else { Verdict::Taken };
+                self.log.push(InputRecord {
+                    frame: f, input: vec![e.what.clone()], stat: 0, verdict, area: 0, value: 0, mode: 0, slot: 0, zone: 0,
+                    key_match: false, handler: INPUT_SCRIPT, writes: vec![], reads: vec![], ops: vec![], ops_dropped: 0,
+                    touches_dropped: 0,
+                });
             }
         }
         self.st.idle = self.idle();
@@ -281,6 +299,12 @@ impl Engine for Toy {
         0.0
     }
     fn quit(self: Box<Self>) {}
+    fn input_log(&mut self) -> EResult<InputLog> {
+        Ok(InputLog { records: std::mem::take(&mut self.log), dropped: 0, frame: self.st.frame })
+    }
+    fn digest(&mut self) -> EResult<Digest> {
+        Ok(Digest { frame: self.st.frame, digest: self.state_key(), bytes: 0 })
+    }
     fn boxes(&mut self) -> EResult<Boxes> {
         self.boxes_asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let b = |x0, y0, x1, y1, flags| WalkBox { ul: (x0, y0), ur: (x1, y0), lr: (x1, y1), ll: (x0, y1), flags };
@@ -391,7 +415,7 @@ fn trials_kept_by_novelty() {
     let inp = afford::inputs_of(&of);
     let tested = [Key::bit(5), Key::bit(6), Key::bit(9)];
     let nov = novelty();
-    let out = afford::try_all(&mut e, &of, &inp, &tested, &nov, &AffordCfg { horizon: 200, fixed: false, third: true }, None).unwrap();
+    let out = afford::try_all(&mut e, &of, &inp, &tested, &nov, &AffordCfg { horizon: 200, fixed: false, third: true, ..Default::default() }, None).unwrap();
     // the entry is untouched
     assert_eq!(e.status().frame, 100);
     let by: std::collections::HashMap<String, &afford::Trial> = out.trials.iter().map(|t| (t.inputs.name(), t)).collect();
@@ -438,7 +462,7 @@ fn m4_form_runs_to_the_horizon() {
             vec![]
         }
     }
-    let out = afford::try_all(&mut e, &of, &inp, &[], &No, &AffordCfg { horizon: 40, fixed: true, third: true }, None).unwrap();
+    let out = afford::try_all(&mut e, &of, &inp, &[], &No, &AffordCfg { horizon: 40, fixed: true, third: true, ..Default::default() }, None).unwrap();
     assert!(out.kept.is_empty());
     assert!(out.trials.iter().all(|t| t.inputs.clicks.len() < 3), "no third click in M4's form");
     for t in &out.trials {
@@ -524,4 +548,58 @@ fn walk_boxes() {
     let w1 = out.kept.iter().find(|k| k.name == "w1").expect("w1 kept");
     assert_eq!(w1.novel, vec!["room=9".to_string()]);
     assert_eq!(w1.events, vec![Event { frame: 101, what: Input::Click(50, 120) }]);
+}
+
+/// E013's refused inputs (FMI_REFUSE's settings, given directly): a trial whose input changed nothing ends at the frame
+/// after its click with no wait; a trial whose stop is in the state of an earlier trial's stop, or of the no-input
+/// twin at the same frame, shares that wait; with the check (gate B4) every shared wait is run again and compared.
+#[test]
+fn refused_inputs_end_at_once_and_equal_states_share_a_wait() {
+    use afford::Point;
+    let mut e = boxed(toy(100, false));
+    let o = e.obs(&ObsReq::default()).unwrap();
+    let of = afford::offer(&mut e, &o).unwrap();
+    let one = |x, y, hit| Inputs { clicks: vec![Point { x, y, hit }] };
+    let inputs = vec![
+        one(300, 190, Hit::Verb { slot: 9, id: 99 }), // the verb screen with no slot there: ignored
+        one(130, 20, Hit::Walk(5)),                   // a walk that ends where it started: the twin's state
+        one(12, 152, Hit::Verb { slot: 1, id: 2 }),   // "open" selected
+        one(12, 152, Hit::Verb { slot: 1, id: 2 }),   // the same again: the state of the trial before
+    ];
+    let calls = std::cell::Cell::new(0);
+    let then_f = |_b: &mut Box<dyn Engine>| -> Result<Vec<Checkpoint>, String> {
+        calls.set(calls.get() + 1);
+        Ok(vec![])
+    };
+    let cfg = AffordCfg { horizon: 200, fixed: false, third: false, refuse: true, dedupe: true, check: false };
+    let out = afford::try_all(&mut e, &of, &inputs, &[Key::bit(9)], &novelty(), &cfg, Some(&then_f)).unwrap();
+    let t = &out.trials;
+    assert_eq!((t[0].reason.as_str(), t[0].verdict.as_deref(), t[0].frame), ("refused", Some("ignored"), 102));
+    assert!(t[0].digest.is_none() && t[0].shared.is_none());
+    assert_eq!(t[1].verdict.as_deref(), Some("taken"));
+    assert_eq!(t[1].shared.as_deref(), Some("twin"));
+    assert_eq!(t[2].shared, None);
+    assert_eq!(t[3].shared.as_deref(), Some("trial 2"));
+    assert_eq!(t[2].digest, t[3].digest);
+    assert_eq!(calls.get(), 1, "only the trial with a new state runs the wait");
+    let j = out.json();
+    assert_eq!(j["refuse"]["ended_at_once"], 1);
+    assert_eq!((j["refuse"]["shared_trial"].as_u64(), j["refuse"]["shared_twin"].as_u64()), (Some(1), Some(1)));
+    assert_eq!(j["verdicts"]["ignored"], 1);
+    assert_eq!(j["verdicts"]["taken"], 3);
+    // gate B4's check: every shared wait run again (the twin's from a fork of it) and compared
+    calls.set(0);
+    let mut e = boxed(toy(100, false));
+    let cfg = AffordCfg { check: true, ..cfg };
+    let out = afford::try_all(&mut e, &of, &inputs, &[Key::bit(9)], &novelty(), &cfg, Some(&then_f)).unwrap();
+    let r = out.refuse.as_ref().unwrap();
+    assert_eq!(r.pairs.len(), 2);
+    assert!(r.pairs.iter().all(|p| p.2));
+    assert_eq!(calls.get(), 1 + 2 + 1, "the new state's wait, the two shared ones again, the twin's own");
+    // off: as E012's step
+    let mut e = boxed(toy(100, false));
+    let cfg = AffordCfg { horizon: 200, fixed: false, third: false, refuse: false, dedupe: false, check: false };
+    let out = afford::try_all(&mut e, &of, &inputs, &[Key::bit(9)], &novelty(), &cfg, None).unwrap();
+    assert!(out.trials.iter().all(|t| t.verdict.is_none() && t.digest.is_none()));
+    assert!(out.json().get("verdicts").is_none());
 }

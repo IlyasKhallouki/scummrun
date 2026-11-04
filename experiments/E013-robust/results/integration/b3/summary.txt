@@ -1,0 +1,11 @@
+[23:48:16] eoff: GUARD: rc 0 wall 282.2 s low 0 min MemAvailable 6637280 kB G12: 272 samples, 268 with an fmi process, largest fmi tree 15 processes, python processes in an fmi tree 0 [23:48:16] heavy lock released; done 
+[23:53:21] e: GUARD: rc 0 wall 301.3 s low 0 min MemAvailable 6293736 kB G12: 291 samples, 287 with an fmi process, largest fmi tree 15 processes, python processes in an fmi tree 0 [23:53:21] heavy lock released; done 
+[00:00:35] all: GUARD: rc 0 wall 431.0 s low 0 min MemAvailable 6258256 kB G12: 416 samples, 411 with an fmi process, largest fmi tree 19 processes, python processes in an fmi tree 0 [00:00:35] heavy lock released; done 
+[00:00:35] G0 eoff vs E012's eoff rc 0: G0 /var/tmp/fast-mi/e013-int/b3f/eoff-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+[00:00:36] G0 e vs E012's e rc 0: G0 /var/tmp/fast-mi/e013-int/b3f/e-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+[00:00:37] all vs E012's e (reported) rc 0: G0 /var/tmp/fast-mi/e013-int/b3f/all-fast: 15 tries, stop class = A's in 8, everything = A's in 0
+[00:00:40] verify-new eoff rc 0: verify-new /var/tmp/fast-mi/e013-int/b3f/eoff-fast: 43 new entries from boot, 0 with differences; by how checkpoint 28/28, end 15/15
+[00:00:46] verify-new e rc 0: verify-new /var/tmp/fast-mi/e013-int/b3f/e-fast: 76 new entries from boot, 0 with differences; by how afford 15/15, checkpoint 28/28, end 15/15, wait 18/18
+[00:01:13] G-on verify-new all (E014's mechanisms on) rc 0: verify-new /var/tmp/fast-mi/e013-int/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
+[00:01:23] G-on verify-new all (every switch unset) rc 0: verify-new /var/tmp/fast-mi/e013-int/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
+[00:01:23] B3-DONE

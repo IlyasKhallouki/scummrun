@@ -1,0 +1,5 @@
+j00000: class "the same empty window 2 times on sentence(4,427,426)#39" (= A's), new [2768,2829,6429,10029,10032,10032,10032,10032,10032,10032,10032,10032,10129,10065], same as A
+j00001: class "goal" (= A's), new [10067,10086], same as A
+j00002: class "" (= A's), new [10174,10123,10127,10160,10210,10177,10129], same as A
+j00003: class "no plan (the planner proved none)" (= A's), new [10125,10127,10129,10131,10133,10135,10137,10139,10140,10142], same as A
+G0 /var/tmp/fast-mi/e013-stall/r2-e14/on/kitchen: 4 tries, stop class = A's in 4, everything = A's in 4

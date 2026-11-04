@@ -1,0 +1,22 @@
+{
+  "steps": 15,
+  "totals": {
+    "digest_s": 0.061041825999999993,
+    "digests": 60.0,
+    "ended_at_once": 0.0,
+    "pairs": 0.0,
+    "pairs_same": 0.0,
+    "shared_trial": 0.0,
+    "shared_twin": 0.0,
+    "twin_forks": 15.0,
+    "waits_run": 60.0
+  },
+  "pairs_differ": [],
+  "verdicts": {
+    "taken": {
+      "trials": 60.0,
+      "seconds": 4.240065155
+    }
+  },
+  "ms_per_digest": 1.0173637666666666
+}

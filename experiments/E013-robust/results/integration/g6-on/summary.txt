@@ -1,0 +1,19 @@
+# the kitchen golden reading (reader-port read kitchen --packed) with E014's reader switches, each alone and all (E14M)
+kitchen reading against golden.py's: 245 compared, 5 differing; first:
+kitchen packed 07041db7 (want 279b7a24): FAIL; wall/user/sys 91.127 31.763 4.979
+one-FMI_EGO_VALUES: kitchen: 72256 records, reading 43.37 s, 43.0 CPU s, peak RSS 827 MB kitchen reading against golden.py's: 72258 compared, 0 differences 
+one-FMI_GOAL_END: kitchen: 72256 records, reading 51.26 s, 50.5 CPU s, peak RSS 833 MB kitchen reading against golden.py's: 72258 compared, 0 differences 
+one-FMI_MERGE_DEDUP: kitchen: 72256 records, reading 42.94 s, 42.5 CPU s, peak RSS 830 MB kitchen reading against golden.py's: 42597 compared, 5 differing; first: 
+  line 42593: record.$Record.unknown[2].$tuple[0]: golden "startObject", candidate "startScript"
+  line 42594: record.$Record.unknown[2].$tuple[0]: golden "startObject", candidate "startScript"
+  line 42595: record.$Record.unknown[2].$tuple[0]: golden "startObject", candidate "startScript"
+  line 42596: record.$Record.unknown[2].$tuple[0]: golden "startObject", candidate "startScript"
+  line 42597: record.$Record.unknown[2].$tuple[0]: golden "startObject", candidate "startScript"
+one-FMI_READ_CUT: kitchen: 72256 records, reading 36.24 s, 36.0 CPU s, peak RSS 830 MB kitchen reading against golden.py's: 72258 compared, 0 differences 
+one-FMI_READ_EVENTS: kitchen: 72256 records, reading 46.01 s, 45.6 CPU s, peak RSS 826 MB kitchen reading against golden.py's: 72258 compared, 0 differences 
+one-FMI_VERBS_VAR_ON: kitchen: 72480 records, reading 36.41 s, 36.0 CPU s, peak RSS 831 MB kitchen reading against golden.py's: 245 compared, 5 differing; first:   line 1: reading.n_records: golden 72256, candidate 72480 
+  line 1: reading.n_records: golden 72256, candidate 72480
+  line 242: record.$Record.engine_pre.$set.length: golden 6, candidate 7
+  line 243: record.$Record.engine_pre.$set.length: golden 6, candidate 7
+  line 244: record.$Record.engine_pre.$set.length: golden 6, candidate 7
+  line 245: record.$Record.engine_pre.$set.length: golden 6, candidate 7

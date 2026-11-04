@@ -1,0 +1,1075 @@
+diff --git a/engines/scumm/actor.cpp b/engines/scumm/actor.cpp
+index 7c48e492..b4c0a745 100644
+--- a/engines/scumm/actor.cpp
++++ b/engines/scumm/actor.cpp
+@@ -37,6 +37,7 @@
+ #include "scumm/he/sprite_he.h"
+ #include "scumm/usage_bits.h"
+ #include "scumm/util.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ 
+ namespace Scumm {
+ 
+@@ -850,6 +851,9 @@ byte Actor_v0::actorWalkYCalculate() {
+ void Actor::startWalkActor(int destX, int destY, int dir) {
+ 	AdjustBoxResult abr;
+ 
++	if (_vm->_speedrun && _vm->_speedrun->logging()) // E013 (patch 0007): a walk a logged handler run starts
++		_vm->_speedrun->onWalk(_number, destX, destY);
++
+ 	if (!isInCurrentRoom() && _vm->_game.version >= 7) {
+ 		debugC(DEBUG_ACTORS, "startWalkActor: attempting to walk actor %d who is not in this room", _number);
+ 		return;
+@@ -2279,6 +2283,8 @@ bool ScummEngine::isValidActor(int id) const {
+ }
+ 
+ Actor *ScummEngine::derefActor(int id, const char *errmsg) const {
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read of an actor
++		_speedrun->onQuery(SpeedrunBridge::kTouchActor, id, 0, 0);
+ 	if (id == 0)
+ 		debugC(DEBUG_ACTORS, "derefActor(0, \"%s\") in script %d, opcode 0x%x",
+ 			errmsg, _currentScript != 0xFF ? vm.slot[_currentScript].number : -1, _opcode);
+@@ -2293,6 +2299,8 @@ Actor *ScummEngine::derefActor(int id, const char *errmsg) const {
+ }
+ 
+ Actor *ScummEngine::derefActorSafe(int id, const char *errmsg) const {
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read of an actor
++		_speedrun->onQuery(SpeedrunBridge::kTouchActor, id, 0, 0);
+ 	if (id == 0)
+ 		debugC(DEBUG_ACTORS, "derefActorSafe(0, \"%s\") in script %d, opcode 0x%x",
+ 			errmsg, _currentScript != 0xFF ? vm.slot[_currentScript].number : -1, _opcode);
+@@ -3466,6 +3474,9 @@ void ScummEngine_v7::actorTalk(const byte *msg) {
+ void ScummEngine::actorTalk(const byte *msg) {
+ 	Actor *a;
+ 
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a message a logged handler run prints
++		_speedrun->onTalk();
++
+ 	convertMessageToString(msg, _charsetBuffer, sizeof(_charsetBuffer));
+ 
+ 	// I have commented out this workaround, since it did cause another
+diff --git a/engines/scumm/object.cpp b/engines/scumm/object.cpp
+index 0e97ae97..46313d1d 100644
+--- a/engines/scumm/object.cpp
++++ b/engines/scumm/object.cpp
+@@ -28,6 +28,7 @@
+ #include "scumm/scumm_v8.h"
+ #include "scumm/usage_bits.h"
+ #include "scumm/util.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ 
+ namespace Scumm {
+ 
+@@ -251,6 +252,8 @@ bool ScummEngine::getClass(int obj, int cls) const {
+ 		}
+ 	}
+ 
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read
++		_speedrun->onQuery(SpeedrunBridge::kTouchClass, obj, cls, (_classData[obj] & (1 << (cls - 1))) != 0);
+ 	return (_classData[obj] & (1 << (cls - 1))) != 0;
+ }
+ 
+@@ -283,6 +286,8 @@ void ScummEngine::putClass(int obj, int cls, bool set) {
+ 		}
+ 	}
+ 
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's write
++		_speedrun->onObjectWrite(SpeedrunBridge::kTouchClass, obj, cls, (_classData[obj] & (1 << (cls - 1))) != 0, set);
+ 	if (set)
+ 		_classData[obj] |= (1 << (cls - 1));
+ 	else
+@@ -295,12 +300,16 @@ void ScummEngine::putClass(int obj, int cls, bool set) {
+ 
+ int ScummEngine::getOwner(int obj) const {
+ 	assertRange(0, obj, _numGlobalObjects - 1, "object");
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read
++		_speedrun->onQuery(SpeedrunBridge::kTouchOwner, obj, 0, _objectOwnerTable[obj]);
+ 	return _objectOwnerTable[obj];
+ }
+ 
+ void ScummEngine::putOwner(int obj, int owner) {
+ 	assertRange(0, obj, _numGlobalObjects - 1, "object");
+ 	assertRange(0, owner, 0xFF, "owner");
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's write
++		_speedrun->onObjectWrite(SpeedrunBridge::kTouchOwner, obj, 0, _objectOwnerTable[obj], owner);
+ 	_objectOwnerTable[obj] = owner;
+ }
+ 
+@@ -321,12 +330,16 @@ int ScummEngine::getState(int obj) {
+ 			_objectStateTable[obj] |= kObjectStateIntrinsic;
+ 	}
+ 
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read
++		_speedrun->onQuery(SpeedrunBridge::kTouchState, obj, 0, _objectStateTable[obj]);
+ 	return _objectStateTable[obj];
+ }
+ 
+ void ScummEngine::putState(int obj, int state) {
+ 	assertRange(0, obj, _numGlobalObjects - 1, "object");
+ 	assertRange(0, state, 0xFF, "state");
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's write
++		_speedrun->onObjectWrite(SpeedrunBridge::kTouchState, obj, 0, _objectStateTable[obj], state);
+ 	_objectStateTable[obj] = state;
+ }
+ 
+diff --git a/engines/scumm/saveload.cpp b/engines/scumm/saveload.cpp
+index 55af0406..dc49637c 100644
+--- a/engines/scumm/saveload.cpp
++++ b/engines/scumm/saveload.cpp
+@@ -618,6 +618,14 @@ bool ScummEngine::saveState(Common::SeekableWriteStream *out, bool writeHeader)
+ 	return true;
+ }
+ 
++void ScummEngine::speedrunSaveStream(Common::SeekableWriteStream *out) {
++	// E013 (patch 0007): the state digest's bytes (speedrun_state.cpp stateDigest()): what saveState() serializes,
++	// without the header, the thumbnail and the save infos (the play time).
++	Serializer ser(nullptr, out);
++	ser.setVersion(CURRENT_VER);
++	saveLoadWithSerializer(ser);
++}
++
+ bool ScummEngine::saveState(int slot, bool compat, Common::String &filename) {
+ 	bool saveFailed = false;
+ 
+diff --git a/engines/scumm/script.cpp b/engines/scumm/script.cpp
+index b0c2f4f5..c4de52a8 100644
+--- a/engines/scumm/script.cpp
++++ b/engines/scumm/script.cpp
+@@ -346,6 +346,11 @@ void ScummEngine::runScriptNested(int script) {
+ 	NestedScript *nest;
+ 	ScriptSlot *slot;
+ 
++	// E013 (patch 0007): every start (runScript, runObjectScript, entry and exit code) comes here: one a logged handler
++	// run makes is one of its writes
++	if (_speedrun && _speedrun->logging())
++		_speedrun->onScriptStart(script);
++
+ 	updateScriptPtr();
+ 
+ 	// Backyard Basketball is one of the games which requires more than 15 nested scripts
+@@ -497,6 +502,8 @@ void ScummEngine::executeScript() {
+ 	// The speedrun bridge's segmentation and explain (speedrun_explain.cpp):
+ 	// one call is one slot run. Off, a null test or one member test.
+ 	const bool speedrunHooks = _speedrun && _speedrun->scriptHooks();
++	// E013 (patch 0007): a logged handler run's opcodes (the input log); off unless one is being logged
++	const bool speedrunLog = _speedrun && _speedrun->logging();
+ 	if (speedrunHooks)
+ 		_speedrun->onRunBegin();
+ 	while (_currentScript != 0xFF) {
+@@ -518,6 +525,8 @@ void ScummEngine::executeScript() {
+ 				getOpcodeDesc(_opcode));
+ 		if (speedrunHooks)
+ 			_speedrun->onOpcode(_opcode);
++		if (speedrunLog)
++			_speedrun->onLogOpcode(_opcode);
+ 		if (_hexdumpScripts == true) {
+ 			for (c = -1; c < 15; c++) {
+ 				debugN(" %02x", *(_scriptPointer + c));
+@@ -638,6 +647,8 @@ int ScummEngine::readVarBody(uint var) {
+ 		}
+ #endif
+ 		assertRange(0, var, _numVariables - 1, "variable (reading)");
++		if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read, after the indirection
++			_speedrun->onReadResolved(var, _scummVars[var]);
+ 		return _scummVars[var];
+ 	}
+ 
+@@ -682,6 +693,8 @@ int ScummEngine::readVarBody(uint var) {
+ 			}
+ 
+ 			assertRange(0, var, _numBitVariables - 1, "variable (reading)");
++			if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's read of a bit
++				_speedrun->onReadResolved(0x8000 | var, (_bitVars[var >> 3] & (1 << (var & 7))) ? 1 : 0);
+ 			return (_bitVars[var >> 3] & (1 << (var & 7))) ? 1 : 0;
+ 		}
+ 	}
+@@ -732,7 +745,7 @@ int ScummEngine::readVarBody(uint var) {
+ 
+ void ScummEngine::writeVar(uint var, int value) {
+ 	debugC(DEBUG_VARS, "writeVar(%d, %d)", var, value);
+-	if (_speedrun && _speedrun->explaining())
++	if (_speedrun && _speedrun->writeHook()) // the explain log, or E013's input log (patch 0007)
+ 		_speedrun->onWriteVar(var, value);
+ 
+ 	if (!(var & 0xF000)) {
+@@ -1191,6 +1204,8 @@ void ScummEngine::doSentence(int verb, int objectA, int objectB) {
+ 	st->objectB = objectB;
+ 	st->preposition = (objectB != 0);
+ 	st->freezeCount = 0;
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a sentence a logged handler run queues
++		_speedrun->onSentence(verb, objectA, objectB);
+ }
+ 
+ void ScummEngine::checkAndRunSentenceScript() {
+@@ -1528,8 +1543,13 @@ void ScummEngine::runInputScript(int clickArea, int val, int mode) {
+ 		_lastInputScriptTime = time;
+ 	}
+ 
++	// E013 (patch 0007): the handler's arguments, and its run inside this call (the input log)
++	if (_speedrun && _speedrun->inputLogOn())
++		_speedrun->onInputScriptBegin(args[0], args[1], args[2]);
+ 	if (verbScript)
+ 		runScript(verbScript, 0, 0, args);
++	if (_speedrun && _speedrun->inputLogOn())
++		_speedrun->onInputScriptEnd();
+ }
+ 
+ void ScummEngine::decreaseScriptDelay(int amount) {
+@@ -1580,8 +1600,13 @@ bool ScummEngine::isScriptRunning(int script) const {
+ 	int i;
+ 	const ScriptSlot *ss = vm.slot;
+ 	for (i = 0; i < NUM_SCRIPT_SLOT; i++, ss++)
+-		if (ss->number == script && (ss->where == WIO_GLOBAL || ss->where == WIO_LOCAL) && ss->status != ssDead)
++		if (ss->number == script && (ss->where == WIO_GLOBAL || ss->where == WIO_LOCAL) && ss->status != ssDead) {
++			if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's query
++				_speedrun->onQuery(SpeedrunBridge::kTouchScriptRunning, script, 0, 1);
+ 			return true;
++		}
++	if (_speedrun && _speedrun->logging())
++		_speedrun->onQuery(SpeedrunBridge::kTouchScriptRunning, script, 0, 0);
+ 	return false;
+ }
+ 
+diff --git a/engines/scumm/script_v5.cpp b/engines/scumm/script_v5.cpp
+index d02ee122..16008c27 100644
+--- a/engines/scumm/script_v5.cpp
++++ b/engines/scumm/script_v5.cpp
+@@ -419,7 +419,10 @@ void ScummEngine_v5::o5_actorFromPos() {
+ 	getResultPos();
+ 	x = getVarOrDirectWord(PARAM_1);
+ 	y = getVarOrDirectWord(PARAM_2);
+-	setResult(getActorFromPos(x, y));
++	const int actor = getActorFromPos(x, y);
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's query
++		_speedrun->onQuery(SpeedrunBridge::kTouchActorAt, x, y, actor);
++	setResult(actor);
+ }
+ 
+ void ScummEngine_v5::o5_actorOps() {
+@@ -1247,6 +1250,8 @@ void ScummEngine_v5::o5_findObject() {
+ 		obj = 468;
+ 	}
+ 
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's query
++		_speedrun->onQuery(SpeedrunBridge::kTouchObjectAt, x, y, obj);
+ 	setResult(obj);
+ }
+ 
+@@ -1440,6 +1445,8 @@ void ScummEngine_v5::o5_getRandomNr() {
+ 	getResultPos();
+ 	int max = getVarOrDirectByte(PARAM_1);
+ 	int rnd = _rnd.getRandomNumber(max);
++	if (_speedrun && _speedrun->logging()) // E013 (patch 0007): a logged handler run's draw
++		_speedrun->onQuery(SpeedrunBridge::kTouchRandom, max, 0, rnd);
+ 	setResult(rnd);
+ 
+ 	debug(6, "o5_getRandomNr(): %d (min: 0, max: %d)", rnd, max);
+diff --git a/engines/scumm/scumm.h b/engines/scumm/scumm.h
+index 44e64283..1db982fd 100644
+--- a/engines/scumm/scumm.h
++++ b/engines/scumm/scumm.h
+@@ -1000,6 +1000,8 @@ protected:
+ 	Common::String _saveLoadDescription;
+ 
+ 	bool saveState(Common::SeekableWriteStream *out, bool writeHeader = true);
++	/** E013 (patch 0007): the save stream alone (no header, thumbnail or infos), for the bridge's state digest. */
++	void speedrunSaveStream(Common::SeekableWriteStream *out);
+ 	bool saveState(int slot, bool compat, Common::String &fileName);
+ 	bool loadState(int slot, bool compat);
+ 	bool loadState(int slot, bool compat, Common::String &fileName);
+diff --git a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+index 41d29075..4f70f7cf 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp
+@@ -211,6 +211,8 @@ void SpeedrunBridge::readEnv() {
+ 		{"SPEEDRUN_REPORT_RESTART", &SpeedrunBridge::_reportRestart},
+ 		// E014: the end's site (observation: the reason's text only)
+ 		{"SPEEDRUN_END_SITE", &SpeedrunBridge::_endSite},
++		// E013 (patch 0007): the input log (observation only)
++		{"SPEEDRUN_INPUT", &SpeedrunBridge::_inputLog},
+ 	};
+ 	for (const auto &var : kBoolVars) {
+ 		const char *value = envValue(var.name);
+@@ -554,6 +556,9 @@ void SpeedrunBridge::onClearClicked() {
+ void SpeedrunBridge::onDecisionPoint() {
+ 	_inputWindow = false; // checkExecVerbs() has run
+ 	_afterDecision = true; // slot runs from here on come after this frame's decision point
++	// E013 (patch 0007): an injected input whose record checkExecVerbs() did not decide this frame (none in v5)
++	if (_recOpen)
++		closeRecord(1, "unread");
+ 	if (_finished)
+ 		return;
+ 
+diff --git a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+index 3ed52f3f..3b2ab0af 100644
+--- a/engines/scumm/speedrun/speedrun_bridge.h
++++ b/engines/scumm/speedrun/speedrun_bridge.h
+@@ -289,6 +289,9 @@ bool parseSpeedrunInterrupts(const Common::String &text, Common::Array<SpeedrunI
+  *                                code offset of the opcode (unset: "restart", "quit", as before)
+  *  - SPEEDRUN_TEST_RESTART=<n>   E012 (patch 0005), tests only: restart() at the start of
+  *                                frame n, as the engine's restart key calls it
++ *  - SPEEDRUN_INPUT=1            E013 (patch 0007): the input log, each injected key or click's
++ *                                path through checkExecVerbs() and the handler, with what the
++ *                                handler's run read and wrote (the InputLog command); observation only
+  * The RNG seed is ScummVM's own --random-seed (ConfMan "random_seed").
+  *
+  * Record stamping (contract C2): records about the completed previous frame
+@@ -375,6 +378,48 @@ public:
+ 	/** E014: o5_systemOps' SO_QUIT, before quitGame(): the script's site, for the end's reason (SPEEDRUN_END_SITE). */
+ 	void onScriptQuit();
+ 
++	// E013 (patch 0007; experiments/E013-robust/plan.md, method A.2-A.3 and amendment (2) (a)): the input log and the
++	// state digest. SPEEDRUN_INPUT=1 turns the log on (speedrun_inputs.cpp): for each frame in which the schedule
++	// injected a key or a click, its path through checkExecVerbs() and the handler (VAR_VERB_SCRIPT's script), with
++	// what the handler's run in that call read and wrote. Every hook below only reads the engine and writes the
++	// bridge's own members; with the switch off each is a null test and a member test. The digest (the Digest command)
++	// needs no switch: it reads the engine's save stream, which changes nothing.
++	/** writeVar(): the explain log or a logged handler run wants the write (onWriteVar). */
++	bool writeHook() const { return _explainNow || _logRun; }
++	/** SPEEDRUN_INPUT=1: the input log is on (runInputScript()'s hooks). */
++	bool inputLogOn() const { return _inputLog; }
++	/** A handler's run is being logged: the read, query and write hooks record. */
++	bool logging() const { return _logRun; }
++	/** checkExecVerbs(), first statement: the path this frame's injected input takes (the gate, the zone). */
++	void onExecVerbs();
++	/** runInputScript(), before it starts the handler: its arguments and the script VAR_VERB_SCRIPT names. */
++	void onInputScriptBegin(int area, int val, int mode);
++	/** runInputScript(), last statement: the handler's run in this call is over (the slot died or broke). */
++	void onInputScriptEnd();
++	/** runScriptNested(), first statement, while a handler's run is logged: slot @p slot starts. */
++	void onScriptStart(int slot);
++	/** doSentence(), last statement, while a handler's run is logged: a sentence was queued. */
++	void onSentence(int verb, int objectA, int objectB);
++	/** Actor::startWalkActor(), first statement, while a handler's run is logged. */
++	void onWalk(int actor, int x, int y);
++	/** actorTalk(), first statement, while a handler's run is logged: a message is printed. */
++	void onTalk();
++	/** putOwner(), putState(), putClass(), while a handler's run is logged: an object table written (kind kTouch*). */
++	void onObjectWrite(int kind, int obj, int a, int oldValue, int newValue);
++	/** readVarBody(), where a global variable or a bit is read (after v5's indirection), while a run is logged. */
++	void onReadResolved(uint var, int value);
++	/** An engine query an opcode made while a handler's run is logged (kind as kTouch*): its subject and answer. */
++	void onQuery(int kind, int a, int b, int value);
++	/** executeScript(), each opcode while a handler's run is logged. */
++	void onLogOpcode(byte opcode);
++
++	/** E013: the kinds of what a handler's run read or wrote (fmi-core TouchKind's variant index). */
++	enum TouchKind {
++		kTouchVar = 0, kTouchBit, kTouchOwner, kTouchState, kTouchClass, kTouchActor, kTouchObjectAt, kTouchRandom,
++		kTouchScriptRunning, kTouchStarted, kTouchSentence, kTouchWalk, kTouchPrint, kTouchVerb, kTouchCamera,
++		kTouchCursor, kTouchUserPut, kTouchActorAt
++	};
++
+ private:
+ 	enum IdleKind { kNotIdle, kIdleSentence, kIdleDialog };
+ 
+@@ -801,6 +846,55 @@ private:
+ 	Common::String boxesJson() const;
+ 	void logExplainRow(byte kind, int64 a, int64 b, int64 c, int64 d = 0, int64 e = 0, int64 f = 0, int64 g = 0,
+ 	                   int64 h = 0);
++
++	// E013 (patch 0007): the input log and the state digest. Observation only: none of it is read by the game.
++	bool _inputLog = false;   // SPEEDRUN_INPUT=1: the input log's records
++	bool _logRun = false;     // a handler's run is being logged (inside runInputScript's start of it)
++	/** One read or write of a handler's run (fmi-core Touch). */
++	struct Touch {
++		uint8 kind;
++		int32 a, b, old, now;
++	};
++	/** One opcode of a handler's run (fmi-core LogOp). */
++	struct LogOp {
++		int32 slot, number, where;
++		int64 code;
++		uint8 opcode;
++	};
++	/** One frame's injected input and its path (fmi-core InputRecord). */
++	struct InputRec {
++		uint64 frame = 0;
++		Common::Array<SpeedrunInput> inputs; // the schedule's keys and clicks of the frame
++		int stat = 0;            // _mouseAndKeyboardStat at checkExecVerbs()
++		uint8 verdict = 0;       // 0 open (not decided), 1 dropped, 2 ignored, 3 taken
++		const char *why = nullptr; // dropped: "gate", "cleared", "zone", "handler", "unread"
++		int area = 0, value = 0, mode = 0, slot = 0, zone = -1, handler = 0;
++		bool keyMatch = false;   // a key equal to a visible slot's key
++		Common::Array<Touch> writes, reads;
++		Common::Array<LogOp> ops;
++		uint32 opsDropped = 0, touchesDropped = 0;
++	};
++	bool _recOpen = false;    // _rec is this frame's record, not yet decided
++	InputRec _rec;
++	Common::Array<InputRec> _inputRecs; // decided, not yet sent (InputLog)
++	uint32 _inputRecsDropped = 0;
++	/** What a handler's run is compared with at its end: the verbs, the camera, the cursor and the gate. */
++	struct RunSnap {
++		Common::Array<int32> verbs; // per slot: verbid, curmode, saveid, key, left, top, right, bottom
++		int camX = 0, camY = 0, camDestX = 0, camDestY = 0, camFollows = 0, camMode = 0;
++		int cursor = 0, userPut = 0;
++	} _runSnap;
++	void snapRun(RunSnap &s) const;
++	/** Close this frame's record with @p verdict (and @p why when dropped) and queue it. */
++	void closeRecord(uint8 verdict, const char *why);
++	void addTouch(Common::Array<Touch> &to, uint8 kind, int a, int b, int old, int now);
++	/** The log's and the digest's encoders (speedrun_wire.cpp) and their JSON (speedrun_inputs.cpp, _state.cpp). */
++	void wireInputLog(SpeedrunBytes &o);
++	void wireDigest(SpeedrunBytes &o);
++	Common::String inputLogJson();
++	Common::String digestJson();
++	/** The state digest (plan.md, A.3): the engine's save stream, the RNG, the input registers and the timers. */
++	uint64 stateDigest(uint32 &bytes);
+ };
+ 
+ } // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_control.cpp b/engines/scumm/speedrun/speedrun_control.cpp
+index 8fc5a303..b5a9a9bd 100644
+--- a/engines/scumm/speedrun/speedrun_control.cpp
++++ b/engines/scumm/speedrun/speedrun_control.cpp
+@@ -57,6 +57,9 @@
+ //     {"cmd": "explain", "from": F0, "to": F1, "units": [[where, number], ...]}  log the opcodes, reads and
+ //                                                writes of those units' runs in frames F0..F1 ("off": true disarms)
+ //     {"cmd": "explain_log"}                     {"explain": [...], "dropped", "violations"}; clears it
++//     {"cmd": "input_log"}                       E013 (patch 0007): {"input_log": {"records": [...], "dropped",
++//                                                "frame"}}, the input log since the last call (SPEEDRUN_INPUT=1); takes it
++//     {"cmd": "digest"}                          E013 (patch 0007): {"digest": {"frame", "digest", "bytes"}}
+ //     {"cmd": "quit"}                            exit at once
+ 
+ #define FORBIDDEN_SYMBOL_ALLOW_ALL
+@@ -390,6 +393,15 @@ void SpeedrunBridge::controlLoop(const char *reason) {
+ 				at.add("verb_slot", _vm->findVerbAtPos(x, y));
+ 				controlSend("{\"at\":" + at.str() + "}");
+ 			}
++		} else if (cmd == "input_log") {
++			// E013 (patch 0007): the input log's records since the last call (taken)
++			if (!_inputLog)
++				error = "input_log: the input log is off (SPEEDRUN_INPUT=1)";
++			else
++				controlSend("{\"input_log\":" + inputLogJson() + "}");
++		} else if (cmd == "digest") {
++			// E013 (patch 0007): the state digest (reads the engine's save stream)
++			controlSend("{\"digest\":" + digestJson() + "}");
+ 		} else if (cmd == "boxes") {
+ 			// E012 (patch 0005): the current room's walk boxes, as the engine holds them (boxes.cpp); reads only.
+ 			controlSend("{\"boxes\":" + boxesJson() + "}");
+diff --git a/engines/scumm/speedrun/speedrun_explain.cpp b/engines/scumm/speedrun/speedrun_explain.cpp
+index 793383e7..a4d35c1d 100644
+--- a/engines/scumm/speedrun/speedrun_explain.cpp
++++ b/engines/scumm/speedrun/speedrun_explain.cpp
+@@ -162,6 +162,19 @@ void SpeedrunBridge::onReadVar(uint var, int value) {
+ }
+ 
+ void SpeedrunBridge::onWriteVar(uint var, int value) {
++	// E013 (patch 0007): a logged handler run's write to a global variable or a bit, with the value it replaces (writeHook()
++	// calls this with the explain log off too). A slot's own locals (0x4000) are its own.
++	if (_logRun && !(var & 0x4000)) {
++		const ScummEngine &e = *_vm;
++		if (!(var & 0xF000) && (int)var < e._numVariables) {
++			addTouch(_rec.writes, kTouchVar, (int)var, 0, e._scummVars[var], value);
++		} else if (var & 0x8000) {
++			const uint bit = var & 0x7FFF;
++			if ((int)bit < e._numBitVariables)
++				addTouch(_rec.writes, kTouchBit, (int)bit, 0, (e._bitVars[bit >> 3] & (1 << (bit & 7))) ? 1 : 0,
++				         value ? 1 : 0);
++		}
++	}
+ 	if (!_explainNow || _runStack.empty())
+ 		return;
+ 	if (_wireBin)
+diff --git a/engines/scumm/speedrun/speedrun_inputs.cpp b/engines/scumm/speedrun/speedrun_inputs.cpp
+index 28b00252..23ec6b50 100644
+--- a/engines/scumm/speedrun/speedrun_inputs.cpp
++++ b/engines/scumm/speedrun/speedrun_inputs.cpp
+@@ -28,6 +28,10 @@
+ #include "common/formats/json.h"
+ #include "common/keyboard.h"
+ 
++#include "scumm/actor.h"
++#include "scumm/script.h"
++#include "scumm/verbs.h"
++
+ #include "scumm/scumm.h"
+ #include "scumm/speedrun/speedrun_bridge.h"
+ 
+@@ -205,7 +209,294 @@ void SpeedrunBridge::applyRawInputs() {
+ 		}
+ 		rec.add("room", (int)e._currentRoom);
+ 		writeRecord(rec);
++		// E013 (patch 0007): this frame's keys and clicks open its input record (the input log)
++		if (_inputLog && (in.kind == SpeedrunInput::kKey || in.kind == SpeedrunInput::kClick ||
++		                  in.kind == SpeedrunInput::kRightClick)) {
++			if (!_recOpen) {
++				_rec = InputRec();
++				_rec.frame = _frames;
++				_recOpen = true;
++			}
++			_rec.inputs.push_back(in);
++		}
++	}
++}
++
++
++#pragma mark - E013: the input log
++
++// E013 (patch 0007; experiments/E013-robust/plan.md, A.2). For each frame in which the schedule injected a key or a
++// click (SPEEDRUN_INPUT=1), its path through checkExecVerbs() and the handler:
++//   - dropped: "gate" (_userPut <= 0, checkExecVerbs()'s first test), "cleared" (the frame's key or click code was 0
++//     when checkExecVerbs() ran: processInput() used the key itself, e.g. Esc or '.', or a script cleared it), "zone"
++//     (a click on no virtual screen), "handler" (VAR_VERB_SCRIPT is 0: runInputScript() starts nothing);
++//   - handled: the area, value and mode runInputScript() gives the handler, the verb slot whose key matched or that
++//     is under the click; then the handler's run inside that call (until its slot dies or breaks: the rest of the
++//     frame's script work is the other slots'): what it wrote (variables and bits, owners, states, classes, scripts
++//     started, sentences queued, walks, prints; the verb slots, the camera, the cursor and the gate, by a snapshot
++//     before and after) and what it read (variables and bits after v5's indirection, owners, states, classes,
++//     actors, the object at a point, random draws, script queries), and its opcodes. "ignored" when it changed
++//     nothing outside its own locals (onInputScriptEnd()), else "taken".
++// Records wait in the bridge until the InputLog command takes them (a fork's child inherits the ones not taken).
++
++namespace {
++const uint kMaxRecs = 4096;   // records kept between two InputLog commands
++const uint kMaxTouches = 4096; // reads, and writes, per record
++const uint kMaxOps = 4096;    // opcodes per record
++} // End of anonymous namespace
++
++void SpeedrunBridge::addTouch(Common::Array<Touch> &to, uint8 kind, int a, int b, int old, int now) {
++	if (to.size() >= kMaxTouches) {
++		_rec.touchesDropped++;
++		return;
++	}
++	Touch t;
++	t.kind = kind;
++	t.a = a;
++	t.b = b;
++	t.old = old;
++	t.now = now;
++	to.push_back(t);
++}
++
++void SpeedrunBridge::closeRecord(uint8 verdict, const char *why) {
++	_rec.verdict = verdict;
++	_rec.why = why;
++	if (_inputRecs.size() < kMaxRecs)
++		_inputRecs.push_back(_rec);
++	else
++		_inputRecsDropped++;
++	_rec = InputRec();
++	_recOpen = false;
++}
++
++void SpeedrunBridge::snapRun(RunSnap &s) const {
++	const ScummEngine &e = *_vm;
++	s.verbs.resize(8 * e._numVerbs);
++	for (int i = 0; i < e._numVerbs; i++) {
++		const VerbSlot &v = e._verbs[i];
++		int32 *p = &s.verbs[8 * i];
++		p[0] = v.verbid, p[1] = v.curmode, p[2] = v.saveid, p[3] = v.key;
++		p[4] = v.curRect.left, p[5] = v.curRect.top, p[6] = v.curRect.right, p[7] = v.curRect.bottom;
++	}
++	s.camX = e.camera._cur.x, s.camY = e.camera._cur.y, s.camDestX = e.camera._dest.x, s.camDestY = e.camera._dest.y;
++	s.camFollows = e.camera._follows, s.camMode = e.camera._mode;
++	s.cursor = e._cursor.state;
++	s.userPut = e._userPut;
++}
++
++void SpeedrunBridge::onExecVerbs() {
++	// checkExecVerbs()'s own tests, in its order, read before it acts on them (verbs.cpp:586-692). What each test read
++	// goes in the record's reads: the gate (_userPut), then the zone or the verb slot the input meets.
++	if (!_recOpen)
++		return;
++	ScummEngine &e = *_vm;
++	_rec.stat = e._mouseAndKeyboardStat;
++	addTouch(_rec.reads, kTouchUserPut, 0, 0, e._userPut, e._userPut);
++	if (e._userPut <= 0) {
++		closeRecord(1, "gate");
++		return;
++	}
++	if (e._mouseAndKeyboardStat == 0) {
++		closeRecord(1, "cleared");
++		return;
++	}
++	if (e._mouseAndKeyboardStat < MBS_MAX_KEY) {
++		for (int i = 1; i < e._numVerbs; i++) {
++			if (verbVisible(i) && e._mouseAndKeyboardStat == e._verbs[i].key) {
++				_rec.slot = i;
++				_rec.keyMatch = true;
++				break;
++			}
++		}
++	} else if (e._mouseAndKeyboardStat & MBS_MOUSE_MASK) {
++		VirtScreen *zone = e.findVirtScreen(e._mouse.y);
++		if (!zone) {
++			closeRecord(1, "zone");
++			return;
++		}
++		_rec.zone = zone->number;
++		_rec.slot = e.findVerbAtPos(e._mouse.x, e._mouse.y);
++	}
++	// runInputScript() decides the rest (onInputScriptBegin())
++}
++
++void SpeedrunBridge::onInputScriptBegin(int area, int val, int mode) {
++	if (!_recOpen)
++		return;
++	const ScummEngine &e = *_vm;
++	const int verbScript = e._scummVars[e.VAR_VERB_SCRIPT];
++	_rec.area = area;
++	_rec.value = val;
++	_rec.mode = mode;
++	_rec.handler = verbScript;
++	// runInputScript()'s own read: the script VAR_VERB_SCRIPT names (none: nothing starts)
++	addTouch(_rec.reads, kTouchVar, (int)e.VAR_VERB_SCRIPT, 0, verbScript, verbScript);
++	if (!verbScript) {
++		closeRecord(1, "handler");
++		return;
++	}
++	snapRun(_runSnap);
++	_logRun = true;
++}
++
++void SpeedrunBridge::onInputScriptEnd() {
++	if (!_logRun)
++		return;
++	_logRun = false;
++	const ScummEngine &e = *_vm;
++	RunSnap now;
++	snapRun(now);
++	for (int i = 0; i < e._numVerbs && (uint)(8 * i + 7) < _runSnap.verbs.size(); i++) {
++		const int32 *a = &_runSnap.verbs[8 * i], *b = &now.verbs[8 * i];
++		bool same = true;
++		for (int k = 0; k < 8; k++)
++			same = same && a[k] == b[k];
++		if (!same)
++			addTouch(_rec.writes, kTouchVerb, i, b[0], a[1], b[1]); // slot, its verb id, its mode before and after
++	}
++	const RunSnap &o = _runSnap;
++	if (o.camX != now.camX || o.camY != now.camY || o.camDestX != now.camDestX || o.camDestY != now.camDestY ||
++	    o.camFollows != now.camFollows || o.camMode != now.camMode)
++		addTouch(_rec.writes, kTouchCamera, now.camDestX, now.camDestY, o.camX, now.camX);
++	if (o.cursor != now.cursor)
++		addTouch(_rec.writes, kTouchCursor, 0, 0, o.cursor, now.cursor);
++	if (o.userPut != now.userPut)
++		addTouch(_rec.writes, kTouchUserPut, 0, 0, o.userPut, now.userPut);
++	// The verdict: "taken" when the run left anything changed outside its own locals: a variable, bit or object
++	// table written with another value than it held, a script started that still runs (the handler itself when it
++	// broke rather than ended), a sentence queued, a walk, a print, a verb slot, the camera, the cursor or the gate
++	// changed, or a random draw (the RNG moved). Else "ignored": the run wrote nothing, or only the values things
++	// already held, and every slot it started has died.
++	bool changed = false;
++	for (const Touch &t : _rec.writes) {
++		switch (t.kind) {
++		case kTouchVar:
++		case kTouchBit:
++		case kTouchOwner:
++		case kTouchState:
++		case kTouchClass:
++			changed = changed || t.old != t.now;
++			break;
++		case kTouchStarted:
++			changed = changed || (t.now >= 0 && t.now < NUM_SCRIPT_SLOT && e.vm.slot[t.now].status != ssDead &&
++			                      (int)e.vm.slot[t.now].number == t.a && (int)e.vm.slot[t.now].where == t.b);
++			break;
++		default:
++			changed = true;
++			break;
++		}
++	}
++	for (const Touch &t : _rec.reads)
++		changed = changed || t.kind == kTouchRandom;
++	closeRecord(changed ? 3 : 2, nullptr);
++}
++
++void SpeedrunBridge::onScriptStart(int slot) {
++	if (!_logRun || slot < 0 || slot >= NUM_SCRIPT_SLOT)
++		return;
++	const ScriptSlot &ss = _vm->vm.slot[slot];
++	addTouch(_rec.writes, kTouchStarted, ss.number, ss.where, 0, slot);
++}
++
++void SpeedrunBridge::onSentence(int verb, int objectA, int objectB) {
++	if (_logRun)
++		addTouch(_rec.writes, kTouchSentence, verb, objectA, objectB, objectB);
++}
++
++void SpeedrunBridge::onWalk(int actor, int x, int y) {
++	if (_logRun)
++		addTouch(_rec.writes, kTouchWalk, actor, 0, x, y);
++}
++
++void SpeedrunBridge::onTalk() {
++	if (_logRun)
++		addTouch(_rec.writes, kTouchPrint, (int)_vm->_actorToPrintStrFor, 0, 0, 0);
++}
++
++void SpeedrunBridge::onObjectWrite(int kind, int obj, int a, int oldValue, int newValue) {
++	if (_logRun)
++		addTouch(_rec.writes, (uint8)kind, obj, a, oldValue, newValue);
++}
++
++void SpeedrunBridge::onReadResolved(uint var, int value) {
++	if (!_logRun)
++		return;
++	if (var & 0x8000)
++		addTouch(_rec.reads, kTouchBit, (int)(var & 0x7FFF), 0, value, value);
++	else
++		addTouch(_rec.reads, kTouchVar, (int)var, 0, value, value);
++}
++
++void SpeedrunBridge::onQuery(int kind, int a, int b, int value) {
++	if (_logRun)
++		addTouch(_rec.reads, (uint8)kind, a, b, value, value);
++}
++
++void SpeedrunBridge::onLogOpcode(byte opcode) {
++	if (!_logRun)
++		return;
++	if (_rec.ops.size() >= kMaxOps) {
++		_rec.opsDropped++;
++		return;
++	}
++	const ScummEngine &e = *_vm;
++	LogOp op;
++	op.slot = e._currentScript;
++	op.number = op.where = -1;
++	op.code = -1;
++	if (op.slot != 0xFF && op.slot < NUM_SCRIPT_SLOT) {
++		const ScriptSlot &ss = e.vm.slot[op.slot];
++		op.number = ss.number;
++		op.where = ss.where;
++		// fetchScriptByte() has moved past the opcode (as onOpcode())
++		const int64 start = scriptStart(op.slot);
++		const int64 offs = (int64)(e._scriptPointer - e._scriptOrgPointer) - 1;
++		op.code = start >= 0 ? offs - start : -1;
++	}
++	op.opcode = opcode;
++	_rec.ops.push_back(op);
++}
++
++Common::String SpeedrunBridge::inputLogJson() {
++	// The InputLog reply's JSON (fmi-core InputLog); takes the records, as InputLog does.
++	static const char *const kVerdict[4] = {"open", "dropped", "ignored", "taken"};
++	static const char *const kKinds[] = {"var", "bit", "owner", "state", "class", "actor", "object_at", "random",
++	                                     "script_running", "started", "sentence", "walk", "print", "verb", "camera",
++	                                     "cursor", "userput", "actor_at"};
++	JsonArray recs;
++	for (uint i = 0; i < _inputRecs.size(); i++) {
++		const InputRec &r = _inputRecs[i];
++		JsonArray inputs;
++		for (const SpeedrunInput &in : r.inputs) {
++			if (in.kind == SpeedrunInput::kKey)
++				inputs.add(JsonObject().add("key", in.keyName.c_str()));
++			else
++				inputs.add(JsonObject().addRaw(in.kind == SpeedrunInput::kClick ? "click" : "rclick",
++				                               JsonArray().add((int)in.x).add((int)in.y).str()));
++		}
++		JsonObject o;
++		o.add("frame", r.frame).addRaw("inputs", inputs.str()).add("stat", r.stat).add("verdict", kVerdict[r.verdict])
++		 .add("why", r.why).add("area", r.area).add("value", r.value).add("mode", r.mode).add("slot", r.slot)
++		 .add("zone", r.zone).add("key_match", r.keyMatch).add("handler", r.handler);
++		for (int w = 0; w < 2; w++) {
++			const Common::Array<Touch> &ts = w ? r.reads : r.writes;
++			JsonArray arr;
++			for (const Touch &t : ts)
++				arr.addRaw(JsonArray().addRaw(jsonString(kKinds[t.kind])).add(t.a).add(t.b).add(t.old).add(t.now).str());
++			o.addRaw(w ? "reads" : "writes", arr.str());
++		}
++		JsonArray ops;
++		for (const LogOp &op : r.ops)
++			ops.addRaw(JsonArray().add(op.slot).add(op.number).add(op.where).add((int)op.code).add((int)op.opcode).str());
++		o.addRaw("ops", ops.str()).add("ops_dropped", (uint)r.opsDropped).add("touches_dropped", (uint)r.touchesDropped);
++		recs.add(o);
+ 	}
++	JsonObject out;
++	out.addRaw("records", recs.str()).add("dropped", (uint)_inputRecsDropped).add("frame", _frames);
++	_inputRecs.clear();
++	_inputRecsDropped = 0;
++	return out.str();
+ }
+ 
+ } // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_state.cpp b/engines/scumm/speedrun/speedrun_state.cpp
+index 23927ad5..df8748e1 100644
+--- a/engines/scumm/speedrun/speedrun_state.cpp
++++ b/engines/scumm/speedrun/speedrun_state.cpp
+@@ -1033,4 +1033,99 @@ Common::String SpeedrunBridge::boxesJson() const {
+ 	return o.str();
+ }
+ 
++
++#pragma mark - E013: the state digest
++
++// E013 (patch 0007; experiments/E013-robust/plan.md, A.3): a 64-bit hash of the engine's state, its own definition of
++// it. What its save writes (ScummEngine::saveLoadWithSerializer, through speedrunSaveStream() in saveload.cpp, with no
++// header, thumbnail or play time), then what a save leaves out and the next frames read: the RNG state (xorshift32),
++// the input registers (the mouse, the buttons, this frame's key and click code, the raw schedule's mouse, the
++// bridge's automatic skips), and the sound state the scripts read (the CD timer and the CD's play state, the speech
++// timer, the sounds running and queued, the audio pump's phase). Counters of elapsed time that no script reads
++// (frames, ticks, quarter-frames, samples pumped) are left out, so equal states at different frames have equal
++// digests. Two equal digests are taken as two equal futures (A0); gate B4 tests that. Reads only: the save stream's
++// serializer only reads the engine when saving.
++
++namespace {
++
++// The digest's sink: a write stream that keeps nothing but an FNV-1a 64 of every byte written, and its count.
++class DigestStream : public Common::SeekableWriteStream {
++public:
++	uint64 h = 14695981039346656037ULL;
++	uint32 n = 0;
++	uint32 write(const void *dataPtr, uint32 dataSize) override {
++		fnv64(h, (const byte *)dataPtr, dataSize);
++		n += dataSize;
++		return dataSize;
++	}
++	int64 pos() const override { return n; }
++	int64 size() const override { return n; }
++	bool seek(int64, int) override { return false; }
++};
++
++void fnvInt(uint64 &h, int64 v) {
++	byte b[8];
++	WRITE_LE_UINT64(b, (uint64)v);
++	fnv64(h, b, 8);
++}
++
++} // End of anonymous namespace
++
++uint64 SpeedrunBridge::stateDigest(uint32 &bytes) {
++	ScummEngine &e = *_vm;
++	DigestStream ds;
++	e.speedrunSaveStream(&ds);
++	uint64 h = ds.h;
++	bytes = ds.n;
++	fnvInt(h, (int64)(uint64)e._rnd.getSeed());
++	const int regs[] = {e._mouse.x, e._mouse.y, e._virtualMouse.x, e._virtualMouse.y, (int)e._leftBtnPressed,
++	                    (int)e._rightBtnPressed, (int)e._mouseAndKeyboardStat, (int)e._keyPressed.keycode,
++	                    (int)e._keyPressed.ascii, (int)e._keyPressed.flags, (int)_rawMouseX, (int)_rawMouseY,
++	                    (int)_skipText, (int)_skipCutscenes, (int)_skipSpare.size()};
++	for (int v : regs)
++		fnvInt(h, v);
++	for (uint i = 0; i < _skipSpare.size(); i++)
++		fnvInt(h, _skipSpare[i]);
++	const Sound *snd = e._sound;
++	if (snd) {
++		if (snd->_soundCD) {
++			const SoundCD *cd = snd->_soundCD;
++			fnvInt(h, (int64)(uint64)cd->_cdMusicTimer);
++			fnvInt(h, (int64)(uint64)cd->_cdMusicTimerMod);
++			fnvInt(h, (int64)cd->_currentCDSound);
++			const AudioCDManager::Status st = g_system->getAudioCDManager()->getStatus();
++			const int cds[] = {(int)st.playing, st.track, st.start, st.duration, st.numLoops, st.volume, st.balance};
++			for (int v : cds)
++				fnvInt(h, v);
++		}
++		fnvInt(h, (int64)(uint64)snd->_speechTimerMod);
++		for (int s = 1; s < e._numSounds; s++) {
++			const int status = snd->isSoundRunning(s);
++			if (status) {
++				fnvInt(h, s);
++				fnvInt(h, status);
++			}
++		}
++		for (int i = 0; i < snd->_soundQueuePos && i < (int)ARRAYSIZE(snd->_soundQueue); i++) {
++			fnvInt(h, snd->_soundQueue[i].sound);
++			fnvInt(h, snd->_soundQueue[i].offset);
++		}
++		for (int i = 0; i < snd->_midiQueuePos && i < (int)ARRAYSIZE(snd->_midiQueue); i++)
++			fnvInt(h, snd->_midiQueue[i]);
++	}
++	fnvInt(h, (int64)_audioPending);
++	uint64 owed;
++	memcpy(&owed, &_audioOwed, sizeof(owed));
++	fnvInt(h, (int64)owed);
++	return h;
++}
++
++Common::String SpeedrunBridge::digestJson() {
++	uint32 bytes = 0;
++	const uint64 d = stateDigest(bytes);
++	JsonObject o;
++	o.add("frame", _frames).add("digest", Common::String::format("%016llx", (unsigned long long)d)).add("bytes", (uint)bytes);
++	return o.str();
++}
++
+ } // End of namespace Scumm
+diff --git a/engines/scumm/speedrun/speedrun_wire.cpp b/engines/scumm/speedrun/speedrun_wire.cpp
+index 6414f5bd..90bfdd72 100644
+--- a/engines/scumm/speedrun/speedrun_wire.cpp
++++ b/engines/scumm/speedrun/speedrun_wire.cpp
+@@ -36,6 +36,11 @@
+ //
+ // E012 (patch 0005): Boxes (0x94, reply 0x12: fmi-core Boxes) and BoxesJson (0x95, reply Json: the JSON "boxes"
+ // reply's text), the current room's walk boxes; both read only (getNumBoxes, getBoxCoordinates, getBoxFlags).
++//
++// E013 (patch 0007): InputLog (0x97, reply 0x14: fmi-core InputLog, the records since the last InputLog, which it
++// takes; SPEEDRUN_INPUT=1) and Digest (0x98, reply 0x15: fmi-core Digest; reads the engine's save stream, which
++// changes nothing), and their JSON twins InputLogJson (0x99) and DigestJson (0x9A) (reply Json: the JSON reply's text).
++// 0x96 and reply 0x13 are kept for the input report of plan.md A.1, which amendment (2) (a) does not build.
+ 
+ #define FORBIDDEN_SYMBOL_ALLOW_ALL
+ 
+@@ -83,7 +88,12 @@ enum : uint8 {
+ 	kWAtMany = 0x92,  // E011 round 2 (patch 0004)
+ 	kWRunObs = 0x93,  // E011 round 2 (patch 0004)
+ 	kWBoxes = 0x94,   // E012 (patch 0005)
+-	kWBoxesJson = 0x95 // E012 (patch 0005)
++	kWBoxesJson = 0x95, // E012 (patch 0005)
++	// 0x96 is kept for the input report (E013 plan.md A.1), not built (amendment (2) (a))
++	kWInputLog = 0x97,  // E013 (patch 0007)
++	kWDigest = 0x98,    // E013 (patch 0007)
++	kWInputLogJson = 0x99, // E013 (patch 0007)
++	kWDigestJson = 0x9A    // E013 (patch 0007)
+ };
+ 
+ // Engine to controller
+@@ -105,7 +115,10 @@ enum : uint8 {
+ 	kRStepObsReply = 0x0F, // E011 round 2 (patch 0004)
+ 	kRAtMany = 0x10,       // E011 round 2 (patch 0004)
+ 	kRRunObsReply = 0x11,  // E011 round 2 (patch 0004)
+-	kRBoxes = 0x12         // E012 (patch 0005)
++	kRBoxes = 0x12,        // E012 (patch 0005)
++	// 0x13 is kept for the input report (not built)
++	kRInputLog = 0x14,     // E013 (patch 0007)
++	kRDigest = 0x15        // E013 (patch 0007)
+ };
+ 
+ const uint32 kBlockMagic = 0x31534D46; // "FMS1"
+@@ -931,6 +944,74 @@ void SpeedrunBridge::wireBoxes(SpeedrunBytes &o) const {
+ 	}
+ }
+ 
++void SpeedrunBridge::wireInputLog(SpeedrunBytes &o) {
++	// fmi-core InputLog, as inputLogJson() (speedrun_inputs.cpp); takes the records
++	o.u32(_inputRecs.size());
++	for (uint i = 0; i < _inputRecs.size(); i++) {
++		const InputRec &r = _inputRecs[i];
++		o.u64(r.frame);
++		o.u32(r.inputs.size());
++		for (const SpeedrunInput &in : r.inputs) {
++			if (in.kind == SpeedrunInput::kKey) {
++				o.u8(3);
++				o.str(in.keyName.c_str(), in.keyName.size());
++			} else {
++				o.u8(in.kind == SpeedrunInput::kClick ? 0 : 1);
++				o.i32(in.x);
++				o.i32(in.y);
++			}
++		}
++		o.i32(r.stat);
++		if (r.verdict == 1) {
++			o.u8(0);
++			o.str(r.why ? r.why : "?");
++		} else {
++			o.u8(r.verdict == 3 ? 2 : 1);
++		}
++		o.i32(r.area);
++		o.i32(r.value);
++		o.i32(r.mode);
++		o.i32(r.slot);
++		o.i32(r.zone);
++		o.b(r.keyMatch);
++		o.i32(r.handler);
++		for (int w = 0; w < 2; w++) {
++			const Common::Array<Touch> &ts = w ? r.reads : r.writes;
++			o.u32(ts.size());
++			for (const Touch &t : ts) {
++				o.u8(t.kind);
++				o.i32(t.a);
++				o.i32(t.b);
++				o.i32(t.old);
++				o.i32(t.now);
++			}
++		}
++		o.u32(r.ops.size());
++		for (const LogOp &op : r.ops) {
++			o.i32(op.slot);
++			o.i32(op.number);
++			o.i32(op.where);
++			o.i64(op.code);
++			o.u8(op.opcode);
++		}
++		o.u32(r.opsDropped);
++		o.u32(r.touchesDropped);
++	}
++	o.u32(_inputRecsDropped);
++	o.u64(_frames);
++	_inputRecs.clear();
++	_inputRecsDropped = 0;
++}
++
++void SpeedrunBridge::wireDigest(SpeedrunBytes &o) {
++	// fmi-core Digest: the frame, the digest, the save stream's length
++	uint32 bytes = 0;
++	const uint64 d = stateDigest(bytes);
++	o.u64(_frames);
++	o.u64(d);
++	o.u32(bytes);
++}
++
+ #pragma mark - Decoders
+ 
+ bool SpeedrunBridge::wireConditions(SpeedrunReader &in, SpeedrunConditions &out, Common::String &error) const {
+@@ -1346,6 +1427,47 @@ void SpeedrunBridge::wireLoop(const char *reason) {
+ 			wireFlush();
+ 			break;
+ 		}
++		case kWInputLog:
++		case kWInputLogJson: {
++			// E013 (patch 0007): the input log's records since the last InputLog (taken), as fmi-core InputLog or as
++			// the JSON "input_log" reply's text
++			if (!in.done()) {
++				error = "input_log: bad payload";
++				break;
++			}
++			if (!_inputLog) {
++				error = "input_log: the input log is off (SPEEDRUN_INPUT=1)";
++				break;
++			}
++			if (type == kWInputLog) {
++				wireBegin(kRInputLog);
++				wireInputLog(_wireOut);
++			} else {
++				wireBegin(kRJson);
++				const Common::String j = inputLogJson();
++				_wireOut.str(j.c_str(), j.size());
++			}
++			wireFlush();
++			break;
++		}
++		case kWDigest:
++		case kWDigestJson: {
++			// E013 (patch 0007): the state digest (reads the engine's save stream), as fmi-core Digest or as JSON
++			if (!in.done()) {
++				error = "digest: bad payload";
++				break;
++			}
++			if (type == kWDigest) {
++				wireBegin(kRDigest);
++				wireDigest(_wireOut);
++			} else {
++				wireBegin(kRJson);
++				const Common::String j = digestJson();
++				_wireOut.str(j.c_str(), j.size());
++			}
++			wireFlush();
++			break;
++		}
+ 		case kWSetRng: {
+ 			const uint32 state = in.u32();
+ 			if (!in.done() || state == 0) {
+diff --git a/engines/scumm/verbs.cpp b/engines/scumm/verbs.cpp
+index 1637dd33..75416527 100644
+--- a/engines/scumm/verbs.cpp
++++ b/engines/scumm/verbs.cpp
+@@ -29,6 +29,7 @@
+ #include "scumm/scumm_v7.h"
+ #include "scumm/string_v7.h"
+ #include "scumm/verbs.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ 
+ namespace Scumm {
+ 
+@@ -587,6 +588,8 @@ void ScummEngine::checkExecVerbs() {
+ 	int i, over;
+ 	VerbSlot *vs;
+ 
++	if (_speedrun) _speedrun->onExecVerbs(); // E013 (patch 0007): the input log's path of this frame's input
++
+ 	if (_userPut <= 0 || _mouseAndKeyboardStat == 0)
+ 		return;
+ 

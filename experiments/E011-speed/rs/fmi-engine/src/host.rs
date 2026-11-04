@@ -68,6 +68,12 @@ pub fn boxes_on() -> bool {
     std::env::var("FMI_BOXES").is_ok_and(|v| v == "1")
 }
 
+/// E013's switches `SPEEDRUN_INPUT=1` (the input log, patch 0007) and `FMI_REFUSE=1` (component refuse, which reads
+/// it): either passes SPEEDRUN_INPUT=1 to every engine. Off by default.
+pub fn input_log_on() -> bool {
+    std::env::var("SPEEDRUN_INPUT").is_ok_and(|v| v == "1") || std::env::var("FMI_REFUSE").is_ok_and(|v| v == "1")
+}
+
 impl HostCfg {
     /// FMI_ENGINE_BIN (else the E011 build), FMI_ROOT (else this crate's repository), the root's game/dos-cd;
     /// FMI_ENGINE_CUTS=1: every engine also gets SPEEDRUN_CUTS=1, round 2's count-only mixer and no pixel output
@@ -106,6 +112,11 @@ impl HostCfg {
             if let Some(v) = std::env::var(k).ok().filter(|v| !v.is_empty()) {
                 extra_env.push((k.to_string(), v));
             }
+        }
+        // E013 (patch 0007): the input log, passed to every engine with SPEEDRUN_INPUT=1, and with FMI_REFUSE=1 (the
+        // component refuse reads it); an engine with patch 0007
+        if input_log_on() {
+            extra_env.push(("SPEEDRUN_INPUT".to_string(), "1".to_string()));
         }
         HostCfg {
             bin,
@@ -690,6 +701,26 @@ impl BinEngine {
         Ok(s)
     }
 
+    /// The JSON "input_log" reply's text at the current stop (patch 0007's InputLogJson; takes the records, as InputLog).
+    pub fn input_log_json(&mut self) -> EResult<String> {
+        self.send(W::msg(wire::C_INPUT_LOG_JSON).finish())?;
+        let p = self.expect(wire::R_JSON)?;
+        let mut r = R::new(&p);
+        let s = r.str().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(s)
+    }
+
+    /// The JSON "digest" reply's text at the current stop (patch 0007's DigestJson).
+    pub fn digest_json(&mut self) -> EResult<String> {
+        self.send(W::msg(wire::C_DIGEST_JSON).finish())?;
+        let p = self.expect(wire::R_JSON)?;
+        let mut r = R::new(&p);
+        let s = r.str().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(s)
+    }
+
     fn shutdown(&mut self) {
         if self.done {
             return;
@@ -934,6 +965,26 @@ impl Engine for BinEngine {
         let b = r.boxes().map_err(bad)?;
         r.done().map_err(bad)?;
         Ok(b)
+    }
+
+    /// One InputLog message (patch 0007, E013's component refuse): the records since the last one, taken.
+    fn input_log(&mut self) -> EResult<InputLog> {
+        self.send(W::msg(wire::C_INPUT_LOG).finish())?;
+        let p = self.expect(wire::R_INPUT_LOG)?;
+        let mut r = R::new(&p);
+        let l = r.input_log().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(l)
+    }
+
+    /// One Digest message (patch 0007).
+    fn digest(&mut self) -> EResult<Digest> {
+        self.send(W::msg(wire::C_DIGEST).finish())?;
+        let p = self.expect(wire::R_DIGEST)?;
+        let mut r = R::new(&p);
+        let d = r.digest().map_err(bad)?;
+        r.done().map_err(bad)?;
+        Ok(d)
     }
 
     /// One Step, its delta read into the facts' changes (block::changes) with no whole facts built (IFACE e011-r2-own).

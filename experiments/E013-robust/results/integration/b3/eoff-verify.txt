@@ -1,0 +1,1 @@
+verify-new /var/tmp/fast-mi/e013-int/b3f/eoff-fast: 43 new entries from boot, 0 with differences; by how checkpoint 28/28, end 15/15

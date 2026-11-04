@@ -41,3 +41,19 @@ path = "src/bin/inventory.rs"
 [[bin]]
 name = "probe"
 path = "src/bin/probe.rs"
+
+[[bin]]
+name = "refuse-check"
+path = "src/bin/refuse_check.rs"
+
+[[bin]]
+name = "stall-report"
+path = "src/bin/stall_report.rs"
+
+[[bin]]
+name = "a3"
+path = "src/bin/a3.rs"
+
+[[bin]]
+name = "e013-report"
+path = "src/bin/e013_report.rs"

@@ -7,6 +7,7 @@
 //!   fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
 //!   fmi explore verify ARCHIVE [--entry ID]
 //!   fmi explore status ARCHIVE
+//!   fmi explore stalls ARCHIVE [--json OUT]   (E013: the stall table over the archive's files, stall.rs)
 //!   fmi try JOB_DIR... | - | @FILE [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
 //!
 //! `--search gbfs --tail` are the fast settings (the Rust search; at a replan the last plan's valid suffix first);
@@ -47,6 +48,7 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi explore run ARCHIVE --workers B [--step-cmd CMD | --fake] [--no-verify] [--search fd|gbfs] [--tail]
        fmi explore verify ARCHIVE [--entry ID]
        fmi explore status ARCHIVE
+       fmi explore stalls ARCHIVE [--json OUT]
        fmi try JOB_DIR... | - | @FILE [--targets K=V,...] [--search fd|gbfs] [--tail] [--doubles RECORDED_JOB_DIR]
        fmi fake-step run JOB_DIR
        fmi check step|harness FIXTURES.jsonl
@@ -136,6 +138,7 @@ fn main() {
         ("explore", Some("init")) => cmd_init(&argv[2..]),
         ("explore", Some("verify")) => cmd_verify(&argv[2..]),
         ("explore", Some("status")) => cmd_status(&argv[2..]),
+        ("explore", Some("stalls")) => cmd_stalls(&argv[2..]),
         ("try", Some(_)) => cmd_try(&argv[1..]),
         ("fake-step", Some("run")) => cmd_fake(&argv[2..]),
         ("check", Some("step")) => cmd_check_step(&argv[2..]),
@@ -357,6 +360,8 @@ fn cmd_run(argv: &[String]) -> i32 {
         eprintln!("fmi explore run: the verify needs the engine host (wire.rs); give --no-verify");
         return 2;
     }
+    // E013: stall's two rules as free's port (asked only with FMI_FREE_SHIFT=1)
+    fmi_explore::free::set_shift(Box::new(fmi_explore::stall::ArchivePort::default()));
     let mut stats = DriverStats::default();
     let ver: Option<&dyn fmi_explore::driver::Verifier> = if a.flag("no-verify") { None } else { verifier.as_ref().map(|v| v as &dyn fmi_explore::driver::Verifier) };
     match driver::run(&PathBuf::from(root), workers, &mode, ver, &mut stats) {
@@ -399,6 +404,19 @@ fn cmd_status(argv: &[String]) -> i32 {
         }
         Err(e) => {
             eprintln!("fmi explore status: {e}");
+            1
+        }
+    }
+}
+
+/// E013: `fmi explore stalls ARCHIVE [--json OUT]` (explorecmd::stalls).
+fn cmd_stalls(argv: &[String]) -> i32 {
+    let a = Args::parse(argv, &["json"]);
+    let Some(root) = a.pos.first() else { usage() };
+    match fmi_explore::explorecmd::stalls(&PathBuf::from(root), a.get("json").map(std::path::Path::new)) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("fmi explore stalls: {e}");
             1
         }
     }

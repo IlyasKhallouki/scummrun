@@ -500,10 +500,15 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
         say(&format!("{}: stopped already ({}); summary.json", a.root.display(), files::py_str(s.get("stop"))));
         return Ok(s);
     }
+    // E013 (component free): FMI_FREE's share, the progress order and stall's port, checked before any job
+    crate::free::check_env(&a)?;
     let m = Machine::from_env();
     a.stage["workers"] = json!(workers);
     a.stage["env"] = plan_env();
     write_json(&a.root.join("stage.json"), &a.stage, Some(1))?;
+    // E013 (FMI_STALLS=1): the stall table from the archive's files, then one try more after each commit, stalls.json
+    // and its line each time (stall.rs; free's port keeps its own, stall::ArchivePort)
+    let mut stalls = if crate::stall::on() { Some(crate::stall::Live::open(&a)?) } else { None };
     let free = || machine::disk_free(&m.disk_path);
     for name in a.job_names() {
         // a dir the driver made but did not finish writing: its selection is made again
@@ -608,6 +613,10 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 line["new_entries"].as_array().map(|x| x.len()).unwrap_or(0), line["new_cells"],
                 line["new_r"].as_array().map(|x| x.len()).unwrap_or(0), a.rows.len(), a.cells.len()
             ));
+            if let Some(s) = stalls.as_mut() {
+                s.commit(&a, &line)?;
+                say(&s.stalls.line());
+            }
             if line["outcome"] == "return differs" {
                 stop = Some("return differs".into());
                 detail = json!({"job": j.name, "entry": j.entry, "return": line["return"]});
@@ -672,18 +681,17 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 if !can_start(&running, &restart) {
                     break;
                 }
-                let ids = a.select(1);
-                if ids.is_empty() {
-                    break;
-                }
-                let d = a.prepare_job(ids[0])?;
+                // E013 (FMI_FREE, component free): the job's kind and its entry; unset, E012's selection
+                let Some((id, kind)) = crate::free::pick(&a)? else { break };
+                let d = a.prepare_job_as(id, kind.as_ref())?;
                 let name = d.file_name().unwrap().to_string_lossy().into_owned();
                 let mut j = Job::new(&a, &name)?;
                 a.busy.insert(name.clone(), (j.entry, j.cell.clone()));
                 j.start(&a, mode, &m)?;
-                say(&format!("{}: entry {} (room {}), scope {:?}, key {}", j.name, j.entry,
+                say(&format!("{}: entry {} (room {}), scope {:?}, key {}{}", j.name, j.entry,
                              a.rows[j.entry].room.map(|r| r.to_string()).unwrap_or("None".into()), j.scope,
-                             pyjson::compact(&read_json(&d.join("select.json"))?["key"])));
+                             pyjson::compact(&read_json(&d.join("select.json"))?["key"]),
+                             kind.map(|k| format!(", {} ({})", k.text(), k.why)).unwrap_or_default()));
                 running.push(j);
                 stats.jobs += 1;
             }

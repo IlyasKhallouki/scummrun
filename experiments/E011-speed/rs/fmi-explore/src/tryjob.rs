@@ -716,6 +716,9 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     // E012's mechanisms in the try (plan.md, "How a try runs"); every switch off: none runs, the try is round 2's
     let sw = Switches::from_env();
     let mut e12 = Map::new();
+    // E013 (FMI_FREE, component free): a free try plans nothing; its offers follow the wait (free.rs)
+    let free_try = crate::free::job_is_free(&job);
+    let mut free_rec: Option<Value> = None;
     let res: Result<(), Result<ReturnDiffers, String>> = (|| {
         if job.get("seed").and_then(|s| s.as_i64()) != Some(step::SEED) {
             return Err(Err(format!("ValueError: seed {}: E008 runs seed {} only (plan.md)", files::py_str(job.get("seed")), step::SEED)));
@@ -769,6 +772,13 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                 out["reading"] = reading_record(&*rd, false, &why, 0.0, load_s);
                 rd
             }
+            // E013: a free try needs a reading for T only: the newest cached reading of the scope when none is reusable
+            None if free_try && !checked.is_empty() => {
+                let p = PathBuf::from(checked[0]["path"].as_str().unwrap_or(""));
+                let rd = machine::port(|| r.readings.open(&p)).map_err(Err)?;
+                out["reading"] = reading_record(&*rd, false, &format!("T only: {why}"), 0.0, t.elapsed().as_secs_f64());
+                rd
+            }
             None => {
                 let (rd, wall, load_s) = read_fresh(r, &job, &state, &status, threads, log, &cancel_arc).map_err(Err)?;
                 out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
@@ -782,10 +792,11 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         prof.mark("reading");
         // E012, 2: T (the reading's tested atoms) and the try's novelty over T and the rooms
         let entry_frame_u = status.frame;
-        let entry_facts = if sw.any() { facts_of(&state) } else { Facts::new() };
+        let entry_facts = if sw.any() || free_try { facts_of(&state) } else { Facts::new() };
         let mut extras: Vec<Extra> = Vec::new();
         let mut dead: Vec<Value> = Vec::new();
-        let (tt, nov): (Option<TestedT>, Option<TryNovel>) = if sw.any() {
+        let mut free_keys: Option<TestedT> = None;
+        let (tt, nov): (Option<TestedT>, Option<TryNovel>) = if sw.any() || free_try {
             let t0 = Instant::now();
             let port = r.mech.tested.as_ref().ok_or_else(|| Err("E012: the E012 switches read T, and no tested port is wired".to_string()))?;
             let t = port.tested(&*rd).map_err(|e| Err(format!("E012 tested: {e}")))?;
@@ -803,7 +814,17 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             if sw.select {
                 out["tested"] = progress::atoms_json(&atoms);
             }
-            let nov = TryNovel::new(&job, &atoms, &entry_facts);
+            let nov = if free_try {
+                // E013: a free try's novelty is over its T merged with the archive's (job.json "novelty"), each atom once
+                let arch = progress::atoms_of_json(job.get("novelty").and_then(|n| n.get("t")));
+                let mut merged = atoms.clone();
+                let have: HashSet<progress::TAtom> = atoms.iter().cloned().collect();
+                merged.extend(arch.iter().filter(|a| !have.contains(*a)).cloned());
+                free_keys = Some(crate::free::merged_keys(&t, &arch));
+                TryNovel::new(&job, &merged, &entry_facts)
+            } else {
+                TryNovel::new(&job, &atoms, &entry_facts)
+            };
             let mut rec = t.record.clone();
             rec["atoms"] = json!(atoms.len());
             rec["keys"] = json!(t.keys().len());
@@ -817,7 +838,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         };
         // E012, 3 (FMI_WAIT): time passes; the stops become candidate entries, kept by novelty
         let mut waited: Option<mech::Waited> = None;
-        if sw.wait {
+        if sw.wait || free_try {
             let (t, nov) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
             let port = r.mech.wait.as_ref().ok_or_else(|| Err("E012: FMI_WAIT=1, and no wait port is wired".to_string()))?;
             let c0 = cpu_now();
@@ -853,8 +874,26 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             waited = Some(w);
             prof.mark("wait");
         }
-        // 3. targets
-        let ts = targets_of(r, &*rd, &job, &job_dir, &facts, &goal, tt.as_ref()).map_err(Err)?;
+        // E013 (component free): the free try's offers at the entry and the wait's stops, delays, one more level
+        if free_try {
+            let (t, nv) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
+            let wait = r.mech.wait.clone().ok_or_else(|| Err("E013 free: no wait port is wired".to_string()))?;
+            let dead_moves: Vec<Value> = job.get("dead").and_then(|d| d.as_array()).cloned().unwrap_or_default();
+            let stops: Vec<mech::Stop> = waited.as_ref().map(|w| w.stops.clone()).unwrap_or_default();
+            let cx = crate::free::Ctx { t, keys: free_keys.as_ref().unwrap_or(t), nov: nv, wait, rd: &*rd, dead_moves: &dead_moves,
+                                        cancel };
+            let c0 = cpu_now();
+            let f = machine::port(|| crate::free::explore(root, &stops, &cx)).map_err(Err)?;
+            cpu_set(&mut cpu, "free", cpu_now() - c0 + f.cpu_s);
+            log.say(&format!("free: {} offers, {} trials, {} kept, {} dead, {:.2} s", f.record["offers"], f.record["trials"],
+                             f.kept.len(), f.dead.len(), f.record["seconds"].as_f64().unwrap_or(0.0)));
+            extras.extend(f.kept);
+            dead.extend(f.dead);
+            free_rec = Some(f.record);
+            prof.mark("free");
+        }
+        // 3. targets (none for a free try)
+        let ts = if free_try { Vec::new() } else { targets_of(r, &*rd, &job, &job_dir, &facts, &goal, tt.as_ref()).map_err(Err)? };
         let by = |n: i64| ts.iter().filter(|x| x.tier == n).count();
         out["targets"] = json!({"by_tier": {"0": by(0), "1": by(1), "2": by(2)},
                                 "first": ts.iter().take(20).map(|x| x.json()).collect::<Vec<_>>(), "n": ts.len()});
@@ -1090,7 +1129,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             }
         }
         // E012, 6 (FMI_AFFORD): no target of the try plans: the interface's own inputs at the entry
-        if sw.afford && played_none(&out) {
+        if sw.afford && !free_try && played_none(&out) {
             let (t, nv) = (tt.as_ref().unwrap(), nov.as_ref().unwrap());
             let c0 = cpu_now();
             let a = run_afford(r, &sw, root, Trigger::NoPlan, t, nv, &*rd, &job, &[], &[], log).map_err(Err)?;
@@ -1103,7 +1142,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         prof.mark("new entries");
         // E012, 7: the commit: the candidate entries kept by novelty (after the attempt's), and the dead moves
         let n_extra = extras.len();
-        if sw.any() {
+        if sw.any() || free_try {
             let mut by_how = Map::new();
             for x in &extras {
                 let n = by_how.get(x.how).and_then(|v| v.as_u64()).unwrap_or(0);
@@ -1128,13 +1167,21 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
         let e12_exhausted = !sw.any()
             || (n_extra == 0 && (!sw.wait || waited.as_ref().map(|w| w.is_static).unwrap_or(false))
                 && (!sw.afford || afford_offered == Some(0)));
-        out["exhausted"] = json!(played_none(&out) && !deferred_now && e12_exhausted);
+        // (E013: a free try tries no target, so it never marks its entry exhausted)
+        out["exhausted"] = json!(!free_try && played_none(&out) && !deferred_now && e12_exhausted);
         out["ok"] = json!(true);
         Ok(())
     })();
-    if sw.any() {
+    if sw.any() || free_try {
         e12.insert("switches".into(), sw.json());
         out["e012"] = Value::Object(e12);
+    }
+    // E013 (FMI_FREE): the job's kind, and a free try's record
+    if let Some(k) = job.get("kind") {
+        out["kind"] = k.clone();
+    }
+    if let Some(f) = free_rec {
+        out["free"] = f;
     }
     match res {
         Ok(()) => {}

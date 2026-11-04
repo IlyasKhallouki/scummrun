@@ -343,3 +343,14 @@ impl Verifier for HostVerifier {
         Ok(out)
     }
 }
+
+/// E013 `fmi explore stalls ARCHIVE [--json OUT]` (plan.md C, stall.rs): the stall table over the archive's files at
+/// any time, read only; `--json` writes it as the driver writes stalls.json.
+pub fn stalls(root: &Path, json_out: Option<&Path>) -> Res<()> {
+    let s = crate::stall::Stalls::of_archive(root)?;
+    print!("{}", crate::stall::report_text(&s));
+    if let Some(p) = json_out {
+        files::write_json(p, &s.json(), Some(1))?;
+    }
+    Ok(())
+}
