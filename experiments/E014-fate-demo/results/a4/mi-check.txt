@@ -1,0 +1,14 @@
+[02:44:37] b3 all: GUARD: rc 0 wall 363.2 s low 0 min MemAvailable 6104116 kB G12: 352 samples, 348 with an fmi process, largest fmi tree 19 processes, python processes in an fmi tree 0 [02:44:37] heavy lock released; done 
+[02:44:39] b3 all vs E013's G-on all rc 0: G0 /var/tmp/fast-mi/e014-a4mi/b3f/all-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+[02:44:39] b3 tries whose reading waited on the bound's thread: 10; bounded: 0
+[02:45:30] b3 verify-new all (E014's mechanisms on) rc 0: verify-new /var/tmp/fast-mi/e014-a4mi/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
+[02:46:17] kitchen: the goal entry 150's chain, 8 entries (44 55 85 123 135 142 146 150) verified from boot, 0 with differences or errors; goal entry: differences: 0; final {'owner:566': 1}
+[02:51:10] smoke (ALLON with A4): [02:46:17] start: /var/tmp/fast-mi/target-e014b/release/fmi, set all, engine /var/tmp/fast-mi/svm-e013/build/scummvm/scummvm, b 1, N 4; load 7.82 5.42 4.78 [02:49:53] run: 215.804 s; GUARD: rc 0 wall 215.7 s low 0 min MemAvailable 8118112 kB [02:51:10] verify: 21 entries from boot (fmi explore verify), 0 with differences or errors [02:51:10] stall-report rc 0: 5 PASS, 0 FAIL 
+  smoke j00000 scope [33] grow None new 2 reading no cached reading
+  smoke j00001 scope [33] grow None new 2 reading reused (e009 keys)
+  smoke j00002 scope [33] grow None new 5 reading reused (e009 keys)
+  smoke j00003 scope [33] grow None new 12 reading reused
+(rebuilt reader) [03:14:22] b3 all: GUARD: rc 0 wall 296.5 s low 0 min MemAvailable 6251192 kB G12: 290 samples, 285 with an fmi process, largest fmi tree 19 processes, python processes in an fmi tree 0 [03:14:22] heavy lock released; done 
+(rebuilt reader) [03:14:23] b3 all vs E013's G-on all rc 0: G0 /var/tmp/fast-mi/e014-a4mi2/b3f/all-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+(rebuilt reader) [03:14:23] b3 tries whose reading waited on the bound's thread: 10; bounded: 0
+(rebuilt reader) [03:14:47] b3 verify-new all (E014's mechanisms on) rc 0: verify-new /var/tmp/fast-mi/e014-a4mi2/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
