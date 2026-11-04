@@ -19,9 +19,16 @@
 //!       fact, the room, the digest). A second pass plays the steps through `executor::play_input` (the hook) from
 //!       the same start; its events and digest are compared. owner:O is reported. Writes OUT/g3.json and
 //!       OUT/events.jsonl (the realized inputs).
+//!
+//!   e016 g4 OUT ARCHIVE GOAL_ENTRY --goal KEY=V [--run-on R] [--mode jobs,chain]
+//!       G4: the goal entry's chain in ARCHIVE (read only), each sentence, walk and dialog step it took re-realized
+//!       (FMI_REALIZE=1): `jobs`, each chain entry's steps from the entry its job started at; `chain`, every step from
+//!       the boot's entry, then on to KEY = V (up to R frames, default 600) and the movie verified from boot. See
+//!       g4.rs. Writes OUT/g4.json and OUT/chain-events.jsonl.
 
 mod common;
 mod g3;
+mod g4;
 mod inlog;
 
 fn main() {
@@ -29,7 +36,8 @@ fn main() {
     let r = match argv.first().map(String::as_str) {
         Some("inlog") => inlog::run(&argv[1..]),
         Some("g3") => g3::run(&argv[1..]),
-        _ => Err("usage: e016 inlog OUT ... | e016 g3 OUT ...".to_string()),
+        Some("g4") => g4::run(&argv[1..]),
+        _ => Err("usage: e016 inlog OUT ... | e016 g3 OUT ... | e016 g4 OUT ...".to_string()),
     };
     if let Err(e) = r {
         eprintln!("e016: {e}");
