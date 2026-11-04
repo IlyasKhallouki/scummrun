@@ -785,3 +785,100 @@ from the opening's verbs and flags. The game's end was not reached. Three blocke
    One of them gave the bridge an input it refuses, and that error ended the try (row 21).
 
 Rows 20 and 21 are recorded and not applied to this run.
+
+## Amendment 2026-11-04 (6): the reading after the opening, diagnosed; loops widened in a run the path limit cut
+
+Written and committed before any code it plans. The sections above stay as written and their predictions are not
+edited. No run of the explorer is planned here: the PI decides the next run from this amendment's result.
+
+### The slow reading, reproduced
+
+The {49} reading from entry 3 of `vm-check` (frame 1042), with the run's build (target-e014b), its switches (ALLON and
+the game's settings) and the try's arguments (3 threads, `--memo-mem --memo-units-set --prep` as the in-process reader
+adds them), run as reader-scope with `READER_TRACE=1`:
+
+- **Where the time goes.** Six event jobs, all resuming one room-local script of the opening's dialog at three of its
+  wait points (two of them twice, with different kept lists). Each took 148-375 s; every other job of the reading took
+  under 0.1 s. The boot's {49} reading has one such job (39.2 s of its 39.3 s), resuming a global script.
+- **What one run of such a job does.** It passes the path limit (1,024 paths): 0 paths end, 13-999 are cut. Its
+  7,008 forks on non-fact tests all sit in one global script, the interface's inventory display. That script works out a
+  window of inventory slots from the inventory's count, then loops over the window: per slot, the object found there, its
+  class, its verb entry and a comparison with one object fork, and so does the loop's exit (488 forks), because the
+  window's bounds come from the count. The reader leaves the inventory's count and order unknown (`findInventory` and
+  `getInventoryCount`: "the inventory is not enumerated by the reader"; the engine's inventory is the order objects were
+  picked up, not a fact). So the loop's exit never decides, the loop runs on until the path limit, and each of its
+  iterations sends one more path to the end of the run.
+- **Why it takes minutes, not seconds: the split ladder.** Under `split_limit` a run past the path limit is run again
+  once per value of its first fork on a read, and each part that passes the limit is split again. Here the forks that
+  pass the limit are on non-facts, so no part ever falls under it: the job is run again once per kept value of every
+  fact the run reads before the cut, one fact per level. The six jobs: 69-137 splits each, 78-149 parts, 19-22 levels
+  deep, most levels keeping 1 value of 2-22. At the bottom, with no fact left, `FMI_READ_CUT=1` reads the part short (no
+  record). The six jobs gave 1-3 records each, from the few parts whose pins keep the run out of the inventory display
+  (the dialog's branch that leaves the room). 292 runs of 1 s or more, 1,716 CPU s, in pass 1 alone; pass 2 repeats
+  round 9.
+- **Why each run takes 1-16 s.** Sampling the boot reading's slow job with gdb (18 busy samples of the machine): 15 in
+  the merge at a join, 13 of them in the merge's set of assumptions (`FMI_MERGE_DEDUP`), which hashes every assumption's
+  text; the unknowns' names grow by one level per iteration of the loop ("((((... the inventory is not enumerated by the
+  reader) + ...") so the cost per iteration grows with the iterations.
+- **From the boot** the interface is off (cutscene on), so the inventory display runs in one job only; from frame 1042
+  the interface is live and every way out of the dialog redraws the inventory.
+
+### The cause, as a mechanic
+
+**An interface loop over values the reader leaves unknown.** Adventure games redraw their interface (an inventory, a
+verb or dialog panel) in a loop over slots whose contents and bounds come from engine state that is not a fact here.
+Monkey Island's inventory has a fixed window; Fate of Atlantis's scrolls, so its bounds come from the count. The
+reachable space is small: the engine draws one window of at most ten slots, once. **The cost is the reader's**:
+
+1. it unrolls a loop whose exit it cannot decide until the path limit, where a loop whose state repeats up to unknown
+   values could be summarised once (a missing widening);
+2. split_limit then repeats the whole run per fact value, though no fact pin can lift a cut made by non-fact forks
+   (redundant work);
+3. each iteration costs more than the last (the merge's set over growing names).
+
+### The fix: `FMI_READ_WIDEN=1` (unset: as before)
+
+A run the path limit cut is run again once with its loops widened; if that run ends under the limit, it is the run's
+reading and nothing is split. A run the path limit does not cut is never touched, so a reading with no such run (Monkey
+Island's B3 readings have none: their reports count no split) is byte for byte the same.
+
+- **Widening (scumm-machine, `Machine::widen_loops`).** At a join point a path reaches again in the same frame (a loop),
+  the machine compares the path's state with its last visit there. From the second visit on, every fact and local
+  whose value changed and is unknown becomes a plain unknown ("varies around the loop", widened), and the point
+  remembers the widened keys. A known value that changed is left as it is (a counter with a known bound runs exactly).
+  When a path comes back to the point and every key that changed since the widened visit is a widened key, its state is
+  an instance of the widened one: the path ends ("widened", dropped as a spin is), and the paths that left the
+  widened iteration stand for every later iteration.
+- **Why it is sound.** A plain unknown is any value, so the widened state holds every state the loop can reach after
+  it; the widened iteration's paths (both sides of every unknown test) cover every concrete iteration from those
+  states, and by induction over the iterations every concrete way out of the loop. A widened fact written by a record is
+  a guess over its domain (`Eff::Guess`), a superset of the values written. The reading then holds records for paths the
+  cut run dropped, and more general records (fewer pins) for the paths the ladder's parts read. Exactness of the run is
+  unchanged: every entry is still its inputs and movie, verified from boot; a record that is too general costs a plan
+  the engine refutes, never an entry.
+- **The builder (scumm-reader, `Builder::run`).** With the switch on and split_limit on, a run with `limit != 0` is run
+  again on the same machine with widening on. Ended under the limit: its paths, held branches and counters are the
+  run's. Still cut: the first run goes on to the split as before (each part, if cut, tries the same once).
+- **Not in this fix:** the merge's set over long names (cause 3) and the inventory as a fact. Both stay recorded.
+- **Tests:** unit tests of the widening (a loop with an unknown exit ends after the widened iteration and its exits
+  carry plain unknowns; a loop with a known counter runs exactly; the switch off leaves the run as before) and of the
+  builder's choice (a run that fits is not re-run; one that is cut and fits widened is not split).
+
+### Predictions (before any code)
+
+| | predicted |
+|---|---|
+| the {49} reading from entry 3, switch on | 5-30 s of wall (1,256 s off); the six jobs each one cut run (2-3 s) and one widened run; no split |
+| the same reading, switch off, on the new build | as before: 600-1,300 s, the same 908 records |
+| the {49} reading from the boot, switch on | 3-15 s (35.6-39.3 s off) |
+| a later state (play4's entry 18 or 19), switch on | under 60 s; off: past 300 s |
+| the outputs where both end | switch on holds every action family of switch off (same labels, a superset of the facts' values reached); more records where switch off cut runs dropped |
+| Monkey Island, rule (2) | B3's 15 tries equal E013's G-on (no B3 reading has a cut run); their new entries verify; the kitchen chain verifies |
+| the risk to exactness | none to entries (verified from boot); the reading is more general where the limit cut |
+
+### Stop rule
+
+- Stop and write up if the widened run of the six jobs is still cut (the fix does not apply), if the {49} reading from
+  entry 3 takes more than 60 s with the switch on, or if any Monkey Island check differs.
+- One revision is allowed, written as a dated note under this amendment before its code. No longer bound and no
+  game-specific rule in any case.
