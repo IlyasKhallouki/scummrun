@@ -377,3 +377,54 @@ G4 still misses, the misses are reported, not fixed again.
 - G4 realizes all 14 steps in both modes: 50%;
 - walk_to(427) is realized within 6 approach clicks: 70%;
 - G3 and G1 pass with changed or unchanged inputs: 90%.
+
+### (5) 2026-11-04, A: realize accepts what the game did, not only what the handler logged
+
+G4's last miss (walk_to(316) along the chain) is a general mechanic: a click starts a walk, and the sentence, or the
+object's handler, runs later from another script. Patch 0007 logs only the input handler's own run (`onSentence`
+records a touch only while that run is logged), so realize's test never sees it. This is the last change to realize
+in E016. A miss after it is reported, not fixed. No engine patch is changed.
+
+**The probe** (`e016 inlog --runs`, `results/g4/probe-316/`). It took the chain-mode state at 18371 and the chain's own
+state at 18364, and read the segment's slot runs of object scripts (where inventory, room or floating object):
+- **Chain mode:** the bare click on 316 at 18372 logs no Sentence touch. In the same frame, slot 7 starts 316's script
+  at code offset 79, and runs it again at 18390.
+- **The chain's own state:** the click at 18365 logs (11, 316, 0). In the same frame, slot 5 starts 316's script at
+  code offset 79.
+
+So the engine reports that object a's script started and where in a's code it started (`Run::code0`, the offset from
+the script's start). **It does not report the verb.** The verb-to-offset table is the object's verb block in the game's
+scripts, and neither the dump nor the runs reply carries it. So no engine signal identifies the verb.
+
+**The new acceptance (fix 3), the next best signal.** A sentence candidate is accepted when either:
+- (as now) its input log shows the Sentence touch (v, a, b); or
+- its input log shows no Sentence touch at all, and object a's script started after its first click. That is a run in
+  the segment's runs reply with where inventory, room or floating object, number a, a slot that held no script of a
+  at the step's start (the dump's slots), within the run to the bridge's next idle stop (at most the horizon, W =
+  1,600 frames).
+
+Each candidate's fork arms the segment (`Engine::segment`) before its clicks. Segment mode reads the runs and changes
+no state (G3's verification ran with it on). Dialog steps are unchanged.
+
+**Its weakness.** The verb is not checked:
+- any of a's handlers counts, such as another verb's, or a's script started by a room script or a timer within that
+  run;
+- a candidate whose own handler queues no sentence, followed by any start of a's script, is accepted as (v, a, b).
+
+The limits: the run counts only when the click logged no sentence (a logged sentence of another verb still rejects the
+candidate), only for a slot of a's not live at the start, and only until the next idle stop. The candidates' order
+(the bare click, then the verb slots) also bounds it. Mapping `code0` to the verb through the reader's object
+entries would remove the weakness. It is left for a later experiment.
+
+**Toy tests:**
+- a deferred sentence accepted by the object's run;
+- a logged sentence of another verb not overruled by a run;
+- no run, a miss.
+
+**Reruns:** G4 (per job, and the chain from boot), G3, G1's gate.
+
+**Predictions:**
+- G4 per job stays at 14 of 14: 85%;
+- the chain realizes walk_to(316): 75%;
+- the chain reaches owner:566 = 1: 35% (the chain-mode probe stays in room 28 for 190 frames after the click);
+- G3 and G1 pass with the same inputs: 80%.
