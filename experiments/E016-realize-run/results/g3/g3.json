@@ -8,7 +8,7 @@
     "owner": 1,
     "class": 1
   },
-  "boot_s": 0.229733697,
+  "boot_s": 0.217670841,
   "steps": [
     {
       "step": "s3:490",
@@ -17,7 +17,7 @@
       "approach": 0,
       "candidates": 4,
       "tries": 10,
-      "seconds": 0.019410894,
+      "seconds": 0.01639479,
       "accepted_at": 2984,
       "events": [
         {
@@ -51,7 +51,7 @@
               ]
             }
           ],
-          "seconds": 0.001980733
+          "seconds": 0.001684816
         },
         {
           "phase": "sentence",
@@ -68,7 +68,7 @@
               ]
             }
           ],
-          "seconds": 0.001742771
+          "seconds": 0.00150855
         },
         {
           "phase": "sentence",
@@ -85,7 +85,7 @@
               ]
             }
           ],
-          "seconds": 0.001665018
+          "seconds": 0.001463066
         },
         {
           "phase": "sentence",
@@ -109,7 +109,7 @@
               ]
             }
           ],
-          "seconds": 0.001756952
+          "seconds": 0.00147431
         },
         {
           "phase": "sentence",
@@ -133,7 +133,7 @@
               ]
             }
           ],
-          "seconds": 0.00167845
+          "seconds": 0.001550028
         },
         {
           "phase": "sentence",
@@ -157,7 +157,7 @@
               ]
             }
           ],
-          "seconds": 0.001797121
+          "seconds": 0.001346581
         },
         {
           "phase": "sentence",
@@ -181,7 +181,7 @@
               ]
             }
           ],
-          "seconds": 0.001941076
+          "seconds": 0.001681658
         },
         {
           "phase": "sentence",
@@ -205,7 +205,7 @@
               ]
             }
           ],
-          "seconds": 0.001920902
+          "seconds": 0.001545732
         },
         {
           "phase": "sentence",
@@ -229,7 +229,7 @@
               ]
             }
           ],
-          "seconds": 0.001705015
+          "seconds": 0.001431326
         },
         {
           "phase": "sentence",
@@ -253,7 +253,7 @@
               ]
             }
           ],
-          "seconds": 0.001890561
+          "seconds": 0.001582948
         }
       ],
       "next_idle": {
@@ -270,32 +270,32 @@
       "approach": 1,
       "candidates": 6,
       "tries": 7,
-      "seconds": 0.015535597,
-      "accepted_at": 3009,
+      "seconds": 0.013401137,
+      "accepted_at": 3008,
       "events": [
         {
           "frame": 2999,
           "click": [
-            228,
-            110
+            219,
+            109
           ]
         },
         {
-          "frame": 3004,
+          "frame": 3003,
           "click": [
             110,
             161
           ]
         },
         {
-          "frame": 3006,
+          "frame": 3005,
           "click": [
             290,
             154
           ]
         },
         {
-          "frame": 3008,
+          "frame": 3007,
           "click": [
             227,
             83
@@ -304,207 +304,207 @@
       ],
       "attempts": [
         {
-          "phase": "approach",
+          "phase": "near",
           "name": "w10",
           "accepted": true,
           "seen": "walk=1 toward=0 hit=1 xstart=0->0",
-          "frame": 3003,
+          "frame": 3002,
           "events": [
             {
               "frame": 2999,
               "click": [
-                228,
-                110
+                219,
+                109
               ]
             }
           ],
-          "seconds": 0.001948552
+          "seconds": 0.001587963
         },
         {
           "phase": "inventory",
           "name": "v8v1t491",
           "accepted": false,
           "seen": "(8,491,0)",
-          "frame": 3009,
+          "frame": 3008,
           "events": [
             {
-              "frame": 3004,
+              "frame": 3003,
               "click": [
                 110,
                 161
               ]
             },
             {
-              "frame": 3006,
+              "frame": 3005,
               "click": [
                 2,
                 154
               ]
             },
             {
-              "frame": 3008,
+              "frame": 3007,
               "click": [
                 227,
                 83
               ]
             }
           ],
-          "seconds": 0.001846739
+          "seconds": 0.001674338
         },
         {
           "phase": "inventory",
           "name": "v8v101t491",
           "accepted": false,
           "seen": "(8,20,491)",
-          "frame": 3009,
+          "frame": 3008,
           "events": [
             {
-              "frame": 3004,
+              "frame": 3003,
               "click": [
                 110,
                 161
               ]
             },
             {
-              "frame": 3006,
+              "frame": 3005,
               "click": [
                 162,
                 154
               ]
             },
             {
-              "frame": 3008,
+              "frame": 3007,
               "click": [
                 227,
                 83
               ]
             }
           ],
-          "seconds": 0.002212315
+          "seconds": 0.001850509
         },
         {
           "phase": "inventory",
           "name": "v8v102t491",
           "accepted": false,
           "seen": "(8,937,491)",
-          "frame": 3009,
+          "frame": 3008,
           "events": [
             {
-              "frame": 3004,
+              "frame": 3003,
               "click": [
                 110,
                 161
               ]
             },
             {
-              "frame": 3006,
+              "frame": 3005,
               "click": [
                 194,
                 154
               ]
             },
             {
-              "frame": 3008,
+              "frame": 3007,
               "click": [
                 227,
                 83
               ]
             }
           ],
-          "seconds": 0.001949104
+          "seconds": 0.001787847
         },
         {
           "phase": "inventory",
           "name": "v8v103t491",
           "accepted": false,
           "seen": "(8,934,491)",
-          "frame": 3009,
+          "frame": 3008,
           "events": [
             {
-              "frame": 3004,
+              "frame": 3003,
               "click": [
                 110,
                 161
               ]
             },
             {
-              "frame": 3006,
+              "frame": 3005,
               "click": [
                 226,
                 154
               ]
             },
             {
-              "frame": 3008,
+              "frame": 3007,
               "click": [
                 227,
                 83
               ]
             }
           ],
-          "seconds": 0.001955575
+          "seconds": 0.001910476
         },
         {
           "phase": "inventory",
           "name": "v8v104t491",
           "accepted": false,
           "seen": "(8,933,491)",
-          "frame": 3009,
+          "frame": 3008,
           "events": [
             {
-              "frame": 3004,
+              "frame": 3003,
               "click": [
                 110,
                 161
               ]
             },
             {
-              "frame": 3006,
+              "frame": 3005,
               "click": [
                 258,
                 154
               ]
             },
             {
-              "frame": 3008,
+              "frame": 3007,
               "click": [
                 227,
                 83
               ]
             }
           ],
-          "seconds": 0.002019567
+          "seconds": 0.001860088
         },
         {
           "phase": "inventory",
           "name": "v8v105t491",
           "accepted": true,
           "seen": "(8,946,491)",
-          "frame": 3009,
+          "frame": 3008,
           "events": [
             {
-              "frame": 3004,
+              "frame": 3003,
               "click": [
                 110,
                 161
               ]
             },
             {
-              "frame": 3006,
+              "frame": 3005,
               "click": [
                 290,
                 154
               ]
             },
             {
-              "frame": 3008,
+              "frame": 3007,
               "click": [
                 227,
                 83
               ]
             }
           ],
-          "seconds": 0.002033948
+          "seconds": 0.001559124
         }
       ]
     }
@@ -512,19 +512,19 @@
   "all_realized": true,
   "candidates": 10,
   "run_on": {
-    "last_input": 3008,
-    "local_ran": 3011,
-    "class_cleared": 3011,
-    "both": 3011,
+    "last_input": 3007,
+    "local_ran": 3010,
+    "class_cleared": 3010,
+    "both": 3010,
     "ended": null,
-    "stop": 3011,
+    "stop": 3010,
     "room": 42,
     "owner": 1,
     "class": 0
   },
   "verify": {
-    "frame": 3011,
-    "got_frame": 3011,
+    "frame": 3010,
+    "got_frame": 3010,
     "inputs": 36,
     "facts": 3870,
     "facts_differ": 0,
@@ -534,11 +534,11 @@
       42
     ],
     "digest": [
-      "0890b94a052fbfa2",
-      "0890b94a052fbfa2"
+      "f13abc735dd7e0ed",
+      "f13abc735dd7e0ed"
     ],
     "differences": 0,
-    "seconds": 0.227521259
+    "seconds": 0.157700523
   },
   "hook": {
     "events": [
@@ -559,26 +559,26 @@
       {
         "frame": 2999,
         "click": [
-          228,
-          110
+          219,
+          109
         ]
       },
       {
-        "frame": 3004,
+        "frame": 3003,
         "click": [
           110,
           161
         ]
       },
       {
-        "frame": 3006,
+        "frame": 3005,
         "click": [
           290,
           154
         ]
       },
       {
-        "frame": 3008,
+        "frame": 3007,
         "click": [
           227,
           83
@@ -587,7 +587,7 @@
     ],
     "error": null,
     "events_equal": true,
-    "frame": 3011,
+    "frame": 3010,
     "digest_equal": false,
     "facts_differ": 1,
     "first": [
@@ -602,11 +602,11 @@
       849678398
     ],
     "tick": [
-      15608,
-      15608
+      15602,
+      15602
     ],
     "control": {
-      "frame": 3011,
+      "frame": 3010,
       "digest_equal_first": false,
       "digest_equal_hook": true,
       "facts_differ_first": 1,
@@ -614,5 +614,5 @@
     }
   },
   "pass": true,
-  "seconds": 0.504729798
+  "seconds": 0.413741377
 }
