@@ -300,3 +300,47 @@ image type first, then the others, each group in the dump's order.
 - Acceptance is unchanged: the Sentence touch (v, a, b).
 - Room objects' candidates are unchanged.
 - The rerun is G3 as stated, with the same tool (af8bcf6 adds only the control fork). Fixes left after this one: 1.
+
+### (3) 2026-11-04, A: the approach fixed before play9 (G4's two misses)
+
+G4 failed on the approach in wide rooms (`results/g4/g4.md`): walk_to(427) in room 33 and walk_to(316) in room 28.
+In both, afford's single floor point per walk box lay behind the actor. Per the retrospective's rule to fix known
+gaps before a run (play8's row 27 was known and left in), the approach is fixed before play9, under the same switch
+(`FMI_REALIZE=1`). This is G4's fix, decided by the coordinator. G3's fix budget (one left) is not used for it.
+
+**Fix 2, in realize's approach, from engine facts only:**
+- **The nearest point of each box.** For each walkable box (afford's rule: index from 1, not locked, not invisible),
+  the approach also offers the box's point nearest the target's place. It is built as follows:
+  - its y is the target's, clamped to the box's rows and to the main screen's (`Status::screen`);
+  - its x is the target's, clamped to the box's columns at that row (between its left edge ul-ll and its right edge
+    ur-lr) and to the screen's columns (`Status::xstart` to xstart + 319);
+  - it is kept only where the engine's hit test answers no object and no actor (afford's floor test), all points in
+    one AtMany.
+  
+  It is offered alongside the box's usual point. The candidates are ordered by distance to the target's place, at
+  most 2 per box. A point at the screen's edge on the target's side can now be a candidate.
+- **A stepping stone.** When no floor point is accepted, the approach tries a bare click on each room object that has
+  a hit point and whose walk point is nearer the target's place than the view's middle column (xstart + 160), the
+  nearest to the target first.
+  - A stone is accepted by the same test as a floor click: a walk and the camera moving toward the target, or the
+    target gaining a hit point.
+  - For a stone, the walk is a Walk touch or the click's Sentence touch on the stone. Patch 0007 logs the handler's
+    writes, and a walk that the sentence script starts is not among them: the probe's click on 323 gave only
+    (11, 323, 0).
+- **Bounds:** `max_approach` (6) accepted clicks; per approach click, at most 2 floor points per walkable box and one
+  stone per object with a hit point.
+- **Toy tests:**
+  - a target that only a box's nearest point brings on screen;
+  - a target that only a stone brings on screen;
+  - the bounds.
+
+**The reruns, with the fix:**
+- G4 as stated, both modes (each step from its job's entry, and the whole chain from boot);
+- G3 as stated;
+- G1's gate (E015 `results/g1/run.sh gate`: play8 entry 0, d120, s10:596, d120, to room 63, verified from boot).
+
+**Predictions:**
+- G4 realizes all 14 steps: 65%;
+- walk_to(427) is realized by a nearest point: 80%;
+- walk_to(316) is realized, by a nearest point or a stone: 60%;
+- G3 and G1 give the same inputs as before: 85%.
