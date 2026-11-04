@@ -1002,3 +1002,128 @@ condition held partly: the slow jobs' widened runs fit in pass 1 except one, and
     whose widened run was cut could run widened;
   - the merge's assumption set could hash cheaply;
   - the inventory could be a fact.
+
+## Amendment 2026-11-04 (7): stagnation after a sweep, a refused input as a trial; the run from the boot with `FMI_READ_WIDEN=1`
+
+Written and committed before any code or run it changes. The sections above stay as written and their predictions are
+not edited.
+
+### Why
+
+Amendment (6) removed the cost that sent every model try after the opening to the bound: with `FMI_READ_WIDEN=1` the
+{49} reading from entry 3 takes 23.6 s, and a try from there plans and plays. The check of play4
+(`notes/log/2026-11-04-e014-bound.md`, "Check") found two errors that bear on the next run:
+
+1. **The stagnation stop is a count, not a sweep.** `archive.rs` `stagnant` fires when the committed tries since the
+   last try that gave a new atom of T or a new room reach the number of cells selectable at that try. The selection
+   orders cells by their counts, then by the entry's key, whose last parts are the frame and the id. In play4 the early
+   cells got a model try and a free try each, and the stop came 28 tries after the last new atom with 6 of the 27
+   selectable cells never tried. Among them were entry 18, the only state with a dialog open, and entry 19, the
+   furthest state.
+2. **An input the bridge refuses ends the whole try** (row 21 of the assumptions table). j00032's free step gave the
+   bridge an input its input check refuses ("event 0: expected frame > 0, and a click/rclick/move in range"). The error
+   ended the try, and its 234 s have no record of their own.
+
+The PI's direction: fix both generally, then run the demo from the boot again with every switch on.
+
+### (a) Stagnation only after a sweep (`FMI_STAG_CELLS=1`; unset: as before)
+
+- **The rule.** Stagnation may fire only once every cell selectable now has had at least one committed try since the
+  last committed try that gave a new atom of T or a new room (since the start, when no try has given one). The count
+  stays as a second condition, so the rule never fires sooner than before.
+- **A try** is a committed line of the log of either kind (model or free), errors included and "return differs"
+  excluded, as the cells' counts take them (`recount`). Its cell is its entry's cell now, so a cell split when T grows
+  is counted by its own entries.
+- **Selectable** is the selection's own test: the cell has a candidate (a live entry, not exhausted under the current
+  T, in an allowed room). Without the progress order, E009's selectable cells.
+- **Why the run still ends.** A cell untried since the last new atom keeps its counts while the tried cells' counts
+  grow, so the selection reaches it (a model try takes the least model counts, a free try the least free counts). New
+  cells made with no new atom extend the sweep; the falsifier bounds the run.
+- **Switch.** It changes when a run may stop, so it has its own switch, on for both games (rule (2)).
+
+### (b) An input the bridge refuses is one refused trial
+
+- **Where.** The affordance step's trials (`afford::try_all`): a trial's clicks, and the third click. They serve E012's
+  affordance step, E013's free step and the bounded try's model-free step.
+- **The change.** When the bridge answers a trial's inputs with an error (its input check: the frames, a click's
+  coordinates, a key's name), the trial is recorded as refused (reason "refused", verdict "dropped: bridge", its
+  seconds), its fork is quit, and the step goes on with the next input. Every other engine error still ends the try.
+- **Records.** The step's record lists each such trial ("bridge_refused": the inputs' name, the events and the bridge's
+  text), so the offer point that made it is in the files. The stall table classes its seconds as "refused input" (B's
+  verdict `dropped: ...`).
+- **No switch.** It changes only a try that this error ended before; every other try is as before. Rule (2) checks
+  this on Monkey Island.
+- **Not changed:** the offer's points. What made such a point is read from the record after the run, not guessed.
+
+### Tests (with the code)
+
+- (a): the count reached with one selectable cell untried since the last new atom (not stagnant), then a try from it
+  (stagnant); a new atom starts a new sweep; free tries count; an exhausted cell is not waited for; the switch off
+  gives the count alone.
+- (b): a toy engine whose input check refuses a click off the screen, as the bridge does: the step records the refused
+  trials, runs every other input and lists them in its record.
+
+### Rule (2) on Monkey Island, every switch on
+
+`A4_ENV=a7/env.sh a4/mi-check.sh OUT b3 kitchen smoke` on the new build; `a7/env.sh` is a6/env.sh with the new build
+and `FMI_STAG_CELLS=1`. It must pass before the run:
+
+- B3's 15 tries equal E013's G-on in every field `fmi check tries` compares, and their new entries verify from boot;
+- the kitchen's goal chain verifies from boot;
+- the smoke run's entries verify from boot, and its stall report passes its checks.
+
+### The run
+
+- **The build:** e014's head with (a) and (b), in `/var/tmp/fast-mi/target-e014d`; the engine svm-e013, unchanged.
+- **The switches:** a6/env.sh's ALLON (every E012, E013 and E014 switch; the bound `FMI_READ_BOUND=300`; grown scopes;
+  `FMI_READ_WIDEN=1`) with `FMI_STAG_CELLS=1`, and the game's settings as before (`a7/env.sh`, `a7/run-env.sh`).
+- **The archive:** a new one, `/var/tmp/fast-mi/e014-archives/play7`, from the boot. Seed 1; amendment (4)'s guide
+  file. Stage play, goal end = 1, the rooms from the files, E009's switches, play when ready, commit as finished, the
+  falsifier at 80 committed tries.
+- **Where.**
+  1. **The cloud VM, one start:** `python3 scripts/cloud.py start --type n2-custom-30-122880 --hours 3 --standard`
+     from main's scripts ($1.5346/h: $4.60 booked of the $12.45 left).
+     - b = 10 and 2 readings in the background (amendment (4)'s count for 30 cores: a try about 2.5 cores, a reading
+       about 2).
+     - Set up, checked and copied back as a4/vm.sh, in `a7/vm.sh`: this build, this archive, and a 2-try check archive
+       `vm-check7` made on the laptop first, verified from boot on the VM, run again there and compared.
+     - The VM is stopped with cloud.py as soon as the run ends or stops, and the ledger records it.
+  2. **If the start is refused:** the laptop, as a4/laptop.sh: b = 2, 1 reading in the background.
+
+  The write-up says which ran.
+- **Verify.** Every entry from boot on the lean engine (`fmi explore verify`), 0 differences. For a goal entry, its
+  chain must hold the system's own inputs on the way to the end site. A chain of waits only, or the demo playing itself
+  to its end, is reported as such and not as reached.
+- **Projection.**
+  - A model try from the states after the opening reads in about 21-24 s on the laptop and plans; the root's try takes
+    about 3.5 minutes (amendment (6)); free tries take 15-120 s (play4). Readings of rooms other than 49 are not
+    measured. A mean try of 50-150 s on the laptop.
+  - **Laptop, b = 2:** 80 tries of 50-150 s give 2,000-6,000 s of driver wall, 0.6-1.7 h; up to 3 h if readings of
+    other rooms are slower.
+  - **VM, b = 10**, a core 1.5-2 times the laptop's: 80 tries in 10-30 minutes of driver wall. With the setup, the
+    check (about 15 minutes), the verify and the copies: 1-1.5 h used, $1.5-2.3. Booked: 3 h.
+- **Stop rule.**
+  - The goal.
+  - E009's stop rules: stagnation over T and rooms, under (a); an exhausted archive.
+  - The falsifier at 80 committed tries.
+  - On the VM, its booked time: the driver is stopped 20 minutes before H, and the write-up says so.
+  - It runs once. Exactness first. A break that stops the driver is fixed only by a dated amendment and rule (2), and
+    the run resumes from its files. Any other break is a row of the assumptions table, recorded and not applied. A stop
+    by hand only if something is clearly broken, with the reason written down.
+
+### Predictions (before any code)
+
+| | predicted |
+|---|---|
+| rule (2) on Monkey Island | B3's 15 tries equal E013's G-on; their new entries, the kitchen chain and the smoke run verify from boot |
+| how the run stops | the falsifier at 80 committed tries: 55%; stagnation under (a): 20%; the goal: 15%; the VM's booked time or a break: 10% |
+| committed tries | 50-80 |
+| rooms entered, of the 11 in the files | 2-5, most likely 3 (room 49 counted) |
+| the end | not reached; reached by the system's own inputs and verified from boot: 15% |
+| model tries whose reading reaches the bound | 0-20% |
+| the stall table | reading bound 0-15% of the seconds; productive 25-60%; interface, no yield 10-40%; model, no yield 5-30%; no plan 0-15%; refused input 0-5%; the rest row at most 1% |
+| (a) | if the stop is stagnation, every cell selectable at the stop had a try since the last new atom or room; a kept state with a dialog open gets a try |
+| (b) | 0-5 trials refused by the bridge in the run; no try ends on a bridge error on its inputs |
+| entries verified from boot | every entry, 0 differences |
+| the VM, if it starts | 1-1.5 h used, $1.5-2.3 |
+| the laptop, if not | 0.6-3 h of driver wall |
