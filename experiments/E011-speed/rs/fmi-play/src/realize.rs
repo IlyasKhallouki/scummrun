@@ -12,7 +12,11 @@
 //! * **The sentence** (v, a, b): candidates in order, (i) a bare click on a, (ii) each offered verb slot then a, and
 //!   for a two-object sentence each of those followed by b, or by each visible slot when b has no hit point. Each is
 //!   tried at up to `max_points` of a's hit points, in a fork run until the input log has the last click's record. A
-//!   candidate is accepted when the log's `Sentence` touch is (v, a, b). At most `max_candidates`.
+//!   candidate is accepted when the log's `Sentence` touch is (v, a, b). At most `max_candidates`. A walk_to step is a
+//!   sentence with the record's walk verb (amendment (1): its run shows as the Sentence touch (w, a, 0)).
+//! * **An inventory object** (E016 A, amendment (1)): when a has no hit point on the screen and no place in the room,
+//!   each visible verb slot is tried as a's click: a verb choice, the slot, then b's hit point (or each visible slot
+//!   when b has none); accepted on the same Sentence touch. The approach then goes to b when b has a place.
 //! * **A dialog verb** v: the offered verb slot whose dump id is v (in SCUMM v5 a slot's id is its verb number),
 //!   clicked in a fork; accepted when the handler took the click (verdict "taken").
 //!
@@ -187,16 +191,28 @@ pub fn realize(e: &mut Box<dyn Engine>, step: &Step, cfg: &Cfg) -> EResult<Resul
             Ok(Ok(rec.done(b, t0)))
         }
         Step::Sentence { v, a, b } => {
-            // the approach: from `e`, then from each accepted fork
+            // the approach: from `e`, then from each accepted fork. Its target is a; when a has no hit point and no
+            // place in the room (an inventory object), b when b has a place and no hit point (E016 A); else none.
             let mut cur: Option<Box<dyn Engine>> = None;
+            let mut target: Option<Option<i32>> = None;
             loop {
                 let base: &mut Box<dyn Engine> = match cur.as_mut() {
                     Some(c) => c,
                     None => &mut *e,
                 };
                 base.input_log()?;
-                let of = offer_at(base)?;
-                if has_hit(&of, a) {
+                let (o, of) = obs_offer(base)?;
+                let t = *target.get_or_insert_with(|| {
+                    if has_hit(&of, a) || place_of(&o, a).is_some() {
+                        Some(a)
+                    } else {
+                        b.filter(|&bo| !has_hit(&of, bo) && place_of(&o, bo).is_some())
+                    }
+                });
+                let Some(t) = t else {
+                    break;
+                };
+                if has_hit(&of, t) {
                     break;
                 }
                 if rec.approach >= cfg.max_approach {
@@ -205,7 +221,7 @@ pub fn realize(e: &mut Box<dyn Engine>, step: &Step, cfg: &Cfg) -> EResult<Resul
                     }
                     return Ok(Err(rec.miss("approach", t0)));
                 }
-                match approach_once(base, &of, a, cfg, &mut rec)? {
+                match approach_once(base, &of, t, cfg, &mut rec)? {
                     Some(next) => {
                         rec.approach += 1;
                         rec.events.extend(rec.attempts.last().unwrap().events.clone());
@@ -243,8 +259,14 @@ pub fn realize(e: &mut Box<dyn Engine>, step: &Step, cfg: &Cfg) -> EResult<Resul
 /// afford's offer at the engine's stop (its full dump; the walk boxes with FMI_BOXES, actors on the screen with
 /// FMI_OFFER_SCREEN).
 fn offer_at(e: &mut Box<dyn Engine>) -> EResult<Offer> {
+    Ok(obs_offer(e)?.1)
+}
+
+/// The dump at the engine's stop and afford's offer from it.
+fn obs_offer(e: &mut Box<dyn Engine>) -> EResult<(Obs, Offer)> {
     let o = e.obs(&ObsReq::default())?;
-    afford::offer_cfg(e, &o, afford::boxes_on(), afford::offer_screen_on())
+    let of = afford::offer_cfg(e, &o, afford::boxes_on(), afford::offer_screen_on())?;
+    Ok((o, of))
 }
 
 /// Whether the offer has a hit point for object or actor `a`.
@@ -391,7 +413,7 @@ fn sentence(e: &mut Box<dyn Engine>, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, 
     let of = offer_at(e)?;
     let pts = hit_points(e, &of, a, cfg.max_points)?;
     if pts.is_empty() {
-        return Ok(None);
+        return inventory(e, &of, v, a, b, cfg, rec);
     }
     // the candidates as click lists with the target's place marked None (filled with each hit point)
     let mut firsts: Vec<Vec<Option<Point>>> = vec![vec![None]];
@@ -424,20 +446,81 @@ fn sentence(e: &mut Box<dyn Engine>, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, 
             let clicks: Vec<Point> = c.iter().map(|x| x.unwrap_or(*p)).collect();
             let (fork, records, mut att) = try_clicks(e, "sentence", &clicks, cfg)?;
             rec.tries += 1;
-            let seen: Vec<(i32, i32, i32)> = records
-                .iter()
-                .flat_map(|r| r.writes.iter())
-                .filter(|t| t.kind == TouchKind::Sentence)
-                .map(|t| (t.a, t.b, t.old))
-                .collect();
+            let seen = sentences(&records);
             let ok = seen.contains(&want);
-            att.seen = seen.iter().map(|s| format!("({},{},{})", s.0, s.1, s.2)).collect::<Vec<_>>().join(" ");
+            att.seen = seen_text(&seen);
             att.accepted = ok;
             rec.attempts.push(att);
             if ok {
                 return Ok(Some(fork));
             }
             fork.quit();
+        }
+    }
+    Ok(None)
+}
+
+/// The Sentence touches (verb, object A, object B) of the records, in order.
+fn sentences(records: &[InputRecord]) -> Vec<(i32, i32, i32)> {
+    records
+        .iter()
+        .flat_map(|r| r.writes.iter())
+        .filter(|t| t.kind == TouchKind::Sentence)
+        .map(|t| (t.a, t.b, t.old))
+        .collect()
+}
+
+fn seen_text(seen: &[(i32, i32, i32)]) -> String {
+    seen.iter().map(|s| format!("({},{},{})", s.0, s.1, s.2)).collect::<Vec<_>>().join(" ")
+}
+
+/// E016 A, the inventory extension (plan.md, A "Inventory objects"; amendment (1)): a has no hit point on the screen.
+/// Each visible verb slot is tried as a's click: a verb choice, the slot, then b's hit point (or each visible slot when
+/// b has none). The verb choices in order: the offered slot whose dump id is v (in SCUMM v5 a slot's id is its verb
+/// number, as the dialog step uses), no verb click, then the other offered slots in the dump's order. For each verb
+/// choice a's slot runs over the offered slots in the dump's order without the choice's own, at most `max_slots`.
+/// The engine judges each candidate as a room object's: the Sentence touch (v, a, b); the slot that shows a is never
+/// read. The accepted fork, or None within `max_candidates`.
+fn inventory(e: &mut Box<dyn Engine>, of: &Offer, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, rec: &mut Rec) -> EResult<Option<Box<dyn Engine>>> {
+    let vslot = of.verbs.iter().find(|p| matches!(p.hit, Hit::Verb { id, .. } if id == v)).copied();
+    let mut choices: Vec<Option<Point>> = Vec::with_capacity(of.verbs.len() + 1);
+    choices.extend(vslot.map(Some));
+    choices.push(None);
+    choices.extend(of.verbs.iter().filter(|p| Some(**p) != vslot).map(|p| Some(*p)));
+    // b's clicks: its hit point, or each visible slot (b in the inventory too); none for a one-object sentence
+    let thirds: Vec<Option<Point>> = match b {
+        None => vec![None],
+        Some(bo) => {
+            let bp: Vec<Point> = of.targets.iter().filter(|p| p.hit == Hit::Object(bo) || p.hit == Hit::Actor(bo)).take(1).copied().collect();
+            if bp.is_empty() {
+                of.verbs.iter().take(cfg.max_slots).map(|p| Some(*p)).collect()
+            } else {
+                bp.into_iter().map(Some).collect()
+            }
+        }
+    };
+    let want = (v, a, b.unwrap_or(0));
+    for c in &choices {
+        let slots: Vec<Point> = of.verbs.iter().filter(|p| Some(**p) != *c).take(cfg.max_slots).copied().collect();
+        for s in &slots {
+            for t in &thirds {
+                if rec.candidates >= cfg.max_candidates {
+                    return Ok(None);
+                }
+                rec.candidates += 1;
+                let clicks: Vec<Point> = c.iter().chain(std::iter::once(s)).chain(t.iter()).copied().collect();
+                let (fork, records, mut att) = try_clicks(e, "inventory", &clicks, cfg)?;
+                rec.tries += 1;
+                let seen = sentences(&records);
+                let ok = seen.contains(&want);
+                att.seen = seen_text(&seen);
+                att.accepted = ok;
+                rec.attempts.push(att);
+                if ok {
+                    return Ok(Some(fork));
+                }
+                fork.quit();
+            }
         }
     }
     Ok(None)
