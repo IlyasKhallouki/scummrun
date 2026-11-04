@@ -781,6 +781,9 @@ impl Run1<'_> {
             digest: None,
             shared: None,
         });
+        if crate::enovel::on() {
+            crate::enovel::observe(&self.out.trials[idx], None);
+        }
         self.worlds.push((st.frame, None));
         self.out.bridge_refused.push((idx, why));
     }
@@ -925,6 +928,10 @@ impl Run1<'_> {
         };
         self.out.phases[2] += tr1.elapsed().as_secs_f64();
         tr.seconds = tt.elapsed().as_secs_f64();
+        if crate::enovel::on() {
+            // E015 G2 (FMI_NOVEL_ENGINE=1): the per-stop observer reads the stop on a fork; no trial or keep changes
+            crate::enovel::observe(&tr, if tr.ended { None } else { Some(b) });
+        }
         self.out.trials.push(tr);
         Ok((idx, res))
     }
