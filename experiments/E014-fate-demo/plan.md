@@ -882,3 +882,123 @@ Island's B3 readings have none: their reports count no split) is byte for byte t
   entry 3 takes more than 60 s with the switch on, or if any Monkey Island check differs.
 - One revision is allowed, written as a dated note under this amendment before its code. No longer bound and no
   game-specific rule in any case.
+
+## Result (2026-11-04): amendment (6), `FMI_READ_WIDEN=1`, measured on the laptop
+
+### In plain terms
+
+- **The cause** is the reader's, not the game's. From the state after the opening, every way out of the dialog redraws
+  the inventory. The inventory display loops over a window of slots whose bounds come from the inventory's count, which
+  the reader leaves unknown. So the reader unrolled the loop until the path limit, and split_limit then ran the whole job
+  again once per value of every fact read before the cut. No part could fall under the limit: 6 jobs, 69-137 splits
+  each, 1-3 records each.
+- **The fix.** A run the path limit cut is run once more with its loops widened. A loop whose exit stays unknown is run
+  exactly once, then once with every value it moved made unknown. A path that comes back in a state the widened
+  iteration holds ends. Runs under the limit are never run again.
+- **The effect.** The {49} reading from entry 3 takes 23.6 s, against 926 s with the switch off on the same build
+  (1,256 s in amendment (5)). A single try from entry 3 now has a model: it reads, plans and plays in 23.1 s. Before,
+  every such try reached the 300 s bound.
+- **Not seconds yet, and the boot is slower.** The reading from the boot takes 94.7 s against 37.0 s. The job at the
+  boot that the cut used to empty now gives records, so the boot reading holds the states after the opening
+  (25,894 records against 37). Runs that pass the limit for other reasons still split.
+
+### The readings ({49}, the try's arguments, 3 threads, `fmi read` on target-e014c, the laptop at a load of 1.7-3.7)
+
+| from | switch | wall | CPU | records | actions | widened runs: whole / still past the limit | splits |
+|---|---|---:|---:|---:|---:|---|---:|
+| entry 3 of `vm-check` (frame 1042) | off | 926.2 s | 1,662 s | 908 | 649 | - | 439 |
+| | on | 23.6 s | 41.5 s | 20,529 | 7,089 | 17 / 13 | 13 (25 parts) |
+| the boot (entry 0, frame 992) | off | 37.0 s | 37.0 s | 37 | 32 | - | 27 |
+| | on | 94.7 s | 182.4 s | 25,894 | 8,758 | 57 / 130 | 130 (181 parts) |
+| play4's entry 19 (frame 1206) | off | 957.0 s | 1,718 s | 907 | 648 | - | 439 |
+| | on | 21.2 s | 38.0 s | 20,528 | 7,088 | 17 / 13 | 13 |
+| play4's entry 18 (frame 1156, the dialog) | on | 20.6 s | 38.4 s | 37,009 | 18,446 | 14 / 7 | 7 |
+
+- **Switch off** is byte for byte the reading before the change: from entry 3 and from the boot, the packed files' sha1
+  equal amendment (5)'s measures (`eccab6b2...` from entry 3).
+- The start rows of entries 18 and 19 were made by `fmi check wait --read-scope 49` (the entry rebuilt from boot), stopped
+  once its start row was written; no try had read from them.
+
+### The outputs where both end
+
+The on reading holds every value the off reading reaches, and every one of its action labels. This held from entry 3,
+from the boot and from entry 19, with 0 values and 0 labels missing.
+
+| from | facts reached (on / off) | values reached | labels | actions |
+|---|---|---|---|---|
+| entry 3 | 451 / 271 | 698 / 453 | 271 / 190 | 7,089 / 649 |
+| the boot | 486 / 79 | 741 / 117 | 288 / 24 | 8,758 / 32 |
+| entry 19 | 449 / 269 | 693 / 448 | 270 / 189 | 7,088 / 648 |
+
+**Why the difference is sound.** The off reading drops the paths of every run the limit cut and the ladder could not
+lift (`FMI_READ_CUT=1`: no record). Those paths are the ways out of the dialog through the inventory display. The on
+reading holds them as records whose widened facts are guesses over their domains: a superset of the values the engine
+writes. The ladder's parts' records come back as records of the whole run with fewer pins (more general). Nothing the
+off reading holds is missing. An over-general record costs a plan the engine refutes, never an entry: entries are
+still their inputs and movie, verified from boot.
+
+### Single tries on this build (scope {49}, the run's switches, `fmi try` on a copy of `vm-check`'s job)
+
+- **From entry 3** (j00002): 23.1 s in all; the fresh reading 20.9 s (not bounded); 6 targets (3 of tier 1, 3 of
+  tier 2). The attempt for bit 20 = 1 planned, played 3,536 frames (frames 1042-4578) and stopped at a reach extension.
+  1 new entry.
+- **From the boot** (j00000): 204.4 s in all, against 40.9 s in amendment (3)'s laptop check. The reading took 86.5 s;
+  a refinement 43.1 s; a reach extension 73.2 s (both on the larger reading); 5 targets, 3 new entries.
+
+### Rule (2) on Monkey Island, the switch on (`A4_ENV=a6/env.sh a4/mi-check.sh`; `results/a6/mi-check.txt`)
+
+- **B3.** The 15 tries equal E013's G-on in every field compared (15 of 15). Their 126 new entries verify from boot with 0
+  differences.
+- **The kitchen.** The goal entry's chain (8 entries) verifies from boot.
+- **The smoke run.** Its 21 entries verify from boot; the stall report passes its 5 checks.
+- **Why B3 is unchanged.** 5 of B3's 12 readings have runs past the path limit (30 runs), and every one was still past it
+  widened. So each was split as before: the outputs are the switch-off ones, at the cost of 30 more runs (B3's wall
+  302.6 s against 296.5 s in amendment (5)'s check).
+
+### Tests
+
+- scumm-machine's 4 new tests (`tests/widen_loops.rs`) and 2 unit tests of the diffs.
+- scumm-reader's 3 new tests (`tests/read_widen.rs`).
+- Every other test of both crates passes, the golden comparisons with model.py included.
+
+### Predictions scored
+
+| | predicted | measured | |
+|---|---|---|---|
+| the {49} reading from entry 3, on | 5-30 s; each slow job one cut run and one widened run; no split | 23.6 s; 17 runs read whole widened, 13 still past the limit and split (25 parts) | wall hit; "no split" missed |
+| the same, off, new build | 600-1,300 s, the same 908 records | 926.2 s, 908 records, the same packed file | hit |
+| the boot, on | 3-15 s | 94.7 s (off 37.0 s) | miss |
+| a later state, on / off | under 60 s / past 300 s | entry 19: 21.2 s / 957.0 s; entry 18: 20.6 s on | hit |
+| the outputs | on holds every action family of off, a superset of the values | 0 values and 0 labels of off missing, at all three states | hit |
+| Monkey Island | B3 equal, verified, the kitchen; "no B3 reading has a cut run" | all four checks hold; but 5 of 12 B3 readings have runs past the limit (30), none fit widened | checks hit; the reason missed |
+| exactness | none to entries | the switch changes no engine path and no verify; the 2 tries' 4 new entries were not verified (not in an archive) | not scored |
+
+**Misses, stated plainly.**
+
+1. **The boot's reading is slower, 37.0 s to 94.7 s, and the root try 40.9 s to 204.4 s.** The prediction did not see
+   that the boot's cut job hid the rest of the opening. Its records now open the interface, and the boot reading then
+   covers the dialog states as well.
+2. **Runs still split.** After the inventory loop is widened, the runs that end the dialog still pass the limit. They
+   multiply forks on facts in the interface's per-frame hover script (the object under the cursor as a set of the
+   room's objects, each one's classes and owner) by its tests of variables that are no facts. Paths with different
+   facts never merge, so this is no loop for widening to summarise. At entry 3 it costs 13 splits (about 12 s of the
+   23.6 s); at the boot, 130.
+3. **"Seconds" is not reached.** Readings after the opening take 20-24 s; the plan aimed at seconds.
+4. **The written reason for Monkey Island was wrong.** The checks hold because no widened run there fit, not because
+   there are no cut runs.
+5. **The machine's merge cost stays.** The first (unwidened) run of a cut job still goes to the limit. In gdb samples of
+   the reading from entry 3 with the switch on, 26 of 43 were in the merge at joins: the assumption sets of
+   `FMI_MERGE_DEDUP`, hashing names that grow with each iteration.
+
+No revision was used. The stop rule did not fire: 23.6 s is under 60 s, and every Monkey Island check holds. Its first
+condition held partly: the slow jobs' widened runs fit in pass 1 except one, and 13 runs did not fit over both passes.
+
+### What this leaves (for the PI's choice of the next run)
+
+- With the switch on, tries from the states after the opening read in about 21-24 s, under the 300 s bound, and plan.
+- The root's try costs about 3.5 minutes once.
+- Not built, each a general change:
+  - the hover script's fact forks are the next cost: a split that keeps one value repeats the run; parts of a split
+    whose widened run was cut could run widened;
+  - the merge's assumption set could hash cheaply;
+  - the inventory could be a fact.
