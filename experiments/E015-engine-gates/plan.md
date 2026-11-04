@@ -473,3 +473,217 @@ feature or prediction changes.
   may pass them; that overshoot is reported.
 - **D2's stops.** The route's clicks are scheduled at their recorded absolute frames. Input i's stop is the run to the
   frame after its click, then to the bridge's idle within W frames.
+
+## Result (2026-11-04)
+
+Written after the three gates and their independent checks, from the gates' records on `e015-item`, `e015-g1` and
+`e015-g2` (merged into e015) and the checks' `check.md` files. This section stands in for the `report.md` the commit
+rule names. Numbers only.
+
+**Overall.** The item gate passes, G1 passes with no fix, and G2 fails as stated. Each check reproduced its gate from a
+separate build and output folder, and each verdict holds. The stop rule did not bind: the plan was committed at 13:37,
+the last gate result at 14:59 and the last check at 15:25, all inside 4 hours.
+
+### The item gate: PASS
+
+| criterion | result |
+|---|---|
+| 946 reached on a chain made of exit A, room 63's openings and room 69's inputs | yes: owner:946 = 1 = ego at frame 1548 |
+| the chain verifies from the boot | 9 clicks, 0 of 3,850 facts differ, room 69 = 69, digest equal (0babbc2cb2c1a1de) |
+| local 212's only start site is in 946's code | yes: 3 literal start sites of a script 212 (room 48 object 587, room 49 local 200, room 69 object 946); the first two start their own room's local 212 |
+| 0 sweep trials from the room-42 entries start local 212 or clear class 12 on 491 | 0 of 30,000 (10 entries, depth 2): Started 0, live 0, cleared 0, ran anywhere 0 |
+
+- **Steps 1-3.** Room 63 loads at frame 1392, first idle at 1405. Room 63 to 69: depth 1, 95 trials, 6 openings reach
+  room 69, all clicks on object 854 (alone or after verb slot 1, 100, 101, 103 or 104). Room 69 to 946: depth 1,
+  135 trials, 1 opening (verb 11, then 946).
+- **Step 5's coverage.** Depth 1 is complete (285 trials per entry, 344 for entry 296). Within the 3,000-trial cap,
+  depth 2 expanded 9 of 275 depth-1 stops (7 of 335 for entry 296), about 3%.
+- **Step 6 (not gating).** No stop reached room 75, so the answer is "not within the sweep".
+- **Cost.** Steps 1-4: 2.4 s wall. Steps 5-6: 136 s wall, 26 s CPU, 3.0-5.4 ms per trial. The code is 811 lines
+  against the 200-300 planned.
+
+### G1: PASS, no fix
+
+| criterion | result |
+|---|---|
+| the input log shows sentence(10,596) | yes: `Sentence` touch (10,596,0) after 2 approach clicks and 1 candidate (a bare click) |
+| room 63 loads after the dialog choice | yes, at frame 1289, 72 frames after the second dialog click |
+| the chain replays from the boot | 5 inputs, 0 of 3,850 facts differ, room, digest, tick 5240 and rng equal; E014's probe (a separate build) also shows room 63 at 1289 |
+| no verb id and no profile | the grep check finds none of `DOS_CD`, `selected_verb`, `wait_walk_to`, `DIALOG_FIRST/LAST` or the executor; the only numeric literals are the limits and the screen's half width |
+
+- **Steps.** Dialog verb 120 at frame 993 (1 fork, 1.7 ms). Approach (5,125)@1043 and (21,131)@1069, xstart
+  256 → 136 → 0, then the bare click (31,23)@1086 (3 forks, 10.3 ms). Dialog verb 120 at frame 1217 (1.7 ms).
+- **(a)** From entry 184: 0 approach clicks, 1 candidate, 2.1 ms. **(b)** sentence(11,593) from entry 0: a miss,
+  "approach", 8 forks, 29 ms. **(c)** 2-10 ms per sentence, 1-2 ms per fork.
+- **Tests.** Every existing fmi-play and fmi-explore test count is unchanged with the switch off; the 9 new tests pass.
+
+### G2: FAIL as stated
+
+| criterion | result |
+|---|---|
+| t596 kept under E | **no** |
+| kept rate over all re-scored trials in [0.5%, 20%] | yes: 97 of 16,026, 0.61% |
+
+- **Why t596 is not kept.** Trial v1t596 (a verb slot then object 596, seq 15, frame 1258) reaches the same local-211
+  dialog, waiting at offset 578, 152 trials earlier in afford's order. It is kept under E for `live:49:local:211` and
+  `at:49:local:211:578`, so t596 (seq 167) holds nothing new. T kept nothing from the step. No archive entry holds
+  local 211 live, so t596 would have been kept had it come first.
+- **Calibration.** G2-0 met (264 trials, 0 kept under T, t596 at 1256 with local 211 live at 578) after two re-runner
+  fixes, within the 45 minutes. 40 of 40 sampled steps reproduce their trial and T-kept counts. 628 of 628 seen-set
+  boots equal their checkpoints.
+- **By kind.** Kept: T 21 (0.13%), T∪U∪W 97, U alone 26, W alone 76, R alone 0, C alone 0. Room 49 keeps 37 of
+  9,281 (0.40%), room 42 60 of 6,745 (0.89%). Per step: median 0.36%, maximum 4.8%. j00077 alone: 2 of 264.
+  The sensitivity rule keeps 769 (4.80%), 7.9 times the primary rule.
+- **D1 (not gating).** IW(1) under E reaches room 63 from 2 of 25 entries (184 at depth 2, 182 at depth 3). 21 run
+  out of kept stops after 37-864 trials; 0 and 13 hit the trial limit at depth 3. A walk click's stop is new under no
+  kind, because the archive already holds every camera bucket and every reachable target.
+- **D2 (not gating).** Along route A, the longest unkept run before room 63 is E 0, T∪U∪W 0, T 2 (from entry 0), and
+  E 0, T∪U∪W 0, T 1 (from entry 184).
+
+### Predictions scored
+
+**The item gate.** 6 of 7 hit, 1 missed; the room-75 question has its outcome.
+
+| prediction | outcome |
+|---|---|
+| exit A reproduces, room 63 at 1392 (97%) | hit |
+| room 69 within the limits (85%), depth 1-2 | hit, depth 1 |
+| exactly 1 opening leads to room 69 from one state | **miss**: 6 of 95, all on object 854 |
+| owner:946 = ego given room 69 (80%), depth 1-3 | hit, depth 1 |
+| the chain verifies given reached (95%) | hit, 0 differences |
+| local 212 has one start site in 946's code, 0 sweep starts (85%) | hit |
+| the gate passes (65%) | hit |
+| room 42 back to 49 via 75: yes 55%, no 20%, not within the sweep 25% | not within the sweep |
+| cost: code about 40 minutes, 200-300 lines; run under 10 minutes CPU | lines **missed** (811); run hit (26 s CPU) |
+
+**G1.** 7 of 9 hit, 2 missed.
+
+| prediction | outcome |
+|---|---|
+| 2-3 approach clicks | hit, 2 |
+| 1 candidate once 596 is on screen (75%) | hit, 1 |
+| at most 6 candidates (90%) | hit, 1 |
+| 0.1-3 s per sentence | **miss**: 0.002-0.010 s, 10-50 times faster |
+| room 63 at frame 1,350-1,600 | **miss**: 1289, because each step clicks at the first idle frame |
+| verifies from the boot (95%) | hit |
+| (b) misses within 60 candidates and 10 s | hit: "approach" after 8 forks, 0.029 s |
+| passes with no fix (65%) | hit |
+| passes within two fixes (85%) | hit |
+
+**G2.** 6 hit, 9 missed (one partly: entry 184's depth 2 was right), 1 not scorable.
+
+| prediction | outcome |
+|---|---|
+| calibration at the first try (80%) | **miss**: two re-runner fixes |
+| calibration met within 45 minutes (95%) | hit |
+| at least 36 of 40 sampled steps reproduce (75%) | hit, 40 of 40 |
+| t596 kept under E (85%) | **miss** |
+| kept through U given kept (90%) | not scorable (v1t596 was kept through U and W) |
+| kept rate 1-8%, median 3% | **miss**: 0.61% |
+| kept rate in [0.5%, 20%] (75%) | hit |
+| j00077 alone 2-15 of 264 | hit, 2 |
+| U or W keep the most | hit (W 76, U 26) |
+| G2 passes (65%) | **miss** |
+| D1 width 1 in at least 80% of entries (60%) | **miss**: 2 of 25 |
+| D1 depth 4-5 from xstart-256 entries; 2 from the left edge | **miss** for xstart 256 (never reached); 184 hit (2); 182 took 3 |
+| D2: E 0 | hit |
+| D2: T∪U∪W 1-2; T 3 | **miss**: 0; **miss**: 2 |
+| sensitivity rule 1.5-3 times | **miss**: 7.9 times |
+
+### The checks' issues and how each was settled
+
+**The item gate** (check 883bba6, tool 90a4c72).
+
+- Reproduced: every summary and every trial log identical apart from timings. Settled: the PASS holds.
+- The positive half, newly shown in the engine: on play8's opening branch, 946 carried into room 42 (frame 2980)
+  then v3t490, v8, v105t491 runs local 212 at frame 3044, clearing `class:491:12`, owner:946 = 0. The 35-click movie
+  replays from the boot with 0 differences. The same sentence without 946 runs nothing at the 8 entries where the
+  sweep tried it. Settled: C5 → C6 is shown in the engine, not only by the reading.
+- Entries 324 and 341 are one state, so the sweep has 9 distinct states and 27,000 distinct trials. Settled: the
+  count is corrected here; the verdict does not change.
+- **C4 → C5 depends on the opening choice.** On ev5's branch (choice (4,184)), room 42 was not reached from room 49
+  holding 946 (depth 2 with 5,000 trials, a verb-slot search with 5,148, exit A's dialog at depth 3 with 4,000).
+  play8's room-42 entries made from room 49 descend from choice (4,154). Settled: recorded as a condition on the
+  ladder (below); not resolved.
+- The static half missed two sites: global script 1 gives 946 to room 69 when its argument is a boot start point,
+  and room 49's local 213 loads room 69 when Bit[418] = 1, whose only literal write sets 0. Settled: neither is a
+  player route as far as the scripts show; the criterion (start sites of local 212) is unaffected.
+- The two "untraced" indirect starts are traced: Var[125] is only read and stays 0; script 72 has no start site.
+  Settled: neither can start local 212.
+- The `Started` touch cannot see scripts started by object code. Settled: the count rests on live, cleared and ran;
+  cleared is robust (only local 212 clears class 12 on 491, and no script sets it).
+- Commit order: amendment (1) at 13:42:39, the tool and amendment (2) at 13:46:42, the build at 13:46:30, the first
+  output at 13:46:58. An earlier, overwritten run cannot be ruled out from the files. Settled: accepted as a limit of
+  the record; reruns are identical.
+- The verb-102 "error" runs (5, 8 and 297 trials) are not investigated. Settled: open; they do not hide the sentence
+  that matters (v102t491 under the v8 node stops at an idle).
+
+**G1** (check b4ead63).
+
+- Reproduced: events byte-equal, records field-equal apart from wall time, verify and probe trace equal, test counts
+  equal. Settled: the PASS holds.
+- "No fix" cannot be shown from git (code and results within 5 minutes, after the run). Settled: consistent with no
+  fix (realize.rs has one commit; reruns of the committed code give the committed result); accepted as a limit.
+- Only candidate (i) ran on the demo; (ii), (iii) and the nearest-first order under a rejection ran only on the toy
+  engine. Settled: open; the next use of the routine must meet them on the real engine.
+- (b) does not test a hidden object (the opening dialog is up, so no floor click walks). Settled: open; a bounded miss
+  from a free-walking state is untested.
+- The approach also misses when no floor point is accepted for a click. Settled: a reading of the spec; no criterion
+  changed.
+- The dialog steps are given as verb ids (120), as the plan allows. Settled: the chain still depends on the planner
+  naming that value.
+- Wall 1.5-2 times higher under load. Settled: the speed prediction is still a miss; the score stays 7 of 9.
+- Room 63 needs all three steps (d120 alone, d120 + s10:596, d120 + d120 all fail to reach it). Settled: supports the
+  verdict.
+- Cosmetic: the gate built in target-e015-g1, not target-e015. Settled: the merged e015 builds in target-e015
+  (below).
+
+**G2** (check d106489).
+
+- Reproduced exactly: seen set, j00077, the 40 steps, score.json, steps.tsv, D1 and D2. An independent Python
+  re-scorer gives the same counts. Settled: the FAIL holds.
+- The plan was followed: amendment (G2-1) committed at 14:23-14:24, before the sample finished and before any score.
+  Settled: no criterion changed after a result.
+- t596's non-keep is not an artifact: it shares every U, R and C atom with v1t596, and every W offset except an
+  ambient unit's. Settled: the FAIL is literal and correct.
+- README error: 40 of 41 recorded initial waits match, not 41 (j00419: recorded 1 stop, the stand-in 0). Settled:
+  corrected here; trial counts are unaffected because the offer points come from the recorded stops.
+- README imprecision: from entry 184, D2's seen set also holds entries 0-183. Settled: corrected here.
+- The criterion names a trial, not a state; E does keep local 211's dialog stop (via v1t596). Settled: the verdict
+  stands as specified. The check names D1 (2 of 25) and the next item as the stronger evidence against §9.
+- The 0.61% is mostly the same states found again in each step (14 room-49 keeps on `at:49:local:206:117`; the 60
+  room-42 keeps on the same 11 atoms), because a stop kept only under E never enters the seen set. Carrying E-novel
+  atoms across steps gives about 28 kept (0.17%), below the 0.5% bound. Settled: the plan fixes the seen set as the
+  archive, so 0.61% stands; noted as a second way the rule would have failed under a cumulative seen set.
+- D1 saves no event chains for its room-63 stops; entry 182's depth-3 chain was not checked separately. Settled:
+  open, minor.
+- Amendment (G2-1)'s approximations (stand-in wait domains; wait stops' U and W atoms not held) can only make E keep
+  more. Settled: they do not change the result.
+
+### The merge
+
+e015-item, e015-g1 and e015-g2 are merged into e015 with no squash. The conflicts were in fmi-checks' `Cargo.toml`
+(the bins `e015`, `e015chk`, `e015-g2`), in `src/bin/e015/main.rs` (now one binary with the subcommands `item` and
+`realize`) and in this plan's amendments (item (1), (2), then (G2-1)). In `CARGO_TARGET_DIR=/var/tmp/fast-mi/target-e015`
+the release bins build, and `cargo test` over the default members gives 241 passed, 0 failed, 9 ignored, with
+`FMI_REALIZE` and `FMI_NOVEL_ENGINE` unset. fmi-explore's unit tests are 50 (G1's 47 plus enovel's 3); every other
+count equals G1's `tests.md`.
+
+### The decision rules, applied
+
+1. **Rule 1 applies.** The item gate shows play8's room-42 branch off the path: room 42's local 212 needs 946, and
+   946 is reached only through exit A, room 63 and room 69. So the ladder is C0-C9 as stated, and play8 stands at C0.
+   The check adds a condition the ladder does not state: C4 → C5 was shown from the branch of opening choice (4,154)
+   and not found from (4,184) within its searches. The ladder is not rewritten (the gate showed it); the condition is
+   carried to the next plan.
+2. **Rule 2 does not apply.** G1 passes but G2 does not, so fixes A-F, K1 and play9 are not triggered by these rules.
+3. **Rule 3 applies.** G2 fails, so the engine-first inversion (report §9) is refuted as stated and is not built.
+4. **Rule 4 does not apply.** G1 passed with no fix.
+5. **Rule 5 does not apply.** No gate is "not run" or "not shown".
+
+**What the rules leave open.** No rule names the next experiment when G1 passes and G2 fails. Rule 2 tied A-F to both
+gates, and its B (live-unit novelty) is the U part of G2's E. What the gates do support: A (engine-confirmed
+realization) passed on the demo's blocker, at milliseconds per sentence; the ladder's C0-C6 are shown in the engine
+on one branch. What they do not settle: whether B is worth building after G2's failure (the dialog state was kept,
+by the earlier trial; D1 reached room 63 from 2 of 25 entries), whether C-F go with A, and the opening-choice
+condition on C4 → C5. The choice of the next experiment is the user's.
