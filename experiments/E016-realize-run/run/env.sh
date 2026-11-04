@@ -17,7 +17,8 @@ nogrow() {
   done
   echo "$out"
 }
-E16="FMI_REALIZE=1 FMI_NOGOOD=1 FMI_FREE_T=archive FMI_GOAL_SITE=verb FMI_FRONTIER=1"
+# FMI_PLAN_DEEPEN=10 (amendment (9)): the first plan limit 10 s, doubled per deferral, where play8 had 120 s
+E16="FMI_REALIZE=1 FMI_NOGOOD=1 FMI_FREE_T=archive FMI_GOAL_SITE=verb FMI_FRONTIER=1 FMI_PLAN_DEEPEN=10"
 E16OFF="FMI_REALIZE= FMI_NOGOOD= FMI_FREE_T= FMI_GOAL_SITE= FMI_FRONTIER="
 ALLON="$(nogrow "$ALLON") FMI_SCOPE_GROW=room $E16"
 ALLOFF="$ALLOFF $E16OFF"
