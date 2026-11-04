@@ -26,6 +26,7 @@ pub mod delay;
 pub mod executor;
 pub mod pyj;
 pub mod reading;
+pub mod realize;
 pub mod recs;
 pub mod refuse;
 pub mod replay;

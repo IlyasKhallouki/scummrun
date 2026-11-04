@@ -12,6 +12,8 @@ json-double = []
 
 [dependencies]
 fmi-core = { path = "../fmi-core" }
+# E015 G1: realize.rs takes afford's offer (fmi-explore does not depend on fmi-play)
+fmi-explore = { path = "../fmi-explore" }
 scumm-ir = { path = "../../../E003-path-through-cloud/scumm/ir" }
 rustc-hash = "2"
 serde_json = { version = "1", features = ["preserve_order"] }
