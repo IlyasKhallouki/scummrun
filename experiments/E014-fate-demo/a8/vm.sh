@@ -148,7 +148,9 @@ check() {
 
 run_bg() {  # W: init and run, then verify every entry, then the stall table
     cd $HERE
-    export ENV=$HERE/run-env.sh HEAVY_LOCK=none W=$1
+    # the disk floor at 2 GB: the VM's 30 GB disk had 13 GB free at the start (earlier runs' files), and a try keeps
+    # about 11 MB in its folder (play7: 863 MB for 80 tries) besides its evictable reading
+    export ENV=$HERE/run-env.sh HEAVY_LOCK=none W=$1 FLOOR_GB=${FLOOR_GB:-2}
     bash $RUN init
     bash $RUN run
     say "run done"
@@ -164,7 +166,7 @@ start() {  # W, detached from the ssh session
 
 resume() {  # W: run the archive on from its files
     cd $HERE
-    export ENV=$HERE/run-env.sh HEAVY_LOCK=none W=$1
+    export ENV=$HERE/run-env.sh HEAVY_LOCK=none W=$1 FLOOR_GB=${FLOOR_GB:-2}
     bash $RUN run
     say "run done"
     bash $RUN stalls || true
