@@ -42,6 +42,11 @@ struct Toy {
     inv: bool,
     /// E016 amendment (2): the inventory slots are image slots (the dump's type 1)
     inv_images: bool,
+    /// E016 amendment (3): one walk box, x 0 to this (in place of the 16 strips); a click on an object also walks to
+    /// its walk point (the walk verb's sentence); object 505 at x 280 with its walk point at x 320
+    one_box: Option<i32>,
+    obj_walks: bool,
+    stone_obj: bool,
 }
 
 fn toy(xstart: i32, dialog: bool) -> Box<dyn Engine> {
@@ -61,6 +66,9 @@ fn toy_raw(xstart: i32, dialog: bool) -> Toy {
         done: vec![],
         inv: false,
         inv_images: false,
+        one_box: None,
+        obj_walks: false,
+        stone_obj: false,
     };
     t.st.idle = t.idle();
     t
@@ -96,10 +104,18 @@ impl Toy {
     }
     fn objects(&self) -> Vec<RoomObject> {
         let o = |id, x, y, w, h| RoomObject { id, x, y, w, h, walk: (x + w / 2, 70), ..Default::default() };
-        vec![o(500, 400, 20, 20, 20), o(501, 20, 20, 30, 30), o(502, 460, 20, 20, 20), o(503, 600, 20, 20, 20), o(504, 520, 20, 20, 20)]
+        let mut v = vec![o(500, 400, 20, 20, 20), o(501, 20, 20, 30, 30), o(502, 460, 20, 20, 20), o(503, 600, 20, 20, 20), o(504, 520, 20, 20, 20)];
+        if self.stone_obj {
+            v.push(RoomObject { id: 505, x: 280, y: 20, w: 20, h: 20, walk: (320, 70), ..Default::default() });
+        }
+        v
     }
     fn boxes_(&self) -> Vec<WalkBox> {
         let mut v = vec![WalkBox::default()];
+        if let Some(x1) = self.one_box {
+            v.push(WalkBox { ul: (0, 60), ur: (x1, 60), lr: (x1, 139), ll: (0, 139), flags: 0 });
+            return v;
+        }
         for i in 0..16 {
             let (x0, x1) = (40 * i, 40 * i + 39);
             v.push(WalkBox { ul: (x0, 60), ur: (x1, 60), lr: (x1, 139), ll: (x0, 139), flags: 0 });
@@ -153,6 +169,10 @@ impl Toy {
                     self.obj1 = 0;
                     self.sel = DEFAULT_VERB;
                     self.busy = 4;
+                    if self.obj_walks {
+                        self.walk_to = self.objects().iter().find(|r| r.id == obj).map(|r| r.walk.0);
+                        self.busy = 10;
+                    }
                 }
             } else if self.boxes_().iter().skip(1).any(|b| inside(vx, vy, (b.ul.0, b.ul.1, b.ur.0 - b.ul.0 + 1, b.ll.1 - b.ul.1 + 1))) {
                 writes.push(Touch { kind: TouchKind::Walk, a: 1, b: 0, old: vx, now: vy });
@@ -545,4 +565,55 @@ fn hook_waits_for_the_idle_stop_and_reports_a_miss() {
     }
     assert!(ex.movie.is_empty());
     assert_eq!(e.status().frame, 100);
+}
+
+// --- E016 amendment (3): the approach in a wide room -----------------------------------------------------------------
+
+#[test]
+fn near_point_brings_a_wide_room_target() {
+    setup();
+    // one box from x 0 to 399: its usual point (the centre, x 199) leaves the camera at xstart 39; only the box's
+    // point nearest 504 (x 520), at the screen's right edge, moves it on
+    let mut t = toy_raw(0, false);
+    t.one_box = Some(399);
+    let mut e: Box<dyn Engine> = Box::new(t.clone());
+    let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 504, None), &Cfg::default()).unwrap().expect("realized");
+    let acc: Vec<&str> = r.attempts.iter().filter(|a| a.accepted).map(|a| a.phase).collect();
+    assert_eq!(acc, vec!["approach", "near", "near", "sentence"], "{:?}", r.attempts.iter().map(|a| (a.phase, &a.seen)).collect::<Vec<_>>());
+    assert_eq!(r.approach, 3);
+    assert_eq!(replayed_on(t, &r.events), vec![(DEFAULT_VERB, 504, 0)]);
+}
+
+#[test]
+fn stepping_stone_brings_the_target() {
+    setup();
+    // one box from x 0 to 79: no floor click moves the camera from xstart 0; the bare click on 505 (walk point x 320,
+    // nearer 502 than the view's middle) walks there and the camera follows; 501 (x 35) is not a stone
+    let mut t = toy_raw(0, false);
+    t.one_box = Some(79);
+    t.obj_walks = true;
+    t.stone_obj = true;
+    let mut e: Box<dyn Engine> = Box::new(t.clone());
+    let r = realize::realize(&mut e, &sentence(DEFAULT_VERB, 502, None), &Cfg::default()).unwrap().expect("realized");
+    let phases: Vec<(&str, bool)> = r.attempts.iter().map(|a| (a.phase, a.accepted)).collect();
+    assert_eq!(phases, vec![("approach", false), ("near", false), ("stone", true), ("sentence", true)], "{:?}",
+               r.attempts.iter().map(|a| (a.phase, &a.name, &a.seen)).collect::<Vec<_>>());
+    assert_eq!(r.approach, 1);
+    assert_eq!(replayed_on(t, &r.events), vec![(DEFAULT_VERB, 505, 0), (DEFAULT_VERB, 502, 0)]);
+}
+
+#[test]
+fn approach_is_bounded() {
+    setup();
+    // 503 is never hit: the approach stops at max_approach accepted clicks, each over at most 2 points per box and
+    // one stone per object
+    let mut e = toy(0, false);
+    let cfg = Cfg::default();
+    let m = realize::realize(&mut e, &sentence(DEFAULT_VERB, 503, None), &cfg).unwrap().err().expect("a miss");
+    assert_eq!(m.reason, "approach");
+    assert!(m.approach <= cfg.max_approach);
+    assert!(m.tries <= (cfg.max_approach + 1) * (2 * 16 + 5), "{}", m.tries);
+    let cfg = Cfg { max_approach: 1, ..Default::default() };
+    let m = realize::realize(&mut e, &sentence(DEFAULT_VERB, 503, None), &cfg).unwrap().err().expect("a miss");
+    assert_eq!((m.reason.as_str(), m.approach), ("approach", 1));
 }

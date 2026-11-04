@@ -9,7 +9,9 @@
 //! * **The approach** (a target with no hit point on the screen): the floor points, nearest first to the target's
 //!   walk point in room coordinates, each clicked in a fork with no verb click and run to the bridge's next idle. A
 //!   click is accepted when its input log shows a walk and the camera's xstart moved toward the target, or the target
-//!   gained a hit point. From the accepted fork it repeats, at most `max_approach` clicks.
+//!   gained a hit point. From the accepted fork it repeats, at most `max_approach` clicks. E016 amendment (3): after
+//!   the boxes' usual points, each box's point nearest the target; then, as stepping stones, bare clicks on room
+//!   objects nearer the target, judged by the same test.
 //! * **The sentence** (v, a, b): candidates in order, (i) a bare click on a, (ii) each offered verb slot then a, and
 //!   for a two-object sentence each of those followed by b, or by each visible slot when b has no hit point. Each is
 //!   tried at up to `max_points` of a's hit points, in a fork run until the input log has the last click's record. A
@@ -334,7 +336,9 @@ fn try_clicks(e: &mut Box<dyn Engine>, phase: &'static str, clicks: &[Point], cf
 }
 
 /// One approach click: the floor points nearest first to the target's place; the first accepted fork, run to the
-/// bridge's next idle (None: no point accepted, or the target has no place in the room).
+/// bridge's next idle (None: no point accepted, or the target has no place in the room). E016 amendment (3): after
+/// the walk boxes' usual points, each box's point nearest the target (`near_points`); when no floor point is
+/// accepted, a bare click on a room object nearer the target as a stepping stone (`stones`).
 fn approach_once(e: &mut Box<dyn Engine>, of: &Offer, a: i32, cfg: &Cfg, rec: &mut Rec) -> EResult<Option<Box<dyn Engine>>> {
     let o = e.obs(&ObsReq::default())?;
     let Some(place) = place_of(&o, a) else {
@@ -350,36 +354,135 @@ fn approach_once(e: &mut Box<dyn Engine>, of: &Offer, a: i32, cfg: &Cfg, rec: &m
     };
     let mut floor: Vec<Point> = of.walks.clone();
     floor.sort_by_key(d2);
-    for p in floor {
-        let (mut b, mut records, mut att) = try_clicks(e, "approach", &[p], cfg)?;
-        rec.tries += 1;
-        let end = b.status().frame + cfg.horizon;
-        let ran = match b.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {
-            Ok(_) => true,
-            Err(EngineError::Ended(_)) => false,
-            Err(x) => return Err(x),
-        };
-        let mut ok = false;
-        if ran {
-            records.extend(b.input_log()?.records);
-            let walk = records.iter().any(|r| r.writes.iter().any(|t| t.kind == TouchKind::Walk));
-            let xs2 = b.status().xstart;
-            let toward = view_dist(xs2, place.0) < view_dist(xs, place.0);
-            let hit = has_hit(&offer_at(&mut b)?, a);
-            ok = (walk && toward) || hit;
-            att.seen = format!("walk={} toward={} hit={} xstart={}->{}", walk as u8, toward as u8, hit as u8, xs, xs2);
-        } else {
-            att.seen = "ended".into();
-        }
-        att.frame = b.status().frame;
-        att.accepted = ok;
-        rec.attempts.push(att);
-        if ok {
+    let mut near = near_points(e, of, place)?;
+    near.sort_by_key(d2);
+    let tries = floor.iter().map(|p| ("approach", *p, None)).chain(near.iter().map(|p| ("near", *p, None)));
+    let stones = stones(&o, of, a, place, xs);
+    for (phase, p, stone) in tries.chain(stones.into_iter().map(|(p, s)| ("stone", p, Some(s)))) {
+        if let Some(b) = approach_try(e, phase, p, stone, a, place, cfg, rec)? {
             return Ok(Some(b));
         }
-        b.quit();
     }
     Ok(None)
+}
+
+/// One approach candidate in a fork: the click, the run to the bridge's next idle, and the test (E015 G1): a walk and
+/// the camera's xstart moved toward the target, or the target gained a hit point. For a stepping stone the walk is a
+/// Walk touch or the click's Sentence touch on the stone (patch 0007 logs the handler's writes; a walk the sentence
+/// script starts is not among them: amendment (3)).
+#[allow(clippy::too_many_arguments)]
+fn approach_try(e: &mut Box<dyn Engine>, phase: &'static str, p: Point, stone: Option<i32>, a: i32, place: (i32, i32), cfg: &Cfg,
+                rec: &mut Rec) -> EResult<Option<Box<dyn Engine>>> {
+    let xs = e.status().xstart;
+    let (mut b, mut records, mut att) = try_clicks(e, phase, &[p], cfg)?;
+    rec.tries += 1;
+    let end = b.status().frame + cfg.horizon;
+    let ran = match b.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {
+        Ok(_) => true,
+        Err(EngineError::Ended(_)) => false,
+        Err(x) => return Err(x),
+    };
+    let mut ok = false;
+    if ran {
+        records.extend(b.input_log()?.records);
+        let walk = records.iter().any(|r| {
+            r.writes.iter().any(|t| t.kind == TouchKind::Walk || (t.kind == TouchKind::Sentence && stone.is_some_and(|s| t.b == s)))
+        });
+        let xs2 = b.status().xstart;
+        let toward = view_dist(xs2, place.0) < view_dist(xs, place.0);
+        let hit = has_hit(&offer_at(&mut b)?, a);
+        ok = (walk && toward) || hit;
+        att.seen = format!("walk={} toward={} hit={} xstart={}->{}", walk as u8, toward as u8, hit as u8, xs, xs2);
+    } else {
+        att.seen = "ended".into();
+    }
+    att.frame = b.status().frame;
+    att.accepted = ok;
+    rec.attempts.push(att);
+    if ok {
+        return Ok(Some(b));
+    }
+    b.quit();
+    Ok(None)
+}
+
+/// E016 amendment (3): for each walkable box (afford's rule), its point nearest the target's place `t` (room
+/// coordinates) on the screen: y the target's, clamped to the box's rows and the main screen's; x the target's,
+/// clamped to the box's columns at that row (between its left edge ul-ll and its right edge ur-lr) and to the
+/// screen's. Kept where the engine's hit test answers no object and no actor (afford's floor test; one AtMany), and
+/// not the box's usual point. Empty without the walk boxes (FMI_BOXES off).
+fn near_points(e: &mut Box<dyn Engine>, of: &Offer, t: (i32, i32)) -> EResult<Vec<Point>> {
+    if of.boxes.is_none() {
+        return Ok(vec![]);
+    }
+    let st = e.status().clone();
+    let xs = st.xstart;
+    let (top, h) = st.screen.map(|s| (s.0, s.1)).unwrap_or((0, afford::SCREEN_H));
+    // the main screen's rows and columns in room coordinates
+    let (ry0, ry1) = (0, h - top - 1);
+    let (rx0, rx1) = (xs, xs + afford::SCREEN_W - 1);
+    let edge = |p: (i32, i32), q: (i32, i32), y: i32| {
+        if q.1 == p.1 {
+            p.0.min(q.0)
+        } else {
+            p.0 + (q.0 - p.0) * (y - p.1).clamp(0.min(q.1 - p.1), 0.max(q.1 - p.1)) / (q.1 - p.1)
+        }
+    };
+    let mut cands: Vec<(usize, (i32, i32))> = Vec::new();
+    for (i, w) in e.boxes()?.boxes.iter().enumerate().skip(afford::FIRST_VALID_BOX) {
+        if !afford::walkable(w.flags) {
+            continue;
+        }
+        let (by0, by1) = (w.ul.1.max(w.ur.1), w.ll.1.min(w.lr.1));
+        let (by0, by1) = if by0 <= by1 { (by0, by1) } else { (w.ul.1.min(w.ur.1), w.ll.1.max(w.lr.1)) };
+        let (y0, y1) = (by0.max(ry0), by1.min(ry1));
+        if y0 > y1 {
+            continue;
+        }
+        let y = t.1.clamp(y0, y1);
+        let (l, r) = (edge(w.ul, w.ll, y), edge(w.ur, w.lr, y));
+        let (l, r) = (l.min(r).max(rx0), l.max(r).min(rx1));
+        if l > r {
+            continue;
+        }
+        let p = (t.0.clamp(l, r) - xs, y + top);
+        if !of.walks.iter().any(|q| q.hit == Hit::Walk(i as i32) && (q.x, q.y) == p) {
+            cands.push((i, p));
+        }
+    }
+    if cands.is_empty() {
+        return Ok(vec![]);
+    }
+    let ats = e.at_many(&cands.iter().map(|c| c.1).collect::<Vec<_>>())?;
+    Ok(cands
+        .into_iter()
+        .zip(ats)
+        .filter(|(_, at)| at.main.is_some_and(|m| m.2 == 0 && m.3 == 0))
+        .map(|((i, p), _)| Point { x: p.0, y: p.1, hit: Hit::Walk(i as i32) })
+        .collect())
+}
+
+/// E016 amendment (3): the stepping stones: each room object of the offer (a hit point on the screen), not a, whose
+/// walk point is nearer the target's place than the view's middle column is, the nearest to the target first; with
+/// its point for a bare click.
+fn stones(o: &Obs, of: &Offer, a: i32, t: (i32, i32), xs: i32) -> Vec<(Point, i32)> {
+    let view = view_dist(xs, t.0);
+    let ros = o.room_objects.as_deref().unwrap_or(&[]);
+    let mut v: Vec<(i64, Point, i32)> = of
+        .targets
+        .iter()
+        .filter_map(|p| match p.hit {
+            Hit::Object(id) if id != a => ros.iter().find(|r| r.id == id).map(|r| (r.walk, *p, id)),
+            _ => None,
+        })
+        .filter(|(w, _, _)| (w.0 - t.0).abs() < view)
+        .map(|(w, p, id)| {
+            let (dx, dy) = ((w.0 - t.0) as i64, (w.1 - t.1) as i64);
+            (dx * dx + dy * dy, p, id)
+        })
+        .collect();
+    v.sort_by_key(|x| x.0);
+    v.into_iter().map(|(_, p, id)| (p, id)).collect()
 }
 
 /// Up to `max_points` points at which the engine's hit test answers object or actor `a`: the object's grid points
