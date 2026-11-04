@@ -1015,3 +1015,14 @@ Patch 0007 (committed before this amendment) decides "ignored" as "changed nothi
 - a slot the run started that is still alive counts as a change.
 
 This is reported with the results.
+
+## Integration, as far as it ran (2026-11-04, 00:55): stopped before the kitchen rerun
+
+The integration merged e013-refuse, e013-stall and e013-free (with E014's pieces already in) and built
+/var/tmp/fast-mi/target-e013. The gates that ran all passed (results/integration/summary.txt): the Rust tests (172
+passed, 0 failed), E011's G2-G5 on the engine with every switch off, on, and with patch 0007's input log (the kitchen's
+test (a) still 488 frames, 36 inputs, 0 differences from boot), the kitchen golden (G6) and G6 with --prep, and G10's
+play fixtures (501 of 501 children equal, off and on) and its lama clause with E012 off. Not run: the rest of G7, G9
+and A3 on, and the kitchen rerun (K1). The PI chose to go straight to the demo (rule (c) of amendment (2)), since the
+gates that ran show Monkey Island unchanged with the switches off and working with them on; K1 measured improvement on a
+goal already reached. The demo runs next on the cloud VM; the independent check after it covers this integration.

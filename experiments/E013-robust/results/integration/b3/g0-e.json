@@ -1,0 +1,243 @@
+[
+ {
+  "job": "j00000",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2767,
+   2848,
+   2850,
+   2862,
+   2929
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00001",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2863,
+   2930
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00002",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2852,
+   2862,
+   2851,
+   2861,
+   2929
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00003",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2850,
+   2862,
+   2929
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00004",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2854,
+   2862,
+   2853,
+   2861,
+   2929
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00005",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2852,
+   2862,
+   2851,
+   2861,
+   2929
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00006",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2768,
+   2818,
+   2820,
+   2854,
+   2768,
+   2818,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00007",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2820,
+   2854,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00008",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2769,
+   2818,
+   2820,
+   2854,
+   2769,
+   2818,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00009",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2768,
+   2818,
+   2820,
+   2854,
+   2768,
+   2818,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00010",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2820,
+   2854,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00011",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2770,
+   2818,
+   2820,
+   2854,
+   2770,
+   2818,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00012",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2769,
+   2818,
+   2820,
+   2854,
+   2769,
+   2818,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00013",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2820,
+   2854,
+   2921
+  ],
+  "differ": []
+ },
+ {
+  "job": "j00014",
+  "class": [
+   "refinement",
+   "refinement"
+  ],
+  "same_class": true,
+  "new": [
+   2771,
+   2818,
+   2820,
+   2854,
+   2771,
+   2818,
+   2921
+  ],
+  "differ": []
+ }
+]
