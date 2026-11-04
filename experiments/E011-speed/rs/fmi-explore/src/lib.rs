@@ -11,11 +11,14 @@
 //! * `mech`: E012's try: the mechanisms' switches and ports, the try's novelty, the entries it commits besides its
 //!   attempt's, the dead moves and the affordance step's triggers (tryjob.rs runs them in the plan's order).
 //! * `wait`: E012's wait move (plan.md section 1); `waitcheck`: its gates (`fmi check wait`).
+//! * `bound`, `grow`: E014 amendment (4)'s bound on a try's fresh reading (FMI_READ_BOUND, FMI_READ_BOUND_BG) and
+//!   its scopes grown as needed (FMI_SCOPE_GROW).
 //! * `stall`: E013's stall accounting (experiments/E013-robust/plan.md, section C): every second of a try in a row of
 //!   the harness's own records and a class; stalls.json after each commit (FMI_STALLS); the free share's shift rules.
 
 pub mod afford;
 pub mod archive;
+pub mod bound;
 pub mod check;
 pub mod doubles;
 pub mod driver;
@@ -24,6 +27,7 @@ pub mod explorecmd;
 pub mod fake;
 pub mod files;
 pub mod free;
+pub mod grow;
 pub mod guide;
 pub mod harness;
 pub mod machine;
