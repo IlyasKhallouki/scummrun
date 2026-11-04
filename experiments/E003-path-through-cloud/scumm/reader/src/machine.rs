@@ -28,7 +28,9 @@ use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use scumm_ir::{
     known, CmpOp, Expr, ExprId, Fact, FactMap, Game, Reason, Slot, Span, Stmt, Sym, UnitId, UnitKey, Yield,
 };
-use scumm_machine::machine::{Fork, Hooks, R, VAR_INVENTORY_SCRIPT, VAR_OVERRIDE, VAR_ROOM, VAR_ROOM_RESOURCE, X};
+use scumm_machine::machine::{
+    Fork, Hooks, R, VAR_INVENTORY_SCRIPT, VAR_OVERRIDE, VAR_ROOM, VAR_ROOM_RESOURCE, WIDENED, X,
+};
 use scumm_machine::oracle::{FactOracle, Prefix};
 use scumm_machine::path::{fmix, Assumption, Call, Entry, Owned, Path, PathExt, Run, Side, Sig, Step, S};
 use scumm_machine::value::{i16w, Dec, Op, Unknown, Val};
@@ -255,6 +257,7 @@ fn reason_of(s: &str) -> Reason {
         R_STEP,
         R_COND,
         R_COPY,
+        WIDENED,
     ];
     if let Some(r) = all.iter().find(|r| r.as_str() == s) {
         return *r;
@@ -2989,6 +2992,14 @@ pub fn dump_capture_run(rd: &mut Reader, cx: &Ctx, i: usize, c: &Py) -> Py {
 mod tests {
     use super::*;
     use crate::record::CutStep;
+
+    /// Every reason the machine half makes reads back as itself, the widened loop's among them (E016 play9's panic).
+    #[test]
+    fn reasons_read_back() {
+        for r in [WIDENED, R_FACT, R_NONFACT, R_COLLAPSED, R_STEP, R_COND, R_COPY, Reason::Var(56), Reason::Sound] {
+            assert_eq!(reason_of(r.as_str().as_ref()), r);
+        }
+    }
 
     /// A path whose stack holds one call with these steps, `done` of them run.
     fn path(steps: Vec<Step>, done: u32) -> Path {
