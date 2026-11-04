@@ -30,6 +30,9 @@ struct Toy {
     boxes_asked: std::sync::Arc<std::sync::atomic::AtomicU32>,
     /// E013: the input log (a click that changes no state is "ignored")
     log: Vec<InputRecord>,
+    /// E014 amendment (7): the bridge's input check (patch 0002: a click needs 0 <= x, y < 0x10000); off, every
+    /// input is scheduled
+    strict: bool,
 }
 
 fn toy(frame: u64, dialog: bool) -> Toy {
@@ -51,6 +54,7 @@ fn toy(frame: u64, dialog: bool) -> Toy {
         dialog,
         boxes_asked: Default::default(),
         log: vec![],
+        strict: false,
     };
     t.st.idle = t.idle();
     t
@@ -241,6 +245,12 @@ impl Engine for Toy {
         }
     }
     fn inputs(&mut self, events: &[Event]) -> EResult<()> {
+        if self.strict {
+            if let Some(k) = events.iter().position(|e| matches!(e.what, Input::Click(x, y) if x < 0 || y < 0)) {
+                return Err(EngineError::Bridge(format!(
+                    "events: event {k}: expected frame > 0, and a click/rclick/move in range, a key name or skips")));
+            }
+        }
         self.pending.extend_from_slice(events);
         Ok(())
     }
@@ -448,6 +458,60 @@ fn trials_kept_by_novelty() {
     assert!(by["v2"].outcome.is_empty());
     assert_eq!(by["v2t100"].outcome, vec![(Key::pack(K_ROOM, 0, 0, 0), 7)]);
     assert_eq!(by["v2t100"].back, Some(by["v2t100"].frame - 100));
+}
+
+#[test]
+fn an_input_the_bridge_refuses_is_a_refused_trial_and_the_step_goes_on() {
+    // the camera scrolled right: the actor stands left of the screen, so its hit point has x < 0, which the bridge's
+    // input check refuses
+    let mk = |strict: bool| {
+        let mut t = toy(100, false);
+        t.st.xstart = 160;
+        t.strict = strict;
+        boxed(t)
+    };
+    let mut e = mk(true);
+    let o = e.obs(&ObsReq::default()).unwrap();
+    let of = afford::offer(&mut e, &o).unwrap();
+    let actor = *of.targets.iter().find(|p| p.hit == Hit::Actor(1)).expect("the actor's point");
+    assert!(actor.x < 0, "{actor:?}");
+    let inp = afford::inputs_of(&of);
+    let tested = [Key::bit(5), Key::bit(6), Key::bit(9)];
+    let nov = novelty();
+    let cfg = AffordCfg { horizon: 200, refuse: true, dedupe: false, check: false, ..Default::default() };
+    let out = afford::try_all(&mut e, &of, &inp, &tested, &nov, &cfg, None).expect("the step goes on");
+    let off_screen = |t: &afford::Trial| t.inputs.clicks.iter().any(|p| p.x < 0 || p.y < 0);
+    let refused: Vec<String> =
+        out.trials.iter().filter(|t| t.verdict.as_deref() == Some(afford::BRIDGE_REFUSED)).map(|t| t.inputs.name()).collect();
+    let expect: Vec<String> = out.trials.iter().filter(|t| off_screen(t)).map(|t| t.inputs.name()).collect();
+    assert_eq!(refused, expect);
+    // the trial's own clicks and a third click
+    for n in ["v2t-1", "v3t-1", "t-1", "v3t102t-1"] {
+        assert!(refused.contains(&n.to_string()), "{n}: {refused:?}");
+    }
+    for t in out.trials.iter().filter(|t| off_screen(t)) {
+        assert_eq!((t.reason.as_str(), t.ended, t.kept), ("refused", false, 0), "{}", t.inputs.name());
+    }
+    // every other trial ran as it does with no input check
+    let mut e2 = mk(false);
+    let out2 = afford::try_all(&mut e2, &of, &inp, &tested, &nov, &cfg, None).unwrap();
+    let ran = |o: &afford::AffordOut| -> Vec<(String, u64, String, Option<String>)> {
+        o.trials.iter().filter(|t| !off_screen(t)).map(|t| (t.inputs.name(), t.frame, t.reason.clone(), t.verdict.clone())).collect()
+    };
+    assert_eq!(ran(&out), ran(&out2));
+    assert!(out2.trials.iter().any(off_screen), "with no input check the actor's clicks run");
+    let kept = |o: &afford::AffordOut| {
+        o.kept.iter().filter(|k| !k.name.contains("t-1")).map(|k| (k.name.clone(), k.novel.clone())).collect::<Vec<_>>()
+    };
+    assert_eq!(kept(&out), kept(&out2));
+    // the record: the refused trials by verdict, and each with its events and the bridge's text
+    let rec = out.json();
+    assert_eq!(rec["verdicts"][afford::BRIDGE_REFUSED], serde_json::json!(refused.len()));
+    let br = rec["bridge_refused"].as_array().unwrap();
+    assert_eq!(br.iter().map(|x| x["inputs"].as_str().unwrap().to_string()).collect::<Vec<_>>(), refused);
+    assert!(br.iter().all(|x| x["why"].as_str().unwrap().starts_with("events: event ")));
+    assert_eq!(br[0]["events"].as_array().unwrap().last().unwrap()["click"][0], serde_json::json!(actor.x));
+    assert!(out2.json().get("bridge_refused").is_none());
 }
 
 #[test]
