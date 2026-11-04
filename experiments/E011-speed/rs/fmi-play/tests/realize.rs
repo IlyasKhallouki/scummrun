@@ -4,7 +4,9 @@
 //! two-object sentence. The switch off is tested in tests/realize_off.rs (its own process).
 //!
 //! E016 A (experiments/E016-realize-run/plan.md, amendment (1)): the inventory extension on a toy with inventory slots
-//! (an inventory object with a room object, with another inventory object, after an approach to b, a bounded miss).
+//! (an inventory object with a room object, with another inventory object, after an approach to b, a bounded miss),
+//! and the run path's hook (`executor::play_input` with the switch on: the accepted events played on the branch; a
+//! miss as a route error with realize's reason).
 
 use fmi_core::*;
 use fmi_play::realize::{self, Cfg, Step};
@@ -405,7 +407,7 @@ fn step_text_round_trips() {
     assert!(Step::parse("x1").is_none());
 }
 
-// --- E016 A: the inventory extension ---------------------------------------------------------
+// --- E016 A: the inventory extension and the run path's hook ---------------------------------------------------------
 
 fn inv_toy_raw(xstart: i32) -> Toy {
     let mut t = toy_raw(xstart, false);
@@ -465,4 +467,62 @@ fn inventory_miss_is_bounded() {
     let cfg = Cfg { max_candidates: 10, ..Default::default() };
     let m = realize::realize(&mut e, &sentence(3, 999, None), &cfg).unwrap().err().expect("a miss");
     assert_eq!(m.candidates, 10);
+}
+
+#[test]
+fn hook_plays_the_accepted_events_on_the_branch() {
+    use fmi_play::executor::{self, Br, Executor};
+    use fmi_play::replay::InputStep;
+    setup();
+    let mut e = toy(320, false);
+    let inp = InputStep { kind: "click", verb: Some(2), a: Some(502), b: None, key: None };
+    let mut ex = Executor::new(false);
+    {
+        let mut br = Br::new(&mut e, None);
+        br.watch_first = true;
+        executor::play_input(&mut ex, &mut br, &inp, "sentence(2,502)#1").unwrap();
+        // the first input's frame and dump are taken where the branch scheduled it
+        assert_eq!(br.first_before.as_ref().map(|f| f.0), Some(100));
+    }
+    // the branch stands at the last event's frame with the events in the executor's movie
+    assert_eq!(ex.movie.len(), 2);
+    assert_eq!(e.status().frame, ex.movie.iter().map(|x| x.frame).max().unwrap());
+    e.run(&RunSpec { frame: Some(e.status().frame + 1), ..Default::default() }).unwrap();
+    let log = e.input_log().unwrap();
+    let seen: Vec<(i32, i32, i32)> =
+        log.records.iter().flat_map(|r| r.writes.iter()).filter(|t| t.kind == TouchKind::Sentence).map(|t| (t.a, t.b, t.old)).collect();
+    assert_eq!(seen, vec![(2, 502, 0)]);
+    assert_eq!(ex.check_var, None);
+    // a dialog line
+    let mut d = toy(320, true);
+    let mut ex = Executor::new(false);
+    let inp = InputStep { kind: "line", verb: Some(120), a: None, b: None, key: None };
+    executor::play_input(&mut ex, &mut Br::new(&mut d, None), &inp, "dialog_line(120)#1").unwrap();
+    assert_eq!((ex.movie.len(), d.status().frame), (1, 101));
+}
+
+#[test]
+fn hook_waits_for_the_idle_stop_and_reports_a_miss() {
+    use fmi_play::executor::{self, Br, Executor, PlayErr};
+    use fmi_play::replay::InputStep;
+    setup();
+    // a branch that is not idle runs to the idle stop first
+    let mut t = toy_raw(320, false);
+    t.busy = 5;
+    t.st.idle = None;
+    let mut e: Box<dyn Engine> = Box::new(t);
+    let mut ex = Executor::new(false);
+    let inp = InputStep { kind: "click", verb: Some(DEFAULT_VERB as i64), a: Some(500), b: None, key: None };
+    executor::play_input(&mut ex, &mut Br::new(&mut e, None), &inp, "s").unwrap();
+    assert_eq!(ex.movie[0].frame, 106);
+    // a miss is the child's interface outcome, with realize's reason
+    let mut e = toy(320, false);
+    let mut ex = Executor::new(false);
+    let inp = InputStep { kind: "click", verb: Some(7), a: Some(500), b: None, key: None };
+    match executor::play_input(&mut ex, &mut Br::new(&mut e, None), &inp, "sentence(7,500)#1") {
+        Err(PlayErr::Route(m)) => assert!(m.starts_with("sentence(7,500)#1: realize: no sentence"), "{m}"),
+        _ => panic!("not a route error"),
+    }
+    assert!(ex.movie.is_empty());
+    assert_eq!(e.status().frame, 100);
 }

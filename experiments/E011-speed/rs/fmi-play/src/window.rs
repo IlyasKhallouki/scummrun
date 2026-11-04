@@ -3248,6 +3248,10 @@ impl Search {
             };
             return Ok(replay::verb_point(verb, s, &mut at)?.is_some());
         }
+        if crate::realize::on() {
+            // E016 A (amendment (1), row 1): realize's click waits for the bridge's idle rule, not the profile's rooms
+            return Ok(st.idle.is_some());
+        }
         Ok(st.cs == 0 && st.room != 0 && (executor::DOS_CD.verbless_rooms.contains(&st.room) || !s.verbs.is_empty()))
     }
 

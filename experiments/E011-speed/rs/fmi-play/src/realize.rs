@@ -1,7 +1,8 @@
 //! E015's G1 (experiments/E015-engine-gates/plan.md, "G1: realize a planned sentence through the engine, not a
 //! profile"): a planned step turned into clicks by searching in forks of the engine, each candidate judged by the
-//! engine's own input log (patch 0007). Switch `FMI_REALIZE=1`, off by default; nothing on the run path calls it in
-//! E015 (the measurement binary `e015 realize` does).
+//! engine's own input log (patch 0007). Switch `FMI_REALIZE=1`, off by default. E016 puts it on the run path
+//! (experiments/E016-realize-run/plan.md, "A. Realization on the run path"; amendment (1)): with the switch on, a window
+//! child's "click" and "line" steps are realized here (`play`), not by the executor and its profile.
 //!
 //! * **The offer** is afford's (`offer_cfg`): the visible verb slots, the touchable room objects and the actors with a
 //!   point the engine's hit test confirms, and the walk boxes' floor points.
@@ -22,6 +23,8 @@
 //!
 //! The engine is the only judge: no interface profile, no verb or variable number of a game, no wait for a verb.
 
+use crate::executor::{Br, PResult, PlayErr};
+use crate::replay::InputStep;
 use fmi_core::*;
 use fmi_explore::afford::{self, Hit, Inputs, Offer, Point};
 use std::time::Instant;
@@ -524,4 +527,56 @@ fn inventory(e: &mut Box<dyn Engine>, of: &Offer, v: i32, a: i32, b: Option<i32>
         }
     }
     Ok(None)
+}
+
+// --- E016 A: the run path's hook ------------------------------------------------------------------------------------
+
+/// The step realize takes for a window child's input (amendment (1)): a "click" step (a sentence or walk_to record,
+/// whose verb is the record's) is `Step::Sentence`, a "line" step (a dialog_line record) `Step::Dialog`; None for
+/// another kind or a step without its verb or object.
+pub fn step_of(inp: &InputStep) -> Option<Step> {
+    match inp.kind {
+        "click" => Some(Step::Sentence { v: inp.verb? as i32, a: inp.a? as i32, b: inp.b.map(|x| x as i32) }),
+        "line" => Some(Step::Dialog { v: inp.verb? as i32 }),
+        _ => None,
+    }
+}
+
+/// E016 A (plan.md, "A. Realization on the run path"; amendment (1)): a window child's "click" or "line" step realized
+/// on the child's engine with FMI_REALIZE=1 (`executor::play_input` calls it). The branch is first run to the bridge's
+/// idle stop when it is not at one (at most `Cfg::horizon` frames). The accepted events are then played in place on
+/// the branch: scheduled with `Br::inputs` and run to the last one's frame through `Br::run`, so the frame observer
+/// and the strict matcher see every frame as with the executor's input; the accepted fork is quit. `movie` gets the
+/// events. A miss is `PlayErr::Route` with realize's reason ("approach", "no sentence", "no slot", "not taken").
+pub fn play(b: &mut Br, inp: &InputStep, name: &str, movie: &mut Vec<Event>) -> PResult<()> {
+    let route = |m: String| Err(PlayErr::Route(format!("{name}: realize: {m}")));
+    let Some(step) = step_of(inp) else {
+        return route(format!("a {} step without its verb or object", inp.kind));
+    };
+    let cfg = Cfg::default();
+    if b.status().idle.is_none() {
+        let end = b.frame() + cfg.horizon;
+        match b.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {
+            Ok(st) if st.reason == "idle" => {}
+            Ok(_) => return route(format!("no idle stop within {} frames", cfg.horizon)),
+            Err(EngineError::Ended(st)) => return route(format!("the run ended: {}", st.reason)),
+            Err(x) => return Err(x.into()),
+        }
+    }
+    match realize(&mut *b.e, &step, &cfg)? {
+        Ok(r) => {
+            r.engine.quit();
+            let Some(last) = r.events.iter().map(|x| x.frame).max() else {
+                return route("no input".into());
+            };
+            b.inputs(&r.events)?;
+            movie.extend(r.events.iter().cloned());
+            match b.run(&RunSpec { frame: Some(last), ..Default::default() }) {
+                Ok(_) => Ok(()),
+                Err(EngineError::Ended(st)) => route(format!("the run ended: {}", st.reason)),
+                Err(x) => Err(x.into()),
+            }
+        }
+        Err(m) => route(format!("{} ({} approach clicks, {} candidates, {} forks)", m.reason, m.approach, m.candidates, m.tries)),
+    }
 }
