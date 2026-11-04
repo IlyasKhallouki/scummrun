@@ -2005,6 +2005,14 @@ impl Archive {
             m.insert("novelty".into(), progress::novelty_json(p, &self.live_rows()));
             m.insert("dead".into(), Value::Array(self.dead_moves(i)));
         }
+        if crate::nogood::on() {
+            // E016 C: the entry's refutations, and the no-plan records of the scope's newest reading (a record of a
+            // reading that a newer one of its scope replaced, or that was evicted, is dropped)
+            let live: HashSet<String> =
+                self.readings_for(&scope).first().and_then(|x| x.get("path")).and_then(|p| p.as_str()).map(|p| p.to_string()).into_iter().collect();
+            let lines: Vec<&Value> = self.logs.iter().filter(|x| committed(x)).collect();
+            m.insert("nogood".into(), crate::nogood::job_json(&lines, i as i64, &live));
+        }
         // E014 amendment (4): the whole ring for the try's scope need (b), the readings that may stand in (a)
         if self.grown.is_some() {
             m.insert("ring".into(), json!(ring(&self.edges, row.room.unwrap_or(i64::MIN), &self.allowed)));
@@ -2361,6 +2369,10 @@ impl Archive {
             line.insert("dead_entries".into(), json!(dead_entries));
             let dead = if outcome != "return differs" { res.get("dead").filter(|d| d.is_array()).cloned() } else { None };
             line.insert("dead".into(), dead.unwrap_or_else(|| json!([])));
+        }
+        // E016 C (FMI_NOGOOD): what the try added to the failure memory (job_doc gives it to later tries)
+        if let Some(ng) = res.get("nogood").filter(|_| outcome != "return differs") {
+            line.insert("nogood".into(), ng.clone());
         }
         if let Some(k) = job.get("kind") {
             // E013 (FMI_FREE): the job's kind, and the cell's free counts after it

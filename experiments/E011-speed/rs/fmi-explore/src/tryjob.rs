@@ -621,7 +621,7 @@ struct Attempt {
 #[allow(clippy::too_many_arguments)]
 fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>, tg: &Target, goal: &[(String, Vec<i64>)],
            adir: &Path, threads: u32, workers: u32, ready: bool, first_limit: Option<u64>, log: &JobLog,
-           cancel: &Arc<AtomicBool>, x: &PlayExtras, keep: bool) -> Result<Attempt, String> {
+           cancel: &Arc<AtomicBool>, x: &PlayExtras, keep: bool, ng: Option<&crate::nogood::Shared>) -> Result<Attempt, String> {
     // the harness's goal (step::target_goal: E012's one target per key gives the key a value list); tier 0's goal has
     // reader-scope's form
     if tg.tier == 0 {
@@ -668,6 +668,13 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let say = |m: &str| log.say(m);
     log.say(&format!("attempt {}: target {} (tier {}) from frame {}", adir.file_name().unwrap().to_string_lossy(), tg.text(), tg.tier, root.status().frame));
     let mut h = Harness::new(cfg, &r.planners, player, Some(&mut wiring), rd.clone(), hgoal, ps, &say)?;
+    if let Some(m) = ng {
+        // E016 C (FMI_NOGOOD): the try's failure memory, with the readings' tested keys for the no-plan key
+        let tp = r.mech.tested.clone();
+        let tested: Option<Arc<dyn Fn(&dyn ReadingSource) -> Option<Vec<Key>> + Send + Sync>> =
+            tp.map(|p| Arc::new(move |rd: &dyn ReadingSource| p.tested(rd).ok().map(|t| t.keys().to_vec())) as _);
+        h.set_nogood(crate::nogood::Ctx { mem: m.clone(), tested });
+    }
     let ta = Instant::now();
     let pa = machine::port_s();
     let res = h.run();
@@ -786,6 +793,8 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     let mut prof = Prof::new();
     // E012's mechanisms in the try (plan.md, "How a try runs"); every switch off: none runs, the try is round 2's
     let sw = Switches::from_env();
+    // E016 C (FMI_NOGOOD): the try's failure memory, from job.json's for its entry, shared by its attempts
+    let ng: Option<crate::nogood::Shared> = crate::nogood::on().then(|| Arc::new(Mutex::new(crate::nogood::Memory::of_job(&job))));
     let mut e12 = Map::new();
     // E013 (FMI_FREE, component free): a free try plans nothing; its offers follow the wait (free.rs)
     let mut free_try = crate::free::job_is_free(&job);
@@ -1054,13 +1063,13 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
             let first_limit = deepen.map(|l0| step::deepen_limit(l0, n_def));
             let x = extras_of(nov.as_ref());
             let att = match from_stop {
-                None => attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine).map_err(Err)?,
+                None => attempt(r, &rd, root, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine, ng.as_ref()).map_err(Err)?,
                 Some(si) => {
                     // the goal again from a wait's stop: the entry's state run on with no input to the stop's frame
                     // (a fork of the entry; the stop's checkpoint is held to it)
                     let stop = &waited.as_ref().unwrap().stops[si];
                     let mut b = engine_at(root, &stop.checkpoint).map_err(Err)?;
-                    let a = attempt(r, &rd, &mut b, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine);
+                    let a = attempt(r, &rd, &mut b, &tg, &goal, &adir, threads, workers, ready, first_limit, log, &cancel_arc, &x, keep_engine, ng.as_ref());
                     machine::port(|| b.quit());
                     a.map_err(Err)?
                 }
@@ -1347,6 +1356,10 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
     }
     if let Some(f) = free_rec {
         out["free"] = f;
+    }
+    // E016 C: what the try's attempts added to the failure memory
+    if let Some(m) = &ng {
+        out["nogood"] = m.lock().unwrap().result_json();
     }
     match res {
         Ok(()) => {}
