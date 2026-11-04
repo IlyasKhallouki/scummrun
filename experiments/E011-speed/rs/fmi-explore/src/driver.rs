@@ -492,6 +492,12 @@ pub struct DriverStats {
     pub own_by_job: Vec<f64>,
 }
 
+/// E014 amendment (8): `FMI_STOP_WALL=S`, the run's wall limit in seconds of this driver's wall. Once it is reached no
+/// try starts; the running tries finish and are committed; the stop is "wall limit". Unset (or not a number): no limit.
+pub fn stop_wall_s() -> Option<f64> {
+    std::env::var("FMI_STOP_WALL").ok().and_then(|v| v.trim().parse::<f64>().ok()).filter(|v| *v >= 0.0)
+}
+
 /// The job loop (explore.py `run`): until a stop rule fires. Returns summary.json's contents.
 pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn Verifier>, stats: &mut DriverStats) -> Res<Value> {
     let mut a = Archive::open(root)?;
@@ -535,6 +541,8 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
     let (mut stop, mut detail, mut stopping): (Option<String>, Value, bool) = (None, Value::Null, false);
     let stop_jobs = files::as_i64(a.e009.get("stop_jobs")).unwrap_or(0);
     let mut bound = false;
+    let (wall0, stop_wall) = (Instant::now(), stop_wall_s());
+    let mut walled = false;
     let commit_finished = files::truthy(a.e010.get("commit_finished"));
     let in_process = matches!(mode, StepMode::InProcess(_));
     let mut woken = 0u64;
@@ -674,6 +682,10 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                     bound = true;
                     break;
                 }
+                if stop_wall.is_some_and(|w| wall0.elapsed().as_secs_f64() >= w) {
+                    walled = true;
+                    break;
+                }
                 if free() < m.floor_gb * GIB {
                     floor = true;
                     break;
@@ -700,6 +712,11 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
             if stop.is_none() && bound && a.goal_entries().is_empty() {
                 stop = Some("prediction bound".into());
                 detail = json!({"jobs": a.job_names().len(), "stop_jobs": stop_jobs});
+            }
+            if stop.is_none() && walled && a.goal_entries().is_empty() {
+                stop = Some("wall limit".into());
+                detail = json!({"wall_s": pyjson::round(wall0.elapsed().as_secs_f64(), 1), "stop_wall_s": stop_wall,
+                                "jobs": a.job_names().len()});
             }
             if stop.is_none() {
                 if a.select(1).is_empty() {

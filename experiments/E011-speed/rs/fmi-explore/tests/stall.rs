@@ -367,3 +367,24 @@ fn a_refined_task_without_the_targets_fact() {
     assert_eq!(missing_goal_fact(&goal, &doms), Some(k));
     assert_eq!(missing_goal_fact(&goal[..1], &doms), None);
 }
+
+/// E014 amendment (8): FMI_STOP_WALL. At a wall limit of 0 s no try starts and the stop is "wall limit"; a limit far
+/// off leaves the run to its other rules (here the falsifier's bound).
+#[test]
+fn the_wall_limit_stops_the_driver() {
+    let _g = env(true);
+    let t = tmp("wall");
+    let root = make(&t, Some(json!({"stop_jobs": 3}))).root.clone();
+    std::env::set_var("FMI_STOP_WALL", "0");
+    let s = drive(&root);
+    assert_eq!(s["stop"], json!("wall limit"));
+    assert_eq!(s["jobs"], json!(0));
+    assert_eq!(s["detail"]["stop_wall_s"], json!(0.0));
+    // resumed with a limit far off: the bound stops it after its 3 tries, every one committed
+    std::fs::remove_file(root.join("summary.json")).unwrap();
+    std::env::set_var("FMI_STOP_WALL", "100000");
+    let s = drive(&root);
+    std::env::remove_var("FMI_STOP_WALL");
+    assert_eq!(s["stop"], json!("prediction bound"));
+    assert_eq!(s["jobs"], json!(3));
+}
