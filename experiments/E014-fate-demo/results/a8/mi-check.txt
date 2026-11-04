@@ -1,0 +1,11 @@
+# E014 amendment (8): rule (2) on Monkey Island, every switch on (A4_ENV=a8/env.sh a4/mi-check.sh /var/tmp/fast-mi/e014-a8mi b3 kitchen smoke), target-e014e
+[10:14:56] b3 all: GUARD: rc 0 wall 591.0 s low 0 min MemAvailable 5557824 kB G12: 560 samples, 556 with an fmi process, largest fmi tree 19 processes, python processes in an fmi tree 0 [10:14:56] heavy lock released; done 
+[10:14:57] b3 all vs E013's G-on all rc 0: G0 /var/tmp/fast-mi/e014-a8mi/b3f/all-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+[10:14:57] b3 tries whose reading waited on the bound's thread: 10; bounded: 0
+[10:15:26] b3 verify-new all (E014's mechanisms on) rc 0: verify-new /var/tmp/fast-mi/e014-a8mi/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
+[10:15:47] kitchen: the goal entry 150's chain, 8 entries (44 55 85 123 135 142 146 150) verified from boot, 0 with differences or errors; goal entry: differences: 0; final {'owner:566': 1}
+[10:17:19] smoke (ALLON with A4): [10:15:47] start: /var/tmp/fast-mi/target-e014e/release/fmi, set all, engine /var/tmp/fast-mi/svm-e013/build/scummvm/scummvm, b 1, N 4; load 4.33 5.97 6.82 [10:17:02] run: 74.4227 s; GUARD: rc 0 wall 74.4 s low 0 min MemAvailable 9223848 kB [10:17:19] verify: 21 entries from boot (fmi explore verify), 0 with differences or errors [10:17:19] stall-report rc 0: 5 PASS, 0 FAIL 
+  smoke j00000 scope [33] grow null new 2 reading no cached reading
+  smoke j00001 scope [33] grow null new 2 reading reused (e009 keys)
+  smoke j00002 scope [33] grow null new 5 reading reused (e009 keys)
+  smoke j00003 scope [33] grow null new 12 reading reused
