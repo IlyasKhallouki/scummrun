@@ -1108,6 +1108,10 @@ impl Builder<'_> {
             // E014's FMI_READ_WIDEN changes the runs the path limit cuts: its store is its own (unset: the text as before)
             writeln!(t, "read_widen 1").unwrap();
         }
+        if crate::builder::read_sound_switch() {
+            // E014's FMI_READ_SOUND changes the runs through sound commands: its store is its own (unset: as before)
+            writeln!(t, "read_sound 1").unwrap();
+        }
         t
     }
 

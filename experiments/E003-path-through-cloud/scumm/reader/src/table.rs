@@ -209,6 +209,9 @@ impl FactTable {
             actor_room_domains(scope, game, &start, &doms, &mut extra, &mut counts);
         }
         let mut engine: BTreeSet<i32> = domains::ENGINE.iter().map(|e| e.0).collect();
+        if crate::builder::read_sound_switch() {
+            engine.insert(domains::VAR_SOUNDRESULT);
+        }
         engine.extend(TIME_VARS);
         engine.extend(MOUSE_VARS);
         let mut points: BTreeMap<&'static str, BTreeMap<String, BTreeSet<i64>>> = BTreeMap::new();
@@ -452,7 +455,7 @@ fn actor_room_domains(
         if let Some(&(_, v)) = SETTINGS.iter().find(|s| s.0 == n) {
             return Some([v].into_iter().collect());
         }
-        if domains::ENGINE.iter().any(|e| e.0 == n) || TIME_VARS.contains(&n) || MOUSE_VARS.contains(&n) {
+        if domains::engine_why(n).is_some() || TIME_VARS.contains(&n) || MOUSE_VARS.contains(&n) {
             return None;
         }
         if !scope.writes.has(&k) {

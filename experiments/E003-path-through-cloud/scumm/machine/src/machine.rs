@@ -43,7 +43,7 @@ pub use hooks::Hooks;
 pub use settle::ROUND;
 
 use crate::enc;
-use crate::heads::{effect, Effect};
+use crate::heads::{effect_with, Effect};
 use crate::oracle::{FactOracle, OVal, Prefix};
 use crate::path::*;
 use crate::trace::Tracer;
@@ -263,6 +263,9 @@ pub struct Machine<'g> {
     pub round_limit: u32,
     /// E014's switch FMI_READ_WIDEN (`widen.rs`): loops are widened in this run; off by default
     pub widen_loops: bool,
+    /// E014 amendment (8)'s switch FMI_READ_SOUND (`heads::effect_with`): output-only ops (sound commands) have no
+    /// tracked effect instead of no rule; off by default
+    pub sound_ops: bool,
     /// golden.py's TraceMachine events, when a run is traced
     pub trace: Option<Tracer>,
     /// the current run's unknowns (handed to its `Run`)
@@ -404,6 +407,7 @@ impl<'g> Machine<'g> {
             step_limit: STEP_LIMIT,
             round_limit: ROUND_LIMIT,
             widen_loops: false,
+            sound_ops: false,
             trace: None,
             v: Vals::default(),
             cites: vec![None; game.ins.len()],
@@ -1470,7 +1474,7 @@ impl<'g> Machine<'g> {
                 Stmt::Assign(a) => self.assign(p, o, a, Some(x))?,
                 Stmt::Start { .. } => more = self.start(p, o, x, st)?,
                 Stmt::Op { name, .. } => {
-                    let eff = effect(name);
+                    let eff = effect_with(name, self.sound_ops);
                     match eff {
                         Effect::Yield => {
                             // after breakHere or a delay the slot resumes at the next instruction (facts.py at:)
