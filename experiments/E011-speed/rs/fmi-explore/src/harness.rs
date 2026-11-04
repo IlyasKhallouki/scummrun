@@ -567,7 +567,7 @@ impl<'a> Harness<'a> {
         let actions_before = self.reading.n_actions();
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let rs_ = start::reach_start_text(&start_f);
+        let rs_ = start::reach_start_text_full(&start_f, self.reading.domains());
         let new = match crate::machine::port(|| rr.extend(&rs_)) {
             Ok(r) => r,
             Err(e) => {
@@ -670,7 +670,7 @@ impl<'a> Harness<'a> {
         }
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
-        let rs_ = start::reach_start_text(&st);
+        let rs_ = start::reach_start_text_full(&st, self.reading.domains());
         let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
             Ok(r) => r,
             Err(e) => {
