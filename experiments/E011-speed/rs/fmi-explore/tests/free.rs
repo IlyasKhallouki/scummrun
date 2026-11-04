@@ -223,6 +223,43 @@ fn the_free_order_reads_the_free_counts() {
     assert_eq!(a.select_free(2), vec![p, 0]);
 }
 
+/// E016 amendment (11): with FMI_SELECT_PLACE=1 a place's own tries order it before its cells: the root's place, tried
+/// 4 times with nothing new in the last 3, comes after two places no try has started from, although its cell's own
+/// counts come first.
+#[test]
+fn places_tried_without_yield_come_after_untried_places() {
+    let _g = env(true, Some("0.25"));
+    std::env::remove_var("FMI_SELECT_PLACE");
+    let t = tmp("place");
+    let mut a = make(&t);
+    let l = ingest(&mut a, 0, Some(&mk(0.25)), &[(5, vec![("room", json!(35))]), (6, vec![("room", json!(38))])], &[]);
+    let (p, q) = (ids(&l)[0], ids(&l)[1]);
+    for _ in 0..3 {
+        ingest(&mut a, 0, Some(&mk(0.25)), &[], &[]);
+    }
+    let c0 = a.rows[0].cell.clone();
+    let (cp_, cq) = (a.rows[p].cell.clone(), a.rows[q].cell.clone());
+    a.cell_mut(&c0).n = 0;
+    a.cell_mut(&c0).chosen = Some(0);
+    for c in [&cp_, &cq] {
+        a.cell_mut(c).n = 5;
+        a.cell_mut(c).chosen = Some(5);
+    }
+    assert_eq!(a.place_key(0, false), (0, 0));
+    assert_eq!(a.select(1), vec![0]);
+    std::env::set_var("FMI_SELECT_PLACE", "1");
+    assert_eq!(a.place_key(0, false), (3, 4));
+    assert_eq!(a.place_key(p, false), (0, 0));
+    assert_eq!(a.place_key(0, true), (0, 0));
+    let s = a.select(3);
+    assert_eq!(s.len(), 3);
+    assert_eq!(s[2], 0);
+    // no free try yet: every place's free counts are (0, 0), so the free order is the cells' as before
+    let free_on = a.select_free(3);
+    std::env::remove_var("FMI_SELECT_PLACE");
+    assert_eq!(a.select_free(3), free_on);
+}
+
 /// Stall's rules as a test gives them: a share, and the cells whose next try is free.
 struct TestShift {
     share: f64,
