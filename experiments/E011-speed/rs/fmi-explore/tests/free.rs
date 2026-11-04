@@ -319,3 +319,38 @@ fn off_the_files_are_e012s() {
     let j2 = files::read_json(&d2.join("job.json")).unwrap();
     assert_eq!(j1, j2);
 }
+
+#[test]
+fn e016_d_a_free_jobs_file_lists_the_registered_readings_that_may_stand_in() {
+    // E016 D (FMI_FREE_T=archive): a free job's job.json lists the registered readings of other scopes holding the
+    // entry's room ("readings_room") and the newest of any scope ("readings_any"); a model job's does not, nor does a
+    // free job's without the switch
+    let _g = env(true, Some("0.25"));
+    let t = tmp("free-t");
+    let mut a = make(&t);
+    let mut paths = Vec::new();
+    for (k, scope) in [vec![28, 33], vec![35], vec![41]].iter().enumerate() {
+        let d = a.root.join("readings").join(format!("r{k}"));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("reading.json"), "{}").unwrap();
+        let p = d.join("reading.json").to_string_lossy().into_owned();
+        a.register_reading(scope, &p, 0, None, "fresh", Some(0)).unwrap();
+        paths.push(p);
+    }
+    let path_of = |v: &Value| v.as_array().unwrap().iter().map(|x| x["path"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    std::env::set_var("FMI_FREE_T", "archive");
+    let d = a.prepare_job_as(0, Some(&fk(0.25))).unwrap();
+    let jb = files::read_json(&d.join("job.json")).unwrap();
+    std::fs::remove_dir_all(&d).unwrap();
+    // newest first; the root's room is 33, held by the first reading's scope only
+    assert_eq!(path_of(&jb["readings_any"]), vec![paths[2].clone(), paths[1].clone(), paths[0].clone()]);
+    assert_eq!(path_of(&jb["readings_room"]), vec![paths[0].clone()]);
+    let d = a.prepare_job_as(0, Some(&mk(0.25))).unwrap();
+    let jm = files::read_json(&d.join("job.json")).unwrap();
+    std::fs::remove_dir_all(&d).unwrap();
+    std::env::remove_var("FMI_FREE_T");
+    assert!(jm.get("readings_any").is_none() && jm.get("readings_room").is_none());
+    let d = a.prepare_job_as(0, Some(&fk(0.25))).unwrap();
+    let jo = files::read_json(&d.join("job.json")).unwrap();
+    assert!(jo.get("readings_any").is_none() && jo.get("readings_room").is_none());
+}

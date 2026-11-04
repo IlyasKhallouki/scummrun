@@ -2056,8 +2056,29 @@ impl Archive {
         files::write_json(&d.join("select.json"), &sel, Some(1))?;
         let mut doc = self.job_doc(&job, i)?;
         doc["kind"] = json!(k.text());
+        if k.free && crate::free::t_archive() {
+            // E016 D: the registered readings that may stand in for the wait, as the try never reads
+            let rows = |v: Vec<&ReadingRow>| -> Value {
+                Value::Array(v.into_iter().map(|x| json!({"path": x.get("path"), "start_entry": x.get("start_entry"), "scope": x.get("scope")})).collect())
+            };
+            if doc.get("readings_room").is_none() {
+                let room = self.rows[i].room;
+                doc["readings_room"] = rows(room.map(|r| self.readings_holding(r, &self.scope_of_room(Some(r)))).unwrap_or_default());
+            }
+            doc["readings_any"] = rows(self.readings_any(crate::free::READINGS_ANY));
+        }
         files::write_json(&d.join("job.json"), &doc, Some(1))?;
         Ok(d)
+    }
+
+    /// E016 D: the live registered readings of any scope, newest first, at most `n`.
+    pub fn readings_any(&self, n: usize) -> Vec<&ReadingRow> {
+        self.readings
+            .iter()
+            .rev()
+            .filter(|x| !truthy(x.get("evicted")) && x.get("path").and_then(|p| p.as_str()).map(|p| Path::new(p).exists()).unwrap_or(false))
+            .take(n)
+            .collect()
     }
 
     /// jobs/JOB/job.json for candidate ``i``, and select.json.
