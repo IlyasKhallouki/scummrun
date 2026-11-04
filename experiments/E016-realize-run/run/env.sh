@@ -34,3 +34,12 @@ export D_ARCH=${D_ARCH:-/var/tmp/fast-mi/e016-archives/play9}
 export D_RUN=${D_RUN:-/var/tmp/fast-mi/e016-archives/play9-run}
 export D_OUT=${D_OUT:-/var/tmp/fast-mi/e016-play9}
 export STAGE=${STAGE:-play}
+# the demo's files are read from fixed paths: a missing one fails here, not as a 600 s connect timeout
+for d in "$E14_GAME_DIR" "$E14_SCRIPTS"; do
+  [ -d "$d" ] || { echo "env.sh: missing $d" >&2; return 1 2>/dev/null || exit 1; }
+done
+# Monkey Island's files are a link in each worktree (never committed): mi_game checks it before its checks
+mi_game() {
+  local d; d=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/game/dos-cd
+  [ -d "$d" ] || { echo "env.sh: missing $d (link game to the main checkout's game)" >&2; return 1; }
+}

@@ -12,6 +12,7 @@
 # usage: k1.sh [init|run|verify]...   (default all three in order)
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
+(source $here/env.sh && mi_game) || exit 1
 source $here/env.sh
 K_ARCH=/var/tmp/fast-mi/e016-archives/k1
 K_RUN=/var/tmp/fast-mi/e016-archives/k1-run

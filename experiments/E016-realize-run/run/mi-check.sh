@@ -8,6 +8,7 @@
 # usage: mi-check.sh OUT b3|kitchen|smoke...   (default OUT /var/tmp/fast-mi/e016-mi-check, all three)
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
+(source $here/env.sh && mi_game) || exit 1
 O=${1:-/var/tmp/fast-mi/e016-mi-check}
 shift || true
 A4_ENV=$here/env.sh exec bash /var/tmp/fast-mi/wt-e014/experiments/E014-fate-demo/a4/mi-check.sh $O ${@:-b3 kitchen smoke}
