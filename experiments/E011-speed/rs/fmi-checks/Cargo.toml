@@ -61,3 +61,7 @@ path = "src/bin/e013_report.rs"
 [[bin]]
 name = "e015"
 path = "src/bin/e015/main.rs"
+
+[[bin]]
+name = "e015chk"
+path = "src/bin/e015chk.rs"
