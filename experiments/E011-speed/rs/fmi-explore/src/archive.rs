@@ -1938,12 +1938,13 @@ impl Archive {
     }
 
     /// The scope of a try from an entry in `room` (None: no room): E009's ring, or with E014's grown scopes (amendment
-    /// (4) (b)) the room and the rooms grown for it, cut to the ring.
+    /// (4) (b)) the room and the rooms grown for it, cut to the ring, or with E016's room scopes the room alone.
     pub fn scope_of_room(&self, room: Option<i64>) -> Vec<i64> {
         let r = room.unwrap_or(i64::MIN);
         let rg = ring(&self.edges, r, &self.allowed);
         match &self.grown {
             Some(g) => crate::grow::scope(r, &rg, g.get(&r)),
+            None if crate::grow::room_only() => crate::grow::scope(r, &rg, None),
             None => rg,
         }
     }

@@ -471,3 +471,29 @@ this commit's tree.
   adds it.
 - **On the VM's disk:** E014's archives (copies of the laptop's play7 and play8) and the E014 builds were removed,
   which left 16 GB free.
+
+### (8) 2026-11-04: plan F's room scopes were not what the switches gave; two void starts of play9
+
+- **First VM start:** play9's first try panicked in the reader: "a reason the machine does not know: widened loop".
+  - The reader's list of reasons that the machine's unknowns can carry back lacked E014's widened loop.
+    `FMI_READ_WIDEN=1` makes those unknowns.
+  - Fixed in 40a4bef, with a test that every machine reason reads back.
+- **Second VM start:** the first try's reading of [24, 42, 48, 49, 63, 68, 69, 75] hit the 300 s bound with nothing
+  read, and the driver stopped on stagnation after that one try.
+  - Plan F says "Scope growth off: a room's reading is that room." But unsetting `FMI_SCOPE_GROW` gives E009's
+    rule, the guide's whole ring, not the room.
+  - The same ring readings had the laptop's memory guard kill Monkey Island's smoke run (12 min, no entry) and K1
+    (14 min).
+  - Fix: `FMI_SCOPE_GROW=room` reads each room alone and never grows it (`grow::room_only`, `Archive::scope_of_room`,
+    with the test `room_scopes_are_the_room_and_do_not_grow`). `run/env.sh` sets it in ALLON and A4. This is plan
+    F's configuration as written, not a new mechanism.
+- Both starts stopped at C0 on defects found before any search ran, so they do not count as play9 or as its rerun
+  under the stop rule.
+  - Their files are kept on the VM and the laptop under `/var/tmp/fast-mi/e016-failed/`.
+  - play9 restarted at 19:50 UTC with room scopes.
+  - Monkey Island's checks and K1 run again with room scopes. The first runs had ring scopes, and their files are
+    kept as `mi-check-ring`, `k1-ring`. Results of those first runs:
+    - b3: 129 new entries, 0 differences;
+    - kitchen: pass;
+    - smoke: killed with no entry;
+    - K1: killed with no entry.
