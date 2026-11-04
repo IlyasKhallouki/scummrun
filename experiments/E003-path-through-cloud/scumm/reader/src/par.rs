@@ -183,10 +183,8 @@ impl<'a, 'g> Pool<'a, 'g> {
         self.abort = Some(abort);
     }
 
-    fn check_abort(&self) {
-        if self.abort.as_ref().is_some_and(|a| a.load(Ordering::Relaxed)) {
-            panic!("the reading was stopped");
-        }
+    fn stopped(&self) -> bool {
+        self.abort.as_ref().is_some_and(|a| a.load(Ordering::Relaxed))
     }
 
     fn estimate(&self, job: &Job) -> f64 {
@@ -293,7 +291,10 @@ impl Machine for Pool<'_, '_> {
             let ready: Vec<JobOut> = {
                 let mut q = self.sh.q.lock().unwrap();
                 loop {
-                    if let Some(f) = &q.failed {
+                    // a stop lets go of the queue's lock first, so that the pool's shutdown (`with_pool`) takes it
+                    // and the idle workers end (E014 amendment (5)); held, the lock was poisoned and they waited on
+                    if let Some(f) = q.failed.clone() {
+                        drop(q);
                         panic!("a worker failed: {f}");
                     }
                     let mut ready = Vec::new();
@@ -307,7 +308,10 @@ impl Machine for Pool<'_, '_> {
                         break ready;
                     }
                     if self.abort.is_some() {
-                        self.check_abort();
+                        if self.stopped() {
+                            drop(q);
+                            panic!("the reading was stopped");
+                        }
                         q = self.sh.done.wait_timeout(q, std::time::Duration::from_millis(100)).unwrap().0;
                     } else {
                         q = self.sh.done.wait(q).unwrap();
@@ -664,7 +668,7 @@ pub fn with_pool<R>(game: &Game, scope: &Scope, threads: usize, f: impl FnOnce(&
         };
         let r = panic::catch_unwind(AssertUnwindSafe(|| f(&mut pool)));
         {
-            let mut q = sh.q.lock().unwrap();
+            let mut q = sh.q.lock().unwrap_or_else(|e| e.into_inner());
             q.shutdown = true;
         }
         sh.work.notify_all();
