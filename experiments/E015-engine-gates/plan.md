@@ -432,3 +432,44 @@ Written after reading the tools and the archive's entry list, before any search 
   room 69 from that state. Both hold only if the state's other openings are tried. So at the first goal stop (room 69
   in step 2, owner:946 = ego in step 3) the rest of that node's inputs are still run and recorded, and then the search
   stops. The chain is the first goal trial. The trial limit still applies.
+
+### (G2-1) 2026-11-04, G2: the re-runner and readings, before G2's first score
+
+Written after the calibration (G2-0, which is not a G2 result) and before any trial was scored under E. No criterion,
+feature or prediction changes.
+
+- **The readings are not on this machine.** play8's readings (`readings/`, `jobs/*/run/`) stayed on the VM, and the
+  plan forbids the VM. The free step needs a reading only for its wait (T's domains and the reading's points). So the
+  re-runner (`e015-g2 rerun`, in fmi-checks; the plan's `e015 rescore` under its own name, so as not to collide with
+  the other gates' `e015`) does this:
+  - **T** is result.json's `tested` atoms, merged with job.json's archive T, exactly as the try merged them.
+  - **The offer points** after the entry are the recorded wait's stops (result.json `e012.wait.stops`). They are frames
+    of the entry's no-input run, so the engine is run there; this is exact.
+  - **The wait after each trial** runs fmi-explore's own wait with domains made from T's atoms, given only to T's own
+    keys (the reading's atoms, before E014's extra ones), the verbs and the goal's key. This is the closest rule to the
+    recorded `observed` counts, and it is not exact: against them it has 2-3 atoms too few in 211 of the 317 steps
+    (room 49), 11 too many in all 80 room-42 steps and 13 room-49 steps, and 6-15 off in the 13 others. A step whose
+    T-kept count or trial count differs is excluded, as step 3 says.
+- **What a trial's atoms are.** U, W, R and C are read at the trial's own stop (its idle stop, or the horizon), on a
+  fork. The wait's later stops are judged under T only, as the run judged them. A trial whose run ended, or whose
+  inputs the bridge refused, has no stop: it is kept under E only if the run kept it under T.
+- **Kept under E.** Kept under T by the run, or holding an atom of U, W (less the ambient units), R or C that no seen
+  state holds. The seen states are the archive entries committed before the job's own line of `log.jsonl` (the root
+  included) and the trials kept under E before it in the step, in the run's order (offers, then delays, then the one
+  more level). A kept trial's atoms are all held after it.
+- **Each kind alone.** Its own sequential keeping over that kind only, T left out. Reported also: of the trials kept
+  under E, how many had a novel atom of each kind.
+- **Ambient units** are recomputed for every step with one rule: a no-input fork of the job's entry run 1,600 frames,
+  every unit whose K_AT offset took 2 or more values (the entry's included). The job's recorded idle keys are listed
+  for comparison, not used.
+- **The sensitivity rule.** W is replaced by one atom per (room, unit, cell) for every unit with an offset, with no
+  ambient rule. The cell is the room and the set of the job's merged T atoms that hold.
+- **D1 and D2's T.** j00077's merged T (its reading's atoms and the archive's at commit 84) for every entry. A T atom
+  is novel when it holds and no seen state holds it, or the room is new. The seen states are the entries with a lower
+  id, the entry itself, and the search's kept stops.
+- **D1's search.** Each kept node is expanded with afford's `try_all` (the offer, its inputs, the third click, E013's
+  refused inputs, all as the run had them) on a fork at the node. The node is rebuilt as the root's fork with the
+  node's clicks, run to its stop frame. The trial and second limits are checked between nodes, so the last node's step
+  may pass them; that overshoot is reported.
+- **D2's stops.** The route's clicks are scheduled at their recorded absolute frames. Input i's stop is the run to the
+  frame after its click, then to the bridge's idle within W frames.

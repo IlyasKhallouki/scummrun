@@ -1,0 +1,30 @@
+{
+ "entry": 184,
+ "frame": 1154,
+ "trials": 294,
+ "kept": 7,
+ "per_depth": [
+  {
+   "depth": 1,
+   "nodes": 1,
+   "trials": 180,
+   "kept": 2
+  },
+  {
+   "depth": 2,
+   "nodes": 2,
+   "trials": 114,
+   "kept": 5
+  }
+ ],
+ "first_unit_depth": 1,
+ "first_room_depth": 2,
+ "stop": "room",
+ "ambient": [
+  "local:209",
+  "script:151",
+  "script:75",
+  "script:86"
+ ],
+ "seconds": 2.9353057270000003
+}

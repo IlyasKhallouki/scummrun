@@ -22,6 +22,7 @@ pub mod bound;
 pub mod check;
 pub mod doubles;
 pub mod driver;
+pub mod enovel;
 pub mod events;
 pub mod explorecmd;
 pub mod fake;
