@@ -653,3 +653,135 @@ Amendment (4)'s predictions are scored as written; its row "the VM" is not score
 |---|---|
 | the run's driver wall on the laptop | 1.5-4 h |
 | background readings | the one slot is taken by the first bounded reading of a state after the opening dialog; it ends within 15-30 minutes on the laptop |
+
+## Result (2026-11-04): amendments (4) and (5) on the laptop; stopped by stagnation after 37 tries, all in room 49
+
+### In plain terms
+
+- **The run.** The explorer ran from the demo's boot on the laptop, because the VM could not start (amendment (5)). It
+  had every E012, E013 and E014 switch on, and both of amendment (4)'s. It stopped by E009's stagnation rule after 37
+  committed tries and 89 minutes of driver wall. It made 46 entries, every one in room 49: 1 of the 11 rooms in the
+  files.
+- **The end** was not reached. Every entry verifies from boot with 0 differences (45 entries, the lean engine).
+- **What the system did, in the game's numbers:**
+  1. It booted to the first decision point (frame 992, room 49) and planned a move of 1 frame that gives var 52 = 0.
+  2. It waited through the opening to frame 1042, where verbs 1, 3-12 and 100-104 come on.
+  3. From there it tried the interface's own inputs, at most 3 per entry. Some clicks set var 107 to each of 3-12, the
+     numbers of the ten verbs shown. Others set bits 16, 18, 22, 403, 415 and 733 and vars 45, 100, 165, 181 and 442.
+     One, at frame 1156, turned on verb 124, one of the reading's dialog verbs.
+  4. No object changed owner, state or class, and no other room was entered. The latest entry is at frame 1206, 214
+     frames after the first decision point.
+- **Why it stopped.**
+  - Every model try from a state after the opening, 18 of the 21, reached the bound: its reading had not ended in
+    300 s. The model-free steps that followed kept 2 entries.
+  - The 16 free tries kept 3 entries, all in one try from the root.
+  - After the 9th commit no try gave a new atom of T or a room. The stagnation rule fired 28 tries later, at the
+    sweep of the 27 selectable cells.
+
+### The stall table by cause (`results/a4/stalls-play4.md`; 37 tries, 9,452.8 s of try wall)
+
+| class | seconds | share |
+|---|---:|---:|
+| reading bound | 5,400.0 | 57.1% |
+| interface, no yield | 3,357.9 | 35.5% |
+| productive | 431.3 | 4.6% |
+| overhead | 236.9 | 2.5% |
+| wait | 26.6 | 0.3% |
+| no plan | 0.1 | 0.0% |
+| model-blind, refused input, effect mismatch, model, no yield | 0.0 | 0.0% |
+
+- **Overhead** is almost all one try's rest. j00032's free step failed on an input the bridge refuses (row 21), so its
+  234 s have no record of their own. That try is also why the rest row is 2.5% and not under 1%.
+- **The largest rows:** the bound (18 tries, 5,400 s); the free step's offers at the entry that kept nothing (30
+  points, 2,532 s); its delays (554 s).
+
+### The two switches on the demo
+
+- **The bound.**
+  - 18 readings reached it: 2 went on in the background and 16 were stopped.
+  - Neither background reading gave a reading. The first, from entry 3 (scope {42, 49}, started at 03:16), ended
+    without one, most likely at the reader's own wall watchdog of 60 minutes (`--cap-min`, default 60). The slot was
+    free again when the second, from entry 41, reached the bound at 04:43, two minutes before the run's end. The run's
+    log has 17 stops of a reading: the 16 at the bound and this one. No try took a reading from the cache.
+  - So row 19's "no wall bound" was not exact. The reader has had its own watchdog of 60 minutes of wall since E012,
+    and amendment (3)'s laptop check stopped its reading at 50 minutes, before it. Without the bound, a try from these
+    states waits 60 minutes and then fails with its reading's stop.
+  - A reading always stood in: the root's reading of {49}, or j00003's of {42, 49}.
+  - The stopped readings did not stop at once (row 20). The reader looks at its stop flag only while it waits for its
+    workers, and a worker ends only when its run ends; at these states one run takes minutes. At the 26th try, 14
+    reading threads and 8 sets of workers were still running, a load of 18-23 on the laptop's 8 threads from then to
+    the end.
+- **The scopes.**
+  - Room 49's first reading was of {49} (35.6 s from the root).
+  - At the 2nd commit the scope grew by room 42 (case 1: the guide's atom room = 82 at depth 1, whose writers are in
+    rooms 42 and 75, the lower one taken).
+  - The only other reading that ended was of {42, 49} (50.7 s from the root). The 18 bounded readings were of
+    {42, 49}.
+  - Nothing grew again. A bounded try is model-free, so it names no room (case 1 is a model try's), and no model-free
+    entry entered another room (case 3).
+  - The measure before the run had already shown that the room count is not what makes these readings slow: {49}
+    alone from entry 3 took 1,256 s.
+
+### Rule (2) on Monkey Island, both switches on (amendment (5); `results/a4/mi-check.txt`)
+
+- **B3.** The 15 tries equal E013's G-on in every field compared. 10 of them read on the bound's thread, and none
+  reached the bound. Their 126 new entries verify from boot with 0 differences. Both held before and after the
+  reader's fix.
+- **The kitchen.** The goal entry's chain (8 entries) verifies from boot with 0 differences.
+- **The smoke run.** 4 tries from the boot, each reading {33} and growing nothing; its 21 entries verify from boot.
+
+### Exactness and the reference
+
+- Every entry verifies from boot on the lean engine: 45 of 45 here, 21 in `vm-check4` and 25 in `scratch4`, each with 0
+  differences.
+- There is no goal entry to verify. E008's `explore.py verify` on svm-w3b cannot run this game (amendment (3)).
+
+### Predictions scored
+
+Amendment (4)'s, as written:
+
+| | predicted | measured | |
+|---|---|---|---|
+| rule (2) on Monkey Island | B3 equal, verified; the kitchen chain verifies; the smoke run verifies; no reading reaches the bound | all four | hit |
+| how the run stops | falsifier 45%, stagnation 35%, the VM's time 10%, the goal 10% | stagnation | (35%) |
+| committed tries | 40-80 | 37 | miss |
+| bounded readings | 40-80% of the model tries after the opening; none from the root | 18 of 18 (100%); none from the root | miss |
+| background readings | 0-30% end within the run; 0-3 later tries take one | 0 of 2 gave a reading; 0 tries | hit |
+| scopes | first reading of a room 1 room; G(49) grows by 1-4 rooms; 80% of readings at most 3 rooms | {49}; G(49) grew by 1 (room 42); every reading 1-2 rooms | hit |
+| rooms entered, of 11 | 2-5, most likely 3 | 1 | miss |
+| the end | not reached (reached: 10%) | not reached | hit |
+| the stall table | reading bound 20-50%; productive 20-50%; interface, no yield 10-35%; no plan and model-blind under 15%; rest at most 1% | 57.1%; 4.6%; 35.5%; 0.0%; 2.5% | 1 of 5 |
+| free tries | 25-50% of the tries; 60-90% of the entries from model-free steps | 16 of 37 (43%); 43 of 45 (96%: wait 2, afford 36, free 5) | 1 of 2 |
+| entries verified from boot | every entry, 0 differences | 45 of 45 | hit |
+| the VM | 1.5-3 h, $2.3-4.6 | no VM ran | not scored |
+
+Amendment (5)'s added rows: the driver wall 1.5-4 h, measured 1.49 h: a miss by 0.01 h. The background slot was taken
+by the first bounded reading after the opening, as predicted, but it gave no reading (predicted: it ends within 15-30
+minutes): a miss, under the load of row 20.
+
+For reference, amendment (3)'s and E013's F, written for this run without the two switches:
+
+- held: the stop by stagnation (25% and 35%); 30-80 and 25-80 tries; the end not reached; free tries 25-50% and
+  25-45%; 1-3 or 1-4 new rows (rows 20 and 21); every entry verified.
+- missed:
+  - rooms 2-5 (1);
+  - productive 30-70% and 10-35% (4.6%);
+  - the longest stretch with no new atom or room, 5-20 tries (28);
+  - at least 30% of free tries keeping a novel entry (1 of 16);
+  - F's model-blind or no plan at 15-35%, and refused input at 5-20% (both 0%).
+
+### Threshold and what bound it
+
+**Partly**, by the success threshold. The explorer ran on this game and made progress past the root: new atoms of T
+from the opening's verbs and flags. The game's end was not reached. Three blockers are named:
+
+1. **The reading at the states after the opening.** At these states the reader's cost is in a few event runs that each
+   take minutes; the scope's room count does not change it (1,256 s for {49}). With the bound, the model is absent
+   from every state after the opening, so the run is a model-free run in room 49.
+2. **The stopped readings keep running** until their workers' runs end (row 20). They took most of the laptop's CPU
+   from the tries.
+3. **The model-free steps found no change of any object** in 2 hours of the interface's inputs, waits and delays.
+   Their offers (verbs, targets, walk boxes) are tried at most 2 levels deep from an entry (1 level after a delay).
+   One of them gave the bridge an input it refuses, and that error ended the try (row 21).
+
+Rows 20 and 21 are recorded and not applied to this run.
