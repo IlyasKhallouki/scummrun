@@ -41,6 +41,14 @@ pub fn boxes_on() -> bool {
     std::env::var("FMI_BOXES").is_ok_and(|v| v == "1")
 }
 
+/// E014 amendment (8)'s switch `FMI_OFFER_SCREEN=1` (assumptions row 24): an actor's offer points are kept only on
+/// the screen (0 <= x < SCREEN_W, 0 <= y < SCREEN_H), as the objects' points are cut to it and the walk boxes' to the
+/// main screen. Off, an actor that stands off the screen is offered at a point the bridge's input check refuses
+/// (x or y below 0) or that no player can click. Unset: as before.
+pub fn offer_screen_on() -> bool {
+    std::env::var("FMI_OFFER_SCREEN").is_ok_and(|v| v == "1")
+}
+
 /// SCUMM v5's screen (`_screenWidth`, `_screenHeight`): the hit test's coordinates.
 pub const SCREEN_W: i32 = 320;
 pub const SCREEN_H: i32 = 200;
@@ -167,6 +175,11 @@ pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
 
 /// `offer`, the walk boxes asked when `boxes` (in a sentence idle only).
 pub fn offer_with(e: &mut Box<dyn Engine>, o: &Obs, boxes: bool) -> EResult<Offer> {
+    offer_cfg(e, o, boxes, offer_screen_on())
+}
+
+/// `offer_with`, an actor's points kept on the screen only when `screen` (`offer_screen_on`).
+pub fn offer_cfg(e: &mut Box<dyn Engine>, o: &Obs, boxes: bool, screen: bool) -> EResult<Offer> {
     let st = e.status().clone();
     let xs = st.xstart;
     // the main screen's topline (patch 0004's layout in the status; 0 where the status has none)
@@ -199,8 +212,14 @@ pub fn offer_with(e: &mut Box<dyn Engine>, o: &Obs, boxes: bool) -> EResult<Offe
         cands.push((Hit::Object(r.id), pts));
     }
     for a in &o.actors {
-        let pts = ACTOR_DY.iter().map(|&dy| (a.x - xs, a.y - a.elevation + dy + top)).collect();
-        cands.push((Hit::Actor(a.id), pts));
+        let pts: Vec<(i32, i32)> = ACTOR_DY
+            .iter()
+            .map(|&dy| (a.x - xs, a.y - a.elevation + dy + top))
+            .filter(|&(x, y)| !screen || ((0..SCREEN_W).contains(&x) && (0..SCREEN_H).contains(&y)))
+            .collect();
+        if !pts.is_empty() {
+            cands.push((Hit::Actor(a.id), pts));
+        }
     }
     let mut box_counts = None;
     if boxes && st.idle.as_deref() == Some("sentence") {
