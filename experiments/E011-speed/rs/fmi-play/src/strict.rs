@@ -127,6 +127,29 @@ pub struct StrictMatcher {
     pub points: FxHashSet<(Unit, i64)>,
     pub keys: FxHashMap<IKey, FxHashSet<Key>>,
     pub by_args: FxHashMap<IKey, (FxHashMap<Val, Vec<Arc<MEntry>>>, Vec<Arc<MEntry>>)>,
+    /// E014 amendment (8), `FMI_ARGS_LATER=1` (`args_later_on`): a unit's args at the end of an observed step belong
+    /// to the unit's last run in the step, so a record's predicted `args:U` is not checked there when a later run of U
+    /// at depth 0, of any unit set, is in the step
+    pub args_later: bool,
+}
+
+/// E014 amendment (8): `FMI_ARGS_LATER=1`. A script that another starts runs at once, nested in its starter, up to its
+/// first yield; the engine's slot loop can run it again before the next decision point (the sentence script runs
+/// after the input, the next frame's slot loop before the next stop). The step's last view then shows the started
+/// unit at a later position, and its `args:` fact (its locals against the reading's lists at that position) is not
+/// the starter's record's to answer for. Unset: as before.
+pub fn args_later_on() -> bool {
+    static C: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *C.get_or_init(|| std::env::var("FMI_ARGS_LATER").is_ok_and(|v| v == "1"))
+}
+
+/// `args_later`'s test: a run at depth 0 of the unit whose args `k` is, after the run of sequence number `seq`.
+pub fn later_run_of_args(k: Key, seq: Seq, step: &[RunR]) -> bool {
+    if k.kind() != K_ARGS {
+        return false;
+    }
+    let u = Unit::of_key(k);
+    step.iter().any(|x| x.depth == 0 && x.seq > seq && x.code0 >= 0 && x.unit == Some(u))
 }
 
 /// A verdict (trace_explain.Verdict): explained (one record), ambiguous (several), unexplained, unplaced.
@@ -223,10 +246,13 @@ impl StrictMatcher {
             points,
             keys,
             by_args,
+            args_later: args_later_on(),
         }
     }
 
-    /// StrictMatcher.match with a branch's check decisions.
+    /// StrictMatcher.match with a branch's check decisions. `step`: every run of the observed step (any unit, any
+    /// depth), for `args_later`.
+    #[allow(clippy::too_many_arguments)]
     pub fn match_runs(
         &self,
         runs: &[RunR],
@@ -235,6 +261,7 @@ impl StrictMatcher {
         open_keys: &FxHashSet<Key>,
         same_unit: bool,
         decide: &mut dyn FnMut(&Check, &RunR) -> Option<bool>,
+        step: &[RunR],
     ) -> Vec<Verdict> {
         let mut state: std::borrow::Cow<View> = std::borrow::Cow::Borrowed(before);
         let entries: Vec<(IKey, IKey)> = runs
@@ -256,7 +283,7 @@ impl StrictMatcher {
                     return true;
                 }
             }
-            false
+            self.args_later && later_run_of_args(k, runs[n].seq, step)
         };
         let after_in = |k: Key| -> Option<&VV> { after.m.get(&k).filter(|v| !v.is_none()) };
         let mut out = Vec::with_capacity(runs.len());
@@ -549,7 +576,7 @@ impl Track {
         let mut decide = |c: &Check, r: &RunR| matcher_decide(code, ex, dump_before, c, r);
         let vs = plan
             .matcher
-            .match_runs(&mine, before, after, &open, log.parter.is_some(), &mut decide);
+            .match_runs(&mine, before, after, &open, log.parter.is_some(), &mut decide, runs);
         vs.into_iter().map(|v| (v.run, v)).collect()
     }
 
@@ -886,6 +913,9 @@ pub fn input_match(
             if k.kind() == K_ARGS && split.iter().any(|s| s.0 == Unit::of_key(*k)) {
                 continue;
             }
+            if plan.matcher.args_later && later_run_of_args(*k, SEQ_BEFORE, &later_all) {
+                continue;
+            }
             return InMatch {
                 ok: false,
                 why: Some(format!("effect {}", k.text())),
@@ -1097,7 +1127,7 @@ impl BranchLog {
     }
 }
 
-/// strict.part_verdicts (9.9)
+/// strict.part_verdicts (9.9); `step`: every run of the step (`args_later`)
 #[allow(clippy::too_many_arguments)]
 pub fn part_verdicts(
     plan: &Plan,
@@ -1109,12 +1139,13 @@ pub fn part_verdicts(
     dump_before: Option<&Obs>,
     ex: &Explained,
     open_keys: &FxHashSet<Key>,
+    step: &[RunR],
 ) -> Vec<(RunR, Verdict)> {
     let mut decide = |c: &Check, r: &RunR| matcher_decide(code, ex, dump_before, c, r);
     let runs: Vec<RunR> = parts.iter().chain(later.iter()).copied().collect();
     let vs = plan
         .matcher
-        .match_runs(&runs, state, after, open_keys, true, &mut decide);
+        .match_runs(&runs, state, after, open_keys, true, &mut decide, step);
     vs.into_iter().take(parts.len()).map(|v| (v.run, v)).collect()
 }
 
@@ -1823,5 +1854,86 @@ mod tests {
             Some((Unit(U_OBJ, 428), 0x1A))
         );
         assert_eq!(cite_unit("a/b/local-1.txt:1 [0000]"), None);
+    }
+
+    // E014 amendment (8), FMI_ARGS_LATER: a script's run starts an object's script, which parks at once (its args
+    // are the record's prediction); the object's script runs again later in the same step, past the point the
+    // record names, so its args at the step's end are not the record's.
+    const STARTER: Unit = Unit(U_SCRIPT, 2);
+    const STARTED: Unit = Unit(U_OBJ, 7);
+    const OTHER: Unit = Unit(U_OBJ, 8);
+
+    fn run_of(u: Unit, seq: i64, depth: i32, code0: i64, code1: i64) -> RunR {
+        RunR {
+            frame: 5,
+            after: false,
+            seq: seq * SEQ_SCALE,
+            depth,
+            slot: 1,
+            where_: 2,
+            number: u.1 as i32,
+            room: 0,
+            code0,
+            code1,
+            status: 2,
+            frozen: 0,
+            delay: 0,
+            ops: 3,
+            unit: Some(u),
+        }
+    }
+
+    fn matcher(args_later: bool) -> StrictMatcher {
+        let rec = B1 {
+            idx: 0,
+            unit: Some(STARTER),
+            wp: Some(10),
+            pre: vec![(STARTER.pos(), vec![10])],
+            eff: vec![(STARTER.pos(), B1Eff::Set(20)), (STARTED.args(), B1Eff::Set(555))],
+            checks: Arc::new(vec![]),
+        };
+        let mut m = StrictMatcher::new(&[Arc::new(rec)]);
+        m.args_later = args_later;
+        m
+    }
+
+    /// The verdict on the starter's run, the step holding `later` after it.
+    fn verdict(args_later: bool, later: &[RunR]) -> Verdict {
+        let mine = [run_of(STARTER, 1, 0, 10, 20)];
+        let mut step = mine.to_vec();
+        step.extend_from_slice(later);
+        let mut before = View::new();
+        before.setv(STARTER.pos(), 10);
+        let mut after = View::new();
+        after.setv(STARTER.pos(), 20);
+        // the started script's args at the step's end: no list at its later position
+        after.set(STARTED.args(), VV::Set(Arc::from(vec![0i64])));
+        let mut decide = |_: &Check, _: &RunR| None;
+        let m = matcher(args_later);
+        m.match_runs(&mine, &before, &after, &FxHashSet::default(), true, &mut decide, &step).remove(0)
+    }
+
+    #[test]
+    fn args_later_off_refutes_on_the_step_end() {
+        let v = verdict(false, &[run_of(STARTED, 2, 0, 35, 36)]);
+        assert_eq!(v.status, "unexplained");
+        assert_eq!(v.why[0].1, format!("effect {}", STARTED.args().text()));
+    }
+
+    #[test]
+    fn args_later_on_leaves_args_to_the_later_run() {
+        let v = verdict(true, &[run_of(STARTED, 2, 0, 35, 36)]);
+        assert_eq!(v.status, "explained");
+        assert_eq!(v.record, vec![0]);
+    }
+
+    #[test]
+    fn args_later_needs_a_later_run_of_that_unit_at_depth_0() {
+        // another unit's later run, the started unit's run nested in the starter's, or no later run: still refuted
+        assert_eq!(verdict(true, &[run_of(OTHER, 2, 0, 35, 36)]).status, "unexplained");
+        assert_eq!(verdict(true, &[run_of(STARTED, 2, 1, 18, 35)]).status, "unexplained");
+        assert_eq!(verdict(true, &[]).status, "unexplained");
+        assert!(!later_run_of_args(STARTED.args(), 3 * SEQ_SCALE, &[run_of(STARTED, 2, 0, 35, 36)]));
+        assert!(!later_run_of_args(STARTED.pos(), 0, &[run_of(STARTED, 2, 0, 35, 36)]));
     }
 }

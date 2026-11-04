@@ -920,6 +920,7 @@ impl<'a, 'w> CRun<'a, 'w> {
                 db.as_deref(),
                 &self.log.kept.ex,
                 &open,
+                &runs_k,
             );
             for (pr, pv) in vs {
                 self.apply_run(k_, &pr, &pv, &va, da.clone());
