@@ -568,3 +568,88 @@ Amendment (3)'s run, with these changes:
 | free tries | 25-50% of the committed tries; with the bounded tries' steps, 60-90% of the entries come from model-free steps |
 | entries verified from boot | every entry, 0 differences |
 | the VM | 1.5-3 h used, $2.3-4.6 |
+
+## Amendment 2026-11-04 (5): the VM could not start; the run on the laptop; the reader's stop fixed
+
+Written and committed before the run. Amendment (4) and its predictions stand; what changes is listed here.
+
+### The VM did not start
+
+`python3 scripts/cloud.py start --type n2-custom-30-122880 --hours 3 --standard` (main's, 02:48 UTC) was refused by
+Google before the VM started:
+
+> The zone 'projects/lumind-mvp/zones/us-central1-a' does not have enough resources available to fulfill the
+> request. Try a different zone, or try again later. (reason: resource_availability)
+
+Nothing started. The ledger has a closed row of 0.00 h: $17.05 committed, $12.45 left. As the PI's direction gives for
+this case, the run goes on the laptop.
+
+### The checks before the run (amendment (4)'s, done)
+
+- **Rule (2) on Monkey Island** (`a4/mi-check.sh`, both switches on, the bound 300 s, no background):
+  - B3's 15 tries equal E013's G-on run in every field `fmi check tries` compares (15 of 15). 10 of them read fresh
+    on the bound's thread, none reached the bound. Their 126 new entries verify from boot with 0 differences.
+  - The kitchen's goal entry 150 and its chain (entries 44, 55, 85, 123, 135, 142, 146, 150) verify from boot with 0
+    differences.
+  - The smoke run (4 jobs from the boot) read scope {33} in every try and grew nothing. Its 21 entries verify from
+    boot with 0 differences, and the stall report passes its 5 checks.
+- **The unit tests:** 188 Rust tests pass (fmi-core, fmi-reading, fmi-plan, fmi-explore, fmi); scumm-reader's 44.
+- **The laptop's check archive** `vm-check4` (2 tries, b = 1, the run's settings): 21 entries verify from boot with 0
+  differences. j00001 named room 42 for room 49's scope (case 1, the guide's atom room = 82, at depth 1).
+- **A scratch run on the demo** (`scratch4`, 8 tries, b = 2, the bound lowered to 120 s to reach it sooner): every
+  piece ran.
+  - Three model tries reached the bound: one reading went on in the background, two were stopped. Each went on
+    model-free from the stand-in, the root's reading of {49}.
+  - Room 49's scope grew twice by case 1: room 42, then room 48 (the guide's atom state:582 = 1).
+  - Its 25 entries verify from boot with 0 differences.
+  - The stall table: reading bound 36.9% of the seconds, productive 36.7%, interface, no yield 26.0%; the rest row
+    0.03%.
+  - Wall: 595.6 s of driver wall for 974 s of try wall.
+
+### The reader's stop, fixed (found by the scratch run)
+
+The in-process reader's stop raised its panic while holding the pool's queue lock, so the lock was poisoned. The pool's
+shutdown then panicked on that lock, and the workers that waited for work were never told to end. The stopped
+reading's thread and those workers stayed, idle, holding their memory, until the process ended.
+
+The fix is in scumm-reader's `par.rs`:
+
+- the stop, and a worker's failure, let go of the lock before they panic;
+- the shutdown takes the lock even when it is poisoned.
+
+A reading that is not stopped runs the same code as before. Checked:
+
+- B3's 15 tries again on the rebuilt binary, against E013's G-on;
+- scumm-reader's 44 tests;
+- two stops at a 60 s bound on a copy of the scratch archive (`scratch4b`, 2 more tries): each gave one panic, the
+  stop's, and no poisoned lock.
+
+### The run on the laptop
+
+Amendment (4)'s run, with these changes:
+
+- **The machine** is the laptop: an i5-8350U, 4 cores and 8 threads, 23 GB of memory. The desktop's other programs
+  leave about 8 GB free and a load of 2-3.
+- **b = 2 and 1 reading in the background** (`A4_BG=1`). A try takes about 2.5 cores and a background reading 1.7
+  cores (the 1-room reading from entry 3: 2,120 CPU s over 1,256 s of wall). The heavy lock is as the driver takes it.
+- **The archive** is a new one, `/var/tmp/fast-mi/e014-archives/play4`, with its files under
+  `/var/tmp/fast-mi/e014-archives/play4-run` and `/var/tmp/fast-mi/e014-play4`. Seed 1; the guide is amendment (4)'s.
+  Every other setting is amendment (4)'s: ALLON with the bound 300 s and grown scopes, the game's settings, the rooms
+  from the files, E009's switches, play when ready, commit as finished, the falsifier at 80 committed tries.
+- **No check of a second machine** is needed: the run is on the laptop that made `vm-check4`.
+- **Projection** from the scratch run, with the bound at 300 s in place of 120 s: about 190 s of try wall per try.
+  With b = 2, 80 tries take about 2 h of driver wall, 1.5-4 h in all.
+- **Stop rule.** Amendment (4)'s, without the VM's booked time: the goal, E009's stop rules (stagnation over T and
+  rooms, an exhausted archive), the falsifier at 80 committed tries. It runs once. Exactness first. A break that stops
+  the driver is fixed only by a dated amendment and rule (2), and the run resumes from its files.
+- **Verify.** Every entry is verified from boot on the lean engine at the end. Any goal entry is verified from boot
+  with `fmi explore verify`. E008's `explore.py verify` cannot run this game, as amendment (3) says.
+
+### Predictions added (before the run)
+
+Amendment (4)'s predictions are scored as written; its row "the VM" is not scored, as no VM ran.
+
+| | predicted |
+|---|---|
+| the run's driver wall on the laptop | 1.5-4 h |
+| background readings | the one slot is taken by the first bounded reading of a state after the opening dialog; it ends within 15-30 minutes on the laptop |
