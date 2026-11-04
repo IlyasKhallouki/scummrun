@@ -575,3 +575,11 @@ this commit's tree.
 - Also seen: at 21:41-21:45 no try committed for 4 minutes before the stop. With every try in one room, the tries
   share one reading and so one planner, whose lock (9) still serializes them; plans after the first keep the 600 s
   limit.
+
+### (12) 2026-11-04: every plan at most 30 s
+
+At 21:46-21:49 the rerun's 10 restarted tries committed nothing for 3 minutes. A stack showed two job threads in
+`WarmPlanner::search` (`taskcore::search::Ff::eval`) and the rest waiting on their readings' planners.
+`FMI_PLAN_DEEPEN=10` bounds only a try's first plans; later plans had `PLAN_TIME` (600 s). In play9, successful plans
+took 0.1 s of planning at the median and 3.5 s at the p95, so `FMI_PLAN_TIME=30` is added to E16. This changes a
+setting only, with no new code. The rerun resumed from its archive at 21:49:42 UTC.
