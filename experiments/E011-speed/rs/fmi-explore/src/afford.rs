@@ -167,6 +167,24 @@ pub fn box_points(b: &WalkBox) -> Vec<(i32, i32)> {
     v
 }
 
+/// The candidate screen points of a room object, in the offer's order (M4's 5 x 5 grid over the part of its box on
+/// the screen): `xs` the camera's xstart, `top` the main screen's topline. Empty when no part of the box is on the
+/// screen.
+pub fn object_grid(r: &RoomObject, xs: i32, top: i32) -> Vec<(i32, i32)> {
+    let (x0, x1) = ((r.x - xs).max(0), (r.x + r.w - xs).min(SCREEN_W) - 1);
+    let (y0, y1) = ((r.y + top).max(0), (r.y + r.h + top).min(SCREEN_H) - 1);
+    if x0 > x1 || y0 > y1 {
+        return Vec::new();
+    }
+    let mut pts = Vec::with_capacity(25);
+    for fy in GRID {
+        for fx in GRID {
+            pts.push((x0 + (x1 - x0) * fx / 4, y0 + (y1 - y0) * fy / 4));
+        }
+    }
+    pts
+}
+
 /// The offer at the engine's stop, from its dump `o` (a full dump: verbs, room objects, classes, actors) and its
 /// status (the camera's xstart, the screen layout, the idle kind); the walk boxes with FMI_BOXES.
 pub fn offer(e: &mut Box<dyn Engine>, o: &Obs) -> EResult<Offer> {
@@ -198,16 +216,9 @@ pub fn offer_cfg(e: &mut Box<dyn Engine>, o: &Obs, boxes: bool, screen: bool) ->
             continue;
         }
         n_touchable += 1;
-        let (x0, x1) = ((r.x - xs).max(0), (r.x + r.w - xs).min(SCREEN_W) - 1);
-        let (y0, y1) = ((r.y + top).max(0), (r.y + r.h + top).min(SCREEN_H) - 1);
-        if x0 > x1 || y0 > y1 {
+        let pts = object_grid(r, xs, top);
+        if pts.is_empty() {
             continue;
-        }
-        let mut pts = Vec::with_capacity(25);
-        for fy in GRID {
-            for fx in GRID {
-                pts.push((x0 + (x1 - x0) * fx / 4, y0 + (y1 - y0) * fy / 4));
-            }
         }
         cands.push((Hit::Object(r.id), pts));
     }
