@@ -10,6 +10,7 @@
 
 use crate::events;
 use crate::files;
+use crate::nogood;
 use crate::ports::WindowPlayer;
 use crate::pyjson;
 use crate::start::{self, Points};
@@ -18,7 +19,7 @@ use fmi_core::{
     PlayState, Planner, PlannerHost, ReadingSource, Search, Val, K_ACTORROOM,
 };
 use serde_json::{json, Map, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -143,6 +144,23 @@ pub struct Harness<'a> {
     progress: &'a dyn Fn(&str),
     /// the reading's domain keys in their text order (the start files'), and the reading's id
     order: Option<([u8; 20], start::TextOrder)>,
+    /// E016 C (FMI_NOGOOD): the try's failure memory, the target's text, the current plan's exact state (its prefix key)
+    /// and start, and the no-plan key's keys of the reading (its id)
+    nogood: Option<nogood::Ctx>,
+    ng_target: String,
+    plan_at: Option<(String, Facts)>,
+    ng_keys: Option<([u8; 20], Arc<HashSet<Key>>)>,
+}
+
+/// The stop reason of a plan request's status other than "plan" (the planner's, or the no-plan memory's).
+fn status_stop(status: &str, limit: u64) -> String {
+    match status {
+        "time" => format!("planner timeout ({} s)", limit),
+        "unsolvable" => "no plan (the planner proved none)".into(),
+        "incomplete" => "no plan (the search ended without one)".into(),
+        "memory" => "planner memory limit (3G)".into(),
+        s => format!("planner {s}"),
+    }
 }
 
 impl<'a> Harness<'a> {
@@ -181,7 +199,76 @@ impl<'a> Harness<'a> {
             t0: Instant::now(),
             progress,
             order: None,
+            nogood: None,
+            ng_target: String::new(),
+            plan_at: None,
+            ng_keys: None,
         })
+    }
+
+    /// E016 C (FMI_NOGOOD): the try's failure memory for this attempt (`nogood`). Without it the harness plans with
+    /// no bans and no memory, as before.
+    pub fn set_nogood(&mut self, c: nogood::Ctx) {
+        self.ng_target = nogood::target_text(&self.goal);
+        self.nogood = Some(c);
+    }
+
+    /// E016 C: the no-plan key's keys for the current reading: its tested keys and the target's (None: every key).
+    fn ng_keys(&mut self) -> Option<Arc<HashSet<Key>>> {
+        let c = self.nogood.as_ref()?;
+        let id = self.reading.id();
+        if let Some((k, ks)) = &self.ng_keys {
+            if *k == id {
+                return Some(ks.clone());
+            }
+        }
+        let tk = c.tested.as_ref().and_then(|f| f(&*self.reading))?;
+        let mut ks: HashSet<Key> = tk.into_iter().collect();
+        ks.extend(self.goal.iter().map(|g| g.0));
+        let ks = Arc::new(ks);
+        self.ng_keys = Some((id, ks.clone()));
+        Some(ks)
+    }
+
+    /// E016 C: the no-plan key's keys (`ng_keys`), or every key of the start when the tested keys are not wired; None
+    /// without the memory.
+    fn ng_keys_or_all(&mut self, start_f: &Facts) -> Option<Arc<HashSet<Key>>> {
+        self.nogood.as_ref()?;
+        Some(self.ng_keys().unwrap_or_else(|| Arc::new(start_f.iter().map(|(k, _)| *k).collect())))
+    }
+
+    /// E016 C: a play that ended at an empty window (the step refused from where the plan stood) refutes the step at
+    /// the plan's exact state: its ban (`nogood::ban_of`) is kept for the plan's (entry, prefix, target).
+    fn note_refuted(&mut self) {
+        let Some(c) = self.nogood.clone() else { return };
+        let Some((prefix, start_f)) = self.plan_at.clone() else { return };
+        let d = self.player.replan_cause_detail();
+        if d.as_ref().and_then(|d| d.get("what")).and_then(|w| w.as_str()) != Some("window empty") {
+            return;
+        }
+        let n_plan = self.plans.len() as u64 - 1;
+        let ws = self.player.windows();
+        let Some(w) = ws.last().filter(|w| w.get("plan").and_then(|p| p.as_u64()) == Some(n_plan)) else { return };
+        let Some(name) = w.get("input").and_then(|x| x.as_str()) else { return };
+        let Some(i) = nogood::step_index(&self.cur.steps, name) else { return };
+        let label = match self.reading.by_name(name) {
+            Some(a) => self.reading.record(a).label,
+            None => nogood::label_of_name(name),
+        };
+        let doms = self.reading.domains();
+        let Some(ban) = nogood::ban_of(&label, &start_f, &self.cur.paths, i, &|k| doms.get(k).is_some()) else { return };
+        let mut mem = c.mem.lock().unwrap();
+        let r = nogood::Refuted { entry: mem.entry, prefix, target: self.ng_target.clone(), ban, step: name.to_string(),
+                                  frame: w.get("start").and_then(|f| f.as_u64()).unwrap_or(0), plan: n_plan as u32,
+                                  why: w.get("end_reason").and_then(|x| x.as_str()).unwrap_or("").to_string() };
+        let j = r.json();
+        if mem.refute(r) {
+            drop(mem);
+            (self.progress)(&format!("refuted at plan {n_plan}'s state: {label} ({} keys)", j["point"].as_array().map(|a| a.len()).unwrap_or(0)));
+            if let Some(e) = self.plans.last_mut() {
+                e.insert("nogood_refuted".into(), j);
+            }
+        }
     }
 
     fn observe(&mut self) -> Result<(), EngineError> {
@@ -241,16 +328,25 @@ impl<'a> Harness<'a> {
         }
         let n = self.plans.len();
         let frame = self.ps.engine.status().frame;
+        // E016 C: the memory's bans for this exact state and target (none without the switch)
+        let (ng_prefix, bans) = match &self.nogood {
+            Some(c) => {
+                let p = nogood::prefix_key(&self.player.movie(), frame);
+                let b = c.mem.lock().unwrap().bans(&p, &self.ng_target);
+                (Some(p), b)
+            }
+            None => (None, Vec::new()),
+        };
         let mut entry = Map::new();
         entry.insert("plan".into(), json!(n));
         entry.insert("frame".into(), json!(frame));
-        entry.insert("bans".into(), json!(0));
+        entry.insert("bans".into(), json!(bans.len()));
         entry.insert("start_counts".into(), json!(counts));
         entry.insert("reorders".into(), json!([]));
         entry.insert("planner".into(), json!("taskcore"));
         entry.insert("search".into(), json!(self.cfg.search_name));
         // _same_input: the planner's input (the start, the bans) is the previous plan's on the same frame
-        let key = crate::machine::section("input_key", || start::input_key(frame, 0, &start_f));
+        let key = crate::machine::section("input_key", || start::input_key(frame, bans.len(), &start_f));
         entry.insert("input_key".into(), json!(key));
         self.plans.push(entry);
         if let Some(prev) = n.checked_sub(1).map(|i| &self.plans[i]) {
@@ -273,7 +369,31 @@ impl<'a> Harness<'a> {
                 return Ok(false);
             }
         }
-        (self.progress)(&format!("planning through taskcore (plan {n}, frame {frame}, 0 bans)"));
+        // E016 C: the no-plan memory answers a request it has seen on this reading
+        if let Some(ks) = self.ng_keys_or_all(&start_f) {
+            let rpath = self.reading.dir().join("reading.json").to_string_lossy().into_owned();
+            let sk = nogood::start_key(&start_f, &ks);
+            let c = self.nogood.clone().unwrap();
+            let mut mem = c.mem.lock().unwrap();
+            if let Some(st) = mem.no_plan(&rpath, &sk, &self.ng_target).map(|x| x.status.clone()) {
+                mem.used_no_plan += 1;
+                drop(mem);
+                let e = self.plans.last_mut().unwrap();
+                e.insert("status".into(), json!(st));
+                e.insert("nogood".into(), json!("no plan (memory)"));
+                e.insert("steps".into(), json!([]));
+                (self.progress)(&format!("plan {n}: {st} (the no-plan memory)"));
+                self.cur = PlanResult { status: st.clone(), ..Default::default() };
+                self.stop(status_stop(&st, self.cfg.plan_time_s));
+                return Ok(false);
+            }
+        }
+        if !bans.is_empty() {
+            let e = self.plans.last_mut().unwrap();
+            e.insert("nogood_bans".into(), json!(bans.iter().map(|b| json!([b.label, b.facts.len()])).collect::<Vec<_>>()));
+            self.nogood.as_ref().unwrap().mem.lock().unwrap().used_bans += 1;
+        }
+        (self.progress)(&format!("planning through taskcore (plan {n}, frame {frame}, {} bans)", bans.len()));
         let pdir = self.cfg.workdir.join(format!("plan-{n:03}"));
         let mut caps = BTreeMap::new();
         if self.cfg.cost_caps {
@@ -300,7 +420,7 @@ impl<'a> Harness<'a> {
         let req = PlanRequest {
             goal: self.goal.clone(),
             start: start_f.clone(),
-            bans: vec![],
+            bans,
             caps: caps.iter().map(|(k, v)| (k.clone(), *v)).collect(),
             search: self.cfg.search,
             start_check: self.cfg.start_check.clone(),
@@ -348,16 +468,27 @@ impl<'a> Harness<'a> {
         }
         (self.progress)(&format!("plan {n}: {}, {} steps, {:.0} s", res.status, res.steps.len(), res.seconds));
         if res.status != "plan" {
-            let why = match res.status.as_str() {
-                "time" => format!("planner timeout ({} s)", limit),
-                "unsolvable" => "no plan (the planner proved none)".into(),
-                "incomplete" => "no plan (the search ended without one)".into(),
-                "memory" => "planner memory limit (3G)".into(),
-                s => format!("planner {s}"),
-            };
+            // E016 C: a no-plan the planner proved, asked with no bans, is the reading's
+            if nogood::proves_none(&res.status) && req.bans.is_empty() {
+                if let Some(ks) = self.ng_keys_or_all(&start_f) {
+                    let head = crate::warm::head(&*self.reading);
+                    let np = nogood::NoPlan {
+                        reading: self.reading.dir().join("reading.json").to_string_lossy().into_owned(),
+                        scope: head["scope"]["rooms"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default(),
+                        start: nogood::start_key(&start_f, &ks),
+                        target: self.ng_target.clone(),
+                        status: res.status.clone(),
+                    };
+                    self.nogood.as_ref().unwrap().mem.lock().unwrap().note_no_plan(np);
+                }
+            }
+            let why = status_stop(&res.status, limit);
             self.cur = res;
             self.stop(why);
             return Ok(false);
+        }
+        if let Some(p) = ng_prefix {
+            self.plan_at = Some((p, start_f.clone()));
         }
         // the plan's slot positions and unobserved facts at its start
         let mut pred = Vec::new();
@@ -633,6 +764,9 @@ impl<'a> Harness<'a> {
                     break;
                 }
                 let how = self.play_ctx_play();
+                if self.nogood.is_some() {
+                    self.note_refuted();
+                }
                 match how {
                     PlayOutcome::Goal => {
                         self.stop("goal".into());

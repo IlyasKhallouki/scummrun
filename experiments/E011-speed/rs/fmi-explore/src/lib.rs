@@ -13,6 +13,8 @@
 //! * `wait`: E012's wait move (plan.md section 1); `waitcheck`: its gates (`fmi check wait`).
 //! * `bound`, `grow`: E014 amendment (4)'s bound on a try's fresh reading (FMI_READ_BOUND, FMI_READ_BOUND_BG) and
 //!   its scopes grown as needed (FMI_SCOPE_GROW).
+//! * `nogood`: E016's failure memory (FMI_NOGOOD): refutations at an exact entry, banned in later plans there, and
+//!   the no-plan memory per reading.
 //! * `stall`: E013's stall accounting (experiments/E013-robust/plan.md, section C): every second of a try in a row of
 //!   the harness's own records and a class; stalls.json after each commit (FMI_STALLS); the free share's shift rules.
 
@@ -33,6 +35,7 @@ pub mod guide;
 pub mod harness;
 pub mod machine;
 pub mod mech;
+pub mod nogood;
 pub mod ports;
 pub mod progress;
 pub mod pyjson;

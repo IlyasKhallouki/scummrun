@@ -765,3 +765,70 @@ fn e016_f_the_frontier_entry_gets_the_next_worker_once() {
     }
     assert!(std::env::var("FMI_FRONTIER").is_err());
 }
+
+/// E016 C's switch, set for one test under the lock and unset when the guard goes.
+struct NoGood;
+
+impl NoGood {
+    fn on() -> NoGood {
+        std::env::set_var("FMI_NOGOOD", "1");
+        NoGood
+    }
+}
+
+impl Drop for NoGood {
+    fn drop(&mut self) {
+        std::env::remove_var("FMI_NOGOOD");
+    }
+}
+
+#[test]
+fn e016_c_the_archive_keeps_the_failure_memory_with_its_entry_and_reading() {
+    // E016 section C (FMI_NOGOOD=1): a try's result.json "nogood" goes into its log line; job.json gives a later try the
+    // refutations of its own entry only, and the no-plan records of its scope's newest registered reading only
+    let _g = switch(true);
+    let t = tmp("nogood");
+    let mut a = make(&t);
+    let l = ingest(&mut a, 0, &[nw(5, &[("var:5", json!(8))])], &[]);
+    let e1 = ids(&l)[0];
+    let rdir = t.join("arch").join("readings").join("r0");
+    std::fs::create_dir_all(&rdir).unwrap();
+    std::fs::write(rdir.join("reading.json"), "{}").unwrap();
+    let rp = rdir.join("reading.json").to_string_lossy().into_owned();
+    let scope = a.scope_of_room(Some(33));
+    a.register_reading(&scope, &rp, 0, None, "fresh", Some(0)).unwrap();
+    let _n = NoGood::on();
+    let d = job(&a, 0, &[], &[], false, json!([]));
+    let mut res = files::read_json(&d.join("result.json")).unwrap();
+    let r = |entry: usize| json!({"entry": entry, "prefix": "p", "target": "t", "label": "sentence(1,2)", "point": [["room", 33]],
+                                  "step": "sentence(1,2)#0", "frame": 100, "plan": 0, "why": "200 frames"});
+    let np = json!({"reading": rp, "scope": scope, "start": "s", "target": "t", "status": "unsolvable"});
+    res["nogood"] = json!({"refuted": [r(0)], "no_plan": [np], "given": {}, "used": {}});
+    std::fs::write(d.join("result.json"), res.to_string()).unwrap();
+    let line = a.ingest(&d, None).unwrap();
+    assert_eq!(line["nogood"]["refuted"][0]["label"], "sentence(1,2)");
+    let job_of = |a: &Archive, i: usize| {
+        let d = a.prepare_job(i).unwrap();
+        let j = files::read_json(&d.join("job.json")).unwrap();
+        std::fs::remove_dir_all(&d).unwrap();
+        j
+    };
+    let j0 = job_of(&a, 0);
+    assert_eq!(j0["nogood"]["refuted"].as_array().unwrap().len(), 1);
+    assert_eq!(j0["nogood"]["no_plan"].as_array().unwrap().len(), 1);
+    // another entry: no refutation, the reading's no-plan record (entry 1 is in room 33's scope too)
+    let j1 = job_of(&a, e1);
+    assert!(j1["nogood"]["refuted"].as_array().unwrap().is_empty());
+    assert_eq!(j1["nogood"]["no_plan"].as_array().unwrap().len(), 1);
+    // a newer reading of the scope replaces it: the no-plan record goes, the refutation stays
+    let rdir2 = t.join("arch").join("readings").join("r1");
+    std::fs::create_dir_all(&rdir2).unwrap();
+    std::fs::write(rdir2.join("reading.json"), "{}").unwrap();
+    a.register_reading(&scope, &rdir2.join("reading.json").to_string_lossy(), e1 as i64, None, "fresh", Some(1)).unwrap();
+    let j0 = job_of(&a, 0);
+    assert_eq!(j0["nogood"]["refuted"].as_array().unwrap().len(), 1);
+    assert!(j0["nogood"]["no_plan"].as_array().unwrap().is_empty());
+    drop(_n);
+    // the switch off: job.json has no "nogood"
+    assert!(job_of(&a, 0).get("nogood").is_none());
+}
