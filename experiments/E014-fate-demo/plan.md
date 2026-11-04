@@ -1294,3 +1294,166 @@ entered.
    refinement (5 tries).
 4. **Two new rows**, recorded and not applied: 23 (the refined task lacks the target's fact) and 24 (an actor's offer
    point off the screen).
+
+## Amendment 2026-11-04 (8): plans the engine refutes and starts the reading does not reach, diagnosed; the matcher's step, sound commands, offers on the screen; the run from the boot to a wall limit
+
+Written and committed before the code it plans is committed. The sections above stay as written and their predictions
+are not edited. The diagnosis below was measured on play7's tries run again on the laptop (`fmi try` on a copy of the
+job with its scope and a fresh reading, the run's switches and build) and with a probe of the engine (fmi-checks'
+`probe state` and `probe watch`: the movie from boot, then per frame the slot runs, the explain log's opcodes, reads
+and writes of chosen units, the slots' locals and cutscene levels). Fixes (a) and (b) were tried as prototypes on single
+tries to confirm the causes; their code is committed after this amendment, with tests.
+
+### The diagnosis, with play7's numbers
+
+**1. Effect mismatch (1,316.6 s, 38.4% of the try wall): the matcher reads a started script's arguments one run too
+late.**
+
+- **Where the seconds are.** 1,313.8 s of the 1,316.6 s (99.8%) are one plan: walk to object 592 (verb 10), then the
+  sentence script's resumption after its walk, for var 52 = 0 (the cursor off). Nine tries planned it from nine entries
+  (33-36, 107, 108, 119-121); seven are classed effect mismatch (1,095.0 s), two productive (their model-free step kept
+  atoms; 218.8 s of their rows are effect mismatch). Each stopped at the second "same empty window" after 3 windows of
+  up to 3,600 frames (108-178 s per try).
+- **Reproduced.** j00074 (entry 36), the target forced to var 52 = 0, on the laptop: the same stop on the same record
+  (`event(script:2@882)`, the sentence script after its WaitForActor), at the same frame (8,292), 87.6 s.
+- **What the engine runs** (probe watch at the window's click). The sentence script walks the ego to the object. The
+  ego already stands at the object's walk point, so WaitForActor does not block (ScummVM's o5_wait goes on when the
+  actor is not moving) and the script runs on in the same frame to startObject, which runs the object's verb script at
+  once, nested in it (runScriptNested). That script opens a cutscene (the cursor goes off: the goal holds in 249 of the
+  window's 294 children, "goal, not from the plan") and parks at its first breakHere (offset 35, its locals the verb and
+  the second object). Then, before the next decision point, the engine's slot loop of the next frame runs the object
+  script again, 35 to 36. The observed step holds both runs.
+- **What the matcher does.** The sentence script's run passed a wait that did not block, so Lemma P splits it, and the
+  part after the wait is matched to the record. The record predicts `args:obj:592`, the object script's locals against
+  the reading's lists at offset 35. The matcher checks it on the view at the step's end, where the object script is at
+  36, which has no list: the view's args read 0 and the record is refuted ("effect args:obj:592: the predicted write
+  is not in the run"). A key that a later run of the step writes is exempt only when that run is of the plan's units
+  (and a unit's own args); the object script is not one of them. The cause finder has no write site for a slot's args
+  either, hence "no cause".
+- **The four questions.** *Widening:* no. The record's checked effect is an exact value, its two checks are the walk's
+  wait and the distance to the object; the try with `FMI_READ_WIDEN` off is in the result. *A missing script or
+  condition:* no, the record is right; the engine writes what it predicts. *Timing:* yes, the matcher's step: its
+  last view is after a later run of the started script. *Learning:* no. A refuted record is not banned: the replan in
+  the same try plans the same two steps (plan 2 = plan 1) and the try stops at the second empty window. Across tries
+  nothing carries over: the same target with the same plan was tried from nine entries. (The same holds for the 7
+  tries on var 104 = 3, which the planner proved unreachable each time: 308.6 s.)
+- **The mechanic.** A script that another starts runs at once, nested in its starter, up to its first yield; the
+  engine's slot loop can run it again before the next decision point. The step a matcher observes between two decision
+  points then ends with the started script past the point its starter's record leaves it. Any started script that
+  yields at once and runs again in the next frame (a cutscene, an animation loop) meets this.
+
+**2. Model-blind (482.1 s, 14.1%): the reader has no rule for sound commands.**
+
+- **Where the seconds are.** 16 tries (312.8 s of model-blind rows) stopped at a reach extension: the start holds
+  `pos:script:151 = 59`, and the extended reading does not reach it either. The rest is Lemma R's R0 on var 165
+  (5 tries, 150.9 s) and 4 probes with no attempt (18.4 s).
+- **The script.** A global script that the room's entry starts: a delay, then a loop of a sound-running test, a random
+  draw, a sound command (`soundKludge`, the iMUSE command queue) and a variable delay, where it parks (offset 59). Every
+  state after its first delay holds it there.
+- **The reading.** In every reading measured (the boot and entry 3 with widening on and off, entry 36), the script's
+  position takes only -1 and 4. The one record of its resumption at 4 is a path that stops it. The reader's machine has
+  no rule for `soundKludge` (scumm-machine `heads.rs`: "no rule"), so a path through it ends "unmodelled", which the
+  reader drops. Every way to offset 59 passes the sound command; a reading extended from a start at 59 drops the same
+  paths. The demo's scripts hold 275 `soundKludge` in 39 units (`results/inventory`): every path through one is lost.
+- **Not a suspended script's starting point:** the readings start from the start's slot positions (the boot reading
+  holds the script at 4 and reads its resumption); the gap is the op's rule.
+- **The mechanic.** Adventure games play sound from their scripts (ambient loops, effects inside verb scripts, music
+  cues in cutscenes). A sound command changes nothing a script reads except the sound engine's answer, which the
+  engine writes outside the scripts (ScummVM's processSoundQueues writes VAR_SOUNDRESULT). A reader that stops at it
+  never sees a script past its first sound.
+- **Prototype.** With sound commands as ops with no tracked effect, the reading from entry 36 reaches offset 59 (2 more
+  records; 40.3 s against 38.8 s); j00014 (entry 11), which stopped at the reach extension at frame 1,868, plans there
+  and plays on.
+
+**3. The refused offers (row 24)** and **4. the refined task without the target's fact (row 23)** are as recorded.
+
+**5. Found, not fixed: the executor's walk-to verb is Monkey Island's.** The executor's profile (fmi-play
+`executor.rs`, `DOS_CD`) is Monkey Island's: walk to is verb 11 in the selected-verb variable. The demo's interface
+resets that variable to verb 10. To reach an object off the screen the executor walks toward it and first waits for
+the selected verb to be walk to; in the demo that never happens ("the verb did not return to Walk to within 120
+frames", every child of j00014's windows after fix (b)). In play7, 3 tries stopped on walk to object 596 (54.7 s). A
+row of the assumptions table; not applied here (the profile's numbers are not read from the game's files yet).
+
+### The fixes (each a switch, on for both games; rule (2) checks Monkey Island with all on)
+
+- **(a) `FMI_ARGS_LATER=1`** (fmi-play `strict.rs`). A record's predicted `args:U` is not checked against the step's
+  last view when a run of U at depth 0 comes later in the step, whatever unit set the plan has: in the strict
+  matcher's verdicts, in the parts of a split run, and in the input's match. The step's runs are passed to the matcher
+  for this. Unset: as before.
+- **(b) `FMI_READ_SOUND=1`** (scumm-machine, scumm-reader). `soundKludge`, `setRoomShadow` (the palette's shadow
+  table) and `debug` (a debug print) have no tracked effect, as `startSound` has none (`heads::effect_with`,
+  `Machine::sound_ops`); VAR_SOUNDRESULT is a variable the engine writes, not a fact (`domains::engine_why`); the
+  reader's memo keeps its own store under the switch. Unset: as before.
+- **(c) `FMI_OFFER_SCREEN=1`** (fmi-explore `afford.rs`, row 24). An actor's offer points are kept only on the screen,
+  0 <= x < 320 and 0 <= y < 200, as the objects' points are cut to it and the walk boxes' points are cut to the main
+  screen. The bridge refuses x or y below 0. Unset: as before.
+- **(d) `FMI_GOAL_FACT=1`** (fmi-explore `harness.rs`, row 23). Before a plan, a target fact the task's reading does
+  not hold after a refinement stops the attempt as "refinement: the refined task holds no fact of the target", class
+  model-blind, without calling the planner. Unset: as before.
+- **(e) The run's wall limit, `FMI_STOP_WALL=S`** (fmi-explore `driver.rs`). After S seconds of the driver's wall no
+  try starts; the running tries finish and are committed; the stop is "wall limit". Unset: no limit. It changes no
+  try.
+- **Tests:** (a) a step whose later run is of a unit outside the plan: refuted off, matched on, and a later run of
+  another unit's args does not exempt; (b) a unit whose path passes `soundKludge`: ends "unmodelled" off, parks at the
+  next wait on; VAR_SOUNDRESULT's reason with the switch; (c) an actor left of the screen: offered off, not offered on;
+  (d) a task without the target's fact: the stop's text and class; (e) the driver stops at the wall limit with no try
+  cut.
+
+### The run
+
+- **The build:** e014's head with (a)-(e), in `/var/tmp/fast-mi/target-e014e`; the engine svm-e013, unchanged.
+- **The switches:** `a8/env.sh` = a7/env.sh (every E012, E013, E014 switch; the bound 300 s; grown scopes;
+  `FMI_READ_WIDEN=1`; `FMI_STAG_CELLS=1`) with `FMI_ARGS_LATER=1 FMI_READ_SOUND=1 FMI_OFFER_SCREEN=1 FMI_GOAL_FACT=1`
+  added to ALLON and A4; the game's settings as before (`a8/run-env.sh`).
+- **The archive:** a new one, `/var/tmp/fast-mi/e014-archives/play8`, from the boot. Seed 1; amendment (4)'s guide
+  file. Stage play, goal end = 1, the rooms from the files, E009's switches, play when ready, commit as finished.
+- **The falsifier is replaced by a wall limit.** The 80-try falsifier was set when a try took minutes on the laptop
+  (amendment (3): 3-5 minutes; a reading after the opening alone took more than 15 minutes before amendment (6)). In
+  play7 a try took 42.9 s on average and 80 tries took 460.7 s of driver wall at b = 10 (5.8 s per committed try): the
+  falsifier stopped a run that was still finding atoms after 7.7 minutes. The limit now is the VM's wall: at most
+  2.5 h up. Setup, push and the check took about 15 minutes in amendment (7); the stall table, the verification
+  (24 at a time) and the copies back about 15 minutes; running tries finish within about 10 minutes of the limit (a
+  try's reading is bounded at 300 s). So the driver's limit is `FMI_STOP_WALL=6600` (1 h 50 min), and
+  `--stop-jobs 100000` (no falsifier in effect). E009's stop rules stay: the goal, stagnation (with `FMI_STAG_CELLS`'s
+  sweep), an exhausted archive, the disk floor.
+- **Where.** The cloud VM, one start: `python3 scripts/cloud.py start --type n2-custom-30-122880 --hours 3 --standard`
+  from main's scripts ($1.5346/h: $4.60 booked of the $11.85 left; at most 2.5 h used, $3.84). b = 10, 2 readings in
+  the background; `a8/vm.sh` (a7/vm.sh with this build, environment and archive, and a 2-try check archive `vm-check8`
+  made on the laptop first, verified from boot on the VM, run again there and compared). The VM is stopped with
+  cloud.py as soon as the run ends, and the ledger records it. If the start is refused: the laptop (a4/laptop.sh's
+  pattern, b = 2, 1 reading in the background) with the same wall limit; the write-up says which ran.
+- **Disk.** The VM's disk is 30 GB. A try's folder holds 0.3-20 MB, a fresh reading 16-20 MB (evicted by size). If
+  the disk floor stops the run, it is E009's stop and is written up as such.
+- **Verify.** Every entry from boot on the lean engine (`fmi explore verify`), 0 differences. For a goal entry, its
+  chain must hold the system's own inputs on the way to the end site. A chain of waits only, or the demo playing itself
+  to its end, is reported as such and not as reached.
+- **Projection.** Tries take 40-120 s (play7: 42.9 s; plans that now play run their windows), so 1 h 50 min at b = 10
+  gives 550-1,650 tries.
+
+### Stop rule
+
+- The goal; E009's stop rules (stagnation under `FMI_STAG_CELLS`, an exhausted archive, the disk floor); the wall
+  limit; Google's stop at the booked time is the hard backstop.
+- It runs once. Exactness first. A break that stops the driver is fixed only by a dated amendment and rule (2), and the
+  run resumes from its files. Any other break is a row of the assumptions table, recorded and not applied. A stop by
+  hand only if something is clearly broken, with the reason written down.
+- Before the run: rule (2) on Monkey Island with every switch on (`A4_ENV=a8/env.sh a4/mi-check.sh`): B3's 15 tries
+  equal E013's G-on, their new entries verify from boot, the kitchen's goal chain verifies, the smoke run's entries
+  verify and its stall report passes. If a check differs, no run: the difference is written up first.
+
+### Predictions (before the code is committed)
+
+| | predicted |
+|---|---|
+| rule (2) on Monkey Island | B3's 15 tries equal E013's G-on; their new entries, the kitchen chain and the smoke run verify |
+| the plan walk to object 592 for var 52 = 0 | reaches the goal from the plan wherever it is planned; 0 stops on `effect args:obj:592` |
+| how the run stops | the wall limit 60%; stagnation 20%; the disk floor or a break 15%; the goal 5% |
+| committed tries | 550-1,650 |
+| rooms entered, of the 11 in the files | 1-3, most likely 2 |
+| the end | not reached; reached by the system's own inputs and verified from boot: 5% |
+| new atoms of T | 80-250 (play7: 62) |
+| the stall table | effect mismatch 0-15% (38.4%); model-blind 0-8% (14.1%); refused input 0-0.2% and no trial refused on an actor's point; interface, no yield 20-50%; no plan 5-25%; productive 5-30%; the rest row at most 1% |
+| readings | none reaches the 300 s bound in more than 5% of model tries |
+| entries verified from boot | every entry, 0 differences |
+| the VM, if it starts | 2.2-2.5 h used, $3.4-3.9 |
+| the laptop, if not | 2.5 h of driver wall at most |
