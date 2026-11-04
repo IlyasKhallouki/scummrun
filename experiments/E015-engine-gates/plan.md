@@ -425,3 +425,10 @@ Written after reading the tools and the archive's entry list, before any search 
 - **Verification (step 4 and step 6).** A fresh engine boots with the movie (ev5, then every click of the chain at its
   absolute frame) and runs to the chain's last stop frame. Compared there: every fact of the full facts (control keys
   included), the room and the digest.
+
+### (2) 2026-11-04, the item gate: the openings at the goal's state, fixed before its first run
+
+- Step 2 says the search stops at the first stop in room 69, and also that the record shows how many openings lead to
+  room 69 from that state. Both hold only if the state's other openings are tried. So at the first goal stop (room 69
+  in step 2, owner:946 = ego in step 3) the rest of that node's inputs are still run and recorded, and then the search
+  stops. The chain is the first goal trial. The trial limit still applies.
