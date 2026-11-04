@@ -269,3 +269,34 @@ with w the record's verb (`step_input`'s src[1]). It accepts a candidate when th
 (w, a, 0): the same test as for any sentence. The first candidate, the bare click on a, gives that touch whenever the
 interface's selected verb is the walk verb. In the demo, none of play8's 502 job results names a walk_to record, so
 this test is exercised on Monkey Island (G4).
+
+### (2) 2026-11-04, A: G3's first run fails on the candidate count; fix 1 (image slots first)
+
+**The first run** (`results/g3/run1/`, tool at a97ef1c, realize at 8bcf853). It started from the item check's 30 clicks,
+idle at frame 2980 in room 42 with owner:946 = 1.
+- **s3:490: 4 candidates, 10 forks, 16 ms.** The bare click (3 hit points) gives (10, 490, 0); verb slot 1 then 490
+  gives (10, 490, 0); slot 5 then 490 gives no sentence; slot 3 then 490 gives (3, 490, 0), accepted. Its clicks are
+  at 2981 and 2983, as in the item check. Next idle: 2998.
+- **s8:946:491: 1 approach click, then 14 candidates, 15 forks, 26 ms.**
+  - At 2998, 491 had no hit point. One floor click at 2999 gave it one.
+  - Then verb 8's slot, a's slot in the dump's order, then 491. The verb slots 1, 5, 3, 4, 11, 12, 9, 6 and 7 each
+    gave (that slot's id, 491, 0): the slot replaced the verb. The image slots 101-104 gave (8, o, 491) with the object
+    each shows. Slot 105 gave (8, 946, 491), accepted, with clicks at 3004, 3006 and 3008.
+- **After the steps:** local 212 ran at frame 3011, and class 12 on 491 was cleared at 3011.
+- **Checks:** the chain from boot (30 + 6 clicks) to frame 3011 gives 0 differences. The second pass, through
+  `executor::play_input`, gives the same 6 events.
+  - That pass's fork and a control fork given the same events at once agree (digest equal, 0 facts differ).
+  - Both differ from the first pass's root engine only in var 56: 0 on the root, -1 in a fork, at 3011. This is a
+    fork-against-root difference that A does not cause (`run1/g3-control.json`). It is reported as an open issue.
+- **Verdict as stated: FAIL.** The two steps took 4 + 14 = 18 candidates, above 15. Every other condition holds.
+  (Per step, both counts are within 15. The plan's text reads as the total, so the total is what is scored.)
+
+**Fix 1.** In the inventory extension, a's slot (and b's, when b has no hit point) runs over the visible slots of
+image type first, then the others, each group in the dump's order.
+- The engine fact behind it: the dump's verb `type` is the slot's `VerbSlot::type`. In SCUMM v5 an image slot is
+  drawn from an object's image (o5_verbOps' image subop calls setVerbObject with an object number), so a slot that
+  shows an object is an image slot whenever the game draws its inventory as images.
+- A game that writes its inventory as text has the same order as before.
+- Acceptance is unchanged: the Sentence touch (v, a, b).
+- Room objects' candidates are unchanged.
+- The rerun is G3 as stated, with the same tool (af8bcf6 adds only the control fork). Fixes left after this one: 1.
