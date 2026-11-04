@@ -55,6 +55,15 @@ pub(crate) fn read_widen_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_WIDEN").is_ok_and(|v| v == "1"))
 }
 
+/// E014 amendment (8)'s switch `FMI_READ_SOUND=1`: the ops whose only effect is on the sound or the screen
+/// (soundKludge, setRoomShadow, debug) have no tracked effect (scumm-machine's `heads::effect_with`), and
+/// VAR_SOUNDRESULT, which the engine's sound queue writes outside the scripts, is no fact (`domains::engine_why`).
+/// Unset: as before (each such op ends its path "unmodelled", dropped).
+pub fn read_sound_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_SOUND").is_ok_and(|v| v == "1"))
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];

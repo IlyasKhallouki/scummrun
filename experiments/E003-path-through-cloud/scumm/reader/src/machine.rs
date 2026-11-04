@@ -2571,6 +2571,7 @@ impl<'g> Reader<'g> {
             Features { own_entry: true, dispatch: true, calls: true, room_change: true, ..Default::default() };
         let mut m = Machine::new(game, features, Switches::default());
         m.path_limit = PATH_LIMIT;
+        m.sound_ops = crate::builder::read_sound_switch();
         m.hooks = Some(&HOOKS);
         m.ext = Some(Box::new(St::default()));
         Reader { m, o: FactOracle::new(FactMap::default(), None) }
