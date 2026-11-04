@@ -497,3 +497,25 @@ this commit's tree.
     - kitchen: pass;
     - smoke: killed with no entry;
     - K1: killed with no entry.
+
+### (9) 2026-11-04: one long plan search stopped every worker; play9 resumed from its archive
+
+- **The finding:** at 20:02 UTC play9 had reached C3 at 5.4 min, then committed no try for 10 minutes.
+  - A stack of the busy thread showed `taskcore::lama::search_with` under `WarmPlanner::search`.
+  - `Harness` held the one lock over every reading's planner (`PlannerCache`) for the whole search, so the other 9
+    workers waited on it.
+  - The limits were play8's: `FMI_PLAN_DEEPEN=120` (first plans), 600 s after that.
+  - Of the run's tries so far, successful plans took a median of 0.1 s of planning and a p95 of 3.5 s. The tries of
+    80-208 s ended mostly with "no plan" or a repeated empty window on a walk sentence.
+- **Fixes:**
+  - Each reading's planner has its own lock (`SharedPlanner`). The cache's lock is held only to find the planner.
+  - `FMI_PLAN_DEEPEN=10` is added to E16: the first limit is 10 s, doubled per deferral as before.
+  - fmi-explore's nogood and free_explore tests pass (19).
+- **The resume:** Ilyas: "yes do it", "from the last checkpoint ofc". So play9 was not restarted.
+  - The driver was killed at 20:28 UTC. The archive (331 entries, C3) was run on from its files with the new binary
+    and switches (`vm.sh resume`). The tries cut off by the kill are restarted by the driver.
+  - The ladder's 40-minute rule counts from the resume's watcher.
+  - play9's report gives the two segments: 0-37 min with play8's plan limits, then the resume.
+- **Monkey Island's checks** with room scopes, before this amendment's changes: kitchen pass; smoke pass (23 entries,
+  0 differences). K1 was killed by the laptop's memory guard while a build ran beside it. The checks and K1 run again
+  with this amendment's set.

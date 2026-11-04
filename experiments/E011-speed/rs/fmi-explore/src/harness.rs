@@ -79,23 +79,29 @@ pub trait Rereads {
     fn cpu_s(&self) -> f64;
 }
 
+/// A reading's warm planner, locked by itself (E016 amendment (9)): one try's long search waits only the tries
+/// that plan on the same reading, not every worker.
+pub type SharedPlanner = Arc<Mutex<Box<dyn Planner>>>;
+
 /// The warm planner of each reading (one per reading id), kept across plans and attempts.
 pub struct PlannerCache {
     pub host: Arc<dyn PlannerHost>,
-    kept: HashMap<[u8; 20], Box<dyn Planner>>,
+    kept: HashMap<[u8; 20], SharedPlanner>,
 }
 
 impl PlannerCache {
     pub fn new(host: Arc<dyn PlannerHost>) -> PlannerCache {
         PlannerCache { host, kept: HashMap::new() }
     }
-    pub fn get(&mut self, rd: &dyn ReadingSource) -> Result<&mut Box<dyn Planner>, PlanError> {
+    /// The reading's planner, made on first use; the cache's lock is held only for this, the planner's own lock
+    /// for a plan.
+    pub fn get(&mut self, rd: &dyn ReadingSource) -> Result<SharedPlanner, PlanError> {
         let id = rd.id();
         if !self.kept.contains_key(&id) {
             let p = self.host.planner(rd)?;
-            self.kept.insert(id, p);
+            self.kept.insert(id, Arc::new(Mutex::new(p)));
         }
-        Ok(self.kept.get_mut(&id).unwrap())
+        Ok(self.kept[&id].clone())
     }
     /// plan_fd.close_servers: the planners' memory, before a reader reads
     pub fn close(&mut self, id: &[u8; 20]) {
@@ -432,11 +438,13 @@ impl<'a> Harness<'a> {
             },
             time_limit_s: limit,
         };
-        // the planners' lock is held for the request only (an extension below plans again)
-        let planned = {
-            let mut g = self.planners.lock().unwrap();
-            crate::machine::port(|| g.get(&*self.reading).and_then(|p| p.plan(&req)))
-        };
+        // the reading's planner's lock is held for the request only (an extension below plans again); the cache's
+        // lock only to find the planner
+        let planned = crate::machine::port(|| {
+            let p = self.planners.lock().unwrap().get(&*self.reading)?;
+            let mut p = p.lock().unwrap_or_else(|e| e.into_inner());
+            p.plan(&req)
+        });
         let res = match planned {
             Ok(r) => r,
             Err(e) => {

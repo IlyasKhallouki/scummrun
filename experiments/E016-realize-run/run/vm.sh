@@ -122,6 +122,20 @@ run_bg() {  # W BG: laptop.sh's init, run, stalls, ladder; then every entry from
     verify_all
 }
 
+resume_bg() {  # W BG: the archive run on from its files (amendment (9)), then stalls, ladder, every entry from boot
+    cd $HERE
+    rm -f $ARCHS/play9/summary.json
+    HEAVY_LOCK=none MIN_FREE_GB=${MIN_FREE_GB:-10} W=$1 A4_BG=$2 bash laptop.sh run stalls ladder || true
+    say "run done"
+    verify_all
+}
+
+resume() {  # [W] [BG], detached
+    mkdir -p $L
+    setsid nohup bash $HERE/vm.sh resume_bg ${1:-10} ${2:-2} >> $L/run.log 2>&1 < /dev/null &
+    say "resumed with ${1:-10} workers, ${2:-2} readings in the background (pid $!)"
+}
+
 start() {  # [W] [BG], detached from the ssh session
     mkdir -p $L
     setsid nohup bash $HERE/vm.sh run_bg ${1:-10} ${2:-2} > $L/run.log 2>&1 < /dev/null &
@@ -179,7 +193,7 @@ vm() {  # run a subcommand of this script on the VM
 
 cmd=${1:-}; shift || true
 case "$cmd" in
-    push|pull|follow|vm|setup|start|run_bg|verify_all|status)
+    push|pull|follow|vm|setup|start|run_bg|resume|resume_bg|verify_all|status)
         $cmd "$@" ;;
     *) sed -n '2,20p' "$0"; exit 2 ;;
 esac
