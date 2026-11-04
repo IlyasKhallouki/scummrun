@@ -394,3 +394,34 @@ At most two fixes. If G1 fails after the second fix, G1 has failed.
   - Otherwise outputs move to the other disk and the work goes on.
 - **Commits.** The code is committed in small pieces, one topic each, on e015, and pushed. The results and a report
   (`report.md`) are committed when the gates stop. Nothing is merged to main.
+
+## Amendments
+
+### (1) 2026-11-04, the item gate: what the procedure leaves open, fixed before its first run
+
+Written after reading the tools and the archive's entry list, before any search of the gate ran.
+
+- **Step 5's entries (the plan cannot be followed as written).** The plan expected at most 8 room-42 entries with
+  `class:491:6 = 1`; play8 has 136 (every one also holds `class:491:12 = 1`). The rule: 8 of them evenly spaced in id
+  order (the ⌊k·136/8⌋-th, k = 0..7), which are entries 302, 324, 341, 358, 456, 556, 573 and 595, plus 356 and 296.
+  That is 10 entries.
+- **The inputs of steps 2 and 3.** In a sentence idle: afford's `inputs_of` less the verb slots alone (the plan lists
+  each target alone, each verb then each target, each floor point). In a dialog idle, where `inputs_of` gives the
+  verb slots alone, those are the inputs (the plan names no dialog case). No third click.
+- **The inputs of steps 5 and 6** are `inputs_of` in full with the third click, as a try runs it (`try_all`'s rule:
+  `composing` after a verb-then-target trial, then a click on every target of that stop).
+- **A trial's run.** The clicks two frames apart from the frame after the stop (afford's timing), then a run to the
+  bridge's next idle, or to W = 1,600 frames after the stop (afford's W), whichever comes first. Only an idle stop in the
+  search's room is expanded at the next depth. A stop in another room, an ended run or a stop at W ends its branch.
+  For step 5's sweep, room 42 is the search's room; a stop in room 75 goes to step 6.
+- **Expanding a stop.** The stop's engine is not kept. It is made again from the search's start engine: a fork, the
+  path's clicks scheduled, a run to the stop's frame. Its patch-0007 digest must equal the one recorded at the trial's
+  stop; a stop that does not is reported and not expanded.
+- **Step 5's counts.** As planned: a `Started` touch of script 212 in the input log (the log holds the input handler's
+  run only), `local:212` live at the stop, and `class:491:12` absent at the stop (it is 1 at every chosen entry). Also
+  reported, not gating: a run of room 42's local 212 anywhere in the trial (the engine's segment of slot runs).
+- **Step 6.** The stops in room 75, distinct by digest, in the order found, at most 10. From each, a depth-2 sweep, at
+  most 3,000 trials. Step 6 stops at the first stop in room 49, which is verified from the boot.
+- **Verification (step 4 and step 6).** A fresh engine boots with the movie (ev5, then every click of the chain at its
+  absolute frame) and runs to the chain's last stop frame. Compared there: every fact of the full facts (control keys
+  included), the room and the digest.
