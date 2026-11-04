@@ -454,7 +454,14 @@ pub struct AffordOut {
     pub phases: [f64; 5],
     /// E013 (FMI_REFUSE): the shared waits' counts and gate B4's pairs (FMI_REFUSE_CHECK)
     pub refuse: Option<RefuseOut>,
+    /// E014 amendment (7): the trials whose inputs the bridge refused (its input check), each recorded as a refused
+    /// trial: (the trial's index, the bridge's text)
+    pub bridge_refused: Vec<(usize, String)>,
 }
+
+/// E014 amendment (7): a trial's verdict when the bridge refused its inputs (B's `dropped: ...`, "refused input" in
+/// the stall table).
+pub const BRIDGE_REFUSED: &str = "dropped: bridge";
 
 /// E013's refused inputs in a step: digests taken, waits shared (with an earlier trial, with the no-input twin), the
 /// twin's forks, and with FMI_REFUSE_CHECK the pairs whose own waits were run and compared (B4).
@@ -523,6 +530,18 @@ impl AffordOut {
                                  "waits_run": self.trials.iter().filter(|t| t.digest.is_some() && t.shared.is_none()).count(),
                                  "pairs": r.pairs.len(), "pairs_same": r.pairs.iter().filter(|p| p.2).count(),
                                  "pairs_differ": r.pairs.iter().filter(|p| !p.2).map(|p| json!([p.0, p.1])).collect::<Vec<_>>()});
+        }
+        if !self.bridge_refused.is_empty() {
+            // E014 amendment (7): which inputs the bridge refused, at which frames, and its text
+            v["bridge_refused"] = json!(self
+                .bridge_refused
+                .iter()
+                .map(|(i, why)| {
+                    let t = &self.trials[*i];
+                    json!({"inputs": t.inputs.name(), "events": t.events.iter().map(crate::events::event_json).collect::<Vec<_>>(),
+                           "why": why})
+                })
+                .collect::<Vec<_>>());
         }
         v
     }
@@ -708,6 +727,34 @@ struct Run1<'a> {
 }
 
 impl Run1<'_> {
+    /// E014 amendment (7): a trial whose inputs the bridge refused when they were scheduled on its fork (the bridge's
+    /// input check): recorded as a refused trial (reason "refused", verdict `BRIDGE_REFUSED`, no run, no world, its
+    /// seconds from `t0`), with the bridge's text in the step's record. The fork is not run; the step goes on.
+    fn refused_by_bridge(&mut self, inputs: Inputs, events: Vec<Event>, st: &Status, why: String, t0: Instant) {
+        let idx = self.out.trials.len();
+        self.out.trials.push(Trial {
+            inputs,
+            events,
+            frame: st.frame,
+            reason: "refused".into(),
+            ended: false,
+            idle: None,
+            room: st.room,
+            back: None,
+            composing: false,
+            outcome: Vec::new(),
+            novel: Vec::new(),
+            kept: 0,
+            seconds: t0.elapsed().as_secs_f64(),
+            tick: st.tick,
+            verdict: Some(BRIDGE_REFUSED.into()),
+            digest: None,
+            shared: None,
+        });
+        self.worlds.push((st.frame, None));
+        self.out.bridge_refused.push((idx, why));
+    }
+
     /// One trial on `b`, whose clicks `events` are scheduled: its run, its record, its world facts, and its stops kept
     /// by novelty. Returns the trial's index and its stop's status and facts (None: the run ended, or no input was
     /// taken). `e`: the offer's engine (the no-input twin's source, with E013's shared waits).
@@ -899,7 +946,21 @@ pub fn try_all(
             b.segment(true)?;
             b.runs()?;
         }
-        b.inputs(&evs)?;
+        match b.inputs(&evs) {
+            Ok(()) => {}
+            // E014 amendment (7): an input the bridge refuses is one refused trial, and the step goes on
+            Err(EngineError::Bridge(why)) => {
+                r.out.phases[1] += ti.elapsed().as_secs_f64();
+                let st = b.status().clone();
+                r.refused_by_bridge(inp.clone(), evs, &st, why, ti);
+                r.cpu += b.cpu_s();
+                let tq = Instant::now();
+                b.quit();
+                r.out.phases[3] += tq.elapsed().as_secs_f64();
+                continue;
+            }
+            Err(x) => return Err(x),
+        }
         r.out.phases[1] += ti.elapsed().as_secs_f64();
         let last = evs.last().map(|x| x.frame).unwrap_or(f0);
         let (i, res) = r.trial(e, &mut b, inp.clone(), evs.clone())?;
@@ -921,10 +982,20 @@ pub fn try_all(
                     let mut evs3 = evs.clone();
                     evs3.push(Event { frame: st.frame + 1, what: Input::Click(t.x, t.y) });
                     let ti = Instant::now();
-                    c.inputs(&evs3[evs3.len() - 1..])?;
-                    r.out.phases[1] += ti.elapsed().as_secs_f64();
                     let inp3 = Inputs { clicks: vec![inp.clicks[0], inp.clicks[1], *t] };
-                    r.trial(e, &mut c, inp3, evs3)?;
+                    match c.inputs(&evs3[evs3.len() - 1..]) {
+                        Ok(()) => {
+                            r.out.phases[1] += ti.elapsed().as_secs_f64();
+                            r.trial(e, &mut c, inp3, evs3)?;
+                        }
+                        // E014 amendment (7): as the trial's first clicks
+                        Err(EngineError::Bridge(why)) => {
+                            r.out.phases[1] += ti.elapsed().as_secs_f64();
+                            let st3 = c.status().clone();
+                            r.refused_by_bridge(inp3, evs3, &st3, why, ti);
+                        }
+                        Err(x) => return Err(x),
+                    }
                     r.cpu += c.cpu_s();
                     let tq = Instant::now();
                     c.quit();
