@@ -1,0 +1,406 @@
+{
+  "hops": [
+    {
+      "hop": "room:63:2:3000:1",
+      "start": {
+        "frame": 1154,
+        "room": 49,
+        "idle": "sentence",
+        "rng": 1148500385
+      },
+      "trials": 2853,
+      "stopped": "goal",
+      "goals": 1,
+      "seconds": 19.034751555,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": {
+        "trial": 2852,
+        "names": [
+          "v1t596",
+          "v120"
+        ],
+        "frame": 1344,
+        "room": 63,
+        "idle": "sentence",
+        "owner": 15,
+        "class": 1,
+        "path": [
+          [
+            1155,
+            2,
+            154
+          ],
+          [
+            1157,
+            31,
+            23
+          ],
+          [
+            1259,
+            4,
+            154
+          ]
+        ]
+      }
+    },
+    {
+      "hop": "room:69:2:3000:0",
+      "start": {
+        "frame": 1344,
+        "room": 63,
+        "idle": "sentence",
+        "rng": 302502692
+      },
+      "trials": 2,
+      "stopped": "goal",
+      "goals": 1,
+      "seconds": 0.019012405,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": {
+        "trial": 1,
+        "names": [
+          "v1t853"
+        ],
+        "frame": 1444,
+        "room": 69,
+        "idle": "sentence",
+        "owner": 15,
+        "class": 1,
+        "path": [
+          [
+            1345,
+            2,
+            154
+          ],
+          [
+            1347,
+            51,
+            75
+          ]
+        ]
+      }
+    },
+    {
+      "hop": "own:0:2:3000:0",
+      "start": {
+        "frame": 1444,
+        "room": 69,
+        "idle": "sentence",
+        "rng": 4231131025
+      },
+      "trials": 34,
+      "stopped": "goal",
+      "goals": 1,
+      "seconds": 0.153354637,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": {
+        "trial": 33,
+        "names": [
+          "v11t946"
+        ],
+        "frame": 1459,
+        "room": 69,
+        "idle": "sentence",
+        "owner": 1,
+        "class": 1,
+        "path": [
+          [
+            1445,
+            56,
+            161
+          ],
+          [
+            1447,
+            91,
+            59
+          ]
+        ]
+      }
+    },
+    {
+      "hop": "room:63:2:3000:0",
+      "start": {
+        "frame": 1459,
+        "room": 69,
+        "idle": "sentence",
+        "rng": 4231131025
+      },
+      "trials": 3,
+      "stopped": "goal",
+      "goals": 1,
+      "seconds": 0.017861133,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": {
+        "trial": 2,
+        "names": [
+          "v1t945"
+        ],
+        "frame": 1475,
+        "room": 63,
+        "idle": "sentence",
+        "owner": 1,
+        "class": 1,
+        "path": [
+          [
+            1460,
+            2,
+            154
+          ],
+          [
+            1462,
+            139,
+            51
+          ]
+        ]
+      }
+    },
+    {
+      "hop": "room:49:2:6000:0",
+      "start": {
+        "frame": 1475,
+        "room": 63,
+        "idle": "sentence",
+        "rng": 3588927825
+      },
+      "trials": 3162,
+      "stopped": "goal",
+      "goals": 1,
+      "seconds": 14.903101238,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": {
+        "trial": 3161,
+        "names": [
+          "w10",
+          "v1t851"
+        ],
+        "frame": 1910,
+        "room": 49,
+        "idle": "sentence",
+        "owner": 1,
+        "class": 1,
+        "path": [
+          [
+            1476,
+            315,
+            59
+          ],
+          [
+            1634,
+            2,
+            154
+          ],
+          [
+            1636,
+            315,
+            71
+          ]
+        ]
+      }
+    },
+    {
+      "hop": "verb:124:2:12000:1",
+      "start": {
+        "frame": 1910,
+        "room": 49,
+        "idle": "sentence",
+        "rng": 936003563
+      },
+      "trials": 3276,
+      "stopped": "goal",
+      "goals": 1,
+      "seconds": 24.474319219,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": {
+        "trial": 3275,
+        "names": [
+          "v1t592",
+          "v12t-11"
+        ],
+        "frame": 2169,
+        "room": 49,
+        "idle": "sentence",
+        "owner": 1,
+        "class": 1,
+        "path": [
+          [
+            1911,
+            2,
+            154
+          ],
+          [
+            1913,
+            315,
+            79
+          ],
+          [
+            2057,
+            55,
+            175
+          ],
+          [
+            2059,
+            131,
+            89
+          ]
+        ]
+      }
+    },
+    {
+      "hop": "vroom:42:7:6000:0",
+      "start": {
+        "frame": 2169,
+        "room": 49,
+        "idle": "sentence",
+        "rng": 2822207152
+      },
+      "trials": 6000,
+      "stopped": "trials",
+      "goals": 0,
+      "seconds": 27.358356836,
+      "stops_ran": 0,
+      "stops_class_0": 0,
+      "goal": null
+    }
+  ],
+  "verify": {
+    "frame": 2169,
+    "got_frame": 2169,
+    "facts": 3855,
+    "facts_differ": 0,
+    "first": [],
+    "room": 49,
+    "room_same": true,
+    "digest_same": true,
+    "digest": "41e1fc9b8f93dbe8",
+    "differences": 0,
+    "seconds": 0.251375568
+  },
+  "movie": [
+    [
+      994,
+      4,
+      154
+    ],
+    [
+      1044,
+      5,
+      125
+    ],
+    [
+      1070,
+      2,
+      154
+    ],
+    [
+      1072,
+      125,
+      105
+    ],
+    [
+      1077,
+      49,
+      138
+    ],
+    [
+      1102,
+      162,
+      154
+    ],
+    [
+      1104,
+      89,
+      118
+    ],
+    [
+      1134,
+      95,
+      99
+    ],
+    [
+      1155,
+      2,
+      154
+    ],
+    [
+      1157,
+      31,
+      23
+    ],
+    [
+      1259,
+      4,
+      154
+    ],
+    [
+      1345,
+      2,
+      154
+    ],
+    [
+      1347,
+      51,
+      75
+    ],
+    [
+      1445,
+      56,
+      161
+    ],
+    [
+      1447,
+      91,
+      59
+    ],
+    [
+      1460,
+      2,
+      154
+    ],
+    [
+      1462,
+      139,
+      51
+    ],
+    [
+      1476,
+      315,
+      59
+    ],
+    [
+      1634,
+      2,
+      154
+    ],
+    [
+      1636,
+      315,
+      71
+    ],
+    [
+      1911,
+      2,
+      154
+    ],
+    [
+      1913,
+      315,
+      79
+    ],
+    [
+      2057,
+      55,
+      175
+    ],
+    [
+      2059,
+      131,
+      89
+    ]
+  ]
+}

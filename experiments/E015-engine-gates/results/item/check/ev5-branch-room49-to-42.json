@@ -1,0 +1,44 @@
+{
+  "step1": {
+    "room": 49,
+    "load_frame": 1982,
+    "idle_frame": 2023,
+    "idle": "sentence",
+    "reason": "idle",
+    "rng": 154279228,
+    "xstart": 0,
+    "seconds": 0.428414399
+  },
+  "step2": {
+    "trials": 5000,
+    "nodes": 66,
+    "stopped": "trials",
+    "goals": 0,
+    "goal": null,
+    "rooms": [
+      [
+        49,
+        4562
+      ],
+      [
+        63,
+        438
+      ]
+    ],
+    "by_depth": [
+      [
+        1,
+        77
+      ],
+      [
+        2,
+        4923
+      ]
+    ],
+    "refused": 0,
+    "ended": 245,
+    "seconds": 140.117362818,
+    "ms_per_trial": 28.0234725636
+  },
+  "verdict": "not shown: no stop in room B within the limits"
+}
