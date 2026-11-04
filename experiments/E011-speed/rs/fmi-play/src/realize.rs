@@ -413,10 +413,10 @@ fn hit_points(e: &mut Box<dyn Engine>, of: &Offer, a: i32, max: usize) -> EResul
 /// within the limit gave the Sentence touch (v, a, b)).
 fn sentence(e: &mut Box<dyn Engine>, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, rec: &mut Rec) -> EResult<Option<Box<dyn Engine>>> {
     e.input_log()?;
-    let of = offer_at(e)?;
+    let (o, of) = obs_offer(e)?;
     let pts = hit_points(e, &of, a, cfg.max_points)?;
     if pts.is_empty() {
-        return inventory(e, &of, v, a, b, cfg, rec);
+        return inventory(e, &o, &of, v, a, b, cfg, rec);
     }
     // the candidates as click lists with the target's place marked None (filled with each hit point)
     let mut firsts: Vec<Vec<Option<Point>>> = vec![vec![None]];
@@ -477,26 +477,37 @@ fn seen_text(seen: &[(i32, i32, i32)]) -> String {
     seen.iter().map(|s| format!("({},{},{})", s.0, s.1, s.2)).collect::<Vec<_>>().join(" ")
 }
 
+/// ScummVM's `kImageVerbType`: a verb slot drawn from an image. In SCUMM v5 that image is an object's (o5_verbOps'
+/// image subop calls setVerbObject with an object number), so a slot that shows an object is of this type whenever the
+/// game draws its inventory as images (amendment (2)).
+pub const IMAGE_VERB: i32 = 1;
+
 /// E016 A, the inventory extension (plan.md, A "Inventory objects"; amendment (1)): a has no hit point on the screen.
 /// Each visible verb slot is tried as a's click: a verb choice, the slot, then b's hit point (or each visible slot when
 /// b has none). The verb choices in order: the offered slot whose dump id is v (in SCUMM v5 a slot's id is its verb
 /// number, as the dialog step uses), no verb click, then the other offered slots in the dump's order. For each verb
-/// choice a's slot runs over the offered slots in the dump's order without the choice's own, at most `max_slots`.
-/// The engine judges each candidate as a room object's: the Sentence touch (v, a, b); the slot that shows a is never
-/// read. The accepted fork, or None within `max_candidates`.
-fn inventory(e: &mut Box<dyn Engine>, of: &Offer, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, rec: &mut Rec) -> EResult<Option<Box<dyn Engine>>> {
+/// choice a's slot runs over the offered slots without the choice's own, at most `max_slots`: the image slots first
+/// (`IMAGE_VERB` in the dump `o`; amendment (2), fix 1), then the others, each in the dump's order; b's slots in the
+/// same order. The engine judges each candidate as a room object's: the Sentence touch (v, a, b); the slot that
+/// shows a is never read. The accepted fork, or None within `max_candidates`.
+#[allow(clippy::too_many_arguments)]
+fn inventory(e: &mut Box<dyn Engine>, o: &Obs, of: &Offer, v: i32, a: i32, b: Option<i32>, cfg: &Cfg, rec: &mut Rec)
+             -> EResult<Option<Box<dyn Engine>>> {
     let vslot = of.verbs.iter().find(|p| matches!(p.hit, Hit::Verb { id, .. } if id == v)).copied();
     let mut choices: Vec<Option<Point>> = Vec::with_capacity(of.verbs.len() + 1);
     choices.extend(vslot.map(Some));
     choices.push(None);
     choices.extend(of.verbs.iter().filter(|p| Some(**p) != vslot).map(|p| Some(*p)));
+    // the slots an object's click may be: the image slots first, then the others
+    let image = |p: &Point| matches!(p.hit, Hit::Verb { slot, .. } if o.verbs.iter().any(|x| x.slot == slot && x.kind == IMAGE_VERB));
+    let ordered: Vec<Point> = of.verbs.iter().filter(|p| image(p)).chain(of.verbs.iter().filter(|p| !image(p))).copied().collect();
     // b's clicks: its hit point, or each visible slot (b in the inventory too); none for a one-object sentence
     let thirds: Vec<Option<Point>> = match b {
         None => vec![None],
         Some(bo) => {
             let bp: Vec<Point> = of.targets.iter().filter(|p| p.hit == Hit::Object(bo) || p.hit == Hit::Actor(bo)).take(1).copied().collect();
             if bp.is_empty() {
-                of.verbs.iter().take(cfg.max_slots).map(|p| Some(*p)).collect()
+                ordered.iter().take(cfg.max_slots).map(|p| Some(*p)).collect()
             } else {
                 bp.into_iter().map(Some).collect()
             }
@@ -504,7 +515,7 @@ fn inventory(e: &mut Box<dyn Engine>, of: &Offer, v: i32, a: i32, b: Option<i32>
     };
     let want = (v, a, b.unwrap_or(0));
     for c in &choices {
-        let slots: Vec<Point> = of.verbs.iter().filter(|p| Some(**p) != *c).take(cfg.max_slots).copied().collect();
+        let slots: Vec<Point> = ordered.iter().filter(|p| Some(**p) != *c).take(cfg.max_slots).copied().collect();
         for s in &slots {
             for t in &thirds {
                 if rec.candidates >= cfg.max_candidates {
