@@ -1,0 +1,13 @@
+# E014 amendment (7): rule (2) on Monkey Island, every switch on (A4_ENV=a7/env.sh a4/mi-check.sh /var/tmp/fast-mi/e014-a7mi b3 kitchen smoke), target-e014d
+# the first smoke run (08:06) stopped at once on the disk floor (3.9 GB free while B3's readings, 2.5 GB, were still on disk); B3's readings were deleted and the smoke run made again (08:07)
+[08:05:30] b3 all: GUARD: rc 0 wall 438.1 s low 0 min MemAvailable 5633508 kB G12: 423 samples, 418 with an fmi process, largest fmi tree 19 processes, python processes in an fmi tree 0 [08:05:30] heavy lock released; done 
+[08:05:31] b3 all vs E013's G-on all rc 0: G0 /var/tmp/fast-mi/e014-a7mi/b3f/all-fast: 15 tries, stop class = A's in 15, everything = A's in 15
+[08:05:31] b3 tries whose reading waited on the bound's thread: 10; bounded: 0
+[08:05:55] b3 verify-new all (E014's mechanisms on) rc 0: verify-new /var/tmp/fast-mi/e014-a7mi/b3f/all-fast: 126 new entries from boot, 0 with differences; by how afford 93/93, checkpoint 7/7, end 8/8, wait 18/18
+[08:06:14] kitchen: the goal entry 150's chain, 8 entries (44 55 85 123 135 142 146 150) verified from boot, 0 with differences or errors; goal entry: differences: 0; final {'owner:566': 1}
+[08:06:15] smoke (ALLON with A4): [08:06:14] start: /var/tmp/fast-mi/target-e014d/release/fmi, set all, engine /var/tmp/fast-mi/svm-e013/build/scummvm/scummvm, b 1, N 4; load 2.97 4.30 3.68 [08:06:15] run: 1.03163 s; GUARD: rc 0 wall 1.0 s low 0 min MemAvailable 8974844 kB [08:06:15] verify: 0 entries from boot (fmi explore verify), 0 with differences or errors [08:06:15] stall-report rc 0: 5 PASS, 0 FAIL 
+[08:08:38] smoke (ALLON with A4): [08:07:26] start: /var/tmp/fast-mi/target-e014d/release/fmi, set all, engine /var/tmp/fast-mi/svm-e013/build/scummvm/scummvm, b 1, N 4; load 1.40 3.55 3.46 [08:08:23] run: 56.3044 s; GUARD: rc 0 wall 56.3 s low 0 min MemAvailable 8642576 kB [08:08:38] verify: 21 entries from boot (fmi explore verify), 0 with differences or errors [08:08:38] stall-report rc 0: 5 PASS, 0 FAIL 
+  smoke j00000 scope [33] grow null new 2 reading no cached reading
+  smoke j00001 scope [33] grow null new 2 reading reused (e009 keys)
+  smoke j00002 scope [33] grow null new 5 reading reused (e009 keys)
+  smoke j00003 scope [33] grow null new 12 reading reused
