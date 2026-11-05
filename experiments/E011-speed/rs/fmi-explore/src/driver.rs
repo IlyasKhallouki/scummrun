@@ -636,7 +636,9 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 s.commit(&a, &line)?;
                 say(&s.stalls.line());
             }
-            if line["outcome"] == "return differs" {
+            if line["outcome"] == "return differs" && crate::archive::differs_dead_on() {
+                say(&format!("{}: entry {} is dead (its return differs); the run goes on", j.name, j.entry));
+            } else if line["outcome"] == "return differs" {
                 stop = Some("return differs".into());
                 detail = json!({"job": j.name, "entry": j.entry, "return": line["return"]});
                 for k in running.iter_mut() {

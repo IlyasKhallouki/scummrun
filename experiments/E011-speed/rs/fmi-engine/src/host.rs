@@ -415,6 +415,10 @@ impl Host {
             .env("SDL_AUDIODRIVER", "dummy")
             .env("SPEEDRUN_CONTROL", &family.sock)
             .env("SPEEDRUN_WIRE", "bin");
+        // E020 (FMI_IMUSE_TICKS=1): iMUSE's sequencer advances by game time, not on the mixer's wall-time timer
+        if std::env::var("FMI_IMUSE_TICKS").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_IMUSE_TICKS", "1");
+        }
         if !sorted.is_empty() {
             let movie = out.join("prefix.jsonl");
             let text: String = sorted.iter().map(|e| event_line(e) + "\n").collect();
