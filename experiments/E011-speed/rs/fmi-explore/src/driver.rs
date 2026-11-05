@@ -487,6 +487,8 @@ fn count_kills(a: &Archive) -> HashMap<String, i64> {
 #[derive(Clone, Debug, Default)]
 pub struct DriverStats {
     pub jobs: usize,
+    /// E019: the jobs committed as the same as an earlier one, not run
+    pub same: usize,
     /// wall seconds spent in the driver's own work (selection, job.json, ingest, the files), polls not counted
     pub own_s: f64,
     pub own_by_job: Vec<f64>,
@@ -710,6 +712,20 @@ pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn V
                 let Some((id, kind)) = crate::free::pick(&a)? else { break };
                 let d = a.prepare_job_as(id, kind.as_ref())?;
                 let name = d.file_name().unwrap().to_string_lossy().into_owned();
+                if crate::archive::skip_same_on() {
+                    // E019: a try whose job.json repeats a committed one's would repeat its result exactly: committed
+                    // as that result with no new entries and no time, not run
+                    if let Some(prev) = a.same_job(&d)? {
+                        a.write_same_result(&d, &prev)?;
+                        let line = a.ingest(&d, None)?;
+                        say(&format!("{name}: entry {id} same as {prev}; not run ({})", line["outcome"].as_str().unwrap_or("")));
+                        if let Some(s) = stalls.as_mut() {
+                            s.commit(&a, &line)?;
+                        }
+                        stats.same += 1;
+                        continue;
+                    }
+                }
                 let mut j = Job::new(&a, &name)?;
                 a.busy.insert(name.clone(), (j.entry, j.cell.clone()));
                 j.start(&a, mode, &m)?;

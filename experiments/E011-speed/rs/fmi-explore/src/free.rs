@@ -27,6 +27,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
+/// E019: `FMI_FREE_SAME=1`, level-1 offer points whose ready state repeats an earlier point's are skipped.
+pub fn same_on() -> bool {
+    std::env::var("FMI_FREE_SAME").is_ok_and(|v| v == "1")
+}
+
 /// The switch: FMI_FREE=ρ0, the standing share of free tries.
 pub const SWITCH: &str = "FMI_FREE";
 /// Stall's switch for its two rules (the share's shift and the cell rule), read here where the kind is decided.
@@ -254,6 +259,10 @@ struct Tally {
     verdicts: BTreeMap<String, usize>,
     delays: Map<String, Value>,
     delay_s: f64,
+    /// E019 (FMI_FREE_SAME=1): the level-1 offer points' (offer frame, state digest) so far; a point whose ready state
+    /// is one of them repeats that point's trials exactly, and is skipped
+    offered: Vec<(u64, u64)>,
+    same: usize,
 }
 
 impl Tally {
@@ -325,8 +334,18 @@ fn offer_point(e: &mut Box<dyn Engine>, cx: &Ctx, then: afford::Then<'_>, prefix
             Some(b) => b,
             None => e,
         };
-        let o = eng.obs(&ObsReq::default())?;
         let f0 = eng.status().frame;
+        if delays && same_on() {
+            // E019: a stop of the wait that reaches the same ready state as an earlier point of this try (the entry's
+            // own idle frame, say) would run the same trials with the same outcomes
+            let d = eng.digest()?.digest;
+            if let Some(k) = tally.offered.iter().position(|&x| x == (f0, d)) {
+                tally.same += 1;
+                return Ok((json!({"frame": frame, "offer_frame": f0, "ready": true, "same_as": k, "seconds": t0.elapsed().as_secs_f64()}), None));
+            }
+            tally.offered.push((f0, d));
+        }
+        let o = eng.obs(&ObsReq::default())?;
         let horizon = afford::W + cx.wait.last_due(&o).map(|d| d.saturating_sub(f0)).unwrap_or(0);
         let offer = afford::offer(eng, &o)?;
         let all = afford::inputs_of(&offer);
@@ -562,7 +581,7 @@ pub fn explore(root: &mut Box<dyn Engine>, stops: &[Stop], cx: &Ctx) -> Result<F
     delays.insert("seconds".into(), json!(tally.delay_s));
     let mut rec = json!({
         "offers": tally.offers, "n_points": points.len(), "trials": tally.trials, "kept": Value::Object(kept),
-        "kept_total": out.kept.len(), "dead": out.dead.len(), "waits_run": waits.get(),
+        "kept_total": out.kept.len(), "dead": out.dead.len(), "waits_run": waits.get(), "same_points": tally.same,
         "waits_reused": tally.stopped.saturating_sub(waits.get()), "delays": Value::Object(delays),
         "seconds": t0.elapsed().as_secs_f64(), "points": points,
     });
