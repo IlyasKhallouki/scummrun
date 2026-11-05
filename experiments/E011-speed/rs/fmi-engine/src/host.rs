@@ -419,6 +419,10 @@ impl Host {
         if std::env::var("FMI_IMUSE_TICKS").is_ok_and(|v| v == "1") {
             cmd.env("SPEEDRUN_IMUSE_TICKS", "1");
         }
+        // E021 (FMI_TEMP_SAVES=1): the scripts' temporary saves and loads are the game's, kept in the engine's memory
+        if std::env::var("FMI_TEMP_SAVES").is_ok_and(|v| v == "1") {
+            cmd.env("SPEEDRUN_TEMP_SAVES", "1");
+        }
         if !sorted.is_empty() {
             let movie = out.join("prefix.jsonl");
             let text: String = sorted.iter().map(|e| event_line(e) + "\n").collect();

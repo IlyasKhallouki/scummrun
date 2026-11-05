@@ -1,0 +1,138 @@
+diff -ruN a/engines/scumm/saveload.cpp b/engines/scumm/saveload.cpp
+--- a/engines/scumm/saveload.cpp	2026-11-05 19:52:33.625741705 +0000
++++ b/engines/scumm/saveload.cpp	2026-11-05 19:52:33.583625875 +0000
+@@ -21,6 +21,7 @@
+ 
+ #include "common/config-manager.h"
+ #include "common/memstream.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ #include "common/savefile.h"
+ #include "common/serializer.h"
+ #include "common/system.h"
+@@ -586,13 +587,28 @@
+ }
+ #endif
+ 
++namespace {
++// E021 (patch 0009): a temporary save written to memory; its bytes go to the speedrun bridge when the save closes it
++class SpeedrunTempSaveStream : public Common::MemoryWriteStreamDynamic {
++public:
++	explicit SpeedrunTempSaveStream(SpeedrunBridge *bridge) : Common::MemoryWriteStreamDynamic(DisposeAfterUse::YES), _bridge(bridge) {}
++	~SpeedrunTempSaveStream() override { _bridge->setTempSave(getData(), (uint32)size()); }
++private:
++	SpeedrunBridge *_bridge;
++};
++} // End of anonymous namespace
++
+ Common::SeekableReadStream *ScummEngine::openSaveFileForReading(int slot, bool compat, Common::String &fileName) {
+ 	fileName = makeSavegameName(slot, compat);
++	if (compat && _speedrun && _speedrun->tempSaves())
++		return _speedrun->tempSaveStream();
+ 	return _saveFileMan->openForLoading(fileName);
+ }
+ 
+ Common::SeekableWriteStream *ScummEngine::openSaveFileForWriting(int slot, bool compat, Common::String &fileName) {
+ 	fileName = makeSavegameName(slot, compat);
++	if (compat && _speedrun && _speedrun->tempSaves())
++		return new SpeedrunTempSaveStream(_speedrun);
+ 	return _saveFileMan->openForSaving(fileName);
+ }
+ 
+diff -ruN a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp	2026-11-05 19:52:33.624705565 +0000
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp	2026-11-05 19:52:33.598991949 +0000
+@@ -41,6 +41,7 @@
+ #include "scumm/scumm.h"
+ #include "scumm/sound.h"
+ #include "scumm/speedrun/speedrun_bridge.h"
++#include "common/memstream.h"
+ #include "scumm/speedrun/speedrun_cuts.h"
+ 
+ namespace Scumm {
+@@ -292,6 +293,8 @@
+ 	// which the mixer runs in wall time
+ 	const char *imuseTicks = envValue("SPEEDRUN_IMUSE_TICKS");
+ 	_imuseTicks = imuseTicks && !strcmp(imuseTicks, "1");
++	const char *tempSaves = envValue("SPEEDRUN_TEMP_SAVES");
++	_tempSaves = tempSaves && !strcmp(tempSaves, "1");
+ 
+ 	const char *timerNext = envValue("SPEEDRUN_TIMER_NEXT");
+ 	if (timerNext) {
+@@ -475,10 +478,17 @@
+ 	// Saving and loading are banned in runs (Alt/Ctrl+digit, autosave). Clear
+ 	// the request so scummLoop does not perform it on the way out.
+ 	if (_vm->_saveLoadFlag != 0) {
+-		const Common::String msg = Common::String::format("save/load requested (flag %d, slot %d)", _vm->_saveLoadFlag, _vm->_saveLoadSlot);
+-		_vm->_saveLoadFlag = 0;
+-		fail("saveload", msg);
+-		return;
++		// E021 (SPEEDRUN_TEMP_SAVES=1): the scripts' own temporary save or load is the game's (a close-up between a save
++		// and its load): scummLoop performs it, in memory (saveload.cpp)
++		if (_tempSaves && _vm->_saveTemporaryState && (_vm->_saveLoadFlag == 1 || _hasTempSave)) {
++			writeRecord(record("temp_save").add("flag", (int)_vm->_saveLoadFlag).add("slot", (int)_vm->_saveLoadSlot)
++			            .add("room", (int)_vm->_currentRoom));
++		} else {
++			const Common::String msg = Common::String::format("save/load requested (flag %d, slot %d)", _vm->_saveLoadFlag, _vm->_saveLoadSlot);
++			_vm->_saveLoadFlag = 0;
++			fail("saveload", msg);
++			return;
++		}
+ 	}
+ 
+ 	// The goal is judged on the state after a whole frame: scripts, the
+@@ -527,6 +537,22 @@
+ 		_vm->_sound->advanceTimers(quarterFrames);
+ }
+ 
++void SpeedrunBridge::setTempSave(const byte *data, uint32 size) {
++	_tempSave.resize(size);
++	if (size)
++		memcpy(_tempSave.data(), data, size);
++	_hasTempSave = true;
++}
++
++Common::SeekableReadStream *SpeedrunBridge::tempSaveStream() const {
++	if (!_hasTempSave)
++		return nullptr;
++	byte *copy = (byte *)malloc(MAX<uint32>(_tempSave.size(), 1));
++	if (_tempSave.size())
++		memcpy(copy, _tempSave.data(), _tempSave.size());
++	return new Common::MemoryReadStream(copy, _tempSave.size(), DisposeAfterUse::YES);
++}
++
+ void SpeedrunBridge::onCDTrack(int track, int numLoops, int startFrame, int duration, bool playing) {
+ 	if (_finished)
+ 		return;
+diff -ruN a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+--- a/engines/scumm/speedrun/speedrun_bridge.h	2026-11-05 19:52:33.623877464 +0000
++++ b/engines/scumm/speedrun/speedrun_bridge.h	2026-11-05 19:52:33.604583937 +0000
+@@ -33,6 +33,7 @@
+ 
+ namespace Common {
+ class JSONValue;
++class SeekableReadStream;
+ }
+ 
+ namespace Scumm {
+@@ -333,6 +334,11 @@
+ 	bool leanNoPresent() const { return _leanNoPresent; }
+ 	bool leanNoEvents() const { return _leanNoEvents; }
+ 	bool imuseTicks() const { return _imuseTicks; }
++	// E021 (patch 0009): SPEEDRUN_TEMP_SAVES=1, the scripts' temporary saves (a close-up shown between a save and its
++	// load) kept in this process's memory (saveload.cpp's streams), so a fork()ed branch holds its own copy
++	bool tempSaves() const { return _tempSaves; }
++	void setTempSave(const byte *data, uint32 size);
++	Common::SeekableReadStream *tempSaveStream() const;
+ 	/**
+ 	 * First statement of waitForTimer(): every wait the engine makes, the
+ 	 * main loop's 4 * delta and the room-change effects' (dissolve, iris,
+@@ -638,6 +644,9 @@
+ 	int32 _rawMouseX = 0, _rawMouseY = 0; // where the schedule last put the mouse
+ 	int32 _timerNextExpected = 6;   // SPEEDRUN_TIMER_NEXT; -1 = any
+ 	bool _imuseTicks = false;       // SPEEDRUN_IMUSE_TICKS=1 (E020)
++	bool _tempSaves = false;        // SPEEDRUN_TEMP_SAVES=1 (E021)
++	Common::Array<byte> _tempSave;  // the last temporary save's bytes
++	bool _hasTempSave = false;
+ 	uint64 _startFrame = 0;         // SPEEDRUN_START_FRAME; 0 = use SPEEDRUN_START
+ 	int _lastRoom = 0;              // for "room" records
+ 	Common::String _envError;       // first invalid variable, reported once the trace is open
