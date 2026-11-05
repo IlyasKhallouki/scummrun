@@ -65,3 +65,19 @@
   - It still holds `bit:403`, `bit:408`, `bit:410` and `var:416 = 2/3`. The book-read entries inherited these sticky
     flags from earlier conversations, so they are not what re-entering the quiz gives. That is `bit:443 = 1`, which a
     reading inside the quiz targets (E021, entry 1296).
+
+## Amendment (2), 2026-11-05 23:30 UTC: place counts and the dialog's refinement
+
+- **The first prediction is met:** an entry in the quiz after the book 6 minutes into the run (22356: room 49,
+  `var:239 = 250`, `var:240 = 2`, local 208 waiting at 0x04BE). 6 such entries by 23:22.
+- **Selection:** a place's count resets only on new T atoms or rooms archive-wide. The book-read context carried
+  E021's 4,640 unproductive tries, so the selection worked the pre-book context. Under `FMI_PLACE_CTX=1` a try now
+  also resets its place's count when its new entries add an atom no earlier entry at their place held
+  (`Archive::place_key`, the log replayed in order). Restarted at 23:24.
+- **The dialog's refinement:**
+  - Every model try from the quiz entries stopped on "Lemma R's premise R0: the last pass wrote values of var [165]
+    outside the domain". `var:165` is the dialog choice, written 120-124 by the dialog and seeded only with its start
+    value.
+  - New: `FMI_REFINE_WIDEN=N` (harness.rs). The out-of-domain values seed the domain through starts that hold them
+    (`Rereads::add_start`, `Wiring` keeps them), and the scope is read again, at most N times. Test:
+    `widen_tests`. The run sets N = 3.

@@ -77,6 +77,25 @@ pub trait Rereads {
     fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String>;
     /// CPU seconds of the readers so far (the extension's and refinement's records)
     fn cpu_s(&self) -> f64;
+    /// E022 (FMI_REFINE_WIDEN): a further start for the next reads, read by none now (it seeds the fact
+    /// variables' domains with its values)
+    fn add_start(&mut self, _start: &str) -> Result<(), String> {
+        Err("no further starts".into())
+    }
+}
+
+/// E022: `FMI_REFINE_WIDEN=N`, at most N more refinement passes when the last pass wrote values of a new fact
+/// variable outside its domain (Lemma R's premise R0): each such value seeds the domain through a start that holds it,
+/// and the scope is read again. Unset or 0: the try stops at R0, as before.
+pub fn refine_widen() -> usize {
+    std::env::var("FMI_REFINE_WIDEN").ok().and_then(|v| v.parse().ok()).unwrap_or(0)
+}
+
+/// A reach start's text with `key` set to `v` (`key<TAB>value` lines).
+fn start_with(text: &str, key: &str, v: i64) -> String {
+    let mut out: Vec<String> = text.lines().filter(|l| l.split('\t').next() != Some(key)).map(String::from).collect();
+    out.push(format!("{key}\t{v}"));
+    out.join("\n") + "\n"
 }
 
 /// A reading's warm planner, locked by itself (E016 amendment (9)): one try's long search waits only the tries
@@ -682,17 +701,46 @@ impl<'a> Harness<'a> {
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
         let rs_ = start::reach_start_text_full(&st, self.reading.domains());
-        let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
-            Ok(r) => r,
-            Err(e) => {
-                self.refinements.push(turn);
-                self.stop(format!("error: refinement: {e}"));
-                return false;
+        let mut widened = 0;
+        let (reading, doc, rep) = loop {
+            let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
+                Ok(r) => r,
+                Err(e) => {
+                    self.refinements.push(turn);
+                    self.stop(format!("error: refinement: {e}"));
+                    return false;
+                }
+            };
+            let doc = crate::warm::head(&*reading);
+            let rep: Vec<Value> = doc.get("fact_vars_report").and_then(|r| r.as_array()).cloned().unwrap_or_default();
+            // E022 (FMI_REFINE_WIDEN): the values written outside a new fact variable's domain seed it, and the scope
+            // is read again (Lemma R's premise R0 then holds, or the try stops as before)
+            let outside: Vec<(i64, Vec<i64>)> = new
+                .iter()
+                .filter_map(|n| {
+                    let r = rep.iter().find(|x| x.get("var").and_then(|v| v.as_i64()) == Some(*n))?;
+                    let vs: Vec<i64> = r.get("outside_after_last_pass")?.as_array()?.iter().filter_map(|v| v.as_i64()).collect();
+                    (!vs.is_empty()).then_some((*n, vs))
+                })
+                .collect();
+            if outside.is_empty() || widened >= refine_widen() {
+                break (reading, doc, rep);
             }
+            widened += 1;
+            let mut ok = true;
+            for (n, vs) in &outside {
+                for v in vs {
+                    if rr.add_start(&start_with(&rs_, &format!("var:{n}"), *v)).is_err() {
+                        ok = false;
+                    }
+                }
+            }
+            if !ok {
+                break (reading, doc, rep);
+            }
+            turn["widened"] = json!(widened);
         };
         let cpu = rr.cpu_s() - cpu0;
-        let doc = crate::warm::head(&*reading);
-        let rep: Vec<Value> = doc.get("fact_vars_report").and_then(|r| r.as_array()).cloned().unwrap_or_default();
         let rep_of = |n: i64| rep.iter().find(|x| x.get("var").and_then(|v| v.as_i64()) == Some(n)).cloned().unwrap_or(json!({}));
         let rs = doc.get("reader_scope").cloned().unwrap_or(json!({}));
         turn["seconds"] = json!(pyjson::round(wall0.elapsed().as_secs_f64(), 2));
@@ -908,4 +956,17 @@ pub fn obs_facts(state: &Obs) -> Facts {
 #[allow(dead_code)]
 fn _k(_: u8) -> u8 {
     K_ACTORROOM
+}
+
+#[cfg(test)]
+mod widen_tests {
+    use super::start_with;
+
+    #[test]
+    fn a_start_with_a_value_replaces_the_key_and_keeps_the_rest() {
+        let t = "room\t49\nvar:165\t0\nbit:5\t1\n";
+        let s = start_with(t, "var:165", 122);
+        assert_eq!(s, "room\t49\nbit:5\t1\nvar:165\t122\n");
+        assert_eq!(start_with("room\t49\n", "var:7", 3), "room\t49\nvar:7\t3\n");
+    }
 }

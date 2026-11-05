@@ -1735,6 +1735,15 @@ impl Archive {
         let mut cache = self.place_counts.borrow_mut();
         if cache.as_ref().map(|c| c.0) != Some(self.logs.len()) {
             let mut counts: [HashMap<String, (i64, i64)>; 2] = [HashMap::new(), HashMap::new()];
+            // E022 (FMI_PLACE_CTX=1): a try that adds an atom no earlier row at its new entry's place held (the
+            // place with its context) gave something too, as a new atom of T or a room does archive-wide
+            let ctx = crate::ctx::on();
+            let mut place_held: HashMap<String, HashSet<(String, i64)>> = HashMap::new();
+            if ctx {
+                if let Some(pl0) = self.place_of_row(0) {
+                    place_held.entry(pl0).or_default().extend(self.rows[0].held.iter().cloned());
+                }
+            }
             for x in &self.logs {
                 if !committed(x) || x["outcome"].as_str() == Some("return differs") {
                     continue;
@@ -1745,8 +1754,21 @@ impl Archive {
                 }
                 let Some(q) = self.place_of_row(e) else { continue };
                 let gave = |k: &str| x.get(k).and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                let mut new_at_place = false;
+                if ctx {
+                    for id in x.get("new_entries").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|v| v.as_u64()) {
+                        let id = id as usize;
+                        let Some(p) = self.rows.get(id).and_then(|_| self.place_of_row(id)) else { continue };
+                        let set = place_held.entry(p).or_default();
+                        for a in &self.rows[id].held {
+                            if set.insert(a.clone()) {
+                                new_at_place = true;
+                            }
+                        }
+                    }
+                }
                 let c = counts[crate::free::line_is_free(x) as usize].entry(q).or_insert((0, 0));
-                c.0 = if gave("new_t") || gave("new_rooms") { 0 } else { c.0 + 1 };
+                c.0 = if gave("new_t") || gave("new_rooms") || new_at_place { 0 } else { c.0 + 1 };
                 c.1 += 1;
             }
             *cache = Some((self.logs.len(), counts));
