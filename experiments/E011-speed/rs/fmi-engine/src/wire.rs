@@ -22,6 +22,8 @@ pub const C_EXPLAIN_LOG: u8 = 0x8D;
 pub const C_STATE_JSON: u8 = 0x8E;
 pub const C_QUIT: u8 = 0x8F;
 pub const C_STEP: u8 = 0x90;
+/// E019: StepTrace: u32 frames, then u32 n and n (offset, length) byte ranges of the block to watch
+pub const C_STEP_TRACE: u8 = 0x9B;
 /// patch 0004 (round 2, play): a run to a frame answered with the runs, the explain entries and a dump
 pub const C_STEP_OBS: u8 = 0x91;
 /// patch 0004 (round 2, play): several hit tests in one message
@@ -67,6 +69,8 @@ pub const R_BOXES: u8 = 0x12;
 pub const R_INPUT_LOG: u8 = 0x14;
 /// patch 0007: `Digest`
 pub const R_DIGEST: u8 = 0x15;
+/// E019: StepTrace's reply: u32 frames, then per frame a status and a block or delta (as a Step's)
+pub const R_STEP_TRACE_REPLY: u8 = 0x16;
 
 /// A message being written: the 5-byte header first, its length set by `finish`.
 pub struct W(pub Vec<u8>);

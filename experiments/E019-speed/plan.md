@@ -42,3 +42,24 @@ On the cloud VM (30 cores), 10 and 30 workers made the same ~7-8 committed tries
    and block delta, and replies once: after the first frame where a watched byte range changes, or at the frame
    budget. The search replays the frames through the same `each` closure, so the stops are unchanged. Gate: old and new
    waits give identical stops on recorded states.
+
+## Fix 3, the batched wait: built, gated, no gain
+
+- **What was built:**
+  - Engine: StepTrace (`kWStepTrace`, in a copy of the engine at `/var/tmp/fast-mi/svm-e019`, not a committed patch).
+  - Search: `BinEngine::wait` uses StepTrace under `FMI_STEP_TRACE=1`, and the wait sets its observed keys as the
+    watch (`Engine::set_watch`).
+- **Gate:** on play9's j00007 with the new engine, the try's result is identical with and without it (same trials,
+  kept states, waits and new entries; only timing fields differ).
+- **Speed:** none, 36.2 s both ways.
+  - A batch covered 1.66 frames on average: 752k frames in 452k batches, over 141 watched ranges including the
+    block's tail (script slots with their code offsets, which move almost every frame).
+  - The audit's numbers also cap any batching at ~30%: a frame costs ~46 us against a plain run's ~32 us. The bulk is
+    the engine running the frame, not the round trip.
+- Left in, off by default. The lever is fewer frames, not fewer messages.
+
+## Next lever: stop a trial's wait when its state rejoins the no-input state
+
+A trial's wait runs to the step's horizon (~2,400 frames). Most trials do nothing that lasts: a message, then idle
+again. If at some frame the trial's state digest equals the no-input twin's at that frame, every later frame is the
+twin's, and its stops are the entry's own wait's, already read. The trial's wait can stop there with nothing lost.

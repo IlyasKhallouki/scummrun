@@ -271,6 +271,33 @@ impl<'a> Block<'a> {
     }
 }
 
+/// E019: the byte ranges (offset, length) of block `b` that hold the keys' values: a var's 4 bytes, a bit's byte, an
+/// object's owner or state byte, an object's 4 class bytes; any other key (room, ego, slots, cutscene, override,
+/// verbs) the whole tail. A run that changes none of these bytes changes none of the keys. Empty when `b` is no block.
+pub fn watch_ranges(b: &[u8], keys: &[Key]) -> Vec<(u32, u32)> {
+    let Some(l) = layout(b) else { return Vec::new() };
+    let mut out: Vec<(u32, u32)> = Vec::new();
+    let mut tail = false;
+    for &k in keys {
+        let a = k.a() as usize;
+        match k.kind() {
+            K_VAR if a < l.n_vars => out.push(((48 + 4 * a) as u32, 4)),
+            K_BIT if (a as u32) < l.n_bits => out.push(((l.bits + a / 8) as u32, 1)),
+            K_OWNER if a < l.n_objs => out.push(((l.owner + a) as u32, 1)),
+            K_STATE if a < l.n_objs => out.push(((l.state + a) as u32, 1)),
+            K_CLASS if a < l.n_objs => out.push(((l.class + 4 * a) as u32, 4)),
+            K_VAR | K_BIT | K_OWNER | K_STATE | K_CLASS => {}
+            _ => tail = true,
+        }
+    }
+    if tail && b.len() > l.end {
+        out.push((l.end as u32, (b.len() - l.end) as u32));
+    }
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
 /// The byte layout of a block's fixed regions (offsets into it).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Layout {
