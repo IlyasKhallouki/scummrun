@@ -124,7 +124,7 @@ run_bg() {  # W BG: laptop.sh's init, run, stalls, ladder; then every entry from
 
 resume_bg() {  # W BG: the archive run on from its files (amendment (9)), then stalls, ladder, every entry from boot
     cd $HERE
-    rm -f $ARCHS/play9/summary.json
+    rm -f ${D_ARCH:-$ARCHS/play9}/summary.json
     HEAVY_LOCK=none MIN_FREE_GB=${MIN_FREE_GB:-10} W=$1 A4_BG=$2 bash laptop.sh run stalls ladder || true
     say "run done"
     verify_all

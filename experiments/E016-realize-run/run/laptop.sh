@@ -10,10 +10,10 @@
 # usage: laptop.sh [init|run|verify|stalls|ladder]...   (default all five in order; run resumes from the archive's files)
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-export ENV=$here/env.sh A4_BG=${A4_BG:-1} W=${W:-4}
+export ENV=${ENV:-$here/env.sh} A4_BG=${A4_BG:-1} W=${W:-4}
 export FMI_STOP_WALL=${FMI_STOP_WALL:-10800} STOP_JOBS=${STOP_JOBS:-100000}
-export D_ARCH=/var/tmp/fast-mi/e016-archives/play9 D_RUN=/var/tmp/fast-mi/e016-archives/play9-run
-export D_OUT=/var/tmp/fast-mi/e016-play9
+export D_ARCH=${D_ARCH:-/var/tmp/fast-mi/e016-archives/play9} D_RUN=${D_RUN:-/var/tmp/fast-mi/e016-archives/play9-run}
+export D_OUT=${D_OUT:-/var/tmp/fast-mi/e016-play9}
 MIN_FREE_GB=${MIN_FREE_GB:-15}
 OTHER=${OTHER:-$HOME/.cache/fast-mi-e016}
 R=$here/../../E014-fate-demo/vm/run.sh
