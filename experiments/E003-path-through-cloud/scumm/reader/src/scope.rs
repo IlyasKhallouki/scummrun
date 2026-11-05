@@ -446,6 +446,9 @@ pub struct Scope {
     /// E019 (`FMI_READ_HELD=1`): the objects of other rooms an actor holds at the start, whose code the scope reads;
     /// the sentences' objects besides `objects` (empty with the switch off)
     pub held: Vec<i64>,
+    /// E021 (`FMI_READ_ACTORS=1`): the actors other than ego that the start reports with a class, sentence objects
+    /// besides the objects (empty with the switch off)
+    pub actors: Vec<i64>,
     pub verbs: Vec<i64>,
     pub dialog_verbs: Vec<i64>,
     pub walk_verb: Option<i64>,
@@ -456,6 +459,11 @@ pub struct Scope {
     /// fix round 1's switches the reading runs with (machine.rs `Switches`; reader.py has none): the Reader's machine
     /// takes them, and `of_with` adds the writes they make
     pub switches: Switches,
+}
+
+/// E021: `FMI_READ_ACTORS=1`, a scope's sentences take actors as their first object (`Scope.actors`).
+pub fn actors_on() -> bool {
+    std::env::var("FMI_READ_ACTORS").is_ok_and(|v| v == "1")
 }
 
 /// E019: `FMI_READ_HELD=1`, a scope reads the code of the objects actors hold (`Scope::of_with`).
@@ -553,6 +561,15 @@ impl Scope {
         objects.sort_unstable();
         let mut held: Vec<i64> = game.object_room.keys().filter(|&&o| held_out(o) && game.id(UnitKey::Obj(o)).is_some()).map(|&o| o as i64).collect();
         held.sort_unstable();
+        // E021: an actor the engine reports with a class at the start (ego aside) is clicked as a sentence's object
+        let ego = start.get0("var:1");
+        let actors: Vec<i64> = if actors_on() {
+            (1..NUM_ACTORS as i64)
+                .filter(|&a| a != ego && start.iter().any(|(k, v)| v != 0 && k.strip_prefix("class:").is_some_and(|r| r.split(':').next() == Some(&a.to_string()))))
+                .collect()
+        } else {
+            vec![]
+        };
         let evs = event_verbs(game);
         let made = made_verbs(game);
         let verbs: Vec<i64> = made
@@ -612,6 +629,7 @@ impl Scope {
             unit_keys,
             objects,
             held,
+            actors,
             verbs,
             dialog_verbs,
             walk_verb,
