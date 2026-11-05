@@ -56,3 +56,20 @@ sentence inputs took only room 42's objects as the first object.
   needs a fresh reading while another try reads the scope waits for it, then takes that reading if the reuse rule
   allows. In play10, 278 of 306 room-42 model tries reused a registered reading (91%).
 - **Run settings:** 12 workers. The old reading cache `play10-run` (not used by this run) is removed for space.
+
+## C6, 2026-11-05 15:33 UTC
+
+- **The rung:** C6 (`class:491:12 = 0`) was reached one minute after the 15:32 resume. j06574 is a model try from a
+  room-42 entry holding 946; it planned the suit and kept entry 10534 at frame 13899.
+- **Verification:** entry 10534 replays from boot with 0 differences (42 inputs, 21 segments).
+- **Time to C6:** 1,183 minutes of run wall since play9's start, including the C5 plateau. That is 1 minute after the
+  resume with the switch on, against the prediction of 60.
+
+## Amendment (2), 2026-11-05 16:05 UTC: disk and workers
+
+- **Disk:** free space fell from 7.8 GB to 2.5 GB in 15 minutes. After C6, room-42 entries differ on 5-8 keys, so fresh
+  330 MB readings keep being made. The VM's boot disk was grown online from 30 to 60 GB.
+- **Workers:** with 12 workers the CPU was 11-48% busy, so the run was cleanly stopped and resumed with 20.
+  - When the stop file was removed, the old driver had not yet exited (it was waiting on its slowest tries) and
+    started new tries next to the new driver for about a minute.
+  - Neither driver committed anything after 15:54:29, so both were killed and one driver was started at 16:06.
