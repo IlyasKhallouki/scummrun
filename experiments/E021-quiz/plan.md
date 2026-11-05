@@ -67,3 +67,35 @@
    - Stop rule: 90 minutes of wall with no new rung (the watcher). Then diagnose from the archive before any change.
 
 Rule (2) still holds: nothing merges to main before Monkey Island's checks pass with every switch on.
+
+## Amendment (1), 2026-11-05 20:00 UTC: the book's cut is the bridge, not the reader
+
+- **Reading the book uses an in-game save and load.**
+  - 937's Look at runs script 98 (the draw), then script 119 with room 83. Script 119 makes the game's temporary save
+    (`saveLoad(1,26)`: the engine's `SO_ROOM_SAVEGAME`, slot 99), loads room 83 to show the page, and on exit loads
+    the save back.
+  - The bridge bans every save and load in runs (`observePreviousFrame`: `fail("saveload")`). That rule was meant for
+    the player's keys and autosave, but it also ended every try that read the book. So no state ever held the drawn
+    coordinates.
+- **Change, patch 0009 (`patches/0009-scumm-speedrun-temp-saves.patch`; fmi `FMI_TEMP_SAVES=1` →
+  `SPEEDRUN_TEMP_SAVES=1`):**
+  - The game's temporary saves and loads are performed, kept in the engine's memory (`openSaveFileForWriting`/
+    `Reading` with `compat`), so a forked branch holds its own copy.
+  - The bridge records each one (`temp_save`). Other saves and loads still fail.
+- **Gate GA, checked with the patched engine and E016's G3 tool, realizing `s9:937` from play9's entry 3412:**
+  - Switch off: no sentence after 60 candidates.
+  - Switch on: realized in 3 candidates. The temporary save is recorded (slot 99, room 49, frame 1649), and the run
+    reaches room 83 by frame 1949.
+  - The chain replays from boot with 0 differences over 3,845 facts, with equal state digests.
+- **Correction:** `reading.actions.jsonl` holds an action's label, checks and preconditions, not its writes. The
+  plan's "no action writes bit:443" counts from it showed nothing. A try's targets are the measure.
+- **Gate GC, partly answered:** from play9's entry 1296, which waits in the quiz's turn 2 (0x10E6), a model try targets
+  `bit:443 = 1` at tier 1. It plans and plays two plans (1 and 3 steps), and then at frame 1565 the planner proves none.
+  The engine's counter stayed 0 there, because the coordinates were never drawn.
+- **Gap B (actors as sentence objects) is not needed for this path:** free tries start the quiz (44 play9 states hold
+  `var:176 = 11`), and a reading from a state in the quiz plans its answers. It stays open as a general gap.
+- **Run:** play10's archive on the VM with `env.sh` (E020's set plus `FMI_TEMP_SAVES=1`) and the engine built with
+  0001-0009.
+  - Prediction: within 90 minutes, entries holding `var:239 ≠ 0` appear (the book read by a free try), then
+    `bit:443 = 1` in room 49, then C7.
+  - Stop rule: the watcher's 90 minutes with no new rung.
