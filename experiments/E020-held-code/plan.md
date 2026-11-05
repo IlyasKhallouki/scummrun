@@ -120,3 +120,29 @@ sentence inputs took only room 42's objects as the first object.
   20 workers the driver held 12 GB, and readings stopped with "the reading's RSS passed 8.0 GB". The run sets it to 40.
   The MemAvailable floor (3 GB) still guards the machine.
 - **Throughput at 20 workers, 16:45-17:00:** 276 tries in 15 minutes, with the CPU 90% busy.
+
+## Result, 2026-11-05 18:36 UTC: C6; stopped by the rule with C7 out of reach
+
+- **The ladder:** C6 was reached at 15:33, one minute after the first resume that had the switch and the disk to run.
+  The rung is entry 10534 (j06574, planned, frame 13899), and it replays from boot with 0 differences. The prediction
+  (C6 within 60 minutes) holds.
+- **The stop:** the watcher's rule (90 minutes of wall with no new rung) stopped the run at 18:33.
+  - The archive holds 17,587 entries and 7,996 committed tries over play9, play10 and E020.
+  - In room 42, 180 entries hold the suit patched and rigged (`class:491:12` and `class:491:6` cleared). 73 used the
+    suit there, so script 209 ran. 285 have Sophia as ego (`var:1 = 2`), the player who works the hoist.
+- **Why C7 is out of reach:** the dive into room 82 is script 207, which the hoist starts on "use 497 with 500". It
+  loads room 82 only if `Bit[443]` is set. Otherwise Indy finds "nothing" and sets `Bit[732]`.
+  - `Bit[443]` is written by room 49's conversation (local 208, at 0x116D) once its answer counter `Local[0]` reaches
+    2. It is also written by global script 1's debug jump, which play does not reach. Room 49's entry clears it, so it
+    must be set on the last visit to room 49 before the trip to room 42.
+  - None of the 15,402 saved states checked holds `bit:443 = 1`. The room-49 readings have no action that writes it:
+    they reach 29 of local 208's wait points, not the branch that counts the answers. So no room-49 try targets it.
+- **Throughput at 20 workers (17:05-18:33):**
+  - 88-276 tries per 15 minutes, with the CPU 65-90% busy.
+  - No dead entries after amendment (4), and no reading stopped by the RSS bound.
+  - The disk held at about 6 GB free through the evictions.
+- **Open:**
+  - Why a try's live engine and a return disagree on `VAR_SOUNDRESULT` (amendment (4)).
+  - Whether patch 0008 should be reverted, since it fixed nothing.
+  - Rule (2): Monkey Island's checks with every switch on, the K1 rerun, and G4's deferred sentence. Nothing merges to
+    main before these pass.
