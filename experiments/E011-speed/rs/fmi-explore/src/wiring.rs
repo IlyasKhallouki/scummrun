@@ -197,6 +197,13 @@ impl crate::harness::Rereads for Wiring {
     fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::extend(self, start)
     }
+    fn add_start(&mut self, start: &str) -> Result<(), String> {
+        let n = self.starts.len() + 1;
+        let f = self.run_dir.join(format!("seed-{n:02}")).join("start.txt");
+        crate::start::write_text(&f, start)?;
+        self.starts.push(f);
+        Ok(())
+    }
     fn refine(&mut self, new: &[i64], start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::refine(self, new, start)
     }
