@@ -27,6 +27,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
+/// E019: `FMI_FREE_NO_STOPS=1`, a free try offers at its entry only, not at the wait's stops.
+pub fn no_stops_on() -> bool {
+    std::env::var("FMI_FREE_NO_STOPS").is_ok_and(|v| v == "1")
+}
+
 /// E019: `FMI_FREE_SAME=1`, level-1 offer points whose ready state repeats an earlier point's are skipped.
 pub fn same_on() -> bool {
     std::env::var("FMI_FREE_SAME").is_ok_and(|v| v == "1")
@@ -531,8 +536,10 @@ pub fn explore(root: &mut Box<dyn Engine>, stops: &[Stop], cx: &Ctx) -> Result<F
     let mut tally = Tally::default();
     let mut points: Vec<Value> = Vec::new();
     let killed = || cx.cancel.load(Ordering::SeqCst);
-    // 1-2: the entry, then each of the wait's stops (time passing, then acting), with delays
-    for p in 0..=stops.len() {
+    // 1-2: the entry, then each of the wait's stops (time passing, then acting), with delays; E019 (FMI_FREE_NO_STOPS=1):
+    // the entry alone (the stops' points kept 0 of 278k trials in play9)
+    let n_points = if no_stops_on() { 0 } else { stops.len() };
+    for p in 0..=n_points {
         if killed() {
             return Err("the guard's kill".into());
         }
