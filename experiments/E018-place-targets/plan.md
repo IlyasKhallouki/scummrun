@@ -52,3 +52,14 @@ By 10:24 the room-49 place holding 946 had about 620 entries. Only a few were mi
 set), and they got 3 model and 20 free tries. `FMI_PLACE_RARITY=1`: within a place, after the cell's own count, entries
 holding pairs that few rows at their place hold come first. This is count-based novelty, as Go-Explore weights cells
 by their attributes' counts.
+
+## Paused (2026-11-05, 11:10 UTC)
+
+- Paused on Ilyas's word ("pause that"). The run was stopped and the VM released and stopped.
+- **The ladder:** C5, room 42 holding 946, reached by entry 7987 (j05927, at 896.9 min of the archive's run wall) and
+  verified from boot with 0 differences.
+- **The archive:** play10, 8,404 entries, kept on the VM's disk at `/var/tmp/fast-mi/e017-archives/play10`.
+- **The VM:** about 44% of 30 cores busy with 10 workers, 7 of 117 GB of memory used. Tries took 18 s at the median
+  and 204 s at the p90, about 410 an hour.
+- **To resume:** start the VM, take the lock, then run `vm.sh resume W 2` with E018's env.sh and the play10 paths (see
+  the session's rebook script). W = 20 would use the idle cores.
