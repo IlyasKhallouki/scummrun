@@ -610,3 +610,110 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
   - Test: `the_reach_start_writes_the_domains_cleared_keys_at_0`. fmi-explore's lib (52) and integration tests pass
     on the VM build.
 - play9 resumed from its archive at 23:09:42 UTC with the switch on.
+
+## Result (2026-11-05): play9 reached C4, verified from boot; below C5, so E016 stops here
+
+**Furthest checkpoint: C4.** The ladder over the whole archive gives:
+
+| Rung | Entry | Try | Kind | Wall (min) |
+|---|---|---|---|---:|
+| C0 | e3 | j00000 | planned | 2.1 |
+| C1 | e128 | j00045 | model-free | 4.6 |
+| C2 | e136 | j00048 | model-free | 4.7 |
+| C3 | e144 | j00051 | model-free | 5.4 |
+| C4 | e3412 | j01004 | model-free | 121.4 |
+
+- **Verified from boot:**
+  - The five rung entries were verified on the VM with the run's last build, each with 0 differences.
+  - So was a random sample of 48 of the 4,175 other entries: 48 of 48 had 0 differences.
+  - Verifying every entry (about 2.5 entries a minute at 24 at a time) did not fit before the VM's booked stop.
+- **How it stopped:** `stop file`, asked by the ladder's watcher after 40 min of wall with no new rung, at 23:57 UTC.
+  That was 4,052 tries (2,030 model, 2,022 free), 4,176 entries and 386 cells. Its entries are in rooms 49 (3,996),
+  69 (127) and 63 (53). No try visited room 42.
+- **The segments**, each a resume from the archive's files:
+
+  | Segment | UTC | Tries | What changed at its start |
+  |---|---|---:|---|
+  | 1 | 19:50-20:28 | 187 | the start (after two void starts, (8)) |
+  | 2 | 20:29-21:08 | 456 | (9): a lock per planner; FMI_PLAN_DEEPEN=10 |
+  | 3 | 21:09-21:45 | 340 | (10): FMI_NOVEL_PLACE; realize's place_of |
+  | 4 | 21:49-22:31 | 1,080 | (11), (12): FMI_SELECT_PLACE; FMI_PLAN_TIME=30 (C4 at 21:52) |
+  | 5 | 22:39-23:09 | 828 | the VM's restart after its booked stop |
+  | 6 | 23:16-23:57 | 1,161 | (13): FMI_REACH_ZEROS |
+
+  The resume at 23:09 was refused by the 10 GB start floor and redone at 23:16 with 5 GB.
+- **Stalls over the run**, 115,773 s of try wall:
+
+  | Class | Share |
+  |---|---:|
+  | interface, no yield | 62.9% |
+  | model, no yield | 17.3% |
+  | no plan | 10.7% |
+  | refused input | 4.0% |
+  | effect mismatch | 3.9% |
+  | productive | 0.6% |
+  | wait | 0.3% |
+  | model-blind | 0.2% |
+  | reading bound | 0.0% |
+
+  The reading bound took 0.0% (play8: 65.0%). The last 20 tries were 99.6% interface with no yield.
+- **The reach fix (13):** "did not reach either" probe stops numbered 137 in 15 of the 2,901 tries before it, and 8
+  in 3 of the 1,151 after. All 8 are a script local at 0 (local:209, local:202). The reading seeds locals
+  otherwise; that is not read further.
+- **Why C5 was not reached:**
+  - C5 needs room 42 while holding 946.
+  - play8 reached room 42 without 946, from a room-49 conversation, with a model plan and then a free try.
+  - E015's item gate found room 42 with 946 only from one of the opening's two dialog choices. play9's conversation
+    states took the other one (bit:401=1, entry 139).
+  - None of play9's 7 entries deep in the conversation (var:416 != 0) holds 946. After (13) no try made a new one.
+- **Cost:** two VM bookings, 19:01-22:31 (3.5 h) and 22:35-00:3x (2 h), at $1.535/h. Laptop: the checks below.
+
+### Predictions against the result
+
+| Prediction | Result | Score |
+|---|---|---|
+| Furthest: median C3, 80% interval C1-C7 | C4 | hit |
+| P(at least C1) 80-90% | yes | hit |
+| P(at least C3) 50-65% | yes | hit |
+| P(at least C5) 25-40% | no | miss |
+| P(at least C7) 10-25% | no | hit (the less likely side) |
+| P(C9) 5-15% | no | hit |
+| The first C1 within 2-20 min | 4.6 min | hit |
+| Reading bound 5-30% (play8 65.0%) | 0.0% | better than the range |
+| Refused input and effect mismatch together 0-10% | 7.9% | hit |
+| Productive 5-25% (play8 1.6%) | 0.6% | miss, worse than play8 |
+| G3 passes, 70-85% | pass | hit |
+| G4: every kitchen step realized, 60-80% | fail along the chain | miss |
+| G5, 95% | pass | hit |
+| K1 reaches the kitchen in 60 min, 45-65% | not measured: killed twice by the laptop's memory guard, once on its load | none |
+| New assumption rows 2-6 | 9: amendments (7)-(13) | miss, 1.5-4.5x over |
+
+- **Success threshold:** No (C4 is below C5).
+- **Stop rule:** play9 stopped below C5, and so did its one amended rerun, segments 4-6 under (11)-(13). Patching
+  stops here. E016 is written up, and the next direction goes to Ilyas.
+
+### What carries forward, and what does not
+
+- **Worked, by measurement:**
+  - Fix A, realize, on the run path: exit A at 4.6 min, after play8's 22 failures.
+  - Room scopes as plan F meant them (8).
+  - The reading bound no longer stalls, at 0.0%.
+  - Place novelty and place-first selection, (10) and (11), made C4: no entry outside room 69 held 946 until they were
+    on.
+  - The reach start's zeros (13) removed 129 of 137 refused starts.
+- **Found by running, not by design:** five defects in E014-E016 code, all general:
+  - the widened reason;
+  - unsetting FMI_SCOPE_GROW gives ring scopes;
+  - one lock over all planners;
+  - realize places a held object;
+  - reach starts drop zeros.
+
+  Two missing mechanisms, the place as a novelty unit and in the selection, came from the same runs. That is the
+  retrospective's pattern again: each new area of the game showed new defects.
+- **Open:**
+  - **Rule (2).** Monkey Island's checks (b3, kitchen, smoke) and K1 with the final set ((8)-(13)) are not done.
+    Before (9): kitchen and smoke passed with room scopes. After it, b3's run died under the laptop's load. Nothing
+    merges to main until they pass. G4's deferred sentence is still open as well.
+  - **Verification.** Full verify-from-boot of all 4,176 entries; the archive is kept on the VM's disk, and on the
+    laptop without readings.
+  - **The C5 route.** The opening's dialog choice that leads to room 42 with 946, per E015's item gate.
