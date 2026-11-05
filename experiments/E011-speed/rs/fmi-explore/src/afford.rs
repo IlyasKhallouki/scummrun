@@ -751,6 +751,8 @@ struct Run1<'a> {
     then: Option<Then<'a>>,
     out: AffordOut,
     kept_atoms: HashSet<String>,
+    /// E018 (FMI_REVEAL=1): the outcomes kept for the targets they reveal, in this step
+    revealed: usize,
     worlds: Vec<(u64, Option<Facts>)>,
     cpu: f64,
     shared: Shared,
@@ -923,6 +925,30 @@ impl Run1<'_> {
                     let room = cp.facts.val(Key::pack(K_ROOM, 0, 0, 0)) as i32;
                     self.out.kept.push(Kept { name: tr.inputs.name(), events: tr.events.clone(), checkpoint: cp, novel: nov, room });
                 }
+                // E018 (FMI_REVEAL=1): an outcome with nothing novel that makes objects or actors clickable which the
+                // step's offer did not hold is kept too (at most REVEAL_MAX in a step), so the next level offers them:
+                // walking somewhere is progress when it brings a new thing in reach
+                if tr.kept == 0 && reveal_on() && tr.shared.is_none() && st.idle.is_some() && self.revealed < REVEAL_MAX {
+                    let o = b.obs(&ObsReq::default())?;
+                    let of2 = offer_with(b, &o, false)?;
+                    let had: HashSet<Hit> = self.out.offer.targets.iter().map(|p| p.hit).collect();
+                    let mut new: Vec<String> = of2.targets.iter()
+                        .filter(|p| matches!(p.hit, Hit::Object(_) | Hit::Actor(_)) && !had.contains(&p.hit))
+                        .map(|p| p.hit.name()).collect();
+                    new.sort();
+                    new.dedup();
+                    if !new.is_empty() {
+                        let txt = format!("reveal={}", new.join(","));
+                        if self.kept_atoms.insert(txt.clone()) {
+                            self.revealed += 1;
+                            let cp = checkpoint_of(&st, &o);
+                            let room = cp.facts.val(Key::pack(K_ROOM, 0, 0, 0)) as i32;
+                            tr.novel.push(txt.clone());
+                            tr.kept += 1;
+                            self.out.kept.push(Kept { name: tr.inputs.name(), events: tr.events.clone(), checkpoint: cp, novel: vec![txt], room });
+                        }
+                    }
+                }
                 Some((st, f))
             }
         };
@@ -936,6 +962,12 @@ impl Run1<'_> {
         Ok((idx, res))
     }
 }
+
+/// E018: the switch of the reveal rule (`Run1::trial`) and its limit per step.
+pub fn reveal_on() -> bool {
+    std::env::var("FMI_REVEAL").is_ok_and(|v| v == "1")
+}
+pub const REVEAL_MAX: usize = 3;
 
 /// `try_all(engine, inputs, &Tested, archive) -> Vec<Kept>` (plan.md, "Components"): every input tried in a fork of
 /// `e`, which is stopped at the offer's frame; each trial's outcome; the stops kept by novelty. `tested`: T's keys
@@ -964,6 +996,7 @@ pub fn try_all(
         then,
         out: AffordOut { offer: of.clone(), refuse: cfg.refuse.then(RefuseOut::default), ..Default::default() },
         kept_atoms: HashSet::new(),
+        revealed: 0,
         worlds: Vec::new(),
         cpu: 0.0,
         shared: Shared::default(),

@@ -36,3 +36,12 @@ place (the room with the objects ego owns), not the atoms held anywhere in the a
 - **Yes:** C5, verified from boot.
 - **Partly:** conversation depth holding 946.
 - **No:** neither; then write up.
+
+## Reveal (added at 10:15)
+
+From room 49 holding 946, E015's chain opened the conversation in two actions: walk to object 592, then talk to
+actor 11. From play10's states, actor 11 is never in the offer (no `t-11` in any try's trials), and the walk's outcome
+holds nothing novel, so it is not kept and the talk never follows. `FMI_REVEAL=1`: an affordance or free trial whose
+stop has nothing novel but whose hit test holds objects or actors that the step's offer did not is kept (its novelty
+text `reveal=<names>`, at most 3 a step). The free try's next level then offers them. This names nothing in the game:
+it is the interface's reach, read from the engine's hit test.
