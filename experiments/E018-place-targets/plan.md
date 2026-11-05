@@ -63,3 +63,26 @@ by their attributes' counts.
   and 204 s at the p90, about 410 an hour.
 - **To resume:** start the VM, take the lock, then run `vm.sh resume W 2` with E018's env.sh and the play10 paths (see
   the session's rebook script). W = 20 would use the idle cores.
+
+## The VM's use, measured (2026-11-05, 11:25-11:52 UTC)
+
+- **The machine:** right-sized from n2-custom-30-122880 ($1.535/h) to n2-custom-30-49152 ($1.214/h, 30 cores, 48 GB).
+- **Workers:** the walk down from 30 was cancelled at Ilyas's word ("if 30 works stick with it").
+- **CPU and memory**, sampled every 5 s from /proc/stat and MemAvailable:
+
+  | | 10 workers (play9/10, spot readings) | 30 workers (68 samples) |
+  |---|---|---|
+  | CPU busy | ~44% | 95% median, 95% peak |
+  | system time | ~27% | 58% median |
+  | user and nice time | ~17% | 37% median |
+  | memory used | 7 GB | 6.3 GB median, 6.7 GB peak |
+  | committed tries per minute | ~7 (410/h) | ~7.7 |
+
+- **Where the time goes:**
+  - The kernel's process counter rose by about 9,700 a second, with about 480,000 context switches a second.
+  - The live processes (fmi with 112 threads, about 225 ScummVM processes) account for only about 2.6 cores.
+  - The rest is processes too short-lived to be sampled: the engine forks of the trials. Each trial and wait forks
+    the game, and the forks' copy-on-write faults and teardown fill the kernel's time.
+- **Conclusion:** past about 10 workers, more cores feed the fork overhead, not the search. The throughput lever is
+  fewer process forks per trial (branching inside one engine process), not more workers.
+- The run was stopped at 11:52 to save the rest of the booking: C5, 8,468 entries.
