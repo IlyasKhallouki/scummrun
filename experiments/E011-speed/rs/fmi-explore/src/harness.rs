@@ -112,6 +112,12 @@ impl PlannerCache {
     }
 }
 
+/// E016 amendment (9): `FMI_PLANNER_LOCK=reading`, a plan holds its reading's planner's lock and not the cache's, so
+/// tries on other readings plan meanwhile. Unset: the cache's lock for the whole request, as before.
+pub fn planner_lock_per_reading() -> bool {
+    std::env::var("FMI_PLANNER_LOCK").is_ok_and(|v| v == "reading")
+}
+
 /// Whether the refinement keeps the old reading's planner (FMI_PLANNER_KEEP, on; 0 closes it as round 1 did).
 fn planner_keep() -> bool {
     std::env::var("FMI_PLANNER_KEEP").map(|v| v != "0").unwrap_or(true)
@@ -438,10 +444,15 @@ impl<'a> Harness<'a> {
             },
             time_limit_s: limit,
         };
-        // the reading's planner's lock is held for the request only (an extension below plans again); the cache's
-        // lock only to find the planner
+        // the planners' lock is held for the request only (an extension below plans again); with
+        // FMI_PLANNER_LOCK=reading (E016 amendment (9)) only the reading's planner's lock is, and the cache's lock
+        // only to find or build the planner
         let planned = crate::machine::port(|| {
-            let p = self.planners.lock().unwrap().get(&*self.reading)?;
+            let mut g = self.planners.lock().unwrap();
+            let p = g.get(&*self.reading)?;
+            if planner_lock_per_reading() {
+                drop(g);
+            }
             let mut p = p.lock().unwrap_or_else(|e| e.into_inner());
             p.plan(&req)
         });

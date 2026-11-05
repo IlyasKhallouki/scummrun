@@ -756,3 +756,13 @@ above matches. The corrections are folded in above. These are added:
   - The resume at 21:08 was at 643 tries and 1,342 entries.
   - At 21:41, 983 tries and 3,386 entries.
   - "22 failures at exit A" is play7 and play8 together, per E015.
+
+### (14) 2026-11-05: the per-planner lock behind a switch; rule (2) owed
+
+- Following the check, (9)'s per-reading planner lock is now behind `FMI_PLANNER_LOCK=reading`, which E16 sets. With
+  it unset, a plan holds the planners' cache lock for the whole request, as before (9). Monkey Island with every
+  switch off is then unchanged by it.
+- With this build (target-e016, laptop) the following run on the laptop: Monkey Island's checks (b3, kitchen, smoke),
+  K1, and G3 and G4 on the final realize.
+- A video of play9's C4 path replayed from boot was made with the bridge's `SPEEDRUN_VIDEO` capture: 18 clicks,
+  131.7 s, ending at the entry's tick (7382) and frame (1646). It is not committed (game images).
