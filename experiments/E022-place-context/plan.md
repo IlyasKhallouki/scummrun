@@ -81,3 +81,14 @@
   - New: `FMI_REFINE_WIDEN=N` (harness.rs). The out-of-domain values seed the domain through starts that hold them
     (`Rereads::add_start`, `Wiring` keeps them), and the scope is read again, at most N times. Test:
     `widen_tests`. The run sets N = 3.
+
+## Amendment (3), 2026-11-05 23:55 UTC: the entries that first reach something at a place are selected first
+
+- **What happened after amendment (2):** in 22 minutes no try started from the 6 quiz entries. The selection did take
+  the book-read context, but in that place they compete with 3,500 entries in fresh cells. Among fresh cells the
+  order falls to the entry's novelty count, which counts the atoms the entry is the least live holder of archive-wide.
+- **Change, under `FMI_PLACE_CTX=1` (progress.rs):** `Progress` keeps the least live holder of each atom per place,
+  the place's text with its context (`first_place`). `novel_counts` counts those instead. So an entry that is the first
+  at its place to hold an atom, as the quiz entries are with `var:176 = 11` after the book, comes first among its
+  place's fresh cells (Go-Explore: newly found cells first).
+- **Check:** fmi-explore's tests all pass. With the switch off the counts are unchanged.
