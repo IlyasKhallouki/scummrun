@@ -13,7 +13,9 @@ place (the room with the objects ego owns), not the atoms held anywhere in the a
 
 ## Method
 
-- `FMI_TARGET_PLACE=1`: job.json's "held" is the union of the held atoms of the entries at the entry's place
+- `FMI_TARGET_PLACE=1`: job.json's "held" is the union of the held atoms of the entries at the entry's place,
+  and (added after 5 min of the run: 0 of 24 tries from places holding 946 had a target) the kept novelty is judged
+  per place too (job.json "novelty"."by_place": an atom is novel where no live entry at the state's place holds it)
   (`Archive::job_doc`). This is the targeting side of E016's place novelty (best-first width search's novelty
   partitioned by a progress feature, here the place). No other change.
 - Run: resume play10's archive on the VM (b = 10), E017's set plus this switch. 3 h wall limit, or 40 min with no new

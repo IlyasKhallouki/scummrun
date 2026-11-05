@@ -2057,7 +2057,13 @@ impl Archive {
             m.insert("deferred".into(), cell.deferred_of(&i.to_string()).cloned().unwrap_or_else(|| json!([])));
         }
         if let Some(p) = &self.progress {
-            m.insert("novelty".into(), progress::novelty_json(p, &self.live_rows()));
+            let live = self.live_rows();
+            let mut nv = progress::novelty_json(p, &live);
+            if target_place_on() {
+                // E018: novelty per place, the targets' partition on the keeping side
+                nv["by_place"] = progress::by_place_json(p, &live, |r| self.rows[r].room);
+            }
+            m.insert("novelty".into(), nv);
             m.insert("dead".into(), Value::Array(self.dead_moves(i)));
         }
         if crate::nogood::on() {
