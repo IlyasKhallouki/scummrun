@@ -1240,7 +1240,7 @@ impl<'g> Builder<'g> {
     pub fn inputs(&mut self) -> Vec<Job> {
         let mut out = Vec::new();
         let ns = self.sentence_scripts();
-        let objects: Vec<i64> = self.scope.objects.iter().chain(&self.scope.held).copied().collect();
+        let objects: Vec<i64> = self.scope.objects.iter().chain(&self.scope.held).chain(&self.scope.actors).copied().collect();
         let verbs = self.scope.verbs.clone();
         for &n in &ns {
             for (variant, ok, base_pins, base_pre) in self.sentence_base(n) {
