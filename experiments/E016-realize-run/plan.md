@@ -625,9 +625,13 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
 
 - **Verified from boot:**
   - The five rung entries were verified on the VM with the run's last build, each with 0 differences.
-  - So was a random sample of 48 of the 4,175 other entries: 48 of 48 had 0 differences.
-  - Verifying every entry (about 2.5 entries a minute at 24 at a time) did not fit before the VM's booked stop.
+  - So did a sample of 48 of the other 4,171 entries: 48 of 48 had 0 differences. The sample is not representative:
+    all 48 are in room 49, 12 come from one try (j03914), and none holds 946.
+  - Verifying every entry (about 8-9 entries a minute at 24 at a time, about 6.8 h for all) did not fit before the
+    VM's booked stop.
 - **How it stopped:** `stop file`, asked by the ladder's watcher after 40 min of wall with no new rung, at 23:57 UTC.
+  The watcher's count restarts at each resume. About 110 min of run wall passed after C4 (21:52) with no new rung, and
+  under the rule as written the run would have stopped about 22:41, before (13).
   That was 4,052 tries (2,030 model, 2,022 free), 4,176 entries and 386 cells. Its entries are in rooms 49 (3,996),
   69 (127) and 63 (53). No try visited room 42.
 - **The segments**, each a resume from the archive's files:
@@ -657,14 +661,24 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
   | reading bound | 0.0% |
 
   The reading bound took 0.0% (play8: 65.0%). The last 20 tries were 99.6% interface with no yield.
-- **The reach fix (13):** "did not reach either" probe stops numbered 137 in 15 of the 2,901 tries before it, and 8
-  in 3 of the 1,151 after. All 8 are a script local at 0 (local:209, local:202). The reading seeds locals
-  otherwise; that is not read further.
+- **The reach fix (13): not measured by the run.**
+  - "Did not reach either" probe stops numbered 137 in 15 of the 2,891 tries before it, and 8 in 3 of the 1,161 tries
+    with it. The 8 are all a script local at 0.
+  - Before the fix the stops were 106 bit:404=0, 26 local:209 or local:202 at 0, 4 var:104=1 and 1 pos:script:86.
+    All of them were in j00042-j00948.
+  - After the fix, no try started from the bit:404 entries (23, 238, 240, 552, 553, 1296, 1298), and entry 46 failed
+    on local:209=0 as before. So the drop comes from which entries were selected, not from the fix.
+  - Its only evidence is the offline planner-only check of (13).
 - **Why C5 was not reached:**
   - C5 needs room 42 while holding 946.
   - play8 reached room 42 without 946, from a room-49 conversation, with a model plan and then a free try.
   - E015's item gate found room 42 with 946 only from one of the opening's two dialog choices. play9's conversation
     states took the other one (bit:401=1, entry 139).
+  - play9's entries 240 and 549 differ from play8's entry 198 only in bit:401. So the data does not show that the
+    reach defect alone kept play9 from room 42.
+  - (12)'s 30 s cap is a confound. Of play9's 2,341 found plans, 3 took more than 30 s: j00110's 152 s replan, which
+    reached var:416=2, and j00406 and j00552. Each was in a try that reached its target. After the cap, 3 replans
+    timed out at 30-31 s.
   - None of play9's 7 entries deep in the conversation (var:416 != 0) holds 946. After (13) no try made a new one.
 - **Cost:** two VM bookings, 19:01-22:31 (3.5 h) and 22:35-00:3x (2 h), at $1.535/h. Laptop: the checks below.
 
@@ -675,8 +689,8 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
 | Furthest: median C3, 80% interval C1-C7 | C4 | hit |
 | P(at least C1) 80-90% | yes | hit |
 | P(at least C3) 50-65% | yes | hit |
-| P(at least C5) 25-40% | no | miss |
-| P(at least C7) 10-25% | no | hit (the less likely side) |
+| P(at least C5) 25-40% | no | the likelier side (60-75% "no") |
+| P(at least C7) 10-25% | no | the likelier side (75-90% "no") |
 | P(C9) 5-15% | no | hit |
 | The first C1 within 2-20 min | 4.6 min | hit |
 | Reading bound 5-30% (play8 65.0%) | 0.0% | better than the range |
@@ -686,7 +700,8 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
 | G4: every kitchen step realized, 60-80% | fail along the chain | miss |
 | G5, 95% | pass | hit |
 | K1 reaches the kitchen in 60 min, 45-65% | not measured: killed twice by the laptop's memory guard, once on its load | none |
-| New assumption rows 2-6 | 9: amendments (7)-(13) | miss, 1.5-4.5x over |
+| New assumption rows 2-6 | 0 rows added to the assumptions table; 7 problems found by running ((7)-(13)) | the measure was not kept; counted as problems, a miss |
+| Repeated (entry, prefix, target) attempts: 0 by construction | not measured | none |
 
 - **Success threshold:** No (C4 is below C5).
 - **Stop rule:** play9 stopped below C5, and so did its one amended rerun, segments 4-6 under (11)-(13). Patching
@@ -700,7 +715,7 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
   - The reading bound no longer stalls, at 0.0%.
   - Place novelty and place-first selection, (10) and (11), made C4: no entry outside room 69 held 946 until they were
     on.
-  - The reach start's zeros (13) removed 129 of 137 refused starts.
+  - The reach start's zeros (13) are shown only offline (the run never re-tried the states they block).
 - **Found by running, not by design:** five defects in E014-E016 code, all general:
   - the widened reason;
   - unsetting FMI_SCOPE_GROW gives ring scopes;
@@ -717,3 +732,27 @@ setting only, with no new code. The rerun resumed from its archive at 21:49:42 U
   - **Verification.** Full verify-from-boot of all 4,176 entries; the archive is kept on the VM's disk, and on the
     laptop without readings.
   - **The C5 route.** The opening's dialog choice that leads to room 42 with 946, per E015's item gate.
+
+### Corrections after the independent check (2026-11-05)
+
+Two checkers re-derived the Result from the pulled archive and read each fix's code. The headline holds: a rerun of
+the ladder over all 4,176 entries gives the same rungs, with C4 at 121.4 min, and every count and verification
+above matches. The corrections are folded in above. These are added:
+
+- **(9) SharedPlanner has no switch and no test.** It changes every run with b > 1, Monkey Island with every switch
+  off included. Plans on different readings now search at once with no memory cap. The cache's lock is still held
+  while a planner is built. A poisoned planner is used again. It needs a switch, or b3 and smoke with every switch off
+  shown unchanged.
+- **(12) is not "every plan at most 30 s".** First plans get 10 x 2^n s (n deferrals; at most 20 s in play9), and
+  later plans 30 s. On Monkey Island, FMI_PLAN_DEEPEN=10 is likely to slow K1: E012's kitchen chain has a 24.6 s first
+  plan (j00013).
+- **(10) changed realize after (5) and (6)** said fix 3 was the last change to realize in E016. G3 and G4 are owed on
+  realize at 6902065.
+- **Segment builds were made on the VM from the working tree.** Two resumes started seconds before the commit that
+  records their code (20:29 against 4d19fe1 at 20:30:59; 21:08 against 6902065 at 21:09:24). The logs hold no build
+  revision.
+- **Small counts:**
+  - (10)'s room-63 trials were 9 points, each with 38 trials ending in room 63 (342 in all), none kept.
+  - The resume at 21:08 was at 643 tries and 1,342 entries.
+  - At 21:41, 983 tries and 3,386 entries.
+  - "22 failures at exit A" is play7 and play8 together, per E015.
