@@ -260,6 +260,24 @@ fn places_tried_without_yield_come_after_untried_places() {
     assert_eq!(a.select_free(3), free_on);
 }
 
+/// E018: with FMI_TARGET_PLACE=1 a try's held atoms are those held at its entry's place: an atom held only in the
+/// root's place stays a target for an entry in another place.
+#[test]
+fn held_atoms_are_the_places_own() {
+    let _g = env(true, Some("0.25"));
+    let t = tmp("target-place");
+    let mut a = make(&t);
+    let l = ingest(&mut a, 0, Some(&mk(0.25)), &[(5, vec![("room", json!(35))])], &[]);
+    let p = ids(&l)[0];
+    a.rows[0].held.push(("var:9".into(), 4));
+    let has = |doc: &Value| doc["held"].as_array().unwrap().iter().any(|x| x == &json!(["var:9", 4]));
+    std::env::set_var("FMI_TARGET_PLACE", "1");
+    let (at_root, at_p) = (a.job_doc("jX", 0).unwrap(), a.job_doc("jY", p).unwrap());
+    std::env::remove_var("FMI_TARGET_PLACE");
+    assert!(has(&at_root));
+    assert!(!has(&at_p));
+}
+
 /// Stall's rules as a test gives them: a share, and the cells whose next try is free.
 struct TestShift {
     share: f64,

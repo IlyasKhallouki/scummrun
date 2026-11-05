@@ -2014,7 +2014,20 @@ impl Archive {
         let cell = self.cell(&row.cell);
         let scope = self.scope_of_room(row.room);
         let rooms = scope.iter().map(|r| r.to_string()).collect::<Vec<_>>().join("-");
-        let mut held: Vec<&(String, i64)> = self.held_by.keys().collect();
+        let mut held: Vec<&(String, i64)> = if target_place_on() {
+            // E018 (FMI_TARGET_PLACE=1): the atoms held at the entry's place only, so a fact reached elsewhere stays a
+            // target where it was not (a conversation's facts, reached without an object, with the object in hand)
+            let pl = self.place_of_row(i);
+            let mut s: BTreeSet<&(String, i64)> = BTreeSet::new();
+            for r in &self.rows {
+                if self.place_of_row(r.id) == pl {
+                    s.extend(r.held.iter());
+                }
+            }
+            s.into_iter().collect()
+        } else {
+            self.held_by.keys().collect()
+        };
         held.sort();
         let readings: Vec<Value> = self
             .readings_for(&scope)
@@ -2642,6 +2655,11 @@ pub fn stag_cells() -> bool {
 /// the next free worker, once (`Archive::frontier`). Unset: the order as before.
 pub fn frontier_on() -> bool {
     std::env::var("FMI_FRONTIER").is_ok_and(|v| v == "1")
+}
+
+/// E018: a try's targets leave out the atoms held at its entry's place, not in the whole archive (`job_doc`).
+pub fn target_place_on() -> bool {
+    std::env::var("FMI_TARGET_PLACE").is_ok_and(|v| v == "1")
 }
 
 /// E016 amendment (11): the selection orders places before cells (`Archive::place_key`).
