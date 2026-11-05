@@ -44,6 +44,21 @@ pub fn val_text(v: Val) -> String {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct Key(pub u64);
 
+/// E019: engine forks counted by the call site that asked for them (`count_fork`), read by `fork_counts`.
+static FORKS: std::sync::Mutex<std::collections::BTreeMap<&'static str, u64>> = std::sync::Mutex::new(std::collections::BTreeMap::new());
+
+/// E019: one fork asked at `site` (file:line).
+pub fn count_fork(site: &'static str) {
+    if let Ok(mut m) = FORKS.lock() {
+        *m.entry(site).or_insert(0) += 1;
+    }
+}
+
+/// E019: the forks counted so far, by site.
+pub fn fork_counts() -> Vec<(&'static str, u64)> {
+    FORKS.lock().map(|m| m.iter().map(|(k, v)| (*k, *v)).collect()).unwrap_or_default()
+}
+
 pub const K_VAR: u8 = 1; // var:N
 pub const K_BIT: u8 = 2; // bit:N
 pub const K_OWNER: u8 = 3; // owner:O

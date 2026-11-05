@@ -381,7 +381,7 @@ fn eng(e: EngineError) -> String {
 /// The wait from the engine `root` stands at (a fork of it, quit at the end), on T's atoms over the reading `rd`.
 pub fn wait(root: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], rd: &dyn ReadingSource, cfg: &WaitCfg) -> Result<WaitOut, String> {
     let t = Instant::now();
-    let mut b = machine::port(|| root.fork()).map_err(eng)?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("wait.rs:384"))).map_err(eng)?;
     let t_fork = t.elapsed().as_secs_f64();
     let r = wait_on(&mut b, atoms, rd.domains(), points_of(rd), cfg, t);
     let cpu = b.cpu_s();

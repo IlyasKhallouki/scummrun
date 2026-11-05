@@ -174,6 +174,16 @@ fn wire_opts(a: &Args) -> Result<wire::WireOpts, String> {
 }
 
 fn cmd_try(argv: &[String]) -> i32 {
+    let rc = cmd_try_in(argv);
+    if std::env::var_os("FMI_FORK_COUNTS").is_some() {
+        for (site, n) in fmi_core::fork_counts() {
+            eprintln!("forks {site} {n}");
+        }
+    }
+    rc
+}
+
+fn cmd_try_in(argv: &[String]) -> i32 {
     let a = Args::parse(argv, &["targets", "search", "doubles", "repeat"]);
     if a.pos.is_empty() {
         usage()

@@ -290,7 +290,7 @@ impl Tally {
 /// An engine at a state the entry's movie reaches: a fork of the entry's engine with `events` (absolute frames after
 /// the entry) scheduled, run to the checkpoint's frame, held to the checkpoint (facts, tick, random state, actors).
 pub fn engine_at(root: &mut Box<dyn Engine>, events: &[Value], cp: &Checkpoint) -> Result<Box<dyn Engine>, String> {
-    let mut b = root.fork().map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = root.fork().inspect(|_| fmi_core::count_fork("free.rs:293")).map_err(|e| format!("EngineError: {e}"))?;
     let evs: Vec<Event> = events.iter().filter_map(events::event_of).collect();
     let differ = (|| -> Result<Option<String>, String> {
         if evs.len() != events.len() {
@@ -435,7 +435,7 @@ fn delay_step(eng: &mut Box<dyn Engine>, offer: &Offer, r: &AffordOut, horizon: 
     frames.dedup();
     let mut twin: BTreeMap<u64, u32> = BTreeMap::new();
     if !frames.is_empty() {
-        let mut c = eng.fork()?;
+        let mut c = eng.fork().inspect(|_| fmi_core::count_fork("free.rs:438"))?;
         for &fr in &frames {
             if fr > c.status().frame {
                 match c.run(&RunSpec { frame: Some(fr), ..Default::default() }) {
@@ -454,7 +454,7 @@ fn delay_step(eng: &mut Box<dyn Engine>, offer: &Offer, r: &AffordOut, horizon: 
     // each candidate's own run to its stop
     let (mut more, mut unknown, mut missed) = (Vec::<Inputs>::new(), 0u64, 0u64);
     for t in &cands {
-        let mut b = eng.fork()?;
+        let mut b = eng.fork().inspect(|_| fmi_core::count_fork("free.rs:457"))?;
         b.inputs(&t.events)?;
         let mine = match b.run(&RunSpec { frame: Some(t.frame), ..Default::default() }) {
             Ok(st) if st.frame == t.frame => Some(st.rng as u32),
@@ -481,7 +481,7 @@ fn delay_step(eng: &mut Box<dyn Engine>, offer: &Offer, r: &AffordOut, horizon: 
     let mut by_d: Vec<Value> = Vec::new();
     if !more.is_empty() {
         for d in DELAYS {
-            let mut b = eng.fork()?;
+            let mut b = eng.fork().inspect(|_| fmi_core::count_fork("free.rs:484"))?;
             let at = match b.run(&RunSpec { frame: Some(f0 + d), ..Default::default() }) {
                 Ok(st) if st.frame == f0 + d => true,
                 Ok(_) | Err(EngineError::Ended(_)) => false,
