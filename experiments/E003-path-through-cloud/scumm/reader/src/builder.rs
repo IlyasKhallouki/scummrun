@@ -1086,7 +1086,7 @@ impl<'g> Builder<'g> {
         let mut handlers: BTreeSet<i64> = BTreeSet::new();
         for &n in ns {
             for v in self.b_verbs(n, verb) {
-                for &o in &self.scope.objects {
+                for &o in self.scope.objects.iter().chain(&self.scope.held) {
                     if o != a && game.entry(o as i32, v as i32).is_some() && self.has_entry(o, v) {
                         handlers.insert(o);
                     }
@@ -1097,7 +1097,7 @@ impl<'g> Builder<'g> {
             return vec![];
         }
         let inside: Vec<i64> =
-            consts.iter().copied().filter(|b| self.scope.objects.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
+            consts.iter().copied().filter(|b| self.scope.objects.contains(b) || self.scope.held.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
         self.counts.add("B constants outside the scope (not built)", (consts.len() - inside.len()) as i64);
         let inside_set: BTreeSet<i64> = inside.iter().copied().collect();
         self.counts.add("B objects whose own entry the sentence script starts", handlers.difference(&inside_set).count() as i64);
@@ -1240,7 +1240,7 @@ impl<'g> Builder<'g> {
     pub fn inputs(&mut self) -> Vec<Job> {
         let mut out = Vec::new();
         let ns = self.sentence_scripts();
-        let objects = self.scope.objects.clone();
+        let objects: Vec<i64> = self.scope.objects.iter().chain(&self.scope.held).copied().collect();
         let verbs = self.scope.verbs.clone();
         for &n in &ns {
             for (variant, ok, base_pins, base_pre) in self.sentence_base(n) {
