@@ -99,3 +99,30 @@ Rule (2) still holds: nothing merges to main before Monkey Island's checks pass 
   - Prediction: within 90 minutes, entries holding `var:239 ≠ 0` appear (the book read by a free try), then
     `bit:443 = 1` in room 49, then C7.
   - Stop rule: the watcher's 90 minutes with no new rung.
+
+## Result, 2026-11-05 21:30 UTC: the book is read; the quiz is not re-entered; C6, stopped by the rule
+
+- **The run:** play10's archive on the VM from 19:56, 20 workers, E020's set plus `FMI_TEMP_SAVES=1`. It stopped at
+  21:30, the watcher's 90 minutes with no new rung. The furthest rung is C6. There are 8,753 tries and 22,227
+  entries in all, 4,640 of them new.
+- **First prediction, met:** entries holding the drawn coordinates appeared within 7 minutes. By the stop there were
+  4,344 (room 49: 3,199, room 63: 607, room 69: 469, room 83: 54, room 42: 15), with draws that vary by path
+  (`var:239` from 160 to 360, `var:240` 1-3).
+- **Second prediction, missed:** no new entry is in the quiz (`var:176 = 11`) after the book, and none holds
+  `bit:443 = 1`. The 15 book-read entries in room 42 show that a try did go through the conversation and sail, but
+  the answers did not count, and the conversation's intermediate states were not kept.
+- **Why:** the run tried what it was offered.
+  - Model tries in room 49 targeted `var:52 = 0`, `owner:593 = 1` and `var:104 = 3` (75 tries), and those in room 83
+    had no target (43).
+  - Earlier runs entered the quiz 159 times (135 by model tries), chasing the conversation's own atoms (`bit:403`,
+    `bit:410`, `bit:408`, `var:416`).
+  - Those atoms are held at the place (room 49 holding the kit) by the entries made before the book was read. So they
+    are neither targets (job.json "held") nor novel (`by_place`) for the book-read entries, which share that place.
+  - The book changed what the quiz can give, but the place (room, owned objects) and its novelty do not see that.
+- **Next (E022):** novelty and targets per context. When an entry first holds a new value of a room's input key, it
+  starts a fresh context at its place. An input key is one the room's guards test, the room's own code does not write,
+  and the archive has never seen cleared.
+  - In play9's 4,176 entries, `var:176` (the dialog topic), `var:165`, `var:442` and `var:52` are cleared along
+    parent → child edges (16, 205, 169 and 275 times).
+  - The conversation's own flags (`bit:403`, `bit:410`, `var:416`) are never cleared, but room 49's code writes them.
+    The coordinates never moved there.
