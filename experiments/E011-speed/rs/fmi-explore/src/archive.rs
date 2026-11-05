@@ -1975,6 +1975,7 @@ impl Archive {
             .filter(|x| {
                 x.get("scope") == Some(&sv)
                     && !truthy(x.get("evicted"))
+                    && (!read_held_on() || truthy(x.get("held")))
                     && x.get("path").and_then(|p| p.as_str()).map(|p| Path::new(p).exists()).unwrap_or(false)
             })
             .collect()
@@ -1987,8 +1988,11 @@ impl Archive {
         s.sort();
         let parent = p.parent().unwrap_or(Path::new(""));
         let bytes = if parent.exists() { files::dir_bytes(parent) } else { 0 };
-        let row = json!({"scope": s, "path": path, "start_entry": start_entry, "job": job, "bytes": bytes,
-                         "last_used": used, "kind": kind});
+        let mut row = json!({"scope": s, "path": path, "start_entry": start_entry, "job": job, "bytes": bytes,
+                             "last_used": used, "kind": kind});
+        if read_held_on() {
+            row["held"] = json!(true);
+        }
         files::append_jsonl(&self.root.join("readings.jsonl"), std::slice::from_ref(&row))?;
         self.readings.push(row.as_object().unwrap().clone());
         Ok(())
@@ -2102,6 +2106,7 @@ impl Archive {
                 x.get("scope") != Some(&sv)
                     && x.get("scope").and_then(|v| v.as_array()).map(|a| a.iter().any(|r| r.as_i64() == Some(room))).unwrap_or(false)
                     && !truthy(x.get("evicted"))
+                    && (!read_held_on() || truthy(x.get("held")))
                     && x.get("path").and_then(|p| p.as_str()).map(|p| Path::new(p).exists()).unwrap_or(false)
             })
             .collect()
@@ -2765,6 +2770,13 @@ pub fn frontier_on() -> bool {
 /// E019: a try whose job.json repeats a committed one's is not run (`Archive::same_job`).
 pub fn skip_same_on() -> bool {
     std::env::var("FMI_SKIP_SAME").is_ok_and(|v| v == "1")
+}
+
+/// E019: readings read the code of the objects actors hold (the reader's `FMI_READ_HELD`), so only the readings
+/// registered with it are offered (`readings_for`, `readings_holding`) and a reading serves the inventory it was read
+/// with (tryjob's reading choice).
+pub fn read_held_on() -> bool {
+    std::env::var("FMI_READ_HELD").is_ok_and(|v| v == "1")
 }
 
 /// E018: a try's targets leave out the atoms held at its entry's place, not in the whole archive (`job_doc`).

@@ -443,6 +443,9 @@ pub struct Scope {
     pub units: Vec<UnitId>,
     pub unit_keys: rustc_hash::FxHashSet<UnitKey>,
     pub objects: Vec<i64>,
+    /// E019 (`FMI_READ_HELD=1`): the objects of other rooms an actor holds at the start, whose code the scope reads;
+    /// the sentences' objects besides `objects` (empty with the switch off)
+    pub held: Vec<i64>,
     pub verbs: Vec<i64>,
     pub dialog_verbs: Vec<i64>,
     pub walk_verb: Option<i64>,
@@ -453,6 +456,11 @@ pub struct Scope {
     /// fix round 1's switches the reading runs with (machine.rs `Switches`; reader.py has none): the Reader's machine
     /// takes them, and `of_with` adds the writes they make
     pub switches: Switches,
+}
+
+/// E019: `FMI_READ_HELD=1`, a scope reads the code of the objects actors hold (`Scope::of_with`).
+pub fn held_on() -> bool {
+    std::env::var("FMI_READ_HELD").is_ok_and(|v| v == "1")
 }
 
 impl Scope {
@@ -467,6 +475,12 @@ impl Scope {
         let mut rooms: Vec<i32> = rooms.to_vec();
         rooms.sort_unstable();
         let in_rooms = |r: i32| rooms.contains(&r);
+        // E019 (FMI_READ_HELD=1): an object of another room an actor holds carries its code into every room (its verb
+        // scripts run wherever it is used), so the scope reads it and its sentences take it
+        let held_out = |o: i32| {
+            let w = start.get0(&format!("owner:{o}"));
+            held_on() && w != 0 && w != OF_OWNER_ROOM && !game.object_room.get(&o).is_some_and(|&r| in_rooms(r))
+        };
         let walks = walk_verbs(game);
         let walk_verb = (walks.len() == 1).then(|| walks[0] as i64);
         let mut units: Vec<UnitId> = Vec::new();
@@ -474,7 +488,7 @@ impl Scope {
             let k = game.unit(u).key;
             let inside = match k {
                 UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) => in_rooms(r),
-                UnitKey::Obj(o) => game.object_room.get(&o).is_some_and(|&r| in_rooms(r)),
+                UnitKey::Obj(o) => game.object_room.get(&o).is_some_and(|&r| in_rooms(r)) || held_out(o),
                 UnitKey::Global(_) => false,
             };
             if inside {
@@ -537,6 +551,8 @@ impl Scope {
         let mut objects: Vec<i64> =
             game.object_room.iter().filter(|(_, &r)| in_rooms(r)).map(|(&o, _)| o as i64).collect();
         objects.sort_unstable();
+        let mut held: Vec<i64> = game.object_room.keys().filter(|&&o| held_out(o) && game.id(UnitKey::Obj(o)).is_some()).map(|&o| o as i64).collect();
+        held.sort_unstable();
         let evs = event_verbs(game);
         let made = made_verbs(game);
         let verbs: Vec<i64> = made
@@ -595,6 +611,7 @@ impl Scope {
             units,
             unit_keys,
             objects,
+            held,
             verbs,
             dialog_verbs,
             walk_verb,

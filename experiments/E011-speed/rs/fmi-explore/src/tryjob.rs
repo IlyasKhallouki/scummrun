@@ -16,7 +16,7 @@ use crate::wiring::Wiring;
 use crate::events;
 use fmi_core::{facts_of, Checkpoint, Engine, Facts, Key, Obs, ObsReq, PlayState, ReadingSource, RunSpec, Search, Status, Val};
 use serde_json::{json, Map, Value};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -442,6 +442,11 @@ fn choose_reading(r: &Resident, job: &Value, facts: &EntryFacts) -> Result<Choic
             row["reuse_keys"] = json!(extra.len());
             row["e009"] = det2;
         }
+        if ok && other_inventory(&d) {
+            ok = false;
+            row["reusable"] = json!(false);
+            row["inventory"] = json!(true);
+        }
         let e009 = row.get("e009").is_some();
         checked.push(row);
         if ok {
@@ -450,6 +455,13 @@ fn choose_reading(r: &Resident, job: &Value, facts: &EntryFacts) -> Result<Choic
     }
     let first = checked[0].get("e009").cloned().unwrap_or_else(|| checked[0].clone());
     Ok((None, format!("differs on {} keys", first["other"]), checked))
+}
+
+/// E019 (`FMI_READ_HELD=1`): a reading read the code of the objects held at its start, so an entry holding other
+/// objects (an owner key that is held on one side only) needs a reading of its own.
+fn other_inventory(d: &BTreeMap<String, (i64, i64)>) -> bool {
+    let held = |w: i64| w != 0 && w != 0x0F;
+    crate::archive::read_held_on() && d.iter().any(|(k, &(a, b))| k.starts_with("owner:") && held(a) != held(b))
 }
 
 /// The reading choice as round 1 made it (FMI_TRY_MEMO=0).
@@ -477,6 +489,11 @@ fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap)
             row["reusable"] = json!(ok);
             row["reuse_keys"] = json!(extra.len());
             row["e009"] = step::reusable_detail(&sf, &k2, facts);
+        }
+        if ok && other_inventory(&step::diff(&sf, facts)) {
+            ok = false;
+            row["reusable"] = json!(false);
+            row["inventory"] = json!(true);
         }
         let e009 = row.get("e009").is_some();
         checked.push(row);

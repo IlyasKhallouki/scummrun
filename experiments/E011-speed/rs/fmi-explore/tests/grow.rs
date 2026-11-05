@@ -180,3 +180,28 @@ fn the_readings_that_may_stand_in() {
     assert_eq!(j["readings_room"].as_array().unwrap().iter().map(|x| x["path"].as_str().unwrap().to_string()).collect::<Vec<_>>(), vec![r1]);
     std::env::remove_var("FMI_READ_BOUND");
 }
+
+/// E019 (FMI_READ_HELD=1): a reading registered without the switch did not read the held objects' code, so with it
+/// the scope's job offers only the readings registered with it.
+#[test]
+fn readings_without_held_code_are_not_offered_with_read_held() {
+    let _g = switch(true);
+    let t = tmp("held");
+    let mut a = make(&t);
+    let p = |n: &str| {
+        let d = t.join(n);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("reading.json"), "{}").unwrap();
+        d.join("reading.json").to_string_lossy().into_owned()
+    };
+    let (r1, r2) = (p("r1"), p("r2"));
+    a.register_reading(&[33], &r1, 0, Some("j1"), "fresh", Some(1)).unwrap();
+    let paths = |j: &Value| j["readings"].as_array().unwrap().iter().map(|x| x["path"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(paths(&job_json(&a, 0)), vec![r1.clone()]);
+    std::env::set_var("FMI_READ_HELD", "1");
+    assert!(paths(&job_json(&a, 0)).is_empty());
+    a.register_reading(&[33], &r2, 0, Some("j2"), "fresh", Some(2)).unwrap();
+    assert_eq!(paths(&job_json(&a, 0)), vec![r2.clone()]);
+    std::env::remove_var("FMI_READ_HELD");
+    assert_eq!(paths(&job_json(&a, 0)), vec![r2, r1]);
+}
