@@ -278,6 +278,33 @@ fn held_atoms_are_the_places_own() {
     assert!(!has(&at_p));
 }
 
+/// E019: with FMI_SKIP_SAME=1 a job whose job.json repeats a committed one's is recognized, and committed as that
+/// one's result with no new entries and no time; a job after the archive changed is not.
+#[test]
+fn a_repeated_job_is_committed_as_the_same_without_running() {
+    let _g = env(true, Some("0.25"));
+    std::env::set_var("FMI_SKIP_SAME", "1");
+    let t = tmp("same");
+    let mut a = make(&t);
+    let first = ingest(&mut a, 0, Some(&fk(0.25)), &[], &[]);
+    let name1 = first["job"].as_str().unwrap().to_string();
+    let d2 = a.prepare_job_as(0, Some(&fk(0.25))).unwrap();
+    assert_eq!(a.same_job(&d2).unwrap(), Some(name1.clone()));
+    a.write_same_result(&d2, &name1).unwrap();
+    let n = a.rows.len();
+    let line = a.ingest(&d2, None).unwrap();
+    assert_eq!(a.rows.len(), n);
+    assert!(line["new_entries"].as_array().map(|x| x.is_empty()).unwrap_or(true));
+    let r = files::read_json(&d2.join("result.json")).unwrap();
+    assert_eq!(r["same_as"], json!(name1));
+    assert_eq!(r["wall_s"], json!(0.0));
+    // a new entry changes the archive's novelty, so the next job's job.json differs: it runs
+    ingest(&mut a, 0, Some(&fk(0.25)), &[(5, vec![("room", json!(35))])], &[]);
+    let d4 = a.prepare_job_as(0, Some(&fk(0.25))).unwrap();
+    assert_eq!(a.same_job(&d4).unwrap(), None);
+    std::env::remove_var("FMI_SKIP_SAME");
+}
+
 /// Stall's rules as a test gives them: a share, and the cells whose next try is free.
 struct TestShift {
     share: f64,

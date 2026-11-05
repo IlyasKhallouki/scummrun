@@ -587,6 +587,8 @@ pub struct Archive {
     place_counts: RefCell<Option<(usize, [HashMap<String, (i64, i64)>; 2])>>,
     /// E018 (FMI_PLACE_RARITY=1): per place, how many rows hold each held pair, made once per row count
     place_pairs: RefCell<Option<(usize, HashMap<String, HashMap<(String, i64), usize>>)>>,
+    /// E019 (FMI_SKIP_SAME=1): job.json fingerprint -> the first job with it, made from the job dirs on first use
+    fingerprints: RefCell<Option<HashMap<String, String>>>,
     pub e009: Map<String, Value>,
     pub e010: Map<String, Value>,
     pub idle_frames: i64,
@@ -717,6 +719,7 @@ impl Archive {
             chain_rooms: RefCell::new(HashMap::new()),
             place_counts: RefCell::new(None),
             place_pairs: RefCell::new(None),
+            fingerprints: RefCell::new(None),
             free_on: crate::free::rho0().is_some(),
             grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
         })
@@ -1747,6 +1750,62 @@ impl Archive {
         -(k.and_then(|k| k.get(1)).and_then(|o| o.as_array()).map(|a| a.len()).unwrap_or(0) as i64)
     }
 
+    /// E019: a job.json's fingerprint, its text less the job's name and reading folder (which name the job): two jobs
+    /// with one fingerprint are the same try, which is deterministic (the archive's verification rests on that).
+    pub fn job_fingerprint(doc: &Value) -> String {
+        let mut d = doc.clone();
+        if let Some(m) = d.as_object_mut() {
+            m.remove("job");
+            m.remove("reading_dir");
+        }
+        sha1_smol::Sha1::from(canonical(&d).as_bytes()).digest().to_string()
+    }
+
+    /// E019 (`FMI_SKIP_SAME=1`): the committed job whose job.json has the fingerprint of the job in `d`, if one has a
+    /// result; else None, and `d`'s fingerprint is noted for later jobs.
+    pub fn same_job(&self, d: &Path) -> Res<Option<String>> {
+        let doc = read_json(&d.join("job.json"))?;
+        let fp = Self::job_fingerprint(&doc);
+        let mut cache = self.fingerprints.borrow_mut();
+        if cache.is_none() {
+            let mut m = HashMap::new();
+            for name in self.committed_jobs() {
+                if let Ok(j) = read_json(&self.root.join("jobs").join(&name).join("job.json")) {
+                    m.entry(Self::job_fingerprint(&j)).or_insert(name);
+                }
+            }
+            *cache = Some(m);
+        }
+        let m = cache.as_mut().unwrap();
+        let name = d.file_name().map(|x| x.to_string_lossy().into_owned()).unwrap_or_default();
+        match m.get(&fp) {
+            Some(prev) if *prev != name && self.root.join("jobs").join(prev).join("result.json").exists()
+                && self.committed_jobs().contains(prev) => Ok(Some(prev.clone())),
+            Some(_) => Ok(None),
+            None => {
+                m.insert(fp, name);
+                Ok(None)
+            }
+        }
+    }
+
+    /// E019: the result of a job that repeats `prev` exactly: `prev`'s result with this job's name, no new entries (they
+    /// are in the archive already), no time spent, and "same_as".
+    pub fn write_same_result(&self, d: &Path, prev: &str) -> Res<()> {
+        let mut r = read_json(&self.root.join("jobs").join(prev).join("result.json"))?;
+        let name = d.file_name().map(|x| x.to_string_lossy().into_owned()).unwrap_or_default();
+        r["job"] = json!(name);
+        r["new"] = json!([]);
+        r["same_as"] = json!(prev);
+        r["wall_s"] = json!(0.0);
+        if let Some(c) = r.get_mut("cpu_s").and_then(|c| c.as_object_mut()) {
+            for v in c.values_mut() {
+                *v = json!(0.0);
+            }
+        }
+        files::write_json(&d.join("result.json"), &r, Some(1))
+    }
+
     /// E018 (`FMI_PLACE_RARITY=1`): entry i's rarity at its place, negated (so rarer first): the sum over its held pairs
     /// of 1 / the number of rows at the place holding the pair, times 1,000 (count-based novelty within a place, as
     /// Go-Explore weights cells by their attributes' counts). 0 with the switch off.
@@ -2701,6 +2760,11 @@ pub fn stag_cells() -> bool {
 /// the next free worker, once (`Archive::frontier`). Unset: the order as before.
 pub fn frontier_on() -> bool {
     std::env::var("FMI_FRONTIER").is_ok_and(|v| v == "1")
+}
+
+/// E019: a try whose job.json repeats a committed one's is not run (`Archive::same_job`).
+pub fn skip_same_on() -> bool {
+    std::env::var("FMI_SKIP_SAME").is_ok_and(|v| v == "1")
 }
 
 /// E018: a try's targets leave out the atoms held at its entry's place, not in the whole archive (`job_doc`).
