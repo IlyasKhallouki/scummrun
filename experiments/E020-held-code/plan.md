@@ -98,3 +98,25 @@ sentence inputs took only room 42's objects as the first object.
   and in the log's replay when the archive opens. Dead entries are never selected again, and the run goes on instead of
   stopping. Test: `an_entry_whose_return_differs_is_dead`. Entries recorded after C6 by the wall-time engine may differ
   the same way.
+
+## Amendment (4), 2026-11-05 17:15 UTC: the wall-time diagnosis was wrong; VAR_SOUNDRESULT left out of the comparison
+
+- **Correction to amendment (3):** the bridge already pumps the mixer by game time (`SpeedrunBridge::pumpAudio`, every
+  frame), so iMUSE did not run in wall time. Patch 0008 replaced one game-time schedule with another. It fixes
+  nothing; it stays on in this run only because the entries since 16:30 were recorded with it.
+- **The evidence:** after 16:30, tries on the patched engine also recorded entries that do not replay (10700, 10722 and
+  10723), each differing only on `var:56` (−1 recorded, 0 on the return). Rerunning j06632 offline reproduces −1 at
+  every new entry, with realize off (`FMI_REALIZE=0`) and with the kept engines and the delay fork off. The cause is
+  still open. A try's live engine and a return to the same frame hold different answers in `VAR_SOUNDRESULT`.
+- **Why leaving it out is safe:** every script that uses it (57, 192, room 82's) sets it with `soundKludge([-1])` and
+  reads it at the next instruction. No script reads its value across a frame. If the music state itself diverged, the
+  script slots and the variables script 192 writes (`Var[453..]`, `Bit[25]`, `Var[232]`) would differ, and the
+  comparison still checks those.
+- **Change, `FMI_SKIP_SOUNDRESULT=1` (tryjob.rs `compare_checkpoint`):** var 56 is left out of returns, verification
+  and the free tries' checks. Entries whose logged return differed on var 56 alone are not dead under it. Tests:
+  `the_sound_result_is_left_out_with_the_switch`, and `an_entry_whose_return_differs_is_dead` extended.
+- **Change, `FMI_READ_MAX_RSS_GB` (reader `run/mod.rs`):** the default for `--max-rss-gb` (8 GB). In process, a
+  reading's RSS is the driver's growth during the reading, so the other tries' allocations counted against it. With
+  20 workers the driver held 12 GB, and readings stopped with "the reading's RSS passed 8.0 GB". The run sets it to 40.
+  The MemAvailable floor (3 GB) still guards the machine.
+- **Throughput at 20 workers, 16:45-17:00:** 276 tries in 15 minutes, with the CPU 90% busy.

@@ -127,6 +127,16 @@ pub fn other_game() -> bool {
     std::env::var("FMI_GAME_ID").is_ok_and(|v| !v.is_empty())
 }
 
+/// VAR_SOUNDRESULT (SCUMM v5's var 56): the answer to the last sound query, a scratch register the scripts set with
+/// soundKludge([-1]) and read at the next instruction.
+const SOUND_RESULT: &str = "var:56";
+
+/// E020 (`FMI_SKIP_SOUNDRESULT=1`): checkpoints are compared without VAR_SOUNDRESULT. A try's live engine and a return
+/// to the same frame can hold different answers there (amendment (4)); no script reads it across a frame.
+fn sound_result_skip_on() -> bool {
+    std::env::var("FMI_SKIP_SOUNDRESULT").is_ok_and(|v| v == "1")
+}
+
 /// replay.compare_checkpoint: the differences between a checkpoint and the engine's state and status.
 pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<String, Value> {
     let mut out = Map::new();
@@ -138,6 +148,9 @@ pub fn compare_checkpoint(want: &Value, state: &Obs, status: &Status) -> Map<Str
         let wf = start::facts_of_json(&want[1]);
         wf.diff(&got).into_iter().map(|(k, a, b)| (k.text(), a, b)).collect()
     };
+    if sound_result_skip_on() {
+        d.retain(|(k, _, _)| k != SOUND_RESULT);
+    }
     if !d.is_empty() {
         d.sort_by(|a, b| a.0.cmp(&b.0));
         out.insert("facts".into(), json!(d.len()));

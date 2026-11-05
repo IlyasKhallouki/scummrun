@@ -459,5 +459,10 @@ fn an_entry_whose_return_differs_is_dead() {
     let b = Archive::open(&t.join("arch")).unwrap();
     assert_eq!(b.rows[e].dead.as_deref(), Some("return differs"));
     assert!(!b.select(8).contains(&e));
+    // E020 amendment (4): with FMI_SKIP_SOUNDRESULT=1 a difference on var:56 alone leaves the entry alive
+    std::env::set_var("FMI_SKIP_SOUNDRESULT", "1");
+    let c = Archive::open(&t.join("arch")).unwrap();
+    assert_eq!(c.rows[e].dead, None);
+    std::env::remove_var("FMI_SKIP_SOUNDRESULT");
     std::env::remove_var("FMI_DIFFERS_DEAD");
 }

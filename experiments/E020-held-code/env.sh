@@ -10,3 +10,6 @@ export ALLON
 export E13_ENGINE_BIN=/var/tmp/fast-mi/svm-e020/build/scummvm/scummvm
 ALLON="$ALLON FMI_IMUSE_TICKS=1 FMI_DIFFERS_DEAD=1"
 export ALLON
+# amendment (4): checkpoints compared without VAR_SOUNDRESULT; the in-process reading's RSS bound at 40 GB
+ALLON="$ALLON FMI_SKIP_SOUNDRESULT=1 FMI_READ_MAX_RSS_GB=40"
+export ALLON
