@@ -342,6 +342,23 @@ impl Truths {
     }
 }
 
+thread_local! {
+    /// E019: inside an affordance step (`afford::try_all`), the trials' waits' floor in frames
+    static TRIAL_FLOOR: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// E019 (`FMI_TRIAL_WAIT_FLOOR=N`): the floor of a trial's wait (its idle frames), N frames where the entry's wait keeps
+/// E009's; the dues and the stops extend a wait as before. Kept states came within 164 frames of their offer in play8
+/// and play9 (play8's room-42 crossing ~390 frames after its click), against a floor of 1,600.
+pub fn trial_floor() -> Option<u64> {
+    std::env::var("FMI_TRIAL_WAIT_FLOOR").ok().and_then(|v| v.parse().ok()).filter(|&v: &u64| v > 0)
+}
+
+/// Sets (or clears) the floor of the waits run in this thread, for an affordance step's trials.
+pub fn set_trial_floor(f: Option<u64>) {
+    TRIAL_FLOOR.with(|c| c.set(f));
+}
+
 /// The observed keys of the atoms (unobserved prefixes left out: args:, saved:, actorroom:), sorted, once each.
 pub fn observed_keys(atoms: &[(Key, Vec<Val>)]) -> Vec<Key> {
     let unob = start::unobserved(true);
@@ -392,7 +409,8 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
     let dues0 = dues_of(&o0);
     let mut horizon = dues0.iter().map(|d| d.1).max().unwrap_or(f0);
     let mut last_stop = f0;
-    let end_of = |horizon: u64, last_stop: u64| (f0 + cfg.idle_frames).max(horizon.max(last_stop) + cfg.w);
+    let floor = TRIAL_FLOOR.with(|c| c.get()).map(|f| f.min(cfg.idle_frames)).unwrap_or(cfg.idle_frames);
+    let end_of = |horizon: u64, last_stop: u64| (f0 + floor).max(horizon.max(last_stop) + cfg.w);
     let mut end_frame = end_of(horizon, last_stop);
     let cap = f0 + cfg.max_frames;
     let mut rule = IdleRule::new();
