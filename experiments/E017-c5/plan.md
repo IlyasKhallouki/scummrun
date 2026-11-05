@@ -54,3 +54,42 @@ rung. Does play9's archive reach C5 (room 42 holding 946) when the plan limit is
 
 - VM: about 3.5 h at $1.535/h, about $5.40, which needs the cap raised (the ledger has $0.84 left).
 - Laptop instead: free, at b = 4, while the machine has memory to spare.
+
+## Result (2026-11-05): no; C4 again, and the raised limit bought no plan
+
+- **The run:** VM, b = 10, from play9's archive as play10, 01:41-02:23 UTC.
+  - It made 1,126 tries and 507 new entries (4,683 in all).
+  - It stopped on the 40-minute rule: no new rung, furthest C4.
+  - No entry holds 946 at conversation depth (var:416 != 0).
+- **Place selection spread the tries as designed:** 90-98 tries per (room, holds 946) place and kind.
+- **The places holding 946 yielded almost nothing:**
+
+  | Start place | New entries |
+  |---|---:|
+  | room 49 holding 946 (191 tries) | 3 |
+  | room 63 holding 946 | 4 |
+  | room 69 holding 946 | 0 |
+  | room 49 without 946 | 482 |
+
+- **Model tries from room 49 holding 946 made no plan probes:** the planner was given no target there.
+- **The raised limit:** 10 searches ran longer than 30 s (4 at about 300 s, 6 at about 60 s), and all 10 ended in a
+  planner timeout. No search over 30 s found a plan.
+- **Stall shares over the archive's whole run** (play9 and play10): interface, no yield 66.7%; model, no yield 15.0%;
+  no plan 10.5%; productive 0.5%.
+- **Predictions:**
+
+  | Prediction | Result |
+  |---|---|
+  | P(C5) 25-40% | no (the likelier side) |
+  | P(a conversation-depth entry holding 946) 50-70% | no (the less likely side, a miss) |
+  | Plans over 30 s: 3-15 | 10, all timeouts |
+  | No try blocked over 5 min by another's plan | not measured |
+
+- **Success threshold:** no.
+- **Cost:** about 0.85 h of VM (the ledger shows $29.95 of the $36.00 cap).
+
+**What it shows:** the limit was not the block. From "room 49 holding 946" the model chooses no target that leads into
+the conversation, and free tries do not cross a conversation 4-5 inputs deep. In play8 the crossing came from a model
+plan for bit:403=1 at the conversation's end state. play10 never reached that state while holding 946, so it never had
+that target. By the stop rule, the next step is design: what the search has to see to enter a conversation with an
+object in hand, which is the retrospective's open question.
