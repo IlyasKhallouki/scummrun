@@ -1325,6 +1325,10 @@ impl Archive {
     /// store already).
     fn progress_place(&mut self, i: usize) {
         let (frame, room, live) = (self.rows[i].frame, self.rows[i].room, self.rows[i].dead.is_none());
+        // E022: the row's state against its parent's, for the keys a room's context leaves out (ctx.rs)
+        if let (true, Some(p), Some(par)) = (crate::ctx::on(), self.progress.as_ref(), self.rows[i].parent) {
+            crate::ctx::note_edge(&p.store.view(par), &p.store.view(i));
+        }
         if let Some(p) = self.progress.as_mut() {
             p.place(i, frame, room, live);
         }
@@ -1711,7 +1715,12 @@ impl Archive {
     /// E016 amendment (11): the place of entry i, its cell key's room and owned objects (None: a cell without a key).
     pub fn place_of_row(&self, i: usize) -> Option<String> {
         let k = self.cell(&self.rows[i].cell).key.as_ref()?;
-        Some(format!("{}|{}", k.get(0)?, k.get(1)?))
+        // E022 (FMI_PLACE_CTX=1): the place's context from the row's facts (ctx.rs)
+        let ctx = match (crate::ctx::on(), self.progress.as_ref(), k.get(0).and_then(|r| r.as_i64())) {
+            (true, Some(p), Some(room)) => crate::ctx::suffix(room, &p.store.view(i)),
+            _ => String::new(),
+        };
+        Some(format!("{}|{}{ctx}", k.get(0)?, k.get(1)?))
     }
 
     /// E016 amendment (11) (`FMI_SELECT_PLACE=1`): the place's (n, chosen) for the model's tries (free false) or the

@@ -460,7 +460,7 @@ pub fn place_text<F: FactLook + ?Sized>(room: i64, f: &F) -> String {
     };
     owned.sort_unstable();
     owned.dedup();
-    format!("place={room}:{}", owned.iter().map(|o| o.to_string()).collect::<Vec<_>>().join(","))
+    format!("place={room}:{}{}", owned.iter().map(|o| o.to_string()).collect::<Vec<_>>().join(","), crate::ctx::suffix(room, f))
 }
 
 impl Seen {
