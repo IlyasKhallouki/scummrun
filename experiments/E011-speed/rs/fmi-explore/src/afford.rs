@@ -984,6 +984,15 @@ pub fn try_all(
     let t0 = Instant::now();
     let c0 = crate::machine::thread_cpu_s();
     let f0 = e.status().frame;
+    // E019: the trials' waits take the trial floor (FMI_TRIAL_WAIT_FLOOR) while this step runs
+    struct Floor;
+    impl Drop for Floor {
+        fn drop(&mut self) {
+            crate::wait::set_trial_floor(None);
+        }
+    }
+    crate::wait::set_trial_floor(crate::wait::trial_floor());
+    let _floor = Floor;
     let entry = e.facts()?;
     let sentence = entry.val(Key::var(VAR_SENTENCE_SCRIPT as u64)) as i32;
     let input0 = entry.val(Key::var(VAR_VERB_SCRIPT as u64)) as i32;

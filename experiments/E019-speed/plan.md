@@ -63,3 +63,28 @@ On the cloud VM (30 cores), 10 and 30 workers made the same ~7-8 committed tries
 A trial's wait runs to the step's horizon (~2,400 frames). Most trials do nothing that lasts: a message, then idle
 again. If at some frame the trial's state digest equals the no-input twin's at that frame, every later frame is the
 twin's, and its stops are the entry's own wait's, already read. The trial's wait can stop there with nothing lost.
+
+## Fix 4, a shorter floor for trials' waits: no gain on the gate try
+
+- **What was built:** `FMI_TRIAL_WAIT_FLOOR=N` takes a trial's wait floor to N frames (the entry's wait keeps E009's
+  1,600). It rests on the kept free states: all 51 in play9 and all 39 in play8 came within 164 frames of the nearest
+  offer (median 3, p95 90-114), and play8's room-42 crossing came ~390 frames after its click.
+- **On j00007:** the same 3 kept states and the same wall (36.4 s at the default, 38.3 s at 600).
+- **Why:** the waits there are set by the offer's dues, not the floor. A paused slot is due ~2,400 frames ahead (the
+  offer's horizon is 2,420 and 2,394), so every trial waits to that wake-up.
+- The other gate tries (play9's j00003, j00047, j00051) did not run on the laptop: their job files name the VM's
+  readings. Left in, off by default.
+
+## Where E019 stands
+
+- **Validated:**
+  - (1) `FMI_FREE_SAME`: -48% on a free try, the same distinct states.
+  - (2) `FMI_SKIP_SAME`: a repeated try is not run (test). It is worth 38-53% of worker wall in starved phases (play9).
+- **Built, no gain:** (3) StepTrace and (4) the trial floor.
+- **The dominant cost left:** each trial waits to the last scheduled wake-up of the offer's state (~2,400 frames,
+  ~110 ms), 96% of a free try.
+  - Cutting it needs a causal rule: wait for what the click started or changed, not for wake-ups the no-input state
+    has as well. This is a design question with a risk to what the search finds.
+- **Cheap cuts the audit measured as yielding nothing:**
+  - offer points at the wait's stops: 27% of free-try time, 0 kept in 278k trials (partly removed by (1));
+  - delays: 13% of the run, 2 entries kept.
