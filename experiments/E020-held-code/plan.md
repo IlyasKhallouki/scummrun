@@ -38,3 +38,21 @@ sentence inputs took only room 42's objects as the first object.
 - **Prediction:** C6 within 60 minutes of run wall after the resume.
 - **Stop rule:** if C6 has not been reached after 90 minutes of run wall, stop, then diagnose from the room-42 tries'
   targets and stops before changing anything.
+
+## Amendment (1), 2026-11-05 15:30 UTC: the first resume ran out of disk
+
+- **What happened:** the resume at 14:51 (24 workers) stopped after 9 tries. The reader's sink panicked on "No space
+  left on device" at 1 GB free.
+- **Cost of one held reading:** a room-42 reading holding 946 is 420-439k records, 62-148 s of wall, 176-2,615 CPU s and
+  about 330 MB on disk (265 MB of actions, 70 MB packed). The off reading is 1,507 records.
+  - Where the records come from: 138k of its 151k actions are events of global script 59, the interface script. The
+    kit's use on the suit starts room 42's script 212, whose cutscene runs scripts 19 and 59.
+  - What was ruled out: scripts 3, 10, 19 and 59 are already in the room's scope without the switch, so leaving out
+    the globals that held objects start changes nothing. Limiting held objects to sentences with a B cut the records
+    by only 1% (424k to 420k). Neither change was kept.
+- **Why the disk filled:** five tries in room 42 each read the room fresh at once, because no held reading was
+  registered yet, and each also wrote reach and refine extensions of about 250 MB.
+- **Change, `FMI_READ_SHARE=1` (tryjob.rs):** in one process, a scope is read fresh by one try at a time. A try that
+  needs a fresh reading while another try reads the scope waits for it, then takes that reading if the reuse rule
+  allows. In play10, 278 of 306 room-42 model tries reused a registered reading (91%).
+- **Run settings:** 12 workers. The old reading cache `play10-run` (not used by this run) is removed for space.

@@ -464,6 +464,17 @@ fn other_inventory(d: &BTreeMap<String, (i64, i64)>) -> bool {
     crate::archive::read_held_on() && d.iter().any(|(k, &(a, b))| k.starts_with("owner:") && held(a) != held(b))
 }
 
+/// E020: `FMI_READ_SHARE=1`, the tries of this process read a scope fresh one at a time and share the readings.
+fn read_share_on() -> bool {
+    std::env::var("FMI_READ_SHARE").is_ok_and(|v| v == "1")
+}
+
+/// E020: the fresh readings this process made of a scope (job.json "scope"), behind the scope's lock.
+fn share_gate(scope: &Value) -> Arc<Mutex<Vec<PathBuf>>> {
+    static G: std::sync::OnceLock<Mutex<std::collections::HashMap<String, Arc<Mutex<Vec<PathBuf>>>>>> = std::sync::OnceLock::new();
+    G.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner()).entry(scope.to_string()).or_default().clone()
+}
+
 /// The reading choice as round 1 made it (FMI_TRY_MEMO=0).
 fn choose_reading_r1(r: &Resident, job: &Value, facts: &crate::archive::FactMap) -> Result<Choice, String> {
     let cands = step::cached_readings(job);
@@ -894,37 +905,62 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
                     return Ok(());
                 }
             },
-            None => match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
-                Fresh::Read(rd, wall, load_s, info) => {
-                    out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
-                    if let Some(i) = info {
-                        out["reading"]["bound_wait"] = i;
+            None => {
+                // E020 (FMI_READ_SHARE=1): one fresh reading of a scope at a time in this process; a try that needs one
+                // while another try reads the scope waits for it, then takes it when the reuse rule allows
+                let gate = read_share_on().then(|| share_gate(&job["scope"]));
+                let mut made = gate.as_ref().map(|g| g.lock().unwrap_or_else(|e| e.into_inner()));
+                let shared = match made.as_ref() {
+                    Some(ps) if ps.iter().any(|p| p.exists()) => {
+                        let mut j2 = job.clone();
+                        j2["readings"] = json!(ps.iter().rev().filter(|p| p.exists())
+                            .map(|p| json!({"path": p.to_string_lossy()})).collect::<Vec<_>>());
+                        choose_reading(r, &j2, &facts).map_err(Err)?.0
                     }
-                    rd
-                }
-                // E014 amendment (4) (a): the bound; the try goes on model-free from a stand-in reading
-                Fresh::Bound(rec) => {
-                    let t1 = Instant::now();
-                    match stand_in(r, &job, &checked) {
-                        Some(rd) => {
-                            out["reading"] = reading_record(&*rd, false, &format!("bound: {why}"), 0.0, t1.elapsed().as_secs_f64());
-                            out["reading"]["bound"] = rec;
-                            log.say(&format!("the try goes on model-free from the stand-in {}", reading_path(&*rd).display()));
-                            free_try = true;
+                    _ => None,
+                };
+                match shared {
+                    Some(rd) => {
+                        out["reading"] = reading_record(&*rd, false, "shared: another try's fresh reading of the scope", 0.0,
+                                                        t.elapsed().as_secs_f64());
+                        rd
+                    }
+                    None => match read_fresh(r, &job, &state, &status, threads, log, &cancel_arc, cancel).map_err(Err)? {
+                        Fresh::Read(rd, wall, load_s, info) => {
+                            if let Some(ps) = made.as_mut() {
+                                ps.push(reading_path(&*rd));
+                            }
+                            out["reading"] = reading_record(&*rd, true, &why, wall, load_s);
+                            if let Some(i) = info {
+                                out["reading"]["bound_wait"] = i;
+                            }
                             rd
                         }
-                        None => {
-                            log.say("no reading stands in: the try keeps nothing");
-                            out["reading"] = json!({"path": null, "fresh": false, "why": format!("bound: {why}; no reading stands in"),
-                                                    "load_s": t1.elapsed().as_secs_f64(), "bound": rec, "candidates": checked});
-                            cpu_add(&mut cpu, "read", cpu_now() - c0);
-                            out["exhausted"] = json!(false);
-                            out["ok"] = json!(true);
-                            return Ok(());
+                        // E014 amendment (4) (a): the bound; the try goes on model-free from a stand-in reading
+                        Fresh::Bound(rec) => {
+                            let t1 = Instant::now();
+                            match stand_in(r, &job, &checked) {
+                                Some(rd) => {
+                                    out["reading"] = reading_record(&*rd, false, &format!("bound: {why}"), 0.0, t1.elapsed().as_secs_f64());
+                                    out["reading"]["bound"] = rec;
+                                    log.say(&format!("the try goes on model-free from the stand-in {}", reading_path(&*rd).display()));
+                                    free_try = true;
+                                    rd
+                                }
+                                None => {
+                                    log.say("no reading stands in: the try keeps nothing");
+                                    out["reading"] = json!({"path": null, "fresh": false, "why": format!("bound: {why}; no reading stands in"),
+                                                            "load_s": t1.elapsed().as_secs_f64(), "bound": rec, "candidates": checked});
+                                    cpu_add(&mut cpu, "read", cpu_now() - c0);
+                                    out["exhausted"] = json!(false);
+                                    out["ok"] = json!(true);
+                                    return Ok(());
+                                }
+                            }
                         }
-                    }
+                    },
                 }
-            },
+            }
         };
         out["reading"]["candidates"] = json!(checked);
         cpu_add(&mut cpu, "read", cpu_now() - c0);
