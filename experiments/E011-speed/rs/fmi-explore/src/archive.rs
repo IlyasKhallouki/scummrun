@@ -1491,6 +1491,9 @@ impl Archive {
                 let at = as_i64(x.get("t_size")).map(|n| n as usize).unwrap_or(p.t.len());
                 p.exhausted.insert(e, at);
             }
+            if differs_dead_on() && x["outcome"].as_str() == Some("return differs") && self.rows[e].dead.is_none() {
+                self.rows[e].dead = Some("return differs".into());
+            }
             let cid = self.rows[e].cell.clone();
             let c = self.cell_mut(&cid);
             if x["outcome"].as_str() != Some("return differs") {
@@ -2406,6 +2409,9 @@ impl Archive {
             new_rooms = rs.into_iter().collect();
         }
         let gave = !new_t.is_empty() || !new_rooms.is_empty();
+        if outcome == "return differs" && differs_dead_on() && self.rows[e].dead.is_none() {
+            self.rows[e].dead = Some("return differs".into());
+        }
         if outcome != "return differs" {
             let mut tried: HashMap<String, Value> = HashMap::new();
             if let Some(t) = self.cell(&cell).tried_of(&e.to_string()).and_then(|t| t.as_array()) {
@@ -2770,6 +2776,12 @@ pub fn frontier_on() -> bool {
 /// E019: a try whose job.json repeats a committed one's is not run (`Archive::same_job`).
 pub fn skip_same_on() -> bool {
     std::env::var("FMI_SKIP_SAME").is_ok_and(|v| v == "1")
+}
+
+/// E020: an entry whose return differed from its checkpoint is dead (never selected again) and the run goes on
+/// (`FMI_DIFFERS_DEAD=1`); unset, the driver stops at the first return that differs.
+pub fn differs_dead_on() -> bool {
+    std::env::var("FMI_DIFFERS_DEAD").is_ok_and(|v| v == "1")
 }
 
 /// E019: readings read the code of the objects actors hold (the reader's `FMI_READ_HELD`), so only the readings

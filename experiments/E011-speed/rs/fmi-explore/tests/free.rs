@@ -436,3 +436,28 @@ fn e016_d_a_free_jobs_file_lists_the_registered_readings_that_may_stand_in() {
     let jo = files::read_json(&d.join("job.json")).unwrap();
     assert!(jo.get("readings_any").is_none() && jo.get("readings_room").is_none());
 }
+
+/// E020 (FMI_DIFFERS_DEAD=1): an entry whose return differed is dead, now and when the archive is reopened, and the
+/// selection never offers it again.
+#[test]
+fn an_entry_whose_return_differs_is_dead() {
+    let _g = env(true, Some("0.25"));
+    std::env::set_var("FMI_DIFFERS_DEAD", "1");
+    let t = tmp("differs");
+    let mut a = make(&t);
+    let first = ingest(&mut a, 0, Some(&fk(0.25)), &[(5, vec![("room", json!(35))])], &[]);
+    let e = ids(&first)[0];
+    assert!(a.select(8).contains(&e));
+    let d = job(&a, e, Some(&fk(0.25)), &[], &[]);
+    let mut r = files::read_json(&d.join("result.json")).unwrap();
+    r["return"] = json!({"same": false, "differ": {"facts": 1, "first": [["var:56", [-1, 0]]]}, "boot_s": 0.0});
+    std::fs::write(d.join("result.json"), r.to_string()).unwrap();
+    let line = a.ingest(&d, None).unwrap();
+    assert_eq!(line["outcome"], json!("return differs"));
+    assert_eq!(a.rows[e].dead.as_deref(), Some("return differs"));
+    assert!(!a.select(8).contains(&e));
+    let b = Archive::open(&t.join("arch")).unwrap();
+    assert_eq!(b.rows[e].dead.as_deref(), Some("return differs"));
+    assert!(!b.select(8).contains(&e));
+    std::env::remove_var("FMI_DIFFERS_DEAD");
+}

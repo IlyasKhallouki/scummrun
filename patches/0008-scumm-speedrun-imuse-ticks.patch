@@ -1,0 +1,125 @@
+diff -ruN a/engines/scumm/imuse/imuse.cpp b/engines/scumm/imuse/imuse.cpp
+--- a/engines/scumm/imuse/imuse.cpp	2026-11-05 16:18:23.691447326 +0000
++++ b/engines/scumm/imuse/imuse.cpp	2026-11-05 16:18:23.692682804 +0000
+@@ -1624,6 +1624,33 @@
+ //
+ ////////////////////////////////////////
+ 
++// E020: with the speedrun bridge's SPEEDRUN_IMUSE_TICKS=1, the sequencer ticks by game time. The drivers' timers
++// (the mixer's, in wall time) are detached at the first call; each driver then gets one on_timer per base tempo of
++// game time, as its timer would give it when the game runs in real time.
++void IMuseInternal::speedrunAdvance(double usec) {
++	TimerCallbackInfo *infos[2] = { &_timer_info_native, &_timer_info_adlib };
++	if (!_speedrunDetached) {
++		for (int i = 0; i < 2; i++) {
++			if (infos[i]->driver)
++				infos[i]->driver->setTimerCallback(nullptr, nullptr);
++		}
++		_speedrunDetached = true;
++	}
++	for (int i = 0; i < 2; i++) {
++		MidiDriver *d = infos[i]->driver;
++		if (!d)
++			continue;
++		const uint32 base = d->getBaseTempo();
++		if (!base)
++			continue;
++		_speedrunUsec[i] += usec;
++		while (_speedrunUsec[i] >= base) {
++			_speedrunUsec[i] -= base;
++			on_timer(d);
++		}
++	}
++}
++
+ void IMuseInternal::midiTimerCallback(void *data) {
+ 	TimerCallbackInfo *info = (TimerCallbackInfo *)data;
+ 	info->imuse->on_timer(info->driver);
+diff -ruN a/engines/scumm/imuse/imuse.h b/engines/scumm/imuse/imuse.h
+--- a/engines/scumm/imuse/imuse.h	2026-11-05 16:18:23.680210059 +0000
++++ b/engines/scumm/imuse/imuse.h	2026-11-05 16:18:23.681554838 +0000
+@@ -60,6 +60,8 @@
+ 
+ public:
+ 	virtual void on_timer(MidiDriver *midi) = 0;
++	// E020 (the speedrun bridge, SPEEDRUN_IMUSE_TICKS=1): advance the sequencer by usec of game time
++	virtual void speedrunAdvance(double usec) {}
+ 	virtual void pause(bool paused) = 0;
+ 	virtual void saveLoadIMuse(Common::Serializer &ser, ScummEngine *scumm, bool fixAfterLoad = true) = 0;
+ 	virtual bool get_sound_active(int sound) const = 0;
+diff -ruN a/engines/scumm/imuse/imuse_internal.h b/engines/scumm/imuse/imuse_internal.h
+--- a/engines/scumm/imuse/imuse_internal.h	2026-11-05 16:18:23.686015115 +0000
++++ b/engines/scumm/imuse/imuse_internal.h	2026-11-05 16:18:23.687109800 +0000
+@@ -425,6 +425,8 @@
+ 	MidiDriver *_midi_native;
+ 	TimerCallbackInfo _timer_info_adlib;
+ 	TimerCallbackInfo _timer_info_native;
++	bool _speedrunDetached = false;          // E020: the drivers' timers no longer call on_timer
++	double _speedrunUsec[2] = { 0.0, 0.0 };  // E020: game time not yet given to each driver's ticks
+ 
+ 	const uint32 _game_id;
+ 
+@@ -489,6 +491,7 @@
+ 
+ 	static void midiTimerCallback(void *data);
+ 	void on_timer(MidiDriver *midi) override;
++	void speedrunAdvance(double usec) override;
+ 
+ 	enum ChunkType {
+ 		kMThd = 1,
+diff -ruN a/engines/scumm/sound.cpp b/engines/scumm/sound.cpp
+--- a/engines/scumm/sound.cpp	2026-11-05 16:18:23.696693243 +0000
++++ b/engines/scumm/sound.cpp	2026-11-05 16:18:23.698694100 +0000
+@@ -27,6 +27,8 @@
+ #include "scumm/actor.h"
+ #include "scumm/file.h"
+ #include "scumm/imuse_digi/dimuse_engine.h"
++#include "scumm/imuse/imuse.h"
++#include "scumm/speedrun/speedrun_bridge.h"
+ #include "scumm/players/player_towns.h"
+ #include "scumm/resource.h"
+ #include "scumm/scumm.h"
+@@ -1246,6 +1248,9 @@
+ 			speechTimerHandler(this);
+ 	}
+ 	_soundCD->advanceCDTimer(quarterFrames);
++	// E020: iMUSE's sequencer too (SPEEDRUN_IMUSE_TICKS=1)
++	if (_vm->_imuse && _vm->_speedrun && _vm->_speedrun->imuseTicks())
++		_vm->_imuse->speedrunAdvance(quarterFrames * 1000000.0 / _vm->getTimerFrequency());
+ }
+ 
+ void Sound::stopSpeechTimer() {
+diff -ruN a/engines/scumm/speedrun/speedrun_bridge.cpp b/engines/scumm/speedrun/speedrun_bridge.cpp
+--- a/engines/scumm/speedrun/speedrun_bridge.cpp	2026-11-05 16:18:23.703222347 +0000
++++ b/engines/scumm/speedrun/speedrun_bridge.cpp	2026-11-05 16:18:23.704321246 +0000
+@@ -288,6 +288,11 @@
+ 	const char *control = envValue("SPEEDRUN_CONTROL");
+ 	_controlPath = control ? control : "";
+ 
++	// E020: iMUSE's sequencer advances by game time (Sound::advanceTimers) instead of on the MIDI driver's timer,
++	// which the mixer runs in wall time
++	const char *imuseTicks = envValue("SPEEDRUN_IMUSE_TICKS");
++	_imuseTicks = imuseTicks && !strcmp(imuseTicks, "1");
++
+ 	const char *timerNext = envValue("SPEEDRUN_TIMER_NEXT");
+ 	if (timerNext) {
+ 		uint64 value = 0;
+diff -ruN a/engines/scumm/speedrun/speedrun_bridge.h b/engines/scumm/speedrun/speedrun_bridge.h
+--- a/engines/scumm/speedrun/speedrun_bridge.h	2026-11-05 16:18:23.708819216 +0000
++++ b/engines/scumm/speedrun/speedrun_bridge.h	2026-11-05 16:18:23.727667288 +0000
+@@ -332,6 +332,7 @@
+ 	 */
+ 	bool leanNoPresent() const { return _leanNoPresent; }
+ 	bool leanNoEvents() const { return _leanNoEvents; }
++	bool imuseTicks() const { return _imuseTicks; }
+ 	/**
+ 	 * First statement of waitForTimer(): every wait the engine makes, the
+ 	 * main loop's 4 * delta and the room-change effects' (dissolve, iris,
+@@ -636,6 +637,7 @@
+ 	uint _inputIndex = 0;           // next event to deliver
+ 	int32 _rawMouseX = 0, _rawMouseY = 0; // where the schedule last put the mouse
+ 	int32 _timerNextExpected = 6;   // SPEEDRUN_TIMER_NEXT; -1 = any
++	bool _imuseTicks = false;       // SPEEDRUN_IMUSE_TICKS=1 (E020)
+ 	uint64 _startFrame = 0;         // SPEEDRUN_START_FRAME; 0 = use SPEEDRUN_START
+ 	int _lastRoom = 0;              // for "room" records
+ 	Common::String _envError;       // first invalid variable, reported once the trace is open

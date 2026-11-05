@@ -73,3 +73,28 @@ sentence inputs took only room 42's objects as the first object.
   - When the stop file was removed, the old driver had not yet exited (it was waiting on its slowest tries) and
     started new tries next to the new driver for about a minute.
   - Neither driver committed anything after 15:54:29, so both were killed and one driver was started at 16:06.
+
+## Amendment (3), 2026-11-05 16:30 UTC: a return that differs, and iMUSE in wall time
+
+- **What stopped the run:** the 20-worker resume stopped after 2 tries on "return differs" for j06605 (entry 10686,
+  room 42, frame 6459). The difference is one fact: `var:56` was −1 in the archive and 0 on the return.
+  - Entry 10686 is the end of j06602, another try that planned the suit fix. From boot it differs on the same fact.
+    Its parent, 8451, replays with 0 differences.
+- **Cause:** `var:56` is `VAR_SOUNDRESULT`, iMUSE's answer to a sound query. The suit's cutscene (script 212) starts
+  script 144, a sound command. iMUSE's sequencer advances on the MIDI driver's timer. With SDL audio off, the null
+  mixer runs that timer in wall time while the game runs faster than real time, so the sequencer's state at a frame
+  depends on the machine's load. The bridge already moves the speech and CD timers onto game time
+  (`Sound::advanceTimers`); iMUSE was not covered.
+- **Change, patch 0008 (`patches/0008-scumm-speedrun-imuse-ticks.patch`):**
+  - With `SPEEDRUN_IMUSE_TICKS=1`, iMUSE detaches the drivers' timers at the first wait.
+  - Each driver then gets one `on_timer` per base tempo of game time, from `Sound::advanceTimers`.
+  - fmi passes the switch to its engines with `FMI_IMUSE_TICKS=1` (host.rs).
+- **Check (VM, patched engine with the switch, from boot):**
+  - The rung entries C1-C6 (128, 136, 144, 3412, 7987 and 10534) replay with 0 differences, so the archive stays
+    valid.
+  - Entry 10686 gives `var:56 = 0` both when the VM is idle and next to 24 busy cores. Its archived −1 came from
+    the wall-time engine.
+- **Change, `FMI_DIFFERS_DEAD=1` (archive.rs, driver.rs):** an entry whose return differs is marked dead, in the commit
+  and in the log's replay when the archive opens. Dead entries are never selected again, and the run goes on instead of
+  stopping. Test: `an_entry_whose_return_differs_is_dead`. Entries recorded after C6 by the wall-time engine may differ
+  the same way.
