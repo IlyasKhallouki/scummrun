@@ -766,3 +766,20 @@ above matches. The corrections are folded in above. These are added:
   K1, and G3 and G4 on the final realize.
 - A video of play9's C4 path replayed from boot was made with the bridge's `SPEEDRUN_VIDEO` capture: 18 clicks,
   131.7 s, ending at the entry's tick (7382) and frame (1646). It is not committed (game images).
+
+### Rule (2) with the final build (2026-11-05)
+
+These ran on the laptop with target-e016 at e041e2d and E016's final set, every switch on. The laptop's load was 11-23
+throughout, from other work.
+
+| Check | Result |
+|---|---|
+| b3 | 15 tries; the stop class is E013's in 15 of 15, everything else in 8 of 15 (as in E016's earlier check); 129 new entries verified from boot, 0 differences |
+| kitchen | E012's goal chain verified from boot, 0 differences |
+| smoke | 4 tries, 23 entries verified from boot, 0 differences |
+| K1 (the kitchen by search, b = 4, 60 min) | **fail**: 132 tries in 88 min of wall (the tries ran past the 60-min limit), no goal entry. E012 reached the kitchen at try 53 from boot. |
+| G3 on the final realize | pass, 10 candidates, verified from boot |
+| G4 on the final realize | **fail as before**: each step from its job's entry 14 of 14; along the chain 12 of 14 (2 "no sentence", the deferred sentence) |
+
+Rule (2) is not met: K1 and G4 fail. Nothing from E016 merges to main. K1 under this load is confounded, so it should
+be repeated on an idle machine before its cause is looked for.
