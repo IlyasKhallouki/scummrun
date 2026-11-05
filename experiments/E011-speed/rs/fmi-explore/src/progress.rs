@@ -309,6 +309,8 @@ pub struct Progress {
     pub held: Vec<Vec<u32>>,
     /// atom id -> (frame, id) of its least live holder
     pub first: HashMap<u32, (i64, usize)>,
+    /// E022 (FMI_PLACE_CTX=1): (place text with its context, atom id) -> (frame, id) of its least live holder there
+    pub first_place: HashMap<(String, u32), (i64, usize)>,
     /// room -> its live entries
     pub rooms: BTreeMap<i64, usize>,
     /// E016 amendment (10) (FMI_NOVEL_PLACE=1): place text (`place_text`) -> its live entries
@@ -381,6 +383,7 @@ impl Progress {
     pub fn clear_rows(&mut self) {
         self.held.clear();
         self.first.clear();
+        self.first_place.clear();
         self.rooms.clear();
         self.places.clear();
     }
@@ -400,6 +403,17 @@ impl Progress {
             }
             if let Some(r) = room {
                 *self.rooms.entry(r).or_insert(0) += 1;
+                if crate::ctx::on() {
+                    let p = place_text(r, &self.store.view(i));
+                    for &a in &h {
+                        match self.first_place.get(&(p.clone(), a)) {
+                            Some(&o) if o <= (frame, i) => {}
+                            _ => {
+                                self.first_place.insert((p.clone(), a), (frame, i));
+                            }
+                        }
+                    }
+                }
                 if place_on() {
                     let p = place_text(r, &self.store.view(i));
                     *self.places.entry(p).or_insert(0) += 1;
@@ -415,6 +429,14 @@ impl Progress {
     /// Per row, the atoms whose least live holder it is.
     pub fn novel_counts(&self) -> HashMap<usize, i64> {
         let mut out = HashMap::new();
+        // E022 (FMI_PLACE_CTX=1): the atoms whose least live holder at its own place (with its context) the row is, so
+        // the entry that first reached something at a place is selected first among its place's fresh cells
+        if crate::ctx::on() {
+            for &(_, i) in self.first_place.values() {
+                *out.entry(i).or_insert(0) += 1;
+            }
+            return out;
+        }
         for &(_, i) in self.first.values() {
             *out.entry(i).or_insert(0) += 1;
         }
