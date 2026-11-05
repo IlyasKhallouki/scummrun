@@ -703,7 +703,12 @@ pub fn run(args: &[String], res: &Resident, ctl: Option<&Ctl>, t_all: Instant) -
         None => arg(&args, "--packed").map_or_else(|| out.join(format!("{name}.tc")), PathBuf::from),
     };
     let cap_s = arg(&args, "--cap-min").map_or(60.0, |m| m.parse::<f64>().unwrap()) * 60.0;
-    let max_rss_kb = (arg(&args, "--max-rss-gb").map_or(8.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
+    // E020: FMI_READ_MAX_RSS_GB, the bound when no --max-rss-gb is given (8 GB): in process the RSS is the driver's, so a
+    // reading's growth there counts the other tries' too
+    let max_rss_gb = arg(&args, "--max-rss-gb")
+        .or_else(|| std::env::var("FMI_READ_MAX_RSS_GB").ok().filter(|v| !v.is_empty()))
+        .map_or(8.0, |g| g.parse::<f64>().unwrap());
+    let max_rss_kb = (max_rss_gb * 1024.0 * 1024.0) as u64;
     let min_free_kb = (arg(&args, "--min-free-gb").map_or(3.0, |g| g.parse::<f64>().unwrap()) * 1024.0 * 1024.0) as u64;
     let max_files_b = arg(&args, "--max-files-gb").map(|g| (g.parse::<f64>().unwrap() * 1073741824.0) as u64);
     let max_cpu_s: Option<f64> = arg(&args, "--max-cpu-s").map(|c| c.parse().unwrap());

@@ -1491,7 +1491,9 @@ impl Archive {
                 let at = as_i64(x.get("t_size")).map(|n| n as usize).unwrap_or(p.t.len());
                 p.exhausted.insert(e, at);
             }
-            if differs_dead_on() && x["outcome"].as_str() == Some("return differs") && self.rows[e].dead.is_none() {
+            if differs_dead_on() && x["outcome"].as_str() == Some("return differs") && self.rows[e].dead.is_none()
+                && !sound_result_only(x.get("return"))
+            {
                 self.rows[e].dead = Some("return differs".into());
             }
             let cid = self.rows[e].cell.clone();
@@ -2409,7 +2411,7 @@ impl Archive {
             new_rooms = rs.into_iter().collect();
         }
         let gave = !new_t.is_empty() || !new_rooms.is_empty();
-        if outcome == "return differs" && differs_dead_on() && self.rows[e].dead.is_none() {
+        if outcome == "return differs" && differs_dead_on() && self.rows[e].dead.is_none() && !sound_result_only(res.get("return")) {
             self.rows[e].dead = Some("return differs".into());
         }
         if outcome != "return differs" {
@@ -2782,6 +2784,18 @@ pub fn skip_same_on() -> bool {
 /// (`FMI_DIFFERS_DEAD=1`); unset, the driver stops at the first return that differs.
 pub fn differs_dead_on() -> bool {
     std::env::var("FMI_DIFFERS_DEAD").is_ok_and(|v| v == "1")
+}
+
+/// E020 amendment (4): a return that differed on VAR_SOUNDRESULT (var 56) alone, which `FMI_SKIP_SOUNDRESULT=1` leaves
+/// out of the comparison: its entry is not dead.
+fn sound_result_only(ret: Option<&Value>) -> bool {
+    let only = |d: &serde_json::Map<String, Value>| {
+        d.len() == 2
+            && d.get("facts").and_then(|f| f.as_i64()) == Some(1)
+            && d.get("first").and_then(|f| f.as_array()).is_some_and(|a| a.len() == 1 && a[0][0] == "var:56")
+    };
+    std::env::var("FMI_SKIP_SOUNDRESULT").is_ok_and(|v| v == "1")
+        && ret.and_then(|r| r.get("differ")).and_then(|d| d.as_object()).is_some_and(only)
 }
 
 /// E019: readings read the code of the objects actors hold (the reader's `FMI_READ_HELD`), so only the readings
