@@ -22,6 +22,9 @@ place (the room with the objects ego owns), not the atoms held anywhere in the a
   rung.
 - Test: `held_atoms_are_the_places_own`.
 
+- Added at 09:25 (amendment): places holding more objects first in the selection (`place_owned_key`), and the
+  no-new-rung stop at 90 min (WAIT=5400): room 42 was reached without 946, which the ladder does not count.
+
 ## Predictions (before running)
 
 - Model tries from places holding 946 with at least one target: over 80% (E017: 1%).

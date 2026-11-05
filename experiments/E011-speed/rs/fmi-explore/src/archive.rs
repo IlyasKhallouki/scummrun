@@ -1633,15 +1633,15 @@ impl Archive {
             let nov = self.novel_counts();
             if frontier_on() {
                 // E016 F: the frontier's entries first
-                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_key(i, false), self.sel_key_p(i, &nov)));
+                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_owned_key(i), self.place_key(i, false), self.sel_key_p(i, &nov)));
             }
-            let mut cands: Vec<(((i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
+            let mut cands: Vec<((i64, (i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
                 .cells
                 .iter()
                 .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
                 .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
                 .filter(|i| !busy_ids.contains(i))
-                .map(|i| ((self.place_key(i, false), self.sel_key_p(i, &nov)), i))
+                .map(|i| ((self.place_owned_key(i), self.place_key(i, false), self.sel_key_p(i, &nov)), i))
                 .collect();
             cands.sort();
             return cands.into_iter().take(b).map(|(_, i)| i).collect();
@@ -1683,15 +1683,15 @@ impl Archive {
         let nov = self.novel_counts();
         if frontier_on() {
             // E016 F: the frontier's entries first, whichever kind the next job is
-            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_key(i, true), self.sel_key_free(i, &nov)));
+            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_owned_key(i), self.place_key(i, true), self.sel_key_free(i, &nov)));
         }
-        let mut cands: Vec<(((i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
+        let mut cands: Vec<((i64, (i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
             .cells
             .iter()
             .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
             .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
             .filter(|i| !busy_ids.contains(i))
-            .map(|i| ((self.place_key(i, true), self.sel_key_free(i, &nov)), i))
+            .map(|i| ((self.place_owned_key(i), self.place_key(i, true), self.sel_key_free(i, &nov)), i))
             .collect();
         cands.sort();
         cands.into_iter().take(b).map(|(_, i)| i).collect()
@@ -1732,6 +1732,16 @@ impl Archive {
             *cache = Some((self.logs.len(), counts));
         }
         cache.as_ref().unwrap().1[free as usize].get(&pl).copied().unwrap_or((0, 0))
+    }
+
+    /// E018 (FMI_TARGET_PLACE=1 with FMI_SELECT_PLACE=1): the place's objects owned, negated, ahead of its counts:
+    /// places holding more objects first (Go-Explore's keys held, here the inventory). 0 otherwise.
+    pub fn place_owned_key(&self, i: usize) -> i64 {
+        if !(select_place_on() && target_place_on()) {
+            return 0;
+        }
+        let k = self.cell(&self.rows[i].cell).key.as_ref();
+        -(k.and_then(|k| k.get(1)).and_then(|o| o.as_array()).map(|a| a.len()).unwrap_or(0) as i64)
     }
 
     /// E016 section F (`FMI_FRONTIER=1`, plan.md "F. Configuration and selection"): the frontier, every live entry that
