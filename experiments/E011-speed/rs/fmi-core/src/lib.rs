@@ -981,6 +981,9 @@ pub trait Engine: Send {
         }
         Ok((st, n))
     }
+    /// E019: the keys a following `wait` stops on (its `each` returns true only after a frame that changed one of them):
+    /// a provider may run the frames between such changes in one round trip. None: any key. Default: ignored.
+    fn set_watch(&mut self, _keys: Option<&[Key]>) {}
     /// E013 (patch 0007): the input log's records since the last call, which it takes (SPEEDRUN_INPUT=1). Default:
     /// an error, for an engine without the command.
     fn input_log(&mut self) -> EResult<InputLog> {

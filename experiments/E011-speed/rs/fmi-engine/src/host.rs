@@ -510,6 +510,8 @@ pub struct BinEngine {
     last_delta: bool,
     /// the block before the last Step (step_changes's scratch)
     prev: Vec<u8>,
+    /// E019: the keys the next waits stop on (`Engine::set_watch`), for StepTrace (FMI_STEP_TRACE=1)
+    watch: Option<Vec<Key>>,
     /// how the facts were had: (followed a delta, built whole)
     pub facts_counts: (u64, u64),
     proc_: Option<Child>,
@@ -536,6 +538,7 @@ impl BinEngine {
             ranges: Vec::new(),
             last_delta: false,
             prev: Vec::new(),
+            watch: None,
             facts_counts: (0, 0),
             proc_: None,
             done: false,
@@ -985,6 +988,80 @@ impl Engine for BinEngine {
         let d = r.digest().map_err(bad)?;
         r.done().map_err(bad)?;
         Ok(d)
+    }
+
+    fn set_watch(&mut self, keys: Option<&[Key]>) {
+        self.watch = keys.map(|k| k.to_vec());
+    }
+
+    /// E019 (FMI_STEP_TRACE=1 with a watch): the frames run by StepTrace, a batch at a time: the engine runs frame by
+    /// frame and replies after the first frame that changed a watched key's bytes (or at the batch's end), with every
+    /// frame's status and delta; `each` sees them frame by frame as `step_changes(1)` would give them. Otherwise one
+    /// `step_changes(1)` per frame (the trait's default).
+    fn wait(&mut self, frames: u64, each: &mut dyn FnMut(&Status, &[(Key, Val, Val)]) -> bool) -> EResult<(Status, u64)> {
+        let trace = std::env::var("FMI_STEP_TRACE").is_ok_and(|v| v == "1");
+        let mut st = self.status().clone();
+        let mut n = 0u64;
+        let Some(keys) = self.watch.clone().filter(|_| trace) else {
+            while n < frames {
+                let (s, ch) = self.step_changes(1)?;
+                n += 1;
+                st = s;
+                if each(&st, &ch) {
+                    break;
+                }
+            }
+            return Ok((st, n));
+        };
+        while n < frames {
+            self.block()?;
+            let ranges = block::watch_ranges(&self.last, &keys);
+            let batch = (frames - n).min(4096) as u32;
+            let mut w = W::msg(wire::C_STEP_TRACE);
+            w.u32(batch);
+            w.u32(ranges.len() as u32);
+            for (o, l) in &ranges {
+                w.u32(*o);
+                w.u32(*l);
+            }
+            self.send(w.finish())?;
+            self.moved();
+            let p = self.expect(wire::R_STEP_TRACE_REPLY)?;
+            let mut r = R::new(&p);
+            let count = r.u32().map_err(bad)?;
+            let mut prev = std::mem::take(&mut self.prev);
+            for i in 0..count {
+                let status = r.status().map_err(bad)?;
+                prev.clear();
+                prev.extend_from_slice(&self.last);
+                let mut rg = std::mem::take(&mut self.ranges);
+                let delta = block::apply(&mut self.last, &mut r, &mut rg).map_err(bad)?;
+                let ch = block::changes(&prev, &self.last, &rg, delta).map_err(bad)?;
+                self.ranges = rg;
+                self.last_delta = delta;
+                self.last_facts = None;
+                self.status = status.clone();
+                st = status;
+                n += 1;
+                if each(&st, &ch) {
+                    if i + 1 != count {
+                        self.prev = prev;
+                        return Err(bad(format!("step_trace: the wait stopped at frame {} of a batch of {count}", i + 1)));
+                    }
+                    r.done().map_err(bad)?;
+                    self.prev = prev;
+                    self.last_now = true;
+                    return Ok((st, n));
+                }
+            }
+            r.done().map_err(bad)?;
+            self.prev = prev;
+            self.last_now = true;
+            if count == 0 {
+                break;
+            }
+        }
+        Ok((st, n))
     }
 
     /// One Step, its delta read into the facts' changes (block::changes) with no whole facts built (IFACE e011-r2-own).

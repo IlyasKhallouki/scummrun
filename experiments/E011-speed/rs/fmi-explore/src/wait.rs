@@ -451,7 +451,10 @@ pub fn wait_on(b: &mut Box<dyn Engine>, atoms: &[(Key, Vec<Val>)], doms: &Domain
                 !newly.is_empty()
             };
             let tw = Instant::now();
+            // E019: the wait stops only after a frame that changed an observed key (newly needs one)
+            b.set_watch(Some(keys.as_slice()));
             let r = machine::port(|| b.wait(target - cur, &mut each));
+            b.set_watch(None);
             s_frames += tw.elapsed().as_secs_f64();
             r
         };
