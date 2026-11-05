@@ -320,7 +320,7 @@ pub fn ready(e: &mut Box<dyn Engine>, horizon: u64) -> EResult<Option<Option<Box
     if e.status().idle.is_some() {
         return Ok(None);
     }
-    let mut b = e.fork()?;
+    let mut b = e.fork().inspect(|_| fmi_core::count_fork("afford.rs:323"))?;
     let end = b.status().frame + horizon;
     match b.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {
         Ok(st) if st.reason == "idle" => Ok(Some(Some(b))),
@@ -700,7 +700,7 @@ impl Shared {
             self.twin.take().unwrap().quit();
         }
         if self.twin.is_none() {
-            self.twin = Some(e.fork()?);
+            self.twin = Some(e.fork().inspect(|_| fmi_core::count_fork("afford.rs:703"))?);
             out.twin_forks += 1;
         }
         let t = self.twin.as_mut().unwrap();
@@ -880,7 +880,7 @@ impl Run1<'_> {
                                     Some(t) => *t == rel,
                                     None => {
                                         // the twin's own wait from the same frame
-                                        let mut tw = self.shared.twin.as_mut().unwrap().fork()?;
+                                        let mut tw = self.shared.twin.as_mut().unwrap().fork().inspect(|_| fmi_core::count_fork("afford.rs:883"))?;
                                         let r = th(&mut tw).map_err(EngineError::Bridge)?;
                                         tw.quit();
                                         rel_stops(st.frame, &r) == rel
@@ -1016,7 +1016,7 @@ pub fn try_all(
     }
     for inp in inputs {
         let tf = Instant::now();
-        let mut b = e.fork()?;
+        let mut b = e.fork().inspect(|_| fmi_core::count_fork("afford.rs:1019"))?;
         r.out.phases[0] += tf.elapsed().as_secs_f64();
         let evs = inp.events(f0);
         let check = cfg.third && !cfg.fixed && inp.clicks.len() == 2;
@@ -1056,7 +1056,7 @@ pub fn try_all(
                 let of2 = offer_with(&mut b, &o, false)?;
                 for t in &of2.targets {
                     let tf = Instant::now();
-                    let mut c = b.fork()?;
+                    let mut c = b.fork().inspect(|_| fmi_core::count_fork("afford.rs:1059"))?;
                     r.out.phases[0] += tf.elapsed().as_secs_f64();
                     let mut evs3 = evs.clone();
                     evs3.push(Event { frame: st.frame + 1, what: Input::Click(t.x, t.y) });
@@ -1094,7 +1094,7 @@ pub fn try_all(
     let mut control: BTreeMap<u64, Facts> = BTreeMap::new();
     let tc = Instant::now();
     if !frames.is_empty() {
-        let mut c = e.fork()?;
+        let mut c = e.fork().inspect(|_| fmi_core::count_fork("afford.rs:1097"))?;
         for &fr in &frames {
             if fr > c.status().frame {
                 match c.run(&RunSpec { frame: Some(fr), ..Default::default() }) {

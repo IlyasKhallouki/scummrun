@@ -241,7 +241,7 @@ fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String
         return measure_idle_whole(root, frames);
     }
     let t = Instant::now();
-    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:244"))).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;
     let mut rule = step::IdleRule::new();
     let mut prev: Option<Facts> = None;
@@ -281,7 +281,7 @@ fn measure_idle(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String
 /// each, the rule run over them all at the end.
 fn measure_idle_whole(root: &mut Box<dyn Engine>, frames: u64) -> Result<Value, String> {
     let t = Instant::now();
-    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:284"))).map_err(|e| format!("EngineError: {e}"))?;
     let f0 = b.status().frame;
     let start_f = machine::port(|| b.facts()).map_err(|e| format!("EngineError: {e}"))?;
     let mut seq = Vec::with_capacity(frames as usize);
@@ -632,7 +632,7 @@ fn attempt(r: &Resident, rd: &Arc<dyn ReadingSource>, root: &mut Box<dyn Engine>
     let frame_costs = files::or(doc.get("frame_costs"), &json!({})).clone();
     std::fs::create_dir_all(adir).map_err(|e| files::io_err(adir, e))?;
     let (cpu0, t0) = (cpu_now(), Instant::now());
-    let branch = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let branch = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:635"))).map_err(|e| format!("EngineError: {e}"))?;
     let cfg = HarnessCfg {
         replan_limit: step::REPLAN_LIMIT,
         time_limit_s: step::TIME_LIMIT,
@@ -1400,7 +1400,7 @@ pub fn run_job(job_dir: &Path, r: &Resident, log: &JobLog, cancel: &AtomicBool) 
 /// E012: an engine at a wait's stop: a fork of the entry's engine run with no input to the stop's frame, held to the
 /// stop's checkpoint (facts, tick, random state, actors), so the goal is requested again from that state.
 fn engine_at(root: &mut Box<dyn Engine>, cp: &Checkpoint) -> Result<Box<dyn Engine>, String> {
-    let mut b = machine::port(|| root.fork()).map_err(|e| format!("EngineError: {e}"))?;
+    let mut b = machine::port(|| root.fork().inspect(|_| fmi_core::count_fork("tryjob.rs:1403"))).map_err(|e| format!("EngineError: {e}"))?;
     let st = machine::port(|| b.run(&RunSpec { frame: Some(cp.frame), ..Default::default() }));
     let differ = match st {
         Ok(st) if st.frame == cp.frame => {

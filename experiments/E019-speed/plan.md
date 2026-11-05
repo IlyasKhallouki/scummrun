@@ -88,3 +88,24 @@ twin's, and its stops are the entry's own wait's, already read. The trial's wait
 - **Cheap cuts the audit measured as yielding nothing:**
   - offer points at the wait's stops: 27% of free-try time, 0 kept in 278k trials (partly removed by (1));
   - delays: 13% of the run, 2 entries kept.
+
+## The fork storm: realize, and its fix (2026-11-05)
+
+- **Measured:** bpftrace on the VM counted ~3,700 new processes a second at 12 workers, all engine forks requested
+  through the bridge's fork command. A per-site fork counter (`fmi_core::count_fork`, printed by `fmi try` with
+  `FMI_FORK_COUNTS=1`) on tries copied from the live run:
+
+  | Try | Wall | Forks | From realize's `try_clicks` |
+  |---|---|---|---|
+  | free j06301 | 40 s | 1,132 | 0 |
+  | model j06288 | 50 s | 16,992 | 14,700 |
+  | model j06286 | 103 s | 40,219 | 36,000 |
+
+  The window search plays each step at many frames, and realize searched each time from scratch.
+- **Fix, `FMI_REALIZE_HINTS=1`:**
+  - The clicks that realized a sentence with no approach are kept by (v, a, b, room, camera xstart), shared in the
+    process.
+  - A step with a hint tries those clicks first, judged by the engine's Sentence touch as every candidate is; a miss
+    falls back to the search.
+  - On j06288: wall 48 s to 25 s, forks 16,992 to 2,904 (realize's 14,700 to 612). The outcome is the same: 2 new
+    entries, and the same probe stop, "the same empty window 2 times on sentence(8,491)#2" (C6's step).

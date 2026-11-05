@@ -38,6 +38,20 @@ pub fn on() -> bool {
     std::env::var(SWITCH).is_ok_and(|v| v == "1")
 }
 
+/// E019 (`FMI_REALIZE_HINTS=1`): the clicks that realized a sentence step with no approach, by (v, a, b, room, the
+/// camera's xstart), shared by the process's tries. A step with a hint tries those clicks first, judged as every
+/// candidate is (the engine's Sentence touch); a miss falls back to the search.
+pub fn hints_on() -> bool {
+    std::env::var("FMI_REALIZE_HINTS").is_ok_and(|v| v == "1")
+}
+
+type HintKey = (i32, i32, i32, i32, i32);
+
+fn hints() -> &'static std::sync::Mutex<std::collections::HashMap<HintKey, Vec<Point>>> {
+    static H: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<HintKey, Vec<Point>>>> = std::sync::OnceLock::new();
+    H.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
 /// A planned step: a sentence (verb v on object a, with object b for a two-object sentence) or a dialog verb.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
@@ -104,6 +118,8 @@ pub struct Attempt {
     /// the fork's frame when judged
     pub frame: u64,
     pub seconds: f64,
+    /// the clicks tried (screen points)
+    pub clicks: Vec<Point>,
 }
 
 /// The step realized: every input (the approach clicks and the accepted candidate's) at absolute frames, the accepted
@@ -196,6 +212,27 @@ pub fn realize(e: &mut Box<dyn Engine>, step: &Step, cfg: &Cfg) -> EResult<Resul
             Ok(Ok(rec.done(b, t0)))
         }
         Step::Sentence { v, a, b } => {
+            let want = (v, a, b.unwrap_or(0));
+            let hk: HintKey = (v, a, b.unwrap_or(0), e.status().room, e.status().xstart);
+            if hints_on() {
+                let hint = hints().lock().ok().and_then(|h| h.get(&hk).cloned());
+                if let Some(clicks) = hint {
+                    e.input_log()?;
+                    rec.candidates += 1;
+                    let (fork, records, mut att) = try_clicks(e, "hint", &clicks, cfg)?;
+                    rec.tries += 1;
+                    let seen = sentences(&records);
+                    att.accepted = seen.contains(&want);
+                    att.seen = seen_text(&seen);
+                    let ok = att.accepted;
+                    rec.attempts.push(att);
+                    if ok {
+                        rec.events.extend(rec.attempts.last().unwrap().events.clone());
+                        return Ok(Ok(rec.done(fork, t0)));
+                    }
+                    fork.quit();
+                }
+            }
             // the approach: from `e`, then from each accepted fork. Its target is a; when a has no hit point and no
             // place in the room (an inventory object), b when b has a place and no hit point (E016 A); else none.
             let mut cur: Option<Box<dyn Engine>> = None;
@@ -252,7 +289,13 @@ pub fn realize(e: &mut Box<dyn Engine>, step: &Step, cfg: &Cfg) -> EResult<Resul
             }
             match found {
                 Some(fork) => {
-                    rec.events.extend(rec.attempts.last().unwrap().events.clone());
+                    let last = rec.attempts.last().unwrap();
+                    rec.events.extend(last.events.clone());
+                    if hints_on() && rec.approach == 0 {
+                        if let Ok(mut h) = hints().lock() {
+                            h.insert(hk, last.clicks.clone());
+                        }
+                    }
                     Ok(Ok(rec.done(fork, t0)))
                 }
                 None => Ok(Err(rec.miss("no sentence", t0))),
@@ -306,7 +349,7 @@ fn try_clicks(e: &mut Box<dyn Engine>, phase: &'static str, clicks: &[Point], cf
     let inp = Inputs { clicks: clicks.to_vec() };
     let evs = inp.events(e.status().frame);
     let last = evs.last().map(|x| x.frame).unwrap_or(e.status().frame);
-    let mut b = e.fork()?;
+    let mut b = e.fork().inspect(|_| fmi_core::count_fork("realize.rs:309"))?;
     let mut records = Vec::new();
     match b.inputs(&evs) {
         Ok(()) => {
@@ -330,6 +373,7 @@ fn try_clicks(e: &mut Box<dyn Engine>, phase: &'static str, clicks: &[Point], cf
     let att = Attempt {
         phase,
         name: inp.name(),
+        clicks: clicks.to_vec(),
         events: evs,
         accepted: false,
         seen: String::new(),

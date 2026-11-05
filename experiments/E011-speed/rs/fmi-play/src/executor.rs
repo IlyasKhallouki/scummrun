@@ -975,7 +975,7 @@ impl Executor {
             for o in &stones {
                 let t_trial = std::time::Instant::now();
                 let c0 = thread_ns();
-                let mut child = b.e.fork()?;
+                let mut child = b.e.fork().inspect(|_| fmi_core::count_fork("executor.rs:978"))?;
                 b.cpu[3] += thread_ns() - c0;
                 self.stone_trials += 1;
                 let mut frames = None;

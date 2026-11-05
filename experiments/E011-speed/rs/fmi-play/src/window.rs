@@ -1288,7 +1288,7 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
         let st_issue = cb.status().clone();
         let d_issue = frames_seen[&s_issue].1.clone();
         let tf = Instant::now();
-        snap = Some(cb.fork()?);
+        snap = Some(cb.fork().inspect(|_| fmi_core::count_fork("window.rs:1291"))?);
         w.prof.fork(tf.elapsed());
         if executor::batch() {
             // the issue's frame and its observation in one StepObs (the run, then observe's runs, explain and dump)
@@ -1985,7 +1985,7 @@ impl BState {
                     let ke = &mut kept.e;
                     let mut gate_open = |f: u64| -> bool {
                         // the parent's gate at frame f, with no input: a fork of the kept parent run there
-                        let Ok(mut p) = ke.fork() else { return false };
+                        let Ok(mut p) = ke.fork().inspect(|_| fmi_core::count_fork("window.rs:1988")) else { return false };
                         let ok = f <= p.status().frame || p.run(&RunSpec { frame: Some(f), ..Default::default() }).is_ok();
                         let open = ok && p.status().up > 0;
                         p.quit();
@@ -2677,10 +2677,10 @@ impl Search {
                                 }
                                 std::thread::sleep(std::time::Duration::from_millis(50));
                             }
-                            let cb = parent.fork().map_err(|e| e.to_string())?;
+                            let cb = parent.fork().inspect(|_| fmi_core::count_fork("window.rs:2680")).map_err(|e| e.to_string())?;
                             if refuse_w {
                                 // the parent at this try's fork frame, kept: a refused try's window may end here
-                                let ke = parent.fork().map_err(|e| e.to_string())?;
+                                let ke = parent.fork().inspect(|_| fmi_core::count_fork("window.rs:2683")).map_err(|e| e.to_string())?;
                                 bst.kept_of.push(Some(Kept {
                                     e: ke,
                                     st: st.clone(),
