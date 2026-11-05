@@ -585,6 +585,8 @@ pub struct Archive {
     /// E016 amendment (11) (FMI_SELECT_PLACE=1): per place, the model's and the free tries' (n, chosen), made from
     /// the log once per its length
     place_counts: RefCell<Option<(usize, [HashMap<String, (i64, i64)>; 2])>>,
+    /// E018 (FMI_PLACE_RARITY=1): per place, how many rows hold each held pair, made once per row count
+    place_pairs: RefCell<Option<(usize, HashMap<String, HashMap<(String, i64), usize>>)>>,
     pub e009: Map<String, Value>,
     pub e010: Map<String, Value>,
     pub idle_frames: i64,
@@ -714,6 +716,7 @@ impl Archive {
             next_dead: None,
             chain_rooms: RefCell::new(HashMap::new()),
             place_counts: RefCell::new(None),
+            place_pairs: RefCell::new(None),
             free_on: crate::free::rho0().is_some(),
             grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
         })
@@ -1633,15 +1636,15 @@ impl Archive {
             let nov = self.novel_counts();
             if frontier_on() {
                 // E016 F: the frontier's entries first
-                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_owned_key(i), self.place_key(i, false), self.sel_key_p(i, &nov)));
+                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_p(i, &nov); (self.place_owned_key(i), self.place_key(i, false), k.0, self.rarity_key(i), k) });
             }
-            let mut cands: Vec<((i64, (i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
+            let mut cands: Vec<((i64, (i64, i64), i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
                 .cells
                 .iter()
                 .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
                 .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
                 .filter(|i| !busy_ids.contains(i))
-                .map(|i| ((self.place_owned_key(i), self.place_key(i, false), self.sel_key_p(i, &nov)), i))
+                .map(|i| { let k = self.sel_key_p(i, &nov); ((self.place_owned_key(i), self.place_key(i, false), k.0, self.rarity_key(i), k), i) })
                 .collect();
             cands.sort();
             return cands.into_iter().take(b).map(|(_, i)| i).collect();
@@ -1683,15 +1686,15 @@ impl Archive {
         let nov = self.novel_counts();
         if frontier_on() {
             // E016 F: the frontier's entries first, whichever kind the next job is
-            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| (self.place_owned_key(i), self.place_key(i, true), self.sel_key_free(i, &nov)));
+            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_free(i, &nov); (self.place_owned_key(i), self.place_key(i, true), k.0, self.rarity_key(i), k) });
         }
-        let mut cands: Vec<((i64, (i64, i64), (i64, i64, i64, i64, i64, usize)), usize)> = self
+        let mut cands: Vec<((i64, (i64, i64), i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
             .cells
             .iter()
             .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
             .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
             .filter(|i| !busy_ids.contains(i))
-            .map(|i| ((self.place_owned_key(i), self.place_key(i, true), self.sel_key_free(i, &nov)), i))
+            .map(|i| { let k = self.sel_key_free(i, &nov); ((self.place_owned_key(i), self.place_key(i, true), k.0, self.rarity_key(i), k), i) })
             .collect();
         cands.sort();
         cands.into_iter().take(b).map(|(_, i)| i).collect()
@@ -1742,6 +1745,33 @@ impl Archive {
         }
         let k = self.cell(&self.rows[i].cell).key.as_ref();
         -(k.and_then(|k| k.get(1)).and_then(|o| o.as_array()).map(|a| a.len()).unwrap_or(0) as i64)
+    }
+
+    /// E018 (`FMI_PLACE_RARITY=1`): entry i's rarity at its place, negated (so rarer first): the sum over its held pairs
+    /// of 1 / the number of rows at the place holding the pair, times 1,000 (count-based novelty within a place, as
+    /// Go-Explore weights cells by their attributes' counts). 0 with the switch off.
+    pub fn rarity_key(&self, i: usize) -> i64 {
+        if !std::env::var("FMI_PLACE_RARITY").is_ok_and(|v| v == "1") {
+            return 0;
+        }
+        let Some(pl) = self.place_of_row(i) else { return 0 };
+        let mut cache = self.place_pairs.borrow_mut();
+        if cache.as_ref().map(|c| c.0) != Some(self.rows.len()) {
+            let mut m: HashMap<String, HashMap<(String, i64), usize>> = HashMap::new();
+            for r in &self.rows {
+                if let Some(q) = self.place_of_row(r.id) {
+                    let e = m.entry(q).or_default();
+                    for p in &r.held {
+                        *e.entry(p.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+            *cache = Some((self.rows.len(), m));
+        }
+        let counts = &cache.as_ref().unwrap().1;
+        let Some(c) = counts.get(&pl) else { return 0 };
+        let score: f64 = self.rows[i].held.iter().map(|p| 1.0 / *c.get(p).unwrap_or(&1) as f64).sum();
+        -((score * 1000.0) as i64)
     }
 
     /// E016 section F (`FMI_FRONTIER=1`, plan.md "F. Configuration and selection"): the frontier, every live entry that

@@ -5,3 +5,6 @@ export ALLON
 # added at 10:15 (plan, "Reveal"): an outcome that brings new objects or actors into the hit test is kept (3 a step)
 ALLON="$ALLON FMI_REVEAL=1"
 export ALLON
+# added at 10:45: within a place, rarer states first (FMI_PLACE_RARITY)
+ALLON="$ALLON FMI_PLACE_RARITY=1"
+export ALLON

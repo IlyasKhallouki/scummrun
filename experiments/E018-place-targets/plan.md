@@ -45,3 +45,10 @@ holds nothing novel, so it is not kept and the talk never follows. `FMI_REVEAL=1
 stop has nothing novel but whose hit test holds objects or actors that the step's offer did not is kept (its novelty
 text `reveal=<names>`, at most 3 a step). The free try's next level then offers them. This names nothing in the game:
 it is the interface's reach, read from the engine's hit test.
+
+## Rarity within a place (added at 10:45)
+
+By 10:24 the room-49 place holding 946 had about 620 entries. Only a few were mid-conversation (dialog flags 403-408
+set), and they got 3 model and 20 free tries. `FMI_PLACE_RARITY=1`: within a place, after the cell's own count, entries
+holding pairs that few rows at their place hold come first. This is count-based novelty, as Go-Explore weights cells
+by their attributes' counts.
