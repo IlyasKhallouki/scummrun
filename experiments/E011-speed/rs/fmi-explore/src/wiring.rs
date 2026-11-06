@@ -99,6 +99,9 @@ pub struct Wiring {
     pub cpu_s: f64,
     pub cancel: Arc<AtomicBool>,
     pub log: Option<Box<dyn Fn(&str) + Send>>,
+    /// E022 (FMI_SLOT_LOCALS): the reading's own `--slot-locals` lines, so its extensions and refinements read the
+    /// slots live at its start with the same locals
+    slot_locals: Vec<Value>,
 }
 
 impl Wiring {
@@ -125,8 +128,11 @@ impl Wiring {
                 starts.push(p);
             }
         }
+        let slot_locals: Vec<Value> = std::fs::read_to_string(rd.dir().join("slot-locals.jsonl"))
+            .map(|t| t.lines().filter_map(|l| serde_json::from_str(l).ok()).collect())
+            .unwrap_or_default();
         Ok(Wiring { readings, doc, run_dir: run_dir.to_path_buf(), threads, starts, facts, elsewhere, seed, start_rows,
-                    rooms, goal, refines: 0, cpu_s: 0.0, cancel, log: None })
+                    rooms, goal, refines: 0, cpu_s: 0.0, cancel, log: None, slot_locals })
     }
 
     fn req(&self, name: &str, out: &Path, stream: bool) -> ReadReq {
@@ -138,7 +144,7 @@ impl Wiring {
             name: name.into(),
             out: out.to_path_buf(),
             threads: self.threads,
-            slot_locals: vec![],
+            slot_locals: self.slot_locals.clone(),
             domain_goals: self.doc.get("domain_goals").and_then(|d| d.as_str()).unwrap_or("none").to_string(),
             elsewhere: self.elsewhere,
             live_locals: self.doc.get("live_locals").map(|l| !l.is_null()).unwrap_or(false),

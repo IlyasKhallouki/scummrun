@@ -477,6 +477,18 @@ fn other_inventory(d: &BTreeMap<String, (i64, i64)>) -> bool {
     crate::archive::read_held_on() && d.iter().any(|(k, &(a, b))| k.starts_with("owner:") && held(a) != held(b))
 }
 
+/// E022 (`FMI_SLOT_LOCALS=1`): the slots running at a fresh reading's start with their dumped locals, as the reader's
+/// `--slot-locals` lines (fix round 1's F10), so a script live at the start resumes with its own locals; fmi sets the
+/// provider (fmi-play's `dumped_slots`; this crate does not depend on fmi-play). None: no dump of the locals.
+pub static SLOT_LOCALS: std::sync::OnceLock<fn(&Obs) -> Option<Vec<Value>>> = std::sync::OnceLock::new();
+
+fn slot_locals_of(state: &Obs) -> Vec<Value> {
+    if !std::env::var("FMI_SLOT_LOCALS").is_ok_and(|v| v == "1") {
+        return vec![];
+    }
+    SLOT_LOCALS.get().and_then(|f| f(state)).unwrap_or_default()
+}
+
 /// E020: `FMI_READ_SHARE=1`, the tries of this process read a scope fresh one at a time and share the readings.
 fn read_share_on() -> bool {
     std::env::var("FMI_READ_SHARE").is_ok_and(|v| v == "1")
@@ -563,7 +575,7 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
         name,
         out: rdir.clone(),
         threads,
-        slot_locals: vec![],
+        slot_locals: slot_locals_of(state),
         domain_goals: "none".into(),
         elsewhere: true,
         live_locals: true,

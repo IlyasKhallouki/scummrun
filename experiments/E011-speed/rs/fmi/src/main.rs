@@ -128,7 +128,21 @@ fn shlex_split(s: &str) -> Vec<String> {
     out
 }
 
+/// E022: the reader's `--slot-locals` lines from a try's state (fmi-play's `dumped_slots`), for fmi-explore's
+/// `tryjob::SLOT_LOCALS`.
+fn slot_locals_json(s: &fmi_core::Obs) -> Option<Vec<serde_json::Value>> {
+    let (slots, _) = fmi_play::reading::dumped_slots(s)?;
+    let mut v: Vec<&fmi_play::reading::DSlot> = slots.values().collect();
+    v.sort_by(|a, b| a.name.cmp(&b.name));
+    Some(v.into_iter().map(|d| serde_json::json!({
+        "name": d.name, "room": d.room, "w": d.w, "esc": d.esc, "locals": d.locals, "override": d.override_,
+        "cut_data": d.cut_data, "owned": d.owned,
+        "flags": d.flags.map(|(r, c, o)| serde_json::json!({"resistant": r, "recursive": c, "owned": o})),
+    })).collect())
+}
+
 fn main() {
+    let _ = fmi_explore::tryjob::SLOT_LOCALS.set(slot_locals_json);
     let argv: Vec<String> = std::env::args().skip(1).collect();
     if argv.is_empty() {
         usage();
