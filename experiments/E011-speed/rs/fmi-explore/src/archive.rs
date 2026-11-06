@@ -587,6 +587,8 @@ pub struct Archive {
     place_counts: RefCell<Option<(usize, [HashMap<String, (i64, i64)>; 2])>>,
     /// E018 (FMI_PLACE_RARITY=1): per place, how many rows hold each held pair, made once per row count
     place_pairs: RefCell<Option<(usize, HashMap<String, HashMap<(String, i64), usize>>)>>,
+    /// E022: per live row, the guide atoms it is the first live row at its place (with its context) to hold, by rows
+    place_firsts: RefCell<Option<(usize, HashMap<usize, i64>)>>,
     /// E019 (FMI_SKIP_SAME=1): job.json fingerprint -> the first job with it, made from the job dirs on first use
     fingerprints: RefCell<Option<HashMap<String, String>>>,
     pub e009: Map<String, Value>,
@@ -719,6 +721,7 @@ impl Archive {
             chain_rooms: RefCell::new(HashMap::new()),
             place_counts: RefCell::new(None),
             place_pairs: RefCell::new(None),
+            place_firsts: RefCell::new(None),
             fingerprints: RefCell::new(None),
             free_on: crate::free::rho0().is_some(),
             grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
@@ -1780,7 +1783,7 @@ impl Archive {
     /// (`Progress::novel_counts` under the switch), while its cell has had fewer than 3 tries of the kind (model, or
     /// free): an entry that first reached something at a place is tried a few times before the place's other fresh
     /// cells. 0 otherwise.
-    pub fn place_new_key(&self, i: usize, nov: &HashMap<usize, i64>, free: bool) -> i64 {
+    pub fn place_new_key(&self, i: usize, _nov: &HashMap<usize, i64>, free: bool) -> i64 {
         if !crate::ctx::on() {
             return 0;
         }
@@ -1789,7 +1792,26 @@ impl Archive {
         if n >= 3 {
             return 0;
         }
-        -nov.get(&i).copied().unwrap_or(0)
+        let mut cache = self.place_firsts.borrow_mut();
+        if cache.as_ref().map(|c| c.0) != Some(self.rows.len()) {
+            // the guide's atoms (Row.held, as job.json's "held"), by place in id order: the first live holder of each
+            let mut seen: HashMap<String, HashSet<(String, i64)>> = HashMap::new();
+            let mut firsts: HashMap<usize, i64> = HashMap::new();
+            for (j, r) in self.rows.iter().enumerate() {
+                if r.dead.is_some() {
+                    continue;
+                }
+                let Some(p) = self.place_of_row(j) else { continue };
+                let set = seen.entry(p).or_default();
+                for a in &r.held {
+                    if set.insert(a.clone()) {
+                        *firsts.entry(j).or_insert(0) += 1;
+                    }
+                }
+            }
+            *cache = Some((self.rows.len(), firsts));
+        }
+        -cache.as_ref().unwrap().1.get(&i).copied().unwrap_or(0)
     }
 
     /// E018 (FMI_TARGET_PLACE=1 with FMI_SELECT_PLACE=1): the place's objects owned, negated, ahead of its counts:
