@@ -92,3 +92,11 @@
   at its place to hold an atom, as the quiz entries are with `var:176 = 11` after the book, comes first among its
   place's fresh cells (Go-Explore: newly found cells first).
 - **Check:** fmi-explore's tests all pass. With the switch off the counts are unchanged.
+
+## Amendment (4), 2026-11-06 00:05 UTC: the place-first count goes ahead of the cell's counts, for a cell's first 3 tries
+
+- **What happened after amendment (3):** the quiz entries' cells had had tries before (`chosen ≥ 1`), so they sorted
+  behind the place's thousands of fresh cells. The novelty count only broke ties among equal counts.
+- **Change, `Archive::place_new_key`:** right after the place's key comes minus the entry's place-first atoms, while its
+  cell has had fewer than 3 tries of the kind (model or free), in the model's and the free selection, with and without
+  the frontier.

@@ -1648,15 +1648,15 @@ impl Archive {
             let nov = self.novel_counts();
             if frontier_on() {
                 // E016 F: the frontier's entries first
-                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_p(i, &nov); (self.place_owned_key(i), self.place_key(i, false), k.0, self.rarity_key(i), k) });
+                return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_p(i, &nov); (self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k) });
             }
-            let mut cands: Vec<((i64, (i64, i64), i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
+            let mut cands: Vec<((i64, (i64, i64), i64, i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
                 .cells
                 .iter()
                 .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
                 .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
                 .filter(|i| !busy_ids.contains(i))
-                .map(|i| { let k = self.sel_key_p(i, &nov); ((self.place_owned_key(i), self.place_key(i, false), k.0, self.rarity_key(i), k), i) })
+                .map(|i| { let k = self.sel_key_p(i, &nov); ((self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k), i) })
                 .collect();
             cands.sort();
             return cands.into_iter().take(b).map(|(_, i)| i).collect();
@@ -1698,15 +1698,15 @@ impl Archive {
         let nov = self.novel_counts();
         if frontier_on() {
             // E016 F: the frontier's entries first, whichever kind the next job is
-            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_free(i, &nov); (self.place_owned_key(i), self.place_key(i, true), k.0, self.rarity_key(i), k) });
+            return self.select_front(b, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_free(i, &nov); (self.place_owned_key(i), self.place_key(i, true), self.place_new_key(i, &nov, true), k.0, self.rarity_key(i), k) });
         }
-        let mut cands: Vec<((i64, (i64, i64), i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
+        let mut cands: Vec<((i64, (i64, i64), i64, i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
             .cells
             .iter()
             .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
             .filter_map(|(cid, _)| self.candidate_p(cid, &nov))
             .filter(|i| !busy_ids.contains(i))
-            .map(|i| { let k = self.sel_key_free(i, &nov); ((self.place_owned_key(i), self.place_key(i, true), k.0, self.rarity_key(i), k), i) })
+            .map(|i| { let k = self.sel_key_free(i, &nov); ((self.place_owned_key(i), self.place_key(i, true), self.place_new_key(i, &nov, true), k.0, self.rarity_key(i), k), i) })
             .collect();
         cands.sort();
         cands.into_iter().take(b).map(|(_, i)| i).collect()
@@ -1774,6 +1774,22 @@ impl Archive {
             *cache = Some((self.logs.len(), counts));
         }
         cache.as_ref().unwrap().1[free as usize].get(&pl).copied().unwrap_or((0, 0))
+    }
+
+    /// E022 (FMI_PLACE_CTX=1): ahead of the cell's counts, minus the atoms entry i is the first at its place to hold
+    /// (`Progress::novel_counts` under the switch), while its cell has had fewer than 3 tries of the kind (model, or
+    /// free): an entry that first reached something at a place is tried a few times before the place's other fresh
+    /// cells. 0 otherwise.
+    pub fn place_new_key(&self, i: usize, nov: &HashMap<usize, i64>, free: bool) -> i64 {
+        if !crate::ctx::on() {
+            return 0;
+        }
+        let c = self.cell(&self.rows[i].cell);
+        let n = if free { c.free.map(|f| f.1).unwrap_or(0) } else { c.chosen.unwrap_or(0) };
+        if n >= 3 {
+            return 0;
+        }
+        -nov.get(&i).copied().unwrap_or(0)
     }
 
     /// E018 (FMI_TARGET_PLACE=1 with FMI_SELECT_PLACE=1): the place's objects owned, negated, ahead of its counts:
