@@ -100,3 +100,11 @@
 - **Change, `Archive::place_new_key`:** right after the place's key comes minus the entry's place-first atoms, while its
   cell has had fewer than 3 tries of the kind (model or free), in the model's and the free selection, with and without
   the frontier.
+
+## Amendment (5), 2026-11-06 00:40 UTC: the place-first count uses the guide's atoms
+
+- **What happened after amendment (4):** in 30 minutes still no try started from the 6 quiz entries. The first-holder
+  count used T, the novelty atoms, and the dialog topic `var:176` is not in T (the code map found room 49's tested
+  keys without it).
+- **Change:** `place_new_key` counts the guide's atoms (`Row.held`, the atoms job.json's "held" and the targets use)
+  that an entry is the first live row at its place to hold. It is cached by the number of rows.
