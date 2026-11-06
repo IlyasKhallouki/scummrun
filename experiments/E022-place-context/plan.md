@@ -108,3 +108,22 @@
   keys without it).
 - **Change:** `place_new_key` counts the guide's atoms (`Row.held`, the atoms job.json's "held" and the targets use)
   that an entry is the first live row at its place to hold. It is cached by the number of rows.
+
+## Amendment (6), 2026-11-06 01:15 UTC: a fresh reading takes the live slots' locals (F10), and so do its extensions
+
+- **What was found on the laptop, rerunning play10's j09542 (entry 22356, local 208 waiting at the conversation's
+  start, 0x04BE):**
+  - The room-49 reading reaches the quiz's turns (events at 0x0DB4 and 0x10E6) but not `bit:443`, and local 208 has no
+    lists of locals.
+  - The slot runs at the reading's start, and `read_fresh` passed no `--slot-locals`. Its locals were unknown through
+    every turn, so the counter never passed the test at 0x1166.
+- **Change, `FMI_SLOT_LOCALS=1`:**
+  - tryjob's `SLOT_LOCALS` provider, which fmi sets from fmi-play's `dumped_slots`, gives the live slots' locals to
+    `read_fresh`.
+  - `Wiring` reads the reading's own `slot-locals.jsonl`, so its reach extensions and refinements read with the same
+    locals. Before this, the extension dropped them and the planner answered "--goal: no fact bit:443".
+- **Result on the same job:** the reading reaches `bit:443 = 1` (reached 0, 1), which becomes the try's first target
+  (tier 1). Local 208 has 27 lists.
+- **Open:** the planner proves `bit:443 = 1` unsolvable on the reach extension from the entry ("6 values not reached"
+  before it). That is the next diagnosis.
+- **The run:** stopped at 01:15 so the booking is not spent while this is diagnosed offline. Still C6.
