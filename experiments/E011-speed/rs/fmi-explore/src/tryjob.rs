@@ -567,6 +567,10 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
     scope.sort();
     log.say(&format!("reading {:?} fresh from frame {} into {}", scope, status.frame, rdir.display()));
     let goal = step::goal_of(job);
+    let fact_vars = crate::ctx::input_vars(&scope);
+    if !fact_vars.is_empty() {
+        log.say(&format!("reading: the rooms' input vars as facts {fact_vars:?}"));
+    }
     let t = Instant::now();
     let req = ReadReq {
         rooms: scope,
@@ -585,7 +589,7 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
         frame_costs: true,
         reach_also: vec![],
         start_rows: Some(rows),
-        fact_vars: vec![],
+        fact_vars,
         stream: true,
     };
     let mut info = None;

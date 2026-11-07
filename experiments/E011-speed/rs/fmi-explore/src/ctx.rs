@@ -147,6 +147,23 @@ pub fn suffix<F: FactLook + ?Sized>(room: i64, f: &F) -> String {
     }
 }
 
+/// E022 amendment (9) (`FMI_READ_INPUT_FACTS=1`): the input vars of `rooms` (the numbers of their `var:` keys), which
+/// a fresh reading takes as fact vars: nothing in the room writes them, so its tests read their start values.
+pub fn input_vars(rooms: &[i64]) -> Vec<i64> {
+    if !std::env::var("FMI_READ_INPUT_FACTS").is_ok_and(|v| v == "1") {
+        return vec![];
+    }
+    let mut out: Vec<i64> = rooms
+        .iter()
+        .filter_map(|r| keys().get(r))
+        .flatten()
+        .filter_map(|k| k.strip_prefix("var:").and_then(|n| n.parse().ok()))
+        .collect();
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
 /// The input keys of `room` and the ones seen cleared (the report's).
 pub fn report(room: i64) -> (Vec<String>, Vec<String>) {
     let c = cleared().read().unwrap_or_else(|e| e.into_inner());
