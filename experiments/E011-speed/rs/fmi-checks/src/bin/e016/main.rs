@@ -29,6 +29,7 @@
 mod common;
 mod g3;
 mod g4;
+mod hits;
 mod inlog;
 
 fn main() {
@@ -37,6 +38,7 @@ fn main() {
         Some("inlog") => inlog::run(&argv[1..]),
         Some("g3") => g3::run(&argv[1..]),
         Some("g4") => g4::run(&argv[1..]),
+        Some("hits") => hits::run(&argv[1..]),
         _ => Err("usage: e016 inlog OUT ... | e016 g3 OUT ... | e016 g4 OUT ...".to_string()),
     };
     if let Err(e) = r {

@@ -841,6 +841,25 @@ impl Builder<'_> {
         self.counts.set("event rounds", rounds - 1);
         self.counts.set("reach: most branches held at once", waits as i64);
         self.counts.set("reach: branches and jobs still held at the end", left as i64);
+        // FMI_READ_HELD_DEBUG: the branches still held at the end, by job label and the fact they wait for
+        if std::env::var_os("FMI_READ_HELD_DEBUG").is_some() {
+            let st = self.reach_state.as_ref().unwrap();
+            let mut by: BTreeMap<(String, String), usize> = BTreeMap::new();
+            for w in &st.wait_set {
+                let label = st.jobs.get(w.job as usize).map(|j| j.label.clone()).unwrap_or_default();
+                *by.entry((label, format!("{} {:?}", w.key, w.set))).or_default() += 1;
+            }
+            let mut v: Vec<_> = by.into_iter().collect();
+            v.sort_by(|a, b| b.1.cmp(&a.1));
+            for ((label, key), n) in v.iter().take(25) {
+                eprintln!("[held] {n} {label} on {key}");
+            }
+            if let Ok(f) = std::env::var("FMI_READ_HELD_DEBUG") {
+                for ((label, key), n) in v.iter().filter(|((l, _), _)| l.contains(f.as_str())) {
+                    eprintln!("[held {f}] {n} {label} on {key}");
+                }
+            }
+        }
         if let Some(st) = self.reach_state.as_ref().filter(|st| st.pairs.is_some()) {
             let p = st.pairs.as_ref().unwrap();
             let (n, acts, held, left) = (p.len() as i64, p.n_actions() as i64, st.pairs_held as i64, st.pair_waits.len() as i64);
