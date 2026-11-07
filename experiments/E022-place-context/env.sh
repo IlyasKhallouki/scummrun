@@ -16,3 +16,10 @@ export ALLON
 # amendment (10): the frontier also holds the untried least live holders of atoms of T
 ALLON="$ALLON FMI_FRONTIER_ATOMS=1"
 export ALLON
+# amendment (11): a room change to a room outside the scope is an action that ends there
+ALLON="$ALLON FMI_READ_EXITS=1"
+# amendment (12): an object with a parent is placed only with its parent in the state findObject needs
+ALLON="$ALLON FMI_READ_PARENTS=1"
+# amendment (13): a child whose run holds the goal is a goal child though the plan's goal records did not match
+ALLON="$ALLON FMI_GOAL_UNPLANNED=1"
+export ALLON

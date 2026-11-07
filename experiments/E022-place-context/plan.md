@@ -220,3 +220,44 @@ Measured on the laptop, rerunning play10's j09542 (entry 22356) with the target 
 - **Change (same switch):** the frontier's entries come with the most guide atoms set first, then in found order.
   This is Go-Explore's preference for cells further along: an adventure's progress is state that stays set.
   - 22574 holds 43 set guide atoms. Only 5 entries in the archive hold more, and the old backlog holds 30–37.
+
+## Amendments (11)–(13), 2026-11-07 17:45–19:52 UTC: the voyage, the suit and the dive (C7 reached by single jobs)
+
+Measured on the laptop, one job at a time from the archive's own states:
+- the quiz's entry 22574, made by the laptop run itself (j08778, 14:12);
+- then each job's last entry.
+
+- **(11) The voyage, `FMI_READ_EXITS=1` (reader `machine.rs`):**
+  - The captain sails with `loadRoom(75)` in room 49's dialog. The reader ended every path that changed to a room
+    outside the scope as "left the scope" and dropped it, so no model try could plan a room exit, and the room the
+    dialog leaves for was never a target.
+  - With the switch, such a path writes the room and ends "room", as a change inside the scope does.
+  - Result: `room = 75` is a tier-1 target. The model try plans the dialog's last two choices and plays 570 frames.
+    It ends in room 42 (the voyage goes through the world map) with `bit:443 = 1`.
+- **(12) The suit, `FMI_READ_PARENTS=1` (`scripts/dump_scripts.py`, IR `game.rs`, reader `builder.rs`):**
+  - From the ship, the plan's first step (the repair kit on the punctured suit) was never formed: 1,801 children and
+    no hit point.
+  - The probe `e016 hits` found the cause. The suit is a child of the locker in room 42's object table, and
+    findObject touches a child only while its parent is in the child's parent state. The suit needs the locker open
+    (state 1).
+  - The index knew the parent's index in the room, not its object or state, so the reader made it an assumption, never
+    a precondition.
+  - Change:
+    - The dump reads each room's OBCD order from the data file, which resolves the parent's index to its object, and
+      reads the parent state from the CDHD flags (1 when 0x80, else the low four bits).
+    - The IR loads both.
+    - Under the switch, a room object's placement requires `state:<parent>` = its parent state, up the chain, where
+      the reading holds that state.
+  - Four objects in the demo have a parent: the suit (locker), the light wand of the dark room 48 (object 585, state
+    1), the balloon (594) and the invoice (941).
+  - Result: the plan opens the locker, patches the suit with the kit, and Indy puts it on (the ego becomes Sophia).
+- **(13) The dive, `FMI_GOAL_UNPLANNED=1` (fmi-play `window.rs`):**
+  - From the suited state, the plan's first step (the hoist with Indy in the suit) was refused twice. The engine's run
+    did not write var 104, the verb script's repeat-click counter, as the record predicted.
+  - The window's summary shows all 588 children reached the goal, room 82, as "goal, not from the plan", and the
+    window discarded them.
+  - Change: a child whose run holds the goal is the goal's child even though the plan's goal records did not match.
+    It is a real run that reached the target, and the records it did not match are the reading's error.
+  - Result: the try plays 121 frames and stops with "goal". Its last entry (frame 18157) is in room 82 with
+    `bit:443 = 1`. **C7 is reached** by the system's own plans from the conversation's entry, through three single
+    jobs. The archive run has not yet recorded it.
