@@ -510,6 +510,10 @@ pub fn stop_file() -> Option<PathBuf> {
 /// The job loop (explore.py `run`): until a stop rule fires. Returns summary.json's contents.
 pub fn run(root: &Path, workers: usize, mode: &StepMode, verifier: Option<&dyn Verifier>, stats: &mut DriverStats) -> Res<Value> {
     let mut a = Archive::open(root)?;
+    // E022 amendment (15) (`FMI_FRONTIER_FRESH=1`): the atom frontier counts this driver's tries only
+    if std::env::var("FMI_FRONTIER_FRESH").is_ok_and(|v| v == "1") {
+        a.fresh_from = Some(a.next_job());
+    }
     if a.root.join("summary.json").exists() {
         let s = read_json(&a.root.join("summary.json"))?;
         say(&format!("{}: stopped already ({}); summary.json", a.root.display(), files::py_str(s.get("stop"))));

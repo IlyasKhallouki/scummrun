@@ -581,6 +581,8 @@ pub struct Archive {
     pub logs: Vec<Value>,
     /// job -> (entry id, cell)
     pub busy: BTreeMap<String, (usize, String)>,
+    /// E022 amendment (15) (`FMI_FRONTIER_FRESH=1`): the driver's first job; the atom frontier counts tries from it on
+    pub fresh_from: Option<String>,
     chain_r: RefCell<HashMap<usize, Rc<HashSet<(String, i64)>>>>,
     /// E016 amendment (11) (FMI_SELECT_PLACE=1): per place, the model's and the free tries' (n, chosen), made from
     /// the log once per its length
@@ -705,6 +707,7 @@ impl Archive {
             readings: Vec::new(),
             logs: Vec::new(),
             busy: BTreeMap::new(),
+            fresh_from: None,
             chain_r: RefCell::new(HashMap::new()),
             e009,
             e010,
@@ -1927,7 +1930,14 @@ impl Archive {
         let mut out: HashSet<usize> = first.into_values().filter(|i| !chosen.contains(i)).collect();
         if let (Some(p), true) = (&self.progress, frontier_atoms_on()) {
             let mut tried = busy;
-            tried.extend(self.logs.iter().filter(|x| crate::free::line_is_free(x) == free).filter_map(entry_of));
+            // E022 amendment (15): with `fresh_from`, only this driver's tries count (the model the earlier tries had
+            // may have planned less)
+            let fresh = |x: &Value| match (&self.fresh_from, x.get("job").and_then(|j| j.as_str())) {
+                (Some(f), Some(j)) => j >= f.as_str(),
+                (Some(_), None) => false,
+                (None, _) => true,
+            };
+            tried.extend(self.logs.iter().filter(|x| crate::free::line_is_free(x) == free && fresh(x)).filter_map(entry_of));
             out.extend(p.first_counts().into_iter().filter(|&(i, n)| n > 0 && !tried.contains(&i)).map(|(i, _)| i));
         }
         out

@@ -26,3 +26,6 @@ export ALLON
 # amendment (14): a start of a global script that enumerates the inventory is summarized as the inventory hook's
 ALLON="$ALLON FMI_READ_INVENTORY_SUMMARY=1"
 export ALLON
+# amendment (15): the atom frontier counts the current driver's tries only (a changed model tries its frontier again)
+ALLON="$ALLON FMI_FRONTIER_FRESH=1"
+export ALLON

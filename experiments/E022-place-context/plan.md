@@ -292,3 +292,14 @@ Measured on the laptop, one job at a time from the archive's own states:
     130 here).
 - **Next:** the run itself, with every switch of amendments (6)–(14). It uses fresh readings: the 75 readings the
   archive had registered on the laptop, and the committed jobs' run folders, moved to `attic-pre-e022-11`.
+
+## Amendment (15), 2026-11-07 21:24 UTC: a changed model tries the frontier again
+
+- **What happened:**
+  - The run with amendments (6)–(14) started at 20:56 and made 156 jobs in 21 minutes. It did not return to the
+    quiz's entry 22574.
+  - That entry had its model try and its free try (j08840, j08857) under the reader before amendment (11), which
+    could not plan the voyage.
+- **Change, `FMI_FRONTIER_FRESH=1`:** the atom frontier counts only the tries of the current driver. The driver marks
+  its first job (`Archive::fresh_from`). With the model changed, the frontier's entries are tried again, the most
+  guide atoms set first.
