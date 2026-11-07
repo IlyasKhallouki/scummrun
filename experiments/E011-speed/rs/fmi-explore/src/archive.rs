@@ -1939,6 +1939,18 @@ impl Archive {
             };
             tried.extend(self.logs.iter().filter(|x| crate::free::line_is_free(x) == free && fresh(x)).filter_map(entry_of));
             out.extend(p.first_counts().into_iter().filter(|&(i, n)| n > 0 && !tried.contains(&i)).map(|(i, _)| i));
+            // E022 amendment (16): with the place context, also the first live entry at each place (a room with the
+            // input keys it holds), as E016 F has the first entry in each room
+            if crate::ctx::on() {
+                let mut seen: HashSet<String> = HashSet::new();
+                for r in self.rows.iter().filter(|r| r.dead.is_none()) {
+                    if let Some(pl) = self.place_of_row(r.id) {
+                        if seen.insert(pl) && !tried.contains(&r.id) {
+                            out.insert(r.id);
+                        }
+                    }
+                }
+            }
         }
         out
     }
