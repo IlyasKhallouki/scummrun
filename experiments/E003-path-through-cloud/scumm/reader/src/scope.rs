@@ -355,6 +355,25 @@ pub fn hook_writes(game: &Game, n: i32) -> Vec<String> {
     keys.into_iter().collect()
 }
 
+/// E022 amendment (14): whether global script `n` enumerates the inventory (an assignment reads findInventory): the
+/// reader cannot enumerate it, so running the script forks on every slot; `FMI_READ_INVENTORY_SUMMARY=1` summarizes a
+/// start of it as the inventory hook's (machine.rs `eng_script`).
+pub fn enumerates_inventory(game: &Game, n: i32) -> bool {
+    fn has(game: &Game, e: scumm_ir::ExprId) -> bool {
+        use scumm_ir::Expr;
+        match game.ast.expr(e) {
+            Expr::Getter { name, args } => name == known::FIND_INVENTORY || game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::BinOp { a, b, .. } | Expr::Cmp { a, b, .. } => has(game, a) || has(game, b),
+            Expr::Neg(x) | Expr::Not(x) | Expr::Truth(x) => has(game, x),
+            Expr::Concat(args) | Expr::List(args) => game.ast.kids(args).iter().any(|&k| has(game, k)),
+            Expr::Embed(a) => has(game, a.rhs),
+            _ => false,
+        }
+    }
+    let Some(u) = game.id(UnitKey::Global(n)) else { return false };
+    game.ins(u).iter().any(|x| matches!(x.st, Some(Stmt::Assign(a)) if has(game, a.rhs)))
+}
+
 /// reader.py `made_verbs`: {verb: the VerbOps sub-op names any script gives it} for every verb some script creates
 /// with New (a constant number).
 pub fn made_verbs(game: &Game) -> BTreeMap<i32, BTreeSet<String>> {

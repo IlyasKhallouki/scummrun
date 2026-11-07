@@ -604,7 +604,15 @@ fn worker(game: &Game, scope: &Scope, sh: &Shared) {
                     eprintln!("start {} {:.1}", jobs[i].label, TRACE_T0.get_or_init(Instant::now).elapsed().as_secs_f64());
                 }
                 let mut m = WorkerMachine { rd: &mut rd, sh, snap: &snap, parts: Vec::new() };
+                let t_job = std::time::Instant::now();
                 let records = b.run_job(&mut m, &jobs[i]);
+                // FMI_READ_SLOW_DEBUG=S: a job that took more than S seconds, its label and records
+                if let Some(s) = std::env::var("FMI_READ_SLOW_DEBUG").ok().and_then(|v| v.parse::<f64>().ok()) {
+                    let dt = t_job.elapsed().as_secs_f64();
+                    if dt > s {
+                        eprintln!("[slow] {dt:.1} s {} {} ({} records)", jobs[i].kind, jobs[i].label, records.len());
+                    }
+                }
                 trace_job(&jobs[i].label, t.elapsed().as_secs_f64(), records.len());
                 // the switch --prep: what the reading's thread and the sink work out of the records, worked out here
                 let mut records = records;

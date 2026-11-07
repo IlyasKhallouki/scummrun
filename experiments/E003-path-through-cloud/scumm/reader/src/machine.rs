@@ -1539,7 +1539,7 @@ impl Hooks for ReaderHooks {
         Ok({
             if n != 0 && m.game.id(UnitKey::Global(n)).is_some() {
                 let hook = lazily(m, |m| m.read(p, Fact::Var(VAR_INVENTORY_SCRIPT), o))?;
-                if hook == Val::Int(n) {
+                if hook == Val::Int(n) || (read_inventory_summary_on() && scope::enumerates_inventory(m.game, n)) {
                     let (head, cite) = call_at(p, ci);
                     if recursive != Some(true) {
                         m.h_stop_script(p, o, n, &cite, &head)?;
@@ -3095,4 +3095,11 @@ mod tests {
 pub fn read_exits_on() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var("FMI_READ_EXITS").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (14): `FMI_READ_INVENTORY_SUMMARY=1`, a start of a global script that enumerates the inventory is
+/// summarized as the inventory hook's run (not run, its writes guessed).
+pub fn read_inventory_summary_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_INVENTORY_SUMMARY").is_ok_and(|v| v == "1"))
 }
