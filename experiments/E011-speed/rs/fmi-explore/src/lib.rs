@@ -30,6 +30,7 @@ pub mod events;
 pub mod explorecmd;
 pub mod fake;
 pub mod files;
+pub mod focus;
 pub mod free;
 pub mod grow;
 pub mod guide;

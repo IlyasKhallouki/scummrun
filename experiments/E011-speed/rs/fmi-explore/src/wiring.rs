@@ -203,6 +203,13 @@ impl crate::harness::Rereads for Wiring {
     fn extend(&mut self, start: &str) -> Result<Arc<dyn ReadingSource>, String> {
         Wiring::extend(self, start)
     }
+    fn add_slot_locals(&mut self, slots: Vec<Value>) {
+        for s in slots {
+            if !self.slot_locals.contains(&s) {
+                self.slot_locals.push(s);
+            }
+        }
+    }
     fn add_start(&mut self, start: &str) -> Result<(), String> {
         let n = self.starts.len() + 1;
         let f = self.run_dir.join(format!("seed-{n:02}")).join("start.txt");

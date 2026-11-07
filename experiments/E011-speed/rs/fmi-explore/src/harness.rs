@@ -82,6 +82,9 @@ pub trait Rereads {
     fn add_start(&mut self, _start: &str) -> Result<(), String> {
         Err("no further starts".into())
     }
+    /// E022 (FMI_SLOT_LOCALS): the live slots of a further start, with their dumped locals, for the next reads (the
+    /// reader builds their lists too, so a replan from that start finds its slots' lists)
+    fn add_slot_locals(&mut self, _slots: Vec<Value>) {}
 }
 
 /// E022: `FMI_REFINE_WIDEN=N`, at most N more refinement passes when the last pass wrote values of a new fact
@@ -89,6 +92,71 @@ pub trait Rereads {
 /// and the scope is read again. Unset or 0: the try stops at R0, as before.
 pub fn refine_widen() -> usize {
     std::env::var("FMI_REFINE_WIDEN").ok().and_then(|v| v.parse().ok()).unwrap_or(0)
+}
+
+/// E022: the live slots' dumped locals of `state` under `FMI_SLOT_LOCALS=1` (tryjob's provider), else None.
+fn slot_locals_now(state: &fmi_core::Obs) -> Option<Vec<Value>> {
+    if !std::env::var("FMI_SLOT_LOCALS").is_ok_and(|v| v == "1") {
+        return None;
+    }
+    crate::tryjob::SLOT_LOCALS.get().and_then(|f| f(state))
+}
+
+/// E022 (`FMI_SLOT_LOCALS=1`; reader task.rs `replan_start_locals`, F10): each `args:<unit>` of a slot live at the
+/// plan's start is the number of the reading's list (its `reading.lists.jsonl`) at the slot's wait point whose locals
+/// and flags the slot's dumped locals match, the list with the most locals when several do; with no match the start
+/// keeps its value. Without the switch, or without dumped locals, nothing changes. Returns the slots with no match
+/// (`name@pos`).
+fn args_of_slots(start_f: &mut fmi_core::Facts, doms: &Domains, state: &fmi_core::Obs, dir: &std::path::Path, counts: &mut BTreeMap<String, i64>) -> Vec<String> {
+    let mut unmatched = Vec::new();
+    if !std::env::var("FMI_SLOT_LOCALS").is_ok_and(|v| v == "1") {
+        return unmatched;
+    }
+    let Some(slots) = crate::tryjob::SLOT_LOCALS.get().and_then(|f| f(state)) else { return unmatched };
+    let lists: Vec<Value> = std::fs::read_to_string(dir.join("reading.lists.jsonl"))
+        .map(|t| t.lines().filter_map(|l| serde_json::from_str(l).ok()).collect())
+        .unwrap_or_default();
+    let flag = |v: &Value, k: &str| v.get(k).and_then(|x| x.as_bool());
+    for (k, _) in &doms.0 {
+        if k.kind() != fmi_core::K_ARGS {
+            continue;
+        }
+        let text = k.text();
+        let name = &text[5..];
+        let pos = start_f.get(fmi_core::Key::parse(&format!("pos:{name}"))).unwrap_or(start::NOWHERE);
+        if pos < 0 {
+            continue;
+        }
+        let Some(slot) = slots.iter().find(|s| s["name"].as_str() == Some(name)) else { continue };
+        let locals: Vec<i64> = slot["locals"].as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default();
+        let sf = &slot["flags"];
+        let best = lists
+            .iter()
+            .filter(|l| l["name"].as_str() == Some(name) && l["w"].as_i64() == Some(pos))
+            .filter(|l| {
+                let lf = &l["flags"];
+                let fl_ok = ["resistant", "owned", "recursive"].iter().all(|f| match (flag(lf, f), flag(sf, f)) {
+                    (Some(a), Some(b)) => a == b,
+                    _ => true,
+                });
+                fl_ok && l["locals"].as_array().map(|ps| ps.iter().all(|p| {
+                    let i = p[0].as_i64().unwrap_or(-1);
+                    i >= 0 && locals.get(i as usize).copied().unwrap_or(0) == p[1].as_i64().unwrap_or(i64::MIN)
+                })).unwrap_or(false)
+            })
+            .max_by_key(|l| l["locals"].as_array().map(|a| a.len()).unwrap_or(0));
+        match best.and_then(|l| l["sig"].as_i64()) {
+            Some(sig) => {
+                start_f.set(*k, sig as fmi_core::Val);
+                *counts.entry("args from the slot's dumped locals".into()).or_insert(0) += 1;
+            }
+            None => {
+                *counts.entry("live slots whose dumped locals match no list".into()).or_insert(0) += 1;
+                unmatched.push(format!("{name}@{pos}"));
+            }
+        }
+    }
+    unmatched
 }
 
 /// A reach start's text with `key` set to `v` (`key<TAB>value` lines).
@@ -343,6 +411,21 @@ impl<'a> Harness<'a> {
         self.ps.stop_reason = Some(why);
     }
 
+    /// The planner on one request. The planners' lock is held for the request only (an extension plans again); with
+    /// FMI_PLANNER_LOCK=reading (E016 amendment (9)) only the reading's planner's lock is, and the cache's lock only to
+    /// find or build the planner.
+    fn plan_req(&self, req: &PlanRequest) -> Result<PlanResult, PlanError> {
+        crate::machine::port(|| {
+            let mut g = self.planners.lock().unwrap();
+            let p = g.get(&*self.reading)?;
+            if planner_lock_per_reading() {
+                drop(g);
+            }
+            let mut p = p.lock().unwrap_or_else(|e| e.into_inner());
+            p.plan(req)
+        })
+    }
+
     /// Harness.plan → _plan_taskcore (the taskcore planner, served): a plan from the engine's state; false when the
     /// planner gives none (the stop reason is set).
     fn plan(&mut self, first: bool) -> Result<bool, EngineError> {
@@ -357,6 +440,8 @@ impl<'a> Harness<'a> {
         if self.cfg.unobserved_actor_rooms {
             start::actor_rooms_start(&mut start_f, doms, &self.ps.pred, first);
         }
+        let mut counts = counts;
+        let unmatched = crate::machine::section("args_of_slots", || args_of_slots(&mut start_f, doms, &self.ps.state, rd.dir(), &mut counts));
         let n = self.plans.len();
         let frame = self.ps.engine.status().frame;
         // E016 C: the memory's bans for this exact state and target (none without the switch)
@@ -389,6 +474,12 @@ impl<'a> Harness<'a> {
                 self.stop(format!("replan at frame {frame} with plan {pn}'s start and bans and no frame played since: the same plan again"));
                 return Ok(false);
             }
+        }
+        // E022 amendment (8): a live slot whose dumped locals match no list of the reading: the reading extended from
+        // this start, with the live slots' locals (FMI_SLOT_LOCALS), as for a start value it did not reach
+        if !unmatched.is_empty() && self.cfg.reach_extend && self.rereads.is_some() {
+            let values: Vec<String> = unmatched.iter().map(|s| format!("locals of {s}")).collect();
+            return self.extend(first, start_f, (values.len() as i64, values));
         }
         let refined = self.refinements.iter().any(|t| t["added"].as_array().is_some_and(|a| !a.is_empty()));
         if goal_fact_on() && refined {
@@ -463,18 +554,34 @@ impl<'a> Harness<'a> {
             },
             time_limit_s: limit,
         };
-        // the planners' lock is held for the request only (an extension below plans again); with
-        // FMI_PLANNER_LOCK=reading (E016 amendment (9)) only the reading's planner's lock is, and the cache's lock
-        // only to find or build the planner
-        let planned = crate::machine::port(|| {
-            let mut g = self.planners.lock().unwrap();
-            let p = g.get(&*self.reading)?;
-            if planner_lock_per_reading() {
-                drop(g);
+        // E022 amendment (7) (FMI_PLAN_FOCUS=1): the goal's families' actions first, the whole reading when they fail
+        let focused = if crate::focus::on() {
+            crate::machine::section("focus", || crate::focus::focus(&*self.reading, &req.start, &req.goal))
+        } else {
+            None
+        };
+        let planned = match focused {
+            Some(f) => {
+                let mut fr = req.clone();
+                fr.bans.extend(f.bans.iter().cloned());
+                fr.time_limit_s = limit.min(crate::focus::limit_s());
+                let r = self.plan_req(&fr);
+                let (st, secs) = match &r {
+                    Ok(x) => (x.status.clone(), x.seconds),
+                    Err(_) => ("error".to_string(), 0.0),
+                };
+                (self.progress)(&format!("plan {n}: focus on {} actions of {:?}: {st}", f.actions, f.families));
+                self.plans.last_mut().unwrap().insert(
+                    "focus".into(),
+                    json!({"families": f.families, "actions": f.actions, "rounds": f.rounds, "status": st, "seconds": secs}),
+                );
+                match r {
+                    Ok(x) if x.status == "plan" => Ok(x),
+                    _ => self.plan_req(&req),
+                }
             }
-            let mut p = p.lock().unwrap_or_else(|e| e.into_inner());
-            p.plan(&req)
-        });
+            None => self.plan_req(&req),
+        };
         let res = match planned {
             Ok(r) => r,
             Err(e) => {
@@ -598,6 +705,9 @@ impl<'a> Harness<'a> {
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
         let rs_ = start::reach_start_text_full(&start_f, self.reading.domains());
+        if let Some(s) = slot_locals_now(&self.ps.state) {
+            rr.add_slot_locals(s);
+        }
         let new = match crate::machine::port(|| rr.extend(&rs_)) {
             Ok(r) => r,
             Err(e) => {
@@ -701,6 +811,9 @@ impl<'a> Harness<'a> {
         let rr = self.rereads.as_mut().unwrap();
         let (cpu0, wall0) = (rr.cpu_s(), Instant::now());
         let rs_ = start::reach_start_text_full(&st, self.reading.domains());
+        if let Some(s) = slot_locals_now(&self.ps.state) {
+            rr.add_slot_locals(s);
+        }
         let mut widened = 0;
         let (reading, doc, rep) = loop {
             let reading = match crate::machine::port(|| rr.refine(&new, &rs_)) {
