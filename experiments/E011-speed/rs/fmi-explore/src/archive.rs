@@ -1933,10 +1933,17 @@ impl Archive {
         out
     }
 
+    /// E022 amendment (10): the frontier's order under `FMI_FRONTIER_ATOMS=1`: the entries holding more of the guide's
+    /// atoms set (nonzero) first, as Go-Explore prefers the cells further along (an adventure's progress is state that
+    /// stays set), then the order they were found.
+    fn front_order(&self, i: usize) -> (i64, usize) {
+        (-(self.rows[i].held.iter().filter(|(_, v)| *v != 0).count() as i64), i)
+    }
+
     /// E016 F: the selection with the frontier first. Each idle cell gives its candidate as before, or its least
     /// frontier entry that a candidate may be (live, not exhausted, in an allowed room); the frontier's entries come
     /// first, then the rest, each part in the order `key` gives. Under `FMI_FRONTIER_ATOMS=1` the frontier's entries
-    /// come in id order (the order they were found), so a stream of new atoms cannot starve an older one.
+    /// come in `front_order`.
     fn select_front<K: Ord>(&self, b: usize, free: bool, busy_ids: &HashSet<usize>, busy_cells: &HashSet<&str>,
                             nov: &HashMap<usize, i64>, key: impl Fn(usize) -> K) -> Vec<usize> {
         let front = self.frontier(free);
@@ -1945,7 +1952,7 @@ impl Archive {
             let r = &self.rows[i];
             r.dead.is_none() && !p.is_some_and(|p| p.exhausted_now(i)) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
         };
-        let mut cands: Vec<((bool, usize, K), usize)> = self
+        let mut cands: Vec<((bool, (i64, usize), K), usize)> = self
             .cells
             .iter()
             .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
@@ -1956,7 +1963,7 @@ impl Archive {
             .filter(|i| !busy_ids.contains(i))
             .map(|i| {
                 let f = front.contains(&i);
-                ((!f, if f && frontier_atoms_on() { i } else { 0 }, key(i)), i)
+                ((!f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
             })
             .collect();
         cands.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1979,7 +1986,7 @@ impl Archive {
             let r = &self.rows[i];
             r.dead.is_none() && !p.is_some_and(|p| p.exhausted_now(i)) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
         };
-        let mut cands: Vec<((bool, usize, _), usize)> = self
+        let mut cands: Vec<((bool, (i64, usize), _), usize)> = self
             .cells
             .iter()
             .filter_map(|(cid, c)| {
@@ -1988,7 +1995,7 @@ impl Archive {
             })
             .map(|i| {
                 let f = front.contains(&i);
-                ((!f, if f && frontier_atoms_on() { i } else { 0 }, key(i)), i)
+                ((!f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
             })
             .collect();
         cands.sort_by(|a, b| a.0.cmp(&b.0));

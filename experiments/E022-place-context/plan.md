@@ -213,3 +213,10 @@ Measured on the laptop, rerunning play10's j09542 (entry 22356) with the target 
   - An atom's first holder stays on the frontier until it has had a try of each kind (model and free).
   - The frontier's entries come in id order, the order they were found, so a stream of new atoms cannot starve an
     older one.
+- **What happened then (17:00–17:34):**
+  - The per-kind rule put old first holders back on the frontier, those lacking a try of one kind. In id order they
+    came first: entries 157 to 11993 in 14 jobs, and 22574 still waited.
+  - A cargo build beside the run took the laptop under the run guard's 3 GB, and the guard stopped the run.
+- **Change (same switch):** the frontier's entries come with the most guide atoms set first, then in found order.
+  This is Go-Explore's preference for cells further along: an adventure's progress is state that stays set.
+  - 22574 holds 43 set guide atoms. Only 5 entries in the archive hold more, and the old backlog holds 30–37.
