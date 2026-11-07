@@ -127,3 +127,61 @@
 - **Open:** the planner proves `bit:443 = 1` unsolvable on the reach extension from the entry ("6 values not reached"
   before it). That is the next diagnosis.
 - **The run:** stopped at 01:15 so the booking is not spent while this is diagnosed offline. Still C6.
+
+## Amendment (7), 2026-11-07 11:40 UTC: replans read the replan state's slots, and a plan tries the goal's families first
+
+Measured on the laptop, rerunning play10's j09542 (entry 22356) with the target `bit:443 = 1`.
+
+- **Replans did not get their slots' lists.** Extensions and refinements read only with the original start's slot
+  locals. At the replan state (frame 2593), local 208's locals matched no list, so its args fell to 0 and the planner
+  ran out of its 300 s.
+  - **Fix:** `Rereads::add_slot_locals`. Before an extension or a refinement, the harness gives the reader the
+    current state's live slots, deduplicated with the ones it has.
+  - **Result (q5):** the replan's slots all match but one ("args from the slot's dumped locals": 4). The planner
+    still ran out of time.
+- **Why it still ran out.** Plan 0 picked dialog line 120, but at frame 2593 only lines 121–124 are on, so the replan
+  has to go through line 124 to open line 120.
+  - The plan exists. A breadth-first search over the dialog's own actions (the clicks, global 17's events, local
+    208's events) finds 16 steps after 394 states.
+  - On the whole reading, LAMA, FD and the Rust GBFS each ran out of 900 s.
+  - Room 49's reading holds 11,272 events of local 209 and 4,800 of global 59, against 898 of local 208. The
+    relaxed plan reaches var 165 through an args-0 event of global 17 in 3 rounds, so the heuristic sees the goal
+    as near everywhere.
+  - With every label outside the dialog banned, LAMA and GBFS each find a 20-step plan in 0.1 s.
+- **Change, `FMI_PLAN_FOCUS=1` (fmi-explore `focus.rs`).** This is partial grounding (Gnad et al., AAAI 2019): plan
+  on a subset of the actions first.
+  - Actions fall into families: an event's slot, or a label with its arguments dropped.
+  - The subset starts with the families that write a goal value. Each round adds the smallest family that writes a
+    precondition value the subset does not reach under relaxation, until it reaches the goal.
+  - The harness bans every other label and plans for at most `FMI_PLAN_FOCUS_S` (30 s), then plans on the whole
+    reading as before.
+  - A plan on the subset is a plan on the reading.
+  - The relaxed start is the planner's own: every fact of the domains, 0 where the state lacks it. The first version
+    seeded only the facts the state named, and found no subset in the harness.
+- **Result (q8):** plan 1 focuses on 931 actions (the dialog lines, local 208, global 17, the boat's events) and finds
+  20 steps in 0.1 s. The try plays 154 frames.
+
+## Amendment (8), 2026-11-07 12:35 UTC: a replan whose live slot matches no list extends the reading
+
+- **What happened (q8):** after 154 frames, the replan at frame 2746 had local 208 at 0x1A4C and global 86, whose
+  locals matched no list. The planner proved no plan.
+- **Change:** `args_of_slots` returns the unmatched slots. The harness extends the reading from that start with the
+  live slots' locals, as for a start value the reading did not reach, under the same limit.
+- **Result (q9):** extensions at frames 2746, 2874 and 3032; the try plays 440 frames. At 3032 local 208 waits at
+  turn 2 (0x10E6) with its counter still 0: turn 1 was answered wrong, and no plan exists from there.
+
+## Amendment (9), 2026-11-07 12:45 UTC: the scope rooms' input vars are facts of a fresh reading
+
+- **What happened (q9):**
+  - The quiz compares the dialog choice with var 239, the distance the book draws. The state has var 239 = 250.
+  - var 239 was not a fact of the reading, so either answer looked right to the planner.
+  - The refinement at the wrong answer's deviation could not name the variable ("the frame before is not kept").
+- **Change, `FMI_READ_INPUT_FACTS=1`:** a fresh reading takes as fact vars the input vars of its scope's rooms
+  (`ctx.rs`: the vars the room's code tests and does not write, the engine's aside). Room 49's are 176, 224, 238,
+  239, 240 and 444. A var the room never writes keeps its start value through the reading, so its tests read that
+  value.
+- **Result (q10):**
+  - Probes on var 444 are proved unsolvable at once.
+  - The `bit:443 = 1` attempt plays 545 frames, with 9 plans (all focused, 0–25 steps, 0 s each) and 4 extensions.
+  - It stops with "goal, not from the plan: it held at a plan's start".
+  - Entry 14 (frame 3137) holds `bit:443 = 1`. The quiz is passed from the conversation's start with no hand input.
