@@ -1910,13 +1910,18 @@ impl Archive {
     /// E016 section F (`FMI_FRONTIER=1`, plan.md "F. Configuration and selection"): the frontier, every live entry that
     /// is the first entry (least id) in its room and that no job has had as its entry yet, committed or running. Such
     /// an entry is in a room no earlier entry held, and it gets the next free worker once.
+    /// The first room entries not chosen yet (E016 F) and, under `FMI_FRONTIER_ATOMS=1` (E022 amendment (10)), each
+    /// entry not chosen yet that is the least live holder in the whole archive of an atom of T
+    /// (`Progress::first_counts`): a new atom comes first as a new room does.
     pub fn frontier(&self) -> HashSet<usize> {
-        self.frontier_with(&HashMap::new())
+        let firsts = match (&self.progress, frontier_atoms_on()) {
+            (Some(p), true) => p.first_counts(),
+            _ => HashMap::new(),
+        };
+        self.frontier_with(&firsts)
     }
 
-    /// `frontier`, and under `FMI_FRONTIER_ATOMS=1` (E022 amendment (10)) also each entry not chosen yet that is the
-    /// least live holder of an atom of T (`nov`, `novel_counts`): a new atom comes first as a new room does.
-    pub fn frontier_with(&self, nov: &HashMap<usize, i64>) -> HashSet<usize> {
+    fn frontier_with(&self, firsts: &HashMap<usize, i64>) -> HashSet<usize> {
         let mut first: HashMap<i64, usize> = HashMap::new();
         for r in self.rows.iter().filter(|r| r.dead.is_none()) {
             if let Some(room) = r.room {
@@ -1926,9 +1931,7 @@ impl Archive {
         let mut chosen: HashSet<usize> = self.busy.values().map(|(e, _)| *e).collect();
         chosen.extend(self.logs.iter().filter_map(|x| x.get("entry").and_then(|e| e.as_u64())).map(|e| e as usize));
         let mut out: HashSet<usize> = first.into_values().filter(|i| !chosen.contains(i)).collect();
-        if frontier_atoms_on() {
-            out.extend(nov.iter().filter(|&(i, &n)| n > 0 && !chosen.contains(i)).map(|(&i, _)| i));
-        }
+        out.extend(firsts.iter().filter(|&(i, &n)| n > 0 && !chosen.contains(i)).map(|(&i, _)| i));
         out
     }
 
@@ -1937,7 +1940,7 @@ impl Archive {
     /// first, then the rest, each part in the order `key` gives.
     fn select_front<K: Ord>(&self, b: usize, busy_ids: &HashSet<usize>, busy_cells: &HashSet<&str>, nov: &HashMap<usize, i64>,
                             key: impl Fn(usize) -> K) -> Vec<usize> {
-        let front = self.frontier_with(nov);
+        let front = self.frontier();
         let p = self.progress.as_ref();
         let may = |i: usize| {
             let r = &self.rows[i];
@@ -1963,7 +1966,7 @@ impl Archive {
     /// rank among the candidates. For reports; it selects nothing.
     pub fn explain_selection(&self, i: usize) -> Value {
         let nov = self.novel_counts();
-        let front = self.frontier_with(&nov);
+        let front = self.frontier();
         let p = self.progress.as_ref();
         let r = &self.rows[i];
         let key = |i: usize| {
@@ -2346,7 +2349,7 @@ impl Archive {
         let mut sel = json!({"key": key, "cell": self.rows[i].cell, "selectable": self.n_selectable(), "time": files::now_s(),
                              "kind": k.text(), "why": k.why, "rho": k.rho});
         if frontier_on() {
-            sel["frontier"] = json!(self.frontier_with(&if frontier_atoms_on() { self.novel_counts() } else { HashMap::new() }).contains(&i));
+            sel["frontier"] = json!(self.frontier().contains(&i));
         }
         if select_place_on() {
             sel["place"] = json!(self.place_of_row(i));
@@ -2389,7 +2392,7 @@ impl Archive {
                              "time": files::now_s()});
         if frontier_on() {
             // E016 F: whether the entry was the frontier's
-            sel["frontier"] = json!(self.frontier_with(&if frontier_atoms_on() { self.novel_counts() } else { HashMap::new() }).contains(&i));
+            sel["frontier"] = json!(self.frontier().contains(&i));
         }
         files::write_json(&d.join("select.json"), &sel, Some(1))?;
         files::write_json(&d.join("job.json"), &self.job_doc(&job, i)?, Some(1))?;

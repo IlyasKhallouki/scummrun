@@ -198,6 +198,8 @@ Measured on the laptop, rerunning play10's j09542 (entry 22356) with the target 
     j08778 gave the atom. Its next 15 tries went to other entries there that first held more of the guide's atoms at
     the place (up to 6, against 22574's 1), and gave nothing. The place now waits behind every place with 14.
 - **Change, `FMI_FRONTIER_ATOMS=1`:** the frontier (E016 F) also holds each entry not chosen yet that is the least
-  live holder of an atom of T. A new atom then comes first, as a new room does.
-- **Result on the archive (offline):** 22574 is on the frontier and ranks 74 of 2,921. The 73 ahead of it are the
-  other untried first holders of atoms of T.
+  live holder in the whole archive of an atom of T (`Progress::first_counts`). A new atom then comes first, as a new
+  room does.
+- **Result on the archive (offline):** 22574 is on the frontier and ranks 4 of 2,921.
+  - A first version used `novel_counts`, which under the place context counts first holders per place. It put 73
+    entries ahead of 22574, and new ones would keep arriving.

@@ -443,6 +443,16 @@ impl Progress {
         out
     }
 
+    /// Per row, the atoms of T whose least live holder in the whole archive it is: `novel_counts` without the place
+    /// context (E022 amendment (10)'s frontier).
+    pub fn first_counts(&self) -> HashMap<usize, i64> {
+        let mut out = HashMap::new();
+        for &(_, i) in self.first.values() {
+            *out.entry(i).or_insert(0) += 1;
+        }
+        out
+    }
+
     /// Whether entry i is exhausted under the current T.
     pub fn exhausted_now(&self, i: usize) -> bool {
         self.exhausted.get(&i).map(|&n| n >= self.t.len()).unwrap_or(false)
