@@ -136,6 +136,51 @@ class Job:
     warnings: list[str] = field(default_factory=list)
 
 
+def parent_objects(data_file: Path) -> dict[int, tuple[int, int]]:
+    """Per object with a parent, (the parent's object, the parent state), from the data file (XOR 0x69 like the index
+    file). A CDHD's parent is a 1-based index into its room's objects in the order of the ROOM block's OBCD blocks
+    (ScummVM's loadRoomObjects fills _objs in that order); the parent state is 1 when the flags byte is 0x80, else the
+    flags' low four bits (resetRoomObject). findObject touches a child only while its parent is in that state."""
+    data = bytes(b ^ 0x69 for b in data_file.read_bytes())
+    out: dict[int, tuple[int, int]] = {}
+    for tag, p, size in iter_blocks(data, 0):
+        if tag != "LECF":
+            continue
+        for t2, q, _ in iter_blocks(data, p + 8, p + size):
+            if t2 != "LOFF":
+                continue
+            for i in range(data[q + 8]):
+                off = struct.unpack("<I", data[q + 10 + i * 5 : q + 14 + i * 5])[0]
+                if data[off : off + 4] != b"ROOM":
+                    continue
+                order = []
+                for t3, r, s3 in iter_blocks(data, off + 8, off + struct.unpack(">I", data[off + 4 : off + 8])[0]):
+                    if t3 != "OBCD":
+                        continue
+                    for t4, c, _ in iter_blocks(data, r + 8, r + s3):
+                        if t4 == "CDHD":
+                            order.append((struct.unpack("<H", data[c + 8 : c + 10])[0], data[c + 15], data[c + 14]))
+                for obj, parent, flags in order:
+                    if 0 < parent <= len(order):
+                        out[obj] = (order[parent - 1][0], 1 if flags == 0x80 else flags & 0xF)
+            break
+    return out
+
+
+def add_parents(objects: dict, data_file: Path, problems: list[str]) -> None:
+    """Each object with a parent gets "parent_object" and "parent_state" (`parent_objects`), when the data file
+    reads."""
+    try:
+        parents = parent_objects(data_file)
+    except (OSError, ValueError, struct.error) as e:
+        problems.append(f"{data_file}: the objects' parents not read ({e})")
+        return
+    for obj, (po, ps) in parents.items():
+        if obj in objects:
+            objects[obj]["parent_object"] = po
+            objects[obj]["parent_state"] = ps
+
+
 def parse_obcd(path: Path) -> dict:
     data = path.read_bytes()
     if data[:4] != b"OBCD":
@@ -482,7 +527,26 @@ def write_index_md(path: Path, idx: dict, title: str | None = None) -> None:
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
+def parents_into(argv: list[str]) -> int:
+    """`dump_scripts.py --parents-into INDEX_JSON --data-file F`: `add_parents` on an index.json made before."""
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--parents-into", type=Path, required=True)
+    ap.add_argument("--data-file", type=Path, required=True)
+    a = ap.parse_args(argv)
+    idx = json.loads(a.parents_into.read_text())
+    objects = {int(k): v for k, v in idx["objects"].items()}
+    problems: list[str] = []
+    add_parents(objects, a.data_file, problems)
+    idx["objects"] = {str(k): v for k, v in sorted(objects.items())}
+    a.parents_into.write_text(json.dumps(idx, indent=1) + "\n")
+    n = sum(1 for o in objects.values() if "parent_object" in o)
+    print(f"{a.parents_into}: {n} objects with a parent object; problems {problems}")
+    return 1 if problems else 0
+
+
 def main() -> int:
+    if "--parents-into" in sys.argv:
+        return parents_into(sys.argv[1:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--index-file", type=Path, required=True)
     ap.add_argument("--blocks", type=Path, required=True)
@@ -500,6 +564,10 @@ def main() -> int:
     if args.verb_dir.exists():
         shutil.rmtree(args.verb_dir)
     jobs, rooms, objects, globals_ = collect_jobs(args.blocks, args.verb_dir, index, problems)
+    # E022 amendment (12): the objects' parents as objects, with the state they need (the data file next to the index)
+    data_file = args.index_file.with_suffix(".001")
+    if data_file.exists():
+        add_parents(objects, data_file, problems)
 
     with ThreadPoolExecutor(max_workers=args.jobs) as ex:
         jobs = list(ex.map(lambda j: run_descumm(args.descumm, j), jobs))

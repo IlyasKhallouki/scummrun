@@ -41,6 +41,9 @@ pub struct GameData {
     pub local_rooms: BTreeMap<i32, Vec<i32>>,
     pub object_room: FxHashMap<i32, i32>,
     pub object_parent: FxHashMap<i32, i32>,
+    /// E022 amendment (12): object -> (its parent object, the parent state findObject needs), index.json's
+    /// "parent_object" and "parent_state" (scripts/dump_scripts.py `parent_objects`)
+    pub object_parent_state: FxHashMap<i32, (i32, i32)>,
     pub verb_offset: FxHashMap<i32, i32>,
     pub room_width: FxHashMap<i32, i32>,
     pub pseudo: FxHashMap<i32, i32>,
@@ -62,6 +65,8 @@ pub struct Game {
     /// object -> the room resource it is defined in
     pub object_room: FxHashMap<i32, i32>,
     pub object_parent: FxHashMap<i32, i32>,
+    /// object -> (its parent object, the parent state), E022 amendment (12)
+    pub object_parent_state: FxHashMap<i32, (i32, i32)>,
     /// object -> offset of its VERB block in its OBCD (getVerbEntrypoint's verboffs)
     pub verb_offset: FxHashMap<i32, i32>,
     /// room -> width (RMHD)
@@ -169,6 +174,7 @@ impl Game {
         let (pseudo, pseudo_conflicts) = pseudo_rooms(&script);
         let mut object_room = FxHashMap::default();
         let mut object_parent = FxHashMap::default();
+        let mut object_parent_state = FxHashMap::default();
         let mut verb_offset = FxHashMap::default();
         for (o, ob) in by_int_key(&meta["objects"]) {
             object_room.insert(o, ob["room"].as_i64().expect("object room") as i32);
@@ -177,6 +183,9 @@ impl Game {
                 Some(p) => p.as_i64().expect("object parent is an int") as i32,
             };
             object_parent.insert(o, parent);
+            if let (Some(po), Some(ps)) = (ob.get("parent_object").and_then(|v| v.as_i64()), ob.get("parent_state").and_then(|v| v.as_i64())) {
+                object_parent_state.insert(o, (po as i32, ps as i32));
+            }
             if let Some(v) = ob.get("verb_block_offset_in_obcd").and_then(|v| v.as_i64()) {
                 verb_offset.insert(o, v as i32);
             }
@@ -189,6 +198,7 @@ impl Game {
             local_rooms,
             object_room,
             object_parent,
+            object_parent_state,
             verb_offset,
             room_width,
             pseudo,
@@ -216,6 +226,7 @@ impl Game {
             local_rooms: data.local_rooms,
             object_room: data.object_room,
             object_parent: data.object_parent,
+            object_parent_state: data.object_parent_state,
             verb_offset: data.verb_offset,
             room_width: data.room_width,
             pseudo: data.pseudo,

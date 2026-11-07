@@ -999,7 +999,28 @@ impl<'g> Builder<'g> {
             rooms = vec![Label::Int(home as i64)];
         }
         let parent = self.game.object_parent.get(&(a as i32)).copied().unwrap_or(0);
-        let checks = if parent != 0 {
+        // E022 amendment (12) (`FMI_READ_PARENTS=1`): findObject touches a child only while each parent up its chain
+        // is in the state the child names (object.cpp:572-594): a precondition on `state:<parent>` when the index
+        // names the parent object and the reading holds its state; else the assumption as before
+        let mut parent_pre: Vec<(String, Labels)> = Vec::new();
+        let mut known = parent != 0 && read_parents_on();
+        let mut cur = a as i32;
+        while known {
+            match self.game.object_parent_state.get(&cur).copied() {
+                Some((po, ps)) => {
+                    let key = format!("state:{po}");
+                    if self.domain(&key).is_none() {
+                        known = false;
+                        break;
+                    }
+                    parent_pre.push((key, vec![Label::Int(ps as i64)]));
+                    cur = po;
+                }
+                None if cur == a as i32 => known = false,
+                None => break,
+            }
+        }
+        let checks = if parent != 0 && !known {
             vec![Assumption::new(
                 "object.cpp:567-590",
                 format!("object {a}'s parent {parent} in its parent state"),
@@ -1009,13 +1030,17 @@ impl<'g> Builder<'g> {
         } else {
             vec![]
         };
+        let mut placed = vec![
+            ("room".to_string(), rooms),
+            (format!("owner:{a}"), vec![Label::Int(OF_OWNER_ROOM)]),
+            (format!("class:{a}:{CLASS_UNTOUCHABLE}"), vec![Label::Int(0)]),
+        ];
+        if known {
+            placed.extend(parent_pre);
+        }
         out.push((
             "room",
-            vec![
-                ("room".to_string(), rooms),
-                (format!("owner:{a}"), vec![Label::Int(OF_OWNER_ROOM)]),
-                (format!("class:{a}:{CLASS_UNTOUCHABLE}"), vec![Label::Int(0)]),
-            ],
+            placed,
             checks,
         ));
         let dom = self.domain(&format!("owner:{a}"));
@@ -2925,3 +2950,10 @@ enum EffOut {
     None,
 }
 
+
+/// E022 amendment (12): `FMI_READ_PARENTS=1`, a room object with a parent is placed only with each parent up its chain
+/// in the state findObject needs (`Builder` placements).
+pub fn read_parents_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_PARENTS").is_ok_and(|v| v == "1"))
+}
