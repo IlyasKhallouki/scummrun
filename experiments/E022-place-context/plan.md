@@ -203,3 +203,13 @@ Measured on the laptop, rerunning play10's j09542 (entry 22356) with the target 
 - **Result on the archive (offline):** 22574 is on the frontier and ranks 4 of 2,921.
   - A first version used `novel_counts`, which under the place context counts first holders per place. It put 73
     entries ahead of 22574, and new ones would keep arriving.
+- **What happened next (the laptop run, 16:37–16:52):**
+  - The model selection took 22574 at once (j08840). Its reading, reused from another state, gave only one dialog
+    click (line 120). No new atom.
+  - Room changes have come from free tries (C1–C6 were model-free). But one try of either kind took 22574 off the
+    frontier for both kinds.
+  - Then one free try (j08841) gave 36 new atoms at once, and the key order puts fresh places ahead of 22574's place.
+- **Change (same switch):**
+  - An atom's first holder stays on the frontier until it has had a try of each kind (model and free).
+  - The frontier's entries come in id order, the order they were found, so a stream of new atoms cannot starve an
+    older one.

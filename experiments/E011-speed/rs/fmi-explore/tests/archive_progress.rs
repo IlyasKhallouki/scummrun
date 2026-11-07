@@ -746,7 +746,7 @@ fn e016_f_the_frontier_entry_gets_the_next_worker_once() {
     {
         let _f = Frontier::on();
         // the root and entry 1 had jobs; entry 2 is the first of room 35; entry 3 is not the first of its room
-        assert_eq!(a.frontier(), [e2].into_iter().collect());
+        assert_eq!(a.frontier(false), [e2].into_iter().collect());
         assert_eq!(a.select(1), vec![e2]);
         assert_eq!(a.select_free(1), vec![e2]);
         assert_eq!(a.select(2), vec![e2, e3]);
@@ -755,12 +755,12 @@ fn e016_f_the_frontier_entry_gets_the_next_worker_once() {
         std::fs::remove_dir_all(&d).unwrap();
         // a running job on entry 2: not the frontier's any more, and its cell is busy
         a.busy.insert("j9".into(), (e2, a.rows[e2].cell.clone()));
-        assert!(a.frontier().is_empty());
+        assert!(a.frontier(false).is_empty());
         assert_eq!(a.select(1), vec![e3]);
         a.busy.clear();
         // once its job is committed, the order is as before
         ingest(&mut a, e2, &[], &[]);
-        assert!(a.frontier().is_empty());
+        assert!(a.frontier(false).is_empty());
         assert_eq!(a.select(1), vec![e3]);
     }
     assert!(std::env::var("FMI_FRONTIER").is_err());
