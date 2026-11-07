@@ -261,3 +261,34 @@ Measured on the laptop, one job at a time from the archive's own states:
   - Result: the try plays 121 frames and stops with "goal". Its last entry (frame 18157) is in room 82 with
     `bit:443 = 1`. **C7 is reached** by the system's own plans from the conversation's entry, through three single
     jobs. The archive run has not yet recorded it.
+
+## Amendment (14), 2026-11-07 20:00–21:00 UTC: C8 by single jobs, and the dark room's reading
+
+- **C8 (room 48), single jobs from the room-82 entry:**
+  - The first dive is a cutscene. Room 82's local 201 shows a shadow by the boat, sets 488's state and loads room
+    42, and room 42 dives again by itself.
+  - On the second dive, room 82's entry clears class 6 on one cave at random. Walking into any other cave loads room
+    48.
+  - The model try's targets put `room = 24` (the drowning's room, its tier and depth equal) before `room = 48`. With
+    room 24 tried, as the archive's next try from the same entry would have it, the try plans one walk click. Its
+    entry (frame 18956) is in room 48.
+- **The dark room's reading did not end.**
+  - Room 48's reading ran past the 300 s bound, and past 30 minutes with the bound raised.
+  - `FMI_READ_SLOW_DEBUG=S` (reader `par.rs`) names jobs slower than S seconds. The slow ones are local 206's events,
+    up to 212 s a run.
+  - Local 206 places the ladder and starts global 10, the inventory redraw, directly: this game's
+    `VAR_INVENTORY_SCRIPT` is 0. The reader does not enumerate the inventory, so `findInventory` is unknown and every
+    one of the ten slots forks.
+- **Change, `FMI_READ_INVENTORY_SUMMARY=1` (reader `machine.rs` `eng_script`, `scope.rs` `enumerates_inventory`):**
+  a start of a global script whose assignment reads `findInventory` is summarized as the inventory hook's run already
+  was: not run, its writes guessed.
+- **Result:** room 48's reading ends in 2 minutes, with 14 targets. They are the first steps of the dark room: the
+  stone box, the wand, the ladder.
+- **The end, from the scripts:**
+  - The demo ends when the player walks to the metal door (582) once it is open: `systemOps(1)`. The run's end entry
+    comes from the engine (`FMI_GOAL_END`), since the reader does not model `systemOps`.
+  - The door opens in local 212, which the sentry statue starts when used with object 933 while `Var[209]` is set.
+  - `Var[209]` is set by local 200, the light, which the wand starts when used with 933 (local 203, if `Var[444]`;
+    130 here).
+- **Next:** the run itself, with every switch of amendments (6)–(14). It uses fresh readings: the 75 readings the
+  archive had registered on the laptop, and the committed jobs' run folders, moved to `attic-pre-e022-11`.

@@ -23,3 +23,6 @@ ALLON="$ALLON FMI_READ_PARENTS=1"
 # amendment (13): a child whose run holds the goal is a goal child though the plan's goal records did not match
 ALLON="$ALLON FMI_GOAL_UNPLANNED=1"
 export ALLON
+# amendment (14): a start of a global script that enumerates the inventory is summarized as the inventory hook's
+ALLON="$ALLON FMI_READ_INVENTORY_SUMMARY=1"
+export ALLON
