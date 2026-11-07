@@ -13,3 +13,6 @@ ALLON="$ALLON FMI_PLAN_FOCUS=1"
 # amendment (9): the scope rooms' input vars are facts of a fresh reading
 ALLON="$ALLON FMI_READ_INPUT_FACTS=1"
 export ALLON
+# amendment (10): the frontier also holds the untried least live holders of atoms of T
+ALLON="$ALLON FMI_FRONTIER_ATOMS=1"
+export ALLON

@@ -185,3 +185,19 @@ Measured on the laptop, rerunning play10's j09542 (entry 22356) with the target 
   - The `bit:443 = 1` attempt plays 545 frames, with 9 plans (all focused, 0–25 steps, 0 s each) and 4 extensions.
   - It stops with "goal, not from the plan: it held at a plan's start".
   - Entry 14 (frame 3137) holds `bit:443 = 1`. The quiz is passed from the conversation's start with no hand input.
+
+## Amendment (10), 2026-11-07 16:00 UTC: a new atom joins the frontier as a new room does
+
+- **What happened (the laptop run from play10, W = 3 then 2, with amendments (6)–(9)):**
+  - At 14:12, job j08778 started from entry 22307 (the conversation's first menu, reached by the run itself). It
+    passed the quiz in 66 s, and its entry 22574 is the archive's only holder of `bit:443 = 1`.
+  - No job started from 22574 in the next 1.5 h.
+  - The selection's report (`Archive::explain_selection`, example `sel_explain`) ranks 22574 at 724 of 2,921
+    candidates, and the place count decides it.
+  - `bit:443` is written by room 49's own code, so it is not in the place's context. The place's count reset when
+    j08778 gave the atom. Its next 15 tries went to other entries there that first held more of the guide's atoms at
+    the place (up to 6, against 22574's 1), and gave nothing. The place now waits behind every place with 14.
+- **Change, `FMI_FRONTIER_ATOMS=1`:** the frontier (E016 F) also holds each entry not chosen yet that is the least
+  live holder of an atom of T. A new atom then comes first, as a new room does.
+- **Result on the archive (offline):** 22574 is on the frontier and ranks 74 of 2,921. The 73 ahead of it are the
+  other untried first holders of atoms of T.
