@@ -1911,6 +1911,12 @@ impl Archive {
     /// is the first entry (least id) in its room and that no job has had as its entry yet, committed or running. Such
     /// an entry is in a room no earlier entry held, and it gets the next free worker once.
     pub fn frontier(&self) -> HashSet<usize> {
+        self.frontier_with(&HashMap::new())
+    }
+
+    /// `frontier`, and under `FMI_FRONTIER_ATOMS=1` (E022 amendment (10)) also each entry not chosen yet that is the
+    /// least live holder of an atom of T (`nov`, `novel_counts`): a new atom comes first as a new room does.
+    pub fn frontier_with(&self, nov: &HashMap<usize, i64>) -> HashSet<usize> {
         let mut first: HashMap<i64, usize> = HashMap::new();
         for r in self.rows.iter().filter(|r| r.dead.is_none()) {
             if let Some(room) = r.room {
@@ -1919,7 +1925,11 @@ impl Archive {
         }
         let mut chosen: HashSet<usize> = self.busy.values().map(|(e, _)| *e).collect();
         chosen.extend(self.logs.iter().filter_map(|x| x.get("entry").and_then(|e| e.as_u64())).map(|e| e as usize));
-        first.into_values().filter(|i| !chosen.contains(i)).collect()
+        let mut out: HashSet<usize> = first.into_values().filter(|i| !chosen.contains(i)).collect();
+        if frontier_atoms_on() {
+            out.extend(nov.iter().filter(|&(i, &n)| n > 0 && !chosen.contains(i)).map(|(&i, _)| i));
+        }
+        out
     }
 
     /// E016 F: the selection with the frontier first. Each idle cell gives its candidate as before, or its least
@@ -1927,7 +1937,7 @@ impl Archive {
     /// first, then the rest, each part in the order `key` gives.
     fn select_front<K: Ord>(&self, b: usize, busy_ids: &HashSet<usize>, busy_cells: &HashSet<&str>, nov: &HashMap<usize, i64>,
                             key: impl Fn(usize) -> K) -> Vec<usize> {
-        let front = self.frontier();
+        let front = self.frontier_with(nov);
         let p = self.progress.as_ref();
         let may = |i: usize| {
             let r = &self.rows[i];
@@ -1946,6 +1956,44 @@ impl Archive {
             .collect();
         cands.sort_by(|a, b| a.0.cmp(&b.0));
         cands.into_iter().take(b).map(|(_, i)| i).collect()
+    }
+
+    /// Why entry `i` is or is not selected (the model's selection with the progress order and the frontier, as
+    /// `select` makes it): whether it is on the frontier and may be a candidate, its cell's candidate, its key and its
+    /// rank among the candidates. For reports; it selects nothing.
+    pub fn explain_selection(&self, i: usize) -> Value {
+        let nov = self.novel_counts();
+        let front = self.frontier_with(&nov);
+        let p = self.progress.as_ref();
+        let r = &self.rows[i];
+        let key = |i: usize| {
+            let k = self.sel_key_p(i, &nov);
+            (self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k)
+        };
+        let may = |i: usize| {
+            let r = &self.rows[i];
+            r.dead.is_none() && !p.is_some_and(|p| p.exhausted_now(i)) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
+        };
+        let mut cands: Vec<((bool, _), usize)> = self
+            .cells
+            .iter()
+            .filter_map(|(cid, c)| {
+                let f = c.entries.iter().copied().filter(|&i| front.contains(&i) && may(i)).min();
+                f.or_else(|| self.candidate_p(cid, &nov))
+            })
+            .map(|i| ((!front.contains(&i), key(i)), i))
+            .collect();
+        cands.sort_by(|a, b| a.0.cmp(&b.0));
+        let rank = cands.iter().position(|(_, j)| *j == i);
+        let cell_cand = cands.iter().find(|(_, j)| self.rows[*j].cell == r.cell).map(|(_, j)| *j);
+        json!({
+            "entry": i, "cell": r.cell, "room": r.room, "frame": r.frame,
+            "dead": r.dead.is_some(), "exhausted": p.is_some_and(|p| p.exhausted_now(i)),
+            "frontier": front.contains(&i), "novel": nov.get(&i).copied().unwrap_or(0),
+            "cell_entries": self.cell(&r.cell).entries.len(), "cell_candidate": cell_cand,
+            "key": format!("{:?}", key(i)), "rank": rank, "candidates": cands.len(),
+            "first": cands.first().map(|(k, j)| json!({"entry": j, "key": format!("{:?}", k)})),
+        })
     }
 
     pub fn goal_entries(&self) -> Vec<usize> {
@@ -2298,7 +2346,7 @@ impl Archive {
         let mut sel = json!({"key": key, "cell": self.rows[i].cell, "selectable": self.n_selectable(), "time": files::now_s(),
                              "kind": k.text(), "why": k.why, "rho": k.rho});
         if frontier_on() {
-            sel["frontier"] = json!(self.frontier().contains(&i));
+            sel["frontier"] = json!(self.frontier_with(&if frontier_atoms_on() { self.novel_counts() } else { HashMap::new() }).contains(&i));
         }
         if select_place_on() {
             sel["place"] = json!(self.place_of_row(i));
@@ -2341,7 +2389,7 @@ impl Archive {
                              "time": files::now_s()});
         if frontier_on() {
             // E016 F: whether the entry was the frontier's
-            sel["frontier"] = json!(self.frontier().contains(&i));
+            sel["frontier"] = json!(self.frontier_with(&if frontier_atoms_on() { self.novel_counts() } else { HashMap::new() }).contains(&i));
         }
         files::write_json(&d.join("select.json"), &sel, Some(1))?;
         files::write_json(&d.join("job.json"), &self.job_doc(&job, i)?, Some(1))?;
@@ -2840,6 +2888,11 @@ pub fn stag_cells() -> bool {
 /// E016 section F's switch `FMI_FRONTIER=1` (experiments/E016-realize-run/plan.md, "F. Configuration and selection"):
 /// under the progress order, an entry in a room that no earlier entry held goes ahead of the selection's order for
 /// the next free worker, once (`Archive::frontier`). Unset: the order as before.
+/// E022 amendment (10): the frontier also holds the untried least live holders of atoms of T.
+pub fn frontier_atoms_on() -> bool {
+    std::env::var("FMI_FRONTIER_ATOMS").is_ok_and(|v| v == "1")
+}
+
 pub fn frontier_on() -> bool {
     std::env::var("FMI_FRONTIER").is_ok_and(|v| v == "1")
 }
