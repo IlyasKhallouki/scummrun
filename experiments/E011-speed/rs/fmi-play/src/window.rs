@@ -1452,6 +1452,14 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
                 let goal = w.holds_goal(&now);
                 let credited = !w.goal_writers.is_empty() && w.goal_writers.iter().all(|i| cr.track.is_matched(*i));
                 if goal && !credited && !(cr.ch.took == Took::NA && w.goal_writers.contains(&first_i)) {
+                    // E022 amendment (13) (`FMI_GOAL_UNPLANNED=1`): a child whose run holds the goal is the goal's
+                    // child though the plan's goal records did not match: a real run reached the target, and what it
+                    // did not match is the reading's error
+                    if goal_unplanned_on() {
+                        cr.ch.outcome = "goal".into();
+                        cr.ch.why = Some(Py::s("goal, not from the plan (FMI_GOAL_UNPLANNED)"));
+                        break;
+                    }
                     let mut gws: Vec<usize> = w.goal_writers.iter().copied().collect();
                     gws.sort();
                     cr.ch.outcome = "goal, not from the plan".into();
@@ -4164,3 +4172,9 @@ impl Player for StrictPlayer {
 #[cfg(test)]
 #[path = "delay_fixture.rs"]
 mod delay_fixture;
+
+/// E022 amendment (13): `FMI_GOAL_UNPLANNED=1`, a child whose run holds the goal is a goal child though the plan's goal
+/// records did not match.
+pub fn goal_unplanned_on() -> bool {
+    std::env::var("FMI_GOAL_UNPLANNED").is_ok_and(|v| v == "1")
+}
