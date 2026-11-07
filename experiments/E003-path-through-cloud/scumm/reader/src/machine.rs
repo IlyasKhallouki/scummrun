@@ -1503,6 +1503,14 @@ impl Hooks for ReaderHooks {
                     if res.is_none() || !st(m).scope_rooms.contains(&res) {
                         let (_, cite) = call_at(p, ci);
                         let at = format!("{cite}: room {}", m.vals_ref().show(*room));
+                        // E022 amendment (11) (`FMI_READ_EXITS=1`): a room change to a known room outside the scope is
+                        // an action that ends there, writing the room, as a change inside it ends "room"; the planner
+                        // can then reach a room the scope leaves for. Unset: dropped ("left the scope").
+                        if read_exits_on() && matches!(*room, Val::Int(_)) {
+                            m.h_write(p, Fact::Room, *room);
+                            m.h_halt(p, "room", at.into());
+                            return Ok(Vec::new());
+                        }
                         m.h_halt(p, "left the scope", at.into());
                         return Ok(Vec::new());
                     }
@@ -3080,4 +3088,11 @@ mod tests {
         let p = path(vec![Step::Sentence { verb: 7, a: 320, b: None }], 0);
         assert_eq!(cut_of(&game, &p, None).steps, vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)]);
     }
+}
+
+/// E022 amendment (11): `FMI_READ_EXITS=1`, a room change to a room outside the scope is kept as an action that ends
+/// there (machine.rs `eng`).
+pub fn read_exits_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_EXITS").is_ok_and(|v| v == "1"))
 }
