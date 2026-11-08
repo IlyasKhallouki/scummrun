@@ -689,6 +689,15 @@ impl<'a> Harness<'a> {
             e.insert("steps".into(), json!([]));
             e.remove("input_key");
         }
+        // E022 amendment (23) (`FMI_REACH_TRY_LIMIT=N`): at most N reach extensions in a try. A try keeps each reading it
+        // made (the dark room's 6 GB each, 35 GB by the fifth); past the limit it stops, and the next try starts from its
+        // end in a process of its own
+        if let Some(lim) = std::env::var("FMI_REACH_TRY_LIMIT").ok().and_then(|v| v.parse::<usize>().ok()) {
+            if self.extensions.len() >= lim {
+                self.stop(format!("reach extension: the try's limit of {lim} reached at frame {frame}"));
+                return Ok(false);
+            }
+        }
         let tries: Vec<&Value> = self.extensions.iter()
             .filter(|x| x["frame"].as_u64() == Some(frame) && x["replans"].as_u64() == Some(self.replans as u64)).collect();
         let last_sub = tries.last().map(|l| {
