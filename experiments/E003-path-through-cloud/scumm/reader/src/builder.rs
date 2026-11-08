@@ -99,6 +99,16 @@ pub fn read_inv_b_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_INV_B").is_ok_and(|v| v == "1"))
 }
 
+/// E022 amendment (27)'s switch `FMI_READ_B_SWAP=1`: an object whose entry for a verb begins with
+/// `doSentence(verb, Local[0], VAR_ME)` (itself as B: the dark room's ladder, the beads 933) takes as its B each object
+/// whose own entry takes it as B, so the sentence the player makes ("use ladder with stairway", (8,583,584)) is built
+/// besides the one it re-issues ((8,584,583)), which the interface cannot make: the realizer found no clicks for it.
+/// Unset: as before.
+pub fn read_b_swap_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_B_SWAP").is_ok_and(|v| v == "1"))
+}
+
 /// E022 amendment (26)'s switch `FMI_READ_RENAME=1`: a fact read by a test that only picks object names
 /// (`machine::rename_test`) is read as one of its values, with no fork and nothing assumed: both arms leave the same
 /// state. The dark room's local 208 tests the dark class (25) of eight objects only to rename them, so the light's
@@ -1132,6 +1142,66 @@ impl<'g> Builder<'g> {
     /// `Builder.b_values`: B for (verb, A).
     pub fn b_values(&mut self, a: i64, verb: i64, ns: &[i64]) -> Vec<i64> {
         let game = self.game;
+        let mut consts = self.b_consts(a, verb);
+        // FMI_READ_B_SWAP: A's entry re-issues the sentence with the objects swapped, so the player's B is each object
+        // whose own entry takes A as its B
+        if read_b_swap_switch() && self.forwards(a, verb) {
+            let others: Vec<i64> = self.scope.objects.iter().chain(&self.scope.held).copied().filter(|&o| o != a).collect();
+            for o in others {
+                if self.b_consts(o, verb).contains(&a) {
+                    consts.insert(o);
+                    self.counts.inc("FMI_READ_B_SWAP: B objects whose own sentence takes A as its B");
+                }
+            }
+        }
+        let mut handlers: BTreeSet<i64> = BTreeSet::new();
+        for &n in ns {
+            for v in self.b_verbs(n, verb) {
+                for &o in self.scope.objects.iter().chain(&self.scope.held) {
+                    if o != a && game.entry(o as i32, v as i32).is_some() && self.has_entry(o, v) {
+                        handlers.insert(o);
+                    }
+                }
+            }
+        }
+        if consts.is_empty() && handlers.is_empty() {
+            return vec![];
+        }
+        let inside: Vec<i64> =
+            consts.iter().copied().filter(|b| self.scope.objects.contains(b) || self.scope.held.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
+        self.counts.add("B constants outside the scope (not built)", (consts.len() - inside.len()) as i64);
+        let inside_set: BTreeSet<i64> = inside.iter().copied().collect();
+        self.counts.add("B objects whose own entry the sentence script starts", handlers.difference(&inside_set).count() as i64);
+        self.counts.add("B actors (reachability a replay check)", inside.iter().filter(|&&b| b < NUM_ACTORS).count() as i64);
+        let all: BTreeSet<i64> = consts.union(&handlers).copied().collect();
+        let other = self.scope.other_b(game, a, &all);
+        if other.is_some() {
+            self.counts.inc("B = other (a stand-in object)");
+        }
+        let mut out: Vec<i64> = inside_set.union(&handlers).copied().collect();
+        out.extend(other);
+        out
+    }
+
+    /// FMI_READ_B_SWAP: whether object `a`'s entry for `verb` begins by re-issuing the sentence with its objects
+    /// swapped, `doSentence(verb, Local[0], VAR_ME)` or with `a` itself as B (the dark room's ladder, the beads 933).
+    fn forwards(&self, a: i64, verb: i64) -> bool {
+        let game = self.game;
+        let ast = &game.ast;
+        let (Some(u), Some(idx)) = (game.id(UnitKey::Obj(a as i32)), game.entry(a as i32, verb as i32)) else { return false };
+        let Some(Stmt::Op { name: known::DO_SENTENCE, args, .. }) = game.ins(u).get(idx as usize).and_then(|x| x.st) else { return false };
+        let k = ast.kids(args);
+        let me = scumm_ir::vars::var_of("VAR_ME");
+        k.len() == 3
+            && ast.constant(k[0]) == Some(verb as i32)
+            && ast.expr(k[1]) == Expr::Local(0)
+            && (ast.constant(k[2]) == Some(a as i32) || matches!(ast.expr(k[2]), Expr::Var(v) if Some(v) == me))
+    }
+
+    /// The constants A's entry for `verb` compares its Local[0] with (and, with FMI_READ_B_ARGS, a started script its
+    /// argument): `b_values`' B constants.
+    fn b_consts(&self, a: i64, verb: i64) -> BTreeSet<i64> {
+        let game = self.game;
         let ast = &game.ast;
         let mut consts: BTreeSet<i64> = BTreeSet::new();
         let u = game.id(UnitKey::Obj(a as i32));
@@ -1168,33 +1238,7 @@ impl<'g> Builder<'g> {
                 }
             }
         }
-        let mut handlers: BTreeSet<i64> = BTreeSet::new();
-        for &n in ns {
-            for v in self.b_verbs(n, verb) {
-                for &o in self.scope.objects.iter().chain(&self.scope.held) {
-                    if o != a && game.entry(o as i32, v as i32).is_some() && self.has_entry(o, v) {
-                        handlers.insert(o);
-                    }
-                }
-            }
-        }
-        if consts.is_empty() && handlers.is_empty() {
-            return vec![];
-        }
-        let inside: Vec<i64> =
-            consts.iter().copied().filter(|b| self.scope.objects.contains(b) || self.scope.held.contains(b) || (0 < *b && *b < NUM_ACTORS)).collect();
-        self.counts.add("B constants outside the scope (not built)", (consts.len() - inside.len()) as i64);
-        let inside_set: BTreeSet<i64> = inside.iter().copied().collect();
-        self.counts.add("B objects whose own entry the sentence script starts", handlers.difference(&inside_set).count() as i64);
-        self.counts.add("B actors (reachability a replay check)", inside.iter().filter(|&&b| b < NUM_ACTORS).count() as i64);
-        let all: BTreeSet<i64> = consts.union(&handlers).copied().collect();
-        let other = self.scope.other_b(game, a, &all);
-        if other.is_some() {
-            self.counts.inc("B = other (a stand-in object)");
-        }
-        let mut out: Vec<i64> = inside_set.union(&handlers).copied().collect();
-        out.extend(other);
-        out
+        consts
     }
 
     /// FMI_READ_B_ARGS: the constants script `n` (started from code of `room`) compares its Local[j] with.
