@@ -959,6 +959,18 @@ impl<'a, 'w> CRun<'a, 'w> {
             return;
         }
         let alt_c: Vec<usize> = (0..self.cs.cands.len()).filter(|&n| !self.cs.cands[n].0).collect();
+        if std::env::var("FMI_WINDOW_ALT_DEBUG").is_ok_and(|v| v == "1") {
+            for n in 0..self.cs.cands.len() {
+                let d = self.cs.decided[n].as_ref();
+                let changed: Vec<String> = d
+                    .and_then(|rj| rj.view.clone())
+                    .map(|view| self.cs.cands[n].4.iter().filter(|k| view.get(**k) != self.v0.get(**k)).map(|k| k.text()).collect())
+                    .unwrap_or_default();
+                eprintln!("[alt] fin {fin} cand {n} plan {} {} units {:?} decided {:?} linked {:?} changed {:?}", self.cs.cands[n].0,
+                    self.cs.cands[n].1, self.cs.cands[n].3.iter().map(|u| u.text()).collect::<Vec<_>>(),
+                    d.map(|rj| (rj.ok, rj.took, rj.why.clone())), self.cs.cands[n].4.iter().map(|k| k.text()).collect::<Vec<_>>(), changed);
+            }
+        }
         for &n in &alt_c {
             let Some(rj) = &self.cs.decided[n] else { continue };
             let linked = &self.cs.cands[n].4;
