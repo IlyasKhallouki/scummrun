@@ -20,6 +20,10 @@
 //!       the same start; its events and digest are compared. owner:O is reported. Writes OUT/g3.json and
 //!       OUT/events.jsonl (the realized inputs).
 //!
+//!   e016 cp OUT --movie FILE --clicks N --frame F
+//!       the first N clicks of FILE's "movie" to frame F, and the engine's checkpoint there as an archive entry keeps
+//!       it. Writes OUT/cp.json.
+//!
 //!   e016 g4 OUT ARCHIVE GOAL_ENTRY --goal KEY=V [--run-on R] [--mode jobs,chain]
 //!       G4: the goal entry's chain in ARCHIVE (read only), each sentence, walk and dialog step it took re-realized
 //!       (FMI_REALIZE=1): `jobs`, each chain entry's steps from the entry its job started at; `chain`, every step from
@@ -27,6 +31,7 @@
 //!       g4.rs. Writes OUT/g4.json and OUT/chain-events.jsonl.
 
 mod common;
+mod cp;
 mod g3;
 mod g4;
 mod hits;
@@ -39,6 +44,7 @@ fn main() {
         Some("g3") => g3::run(&argv[1..]),
         Some("g4") => g4::run(&argv[1..]),
         Some("hits") => hits::run(&argv[1..]),
+        Some("cp") => cp::run(&argv[1..]),
         _ => Err("usage: e016 inlog OUT ... | e016 g3 OUT ... | e016 g4 OUT ...".to_string()),
     };
     if let Err(e) = r {
