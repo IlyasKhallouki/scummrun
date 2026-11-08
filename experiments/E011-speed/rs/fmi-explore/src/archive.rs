@@ -1654,7 +1654,7 @@ impl Archive {
             let nov = self.novel_counts();
             if frontier_on() {
                 // E016 F: the frontier's entries first
-                return self.select_front(b, false, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_p(i, &nov); (self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k) });
+                return self.select_front(b, false, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_p(i, &nov); (self.advanced_key(k.0, i), self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k) });
             }
             let mut cands: Vec<((i64, (i64, i64), i64, i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
                 .cells
@@ -1704,7 +1704,7 @@ impl Archive {
         let nov = self.novel_counts();
         if frontier_on() {
             // E016 F: the frontier's entries first, whichever kind the next job is
-            return self.select_front(b, true, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_free(i, &nov); (self.place_owned_key(i), self.place_key(i, true), self.place_new_key(i, &nov, true), k.0, self.rarity_key(i), k) });
+            return self.select_front(b, true, &busy_ids, &busy_cells, &nov, |i| { let k = self.sel_key_free(i, &nov); (self.advanced_key(k.0, i), self.place_owned_key(i), self.place_key(i, true), self.place_new_key(i, &nov, true), k.0, self.rarity_key(i), k) });
         }
         let mut cands: Vec<((i64, (i64, i64), i64, i64, i64, (i64, i64, i64, i64, i64, usize)), usize)> = self
             .cells
@@ -1953,6 +1953,16 @@ impl Archive {
             }
         }
         out
+    }
+
+    /// E022 amendment (17) (`FMI_SELECT_ADVANCED=1`): ahead of the place keys, the cell's tries of the kind (`n`), then the
+    /// entry's guide atoms set, most first: among the cells tried least, the most advanced first (Go-Explore's
+    /// preference for cells further along). (0, 0) otherwise.
+    fn advanced_key(&self, n: i64, i: usize) -> (i64, i64) {
+        if !std::env::var("FMI_SELECT_ADVANCED").is_ok_and(|v| v == "1") {
+            return (0, 0);
+        }
+        (n, self.front_order(i).0)
     }
 
     /// E022 amendment (10): the frontier's order under `FMI_FRONTIER_ATOMS=1`: the entries holding more of the guide's

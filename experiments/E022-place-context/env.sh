@@ -29,3 +29,10 @@ export ALLON
 # amendment (15): the atom frontier counts the current driver's tries only (a changed model tries its frontier again)
 ALLON="$ALLON FMI_FRONTIER_FRESH=1"
 export ALLON
+# amendment (17): ahead of the place keys, the cells tried least, the most advanced (guide atoms set) first
+ALLON="$ALLON FMI_SELECT_ADVANCED=1"
+export ALLON
+# amendment (17): a continuing run with an unchanged model leaves the fresh reset off (every restart put hundreds of
+# untried first holders back ahead of the rest)
+ALLON="$ALLON FMI_FRONTIER_FRESH=0"
+export ALLON

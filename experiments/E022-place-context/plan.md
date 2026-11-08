@@ -303,3 +303,23 @@ Measured on the laptop, one job at a time from the archive's own states:
 - **Change, `FMI_FRONTIER_FRESH=1`:** the atom frontier counts only the tries of the current driver. The driver marks
   its first job (`Archive::fresh_from`). With the model changed, the frontier's entries are tried again, the most
   guide atoms set first.
+
+## Amendment (17), 2026-11-08 01:15 UTC: the VM run, and the most advanced fresh cells first
+
+- **The VM run:**
+  - Started 00:07 UTC on fast-mi-1 (8 workers, 2.5 h booked, the cap's last $3.12), on its own archive: 33,301
+    entries, which hold the conversation's entries.
+  - It used fresh readings: the archive's registered readings and the committed jobs' run folders were deleted, and
+    the old 16 GB reading cache `play9-run` too, when the disk fell to 4 GB.
+  - By 00:35 the run held room-42 entries with `bit:443 = 1` from frame 3714. That is a shorter route than the
+    laptop's (10656).
+  - Its model tries opened the locker, patched the suit and put it on. They were refuted on the verb script's click
+    counter, as in amendment (13)'s case.
+  - j09872's entry 33621 (frame 11119) is the suited state before the dive: ego 2, suit on, `bit:443 = 1`.
+  - No job took 33621 in 35 minutes. It is no first holder (an older C6 branch suited up) and not the first at its
+    place, so it waited in the place order. The jobs went to early room-49 entries.
+- **Change, `FMI_SELECT_ADVANCED=1` (archive `advanced_key`):** ahead of the place keys, the cell's tries of the kind,
+  then the entry's guide atoms set, most first. Among the cells tried least, the most advanced comes first
+  (Go-Explore's preference for cells further along).
+- **And `FMI_FRONTIER_FRESH=0` for this run:** the model does not change within it, and every restart under the fresh
+  reset put hundreds of untried first holders ahead of the rest.
