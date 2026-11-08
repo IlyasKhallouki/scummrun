@@ -39,3 +39,6 @@ export ALLON
 # amendment (19): object code's local starts go to the object's own room in the F flags
 ALLON="$ALLON FMI_READ_OBJ_ROOM=1"
 export ALLON
+# amendment (20): the end entries of the model tries that played first, nearest the goal by the guide's depths
+ALLON="$ALLON FMI_SELECT_CONTINUE=1"
+export ALLON

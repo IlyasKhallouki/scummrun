@@ -385,3 +385,31 @@ Measured on the laptop, one job at a time from the archive's own states:
   5 entries). The state that failed on the VM now passes.
 - **Left:** the selection has no measure of progress. The runs ranked untried or atom-rich entries ahead of the
   newest step of the chain. The guide's depths (amendment (18)) are the measure to try next.
+
+## Amendment (20), 2026-11-08 13:40 UTC: the archive follows the chain of model tries
+
+- **Problem (amendment (19)):** the runs never went back to the newest step of the chain. Each model try plans to
+  one of the guide's targets and stops at the first step the engine refutes, so the chain C6 → C9 needs a try from
+  each try's end. The selection put untried first holders (the frontier) or the cells holding the most atoms first,
+  and the chain's ends waited behind thousands of entries.
+- **Change, `FMI_SELECT_CONTINUE=1` (archive `continuation`, `continue_key`, `depth_profile`):**
+  - The end entry of every model try that played (its attempt ran frames, it committed entries; the entry marked
+    `end`, else its last frame) is a continuation until the kind (model, or free) has tried it. A cell's continuation
+    stands for its cell.
+  - Continuations come first, ahead of the frontier. Among them, the guide atoms each holds set (nonzero) are counted
+    by depth from the goal, depth 1 first, most first; then the newest.
+- **Measured before the run, play10 (24,184 entries, 2,227 continuations, 1,904 untried by a model try):**
+  - Order by depth profile: first 23351, the quiz try's end in room 49 (`bit:443 = 1`); second 24147, the voyage's
+    end in room 42. Every other candidate comes after (3,252).
+  - Newest first alone put 24149 first, a room-63 side try's end, and it would have followed that chain first.
+    Rarity (24147 at rank 74) and frame (464) do not order it either.
+- **Tried and dropped:** a guide whose any-value atoms (a room change) are not regressed (`FMI_GUIDE_SPECIFIC`)
+  still has 340 atoms at depth 2 of 492, since the specific rooms' writers read most of the game too. The code is not
+  kept.
+- **The run:** play10 on the laptop, 1 worker, every switch through (20), readings fresh (the registered readings and
+  the jobs' run folders, made under the reader before (19), moved to `attic-pre-e022-20`), wall limit 4 h, the
+  watcher's stop after 90 minutes without a new rung.
+- **Prediction:** the first model try starts from 23351 or 24147; C7 (room 82) within 2 hours; C8 (room 48) within
+  3 hours.
+- **Stop rule:** the wall limit, the watcher, or a memory guard kill. A kill is the laptop's limit, not the
+  selection's result, and is reported as such.
