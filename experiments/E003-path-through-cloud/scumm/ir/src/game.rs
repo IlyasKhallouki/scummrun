@@ -8,7 +8,7 @@ use crate::facts::{Fact, Slot};
 use crate::places::{self, ObjBox};
 use crate::read::{self, by_int_key, Script};
 use crate::sym::known;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io;
@@ -117,6 +117,12 @@ pub fn default_root() -> PathBuf {
 /// (`scripts/dump-scripts.sh`'s OUT_ROOT/data/scripts-RELEASE, holding index.json). Unset: MI's, as before.
 pub fn game_scripts_env() -> Option<PathBuf> {
     std::env::var_os("FMI_GAME_SCRIPTS").filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// E022 amendment (19)'s switch `FMI_READ_OBJ_ROOM=1`: in the F flags (`Game::compute_resistance`), a start of a
+/// local script from an object's code starts its own room's local, unless the object can be in the inventory.
+pub fn obj_room_on() -> bool {
+    std::env::var("FMI_READ_OBJ_ROOM").is_ok_and(|v| v == "1")
 }
 
 /// The game's decompiled scripts: `FMI_GAME_SCRIPTS`, else `root`/data/scripts-dos-cd.
@@ -265,10 +271,15 @@ impl Game {
         let mut flags: FxHashMap<UnitKey, u8> = FxHashMap::default();
         let mut wild = Vec::new();
         let mut chains: Vec<(Option<UnitKey>, UnitKey)> = Vec::new();
+        // E022 amendment (19) (`FMI_READ_OBJ_ROOM=1`): the engine runs an object's code only while the object's room
+        // is current, or from the inventory in any room; a start of a local script number from the code of an object
+        // that is never in the inventory starts its own room's local, not every room's of that number
+        let ownable = if obj_room_on() { self.ownable() } else { FxHashSet::default() };
         for u in self.ids() {
             let key = self.unit(u).key;
             let room = match key {
                 UnitKey::Local(r, _) | UnitKey::Entry(r) | UnitKey::Exit(r) => Some(r),
+                UnitKey::Obj(o) if obj_room_on() && !ownable.contains(&o) => self.object_room.get(&o).copied(),
                 _ => None,
             };
             let src = matches!(key, UnitKey::Global(_) | UnitKey::Local(..)).then_some(key);
@@ -323,6 +334,34 @@ impl Game {
             }
         }
         (flags.into_iter().map(|(k, b)| (k, Resist::from_bits(b))).collect(), wild)
+    }
+
+    /// E022 amendment (19): the objects that can be in the inventory: those a pickupObject or setOwnerOf names as a
+    /// constant, and an object whose own code picks up or gives VAR_ME. A site with another object argument (a give
+    /// helper's `Local[0]`) hands over an object something already holds, and adds none.
+    pub fn ownable(&self) -> FxHashSet<i32> {
+        let ast = &self.ast;
+        let mut out = FxHashSet::default();
+        for u in self.ids() {
+            let key = self.unit(u).key;
+            for x in self.ins(u) {
+                let Some(Stmt::Op { name, args, .. }) = x.st else { continue };
+                if name != known::PICKUP_OBJECT && name != known::SET_OWNER_OF {
+                    continue;
+                }
+                let Some(&a) = ast.kids(args).first() else { continue };
+                match (ast.constant(a), ast.expr(a), key) {
+                    (Some(o), _, _) => {
+                        out.insert(o);
+                    }
+                    (None, Expr::Var(v), UnitKey::Obj(o)) if crate::vars::var_of("VAR_ME") == Some(v) => {
+                        out.insert(o);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        out
     }
 
     /// model.py `Game._started`: the units a start of script `n` from code of `room` (None: global or
