@@ -36,3 +36,6 @@ export ALLON
 # untried first holders back ahead of the rest)
 ALLON="$ALLON FMI_FRONTIER_FRESH=0"
 export ALLON
+# amendment (19): object code's local starts go to the object's own room in the F flags
+ALLON="$ALLON FMI_READ_OBJ_ROOM=1"
+export ALLON

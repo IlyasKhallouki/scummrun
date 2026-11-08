@@ -341,3 +341,47 @@ Measured on the laptop, one job at a time from the archive's own states:
     (`sentence(8,496,491)`) before suiting up.
 - **The booking ends at 02:32 UTC with the cap: $49.50 of $50 committed.** The run stops with the VM, and its archive
   stays on the VM's disk.
+
+## Amendment (19), 2026-11-08 12:45 UTC: why neither run passed C6
+
+- **The laptop run** (amendment (15)):
+  - The memory guard killed it at 22:03 on 11-07, seven jobs after j08908 reached room 42 with `bit:443 = 1`
+    (entry 24147, frame 10656).
+  - None of the seven started from 24147. The killed job, j08912, was a model try from 8296 (room 42 at frame 2776,
+    before the quiz); its five reach extensions took the memory.
+  - Under `FMI_FRONTIER_FRESH=1`, every untried first holder came ahead of 24147, which was not on the frontier.
+    Under the current switches `sel_explain` ranks 24147 first of 3,252 candidates; the run was gone by then.
+- **The VM run** (amendments (17), (18)):
+  - Its suited entry 33621 waited: its cell already held an older suited entry, and `FMI_SELECT_ADVANCED` ranked
+    side branches holding more atoms ahead of it.
+  - Taken by hand, its first step (the hoist with Indy in the suit) was refused in all 588 children: "input
+    sentence(8,497,500)#92: effect frozen:local:201: the predicted write is not in the run; script:20".
+  - The air compressor's loop (room 42's local 201) runs in that state. The dive's cutscene starts global 20, which
+    calls `freezeScripts(127)`. The engine spares a slot started with the F flag, and both starts of room 42's local
+    201 (the entry and local 213) pass F.
+  - The F flags (IR `compute_resistance`) gave object code no room. A start of a local number from an object's
+    script counted for every room's local of that number. Objects of rooms 63 (853–855) and 69 (943) start their own
+    local 201 without F, so room 42's local 201 had both flags and its F was not known.
+  - The reader then counts the slot frozen. The sentence's record predicts `frozen:local:201 = 1`, and the window
+    refuses the real run at the click, before the dive.
+  - In the laptop's suited state (frame 18036) the compressor was off: nothing to freeze, and the dive played.
+- **Reproduced on the laptop:**
+  - `e016 cp` (new) records the engine's checkpoint at a movie's frame. The laptop's suited state with the switch
+    pulled at 18037 gives a compressor-on state at frame 18500 (`local:201 = 1`, `state:495 = 1`).
+  - The engine dives from it: `e016 g3`, the hoist, room 82 by frame 20005.
+  - The single job fails as the VM's did: "the same empty window 2 times on sentence(8,497,500)#92 … effect
+    frozen:local:201".
+- **Change, `FMI_READ_OBJ_ROOM=1` (IR `game.rs`):**
+  - In the F flags, a start of a local script from an object's code starts its own room's local, unless the object
+    can be in the inventory. That is the case when a constant `pickupObject` or `setOwnerOf` names it, or its own code
+    picks up `VAR_ME`.
+  - Nine units' flags become definite. Room 42's 201; room 48's 201, 205, 209, 211 and 213; room 49's 201, 209 and
+    213. Five of them are in the dark room, the C9 path.
+  - Probe: `examples/resist` in the IR crate.
+- **A writer bug on the way:** the next try's reach extension (from the dive's cutscene) failed with "185814 action
+  lines for 185338 actions". `Files::reset` truncated the actions file before the old writer's buffer went out.
+  Fixed, with a test (6f01029).
+- **Result:** from the compressor-on state, the job plans the dive and stops "goal" in room 82 (frame 18814,
+  5 entries). The state that failed on the VM now passes.
+- **Left:** the selection has no measure of progress. The runs ranked untried or atom-rich entries ahead of the
+  newest step of the chain. The guide's depths (amendment (18)) are the measure to try next.
