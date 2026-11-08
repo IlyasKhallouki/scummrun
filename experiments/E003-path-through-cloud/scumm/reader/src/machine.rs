@@ -2307,6 +2307,10 @@ fn queue_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st
         if sx(p).queued.is_none() {
             let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
             let vals: Vec<Val> = kids.iter().map(|&a| m.val(p, o, a, Some(x))).collect::<R<Vec<Val>>>()?;
+            if std::env::var_os("FMI_READ_QUEUE_DEBUG").is_some() {
+                let strs: Vec<String> = vals.iter().map(|&v| m.vals_ref().show(v).to_string()).collect();
+                eprintln!("[queue] doSentence [{}]", strs.join(", "));
+            }
             if let [Val::Int(v), Val::Int(a), Val::Int(b)] = vals[..] {
                 sx_mut(p).queued = Some((v, a, b));
                 count(m, "FMI_READ_QUEUE: sentences a doSentence holds");
@@ -2318,12 +2322,28 @@ fn queue_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st
 
 /// E022 amendment (27) (`FMI_READ_QUEUE=1`): where a sentence or event run's own step ends, a sentence the path holds
 /// runs as checkAndRunSentenceScript runs it at the frame's end (script.cpp:1244-1246), when the path's facts say the
-/// sentence script is idle (`sentence_wait_known`); else, or with nothing held, the path ends as before. A v5 sentence
+/// sentence script is idle (its slots not live); else, or with nothing held, the path ends as before. A v5 sentence
 /// whose B is A and not 0 is dropped (script.cpp:1202-1204).
 fn queue_end(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> R<Vec<Path>> {
     Ok({
         let Some((verb, a, b)) = sx(p).queued else { return Ok(Vec::new()) };
-        if (b != 0 && a == b) || m.sentence_wait_known(p, o)? != Some(false) {
+        // the sentence script idle: VAR_SENTENCE_SCRIPT known and its slots known and not live (script.cpp:1186-1191)
+        let n = m.read(p, Fact::Var(scumm_machine::machine::VAR_SENTENCE_SCRIPT), o)?;
+        let idle = match n {
+            Val::Int(n) if n != 0 => {
+                let mut ok = true;
+                for k in [m.game.script_key(n), Fact::ObjScript(n)] {
+                    let v = m.read(p, k, o)?;
+                    ok &= v == Val::Int(0);
+                }
+                ok
+            }
+            _ => false,
+        };
+        if std::env::var_os("FMI_READ_QUEUE_DEBUG").is_some() {
+            eprintln!("[queue] end with ({verb},{a},{b}) held: sentence script idle {idle}");
+        }
+        if (b != 0 && a == b) || !idle {
             return Ok(Vec::new());
         }
         sx_mut(p).queued = None;
