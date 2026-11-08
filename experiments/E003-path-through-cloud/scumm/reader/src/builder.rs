@@ -1429,7 +1429,13 @@ impl<'g> Builder<'g> {
                                 continue;
                             }
                             let kind = if walk { "walk_to" } else { "sentence" };
-                            let mut bs: Vec<Option<i64>> = vec![None];
+                            // FMI_READ_B_SWAP: an entry that re-issues the sentence with B as A takes a B; alone it
+                            // re-issues (verb, 0, a), and the interface asks for B before any sentence
+                            let alone = walk || !(read_b_swap_switch() && self.forwards(a, verb));
+                            let mut bs: Vec<Option<i64>> = if alone { vec![None] } else { Vec::new() };
+                            if !alone {
+                                self.counts.inc("FMI_READ_B_SWAP: one-object sentences of an entry that re-issues them (not built)");
+                            }
                             if !walk {
                                 bs.extend(self.b_values(a, verb, &ns).into_iter().map(Some));
                             }
