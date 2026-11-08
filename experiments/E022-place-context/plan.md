@@ -323,3 +323,21 @@ Measured on the laptop, one job at a time from the archive's own states:
   (Go-Explore's preference for cells further along).
 - **And `FMI_FRONTIER_FRESH=0` for this run:** the model does not change within it, and every restart under the fresh
   reset put hundreds of untried first holders ahead of the rest.
+
+## Amendment (18), 2026-11-08 01:50 UTC: the VM run at the cap's end
+
+- **The VM run from 01:13 (amendment (17)):**
+  - 42 jobs by 01:43; the ladder stays at C6.
+  - `FMI_SELECT_ADVANCED` took the fresh cells with the most guide atoms set. Those are side-branch entries (45 set,
+    rooms 49/63 near frame 14,600, without `bit:443`), not the suited entry 33621 (41 set).
+  - The count of guide atoms set does not measure progress: side branches gather atoms the goal does not need.
+  - The guide gives each atom a depth from the goal: rooms 48 and 82 and `state:582 = 1` at 1, `bit:443`, the kit
+    and the suit's class at 2. That is the measure to try next.
+- **A single job on the VM from 33621 (frame 11119, suited, `bit:443 = 1`), target `room = 82`:**
+  - The plan's first step, the hoist with Indy in the suit, ran in all 588 children. All were "spent": no dive.
+  - The laptop's suited state (frame 18036), where the same step dives (amendment (13)), differs in the hose
+    animation's state: object 495 is 3 on the VM and 0 on the laptop.
+  - Not explained yet. The hose and the compressor are the first suspects. The laptop's chain connected the hose
+    (`sentence(8,496,491)`) before suiting up.
+- **The booking ends at 02:32 UTC with the cap: $49.50 of $50 committed.** The run stops with the VM, and its archive
+  stays on the VM's disk.
