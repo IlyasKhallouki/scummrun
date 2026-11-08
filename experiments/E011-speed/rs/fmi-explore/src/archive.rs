@@ -591,6 +591,11 @@ pub struct Archive {
     place_pairs: RefCell<Option<(usize, HashMap<String, HashMap<(String, i64), usize>>)>>,
     /// E022: per live row, the guide atoms it is the first live row at its place (with its context) to hold, by rows
     place_firsts: RefCell<Option<(usize, HashMap<usize, i64>)>>,
+    /// E022 amendment (20) (FMI_SELECT_CONTINUE=1): the end entries of the model tries that played, and the kinds
+    /// (model, free) that have tried each, made from the log once per its length
+    continues: RefCell<Option<(usize, HashMap<usize, [bool; 2]>)>>,
+    /// E022 amendment (20): the guide's depth of each atom, (key, value or None for any value), made on first use
+    depths: RefCell<Option<HashMap<(String, Option<i64>), i64>>>,
     /// E019 (FMI_SKIP_SAME=1): job.json fingerprint -> the first job with it, made from the job dirs on first use
     fingerprints: RefCell<Option<HashMap<String, String>>>,
     pub e009: Map<String, Value>,
@@ -725,6 +730,8 @@ impl Archive {
             place_counts: RefCell::new(None),
             place_pairs: RefCell::new(None),
             place_firsts: RefCell::new(None),
+            continues: RefCell::new(None),
+            depths: RefCell::new(None),
             fingerprints: RefCell::new(None),
             free_on: crate::free::rho0().is_some(),
             grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
@@ -1955,6 +1962,77 @@ impl Archive {
         out
     }
 
+    /// E022 amendment (20) (`FMI_SELECT_CONTINUE=1`): the end entry of every model try that played (its attempt ran
+    /// frames and it committed entries), live, that the kind (model, or free) has not tried yet. A model try plans
+    /// toward one of the guide's targets and stops at the first step the engine refutes, short of it or at it; its
+    /// end is where the plan's next step starts. These come first, the newest first: the archive follows the chain
+    /// of model tries, as the single jobs of amendments (11)-(14) did by hand.
+    fn continuation(&self, i: usize, free: bool) -> bool {
+        if !select_continue_on() {
+            return false;
+        }
+        let mut cache = self.continues.borrow_mut();
+        if cache.as_ref().map(|c| c.0) != Some(self.logs.len()) {
+            let mut m: HashMap<usize, [bool; 2]> = HashMap::new();
+            let ids = |x: &Value| -> Vec<usize> {
+                x.get("new_entries").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|v| v.as_u64()).map(|v| v as usize).collect()
+            };
+            for x in self.logs.iter().filter(|x| committed(x)) {
+                let played = x.get("attempt").and_then(|a| a.get("frames")).and_then(|f| f.as_i64()).unwrap_or(0) > 0;
+                if crate::free::line_is_free(x) || !played {
+                    continue;
+                }
+                let end = ids(x).into_iter().filter(|&e| e < self.rows.len()).max_by_key(|&e| (self.rows[e].how == "end", self.rows[e].frame, e));
+                if let Some(e) = end {
+                    m.entry(e).or_insert([false, false]);
+                }
+            }
+            for x in self.logs.iter().filter(|x| committed(x)) {
+                let Some(e) = x.get("entry").and_then(|e| e.as_u64()).map(|e| e as usize) else { continue };
+                if let Some(t) = m.get_mut(&e) {
+                    t[crate::free::line_is_free(x) as usize] = true;
+                }
+            }
+            *cache = Some((self.logs.len(), m));
+        }
+        let c = cache.as_ref().unwrap();
+        c.1.get(&i).is_some_and(|t| !t[free as usize]) && self.rows[i].dead.is_none()
+    }
+
+    /// E022 amendment (20): the guide atoms entry i holds set (nonzero), counted by their depth from the goal (the
+    /// least of the value's and the any-value atom's, `guide::depth`), depth 1 first, each count negated: the entries
+    /// that set more of what the goal's writers test, the nearer first, come first.
+    pub fn depth_profile(&self, i: usize) -> Vec<i64> {
+        let mut dm = self.depths.borrow_mut();
+        let d = dm.get_or_insert_with(|| {
+            let mut m = HashMap::new();
+            for a in self.guide["atoms"].as_array().into_iter().flatten() {
+                if let (Some(k), Some(dd)) = (a[0].as_str(), a[2].as_i64()) {
+                    m.insert((k.to_string(), a[1].as_i64()), dd);
+                }
+            }
+            m
+        });
+        let mut c = vec![0i64; 8];
+        for (k, v) in self.rows[i].held.iter().filter(|(_, v)| *v != 0) {
+            let x = [d.get(&(k.clone(), Some(*v))), d.get(&(k.clone(), None))].into_iter().flatten().min();
+            if let Some(&x) = x {
+                c[(x.max(0) as usize).min(7)] += 1;
+            }
+        }
+        c.iter().skip(1).map(|n| -n).collect()
+    }
+
+    /// E022 amendment (20): the continuation's place in the order, ahead of the frontier: for an entry to continue
+    /// from, (0, its depth profile, -id), the nearest the goal first, then the newest; (1, [], 0) otherwise; (0, [], 0)
+    /// with the switch off.
+    fn continue_key(&self, i: usize, free: bool) -> (i64, Vec<i64>, i64) {
+        if !select_continue_on() {
+            return (0, vec![], 0);
+        }
+        if self.continuation(i, free) { (0, self.depth_profile(i), -(i as i64)) } else { (1, vec![], 0) }
+    }
+
     /// E022 amendment (17) (`FMI_SELECT_ADVANCED=1`): ahead of the place keys, the cell's tries of the kind (`n`), then the
     /// entry's guide atoms set, most first: among the cells tried least, the most advanced first (Go-Explore's
     /// preference for cells further along). (0, 0) otherwise.
@@ -1984,18 +2062,20 @@ impl Archive {
             let r = &self.rows[i];
             r.dead.is_none() && !p.is_some_and(|p| p.exhausted_now(i)) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
         };
-        let mut cands: Vec<((bool, (i64, usize), K), usize)> = self
+        let mut cands: Vec<(((i64, Vec<i64>, i64), bool, (i64, usize), K), usize)> = self
             .cells
             .iter()
             .filter(|(cid, _)| !busy_cells.contains(cid.as_str()))
             .filter_map(|(cid, c)| {
+                // E022 amendment (20): a cell's newest entry to continue from stands for it
+                let k = c.entries.iter().copied().filter(|&i| self.continuation(i, free) && may(i) && !busy_ids.contains(&i)).min_by_key(|&i| self.continue_key(i, free));
                 let f = c.entries.iter().copied().filter(|&i| front.contains(&i) && may(i) && !busy_ids.contains(&i)).min();
-                f.or_else(|| self.candidate_p(cid, nov))
+                k.or(f).or_else(|| self.candidate_p(cid, nov))
             })
             .filter(|i| !busy_ids.contains(i))
             .map(|i| {
                 let f = front.contains(&i);
-                ((!f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
+                ((self.continue_key(i, free), !f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
             })
             .collect();
         cands.sort_by(|a, b| a.0.cmp(&b.0));
@@ -2012,22 +2092,23 @@ impl Archive {
         let r = &self.rows[i];
         let key = |i: usize| {
             let k = self.sel_key_p(i, &nov);
-            (self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k)
+            (self.advanced_key(k.0, i), self.place_owned_key(i), self.place_key(i, false), self.place_new_key(i, &nov, false), k.0, self.rarity_key(i), k)
         };
         let may = |i: usize| {
             let r = &self.rows[i];
             r.dead.is_none() && !p.is_some_and(|p| p.exhausted_now(i)) && r.room.map(|x| self.allowed.contains(&x)).unwrap_or(false)
         };
-        let mut cands: Vec<((bool, (i64, usize), _), usize)> = self
+        let mut cands: Vec<(((i64, Vec<i64>, i64), bool, (i64, usize), _), usize)> = self
             .cells
             .iter()
             .filter_map(|(cid, c)| {
+                let k = c.entries.iter().copied().filter(|&i| self.continuation(i, false) && may(i)).min_by_key(|&i| self.continue_key(i, false));
                 let f = c.entries.iter().copied().filter(|&i| front.contains(&i) && may(i)).min();
-                f.or_else(|| self.candidate_p(cid, &nov))
+                k.or(f).or_else(|| self.candidate_p(cid, &nov))
             })
             .map(|i| {
                 let f = front.contains(&i);
-                ((!f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
+                ((self.continue_key(i, false), !f, if f && frontier_atoms_on() { self.front_order(i) } else { (0, 0) }, key(i)), i)
             })
             .collect();
         cands.sort_by(|a, b| a.0.cmp(&b.0));
@@ -2036,7 +2117,7 @@ impl Archive {
         json!({
             "entry": i, "cell": r.cell, "room": r.room, "frame": r.frame,
             "dead": r.dead.is_some(), "exhausted": p.is_some_and(|p| p.exhausted_now(i)),
-            "frontier": front.contains(&i), "novel": nov.get(&i).copied().unwrap_or(0),
+            "frontier": front.contains(&i), "continue": self.continuation(i, false), "novel": nov.get(&i).copied().unwrap_or(0),
             "cell_entries": self.cell(&r.cell).entries.len(), "cell_candidate": cell_cand,
             "key": format!("{:?}", key(i)), "rank": rank, "candidates": cands.len(),
             "first": cands.first().map(|(k, j)| json!({"entry": j, "key": format!("{:?}", k)})),
@@ -2936,6 +3017,11 @@ pub fn stag_cells() -> bool {
 /// under the progress order, an entry in a room that no earlier entry held goes ahead of the selection's order for
 /// the next free worker, once (`Archive::frontier`). Unset: the order as before.
 /// E022 amendment (10): the frontier also holds the untried least live holders of atoms of T.
+/// E022 amendment (20): `FMI_SELECT_CONTINUE=1`, the end entries of the model tries that played first.
+pub fn select_continue_on() -> bool {
+    std::env::var("FMI_SELECT_CONTINUE").is_ok_and(|v| v == "1")
+}
+
 pub fn frontier_atoms_on() -> bool {
     std::env::var("FMI_FRONTIER_ATOMS").is_ok_and(|v| v == "1")
 }
