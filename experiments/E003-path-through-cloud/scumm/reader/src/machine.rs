@@ -65,6 +65,8 @@ const RESUME_STEP: &str = "\u{1}reader: _eng_resume_at";
 const F1C_CLICK_A: &str = "\u{1}reader: F1c click A";
 const F1C_CLICK_B: &str = "\u{1}reader: F1c click B";
 const F1C_END: &str = "\u{1}reader: F1c end";
+/// E022 amendment (27) (`FMI_READ_QUEUE=1`): the step a sentence or event run takes after its own (`queue_end`)
+const QUEUE_END: &str = "\u{1}reader: queue end";
 const VERB_CLICK_AREA: i32 = 1; // model.py, verbs.h:35
 const LEFT_CLICK: i32 = 1; // model.py, verbs.cpp:666
 const VAR_VERB_SCRIPT: i32 = 32;
@@ -1459,6 +1461,7 @@ impl Hooks for ReaderHooks {
                 known::RESTORE_VERBS => restore_verbs(m, p, o, x, st, args)?,
                 known::VERB_OPS => lazily(m, |m| m.op_base(p, o, x, st))?,
                 known::DO_SENTENCE if sx(p).settled_target != 0 => f1c_do_sentence(m, p, o, x, st)?,
+                known::DO_SENTENCE if crate::builder::read_queue_switch() => queue_do_sentence(m, p, o, x, st)?,
                 _ => m.op_base(p, o, x, st)?,
             }
         })
@@ -1615,6 +1618,7 @@ impl Hooks for ReaderHooks {
                 Step::Note(s) if &**s == F1C_CLICK_A => f1c_click(m, p, false),
                 Step::Note(s) if &**s == F1C_CLICK_B => f1c_click(m, p, true),
                 Step::Note(s) if &**s == F1C_END => f1c_end(m, p),
+                Step::Note(s) if &**s == QUEUE_END => queue_end(m, p, o)?,
                 Step::Scene { room, .. } => {
                     // `Reader._eng_scene`: a room change to a room outside the scope ends the path there
                     let res = match *room {
@@ -2290,6 +2294,55 @@ fn f1c_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: 
     })
 }
 
+/// E022 amendment (27) (`FMI_READ_QUEUE=1`): doSentence on a path outside a click's run holds a sentence of known
+/// values (the first; STOP empties it), as F1c's `f1c_do_sentence` does on a click's; the op's own note as before.
+fn queue_do_sentence(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle, x: X, st: Stmt) -> R<Vec<Path>> {
+    Ok({
+        let Stmt::Op { args, flags, .. } = st else { unreachable!() };
+        let g = m.game;
+        if g.ast.flags(flags).contains(&known::STOP) {
+            sx_mut(p).queued = None;
+            return Ok(m.op_base(p, o, x, st)?);
+        }
+        if sx(p).queued.is_none() {
+            let kids: Vec<ExprId> = g.ast.kids(args).to_vec();
+            let vals: Vec<Val> = kids.iter().map(|&a| m.val(p, o, a, Some(x))).collect::<R<Vec<Val>>>()?;
+            if let [Val::Int(v), Val::Int(a), Val::Int(b)] = vals[..] {
+                sx_mut(p).queued = Some((v, a, b));
+                count(m, "FMI_READ_QUEUE: sentences a doSentence holds");
+            }
+        }
+        m.op_base(p, o, x, st)?
+    })
+}
+
+/// E022 amendment (27) (`FMI_READ_QUEUE=1`): where a sentence or event run's own step ends, a sentence the path holds
+/// runs as checkAndRunSentenceScript runs it at the frame's end (script.cpp:1244-1246), when the path's facts say the
+/// sentence script is idle (`sentence_wait_known`); else, or with nothing held, the path ends as before. A v5 sentence
+/// whose B is A and not 0 is dropped (script.cpp:1202-1204).
+fn queue_end(m: &mut Machine<'_>, p: &mut Path, o: &FactOracle) -> R<Vec<Path>> {
+    Ok({
+        let Some((verb, a, b)) = sx(p).queued else { return Ok(Vec::new()) };
+        if (b != 0 && a == b) || m.sentence_wait_known(p, o)? != Some(false) {
+            return Ok(Vec::new());
+        }
+        sx_mut(p).queued = None;
+        count(m, "FMI_READ_QUEUE: held sentences run where the run's step ended");
+        let cid = m.h_cid();
+        let step = Step::Sentence { verb, a, b: (b != 0).then_some(b) };
+        p.stack.push(Entry::Call(Call {
+            head: "checkAndRunSentenceScript".into(),
+            cite: "script.cpp:1244-1246".into(),
+            steps: vec![step].into(),
+            caller: None,
+            active: false,
+            i: 0,
+            cid,
+        }));
+        Vec::new()
+    })
+}
+
 /// F1c rule 7: where the click's run ends, a sentence held runs as today's record runs it (the job's pins hold the
 /// sentence script idle, or live and frozen); a v5 sentence whose B is A and not 0 is dropped (script.cpp:1202-1204).
 /// None held: the record ends, and what it leaves waiting carries the constants (rule 8).
@@ -2684,6 +2737,8 @@ fn pending_step(st: &Step, settled: Option<&SettledRun>) -> Vec<crate::record::C
         },
         // F1c's end: the sentence its click queued (`f1c_end`)
         Step::Note(s) if &**s == F1C_END => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
+        // FMI_READ_QUEUE's end: the sentence a doSentence on the path held (`queue_end`)
+        Step::Note(s) if &**s == QUEUE_END => vec![CutStep::Hook(scumm_machine::machine::VAR_SENTENCE_SCRIPT)],
         _ => other(st),
     }
 }
@@ -2704,6 +2759,9 @@ impl<'g> Reader<'g> {
         let mut m = Machine::new(game, features, Switches::default());
         m.path_limit = PATH_LIMIT;
         m.sound_ops = crate::builder::read_sound_switch();
+        if crate::builder::read_queue_switch() {
+            m.sentence_tail = vec![Step::Note(QUEUE_END.into())];
+        }
         m.hooks = Some(&HOOKS);
         m.ext = Some(Box::new(St::default()));
         Reader { m, o: FactOracle::new(FactMap::default(), None) }
@@ -2857,7 +2915,12 @@ impl Reader<'_> {
                 let call = Call {
                     head: "runAllScripts".into(),
                     cite: "script.cpp:968-987".into(),
-                    steps: vec![Step::Note(RESUME_STEP.into())].into(),
+                    steps: if crate::builder::read_queue_switch() {
+                        vec![Step::Note(RESUME_STEP.into()), Step::Note(QUEUE_END.into())]
+                    } else {
+                        vec![Step::Note(RESUME_STEP.into())]
+                    }
+                    .into(),
                     caller: None,
                     active: false,
                     i: 0,

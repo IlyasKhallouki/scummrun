@@ -1116,6 +1116,10 @@ impl Builder<'_> {
             // E022's FMI_READ_RENAME changes the runs through rename-only tests: its store is its own (unset: as before)
             writeln!(t, "read_rename 1").unwrap();
         }
+        if crate::builder::read_queue_switch() {
+            // E022's FMI_READ_QUEUE runs held sentences: its store is its own (unset: as before)
+            writeln!(t, "read_queue 1").unwrap();
+        }
         t
     }
 

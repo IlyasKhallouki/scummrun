@@ -115,6 +115,7 @@ impl<'g> Machine<'g> {
         let resumed: Vec<String> =
             steps.iter().filter_map(|st| if let Step::Resume(k) = st { Some(k.to_string()) } else { None }).collect();
         steps.push(Step::Sentence { verb, a, b });
+        steps.extend(self.sentence_tail.iter().cloned());
         let cid = self.cid();
         let call = Call {
             head: rc("checkAndRunSentenceScript"),

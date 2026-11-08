@@ -267,6 +267,9 @@ pub struct Machine<'g> {
     /// E014 amendment (8)'s switch FMI_READ_SOUND (`heads::effect_with`): output-only ops (sound commands) have no
     /// tracked effect instead of no rule; off by default
     pub sound_ops: bool,
+    /// E022 amendment (27) (the reader's FMI_READ_QUEUE): steps a sentence run's call takes after its sentence; empty
+    /// by default
+    pub sentence_tail: Vec<Step>,
     /// golden.py's TraceMachine events, when a run is traced
     pub trace: Option<Tracer>,
     /// the current run's unknowns (handed to its `Run`)
@@ -409,6 +412,7 @@ impl<'g> Machine<'g> {
             round_limit: ROUND_LIMIT,
             widen_loops: false,
             sound_ops: false,
+            sentence_tail: Vec::new(),
             trace: None,
             v: Vals::default(),
             cites: vec![None; game.ins.len()],

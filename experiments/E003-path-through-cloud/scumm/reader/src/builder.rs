@@ -109,6 +109,15 @@ pub fn read_b_swap_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_B_SWAP").is_ok_and(|v| v == "1"))
 }
 
+/// E022 amendment (27)'s switch `FMI_READ_QUEUE=1`: a doSentence on a sentence or event run holds its sentence, which
+/// runs where the run's own step ends when the sentence script is idle, as the engine's checkAndRunSentenceScript runs
+/// the queue at the frame's end (`machine::queue_end`). Before, the op was a note and the sentence never ran: the
+/// ladder's "use ladder with stairway" (8,583,584) re-issues (8,584,583), which places the ladder. Unset: as before.
+pub fn read_queue_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_QUEUE").is_ok_and(|v| v == "1"))
+}
+
 /// E022 amendment (26)'s switch `FMI_READ_RENAME=1`: a fact read by a test that only picks object names
 /// (`machine::rename_test`) is read as one of its values, with no fork and nothing assumed: both arms leave the same
 /// state. The dark room's local 208 tests the dark class (25) of eight objects only to rename them, so the light's
