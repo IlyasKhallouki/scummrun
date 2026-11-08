@@ -345,7 +345,21 @@ impl<'a> Harness<'a> {
         let Some(c) = self.nogood.clone() else { return };
         let Some((prefix, start_f)) = self.plan_at.clone() else { return };
         let d = self.player.replan_cause_detail();
-        if d.as_ref().and_then(|d| d.get("what")).and_then(|w| w.as_str()) != Some("window empty") {
+        let what = d.as_ref().and_then(|d| d.get("what")).and_then(|w| w.as_str());
+        // E022 amendment (27) (FMI_BAN_TRY): a deviation counts its refuted record's label too. Try 7 planned "look at
+        // the archway" and the sentence script's continuation after it, which no record of the engine's end matched;
+        // each deviation kept 27 frames and the same plan came back, 13 times, to the replan limit
+        if what == Some("deviation") && std::env::var("FMI_BAN_TRY").is_ok_and(|v| v == "1") {
+            let rec = d.as_ref().and_then(|d| d.get("cause")).and_then(|c| c.get("record")).and_then(|r| r.as_str());
+            if let Some(name) = rec {
+                let label = match self.reading.by_name(name) {
+                    Some(a) => self.reading.record(a).label,
+                    None => nogood::label_of_name(name),
+                };
+                *self.try_refused.entry(label).or_insert(0) += 1;
+            }
+        }
+        if what != Some("window empty") {
             return;
         }
         let n_plan = self.plans.len() as u64 - 1;
