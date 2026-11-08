@@ -232,6 +232,8 @@ pub struct Harness<'a> {
     pub plans: Vec<Map<String, Value>>,
     pub replans: u32,
     pub extensions: Vec<Value>,
+    /// E022 amendment (24) (`FMI_BAN_TRY=1`): label -> how often this try's plays refused it (any state)
+    pub try_refused: HashMap<String, u32>,
     pub refinements: Vec<Value>,
     refined: Vec<(i64, usize)>,
     frame0: u64,
@@ -290,6 +292,7 @@ impl<'a> Harness<'a> {
             plans: Vec::new(),
             replans: 0,
             extensions: Vec::new(),
+            try_refused: HashMap::new(),
             refinements: Vec::new(),
             refined: Vec::new(),
             frame0: 0,
@@ -361,6 +364,8 @@ impl<'a> Harness<'a> {
                                   frame: w.get("start").and_then(|f| f.as_u64()).unwrap_or(0), plan: n_plan as u32,
                                   why: w.get("end_reason").and_then(|x| x.as_str()).unwrap_or("").to_string() };
         let j = r.json();
+        // E022 amendment (24): the try's own count of the label's refusals, whatever the state
+        *self.try_refused.entry(label.clone()).or_insert(0) += 1;
         if mem.refute(r) {
             drop(mem);
             (self.progress)(&format!("refuted at plan {n_plan}'s state: {label} ({} keys)", j["point"].as_array().map(|a| a.len()).unwrap_or(0)));
@@ -448,7 +453,19 @@ impl<'a> Harness<'a> {
         let (ng_prefix, bans) = match &self.nogood {
             Some(c) => {
                 let p = nogood::prefix_key(&self.player.movie(), frame);
-                let b = c.mem.lock().unwrap().bans(&p, &self.ng_target);
+                let mut b = c.mem.lock().unwrap().bans(&p, &self.ng_target);
+                // E022 amendment (24) (`FMI_BAN_TRY=1`): a step refused twice in this try is banned in every state
+                // for the rest of it. A refusal's ban holds for the movie's exact prefix, and a window that played a
+                // few frames moves the next plan's start past it: the dark room's try planned the same refused
+                // stairway step four times, a reach extension each time
+                if std::env::var("FMI_BAN_TRY").is_ok_and(|v| v == "1") {
+                    for (l, n) in &self.try_refused {
+                        let ban = fmi_core::Ban { label: l.clone(), facts: vec![] };
+                        if *n >= 2 && !b.contains(&ban) {
+                            b.push(ban);
+                        }
+                    }
+                }
                 (Some(p), b)
             }
             None => (None, Vec::new()),
