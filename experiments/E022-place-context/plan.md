@@ -542,3 +542,34 @@ Measured on the laptop, one job at a time from the archive's own states:
 - **Also open:** room-48 tries from the C8 entry (the arrival cutscene) fail on its background scripts (local
   201/202); the idle states after it (254 of 269 room-48 entries) do not have that. The stairway walk's outcome (within
   10 px of a spot) is the engine's.
+
+## Amendment (26), 2026-11-08 21:30–22:30 UTC: the dark room's light reads in seconds
+
+- **Measured (amendment (25)'s open item):** with the ladder usable, room 48's reading from the idle state ran an hour
+  and did not end (rounds 34–43 at 200–350 s each, about 110 records a round). The time was one job: the light (local
+  203) resumed after its wait. Its run starts local 200, which starts local 208, which tests the dark class (25) of
+  eight objects only to pick their names: 2^8 paths times the fade's `Var[211]` values, past the path limit, so the job
+  split some 80 ways (beads `Var[229]` 5 values x owner of 933 x six more facts), each part about 1,000 paths and
+  2–4 s, and every round a newly reached value ran it again. `Var[229]` (the beads the light spends) has 6 values; it
+  does not grow.
+- **Change, `FMI_READ_RENAME=1` (reader `machine::rename_test`):** a jump whose test reads classes, states, owners,
+  locals and constants alone, whose two arms hold only setObjectName, such tests and forward jumps up to where they
+  meet, and where every way runs a setObjectName before any other statement, is read with no fork and nothing assumed.
+  setObjectName's one effect the machine keeps is the inventory hook's run, whose writes are the same at every run and
+  which no such test reads, so both arms are in the same state at the first rename after the test. In local 208 it
+  takes six of the eight dark-class tests (582, 584's 26, 585, 586, 587, 589); 583 and 584's 25 stay forked (an arm
+  writes `VAR_RESULT`).
+- **Room 48, all switches** (merge, B args, inventory B, rename): the whole reading 36 s wall, 197 MB peak, 8.3 MB
+  packed, 16,680 actions. Before: no end in an hour.
+- **Gate, off vs on** (each with `FMI_READ_MERGE=1`): rooms 63, 49, 42: every action of either reading covers one of
+  the other, reached values equal (room 42: 268 s to 220 s). Room 48 (without the B switches, which make the off
+  reading too long): every off action is covered by an on action with the same label, end and continuation, a covering
+  precondition, the off checks among its checks and, where they differ, a guessed write holding the off value. The
+  on reading is coarser at two joins the machine already had: siblings that no longer differ in a dark class meet
+  there, and the join joins their values: the cutscene-end script's data (`Local[0]` of global 21, checks the
+  engine settles) and `Var[113]` after the ladder is placed. Reached values equal (271 keys); 14,417 actions to 12,096.
+- **Seen, not changed:** the ladder climb's animation (global 125) loops to a bound the actors' positions set, a
+  non-fact, so its chain runs to the fold limit: about 6,000 one-job rounds, 7,000 cheap records, a few seconds.
+- **The stairway walk:** local 204 places the ladder only when the walk ends within 10 px of (381,129); the scripts
+  cannot say whether it does, the engine can. The light does not depend on it: local 203 starts global 84 first, which
+  sets `Var[444]` to -1.
