@@ -439,3 +439,27 @@ Measured on the laptop, one job at a time from the archive's own states:
 - **The run resumes** on play10 under the same settings. The killed run's unfinished job (j08928, room 63) is moved to
   the attic.
 - **Prediction:** the first model try starts from 24241 or 24197; C7 within an hour; C8 within 2 hours.
+
+## Amendment (22), 2026-11-08 16:00 UTC: C7 in the run, the order's fixes from an adversarial review, the VM
+
+- **The run of amendment (21), from 15:02 UTC:**
+  - j08928, a model try from 24241 (room 42, before the suit) with target room 82, played the suit and the hoist and
+    stopped "goal" in room 82: entry 24381 at frame 18157. **C7, by the run itself**, 4 minutes after the restart.
+  - j08930, a model try from 24381, aimed at room 42 (the first dive is a cutscene back to the ship) and reached it.
+    Its end 24391 (frame 18321) is the furthest state; its waits found the air counter (`var:452`) and the drowning
+    (room 24).
+  - The next model try went to 24197, a copy of the pre-suit state, since its try's target had been new when it
+    was made.
+- **Fixes to the order (`FMI_SELECT_CONTINUE`), the review's three confirmed findings and the drowning:**
+  - Novelty is read when the order is made. A try counts as having gone for something new while a value it went for
+    is held by no row but its own entries: its target's value (any of a list target's values; list targets were
+    never counted before), or an atom of T or a room it gave.
+  - Only the latest 64 played model tries (`CONT_WINDOW`) make continuations. Before, every played model try of the
+    archive's history did, 1,946 still open, and the frontier would never have decided a selection again.
+  - A continuation stays open for up to 3 model tries (`CONT_TRIES`) while none of its tries left a live end. From
+    the room-82 entry a first try that goes for the drowning (a dead end) no longer ends the chain.
+- **Order on play10 after j08932:** first 24391, the end past the first dive's cutscene. 24197 and 24241 are closed.
+- **The VM, with $10 more approved (cap $60):** fast-mi-1 on the 48 GB shape for 8 h (the last VM run at 8 workers
+  never went under 24 GB free). The run on a copy of the laptop's play10 (the C7 chain), 10 workers, every switch
+  through (22), the reading bound 900 s, wall limit to the booking's end.
+- **Prediction:** C8 within 1 hour of the start; C9 today, before the booking ends (23:43 UTC).

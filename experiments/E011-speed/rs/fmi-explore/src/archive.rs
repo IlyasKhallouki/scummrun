@@ -593,9 +593,9 @@ pub struct Archive {
     place_firsts: RefCell<Option<(usize, HashMap<usize, i64>)>>,
     /// E022 amendment (20) (FMI_SELECT_CONTINUE=1): the end entries of the model tries that played, and the kinds
     /// (model, free) that have tried each, made from the log once per its length
-    continues: RefCell<Option<(usize, HashMap<usize, ([bool; 2], bool)>)>>,
-    /// E022 amendment (21): key -> (rows when made, value -> its least holder), for the targets' novelty
-    least: RefCell<HashMap<String, (usize, HashMap<i64, usize>)>>,
+    continues: RefCell<Option<(usize, HashMap<usize, Cont>)>>,
+    /// E022 amendment (22): key -> (rows counted, value -> how many rows hold it), for the continuations' novelty
+    holders: RefCell<HashMap<String, (usize, HashMap<i64, usize>)>>,
     /// E019 (FMI_SKIP_SAME=1): job.json fingerprint -> the first job with it, made from the job dirs on first use
     fingerprints: RefCell<Option<HashMap<String, String>>>,
     pub e009: Map<String, Value>,
@@ -731,7 +731,7 @@ impl Archive {
             place_pairs: RefCell::new(None),
             place_firsts: RefCell::new(None),
             continues: RefCell::new(None),
-            least: RefCell::new(HashMap::new()),
+            holders: RefCell::new(HashMap::new()),
             fingerprints: RefCell::new(None),
             free_on: crate::free::rho0().is_some(),
             grown: if crate::grow::on() { Some(BTreeMap::new()) } else { None },
@@ -1963,7 +1963,8 @@ impl Archive {
     }
 
     /// E022 amendment (20) (`FMI_SELECT_CONTINUE=1`): the end entry of every model try that played (its attempt ran
-    /// frames and it committed entries), live, that the kind (model, or free) has not tried yet. A model try plans
+    /// frames and it committed entries), live, that the kind (model, or free) has not tried yet, or for the model
+    /// fewer than `CONT_TRIES` times while none of its tries left a live end (amendment (22)). A model try plans
     /// toward one of the guide's targets and stops at the first step the engine refutes, short of it or at it; its
     /// end is where the plan's next step starts. These come first, the newest first: the archive follows the chain
     /// of model tries, as the single jobs of amendments (11)-(14) did by hand.
@@ -1973,56 +1974,87 @@ impl Archive {
         }
         let mut cache = self.continues.borrow_mut();
         if cache.as_ref().map(|c| c.0) != Some(self.logs.len()) {
-            let mut m: HashMap<usize, ([bool; 2], bool)> = HashMap::new();
             let ids = |x: &Value| -> Vec<usize> {
                 x.get("new_entries").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|v| v.as_u64()).map(|v| v as usize).collect()
             };
-            for x in self.logs.iter().filter(|x| committed(x)) {
+            // a played model try's end entry: marked `end`, else its last frame
+            let end_of = |x: &Value| -> Option<usize> {
                 let played = x.get("attempt").and_then(|a| a.get("frames")).and_then(|f| f.as_i64()).unwrap_or(0) > 0;
                 if crate::free::line_is_free(x) || !played {
-                    continue;
+                    return None;
                 }
-                let new = ids(x);
-                let end = new.iter().copied().filter(|&e| e < self.rows.len()).max_by_key(|&e| (self.rows[e].how == "end", self.rows[e].frame, e));
-                if let Some(e) = end {
-                    // E022 amendment (21): the try aimed at a value no entry before it held (its target's tier 1)
-                    let first = new.iter().copied().min().unwrap_or(e);
-                    let t = x.get("attempt").and_then(|a| a.get("target"));
-                    let novel = match (t.and_then(|t| t[0].as_str()), t.and_then(|t| t[1].as_i64())) {
-                        (Some(k), Some(v)) => self.least_holder(k, v).is_none_or(|h| h >= first),
-                        _ => false,
-                    };
-                    m.entry(e).or_insert(([false, false], novel));
-                }
+                ids(x).into_iter().filter(|&e| e < self.rows.len()).max_by_key(|&e| (self.rows[e].how == "end", self.rows[e].frame, e))
+            };
+            let mut m: HashMap<usize, Cont> = HashMap::new();
+            // E022 amendment (22): the latest `CONT_WINDOW` played model tries only; older ends go back to the order
+            let played: Vec<(&Value, usize)> = self.logs.iter().filter(|x| committed(x)).filter_map(|x| end_of(x).map(|e| (x, e))).collect();
+            for &(x, e) in &played[played.len().saturating_sub(CONT_WINDOW)..] {
+                let novel = self.novel_now(x, &ids(x));
+                m.entry(e).or_insert(Cont { novel, ..Default::default() });
             }
             for x in self.logs.iter().filter(|x| committed(x)) {
                 let Some(e) = x.get("entry").and_then(|e| e.as_u64()).map(|e| e as usize) else { continue };
+                let led_on = end_of(x).is_some_and(|f| self.rows[f].dead.is_none());
                 if let Some(t) = m.get_mut(&e) {
-                    t.0[crate::free::line_is_free(x) as usize] = true;
+                    if crate::free::line_is_free(x) {
+                        t.free_tried = true;
+                    } else {
+                        t.model_tries += 1;
+                        t.led_on |= led_on;
+                    }
                 }
             }
             *cache = Some((self.logs.len(), m));
         }
         let c = cache.as_ref().unwrap();
-        c.1.get(&i).is_some_and(|t| !t.0[free as usize]) && self.rows[i].dead.is_none()
+        let open = |t: &Cont| if free { !t.free_tried } else { t.model_tries == 0 || (t.model_tries < CONT_TRIES && !t.led_on) };
+        c.1.get(&i).is_some_and(open) && self.rows[i].dead.is_none()
     }
 
-    /// E022 amendment (21): whether entry i is the end of a try whose target was a value no entry before it held.
+    /// E022 amendments (21), (22): whether entry i is the end of a try whose target was a value no entry before it held,
+    /// or that gave a new atom of T or a new room.
     fn continuation_novel(&self, i: usize) -> bool {
-        self.continues.borrow().as_ref().and_then(|c| c.1.get(&i).map(|t| t.1)).unwrap_or(false)
+        self.continues.borrow().as_ref().and_then(|c| c.1.get(&i).map(|t| t.novel)).unwrap_or(false)
     }
 
-    /// E022 amendment (21): the least row holding `k = v` (the progress store's facts), None when none does.
-    fn least_holder(&self, k: &str, v: i64) -> Option<usize> {
-        let p = self.progress.as_ref()?;
-        let mut cache = self.least.borrow_mut();
+    /// E022 amendments (21), (22): whether a try went for something new and still holds it alone: its target's value
+    /// (any of a list's values), an atom of T or a room it gave, held now by no row but the try's own entries. Read
+    /// when the order is made, so a chain that reached the value elsewhere closes the claim of a copy left behind.
+    fn novel_now(&self, x: &Value, own: &[usize]) -> bool {
+        let Some(p) = self.progress.as_ref() else { return false };
+        let mut cands: Vec<(String, i64)> = Vec::new();
+        if let Some(t) = x.get("attempt").and_then(|a| a.get("target")) {
+            if let Some(k) = t[0].as_str() {
+                match &t[1] {
+                    Value::Array(vs) => cands.extend(vs.iter().filter_map(|v| v.as_i64()).map(|v| (k.to_string(), v))),
+                    v => cands.extend(v.as_i64().map(|v| (k.to_string(), v))),
+                }
+            }
+        }
+        for a in x.get("new_t").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|a| a.as_str()) {
+            if let Some((k, v)) = a.split_once('=').and_then(|(k, v)| v.parse::<i64>().ok().map(|v| (k.to_string(), v))) {
+                cands.push((k, v));
+            }
+        }
+        cands.extend(x.get("new_rooms").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|r| r.as_i64()).map(|r| ("room".to_string(), r)));
+        let own: Vec<usize> = own.iter().copied().filter(|&r| r < self.rows.len() && p.store.has(r)).collect();
+        cands.iter().any(|(k, v)| {
+            let mine = own.iter().filter(|&&r| p.store.get(r, k) == *v).count();
+            mine > 0 && self.holders(k, *v) == mine
+        })
+    }
+
+    /// E022 amendment (22): how many rows hold `k = v` (the progress store's facts), counted once per key as rows come.
+    fn holders(&self, k: &str, v: i64) -> usize {
+        let Some(p) = self.progress.as_ref() else { return 0 };
+        let mut cache = self.holders.borrow_mut();
         let e = cache.entry(k.to_string()).or_insert((0, HashMap::new()));
         let n = (e.0..self.rows.len()).take_while(|&r| p.store.has(r)).last().map_or(e.0, |r| r + 1);
         for r in e.0..n {
-            e.1.entry(p.store.get(r, k)).or_insert(r);
+            *e.1.entry(p.store.get(r, k)).or_insert(0) += 1;
         }
         e.0 = n;
-        e.1.get(&v).copied()
+        e.1.get(&v).copied().unwrap_or(0)
     }
 
     /// E022 amendment (20): the continuation's place in the order, ahead of the frontier: for an entry to continue
@@ -3020,6 +3052,24 @@ pub fn stag_cells() -> bool {
 /// under the progress order, an entry in a room that no earlier entry held goes ahead of the selection's order for
 /// the next free worker, once (`Archive::frontier`). Unset: the order as before.
 /// E022 amendment (10): the frontier also holds the untried least live holders of atoms of T.
+/// E022 amendment (22): a continuation's model tries, while none of them left a live end of its own (its run died, or
+/// it played nothing): a first try that goes for a death (room 82's drowning before its caves) does not end the chain.
+pub const CONT_TRIES: u32 = 3;
+
+/// E022 amendment (22): the played model tries whose ends are continuations, the latest this many: the chains being
+/// followed, not every try of the archive's history (whose ends would stay ahead of the frontier for good).
+pub const CONT_WINDOW: usize = 64;
+
+/// E022 amendments (20)-(22): a continuation's state: whether a free try took it, its model tries, whether one of them
+/// left a live end (a continuation of its own), and whether its own try aimed at a value no entry held.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Cont {
+    pub free_tried: bool,
+    pub model_tries: u32,
+    pub led_on: bool,
+    pub novel: bool,
+}
+
 /// E022 amendment (20): `FMI_SELECT_CONTINUE=1`, the end entries of the model tries that played first.
 pub fn select_continue_on() -> bool {
     std::env::var("FMI_SELECT_CONTINUE").is_ok_and(|v| v == "1")
