@@ -364,8 +364,12 @@ impl<'a> Harness<'a> {
                                   frame: w.get("start").and_then(|f| f.as_u64()).unwrap_or(0), plan: n_plan as u32,
                                   why: w.get("end_reason").and_then(|x| x.as_str()).unwrap_or("").to_string() };
         let j = r.json();
-        // E022 amendment (24): the try's own count of the label's refusals, whatever the state
-        *self.try_refused.entry(label.clone()).or_insert(0) += 1;
+        // E022 amendment (24): the try's own count of the label's refusals, whatever the state. Amendment (27): a window
+        // whose children formed no input (the interface refused every candidate: a held object's Use waits for B, a
+        // sentence an object re-issues) counts twice, so the label is banned at once and the next plan goes round it;
+        // a second such window on it would stop the attempt ("the same empty window 2 times")
+        let unformed = w.get("end_reason").and_then(|x| x.as_str()).is_some_and(|r| r.contains("no input formed"));
+        *self.try_refused.entry(label.clone()).or_insert(0) += if unformed { 2 } else { 1 };
         if mem.refute(r) {
             drop(mem);
             (self.progress)(&format!("refuted at plan {n_plan}'s state: {label} ({} keys)", j["point"].as_array().map(|a| a.len()).unwrap_or(0)));
