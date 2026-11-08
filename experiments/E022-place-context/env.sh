@@ -42,3 +42,11 @@ export ALLON
 # amendment (20): the end entries of the model tries that played first, nearest the goal by the guide's depths
 ALLON="$ALLON FMI_SELECT_CONTINUE=1"
 export ALLON
+# amendments (24)-(27): the dark room. Exact record merge, the second objects a script compares, B in the inventory,
+# no fork on tests that only rename, a step refused twice banned in the try, readings released; a refuted check on a
+# non-fact makes it a fact; a sentence an object re-issues: the player's form built, held and run when the sentence
+# script ends (with wait_both), and played with no input when the game queued it
+ALLON="$ALLON FMI_READ_MERGE=1 FMI_READ_B_ARGS=1 FMI_READ_INV_B=1 FMI_READ_RENAME=1 FMI_BAN_TRY=1 FMI_READ_TRIM=1"
+ALLON="$ALLON FMI_REFINE_CHECKS=1 FMI_REALIZE_QUEUED=1 FMI_READ_B_SWAP=1 FMI_READ_QUEUE=1"
+ALLON="$ALLON FMI_READ_SWITCHES=value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost,wait_both"
+export ALLON
