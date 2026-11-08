@@ -348,6 +348,34 @@ pub fn refinable(cause: Option<&Value>) -> Vec<i64> {
     out
 }
 
+/// E022 amendment (27)'s switch `FMI_REFINE_CHECKS=1`: a cause that is a refuted check of a record (the window's
+/// "check CITE") names the variable that check read when the record says the reading holds no fact of it (its check's
+/// reason `?(not a fact: var:N)`), as a split names one. The sentence script's first test compares `Var[105]`, the last
+/// sentence's object, which no reading held: the planner chose the record whose check the engine contradicts at every
+/// replan, and the refinement, which took splits alone, never made it a fact. Unset: as before.
+pub fn refine_checks_on() -> bool {
+    std::env::var("FMI_REFINE_CHECKS").is_ok_and(|v| v == "1")
+}
+
+/// The variables a refuted check names (`refine_checks_on`): `cause` the window's cause ("record", "why" = "check
+/// CITE"), `line` the record's line in the reading (its "checks", each [cite, text, outcome, reason]).
+pub fn check_refinable(cause: &Value, line: &Value) -> Vec<i64> {
+    let Some(cite) = cause.get("why").and_then(|w| w.as_str()).and_then(|w| w.strip_prefix("check ")) else { return vec![] };
+    let mut out = Vec::new();
+    for c in line.get("checks").and_then(|x| x.as_array()).into_iter().flatten() {
+        let Some(c) = c.as_array() else { continue };
+        if c.first().and_then(|x| x.as_str()) != Some(cite) {
+            continue;
+        }
+        let reason = c.get(3).and_then(|x| x.as_str()).unwrap_or("");
+        let n = reason.strip_prefix("?(not a fact: var:").and_then(|r| r.strip_suffix(')')).and_then(|d| d.parse::<i64>().ok());
+        if let Some(n) = n.filter(|n| !out.contains(n)) {
+            out.push(n);
+        }
+    }
+    out
+}
+
 /// replay.reach_misses: (how many, the named values "key=value") from taskcore's message, or None.
 pub fn reach_misses(message: &str) -> Option<(i64, Vec<String>)> {
     let pat = "the start holds ";
@@ -619,6 +647,21 @@ pub fn facts_of_json(v: &Value) -> Facts {
 mod tests {
     use super::*;
     use fmi_core::Domain;
+
+    /// Amendment (27): the room-48 try's refuted check names var 105, the variable its record's check at that cite
+    /// says the reading holds no fact of; a check at another cite, or on a fact, names nothing.
+    #[test]
+    fn a_refuted_check_names_its_non_fact_variable() {
+        let cause = serde_json::json!({"failure": "input", "record": "sentence(9,583)#23", "why": "check global/script-002.txt:8 [0000]", "cause": null});
+        let line = serde_json::json!({"i": 23, "label": "sentence(9,583)", "checks": [
+            ["global/script-002.txt:8 [0000]", "Var[105] == Local[2]", false, "?(not a fact: var:105)"],
+            ["global/script-002.txt:205 [0395]", "VAR_RESULT > 16", true, "?(position: getDist(1, 583))"]]});
+        assert_eq!(check_refinable(&cause, &line), vec![105]);
+        let other = serde_json::json!({"why": "check global/script-002.txt:205 [0395]"});
+        assert!(check_refinable(&other, &line).is_empty());
+        let split = serde_json::json!({"why": "effect var:104: wrote another value"});
+        assert!(check_refinable(&split, &line).is_empty());
+    }
 
     /// Amendment (13): a cleared bit the engine's facts leave out is written at 0 with the switch on; a position key
     /// is not; with the switch off the text is `reach_start_text`'s.

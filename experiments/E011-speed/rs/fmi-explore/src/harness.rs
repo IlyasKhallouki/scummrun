@@ -770,7 +770,15 @@ impl<'a> Harness<'a> {
         let d = self.player.replan_cause_detail().unwrap_or(Value::Null);
         let cause = d.get("cause").cloned().unwrap_or(Value::Null);
         let cause_obj = if cause.is_object() { cause.clone() } else { json!({}) };
-        let new = start::refinable(Some(&cause_obj));
+        let mut new = start::refinable(Some(&cause_obj));
+        if new.is_empty() && start::refine_checks_on() {
+            // E022 amendment (27): a refuted check on a variable the reading holds no fact of
+            let rec = cause_obj.get("record").and_then(|r| r.as_str()).and_then(|r| self.reading.by_name(r));
+            if let Some(i) = rec {
+                let line: Value = serde_json::from_str(self.reading.action_line(i)).unwrap_or(Value::Null);
+                new = start::check_refinable(&cause_obj, &line);
+            }
+        }
         let short = if files::truthy(Some(&cause)) { Value::from(self.player.short(&cause)) } else { Value::Null };
         let what = d.get("what").filter(|w| files::truthy(Some(w))).cloned()
             .unwrap_or_else(|| self.player.replan_cause().map(Value::from).unwrap_or(Value::Null));
