@@ -82,6 +82,23 @@ pub fn read_merge_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_MERGE").is_ok_and(|v| v == "1"))
 }
 
+/// E022 amendment (25)'s switch `FMI_READ_B_ARGS=1`: `Builder::b_values` also follows A's Local[0] into the scripts A's
+/// entry starts with it as an argument, and takes the constants compared there with that argument as B. The broken
+/// stairway's Use (room 48's object 584) starts local 204 with [8, Local[0]], and 204 compares its Local[1] with the
+/// ladder (583): "use ladder with stairway" was never built. Unset: as before.
+pub fn read_b_args_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_B_ARGS").is_ok_and(|v| v == "1"))
+}
+
+/// E022 amendment (25)'s switch `FMI_READ_INV_B=1`: a sentence's B is placed in the room and, besides, in the inventory
+/// (each placement whose pins hold is an input); before, B's room placement alone when it has one, so a B the player
+/// holds was never a sentence's (the light wand used with 933). Unset: as before.
+pub fn read_inv_b_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_INV_B").is_ok_and(|v| v == "1"))
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
@@ -1112,6 +1129,7 @@ impl<'g> Builder<'g> {
         if let (Some(u), Some(idx)) = (u, idx) {
             let mut caps = 0;
             let ins = game.ins(u);
+            let room = game.object_room.get(&(a as i32)).copied();
             for i in domains::live(game, u, &domains::settings_env(), Some(&[idx]), &mut caps) {
                 if let Some(Stmt::Jump { cond: Some(c), .. }) = ins[i as usize].st {
                     if let Expr::Cmp { a: x, b: y, .. } = ast.expr(c) {
@@ -1119,6 +1137,20 @@ impl<'g> Builder<'g> {
                             if ast.expr(l) == Expr::Local(0) {
                                 if let Some(v) = ast.constant(r) {
                                     consts.insert(v as i64);
+                                }
+                            }
+                        }
+                    }
+                }
+                // FMI_READ_B_ARGS: Local[0] passed on as a started script's argument j, compared there as its Local[j]
+                if read_b_args_switch() {
+                    if let Some(Stmt::Start { name, script, args, .. }) = ins[i as usize].st {
+                        if name == known::START_SCRIPT || name == known::CHAIN_SCRIPT {
+                            if let Some(n) = ast.constant(script) {
+                                for (j, &e) in ast.kids(args).iter().enumerate() {
+                                    if ast.expr(e) == Expr::Local(0) {
+                                        consts.extend(self.local_consts(n as i64, room, j as i32));
+                                    }
                                 }
                             }
                         }
@@ -1152,6 +1184,30 @@ impl<'g> Builder<'g> {
         }
         let mut out: Vec<i64> = inside_set.union(&handlers).copied().collect();
         out.extend(other);
+        out
+    }
+
+    /// FMI_READ_B_ARGS: the constants script `n` (started from code of `room`) compares its Local[j] with.
+    fn local_consts(&self, n: i64, room: Option<i32>, j: i32) -> BTreeSet<i64> {
+        let game = self.game;
+        let ast = &game.ast;
+        let mut out = BTreeSet::new();
+        for key in game.started(n as i32, room) {
+            let Some(u) = game.id(key) else { continue };
+            for x in game.ins(u) {
+                if let Some(Stmt::Jump { cond: Some(c), .. }) = x.st {
+                    if let Expr::Cmp { a: l0, b: r0, .. } = ast.expr(c) {
+                        for (l, r) in [(l0, r0), (r0, l0)] {
+                            if ast.expr(l) == Expr::Local(j) {
+                                if let Some(v) = ast.constant(r) {
+                                    out.insert(v as i64);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         out
     }
 
@@ -1332,24 +1388,35 @@ impl<'g> Builder<'g> {
                                 }
                                 match b {
                                     Some(b) => {
-                                        let (mut pb, mut prb) = (pins.clone(), pre.clone());
                                         let all = self.placements(b);
                                         let room: Vec<_> = all.iter().filter(|x| x.0 != "inventory").cloned().collect();
-                                        let pl = if room.is_empty() { all } else { room };
-                                        let okb = pl[0].1.iter().all(|(k, v)| self.pin(&mut pb, &mut prb, k, v));
-                                        if !okb {
-                                            continue;
+                                        // FMI_READ_INV_B: B's room placement and its inventory one, each an input
+                                        let pls = if read_inv_b_switch() {
+                                            let mut v: Vec<_> = room.iter().take(1).cloned().collect();
+                                            v.extend(all.iter().filter(|x| x.0 == "inventory").take(1).cloned());
+                                            if v.is_empty() { all.iter().take(1).cloned().collect() } else { v }
+                                        } else if room.is_empty() {
+                                            all.iter().take(1).cloned().collect::<Vec<_>>()
+                                        } else {
+                                            room.iter().take(1).cloned().collect()
+                                        };
+                                        for pl in pls {
+                                            let (mut pb, mut prb) = (pins.clone(), pre.clone());
+                                            let okb = pl.1.iter().all(|(k, v)| self.pin(&mut pb, &mut prb, k, v));
+                                            if !okb {
+                                                continue;
+                                            }
+                                            let mut ch = checks.clone();
+                                            ch.extend(pl.2.iter().cloned());
+                                            out.push(Job {
+                                                kind: kind.into(),
+                                                label: label.clone(),
+                                                pins: pb,
+                                                pre: prb,
+                                                what: What::Sentence { verb, a, b: Some(b) },
+                                                checks: ch,
+                                            });
                                         }
-                                        let mut ch = checks.clone();
-                                        ch.extend(pl[0].2.iter().cloned());
-                                        out.push(Job {
-                                            kind: kind.into(),
-                                            label,
-                                            pins: pb,
-                                            pre: prb,
-                                            what: What::Sentence { verb, a, b: Some(b) },
-                                            checks: ch,
-                                        });
                                     }
                                     None => out.push(Job {
                                         kind: kind.into(),
