@@ -495,3 +495,50 @@ Measured on the laptop, one job at a time from the archive's own states:
   - Use the sentry statue (587) with 933 while `Var[209]` is set: local 212 opens the metal door (582). Walking to
     the open door is the restart, C9.
 - **The run:** restarted twice on the VM (16:18 and 16:28 UTC) for these changes; the uncommitted jobs run again.
+
+## Amendment (24), 2026-11-08 18:40–20:40 UTC: the dark room's reading from gigabytes to megabytes
+
+- **The VM is off until room 48 reads in megabytes** (Ilyas). It ran 15:43–18:16 UTC (2.6 h, $3.16); its run had
+  ended at 17:55 on repeated engine failures while my 18 GB scout squeezed its memory. From 15:53 to 17:09 it ran the
+  reader of Nov 7: my sync of the reader's sources went to the wrong folder (`experiments/scumm`), so
+  `FMI_READ_OBJ_ROOM` and the writer fix were not in its build until 17:09.
+- **What multiplied room 48's reading** (a read-only workflow, its findings checked by a second agent; reader-scope on
+  the laptop from the idle state, entry 28025 at frame 19203):
+  - 285,696 of its 311,734 actions are the ladder climb's events (local 205 after its two WaitForActor, 142,848
+    each). Each run goes on into local 208, which tests the dark classes (25) of eight objects and only renames them:
+    3 x 2^8 paths a run, then local 211's walk-box test and a re-chain of 205 that copies var:113 (13 values).
+  - The machine forks a path on each fact it reads; at a join the siblings stay apart while their assumed values
+    differ (the join's signature holds them); each path is a record.
+  - Lowering SIG_LIMIT, turning off value_sets and turning on reach_pairs changed nothing (measured).
+- **Change, `FMI_READ_MERGE=1` (reader `Builder::merge_records`):** a run's records equal in all but their
+  preconditions are merged exactly: one key's values united (the key dropped when they cover its domain), a covered
+  record dropped.
+  - Room 48: 315,519 records made, 5.2 GB, 642 MB packed → 16,755, 322 MB, 7.3 MB.
+  - Room 42: 477,501 records, 1,117 MB → 49,943, 282 MB; reached values equal (519 keys); every record of the reading
+    without the switch covered by one with it (same label, effects, end and checks, its precondition covering).
+    Rooms 63 and 49: nothing to merge, the readings equal.
+- **Tried and dropped:** a union at the machine's joins (paths whose whole state is equal and whose assumptions differ
+  in one key). It cut the paths themselves, but lost records: global 59's input loop, 1,050 of room 63's 3,092
+  actions uncovered, every union at one join (0x250, `script:2` assumed 0 and 1 by the settled round). Keeping both
+  paths' loop histories did not change it. The cause is not found and the code is not kept.
+- **`FMI_BAN_TRY=1` (harness):** a step refused twice in a try is banned in every state for the rest of it (the ban by
+  movie prefix missed the next plan's start). On the laptop the third plan carried the ban.
+- **`FMI_READ_TRIM=1`** (a try's readings released, the heap trimmed) and **`FMI_REACH_TRY_LIMIT`** stay, for memory.
+
+## Amendment (25), 2026-11-08 20:00–20:40 UTC: the sentences the dark room's chain needs
+
+- **Why "open the box" was unsolvable from the idle state** (the workflow's second finding, checked): the box is
+  untouchable (`class:585:32 = 1`) until local 208 clears it, which with the light off needs class 27 on the
+  stairway (584), set only by local 206, started only by local 204 when it is run for the ladder (583). The input
+  "use ladder with stairway" was never built: `b_values` takes B from constants compared with Local[0] in A's own
+  entry, and the stairway's Use passes Local[0] to local 204 (`startScript(204,[8,Local[0]])`), which compares it as
+  its Local[1]. And a B held in the inventory was never placed there: "use wand with 933" was missing too.
+- **Changes:** `FMI_READ_B_ARGS=1` follows Local[0] into a started or chained script's argument; `FMI_READ_INV_B=1`
+  places B in the room and in the inventory. Room 48's reading now has `sentence(8,584,583)`, `sentence(8,586,933)`
+  (and `[inv]`) and `sentence(8,587,933)`.
+- **Open:** with the ladder usable the reading reaches the climb, the light and their scripts; on the laptop it was at
+  round 20 after 344 s and did not end in 15 minutes (each such run enumerates its paths before its records merge).
+  Measuring it to the end; the path-level cut is the remaining work.
+- **Also open:** room-48 tries from the C8 entry (the arrival cutscene) fail on its background scripts (local
+  201/202); the idle states after it (254 of 269 room-48 entries) do not have that. The stairway walk's outcome (within
+  10 px of a spot) is the engine's.
