@@ -594,8 +594,8 @@ pub struct Archive {
     /// E022 amendment (20) (FMI_SELECT_CONTINUE=1): the end entries of the model tries that played, and the kinds
     /// (model, free) that have tried each, made from the log once per its length
     continues: RefCell<Option<(usize, HashMap<usize, Cont>)>>,
-    /// E022 amendment (22): key -> (rows counted, value -> how many rows hold it), for the continuations' novelty
-    holders: RefCell<HashMap<String, (usize, HashMap<i64, usize>)>>,
+    /// E022 amendment (22): key -> (rows counted, value -> the rows that hold it), for the continuations' novelty
+    holders: RefCell<HashMap<String, (usize, HashMap<i64, Vec<usize>>)>>,
     /// E019 (FMI_SKIP_SAME=1): job.json fingerprint -> the first job with it, made from the job dirs on first use
     fingerprints: RefCell<Option<HashMap<String, String>>>,
     pub e009: Map<String, Value>,
@@ -2037,24 +2037,37 @@ impl Archive {
             }
         }
         cands.extend(x.get("new_rooms").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|r| r.as_i64()).map(|r| ("room".to_string(), r)));
-        let own: Vec<usize> = own.iter().copied().filter(|&r| r < self.rows.len() && p.store.has(r)).collect();
+        let own: HashSet<usize> = own.iter().copied().filter(|&r| r < self.rows.len() && p.store.has(r)).collect();
+        let Some(&low) = own.iter().min() else { return false };
+        // E022 amendment (23): a row below the try's own (a later try from its end) does not take the claim away
+        let below = |mut r: usize| -> bool {
+            loop {
+                if own.contains(&r) {
+                    return true;
+                }
+                match self.rows[r].parent {
+                    Some(q) if q >= low => r = q,
+                    _ => return false,
+                }
+            }
+        };
         cands.iter().any(|(k, v)| {
-            let mine = own.iter().filter(|&&r| p.store.get(r, k) == *v).count();
-            mine > 0 && self.holders(k, *v) == mine
+            let hs = self.holders(k, *v);
+            hs.iter().any(|h| own.contains(h)) && hs.len() <= 4096 && hs.iter().all(|&h| below(h))
         })
     }
 
-    /// E022 amendment (22): how many rows hold `k = v` (the progress store's facts), counted once per key as rows come.
-    fn holders(&self, k: &str, v: i64) -> usize {
-        let Some(p) = self.progress.as_ref() else { return 0 };
+    /// E022 amendment (22): the rows that hold `k = v` (the progress store's facts), listed once per key as rows come.
+    fn holders(&self, k: &str, v: i64) -> Vec<usize> {
+        let Some(p) = self.progress.as_ref() else { return vec![] };
         let mut cache = self.holders.borrow_mut();
         let e = cache.entry(k.to_string()).or_insert((0, HashMap::new()));
         let n = (e.0..self.rows.len()).take_while(|&r| p.store.has(r)).last().map_or(e.0, |r| r + 1);
         for r in e.0..n {
-            *e.1.entry(p.store.get(r, k)).or_insert(0) += 1;
+            e.1.entry(p.store.get(r, k)).or_default().push(r);
         }
         e.0 = n;
-        e.1.get(&v).copied().unwrap_or(0)
+        e.1.get(&v).cloned().unwrap_or_default()
     }
 
     /// E022 amendment (20): the continuation's place in the order, ahead of the frontier: for an entry to continue

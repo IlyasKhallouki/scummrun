@@ -463,3 +463,35 @@ Measured on the laptop, one job at a time from the archive's own states:
   never went under 24 GB free). The run on a copy of the laptop's play10 (the C7 chain), 10 workers, every switch
   through (22), the reading bound 900 s, wall limit to the booking's end.
 - **Prediction:** C8 within 1 hour of the start; C9 today, before the booking ends (23:43 UTC).
+
+## Amendment (23), 2026-11-08 16:30 UTC: C8 on the VM; the dark room's memory and stairway
+
+- **C8 at 16:04 UTC, 11 minutes into the VM run:** j08934, a model try from a room-82 entry with target room 48,
+  walked into a cave. Its end 24418 is in room 48 at frame 18956, with 64 inputs from boot on its chain.
+- **The dark room's readings (a scout from the 11-07 room-48 entry, on the VM with an 18 GB reading cap):**
+  - The base reading: 340,034 records, 5.3 GB. Each reach extension: about 365,000 records and 6 GB more. The try
+    keeps every reading it made: 11.5, 17.5, 23, 30, then 35 GB by the fifth extension. The scout was stopped at
+    6.5 GB available.
+  - The reading cap bounds one reading's growth, not the process. A try's memory can reach the guards' floor, where
+    the driver's guard ends the whole run (the laptop run's end at 14:24 was this).
+  - 307,000 of the base reading's 336,000 actions are room 48's local 205, the ladder climb. It copies the pending
+    sentence (verb, objects) into its locals, so each sentence is a list of locals of its own (up to SIG_LIMIT, 1,024
+    per wait point), each with a chain of events polling global 126.
+  - The plan's first step on the broken stairway (584, local 204) was refused 5 times. Local 204 walks Indy to a
+    spot and sets `Var[444]` = 1 only when he ends within 10 pixels: a walk's outcome the scripts do not decide.
+- **Changes:**
+  - `FMI_REACH_TRY_LIMIT=1` (harness): a try makes at most one reach extension. The next try starts from its end in a
+    process of its own.
+  - The guards staggered on the VM: the reading stops at 3 GB available, a job's guard at 2 GB (`guard-job.sh`,
+    `E008_GUARD`), the driver's guard at 1 GB (`GUARD_MIN_KB`, `guard.sh`).
+  - The continuations' novelty does not count the rows below the try's own entries. The free try from the room-48
+    end made more room-48 rows, which took the end's claim, and side ends in rooms 63 and 69 filled the 10 workers.
+- **The C9 chain, from the scripts:**
+  - Open the stone box (585), which shows the wand (586, a child of the box at state 1). Take the wand.
+  - Use the wand with 933, which starts local 203. Local 203 lights the room (local 200, `Var[209]`) when `Var[444]`
+    is not 0. `Var[444]` is a scratch variable several globals write; it is 130 in the room-48 entry's state. The
+    stairway is not needed.
+  - A stairway walk that ends short sets `Var[444]` to 0, which closes the light in that branch.
+  - Use the sentry statue (587) with 933 while `Var[209]` is set: local 212 opens the metal door (582). Walking to
+    the open door is the restart, C9.
+- **The run:** restarted twice on the VM (16:18 and 16:28 UTC) for these changes; the uncommitted jobs run again.
