@@ -71,6 +71,17 @@ pub fn read_sound_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_SOUND").is_ok_and(|v| v == "1"))
 }
 
+/// E022 amendment (24)'s switch `FMI_READ_MERGE=1`: a run's records that differ in one precondition key alone are one
+/// record, the key's values joined (dropped when they cover its domain), and a record another one's precondition
+/// covers with the same effects goes (`Builder::merge_records`). The machine forks a path on each fact it reads and
+/// keeps the siblings apart at a join while their assumed values differ, so a run that tests independent facts it does
+/// not write by (the dark room's local 208 renames each object by its class 25) made one record per combination:
+/// 3 x 2^8 a run, 285,000 of the room's 312,000 actions. Unset: as before.
+pub fn read_merge_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_MERGE").is_ok_and(|v| v == "1"))
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];
@@ -1785,7 +1796,7 @@ impl<'g> Builder<'g> {
                     out.extend(self.run(m, job, p2, pre2, budget));
                 }
                 budget.1 -= 1;
-                return out;
+                return self.merge_records(out);
             }
             self.counts.inc("runs past the path limit not split (depth or budget used up, or no fork on a read)");
         }
@@ -1832,7 +1843,105 @@ impl<'g> Builder<'g> {
             }
             out.push(rec);
         }
+        self.merge_records(out)
+    }
+
+    /// `read_merge_switch`: a run's records less those that differ from another in one precondition key alone (joined
+    /// into one, the key's values united, the key dropped when they cover its domain) or whose precondition another
+    /// record with the same effects covers. Both are exact: the merged record applies in just the states the records
+    /// did. Records are compared on all else (the label, the effects, the checks, the end, the next events).
+    fn merge_records(&mut self, recs: Vec<Record>) -> Vec<Record> {
+        if !read_merge_switch() || recs.len() < 2 {
+            return recs;
+        }
+        let n0 = recs.len();
+        let rest = |r: &Record| {
+            let mut c = r.clone();
+            c.pre = Pre::new();
+            c.engine_pre = Vec::new();
+            format!("{c:?}")
+        };
+        let mut order: Vec<String> = Vec::new();
+        let mut groups: FxHashMap<String, Vec<Record>> = FxHashMap::default();
+        for r in recs {
+            let k = rest(&r);
+            if !groups.contains_key(&k) {
+                order.push(k.clone());
+            }
+            groups.entry(k).or_default().push(r);
+        }
+        let mut out = Vec::new();
+        for k in order {
+            let g = groups.remove(&k).unwrap();
+            out.extend(if g.len() < 2 { g } else { self.merge_group(g) });
+        }
+        if out.len() < n0 {
+            self.counts.add("FMI_READ_MERGE: records merged into others", (n0 - out.len()) as i64);
+        }
         out
+    }
+
+    /// `merge_records` on records equal but for their preconditions, to a fixed point.
+    fn merge_group(&mut self, mut rs: Vec<Record>) -> Vec<Record> {
+        loop {
+            let mut changed = false;
+            let keys: BTreeSet<String> = rs.iter().flat_map(|r| r.pre.keys().cloned()).collect();
+            for k in keys {
+                // the records holding k, by their precondition without it: each bucket is one record
+                let mut buckets: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+                for (i, r) in rs.iter().enumerate() {
+                    if r.pre.contains_key(&k) {
+                        let mut p = r.pre.clone();
+                        p.remove(&k);
+                        buckets.entry(format!("{p:?}")).or_default().push(i);
+                    }
+                }
+                let mut gone: FxHashSet<usize> = FxHashSet::default();
+                for idx in buckets.values().filter(|v| v.len() > 1) {
+                    let mut vals: Labels = idx.iter().flat_map(|&i| rs[i].pre[&k].iter().copied()).collect();
+                    vals.sort();
+                    vals.dedup();
+                    let all = self.domain(&k).is_some_and(|d| d.values.iter().all(|v| vals.contains(v)));
+                    let r0 = &mut rs[idx[0]];
+                    if all {
+                        r0.pre.remove(&k);
+                    } else {
+                        r0.pre.insert(k.clone(), vals);
+                    }
+                    gone.extend(idx[1..].iter().copied());
+                }
+                if !gone.is_empty() {
+                    changed = true;
+                    rs = rs.into_iter().enumerate().filter(|(i, _)| !gone.contains(i)).map(|(_, r)| r).collect();
+                }
+            }
+            // a record whose precondition a more general one's covers (that one's keys a subset, its values a superset)
+            let covers = |s: &Pre, r: &Pre| s.iter().all(|(k, sv)| r.get(k).is_some_and(|rv| rv.iter().all(|v| sv.contains(v))));
+            let mut gone: FxHashSet<usize> = FxHashSet::default();
+            for i in 0..rs.len() {
+                if gone.contains(&i) {
+                    continue;
+                }
+                for j in 0..rs.len() {
+                    if i != j && !gone.contains(&j) && covers(&rs[j].pre, &rs[i].pre) && (rs[j].pre != rs[i].pre || j < i) {
+                        gone.insert(i);
+                        break;
+                    }
+                }
+            }
+            if !gone.is_empty() {
+                changed = true;
+                rs = rs.into_iter().enumerate().filter(|(i, _)| !gone.contains(i)).map(|(_, r)| r).collect();
+            }
+            if !changed {
+                break;
+            }
+        }
+        for r in rs.iter_mut() {
+            let keep: Vec<String> = r.engine_pre.iter().filter(|k| r.pre.contains_key(*k)).cloned().collect();
+            r.engine_pre = keep;
+        }
+        rs
     }
 
     /// A run's counters and, for the job memo, what it touched and asked (`run`; FMI_READ_WIDEN books both runs).
@@ -1937,7 +2046,7 @@ impl<'g> Builder<'g> {
             out.extend(self.run(m, job, p2, pre2, budget));
         }
         budget.1 -= 1;
-        out
+        self.merge_records(out)
     }
 
     /// `Builder.record`: the record of one path, or None when it changes nothing.
