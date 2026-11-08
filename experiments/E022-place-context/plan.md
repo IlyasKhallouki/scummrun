@@ -413,3 +413,29 @@ Measured on the laptop, one job at a time from the archive's own states:
   3 hours.
 - **Stop rule:** the wall limit, the watcher, or a memory guard kill. A kill is the laptop's limit, not the
   selection's result, and is reported as such.
+
+## Amendment (21), 2026-11-08 14:55 UTC: the run's first 35 minutes, and the continuations ordered by their try's target
+
+- **The run of amendment (20), 13:49–14:24 UTC, 12 jobs:**
+  - j08916, a model try from 23351, played the voyage: entry 24189, room 42 at frame 10657 with `bit:443 = 1`. As
+    predicted.
+  - j08918, a model try from 24189 with target room 82, opened the locker, used the kit and connected the hose, then
+    waited 2 × 3,600 frames on the suit (`sentence(8,491)`). All 588 children were refused on the sentence script's
+    repeat-click test (`global/script-002.txt:8`, `Var[105] == Local[2]`, no fact). Its end, 24197 (frame 17965),
+    is the state before the suit.
+  - The next model try took 24147 and failed the same way. Then the order went to side tries' ends in rooms 49 and
+    63: their depth profile tied (36–37 atoms set at depth 2) and they were newer.
+  - The memory guard ended the run at 14:24, in a free try in room 63 (3.1 GB available).
+- **The suit, by a single job from 24196 (frame 14365, just before the suit step):** a fresh reading plans the suit and
+  the hoist and stops "goal" in room 82 (4 entries). The hoist passed through one of the click's other records
+  (`FMI_WINDOW_ALT_DEBUG=1`). The step can pass from that state; the run did not continue there.
+- **Tried and dropped:** h_add over the guide's regression graph (the write sites' needs, exported by the guide
+  builder) gave 23 for every entry, the boot's included. A writer of room 48 has no needs (the boot script), and the
+  end's `owner:582` has no writer.
+- **Change, under `FMI_SELECT_CONTINUE=1`:** continuations are ordered by their try's target. A target value no entry
+  held before the try comes first (the guide target's tier 1; novelty from the progress store), then the newest.
+  - On play10 after the run: first 24241, the end of the second room-42 try (target room 82). The side ends follow at
+    ranks 406–407.
+- **The run resumes** on play10 under the same settings. The killed run's unfinished job (j08928, room 63) is moved to
+  the attic.
+- **Prediction:** the first model try starts from 24241 or 24197; C7 within an hour; C8 within 2 hours.
