@@ -99,6 +99,16 @@ pub fn read_inv_b_switch() -> bool {
     *ON.get_or_init(|| std::env::var("FMI_READ_INV_B").is_ok_and(|v| v == "1"))
 }
 
+/// E022 amendment (26)'s switch `FMI_READ_RENAME=1`: a fact read by a test that only picks object names
+/// (`machine::rename_test`) is read as one of its values, with no fork and nothing assumed: both arms leave the same
+/// state. The dark room's local 208 tests the dark class (25) of eight objects only to rename them, so the light's
+/// run (local 203, which starts it through local 200) forked 2^8 ways, past the path limit, and its job split into
+/// some 80 parts of 1,000 paths each, 200-350 s a job. Unset: as before.
+pub fn read_rename_switch() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("FMI_READ_RENAME").is_ok_and(|v| v == "1"))
+}
+
 /// Path ends that are no action (reader.DROP_ENDS: model.INFEASIBLE and the reader's own).
 pub const DROP_ENDS: [&str; 9] =
     ["spin", "nesting", "error", "limit", "unmodelled", "deferral unknown", "nothing ran", "left the scope", "no value"];

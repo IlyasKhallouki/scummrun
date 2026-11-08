@@ -431,6 +431,8 @@ struct St {
     verb_reads: u64,
     click_read: bool,
     clicked: bool,
+    /// E022 amendment (26): `rename_test` of each jump read so far, by (unit, instruction)
+    renames: FxHashMap<(u32, u32), bool>,
 }
 
 /// F1c: one input's run from input script `n` (machine.rs `f1c_click`).
@@ -590,6 +592,119 @@ fn read_by_sets(m: &mut Machine<'_>, k: Fact, cands: &[Label], p: &Path) -> R<Op
     }
     count(m, "F12: forks on read into value sets");
     Err(Fork(Box::new(ForkOn(k, Some(sets)))))
+}
+
+/// E022 amendment (26) (`FMI_READ_RENAME=1`): a read of fact `k`, whose values left are `cands`, by a rename-only
+/// test (`rename_test`): its first value, with no fork and nothing assumed. None: not such a test, or no plain value.
+fn rename_read(m: &mut Machine<'_>, k: Fact, cands: &[Label]) -> Option<Val> {
+    if !crate::builder::read_rename_switch() {
+        return None;
+    }
+    let x = st(m).cur?;
+    let l = *cands.iter().find(|l| matches!(l, Label::Int(_)))?;
+    let key = (x.u.0, x.i);
+    let ok = match st(m).renames.get(&key) {
+        Some(&b) => b,
+        None => {
+            let b = rename_test(m.game, x.u, x.i);
+            st_mut(m).renames.insert(key, b);
+            if std::env::var_os("FMI_READ_RENAME_DEBUG").is_some() {
+                let g = m.game;
+                eprintln!("[rename] {} {} {:04X}: {b}", Game::unit_name(g.unit(x.u).key), k, g.ins(x.u)[x.i as usize].offset);
+            }
+            b
+        }
+    };
+    if !ok {
+        return None;
+    }
+    count(m, "E022: facts a rename-only test reads, read with no fork");
+    let i = info(m, k);
+    Some(value(m, &i, l))
+}
+
+/// E022 amendment (26): whether the jump at instruction `i` of unit `u` only picks object names, so that the fact its
+/// test reads needs no fork. Its test reads only classOfIs, getObjectState, getObjectOwner, locals and constants; its
+/// two arms, up to the instruction where they meet, hold only setObjectName, such tests and forward jumps inside
+/// them; and every way through each arm either runs a setObjectName or, after the meeting point, runs one before any
+/// other statement (through such tests and forward jumps). setObjectName's one effect the machine keeps is the
+/// inventory hook's run (`inventory_hook`, `eng_script`): the hook script stopped and its keys written with one
+/// value, the same at every run, which no such test reads. So both arms are in the same state at the first rename
+/// after the test, whichever value the fact has.
+pub(crate) fn rename_test(g: &Game, u: UnitId, i: u32) -> bool {
+    let ins = g.ins(u);
+    let n = ins.len() as u32;
+    let ast = &g.ast;
+    fn pure(ast: &scumm_ir::Ast, e: ExprId) -> bool {
+        match ast.expr(e) {
+            Expr::Const(_) | Expr::Local(_) | Expr::Str(_) => true,
+            Expr::Getter { name, args } => {
+                matches!(name, known::CLASS_OF_IS | known::GET_OBJECT_STATE | known::GET_OBJECT_OWNER)
+                    && ast.kids(args).iter().all(|&a| pure(ast, a))
+            }
+            Expr::List(args) => ast.kids(args).iter().all(|&a| pure(ast, a)),
+            Expr::Cmp { a, b, .. } => pure(ast, a) && pure(ast, b),
+            Expr::Not(a) | Expr::Truth(a) | Expr::Neg(a) => pure(ast, a),
+            _ => false,
+        }
+    }
+    let rename = |j: u32| matches!(ins[j as usize].st, Some(Stmt::Op { name: known::SET_OBJECT_NAME, .. }));
+    // a test or jump the region may hold: forward, its test pure; (fall-through, target)
+    let step = |j: u32| -> Option<(Option<u32>, u32)> {
+        let x = &ins[j as usize];
+        match x.st? {
+            Stmt::Jump { cond, .. } => {
+                let t = x.target?;
+                if t <= j || cond.is_some_and(|c| !pure(ast, c)) {
+                    return None;
+                }
+                Some((if cond.is_some() { x.next } else { None }, t))
+            }
+            _ => None,
+        }
+    };
+    let Some((Some(a), b)) = step(i) else { return false };
+    // where the arms meet: past the then arm's closing jump over the else arm, or the test's target
+    let join = match (b > a).then(|| step(b - 1)).flatten() {
+        Some((None, t)) if t >= b => t,
+        _ => b,
+    };
+    if join > n {
+        return false;
+    }
+    for j in a..join {
+        if rename(j) {
+            continue;
+        }
+        match step(j) {
+            Some((_, t)) if t <= join => {}
+            _ => return false,
+        }
+    }
+    // every way from `j` runs a rename before `stop` (inside the region) or before any other statement (after it)
+    fn first<F: Fn(u32) -> bool, S: Fn(u32) -> Option<(Option<u32>, u32)>>(
+        j: u32,
+        stop: Option<u32>,
+        n: u32,
+        rename: &F,
+        step: &S,
+        budget: &mut u32,
+    ) -> bool {
+        if Some(j) == stop || j >= n || *budget == 0 {
+            return false;
+        }
+        *budget -= 1;
+        if rename(j) {
+            return true;
+        }
+        match step(j) {
+            Some((f, t)) => f.is_none_or(|f| first(f, stop, n, rename, step, budget)) && first(t, stop, n, rename, step, budget),
+            None => false,
+        }
+    }
+    let mut budget = 256;
+    let arms = first(a, Some(join), n, &rename, &step, &mut budget) && first(b, Some(join), n, &rename, &step, &mut budget);
+    arms || first(join, None, n, &rename, &step, &mut budget)
 }
 
 fn info(m: &mut Machine<'_>, k: Fact) -> Rc<Info> {
@@ -849,6 +964,9 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Va
                 return Ok(lazy_of(m, &i, Some(&s)));
             }
             let s = s.clone();
+            if let Some(v) = rename_read(m, k, &s) {
+                return Ok(v);
+            }
             if let Some(v) = read_by_sets(m, k, &s, p)? {
                 return Ok(v);
             }
@@ -880,6 +998,9 @@ fn read_fact(m: &mut Machine<'_>, p: &mut Path, k: Fact, o: &FactOracle) -> R<Va
                     return Ok(lazy_of(m, &i, None));
                 }
                 let all = d.values.clone();
+                if let Some(v) = rename_read(m, k, &all) {
+                    return Ok(v);
+                }
                 if let Some(v) = read_by_sets(m, k, &all, p)? {
                     return Ok(v);
                 }

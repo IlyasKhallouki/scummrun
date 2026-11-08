@@ -1112,6 +1112,10 @@ impl Builder<'_> {
             // E014's FMI_READ_SOUND changes the runs through sound commands: its store is its own (unset: as before)
             writeln!(t, "read_sound 1").unwrap();
         }
+        if crate::builder::read_rename_switch() {
+            // E022's FMI_READ_RENAME changes the runs through rename-only tests: its store is its own (unset: as before)
+            writeln!(t, "read_rename 1").unwrap();
+        }
         t
     }
 
