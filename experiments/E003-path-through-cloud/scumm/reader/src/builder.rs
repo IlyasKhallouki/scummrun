@@ -15,6 +15,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 pub const SIG_LIMIT: usize = 1024;
+
+/// E022 amendment (24): `FMI_READ_SIG_LIMIT=N`, a wait point's lists of locals past N folded into 0 (SIG_LIMIT
+/// otherwise). The dark room's ladder (room 48's local 204/205) copies the pending sentence into its locals, so each
+/// sentence is a list of its own: 307,000 of the room's 336,000 actions at 1,024.
+pub fn sig_limit_env() -> usize {
+    std::env::var("FMI_READ_SIG_LIMIT").ok().and_then(|v| v.parse().ok()).filter(|&n: &usize| n > 0).unwrap_or(SIG_LIMIT)
+}
 pub const SPLIT_DEPTH: i64 = 2;
 pub const SPLIT_BUDGET: i64 = 4;
 pub const VAR_CUTSCENEEXIT_KEY: i32 = 24;
@@ -783,7 +790,7 @@ impl<'g> Builder<'g> {
             due: None,
             scope,
             table,
-            sig_limit: SIG_LIMIT,
+            sig_limit: sig_limit_env(),
             records: Vec::new(),
             counts: Counter::default(),
             ends: PyCounter::default(),

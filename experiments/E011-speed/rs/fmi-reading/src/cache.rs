@@ -166,6 +166,16 @@ impl ReadSpec {
             self.domain_goals, self.elsewhere as u8, self.live_locals as u8, self.split_limit as u8, self.switches,
             self.reach as u8, self.frame_costs as u8
         );
+        // E022 amendment (24): the reader's switches set in the environment (FMI_READ_*) change what it reads; the ones
+        // that only bound or report a reading do not
+        let mut env: Vec<String> = std::env::vars()
+            .filter(|(k, _)| k.starts_with("FMI_READ_") && !["BOUND", "RSS", "TRIM", "DEBUG"].iter().any(|w| k.contains(w)))
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect();
+        env.sort();
+        if !env.is_empty() {
+            let _ = writeln!(t, "env {}", env.join(" "));
+        }
         let _ = writeln!(t, "goal {}", self.goal);
         let _ = writeln!(t, "fact_vars {}", self.fact_vars.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","));
         let start = self.start_text(root)?;
