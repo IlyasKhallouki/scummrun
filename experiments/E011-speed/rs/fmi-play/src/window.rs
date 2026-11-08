@@ -1231,6 +1231,8 @@ fn child_strict_<'a>(w: &W<'a>, c: usize, mut cb: Box<dyn Engine>, mut ch: Child
             .map(|e| e.frame)
             .collect();
         ch.events = ex.movie.clone();
+        // E022 amendment (27): a sentence the game queued itself is played with no input, from the frame it began
+        let ins = if ins.is_empty() { ex.queued_at.map(|f| vec![f]).unwrap_or_default() } else { ins };
         if ins.is_empty() {
             ch.set("interface", Some(Py::s("no input event")));
             ch.reached = Some(cb.status().frame);

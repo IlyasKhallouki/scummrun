@@ -52,6 +52,52 @@ fn hints() -> &'static std::sync::Mutex<std::collections::HashMap<HintKey, Vec<P
     H.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
+/// E022 amendment (27)'s switch `FMI_REALIZE_QUEUED=1`: a planned sentence the game queued itself (an object's code
+/// re-issued it, doSentence: the dark room's ladder and beads run `doSentence(8,Local[0],VAR_ME)`, so the player's
+/// "use ladder with stairway" becomes (8,584,583)) is played with no input when the engine's sentence script begins it
+/// within `QUEUE_FRAMES` frames: the engine judges, by the script's slot and its first three locals. Unset: as before.
+pub fn queued_on() -> bool {
+    std::env::var("FMI_REALIZE_QUEUED").is_ok_and(|v| v == "1")
+}
+
+/// Frames a queued sentence may take to begin (checkAndRunSentenceScript pops the queue at a frame's end).
+pub const QUEUE_FRAMES: u64 = 8;
+
+/// Whether the engine's sentence script (VAR_SENTENCE_SCRIPT) runs with `want` (verb, A, B) as its first locals.
+fn runs_sentence(o: &Obs, want: (i32, i32, i32)) -> bool {
+    let n = o.vars.get(afford::VAR_SENTENCE_SCRIPT).copied().unwrap_or(0);
+    n != 0
+        && o.slots.iter().any(|s| {
+            s.number == n && s.status != 0 && s.locals.as_ref().is_some_and(|l| l.len() >= 3 && (l[0], l[1], l[2]) == want)
+        })
+}
+
+/// The frame at which the engine's sentence script runs `want` with no input, in a fork of `e` run at most
+/// `QUEUE_FRAMES` frames; None when it does not.
+fn queued_frame(e: &mut Box<dyn Engine>, want: (i32, i32, i32)) -> EResult<Option<u64>> {
+    let mut b = e.fork().inspect(|_| fmi_core::count_fork("realize.rs:queued"))?;
+    let end = b.status().frame + QUEUE_FRAMES;
+    let found = loop {
+        if runs_sentence(&b.obs(&ObsReq::default())?, want) {
+            break Some(b.status().frame);
+        }
+        let f = b.status().frame;
+        if f >= end {
+            break None;
+        }
+        match b.run(&RunSpec { frame: Some(f + 1), ..Default::default() }) {
+            Ok(_) => {}
+            Err(EngineError::Ended(_)) => break None,
+            Err(x) => {
+                b.quit();
+                return Err(x);
+            }
+        }
+    };
+    b.quit();
+    Ok(found)
+}
+
 /// A planned step: a sentence (verb v on object a, with object b for a two-object sentence) or a dialog verb.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
@@ -711,12 +757,26 @@ pub fn step_of(inp: &InputStep) -> Option<Step> {
 /// the branch: scheduled with `Br::inputs` and run to the last one's frame through `Br::run`, so the frame observer
 /// and the strict matcher see every frame as with the executor's input; the accepted fork is quit. `movie` gets the
 /// events. A miss is `PlayErr::Route` with realize's reason ("approach", "no sentence", "no slot", "not taken").
-pub fn play(b: &mut Br, inp: &InputStep, name: &str, movie: &mut Vec<Event>) -> PResult<()> {
+pub fn play(b: &mut Br, inp: &InputStep, name: &str, movie: &mut Vec<Event>, queued_at: &mut Option<u64>) -> PResult<()> {
     let route = |m: String| Err(PlayErr::Route(format!("{name}: realize: {m}")));
     let Some(step) = step_of(inp) else {
         return route(format!("a {} step without its verb or object", inp.kind));
     };
     let cfg = Cfg::default();
+    // E022 amendment (27): a sentence the game queued itself, before the idle run would play it past
+    if let (true, Step::Sentence { v, a, b: ob }) = (queued_on(), &step) {
+        if let Some(f) = queued_frame(&mut *b.e, (*v, *a, ob.unwrap_or(0)))? {
+            if b.frame() < f {
+                match b.run(&RunSpec { frame: Some(f), ..Default::default() }) {
+                    Ok(_) => {}
+                    Err(EngineError::Ended(st)) => return route(format!("the run ended: {}", st.reason)),
+                    Err(x) => return Err(x.into()),
+                }
+            }
+            *queued_at = Some(f);
+            return Ok(());
+        }
+    }
     if b.status().idle.is_none() {
         let end = b.frame() + cfg.horizon;
         match b.run(&RunSpec { idle: true, max_frame: Some(end), ..Default::default() }) {

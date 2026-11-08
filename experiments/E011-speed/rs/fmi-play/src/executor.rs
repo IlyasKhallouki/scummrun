@@ -399,6 +399,9 @@ pub struct Executor {
     /// E013 (component refuse): set when a check after an input this executor issued failed (the verb key check:
     /// the profile's selected-verb variable it read); None when a route error is one of forming the input
     pub check_var: Option<usize>,
+    /// E022 amendment (27) (`realize::queued_on`): the frame the sentence script began a planned sentence the game had
+    /// queued itself, played with no input
+    pub queued_at: Option<u64>,
 }
 
 impl Executor {
@@ -415,6 +418,7 @@ impl Executor {
             stone_at: 0,
             stats_kept: 0,
             check_var: None,
+            queued_at: None,
         }
     }
 
@@ -1095,7 +1099,7 @@ impl Executor {
 /// profile is read for it; its events go to the executor's movie.
 pub fn play_input(ex: &mut Executor, b: &mut Br, inp: &InputStep, name: &str) -> PResult<()> {
     if (inp.kind == "click" || inp.kind == "line") && crate::realize::on() {
-        return crate::realize::play(b, inp, name, &mut ex.movie);
+        return crate::realize::play(b, inp, name, &mut ex.movie, &mut ex.queued_at);
     }
     if inp.kind == "click" {
         wait_camera(ex, b, inp, INPUT_LIMIT)?;
