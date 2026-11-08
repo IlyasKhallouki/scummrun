@@ -63,6 +63,18 @@ pub fn queued_on() -> bool {
 /// Frames a queued sentence may take to begin (checkAndRunSentenceScript pops the queue at a frame's end).
 pub const QUEUE_FRAMES: u64 = 8;
 
+/// E022 amendment (27)'s switch `FMI_REALIZE_SWAP=1`: a planned two-object sentence (v, a, b) no clicks make is tried
+/// as the player makes it, (v, b, a), and accepted when the engine's sentence script then runs (v, a, b) itself within
+/// `SWAP_FRAMES` frames: b's code re-issued it (`doSentence(v,Local[0],VAR_ME)`). The dark room's (8,584,583): no
+/// clicks in 60 candidates; (8,583,584), "use ladder with stairway", in 6, and the ladder placed 8 frames on. Unset:
+/// as before.
+pub fn swap_on() -> bool {
+    std::env::var("FMI_REALIZE_SWAP").is_ok_and(|v| v == "1")
+}
+
+/// Frames the swapped sentence's re-issue may take (the sentence script's first run, then the queue at a frame's end).
+pub const SWAP_FRAMES: u64 = 30;
+
 /// Whether the engine's sentence script (VAR_SENTENCE_SCRIPT) runs with `want` (verb, A, B) as its first locals.
 fn runs_sentence(o: &Obs, want: (i32, i32, i32)) -> bool {
     let n = o.vars.get(afford::VAR_SENTENCE_SCRIPT).copied().unwrap_or(0);
@@ -75,10 +87,24 @@ fn runs_sentence(o: &Obs, want: (i32, i32, i32)) -> bool {
 /// The frame at which the engine's sentence script runs `want` with no input, in a fork of `e` run at most
 /// `QUEUE_FRAMES` frames; None when it does not.
 fn queued_frame(e: &mut Box<dyn Engine>, want: (i32, i32, i32)) -> EResult<Option<u64>> {
+    queued_frame_n(e, want, QUEUE_FRAMES)
+}
+
+/// Whether the engine's run log shows object `a`'s own code running (an object's script: in the room, the inventory
+/// or a flobject), as the sentence script starts A's verb entry for (v, a, b). A sentence that runs and ends within a
+/// frame leaves no live slot for `runs_sentence` to see; its object's code is in the log.
+fn ran_object(rows: &RunsReply, a: i32) -> bool {
+    rows.runs.iter().any(|r| r.number == a && [WIO_ROOM, WIO_INVENTORY, WIO_FLOBJECT].contains(&r.where_))
+}
+
+/// `queued_frame` within `n` frames: the sentence script's slot holding `want`, or A's code in the run log.
+fn queued_frame_n(e: &mut Box<dyn Engine>, want: (i32, i32, i32), n: u64) -> EResult<Option<u64>> {
     let mut b = e.fork().inspect(|_| fmi_core::count_fork("realize.rs:queued"))?;
-    let end = b.status().frame + QUEUE_FRAMES;
+    b.segment(true)?;
+    b.runs()?;
+    let end = b.status().frame + n;
     let found = loop {
-        if runs_sentence(&b.obs(&ObsReq::default())?, want) {
+        if runs_sentence(&b.obs(&ObsReq::default())?, want) || ran_object(&b.runs()?, want.1) {
             break Some(b.status().frame);
         }
         let f = b.status().frame;
@@ -329,7 +355,22 @@ pub fn realize(e: &mut Box<dyn Engine>, step: &Step, cfg: &Cfg) -> EResult<Resul
                 Some(c) => c,
                 None => &mut *e,
             };
-            let found = sentence(base, v, a, b, cfg, &mut rec)?;
+            let mut found = sentence(base, v, a, b, cfg, &mut rec)?;
+            // E022 amendment (27): the player's sentence with the objects swapped, when the engine re-issues the plan's
+            if found.is_none() && swap_on() {
+                if let Some(bo) = b.filter(|&bo| bo != 0 && bo != a) {
+                    let spent = std::mem::replace(&mut rec.candidates, 0);
+                    let f = sentence(base, v, bo, Some(a), cfg, &mut rec)?;
+                    rec.candidates += spent;
+                    if let Some(mut fork) = f {
+                        if queued_frame_n(&mut fork, (v, a, bo), SWAP_FRAMES)?.is_some() {
+                            found = Some(fork);
+                        } else {
+                            fork.quit();
+                        }
+                    }
+                }
+            }
             if let Some(c) = cur {
                 c.quit();
             }
