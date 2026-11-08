@@ -56,6 +56,24 @@ pub fn mem_available_kb() -> u64 {
         .unwrap_or(0)
 }
 
+/// E022 amendment (24): `FMI_READ_TRIM=1`, a try's memory released between its readings (`trim_heap`, and
+/// `RealReadings` keeping the first reading it opened and the newest).
+pub fn read_trim_on() -> bool {
+    std::env::var("FMI_READ_TRIM").is_ok_and(|v| v == "1")
+}
+
+/// E022 amendment (24): the heap's free pages back to the system (glibc's malloc_trim) under `read_trim_on`. An
+/// in-process reading frees its few gigabytes when it ends, but the allocator keeps them mapped, so a try's RSS rose by
+/// each reading's peak (the dark room: 6 GB a reach extension, 35 GB by the fifth).
+pub fn trim_heap() {
+    if read_trim_on() {
+        // SAFETY: malloc_trim only returns the allocator's free memory to the system
+        unsafe {
+            libc::malloc_trim(0);
+        }
+    }
+}
+
 pub fn mem_available_gb() -> f64 {
     mem_available_kb() as f64 / (1u64 << 20) as f64
 }

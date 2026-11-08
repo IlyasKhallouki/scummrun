@@ -135,9 +135,8 @@ fn index(rd: &dyn ReadingSource) -> Arc<Index> {
     }
     let ix = Arc::new(Index::of((0..rd.n_actions()).map(|i| rd.action(i)).collect(), rd.domains()));
     let mut c = C.lock().unwrap();
-    if c.len() >= 4 {
-        c.remove(0);
-    }
+    // E022 amendment (24): one reading's index (a try plans on its newest reading; an index holds every action)
+    c.clear();
     c.push((id, ix.clone()));
     ix
 }
