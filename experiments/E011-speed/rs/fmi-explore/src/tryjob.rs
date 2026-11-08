@@ -584,7 +584,7 @@ fn read_fresh(r: &Resident, job: &Value, state: &Obs, status: &Status, threads: 
         elsewhere: true,
         live_locals: true,
         split_limit: true,
-        switches: step::SWITCHES.into(),
+        switches: step::switches(),
         reach: true,
         frame_costs: true,
         reach_also: vec![],

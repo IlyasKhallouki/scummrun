@@ -16,6 +16,12 @@ pub const SLOT_PREFIXES: [&str; 5] = ["at:", "script:", "local:", "objscript:", 
 pub const GUIDE_KINDS: [&str; 5] = ["var:", "bit:", "owner:", "state:", "class:"];
 /// read.sh's, with wait_pass_cost
 pub const SWITCHES: &str = "value_sets,draw_clears,actor_rooms,input_settled,wait_pass_cost";
+
+/// E022 amendment (24): the reader's switches, `FMI_READ_SWITCHES` when set (the reading cache's key holds them), else
+/// `SWITCHES`.
+pub fn switches() -> String {
+    std::env::var("FMI_READ_SWITCHES").ok().filter(|v| !v.is_empty()).unwrap_or_else(|| SWITCHES.to_string())
+}
 /// walk's run.sh (E006's limits)
 pub const REPLAN_LIMIT: u32 = 30;
 pub const TIME_LIMIT: f64 = 86400.0;
