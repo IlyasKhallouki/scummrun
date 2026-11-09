@@ -1,4 +1,4 @@
-# E023: the system shortens its own route, re-finding each step from boot with skips on
+# E024: the system shortens its own route, re-finding each step from boot with skips on
 
 Date planned: 2026-11-09
 Research question it serves: RQ2 (optimization), RQ4 (generality)
@@ -130,6 +130,21 @@ It runs as the run's last stage once a goal entry exists (driver.rs:664 stops at
   - On E012's Monkey Island kitchen chain (`/var/tmp/fast-mi/e012-archives/kitchen`, with its goal facts), every click gets an anchor.
   - Under skips from boot, the stage reaches the kitchen goal, verified from boot, no later than the chain's own tick.
   - The var-19 rule either passes or moves the skip start past Monkey Island's logo.
+
+## Amendment 1 (2026-11-09, after G0 and G2 on 8fc2104 and their review)
+
+- **G2's draw part: the twin fork is the gate; draws.rs is reported only.**
+  - Measured: the twin fork marks the book step (12: vars 239, 240, 242, 243) and room 82's entry (23: class 1100, 1101). draws.rs marks no step.
+  - Cause: the archive holds 8 readings, and neither draw is in any of them. Room 82's entry runs before the room-82 reading starts, and the book's quiz draw is in no reading. The marking code is correct.
+  - A fresh reading per step would cost a reading per step for a fact the twin fork already measures from the engine.
+- **Three twins per step, not one.** Each twin uses its own perturbed RNG. A step is marked if any twin differs. One twin misses a draw whose new value equals the old one; for the cave that is 1 in 6, and with three twins about 1 in 216.
+  - Extra marks, like steps 8 and 20 here, only cost a re-find. They are kept.
+- **Fixes before item 4** (from the review of 8fc2104):
+  - A click's identity names what the hit test returned at the frame before: object, actor, verb or inventory slot. A click on another object must fail the click verdict, even if area, value, mode and handler match.
+  - G2's "same hit" check places each anchor by its anchor alone, not by the placement's own hit test. Key and Raw count only if the input log's record matches.
+  - The "idle" timing class requires the original input to be at a control stop.
+  - The interface keys are measured as the keys a refused click and a mouse move write, from forks at the first control stop. They are no longer every key any input handler wrote. A key that a step's own taken input writes, and that no refused click writes, stays in that step's progress.
+  - The last input's record is read even when the game ends on the next frame.
 
 ## Run, prediction, stop rule
 
