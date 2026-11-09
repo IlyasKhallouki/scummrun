@@ -1,7 +1,8 @@
 //! G3 (plan.md, "Gates"), fmi-shorten's scan, pass and verify on a fake engine: the earliest completion when t=5
 //! fails, t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order, nor (the
 //! bound by (tick, frame, t)) one at a later frame with a lower tick; ties go to the earliest t; a candidate's engine
-//! error and the goal reached while a candidate waits for an inner input; a reduction is kept only for an earlier
+//! error and the goal reached while a candidate waits for an inner input; a fallback trial's engine error (an offer
+//! trial's, a dialog line's) counted as its outcome; a reduction is kept only for an earlier
 //! verified end (verdict::earlier; reduce.rs: a step the game does not need dropped and kept once its end verifies, a
 //! drop that loses the end not kept, nor one whose version does not verify); a forward pass of two steps; a route
 //! verified from its files, and a movie without its step log failing.
@@ -11,7 +12,7 @@ use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
 use fmi_shorten::scan::{self, Cfg, In, StepSpec};
 use fmi_shorten::verdict::{self, End, Goal};
 use fmi_shorten::reduce::{self, Best, Cand, Drop};
-use fmi_shorten::refind::RCfg;
+use fmi_shorten::refind::{self, How, RCfg};
 use fmi_shorten::{movie, pass};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -24,6 +25,20 @@ const V_END: usize = 41;
 const WINDOW: i32 = 52;
 const V_WIN: usize = 42;
 const WIN_DELAY: u64 = 20;
+/// A dialog line of the fake: a verb slot at (x, y), 20 by 8, taken whenever nothing is pending, setting V_DONE
+/// `LINE_DELAY` frames later; with `kill` its click ends the engine's process (a crash or a timeout: the run fails with
+/// an io error), with `fast` it makes every frame after it one tick long.
+#[derive(Clone, Copy)]
+struct Line {
+    slot: i32,
+    x: i32,
+    y: i32,
+    kill: bool,
+    fast: bool,
+}
+const LINE_DELAY: u64 = 3;
+/// The input handler the fake's lines are chosen under (VAR_VERB_SCRIPT)
+const DIALOG_HANDLER: i32 = 7;
 
 /// The fake game: a door on the screen. A click on it at frame f is taken when the rule has f, and sets V_DONE (the
 /// step's progress) the rule's delay later; any other click is ignored. A taken click on the door while V_DONE is set
@@ -42,6 +57,9 @@ struct Fake {
     /// frames whose taken click makes every frame after it one tick long (a skip), and the ticks a frame takes
     fast: Arc<Vec<u64>>,
     pace: u64,
+    lines: Arc<Vec<Line>>,
+    /// a line's `kill` was clicked: the process is gone
+    dead: bool,
 }
 
 fn fake(rule: &[(u64, u64)]) -> Fake {
@@ -55,11 +73,24 @@ fn fake(rule: &[(u64, u64)]) -> Fake {
         crash: Arc::new(Vec::new()),
         fast: Arc::new(Vec::new()),
         pace: 6,
+        lines: Arc::new(Vec::new()),
+        dead: false,
+    }
+}
+
+fn record(frame: u64, what: &Input, taken: bool) -> InputRecord {
+    InputRecord {
+        frame, input: vec![what.clone()], stat: 0, verdict: if taken { Verdict::Taken } else { Verdict::Ignored },
+        area: 2, value: 0, mode: 1, slot: 0, zone: 0, key_match: false, handler: 4, writes: vec![], reads: vec![],
+        ops: vec![], ops_dropped: 0, touches_dropped: 0,
     }
 }
 
 impl Fake {
     fn hit(&self, x: i32, y: i32) -> At {
+        if let Some(l) = self.lines.iter().find(|l| (l.x..l.x + 20).contains(&x) && (l.y..l.y + 8).contains(&y)) {
+            return At { x, y, zone: 0, main: None, verb_slot: l.slot };
+        }
         let obj = if (100..140).contains(&x) && (50..90).contains(&y) {
             DOOR
         } else if (200..240).contains(&x) && (50..90).contains(&y) {
@@ -78,7 +109,23 @@ impl Fake {
         self.pending.retain(|e| e.frame != f);
         for e in now {
             if let Input::Click(x, y) = e.what {
-                let on = self.hit(x, y).main.map_or(0, |m| m.2);
+                let at = self.hit(x, y);
+                if let Some(l) = self.lines.iter().find(|l| l.slot == at.verb_slot).copied() {
+                    if l.kill {
+                        self.dead = true;
+                        return Ok(());
+                    }
+                    let taken = self.due.is_none();
+                    if taken {
+                        self.due = Some((f + LINE_DELAY, V_DONE));
+                        if l.fast {
+                            self.pace = 1;
+                        }
+                    }
+                    self.log.push(record(f, &e.what, taken));
+                    continue;
+                }
+                let on = at.main.map_or(0, |m| m.2);
                 let on_window = on == WINDOW && self.due.is_none();
                 if on_window {
                     self.due = Some((f + WIN_DELAY, V_WIN));
@@ -91,11 +138,7 @@ impl Fake {
                         self.pace = 1;
                     }
                 }
-                self.log.push(InputRecord {
-                    frame: f, input: vec![e.what.clone()], stat: 0, verdict: if taken || on_window { Verdict::Taken } else { Verdict::Ignored },
-                    area: 2, value: 0, mode: 1, slot: 0, zone: 0, key_match: false, handler: 4, writes: vec![], reads: vec![],
-                    ops: vec![], ops_dropped: 0, touches_dropped: 0,
-                });
+                self.log.push(record(f, &e.what, taken || on_window));
             }
         }
         if let Some((at, var)) = self.due {
@@ -137,6 +180,9 @@ impl Engine for Fake {
         }
         loop {
             self.step().map_err(EngineError::Ended)?;
+            if self.dead {
+                return Err(EngineError::Io(std::io::Error::other("the engine's process is gone")));
+            }
             let f = self.st.frame;
             let reason = if spec.frame.is_some_and(|x| f >= x) {
                 "frame"
@@ -166,6 +212,7 @@ impl Engine for Fake {
             room: self.st.room,
             ego: Some(1),
             vars: self.vars.clone(),
+            verbs: self.lines.iter().map(|l| Verb { slot: l.slot, id: 100 + l.slot, x: l.x, y: l.y, ..Default::default() }).collect(),
             room_objects: Some(vec![
                 RoomObject { id: DOOR, x: 100, y: 50, w: 40, h: 40, ..Default::default() },
                 RoomObject { id: WINDOW, x: 200, y: 50, w: 40, h: 40, ..Default::default() },
@@ -323,6 +370,48 @@ fn a_candidates_engine_error_is_its_outcome_not_the_scans() {
         assert_eq!(s.found.as_ref().map(|f| (f.t, f.frame)), Some((6, 10)), "workers {workers}");
         assert_eq!(s.counts.error, 1);
         assert_eq!(s.errors.iter().map(|x| x.0).collect::<Vec<_>>(), vec![4]);
+    }
+}
+
+fn rcfg(workers: usize) -> RCfg {
+    let dialog = [DIALOG_HANDLER].into_iter().collect();
+    RCfg { scan: Cfg { workers, chunk: 4 }, skips: false, leaves: 10, sentence: Default::default(), dialog }
+}
+
+/// The fake at its idle stop at frame 2 with `lines` offered, chosen under DIALOG_HANDLER; the door taken at 3 (V_DONE
+/// at 6).
+fn with_lines(lines: Vec<Line>) -> Box<dyn Engine> {
+    let mut f = fake(&[(3, 3)]);
+    f.lines = Arc::new(lines);
+    f.vars[fmi_explore::afford::VAR_VERB_SCRIPT] = DIALOG_HANDLER;
+    let mut e: Box<dyn Engine> = Box::new(f);
+    e.run(&RunSpec { frame: Some(2), ..Default::default() }).unwrap();
+    e
+}
+
+#[test]
+fn a_fallback_trials_engine_error_is_its_outcome_not_the_passes() {
+    let kill = Line { slot: 1, x: 10, y: 150, kill: true, fast: false };
+    let line = Line { slot: 2, x: 10, y: 160, kill: false, fast: false };
+    for workers in [1, 3] {
+        // the offer at 2: the line that kills the engine alone, then with the door and with the window: three errors;
+        // the door alone completes at 6, the window alone does not
+        let mut e = with_lines(vec![kill]);
+        let (r, reps) = refind::refind(&mut e, &spec(), 50, 0, 200, &rcfg(workers)).unwrap();
+        let r = r.expect("found by an offer trial");
+        assert_eq!((r.how, r.found.t, r.found.frame), (How::Offer, 2, 6), "workers {workers}");
+        let o = reps.iter().find(|v| v["how"] == "offer").unwrap();
+        assert_eq!((o["inputs"].as_u64(), o["error"].as_u64(), o["run"].as_u64(), o["done"].as_u64()), (Some(5), Some(3), Some(2), Some(1)), "{o}");
+        assert!(o["errors"][0][1].as_str().is_some_and(|m| m.contains("process is gone")), "{o}");
+        // the dialog lines (the offer's trials cut to the original step's length, 1 frame: none completes): the line
+        // that kills the engine is a leaf, counted; the other completes at 6
+        let mut e = with_lines(vec![kill, line]);
+        let (r, reps) = refind::refind(&mut e, &spec(), 1, 0, 200, &rcfg(workers)).unwrap();
+        let r = r.expect("found by the dialog lines");
+        assert_eq!((r.how, r.found.frame, r.found.events.len()), (How::Dialogs, 6, 1), "workers {workers}");
+        let d = reps.iter().find(|v| v["how"] == "dialogs").unwrap();
+        assert_eq!((d["lines"].as_u64(), d["leaves"].as_u64(), d["error"].as_u64()), (Some(2), Some(2), Some(1)), "{d}");
+        assert_eq!(reps.iter().find(|v| v["how"] == "offer").unwrap()["done"], 0);
     }
 }
 
