@@ -6,14 +6,15 @@
 //! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings). --entry E
 //! takes the archive's entry E's movie from boot (its chain's events) for --movie, in `run` as well.
 //!
-//! `fmi shorten run --movie M --archive A --goal end --seed S [--movie-seed S0] [--skips] [--workers N] [--chunk C]
+//! `fmi shorten run --movie M --archive A --goal end|facts --seed S [--movie-seed S0] [--skips] [--workers N] [--chunk C]
 //! [--tail N] [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT` (items 4-9): the movie's
 //! steps (as `label`, on the seed the movie was recorded on: --movie-seed, else the archive's stage.json seed, with
 //! the twins' draw keys unless --no-twins), then the forward pass on seed S, each step found again in order from
 //! boot (fmi-shorten pass.rs; --no-ego: a step's goal without where ego stands), a step the scan does not complete by
 //! the fallbacks (refind.rs, unless --no-fallbacks), with --skips under text and cutscene skips from boot (skips.rs);
 //! a pass that reaches the goal (the movie's end reason, with its site, where the stage's replay of the route ends
-//! too) is written as OUT/unverified-NNN.jsonl with its step log (each step's completion, tick and digest from that
+//! too; with --goal facts the archive's goal facts as the bridge's goal, SPEEDRUN_GOAL, in every engine: the end
+//! "goal") is written as OUT/unverified-NNN.jsonl with its step log (each step's completion, tick and digest from that
 //! replay), verified from boot (movie.rs), and renamed OUT/route-NNN.jsonl only if that passes; a pass that stops is
 //! written as OUT/stopped-NNN.jsonl with its log. With --rounds R (R > 0) the reductions (reduce.rs) from the verified
 //! route, at most R rounds and --wall seconds (7200) from the start, each kept drop a new verified version.
@@ -245,10 +246,14 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let (movie_path, movie) = movie_in(a)?;
     let movie_path = movie_path.as_str();
     let goal = a.get("goal").unwrap_or("end");
-    if goal != "end" {
-        return Err(format!("--goal {goal}: only the game's end (end) is a goal here"));
-    }
     let archive = a.get("archive").ok_or("--archive")?;
+    // the goal: the game's end (its reason and site the movie's), or the archive's goal facts as the bridge's goal
+    // (every engine ends with reason "goal" where they hold, G7)
+    let goal_env: Vec<(String, String)> = match goal {
+        "end" => Vec::new(),
+        "facts" => vec![chain::goal_env(Path::new(archive))?],
+        _ => return Err(format!("--goal {goal}: the game's end (end) or the archive's goal facts (facts)")),
+    };
     let mut held = Held::load(Path::new(archive))?;
     let num = |k: &str, d: u64| a.get(k).map(|v| v.parse::<u64>().map_err(|e| format!("--{k}: {e}"))).unwrap_or(Ok(d));
     let seed = num("seed", 1)? as u32;
@@ -263,7 +268,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let scan_cfg = Cfg { workers: num("workers", 8)? as usize, chunk: num("chunk", 16)? as u32 };
     std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let eng = out.join("engines");
-    let base = HostCfg::from_env();
+    let base = with_env(&HostCfg::from_env(), &goal_env);
     let host0 = Host::new(base.clone()).map_err(|e| format!("the engine host: {e}"))?;
     // items 1-3: the movie's steps as it was run
     let o = Opts { seed: movie_seed, out: eng.join("replay"), twins: !a.flag("no-twins"), tail: num("tail", 3000)? };
@@ -279,7 +284,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let label_s = t0.elapsed().as_secs_f64();
     eprintln!("labels: {} inputs, {} steps ({label_s:.1} s)", ch.met.len(), specs.len());
     // item 8: skips from boot
-    let (host, boot, skips_report, env) = if a.flag("skips") {
+    let (host, boot, skips_report, mut env) = if a.flag("skips") {
         let make = |env: &[(String, String)]| -> Box<dyn EngineHost> { Box::new(Host::new(with_env(&base, env)).expect("host")) };
         let sk = skips::setup(&make, seed, &eng.join("skips"))?;
         eprintln!("skips: {}", sk.report);
@@ -288,6 +293,8 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     } else {
         (host0.clone(), Vec::new(), Value::Null, Vec::new())
     };
+    // the step log's settings hold the goal's too (verify boots with them)
+    env.splice(0..0, goal_env.iter().cloned());
     let hcfg = with_env(&base, &env);
     // item 6's settings: the input handlers of the movie's sentences and of its dialog lines (label.rs)
     let dialog: BTreeSet<i32> = l.anchors.iter().zip(&l.ids).filter(|(an, _)| matches!(an, label::Anchor::Dialog { .. })).filter_map(|(_, id)| id.as_ref().map(|x| x.handler)).collect();

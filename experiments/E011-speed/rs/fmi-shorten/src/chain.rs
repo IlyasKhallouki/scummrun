@@ -301,6 +301,38 @@ pub fn archive_seed(root: &Path) -> Option<u32> {
     files::read_json(&root.join("stage.json")).ok()?["seed"].as_u64().map(|s| s as u32)
 }
 
+/// The archive's goal facts (stage.json's goal: key, its values) as the bridge's SPEEDRUN_GOAL conditions (patch
+/// 0001's: the run ends with reason "goal" where they all hold), for a goal that is no end of the game (G7's kitchen).
+pub fn goal_env(root: &Path) -> Res<(String, String)> {
+    let stage = files::read_json(&root.join("stage.json"))?;
+    let goal = stage["goal"].as_object().ok_or(format!("{}: stage.json has no goal", root.display()))?;
+    let mut conds = Vec::new();
+    for (k, vs) in goal {
+        let key = Key::parse(k);
+        let vals: Vec<i64> = vs.as_array().into_iter().flatten().filter_map(|v| v.as_i64()).collect();
+        let name = match key.kind() {
+            K_VAR => "var",
+            K_BIT => "bit",
+            K_OWNER => "owner",
+            K_STATE => "state",
+            K_CLASS if vals == [1] => {
+                conds.push(json!({"class": key.a(), "set": key.b()}));
+                continue;
+            }
+            K_CLASS if vals == [0] => {
+                conds.push(json!({"not": {"class": key.a(), "set": key.b()}}));
+                continue;
+            }
+            _ => return Err(format!("the goal's {k}: no condition of the bridge reads it")),
+        };
+        if vals.is_empty() {
+            return Err(format!("the goal's {k}: no value"));
+        }
+        conds.push(json!({name: key.a(), "in": vals}));
+    }
+    Ok(("SPEEDRUN_GOAL".into(), Value::Array(conds).to_string()))
+}
+
 /// An archive entry's movie from boot (Archive::movie's: the events of the chain of entries from the root to it),
 /// read only from the archive's entries.jsonl and entries/N.json.gz.
 pub fn archive_movie(root: &Path, entry: usize) -> Res<Vec<Event>> {
