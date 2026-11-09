@@ -301,6 +301,15 @@ pub fn archive_seed(root: &Path) -> Option<u32> {
     files::read_json(&root.join("stage.json")).ok()?["seed"].as_u64().map(|s| s as u32)
 }
 
+/// The archive's goal as `fmi shorten run --goal` takes it: "end" when stage.json's goal is the game's end (its key
+/// guide::END_KEY), "facts" when it is facts of the game alone (G7's kitchen: owner:566 = 1; `goal_env`). An archive
+/// with no goal is an error.
+pub fn archive_goal(root: &Path) -> Res<&'static str> {
+    let stage = files::read_json(&root.join("stage.json"))?;
+    let goal = stage["goal"].as_object().filter(|g| !g.is_empty()).ok_or(format!("{}: stage.json has no goal", root.display()))?;
+    Ok(if goal.contains_key(fmi_explore::guide::END_KEY) { "end" } else { "facts" })
+}
+
 /// The archive's goal facts (stage.json's goal: key, its values) as the bridge's SPEEDRUN_GOAL conditions (patch
 /// 0001's: the run ends with reason "goal" where they all hold), for a goal that is no end of the game (G7's kitchen).
 pub fn goal_env(root: &Path) -> Res<(String, String)> {
