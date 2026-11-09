@@ -7,10 +7,12 @@
 //!   anchors re-placed at their own frames (G2).
 //! * `draws`: item 3's cross-check, the archive's readings' draws (fmi-reading draws.rs) against the steps.
 //! * `verdict`: item 4, a click's and a step's verdicts.
+//! * `scan`: item 5, a step found again at every frame from the steps before it.
 
 pub mod chain;
 pub mod draws;
 pub mod label;
+pub mod scan;
 pub mod verdict;
 
 pub type Res<T> = Result<T, String>;
