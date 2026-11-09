@@ -5,7 +5,8 @@
 //! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings).
 //!
 //! `fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
-//! [--no-twins] [--no-ego] OUT` (items 4, 5, 8, 9): the movie's steps (as `label`, with the twins' draw keys unless
+//! [--no-twins] [--no-ego] [--rounds 0] OUT` (items 4, 5, 8, 9; --rounds above 0 is refused: the reductions, item 7,
+//! are stage B): the movie's steps (as `label`, with the twins' draw keys unless
 //! --no-twins), then the forward pass, each step found again in order from boot (fmi-shorten pass.rs; --no-ego: a
 //! step's goal without where ego stands), with --skips under text and cutscene skips from boot (skips.rs); a pass that
 //! reaches the game's end is written as OUT/route-NNN.jsonl with its step log OUT/route-NNN.steps.jsonl (each step's
@@ -22,6 +23,25 @@ use fmi_shorten::{draws, label, movie, pass, skips};
 use serde_json::{json, Value};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+
+/// A subcommand's arguments: `with_value` its options with a value, `flags` its flags, at most `npos` positionals.
+/// Any other option is an error, as is a flag given a value or an option none (the review of stage A: the plan's
+/// `--rounds 3`, an unknown option, made OUT "3").
+fn args(argv: &[String], with_value: &[&str], flags: &[&str], npos: usize) -> Result<super::Args, String> {
+    let a = super::Args::parse(argv, with_value);
+    for (k, v) in &a.opts {
+        match (with_value.contains(&k.as_str()), flags.contains(&k.as_str()), v) {
+            (true, _, Some(_)) | (_, true, None) => {}
+            (true, _, None) => return Err(format!("--{k}: no value")),
+            (_, true, Some(v)) => return Err(format!("--{k}={v}: a flag takes no value")),
+            _ => return Err(format!("--{k}: no such option")),
+        }
+    }
+    if a.pos.len() > npos {
+        return Err(format!("{} arguments ({}), {npos} at most", a.pos.len(), a.pos.join(" ")));
+    }
+    Ok(a)
+}
 
 fn read_movie(p: &Path) -> Result<Vec<fmi_core::Event>, String> {
     let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
@@ -78,8 +98,7 @@ fn label_in(a: &super::Args) -> Result<(), String> {
 }
 
 pub fn cmd_label(argv: &[String]) -> i32 {
-    let a = super::Args::parse(argv, &["movie", "archive", "seed", "tail"]);
-    match label_in(&a) {
+    match args(argv, &["movie", "archive", "seed", "tail"], &["no-twins", "no-draws", "check"], 1).and_then(|a| label_in(&a)) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("fmi shorten label: {e}");
@@ -116,6 +135,9 @@ fn write_json(p: &Path, v: &Value) -> Result<(), String> {
 
 fn run_in(a: &super::Args) -> Result<(), String> {
     let t0 = std::time::Instant::now();
+    if a.get("rounds").is_some_and(|r| r != "0") {
+        return Err("--rounds: the reductions (plan.md item 7) are stage B, not built: no round can run".into());
+    }
     let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
     let movie_path = a.get("movie").ok_or("--movie")?;
     let movie = read_movie(Path::new(movie_path))?;
@@ -230,8 +252,8 @@ fn run_in(a: &super::Args) -> Result<(), String> {
 }
 
 pub fn cmd_run(argv: &[String]) -> i32 {
-    let a = super::Args::parse(argv, &["movie", "archive", "goal", "seed", "workers", "chunk", "tail"]);
-    match run_in(&a) {
+    let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds"];
+    match args(argv, &opts, &["skips", "no-twins", "no-ego"], 1).and_then(|a| run_in(&a)) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("fmi shorten run: {e}");
@@ -244,8 +266,8 @@ pub fn cmd_run(argv: &[String]) -> i32 {
 /// (the bridge's settings from its step log's first line); with --ends, a diagnostic only: the movie's end by the
 /// bridge's launch and standalone, with no step log and no verdict.
 pub fn cmd_verify(argv: &[String]) -> i32 {
-    let a = super::Args::parse(argv, &[]);
     let r = (|| -> Result<(), String> {
+        let a = args(argv, &[], &["ends"], 2)?;
         let route = PathBuf::from(a.pos.first().ok_or("ROUTE")?);
         let out = PathBuf::from(a.pos.get(1).ok_or("OUT")?);
         let meta: Value = std::fs::read_to_string(movie::steps_path(&route))
@@ -284,8 +306,8 @@ pub fn cmd_verify(argv: &[String]) -> i32 {
 /// and, frame by frame in [F, T], its stop: frame, tick, room, the camera's xstart, the idle kind, ego's position, var
 /// 19 (one JSON line each on stdout).
 pub fn cmd_trace(argv: &[String]) -> i32 {
-    let a = super::Args::parse(argv, &["movie", "seed", "from", "to", "env"]);
     let r = (|| -> Result<(), String> {
+        let a = args(argv, &["movie", "seed", "from", "to", "env"], &[], 1)?;
         let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
         let movie = read_movie(Path::new(a.get("movie").ok_or("--movie")?))?;
         let num = |k: &str, d: u64| a.get(k).map(|v| v.parse::<u64>().map_err(|e| format!("--{k}: {e}"))).unwrap_or(Ok(d));
