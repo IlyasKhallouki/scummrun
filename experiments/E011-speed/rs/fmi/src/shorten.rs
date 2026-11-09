@@ -1,8 +1,10 @@
-//! E024: `fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT`
+//! E024: `fmi shorten label (--movie M | --entry E) --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N]
+//! OUT`
 //! (fmi-shorten, experiments/E024-shorten/plan.md Part 2, items 1-3). The movie replayed from boot with the engine host
 //! of this process's environment: OUT/steps.jsonl (the steps, each input's anchor, timing and identity, keep(k), the
 //! twin's draw keys and the readings' draws that mark it) and OUT/labels.json (the summary); with --check, G2's
-//! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings).
+//! re-placement in OUT/g2.json. The archive folder is read only (its readings are linked into OUT/readings). --entry E
+//! takes the archive's entry E's movie from boot (its chain's events) for --movie, in `run` as well.
 //!
 //! `fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
 //! [--no-twins] [--no-ego] [--no-fallbacks] [--rounds R] [--wall SECONDS] OUT` (items 4-9): the movie's steps (as
@@ -57,9 +59,22 @@ fn read_movie(p: &Path) -> Result<Vec<fmi_core::Event>, String> {
         .collect()
 }
 
+/// The input movie: --movie's file, or with --entry E the archive's entry E's movie from boot (chain.rs).
+fn movie_in(a: &super::Args) -> Result<(String, Vec<Event>), String> {
+    match (a.get("movie"), a.get("entry")) {
+        (Some(m), None) => Ok((m.to_string(), read_movie(Path::new(m))?)),
+        (None, Some(e)) => {
+            let arch = a.get("archive").ok_or("--archive")?;
+            let i = e.parse::<usize>().map_err(|x| format!("--entry: {x}"))?;
+            Ok((format!("{arch}#entry {i}"), chain::archive_movie(Path::new(arch), i)?))
+        }
+        _ => Err("--movie M or --entry E (the archive's entry), one of them".into()),
+    }
+}
+
 fn label_in(a: &super::Args) -> Result<(), String> {
     let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
-    let movie = read_movie(Path::new(a.get("movie").ok_or("--movie")?))?;
+    let (_, movie) = movie_in(a)?;
     let mut held = Held::load(Path::new(a.get("archive").ok_or("--archive")?))?;
     let num = |k: &str, d: u64| a.get(k).map(|v| v.parse::<u64>().map_err(|e| format!("--{k}: {e}"))).unwrap_or(Ok(d));
     let o = Opts { seed: num("seed", 1)? as u32, out: out.join("replay"), twins: !a.flag("no-twins"), tail: num("tail", 3000)? };
@@ -104,7 +119,7 @@ fn label_in(a: &super::Args) -> Result<(), String> {
 }
 
 pub fn cmd_label(argv: &[String]) -> i32 {
-    match args(argv, &["movie", "archive", "seed", "tail"], &["no-twins", "no-draws", "check"], 1).and_then(|a| label_in(&a)) {
+    match args(argv, &["movie", "entry", "archive", "seed", "tail"], &["no-twins", "no-draws", "check"], 1).and_then(|a| label_in(&a)) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("fmi shorten label: {e}");
@@ -226,8 +241,8 @@ const WALL_S: u64 = 7200;
 fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
     let t0 = std::time::Instant::now();
     let out = PathBuf::from(a.pos.first().ok_or("OUT")?);
-    let movie_path = a.get("movie").ok_or("--movie")?;
-    let movie = read_movie(Path::new(movie_path))?;
+    let (movie_path, movie) = movie_in(a)?;
+    let movie_path = movie_path.as_str();
     let goal = a.get("goal").unwrap_or("end");
     if goal != "end" {
         return Err(format!("--goal {goal}: only the game's end (end) is a goal here"));
@@ -321,7 +336,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
 }
 
 pub fn cmd_run(argv: &[String]) -> i32 {
-    let opts = ["movie", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds", "wall"];
+    let opts = ["movie", "entry", "archive", "goal", "seed", "workers", "chunk", "tail", "rounds", "wall"];
     match args(argv, &opts, &["skips", "no-twins", "no-ego", "no-fallbacks"], 1).and_then(|a| run_in(&a)) {
         Ok((ok, sum)) if ok => {
             println!("{sum}");

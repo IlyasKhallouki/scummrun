@@ -296,6 +296,27 @@ fn take_log(e: &mut Box<dyn Engine>, recs: &mut BTreeMap<u64, Vec<InputRecord>>)
     Ok(())
 }
 
+/// An archive entry's movie from boot (Archive::movie's: the events of the chain of entries from the root to it),
+/// read only from the archive's entries.jsonl and entries/N.json.gz.
+pub fn archive_movie(root: &Path, entry: usize) -> Res<Vec<Event>> {
+    let (rows, _) = files::read_jsonl(&root.join("entries.jsonl"))?;
+    let parent: BTreeMap<u64, Option<u64>> = rows.iter().filter_map(|r| Some((r["id"].as_u64()?, r["parent"].as_u64()))).collect();
+    let mut chain = Vec::new();
+    let mut cur = Some(entry as u64);
+    while let Some(i) = cur {
+        chain.push(i);
+        cur = *parent.get(&i).ok_or(format!("{}: no entry {i}", root.display()))?;
+    }
+    let mut out = Vec::new();
+    for i in chain.into_iter().rev() {
+        let doc = files::read_gz(&root.join("entries").join(format!("{i}.json.gz")))?;
+        for v in doc["events"].as_array().into_iter().flatten() {
+            out.push(fmi_explore::events::event_of(v).ok_or(format!("entry {i}: not an event: {v}"))?);
+        }
+    }
+    Ok(out)
+}
+
 /// The movie's inputs (keys, clicks, moves), in frame order.
 pub fn inputs_of(movie: &[Event]) -> Vec<Event> {
     let mut v: Vec<Event> = movie.iter().filter(|e| !matches!(e.what, Input::Skips { .. })).cloned().collect();
