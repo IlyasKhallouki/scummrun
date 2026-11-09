@@ -2,10 +2,11 @@
 //! t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order, nor (the bound
 //! by (tick, frame, t)) one at a later frame with a lower tick; ties go to the earliest t; a candidate's engine error
 //! and the goal reached while a candidate waits for an inner input; a fallback trial's engine error (an offer trial's,
-//! a dialog line's) counted as its outcome; a reduction is kept only for an earlier verified end (verdict::earlier;
-//! reduce.rs: a step the game does not need dropped and kept once its end verifies, a drop that loses the end not kept,
-//! nor one whose version does not verify; a test's engine error fails that test alone, the rounds going on); a forward
-//! pass of two steps; a route verified from its files, and a movie without its step log failing.
+//! a dialog line's) counted as its outcome; the dialog search keeping the earlier of two lines at one frame; a
+//! reduction is kept only for an earlier verified end (verdict::earlier; reduce.rs: a step the game does not need
+//! dropped and kept once its end verifies, a drop that loses the end not kept, nor one whose version does not verify; a
+//! test's engine error fails that test alone, the rounds going on); a forward pass of two steps; a route verified from
+//! its files, and a movie without its step log failing.
 
 use fmi_core::*;
 use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
@@ -412,6 +413,21 @@ fn a_fallback_trials_engine_error_is_its_outcome_not_the_passes() {
         let d = reps.iter().find(|v| v["how"] == "dialogs").unwrap();
         assert_eq!((d["lines"].as_u64(), d["leaves"].as_u64(), d["error"].as_u64()), (Some(2), Some(2), Some(1)), "{d}");
         assert_eq!(reps.iter().find(|v| v["how"] == "offer").unwrap()["done"], 0);
+    }
+}
+
+#[test]
+fn the_dialog_search_keeps_the_earlier_tick_at_one_frame() {
+    // two lines, both V_DONE at frame 6; the second (searched first) makes the frames after it one tick long: tick 21
+    // against the first's 36. The offer's trials cut to 1 frame complete none
+    let slow = Line { slot: 1, x: 10, y: 150, kill: false, fast: false };
+    let fast = Line { slot: 2, x: 10, y: 160, kill: false, fast: true };
+    for workers in [1, 3] {
+        let mut e = with_lines(vec![slow, fast]);
+        let (r, _) = refind::refind(&mut e, &spec(), 1, 0, 200, &rcfg(workers)).unwrap();
+        let r = r.expect("found by the dialog lines");
+        assert_eq!((r.how, r.found.frame, r.found.tick), (How::Dialogs, 6, 21), "workers {workers}");
+        assert_eq!(r.found.events.iter().map(|e| e.what.clone()).collect::<Vec<_>>(), vec![Input::Click(fast.x + 2, fast.y + 2)]);
     }
 }
 

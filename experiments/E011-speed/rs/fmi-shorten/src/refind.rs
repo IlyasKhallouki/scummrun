@@ -378,7 +378,11 @@ fn by_dialogs(base: &mut Box<dyn Engine>, goal: &Goal, after: u64, limit: u64, c
             match step(&mut c) {
                 Ok(Some(st)) if st.reason == "until" => {
                     leaves += 1;
-                    best = Some(Found { t, events: path, frame: st.frame, tick: st.tick });
+                    // kept only when earlier by (tick, frame): a line run to the best's frame can reach it there with
+                    // more ticks (the review of stage B: the search replaced the best unasked)
+                    if best.as_ref().is_none_or(|b| (st.tick, st.frame) < (b.tick, b.frame)) {
+                        best = Some(Found { t, events: path, frame: st.frame, tick: st.tick });
+                    }
                     c.quit();
                 }
                 Ok(Some(st)) if st.reason == "idle" => stack.push((c, path)),
