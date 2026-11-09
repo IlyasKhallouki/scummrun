@@ -35,6 +35,8 @@ pub const DELTA_CAP: i64 = 15;
 pub const MEM_FLOOR_KB: u64 = 3 * 1024 * 1024;
 pub const CHILD_ROWS: usize = 4000;
 pub const LEMMA9: &str = "another path of the click, no change a later step reads";
+/// E024 Part 1 (FMI_READY_END=1): the end of a ready window whose tries stopped with none left to choose.
+pub const READY_END: &str = "ready: forking stopped, no try left";
 pub const END_POINTS: [&str; 3] = ["success", "goal", "deviation"];
 
 /// window.WindowConfig as E009 runs it (and E010's ready). Any other combination is refused by name.
@@ -1923,6 +1925,12 @@ impl Ready {
             && self.delay.as_ref().is_none_or(|d| d.open_at(g))
     }
 
+    /// E024 Part 1: the tries stopped (the bound on failed tries) with none chosen and no delay fork's fallback;
+    /// resolve_tries has cancelled every try after the cursor, so no try is left to choose.
+    fn spent(&self) -> bool {
+        self.stopped && self.chosen.is_none() && self.delay.as_ref().is_none_or(|d| d.fallback.is_none())
+    }
+
     /// The delay fork's refutation at parent frame g: every try is resolved and none left can have k < K. The first
     /// deviation is chosen (E010's choice), or the tries stop.
     fn delay_refute(&mut self, g: u64, n_children: usize) -> bool {
@@ -2670,6 +2678,12 @@ impl Search {
                                 end_reason = "ready: the first end point in the order of tries".into();
                                 break;
                             }
+                            // E024 Part 1 (FMI_READY_END=1): the tries stopped with none chosen and no delay fallback;
+                            // resolve cancelled every try after the cursor, so the frames left choose nothing
+                            if self.ready_end_on && ready.spent() {
+                                end_reason = READY_END.into();
+                                break;
+                            }
                             turn = gate && ready.may_fork(g);
                             // E013: the tries resolved so far, read in fork order; then no try at this frame while a
                             // refused try's watched values have not changed (amendment (3))
@@ -2854,7 +2868,9 @@ impl Search {
         if refuse_w {
             let view: Vec<Option<&Child>> = children.iter().map(Some).collect();
             bst.advance(children.len(), &view);
-            if best_i.is_none() && end_reason == format!("{} frames", cfg.window_frames) && bst.skip.is_some() {
+            // (E024 Part 1: a window that ended when its tries stopped ends there too)
+            let bound = end_reason == format!("{} frames", cfg.window_frames) || end_reason == READY_END;
+            if best_i.is_none() && bound && bst.skip.is_some() {
                 let sk = bst.skip.take().unwrap();
                 bst.close(&sk);
                 end_reason = format!("refused input: {}", sk.cause);
@@ -3462,6 +3478,9 @@ pub struct Search {
     pub delay_log: delay::Log,
     /// E013's component refuse (FMI_REFUSE=1, read when the search is made; off: E010's and E012's windows)
     pub refuse_on: bool,
+    /// E024 Part 1 (FMI_READY_END=1, read when the search is made; off: a window whose tries stopped runs on to its
+    /// frame bound)
+    pub ready_end_on: bool,
 }
 
 /// window.Search._goal_writers
@@ -3523,6 +3542,7 @@ impl Search {
             delay_candidates: vec![],
             delay_log: delay::Log::default(),
             refuse_on: crate::refuse::on(),
+            ready_end_on: ready_end_on(),
         })
     }
 
@@ -4187,8 +4207,19 @@ impl Player for StrictPlayer {
 #[path = "delay_fixture.rs"]
 mod delay_fixture;
 
+/// E024 Part 1: a ready window whose tries stopped chooses nothing in its frames left (FMI_READY_END).
+#[cfg(test)]
+#[path = "ready_end_fixture.rs"]
+mod ready_end_fixture;
+
 /// E022 amendment (13): `FMI_GOAL_UNPLANNED=1`, a child whose run holds the goal is a goal child though the plan's goal
 /// records did not match.
 pub fn goal_unplanned_on() -> bool {
     std::env::var("FMI_GOAL_UNPLANNED").is_ok_and(|v| v == "1")
+}
+
+/// E024 Part 1: `FMI_READY_END=1`, a ready window ends when its tries stopped with none left to choose (READY_END), not
+/// at its frame bound: the frames after the stop were a wait the route kept.
+pub fn ready_end_on() -> bool {
+    std::env::var("FMI_READY_END").is_ok_and(|v| v == "1")
 }

@@ -230,6 +230,34 @@ pub fn trigger_of_stop(stop: Option<&str>) -> Option<Trigger> {
     }
 }
 
+/// E024 Part 1: `FMI_AFFORD_P0=1`, the affordance step of an attempt that stopped on its trailing empty windows runs at
+/// P0, where they began, not at the attempt's end (experiments/E024-shorten/plan.md, "The affordance step runs at P0").
+pub fn afford_p0() -> bool {
+    env_is("FMI_AFFORD_P0", "1")
+}
+
+/// E024 Part 1: an empty window whose search gave up with the parent unchanged: no try chosen, and the end its frame
+/// bound, its tries' stop (FMI_READY_END) or E013's refused input. A window that ended on a change in the parent (an
+/// input's precondition closed, a record refuted, the goal) is a state the game reached by itself.
+fn gave_up(w: &Value) -> bool {
+    let e = w["end_reason"].as_str().unwrap_or("");
+    let bound = e.strip_suffix(" frames").is_some_and(|n| !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit()));
+    w["best"].is_null() && (bound || e == "ready: forking stopped, no try left" || e.starts_with("refused input"))
+}
+
+/// E024 Part 1: P0 of an attempt's window records, the start of its trailing run of empty windows that gave up
+/// (`gave_up`); the attempt's start `frame0` when every window is one. None: no window, or the last one is not.
+pub fn p0_of(windows: &[Value], frame0: i64) -> Option<i64> {
+    let n = windows.iter().rev().take_while(|w| gave_up(w)).count();
+    if n == 0 {
+        None
+    } else if n == windows.len() {
+        Some(frame0)
+    } else {
+        windows[windows.len() - n]["start"].as_i64()
+    }
+}
+
 /// The game's end a harness stop names ("engine: engine ended: R" with R one of fmi-core's GAME_ENDS).
 pub fn game_end_of_stop(stop: Option<&str>) -> Option<String> {
     let r = stop?.strip_prefix("engine: engine ended: ")?;
@@ -539,6 +567,29 @@ pub fn novelty_extra(flat: &mut Vec<(Key, Vec<Val>)>, job: &Value, scope: &Value
 mod tests {
     use super::*;
     use fmi_core::K_ROOM;
+
+    #[test]
+    fn p0_is_where_the_trailing_empty_windows_began() {
+        let w = |start: i64, best: bool, end: &str| json!({"start": start, "best": if best { json!({"g": start}) } else { Value::Null }, "end_reason": end});
+        let chose = w(10656, true, "ready: the first end point in the order of tries");
+        let empty = |s: i64| w(s, false, "3600 frames");
+        assert_eq!(p0_of(&[chose.clone(), empty(10764), empty(14364)], 10656), Some(10764));
+        assert_eq!(p0_of(&[empty(2521), empty(6121)], 2521), Some(2521));
+        assert_eq!(p0_of(&[empty(2521), chose.clone()], 2521), None);
+        assert_eq!(p0_of(&[], 2521), None);
+        // a window the plan matched in the parent is no empty window; a delay fork's fallback chose a try
+        let matched = w(10700, false, "matched in the parent");
+        assert_eq!(p0_of(&[chose.clone(), matched, empty(10764), empty(14364)], 10656), Some(10764));
+        assert_eq!(p0_of(&[empty(10600), w(10656, true, "3600 frames"), empty(10764)], 10600), Some(10764));
+        let ready_end = |s: i64| w(s, false, "ready: forking stopped, no try left");
+        assert_eq!(p0_of(&[chose.clone(), ready_end(10764), empty(11059)], 10656), Some(10764));
+        assert_eq!(p0_of(&[ready_end(2521), w(2815, false, "refused input: dropped: gate")], 2521), Some(2521));
+        // a precondition closed in the parent: the game changed by itself there (j08932, 18802), so the run ends
+        let closed = |s: i64| w(s, false, "the input's precondition closed in the parent after its window opened");
+        assert_eq!(p0_of(&[chose.clone(), closed(18322), ready_end(18324), closed(18618)], 17965), None);
+        assert_eq!(p0_of(&[chose, closed(18322), ready_end(18324)], 17965), Some(18324));
+        assert_eq!(p0_of(&[closed(2521), ready_end(2523)], 2521), Some(2523));
+    }
 
     fn facts(pairs: &[(&str, i64)]) -> Facts {
         Facts::from_pairs(pairs.iter().map(|(k, v)| (Key::parse(k), *v)).collect())
