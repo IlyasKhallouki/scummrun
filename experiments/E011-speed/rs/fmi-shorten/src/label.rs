@@ -319,13 +319,22 @@ pub fn same_hit(at: &At, verbs: &[Verb], a: &Anchor) -> bool {
 /// The input that acts on the anchor at this stop, from the anchor alone (None: no point gives it). `orig` is the
 /// input as the movie had it: only its kind (click or right click) is read.
 pub fn place(e: &mut Box<dyn Engine>, a: &Anchor, orig: &Input) -> EResult<Option<Input>> {
+    Ok(place_hit(e, a, orig)?.map(|p| p.0))
+}
+
+/// `place`, with what the hit test answers at the placed point (HitId::None for a key).
+pub fn place_hit(e: &mut Box<dyn Engine>, a: &Anchor, orig: &Input) -> EResult<Option<(Input, HitId)>> {
     let mk = |x: i32, y: i32| match orig {
         Input::RClick(..) => Input::RClick(x, y),
         _ => Input::Click(x, y),
     };
     match a {
-        Anchor::Key { key } => Ok(Some(Input::Key(key.clone()))),
-        Anchor::Raw { x, y } => Ok(Some(mk(*x, *y))),
+        Anchor::Key { key } => Ok(Some((Input::Key(key.clone()), HitId::None))),
+        Anchor::Raw { x, y } => {
+            let at = e.at(*x, *y)?;
+            let verbs = if at.verb_slot > 0 { e.obs(&ObsReq::default())?.verbs } else { Vec::new() };
+            Ok(Some((mk(*x, *y), hit_id(&at, &verbs))))
+        }
         Anchor::Walk { x, y, .. } => {
             let st = e.status().clone();
             let (px, py) = (x - st.xstart, y + st.screen.map(|s| s.0).unwrap_or(0));
@@ -333,7 +342,7 @@ pub fn place(e: &mut Box<dyn Engine>, a: &Anchor, orig: &Input) -> EResult<Optio
                 return Ok(None);
             }
             let at = e.at(px, py)?;
-            Ok(same_hit(&at, &[], a).then(|| mk(px, py)))
+            Ok(same_hit(&at, &[], a).then(|| (mk(px, py), hit_id(&at, &[]))))
         }
         Anchor::Verb { .. } | Anchor::Dialog { .. } | Anchor::Object { .. } | Anchor::Actor { .. } => {
             let o = e.obs(&ObsReq::default())?;
@@ -361,7 +370,7 @@ pub fn place(e: &mut Box<dyn Engine>, a: &Anchor, orig: &Input) -> EResult<Optio
                 return Ok(None);
             }
             let ats = e.at_many(&pts)?;
-            Ok(pts.iter().zip(ats.iter()).find(|(_, at)| same_hit(at, &o.verbs, a)).map(|(p, _)| mk(p.0, p.1)))
+            Ok(pts.iter().zip(ats.iter()).find(|(_, at)| same_hit(at, &o.verbs, a)).map(|(p, at)| (mk(p.0, p.1), hit_id(at, &o.verbs))))
         }
     }
 }
@@ -391,12 +400,14 @@ pub struct Twin {
     pub draw: Vec<Key>,
     /// the twins (by their index in TWIN_FLIPS) with a draw key
     pub by: Vec<usize>,
+    /// a twin's ego stood elsewhere (ego's position is no key)
+    pub ego: bool,
 }
 
 impl Twin {
     pub fn json(&self) -> Value {
         json!({"frame": self.frame, "ended": self.ended, "keys": self.keys.len(),
-               "draw": self.draw.iter().map(|k| k.text()).collect::<Vec<_>>(), "by": self.by})
+               "draw": self.draw.iter().map(|k| k.text()).collect::<Vec<_>>(), "by": self.by, "ego": self.ego})
     }
 
     /// Twin `i`'s outcome added to this one's.
@@ -410,23 +421,26 @@ impl Twin {
             }
         }
         self.keys.sort();
-        if !t.draw.is_empty() {
+        if !t.draw.is_empty() || t.ego {
             self.by.push(i);
         }
+        self.ego |= t.ego;
         let mut d: BTreeSet<Key> = self.draw.iter().copied().collect();
         d.extend(t.draw);
         self.draw = d.into_iter().collect();
     }
 }
 
-/// The twin run to `frame`, its world keys against `main`'s (the replay's facts there); the twin is quit.
-pub fn twin_diff(mut t: Box<dyn Engine>, frame: u64, main: &Facts, held: &Held) -> Twin {
+/// The twin run to `frame`, its world keys against `main`'s (the replay's facts there) and its ego's position against
+/// `ego` (the replay's there); the twin is quit.
+pub fn twin_diff(mut t: Box<dyn Engine>, frame: u64, main: &Facts, ego: Option<(i32, i32)>, held: &Held) -> Twin {
     let mut out = Twin { frame, ..Default::default() };
     let r = if t.status().frame < frame { t.run(&RunSpec { frame: Some(frame), ..Default::default() }).map(|_| ()) } else { Ok(()) };
     match r.and_then(|_| t.facts()) {
         Ok(f) => {
             out.keys = main.diff(&f).into_iter().filter(|(k, _, _)| world(*k)).collect();
             out.draw = out.keys.iter().map(|x| x.0).filter(|k| !held.is_idle(*k) && !held.iface.contains(k)).collect();
+            out.ego = t.status().ego != ego;
             t.quit();
         }
         Err(EngineError::Ended(st)) => out.ended = Some(st.reason),

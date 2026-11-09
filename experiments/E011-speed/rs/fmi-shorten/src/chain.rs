@@ -149,14 +149,16 @@ pub struct Stop {
     pub tick: u64,
     pub idle: Option<String>,
     pub room: i32,
+    /// ego's position
+    pub ego: Option<(i32, i32)>,
 }
 
 impl Stop {
     pub fn of(s: &Status) -> Stop {
-        Stop { frame: s.frame, tick: s.tick, idle: s.idle.clone(), room: s.room }
+        Stop { frame: s.frame, tick: s.tick, idle: s.idle.clone(), room: s.room, ego: s.ego }
     }
     pub fn json(&self) -> Value {
-        json!({"frame": self.frame, "tick": self.tick, "idle": self.idle, "room": self.room})
+        json!({"frame": self.frame, "tick": self.tick, "idle": self.idle, "room": self.room, "ego": self.ego})
     }
 }
 
@@ -201,6 +203,8 @@ pub struct Step {
     pub twin: Option<Twin>,
     /// the last step: the game's end reason
     pub goal: Option<String>,
+    /// ego (its actor) at the step's end
+    pub ego: Val,
 }
 
 /// The replay's result.
@@ -561,9 +565,9 @@ fn gather(host: &dyn EngineHost, movie: &[Event], held: &Held, o: &Opts) -> Res<
     met[n - 1].next = match &end {
         Some(st) => {
             let f = st.frame.saturating_sub(1);
-            Stop { frame: f, tick: tr.ticks.get(f as usize).copied().unwrap_or(0), idle: None, room: tr.facts.val(ROOM) as i32 }
+            Stop { frame: f, tick: tr.ticks.get(f as usize).copied().unwrap_or(0), idle: None, room: tr.facts.val(ROOM) as i32, ego: None }
         }
-        None => Stop { frame: last + 1 + o.tail, tick: tr.ticks.last().copied().unwrap_or(0), idle: None, room: tr.facts.val(ROOM) as i32 },
+        None => Stop { frame: last + 1 + o.tail, tick: tr.ticks.last().copied().unwrap_or(0), idle: None, room: tr.facts.val(ROOM) as i32, ego: None },
     };
     met[n - 1].facts = tr.facts.clone();
     let mut taken: Option<u64> = None;
@@ -626,6 +630,7 @@ fn steps_of(ch: &Chain, held: &Held) -> Vec<Step> {
             rooms,
             twin: None,
             goal: if last { ch.end.as_ref().map(|s| s.reason.clone()) } else { None },
+            ego: m.facts.val(EGO),
         });
         first = i + 1;
     }
@@ -654,8 +659,9 @@ fn twins(host: &dyn EngineHost, movie: &[Event], ch: &mut Chain, held: &Held, o:
                 let i = ch.steps[k].inputs.end - 1;
                 ch.twin_differs += ch.met[i].facts.diff(&f).len();
                 let mut tw = Twin { frame: end, ..Default::default() };
+                let ego = e.status().ego;
                 for (j, t) in ts.into_iter().enumerate() {
-                    tw.add(j, label::twin_diff(t, end, &f, held));
+                    tw.add(j, label::twin_diff(t, end, &f, ego, held));
                 }
                 ch.steps[k].twin = Some(tw);
             }
