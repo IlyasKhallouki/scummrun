@@ -20,6 +20,13 @@
 //!                      arguments (E012 resident: read.rs)
 //!   fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
 //!                      E024: a movie's steps, anchors and draw keys (fmi-shorten; shorten.rs)
+//!   fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N]
+//!                   [--no-twins] [--no-ego] OUT
+//!                      E024: the movie's steps found again from boot (the forward pass), its route verified
+//!   fmi shorten verify ROUTE [--ends] OUT
+//!                      E024: a route checked from boot from its files (item 9)
+//!   fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT
+//!                      E024: a diagnostic, the movie's stops frame by frame
 //!
 //! `explore run` is explore.py's `run`: the same archive files. With `--step-cmd` each job is a process as explore.py
 //! runs it; with `--fake` each job is fake_step.py's port run inside this process; else each job is a try (step.py's
@@ -66,7 +73,11 @@ const USAGE: &str = "usage: fmi explore init ARCHIVE --stage NAME --goal K=V[,K=
        fmi guide map --goal K=V[,K=V] | part1 | end=1 --out GUIDE.json [--wide] [--seed 1] [--start-boot]
        fmi guide stats GUIDE.json [--key KEY.json]
        fmi read FILE
-       fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT";
+       fmi shorten label --movie M --archive A [--seed S] [--no-twins] [--no-draws] [--check] [--tail N] OUT
+       fmi shorten run --movie M --archive A --goal end --seed S [--skips] [--workers N] [--chunk C] [--tail N] [--no-twins]
+                       [--no-ego] OUT
+       fmi shorten verify ROUTE [--ends] OUT
+       fmi shorten trace --movie M [--seed S] [--from F] [--to T] [--env K=V,...] OUT";
 
 struct Args {
     pos: Vec<String>,
@@ -172,6 +183,9 @@ fn main() {
         ("guide", Some("stats")) => cmd_guide_stats(&argv[2..]),
         ("read", Some(_)) => read::cmd_read(&argv[1..]),
         ("shorten", Some("label")) => shorten::cmd_label(&argv[2..]),
+        ("shorten", Some("run")) => shorten::cmd_run(&argv[2..]),
+        ("shorten", Some("trace")) => shorten::cmd_trace(&argv[2..]),
+        ("shorten", Some("verify")) => shorten::cmd_verify(&argv[2..]),
         _ => usage(),
     };
     std::process::exit(code)
