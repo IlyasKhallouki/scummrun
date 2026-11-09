@@ -401,13 +401,12 @@ pub fn attempt(
     })
 }
 
-/// The outcome of an end inside the frame of the step's input `events.last()`: the step's completion when the step
-/// ends the game with the goal's reason there and the input is its last, else an end.
+/// The outcome of the game's end in a candidate that placed `events`, in an input's frame or while it waited for the
+/// next input: the step's completion when the step is the goal's and the end has its reason (with the site), the
+/// inputs not placed yet not needed; else an end (the review of stage A: an end in a wait ended the pass).
 fn ended_in(spec: &StepSpec, st: &Status, t: u64, events: Vec<Event>) -> Outcome {
     match &spec.goal {
-        Goal::End(want) if st.reason == *want && events.len() == spec.inputs.len() => {
-            Outcome::Done(Found { t, events, frame: st.frame, tick: st.tick })
-        }
+        Goal::End(want) if st.reason == *want => Outcome::Done(Found { t, events, frame: st.frame, tick: st.tick }),
         _ => Outcome::Ended(st.reason.clone()),
     }
 }
@@ -438,6 +437,7 @@ fn play(x: &mut Box<dyn Engine>, t: u64, spec: &StepSpec, maxf: &dyn Fn() -> u64
                 events.push(ev);
                 return Ok(ended_in(spec, &st, t, events));
             }
+            Inner::EndedBefore(st) => return Ok(ended_in(spec, &st, t, events)),
         }
     }
     Ok(match verdict::step(x, &spec.goal, maxf())? {
@@ -454,6 +454,8 @@ enum Inner {
     Late,
     /// the game ended in the input's frame
     Ended(Box<Status>, Event),
+    /// the game ended before the input was placed
+    EndedBefore(Box<Status>),
 }
 
 /// An inner input placed by its timing class after the last taken input at `last` (`x` stopped there); `x` goes on
@@ -467,7 +469,11 @@ fn inner(x: &mut Box<dyn Engine>, inn: &In, last: u64, maxf: &dyn Fn() -> u64) -
                 if s + 1 > maxf() {
                     return Ok(Inner::Late);
                 }
-                run_to(x, s)?;
+                match run_to(x, s) {
+                    Ok(()) => {}
+                    Err(EngineError::Ended(st)) => return Ok(Inner::EndedBefore(st)),
+                    Err(e) => return Err(e),
+                }
                 let mut y = x.fork()?;
                 let Some((inp, hit)) = label::place_hit(&mut y, &inn.anchor, &inn.orig)? else {
                     y.quit();
@@ -496,7 +502,11 @@ fn inner(x: &mut Box<dyn Engine>, inn: &In, last: u64, maxf: &dyn Fn() -> u64) -
             if x.status().frame + 1 >= m {
                 return Ok(Inner::Late);
             }
-            let st = x.run(&RunSpec { idle: true, max_frame: Some(m - 1), ..Default::default() })?;
+            let st = match x.run(&RunSpec { idle: true, max_frame: Some(m - 1), ..Default::default() }) {
+                Ok(st) => st,
+                Err(EngineError::Ended(st)) => return Ok(Inner::EndedBefore(st)),
+                Err(e) => return Err(e),
+            };
             if st.reason != "idle" {
                 return Ok(Inner::Late);
             }

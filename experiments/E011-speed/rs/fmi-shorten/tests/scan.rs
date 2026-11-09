@@ -284,6 +284,31 @@ fn a_candidates_engine_error_is_its_outcome_not_the_scans() {
 }
 
 #[test]
+fn the_goal_reached_while_waiting_for_an_inner_input_is_its_completion() {
+    // V_DONE already set: the door at 7 ends the game at 11, before the step's second input (by either timing class)
+    // is placed; the goal's end with its reason is the completion, its inputs those placed
+    for timing in [Timing::Idle, Timing::Next] {
+        let mut f = fake(&[(7, 4)]);
+        f.vars[V_DONE] = 1;
+        let mut e: Box<dyn Engine> = Box::new(f);
+        e.run(&RunSpec { frame: Some(2), ..Default::default() }).unwrap();
+        let second = In { timing, gap: 6, ..door_click() };
+        let goal = StepSpec { k: 0, inputs: vec![door_click(), second.clone()], goal: Goal::End("restart@1:2:3:0004".into()), relaxed: None };
+        let s = scan::scan(&mut e, &goal, 200, &Cfg { workers: 2, chunk: 4 }).unwrap();
+        let found = s.found.expect("found");
+        assert_eq!((found.t, found.frame, found.events[0].frame), (6, 11, 7), "{timing:?}");
+        // idle: no stop before the end, the second input never placed; next: tried at each frame on a fork of its own,
+        // the last in the end's own frame
+        assert_eq!(found.events.len(), if timing == Timing::Idle { 1 } else { 2 });
+        // another end reason: an end, counted
+        let other = StepSpec { goal: Goal::End("restart@9:9:9:0009".into()), ..goal };
+        let s = scan::scan(&mut e, &other, 200, &Cfg { workers: 2, chunk: 4 }).unwrap();
+        assert!(s.found.is_none());
+        assert!(s.counts.ended >= 1 && s.counts.error == 0, "{:?}", s.counts);
+    }
+}
+
+#[test]
 fn a_reduction_is_kept_only_for_an_earlier_verified_end() {
     let best = End { tick: 1200, frame: 200, reason: "restart@1:2:3:0004".into() };
     let at = |tick, frame, r: &str| End { tick, frame, reason: r.into() };
