@@ -327,7 +327,7 @@ fn run_in(a: &super::Args) -> Result<(bool, Value), String> {
         let cx = reduce::Ctx { host: &host, boot: &boot, specs: &make, cfg: &pcfg, out: &eng, version: &ver };
         let best = reduce::Best { pass: p, end, path: path.clone(), dropped: BTreeSet::new() };
         let deadline = t0 + std::time::Duration::from_secs(wall);
-        let (best, recs) = reduce::rounds(best, &by_k, rounds, deadline, &cx)?;
+        let (best, recs) = reduce::rounds(best, &by_k, rounds, deadline, &cx);
         sum["rounds"] = json!(recs);
         sum["dropped"] = json!(best.dropped);
         sum["route"] = json!(best.path.display().to_string());

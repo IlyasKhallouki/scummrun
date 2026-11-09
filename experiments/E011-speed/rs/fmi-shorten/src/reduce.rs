@@ -17,7 +17,9 @@
 //!   boot (the caller's `version`, movie.rs).
 //! * **Rounds**: at most `rounds`, each over the candidates of the best at its start (a candidate whose steps a drop
 //!   kept in the round took is passed over); the rounds stop when one gains less than `MIN_GAIN` ticks, or at the
-//!   deadline.
+//!   deadline. A test's error (an engine's: a boot, a fork, a timeout; or its version's) fails that test, recorded with
+//!   its message, and the next goes on: the best so far is verified and stays (the review of stage B: one test's error
+//!   ended every round, and `run` exited without its summary).
 
 use crate::pass::{self, Orig, Pass, PassCfg, Plan, StepRun};
 use crate::refind::{self, How};
@@ -314,7 +316,7 @@ pub fn attempt(c: &Cand, best: &Best, cx: &Ctx) -> Res<(Option<Best>, Value)> {
 }
 
 /// The rounds (module docstring) from `best`: the best at the end, and each round's record.
-pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline: Instant, cx: &Ctx) -> Res<(Best, Vec<Value>)> {
+pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline: Instant, cx: &Ctx) -> (Best, Vec<Value>) {
     let mut out = Vec::new();
     for r in 0..n {
         let t0 = Instant::now();
@@ -323,6 +325,7 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
         let mut taken: BTreeSet<usize> = BTreeSet::new();
         let mut tried = Vec::new();
         let mut kept = 0;
+        let mut errors = 0;
         let mut timed_out = false;
         for c in &cands {
             if Instant::now() >= deadline {
@@ -332,9 +335,18 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
             if c.steps().iter().any(|k| taken.contains(k) || best.dropped.contains(k)) {
                 continue;
             }
-            let (nb, rec) = attempt(c, &best, cx)?;
-            eprintln!("round {}: {} -> {}{}", r + 1, c.json(), rec["result"].as_str().unwrap_or(""),
-                      rec["end"].as_object().map(|e| format!(" (end tick {})", e["tick"])).unwrap_or_default());
+            let t1 = Instant::now();
+            let (nb, rec) = attempt(c, &best, cx).unwrap_or_else(|x| {
+                let mut rec = c.json();
+                rec["result"] = json!("error");
+                rec["error"] = json!(x);
+                rec["seconds"] = json!(t1.elapsed().as_secs_f64());
+                errors += 1;
+                (None, rec)
+            });
+            eprintln!("round {}: {} -> {}{}{}", r + 1, c.json(), rec["result"].as_str().unwrap_or(""),
+                      rec["end"].as_object().map(|e| format!(" (end tick {})", e["tick"])).unwrap_or_default(),
+                      rec["error"].as_str().map(|e| format!(": {e}")).unwrap_or_default());
             tried.push(rec);
             if let Some(nb) = nb {
                 taken.extend(c.steps());
@@ -343,7 +355,7 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
             }
         }
         let gain = start.tick.saturating_sub(best.end.tick);
-        out.push(json!({"round": r + 1, "candidates": cands.len(), "tried": tried.len(), "kept": kept, "gain_ticks": gain,
+        out.push(json!({"round": r + 1, "candidates": cands.len(), "tried": tried.len(), "kept": kept, "errors": errors, "gain_ticks": gain,
                         "start": {"frame": start.frame, "tick": start.tick}, "end": {"frame": best.end.frame, "tick": best.end.tick},
                         "route": best.path.display().to_string(), "seconds": t0.elapsed().as_secs_f64(), "deadline": timed_out,
                         "tests": tried}));
@@ -351,5 +363,5 @@ pub fn rounds(mut best: Best, origs: &BTreeMap<usize, Orig>, n: usize, deadline:
             break;
         }
     }
-    Ok((best, out))
+    (best, out)
 }

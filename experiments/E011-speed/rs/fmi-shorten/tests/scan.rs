@@ -1,11 +1,11 @@
-//! G3 (plan.md, "Gates"), fmi-shorten's scan, pass and verify on a fake engine: the earliest completion when t=5
-//! fails, t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order, nor (the
-//! bound by (tick, frame, t)) one at a later frame with a lower tick; ties go to the earliest t; a candidate's engine
-//! error and the goal reached while a candidate waits for an inner input; a fallback trial's engine error (an offer
-//! trial's, a dialog line's) counted as its outcome; a reduction is kept only for an earlier
-//! verified end (verdict::earlier; reduce.rs: a step the game does not need dropped and kept once its end verifies, a
-//! drop that loses the end not kept, nor one whose version does not verify); a forward pass of two steps; a route
-//! verified from its files, and a movie without its step log failing.
+//! G3 (plan.md, "Gates"), fmi-shorten's scan, pass and verify on a fake engine: the earliest completion when t=5 fails,
+//! t=6 works and t=7 fails; pruning at best-1 never loses an earlier end, whatever the workers' order, nor (the bound
+//! by (tick, frame, t)) one at a later frame with a lower tick; ties go to the earliest t; a candidate's engine error
+//! and the goal reached while a candidate waits for an inner input; a fallback trial's engine error (an offer trial's,
+//! a dialog line's) counted as its outcome; a reduction is kept only for an earlier verified end (verdict::earlier;
+//! reduce.rs: a step the game does not need dropped and kept once its end verifies, a drop that loses the end not kept,
+//! nor one whose version does not verify; a test's engine error fails that test alone, the rounds going on); a forward
+//! pass of two steps; a route verified from its files, and a movie without its step log failing.
 
 use fmi_core::*;
 use fmi_shorten::label::{Anchor, HitId, Identity, Timing};
@@ -514,13 +514,14 @@ fn a_forward_pass_and_its_route_verified() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-#[test]
-fn a_drop_is_kept_only_for_an_earlier_verified_end() {
-    // step 0: the window (V_WIN 20 frames later), a step the game does not need; step 1: the door (V_DONE); step 2,
-    // the goal: the door again ends the game. The door is taken at any frame from 3 on, three frames to V_DONE and to
-    // the end
-    let rule: Vec<(u64, u64)> = (3..400).map(|f| (f, 3)).collect();
-    let host = FakeHost(rule);
+/// The drops' game: the door taken at any frame from 3 on, three frames to V_DONE and to the end.
+fn drop_host() -> FakeHost {
+    FakeHost((3..400).map(|f| (f, 3)).collect())
+}
+
+/// The drops' steps: step 0, the window (V_WIN 20 frames later), a step the game does not need; step 1, the door
+/// (V_DONE); step 2, the goal: the door again ends the game. And the movie's steps.
+fn drop_steps() -> (Vec<StepSpec>, Vec<pass::Orig>) {
     let win = {
         let want = Identity { hit: HitId::Object(WINDOW, 0), verdict: "taken".into(), area: 2, value: 0, mode: 1, handler: 4, sentences: vec![], walks: vec![] };
         In { anchor: Anchor::Object { id: WINDOW, actor: 0 }, timing: Timing::Idle, gap: 0, want, orig: Input::Click(0, 0) }
@@ -531,7 +532,13 @@ fn a_drop_is_kept_only_for_an_earlier_verified_end() {
         StepSpec { k: 2, inputs: vec![door_click()], goal: Goal::End("restart@1:2:3:0004".into()), relaxed: None },
     ];
     let orig = |from, frame| pass::Orig { from, frame, tick: frame * 6, rooms: vec![1], inputs: 1, skipped: vec![] };
-    let origs = vec![orig(2, 40), orig(40, 60), orig(60, 80)];
+    (all, vec![orig(2, 40), orig(40, 60), orig(60, 80)])
+}
+
+#[test]
+fn a_drop_is_kept_only_for_an_earlier_verified_end() {
+    let host = drop_host();
+    let (all, origs) = drop_steps();
     let dir = std::env::temp_dir().join(format!("fmi-shorten-g3r-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let rc = RCfg { scan: Cfg { workers: 2, chunk: 4 }, skips: false, leaves: 10, sentence: Default::default(), dialog: Default::default() };
@@ -576,10 +583,59 @@ fn a_drop_is_kept_only_for_an_earlier_verified_end() {
     assert!(nb2.is_none() && rec["result"] == "not verified", "{rec}");
     // the rounds: the window's drop kept in round 1, round 2 gains nothing and stops
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
-    let (b, recs) = reduce::rounds(best, &by_k, 3, deadline, &cx).unwrap();
+    let (b, recs) = reduce::rounds(best, &by_k, 3, deadline, &cx);
     assert_eq!((b.end.tick, b.dropped.iter().copied().collect::<Vec<_>>()), (60, vec![0]));
     assert_eq!(recs.len(), 2);
     assert_eq!(recs[0]["kept"], 1);
     assert_eq!(recs[1]["gain_ticks"], 0);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A host whose boot number `fail` (from 0) fails as an engine that does not answer.
+struct Flaky {
+    inner: FakeHost,
+    boots: std::sync::atomic::AtomicUsize,
+    fail: usize,
+}
+
+impl EngineHost for Flaky {
+    fn boot(&self, cfg: &BootCfg) -> EResult<Box<dyn Engine>> {
+        if self.boots.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == self.fail {
+            return Err(EngineError::Io(std::io::Error::new(std::io::ErrorKind::TimedOut, "the engine did not answer")));
+        }
+        self.inner.boot(cfg)
+    }
+}
+
+#[test]
+fn a_reduction_tests_engine_error_fails_that_test_alone() {
+    let host = drop_host();
+    let (all, origs) = drop_steps();
+    let dir = std::env::temp_dir().join(format!("fmi-shorten-g3e-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let rc = RCfg { scan: Cfg { workers: 2, chunk: 4 }, skips: false, leaves: 10, sentence: Default::default(), dialog: Default::default() };
+    let cfg = pass::PassCfg { seed: 1, scan: Cfg { workers: 2, chunk: 4 }, out: dir.join("e"), w: 50, refind: Some(rc) };
+    let p = pass::forward(&host, &[], &all, &origs, &cfg).unwrap();
+    let f = p.end.clone().expect("the end");
+    let best = Best { pass: p, end: End { tick: f.tick, frame: f.frame, reason: "restart@1:2:3:0004".into() }, path: dir.join("route-001.jsonl"), dropped: Default::default() };
+    let specs = |d: &std::collections::BTreeSet<usize>| -> Result<(Vec<StepSpec>, Vec<pass::Orig>), String> {
+        Ok(all.iter().cloned().zip(origs.iter().cloned()).filter(|(s, _)| !d.contains(&s.k)).unzip())
+    };
+    let version = |p: &pass::Pass, _d: &std::collections::BTreeSet<usize>| -> Result<(Option<End>, std::path::PathBuf, serde_json::Value), String> {
+        Ok((movie::replay(&host, &p.route, 1, &[], 1000, &dir.join("stage"))?.end, dir.join("route-002.jsonl"), serde_json::json!({})))
+    };
+    let by_k: BTreeMap<usize, pass::Orig> = all.iter().zip(&origs).map(|(s, o)| (s.k, o.clone())).collect();
+    // round 1: the window's drop (boots 0 and 1: the cheap replay's and the pass's) kept; the door's drop, its boot
+    // failing: an error, recorded, and the round goes on; round 2: the door's drop again, no gain, the rounds stop
+    let flaky = Flaky { inner: drop_host(), boots: 0.into(), fail: 2 };
+    let cx = reduce::Ctx { host: &flaky, boot: &[], specs: &specs, cfg: &cfg, out: &dir, version: &version };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let (b, recs) = reduce::rounds(best, &by_k, 3, deadline, &cx);
+    assert_eq!((b.end.tick, b.dropped.iter().copied().collect::<Vec<_>>()), (60, vec![0]));
+    assert_eq!((recs.len(), &recs[0]["kept"], &recs[0]["errors"], &recs[0]["tried"]), (2, &1.into(), &1.into(), &2.into()), "{}", recs[0]);
+    let t = &recs[0]["tests"][1];
+    assert_eq!((&t["drop"]["steps"], t["result"].as_str()), (&serde_json::json!([1]), Some("error")), "{t}");
+    assert!(t["error"].as_str().is_some_and(|m| m.contains("did not answer")), "{t}");
+    assert_eq!(recs[1]["errors"], 0);
     let _ = std::fs::remove_dir_all(&dir);
 }
