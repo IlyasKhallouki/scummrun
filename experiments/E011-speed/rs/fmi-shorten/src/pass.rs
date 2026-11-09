@@ -11,7 +11,8 @@
 //!   the scan from E's stop, its latest completion allowed the original step's length (from the movie's last input
 //!   before it to its completion) plus afford::W after E's stop; then E_k: a fork of E with the found inputs, run to
 //!   the last one's frame. A step the scan does not complete stops the pass, named with what its t's met (the
-//!   fallbacks, refind.rs, are stage B).
+//!   fallbacks, refind.rs, are stage B); so does an engine error of the base's (its scan's producer, E_k), named with
+//!   the error, and the steps found before it are kept (the review of stage A: a crash lost them all).
 
 use crate::chain::Chain;
 use crate::label::{Labels, Timing};
@@ -158,14 +159,34 @@ pub fn forward(host: &dyn EngineHost, boot: &[Event], specs: &[StepSpec], origs:
                 sc.counts.tried
             )
         };
-        let sc = scan::scan(&mut e, spec, limit, &cfg.scan)?;
+        let error = |pass: &mut Pass, x: String| {
+            eprintln!("step {}: {x}", spec.k);
+            pass.stopped = Some(json!({"k": spec.k, "why": format!("engine error: {x}")}));
+        };
+        let sc = match scan::scan(&mut e, spec, limit, &cfg.scan) {
+            Ok(x) => x,
+            Err(x) => {
+                error(&mut pass, x);
+                e.quit();
+                break;
+            }
+        };
         show("", &sc);
         // the draw keys judged as changed from the root when no t gives the movie's values
         let mut relaxed = None;
         if let (None, Some(g)) = (&sc.found, &spec.relaxed) {
-            let r = scan::scan(&mut e, &StepSpec { goal: g.clone(), ..spec.clone() }, limit, &cfg.scan)?;
-            show(", relaxed", &r);
-            relaxed = Some(r);
+            match scan::scan(&mut e, &StepSpec { goal: g.clone(), ..spec.clone() }, limit, &cfg.scan) {
+                Ok(r) => {
+                    show(", relaxed", &r);
+                    relaxed = Some(r);
+                }
+                Err(x) => {
+                    error(&mut pass, x);
+                    pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: None });
+                    e.quit();
+                    break;
+                }
+            }
         }
         let Some(f) = sc.found.clone().or_else(|| relaxed.as_ref().and_then(|r| r.found.clone())) else {
             pass.stopped = Some(json!({"k": spec.k, "why": "no t completes within the original step's length plus W",
@@ -185,14 +206,28 @@ pub fn forward(host: &dyn EngineHost, boot: &[Event], specs: &[StepSpec], origs:
             break;
         }
         // E_k: the found inputs from E's stop, run to the last one's frame
-        let mut n = e.fork().map_err(e2s)?;
-        n.inputs(&f.events).map_err(e2s)?;
-        if n.status().frame < last {
-            n.run(&RunSpec { frame: Some(last), ..Default::default() }).map_err(|x| format!("step {}: E_k: {x}", spec.k))?;
+        let ek = |e: &mut Box<dyn Engine>| -> EResult<Box<dyn Engine>> {
+            let mut n = e.fork()?;
+            n.inputs(&f.events)?;
+            if n.status().frame < last {
+                n.run(&RunSpec { frame: Some(last), ..Default::default() })?;
+            }
+            Ok(n)
+        };
+        match ek(&mut e) {
+            Ok(n) => {
+                e.quit();
+                e = n;
+                pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: Some(last) });
+            }
+            Err(x) => {
+                // the step was found: its inputs stay in the route, the pass stops after it
+                error(&mut pass, format!("E_k: {x}"));
+                pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: None });
+                e.quit();
+                break;
+            }
         }
-        e.quit();
-        e = n;
-        pass.steps.push(StepRun { k: spec.k, scan: sc, relaxed, next: Some(last) });
     }
     pass.route.sort_by_key(|x| x.frame);
     pass.wall_s = t0.elapsed().as_secs_f64();

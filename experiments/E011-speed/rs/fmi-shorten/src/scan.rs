@@ -13,6 +13,8 @@
 //!   finish in.
 //! * **The result**: the earliest completion by (tick, frame, t), its inputs at their frames; with counts of what
 //!   each t met and the candidates' costs (G6).
+//! * **A candidate's engine error** (its process gone, a bridge error) is that t's outcome, counted with its message
+//!   (the review of stage A: one candidate's crash ended the pass); only the base's or the producer's ends the scan.
 
 use crate::label::{self, Anchor, HitId, Identity, Timing};
 use crate::verdict::{self, Click, Goal, Run};
@@ -98,6 +100,8 @@ pub enum Outcome {
     Late(Vec<String>),
     /// the game ended with another reason
     Ended(String),
+    /// the candidate's engine failed (the error)
+    Error(String),
     Done(Found),
 }
 
@@ -113,6 +117,7 @@ pub struct Counts {
     pub inner_refused: usize,
     pub late: usize,
     pub ended: usize,
+    pub error: usize,
     pub done: usize,
 }
 
@@ -128,13 +133,14 @@ impl Counts {
             Outcome::InnerRefused(_) => self.inner_refused += 1,
             Outcome::Late(_) => self.late += 1,
             Outcome::Ended(_) => self.ended += 1,
+            Outcome::Error(_) => self.error += 1,
             Outcome::Done(_) => self.done += 1,
         }
     }
     pub fn json(&self) -> Value {
         json!({"tried": self.tried, "pruned": self.pruned, "no_point": self.no_point, "refused": self.refused,
                "other": self.other, "inner_no_point": self.inner_no_point, "inner_refused": self.inner_refused,
-               "late": self.late, "ended": self.ended, "done": self.done})
+               "late": self.late, "ended": self.ended, "error": self.error, "done": self.done})
     }
 }
 
@@ -199,6 +205,8 @@ impl Cost {
 
 /// Late candidates whose goal's misses are asked (one condition at a time: a round trip each).
 pub const MISS_ASKED: usize = 4;
+/// Candidates' engine errors kept with their message.
+pub const ERRORS_KEPT: usize = 4;
 
 /// A step's scan.
 #[derive(Clone, Debug, Default)]
@@ -208,6 +216,8 @@ pub struct Scan {
     pub cost: Cost,
     /// the conditions that did not hold at the stop of the first late candidates: (condition, candidates)
     pub misses: BTreeMap<String, usize>,
+    /// the first candidates' engine errors: (t, the error)
+    pub errors: Vec<(u64, String)>,
     /// the base's stop (the first t) and the latest completion frame allowed
     pub from: u64,
     pub limit: u64,
@@ -220,7 +230,7 @@ impl Scan {
     pub fn json(&self) -> Value {
         json!({"from": self.from, "limit": self.limit, "to": self.to, "wall_s": self.wall_s,
                "found": self.found.as_ref().map(Found::json), "counts": self.counts.json(), "cost": self.cost.json(),
-               "misses": self.misses})
+               "misses": self.misses, "errors": self.errors})
     }
 }
 
@@ -244,10 +254,11 @@ pub fn scan(base: &mut Box<dyn Engine>, spec: &StepSpec, limit: u64, cfg: &Cfg) 
         return Err(format!("step {}: no input to place", spec.k));
     }
     let best: Mutex<Option<Found>> = Mutex::new(None);
-    let tally: Mutex<(Counts, Cost, BTreeMap<String, usize>)> = Mutex::new(Default::default());
+    let tally: Mutex<(Counts, Cost, BTreeMap<String, usize>, Vec<(u64, String)>)> = Mutex::new(Default::default());
     let asked = AtomicUsize::new(0);
     let (tx, rx) = mpsc::sync_channel::<(u64, Box<dyn Engine>)>(cfg.workers.max(1) * 2);
     let rx = Mutex::new(rx);
+    // the producer's error (the base's fork, a fork_each): it ends the scan
     let err: Mutex<Option<String>> = Mutex::new(None);
     let produced = std::thread::scope(|sc| -> Res<u64> {
         for _ in 0..cfg.workers.max(1) {
@@ -255,31 +266,28 @@ pub fn scan(base: &mut Box<dyn Engine>, spec: &StepSpec, limit: u64, cfg: &Cfg) 
                 let next = rx.lock().unwrap().recv();
                 let Ok((t, child)) = next else { break };
                 let s = Instant::now();
-                let r = attempt(child, t, spec, &best, limit, &asked);
+                let (o, frames) = attempt(child, t, spec, &best, limit, &asked).unwrap_or_else(|e| (Outcome::Error(e.to_string()), 0));
                 let ms = s.elapsed().as_secs_f64() * 1e3;
-                match r {
-                    Ok((o, frames)) => {
-                        let at_click = matches!(o, Outcome::NoPoint | Outcome::Refused | Outcome::Other);
-                        let mut g = tally.lock().unwrap();
-                        g.0.add(&o);
-                        if !matches!(o, Outcome::Pruned) {
-                            g.1.add(ms, frames, at_click);
-                        }
-                        if let Outcome::Late(m) = &o {
-                            for c in m {
-                                *g.2.entry(c.clone()).or_default() += 1;
-                            }
-                        }
-                        drop(g);
-                        if let Outcome::Done(f) = o {
-                            let mut b = best.lock().unwrap();
-                            if b.as_ref().is_none_or(|x| f.key() < x.key()) {
-                                *b = Some(f);
-                            }
+                let at_click = matches!(o, Outcome::NoPoint | Outcome::Refused | Outcome::Other);
+                let mut g = tally.lock().unwrap();
+                g.0.add(&o);
+                if !matches!(o, Outcome::Pruned | Outcome::Error(_)) {
+                    g.1.add(ms, frames, at_click);
+                }
+                match &o {
+                    Outcome::Late(m) => {
+                        for c in m {
+                            *g.2.entry(c.clone()).or_default() += 1;
                         }
                     }
-                    Err(e) => {
-                        err.lock().unwrap().get_or_insert(format!("t {t}: {e}"));
+                    Outcome::Error(e) if g.3.len() < ERRORS_KEPT => g.3.push((t, e.clone())),
+                    _ => {}
+                }
+                drop(g);
+                if let Outcome::Done(f) = o {
+                    let mut b = best.lock().unwrap();
+                    if b.as_ref().is_none_or(|x| f.key() < x.key()) {
+                        *b = Some(f);
                     }
                 }
             });
@@ -292,10 +300,11 @@ pub fn scan(base: &mut Box<dyn Engine>, spec: &StepSpec, limit: u64, cfg: &Cfg) 
         return Err(format!("step {}: {e}", spec.k));
     }
     out.to = produced?;
-    let (c, k, m) = tally.into_inner().unwrap();
+    let (c, k, m, x) = tally.into_inner().unwrap();
     out.counts = c;
     out.cost = k;
     out.misses = m;
+    out.errors = x;
     out.found = best.into_inner().unwrap();
     out.wall_s = t0.elapsed().as_secs_f64();
     Ok(out)

@@ -170,7 +170,11 @@ fn run_in(a: &super::Args) -> Result<(), String> {
     comps.sort_unstable();
     comps.dedup();
     let last = comps.iter().copied().chain(end_frame).max().unwrap_or(0);
-    let stage = movie::replay(&host, &p.route, seed, &comps, last + 1000, &eng.join("stage"))?;
+    // an error here leaves the pass's files written (no end: the stopped route)
+    let (stage, stage_err) = match movie::replay(&host, &p.route, seed, &comps, last + 1000, &eng.join("stage")) {
+        Ok(b) => (b, None),
+        Err(x) => (movie::Boot::default(), Some(x)),
+    };
     let rows: Vec<Value> = p
         .steps
         .iter()
@@ -197,7 +201,7 @@ fn run_in(a: &super::Args) -> Result<(), String> {
                          "seconds": label_s, "end": ch.end.as_ref().map(|s| json!({"frame": s.frame, "tick": s.tick, "reason": s.reason}))},
                          "pass": {"wall_s": p.wall_s, "steps": p.steps.len(), "stopped": p.stopped, "events": p.route.len(),
                                   "end": p.end.as_ref().map(|f| json!({"frame": f.frame, "tick": f.tick}))},
-                         "stage": {"end": stage.end.as_ref().map(end_json), "digests": stage.digests.len()},
+                         "stage": {"end": stage.end.as_ref().map(end_json), "digests": stage.digests.len(), "error": stage_err},
                          "cost": cost.json()});
     match (&p.end, &stage.end) {
         (Some(f), Some(e)) if e.frame == f.frame && e.tick == f.tick => {

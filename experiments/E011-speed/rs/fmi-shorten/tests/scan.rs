@@ -28,6 +28,8 @@ struct Fake {
     due: Option<(u64, usize)>,
     rule: Arc<BTreeMap<u64, u64>>,
     log: Vec<InputRecord>,
+    /// frames whose click fails the engine (its process gone)
+    crash: Arc<Vec<u64>>,
 }
 
 fn fake(rule: &[(u64, u64)]) -> Fake {
@@ -38,6 +40,7 @@ fn fake(rule: &[(u64, u64)]) -> Fake {
         due: None,
         rule: Arc::new(rule.iter().copied().collect()),
         log: Vec::new(),
+        crash: Arc::new(Vec::new()),
     }
 }
 
@@ -124,6 +127,9 @@ impl Engine for Fake {
         }
     }
     fn inputs(&mut self, events: &[Event]) -> EResult<()> {
+        if events.iter().any(|e| self.crash.contains(&e.frame)) {
+            return Err(EngineError::Bridge("engine closed the connection".into()));
+        }
         self.pending.extend_from_slice(events);
         Ok(())
     }
@@ -260,6 +266,21 @@ fn pruning_at_best_less_one_never_loses_an_earlier_end() {
     let s = scan_with(&[(150, 100)], Cfg { workers: 4, chunk: 8 });
     assert!(s.found.is_none());
     assert_eq!(s.counts.late, 1);
+}
+
+#[test]
+fn a_candidates_engine_error_is_its_outcome_not_the_scans() {
+    // the click at 5 (t = 4) fails its engine: counted with its message; t = 6 is still found
+    let mut f = fake(&[(7, 3)]);
+    f.crash = Arc::new(vec![5]);
+    let mut e: Box<dyn Engine> = Box::new(f);
+    e.run(&RunSpec { frame: Some(2), ..Default::default() }).unwrap();
+    for workers in [1, 4] {
+        let s = scan::scan(&mut e, &spec(), 200, &Cfg { workers, chunk: 4 }).unwrap();
+        assert_eq!(s.found.as_ref().map(|f| (f.t, f.frame)), Some((6, 10)), "workers {workers}");
+        assert_eq!(s.counts.error, 1);
+        assert_eq!(s.errors.iter().map(|x| x.0).collect::<Vec<_>>(), vec![4]);
+    }
 }
 
 #[test]
